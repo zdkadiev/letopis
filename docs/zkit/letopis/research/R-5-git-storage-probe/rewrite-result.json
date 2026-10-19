@@ -1,0 +1,81 @@
+{
+  "profile": "rewrite",
+  "repo": "/private/tmp/engram-git-probe-run-916uu96c/rewrite",
+  "steps": 200,
+  "files": 30,
+  "nodes_per_file": 30,
+  "file_bytes": 60000,
+  "new_file_versions": 1000,
+  "new_file_content_bytes": 60000000,
+  "initial": {
+    "git": {
+      "files": 35,
+      "logical_bytes": 453443,
+      "allocated_file_bytes": 512000
+    },
+    "objects": {
+      "files": 31,
+      "logical_bytes": 450776,
+      "allocated_file_bytes": 495616
+    },
+    "refs": {
+      "files": 1,
+      "logical_bytes": 41,
+      "allocated_file_bytes": 4096
+    },
+    "working_markdown_bytes": 1800000,
+    "count_objects_v": "count: 31\nsize: 484\nin-pack: 0\npacks: 0\nsize-pack: 0\nprune-packable: 0\ngarbage: 0\nsize-garbage: 0\n"
+  },
+  "before_pack": {
+    "git": {
+      "files": 1435,
+      "logical_bytes": 15613623,
+      "allocated_file_bytes": 18534400
+    },
+    "objects": {
+      "files": 1231,
+      "logical_bytes": 15602756,
+      "allocated_file_bytes": 17698816
+    },
+    "refs": {
+      "files": 201,
+      "logical_bytes": 8241,
+      "allocated_file_bytes": 823296
+    },
+    "working_markdown_bytes": 1800000,
+    "count_objects_v": "count: 1231\nsize: 17284\nin-pack: 0\npacks: 0\nsize-pack: 0\nprune-packable: 0\ngarbage: 0\nsize-garbage: 0\n"
+  },
+  "after_pack": {
+    "git": {
+      "files": 209,
+      "logical_bytes": 1343754,
+      "allocated_file_bytes": 2179072
+    },
+    "objects": {
+      "files": 4,
+      "logical_bytes": 1318214,
+      "allocated_file_bytes": 1327104
+    },
+    "refs": {
+      "files": 201,
+      "logical_bytes": 8241,
+      "allocated_file_bytes": 823296
+    },
+    "working_markdown_bytes": 1800000,
+    "count_objects_v": "count: 0\nsize: 0\nin-pack: 1231\npacks: 1\nsize-pack: 1282\nprune-packable: 0\ngarbage: 0\nsize-garbage: 0\n"
+  },
+  "verify_before": {
+    "refs_checked": 201,
+    "objects_checked": 1231,
+    "all_object_bytes_verified": true
+  },
+  "verify_after": {
+    "refs_checked": 201,
+    "objects_checked": 1231,
+    "all_object_bytes_verified": true
+  },
+  "fsck_stdout": "",
+  "generation_s": 17.977719540940598,
+  "pack_s": 0.41740475012920797,
+  "total_s": 19.37088662502356
+}

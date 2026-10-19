@@ -1,0 +1,57 @@
+{
+  "profiles": [
+    {
+      "profile": "point",
+      "git": {
+        "files": 9,
+        "logical_bytes": 645604,
+        "allocated_file_bytes": 667648
+      },
+      "objects": {
+        "files": 4,
+        "logical_bytes": 613586,
+        "allocated_file_bytes": 622592
+      },
+      "loose_refs": {
+        "files": 0,
+        "logical_bytes": 0,
+        "allocated_file_bytes": 0
+      },
+      "packed_refs": {
+        "logical_bytes": 14719,
+        "allocated_file_bytes": 16384
+      },
+      "refs_checked": 201,
+      "objects_checked": 1231,
+      "all_object_bytes_verified": true,
+      "pack_refs_s": 0.04203504207544029
+    },
+    {
+      "profile": "rewrite",
+      "git": {
+        "files": 9,
+        "logical_bytes": 1350232,
+        "allocated_file_bytes": 1372160
+      },
+      "objects": {
+        "files": 4,
+        "logical_bytes": 1318214,
+        "allocated_file_bytes": 1327104
+      },
+      "loose_refs": {
+        "files": 0,
+        "logical_bytes": 0,
+        "allocated_file_bytes": 0
+      },
+      "packed_refs": {
+        "logical_bytes": 14719,
+        "allocated_file_bytes": 16384
+      },
+      "refs_checked": 201,
+      "objects_checked": 1231,
+      "all_object_bytes_verified": true,
+      "pack_refs_s": 0.044271708000451326
+    }
+  ],
+  "elapsed_s": 0.5219727919902653
+}

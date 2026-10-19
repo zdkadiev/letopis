@@ -1,0 +1,9 @@
+{
+  "source_url": "https://raw.githubusercontent.com/sqlite/sqlite/a27bcfe21c9b4e0989e86eec8fb34a3832cd23c7/ext/vec1/vec1.c",
+  "source_sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9",
+  "download_bytes": 378128,
+  "download_s": 3.066289542010054,
+  "root": "/private/tmp/engram-sqlite-capacity-idny94a4",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "started_utc": "2026-10-18T19:19:29Z"
+}

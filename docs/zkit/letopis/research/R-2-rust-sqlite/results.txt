@@ -1,0 +1,31 @@
+config conn=0 sqlite=3.53.2 vec1=version 0.8 (NEON, multi-threaded)
+config conn=0 pragma=synchronous value=2
+config conn=0 pragma=fullfsync value=1
+config conn=0 pragma=foreign_keys value=1
+config conn=1 sqlite=3.53.2 vec1=version 0.8 (NEON, multi-threaded)
+config conn=1 pragma=synchronous value=2
+config conn=1 pragma=fullfsync value=1
+config conn=1 pragma=foreign_keys value=1
+check contentless_fts_delete=PASS
+check extension_two_connections=PASS
+check vector_raii_rollback=PASS
+check wal_vector_snapshot=PASS
+filter options={"K":1} count=0
+filter options={"K":1,"streaming":1} count=1
+check vector_filters=PASS
+check extension_reopened_connection=PASS
+load from_go_dataset vectors=50000 dim=384 elapsed=2.989672292s
+rebuild elapsed=436.475875ms
+search iteration=0 rows=10 elapsed=16.77875ms
+search iteration=1 rows=10 elapsed=14.279625ms
+search iteration=2 rows=10 elapsed=13.055208ms
+search iteration=3 rows=10 elapsed=12.607833ms
+search iteration=4 rows=10 elapsed=12.048292ms
+cancel label=core_sql elapsed=1.594ms error=interrupted
+check cancel_core_sql=PASS
+cancel label=vector_search elapsed=1.644458ms error=interrupted
+check cancel_vector_search=PASS
+cancel label=flat_rebuild elapsed=1.574209ms error=interrupted
+check cancel_flat_rebuild=PASS
+check index_after_cancellation=PASS
+complete rusqlite_probe=PASS

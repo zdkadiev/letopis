@@ -1,0 +1,23 @@
+{
+  "links": {
+    "exit": 0,
+    "output": "linked: letopis — 7 stage documents, 72 decisions, 7 reports\n"
+  },
+  "data": {
+    "exit": 0,
+    "output": "WARN   E-10: volume has neither a number nor an assumption A-n from resource-math\nCLARITY 1 entity(ies) without a volume figure or assumption; 0 open fork(s)\n12 entities, 4 memory regions\n"
+  },
+  "requirements": {
+    "exit": 0,
+    "output": "WARN   Must is 95% (42 of 44); say why in the doc or cut\nCLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 0 open question(s) in the log\n44 requirements, 8 constraints checked\n"
+  },
+  "contracts": {
+    "exit": 0,
+    "output": "CLARITY 0 consumed contract(s) serving a Must requirement and not verified: -; 0 open fork(s)\n4 boundaries, 4 spec files\n"
+  },
+  "contract_examples": {
+    "exit": 0,
+    "output": "{\n  \"scope\": \"schemas/examples and stated correspondence checks; not letopis implementation or crash validation\",\n  \"counts\": {\n    \"cli_examples\": 60,\n    \"provider_examples\": 6,\n    \"metadata_examples\": 8,\n    \"assertions\": 90\n  },\n  \"errors\": [],\n  \"runtime_calls\": 0,\n  \"measurements\": 0\n}\n"
+  },
+  "scope": "Documentation consistency only; no runtime, inference, load tests or new measurements. Unknown volumes/RAM/crash behaviour remain unverified."
+}

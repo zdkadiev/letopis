@@ -1,0 +1,34 @@
+{
+  "architecture_initial": {
+    "exit": 1,
+    "output": "ERROR  no Mermaid diagram\nWARN   technology words outside decisions and constraints (contracts or mechanics?): rust, sqlite\nERROR  entity E-10 of data.md has no owning part (put it in a part's 'Owns' cell)\nERROR  entity E-11 of data.md has no owning part (put it in a part's 'Owns' cell)\nERROR  entity E-12 of data.md has no owning part (put it in a part's 'Owns' cell)\nWARN   header has no 'Based on' date for resource-math\nERROR  contracts (2026-10-19) is newer than the date the architecture is based on (2026-10-18)\nERROR  data (2026-10-19) is newer than the date the architecture is based on (2026-10-18)\nCLARITY 0 Must requirement(s) without a covering part: -; 0 open fork(s); 0 architectural assumption(s) without a validation; 0 boundary(ies) unhandled; 3 entity(ies) unowned\n6 parts, 5 interfaces, 3 scenarios, 52 requirements known\n"
+  },
+  "links": {
+    "exit": 0,
+    "output": "linked: letopis — 7 stage documents, 73 decisions, 7 reports\n"
+  },
+  "requirements": {
+    "exit": 0,
+    "output": "WARN   Must is 95% (42 of 44); say why in the doc or cut\nCLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 0 open question(s) in the log\n44 requirements, 8 constraints checked\n"
+  },
+  "resource-math": {
+    "exit": 0,
+    "output": "CLARITY 0 limit(s) failing in the expected scenario without a decision: -; 0 assumption(s) without a validation\n11 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n"
+  },
+  "contracts": {
+    "exit": 0,
+    "output": "CLARITY 0 consumed contract(s) serving a Must requirement and not verified: -; 0 open fork(s)\n4 boundaries, 4 spec files\n"
+  },
+  "data": {
+    "exit": 0,
+    "output": "CLARITY 0 entity(ies) without a volume figure or assumption; 0 open fork(s)\n12 entities, 4 memory regions\n"
+  },
+  "architecture": {
+    "exit": 1,
+    "output": "ERROR  no Mermaid diagram\nWARN   technology words outside decisions and constraints (contracts or mechanics?): rust, sqlite\nERROR  entity E-10 of data.md has no owning part (put it in a part's 'Owns' cell)\nERROR  entity E-11 of data.md has no owning part (put it in a part's 'Owns' cell)\nERROR  entity E-12 of data.md has no owning part (put it in a part's 'Owns' cell)\nWARN   header has no 'Based on' date for resource-math\nERROR  contracts (2026-10-19) is newer than the date the architecture is based on (2026-10-18)\nERROR  data (2026-10-19) is newer than the date the architecture is based on (2026-10-18)\nCLARITY 0 Must requirement(s) without a covering part: -; 0 open fork(s); 0 architectural assumption(s) without a validation; 0 boundary(ies) unhandled; 3 entity(ies) unowned\n6 parts, 5 interfaces, 3 scenarios, 52 requirements known\n"
+  },
+  "mechanics": {
+    "exit": 1,
+    "output": "ERROR  MC-2 is high risk and has no executable model (mechanics/model_*.py)\nERROR  MC-3 is high risk and has no executable model (mechanics/model_*.py)\nWARN   header has no 'Based on' date for resource-math\nERROR  contracts (2026-10-19) is newer than the date the mechanics are based on (2026-10-18)\nCLARITY 2 high-risk mechanism(s) without an executable model: MC-2, MC-3; 0 open fork(s)\n4 mechanisms, 0 state machines, 0 executable models\n"
+  }
+}

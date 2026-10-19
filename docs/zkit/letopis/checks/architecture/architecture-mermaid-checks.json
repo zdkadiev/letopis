@@ -1,0 +1,21 @@
+{
+  "scope": "Mermaid syntax parsing only; no rendering, runtime or measurements",
+  "mermaid": "12.2.0",
+  "results": [
+    {
+      "file": "diagrams/architecture-context.mmd",
+      "parsed": true,
+      "type": "flowchart-v2"
+    },
+    {
+      "file": "diagrams/architecture-containers.mmd",
+      "parsed": true,
+      "type": "flowchart-v2"
+    },
+    {
+      "file": "diagrams/architecture-components.mmd",
+      "parsed": true,
+      "type": "flowchart-v2"
+    }
+  ]
+}

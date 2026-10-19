@@ -1,0 +1,222 @@
+# letopis — план выполнения по неделям
+
+> **Links:** [concept](concept.md) · [requirements](requirements.md) · [resource-math](resource-math.md) · [contracts](contracts.md) · [data](data.md) · [architecture](architecture.md) · [mechanics](mechanics.md) · [resilience](resilience.md) · [decisions](decisions.md)
+> **Status:** draft · **Date:** 2026-10-19 · **Based on:** requirements.md (2026-10-19), resource-math.md (2026-10-19), contracts.md (2026-10-19), data.md (2026-10-19), architecture.md (2026-10-19), mechanics.md (2026-10-19), resilience.md (2026-10-19)
+> **Counts:** 5 PH · 5 G · 45 TK · 8 EP
+> **Terminal:** TK-45
+
+## 1. Summary
+
+По прямому уточнению пользователя [D-86](decisions.md#D-86) roadmap содержит **все 45 задач**, их зависимости, оценки, критерии приёмки и распределение по неделям до конечной задачи **«v1 готова»**. Все 8 эпиков — контейнеры подробно раскрытых задач, дополнительных часов они не добавляют. При 10 часах разработки в неделю ожидаемые 372 часа занимают 37,2 рабочей недели: таблица содержит недели 1–38, в последней запланировано 2 часа. Диапазон прежних оценок сохранён: 204 / 372 / 672 часа, или 20,4 / 37,2 / 67,2 недели; фиксированного deadline и даты старта нет по [D-84](decisions.md#D-84)/D-85. Проверки и реализация только запланированы: этим документом ни одна TK не отмечается выполненной и готовность продукта не объявляется.
+
+Интервью R1 закрыто 2/2, очередь 0; новое уточнение формата записано как [D-86](decisions.md#D-86) без нового раунда вопросов. Пользовательское требование полной детализации приоритетнее обычного rolling-detail правила навыка zkit. Все будущие работы уже представлены задачами; неуспешный gate может потребовать пересмотра плана, но не служит причиной заранее оставлять следующие фазы без заданий.
+
+Формальный статус draft сохраняется из-за входных resource-math/contracts с незакрытыми validation gates. Это не отсутствие недельного плана: проверки включены в TK, а TK-45 требует обновить исходные документы по их реальным результатам. Новых measurements, provider calls, implementation, backup/restore и physical drills сейчас нет; исходные измерительные артефакты не меняются.
+
+## 2. Capacity and deadline
+
+| Scenario | Hours per week | Deadline (weeks) |
+|---|---|---|
+| best | 10 | — |
+| expected | 10 | — |
+| worst | 10 | — |
+
+Один разработчик, включая управление агентами и проверку результатов, [D-84](decisions.md#D-84). Десять runtime-агентов — нагрузка продукта, не десять разработчиков. Расписываем expected усилия последовательно с проверенными зависимостями; долгую задачу можно продолжить на следующей неделе, и в таблице показаны часы каждой части. Best/worst получаются из диапазонов задач, без выдуманной дополнительной команды. Нет фиксированного срока v1 по [D-85](decisions.md#D-85); календарная дата не назначается. Перерывы и реальное ожидание оборудования/весов добавляются по факту: текущие Wait=0 — явно assumed доступность, не обещание отсутствия задержек. Неизмеренные ожидания выполнения полных embedding/agent прогонов также могут сдвинуть недели; 38 недель — раскладка рабочего ресурса при этих допущениях, а не замер календарного времени.
+
+## 3. Phases
+
+| ID | Phase | Goal | Detail |
+|---|---|---|---|
+| PH-0 | Риски выбранных механизмов | Узкие проверки сборки, commit/read/seq/IPC и подготовка пилота до основного build | TK-1…TK-6 |
+| PH-1 | Сквозной slice и ранняя проверка подхода | Реальные CLI/Markdown/Git/graph/FTS/embeddings; target-scale RAM и ранний пилот | TK-7…TK-17 |
+| PH-2 | Полный функциональный scope | Валидация, CRUD, происхождение, filters/traverse/inspect, reindex/config/errors/cancel | TK-18…TK-29 |
+| PH-3 | Полная проверка реализации | Пилот, профиль нагрузки, RAM/latency/disk/queue, crash/corruption/restore/security | TK-30…TK-42 |
+| PH-4 | Поставка и готовность | Чистая установка, навык/документация и конечная приёмка v1 | TK-43…TK-45 |
+
+## 4. Gates
+
+| ID | Phase | Criteria (measurable) | If fail (continue / change / stop) |
+|---|---|---|---|
+| G-0 | PH-0 | Все acceptance TK-1…TK-6 пройдены с артефактами; отрицательная воспроизводимость не считается pass | continue: TK-7; change: исправить конкретный механизм/сборку и повторить; stop основного build, если Must не обеспечивается |
+| G-1 | PH-1 | TK-14 даёт рабочий slice, TK-16 на 4 ГБ оборудовании показывает всю связку ≤1 ГБ без OOM, TK-17 имеет корректный пилот и зафиксированное решение | continue: TK-18 после оценки пользы; change: ресурсный/поисковый дизайн или протокол пилота; stop расширения при превышении бюджета/нерабочем пути/недостаточных свидетельствах или отсутствии оборудования |
+| G-2 | PH-2 | Полный навык и CLI совместно проверены в TK-29; TK-18…TK-29 покрывают FR-1…FR-36 и C-1…C-8 в действующей реализации; полный рабочий навык и schema/negative scenarios пройдены | continue: TK-30; change: исправить несоответствия; stop испытаний релизного scope до устранения блокеров, не удалять Must ради срока |
+| G-3 | PH-3 | P-1/P-2.1…P-2.7/P-3 и DR-1…DR-8 имеют результаты, все Must выполняются; NFR-3/NFR-8 оценены с явными решениями при отклонениях | continue: TK-43; change: исправить источник failed result и повторить затронутые тесты; stop поставки при потере/смешении данных, невыполненном Must или непринятом результате пользы |
+| G-4 | PH-4 | TK-43/TK-44 поставлены, TK-45 завершает проверяемую приёмку конкретной сборки без открытых блокеров | continue: зафиксировать «v1 готова»; change: исправить установку/документацию/дефект и повторить; stop объявления готовности до выполненных критериев |
+
+Gate — условие допуска, а не отдельная неучтённая работа. Их прохождение проверяет исполнитель последней задачи соответствующей фазы: TK-6, TK-17, TK-29, TK-42 и TK-45. Если любую предыдущую задачу фазы не удалось закрыть, переход запрещён независимо от рассчитанной недели. Проверка G-0 включена в TK-6; ошибки earlier TK не обходятся её транспортным smoke.
+
+## 5. Реестр задач выполнения
+
+Каждая строка ссылается на отдельную карточку в roadmap/epics/EP-n-<slug>/tasks/. Полные действия, ожидаемый результат, приёмка и отчёт хранятся в карточке по [стандарту задачи](roadmap/task-template.md); расписание, оценки и зависимости задаёт этот реестр. Смена плановых данных обновляет карточки в той же правке, а roadmap/schedule.py --check выявляет расхождения. Каждая строка — конкретная задача; expected от 4 до 16 часов. TK-1…TK-6 сохраняют прежние ID; новые TK-7…TK-45 полностью раскрывают прежние EP-1…EP-7. Все задачи пока planned. Частичная неделя не считается частично готовой функцией: задача закрывается только по Acceptance. Каждая задача включает собственные необходимые регрессии и фиксацию результата, а финальные системные испытания выполняются отдельно.
+
+| ID | Task | Epic | Phase | Best | Expected | Worst | Depends | Wait (weeks) | Source | Serves | Acceptance |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| TK-1 | [Проверить сборку Rust/SQLite/FTS5/vec1 на macOS/Linux](roadmap/epics/EP-8-proofs/tasks/TK-1-build.md) | EP-8 | PH-0 | 4 | 8 | 16 | — | 0 | MC-3, C-4/C-5, R-2/R-8 | NFR-5, NFR-7 | [Критерии приёмки](roadmap/epics/EP-8-proofs/tasks/TK-1-build.md) |
+| TK-2 | [Проверить commit/rollback Git, файлов и SQLite](roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md) | EP-8 | PH-0 | 8 | 16 | 32 | TK-1 | 0 | MC-2, A-AR3, DR-1/DR-3 | FR-13, FR-14, FR-15, NFR-1 | [Критерии приёмки](roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md) |
+| TK-3 | [Проверить vec1 reset, read snapshot и seq CAS](roadmap/epics/EP-8-proofs/tasks/TK-3-vector-harness.md) | EP-8 | PH-0 | 4 | 12 | 24 | TK-1 | 0 | MC-3/MC-6, R-8, P-2.4 | FR-29, FR-30, NFR-7 | [Критерии приёмки](roadmap/epics/EP-8-proofs/tasks/TK-3-vector-harness.md) |
+| TK-4 | [Проверить bootstrap, IPC и recovery barrier](roadmap/epics/EP-8-proofs/tasks/TK-4-runtime-harness.md) | EP-8 | PH-0 | 4 | 8 | 16 | TK-1 | 0 | MC-5, A-AR1 | NFR-2, NFR-5, FR-15, FR-31, FR-32 | [Критерии приёмки](roadmap/epics/EP-8-proofs/tasks/TK-4-runtime-harness.md) |
+| TK-5 | [Подготовить воспроизводимый протокол пилота](roadmap/epics/EP-8-proofs/tasks/TK-5-pilot-protocol.md) | EP-8 | PH-0 | 4 | 8 | 16 | — | 0 | P-1, [D-25](decisions.md#D-25)…[D-28](decisions.md#D-28)/D-33 | NFR-8, FR-36 | [Критерии приёмки](roadmap/epics/EP-8-proofs/tasks/TK-5-pilot-protocol.md) |
+| TK-6 | [Проверить embedding transport и offline ошибки](roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md) | EP-8 | PH-0 | 4 | 8 | 16 | TK-1 | 0 | X-2, [D-83](decisions.md#D-83), DR-5/DR-8 | FR-22, FR-30, NFR-6 | [Критерии приёмки](roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md) |
+| TK-7 | [Реализовать разметку, ID, хеши и доменные типы](roadmap/epics/EP-1-thin-slice/tasks/TK-7-markdown.md) | EP-1 | PH-1 | 5 | 8 | 14 | TK-1, TK-2, TK-3, TK-4, TK-5, TK-6 | 0 | MC-1, B-2, X-4 | FR-3, FR-4, FR-5, FR-6, FR-10, FR-35, C-7 | [Критерии приёмки](roadmap/epics/EP-1-thin-slice/tasks/TK-7-markdown.md) |
+| TK-8 | [Реализовать Git snapshots и удержание объектов](roadmap/epics/EP-1-thin-slice/tasks/TK-8-git-snapshots.md) | EP-1 | PH-1 | 5 | 8 | 14 | TK-7 | 0 | MC-2/MC-4, X-3, [D-77](decisions.md#D-77) | FR-18, FR-25, FR-34, C-3, C-8 | [Критерии приёмки](roadmap/epics/EP-1-thin-slice/tasks/TK-8-git-snapshots.md) |
+| TK-9 | [Реализовать служебную SQLite и storage ports](roadmap/epics/EP-1-thin-slice/tasks/TK-9-storage.md) | EP-1 | PH-1 | 5 | 8 | 14 | TK-7, TK-8 | 0 | E-1…E-12, B-2/B-3, MC-2/MC-3 | FR-4, FR-13, FR-17, FR-29, FR-32, C-3, C-4, C-5 | [Критерии приёмки](roadmap/epics/EP-1-thin-slice/tasks/TK-9-storage.md) |
+| TK-10 | [Реализовать защищённое сохранение и восстановление](roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md) | EP-1 | PH-1 | 5 | 8 | 14 | TK-7, TK-8, TK-9, TK-2 | 0 | MC-2, B-2/B-3, I-1/I-2 | FR-3, FR-7, FR-8, FR-9, FR-10, FR-13, FR-14, FR-15 | [Критерии приёмки](roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md) |
+| TK-11 | [Реализовать worker, IPC и CLI JSON](roadmap/epics/EP-1-thin-slice/tasks/TK-11-cli-runtime.md) | EP-1 | PH-1 | 5 | 8 | 14 | TK-4, TK-9, TK-10 | 0 | MC-5, X-1, B-1 | FR-3, FR-15, FR-16, FR-25, NFR-2, C-1, C-2, C-7 | [Критерии приёмки](roadmap/epics/EP-1-thin-slice/tasks/TK-11-cli-runtime.md) |
+| TK-12 | [Реализовать поиск ссылок и согласованное чтение](roadmap/epics/EP-1-thin-slice/tasks/TK-12-search.md) | EP-1 | PH-1 | 5 | 8 | 14 | TK-9, TK-11 | 0 | MC-6, B-4, I-3/I-8 | FR-21, FR-22, FR-25, NFR-7 | [Критерии приёмки](roadmap/epics/EP-1-thin-slice/tasks/TK-12-search.md) |
+| TK-13 | [Реализовать config и базовый embedding executor](roadmap/epics/EP-1-thin-slice/tasks/TK-13-embeddings.md) | EP-1 | PH-1 | 5 | 8 | 14 | TK-3, TK-6, TK-9 | 0 | MC-3, B-3, X-2 | FR-22, FR-29, FR-30, NFR-6 | [Критерии приёмки](roadmap/epics/EP-1-thin-slice/tasks/TK-13-embeddings.md) |
+| TK-14 | [Собрать сквозной slice и начальный навык агента](roadmap/epics/EP-1-thin-slice/tasks/TK-14-thin-slice.md) | EP-1 | PH-1 | 5 | 8 | 14 | TK-7, TK-8, TK-9, TK-10, TK-11, TK-12, TK-13 | 0 | S-1…S-4, MC-1…MC-7 | FR-1, FR-2, FR-7, FR-13, FR-14, FR-21, FR-22, FR-25, FR-36 | [Критерии приёмки](roadmap/epics/EP-1-thin-slice/tasks/TK-14-thin-slice.md) |
+| TK-15 | [Подготовить изолированный целевой корпус](roadmap/epics/EP-7-early-validation/tasks/TK-15-target-corpus.md) | EP-7 | PH-1 | 4 | 8 | 16 | TK-14 | 0 | P-2.1, A-1…A-5 | NFR-4 | [Критерии приёмки](roadmap/epics/EP-7-early-validation/tasks/TK-15-target-corpus.md) |
+| TK-16 | [Проверить RAM всей связки на минимальном оборудовании](roadmap/epics/EP-7-early-validation/tasks/TK-16-early-memory.md) | EP-7 | PH-1 | 4 | 8 | 16 | TK-15, TK-13 | 0 | P-2.1, A-AR4, G-1 | NFR-4, NFR-6 | [Критерии приёмки](roadmap/epics/EP-7-early-validation/tasks/TK-16-early-memory.md) |
+| TK-17 | [Провести первый сравнительный пилот slice](roadmap/epics/EP-7-early-validation/tasks/TK-17-early-pilot.md) | EP-7 | PH-1 | 4 | 8 | 16 | TK-5, TK-14, TK-16 | 0 | P-1, [D-25](decisions.md#D-25)…[D-28](decisions.md#D-28)/D-33, G-1 | NFR-8, FR-1, FR-2, FR-36 | [Критерии приёмки](roadmap/epics/EP-7-early-validation/tasks/TK-17-early-pilot.md) |
+| TK-18 | [Завершить graph validation и временные ID](roadmap/epics/EP-2-knowledge/tasks/TK-18-graph-validation.md) | EP-2 | PH-2 | 4 | 8 | 12 | TK-17, TK-7, TK-10 | 0 | MC-1, X-4 | FR-3, FR-4, FR-5, FR-6, FR-8, FR-9, FR-10, FR-12 | [Критерии приёмки](roadmap/epics/EP-2-knowledge/tasks/TK-18-graph-validation.md) |
+| TK-19 | [Завершить edit/delete/перенос и optimistic conflicts](roadmap/epics/EP-2-knowledge/tasks/TK-19-mutations.md) | EP-2 | PH-2 | 4 | 8 | 12 | TK-18, TK-10 | 0 | MC-1/MC-2, X-1 | FR-7, FR-8, FR-9, FR-11, FR-12, FR-16, FR-35 | [Критерии приёмки](roadmap/epics/EP-2-knowledge/tasks/TK-19-mutations.md) |
+| TK-20 | [Завершить source identity, URI и доступность](roadmap/epics/EP-2-knowledge/tasks/TK-20-source-identity.md) | EP-2 | PH-2 | 4 | 8 | 12 | TK-18, TK-19, TK-9 | 0 | MC-4, E-3, X-4 | FR-17, FR-20, FR-25, FR-35 | [Критерии приёмки](roadmap/epics/EP-2-knowledge/tasks/TK-20-source-identity.md) |
+| TK-21 | [Завершить source_snapshot и проверку происхождения](roadmap/epics/EP-2-knowledge/tasks/TK-21-provenance.md) | EP-2 | PH-2 | 4 | 8 | 16 | TK-8, TK-20 | 0 | MC-4, [D-11](decisions.md#D-11)/D-14, X-3 | FR-18, FR-19, FR-20, FR-24, FR-34 | [Критерии приёмки](roadmap/epics/EP-2-knowledge/tasks/TK-21-provenance.md) |
+| TK-22 | [Завершить поисковые filters и fallback](roadmap/epics/EP-2-knowledge/tasks/TK-22-filters.md) | EP-2 | PH-2 | 4 | 8 | 16 | TK-12, TK-20, TK-21 | 0 | MC-6, A-AR5, X-1 | FR-20, FR-21, FR-22, FR-23, FR-24 | [Критерии приёмки](roadmap/epics/EP-2-knowledge/tasks/TK-22-filters.md) |
+| TK-23 | [Реализовать полный traverse](roadmap/epics/EP-2-knowledge/tasks/TK-23-traversal.md) | EP-2 | PH-2 | 6 | 8 | 16 | TK-18, TK-20, TK-21, TK-12 | 0 | MC-6, X-1 | FR-5, FR-21, FR-26, NFR-7 | [Критерии приёмки](roadmap/epics/EP-2-knowledge/tasks/TK-23-traversal.md) |
+| TK-24 | [Завершить batch inspect и навык чтения/записи](roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md) | EP-2 | PH-2 | 6 | 8 | 12 | TK-19, TK-20, TK-21, TK-22, TK-23 | 0 | MC-4/MC-6, [D-77](decisions.md#D-77), X-1 | FR-1, FR-2, FR-25, FR-36, C-1 | [Критерии приёмки](roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md) |
+| TK-25 | [Реализовать full/selective reindex и Git detection](roadmap/epics/EP-3-maintenance/tasks/TK-25-reindexing.md) | EP-3 | PH-2 | 4 | 8 | 16 | TK-24, TK-10, TK-13 | 0 | MC-2, B-3, [D-71](decisions.md#D-71) | FR-27, FR-28, FR-34, C-8 | [Критерии приёмки](roadmap/epics/EP-3-maintenance/tasks/TK-25-reindexing.md) |
+| TK-26 | [Проверить corruption и fail-closed восстановления](roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md) | EP-3 | PH-2 | 4 | 8 | 16 | TK-25, TK-10 | 0 | MC-2, P-3, A-AR3 | FR-13, FR-14, FR-15, FR-16, NFR-1 | [Критерии приёмки](roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md) |
+| TK-27 | [Завершить замену jobs/config и bounded retries](roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md) | EP-3 | PH-2 | 4 | 8 | 16 | TK-25, TK-26, TK-13 | 0 | MC-3, E-7, P-2.4 | FR-22, FR-29, FR-30 | [Критерии приёмки](roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md) |
+| TK-28 | [Реализовать status/errors и безопасный clear](roadmap/epics/EP-3-maintenance/tasks/TK-28-diagnostics.md) | EP-3 | PH-2 | 6 | 8 | 12 | TK-26, TK-27 | 0 | MC-7, A-AR2, E-10 | FR-32, FR-33, C-1 | [Критерии приёмки](roadmap/epics/EP-3-maintenance/tasks/TK-28-diagnostics.md) |
+| TK-29 | [Завершить отмену, waiters и потерю соединения](roadmap/epics/EP-3-maintenance/tasks/TK-29-cancellation.md) | EP-3 | PH-2 | 6 | 8 | 12 | TK-25, TK-27, TK-28, TK-11, TK-24 | 0 | MC-5/MC-7, S-6 | FR-16, FR-31, FR-32, FR-33 | [Критерии приёмки](roadmap/epics/EP-3-maintenance/tasks/TK-29-cancellation.md) |
+| TK-30 | [Подготовить финальный пилот на полном функционале](roadmap/epics/EP-5-final-pilot/tasks/TK-30-pilot-setup.md) | EP-5 | PH-3 | 4 | 8 | 12 | TK-24, TK-25, TK-26, TK-27, TK-28, TK-29, TK-5 | 0 | P-1, [D-25](decisions.md#D-25)…[D-28](decisions.md#D-28)/D-33 | NFR-8, FR-36 | [Критерии приёмки](roadmap/epics/EP-5-final-pilot/tasks/TK-30-pilot-setup.md) |
+| TK-31 | [Выполнить условие пилота без памяти](roadmap/epics/EP-5-final-pilot/tasks/TK-31-baseline.md) | EP-5 | PH-3 | 4 | 8 | 16 | TK-30 | 0 | P-1 | NFR-8 | [Критерии приёмки](roadmap/epics/EP-5-final-pilot/tasks/TK-31-baseline.md) |
+| TK-32 | [Выполнить условие пилота с памятью](roadmap/epics/EP-5-final-pilot/tasks/TK-32-memory-condition.md) | EP-5 | PH-3 | 4 | 8 | 16 | TK-30, TK-31 | 0 | P-1, P-2.7 | NFR-8, FR-1, FR-2, FR-36 | [Критерии приёмки](roadmap/epics/EP-5-final-pilot/tasks/TK-32-memory-condition.md) |
+| TK-33 | [Свести пользу и фактический рабочий профиль](roadmap/epics/EP-5-final-pilot/tasks/TK-33-pilot-analysis.md) | EP-5 | PH-3 | 4 | 8 | 12 | TK-31, TK-32, TK-17 | 0 | P-1, P-2.7, A-AR5 | NFR-8 | [Критерии приёмки](roadmap/epics/EP-5-final-pilot/tasks/TK-33-pilot-analysis.md) |
+| TK-34 | [Проверить полный RAM и десять клиентов](roadmap/epics/EP-4-system-validation/tasks/TK-34-mixed-memory.md) | EP-4 | PH-3 | 4 | 8 | 16 | TK-33, TK-16, TK-29 | 0 | P-2.1/P-2.2, A-AR4 | NFR-2, NFR-4, NFR-7 | [Критерии приёмки](roadmap/epics/EP-4-system-validation/tasks/TK-34-mixed-memory.md) |
+| TK-35 | [Оценить полный search и холодный запуск](roadmap/epics/EP-4-system-validation/tasks/TK-35-search-latency.md) | EP-4 | PH-3 | 4 | 8 | 12 | TK-34, TK-22 | 0 | P-2.2, A-AR4/A-AR5 | NFR-3, FR-21, FR-22, FR-23 | [Критерии приёмки](roadmap/epics/EP-4-system-validation/tasks/TK-35-search-latency.md) |
+| TK-36 | [Оценить годовой диск и Git обслуживание](roadmap/epics/EP-4-system-validation/tasks/TK-36-disk-growth.md) | EP-4 | PH-3 | 4 | 8 | 12 | TK-33, TK-15, TK-25, TK-28 | 0 | P-2.3, A-2/A-5/A-9/A-10/A-11 | FR-34, NFR-4, C-3 | [Критерии приёмки](roadmap/epics/EP-4-system-validation/tasks/TK-36-disk-growth.md) |
+| TK-37 | [Испытать полный ввод и гонки embedding queue](roadmap/epics/EP-4-system-validation/tasks/TK-37-queue-drill.md) | EP-4 | PH-3 | 4 | 8 | 12 | TK-33, TK-27, TK-29, TK-15 | 0 | P-2.4, DR-6, MC-3 | FR-22, FR-29, FR-30, FR-31, NFR-7, DR-6 | [Критерии приёмки](roadmap/epics/EP-4-system-validation/tasks/TK-37-queue-drill.md) |
+| TK-38 | [Провести crash и физические power-loss drills](roadmap/epics/EP-4-system-validation/tasks/TK-38-power-loss.md) | EP-4 | PH-3 | 6 | 8 | 24 | TK-33, TK-26, TK-28 | 0 | P-3, DR-1 | FR-13, FR-14, FR-15, FR-33, NFR-1, DR-1 | [Критерии приёмки](roadmap/epics/EP-4-system-validation/tasks/TK-38-power-loss.md) |
+| TK-39 | [Испытать corruption, Git-смену и freshness](roadmap/epics/EP-4-system-validation/tasks/TK-39-corruption-drill.md) | EP-4 | PH-3 | 4 | 8 | 12 | TK-38, TK-21, TK-25, TK-26 | 0 | P-3, DR-3/DR-4 | FR-18, FR-19, FR-20, FR-24, FR-27, FR-28, DR-3, DR-4 | [Критерии приёмки](roadmap/epics/EP-4-system-validation/tasks/TK-39-corruption-drill.md) |
+| TK-40 | [Проверить внешний backup и restore на чистом устройстве](roadmap/epics/EP-4-system-validation/tasks/TK-40-restore.md) | EP-4 | PH-3 | 4 | 8 | 16 | TK-39, TK-28, TK-27 | 0 | P-2.5/P-3, DR-2, [D-80](decisions.md#D-80)…[D-82](decisions.md#D-82) | FR-14, FR-17, FR-34, FR-35, DR-2 | [Критерии приёмки](roadmap/epics/EP-4-system-validation/tasks/TK-40-restore.md) |
+| TK-41 | [Испытать providers, секреты и полностью offline режим](roadmap/epics/EP-4-system-validation/tasks/TK-41-provider-drill.md) | EP-4 | PH-3 | 4 | 8 | 12 | TK-33, TK-6, TK-13, TK-27, TK-29 | 0 | P-2.6, DR-5, [D-83](decisions.md#D-83) | FR-22, FR-30, NFR-5, NFR-6, DR-5 | [Критерии приёмки](roadmap/epics/EP-4-system-validation/tasks/TK-41-provider-drill.md) |
+| TK-42 | [Испытать storage exhaustion и границы доверия](roadmap/epics/EP-4-system-validation/tasks/TK-42-exhaustion.md) | EP-4 | PH-3 | 6 | 8 | 12 | TK-34, TK-35, TK-36, TK-37, TK-38, TK-39, TK-40, TK-41, TK-28 | 0 | P-3, DR-7/DR-8, A-AR1/A-AR2 | FR-3, FR-14, FR-31, FR-33, NFR-1, NFR-5, DR-7, DR-8 | [Критерии приёмки](roadmap/epics/EP-4-system-validation/tasks/TK-42-exhaustion.md) |
+| TK-43 | [Собрать и установить воспроизводимую поставку v1](roadmap/epics/EP-6-delivery/tasks/TK-43-delivery.md) | EP-6 | PH-4 | 6 | 12 | 20 | TK-34, TK-35, TK-36, TK-37, TK-38, TK-39, TK-40, TK-41, TK-42 | 0 | G-3, C-1…C-8 | NFR-5, NFR-6, C-1, C-2, C-3, C-4, C-5, C-6, C-7, C-8 | [Критерии приёмки](roadmap/epics/EP-6-delivery/tasks/TK-43-delivery.md) |
+| TK-44 | [Завершить навык и эксплуатационную документацию](roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md) | EP-6 | PH-4 | 4 | 8 | 12 | TK-43, TK-24, TK-40, TK-41 | 0 | FR-36, [D-77](decisions.md#D-77)/D-80, X-1 | FR-36, NFR-5, NFR-6, C-1 | [Критерии приёмки](roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md) |
+| TK-45 | [Финальная приёмка: v1 готова](roadmap/epics/EP-6-delivery/tasks/TK-45-acceptance.md) | EP-6 | PH-4 | 2 | 4 | 8 | TK-43, TK-44, TK-42, TK-33 | 0 | G-4, FR-1…FR-36, NFR-1…NFR-8, C-1…C-8 | FR-1…FR-36, NFR-1…NFR-8, C-1…C-8 | [Критерии приёмки](roadmap/epics/EP-6-delivery/tasks/TK-45-acceptance.md) |
+
+### Основание оценок и условия испытаний
+
+Часы — предварительное инженерное разложение уже принятого объёма, не отраслевой норматив и не измеренная скорость разработчика/агента. Разложение сохраняет прежние агрегаты best/expected/worst, но теперь каждый час имеет задачу: PH-0 — 28/60/120, PH-1 — 52/88/160, PH-2 — 56/96/168, PH-3 — 56/104/184, PH-4 — 12/24/40. Значимые несовместимости, failed gate или достигнутый worst без результата требуют переоценки и повторного расчёта недель; скрытый бесконечный резерв не добавлен.
+
+TK-1…TK-6 — ограниченные proof harnesses, а не параллельная временная архитектура продукта. TK-7…TK-14 оплачивают production-интеграцию; TK-18…TK-29 — полные ветви контрактов и гонки. Ранний RAM/пилот и финальные испытания проверяют разные объёмы/готовность и не засчитывают один прогон дважды. Ранняя RAM-проба включает начальную source projection и production загрузку; final mixed-client проверка повторяет измерение с полным функционалом.
+
+В TK-5 методика фиксирует planned sample: первый пилот TK-17 — две цепочки по две связанные задачи; финальный TK-30…TK-33 — три цепочки по три задачи. Это проверяемый объём плана, не новый продуктовый лимит или доказанная статистическая мощность. Конкретные coding-задачи подбираются из реального Letopis по заранее записанным критериям, а не с известными выигрышными ответами. Если sample не даёт однозначного вывода, отчёт говорит об этом; новая статистическая уверенность не выдумывается.
+
+Для всех proof results сохраняются версия сборки/платформа, входы, команда/условие инъекции, observed result и pass/fail/not assessed с основанием. Это артефакты разработки, не новые production services/tables. Synthetic target corpus изолирован от пустой памяти пилота. Physical power-loss/corruption/exhaustion выполняются только на изолированных данных, которые допустимо потерять. Доступ к обеим платформам проверяется перед TK-1, к минимальному устройству — перед TK-16; нет доступа — задача заблокирована, а недельный календарь пересчитывается, не объявляется pass.
+
+## 6. Эпики
+
+Все эпики — контейнеры задач, полностью раскрытых по [D-86](decisions.md#D-86). Их часы ниже равны суммам задач; в расписании учитываются только TK, без удвоения. Прежние EP-1…EP-7 сохраняют смысл; EP-8 объединяет начальные proof-задачи. Адаптация к 0.2.5 принята в [D-88](decisions.md#D-88).
+
+| ID | Epic | Phase | Best | Expected | Worst | Depends | Wait (weeks) | Source | Serves | Acceptance |
+|---|---|---|---|---|---|---|---|---|---|---|
+| EP-8 | [Риски выбранных механизмов](roadmap/epics/EP-8-proofs/epic.md) | PH-0 | 28 | 60 | 120 | — | 0 | [D-86](decisions.md#D-86), [D-88](decisions.md#D-88) | G-0 | [Приёмка эпика](roadmap/epics/EP-8-proofs/epic.md#приёмка) |
+| EP-1 | [Сквозной рабочий slice](roadmap/epics/EP-1-thin-slice/epic.md) | PH-1 | 40 | 64 | 112 | TK-1, TK-2, TK-3, TK-4, TK-5, TK-6 | 0 | [D-86](decisions.md#D-86), [D-88](decisions.md#D-88) | G-1 | [Приёмка эпика](roadmap/epics/EP-1-thin-slice/epic.md#приёмка) |
+| EP-7 | [Ранняя проверка ресурсов и пользы](roadmap/epics/EP-7-early-validation/epic.md) | PH-1 | 12 | 24 | 48 | TK-5, TK-13, TK-14 | 0 | [D-86](decisions.md#D-86), [D-88](decisions.md#D-88) | G-1 | [Приёмка эпика](roadmap/epics/EP-7-early-validation/epic.md#приёмка) |
+| EP-2 | [Полные знания, источники и чтение](roadmap/epics/EP-2-knowledge/epic.md) | PH-2 | 32 | 56 | 96 | TK-7, TK-8, TK-9, TK-10, TK-12, TK-17 | 0 | [D-86](decisions.md#D-86), [D-88](decisions.md#D-88) | G-2 | [Приёмка эпика](roadmap/epics/EP-2-knowledge/epic.md#приёмка) |
+| EP-3 | [Обслуживание и полный lifecycle](roadmap/epics/EP-3-maintenance/epic.md) | PH-2 | 24 | 40 | 72 | TK-10, TK-11, TK-13, TK-24 | 0 | [D-86](decisions.md#D-86), [D-88](decisions.md#D-88) | G-2 | [Приёмка эпика](roadmap/epics/EP-3-maintenance/epic.md#приёмка) |
+| EP-5 | [Финальный сравнительный пилот](roadmap/epics/EP-5-final-pilot/epic.md) | PH-3 | 16 | 32 | 56 | TK-5, TK-17, TK-24, TK-25, TK-26, TK-27, TK-28, TK-29 | 0 | [D-86](decisions.md#D-86), [D-88](decisions.md#D-88) | G-3 | [Приёмка эпика](roadmap/epics/EP-5-final-pilot/epic.md#приёмка) |
+| EP-4 | [Полная системная проверка](roadmap/epics/EP-4-system-validation/epic.md) | PH-3 | 40 | 72 | 128 | TK-6, TK-13, TK-15, TK-16, TK-21, TK-22, TK-25, TK-26, TK-27, TK-28, TK-29, TK-33 | 0 | [D-86](decisions.md#D-86), [D-88](decisions.md#D-88) | G-3 | [Приёмка эпика](roadmap/epics/EP-4-system-validation/epic.md#приёмка) |
+| EP-6 | [Поставка и готовность v1](roadmap/epics/EP-6-delivery/epic.md) | PH-4 | 12 | 24 | 40 | TK-24, TK-33, TK-34, TK-35, TK-36, TK-37, TK-38, TK-39, TK-40, TK-41, TK-42 | 0 | [D-86](decisions.md#D-86), [D-88](decisions.md#D-88) | G-4 | [Приёмка эпика](roadmap/epics/EP-6-delivery/epic.md#приёмка) |
+
+## 7. Расписание по неделям
+
+Ниже expected-план при 10 часах в неделю, недели от начала работ без назначенной даты. Каждая задача может занимать часть недели или переходить на следующую. В строке указаны часы этой недели; суммарно каждая TK получает ровно свой Expected. Результат недели — планируемый, а не уже выполненный. Следующая неделя начинается только при выполненных зависимостях и gates; отсутствие даты/жёсткого deadline не отменяет плановую загрузку.
+
+Недельный блок генерируется `python3 roadmap/schedule.py --update`, проверяется `python3 roadmap/schedule.py --check`; вручную часы и последний номер недели не редактируются.
+
+<!-- weeks:begin -->
+| Неделя | Задачи и часы этой недели | Всего, ч | Планируемое завершение |
+|---|---|---|---|
+| 1 | **TK-1** [Проверить сборку Rust/SQLite/FTS5/vec1 на macOS/Linux](roadmap/epics/EP-8-proofs/tasks/TK-1-build.md) — 8 ч; **TK-2** [Проверить commit/rollback Git, файлов и SQLite](roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md) — 2 ч (накоплено 2/16 ч) | 10 | TK-1 |
+| 2 | **TK-2** [Проверить commit/rollback Git, файлов и SQLite](roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md) — 10 ч (накоплено 12/16 ч) | 10 | Продолжение начатой задачи |
+| 3 | **TK-2** [Проверить commit/rollback Git, файлов и SQLite](roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md) — 4 ч (накоплено 16/16 ч); **TK-3** [Проверить vec1 reset, read snapshot и seq CAS](roadmap/epics/EP-8-proofs/tasks/TK-3-vector-harness.md) — 6 ч (накоплено 6/12 ч) | 10 | TK-2 |
+| 4 | **TK-3** [Проверить vec1 reset, read snapshot и seq CAS](roadmap/epics/EP-8-proofs/tasks/TK-3-vector-harness.md) — 6 ч (накоплено 12/12 ч); **TK-4** [Проверить bootstrap, IPC и recovery barrier](roadmap/epics/EP-8-proofs/tasks/TK-4-runtime-harness.md) — 4 ч (накоплено 4/8 ч) | 10 | TK-3 |
+| 5 | **TK-4** [Проверить bootstrap, IPC и recovery barrier](roadmap/epics/EP-8-proofs/tasks/TK-4-runtime-harness.md) — 4 ч (накоплено 8/8 ч); **TK-5** [Подготовить воспроизводимый протокол пилота](roadmap/epics/EP-8-proofs/tasks/TK-5-pilot-protocol.md) — 6 ч (накоплено 6/8 ч) | 10 | TK-4 |
+| 6 | **TK-5** [Подготовить воспроизводимый протокол пилота](roadmap/epics/EP-8-proofs/tasks/TK-5-pilot-protocol.md) — 2 ч (накоплено 8/8 ч); **TK-6** [Проверить embedding transport и offline ошибки](roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md) — 8 ч | 10 | TK-5, TK-6 |
+| 7 | **TK-7** [Реализовать разметку, ID, хеши и доменные типы](roadmap/epics/EP-1-thin-slice/tasks/TK-7-markdown.md) — 8 ч; **TK-8** [Реализовать Git snapshots и удержание объектов](roadmap/epics/EP-1-thin-slice/tasks/TK-8-git-snapshots.md) — 2 ч (накоплено 2/8 ч) | 10 | TK-7 |
+| 8 | **TK-8** [Реализовать Git snapshots и удержание объектов](roadmap/epics/EP-1-thin-slice/tasks/TK-8-git-snapshots.md) — 6 ч (накоплено 8/8 ч); **TK-9** [Реализовать служебную SQLite и storage ports](roadmap/epics/EP-1-thin-slice/tasks/TK-9-storage.md) — 4 ч (накоплено 4/8 ч) | 10 | TK-8 |
+| 9 | **TK-9** [Реализовать служебную SQLite и storage ports](roadmap/epics/EP-1-thin-slice/tasks/TK-9-storage.md) — 4 ч (накоплено 8/8 ч); **TK-10** [Реализовать защищённое сохранение и восстановление](roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md) — 6 ч (накоплено 6/8 ч) | 10 | TK-9 |
+| 10 | **TK-10** [Реализовать защищённое сохранение и восстановление](roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md) — 2 ч (накоплено 8/8 ч); **TK-11** [Реализовать worker, IPC и CLI JSON](roadmap/epics/EP-1-thin-slice/tasks/TK-11-cli-runtime.md) — 8 ч | 10 | TK-10, TK-11 |
+| 11 | **TK-12** [Реализовать поиск ссылок и согласованное чтение](roadmap/epics/EP-1-thin-slice/tasks/TK-12-search.md) — 8 ч; **TK-13** [Реализовать config и базовый embedding executor](roadmap/epics/EP-1-thin-slice/tasks/TK-13-embeddings.md) — 2 ч (накоплено 2/8 ч) | 10 | TK-12 |
+| 12 | **TK-13** [Реализовать config и базовый embedding executor](roadmap/epics/EP-1-thin-slice/tasks/TK-13-embeddings.md) — 6 ч (накоплено 8/8 ч); **TK-14** [Собрать сквозной slice и начальный навык агента](roadmap/epics/EP-1-thin-slice/tasks/TK-14-thin-slice.md) — 4 ч (накоплено 4/8 ч) | 10 | TK-13 |
+| 13 | **TK-14** [Собрать сквозной slice и начальный навык агента](roadmap/epics/EP-1-thin-slice/tasks/TK-14-thin-slice.md) — 4 ч (накоплено 8/8 ч); **TK-15** [Подготовить изолированный целевой корпус](roadmap/epics/EP-7-early-validation/tasks/TK-15-target-corpus.md) — 6 ч (накоплено 6/8 ч) | 10 | TK-14 |
+| 14 | **TK-15** [Подготовить изолированный целевой корпус](roadmap/epics/EP-7-early-validation/tasks/TK-15-target-corpus.md) — 2 ч (накоплено 8/8 ч); **TK-16** [Проверить RAM всей связки на минимальном оборудовании](roadmap/epics/EP-7-early-validation/tasks/TK-16-early-memory.md) — 8 ч | 10 | TK-15, TK-16 |
+| 15 | **TK-17** [Провести первый сравнительный пилот slice](roadmap/epics/EP-7-early-validation/tasks/TK-17-early-pilot.md) — 8 ч; **TK-18** [Завершить graph validation и временные ID](roadmap/epics/EP-2-knowledge/tasks/TK-18-graph-validation.md) — 2 ч (накоплено 2/8 ч) | 10 | TK-17 |
+| 16 | **TK-18** [Завершить graph validation и временные ID](roadmap/epics/EP-2-knowledge/tasks/TK-18-graph-validation.md) — 6 ч (накоплено 8/8 ч); **TK-19** [Завершить edit/delete/перенос и optimistic conflicts](roadmap/epics/EP-2-knowledge/tasks/TK-19-mutations.md) — 4 ч (накоплено 4/8 ч) | 10 | TK-18 |
+| 17 | **TK-19** [Завершить edit/delete/перенос и optimistic conflicts](roadmap/epics/EP-2-knowledge/tasks/TK-19-mutations.md) — 4 ч (накоплено 8/8 ч); **TK-20** [Завершить source identity, URI и доступность](roadmap/epics/EP-2-knowledge/tasks/TK-20-source-identity.md) — 6 ч (накоплено 6/8 ч) | 10 | TK-19 |
+| 18 | **TK-20** [Завершить source identity, URI и доступность](roadmap/epics/EP-2-knowledge/tasks/TK-20-source-identity.md) — 2 ч (накоплено 8/8 ч); **TK-21** [Завершить source_snapshot и проверку происхождения](roadmap/epics/EP-2-knowledge/tasks/TK-21-provenance.md) — 8 ч | 10 | TK-20, TK-21 |
+| 19 | **TK-22** [Завершить поисковые filters и fallback](roadmap/epics/EP-2-knowledge/tasks/TK-22-filters.md) — 8 ч; **TK-23** [Реализовать полный traverse](roadmap/epics/EP-2-knowledge/tasks/TK-23-traversal.md) — 2 ч (накоплено 2/8 ч) | 10 | TK-22 |
+| 20 | **TK-23** [Реализовать полный traverse](roadmap/epics/EP-2-knowledge/tasks/TK-23-traversal.md) — 6 ч (накоплено 8/8 ч); **TK-24** [Завершить batch inspect и навык чтения/записи](roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md) — 4 ч (накоплено 4/8 ч) | 10 | TK-23 |
+| 21 | **TK-24** [Завершить batch inspect и навык чтения/записи](roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md) — 4 ч (накоплено 8/8 ч); **TK-25** [Реализовать full/selective reindex и Git detection](roadmap/epics/EP-3-maintenance/tasks/TK-25-reindexing.md) — 6 ч (накоплено 6/8 ч) | 10 | TK-24 |
+| 22 | **TK-25** [Реализовать full/selective reindex и Git detection](roadmap/epics/EP-3-maintenance/tasks/TK-25-reindexing.md) — 2 ч (накоплено 8/8 ч); **TK-26** [Проверить corruption и fail-closed восстановления](roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md) — 8 ч | 10 | TK-25, TK-26 |
+| 23 | **TK-27** [Завершить замену jobs/config и bounded retries](roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md) — 8 ч; **TK-28** [Реализовать status/errors и безопасный clear](roadmap/epics/EP-3-maintenance/tasks/TK-28-diagnostics.md) — 2 ч (накоплено 2/8 ч) | 10 | TK-27 |
+| 24 | **TK-28** [Реализовать status/errors и безопасный clear](roadmap/epics/EP-3-maintenance/tasks/TK-28-diagnostics.md) — 6 ч (накоплено 8/8 ч); **TK-29** [Завершить отмену, waiters и потерю соединения](roadmap/epics/EP-3-maintenance/tasks/TK-29-cancellation.md) — 4 ч (накоплено 4/8 ч) | 10 | TK-28 |
+| 25 | **TK-29** [Завершить отмену, waiters и потерю соединения](roadmap/epics/EP-3-maintenance/tasks/TK-29-cancellation.md) — 4 ч (накоплено 8/8 ч); **TK-30** [Подготовить финальный пилот на полном функционале](roadmap/epics/EP-5-final-pilot/tasks/TK-30-pilot-setup.md) — 6 ч (накоплено 6/8 ч) | 10 | TK-29 |
+| 26 | **TK-30** [Подготовить финальный пилот на полном функционале](roadmap/epics/EP-5-final-pilot/tasks/TK-30-pilot-setup.md) — 2 ч (накоплено 8/8 ч); **TK-31** [Выполнить условие пилота без памяти](roadmap/epics/EP-5-final-pilot/tasks/TK-31-baseline.md) — 8 ч | 10 | TK-30, TK-31 |
+| 27 | **TK-32** [Выполнить условие пилота с памятью](roadmap/epics/EP-5-final-pilot/tasks/TK-32-memory-condition.md) — 8 ч; **TK-33** [Свести пользу и фактический рабочий профиль](roadmap/epics/EP-5-final-pilot/tasks/TK-33-pilot-analysis.md) — 2 ч (накоплено 2/8 ч) | 10 | TK-32 |
+| 28 | **TK-33** [Свести пользу и фактический рабочий профиль](roadmap/epics/EP-5-final-pilot/tasks/TK-33-pilot-analysis.md) — 6 ч (накоплено 8/8 ч); **TK-34** [Проверить полный RAM и десять клиентов](roadmap/epics/EP-4-system-validation/tasks/TK-34-mixed-memory.md) — 4 ч (накоплено 4/8 ч) | 10 | TK-33 |
+| 29 | **TK-34** [Проверить полный RAM и десять клиентов](roadmap/epics/EP-4-system-validation/tasks/TK-34-mixed-memory.md) — 4 ч (накоплено 8/8 ч); **TK-35** [Оценить полный search и холодный запуск](roadmap/epics/EP-4-system-validation/tasks/TK-35-search-latency.md) — 6 ч (накоплено 6/8 ч) | 10 | TK-34 |
+| 30 | **TK-35** [Оценить полный search и холодный запуск](roadmap/epics/EP-4-system-validation/tasks/TK-35-search-latency.md) — 2 ч (накоплено 8/8 ч); **TK-36** [Оценить годовой диск и Git обслуживание](roadmap/epics/EP-4-system-validation/tasks/TK-36-disk-growth.md) — 8 ч | 10 | TK-35, TK-36 |
+| 31 | **TK-37** [Испытать полный ввод и гонки embedding queue](roadmap/epics/EP-4-system-validation/tasks/TK-37-queue-drill.md) — 8 ч; **TK-38** [Провести crash и физические power-loss drills](roadmap/epics/EP-4-system-validation/tasks/TK-38-power-loss.md) — 2 ч (накоплено 2/8 ч) | 10 | TK-37 |
+| 32 | **TK-38** [Провести crash и физические power-loss drills](roadmap/epics/EP-4-system-validation/tasks/TK-38-power-loss.md) — 6 ч (накоплено 8/8 ч); **TK-39** [Испытать corruption, Git-смену и freshness](roadmap/epics/EP-4-system-validation/tasks/TK-39-corruption-drill.md) — 4 ч (накоплено 4/8 ч) | 10 | TK-38 |
+| 33 | **TK-39** [Испытать corruption, Git-смену и freshness](roadmap/epics/EP-4-system-validation/tasks/TK-39-corruption-drill.md) — 4 ч (накоплено 8/8 ч); **TK-40** [Проверить внешний backup и restore на чистом устройстве](roadmap/epics/EP-4-system-validation/tasks/TK-40-restore.md) — 6 ч (накоплено 6/8 ч) | 10 | TK-39 |
+| 34 | **TK-40** [Проверить внешний backup и restore на чистом устройстве](roadmap/epics/EP-4-system-validation/tasks/TK-40-restore.md) — 2 ч (накоплено 8/8 ч); **TK-41** [Испытать providers, секреты и полностью offline режим](roadmap/epics/EP-4-system-validation/tasks/TK-41-provider-drill.md) — 8 ч | 10 | TK-40, TK-41 |
+| 35 | **TK-42** [Испытать storage exhaustion и границы доверия](roadmap/epics/EP-4-system-validation/tasks/TK-42-exhaustion.md) — 8 ч; **TK-43** [Собрать и установить воспроизводимую поставку v1](roadmap/epics/EP-6-delivery/tasks/TK-43-delivery.md) — 2 ч (накоплено 2/12 ч) | 10 | TK-42 |
+| 36 | **TK-43** [Собрать и установить воспроизводимую поставку v1](roadmap/epics/EP-6-delivery/tasks/TK-43-delivery.md) — 10 ч (накоплено 12/12 ч) | 10 | TK-43 |
+| 37 | **TK-44** [Завершить навык и эксплуатационную документацию](roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md) — 8 ч; **TK-45** [Финальная приёмка: v1 готова](roadmap/epics/EP-6-delivery/tasks/TK-45-acceptance.md) — 2 ч (накоплено 2/4 ч) | 10 | TK-44 |
+| 38 | **TK-45** [Финальная приёмка: v1 готова](roadmap/epics/EP-6-delivery/tasks/TK-45-acceptance.md) — 2 ч (накоплено 4/4 ч) | 2 | **TK-45: v1 готова — при выполненных критериях приёмки** |
+<!-- weeks:end -->
+
+### Сводный календарь best / expected / worst
+
+Блок ниже формирует стандартный checker zkit. Во всех сценариях один разработчик по 10 часов в неделю; разница — только диапазоны трудоёмкости. Пустой deadline не означает обещание fits: обязательной даты нет по [D-85](decisions.md#D-85).
+
+<!-- schedule:begin -->
+**Schedule** (one developer; weeks from the start; hours per week best / expected / worst: 10 / 10 / 10)
+
+| Phase | Hours best | Hours expected | Hours worst | Done in week (best) | (expected) | (worst) |
+|---|---|---|---|---|---|---|
+| PH-0 | 28 | 60 | 120 | 2.8 | 6.0 | 12.0 |
+| PH-1 | 52 | 88 | 160 | 8.0 | 14.8 | 28.0 |
+| PH-2 | 56 | 96 | 168 | 13.6 | 24.4 | 44.8 |
+| PH-3 | 56 | 104 | 184 | 19.2 | 34.8 | 63.2 |
+| PH-4 | 12 | 24 | 40 | 20.4 | 37.2 | 67.2 |
+| **Total** | 204 | 372 | 672 | 20.4 | 37.2 | 67.2 |
+
+**Deadline check**
+
+
+**Critical path (expected, last items)**: TK-40, TK-41, TK-42, TK-43, TK-44, TK-45
+<!-- schedule:end -->
+
+## 8. Сокращения и изменение плана
+
+Фиксированного deadline нет, поэтому сокращения ради даты не требуются. Полный v1 scope сохранён. Should-цель NFR-3 и измерение пользы NFR-8 должны получить результаты; отклонение не маскируется молчаливым удалением задачи или автоматической готовностью. Если после будущего измерения возникает необходимость смены дизайна или неоднозначный пилот, gate фиксирует блокер/решение и обновлённый план. Последняя строка таблицы не становится успешной просто потому, что наступила неделя 38.
+
+## 9. Риски плана
+
+Оценки неизвестны по реальной скорости разработки; несовместимость Git/files/SQLite/vec1, неуспешный RAM gate, отсутствие оборудования и отрицательная польза способны увеличить срок или остановить работу. Ранние TK-1…TK-6/TK-16/TK-17 выявляют это до широкого build. Нет заранее выбранного ANN, дополнительных caches/ACL/backup-сервиса или команды snapshot. Существующие max_retries, состояние jobs и общий порт embeddings сохраняются. Годовая трасса — обоснованная экстраполяция из наблюдений, не ожидание реального года; окно потерь и restore deadline не назначаются.
+
+## 10. Согласование с исходными документами
+
+[D-84](decisions.md#D-84)/D-85: 10 часов разработки в неделю и отсутствие фиксированного срока. [D-86](decisions.md#D-86): все задачи и недели до финальной готовности вместо поздних недетализированных эпиков. Проектные требования, архитектура, механизмы и схемы не меняются. P-1/P-2.1…P-2.7/P-3, A-AR1…A-AR5, MC-1…MC-7 и DR-1…DR-8 получают конкретных исполнителей-TK и acceptance. R-3…R-6 — исторические опоры, не выполненные проверки новой реализации. Новые измерения и код продукта этой редакцией не запускаются.
+
+## 11. Что остаётся условным
+
+План покрывает весь принятый scope. Условны оценки часов, доступность оборудования/весов и успешность будущих gates; конкретные sample coding-задачи выбираются в уже назначенных TK-5/TK-30 по протоколу. Реальная неисправность или отрицательное измерение могут породить исправление/перепланирование, что нельзя честно перечислить как заранее известные дефекты. Это не оставленные на потом эпики. Конечная задача TK-45 не закрывается до фактической готовности.
+
+Карточки распределены по roadmap/epics/EP-n-<slug>/tasks/TK-n-<slug>.md по [D-88](decisions.md#D-88); один файл соответствует одной задаче, у каждого эпика есть epic.md. Стандарт — [task-template.md](roadmap/task-template.md); действия/приёмка/результат/отчёт находятся в карточках. Проверки и review — [task-cards-checks.json](checks/roadmap/task-cards-checks.json) и [task-cards-review](checks/roadmap/task-cards-review-2026-10-19.md). Статусы задач остаются planned.
+
+## 12. Проверка согласованности
+
+Адаптация 2026-10-19 к zkit 0.2.5: [D-88](decisions.md#D-88), 45 задач в 8 эпиках-контейнерах; полные недели сохранены. Исправлены границы durable save TK-10/TK-26 и полноты навыка TK-24/TK-29/TK-44; каждой карточке добавлены границы, входы/выходы и обоснование оценок. Текущие результаты проверки и ревью: [отчёт адаптации](checks/roadmap/roadmap-zkit-0.2.5-adaptation-2026-10-19.md), [checks](checks/roadmap/roadmap-zkit-0.2.5-adaptation-checks-2026-10-19.json). До выполнения проверок в отчёте не утверждается их успех.
+
+Исходная редакция 2026-10-19: полный недельный план по [D-86](decisions.md#D-86), 45 задач, без нераскрытых эпиков. R1 остаётся закрытым 2/2, очередь 0. Пересчёт/проверка недель, зависимостей, терминальной задачи и стандартные zkit checks — в checks/roadmap/roadmap-weekly-checks.json; независимый review — checks/roadmap/roadmap-weekly-review-2026-10-19.md. Исторические недельные/zkit/schema/model checks предыдущей редакции прошли; все пять контрольных испорченных входов отклонены, независимый reviewer после исправлений дал consistent без открытых материальных замечаний. Draft связан с незакрытыми входными validation gates. Ни готовность продукта, ни физические проверки этим статусом не объявляются.
+
+## Sources
+
+Текущие concept/requirements/resource-math/contracts/data/architecture/mechanics/resilience/decisions, R-1…R-9, предыдущий roadmap review. Новых внешних фактов и замеров нет.

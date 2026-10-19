@@ -1,0 +1,20 @@
+{
+  "scope": "G1 accepted; G2/G3 pending. Mechanics expected incomplete without models.",
+  "checks": {
+    "links": {
+      "exit_code": 0,
+      "stdout": "linked: letopis \u2014 7 stage documents, 76 decisions, 7 reports\n",
+      "stderr": ""
+    },
+    "requirements": {
+      "exit_code": 0,
+      "stdout": "WARN   Must is 95% (42 of 44); say why in the doc or cut\nCLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 0 open question(s) in the log\n44 requirements, 8 constraints checked\n",
+      "stderr": ""
+    },
+    "mechanics": {
+      "exit_code": 1,
+      "stdout": "ERROR  MC-2 is high risk and has no executable model (mechanics/model_*.py)\nERROR  MC-3 is high risk and has no executable model (mechanics/model_*.py)\nCLARITY 2 high-risk mechanism(s) without an executable model: MC-2, MC-3; 2 open fork(s)\n4 mechanisms, 0 state machines, 0 executable models\n",
+      "stderr": ""
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "date": "2026-10-12",
+  "purpose": "throwaway integration research, not product implementation",
+  "go": "1.27.1",
+  "platform": "darwin/arm64",
+  "compiler": "Apple clang 21.0.0",
+  "modules": {
+    "mattn/go-sqlite3": "v1.14.52",
+    "ncruces/go-sqlite3": "v0.35.4",
+    "ncruces/go-sqlite3-wasm/v5": "v5.0.35304",
+    "modernc.org/sqlite": "v1.58.0"
+  },
+  "sqlite_version": "3.53.4",
+  "native_vec1_version": "0.8",
+  "ncruces_vec1_version": "0.7",
+  "vec1_source_url": "https://raw.githubusercontent.com/sqlite/sqlite/a27bcfe21c9b4e0989e86eec8fb34a3832cd23c7/ext/vec1/vec1.c",
+  "vec1_source_sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9",
+  "vec1_c_flags": [
+    "-O3",
+    "-DNDEBUG",
+    "-shared",
+    "-fPIC"
+  ],
+  "linux_cross_build": [
+    "amd64",
+    "arm64"
+  ],
+  "linux_runtime_tested": false,
+  "dataset": {
+    "vectors": 50000,
+    "dimensions": 384,
+    "type": "float32",
+    "pcg_seed": [
+      1,
+      2
+    ],
+    "queries": 5,
+    "k": 10
+  },
+  "source_checksums": {
+    "go.mod": "ab1874ffcd9089341a2c4c66132ee7485afb0e557c03e0fc9ead885b8b214be0",
+    "go.sum": "119f1a7e049c82c7f10a3e4eb5cfc8c316973f0ce78e2154ddd8ec30d336a3ec",
+    "README.md": "f4c9c1a0967a684393be37dca9478717fcc29ec850a227e8f4b88c1b4cf13233",
+    "native-final-results.txt": "cc3df42abdbaed58bb838bc61b20ebbc5da8c689eef1a3df14359a6630a43dd3",
+    "native-path-check.txt": "8d376b8c8c2f95cdbb495a19ae1fce3f8d4e5374eb03b5f7374e6375d0550f7c",
+    "modernc-results.txt": "30de25bbd85dc1329c3d063e65003339f983ca89a1a36ab1fd0fba755e45eb29",
+    "ncruces-final-results.txt": "ada28008807f856741e57693c3842bc3b53f6b07a30b5c48d66104eb250754b9",
+    "modernc/main.go": "a4e25f8e3b2e43130a8e59426caab9f562c8b4dee3d3571d036216de84a69197",
+    "probe/native.go": "82da35799dd13887d126b2b463fb68076b13ee98f8125f13966ffb2d54ff47e7",
+    "probe/ncruces.go": "c0109ddcef46b4a3eac84c6c5062f08946d42e413e2db8b9ea611559c3f9029d",
+    "probe/main.go": "0314d29e126b26d8b917100aceb2f2c58da449fad0058e1e3b1b36fb103e8eeb"
+  }
+}

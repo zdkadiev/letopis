@@ -1,0 +1,18 @@
+flowchart LR
+    Agent["🤖 Agents"] -->|"X-1 argv / stdin / stdout"| B1["B-1 CLI process"]
+    subgraph Letopis["letopis on one machine / one project"]
+        B1 -->|"I-1 / I-3 / I-5 / I-6 · local IPC"| Worker["⚙️ One worker process<br/>B-2 documents · B-3 indexing<br/>B-4 search · B-5 sources · B-6 state"]
+        Worker -->|"Shared storage ports"| DB[("One service database<br/>graph / FTS / vectors / jobs / diagnostics")]
+        Worker -->|"X-4 canonical files"| Markdown["📄 Knowledge Markdown"]
+        Worker -->|"X-3 raw snapshots"| Objects["Git objects and service refs"]
+    end
+    Worker -->|"X-3 command adapter"| Git["Local Git tool"]
+    Worker -->|"X-2 provider adapters"| Provider["Local embedding process or configured remote server"]
+    %% Internal I-2, I-4, I-7, I-8, I-9, I-10, I-11 and I-12 remain inside Worker; see Level 3.
+    %% B-2 through B-6 are module mappings in one process, not separate C4 containers.
+    classDef primary fill:#d8eafe,stroke:#153e75,color:#102a43
+    classDef storage fill:#e9e1f5,stroke:#44337a,color:#1a1033
+    classDef external fill:#edf2f7,stroke:#334e68,color:#102a43
+    class B1,Worker primary
+    class DB,Markdown,Objects storage
+    class Agent,Git,Provider external

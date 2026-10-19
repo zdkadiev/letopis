@@ -1,0 +1,11 @@
+config conn=0 query="SELECT sqlite_version()" value=3.53.4
+config conn=0 query="SELECT vec_version()" value=v0.1.9
+config conn=0 query="PRAGMA journal_mode" value=wal
+config conn=0 query="PRAGMA synchronous" value=2
+config conn=0 query="PRAGMA fullfsync" value=1
+config conn=1 query="SELECT sqlite_version()" value=3.53.4
+config conn=1 query="SELECT vec_version()" value=v0.1.9
+config conn=1 query="PRAGMA journal_mode" value=wal
+config conn=1 query="PRAGMA synchronous" value=2
+config conn=1 query="PRAGMA fullfsync" value=1
+check modernc_fts5_vec0_two_connections=PASS

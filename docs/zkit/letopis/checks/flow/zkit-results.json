@@ -1,0 +1,71 @@
+[
+  {
+    "stage": "requirements",
+    "exit_code": 0,
+    "errors": [],
+    "warnings": [
+      "WARN   Must is 95% (42 of 44); say why in the doc or cut"
+    ],
+    "clarity": [
+      "CLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 2 open question(s) in the log"
+    ]
+  },
+  {
+    "stage": "contracts",
+    "exit_code": 0,
+    "errors": [],
+    "warnings": [
+      "WARN   PyYAML is not installed: spec files are NOT checked (pip install pyyaml)",
+      "WARN   jsonschema is not installed: examples are NOT validated against their schemas (pip install jsonschema)",
+      "WARN   X-2 is consumed and not verified against the counterparty's documentation",
+      "WARN   X-3 is consumed and not verified against the counterparty's documentation"
+    ],
+    "clarity": [
+      "CLARITY 2 consumed contract(s) serving a Must requirement and not verified: X-2, X-3; 0 open fork(s)"
+    ]
+  },
+  {
+    "stage": "data",
+    "exit_code": 0,
+    "errors": [],
+    "warnings": [
+      "WARN   E-1: volume has neither a number nor an assumption A-n from resource-math",
+      "WARN   E-2: volume has neither a number nor an assumption A-n from resource-math",
+      "WARN   E-3: volume has neither a number nor an assumption A-n from resource-math",
+      "WARN   E-4: volume has neither a number nor an assumption A-n from resource-math",
+      "WARN   E-5: volume has neither a number nor an assumption A-n from resource-math",
+      "WARN   E-8: volume has neither a number nor an assumption A-n from resource-math",
+      "WARN   E-10: volume has neither a number nor an assumption A-n from resource-math"
+    ],
+    "clarity": [
+      "CLARITY 7 entity(ies) without a volume figure or assumption; 0 open fork(s)"
+    ]
+  },
+  {
+    "stage": "architecture",
+    "exit_code": 1,
+    "errors": [
+      "ERROR  no Mermaid diagram",
+      "ERROR  entity E-10 of data.md has no owning part (put it in a part's 'Owns' cell)"
+    ],
+    "warnings": [
+      "WARN   requirements are not marked agreed; the design rests on a draft",
+      "WARN   technology words outside decisions and constraints (contracts or mechanics?): rust, sqlite"
+    ],
+    "clarity": [
+      "CLARITY 0 Must requirement(s) without a covering part: -; 0 open fork(s); 0 architectural assumption(s) without a validation; 0 boundary(ies) unhandled; 1 entity(ies) unowned"
+    ]
+  },
+  {
+    "stage": "mechanics",
+    "exit_code": 1,
+    "errors": [
+      "ERROR  MC-2 is high risk and has no executable model (mechanics/model_*.py)",
+      "ERROR  MC-3 is high risk and has no executable model (mechanics/model_*.py)"
+    ],
+    "warnings": [],
+    "clarity": [
+      "CLARITY 2 high-risk mechanism(s) without an executable model: MC-2, MC-3; 0 open fork(s)"
+    ]
+  }
+]

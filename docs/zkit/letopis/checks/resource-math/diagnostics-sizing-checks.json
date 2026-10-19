@@ -1,0 +1,48 @@
+{
+  "scope": "Sizing arithmetic and documentation; no runtime or new measurements",
+  "scenarios": {
+    "best": {
+      "diagnostics_daily_payload_mb": 0.04,
+      "diagnostics_horizon_reports": 3650,
+      "diagnostics_horizon_payload_mb": 14.6
+    },
+    "expected": {
+      "diagnostics_daily_payload_mb": 0.4,
+      "diagnostics_horizon_reports": 36500,
+      "diagnostics_horizon_payload_mb": 146.0
+    },
+    "worst": {
+      "diagnostics_daily_payload_mb": 4.0,
+      "diagnostics_horizon_reports": 365000,
+      "diagnostics_horizon_payload_mb": 1460.0
+    }
+  },
+  "old_metrics_unchanged": true,
+  "checks": {
+    "model_update": {
+      "exit": 0,
+      "output": "block updated\nCLARITY 0 limit(s) failing in the expected scenario without a decision: -; 0 assumption(s) without a validation\n11 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n"
+    },
+    "links": {
+      "exit": 0,
+      "output": "linked: letopis — 7 stage documents, 73 decisions, 7 reports\n"
+    },
+    "resource_math": {
+      "exit": 0,
+      "output": "CLARITY 0 limit(s) failing in the expected scenario without a decision: -; 0 assumption(s) without a validation\n11 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n"
+    },
+    "data": {
+      "exit": 0,
+      "output": "CLARITY 0 entity(ies) without a volume figure or assumption; 0 open fork(s)\n12 entities, 4 memory regions\n"
+    },
+    "requirements": {
+      "exit": 0,
+      "output": "WARN   Must is 95% (42 of 44); say why in the doc or cut\nCLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 0 open question(s) in the log\n44 requirements, 8 constraints checked\n"
+    },
+    "contracts": {
+      "exit": 0,
+      "output": "CLARITY 0 consumed contract(s) serving a Must requirement and not verified: -; 0 open fork(s)\n4 boundaries, 4 spec files\n"
+    }
+  },
+  "independent_review": "No actionable findings; arithmetic, original metrics, unchanged retention/API and logical agreed gate independently verified."
+}

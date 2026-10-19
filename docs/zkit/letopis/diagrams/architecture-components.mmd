@@ -1,0 +1,50 @@
+flowchart TB
+    B1["B-1 CLI"]
+    subgraph Worker["Components inside the one letopis worker"]
+        B2["B-2 Documents<br/>editor / recovery / commit ownership"]
+        B3["B-3 Indexing<br/>graph / FTS / embedding queue / config"]
+        B4["B-4 Search<br/>search / inspect / traverse"]
+        B5["B-5 Source validator"]
+        B6["B-6 StateService<br/>read-only aggregation"]
+        Domain["Shared knowledge model and invariants"]
+        Codec["Markdown codec"]
+        Diag["Shared DiagnosticsPort<br/>E-10 storage owned by B-2"]
+        Embed["Shared EmbeddingsPort<br/>runtime and E-11 owned by B-3"]
+        Store["One database adapter / unit of work"]
+        GitPort["Git / document adapters"]
+    end
+    B1 -->|"I-1"| B2
+    B1 -->|"I-3"| B4
+    B1 -->|"I-5"| B6
+    B1 -->|"I-6"| B3
+    B2 -->|"I-2 prepare projection in common commit"| B3
+    B2 -->|"I-4"| B5
+    B4 -->|"I-7"| B5
+    B4 -->|"I-8 pin read view / config"| B3
+    B6 -->|"I-9"| B2
+    B6 -->|"I-10"| B3
+    B3 -->|"I-12 obtain immutable snapshot"| B2
+    B4 -->|"I-12 current canonical snapshot for inspect"| B2
+    B3 -->|"I-11"| Diag
+    B4 -->|"I-11"| Diag
+    B5 -->|"I-11"| Diag
+    B2 --> Diag
+    B2 --> Codec
+    B3 --> Codec
+    Codec --> Domain
+    B2 --> Domain
+    B3 --> Domain
+    B3 --> Embed
+    B4 --> Embed
+    B2 --> Store
+    B3 --> Store
+    B4 --> Store
+    Diag --> Store
+    B2 --> GitPort
+    B5 --> GitPort
+    classDef primary fill:#d8eafe,stroke:#153e75,color:#102a43
+    classDef port fill:#e5f4df,stroke:#276749,color:#183d27
+    classDef domain fill:#fff3c4,stroke:#805b10,color:#3d2b00
+    class B1,B2,B3,B4,B5,B6 primary
+    class Diag,Embed,Store,GitPort port
+    class Domain,Codec domain

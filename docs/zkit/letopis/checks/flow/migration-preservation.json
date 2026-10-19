@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "counts": {
+    "source_files": 27,
+    "json_examples_preserved": 149,
+    "local_links": 391,
+    "external_local_links": 2,
+    "payloads": 9,
+    "evidence_files": 16
+  },
+  "errors": []
+}

@@ -1,0 +1,39 @@
+{
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "runs": [
+    {
+      "mode": "readers_1",
+      "exit_code": 0,
+      "deadline_exceeded": false,
+      "observed_max_rss_bytes": 11665408,
+      "files": {
+        "capacity.db": 687943680,
+        "capacity.db-wal": 0,
+        "capacity.db-shm": 32768
+      }
+    },
+    {
+      "mode": "readers_2",
+      "exit_code": 0,
+      "deadline_exceeded": false,
+      "observed_max_rss_bytes": 19644416,
+      "files": {
+        "capacity.db": 687943680,
+        "capacity.db-wal": 0,
+        "capacity.db-shm": 32768
+      }
+    },
+    {
+      "mode": "readers_4",
+      "exit_code": 0,
+      "deadline_exceeded": false,
+      "observed_max_rss_bytes": 32653312,
+      "files": {
+        "capacity.db": 687943680,
+        "capacity.db-wal": 0,
+        "capacity.db-shm": 32768
+      }
+    }
+  ],
+  "elapsed_s": 50.18522233283147
+}

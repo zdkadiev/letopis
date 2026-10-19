@@ -1,0 +1,128 @@
+{
+  "scope": "Schemas, model invariants and isolated guard removals; not implementation validation",
+  "counts": {
+    "internal_cases": 69,
+    "guard_mutations": 14,
+    "models": 3
+  },
+  "models": {
+    "model_commit.py": {
+      "normal": [],
+      "broken": [
+        "accepted source_snapshot became unreachable after Git GC",
+        "crash produced mixed file/DB state at cut 6",
+        "crash produced mixed file/DB state at cut 7",
+        "crash produced mixed file/DB state at cut 8",
+        "late reindex regressed a committed apply",
+        "reindex restored vectors/jobs from prior config",
+        "reindex target differs from live canonical snapshot",
+        "snapshot captured a mixed in-progress file group",
+        "two individually valid includes formed a cycle",
+        "two stale base hashes both committed: ('A_check', 'B_check', 'A_publish', 'B_publish')",
+        "two stale base hashes both committed: ('A_check', 'B_check', 'B_publish', 'A_publish')",
+        "two stale base hashes both committed: ('B_check', 'A_check', 'A_publish', 'B_publish')",
+        "two stale base hashes both committed: ('B_check', 'A_check', 'B_publish', 'A_publish')"
+      ],
+      "isolated_guards": {
+        "flush": [
+          "crash produced mixed file/DB state at cut 7"
+        ],
+        "journal": [
+          "crash produced mixed file/DB state at cut 6",
+          "crash produced mixed file/DB state at cut 7"
+        ],
+        "gate": [
+          "two individually valid includes formed a cycle",
+          "two stale base hashes both committed: ('A_check', 'B_check', 'A_publish', 'B_publish')",
+          "two stale base hashes both committed: ('A_check', 'B_check', 'B_publish', 'A_publish')",
+          "two stale base hashes both committed: ('B_check', 'A_check', 'A_publish', 'B_publish')",
+          "two stale base hashes both committed: ('B_check', 'A_check', 'B_publish', 'A_publish')"
+        ],
+        "reindex": [
+          "late reindex regressed a committed apply",
+          "reindex restored vectors/jobs from prior config",
+          "reindex target differs from live canonical snapshot"
+        ],
+        "snapshot": [
+          "snapshot captured a mixed in-progress file group"
+        ],
+        "retention": [
+          "accepted source_snapshot became unreachable after Git GC"
+        ]
+      }
+    },
+    "model_embedding.py": {
+      "normal": [],
+      "broken": [
+        "deleted node retained vector",
+        "old or cancelled vector published: cancel",
+        "old or cancelled vector published: config",
+        "old or cancelled vector published: delete",
+        "old or cancelled vector published: replace",
+        "old seq removed replacement job: config",
+        "old seq removed replacement job: replace",
+        "restart exceeded attempt budget 1",
+        "restart exceeded attempt budget 2",
+        "restart exceeded attempt budget 3",
+        "restart exceeded attempt budget 4"
+      ],
+      "isolated_guards": {
+        "seq": [
+          "deleted node retained vector",
+          "old or cancelled vector published: cancel",
+          "old or cancelled vector published: config",
+          "old or cancelled vector published: delete",
+          "old or cancelled vector published: replace",
+          "old seq removed replacement job: config",
+          "old seq removed replacement job: replace"
+        ],
+        "attempts": [
+          "restart exceeded attempt budget 1",
+          "restart exceeded attempt budget 2",
+          "restart exceeded attempt budget 3",
+          "restart exceeded attempt budget 4"
+        ]
+      }
+    },
+    "model_runtime.py": {
+      "normal": [],
+      "broken": [
+        "candidate unlinked a live worker endpoint",
+        "clear removed an active error",
+        "ready worker lost kernel/endpoint ownership",
+        "reindex waiter did not receive shared cancellation",
+        "retry left orphaned or duplicate active diagnostics",
+        "rollback diagnostic lost",
+        "served command before recovery completed",
+        "served while unfinished recovery journal exists",
+        "two worker owners admitted"
+      ],
+      "isolated_guards": {
+        "owner": [
+          "candidate unlinked a live worker endpoint",
+          "ready worker lost kernel/endpoint ownership",
+          "two worker owners admitted"
+        ],
+        "recovery": [
+          "served command before recovery completed",
+          "served while unfinished recovery journal exists"
+        ],
+        "journal": [
+          "rollback diagnostic lost"
+        ],
+        "clear": [
+          "clear removed an active error"
+        ],
+        "waiters": [
+          "reindex waiter did not receive shared cancellation"
+        ],
+        "diagnostic_owner": [
+          "retry left orphaned or duplicate active diagnostics"
+        ]
+      }
+    }
+  },
+  "errors": [],
+  "measurements": 0,
+  "provider_calls": 0
+}

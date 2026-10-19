@@ -1,0 +1,6 @@
+ERROR  no Mermaid diagram
+WARN   requirements are not marked agreed; the design rests on a draft
+WARN   technology words outside decisions and constraints (contracts or mechanics?): rust, sqlite
+ERROR  entity E-10 of data.md has no owning part (put it in a part's 'Owns' cell)
+CLARITY 0 Must requirement(s) without a covering part: -; 0 open fork(s); 0 architectural assumption(s) without a validation; 0 boundary(ies) unhandled; 1 entity(ies) unowned
+6 parts, 5 interfaces, 3 scenarios, 52 requirements known

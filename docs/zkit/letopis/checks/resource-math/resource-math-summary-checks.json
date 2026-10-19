@@ -1,0 +1,148 @@
+{
+  "date": "2026-10-18",
+  "scope": "read-only recalculation of existing evidence and arithmetic; no new measurements",
+  "new_measurements_started": false,
+  "model_syntax": "PASS",
+  "assumptions_numeric_values_unchanged": true,
+  "legacy_results_preserved_after_rename": true,
+  "scenario_results": {
+    "best": {
+      "create_edit_apply_per_second": 0.03333333333333333,
+      "reference_daily_create_edit_apply_reference": 28800.0,
+      "reference_horizon_create_edit_apply_reference": 10512000.0,
+      "reference_daily_changes_reference": 144000,
+      "reference_horizon_changes_reference": 52560000,
+      "knowledge_file_count_estimate": 10000,
+      "mean_marked_file_kb": 5.0,
+      "mean_touched_files_per_apply": 5,
+      "reference_horizon_file_versions_reference": 52560000.0,
+      "reference_horizon_file_content_reference_tb": 0.2628,
+      "reference_between_pack_apply_reference": 28800.0,
+      "reference_between_pack_file_versions_reference": 144000.0,
+      "reference_between_pack_file_content_reference_gb": 0.72,
+      "graph_node_rows": 200000,
+      "canonical_markdown_mb": 50.0,
+      "vectors_payload_mb_if_float32": 307.2,
+      "model_blob_mb": 238.530688,
+      "known_storage_payload_mb": 595.730688,
+      "changed_elements_per_second": 0.16666666666666666,
+      "changed_markdown_kb_per_second": 0.08333333333333333,
+      "embedding_job_rows_upper": 100000,
+      "bulk_input_minutes_reference": 100.0
+    },
+    "expected": {
+      "create_edit_apply_per_second": 0.3333333333333333,
+      "reference_daily_create_edit_apply_reference": 28800.0,
+      "reference_horizon_create_edit_apply_reference": 10512000.0,
+      "reference_daily_changes_reference": 144000,
+      "reference_horizon_changes_reference": 52560000,
+      "knowledge_file_count_estimate": 3334,
+      "mean_marked_file_kb": 60.0,
+      "mean_touched_files_per_apply": 5,
+      "reference_horizon_file_versions_reference": 52560000.0,
+      "reference_horizon_file_content_reference_tb": 3.1536,
+      "reference_between_pack_apply_reference": 28800.0,
+      "reference_between_pack_file_versions_reference": 144000.0,
+      "reference_between_pack_file_content_reference_gb": 8.64,
+      "graph_node_rows": 200000,
+      "canonical_markdown_mb": 200.0,
+      "vectors_payload_mb_if_float32": 307.2,
+      "model_blob_mb": 238.530688,
+      "known_storage_payload_mb": 745.730688,
+      "changed_elements_per_second": 1.6666666666666667,
+      "changed_markdown_kb_per_second": 3.3333333333333335,
+      "embedding_job_rows_upper": 100000,
+      "bulk_input_minutes_reference": 100.0
+    },
+    "worst": {
+      "create_edit_apply_per_second": 3.3333333333333335,
+      "reference_daily_create_edit_apply_reference": 28800.0,
+      "reference_horizon_create_edit_apply_reference": 10512000.0,
+      "reference_daily_changes_reference": 144000,
+      "reference_horizon_changes_reference": 52560000,
+      "knowledge_file_count_estimate": 2000,
+      "mean_marked_file_kb": 400.0,
+      "mean_touched_files_per_apply": 5,
+      "reference_horizon_file_versions_reference": 52560000.0,
+      "reference_horizon_file_content_reference_tb": 21.024,
+      "reference_between_pack_apply_reference": 28800.0,
+      "reference_between_pack_file_versions_reference": 144000.0,
+      "reference_between_pack_file_content_reference_gb": 57.6,
+      "graph_node_rows": 200000,
+      "canonical_markdown_mb": 800.0,
+      "vectors_payload_mb_if_float32": 307.2,
+      "model_blob_mb": 238.530688,
+      "known_storage_payload_mb": 1345.730688,
+      "changed_elements_per_second": 16.666666666666668,
+      "changed_markdown_kb_per_second": 133.33333333333334,
+      "embedding_job_rows_upper": 100000,
+      "bulk_input_minutes_reference": 100.0
+    }
+  },
+  "artifact_manifests_verified": {
+    "git-2026-10-18": 11,
+    "ollama-2026-10-18": 6,
+    "sqlite-2026-10-18": 38
+  },
+  "sqlite_latency_recomputed": {
+    "readers_1": {
+      "p50_ms": 733.6193125,
+      "p95_ms": 1338.5351249999999,
+      "max_ms": 1403.828
+    },
+    "readers_2": {
+      "p50_ms": 158.69243799999998,
+      "p95_ms": 208.10995899999998,
+      "max_ms": 224.124
+    },
+    "readers_4": {
+      "p50_ms": 303.765271,
+      "p95_ms": 499.452417,
+      "max_ms": 568.339042
+    },
+    "mixed": {
+      "p50_ms": 2553.8911664999996,
+      "p95_ms": 4186.768667,
+      "max_ms": 4503.097333
+    }
+  },
+  "sqlite_db_bytes": 687943680,
+  "sqlite_free_page_bytes": 101003264,
+  "illustrative_current_disk_subset_bytes_not_ram": 1126474368,
+  "arithmetic_sensitivity_not_limit_verdict": {
+    "A-2": {
+      "canonical_markdown_mb": 4.0,
+      "reference_horizon_file_content_reference_tb": 4.0
+    },
+    "A-5": {
+      "canonical_markdown_mb": 1.0,
+      "reference_horizon_file_content_reference_tb": 1.6666666666666667
+    }
+  },
+  "zkit_checker_version": "0.2.0",
+  "check_outputs_pending": false,
+  "structural_checks": {
+    "requirements": {
+      "exit_code": 0,
+      "stdout": "WARN   Must is 95% (42 of 44); say why in the doc or cut\nCLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 0 open question(s) in the log\n44 requirements, 8 constraints checked\n",
+      "stderr": "",
+      "script_sha256": "2b4664706b0bc73dbc0b84f5e30156fa05b5c091f0e881751ac77d43aaa7ef6f"
+    },
+    "resource_math": {
+      "exit_code": 0,
+      "stdout": "CLARITY 0 limit(s) failing in the expected scenario without a decision: -; 0 assumption(s) without a validation\n9 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n",
+      "stderr": "",
+      "script_sha256": "5794ac10d5a095bcb2eec33275a3ede25ac5a751ecc846036dd079b7cd666bc2"
+    }
+  },
+  "existing_measurement_and_reference_files_unchanged": true,
+  "research_bodies_unchanged": true,
+  "changed_document_local_file_links_checked": 534,
+  "independent_review": {
+    "agent": "resource_math_summary_review",
+    "verdict": "consistent",
+    "substantive_findings": 0,
+    "editorial_placeholder_resolved": true,
+    "report": "resource-math-review-2026-10-18.md"
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "observer_sqlite": "3.53.4",
+  "page_size": 4096,
+  "page_count": 167955,
+  "freelist_count": 24659,
+  "dbstat": [
+    {
+      "name": "edges",
+      "pages": 25064,
+      "bytes": 102662144,
+      "payload_bytes": 95605000
+    },
+    {
+      "name": "edges_includes",
+      "pages": 117,
+      "bytes": 479232,
+      "payload_bytes": 394672
+    },
+    {
+      "name": "edges_source_probe",
+      "pages": 6282,
+      "bytes": 25731072,
+      "payload_bytes": 20967105
+    },
+    {
+      "name": "edges_target_probe",
+      "pages": 6247,
+      "bytes": 25587712,
+      "payload_bytes": 20967105
+    },
+    {
+      "name": "nodes",
+      "pages": 10258,
+      "bytes": 42016768,
+      "payload_bytes": 39193328
+    },
+    {
+      "name": "nodes_source_uri",
+      "pages": 1473,
+      "bytes": 6033408,
+      "payload_bytes": 5000000
+    },
+    {
+      "name": "sqlite_autoindex_edges_1",
+      "pages": 6177,
+      "bytes": 25300992,
+      "payload_bytes": 20967105
+    },
+    {
+      "name": "sqlite_autoindex_nodes_1",
+      "pages": 2443,
+      "bytes": 10006528,
+      "payload_bytes": 8367105
+    },
+    {
+      "name": "sqlite_schema",
+      "pages": 1,
+      "bytes": 4096,
+      "payload_bytes": 2749
+    },
+    {
+      "name": "sqlite_sequence",
+      "pages": 1,
+      "bytes": 4096,
+      "payload_bytes": 11
+    },
+    {
+      "name": "text_index_config",
+      "pages": 1,
+      "bytes": 4096,
+      "payload_bytes": 11
+    },
+    {
+      "name": "text_index_data",
+      "pages": 9319,
+      "bytes": 38170624,
+      "payload_bytes": 37600563
+    },
+    {
+      "name": "text_index_docsize",
+      "pages": 315,
+      "bytes": 1290240,
+      "payload_bytes": 697611
+    },
+    {
+      "name": "text_index_idx",
+      "pages": 4,
+      "bytes": 16384,
+      "payload_bytes": 8954
+    },
+    {
+      "name": "vector_index_base",
+      "pages": 293,
+      "bytes": 1200128,
+      "payload_bytes": 300000
+    },
+    {
+      "name": "vector_index_config",
+      "pages": 1,
+      "bytes": 4096,
+      "payload_bytes": 12
+    },
+    {
+      "name": "vector_index_idx",
+      "pages": 75295,
+      "bytes": 308408320,
+      "payload_bytes": 307607475
+    },
+    {
+      "name": "vector_index_idx_idx",
+      "pages": 3,
+      "bytes": 12288,
+      "payload_bytes": 3512
+    },
+    {
+      "name": "vector_index_meta",
+      "pages": 1,
+      "bytes": 4096,
+      "payload_bytes": 0
+    },
+    {
+      "name": "vector_index_model",
+      "pages": 1,
+      "bytes": 4096,
+      "payload_bytes": 27
+    }
+  ],
+  "node_meta": [
+    [
+      "metavertex",
+      5000,
+      59,
+      59,
+      64,
+      64
+    ],
+    [
+      "source",
+      100000,
+      44,
+      44,
+      64,
+      64
+    ],
+    [
+      "vertex",
+      95000,
+      59,
+      59,
+      64,
+      64
+    ]
+  ],
+  "edge_types": [
+    [
+      "external",
+      100000
+    ],
+    [
+      "includes",
+      5000
+    ],
+    [
+      "related",
+      395000
+    ]
+  ],
+  "additional_checks": {
+    "uuid_disjoint_nodes_edges": true,
+    "includes_sources_metavertices": true,
+    "includes_no_metavertex_targets_in_fixture": true
+  }
+}

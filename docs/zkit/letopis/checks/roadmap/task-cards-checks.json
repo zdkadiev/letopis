@@ -1,0 +1,49 @@
+{
+  "scope": "Documentation/cards and planning checks only; no task execution or runtime measurements.",
+  "checks": {
+    "links": {
+      "exit_code": 0,
+      "stdout": "linked: letopis — 9 stage documents, 87 decisions, 9 reports\n",
+      "stderr": ""
+    },
+    "weekly_update": {
+      "exit_code": 0,
+      "stdout": "{\"tasks\": 45, \"hours\": 372, \"task_cards\": 45, \"weeks\": 38, \"max_week_hours\": 10, \"last_week_hours\": 2, \"terminal\": \"TK-45\", \"dependency_errors\": 0, \"phase_gate_errors\": 0, \"unscheduled_tasks\": 0, \"runtime_calls\": 0, \"measurements\": 0}\n",
+      "stderr": ""
+    },
+    "weekly_check": {
+      "exit_code": 0,
+      "stdout": "{\"tasks\": 45, \"hours\": 372, \"task_cards\": 45, \"weeks\": 38, \"max_week_hours\": 10, \"last_week_hours\": 2, \"terminal\": \"TK-45\", \"dependency_errors\": 0, \"phase_gate_errors\": 0, \"unscheduled_tasks\": 0, \"runtime_calls\": 0, \"measurements\": 0}\n",
+      "stderr": ""
+    },
+    "roadmap": {
+      "exit_code": 0,
+      "stdout": "CLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; expected scenario meets or has no the deadline\n5 phases, 5 gates, 45 tasks, 0 epics; hours 204 / 372 / 672; weeks 20.4 / 37.2 / 67.2\n",
+      "stderr": ""
+    }
+  },
+  "acceptance_preservation": {
+    "cards": 45,
+    "original_criteria_word_equivalent": true,
+    "all_planned": true
+  },
+  "local_links": {
+    "checked": 640,
+    "errors": 0
+  },
+  "unchanged_resource_artifacts": true,
+  "negative_cases": {
+    "missing_card": {
+      "rejected": true,
+      "reason": "tasks/ must contain exactly one card per roadmap task"
+    },
+    "stale_estimate": {
+      "rejected": true,
+      "reason": "Task scheduling metadata is stale: TK-1"
+    },
+    "missing_acceptance_section": {
+      "rejected": true,
+      "reason": "Missing task section Критерии приёмки: TK-1"
+    }
+  }
+}

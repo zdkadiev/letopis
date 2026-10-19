@@ -1,0 +1,15 @@
+{
+  "scope": "G1 closed; G2/G3 pending, numeric model absent intentionally; not a passed stage gate.",
+  "checks": {
+    "links": {
+      "exit_code": 0,
+      "stdout": "linked: letopis — 8 stage documents, 80 decisions, 8 reports\n",
+      "stderr": ""
+    },
+    "resilience": {
+      "exit_code": 1,
+      "stdout": "ERROR  no resilience_model.py in /private/tmp/letopis-resilience-g1-qyn928dl/letopis\nCLARITY 0 target(s) of architecture/contracts/data not covered; 0 high-severity row(s) without a drill; 0 limit(s) failing in the expected scenario without a decision: -\n9 faults, 5 threats, 8 signals, 8 drills, 0 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n",
+      "stderr": ""
+    }
+  }
+}

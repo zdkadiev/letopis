@@ -1,0 +1,4 @@
+ERROR  MC-2 is high risk and has no executable model (mechanics/model_*.py)
+ERROR  MC-3 is high risk and has no executable model (mechanics/model_*.py)
+CLARITY 2 high-risk mechanism(s) without an executable model: MC-2, MC-3; 0 open fork(s)
+4 mechanisms, 0 state machines, 0 executable models

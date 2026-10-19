@@ -1,0 +1,2742 @@
+{
+  "version": "0.2.6",
+  "scope": "File layout, live links and executable check paths; no new measurements",
+  "moves": {
+    "resource_model.py": "resource-math/model.py",
+    "simplification-audit.md": "appendix/simplification-audit.md",
+    "domain-model.md": "appendix/domain-model.md",
+    "migration-manifest.json": "appendix/migration-manifest.json",
+    "migration.md": "appendix/migration.md",
+    "roadmap_schedule.py": "roadmap/schedule.py",
+    "resilience_model.py": "resilience/model.py",
+    "scenarios.md": "appendix/scenarios.md",
+    "task-template.md": "roadmap/task-template.md",
+    "contracts/x-2-embeddings.md": "contracts/X-2-embeddings.md",
+    "contracts/x-3-git.md": "contracts/X-3-git.md",
+    "contracts/i-8-read-view.md": "contracts/I-8-read-view.md",
+    "contracts/i-12-snapshot.md": "contracts/I-12-snapshot.md",
+    "contracts/i-4-sources.md": "contracts/I-4-sources.md",
+    "contracts/x-4-markdown.md": "contracts/X-4-markdown.md",
+    "contracts/x-1-cli.md": "contracts/X-1-cli.md",
+    "contracts/i-2-projections.md": "contracts/I-2-projections.md",
+    "contracts/i-11-diagnostics.md": "contracts/I-11-diagnostics.md",
+    "contracts/i-1-worker.yaml": "contracts/I-1-worker.yaml",
+    "contracts/schemas/x-2-embeddings.yaml": "contracts/schemas/X-2-embeddings.yaml",
+    "contracts/schemas/x-4-metadata.yaml": "contracts/schemas/X-4-metadata.yaml",
+    "contracts/schemas/x-1-cli.yaml": "contracts/schemas/X-1-cli.yaml",
+    "measurements/sqlite-2026-10-18/Cargo.toml": "research/R-6-sqlite-capacity-probe/Cargo.toml",
+    "measurements/sqlite-2026-10-18/load-memory.json": "research/R-6-sqlite-capacity-probe/load-memory.json",
+    "measurements/sqlite-2026-10-18/sha256.json": "research/R-6-sqlite-capacity-probe/sha256.json",
+    "measurements/sqlite-2026-10-18/readers_2-memory.json": "research/R-6-sqlite-capacity-probe/readers_2-memory.json",
+    "measurements/sqlite-2026-10-18/schema.sql": "research/R-6-sqlite-capacity-probe/schema.sql",
+    "measurements/sqlite-2026-10-18/mixed-run-summary.json": "research/R-6-sqlite-capacity-probe/mixed-run-summary.json",
+    "measurements/sqlite-2026-10-18/run_probe.py": "research/R-6-sqlite-capacity-probe/run_probe.py",
+    "measurements/sqlite-2026-10-18/readers_1-memory.json": "research/R-6-sqlite-capacity-probe/readers_1-memory.json",
+    "measurements/sqlite-2026-10-18/readers_1-time.txt": "research/R-6-sqlite-capacity-probe/readers_1-time.txt",
+    "measurements/sqlite-2026-10-18/read-stdout.jsonl": "research/R-6-sqlite-capacity-probe/read-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/readers_1-stdout.jsonl": "research/R-6-sqlite-capacity-probe/readers_1-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/Cargo.lock": "research/R-6-sqlite-capacity-probe/Cargo.lock",
+    "measurements/sqlite-2026-10-18/run_mixed.py": "research/R-6-sqlite-capacity-probe/run_mixed.py",
+    "measurements/sqlite-2026-10-18/build-manifest.json": "research/R-6-sqlite-capacity-probe/build-manifest.json",
+    "measurements/sqlite-2026-10-18/readers_4-memory.json": "research/R-6-sqlite-capacity-probe/readers_4-memory.json",
+    "measurements/sqlite-2026-10-18/load-time.txt": "research/R-6-sqlite-capacity-probe/load-time.txt",
+    "measurements/sqlite-2026-10-18/readers_4-stdout.jsonl": "research/R-6-sqlite-capacity-probe/readers_4-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/README.md": "research/R-6-sqlite-capacity-probe/README.md",
+    "measurements/sqlite-2026-10-18/mixed-stdout.jsonl": "research/R-6-sqlite-capacity-probe/mixed-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/db-breakdown.json": "research/R-6-sqlite-capacity-probe/db-breakdown.json",
+    "measurements/sqlite-2026-10-18/parallelism-run-summary.json": "research/R-6-sqlite-capacity-probe/parallelism-run-summary.json",
+    "measurements/sqlite-2026-10-18/load-stdout.jsonl": "research/R-6-sqlite-capacity-probe/load-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/first-build.json": "research/R-6-sqlite-capacity-probe/first-build.json",
+    "measurements/sqlite-2026-10-18/read-time.txt": "research/R-6-sqlite-capacity-probe/read-time.txt",
+    "measurements/sqlite-2026-10-18/run_parallelism.py": "research/R-6-sqlite-capacity-probe/run_parallelism.py",
+    "measurements/sqlite-2026-10-18/readers_2-stdout.jsonl": "research/R-6-sqlite-capacity-probe/readers_2-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/readers_4-time.txt": "research/R-6-sqlite-capacity-probe/readers_4-time.txt",
+    "measurements/sqlite-2026-10-18/analysis.json": "research/R-6-sqlite-capacity-probe/analysis.json",
+    "measurements/sqlite-2026-10-18/mixed-time.txt": "research/R-6-sqlite-capacity-probe/mixed-time.txt",
+    "measurements/sqlite-2026-10-18/mixed-memory.json": "research/R-6-sqlite-capacity-probe/mixed-memory.json",
+    "measurements/sqlite-2026-10-18/inspect_db.py": "research/R-6-sqlite-capacity-probe/inspect_db.py",
+    "measurements/sqlite-2026-10-18/readers_2-time.txt": "research/R-6-sqlite-capacity-probe/readers_2-time.txt",
+    "measurements/sqlite-2026-10-18/preflight.json": "research/R-6-sqlite-capacity-probe/preflight.json",
+    "measurements/sqlite-2026-10-18/read-memory.json": "research/R-6-sqlite-capacity-probe/read-memory.json",
+    "measurements/sqlite-2026-10-18/run-summary.json": "research/R-6-sqlite-capacity-probe/run-summary.json",
+    "measurements/sqlite-2026-10-18/analyze.py": "research/R-6-sqlite-capacity-probe/analyze.py",
+    "measurements/sqlite-2026-10-18/src/main.rs": "research/R-6-sqlite-capacity-probe/src/main.rs",
+    "measurements/sqlite-2026-10-18/src/bin/parallelism.rs": "research/R-6-sqlite-capacity-probe/src/bin/parallelism.rs",
+    "measurements/sqlite-2026-10-18/src/bin/mixed.rs": "research/R-6-sqlite-capacity-probe/src/bin/mixed.rs",
+    "measurements/ollama-2026-10-18/summary.json": "research/R-4-ollama-local-probe/summary.json",
+    "measurements/ollama-2026-10-18/sha256.json": "research/R-4-ollama-local-probe/sha256.json",
+    "measurements/ollama-2026-10-18/download.json": "research/R-4-ollama-local-probe/download.json",
+    "measurements/ollama-2026-10-18/memory.json": "research/R-4-ollama-local-probe/memory.json",
+    "measurements/ollama-2026-10-18/metadata.json": "research/R-4-ollama-local-probe/metadata.json",
+    "measurements/ollama-2026-10-18/requests.jsonl": "research/R-4-ollama-local-probe/requests.jsonl",
+    "measurements/ollama-2026-10-18/README.md": "research/R-4-ollama-local-probe/README.md",
+    "measurements/ollama-2026-10-18/probe.executed.py": "research/R-4-ollama-local-probe/probe.executed.py",
+    "measurements/git-2026-10-18/summary.json": "research/R-5-git-storage-probe/summary.json",
+    "measurements/git-2026-10-18/rewrite-objects.json": "research/R-5-git-storage-probe/rewrite-objects.json",
+    "measurements/git-2026-10-18/sha256.json": "research/R-5-git-storage-probe/sha256.json",
+    "measurements/git-2026-10-18/point-snapshots.json": "research/R-5-git-storage-probe/point-snapshots.json",
+    "measurements/git-2026-10-18/rewrite-snapshots.json": "research/R-5-git-storage-probe/rewrite-snapshots.json",
+    "measurements/git-2026-10-18/packed-refs-result.json": "research/R-5-git-storage-probe/packed-refs-result.json",
+    "measurements/git-2026-10-18/metadata.json": "research/R-5-git-storage-probe/metadata.json",
+    "measurements/git-2026-10-18/README.md": "research/R-5-git-storage-probe/README.md",
+    "measurements/git-2026-10-18/point-result.json": "research/R-5-git-storage-probe/point-result.json",
+    "measurements/git-2026-10-18/pack_refs_probe.executed.py": "research/R-5-git-storage-probe/pack_refs_probe.executed.py",
+    "measurements/git-2026-10-18/probe.executed.py": "research/R-5-git-storage-probe/probe.executed.py",
+    "measurements/git-2026-10-18/point-objects.json": "research/R-5-git-storage-probe/point-objects.json",
+    "measurements/git-2026-10-18/rewrite-result.json": "research/R-5-git-storage-probe/rewrite-result.json",
+    "reference/requirements-pre-zkit.md": "appendix/requirements-pre-zkit.md",
+    "reference/probes/rust-sqlite/Cargo.toml": "research/R-2-rust-sqlite/Cargo.toml",
+    "reference/probes/rust-sqlite/Cargo.lock": "research/R-2-rust-sqlite/Cargo.lock",
+    "reference/probes/rust-sqlite/build-manifest.json": "research/R-2-rust-sqlite/build-manifest.json",
+    "reference/probes/rust-sqlite/results.txt": "research/R-2-rust-sqlite/results.txt",
+    "reference/probes/rust-sqlite/README.md": "research/R-2-rust-sqlite/README.md",
+    "reference/probes/rust-sqlite/src/main.rs": "research/R-2-rust-sqlite/src/main.rs",
+    "reference/probes/go-sqlite/go.mod": "research/R-1-go-sqlite/go.mod",
+    "reference/probes/go-sqlite/build-manifest.json": "research/R-1-go-sqlite/build-manifest.json",
+    "reference/probes/go-sqlite/go.sum": "research/R-1-go-sqlite/go.sum",
+    "reference/probes/go-sqlite/README.md": "research/R-1-go-sqlite/README.md",
+    "reference/probes/go-sqlite/native-final-results.txt": "research/R-1-go-sqlite/native-final-results.txt",
+    "reference/probes/go-sqlite/native-path-check.txt": "research/R-1-go-sqlite/native-path-check.txt",
+    "reference/probes/go-sqlite/modernc-results.txt": "research/R-1-go-sqlite/modernc-results.txt",
+    "reference/probes/go-sqlite/ncruces-final-results.txt": "research/R-1-go-sqlite/ncruces-final-results.txt",
+    "reference/probes/go-sqlite/modernc/main.go": "research/R-1-go-sqlite/modernc/main.go",
+    "reference/probes/go-sqlite/probe/native.go": "research/R-1-go-sqlite/probe/native.go",
+    "reference/probes/go-sqlite/probe/ncruces.go": "research/R-1-go-sqlite/probe/ncruces.go",
+    "reference/probes/go-sqlite/probe/main.go": "research/R-1-go-sqlite/probe/main.go",
+    "validation/contracts-examples.json": "checks/contracts/contracts-examples.json",
+    "validation/mechanics-review-2026-10-19.md": "checks/mechanics/mechanics-review-2026-10-19.md",
+    "validation/architecture-checks.json": "checks/architecture/architecture-checks.json",
+    "validation/resilience-checks.json": "checks/resilience/resilience-checks.json",
+    "validation/resilience-resilience_arithmetic.json": "checks/resilience/resilience-resilience_arithmetic.json",
+    "validation/zkit-requirements.txt": "checks/requirements/zkit-requirements.txt",
+    "validation/roadmap-checks.json": "checks/roadmap/roadmap-checks.json",
+    "validation/roadmap-weekly-review-2026-10-19.md": "checks/roadmap/roadmap-weekly-review-2026-10-19.md",
+    "validation/data-review-2026-10-19.md": "checks/data/data-review-2026-10-19.md",
+    "validation/architecture-mermaid-checks.json": "checks/architecture/architecture-mermaid-checks.json",
+    "validation/check_resilience_arithmetic.py": "checks/resilience/check_resilience_arithmetic.py",
+    "validation/resource-math-summary-checks.json": "checks/resource-math/resource-math-summary-checks.json",
+    "validation/diagnostics-sizing-checks.json": "checks/resource-math/diagnostics-sizing-checks.json",
+    "validation/mechanics-models.json": "checks/mechanics/mechanics-models.json",
+    "validation/resilience-intake-checks-2026-10-19.json": "checks/resilience/resilience-intake-checks-2026-10-19.json",
+    "validation/diagnostics-sizing-2026-10-19.md": "checks/resource-math/diagnostics-sizing-2026-10-19.md",
+    "validation/resilience-g1-checks-2026-10-19.json": "checks/resilience/resilience-g1-checks-2026-10-19.json",
+    "validation/roadmap-round-1-audit-2026-10-19.md": "checks/roadmap/roadmap-round-1-audit-2026-10-19.md",
+    "validation/roadmap-review-2026-10-19.md": "checks/roadmap/roadmap-review-2026-10-19.md",
+    "validation/contracts-verification-2026-10-18.md": "checks/contracts/contracts-verification-2026-10-18.md",
+    "validation/mechanics-round-1-audit-2026-10-19.md": "checks/mechanics/mechanics-round-1-audit-2026-10-19.md",
+    "validation/resilience-g2-checks-2026-10-19.json": "checks/resilience/resilience-g2-checks-2026-10-19.json",
+    "validation/resilience-review-2026-10-19.md": "checks/resilience/resilience-review-2026-10-19.md",
+    "validation/resource-math-review-2026-10-18.md": "checks/resource-math/resource-math-review-2026-10-18.md",
+    "validation/roadmap-weekly-schedule.json": "checks/roadmap/roadmap-weekly-schedule.json",
+    "validation/migration-preservation.json": "checks/flow/migration-preservation.json",
+    "validation/roadmap-zkit-0.2.5-adaptation-2026-10-19.md": "checks/roadmap/roadmap-zkit-0.2.5-adaptation-2026-10-19.md",
+    "validation/zkit-data.txt": "checks/data/zkit-data.txt",
+    "validation/zkit-contracts.txt": "checks/contracts/zkit-contracts.txt",
+    "validation/README.md": "checks/README.md",
+    "validation/mechanics-mermaid-checks.json": "checks/mechanics/mechanics-mermaid-checks.json",
+    "validation/check_mechanics_artifacts.py": "checks/mechanics/check_mechanics_artifacts.py",
+    "validation/zkit-mechanics.txt": "checks/mechanics/zkit-mechanics.txt",
+    "validation/roadmap-weekly-checks.json": "checks/roadmap/roadmap-weekly-checks.json",
+    "validation/zkit-architecture.txt": "checks/architecture/zkit-architecture.txt",
+    "validation/roadmap-zkit-0.2.5-review-2026-10-19.md": "checks/roadmap/roadmap-zkit-0.2.5-review-2026-10-19.md",
+    "validation/resilience-external_examples.json": "checks/resilience/resilience-external_examples.json",
+    "validation/contracts-checks.json": "checks/contracts/contracts-checks.json",
+    "validation/resilience-round-1-audit-2026-10-19.md": "checks/resilience/resilience-round-1-audit-2026-10-19.md",
+    "validation/task-cards-checks.json": "checks/roadmap/task-cards-checks.json",
+    "validation/architecture-review-2026-10-19.md": "checks/architecture/architecture-review-2026-10-19.md",
+    "validation/roadmap-g1-checks-2026-10-19.json": "checks/roadmap/roadmap-g1-checks-2026-10-19.json",
+    "validation/mechanics-g2-checks-2026-10-19.json": "checks/mechanics/mechanics-g2-checks-2026-10-19.json",
+    "validation/task-cards-review-2026-10-19.md": "checks/roadmap/task-cards-review-2026-10-19.md",
+    "validation/mechanics-external-examples.json": "checks/mechanics/mechanics-external-examples.json",
+    "validation/resilience-internal_models.json": "checks/resilience/resilience-internal_models.json",
+    "validation/architecture-intake-checks-2026-10-19.json": "checks/architecture/architecture-intake-checks-2026-10-19.json",
+    "validation/check_contract_examples.py": "checks/contracts/check_contract_examples.py",
+    "validation/roadmap-intake-checks-2026-10-19.json": "checks/roadmap/roadmap-intake-checks-2026-10-19.json",
+    "validation/roadmap-zkit-0.2.5-checks-2026-10-19.json": "checks/roadmap/roadmap-zkit-0.2.5-checks-2026-10-19.json",
+    "validation/data-checks.json": "checks/data/data-checks.json",
+    "validation/mechanics-checks.json": "checks/mechanics/mechanics-checks.json",
+    "validation/resilience-precloseout-check-2026-10-19.json": "checks/resilience/resilience-precloseout-check-2026-10-19.json",
+    "validation/zkit-results.json": "checks/flow/zkit-results.json",
+    "validation/mechanics-g1-checks-2026-10-19.json": "checks/mechanics/mechanics-g1-checks-2026-10-19.json",
+    "validation/contracts-round-1-audit-2026-10-18.md": "checks/contracts/contracts-round-1-audit-2026-10-18.md",
+    "validation/mechanics-intake-checks-2026-10-19.json": "checks/mechanics/mechanics-intake-checks-2026-10-19.json",
+    "validation/roadmap-zkit-0.2.5-adaptation-checks-2026-10-19.json": "checks/roadmap/roadmap-zkit-0.2.5-adaptation-checks-2026-10-19.json"
+  },
+  "all_files": {
+    "concept.md": "concept.md",
+    "requirements.md": "requirements.md",
+    "contracts.md": "contracts.md",
+    "architecture.md": "architecture.md",
+    "resilience.md": "resilience.md",
+    "resource_model.py": "resource-math/model.py",
+    "simplification-audit.md": "appendix/simplification-audit.md",
+    "domain-model.md": "appendix/domain-model.md",
+    "data.md": "data.md",
+    "migration-manifest.json": "appendix/migration-manifest.json",
+    "migration.md": "appendix/migration.md",
+    "roadmap_schedule.py": "roadmap/schedule.py",
+    "resilience_model.py": "resilience/model.py",
+    "roadmap.md": "roadmap.md",
+    "scenarios.md": "appendix/scenarios.md",
+    "task-template.md": "roadmap/task-template.md",
+    "mechanics.md": "mechanics.md",
+    "resource-math.md": "resource-math.md",
+    "decisions.md": "decisions.md",
+    "research/R-5-git-storage-probe.md": "research/R-5-git-storage-probe.md",
+    "research/R-3-ollama-embeddings.md": "research/R-3-ollama-embeddings.md",
+    "research/R-8-durability-and-search-primitives.md": "research/R-8-durability-and-search-primitives.md",
+    "research/R-9-sqlite-copy-and-restore.md": "research/R-9-sqlite-copy-and-restore.md",
+    "research/R-4-ollama-local-probe.md": "research/R-4-ollama-local-probe.md",
+    "research/R-1-go-sqlite.md": "research/R-1-go-sqlite.md",
+    "research/R-6-sqlite-capacity-probe.md": "research/R-6-sqlite-capacity-probe.md",
+    "research/R-2-rust-sqlite.md": "research/R-2-rust-sqlite.md",
+    "research/R-7-embedding-api-compatibility.md": "research/R-7-embedding-api-compatibility.md",
+    "roadmap/epics/EP-5-final-pilot/epic.md": "roadmap/epics/EP-5-final-pilot/epic.md",
+    "roadmap/epics/EP-5-final-pilot/tasks/TK-31-baseline.md": "roadmap/epics/EP-5-final-pilot/tasks/TK-31-baseline.md",
+    "roadmap/epics/EP-5-final-pilot/tasks/TK-33-pilot-analysis.md": "roadmap/epics/EP-5-final-pilot/tasks/TK-33-pilot-analysis.md",
+    "roadmap/epics/EP-5-final-pilot/tasks/TK-32-memory-condition.md": "roadmap/epics/EP-5-final-pilot/tasks/TK-32-memory-condition.md",
+    "roadmap/epics/EP-5-final-pilot/tasks/TK-30-pilot-setup.md": "roadmap/epics/EP-5-final-pilot/tasks/TK-30-pilot-setup.md",
+    "roadmap/epics/EP-3-maintenance/epic.md": "roadmap/epics/EP-3-maintenance/epic.md",
+    "roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md": "roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md",
+    "roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md": "roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md",
+    "roadmap/epics/EP-3-maintenance/tasks/TK-29-cancellation.md": "roadmap/epics/EP-3-maintenance/tasks/TK-29-cancellation.md",
+    "roadmap/epics/EP-3-maintenance/tasks/TK-25-reindexing.md": "roadmap/epics/EP-3-maintenance/tasks/TK-25-reindexing.md",
+    "roadmap/epics/EP-3-maintenance/tasks/TK-28-diagnostics.md": "roadmap/epics/EP-3-maintenance/tasks/TK-28-diagnostics.md",
+    "roadmap/epics/EP-4-system-validation/epic.md": "roadmap/epics/EP-4-system-validation/epic.md",
+    "roadmap/epics/EP-4-system-validation/tasks/TK-41-provider-drill.md": "roadmap/epics/EP-4-system-validation/tasks/TK-41-provider-drill.md",
+    "roadmap/epics/EP-4-system-validation/tasks/TK-35-search-latency.md": "roadmap/epics/EP-4-system-validation/tasks/TK-35-search-latency.md",
+    "roadmap/epics/EP-4-system-validation/tasks/TK-40-restore.md": "roadmap/epics/EP-4-system-validation/tasks/TK-40-restore.md",
+    "roadmap/epics/EP-4-system-validation/tasks/TK-37-queue-drill.md": "roadmap/epics/EP-4-system-validation/tasks/TK-37-queue-drill.md",
+    "roadmap/epics/EP-4-system-validation/tasks/TK-39-corruption-drill.md": "roadmap/epics/EP-4-system-validation/tasks/TK-39-corruption-drill.md",
+    "roadmap/epics/EP-4-system-validation/tasks/TK-42-exhaustion.md": "roadmap/epics/EP-4-system-validation/tasks/TK-42-exhaustion.md",
+    "roadmap/epics/EP-4-system-validation/tasks/TK-34-mixed-memory.md": "roadmap/epics/EP-4-system-validation/tasks/TK-34-mixed-memory.md",
+    "roadmap/epics/EP-4-system-validation/tasks/TK-36-disk-growth.md": "roadmap/epics/EP-4-system-validation/tasks/TK-36-disk-growth.md",
+    "roadmap/epics/EP-4-system-validation/tasks/TK-38-power-loss.md": "roadmap/epics/EP-4-system-validation/tasks/TK-38-power-loss.md",
+    "roadmap/epics/EP-2-knowledge/epic.md": "roadmap/epics/EP-2-knowledge/epic.md",
+    "roadmap/epics/EP-2-knowledge/tasks/TK-20-source-identity.md": "roadmap/epics/EP-2-knowledge/tasks/TK-20-source-identity.md",
+    "roadmap/epics/EP-2-knowledge/tasks/TK-21-provenance.md": "roadmap/epics/EP-2-knowledge/tasks/TK-21-provenance.md",
+    "roadmap/epics/EP-2-knowledge/tasks/TK-22-filters.md": "roadmap/epics/EP-2-knowledge/tasks/TK-22-filters.md",
+    "roadmap/epics/EP-2-knowledge/tasks/TK-19-mutations.md": "roadmap/epics/EP-2-knowledge/tasks/TK-19-mutations.md",
+    "roadmap/epics/EP-2-knowledge/tasks/TK-18-graph-validation.md": "roadmap/epics/EP-2-knowledge/tasks/TK-18-graph-validation.md",
+    "roadmap/epics/EP-2-knowledge/tasks/TK-23-traversal.md": "roadmap/epics/EP-2-knowledge/tasks/TK-23-traversal.md",
+    "roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md": "roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md",
+    "roadmap/epics/EP-6-delivery/epic.md": "roadmap/epics/EP-6-delivery/epic.md",
+    "roadmap/epics/EP-6-delivery/tasks/TK-43-delivery.md": "roadmap/epics/EP-6-delivery/tasks/TK-43-delivery.md",
+    "roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md": "roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md",
+    "roadmap/epics/EP-6-delivery/tasks/TK-45-acceptance.md": "roadmap/epics/EP-6-delivery/tasks/TK-45-acceptance.md",
+    "roadmap/epics/EP-1-thin-slice/epic.md": "roadmap/epics/EP-1-thin-slice/epic.md",
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-12-search.md": "roadmap/epics/EP-1-thin-slice/tasks/TK-12-search.md",
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-14-thin-slice.md": "roadmap/epics/EP-1-thin-slice/tasks/TK-14-thin-slice.md",
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-8-git-snapshots.md": "roadmap/epics/EP-1-thin-slice/tasks/TK-8-git-snapshots.md",
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-13-embeddings.md": "roadmap/epics/EP-1-thin-slice/tasks/TK-13-embeddings.md",
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-7-markdown.md": "roadmap/epics/EP-1-thin-slice/tasks/TK-7-markdown.md",
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md": "roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md",
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-11-cli-runtime.md": "roadmap/epics/EP-1-thin-slice/tasks/TK-11-cli-runtime.md",
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-9-storage.md": "roadmap/epics/EP-1-thin-slice/tasks/TK-9-storage.md",
+    "roadmap/epics/EP-8-proofs/epic.md": "roadmap/epics/EP-8-proofs/epic.md",
+    "roadmap/epics/EP-8-proofs/tasks/TK-5-pilot-protocol.md": "roadmap/epics/EP-8-proofs/tasks/TK-5-pilot-protocol.md",
+    "roadmap/epics/EP-8-proofs/tasks/TK-1-build.md": "roadmap/epics/EP-8-proofs/tasks/TK-1-build.md",
+    "roadmap/epics/EP-8-proofs/tasks/TK-4-runtime-harness.md": "roadmap/epics/EP-8-proofs/tasks/TK-4-runtime-harness.md",
+    "roadmap/epics/EP-8-proofs/tasks/TK-3-vector-harness.md": "roadmap/epics/EP-8-proofs/tasks/TK-3-vector-harness.md",
+    "roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md": "roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md",
+    "roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md": "roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md",
+    "roadmap/epics/EP-7-early-validation/epic.md": "roadmap/epics/EP-7-early-validation/epic.md",
+    "roadmap/epics/EP-7-early-validation/tasks/TK-15-target-corpus.md": "roadmap/epics/EP-7-early-validation/tasks/TK-15-target-corpus.md",
+    "roadmap/epics/EP-7-early-validation/tasks/TK-16-early-memory.md": "roadmap/epics/EP-7-early-validation/tasks/TK-16-early-memory.md",
+    "roadmap/epics/EP-7-early-validation/tasks/TK-17-early-pilot.md": "roadmap/epics/EP-7-early-validation/tasks/TK-17-early-pilot.md",
+    "contracts/x-2-embeddings.md": "contracts/X-2-embeddings.md",
+    "contracts/x-3-git.md": "contracts/X-3-git.md",
+    "contracts/i-8-read-view.md": "contracts/I-8-read-view.md",
+    "contracts/i-12-snapshot.md": "contracts/I-12-snapshot.md",
+    "contracts/i-4-sources.md": "contracts/I-4-sources.md",
+    "contracts/x-4-markdown.md": "contracts/X-4-markdown.md",
+    "contracts/x-1-cli.md": "contracts/X-1-cli.md",
+    "contracts/i-2-projections.md": "contracts/I-2-projections.md",
+    "contracts/i-11-diagnostics.md": "contracts/I-11-diagnostics.md",
+    "contracts/i-1-worker.yaml": "contracts/I-1-worker.yaml",
+    "contracts/schemas/x-2-embeddings.yaml": "contracts/schemas/X-2-embeddings.yaml",
+    "contracts/schemas/x-4-metadata.yaml": "contracts/schemas/X-4-metadata.yaml",
+    "contracts/schemas/x-1-cli.yaml": "contracts/schemas/X-1-cli.yaml",
+    "diagrams/mechanics-types.mmd": "diagrams/mechanics-types.mmd",
+    "diagrams/architecture-components.mmd": "diagrams/architecture-components.mmd",
+    "diagrams/architecture-containers.mmd": "diagrams/architecture-containers.mmd",
+    "diagrams/architecture-context.mmd": "diagrams/architecture-context.mmd",
+    "mechanics/model_commit.py": "mechanics/model_commit.py",
+    "mechanics/model_embedding.py": "mechanics/model_embedding.py",
+    "mechanics/storage-schema.sql": "mechanics/storage-schema.sql",
+    "mechanics/storage-model.md": "mechanics/storage-model.md",
+    "mechanics/model_runtime.py": "mechanics/model_runtime.py",
+    "measurements/sqlite-2026-10-18/Cargo.toml": "research/R-6-sqlite-capacity-probe/Cargo.toml",
+    "measurements/sqlite-2026-10-18/load-memory.json": "research/R-6-sqlite-capacity-probe/load-memory.json",
+    "measurements/sqlite-2026-10-18/sha256.json": "research/R-6-sqlite-capacity-probe/sha256.json",
+    "measurements/sqlite-2026-10-18/readers_2-memory.json": "research/R-6-sqlite-capacity-probe/readers_2-memory.json",
+    "measurements/sqlite-2026-10-18/schema.sql": "research/R-6-sqlite-capacity-probe/schema.sql",
+    "measurements/sqlite-2026-10-18/mixed-run-summary.json": "research/R-6-sqlite-capacity-probe/mixed-run-summary.json",
+    "measurements/sqlite-2026-10-18/run_probe.py": "research/R-6-sqlite-capacity-probe/run_probe.py",
+    "measurements/sqlite-2026-10-18/readers_1-memory.json": "research/R-6-sqlite-capacity-probe/readers_1-memory.json",
+    "measurements/sqlite-2026-10-18/readers_1-time.txt": "research/R-6-sqlite-capacity-probe/readers_1-time.txt",
+    "measurements/sqlite-2026-10-18/read-stdout.jsonl": "research/R-6-sqlite-capacity-probe/read-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/readers_1-stdout.jsonl": "research/R-6-sqlite-capacity-probe/readers_1-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/Cargo.lock": "research/R-6-sqlite-capacity-probe/Cargo.lock",
+    "measurements/sqlite-2026-10-18/run_mixed.py": "research/R-6-sqlite-capacity-probe/run_mixed.py",
+    "measurements/sqlite-2026-10-18/build-manifest.json": "research/R-6-sqlite-capacity-probe/build-manifest.json",
+    "measurements/sqlite-2026-10-18/readers_4-memory.json": "research/R-6-sqlite-capacity-probe/readers_4-memory.json",
+    "measurements/sqlite-2026-10-18/load-time.txt": "research/R-6-sqlite-capacity-probe/load-time.txt",
+    "measurements/sqlite-2026-10-18/readers_4-stdout.jsonl": "research/R-6-sqlite-capacity-probe/readers_4-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/README.md": "research/R-6-sqlite-capacity-probe/README.md",
+    "measurements/sqlite-2026-10-18/mixed-stdout.jsonl": "research/R-6-sqlite-capacity-probe/mixed-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/db-breakdown.json": "research/R-6-sqlite-capacity-probe/db-breakdown.json",
+    "measurements/sqlite-2026-10-18/parallelism-run-summary.json": "research/R-6-sqlite-capacity-probe/parallelism-run-summary.json",
+    "measurements/sqlite-2026-10-18/load-stdout.jsonl": "research/R-6-sqlite-capacity-probe/load-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/first-build.json": "research/R-6-sqlite-capacity-probe/first-build.json",
+    "measurements/sqlite-2026-10-18/read-time.txt": "research/R-6-sqlite-capacity-probe/read-time.txt",
+    "measurements/sqlite-2026-10-18/run_parallelism.py": "research/R-6-sqlite-capacity-probe/run_parallelism.py",
+    "measurements/sqlite-2026-10-18/readers_2-stdout.jsonl": "research/R-6-sqlite-capacity-probe/readers_2-stdout.jsonl",
+    "measurements/sqlite-2026-10-18/readers_4-time.txt": "research/R-6-sqlite-capacity-probe/readers_4-time.txt",
+    "measurements/sqlite-2026-10-18/analysis.json": "research/R-6-sqlite-capacity-probe/analysis.json",
+    "measurements/sqlite-2026-10-18/mixed-time.txt": "research/R-6-sqlite-capacity-probe/mixed-time.txt",
+    "measurements/sqlite-2026-10-18/mixed-memory.json": "research/R-6-sqlite-capacity-probe/mixed-memory.json",
+    "measurements/sqlite-2026-10-18/inspect_db.py": "research/R-6-sqlite-capacity-probe/inspect_db.py",
+    "measurements/sqlite-2026-10-18/readers_2-time.txt": "research/R-6-sqlite-capacity-probe/readers_2-time.txt",
+    "measurements/sqlite-2026-10-18/preflight.json": "research/R-6-sqlite-capacity-probe/preflight.json",
+    "measurements/sqlite-2026-10-18/read-memory.json": "research/R-6-sqlite-capacity-probe/read-memory.json",
+    "measurements/sqlite-2026-10-18/run-summary.json": "research/R-6-sqlite-capacity-probe/run-summary.json",
+    "measurements/sqlite-2026-10-18/analyze.py": "research/R-6-sqlite-capacity-probe/analyze.py",
+    "measurements/sqlite-2026-10-18/src/main.rs": "research/R-6-sqlite-capacity-probe/src/main.rs",
+    "measurements/sqlite-2026-10-18/src/bin/parallelism.rs": "research/R-6-sqlite-capacity-probe/src/bin/parallelism.rs",
+    "measurements/sqlite-2026-10-18/src/bin/mixed.rs": "research/R-6-sqlite-capacity-probe/src/bin/mixed.rs",
+    "measurements/ollama-2026-10-18/summary.json": "research/R-4-ollama-local-probe/summary.json",
+    "measurements/ollama-2026-10-18/sha256.json": "research/R-4-ollama-local-probe/sha256.json",
+    "measurements/ollama-2026-10-18/download.json": "research/R-4-ollama-local-probe/download.json",
+    "measurements/ollama-2026-10-18/memory.json": "research/R-4-ollama-local-probe/memory.json",
+    "measurements/ollama-2026-10-18/metadata.json": "research/R-4-ollama-local-probe/metadata.json",
+    "measurements/ollama-2026-10-18/requests.jsonl": "research/R-4-ollama-local-probe/requests.jsonl",
+    "measurements/ollama-2026-10-18/README.md": "research/R-4-ollama-local-probe/README.md",
+    "measurements/ollama-2026-10-18/probe.executed.py": "research/R-4-ollama-local-probe/probe.executed.py",
+    "measurements/git-2026-10-18/summary.json": "research/R-5-git-storage-probe/summary.json",
+    "measurements/git-2026-10-18/rewrite-objects.json": "research/R-5-git-storage-probe/rewrite-objects.json",
+    "measurements/git-2026-10-18/sha256.json": "research/R-5-git-storage-probe/sha256.json",
+    "measurements/git-2026-10-18/point-snapshots.json": "research/R-5-git-storage-probe/point-snapshots.json",
+    "measurements/git-2026-10-18/rewrite-snapshots.json": "research/R-5-git-storage-probe/rewrite-snapshots.json",
+    "measurements/git-2026-10-18/packed-refs-result.json": "research/R-5-git-storage-probe/packed-refs-result.json",
+    "measurements/git-2026-10-18/metadata.json": "research/R-5-git-storage-probe/metadata.json",
+    "measurements/git-2026-10-18/README.md": "research/R-5-git-storage-probe/README.md",
+    "measurements/git-2026-10-18/point-result.json": "research/R-5-git-storage-probe/point-result.json",
+    "measurements/git-2026-10-18/pack_refs_probe.executed.py": "research/R-5-git-storage-probe/pack_refs_probe.executed.py",
+    "measurements/git-2026-10-18/probe.executed.py": "research/R-5-git-storage-probe/probe.executed.py",
+    "measurements/git-2026-10-18/point-objects.json": "research/R-5-git-storage-probe/point-objects.json",
+    "measurements/git-2026-10-18/rewrite-result.json": "research/R-5-git-storage-probe/rewrite-result.json",
+    "reference/requirements-pre-zkit.md": "appendix/requirements-pre-zkit.md",
+    "reference/probes/rust-sqlite/Cargo.toml": "research/R-2-rust-sqlite/Cargo.toml",
+    "reference/probes/rust-sqlite/Cargo.lock": "research/R-2-rust-sqlite/Cargo.lock",
+    "reference/probes/rust-sqlite/build-manifest.json": "research/R-2-rust-sqlite/build-manifest.json",
+    "reference/probes/rust-sqlite/results.txt": "research/R-2-rust-sqlite/results.txt",
+    "reference/probes/rust-sqlite/README.md": "research/R-2-rust-sqlite/README.md",
+    "reference/probes/rust-sqlite/src/main.rs": "research/R-2-rust-sqlite/src/main.rs",
+    "reference/probes/go-sqlite/go.mod": "research/R-1-go-sqlite/go.mod",
+    "reference/probes/go-sqlite/build-manifest.json": "research/R-1-go-sqlite/build-manifest.json",
+    "reference/probes/go-sqlite/go.sum": "research/R-1-go-sqlite/go.sum",
+    "reference/probes/go-sqlite/README.md": "research/R-1-go-sqlite/README.md",
+    "reference/probes/go-sqlite/native-final-results.txt": "research/R-1-go-sqlite/native-final-results.txt",
+    "reference/probes/go-sqlite/native-path-check.txt": "research/R-1-go-sqlite/native-path-check.txt",
+    "reference/probes/go-sqlite/modernc-results.txt": "research/R-1-go-sqlite/modernc-results.txt",
+    "reference/probes/go-sqlite/ncruces-final-results.txt": "research/R-1-go-sqlite/ncruces-final-results.txt",
+    "reference/probes/go-sqlite/modernc/main.go": "research/R-1-go-sqlite/modernc/main.go",
+    "reference/probes/go-sqlite/probe/native.go": "research/R-1-go-sqlite/probe/native.go",
+    "reference/probes/go-sqlite/probe/ncruces.go": "research/R-1-go-sqlite/probe/ncruces.go",
+    "reference/probes/go-sqlite/probe/main.go": "research/R-1-go-sqlite/probe/main.go",
+    "validation/contracts-examples.json": "checks/contracts/contracts-examples.json",
+    "validation/mechanics-review-2026-10-19.md": "checks/mechanics/mechanics-review-2026-10-19.md",
+    "validation/architecture-checks.json": "checks/architecture/architecture-checks.json",
+    "validation/resilience-checks.json": "checks/resilience/resilience-checks.json",
+    "validation/resilience-resilience_arithmetic.json": "checks/resilience/resilience-resilience_arithmetic.json",
+    "validation/zkit-requirements.txt": "checks/requirements/zkit-requirements.txt",
+    "validation/roadmap-checks.json": "checks/roadmap/roadmap-checks.json",
+    "validation/roadmap-weekly-review-2026-10-19.md": "checks/roadmap/roadmap-weekly-review-2026-10-19.md",
+    "validation/data-review-2026-10-19.md": "checks/data/data-review-2026-10-19.md",
+    "validation/architecture-mermaid-checks.json": "checks/architecture/architecture-mermaid-checks.json",
+    "validation/check_resilience_arithmetic.py": "checks/resilience/check_resilience_arithmetic.py",
+    "validation/resource-math-summary-checks.json": "checks/resource-math/resource-math-summary-checks.json",
+    "validation/diagnostics-sizing-checks.json": "checks/resource-math/diagnostics-sizing-checks.json",
+    "validation/mechanics-models.json": "checks/mechanics/mechanics-models.json",
+    "validation/resilience-intake-checks-2026-10-19.json": "checks/resilience/resilience-intake-checks-2026-10-19.json",
+    "validation/diagnostics-sizing-2026-10-19.md": "checks/resource-math/diagnostics-sizing-2026-10-19.md",
+    "validation/resilience-g1-checks-2026-10-19.json": "checks/resilience/resilience-g1-checks-2026-10-19.json",
+    "validation/roadmap-round-1-audit-2026-10-19.md": "checks/roadmap/roadmap-round-1-audit-2026-10-19.md",
+    "validation/roadmap-review-2026-10-19.md": "checks/roadmap/roadmap-review-2026-10-19.md",
+    "validation/contracts-verification-2026-10-18.md": "checks/contracts/contracts-verification-2026-10-18.md",
+    "validation/mechanics-round-1-audit-2026-10-19.md": "checks/mechanics/mechanics-round-1-audit-2026-10-19.md",
+    "validation/resilience-g2-checks-2026-10-19.json": "checks/resilience/resilience-g2-checks-2026-10-19.json",
+    "validation/resilience-review-2026-10-19.md": "checks/resilience/resilience-review-2026-10-19.md",
+    "validation/resource-math-review-2026-10-18.md": "checks/resource-math/resource-math-review-2026-10-18.md",
+    "validation/roadmap-weekly-schedule.json": "checks/roadmap/roadmap-weekly-schedule.json",
+    "validation/migration-preservation.json": "checks/flow/migration-preservation.json",
+    "validation/roadmap-zkit-0.2.5-adaptation-2026-10-19.md": "checks/roadmap/roadmap-zkit-0.2.5-adaptation-2026-10-19.md",
+    "validation/zkit-data.txt": "checks/data/zkit-data.txt",
+    "validation/zkit-contracts.txt": "checks/contracts/zkit-contracts.txt",
+    "validation/README.md": "checks/README.md",
+    "validation/mechanics-mermaid-checks.json": "checks/mechanics/mechanics-mermaid-checks.json",
+    "validation/check_mechanics_artifacts.py": "checks/mechanics/check_mechanics_artifacts.py",
+    "validation/zkit-mechanics.txt": "checks/mechanics/zkit-mechanics.txt",
+    "validation/roadmap-weekly-checks.json": "checks/roadmap/roadmap-weekly-checks.json",
+    "validation/zkit-architecture.txt": "checks/architecture/zkit-architecture.txt",
+    "validation/roadmap-zkit-0.2.5-review-2026-10-19.md": "checks/roadmap/roadmap-zkit-0.2.5-review-2026-10-19.md",
+    "validation/resilience-external_examples.json": "checks/resilience/resilience-external_examples.json",
+    "validation/contracts-checks.json": "checks/contracts/contracts-checks.json",
+    "validation/resilience-round-1-audit-2026-10-19.md": "checks/resilience/resilience-round-1-audit-2026-10-19.md",
+    "validation/task-cards-checks.json": "checks/roadmap/task-cards-checks.json",
+    "validation/architecture-review-2026-10-19.md": "checks/architecture/architecture-review-2026-10-19.md",
+    "validation/roadmap-g1-checks-2026-10-19.json": "checks/roadmap/roadmap-g1-checks-2026-10-19.json",
+    "validation/mechanics-g2-checks-2026-10-19.json": "checks/mechanics/mechanics-g2-checks-2026-10-19.json",
+    "validation/task-cards-review-2026-10-19.md": "checks/roadmap/task-cards-review-2026-10-19.md",
+    "validation/mechanics-external-examples.json": "checks/mechanics/mechanics-external-examples.json",
+    "validation/resilience-internal_models.json": "checks/resilience/resilience-internal_models.json",
+    "validation/architecture-intake-checks-2026-10-19.json": "checks/architecture/architecture-intake-checks-2026-10-19.json",
+    "validation/check_contract_examples.py": "checks/contracts/check_contract_examples.py",
+    "validation/roadmap-intake-checks-2026-10-19.json": "checks/roadmap/roadmap-intake-checks-2026-10-19.json",
+    "validation/roadmap-zkit-0.2.5-checks-2026-10-19.json": "checks/roadmap/roadmap-zkit-0.2.5-checks-2026-10-19.json",
+    "validation/data-checks.json": "checks/data/data-checks.json",
+    "validation/mechanics-checks.json": "checks/mechanics/mechanics-checks.json",
+    "validation/resilience-precloseout-check-2026-10-19.json": "checks/resilience/resilience-precloseout-check-2026-10-19.json",
+    "validation/zkit-results.json": "checks/flow/zkit-results.json",
+    "validation/mechanics-g1-checks-2026-10-19.json": "checks/mechanics/mechanics-g1-checks-2026-10-19.json",
+    "validation/contracts-round-1-audit-2026-10-18.md": "checks/contracts/contracts-round-1-audit-2026-10-18.md",
+    "validation/mechanics-intake-checks-2026-10-19.json": "checks/mechanics/mechanics-intake-checks-2026-10-19.json",
+    "validation/roadmap-zkit-0.2.5-adaptation-checks-2026-10-19.json": "checks/roadmap/roadmap-zkit-0.2.5-adaptation-checks-2026-10-19.json"
+  },
+  "links": {
+    "contracts.md": [
+      {
+        "old": "requirements.md",
+        "new": "../../requirements.md"
+      },
+      {
+        "old": "domain-model.md",
+        "new": "../../appendix/domain-model.md"
+      },
+      {
+        "old": "scenarios.md",
+        "new": "../../appendix/scenarios.md"
+      },
+      {
+        "old": "architecture.md",
+        "new": "../../architecture.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../../mechanics/storage-model.md"
+      },
+      {
+        "old": "decisions.md#D-30",
+        "new": "../../decisions.md#D-30"
+      },
+      {
+        "old": "decisions.md#D-5",
+        "new": "../../decisions.md#D-5"
+      },
+      {
+        "old": "decisions.md#D-30",
+        "new": "../../decisions.md#D-30"
+      },
+      {
+        "old": "decisions.md#D-30",
+        "new": "../../decisions.md#D-30"
+      },
+      {
+        "old": "decisions.md#D-30",
+        "new": "../../decisions.md#D-30"
+      },
+      {
+        "old": "decisions.md#D-7",
+        "new": "../../decisions.md#D-7"
+      },
+      {
+        "old": "decisions.md#D-71",
+        "new": "../../decisions.md#D-71"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../../mechanics/storage-model.md"
+      },
+      {
+        "old": "decisions.md#D-71",
+        "new": "../../decisions.md#D-71"
+      },
+      {
+        "old": "decisions.md#D-71",
+        "new": "../../decisions.md#D-71"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../../mechanics/storage-model.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../../mechanics/storage-model.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../../mechanics/storage-model.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../../mechanics/storage-model.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../../mechanics/storage-model.md"
+      },
+      {
+        "old": "simplification-audit.md",
+        "new": "../../appendix/simplification-audit.md"
+      },
+      {
+        "old": "migration.md",
+        "new": "appendix/migration.md"
+      },
+      {
+        "old": "validation/contracts-examples.json",
+        "new": "checks/contracts/contracts-examples.json"
+      },
+      {
+        "old": "contracts/schemas/x-1-cli.yaml",
+        "new": "contracts/schemas/X-1-cli.yaml"
+      },
+      {
+        "old": "contracts/schemas/x-2-embeddings.yaml",
+        "new": "contracts/schemas/X-2-embeddings.yaml"
+      },
+      {
+        "old": "contracts/schemas/x-4-metadata.yaml",
+        "new": "contracts/schemas/X-4-metadata.yaml"
+      },
+      {
+        "old": "contracts/i-1-worker.yaml",
+        "new": "contracts/I-1-worker.yaml"
+      },
+      {
+        "old": "contracts/i-2-projections.md",
+        "new": "contracts/I-2-projections.md"
+      },
+      {
+        "old": "contracts/i-4-sources.md",
+        "new": "contracts/I-4-sources.md"
+      },
+      {
+        "old": "contracts/i-8-read-view.md",
+        "new": "contracts/I-8-read-view.md"
+      },
+      {
+        "old": "contracts/i-11-diagnostics.md",
+        "new": "contracts/I-11-diagnostics.md"
+      },
+      {
+        "old": "contracts/i-12-snapshot.md",
+        "new": "contracts/I-12-snapshot.md"
+      },
+      {
+        "old": "validation/contracts-round-1-audit-2026-10-18.md",
+        "new": "checks/contracts/contracts-round-1-audit-2026-10-18.md"
+      },
+      {
+        "old": "validation/check_contract_examples.py",
+        "new": "checks/contracts/check_contract_examples.py"
+      },
+      {
+        "old": "validation/contracts-verification-2026-10-18.md",
+        "new": "checks/contracts/contracts-verification-2026-10-18.md"
+      }
+    ],
+    "concept.md": [
+      {
+        "old": "migration.md",
+        "new": "appendix/migration.md"
+      },
+      {
+        "old": "reference/requirements-pre-zkit.md",
+        "new": "appendix/requirements-pre-zkit.md"
+      },
+      {
+        "old": "migration.md#open-questions",
+        "new": "appendix/migration.md#open-questions"
+      },
+      {
+        "old": "migration-manifest.json",
+        "new": "appendix/migration-manifest.json"
+      }
+    ],
+    "requirements.md": [
+      {
+        "old": "migration.md",
+        "new": "appendix/migration.md"
+      },
+      {
+        "old": "reference/requirements-pre-zkit.md",
+        "new": "appendix/requirements-pre-zkit.md"
+      },
+      {
+        "old": "migration.md#verification",
+        "new": "appendix/migration.md#verification"
+      },
+      {
+        "old": "reference/requirements-pre-zkit.md",
+        "new": "appendix/requirements-pre-zkit.md"
+      }
+    ],
+    "architecture.md": [
+      {
+        "old": "validation/architecture-review-2026-10-19.md",
+        "new": "checks/architecture/architecture-review-2026-10-19.md"
+      },
+      {
+        "old": "validation/architecture-checks.json",
+        "new": "checks/architecture/architecture-checks.json"
+      },
+      {
+        "old": "validation/architecture-intake-checks-2026-10-19.json",
+        "new": "checks/architecture/architecture-intake-checks-2026-10-19.json"
+      }
+    ],
+    "resilience.md": [
+      {
+        "old": "validation/resilience-review-2026-10-19.md",
+        "new": "checks/resilience/resilience-review-2026-10-19.md"
+      },
+      {
+        "old": "validation/resilience-checks.json",
+        "new": "checks/resilience/resilience-checks.json"
+      }
+    ],
+    "simplification-audit.md": [
+      {
+        "old": "decisions.md",
+        "new": "../decisions.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../mechanics/storage-model.md"
+      },
+      {
+        "old": "requirements.md",
+        "new": "../requirements.md"
+      },
+      {
+        "old": "architecture.md",
+        "new": "../architecture.md"
+      },
+      {
+        "old": "contracts.md",
+        "new": "../contracts.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../mechanics/storage-model.md"
+      },
+      {
+        "old": "decisions.md#D-30",
+        "new": "../decisions.md#D-30"
+      }
+    ],
+    "domain-model.md": [
+      {
+        "old": "decisions.md",
+        "new": "../decisions.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../mechanics/storage-model.md"
+      },
+      {
+        "old": "requirements.md",
+        "new": "../requirements.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../mechanics/storage-model.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../mechanics/storage-model.md"
+      }
+    ],
+    "data.md": [
+      {
+        "old": "domain-model.md",
+        "new": "appendix/domain-model.md"
+      },
+      {
+        "old": "validation/data-review-2026-10-19.md",
+        "new": "checks/data/data-review-2026-10-19.md"
+      },
+      {
+        "old": "validation/diagnostics-sizing-2026-10-19.md",
+        "new": "checks/resource-math/diagnostics-sizing-2026-10-19.md"
+      },
+      {
+        "old": "domain-model.md",
+        "new": "appendix/domain-model.md"
+      },
+      {
+        "old": "contracts/x-1-cli.md",
+        "new": "contracts/X-1-cli.md"
+      }
+    ],
+    "migration.md": [
+      {
+        "old": "decisions.md#D-30",
+        "new": "../decisions.md#D-30"
+      },
+      {
+        "old": "decisions.md#D-30",
+        "new": "../decisions.md#D-30"
+      },
+      {
+        "old": "validation/zkit-results.json",
+        "new": "../checks/flow/zkit-results.json"
+      },
+      {
+        "old": "validation/migration-preservation.json",
+        "new": "../checks/flow/migration-preservation.json"
+      },
+      {
+        "old": "decisions.md#D-72",
+        "new": "../decisions.md#D-72"
+      }
+    ],
+    "roadmap.md": [
+      {
+        "old": "task-template.md",
+        "new": "roadmap/task-template.md"
+      },
+      {
+        "old": "task-template.md",
+        "new": "roadmap/task-template.md"
+      },
+      {
+        "old": "validation/task-cards-checks.json",
+        "new": "checks/roadmap/task-cards-checks.json"
+      },
+      {
+        "old": "validation/task-cards-review-2026-10-19.md",
+        "new": "checks/roadmap/task-cards-review-2026-10-19.md"
+      },
+      {
+        "old": "validation/roadmap-zkit-0.2.5-adaptation-2026-10-19.md",
+        "new": "checks/roadmap/roadmap-zkit-0.2.5-adaptation-2026-10-19.md"
+      },
+      {
+        "old": "validation/roadmap-zkit-0.2.5-adaptation-checks-2026-10-19.json",
+        "new": "checks/roadmap/roadmap-zkit-0.2.5-adaptation-checks-2026-10-19.json"
+      }
+    ],
+    "scenarios.md": [
+      {
+        "old": "decisions.md",
+        "new": "../decisions.md"
+      },
+      {
+        "old": "mechanics/storage-model.md",
+        "new": "../mechanics/storage-model.md"
+      },
+      {
+        "old": "requirements.md",
+        "new": "../requirements.md"
+      }
+    ],
+    "task-template.md": [
+      {
+        "old": "decisions.md#D-86",
+        "new": "../decisions.md#D-86"
+      },
+      {
+        "old": "decisions.md#D-88",
+        "new": "../decisions.md#D-88"
+      }
+    ],
+    "mechanics.md": [
+      {
+        "old": "validation/mechanics-round-1-audit-2026-10-19.md",
+        "new": "checks/mechanics/mechanics-round-1-audit-2026-10-19.md"
+      }
+    ],
+    "resource-math.md": [
+      {
+        "old": "resource_model.py",
+        "new": "resource-math/model.py"
+      },
+      {
+        "old": "validation/diagnostics-sizing-2026-10-19.md",
+        "new": "checks/resource-math/diagnostics-sizing-2026-10-19.md"
+      },
+      {
+        "old": "validation/resource-math-summary-checks.json",
+        "new": "checks/resource-math/resource-math-summary-checks.json"
+      },
+      {
+        "old": "validation/resource-math-review-2026-10-18.md",
+        "new": "checks/resource-math/resource-math-review-2026-10-18.md"
+      }
+    ],
+    "decisions.md": [
+      {
+        "old": "migration.md#open-questions",
+        "new": "appendix/migration.md#open-questions"
+      },
+      {
+        "old": "domain-model.md",
+        "new": "appendix/domain-model.md"
+      },
+      {
+        "old": "domain-model.md",
+        "new": "appendix/domain-model.md"
+      },
+      {
+        "old": "simplification-audit.md",
+        "new": "appendix/simplification-audit.md"
+      },
+      {
+        "old": "domain-model.md",
+        "new": "appendix/domain-model.md"
+      },
+      {
+        "old": "simplification-audit.md",
+        "new": "appendix/simplification-audit.md"
+      },
+      {
+        "old": "simplification-audit.md",
+        "new": "appendix/simplification-audit.md"
+      },
+      {
+        "old": "measurements/sqlite-2026-10-18/README.md",
+        "new": "research/R-6-sqlite-capacity-probe/README.md"
+      },
+      {
+        "old": "contracts/x-2-embeddings.md",
+        "new": "contracts/X-2-embeddings.md"
+      },
+      {
+        "old": "contracts/x-1-cli.md",
+        "new": "contracts/X-1-cli.md"
+      },
+      {
+        "old": "contracts/x-2-embeddings.md",
+        "new": "contracts/X-2-embeddings.md"
+      },
+      {
+        "old": "resource_model.py",
+        "new": "resource-math/model.py"
+      },
+      {
+        "old": "validation/resource-math-review-2026-10-18.md",
+        "new": "checks/resource-math/resource-math-review-2026-10-18.md"
+      },
+      {
+        "old": "contracts/x-2-embeddings.md",
+        "new": "contracts/X-2-embeddings.md"
+      },
+      {
+        "old": "contracts/x-2-embeddings.md",
+        "new": "contracts/X-2-embeddings.md"
+      },
+      {
+        "old": "contracts/x-2-embeddings.md",
+        "new": "contracts/X-2-embeddings.md"
+      },
+      {
+        "old": "contracts/x-2-embeddings.md",
+        "new": "contracts/X-2-embeddings.md"
+      },
+      {
+        "old": "contracts/x-2-embeddings.md",
+        "new": "contracts/X-2-embeddings.md"
+      },
+      {
+        "old": "contracts/x-1-cli.md",
+        "new": "contracts/X-1-cli.md"
+      },
+      {
+        "old": "contracts/x-1-cli.md",
+        "new": "contracts/X-1-cli.md"
+      },
+      {
+        "old": "contracts/x-2-embeddings.md",
+        "new": "contracts/X-2-embeddings.md"
+      },
+      {
+        "old": "contracts/x-1-cli.md",
+        "new": "contracts/X-1-cli.md"
+      },
+      {
+        "old": "validation/roadmap-zkit-0.2.5-review-2026-10-19.md",
+        "new": "checks/roadmap/roadmap-zkit-0.2.5-review-2026-10-19.md"
+      },
+      {
+        "old": "task-template.md",
+        "new": "roadmap/task-template.md"
+      }
+    ],
+    "research/R-5-git-storage-probe.md": [
+      {
+        "old": "../measurements/git-2026-10-18/README.md",
+        "new": "R-5-git-storage-probe/README.md"
+      }
+    ],
+    "research/R-4-ollama-local-probe.md": [
+      {
+        "old": "../measurements/ollama-2026-10-18/README.md",
+        "new": "R-4-ollama-local-probe/README.md"
+      }
+    ],
+    "research/R-1-go-sqlite.md": [
+      {
+        "old": "../reference/probes/go-sqlite/README.md",
+        "new": "R-1-go-sqlite/README.md"
+      }
+    ],
+    "research/R-6-sqlite-capacity-probe.md": [
+      {
+        "old": "../measurements/sqlite-2026-10-18/README.md",
+        "new": "R-6-sqlite-capacity-probe/README.md"
+      }
+    ],
+    "research/R-2-rust-sqlite.md": [
+      {
+        "old": "../reference/probes/rust-sqlite/README.md",
+        "new": "R-2-rust-sqlite/README.md"
+      }
+    ],
+    "roadmap/epics/EP-2-knowledge/tasks/TK-20-source-identity.md": [
+      {
+        "old": "../../../../contracts/x-4-markdown.md",
+        "new": "../../../../contracts/X-4-markdown.md"
+      }
+    ],
+    "roadmap/epics/EP-2-knowledge/tasks/TK-21-provenance.md": [
+      {
+        "old": "../../../../contracts/x-3-git.md",
+        "new": "../../../../contracts/X-3-git.md"
+      }
+    ],
+    "roadmap/epics/EP-2-knowledge/tasks/TK-22-filters.md": [
+      {
+        "old": "../../../../contracts/x-1-cli.md",
+        "new": "../../../../contracts/X-1-cli.md"
+      }
+    ],
+    "roadmap/epics/EP-2-knowledge/tasks/TK-19-mutations.md": [
+      {
+        "old": "../../../../contracts/x-1-cli.md",
+        "new": "../../../../contracts/X-1-cli.md"
+      }
+    ],
+    "roadmap/epics/EP-2-knowledge/tasks/TK-18-graph-validation.md": [
+      {
+        "old": "../../../../contracts/x-4-markdown.md",
+        "new": "../../../../contracts/X-4-markdown.md"
+      }
+    ],
+    "roadmap/epics/EP-2-knowledge/tasks/TK-23-traversal.md": [
+      {
+        "old": "../../../../contracts/x-1-cli.md",
+        "new": "../../../../contracts/X-1-cli.md"
+      }
+    ],
+    "roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md": [
+      {
+        "old": "../../../../contracts/x-1-cli.md",
+        "new": "../../../../contracts/X-1-cli.md"
+      }
+    ],
+    "roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md": [
+      {
+        "old": "../../../../contracts/x-1-cli.md",
+        "new": "../../../../contracts/X-1-cli.md"
+      }
+    ],
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-8-git-snapshots.md": [
+      {
+        "old": "../../../../contracts/x-3-git.md",
+        "new": "../../../../contracts/X-3-git.md"
+      }
+    ],
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-13-embeddings.md": [
+      {
+        "old": "../../../../contracts/x-2-embeddings.md",
+        "new": "../../../../contracts/X-2-embeddings.md"
+      }
+    ],
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-7-markdown.md": [
+      {
+        "old": "../../../../contracts/x-4-markdown.md",
+        "new": "../../../../contracts/X-4-markdown.md"
+      }
+    ],
+    "roadmap/epics/EP-1-thin-slice/tasks/TK-11-cli-runtime.md": [
+      {
+        "old": "../../../../contracts/x-1-cli.md",
+        "new": "../../../../contracts/X-1-cli.md"
+      }
+    ],
+    "roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md": [
+      {
+        "old": "../../../../contracts/x-2-embeddings.md",
+        "new": "../../../../contracts/X-2-embeddings.md"
+      }
+    ],
+    "contracts/x-2-embeddings.md": [
+      {
+        "old": "schemas/x-2-embeddings.yaml",
+        "new": "schemas/X-2-embeddings.yaml"
+      }
+    ],
+    "contracts/x-4-markdown.md": [
+      {
+        "old": "schemas/x-4-metadata.yaml",
+        "new": "schemas/X-4-metadata.yaml"
+      }
+    ],
+    "contracts/x-1-cli.md": [
+      {
+        "old": "schemas/x-1-cli.yaml",
+        "new": "schemas/X-1-cli.yaml"
+      },
+      {
+        "old": "../validation/contracts-examples.json",
+        "new": "../checks/contracts/contracts-examples.json"
+      }
+    ],
+    "mechanics/storage-model.md": [
+      {
+        "old": "../domain-model.md",
+        "new": "../appendix/domain-model.md"
+      },
+      {
+        "old": "../simplification-audit.md",
+        "new": "../appendix/simplification-audit.md"
+      }
+    ],
+    "measurements/sqlite-2026-10-18/README.md": [
+      {
+        "old": "../../research/R-6-sqlite-capacity-probe.md",
+        "new": "../R-6-sqlite-capacity-probe.md"
+      }
+    ],
+    "measurements/ollama-2026-10-18/README.md": [
+      {
+        "old": "../../research/R-4-ollama-local-probe.md",
+        "new": "../R-4-ollama-local-probe.md"
+      }
+    ],
+    "measurements/git-2026-10-18/README.md": [
+      {
+        "old": "../../research/R-5-git-storage-probe.md",
+        "new": "../R-5-git-storage-probe.md"
+      }
+    ],
+    "reference/requirements-pre-zkit.md": [
+      {
+        "old": "../simplification-audit.md",
+        "new": "simplification-audit.md"
+      }
+    ],
+    "reference/probes/rust-sqlite/README.md": [
+      {
+        "old": "../../../research/R-2-rust-sqlite.md",
+        "new": "../R-2-rust-sqlite.md"
+      },
+      {
+        "old": "../go-sqlite/README.md",
+        "new": "../R-1-go-sqlite/README.md"
+      }
+    ],
+    "reference/probes/go-sqlite/README.md": [
+      {
+        "old": "../../../research/R-1-go-sqlite.md",
+        "new": "../R-1-go-sqlite.md"
+      }
+    ],
+    "validation/data-review-2026-10-19.md": [
+      {
+        "old": "diagnostics-sizing-2026-10-19.md",
+        "new": "../resource-math/diagnostics-sizing-2026-10-19.md"
+      }
+    ],
+    "validation/diagnostics-sizing-2026-10-19.md": [
+      {
+        "old": "../decisions.md#D-73",
+        "new": "../../decisions.md#D-73"
+      },
+      {
+        "old": "../resource_model.py",
+        "new": "../../resource-math/model.py"
+      },
+      {
+        "old": "../resource-math.md",
+        "new": "../../resource-math.md"
+      },
+      {
+        "old": "../data.md",
+        "new": "../../data.md"
+      }
+    ],
+    "validation/contracts-verification-2026-10-18.md": [
+      {
+        "old": "../research/R-7-embedding-api-compatibility.md",
+        "new": "../../research/R-7-embedding-api-compatibility.md"
+      }
+    ],
+    "validation/mechanics-round-1-audit-2026-10-19.md": [
+      {
+        "old": "../decisions.md#D-76",
+        "new": "../../decisions.md#D-76"
+      },
+      {
+        "old": "../decisions.md#D-77",
+        "new": "../../decisions.md#D-77"
+      }
+    ],
+    "validation/roadmap-zkit-0.2.5-adaptation-2026-10-19.md": [
+      {
+        "old": "../decisions.md#D-88",
+        "new": "../../decisions.md#D-88"
+      },
+      {
+        "old": "../roadmap.md",
+        "new": "../../roadmap.md"
+      },
+      {
+        "old": "../roadmap/epics/EP-8-proofs/epic.md",
+        "new": "../../roadmap/epics/EP-8-proofs/epic.md"
+      },
+      {
+        "old": "../task-template.md",
+        "new": "../../roadmap/task-template.md"
+      },
+      {
+        "old": "../roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md",
+        "new": "../../roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md"
+      },
+      {
+        "old": "../roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md",
+        "new": "../../roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md"
+      },
+      {
+        "old": "../roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md",
+        "new": "../../roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md"
+      },
+      {
+        "old": "../task-template.md",
+        "new": "../../roadmap/task-template.md"
+      },
+      {
+        "old": "../roadmap_schedule.py",
+        "new": "../../roadmap/schedule.py"
+      },
+      {
+        "old": "../roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md",
+        "new": "../../roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md"
+      },
+      {
+        "old": "../roadmap/epics/EP-3-maintenance/tasks/TK-29-cancellation.md",
+        "new": "../../roadmap/epics/EP-3-maintenance/tasks/TK-29-cancellation.md"
+      },
+      {
+        "old": "../roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md",
+        "new": "../../roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md"
+      },
+      {
+        "old": "../decisions.md#D-86",
+        "new": "../../decisions.md#D-86"
+      }
+    ],
+    "validation/roadmap-zkit-0.2.5-review-2026-10-19.md": [
+      {
+        "old": "../roadmap.md",
+        "new": "../../roadmap.md"
+      },
+      {
+        "old": "../task-template.md",
+        "new": "../../roadmap/task-template.md"
+      },
+      {
+        "old": "../decisions.md#D-86",
+        "new": "../../decisions.md#D-86"
+      },
+      {
+        "old": "../roadmap.md",
+        "new": "../../roadmap.md"
+      },
+      {
+        "old": "../roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md",
+        "new": "../../roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md"
+      },
+      {
+        "old": "../roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md",
+        "new": "../../roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md"
+      },
+      {
+        "old": "../roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md",
+        "new": "../../roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md"
+      },
+      {
+        "old": "../mechanics.md",
+        "new": "../../mechanics.md"
+      },
+      {
+        "old": "../task-template.md",
+        "new": "../../roadmap/task-template.md"
+      },
+      {
+        "old": "../roadmap_schedule.py",
+        "new": "../../roadmap/schedule.py"
+      },
+      {
+        "old": "../roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md",
+        "new": "../../roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md"
+      },
+      {
+        "old": "../roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md",
+        "new": "../../roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md"
+      }
+    ],
+    "validation/contracts-round-1-audit-2026-10-18.md": [
+      {
+        "old": "../contracts.md#интервью-contracts-фиксированный-раунд-r1",
+        "new": "../../contracts.md#интервью-contracts-фиксированный-раунд-r1"
+      }
+    ]
+  },
+  "script_path_edits": {
+    "roadmap_schedule.py": "Project-root depth and stored schedule location only.",
+    "contracts/i-1-worker.yaml": "Reference file-name case only.",
+    "contracts/schemas/x-2-embeddings.yaml": "Reference file-name case only.",
+    "contracts/schemas/x-4-metadata.yaml": "Reference file-name case only.",
+    "contracts/schemas/x-1-cli.yaml": "Reference file-name case only.",
+    "validation/check_resilience_arithmetic.py": "Project-root depth and moved schema/example/model paths only.",
+    "validation/check_mechanics_artifacts.py": "Project-root depth and moved schema/example/model paths only.",
+    "validation/check_contract_examples.py": "Project-root depth and moved schema/example/model paths only."
+  },
+  "preserved_archival_files": {
+    "research/R-6-sqlite-capacity-probe/load-stdout.jsonl": "3faaf62c17114e36364f2beb82c02d5c6dbfe2db28dcf56efde52569904436b5",
+    "research/R-6-sqlite-capacity-probe/readers_1-time.txt": "a4a89d5992daff39260b687271e9b0cdd4b4118f9dd5b132a6167b5bbcc13587",
+    "research/R-6-sqlite-capacity-probe/run_mixed.py": "b95c0e8cbec0c1a7554f11b84df8f79dac127ec0aef99e5742701f6bbbf0441b",
+    "research/R-6-sqlite-capacity-probe/src/main.rs": "6f843030eeadae435b27f44f95fabc46c9aee4850dda0772aab8bfd94cbbc14f",
+    "research/R-1-go-sqlite/probe/ncruces.go": "c0109ddcef46b4a3eac84c6c5062f08946d42e413e2db8b9ea611559c3f9029d",
+    "research/R-6-sqlite-capacity-probe/db-breakdown.json": "d5bc0f2ea258ecea22ae227d24ac44fb6eaa05157d86b148524ec21a40632167",
+    "research/R-1-go-sqlite/build-manifest.json": "83c6c131d5cf58e6d403c7713af16b8739de9907b012dc0b0172cc47cb2af3fa",
+    "research/R-2-rust-sqlite/src/main.rs": "9a1e90c11c275f8e847d2b7b755624801adbff2e890972eb371b12cc466fea16",
+    "research/R-6-sqlite-capacity-probe/readers_2-time.txt": "060dbbf4f51963cde512414ef7423e9eecb65c6b8a001853beb1acff2df0323d",
+    "research/R-6-sqlite-capacity-probe/readers_2-stdout.jsonl": "a359e862075f3ab5fc0894be0e42f6f25f3adeda37fd2945fe636b830337d100",
+    "research/R-1-go-sqlite/go.sum": "119f1a7e049c82c7f10a3e4eb5cfc8c316973f0ce78e2154ddd8ec30d336a3ec",
+    "research/R-4-ollama-local-probe/metadata.json": "7edc1bf372c62beb166672b9ee399e70b72a789e3fd03a8ce88007bd48c2d98b",
+    "research/R-6-sqlite-capacity-probe/run_probe.py": "3c744a09917bf0e4ebd19a03bceecc17868ed5c9b48691242c27a8c9c4dd89eb",
+    "research/R-6-sqlite-capacity-probe/load-memory.json": "60f42567bed9810febd6693be42374727bf80ddb9cf00cc23210284bab397bd2",
+    "research/R-6-sqlite-capacity-probe/schema.sql": "55278786ee24f9fc408fdc816521a1a753e26e43dc00cea6621eee508edcc4c8",
+    "research/R-6-sqlite-capacity-probe/read-stdout.jsonl": "79ba6e34da49f58d0de014bb6517ac03b343526547f1cb620e471c1cabd974f8",
+    "research/R-1-go-sqlite/native-path-check.txt": "8d376b8c8c2f95cdbb495a19ae1fce3f8d4e5374eb03b5f7374e6375d0550f7c",
+    "research/R-1-go-sqlite/go.mod": "ab1874ffcd9089341a2c4c66132ee7485afb0e557c03e0fc9ead885b8b214be0",
+    "research/R-6-sqlite-capacity-probe/Cargo.toml": "7a3df82c2b7fe1b4f4830eee18c9d14fc0af0d9ad95f14071b872392bfbd2dd5",
+    "research/R-5-git-storage-probe/metadata.json": "2fd469a2cd44dec84dbb2c21e7d4dff9d1b7aa92f84e03749b0c3eb09adb9f98",
+    "research/R-6-sqlite-capacity-probe/load-time.txt": "a9e25a0698455ad2dd4d4c6a850e40c17f9671506c82e0dacebd5341a041b87d",
+    "research/R-6-sqlite-capacity-probe/run_parallelism.py": "6d0c5345f15b9684168ec7399c016fc60454a4e5f9ac6ac3d719718daefa5538",
+    "research/R-6-sqlite-capacity-probe/read-memory.json": "f41ef52ed3ab3fe5fb8db4bdd79c750d8935b2294111888e9caa3fb9ccd70b29",
+    "research/R-6-sqlite-capacity-probe/readers_1-memory.json": "2381759c4fbee375971956b1452b462e4c6adffae89f0f1a5c2699c5a5d80165",
+    "research/R-6-sqlite-capacity-probe/preflight.json": "740639d4f841fcc96da783ed32fbd7266c525338fd73057d0fd052ee31edf860",
+    "research/R-5-git-storage-probe/rewrite-result.json": "d8122720108ebcddea340e46eaf99f44323c54896992903373e1c91be2179851",
+    "research/R-6-sqlite-capacity-probe/readers_1-stdout.jsonl": "c7fb2ffe4f1e9fd0865ae46f38d362effaaddb3ecc5c81c95d40f0dc7ee4a6a2",
+    "research/R-6-sqlite-capacity-probe/read-time.txt": "54f8ef71116f3188bd9cd0d465e4a07ccfa0140199e9ecf3e0cc839224798ca3",
+    "research/R-4-ollama-local-probe/probe.executed.py": "32f06de25322bd9562a305164412fec05dd76faaaccc62cc2391621ac3613a7e",
+    "research/R-5-git-storage-probe/rewrite-objects.json": "becbf5fc4d09b31d2621ac637cc05ec114da1017414c9b31e6c14c05bea372b8",
+    "research/R-2-rust-sqlite/build-manifest.json": "27a2ea8f93800f80af240adf4332bfd7b6b532e0710215349320dc9474caaa7b",
+    "research/R-6-sqlite-capacity-probe/mixed-time.txt": "78f0935f9f59632472b8f4023e9073bdb7a69a6b1132046aab33592e985d7e35",
+    "research/R-2-rust-sqlite/Cargo.lock": "f922742524514ecb13acb0807f981c59a1623513935bb74140d7651558f2e389",
+    "research/R-6-sqlite-capacity-probe/analyze.py": "033f5b5b0ba42ffc635f3ea1e5df99285e4ed9813a08f974e32168d9d4d997cd",
+    "research/R-6-sqlite-capacity-probe/inspect_db.py": "44d6ff68e5403dbb1741f96722f98e89c816f6a205d77d1f6545c7fda7f5cffc",
+    "research/R-6-sqlite-capacity-probe/mixed-memory.json": "763cfd40a3e200a63d6adc93e4e2b83ad246fdce74ea77a4c9ce911c6bc3cc1e",
+    "research/R-1-go-sqlite/native-final-results.txt": "cc3df42abdbaed58bb838bc61b20ebbc5da8c689eef1a3df14359a6630a43dd3",
+    "research/R-2-rust-sqlite/results.txt": "9d748477eecb3b755facd0a4645a37a8decda5cc8ead64e2612c15810976ed41",
+    "research/R-6-sqlite-capacity-probe/first-build.json": "199f8b09490666173dcbb2c43ed8332f07282bdb1f282f59ae286cfe8ee188ce",
+    "research/R-5-git-storage-probe/point-snapshots.json": "2fc0df7b4ecbfe28ff1632b0d0d2f618acf669071f819637762894d0b90602c0",
+    "research/R-5-git-storage-probe/point-objects.json": "3a8f28ff06cc2afa6fa931b8f81d92c6dcc20fd6ab34ae0d1a8109b385a1459b",
+    "research/R-6-sqlite-capacity-probe/run-summary.json": "2427fea44656eecdf91e03be74b95c9b7025adef25a454f3683fb5cd6d7c6c0f",
+    "research/R-1-go-sqlite/ncruces-final-results.txt": "ada28008807f856741e57693c3842bc3b53f6b07a30b5c48d66104eb250754b9",
+    "research/R-1-go-sqlite/probe/native.go": "82da35799dd13887d126b2b463fb68076b13ee98f8125f13966ffb2d54ff47e7",
+    "research/R-6-sqlite-capacity-probe/Cargo.lock": "f922742524514ecb13acb0807f981c59a1623513935bb74140d7651558f2e389",
+    "research/R-6-sqlite-capacity-probe/analysis.json": "13adf3bd5353c5f20e9ef2da45aefd54da6c086a626e744380edf0107ca987d2",
+    "research/R-1-go-sqlite/modernc-results.txt": "30de25bbd85dc1329c3d063e65003339f983ca89a1a36ab1fd0fba755e45eb29",
+    "research/R-6-sqlite-capacity-probe/readers_4-memory.json": "348da6c1fd825ac260aabd472051d029f2c49557c60cf12e2a273a6808f7bbb1",
+    "research/R-6-sqlite-capacity-probe/parallelism-run-summary.json": "5e83333b13a65a380e94074624ecda7d6a8b1a3f0d6579d7b51ab40985bc0ec3",
+    "research/R-4-ollama-local-probe/sha256.json": "dc2674b8c47abeb79167a7337f688cb3f01f31c325442a6cede9dcce3d915eb1",
+    "research/R-4-ollama-local-probe/download.json": "b5dd31dd8dbd3a00c8dcf6797945c44177b9e5a0f794d1168b2240daae696cb8",
+    "research/R-6-sqlite-capacity-probe/mixed-run-summary.json": "cb3811b941ff9abdaacdef03d588e597cd16fbb9cc0d8970eaafbf89f2849eb4",
+    "research/R-6-sqlite-capacity-probe/mixed-stdout.jsonl": "3222c007821b78ae74dd5edb21a8a6ca70533e1656bd0dd3f9b68a1b7e3ce8c5",
+    "research/R-5-git-storage-probe/rewrite-snapshots.json": "cc4e99d6e27ab4ac63bc4d829f851be02f04a6b12ed6a5d5a0898e9a7ef3240c",
+    "research/R-5-git-storage-probe/summary.json": "51734c80567a60242f6f55adfecb6eb9d0512558c4afc57dcd49a4fdacf501f2",
+    "research/R-5-git-storage-probe/packed-refs-result.json": "e8cc028524d6228ca353ccf4028b24166ef78a8ba212b9b66fff54ed517295e9",
+    "research/R-6-sqlite-capacity-probe/build-manifest.json": "b7101c7004d7bb04f27b97c705c4baa70be9506a930f9287b8f5429c0b46cd58",
+    "research/R-4-ollama-local-probe/memory.json": "8a7a1558f87fd2e31b1a40426ff8b1fcebd2d4ae37f5298f2543fa4071ab934f",
+    "research/R-5-git-storage-probe/sha256.json": "7d5e3b37d31d3ff9eedaeedee5b638a545c227079234697d475466a09a9523b0",
+    "research/R-6-sqlite-capacity-probe/src/bin/mixed.rs": "3c8112d7eb0f6951f8c58396cd469be6e3fa1316bacf397ba0264801e575db29",
+    "research/R-5-git-storage-probe/pack_refs_probe.executed.py": "67a501ba5e5789e0e196216097947655b3192d60d46200b93c73a9085ebe0de3",
+    "research/R-5-git-storage-probe/probe.executed.py": "71b99c1c12d2a28cda6377f4bec10c62eda87e5b925d64954cb1ef92fc73e96c",
+    "research/R-6-sqlite-capacity-probe/readers_4-stdout.jsonl": "92e7a8d152d2dcb5735ab061ff29ee0d7eb75da17c48c45512313bdd82a90925",
+    "research/R-4-ollama-local-probe/requests.jsonl": "77680b8666eae57f7c3320aa3314073495b53e7adfbde836cec736ce74ab77e5",
+    "research/R-1-go-sqlite/modernc/main.go": "a4e25f8e3b2e43130a8e59426caab9f562c8b4dee3d3571d036216de84a69197",
+    "research/R-1-go-sqlite/probe/main.go": "0314d29e126b26d8b917100aceb2f2c58da449fad0058e1e3b1b36fb103e8eeb",
+    "research/R-5-git-storage-probe/point-result.json": "99af9de17d9750c515ca1c4550d4d069e881a20e6a32118ccc081fb43edb16ff",
+    "research/R-6-sqlite-capacity-probe/src/bin/parallelism.rs": "a0b511e4d96d41afa010d01be6dd1af2f673a8a732a88f9955f661cdbfec0d69",
+    "research/R-6-sqlite-capacity-probe/readers_2-memory.json": "2547ceea716eeeacb8b7ca6b4aa8670fa639b9e71468e4919d6fccb5e541d50a",
+    "research/R-6-sqlite-capacity-probe/readers_4-time.txt": "46fdf6207433866b6166aa345424bbe21dc528b1995c8155b695379ea64cd352",
+    "research/R-4-ollama-local-probe/summary.json": "cbc4b3231a16079c11bfca3533b84021124700b86234b486fceabb993e2ab2c8",
+    "research/R-6-sqlite-capacity-probe/sha256.json": "6408bb3a623c4791981db01ec420f5d5b8ce8414bc90c740e671ecfe18712412",
+    "research/R-2-rust-sqlite/Cargo.toml": "7a3df82c2b7fe1b4f4830eee18c9d14fc0af0d9ad95f14071b872392bfbd2dd5"
+  },
+  "contract_split": {
+    "source": "contracts.md",
+    "legacy": "contracts/legacy/contracts.md",
+    "original_body_sha256": "15e6ca644b4607d10bd0e68f1b319de9472a6b1a357809104902b8e956a811b7",
+    "body_preserved_except_link_rebasing_and_case": true
+  },
+  "files": [
+    {
+      "source": "concept.md",
+      "destination": "concept.md",
+      "source_sha256": "7aa7c9dd5dd3a8eefab8c86d3978b3eb164b542bddbd7318b97b7b54b7725836",
+      "destination_sha256": "f5ffa13689c26820a46346156298a705360b0c907550ff60fc551bd7daa6c992"
+    },
+    {
+      "source": "requirements.md",
+      "destination": "requirements.md",
+      "source_sha256": "dadd873bcd8b0e676fa9640df1af8d33886f45d3aefb38d2c1d25d38d2ffefbe",
+      "destination_sha256": "691329e892905cb3ca070270c642d809410cfecae848368e375ec252f50380fb"
+    },
+    {
+      "source": "contracts.md",
+      "destination": "contracts.md",
+      "source_sha256": "baf9e564f144cc5c2f8d3bcdca8132f5c3697334e0ecbe99cd237ba0d6017862",
+      "destination_sha256": "53f06e09297750a1e995f481dcd6f2921d5995cf5cf3f8d49e124d240c685e60"
+    },
+    {
+      "source": "architecture.md",
+      "destination": "architecture.md",
+      "source_sha256": "34d3e7efe7ec300ce8b39e77cb7533c4913287f1d29748cfc76240fa77622dc3",
+      "destination_sha256": "047df5c0619e3f28c98a1cea0ca9622416fb47206680898eaa118dfb47bb3ec7"
+    },
+    {
+      "source": "resilience.md",
+      "destination": "resilience.md",
+      "source_sha256": "c42297aff8bc7ae96ddbc0232703ee9431fdf5b20c6e86c955677a7657406107",
+      "destination_sha256": "678bfa65cc25875338948318f352a35f4a1e47a9a967ffd31459e77848be6dd7"
+    },
+    {
+      "source": "resource_model.py",
+      "destination": "resource-math/model.py",
+      "source_sha256": "413fbdee945aa5f9347aae80ca6b735733492ff1cc272b13b2981e69a4ebb0f0",
+      "destination_sha256": "413fbdee945aa5f9347aae80ca6b735733492ff1cc272b13b2981e69a4ebb0f0"
+    },
+    {
+      "source": "simplification-audit.md",
+      "destination": "appendix/simplification-audit.md",
+      "source_sha256": "c1183fad630dcfe3d694b54a580d6a52cfa0446cb8d44f882a86d585d33c7492",
+      "destination_sha256": "9e591685e6bd8941d9091cc3b9094e90d8eeba6493f59a6c2cbc9dd1a31c1f21"
+    },
+    {
+      "source": "domain-model.md",
+      "destination": "appendix/domain-model.md",
+      "source_sha256": "359a6f5674570fe2b2fd9bfd1f301dcab53377f5a9a40e6edf99cdcd875236d2",
+      "destination_sha256": "de839c8de44e67add7b6363ddfeb83e8501a36046033fba4efd53ee1dd970508"
+    },
+    {
+      "source": "data.md",
+      "destination": "data.md",
+      "source_sha256": "c43b44b7a15d94ea8e96e27eac5c530d224a3a36a0c80791c1b05f086ad6547b",
+      "destination_sha256": "c9d35a5584131d3cf43b3dc77d1b2d777effcd10a36060b40cc00fab76c672a4"
+    },
+    {
+      "source": "migration-manifest.json",
+      "destination": "appendix/migration-manifest.json",
+      "source_sha256": "c2fb4f988419fefc75885e6328ae1524daa25fd4970edec0c9ad60c5041882bd",
+      "destination_sha256": "c2fb4f988419fefc75885e6328ae1524daa25fd4970edec0c9ad60c5041882bd"
+    },
+    {
+      "source": "migration.md",
+      "destination": "appendix/migration.md",
+      "source_sha256": "1d3e13ef533edd74f6624269be51d0867c63731b8fc35711fea01cd35a049e6b",
+      "destination_sha256": "6f0764501f5e24076d2843dd4cc6ab1fec170c83eb4af33f0487e2abdbcc2df4"
+    },
+    {
+      "source": "roadmap_schedule.py",
+      "destination": "roadmap/schedule.py",
+      "source_sha256": "8489bee8546eaefae9cb48381b2c1ed1f205c1397f502d42308f8995c5319afb",
+      "destination_sha256": "58e481512cd6a9dac1edffe9a1f033d2730c9262ce7eb6f53448743bb8c87c73"
+    },
+    {
+      "source": "resilience_model.py",
+      "destination": "resilience/model.py",
+      "source_sha256": "0647a836d7667dd7ff5fcc56d227d840b9146ffcaa798ba6c8d7ba6741d95ac1",
+      "destination_sha256": "0647a836d7667dd7ff5fcc56d227d840b9146ffcaa798ba6c8d7ba6741d95ac1"
+    },
+    {
+      "source": "roadmap.md",
+      "destination": "roadmap.md",
+      "source_sha256": "3dc63745adbfb96e977b24dbb2c4464b24f7909c5fd06c3ef31c2a2105f48b2f",
+      "destination_sha256": "2426163ee87775ec5969231cf5b76e6f61c47031664c3c7b4a778c3798f2b529"
+    },
+    {
+      "source": "scenarios.md",
+      "destination": "appendix/scenarios.md",
+      "source_sha256": "6644243f4406de05b251c20a9515fe97f24e15f9a8c0425c36138672f0cbb33f",
+      "destination_sha256": "d0410454ef56a071603bab64496c66c97fb2924885428b4212b314aba53d2a23"
+    },
+    {
+      "source": "task-template.md",
+      "destination": "roadmap/task-template.md",
+      "source_sha256": "e45d611216113407a8f0334b32d60c244470dde6540b97fd863e75d35816a566",
+      "destination_sha256": "6915ffd0bbd49d331d35b6974f16a6b4f52373b4ff3c865df58fe8cbeda51cfd"
+    },
+    {
+      "source": "mechanics.md",
+      "destination": "mechanics.md",
+      "source_sha256": "dc23e5b9a566401b6ce6a2840addb674ccf7720481377fd8a9d36ed4813f9d76",
+      "destination_sha256": "b88f6055290f322f63e5c6f0fd03c2c83e430213083e2143937c4e18fcc84aaf"
+    },
+    {
+      "source": "resource-math.md",
+      "destination": "resource-math.md",
+      "source_sha256": "90befe4b4a4742ca2522b32ab10bd7fd0d9afd935061e020adabc2f6df0ee11a",
+      "destination_sha256": "a300bdec04e5e6ac6ce0feab8bf7ee069a21dff8fe3118eff5f7137566f438e2"
+    },
+    {
+      "source": "decisions.md",
+      "destination": "decisions.md",
+      "source_sha256": "f996fd49b956358875a1f62652c44a49ed6c55980d292361ee302cd21b5fb165",
+      "destination_sha256": "b37106e9fa6bfdb896ee0aa43fafa230362747ecc3898ca4fafb8aa07fa0911e"
+    },
+    {
+      "source": "research/R-5-git-storage-probe.md",
+      "destination": "research/R-5-git-storage-probe.md",
+      "source_sha256": "5f5c2a0012e6c08aa32cb52cc46db54ca4746af84d6616895f6ebf536204d335",
+      "destination_sha256": "8cc85955a1e25f8fe59aeceaf099294e2390c9fa840b15175b1f52eef9707241"
+    },
+    {
+      "source": "research/R-3-ollama-embeddings.md",
+      "destination": "research/R-3-ollama-embeddings.md",
+      "source_sha256": "43bd167e4b7fb36f559038326c7bddd987536a79c57b9bb153eb184234c496ff",
+      "destination_sha256": "43bd167e4b7fb36f559038326c7bddd987536a79c57b9bb153eb184234c496ff"
+    },
+    {
+      "source": "research/R-8-durability-and-search-primitives.md",
+      "destination": "research/R-8-durability-and-search-primitives.md",
+      "source_sha256": "06dfa80644cf9167bfdb6eb042bc89a1ad96f092ad54ff2406c3d6582f6d8be2",
+      "destination_sha256": "06dfa80644cf9167bfdb6eb042bc89a1ad96f092ad54ff2406c3d6582f6d8be2"
+    },
+    {
+      "source": "research/R-9-sqlite-copy-and-restore.md",
+      "destination": "research/R-9-sqlite-copy-and-restore.md",
+      "source_sha256": "46565905d9773daba6876c00a01862304af5e3696bc3719aaa2f3322c9a38230",
+      "destination_sha256": "46565905d9773daba6876c00a01862304af5e3696bc3719aaa2f3322c9a38230"
+    },
+    {
+      "source": "research/R-4-ollama-local-probe.md",
+      "destination": "research/R-4-ollama-local-probe.md",
+      "source_sha256": "2117239e17acaeb4d4ee7483410af8b80485518ef46b8f1d81411dae9e4e40c3",
+      "destination_sha256": "bed591f52197994772f763aa537f6e1cdc56d7abf694175edfba6c788cc794c7"
+    },
+    {
+      "source": "research/R-1-go-sqlite.md",
+      "destination": "research/R-1-go-sqlite.md",
+      "source_sha256": "8444a2b83eaa8fd7e6028c0ee5faf97dd14910901883ec15c67013542cb99d94",
+      "destination_sha256": "a59efea561cd0e4a481233f7cf512ae4f99f5cd6b49538fb7b714d94ce9430d8"
+    },
+    {
+      "source": "research/R-6-sqlite-capacity-probe.md",
+      "destination": "research/R-6-sqlite-capacity-probe.md",
+      "source_sha256": "5863f54342d2406b85a4701812d50658f46db7dad1c72533a624a6641bd24315",
+      "destination_sha256": "dd79bb9620a4e97dbebbc43362383bb6586c4c52a0825bb1d53cf16318094d2f"
+    },
+    {
+      "source": "research/R-2-rust-sqlite.md",
+      "destination": "research/R-2-rust-sqlite.md",
+      "source_sha256": "bb54aa4951df1c26b916c48c2a8b728c997914cf111254a2c5c7c59807f7058f",
+      "destination_sha256": "8ac70ddc3ff0d7733c65d7310eacd2f818bf6682c9f4b7b2be9beb3188281253"
+    },
+    {
+      "source": "research/R-7-embedding-api-compatibility.md",
+      "destination": "research/R-7-embedding-api-compatibility.md",
+      "source_sha256": "b6ba4ff5b153817b1c753de07e8e48fc9ae3e5a41735ac2e2035337602e25953",
+      "destination_sha256": "b6ba4ff5b153817b1c753de07e8e48fc9ae3e5a41735ac2e2035337602e25953"
+    },
+    {
+      "source": "roadmap/epics/EP-5-final-pilot/epic.md",
+      "destination": "roadmap/epics/EP-5-final-pilot/epic.md",
+      "source_sha256": "880691727579b597259f76382b2354fe694f39027e2060e744853cb53efd74ec",
+      "destination_sha256": "880691727579b597259f76382b2354fe694f39027e2060e744853cb53efd74ec"
+    },
+    {
+      "source": "roadmap/epics/EP-5-final-pilot/tasks/TK-31-baseline.md",
+      "destination": "roadmap/epics/EP-5-final-pilot/tasks/TK-31-baseline.md",
+      "source_sha256": "898b10d01d3646a15d21c4de329dfbdae01e921dc411fd37556d8b181d7d21a8",
+      "destination_sha256": "898b10d01d3646a15d21c4de329dfbdae01e921dc411fd37556d8b181d7d21a8"
+    },
+    {
+      "source": "roadmap/epics/EP-5-final-pilot/tasks/TK-33-pilot-analysis.md",
+      "destination": "roadmap/epics/EP-5-final-pilot/tasks/TK-33-pilot-analysis.md",
+      "source_sha256": "8767bcee75791e92ed63ee2f48bbda3f7d71f6da693d0bf759fc19d053e92ddb",
+      "destination_sha256": "8767bcee75791e92ed63ee2f48bbda3f7d71f6da693d0bf759fc19d053e92ddb"
+    },
+    {
+      "source": "roadmap/epics/EP-5-final-pilot/tasks/TK-32-memory-condition.md",
+      "destination": "roadmap/epics/EP-5-final-pilot/tasks/TK-32-memory-condition.md",
+      "source_sha256": "7f7f6914966d9e893a8c441927774d625c64db3e2e9449b03e2349e3509371e0",
+      "destination_sha256": "7f7f6914966d9e893a8c441927774d625c64db3e2e9449b03e2349e3509371e0"
+    },
+    {
+      "source": "roadmap/epics/EP-5-final-pilot/tasks/TK-30-pilot-setup.md",
+      "destination": "roadmap/epics/EP-5-final-pilot/tasks/TK-30-pilot-setup.md",
+      "source_sha256": "934c7c8cc785aec12640b2908b7171a23fc97a33ea877f980782683985a341fe",
+      "destination_sha256": "934c7c8cc785aec12640b2908b7171a23fc97a33ea877f980782683985a341fe"
+    },
+    {
+      "source": "roadmap/epics/EP-3-maintenance/epic.md",
+      "destination": "roadmap/epics/EP-3-maintenance/epic.md",
+      "source_sha256": "f92f07bc5eb3f16a120be4d8f76256f7d8ca41c2d49dfeb8b9ea8cce76a15962",
+      "destination_sha256": "f92f07bc5eb3f16a120be4d8f76256f7d8ca41c2d49dfeb8b9ea8cce76a15962"
+    },
+    {
+      "source": "roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md",
+      "destination": "roadmap/epics/EP-3-maintenance/tasks/TK-26-corruption.md",
+      "source_sha256": "d1c278d2b45f9a2e9f3c26929322bd07a309a309a664dddae0e7c73ae2e62877",
+      "destination_sha256": "d1c278d2b45f9a2e9f3c26929322bd07a309a309a664dddae0e7c73ae2e62877"
+    },
+    {
+      "source": "roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md",
+      "destination": "roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md",
+      "source_sha256": "6945a258e7f65a32e92da0a44b715fe943216a7b954f397a50ec14959f41efbb",
+      "destination_sha256": "6945a258e7f65a32e92da0a44b715fe943216a7b954f397a50ec14959f41efbb"
+    },
+    {
+      "source": "roadmap/epics/EP-3-maintenance/tasks/TK-29-cancellation.md",
+      "destination": "roadmap/epics/EP-3-maintenance/tasks/TK-29-cancellation.md",
+      "source_sha256": "b4705c0faf9d7c4a3642f5cd118971cf132ab3e5f3ad467145defaa057e3fd98",
+      "destination_sha256": "b4705c0faf9d7c4a3642f5cd118971cf132ab3e5f3ad467145defaa057e3fd98"
+    },
+    {
+      "source": "roadmap/epics/EP-3-maintenance/tasks/TK-25-reindexing.md",
+      "destination": "roadmap/epics/EP-3-maintenance/tasks/TK-25-reindexing.md",
+      "source_sha256": "b0ded386081682e4b8a89995deb22bc2dfb90400e79b81ee592bc6fb77f827e8",
+      "destination_sha256": "b0ded386081682e4b8a89995deb22bc2dfb90400e79b81ee592bc6fb77f827e8"
+    },
+    {
+      "source": "roadmap/epics/EP-3-maintenance/tasks/TK-28-diagnostics.md",
+      "destination": "roadmap/epics/EP-3-maintenance/tasks/TK-28-diagnostics.md",
+      "source_sha256": "4da87eed5cf72b9c6cc379b4770355ad3751da4df9cda59be4c0cc3b3fe8f24f",
+      "destination_sha256": "4da87eed5cf72b9c6cc379b4770355ad3751da4df9cda59be4c0cc3b3fe8f24f"
+    },
+    {
+      "source": "roadmap/epics/EP-4-system-validation/epic.md",
+      "destination": "roadmap/epics/EP-4-system-validation/epic.md",
+      "source_sha256": "d11d9b082d021fcf125c8288fb6bca1eaf39a855de6048746b41bf3c186ac6f4",
+      "destination_sha256": "d11d9b082d021fcf125c8288fb6bca1eaf39a855de6048746b41bf3c186ac6f4"
+    },
+    {
+      "source": "roadmap/epics/EP-4-system-validation/tasks/TK-41-provider-drill.md",
+      "destination": "roadmap/epics/EP-4-system-validation/tasks/TK-41-provider-drill.md",
+      "source_sha256": "0a00ca2a894a7fbf3788847cf5956411162fda53e54fc505ad6963c93da045f3",
+      "destination_sha256": "0a00ca2a894a7fbf3788847cf5956411162fda53e54fc505ad6963c93da045f3"
+    },
+    {
+      "source": "roadmap/epics/EP-4-system-validation/tasks/TK-35-search-latency.md",
+      "destination": "roadmap/epics/EP-4-system-validation/tasks/TK-35-search-latency.md",
+      "source_sha256": "6a64c395cfee746127026ea0e5d4ba71a96817ead2a2eab577e12f1eff47058e",
+      "destination_sha256": "6a64c395cfee746127026ea0e5d4ba71a96817ead2a2eab577e12f1eff47058e"
+    },
+    {
+      "source": "roadmap/epics/EP-4-system-validation/tasks/TK-40-restore.md",
+      "destination": "roadmap/epics/EP-4-system-validation/tasks/TK-40-restore.md",
+      "source_sha256": "b103dae144c48295921d5e920ac954f5ec71d5d24ef48df5ea87be51b7e5d086",
+      "destination_sha256": "b103dae144c48295921d5e920ac954f5ec71d5d24ef48df5ea87be51b7e5d086"
+    },
+    {
+      "source": "roadmap/epics/EP-4-system-validation/tasks/TK-37-queue-drill.md",
+      "destination": "roadmap/epics/EP-4-system-validation/tasks/TK-37-queue-drill.md",
+      "source_sha256": "60eb27c2b156a69a350010edbe71dbac9a9868d7c8f2544dba4bb0d4b8bd6a94",
+      "destination_sha256": "60eb27c2b156a69a350010edbe71dbac9a9868d7c8f2544dba4bb0d4b8bd6a94"
+    },
+    {
+      "source": "roadmap/epics/EP-4-system-validation/tasks/TK-39-corruption-drill.md",
+      "destination": "roadmap/epics/EP-4-system-validation/tasks/TK-39-corruption-drill.md",
+      "source_sha256": "4faa714bd28c74cea09a188339c0f439cb563971724a7e2b088e652d49f2ba80",
+      "destination_sha256": "4faa714bd28c74cea09a188339c0f439cb563971724a7e2b088e652d49f2ba80"
+    },
+    {
+      "source": "roadmap/epics/EP-4-system-validation/tasks/TK-42-exhaustion.md",
+      "destination": "roadmap/epics/EP-4-system-validation/tasks/TK-42-exhaustion.md",
+      "source_sha256": "9519701eba279dd48752ff317b5740c3c87e492c3b5b59817bafb39a32064a5b",
+      "destination_sha256": "9519701eba279dd48752ff317b5740c3c87e492c3b5b59817bafb39a32064a5b"
+    },
+    {
+      "source": "roadmap/epics/EP-4-system-validation/tasks/TK-34-mixed-memory.md",
+      "destination": "roadmap/epics/EP-4-system-validation/tasks/TK-34-mixed-memory.md",
+      "source_sha256": "f702c582b5be99a762a7d5a3d2167c2149726f548a3559122b8d4ae1b52d0387",
+      "destination_sha256": "f702c582b5be99a762a7d5a3d2167c2149726f548a3559122b8d4ae1b52d0387"
+    },
+    {
+      "source": "roadmap/epics/EP-4-system-validation/tasks/TK-36-disk-growth.md",
+      "destination": "roadmap/epics/EP-4-system-validation/tasks/TK-36-disk-growth.md",
+      "source_sha256": "8bb61c75e525d757ddb16b5e1815e28ff55968ce0d63011235f2cab604e33ae3",
+      "destination_sha256": "8bb61c75e525d757ddb16b5e1815e28ff55968ce0d63011235f2cab604e33ae3"
+    },
+    {
+      "source": "roadmap/epics/EP-4-system-validation/tasks/TK-38-power-loss.md",
+      "destination": "roadmap/epics/EP-4-system-validation/tasks/TK-38-power-loss.md",
+      "source_sha256": "4dfd8d270d2490f27120fd8513302da6c655bebe649eeb231b0f6816c753d457",
+      "destination_sha256": "4dfd8d270d2490f27120fd8513302da6c655bebe649eeb231b0f6816c753d457"
+    },
+    {
+      "source": "roadmap/epics/EP-2-knowledge/epic.md",
+      "destination": "roadmap/epics/EP-2-knowledge/epic.md",
+      "source_sha256": "1d4f3b0239e22b1850849374c964d2326b6fc084d1ac4b8567d5f48bca893913",
+      "destination_sha256": "1d4f3b0239e22b1850849374c964d2326b6fc084d1ac4b8567d5f48bca893913"
+    },
+    {
+      "source": "roadmap/epics/EP-2-knowledge/tasks/TK-20-source-identity.md",
+      "destination": "roadmap/epics/EP-2-knowledge/tasks/TK-20-source-identity.md",
+      "source_sha256": "f1075a9b44dad641cbdd0b4736e6848185da2f81d40ebe503e15d550bb60c779",
+      "destination_sha256": "5f9fbc5aa0e768a0292e6b1e2f320dd3c1046edb2c9e33f37b5494fc0084d194"
+    },
+    {
+      "source": "roadmap/epics/EP-2-knowledge/tasks/TK-21-provenance.md",
+      "destination": "roadmap/epics/EP-2-knowledge/tasks/TK-21-provenance.md",
+      "source_sha256": "89a36ec45bd98f9d15ad2aa21aab3991696233fe5563f6c6fa72944aca14ee3f",
+      "destination_sha256": "2af0b0c2cb43d8994255c614e651b7e4942273f60e350fbd753c5b4e535a2d9e"
+    },
+    {
+      "source": "roadmap/epics/EP-2-knowledge/tasks/TK-22-filters.md",
+      "destination": "roadmap/epics/EP-2-knowledge/tasks/TK-22-filters.md",
+      "source_sha256": "3ae0206c8e497797095a39b5af11c6ac7fef95c2aded12b766ad3920bdaa6fae",
+      "destination_sha256": "c4b38dc180bef604a29a70d171981835b0d0d71c90fbe81619f8bd35a3fff2c0"
+    },
+    {
+      "source": "roadmap/epics/EP-2-knowledge/tasks/TK-19-mutations.md",
+      "destination": "roadmap/epics/EP-2-knowledge/tasks/TK-19-mutations.md",
+      "source_sha256": "238c49a4a903ebc7125576d6cd14aea2c3035c2374dc93c89e2943b1a4879158",
+      "destination_sha256": "73fa02d10694389e9a30dd24f491e7d3e5c02b551a30f5d61822f5696de3166a"
+    },
+    {
+      "source": "roadmap/epics/EP-2-knowledge/tasks/TK-18-graph-validation.md",
+      "destination": "roadmap/epics/EP-2-knowledge/tasks/TK-18-graph-validation.md",
+      "source_sha256": "4fc48c32ebf03697ce0b37e607862f73e60846b8d7b4e4f2ebe47dcc84d56183",
+      "destination_sha256": "88c9ecad631a09b2e702ad1ee7bd4ed8e2320690fe944972c132179cb66abe52"
+    },
+    {
+      "source": "roadmap/epics/EP-2-knowledge/tasks/TK-23-traversal.md",
+      "destination": "roadmap/epics/EP-2-knowledge/tasks/TK-23-traversal.md",
+      "source_sha256": "cebf8d0ad66f5579d087a49d5cbd4a4ee9ec079f57dc0ff49d93b2678c4a5877",
+      "destination_sha256": "a5ebad344586c6b28e8058843c48bf31affaac9a373cdb5fda78a7539c0c26bc"
+    },
+    {
+      "source": "roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md",
+      "destination": "roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md",
+      "source_sha256": "23e99d85e16480c6d663cbb784ded58dda659e75c9df4e4719c221146178882d",
+      "destination_sha256": "45131092c759b1251b806af227969df5a49ad2b0db7e428c47fab8051530eed3"
+    },
+    {
+      "source": "roadmap/epics/EP-6-delivery/epic.md",
+      "destination": "roadmap/epics/EP-6-delivery/epic.md",
+      "source_sha256": "6fb88d2d471ccfcbd7f5e8c6b6b9c6a60ec5f8666abb15d7b6f5115adb74cff7",
+      "destination_sha256": "6fb88d2d471ccfcbd7f5e8c6b6b9c6a60ec5f8666abb15d7b6f5115adb74cff7"
+    },
+    {
+      "source": "roadmap/epics/EP-6-delivery/tasks/TK-43-delivery.md",
+      "destination": "roadmap/epics/EP-6-delivery/tasks/TK-43-delivery.md",
+      "source_sha256": "afbd914bcc01527471775ca62554728fabfc620c9bb351b435c6b394a1bc1823",
+      "destination_sha256": "afbd914bcc01527471775ca62554728fabfc620c9bb351b435c6b394a1bc1823"
+    },
+    {
+      "source": "roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md",
+      "destination": "roadmap/epics/EP-6-delivery/tasks/TK-44-operations.md",
+      "source_sha256": "11a687c3c2fc276b5aa11d5a18a79f089f9a2664d47346e46235d1fc9d91b4ec",
+      "destination_sha256": "60f4552c79c0ed05b1de30f8444d8591be1415706664f2c46d6aced2f1cc9efb"
+    },
+    {
+      "source": "roadmap/epics/EP-6-delivery/tasks/TK-45-acceptance.md",
+      "destination": "roadmap/epics/EP-6-delivery/tasks/TK-45-acceptance.md",
+      "source_sha256": "f86df8d3491c22ad44b28affdf2a4a20ceb13e44dfd861b0f20110d88db6ceca",
+      "destination_sha256": "f86df8d3491c22ad44b28affdf2a4a20ceb13e44dfd861b0f20110d88db6ceca"
+    },
+    {
+      "source": "roadmap/epics/EP-1-thin-slice/epic.md",
+      "destination": "roadmap/epics/EP-1-thin-slice/epic.md",
+      "source_sha256": "9559ca63495d94fdd03648e0d41ec442d358798f3f788f4f49a957a96c0969b1",
+      "destination_sha256": "9559ca63495d94fdd03648e0d41ec442d358798f3f788f4f49a957a96c0969b1"
+    },
+    {
+      "source": "roadmap/epics/EP-1-thin-slice/tasks/TK-12-search.md",
+      "destination": "roadmap/epics/EP-1-thin-slice/tasks/TK-12-search.md",
+      "source_sha256": "10c45eb38cc04069cf46e0217dbb3be312d35c5cab94a8e76261dfca7dabb215",
+      "destination_sha256": "10c45eb38cc04069cf46e0217dbb3be312d35c5cab94a8e76261dfca7dabb215"
+    },
+    {
+      "source": "roadmap/epics/EP-1-thin-slice/tasks/TK-14-thin-slice.md",
+      "destination": "roadmap/epics/EP-1-thin-slice/tasks/TK-14-thin-slice.md",
+      "source_sha256": "8b1865163b8d1a96b0740198e21c83a2a50050514bfa042df0ff0406dcf9baea",
+      "destination_sha256": "8b1865163b8d1a96b0740198e21c83a2a50050514bfa042df0ff0406dcf9baea"
+    },
+    {
+      "source": "roadmap/epics/EP-1-thin-slice/tasks/TK-8-git-snapshots.md",
+      "destination": "roadmap/epics/EP-1-thin-slice/tasks/TK-8-git-snapshots.md",
+      "source_sha256": "9367685e066d68a7b1c3442839279aae5c22f8073111c2ee522da7e95d962ae9",
+      "destination_sha256": "9a9c2ff67fc77010bb11bf20d9ce5313152dbc0b85b1a66c85ad33f64b754def"
+    },
+    {
+      "source": "roadmap/epics/EP-1-thin-slice/tasks/TK-13-embeddings.md",
+      "destination": "roadmap/epics/EP-1-thin-slice/tasks/TK-13-embeddings.md",
+      "source_sha256": "a45375e5a5b2ee1bd9e7b0b16715e2c4771cd4da03aa1476cd5bbde8bc338288",
+      "destination_sha256": "3d17e4454fb6a410e537791b4e3c87c7893b24a0fd53dc9c00bed723f1030d16"
+    },
+    {
+      "source": "roadmap/epics/EP-1-thin-slice/tasks/TK-7-markdown.md",
+      "destination": "roadmap/epics/EP-1-thin-slice/tasks/TK-7-markdown.md",
+      "source_sha256": "c9ea7f8c40ab7e92d0c1704f8afd2ad3a77ef0412f2323f43239262baba4d277",
+      "destination_sha256": "b2e738c4ba6caca6caa9e35f546e5d69424ef55b05212ac683236c1cf84f919f"
+    },
+    {
+      "source": "roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md",
+      "destination": "roadmap/epics/EP-1-thin-slice/tasks/TK-10-save-recovery.md",
+      "source_sha256": "6e123175227a80c90d939b2d2aad122404a60ef3fa7f9fe98ac82247b26f3902",
+      "destination_sha256": "6e123175227a80c90d939b2d2aad122404a60ef3fa7f9fe98ac82247b26f3902"
+    },
+    {
+      "source": "roadmap/epics/EP-1-thin-slice/tasks/TK-11-cli-runtime.md",
+      "destination": "roadmap/epics/EP-1-thin-slice/tasks/TK-11-cli-runtime.md",
+      "source_sha256": "0e892d8cb975c1f1cb2bc86288420decb50066cf75e3197e0aa5e765454517b1",
+      "destination_sha256": "0edf9307d3c73711d84888b4202d09a062aa8fe8cb73c6f22aa9c539588925dd"
+    },
+    {
+      "source": "roadmap/epics/EP-1-thin-slice/tasks/TK-9-storage.md",
+      "destination": "roadmap/epics/EP-1-thin-slice/tasks/TK-9-storage.md",
+      "source_sha256": "36ff46e71e3acf4e16226912127fc138add2a474c86254147ea147f9891c1f94",
+      "destination_sha256": "36ff46e71e3acf4e16226912127fc138add2a474c86254147ea147f9891c1f94"
+    },
+    {
+      "source": "roadmap/epics/EP-8-proofs/epic.md",
+      "destination": "roadmap/epics/EP-8-proofs/epic.md",
+      "source_sha256": "953eb920abad04397e9079049791436e5ff58556ee95e5691f1e7e154a7f9857",
+      "destination_sha256": "953eb920abad04397e9079049791436e5ff58556ee95e5691f1e7e154a7f9857"
+    },
+    {
+      "source": "roadmap/epics/EP-8-proofs/tasks/TK-5-pilot-protocol.md",
+      "destination": "roadmap/epics/EP-8-proofs/tasks/TK-5-pilot-protocol.md",
+      "source_sha256": "94377c510b7cc0dff618f981bcb46d209ce8ef3bccd09cd7cf51b74dad8331f7",
+      "destination_sha256": "94377c510b7cc0dff618f981bcb46d209ce8ef3bccd09cd7cf51b74dad8331f7"
+    },
+    {
+      "source": "roadmap/epics/EP-8-proofs/tasks/TK-1-build.md",
+      "destination": "roadmap/epics/EP-8-proofs/tasks/TK-1-build.md",
+      "source_sha256": "0b117fc577676dc8af318b9dcb001f2a05d3559c076cc7dd17690a6fb0ef561d",
+      "destination_sha256": "0b117fc577676dc8af318b9dcb001f2a05d3559c076cc7dd17690a6fb0ef561d"
+    },
+    {
+      "source": "roadmap/epics/EP-8-proofs/tasks/TK-4-runtime-harness.md",
+      "destination": "roadmap/epics/EP-8-proofs/tasks/TK-4-runtime-harness.md",
+      "source_sha256": "def26fc57c355735439a3f126297a8f1b243d817eaf37c52671fe2d5cb1f3f42",
+      "destination_sha256": "def26fc57c355735439a3f126297a8f1b243d817eaf37c52671fe2d5cb1f3f42"
+    },
+    {
+      "source": "roadmap/epics/EP-8-proofs/tasks/TK-3-vector-harness.md",
+      "destination": "roadmap/epics/EP-8-proofs/tasks/TK-3-vector-harness.md",
+      "source_sha256": "8195012abc5dcf8d41c5bb40415f5927ef0bac4de537f054105af1a6ffd3aa58",
+      "destination_sha256": "8195012abc5dcf8d41c5bb40415f5927ef0bac4de537f054105af1a6ffd3aa58"
+    },
+    {
+      "source": "roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md",
+      "destination": "roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md",
+      "source_sha256": "51ae6fff75db72b9552e97e04fe48de909bb2411c6f1eaded2a823e630518808",
+      "destination_sha256": "30445e94eecf7bf67e6256bd5660818560596677ab69cae474ae285df6898d9a"
+    },
+    {
+      "source": "roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md",
+      "destination": "roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md",
+      "source_sha256": "a7a7d7072702d3585753b9e6bb91aa6b931a1b17a2da6e0d159993ee1d825d5b",
+      "destination_sha256": "a7a7d7072702d3585753b9e6bb91aa6b931a1b17a2da6e0d159993ee1d825d5b"
+    },
+    {
+      "source": "roadmap/epics/EP-7-early-validation/epic.md",
+      "destination": "roadmap/epics/EP-7-early-validation/epic.md",
+      "source_sha256": "7737790a6d632a2d59d1414d0456b7d899177326208c2579a1947fc1f669659a",
+      "destination_sha256": "7737790a6d632a2d59d1414d0456b7d899177326208c2579a1947fc1f669659a"
+    },
+    {
+      "source": "roadmap/epics/EP-7-early-validation/tasks/TK-15-target-corpus.md",
+      "destination": "roadmap/epics/EP-7-early-validation/tasks/TK-15-target-corpus.md",
+      "source_sha256": "2ff2091bf05e77f040b812ec549f4a9f334cb42c28e4aba5e7744f6bcf65a374",
+      "destination_sha256": "2ff2091bf05e77f040b812ec549f4a9f334cb42c28e4aba5e7744f6bcf65a374"
+    },
+    {
+      "source": "roadmap/epics/EP-7-early-validation/tasks/TK-16-early-memory.md",
+      "destination": "roadmap/epics/EP-7-early-validation/tasks/TK-16-early-memory.md",
+      "source_sha256": "ea2aead40b7834eee35ebc937012e11c9bad3cc4e12810841357a18a8790114d",
+      "destination_sha256": "ea2aead40b7834eee35ebc937012e11c9bad3cc4e12810841357a18a8790114d"
+    },
+    {
+      "source": "roadmap/epics/EP-7-early-validation/tasks/TK-17-early-pilot.md",
+      "destination": "roadmap/epics/EP-7-early-validation/tasks/TK-17-early-pilot.md",
+      "source_sha256": "8084dc991d70231abedcaa271de3662060d9360d3ef385161ae9afbd1cef8ea1",
+      "destination_sha256": "8084dc991d70231abedcaa271de3662060d9360d3ef385161ae9afbd1cef8ea1"
+    },
+    {
+      "source": "contracts/x-2-embeddings.md",
+      "destination": "contracts/X-2-embeddings.md",
+      "source_sha256": "e42d474163548efed64ffef8a0c2ebce3f36edefe7d3e92f6e701e7f3b8fdfe1",
+      "destination_sha256": "ad21d19459027bf6827a7c57eac21d0d9ff15f8a3b0953e45d8aa8e0bdfafe97"
+    },
+    {
+      "source": "contracts/x-3-git.md",
+      "destination": "contracts/X-3-git.md",
+      "source_sha256": "236bfb795ed39e11d910ee0a74cb78697bfcf4eec2656f4ef745236ca08458f8",
+      "destination_sha256": "236bfb795ed39e11d910ee0a74cb78697bfcf4eec2656f4ef745236ca08458f8"
+    },
+    {
+      "source": "contracts/i-8-read-view.md",
+      "destination": "contracts/I-8-read-view.md",
+      "source_sha256": "2fb9836392126744eda3c8e11052d45804ddcfab3439222f9fcf741429ba1033",
+      "destination_sha256": "2fb9836392126744eda3c8e11052d45804ddcfab3439222f9fcf741429ba1033"
+    },
+    {
+      "source": "contracts/i-12-snapshot.md",
+      "destination": "contracts/I-12-snapshot.md",
+      "source_sha256": "ebf71990db9357e529388659a095aeff3474975483c72ef5bc587d94b7533143",
+      "destination_sha256": "ebf71990db9357e529388659a095aeff3474975483c72ef5bc587d94b7533143"
+    },
+    {
+      "source": "contracts/i-4-sources.md",
+      "destination": "contracts/I-4-sources.md",
+      "source_sha256": "6993e4fef98e738461064a5607054d5e6a73e57120c8c787c5499c8390216d83",
+      "destination_sha256": "6993e4fef98e738461064a5607054d5e6a73e57120c8c787c5499c8390216d83"
+    },
+    {
+      "source": "contracts/x-4-markdown.md",
+      "destination": "contracts/X-4-markdown.md",
+      "source_sha256": "aa74aca442d4e6fff9c3bd07bec5098d87415a711dc297b611b78d363af21410",
+      "destination_sha256": "1ecace78650ff36198593e076cc855c2e3002ea5bb5bf24d9e8452f442d7526e"
+    },
+    {
+      "source": "contracts/x-1-cli.md",
+      "destination": "contracts/X-1-cli.md",
+      "source_sha256": "f0660bf784ae99b43095c90e28bc47068cc5c4b46f1d9742f462b0f9d594f4bc",
+      "destination_sha256": "99db84595b3875f3a2f9f8a95bebcb9755d6f770740715beeb03e8ffb186319b"
+    },
+    {
+      "source": "contracts/i-2-projections.md",
+      "destination": "contracts/I-2-projections.md",
+      "source_sha256": "8ce2e054413d426cdd8d777915388a1ee10c2cd590aed7d149d7230109c8a410",
+      "destination_sha256": "8ce2e054413d426cdd8d777915388a1ee10c2cd590aed7d149d7230109c8a410"
+    },
+    {
+      "source": "contracts/i-11-diagnostics.md",
+      "destination": "contracts/I-11-diagnostics.md",
+      "source_sha256": "3064ea17bcd53430f42203286e3b5af0d29355851748e39ef2942fd9fd296321",
+      "destination_sha256": "3064ea17bcd53430f42203286e3b5af0d29355851748e39ef2942fd9fd296321"
+    },
+    {
+      "source": "contracts/i-1-worker.yaml",
+      "destination": "contracts/I-1-worker.yaml",
+      "source_sha256": "0137089583e4bfb81e3b95a6a8273096be9ae4a202e37dfe096024715503432e",
+      "destination_sha256": "c69a12c4b1ec38710a896ece3d6f067271f43a95fb8a449b2fc2217c5153cf87"
+    },
+    {
+      "source": "contracts/schemas/x-2-embeddings.yaml",
+      "destination": "contracts/schemas/X-2-embeddings.yaml",
+      "source_sha256": "06c8194fe6f088d62630b9a44f7c1bd3b397236edddfd14d05b0c89f7a2059b0",
+      "destination_sha256": "06c8194fe6f088d62630b9a44f7c1bd3b397236edddfd14d05b0c89f7a2059b0"
+    },
+    {
+      "source": "contracts/schemas/x-4-metadata.yaml",
+      "destination": "contracts/schemas/X-4-metadata.yaml",
+      "source_sha256": "431a32d01c4ecb7f667d1f2e31223e2702ce6a9fe7b219f5b8c59871feb4cfca",
+      "destination_sha256": "431a32d01c4ecb7f667d1f2e31223e2702ce6a9fe7b219f5b8c59871feb4cfca"
+    },
+    {
+      "source": "contracts/schemas/x-1-cli.yaml",
+      "destination": "contracts/schemas/X-1-cli.yaml",
+      "source_sha256": "fb5029d065d02e3b2548aa5b29606ea5b1fe72c2813198b1171c2dbbce261351",
+      "destination_sha256": "fb5029d065d02e3b2548aa5b29606ea5b1fe72c2813198b1171c2dbbce261351"
+    },
+    {
+      "source": "diagrams/mechanics-types.mmd",
+      "destination": "diagrams/mechanics-types.mmd",
+      "source_sha256": "e09fbcb9ef1d14390e85ae8c842e55b10f0682785378f34b3aa62425bcbe51ea",
+      "destination_sha256": "e09fbcb9ef1d14390e85ae8c842e55b10f0682785378f34b3aa62425bcbe51ea"
+    },
+    {
+      "source": "diagrams/architecture-components.mmd",
+      "destination": "diagrams/architecture-components.mmd",
+      "source_sha256": "6741fad275d686073b79593b640b809912c28be75d70a58c0a4854b1e17f1745",
+      "destination_sha256": "6741fad275d686073b79593b640b809912c28be75d70a58c0a4854b1e17f1745"
+    },
+    {
+      "source": "diagrams/architecture-containers.mmd",
+      "destination": "diagrams/architecture-containers.mmd",
+      "source_sha256": "b4f04853d7539633885737b429a413d85b3ffb363d4df31fb7057bae6404c7f8",
+      "destination_sha256": "b4f04853d7539633885737b429a413d85b3ffb363d4df31fb7057bae6404c7f8"
+    },
+    {
+      "source": "diagrams/architecture-context.mmd",
+      "destination": "diagrams/architecture-context.mmd",
+      "source_sha256": "bb586d4ff6f2e0da1561575dca9e692243442fee673a900f71966177ed6212ed",
+      "destination_sha256": "bb586d4ff6f2e0da1561575dca9e692243442fee673a900f71966177ed6212ed"
+    },
+    {
+      "source": "mechanics/model_commit.py",
+      "destination": "mechanics/model_commit.py",
+      "source_sha256": "784187d1009b4c356999d3195643699a60433c9e9262b3ba4211c766c569caf8",
+      "destination_sha256": "784187d1009b4c356999d3195643699a60433c9e9262b3ba4211c766c569caf8"
+    },
+    {
+      "source": "mechanics/model_embedding.py",
+      "destination": "mechanics/model_embedding.py",
+      "source_sha256": "51e26faf5417e47a6aa1c5512f7cbb5be1cb6c0a371a30132c2057cf9ede8a96",
+      "destination_sha256": "51e26faf5417e47a6aa1c5512f7cbb5be1cb6c0a371a30132c2057cf9ede8a96"
+    },
+    {
+      "source": "mechanics/storage-schema.sql",
+      "destination": "mechanics/storage-schema.sql",
+      "source_sha256": "70dd89f04ac4cd7a98371b3bccb028da9bc4900026156d7316dba68fbfcabeda",
+      "destination_sha256": "70dd89f04ac4cd7a98371b3bccb028da9bc4900026156d7316dba68fbfcabeda"
+    },
+    {
+      "source": "mechanics/storage-model.md",
+      "destination": "mechanics/storage-model.md",
+      "source_sha256": "715dd7bf3a00e1f67f154fdf96c8284e4caa6503d79d2ce3852b0e656d3e83cb",
+      "destination_sha256": "8bfcd14362ae4f70bfe8be66faff196e9b9cbe6a38bc3361067060c266e3ade1"
+    },
+    {
+      "source": "mechanics/model_runtime.py",
+      "destination": "mechanics/model_runtime.py",
+      "source_sha256": "16f3136651e55d6a48a2a9508d4cbe110e0394aab4445f306b426d89cafc1fe9",
+      "destination_sha256": "16f3136651e55d6a48a2a9508d4cbe110e0394aab4445f306b426d89cafc1fe9"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/Cargo.toml",
+      "destination": "research/R-6-sqlite-capacity-probe/Cargo.toml",
+      "source_sha256": "7a3df82c2b7fe1b4f4830eee18c9d14fc0af0d9ad95f14071b872392bfbd2dd5",
+      "destination_sha256": "7a3df82c2b7fe1b4f4830eee18c9d14fc0af0d9ad95f14071b872392bfbd2dd5"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/load-memory.json",
+      "destination": "research/R-6-sqlite-capacity-probe/load-memory.json",
+      "source_sha256": "60f42567bed9810febd6693be42374727bf80ddb9cf00cc23210284bab397bd2",
+      "destination_sha256": "60f42567bed9810febd6693be42374727bf80ddb9cf00cc23210284bab397bd2"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/sha256.json",
+      "destination": "research/R-6-sqlite-capacity-probe/sha256.json",
+      "source_sha256": "6408bb3a623c4791981db01ec420f5d5b8ce8414bc90c740e671ecfe18712412",
+      "destination_sha256": "6408bb3a623c4791981db01ec420f5d5b8ce8414bc90c740e671ecfe18712412"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/readers_2-memory.json",
+      "destination": "research/R-6-sqlite-capacity-probe/readers_2-memory.json",
+      "source_sha256": "2547ceea716eeeacb8b7ca6b4aa8670fa639b9e71468e4919d6fccb5e541d50a",
+      "destination_sha256": "2547ceea716eeeacb8b7ca6b4aa8670fa639b9e71468e4919d6fccb5e541d50a"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/schema.sql",
+      "destination": "research/R-6-sqlite-capacity-probe/schema.sql",
+      "source_sha256": "55278786ee24f9fc408fdc816521a1a753e26e43dc00cea6621eee508edcc4c8",
+      "destination_sha256": "55278786ee24f9fc408fdc816521a1a753e26e43dc00cea6621eee508edcc4c8"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/mixed-run-summary.json",
+      "destination": "research/R-6-sqlite-capacity-probe/mixed-run-summary.json",
+      "source_sha256": "cb3811b941ff9abdaacdef03d588e597cd16fbb9cc0d8970eaafbf89f2849eb4",
+      "destination_sha256": "cb3811b941ff9abdaacdef03d588e597cd16fbb9cc0d8970eaafbf89f2849eb4"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/run_probe.py",
+      "destination": "research/R-6-sqlite-capacity-probe/run_probe.py",
+      "source_sha256": "3c744a09917bf0e4ebd19a03bceecc17868ed5c9b48691242c27a8c9c4dd89eb",
+      "destination_sha256": "3c744a09917bf0e4ebd19a03bceecc17868ed5c9b48691242c27a8c9c4dd89eb"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/readers_1-memory.json",
+      "destination": "research/R-6-sqlite-capacity-probe/readers_1-memory.json",
+      "source_sha256": "2381759c4fbee375971956b1452b462e4c6adffae89f0f1a5c2699c5a5d80165",
+      "destination_sha256": "2381759c4fbee375971956b1452b462e4c6adffae89f0f1a5c2699c5a5d80165"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/readers_1-time.txt",
+      "destination": "research/R-6-sqlite-capacity-probe/readers_1-time.txt",
+      "source_sha256": "a4a89d5992daff39260b687271e9b0cdd4b4118f9dd5b132a6167b5bbcc13587",
+      "destination_sha256": "a4a89d5992daff39260b687271e9b0cdd4b4118f9dd5b132a6167b5bbcc13587"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/read-stdout.jsonl",
+      "destination": "research/R-6-sqlite-capacity-probe/read-stdout.jsonl",
+      "source_sha256": "79ba6e34da49f58d0de014bb6517ac03b343526547f1cb620e471c1cabd974f8",
+      "destination_sha256": "79ba6e34da49f58d0de014bb6517ac03b343526547f1cb620e471c1cabd974f8"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/readers_1-stdout.jsonl",
+      "destination": "research/R-6-sqlite-capacity-probe/readers_1-stdout.jsonl",
+      "source_sha256": "c7fb2ffe4f1e9fd0865ae46f38d362effaaddb3ecc5c81c95d40f0dc7ee4a6a2",
+      "destination_sha256": "c7fb2ffe4f1e9fd0865ae46f38d362effaaddb3ecc5c81c95d40f0dc7ee4a6a2"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/Cargo.lock",
+      "destination": "research/R-6-sqlite-capacity-probe/Cargo.lock",
+      "source_sha256": "f922742524514ecb13acb0807f981c59a1623513935bb74140d7651558f2e389",
+      "destination_sha256": "f922742524514ecb13acb0807f981c59a1623513935bb74140d7651558f2e389"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/run_mixed.py",
+      "destination": "research/R-6-sqlite-capacity-probe/run_mixed.py",
+      "source_sha256": "b95c0e8cbec0c1a7554f11b84df8f79dac127ec0aef99e5742701f6bbbf0441b",
+      "destination_sha256": "b95c0e8cbec0c1a7554f11b84df8f79dac127ec0aef99e5742701f6bbbf0441b"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/build-manifest.json",
+      "destination": "research/R-6-sqlite-capacity-probe/build-manifest.json",
+      "source_sha256": "b7101c7004d7bb04f27b97c705c4baa70be9506a930f9287b8f5429c0b46cd58",
+      "destination_sha256": "b7101c7004d7bb04f27b97c705c4baa70be9506a930f9287b8f5429c0b46cd58"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/readers_4-memory.json",
+      "destination": "research/R-6-sqlite-capacity-probe/readers_4-memory.json",
+      "source_sha256": "348da6c1fd825ac260aabd472051d029f2c49557c60cf12e2a273a6808f7bbb1",
+      "destination_sha256": "348da6c1fd825ac260aabd472051d029f2c49557c60cf12e2a273a6808f7bbb1"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/load-time.txt",
+      "destination": "research/R-6-sqlite-capacity-probe/load-time.txt",
+      "source_sha256": "a9e25a0698455ad2dd4d4c6a850e40c17f9671506c82e0dacebd5341a041b87d",
+      "destination_sha256": "a9e25a0698455ad2dd4d4c6a850e40c17f9671506c82e0dacebd5341a041b87d"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/readers_4-stdout.jsonl",
+      "destination": "research/R-6-sqlite-capacity-probe/readers_4-stdout.jsonl",
+      "source_sha256": "92e7a8d152d2dcb5735ab061ff29ee0d7eb75da17c48c45512313bdd82a90925",
+      "destination_sha256": "92e7a8d152d2dcb5735ab061ff29ee0d7eb75da17c48c45512313bdd82a90925"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/README.md",
+      "destination": "research/R-6-sqlite-capacity-probe/README.md",
+      "source_sha256": "142b5bad20694ea663de6ab359341f4f1cf1ccac153ceca98601d70adbaec868",
+      "destination_sha256": "016e2304a618c6bf05345004be7f1aa126088fe9acf65d509caaa2faf8e61254"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/mixed-stdout.jsonl",
+      "destination": "research/R-6-sqlite-capacity-probe/mixed-stdout.jsonl",
+      "source_sha256": "3222c007821b78ae74dd5edb21a8a6ca70533e1656bd0dd3f9b68a1b7e3ce8c5",
+      "destination_sha256": "3222c007821b78ae74dd5edb21a8a6ca70533e1656bd0dd3f9b68a1b7e3ce8c5"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/db-breakdown.json",
+      "destination": "research/R-6-sqlite-capacity-probe/db-breakdown.json",
+      "source_sha256": "d5bc0f2ea258ecea22ae227d24ac44fb6eaa05157d86b148524ec21a40632167",
+      "destination_sha256": "d5bc0f2ea258ecea22ae227d24ac44fb6eaa05157d86b148524ec21a40632167"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/parallelism-run-summary.json",
+      "destination": "research/R-6-sqlite-capacity-probe/parallelism-run-summary.json",
+      "source_sha256": "5e83333b13a65a380e94074624ecda7d6a8b1a3f0d6579d7b51ab40985bc0ec3",
+      "destination_sha256": "5e83333b13a65a380e94074624ecda7d6a8b1a3f0d6579d7b51ab40985bc0ec3"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/load-stdout.jsonl",
+      "destination": "research/R-6-sqlite-capacity-probe/load-stdout.jsonl",
+      "source_sha256": "3faaf62c17114e36364f2beb82c02d5c6dbfe2db28dcf56efde52569904436b5",
+      "destination_sha256": "3faaf62c17114e36364f2beb82c02d5c6dbfe2db28dcf56efde52569904436b5"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/first-build.json",
+      "destination": "research/R-6-sqlite-capacity-probe/first-build.json",
+      "source_sha256": "199f8b09490666173dcbb2c43ed8332f07282bdb1f282f59ae286cfe8ee188ce",
+      "destination_sha256": "199f8b09490666173dcbb2c43ed8332f07282bdb1f282f59ae286cfe8ee188ce"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/read-time.txt",
+      "destination": "research/R-6-sqlite-capacity-probe/read-time.txt",
+      "source_sha256": "54f8ef71116f3188bd9cd0d465e4a07ccfa0140199e9ecf3e0cc839224798ca3",
+      "destination_sha256": "54f8ef71116f3188bd9cd0d465e4a07ccfa0140199e9ecf3e0cc839224798ca3"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/run_parallelism.py",
+      "destination": "research/R-6-sqlite-capacity-probe/run_parallelism.py",
+      "source_sha256": "6d0c5345f15b9684168ec7399c016fc60454a4e5f9ac6ac3d719718daefa5538",
+      "destination_sha256": "6d0c5345f15b9684168ec7399c016fc60454a4e5f9ac6ac3d719718daefa5538"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/readers_2-stdout.jsonl",
+      "destination": "research/R-6-sqlite-capacity-probe/readers_2-stdout.jsonl",
+      "source_sha256": "a359e862075f3ab5fc0894be0e42f6f25f3adeda37fd2945fe636b830337d100",
+      "destination_sha256": "a359e862075f3ab5fc0894be0e42f6f25f3adeda37fd2945fe636b830337d100"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/readers_4-time.txt",
+      "destination": "research/R-6-sqlite-capacity-probe/readers_4-time.txt",
+      "source_sha256": "46fdf6207433866b6166aa345424bbe21dc528b1995c8155b695379ea64cd352",
+      "destination_sha256": "46fdf6207433866b6166aa345424bbe21dc528b1995c8155b695379ea64cd352"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/analysis.json",
+      "destination": "research/R-6-sqlite-capacity-probe/analysis.json",
+      "source_sha256": "13adf3bd5353c5f20e9ef2da45aefd54da6c086a626e744380edf0107ca987d2",
+      "destination_sha256": "13adf3bd5353c5f20e9ef2da45aefd54da6c086a626e744380edf0107ca987d2"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/mixed-time.txt",
+      "destination": "research/R-6-sqlite-capacity-probe/mixed-time.txt",
+      "source_sha256": "78f0935f9f59632472b8f4023e9073bdb7a69a6b1132046aab33592e985d7e35",
+      "destination_sha256": "78f0935f9f59632472b8f4023e9073bdb7a69a6b1132046aab33592e985d7e35"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/mixed-memory.json",
+      "destination": "research/R-6-sqlite-capacity-probe/mixed-memory.json",
+      "source_sha256": "763cfd40a3e200a63d6adc93e4e2b83ad246fdce74ea77a4c9ce911c6bc3cc1e",
+      "destination_sha256": "763cfd40a3e200a63d6adc93e4e2b83ad246fdce74ea77a4c9ce911c6bc3cc1e"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/inspect_db.py",
+      "destination": "research/R-6-sqlite-capacity-probe/inspect_db.py",
+      "source_sha256": "44d6ff68e5403dbb1741f96722f98e89c816f6a205d77d1f6545c7fda7f5cffc",
+      "destination_sha256": "44d6ff68e5403dbb1741f96722f98e89c816f6a205d77d1f6545c7fda7f5cffc"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/readers_2-time.txt",
+      "destination": "research/R-6-sqlite-capacity-probe/readers_2-time.txt",
+      "source_sha256": "060dbbf4f51963cde512414ef7423e9eecb65c6b8a001853beb1acff2df0323d",
+      "destination_sha256": "060dbbf4f51963cde512414ef7423e9eecb65c6b8a001853beb1acff2df0323d"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/preflight.json",
+      "destination": "research/R-6-sqlite-capacity-probe/preflight.json",
+      "source_sha256": "740639d4f841fcc96da783ed32fbd7266c525338fd73057d0fd052ee31edf860",
+      "destination_sha256": "740639d4f841fcc96da783ed32fbd7266c525338fd73057d0fd052ee31edf860"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/read-memory.json",
+      "destination": "research/R-6-sqlite-capacity-probe/read-memory.json",
+      "source_sha256": "f41ef52ed3ab3fe5fb8db4bdd79c750d8935b2294111888e9caa3fb9ccd70b29",
+      "destination_sha256": "f41ef52ed3ab3fe5fb8db4bdd79c750d8935b2294111888e9caa3fb9ccd70b29"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/run-summary.json",
+      "destination": "research/R-6-sqlite-capacity-probe/run-summary.json",
+      "source_sha256": "2427fea44656eecdf91e03be74b95c9b7025adef25a454f3683fb5cd6d7c6c0f",
+      "destination_sha256": "2427fea44656eecdf91e03be74b95c9b7025adef25a454f3683fb5cd6d7c6c0f"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/analyze.py",
+      "destination": "research/R-6-sqlite-capacity-probe/analyze.py",
+      "source_sha256": "033f5b5b0ba42ffc635f3ea1e5df99285e4ed9813a08f974e32168d9d4d997cd",
+      "destination_sha256": "033f5b5b0ba42ffc635f3ea1e5df99285e4ed9813a08f974e32168d9d4d997cd"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/src/main.rs",
+      "destination": "research/R-6-sqlite-capacity-probe/src/main.rs",
+      "source_sha256": "6f843030eeadae435b27f44f95fabc46c9aee4850dda0772aab8bfd94cbbc14f",
+      "destination_sha256": "6f843030eeadae435b27f44f95fabc46c9aee4850dda0772aab8bfd94cbbc14f"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/src/bin/parallelism.rs",
+      "destination": "research/R-6-sqlite-capacity-probe/src/bin/parallelism.rs",
+      "source_sha256": "a0b511e4d96d41afa010d01be6dd1af2f673a8a732a88f9955f661cdbfec0d69",
+      "destination_sha256": "a0b511e4d96d41afa010d01be6dd1af2f673a8a732a88f9955f661cdbfec0d69"
+    },
+    {
+      "source": "measurements/sqlite-2026-10-18/src/bin/mixed.rs",
+      "destination": "research/R-6-sqlite-capacity-probe/src/bin/mixed.rs",
+      "source_sha256": "3c8112d7eb0f6951f8c58396cd469be6e3fa1316bacf397ba0264801e575db29",
+      "destination_sha256": "3c8112d7eb0f6951f8c58396cd469be6e3fa1316bacf397ba0264801e575db29"
+    },
+    {
+      "source": "measurements/ollama-2026-10-18/summary.json",
+      "destination": "research/R-4-ollama-local-probe/summary.json",
+      "source_sha256": "cbc4b3231a16079c11bfca3533b84021124700b86234b486fceabb993e2ab2c8",
+      "destination_sha256": "cbc4b3231a16079c11bfca3533b84021124700b86234b486fceabb993e2ab2c8"
+    },
+    {
+      "source": "measurements/ollama-2026-10-18/sha256.json",
+      "destination": "research/R-4-ollama-local-probe/sha256.json",
+      "source_sha256": "dc2674b8c47abeb79167a7337f688cb3f01f31c325442a6cede9dcce3d915eb1",
+      "destination_sha256": "dc2674b8c47abeb79167a7337f688cb3f01f31c325442a6cede9dcce3d915eb1"
+    },
+    {
+      "source": "measurements/ollama-2026-10-18/download.json",
+      "destination": "research/R-4-ollama-local-probe/download.json",
+      "source_sha256": "b5dd31dd8dbd3a00c8dcf6797945c44177b9e5a0f794d1168b2240daae696cb8",
+      "destination_sha256": "b5dd31dd8dbd3a00c8dcf6797945c44177b9e5a0f794d1168b2240daae696cb8"
+    },
+    {
+      "source": "measurements/ollama-2026-10-18/memory.json",
+      "destination": "research/R-4-ollama-local-probe/memory.json",
+      "source_sha256": "8a7a1558f87fd2e31b1a40426ff8b1fcebd2d4ae37f5298f2543fa4071ab934f",
+      "destination_sha256": "8a7a1558f87fd2e31b1a40426ff8b1fcebd2d4ae37f5298f2543fa4071ab934f"
+    },
+    {
+      "source": "measurements/ollama-2026-10-18/metadata.json",
+      "destination": "research/R-4-ollama-local-probe/metadata.json",
+      "source_sha256": "7edc1bf372c62beb166672b9ee399e70b72a789e3fd03a8ce88007bd48c2d98b",
+      "destination_sha256": "7edc1bf372c62beb166672b9ee399e70b72a789e3fd03a8ce88007bd48c2d98b"
+    },
+    {
+      "source": "measurements/ollama-2026-10-18/requests.jsonl",
+      "destination": "research/R-4-ollama-local-probe/requests.jsonl",
+      "source_sha256": "77680b8666eae57f7c3320aa3314073495b53e7adfbde836cec736ce74ab77e5",
+      "destination_sha256": "77680b8666eae57f7c3320aa3314073495b53e7adfbde836cec736ce74ab77e5"
+    },
+    {
+      "source": "measurements/ollama-2026-10-18/README.md",
+      "destination": "research/R-4-ollama-local-probe/README.md",
+      "source_sha256": "acc2bd861d8c859b13b650ea138a3b30ea3d6e35431372e81b0c56549d19f7b0",
+      "destination_sha256": "679638f42b18e04f29e5409f8584edf256b62091af207c647e301f6870fd8e49"
+    },
+    {
+      "source": "measurements/ollama-2026-10-18/probe.executed.py",
+      "destination": "research/R-4-ollama-local-probe/probe.executed.py",
+      "source_sha256": "32f06de25322bd9562a305164412fec05dd76faaaccc62cc2391621ac3613a7e",
+      "destination_sha256": "32f06de25322bd9562a305164412fec05dd76faaaccc62cc2391621ac3613a7e"
+    },
+    {
+      "source": "measurements/git-2026-10-18/summary.json",
+      "destination": "research/R-5-git-storage-probe/summary.json",
+      "source_sha256": "51734c80567a60242f6f55adfecb6eb9d0512558c4afc57dcd49a4fdacf501f2",
+      "destination_sha256": "51734c80567a60242f6f55adfecb6eb9d0512558c4afc57dcd49a4fdacf501f2"
+    },
+    {
+      "source": "measurements/git-2026-10-18/rewrite-objects.json",
+      "destination": "research/R-5-git-storage-probe/rewrite-objects.json",
+      "source_sha256": "becbf5fc4d09b31d2621ac637cc05ec114da1017414c9b31e6c14c05bea372b8",
+      "destination_sha256": "becbf5fc4d09b31d2621ac637cc05ec114da1017414c9b31e6c14c05bea372b8"
+    },
+    {
+      "source": "measurements/git-2026-10-18/sha256.json",
+      "destination": "research/R-5-git-storage-probe/sha256.json",
+      "source_sha256": "7d5e3b37d31d3ff9eedaeedee5b638a545c227079234697d475466a09a9523b0",
+      "destination_sha256": "7d5e3b37d31d3ff9eedaeedee5b638a545c227079234697d475466a09a9523b0"
+    },
+    {
+      "source": "measurements/git-2026-10-18/point-snapshots.json",
+      "destination": "research/R-5-git-storage-probe/point-snapshots.json",
+      "source_sha256": "2fc0df7b4ecbfe28ff1632b0d0d2f618acf669071f819637762894d0b90602c0",
+      "destination_sha256": "2fc0df7b4ecbfe28ff1632b0d0d2f618acf669071f819637762894d0b90602c0"
+    },
+    {
+      "source": "measurements/git-2026-10-18/rewrite-snapshots.json",
+      "destination": "research/R-5-git-storage-probe/rewrite-snapshots.json",
+      "source_sha256": "cc4e99d6e27ab4ac63bc4d829f851be02f04a6b12ed6a5d5a0898e9a7ef3240c",
+      "destination_sha256": "cc4e99d6e27ab4ac63bc4d829f851be02f04a6b12ed6a5d5a0898e9a7ef3240c"
+    },
+    {
+      "source": "measurements/git-2026-10-18/packed-refs-result.json",
+      "destination": "research/R-5-git-storage-probe/packed-refs-result.json",
+      "source_sha256": "e8cc028524d6228ca353ccf4028b24166ef78a8ba212b9b66fff54ed517295e9",
+      "destination_sha256": "e8cc028524d6228ca353ccf4028b24166ef78a8ba212b9b66fff54ed517295e9"
+    },
+    {
+      "source": "measurements/git-2026-10-18/metadata.json",
+      "destination": "research/R-5-git-storage-probe/metadata.json",
+      "source_sha256": "2fd469a2cd44dec84dbb2c21e7d4dff9d1b7aa92f84e03749b0c3eb09adb9f98",
+      "destination_sha256": "2fd469a2cd44dec84dbb2c21e7d4dff9d1b7aa92f84e03749b0c3eb09adb9f98"
+    },
+    {
+      "source": "measurements/git-2026-10-18/README.md",
+      "destination": "research/R-5-git-storage-probe/README.md",
+      "source_sha256": "7984907fa8b5e80eb2a2696c1d72afe3d24192dd64dae022d442c262ee4e1542",
+      "destination_sha256": "b8351671d2cad66a64144c3377e36853920596db4be9aa6f91bb59351cf4427d"
+    },
+    {
+      "source": "measurements/git-2026-10-18/point-result.json",
+      "destination": "research/R-5-git-storage-probe/point-result.json",
+      "source_sha256": "99af9de17d9750c515ca1c4550d4d069e881a20e6a32118ccc081fb43edb16ff",
+      "destination_sha256": "99af9de17d9750c515ca1c4550d4d069e881a20e6a32118ccc081fb43edb16ff"
+    },
+    {
+      "source": "measurements/git-2026-10-18/pack_refs_probe.executed.py",
+      "destination": "research/R-5-git-storage-probe/pack_refs_probe.executed.py",
+      "source_sha256": "67a501ba5e5789e0e196216097947655b3192d60d46200b93c73a9085ebe0de3",
+      "destination_sha256": "67a501ba5e5789e0e196216097947655b3192d60d46200b93c73a9085ebe0de3"
+    },
+    {
+      "source": "measurements/git-2026-10-18/probe.executed.py",
+      "destination": "research/R-5-git-storage-probe/probe.executed.py",
+      "source_sha256": "71b99c1c12d2a28cda6377f4bec10c62eda87e5b925d64954cb1ef92fc73e96c",
+      "destination_sha256": "71b99c1c12d2a28cda6377f4bec10c62eda87e5b925d64954cb1ef92fc73e96c"
+    },
+    {
+      "source": "measurements/git-2026-10-18/point-objects.json",
+      "destination": "research/R-5-git-storage-probe/point-objects.json",
+      "source_sha256": "3a8f28ff06cc2afa6fa931b8f81d92c6dcc20fd6ab34ae0d1a8109b385a1459b",
+      "destination_sha256": "3a8f28ff06cc2afa6fa931b8f81d92c6dcc20fd6ab34ae0d1a8109b385a1459b"
+    },
+    {
+      "source": "measurements/git-2026-10-18/rewrite-result.json",
+      "destination": "research/R-5-git-storage-probe/rewrite-result.json",
+      "source_sha256": "d8122720108ebcddea340e46eaf99f44323c54896992903373e1c91be2179851",
+      "destination_sha256": "d8122720108ebcddea340e46eaf99f44323c54896992903373e1c91be2179851"
+    },
+    {
+      "source": "reference/requirements-pre-zkit.md",
+      "destination": "appendix/requirements-pre-zkit.md",
+      "source_sha256": "57c4cc670193acdd545709266009ea8418f1917cc517ab82a19e45b75623d6bd",
+      "destination_sha256": "db2dc50e3678adf009686f8b65e0ee9df15177236e2855ceab12b6bd8ea215b8"
+    },
+    {
+      "source": "reference/probes/rust-sqlite/Cargo.toml",
+      "destination": "research/R-2-rust-sqlite/Cargo.toml",
+      "source_sha256": "7a3df82c2b7fe1b4f4830eee18c9d14fc0af0d9ad95f14071b872392bfbd2dd5",
+      "destination_sha256": "7a3df82c2b7fe1b4f4830eee18c9d14fc0af0d9ad95f14071b872392bfbd2dd5"
+    },
+    {
+      "source": "reference/probes/rust-sqlite/Cargo.lock",
+      "destination": "research/R-2-rust-sqlite/Cargo.lock",
+      "source_sha256": "f922742524514ecb13acb0807f981c59a1623513935bb74140d7651558f2e389",
+      "destination_sha256": "f922742524514ecb13acb0807f981c59a1623513935bb74140d7651558f2e389"
+    },
+    {
+      "source": "reference/probes/rust-sqlite/build-manifest.json",
+      "destination": "research/R-2-rust-sqlite/build-manifest.json",
+      "source_sha256": "27a2ea8f93800f80af240adf4332bfd7b6b532e0710215349320dc9474caaa7b",
+      "destination_sha256": "27a2ea8f93800f80af240adf4332bfd7b6b532e0710215349320dc9474caaa7b"
+    },
+    {
+      "source": "reference/probes/rust-sqlite/results.txt",
+      "destination": "research/R-2-rust-sqlite/results.txt",
+      "source_sha256": "9d748477eecb3b755facd0a4645a37a8decda5cc8ead64e2612c15810976ed41",
+      "destination_sha256": "9d748477eecb3b755facd0a4645a37a8decda5cc8ead64e2612c15810976ed41"
+    },
+    {
+      "source": "reference/probes/rust-sqlite/README.md",
+      "destination": "research/R-2-rust-sqlite/README.md",
+      "source_sha256": "6d271ff0839e8de035b86d20e2459464ad44b7111a73898d17f1f12fe9a5d28c",
+      "destination_sha256": "8eca275e008e2986fc7e14c45f1a56023d205415027ab53f436bb73b54bfd882"
+    },
+    {
+      "source": "reference/probes/rust-sqlite/src/main.rs",
+      "destination": "research/R-2-rust-sqlite/src/main.rs",
+      "source_sha256": "9a1e90c11c275f8e847d2b7b755624801adbff2e890972eb371b12cc466fea16",
+      "destination_sha256": "9a1e90c11c275f8e847d2b7b755624801adbff2e890972eb371b12cc466fea16"
+    },
+    {
+      "source": "reference/probes/go-sqlite/go.mod",
+      "destination": "research/R-1-go-sqlite/go.mod",
+      "source_sha256": "ab1874ffcd9089341a2c4c66132ee7485afb0e557c03e0fc9ead885b8b214be0",
+      "destination_sha256": "ab1874ffcd9089341a2c4c66132ee7485afb0e557c03e0fc9ead885b8b214be0"
+    },
+    {
+      "source": "reference/probes/go-sqlite/build-manifest.json",
+      "destination": "research/R-1-go-sqlite/build-manifest.json",
+      "source_sha256": "83c6c131d5cf58e6d403c7713af16b8739de9907b012dc0b0172cc47cb2af3fa",
+      "destination_sha256": "83c6c131d5cf58e6d403c7713af16b8739de9907b012dc0b0172cc47cb2af3fa"
+    },
+    {
+      "source": "reference/probes/go-sqlite/go.sum",
+      "destination": "research/R-1-go-sqlite/go.sum",
+      "source_sha256": "119f1a7e049c82c7f10a3e4eb5cfc8c316973f0ce78e2154ddd8ec30d336a3ec",
+      "destination_sha256": "119f1a7e049c82c7f10a3e4eb5cfc8c316973f0ce78e2154ddd8ec30d336a3ec"
+    },
+    {
+      "source": "reference/probes/go-sqlite/README.md",
+      "destination": "research/R-1-go-sqlite/README.md",
+      "source_sha256": "55b2188c3f19c282a72edebafac4d3c0e9b273d9010e0f212471315c6a6650c7",
+      "destination_sha256": "e06716a0d21d9e2d78e99a3c81ead11b665c87bfdbdc2713179608a3d160acd9"
+    },
+    {
+      "source": "reference/probes/go-sqlite/native-final-results.txt",
+      "destination": "research/R-1-go-sqlite/native-final-results.txt",
+      "source_sha256": "cc3df42abdbaed58bb838bc61b20ebbc5da8c689eef1a3df14359a6630a43dd3",
+      "destination_sha256": "cc3df42abdbaed58bb838bc61b20ebbc5da8c689eef1a3df14359a6630a43dd3"
+    },
+    {
+      "source": "reference/probes/go-sqlite/native-path-check.txt",
+      "destination": "research/R-1-go-sqlite/native-path-check.txt",
+      "source_sha256": "8d376b8c8c2f95cdbb495a19ae1fce3f8d4e5374eb03b5f7374e6375d0550f7c",
+      "destination_sha256": "8d376b8c8c2f95cdbb495a19ae1fce3f8d4e5374eb03b5f7374e6375d0550f7c"
+    },
+    {
+      "source": "reference/probes/go-sqlite/modernc-results.txt",
+      "destination": "research/R-1-go-sqlite/modernc-results.txt",
+      "source_sha256": "30de25bbd85dc1329c3d063e65003339f983ca89a1a36ab1fd0fba755e45eb29",
+      "destination_sha256": "30de25bbd85dc1329c3d063e65003339f983ca89a1a36ab1fd0fba755e45eb29"
+    },
+    {
+      "source": "reference/probes/go-sqlite/ncruces-final-results.txt",
+      "destination": "research/R-1-go-sqlite/ncruces-final-results.txt",
+      "source_sha256": "ada28008807f856741e57693c3842bc3b53f6b07a30b5c48d66104eb250754b9",
+      "destination_sha256": "ada28008807f856741e57693c3842bc3b53f6b07a30b5c48d66104eb250754b9"
+    },
+    {
+      "source": "reference/probes/go-sqlite/modernc/main.go",
+      "destination": "research/R-1-go-sqlite/modernc/main.go",
+      "source_sha256": "a4e25f8e3b2e43130a8e59426caab9f562c8b4dee3d3571d036216de84a69197",
+      "destination_sha256": "a4e25f8e3b2e43130a8e59426caab9f562c8b4dee3d3571d036216de84a69197"
+    },
+    {
+      "source": "reference/probes/go-sqlite/probe/native.go",
+      "destination": "research/R-1-go-sqlite/probe/native.go",
+      "source_sha256": "82da35799dd13887d126b2b463fb68076b13ee98f8125f13966ffb2d54ff47e7",
+      "destination_sha256": "82da35799dd13887d126b2b463fb68076b13ee98f8125f13966ffb2d54ff47e7"
+    },
+    {
+      "source": "reference/probes/go-sqlite/probe/ncruces.go",
+      "destination": "research/R-1-go-sqlite/probe/ncruces.go",
+      "source_sha256": "c0109ddcef46b4a3eac84c6c5062f08946d42e413e2db8b9ea611559c3f9029d",
+      "destination_sha256": "c0109ddcef46b4a3eac84c6c5062f08946d42e413e2db8b9ea611559c3f9029d"
+    },
+    {
+      "source": "reference/probes/go-sqlite/probe/main.go",
+      "destination": "research/R-1-go-sqlite/probe/main.go",
+      "source_sha256": "0314d29e126b26d8b917100aceb2f2c58da449fad0058e1e3b1b36fb103e8eeb",
+      "destination_sha256": "0314d29e126b26d8b917100aceb2f2c58da449fad0058e1e3b1b36fb103e8eeb"
+    },
+    {
+      "source": "validation/contracts-examples.json",
+      "destination": "checks/contracts/contracts-examples.json",
+      "source_sha256": "1542f38f1c6104b0ec7d336ce4e3035f9f4750db863db6e3fa69c126159a65f3",
+      "destination_sha256": "1542f38f1c6104b0ec7d336ce4e3035f9f4750db863db6e3fa69c126159a65f3"
+    },
+    {
+      "source": "validation/mechanics-review-2026-10-19.md",
+      "destination": "checks/mechanics/mechanics-review-2026-10-19.md",
+      "source_sha256": "390989863a9744b0e86e401b5b51f71cd03b09e08476e8cdefd09ca5985c612f",
+      "destination_sha256": "390989863a9744b0e86e401b5b51f71cd03b09e08476e8cdefd09ca5985c612f"
+    },
+    {
+      "source": "validation/architecture-checks.json",
+      "destination": "checks/architecture/architecture-checks.json",
+      "source_sha256": "3e2b37dc3178bccc1d7ff3e2dd1f39ce4c9f669c4e470864191a61b5940eb561",
+      "destination_sha256": "3e2b37dc3178bccc1d7ff3e2dd1f39ce4c9f669c4e470864191a61b5940eb561"
+    },
+    {
+      "source": "validation/resilience-checks.json",
+      "destination": "checks/resilience/resilience-checks.json",
+      "source_sha256": "907ef99c0469f30628fdcc82ba6a7703a592c6366c97ea91bd83ca315cad0442",
+      "destination_sha256": "907ef99c0469f30628fdcc82ba6a7703a592c6366c97ea91bd83ca315cad0442"
+    },
+    {
+      "source": "validation/resilience-resilience_arithmetic.json",
+      "destination": "checks/resilience/resilience-resilience_arithmetic.json",
+      "source_sha256": "d047cfe1fd88894cd908357e69a54791e694e447d756fb1b51ab997a44df2852",
+      "destination_sha256": "d047cfe1fd88894cd908357e69a54791e694e447d756fb1b51ab997a44df2852"
+    },
+    {
+      "source": "validation/zkit-requirements.txt",
+      "destination": "checks/requirements/zkit-requirements.txt",
+      "source_sha256": "136e1dd4dc6ecbef9830d216b71c763a333bc48cd9bf54792fd7fd3f5366e6a6",
+      "destination_sha256": "136e1dd4dc6ecbef9830d216b71c763a333bc48cd9bf54792fd7fd3f5366e6a6"
+    },
+    {
+      "source": "validation/roadmap-checks.json",
+      "destination": "checks/roadmap/roadmap-checks.json",
+      "source_sha256": "f4f8b51255bb1848ebe154b1c7b2a40df4ccb968ad22757841dc365b55c455ad",
+      "destination_sha256": "f4f8b51255bb1848ebe154b1c7b2a40df4ccb968ad22757841dc365b55c455ad"
+    },
+    {
+      "source": "validation/roadmap-weekly-review-2026-10-19.md",
+      "destination": "checks/roadmap/roadmap-weekly-review-2026-10-19.md",
+      "source_sha256": "cce387a65c0a43fc75012f329b34bb1015118eefd0609fe61d4c13be6338e663",
+      "destination_sha256": "cce387a65c0a43fc75012f329b34bb1015118eefd0609fe61d4c13be6338e663"
+    },
+    {
+      "source": "validation/data-review-2026-10-19.md",
+      "destination": "checks/data/data-review-2026-10-19.md",
+      "source_sha256": "d8245ea94bfd5ff2c9bf624292b723f7a1bbaef97621a752c01e3c0454b76346",
+      "destination_sha256": "6c76211ba058b76b4eec81a51dce7ebe1593f638b3e10db22e7b59ac7a218855"
+    },
+    {
+      "source": "validation/architecture-mermaid-checks.json",
+      "destination": "checks/architecture/architecture-mermaid-checks.json",
+      "source_sha256": "f8474d945d3c9b7a4e1fe9692923aa3976a95a4370ec1d10ccf0b7b59b516d0d",
+      "destination_sha256": "f8474d945d3c9b7a4e1fe9692923aa3976a95a4370ec1d10ccf0b7b59b516d0d"
+    },
+    {
+      "source": "validation/check_resilience_arithmetic.py",
+      "destination": "checks/resilience/check_resilience_arithmetic.py",
+      "source_sha256": "34278b246e7627742c6146510a2f4da8838ad644a330f3f00389f7fb13ca3291",
+      "destination_sha256": "f89e20496d12a779496443aefa6d29c2e93ded92d06e20f825107fc167e8f772"
+    },
+    {
+      "source": "validation/resource-math-summary-checks.json",
+      "destination": "checks/resource-math/resource-math-summary-checks.json",
+      "source_sha256": "d114a20245e2046f7d4f04d58fb5d294abc99bb7d062bd68b8eda05a5a9a2b74",
+      "destination_sha256": "d114a20245e2046f7d4f04d58fb5d294abc99bb7d062bd68b8eda05a5a9a2b74"
+    },
+    {
+      "source": "validation/diagnostics-sizing-checks.json",
+      "destination": "checks/resource-math/diagnostics-sizing-checks.json",
+      "source_sha256": "5b76e0d0f8b6e842eb85d1a50a545beaab185d712e066b8022a36bdb72bdb55a",
+      "destination_sha256": "5b76e0d0f8b6e842eb85d1a50a545beaab185d712e066b8022a36bdb72bdb55a"
+    },
+    {
+      "source": "validation/mechanics-models.json",
+      "destination": "checks/mechanics/mechanics-models.json",
+      "source_sha256": "b89f3658b68f20820acf0b0530c832d4bbc9c055c967557ef9ded90773fb7cb9",
+      "destination_sha256": "b89f3658b68f20820acf0b0530c832d4bbc9c055c967557ef9ded90773fb7cb9"
+    },
+    {
+      "source": "validation/resilience-intake-checks-2026-10-19.json",
+      "destination": "checks/resilience/resilience-intake-checks-2026-10-19.json",
+      "source_sha256": "37f4efaca944de841171b077c606d3d3098bb5403234fdefd60dfce11ea76a41",
+      "destination_sha256": "37f4efaca944de841171b077c606d3d3098bb5403234fdefd60dfce11ea76a41"
+    },
+    {
+      "source": "validation/diagnostics-sizing-2026-10-19.md",
+      "destination": "checks/resource-math/diagnostics-sizing-2026-10-19.md",
+      "source_sha256": "b700eebf063b5d62d68f653c1b1a90fe1c20f98677ab4b3ac37c8fb0cbc363f3",
+      "destination_sha256": "6cc940ee227590ac3f9b075b306f58c3c67f7fd2c4b70356db9108817b8bfa13"
+    },
+    {
+      "source": "validation/resilience-g1-checks-2026-10-19.json",
+      "destination": "checks/resilience/resilience-g1-checks-2026-10-19.json",
+      "source_sha256": "9deede5365380b4becfad6ec46f29fd45f420bd50631b67dc6aae6c293dd0f77",
+      "destination_sha256": "9deede5365380b4becfad6ec46f29fd45f420bd50631b67dc6aae6c293dd0f77"
+    },
+    {
+      "source": "validation/roadmap-round-1-audit-2026-10-19.md",
+      "destination": "checks/roadmap/roadmap-round-1-audit-2026-10-19.md",
+      "source_sha256": "2f1ef2e309d30aae3becf07483795f95e1df68eb463652c673feb7e45ca9bafb",
+      "destination_sha256": "2f1ef2e309d30aae3becf07483795f95e1df68eb463652c673feb7e45ca9bafb"
+    },
+    {
+      "source": "validation/roadmap-review-2026-10-19.md",
+      "destination": "checks/roadmap/roadmap-review-2026-10-19.md",
+      "source_sha256": "a70dfbeff8ef3c1d95ff6938d3758f1fa04f5338a5528fca5f8f9f641d6ee5df",
+      "destination_sha256": "a70dfbeff8ef3c1d95ff6938d3758f1fa04f5338a5528fca5f8f9f641d6ee5df"
+    },
+    {
+      "source": "validation/contracts-verification-2026-10-18.md",
+      "destination": "checks/contracts/contracts-verification-2026-10-18.md",
+      "source_sha256": "30688d586982f512f33373e08abcca36bd9d964fff26bc547fc3ceee95fc90c1",
+      "destination_sha256": "7e903b1ebbd8309e756f854149df0bb85db5a91b716ce9f2f99548e34641c87f"
+    },
+    {
+      "source": "validation/mechanics-round-1-audit-2026-10-19.md",
+      "destination": "checks/mechanics/mechanics-round-1-audit-2026-10-19.md",
+      "source_sha256": "76abbaa50051690c472287cc50d83c249b3c2b777a7c1f2c288d03f82fea297c",
+      "destination_sha256": "aa909c651d0f9a532afa03f1ea7b736dbffa091907a34244f4c1a723674958a3"
+    },
+    {
+      "source": "validation/resilience-g2-checks-2026-10-19.json",
+      "destination": "checks/resilience/resilience-g2-checks-2026-10-19.json",
+      "source_sha256": "f7fd1d9d24552b3a619312592f396071bb0dee84e67a1d1a16a226388358f308",
+      "destination_sha256": "f7fd1d9d24552b3a619312592f396071bb0dee84e67a1d1a16a226388358f308"
+    },
+    {
+      "source": "validation/resilience-review-2026-10-19.md",
+      "destination": "checks/resilience/resilience-review-2026-10-19.md",
+      "source_sha256": "44681cb11a71bcd3c1c459be72d772c20276f099230e3a0d0df038d3cfe53c27",
+      "destination_sha256": "44681cb11a71bcd3c1c459be72d772c20276f099230e3a0d0df038d3cfe53c27"
+    },
+    {
+      "source": "validation/resource-math-review-2026-10-18.md",
+      "destination": "checks/resource-math/resource-math-review-2026-10-18.md",
+      "source_sha256": "75432b544e7165334597545ef895798884214aa791b1ac2551099165953d4ca4",
+      "destination_sha256": "75432b544e7165334597545ef895798884214aa791b1ac2551099165953d4ca4"
+    },
+    {
+      "source": "validation/roadmap-weekly-schedule.json",
+      "destination": "checks/roadmap/roadmap-weekly-schedule.json",
+      "source_sha256": "ddac674ef149ea5c29fc6438f8bbd61da387be20cc4cba03b594f59e5f0f8a11",
+      "destination_sha256": "ddac674ef149ea5c29fc6438f8bbd61da387be20cc4cba03b594f59e5f0f8a11"
+    },
+    {
+      "source": "validation/migration-preservation.json",
+      "destination": "checks/flow/migration-preservation.json",
+      "source_sha256": "308fc8696615b332182fbdc205a976f5b47b6f99287ba519000ca971dbd048b4",
+      "destination_sha256": "308fc8696615b332182fbdc205a976f5b47b6f99287ba519000ca971dbd048b4"
+    },
+    {
+      "source": "validation/roadmap-zkit-0.2.5-adaptation-2026-10-19.md",
+      "destination": "checks/roadmap/roadmap-zkit-0.2.5-adaptation-2026-10-19.md",
+      "source_sha256": "30b1d2d458eb8fd2ad3580d4dd5c34ba90718cd5a1a7a0a8cd18491ebec37277",
+      "destination_sha256": "be2fcea5a4c85b13797bc2b99eaee2038c643cbf4cbdc8f01155e53691efaec8"
+    },
+    {
+      "source": "validation/zkit-data.txt",
+      "destination": "checks/data/zkit-data.txt",
+      "source_sha256": "ac7e2c8c8bbb000473e76b56e8fb36bcd6c2b2452e0605860c9b7c80c616eb0b",
+      "destination_sha256": "ac7e2c8c8bbb000473e76b56e8fb36bcd6c2b2452e0605860c9b7c80c616eb0b"
+    },
+    {
+      "source": "validation/zkit-contracts.txt",
+      "destination": "checks/contracts/zkit-contracts.txt",
+      "source_sha256": "71fb3301157125e683e0cc7fb86682e52531eeec58b571f0af1cf719d1235048",
+      "destination_sha256": "71fb3301157125e683e0cc7fb86682e52531eeec58b571f0af1cf719d1235048"
+    },
+    {
+      "source": "validation/README.md",
+      "destination": "checks/README.md",
+      "source_sha256": "f1e753c1e5de068f2dd9640eeffb82a1e221312bea8a09dd843217f1921485bf",
+      "destination_sha256": "edd37410a6b5c20898f600fd2cfcd5c65245c96dd01b735b935f432ff1586c7c"
+    },
+    {
+      "source": "validation/mechanics-mermaid-checks.json",
+      "destination": "checks/mechanics/mechanics-mermaid-checks.json",
+      "source_sha256": "faf83a02cd7270adf16e441bca25ccd1fc30fd3164dca33794e8530635dd169d",
+      "destination_sha256": "faf83a02cd7270adf16e441bca25ccd1fc30fd3164dca33794e8530635dd169d"
+    },
+    {
+      "source": "validation/check_mechanics_artifacts.py",
+      "destination": "checks/mechanics/check_mechanics_artifacts.py",
+      "source_sha256": "b8716109b9bb041681d4d981bfa4bd2933c5731c9d46f0393d6382ed3ddc652c",
+      "destination_sha256": "36b236671ed0811b946cb4f15d965d51d8cd115e5b1ee9504b451939d97065d9"
+    },
+    {
+      "source": "validation/zkit-mechanics.txt",
+      "destination": "checks/mechanics/zkit-mechanics.txt",
+      "source_sha256": "22effd0dac6ba1f2805ff78f8c7909e5564d7a793935d8663312bec22f17319b",
+      "destination_sha256": "22effd0dac6ba1f2805ff78f8c7909e5564d7a793935d8663312bec22f17319b"
+    },
+    {
+      "source": "validation/roadmap-weekly-checks.json",
+      "destination": "checks/roadmap/roadmap-weekly-checks.json",
+      "source_sha256": "69aa71c333b83cb151ddfbbb0e2ad8e3a120bed3fc1b60a8f0cbf32f0fb4da6f",
+      "destination_sha256": "69aa71c333b83cb151ddfbbb0e2ad8e3a120bed3fc1b60a8f0cbf32f0fb4da6f"
+    },
+    {
+      "source": "validation/zkit-architecture.txt",
+      "destination": "checks/architecture/zkit-architecture.txt",
+      "source_sha256": "4eab0635c86aeebe4e256f922895bb4086f1b49107fbb94978a82435796da34d",
+      "destination_sha256": "4eab0635c86aeebe4e256f922895bb4086f1b49107fbb94978a82435796da34d"
+    },
+    {
+      "source": "validation/roadmap-zkit-0.2.5-review-2026-10-19.md",
+      "destination": "checks/roadmap/roadmap-zkit-0.2.5-review-2026-10-19.md",
+      "source_sha256": "332fe3c17575183949746fe48789442edd27db77e2a968e413eed82e3c5b56f0",
+      "destination_sha256": "078630dcd604eba3092cab954e6d4a553f286e853c9bc37784956ca8b3e69ba6"
+    },
+    {
+      "source": "validation/resilience-external_examples.json",
+      "destination": "checks/resilience/resilience-external_examples.json",
+      "source_sha256": "406ec56f0fde61d90204cb9d43a368e836e3554cd3708b5fda883c4ef5c25f32",
+      "destination_sha256": "406ec56f0fde61d90204cb9d43a368e836e3554cd3708b5fda883c4ef5c25f32"
+    },
+    {
+      "source": "validation/contracts-checks.json",
+      "destination": "checks/contracts/contracts-checks.json",
+      "source_sha256": "65afaef82c05427b399616abb65b748265c585c49ae7f162a613293601892530",
+      "destination_sha256": "65afaef82c05427b399616abb65b748265c585c49ae7f162a613293601892530"
+    },
+    {
+      "source": "validation/resilience-round-1-audit-2026-10-19.md",
+      "destination": "checks/resilience/resilience-round-1-audit-2026-10-19.md",
+      "source_sha256": "a36bec568d3e03a0e5494a1cfbd1b7e232b64df575b834a8575592ba28798a53",
+      "destination_sha256": "a36bec568d3e03a0e5494a1cfbd1b7e232b64df575b834a8575592ba28798a53"
+    },
+    {
+      "source": "validation/task-cards-checks.json",
+      "destination": "checks/roadmap/task-cards-checks.json",
+      "source_sha256": "b9fb24c2e7952eaf03c124eabe87a2623d34bbb4d990d9de38ad5307766faf53",
+      "destination_sha256": "b9fb24c2e7952eaf03c124eabe87a2623d34bbb4d990d9de38ad5307766faf53"
+    },
+    {
+      "source": "validation/architecture-review-2026-10-19.md",
+      "destination": "checks/architecture/architecture-review-2026-10-19.md",
+      "source_sha256": "1dd7b43766195e4b84e514a7657b379898dc782d6e3819ac8fd33c7ba37c00e8",
+      "destination_sha256": "1dd7b43766195e4b84e514a7657b379898dc782d6e3819ac8fd33c7ba37c00e8"
+    },
+    {
+      "source": "validation/roadmap-g1-checks-2026-10-19.json",
+      "destination": "checks/roadmap/roadmap-g1-checks-2026-10-19.json",
+      "source_sha256": "b75556ba03306908a2bf425719c216febc1add8766ac7c3e072f34425225ecfb",
+      "destination_sha256": "b75556ba03306908a2bf425719c216febc1add8766ac7c3e072f34425225ecfb"
+    },
+    {
+      "source": "validation/mechanics-g2-checks-2026-10-19.json",
+      "destination": "checks/mechanics/mechanics-g2-checks-2026-10-19.json",
+      "source_sha256": "f5e58cb8a1be7c1f11324d12235dde5f9571563825ac5c18559544db730f0bef",
+      "destination_sha256": "f5e58cb8a1be7c1f11324d12235dde5f9571563825ac5c18559544db730f0bef"
+    },
+    {
+      "source": "validation/task-cards-review-2026-10-19.md",
+      "destination": "checks/roadmap/task-cards-review-2026-10-19.md",
+      "source_sha256": "d3656259412daa703c71b4ba9cf3812dde0ea3b5604359ed8c5fb9fcc0620f5c",
+      "destination_sha256": "d3656259412daa703c71b4ba9cf3812dde0ea3b5604359ed8c5fb9fcc0620f5c"
+    },
+    {
+      "source": "validation/mechanics-external-examples.json",
+      "destination": "checks/mechanics/mechanics-external-examples.json",
+      "source_sha256": "406ec56f0fde61d90204cb9d43a368e836e3554cd3708b5fda883c4ef5c25f32",
+      "destination_sha256": "406ec56f0fde61d90204cb9d43a368e836e3554cd3708b5fda883c4ef5c25f32"
+    },
+    {
+      "source": "validation/resilience-internal_models.json",
+      "destination": "checks/resilience/resilience-internal_models.json",
+      "source_sha256": "b89f3658b68f20820acf0b0530c832d4bbc9c055c967557ef9ded90773fb7cb9",
+      "destination_sha256": "b89f3658b68f20820acf0b0530c832d4bbc9c055c967557ef9ded90773fb7cb9"
+    },
+    {
+      "source": "validation/architecture-intake-checks-2026-10-19.json",
+      "destination": "checks/architecture/architecture-intake-checks-2026-10-19.json",
+      "source_sha256": "685a49454c311c91d557dadbdf61fe126dc0c0976cc3a65ccca3c3122f2df317",
+      "destination_sha256": "685a49454c311c91d557dadbdf61fe126dc0c0976cc3a65ccca3c3122f2df317"
+    },
+    {
+      "source": "validation/check_contract_examples.py",
+      "destination": "checks/contracts/check_contract_examples.py",
+      "source_sha256": "676efc0660495f7868a88018d4464ead79f533f3508c96fc3cac0035a819edbc",
+      "destination_sha256": "69b965e6b7d6fb8d9da137c07d92b0ec3ed8f52107233708780f7274d21723fb"
+    },
+    {
+      "source": "validation/roadmap-intake-checks-2026-10-19.json",
+      "destination": "checks/roadmap/roadmap-intake-checks-2026-10-19.json",
+      "source_sha256": "01a948cb637155e74da21bcc9829b98f2c7c2d9693afc9da971ceefdf9d4028f",
+      "destination_sha256": "01a948cb637155e74da21bcc9829b98f2c7c2d9693afc9da971ceefdf9d4028f"
+    },
+    {
+      "source": "validation/roadmap-zkit-0.2.5-checks-2026-10-19.json",
+      "destination": "checks/roadmap/roadmap-zkit-0.2.5-checks-2026-10-19.json",
+      "source_sha256": "092f93dbb0a1e59fc1c3f1014be14df3409ad83fdcbaee7a5a283d1609ffe4cd",
+      "destination_sha256": "092f93dbb0a1e59fc1c3f1014be14df3409ad83fdcbaee7a5a283d1609ffe4cd"
+    },
+    {
+      "source": "validation/data-checks.json",
+      "destination": "checks/data/data-checks.json",
+      "source_sha256": "d8dbc31e9c20a204bdbbcd141d42c7ce8029eef82753e82e175ae13b61304eb9",
+      "destination_sha256": "d8dbc31e9c20a204bdbbcd141d42c7ce8029eef82753e82e175ae13b61304eb9"
+    },
+    {
+      "source": "validation/mechanics-checks.json",
+      "destination": "checks/mechanics/mechanics-checks.json",
+      "source_sha256": "910a1c682eb71f206c01e53d3148ebecf95ac4ed4ffbbaab6798a94674de5fa9",
+      "destination_sha256": "910a1c682eb71f206c01e53d3148ebecf95ac4ed4ffbbaab6798a94674de5fa9"
+    },
+    {
+      "source": "validation/resilience-precloseout-check-2026-10-19.json",
+      "destination": "checks/resilience/resilience-precloseout-check-2026-10-19.json",
+      "source_sha256": "525c168f135cc84bdaf38d77ff0d92f7c578a991ca837e64d01c47e32e6fb892",
+      "destination_sha256": "525c168f135cc84bdaf38d77ff0d92f7c578a991ca837e64d01c47e32e6fb892"
+    },
+    {
+      "source": "validation/zkit-results.json",
+      "destination": "checks/flow/zkit-results.json",
+      "source_sha256": "c082fc7a3084da98b92966b9faa23f55239570429730a82f193d918cdb3a8228",
+      "destination_sha256": "c082fc7a3084da98b92966b9faa23f55239570429730a82f193d918cdb3a8228"
+    },
+    {
+      "source": "validation/mechanics-g1-checks-2026-10-19.json",
+      "destination": "checks/mechanics/mechanics-g1-checks-2026-10-19.json",
+      "source_sha256": "17c1d3e00d0dba6a4fce8143af760bb129bcb44588a6fd613fb3c990d27de8ad",
+      "destination_sha256": "17c1d3e00d0dba6a4fce8143af760bb129bcb44588a6fd613fb3c990d27de8ad"
+    },
+    {
+      "source": "validation/contracts-round-1-audit-2026-10-18.md",
+      "destination": "checks/contracts/contracts-round-1-audit-2026-10-18.md",
+      "source_sha256": "bd574c50db90a6ce53b13d843d465557e70a60b053c41eea0e1781dd79633d82",
+      "destination_sha256": "df8a338588fd3901dc3a0c7752614a1103f0fc05b343a68ea1d3e743cf6671e5"
+    },
+    {
+      "source": "validation/mechanics-intake-checks-2026-10-19.json",
+      "destination": "checks/mechanics/mechanics-intake-checks-2026-10-19.json",
+      "source_sha256": "7f411414673d57e037976698c068eeb6058734198b126d3f14fda63b412d1b4a",
+      "destination_sha256": "7f411414673d57e037976698c068eeb6058734198b126d3f14fda63b412d1b4a"
+    },
+    {
+      "source": "validation/roadmap-zkit-0.2.5-adaptation-checks-2026-10-19.json",
+      "destination": "checks/roadmap/roadmap-zkit-0.2.5-adaptation-checks-2026-10-19.json",
+      "source_sha256": "48596e1328895bca510a72751d4663a1575609ea2f4afc1c5f4c3d075dfd2b74",
+      "destination_sha256": "48596e1328895bca510a72751d4663a1575609ea2f4afc1c5f4c3d075dfd2b74"
+    }
+  ]
+}

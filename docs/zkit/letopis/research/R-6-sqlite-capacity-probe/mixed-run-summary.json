@@ -1,0 +1,17 @@
+{
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "runs": [
+    {
+      "mode": "mixed",
+      "exit_code": 0,
+      "deadline_exceeded": false,
+      "observed_max_rss_bytes": 68239360,
+      "files": {
+        "capacity.db": 687943680,
+        "capacity.db-wal": 0,
+        "capacity.db-shm": 32768
+      }
+    }
+  ],
+  "elapsed_s": 23.727194958133623
+}

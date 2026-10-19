@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:letopis:contracts:markdown-metadata:v1",
+  "title": "letopis metadata inside Markdown, not whole-Markdown parser",
+  "x-boundary": "X-4",
+  "x-direction": "published",
+  "x-status": "draft",
+  "x-serves": [
+    "FR-3",
+    "FR-4",
+    "FR-5",
+    "FR-6",
+    "FR-10",
+    "FR-18",
+    "FR-19",
+    "FR-35"
+  ],
+  "x-limits": [],
+  "$defs": {
+    "canonical": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])"
+        },
+        "kind": {
+          "enum": [
+            "vertex",
+            "metavertex"
+          ]
+        },
+        "created_at": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_snapshot": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})(?![\\s\\S])"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])"
+            },
+            {
+              "type": "string",
+              "pattern": "^tmp:[0-9a-f]{3}(?![\\s\\S])"
+            }
+          ]
+        },
+        "kind": {
+          "enum": [
+            "vertex",
+            "metavertex"
+          ]
+        },
+        "created_at": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_snapshot": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})(?![\\s\\S])"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "edgeTitle": {
+      "type": "string",
+      "pattern": "^letopis:id=[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12};type=[a-z][a-z0-9_]*;created_at=[0-9]+(?![\\s\\S])"
+    }
+  },
+  "$ref": "#/$defs/canonical",
+  "examples": [
+    {
+      "id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+      "kind": "vertex",
+      "created_at": 1792285200
+    }
+  ]
+}

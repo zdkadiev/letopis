@@ -1,0 +1,12 @@
+{
+  "scope": "schemas/examples and stated correspondence checks; not letopis implementation or crash validation",
+  "counts": {
+    "cli_examples": 67,
+    "provider_examples": 6,
+    "metadata_examples": 8,
+    "assertions": 97
+  },
+  "errors": [],
+  "runtime_calls": 0,
+  "measurements": 0
+}

@@ -1,0 +1,286 @@
+{
+  "scope": "Documentation/helper consistency only. No measurements, models, provider calls or product implementation.",
+  "plugin_version": "0.2.5",
+  "zkit": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.5/skills/roadmap/scripts/check_roadmap.py",
+      "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/letopis"
+    ],
+    "exit_code": 0,
+    "stdout": "CLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; 0 epic/task file(s) missing; expected scenario meets or has no the deadline\n5 phases, 5 gates, 45 tasks, 8 epics; hours 204 / 372 / 672; weeks 20.4 / 37.2 / 67.2\n",
+    "stderr": ""
+  },
+  "weekly_cards_epics": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/letopis/roadmap_schedule.py",
+      "--check"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"tasks\": 45, \"hours\": 372, \"task_cards\": 45, \"weeks\": 38, \"max_week_hours\": 10, \"last_week_hours\": 2, \"terminal\": \"TK-45\", \"dependency_errors\": 0, \"phase_gate_errors\": 0, \"unscheduled_tasks\": 0, \"runtime_calls\": 0, \"measurements\": 0}\n",
+    "stderr": ""
+  },
+  "preservation": {
+    "task_ids": [
+      "TK-1",
+      "TK-2",
+      "TK-3",
+      "TK-4",
+      "TK-5",
+      "TK-6",
+      "TK-7",
+      "TK-8",
+      "TK-9",
+      "TK-10",
+      "TK-11",
+      "TK-12",
+      "TK-13",
+      "TK-14",
+      "TK-15",
+      "TK-16",
+      "TK-17",
+      "TK-18",
+      "TK-19",
+      "TK-20",
+      "TK-21",
+      "TK-22",
+      "TK-23",
+      "TK-24",
+      "TK-25",
+      "TK-26",
+      "TK-27",
+      "TK-28",
+      "TK-29",
+      "TK-30",
+      "TK-31",
+      "TK-32",
+      "TK-33",
+      "TK-34",
+      "TK-35",
+      "TK-36",
+      "TK-37",
+      "TK-38",
+      "TK-39",
+      "TK-40",
+      "TK-41",
+      "TK-42",
+      "TK-43",
+      "TK-44",
+      "TK-45"
+    ],
+    "card_count": 45,
+    "epic_count": 8,
+    "weekly_allocations_unchanged": true,
+    "all_task_hours_phases_dependencies_unchanged": true,
+    "acceptance_changed_only": [
+      "TK-10",
+      "TK-22",
+      "TK-24",
+      "TK-26",
+      "TK-28",
+      "TK-29"
+    ],
+    "reason": "MC-2 ownership, phased/full skill, and query-fallback diagnostic handoff only; all other 39 criteria unchanged.",
+    "modified_existing_files": [
+      "roadmap_schedule.py",
+      "roadmap.md",
+      "task-template.md",
+      "decisions.md",
+      "validation/roadmap-zkit-0.2.5-review-2026-10-19.md"
+    ],
+    "deleted_old_cards": [
+      "tasks/TK-28.md",
+      "tasks/TK-38.md",
+      "tasks/TK-18.md",
+      "tasks/TK-08.md",
+      "tasks/TK-19.md",
+      "tasks/TK-09.md",
+      "tasks/TK-29.md",
+      "tasks/TK-39.md",
+      "tasks/TK-22.md",
+      "tasks/TK-16.md",
+      "tasks/TK-06.md",
+      "tasks/TK-32.md",
+      "tasks/TK-43.md",
+      "tasks/TK-12.md",
+      "tasks/TK-26.md",
+      "tasks/TK-36.md",
+      "tasks/TK-02.md",
+      "tasks/TK-42.md",
+      "tasks/TK-13.md",
+      "tasks/TK-27.md",
+      "tasks/TK-37.md",
+      "tasks/TK-03.md",
+      "tasks/TK-23.md",
+      "tasks/TK-17.md",
+      "tasks/TK-07.md",
+      "tasks/TK-33.md",
+      "tasks/TK-10.md",
+      "tasks/TK-41.md",
+      "tasks/TK-24.md",
+      "tasks/TK-34.md",
+      "tasks/TK-20.md",
+      "tasks/TK-45.md",
+      "tasks/TK-14.md",
+      "tasks/TK-04.md",
+      "tasks/TK-30.md",
+      "tasks/TK-21.md",
+      "tasks/TK-44.md",
+      "tasks/TK-15.md",
+      "tasks/TK-05.md",
+      "tasks/TK-31.md",
+      "tasks/TK-11.md",
+      "tasks/TK-40.md",
+      "tasks/TK-25.md",
+      "tasks/TK-35.md",
+      "tasks/TK-01.md"
+    ],
+    "all_other_existing_documents_models_and_measurements_unchanged": true
+  },
+  "links": {
+    "checked": 1678,
+    "missing": []
+  },
+  "negative_controls": {
+    "missing-card": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.5/skills/roadmap/scripts/check_roadmap.py",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-missing-card"
+      ],
+      "exit_code": 1,
+      "stdout": "ERROR  TK-1 has no file roadmap/epics/EP-8-<slug>/tasks/TK-1-<slug>.md\nCLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; 1 epic/task file(s) missing; expected scenario meets or has no the deadline\n5 phases, 5 gates, 45 tasks, 8 epics; hours 204 / 372 / 672; weeks 20.4 / 37.2 / 67.2\n",
+      "stderr": ""
+    },
+    "wrong-epic": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.5/skills/roadmap/scripts/check_roadmap.py",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-wrong-epic"
+      ],
+      "exit_code": 1,
+      "stdout": "ERROR  TK-1 lies in the folder of another epic than its table row says (EP-1)\nCLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; 0 epic/task file(s) missing; expected scenario meets or has no the deadline\n5 phases, 5 gates, 45 tasks, 8 epics; hours 204 / 372 / 672; weeks 20.4 / 37.2 / 67.2\n",
+      "stderr": ""
+    },
+    "missing-boundaries": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.5/skills/roadmap/scripts/check_roadmap.py",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-missing-boundaries"
+      ],
+      "exit_code": 1,
+      "stdout": "ERROR  roadmap/epics/EP-8-proofs/tasks/TK-1-build.md has no 'boundaries (in / out)' section\nCLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; 0 epic/task file(s) missing; expected scenario meets or has no the deadline\n5 phases, 5 gates, 45 tasks, 8 epics; hours 204 / 372 / 672; weeks 20.4 / 37.2 / 67.2\n",
+      "stderr": ""
+    },
+    "stale-card-estimate": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-stale-card-estimate/roadmap_schedule.py",
+        "--check"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-stale-card-estimate/roadmap_schedule.py\", line 293, in <module>\n    main()\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-stale-card-estimate/roadmap_schedule.py\", line 268, in main\n    card_count = check_task_cards(schedule, by_id)\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-stale-card-estimate/roadmap_schedule.py\", line 185, in check_task_cards\n    raise ValueError('Task scheduling metadata is stale: ' + task_id)\nValueError: Task scheduling metadata is stale: TK-1\n"
+    },
+    "empty-handoff": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-empty-handoff/roadmap_schedule.py",
+        "--check"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-empty-handoff/roadmap_schedule.py\", line 293, in <module>\n    main()\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-empty-handoff/roadmap_schedule.py\", line 268, in main\n    card_count = check_task_cards(schedule, by_id)\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-empty-handoff/roadmap_schedule.py\", line 194, in check_task_cards\n    raise ValueError('Missing boundary ' + label + ': ' + task_id)\nValueError: Missing boundary Интерфейсы — выход: TK-1\n"
+    },
+    "wrong-epic-sum": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-wrong-epic-sum/roadmap_schedule.py",
+        "--check"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-wrong-epic-sum/roadmap_schedule.py\", line 293, in <module>\n    main()\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-wrong-epic-sum/roadmap_schedule.py\", line 268, in main\n    card_count = check_task_cards(schedule, by_id)\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-wrong-epic-sum/roadmap_schedule.py\", line 233, in check_task_cards\n    raise ValueError('Epic hours differ from child sum: ' + epic_id)\nValueError: Epic hours differ from child sum: EP-8\n"
+    },
+    "missing-acceptance": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.5/skills/roadmap/scripts/check_roadmap.py",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-missing-acceptance"
+      ],
+      "exit_code": 1,
+      "stdout": "ERROR  roadmap/epics/EP-8-proofs/tasks/TK-1-build.md has no 'acceptance' section\nCLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; 0 epic/task file(s) missing; expected scenario meets or has no the deadline\n5 phases, 5 gates, 45 tasks, 8 epics; hours 204 / 372 / 672; weeks 20.4 / 37.2 / 67.2\n",
+      "stderr": ""
+    },
+    "stale-weekly-allocation": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-stale-weekly-allocation/roadmap_schedule.py",
+        "--check"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-stale-weekly-allocation/roadmap_schedule.py\", line 293, in <module>\n    main()\n  File \"/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-zkit025-adapt-8qbkzj0_/negative-stale-weekly-allocation/roadmap_schedule.py\", line 280, in main\n    raise ValueError('Weekly block is stale; run --update')\nValueError: Weekly block is stale; run --update\n"
+    }
+  },
+  "negative_controls_rejected": 8,
+  "helper_syntax": "PASS",
+  "changes_pending_review": false,
+  "independent_review": {
+    "reviewer": "/root/roadmap_025_adaptation_review",
+    "verdict": "consistent; no open material findings",
+    "closed_audit_findings": [
+      "F-1",
+      "F-2",
+      "F-3",
+      "F-4",
+      "F-5",
+      "F-6"
+    ],
+    "additional_finding_closed": "TK-22 diagnostics port to TK-28 CLI status handoff",
+    "scope": "Chain, authoritative X-1..X-4, roadmap, standard, 45 cards and 8 epics; legacy contracts appendix not re-read line by line.",
+    "new_product_question_round": false
+  },
+  "final_project_checks": {
+    "zkit_025": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.5/skills/roadmap/scripts/check_roadmap.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "exit_code": 0,
+      "stdout": "CLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; 0 epic/task file(s) missing; expected scenario meets or has no the deadline\n5 phases, 5 gates, 45 tasks, 8 epics; hours 204 / 372 / 672; weeks 20.4 / 37.2 / 67.2\n",
+      "stderr": ""
+    },
+    "weekly_cards_epics": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis/roadmap_schedule.py",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"tasks\": 45, \"hours\": 372, \"task_cards\": 45, \"weeks\": 38, \"max_week_hours\": 10, \"last_week_hours\": 2, \"terminal\": \"TK-45\", \"dependency_errors\": 0, \"phase_gate_errors\": 0, \"unscheduled_tasks\": 0, \"runtime_calls\": 0, \"measurements\": 0}\n",
+      "stderr": ""
+    }
+  },
+  "installed_changes": {
+    "modified_or_created_files": 60,
+    "old_cards_removed": 45,
+    "staged_bytes_verified": true,
+    "concurrent_changes_guard": "passed",
+    "scope": "Roadmap, standard, calculator, decision D-88, migrated cards/epics, audit links and new validation evidence only."
+  }
+}

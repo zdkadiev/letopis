@@ -1,0 +1,6 @@
+{
+  "scope": "syntax parsing, not visual rendering or implementation validation",
+  "file": "diagrams/mechanics-types.mmd",
+  "diagramType": "classDiagram",
+  "errors": []
+}

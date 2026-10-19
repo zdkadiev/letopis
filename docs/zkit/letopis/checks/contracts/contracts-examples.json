@@ -1,0 +1,773 @@
+{
+  "note": "Schema examples only, no runtime or performance evidence. IDs/hashes are synthetic valid-shape values.",
+  "cases": [
+    {
+      "command": "apply",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "operations": [
+          {
+            "type": "create",
+            "path": "knowledge/new.md",
+            "markdown": "<!-- letopis: {\"id\":\"tmp:000\",\"kind\":\"vertex\"} -->\nТекст знания.\n<!-- /letopis -->\n"
+          }
+        ]
+      }
+    },
+    {
+      "command": "apply",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ids": {
+            "tmp:000": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+          }
+        }
+      }
+    },
+    {
+      "command": "apply",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "apply --check",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "operations": [
+          {
+            "type": "edit",
+            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+            "base_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "markdown": "<!-- letopis: {\"id\":\"08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c\",\"kind\":\"vertex\"} -->\nТекст знания.\n<!-- /letopis -->\n"
+          }
+        ]
+      }
+    },
+    {
+      "command": "apply --check",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "paths": [
+            "knowledge/new.md"
+          ],
+          "element_ids": [
+            "tmp:000"
+          ]
+        }
+      }
+    },
+    {
+      "command": "apply --check",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "element_ids": [
+          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+        ]
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "elements": {
+            "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c": {
+              "path": "src/storage.rs",
+              "hash": null,
+              "file_hash": null,
+              "lines": [
+                10,
+                25
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "search",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "query": "атомарная запись",
+        "limit": 5,
+        "filters": {
+          "source_revisions": []
+        }
+      }
+    },
+    {
+      "command": "search",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+            "path": "knowledge/design.md",
+            "lines": [
+              1,
+              5
+            ],
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "flags": []
+          }
+        ]
+      }
+    },
+    {
+      "command": "search",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "traverse",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "element_ids": [
+          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+        ],
+        "mode": "both",
+        "direction": "outgoing",
+        "depth": 2,
+        "limit": 10,
+        "edge_limit": 20
+      }
+    },
+    {
+      "command": "traverse",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "elements": [
+            {
+              "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "path": "knowledge/design.md",
+              "lines": [
+                1,
+                5
+              ],
+              "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "flags": []
+            }
+          ],
+          "edges": [
+            {
+              "element_id": "064f2964-77cc-41f0-87ac-d280c0ec59a7",
+              "type": "depends_on",
+              "source": "521eb6f0-bd63-4d44-9aaf-c2d9be2bb5e4",
+              "target": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "traverse",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "reindex",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "paths": [],
+        "element_ids": []
+      }
+    },
+    {
+      "command": "reindex",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    },
+    {
+      "command": "reindex",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "reindex --cancel",
+      "kind": "input",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "command": "reindex --cancel",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": null
+        }
+      }
+    },
+    {
+      "command": "reindex --cancel",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "input",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reindex": null,
+          "embedding_jobs": 3,
+          "locks": [],
+          "errors": []
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "errors",
+      "kind": "input",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "command": "errors",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": []
+      }
+    },
+    {
+      "command": "errors",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "errors --clear",
+      "kind": "input",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "command": "errors --clear",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": []
+      }
+    },
+    {
+      "command": "errors --clear",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "config",
+      "kind": "input",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "command": "config",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": null
+      }
+    },
+    {
+      "command": "config",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "provider": "ollama",
+        "model": "embeddinggemma:300m-qat-q4_0",
+        "parameters": {
+          "base_url": "http://localhost:11434/api"
+        },
+        "max_retries": 3
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {}
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "apply",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "operations": []
+      }
+    },
+    {
+      "command": "apply",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "operations": [
+          {
+            "type": "edit",
+            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+            "markdown": "<!-- letopis: {\"id\":\"tmp:000\",\"kind\":\"vertex\"} -->\nТекст знания.\n<!-- /letopis -->\n"
+          }
+        ]
+      }
+    },
+    {
+      "command": "apply",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "operations": [
+          {
+            "type": "delete",
+            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+            "base_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "operation_id": "extra"
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "element_ids": []
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "element_ids": [
+          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+        ]
+      }
+    },
+    {
+      "command": "search",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "query": "x",
+        "limit": 0
+      }
+    },
+    {
+      "command": "search",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "query": "x",
+        "limit": 1,
+        "filters": {
+          "types": [
+            "decision"
+          ]
+        }
+      }
+    },
+    {
+      "command": "search",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+            "path": "knowledge/design.md",
+            "lines": [
+              1,
+              5
+            ],
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "flags": [],
+            "text": "forbidden"
+          }
+        ]
+      }
+    },
+    {
+      "command": "traverse",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "element_ids": [
+          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+        ],
+        "mode": "both",
+        "direction": "outgoing",
+        "depth": 2,
+        "limit": 10,
+        "edge_limit": 0
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reindex": {
+            "stage": "graph",
+            "completed": 101
+          },
+          "embedding_jobs": 3,
+          "locks": [],
+          "errors": []
+        }
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "provider": "ollama"
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "provider": "ollama",
+        "model": "embeddinggemma:300m-qat-q4_0",
+        "parameters": {
+          "api_key": "fake-placeholder"
+        },
+        "max_retries": 3
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "provider": "ollama",
+        "model": "embeddinggemma:300m-qat-q4_0",
+        "parameters": [],
+        "max_retries": 3
+      }
+    },
+    {
+      "command": "search",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+            "path": "knowledge/design.md",
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "flags": []
+          }
+        ]
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "element_ids": [
+          "08FF5C9E-D4C6-4F73-B0F4-58FD455C6C5C"
+        ]
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "element_ids": [
+          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c\n"
+        ]
+      }
+    },
+    {
+      "command": "apply",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "operations": [
+          {
+            "type": "delete",
+            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+            "base_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+          }
+        ]
+      }
+    },
+    {
+      "command": "search",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "query": "x",
+        "limit": 1,
+        "filters": {
+          "source_revisions": [
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+          ]
+        }
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "provider": "ollama",
+        "model": "fixture",
+        "parameters": {
+          "base_url": "http://127.0.0.1:11434/api"
+        },
+        "max_retries": 0
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "provider": "ollama",
+        "model": "fixture",
+        "parameters": {
+          "base_url": "http://127.0.0.1:11434/api"
+        },
+        "max_retries": -1
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "provider": "ollama",
+        "model": "fixture",
+        "parameters": {
+          "base_url": "http://127.0.0.1:11434/api"
+        },
+        "max_retries": 1.5
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "provider": "ollama",
+        "model": "fixture",
+        "parameters": {
+          "base_url": "http://127.0.0.1:11434/api"
+        },
+        "max_retries": true
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "provider": "ollama",
+        "model": "fixture",
+        "parameters": {
+          "base_url": "http://127.0.0.1:11434/api"
+        },
+        "max_retries": "3"
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "provider": "ollama",
+        "model": "fixture",
+        "parameters": {
+          "base_url": "http://127.0.0.1:11434/api"
+        },
+        "max_retries": null
+      }
+    },
+    {
+      "command": "config --set",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "provider": "ollama",
+        "model": "fixture",
+        "parameters": {
+          "base_url": "http://127.0.0.1:11434/api"
+        }
+      }
+    }
+  ]
+}

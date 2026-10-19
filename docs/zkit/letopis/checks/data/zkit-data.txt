@@ -1,0 +1,9 @@
+WARN   E-1: volume has neither a number nor an assumption A-n from resource-math
+WARN   E-2: volume has neither a number nor an assumption A-n from resource-math
+WARN   E-3: volume has neither a number nor an assumption A-n from resource-math
+WARN   E-4: volume has neither a number nor an assumption A-n from resource-math
+WARN   E-5: volume has neither a number nor an assumption A-n from resource-math
+WARN   E-8: volume has neither a number nor an assumption A-n from resource-math
+WARN   E-10: volume has neither a number nor an assumption A-n from resource-math
+CLARITY 7 entity(ies) without a volume figure or assumption; 0 open fork(s)
+10 entities, 3 memory regions

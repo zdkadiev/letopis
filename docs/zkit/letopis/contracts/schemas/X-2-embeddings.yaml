@@ -1,0 +1,331 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "letopis relied-on embedding provider subset",
+    "version": "1.0.0"
+  },
+  "x-boundary": "X-2",
+  "x-direction": "consumed",
+  "x-status": "draft",
+  "x-serves": [
+    "FR-22",
+    "FR-29",
+    "FR-30",
+    "NFR-6"
+  ],
+  "x-limits": [],
+  "x-verified": {
+    "status": "verified",
+    "date": "2026-10-18",
+    "source": "https://docs.ollama.com/api/embed ; https://developers.openai.com/api/reference/resources/embeddings/methods/create ; research/R-7-embedding-api-compatibility.md",
+    "scope": "Documented native Ollama and official OpenAI subset only, not conformance of arbitrary compatible servers or letopis runtime."
+  },
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Value comes from OPENAI_API_KEY in worker environment; never persisted."
+      }
+    }
+  },
+  "paths": {
+    "/embed": {
+      "post": {
+        "operationId": "ollamaEmbed",
+        "x-idempotency": "natural",
+        "description": "Pure computation; retries can incur provider cost; no external writes. Response fields beyond the relied-on subset are allowed.",
+        "servers": [
+          {
+            "url": "http://localhost:11434/api",
+            "description": "Documentation example, not an letopis default."
+          }
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "input": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    ]
+                  },
+                  "dimensions": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "truncate": {
+                    "const": false
+                  },
+                  "keep_alive": {
+                    "type": "string"
+                  },
+                  "options": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "model",
+                  "input",
+                  "truncate"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "model": "embeddinggemma:300m-qat-q4_0",
+                "input": [
+                  "Текст знания"
+                ],
+                "truncate": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One vector per input; finite numbers, consistent configured dimension; compatible indices must bijectively cover inputs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "embeddings": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "model",
+                    "embeddings"
+                  ],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "model": "fixture-model",
+                  "embeddings": [
+                    [
+                      0.1,
+                      0.2
+                    ]
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Provider/transport error; map to existing embedding_failed, diagnostic sanitized, bounded retries retained.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "the input length exceeds the context length"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/embeddings": {
+      "post": {
+        "operationId": "compatibleEmbed",
+        "x-idempotency": "natural",
+        "description": "Pure computation; retries can incur provider cost; no external writes. Response fields beyond the relied-on subset are allowed.",
+        "servers": [
+          {
+            "url": "https://api.openai.com/v1",
+            "description": "Documentation example, not an letopis default."
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "input": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    ]
+                  },
+                  "dimensions": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "encoding_format": {
+                    "const": "float"
+                  }
+                },
+                "required": [
+                  "model",
+                  "input",
+                  "encoding_format"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "model": "text-embedding-3-small",
+                "input": [
+                  "Текст знания"
+                ],
+                "encoding_format": "float",
+                "dimensions": 2
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One vector per input; finite numbers, consistent configured dimension; compatible indices must bijectively cover inputs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "index": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "embedding": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "number"
+                            }
+                          }
+                        },
+                        "required": [
+                          "index",
+                          "embedding"
+                        ],
+                        "additionalProperties": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "data": [
+                    {
+                      "index": 0,
+                      "embedding": [
+                        0.1,
+                        0.2
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Provider/transport error; map to existing embedding_failed, diagnostic sanitized, bounded retries retained.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": {
+                    "message": "Invalid embedding input"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,3 @@
+WARN   Must is 95% (42 of 44); say why in the doc or cut
+CLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 2 open question(s) in the log
+44 requirements, 8 constraints checked

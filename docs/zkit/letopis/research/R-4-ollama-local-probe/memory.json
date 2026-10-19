@@ -1,0 +1,928 @@
+[
+  {
+    "elapsed_s": 0.12047504214569926,
+    "phase": "baseline",
+    "processes": [
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40337408,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 139247616
+  },
+  {
+    "elapsed_s": 0.6747152090538293,
+    "phase": "baseline",
+    "processes": [
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40337408,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 139247616
+  },
+  {
+    "elapsed_s": 1.2303809172008187,
+    "phase": "baseline",
+    "processes": [
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40337408,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 139247616
+  },
+  {
+    "elapsed_s": 1.785594459157437,
+    "phase": "baseline",
+    "processes": [
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40337408,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 139247616
+  },
+  {
+    "elapsed_s": 2.318893959047273,
+    "phase": "first_load",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 119554048,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40534016,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 258998272
+  },
+  {
+    "elapsed_s": 2.873713750159368,
+    "phase": "first_load",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 389185536,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40550400,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 528646144
+  },
+  {
+    "elapsed_s": 3.4210398751311004,
+    "phase": "warm_serial",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 398737408,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40747008,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 538394624
+  },
+  {
+    "elapsed_s": 3.9711372922174633,
+    "phase": "warm_serial",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437583872,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40763392,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 577257472
+  },
+  {
+    "elapsed_s": 4.516404875088483,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437583872,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40763392,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 577257472
+  },
+  {
+    "elapsed_s": 5.067310334183276,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437600256,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40763392,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 577273856
+  },
+  {
+    "elapsed_s": 5.611376959132031,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437518336,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40763392,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 577191936
+  },
+  {
+    "elapsed_s": 6.1460311252158135,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437370880,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40763392,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 577044480
+  },
+  {
+    "elapsed_s": 6.6879269171040505,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437223424,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40763392,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576897024
+  },
+  {
+    "elapsed_s": 7.237037709215656,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437092352,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40763392,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576765952
+  },
+  {
+    "elapsed_s": 7.789471084019169,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40779776,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576765952
+  },
+  {
+    "elapsed_s": 8.33738062507473,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40812544,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576798720
+  },
+  {
+    "elapsed_s": 8.891020042123273,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40812544,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576798720
+  },
+  {
+    "elapsed_s": 9.435221916995943,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40812544,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576798720
+  },
+  {
+    "elapsed_s": 9.989091792143881,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40812544,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576798720
+  },
+  {
+    "elapsed_s": 10.530739000067115,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437059584,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40812544,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576782336
+  },
+  {
+    "elapsed_s": 11.086357000051066,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437059584,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40812544,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576782336
+  },
+  {
+    "elapsed_s": 11.639803250087425,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437059584,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40812544,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576782336
+  },
+  {
+    "elapsed_s": 12.192209125030786,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437059584,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40812544,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576782336
+  },
+  {
+    "elapsed_s": 12.747407834045589,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437059584,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576798720
+  },
+  {
+    "elapsed_s": 13.301725625060499,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437059584,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576798720
+  },
+  {
+    "elapsed_s": 13.856777750188485,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576815104
+  },
+  {
+    "elapsed_s": 14.394666917156428,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576815104
+  },
+  {
+    "elapsed_s": 14.951809750171378,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576815104
+  },
+  {
+    "elapsed_s": 15.487806792138144,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576815104
+  },
+  {
+    "elapsed_s": 16.049628667067736,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576815104
+  },
+  {
+    "elapsed_s": 16.6063707920257,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576815104
+  },
+  {
+    "elapsed_s": 17.164178125094622,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576815104
+  },
+  {
+    "elapsed_s": 17.712061792146415,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576815104
+  },
+  {
+    "elapsed_s": 18.27987104211934,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576815104
+  },
+  {
+    "elapsed_s": 18.83731162501499,
+    "phase": "mixed",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98910208,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576815104
+  },
+  {
+    "elapsed_s": 19.396739875199273,
+    "phase": "after",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98893824,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576798720
+  },
+  {
+    "elapsed_s": 19.945386667037383,
+    "phase": "after",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98893824,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576798720
+  },
+  {
+    "elapsed_s": 20.50844612508081,
+    "phase": "after",
+    "processes": [
+      {
+        "pid": 34119,
+        "ppid": 41502,
+        "rss_bytes": 437075968,
+        "command": "/Applications/Ollama.app/Contents/Resources/llama-server"
+      },
+      {
+        "pid": 41484,
+        "ppid": 1,
+        "rss_bytes": 98893824,
+        "command": "/Applications/Ollama.app/Contents/MacOS/Ollama"
+      },
+      {
+        "pid": 41502,
+        "ppid": 41484,
+        "rss_bytes": 40828928,
+        "command": "/Applications/Ollama.app/Contents/Resources/ollama"
+      }
+    ],
+    "rss_sum_bytes": 576798720
+  }
+]

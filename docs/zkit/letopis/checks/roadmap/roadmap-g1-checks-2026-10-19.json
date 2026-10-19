@@ -1,0 +1,15 @@
+{
+  "scope": "Planning arithmetic only; G2 delivery deadline remains open. No runtime measurements.",
+  "checks": {
+    "generate": {
+      "exit_code": 0,
+      "stdout": "block updated\nCLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; expected scenario meets or has no the deadline\n5 phases, 5 gates, 6 tasks, 7 epics; hours 200 / 364 / 656; weeks 20.0 / 36.4 / 65.6\n",
+      "stderr": ""
+    },
+    "check": {
+      "exit_code": 0,
+      "stdout": "CLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; expected scenario meets or has no the deadline\n5 phases, 5 gates, 6 tasks, 7 epics; hours 200 / 364 / 656; weeks 20.0 / 36.4 / 65.6\n",
+      "stderr": ""
+    }
+  }
+}

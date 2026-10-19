@@ -1,0 +1,33 @@
+# EP-3 — Обслуживание и полный lifecycle
+
+> **Фаза:** PH-2
+> **Оценка, ч:** 24 / 40 / 72 (best / expected / worst)
+> **Зависимости:** [TK-10](../EP-1-thin-slice/tasks/TK-10-save-recovery.md), [TK-11](../EP-1-thin-slice/tasks/TK-11-cli-runtime.md), [TK-13](../EP-1-thin-slice/tasks/TK-13-embeddings.md), [TK-24](../EP-2-knowledge/tasks/TK-24-inspect.md)
+
+## Цель
+
+Reindex, диагностика, устойчивость к corruption, очередь и отмена доведены до полного функционального G-2.
+
+## Границы
+
+- **Входит:** Reindex, диагностика, устойчивость к corruption, очередь и отмена доведены до полного функционального G-2. Выполняются только задачи, перечисленные ниже.
+- **Не входит:** Здесь не создаётся заново durable save TK-10; provenance и read-алгоритмы — EP-2; масштабные и физические drills — EP-4.
+- **Интерфейсы:** точные входы/выходы и ссылки на потребителей заданы в карточках. Эпик не вводит отдельный процесс или runtime-сервис.
+
+## Задачи
+
+Разделение следует проверяемым механизмам и артефактам, а не слоям design/code/test. Порядок определяется зависимостями и [недельным планом](../../../roadmap.md); G-2 закрывается последней задачей фазы.
+
+- [TK-25 — Реализовать full/selective reindex и Git detection](tasks/TK-25-reindexing.md): Координатор reindex и Git detection без фонового watcher.
+- [TK-26 — Проверить corruption и fail-closed восстановления](tasks/TK-26-corruption.md): Проверенные corruption/fail-closed ветви существующего recovery и долговечная диагностика.
+- [TK-27 — Завершить замену jobs/config и bounded retries](tasks/TK-27-embedding-lifecycle.md): Полный lifecycle embedding jobs/config и ограниченные ретраи.
+- [TK-28 — Реализовать status/errors и безопасный clear](tasks/TK-28-diagnostics.md): StateService, errors и безопасная согласованная очистка диагностики.
+- [TK-29 — Завершить отмену, waiters и потерю соединения](tasks/TK-29-cancellation.md): Полный протокол отмены и завершённый функциональный scope перед системными испытаниями.
+
+## Приёмка
+
+Все критерии [TK-25](tasks/TK-25-reindexing.md), [TK-26](tasks/TK-26-corruption.md), [TK-27](tasks/TK-27-embedding-lifecycle.md), [TK-28](tasks/TK-28-diagnostics.md), [TK-29](tasks/TK-29-cancellation.md) выполнены с evidence. Gate фазы отдельно закрывает её последняя задача; промежуточный эпик может передать готовые результаты задачам той же фазы до этого gate. Сам эпик не дублирует выполнение или часы дочерних задач.
+
+## Оценка и риски
+
+Диапазон — сумма карточек, где указаны причины best/expected/worst и действия при неуспехе. Новых ожиданий или резервных часов на уровне контейнера нет. Все задачи planned: наличие карточек не является свидетельством выполнения.

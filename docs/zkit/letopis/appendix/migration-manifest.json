@@ -1,0 +1,170 @@
+{
+  "date": "2026-10-18",
+  "project": "letopis",
+  "kind": "documentation-adoption",
+  "sources": [
+    {
+      "source": "docs/Engram_2_Requirements_RU.md",
+      "destination": "docs/zkit/letopis/reference/requirements-pre-zkit.md",
+      "sha256_before": "0011dcf2a13ede6feb8a2a717905ef7245025633dfd3ad7dc76d0c28e4187df4",
+      "payload": true
+    },
+    {
+      "source": "docs/Engram_2_Domain_Model_RU.md",
+      "destination": "docs/zkit/letopis/domain-model.md",
+      "sha256_before": "95a02ecdf355a30c9ab7f3f7a2048928344a1e97d155b755a32b6f418a04a5fa",
+      "payload": true
+    },
+    {
+      "source": "docs/Engram_2_Scenarios_RU.md",
+      "destination": "docs/zkit/letopis/scenarios.md",
+      "sha256_before": "d67c37513437f98b36cc983860e9e1dc765e31bfa09acf00f49b7032de920d43",
+      "payload": true
+    },
+    {
+      "source": "docs/Engram_2_Subsystems_RU.md",
+      "destination": "docs/zkit/letopis/architecture.md",
+      "sha256_before": "c13501d66a8298e33ee867905d18952b751b2f2f4094d58cf0405752b2ac8169",
+      "payload": true
+    },
+    {
+      "source": "docs/Engram_2_Contracts_RU.md",
+      "destination": "docs/zkit/letopis/contracts.md",
+      "sha256_before": "98d3268b9095e506da4764b1f103b8048c6a18f56edf637051413949325e538f",
+      "payload": true
+    },
+    {
+      "source": "docs/Engram_2_Storage_Model_RU.md",
+      "destination": "docs/zkit/letopis/mechanics/storage-model.md",
+      "sha256_before": "d3c5843a0438003eab8ba5771277b3a3318031c396d648140aba01700f6bb89c",
+      "payload": true
+    },
+    {
+      "source": "docs/Engram_2_Simplification_Audit_RU.md",
+      "destination": "docs/zkit/letopis/simplification-audit.md",
+      "sha256_before": "a928978d7d39f5a538408eeecf7246d4f8195bc3dda76346779c0d2b8fcc2757",
+      "payload": true
+    },
+    {
+      "source": "docs/Engram_2_Go_SQLite_Research_RU.md",
+      "destination": "docs/zkit/letopis/research/R-1-go-sqlite.md",
+      "sha256_before": "edf4964b080e259ef590f1849d17cdf440a3f367d38cd6c9ba807a001ab08a4b",
+      "payload": true
+    },
+    {
+      "source": "docs/Engram_2_Rust_Research_RU.md",
+      "destination": "docs/zkit/letopis/research/R-2-rust-sqlite.md",
+      "sha256_before": "10c9ab6fe0acabd6113188701f7950c8ad3f5fcc9324d219a26b8d4180cc414d",
+      "payload": true
+    },
+    {
+      "source": "docs/research/go-sqlite/README.md",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/README.md",
+      "sha256_before": "f4c9c1a0967a684393be37dca9478717fcc29ec850a227e8f4b88c1b4cf13233",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/build-manifest.json",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/build-manifest.json",
+      "sha256_before": "83c6c131d5cf58e6d403c7713af16b8739de9907b012dc0b0172cc47cb2af3fa",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/go.mod",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/go.mod",
+      "sha256_before": "ab1874ffcd9089341a2c4c66132ee7485afb0e557c03e0fc9ead885b8b214be0",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/go.sum",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/go.sum",
+      "sha256_before": "119f1a7e049c82c7f10a3e4eb5cfc8c316973f0ce78e2154ddd8ec30d336a3ec",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/modernc/main.go",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/modernc/main.go",
+      "sha256_before": "a4e25f8e3b2e43130a8e59426caab9f562c8b4dee3d3571d036216de84a69197",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/modernc-results.txt",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/modernc-results.txt",
+      "sha256_before": "30de25bbd85dc1329c3d063e65003339f983ca89a1a36ab1fd0fba755e45eb29",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/native-final-results.txt",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/native-final-results.txt",
+      "sha256_before": "cc3df42abdbaed58bb838bc61b20ebbc5da8c689eef1a3df14359a6630a43dd3",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/native-path-check.txt",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/native-path-check.txt",
+      "sha256_before": "8d376b8c8c2f95cdbb495a19ae1fce3f8d4e5374eb03b5f7374e6375d0550f7c",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/ncruces-final-results.txt",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/ncruces-final-results.txt",
+      "sha256_before": "ada28008807f856741e57693c3842bc3b53f6b07a30b5c48d66104eb250754b9",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/probe/main.go",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/probe/main.go",
+      "sha256_before": "0314d29e126b26d8b917100aceb2f2c58da449fad0058e1e3b1b36fb103e8eeb",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/probe/native.go",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/probe/native.go",
+      "sha256_before": "82da35799dd13887d126b2b463fb68076b13ee98f8125f13966ffb2d54ff47e7",
+      "payload": false
+    },
+    {
+      "source": "docs/research/go-sqlite/probe/ncruces.go",
+      "destination": "docs/zkit/letopis/reference/probes/go-sqlite/probe/ncruces.go",
+      "sha256_before": "c0109ddcef46b4a3eac84c6c5062f08946d42e413e2db8b9ea611559c3f9029d",
+      "payload": false
+    },
+    {
+      "source": "docs/research/rust-sqlite/Cargo.lock",
+      "destination": "docs/zkit/letopis/reference/probes/rust-sqlite/Cargo.lock",
+      "sha256_before": "f922742524514ecb13acb0807f981c59a1623513935bb74140d7651558f2e389",
+      "payload": false
+    },
+    {
+      "source": "docs/research/rust-sqlite/Cargo.toml",
+      "destination": "docs/zkit/letopis/reference/probes/rust-sqlite/Cargo.toml",
+      "sha256_before": "7a3df82c2b7fe1b4f4830eee18c9d14fc0af0d9ad95f14071b872392bfbd2dd5",
+      "payload": false
+    },
+    {
+      "source": "docs/research/rust-sqlite/README.md",
+      "destination": "docs/zkit/letopis/reference/probes/rust-sqlite/README.md",
+      "sha256_before": "add42522407e184044944c37ed8d70166f16959602daf56150e95ae77ca49fc0",
+      "payload": false
+    },
+    {
+      "source": "docs/research/rust-sqlite/build-manifest.json",
+      "destination": "docs/zkit/letopis/reference/probes/rust-sqlite/build-manifest.json",
+      "sha256_before": "27a2ea8f93800f80af240adf4332bfd7b6b532e0710215349320dc9474caaa7b",
+      "payload": false
+    },
+    {
+      "source": "docs/research/rust-sqlite/results.txt",
+      "destination": "docs/zkit/letopis/reference/probes/rust-sqlite/results.txt",
+      "sha256_before": "9d748477eecb3b755facd0a4645a37a8decda5cc8ead64e2612c15810976ed41",
+      "payload": false
+    },
+    {
+      "source": "docs/research/rust-sqlite/src/main.rs",
+      "destination": "docs/zkit/letopis/reference/probes/rust-sqlite/src/main.rs",
+      "sha256_before": "9a1e90c11c275f8e847d2b7b755624801adbff2e890972eb371b12cc466fea16",
+      "payload": false
+    }
+  ],
+  "note": "Before hashes identify the exact dirty working-copy inputs. Link-only rewriting and added stage headers are permitted; original JSON examples and all non-Markdown research evidence must be preserved."
+}

@@ -1,0 +1,34 @@
+config conn=0 query="SELECT sqlite_version()" value=3.53.4
+config conn=0 query="SELECT vec1_info()" value=version 0.7 (Scalar, single-threaded)
+config conn=0 query="PRAGMA journal_mode" value=wal
+config conn=0 query="PRAGMA synchronous" value=2
+config conn=0 query="PRAGMA fullfsync" value=1
+config conn=0 query="PRAGMA foreign_keys" value=1
+config conn=1 query="SELECT sqlite_version()" value=3.53.4
+config conn=1 query="SELECT vec1_info()" value=version 0.7 (Scalar, single-threaded)
+config conn=1 query="PRAGMA journal_mode" value=wal
+config conn=1 query="PRAGMA synchronous" value=2
+config conn=1 query="PRAGMA fullfsync" value=1
+config conn=1 query="PRAGMA foreign_keys" value=1
+check contentless_fts=PASS
+check contentless_delete=PASS
+check extension_two_connections=PASS
+check vector_update_rollback=PASS
+check wal_vector_snapshot=PASS
+filter params={"K":1} count=0
+filter params={"K":1,"streaming":1} count=1
+check vector_delete=PASS
+check extension_reopened_connection=PASS
+load vectors=50000 dim=384 elapsed=598.691291ms
+rebuild elapsed=559.004458ms
+search iteration=0 rows=10 elapsed=29.476ms
+search iteration=1 rows=10 elapsed=27.291625ms
+search iteration=2 rows=10 elapsed=27.739417ms
+search iteration=3 rows=10 elapsed=27.544083ms
+search iteration=4 rows=10 elapsed=27.981708ms
+cancel query="WITH RECURSIVE seq(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM seq WHERE x<100000000) SELECT sum(x) FROM seq" elapsed=1.185292ms error=sqlite3: interrupted context=context deadline exceeded
+cancel query="SELECT rowid FROM big(?, '{\"K\":10}')" elapsed=8.588458ms error=sqlite3: interrupted context=context deadline exceeded
+check connection_after_cancel=PASS
+cancel rebuild elapsed=1.349791ms error=sqlite3: interrupted context=context deadline exceeded
+check index_after_cancelled_rebuild=PASS
+memory maxrss_raw=22855680 GOOS=darwin go_heap_sys=12025856

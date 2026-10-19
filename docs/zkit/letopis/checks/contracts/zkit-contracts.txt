@@ -1,0 +1,6 @@
+WARN   PyYAML is not installed: spec files are NOT checked (pip install pyyaml)
+WARN   jsonschema is not installed: examples are NOT validated against their schemas (pip install jsonschema)
+WARN   X-2 is consumed and not verified against the counterparty's documentation
+WARN   X-3 is consumed and not verified against the counterparty's documentation
+CLARITY 2 consumed contract(s) serving a Must requirement and not verified: X-2, X-3; 0 open fork(s)
+4 boundaries, 4 spec files

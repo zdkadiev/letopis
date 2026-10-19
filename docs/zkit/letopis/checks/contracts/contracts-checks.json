@@ -1,0 +1,31 @@
+{
+  "examples": {
+    "scope": "schemas/examples and stated correspondence checks; not Engram implementation or crash validation",
+    "counts": {
+      "cli_examples": 60,
+      "provider_examples": 6,
+      "metadata_examples": 8,
+      "assertions": 90
+    },
+    "errors": [],
+    "runtime_calls": 0,
+    "measurements": 0
+  },
+  "link_docs": {
+    "exit": 0,
+    "output": "linked: engram-2 — 7 stage documents, 71 decisions, 7 reports\n"
+  },
+  "contracts": {
+    "exit": 0,
+    "output": "CLARITY 0 consumed contract(s) serving a Must requirement and not verified: -; 0 open fork(s)\n4 boundaries, 4 spec files\n"
+  },
+  "requirements": {
+    "exit": 0,
+    "output": "WARN   Must is 95% (42 of 44); say why in the doc or cut\nCLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 0 open question(s) in the log\n44 requirements, 8 constraints checked\n"
+  },
+  "dependencies": {
+    "PyYAML": "6.0.3",
+    "jsonschema": "4.25.1"
+  },
+  "scope": "Design validation only. No runtime, load measurements or inference. Resource-math unchanged and draft."
+}

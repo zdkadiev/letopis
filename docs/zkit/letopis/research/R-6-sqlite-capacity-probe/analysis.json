@@ -1,0 +1,379 @@
+{
+  "units": "milliseconds and bytes; nearest-rank p95",
+  "counts": {
+    "nodes": 200000,
+    "edges": 500000,
+    "text_index": 100000,
+    "vector_index": 100000
+  },
+  "active_program_seconds": 101.725189416,
+  "observed_wal_max_bytes": 312407272,
+  "db_breakdown": {
+    "observer_sqlite": "3.53.4",
+    "page_size": 4096,
+    "page_count": 167955,
+    "freelist_count": 24659,
+    "dbstat": [
+      {
+        "name": "edges",
+        "pages": 25064,
+        "bytes": 102662144,
+        "payload_bytes": 95605000
+      },
+      {
+        "name": "edges_includes",
+        "pages": 117,
+        "bytes": 479232,
+        "payload_bytes": 394672
+      },
+      {
+        "name": "edges_source_probe",
+        "pages": 6282,
+        "bytes": 25731072,
+        "payload_bytes": 20967105
+      },
+      {
+        "name": "edges_target_probe",
+        "pages": 6247,
+        "bytes": 25587712,
+        "payload_bytes": 20967105
+      },
+      {
+        "name": "nodes",
+        "pages": 10258,
+        "bytes": 42016768,
+        "payload_bytes": 39193328
+      },
+      {
+        "name": "nodes_source_uri",
+        "pages": 1473,
+        "bytes": 6033408,
+        "payload_bytes": 5000000
+      },
+      {
+        "name": "sqlite_autoindex_edges_1",
+        "pages": 6177,
+        "bytes": 25300992,
+        "payload_bytes": 20967105
+      },
+      {
+        "name": "sqlite_autoindex_nodes_1",
+        "pages": 2443,
+        "bytes": 10006528,
+        "payload_bytes": 8367105
+      },
+      {
+        "name": "sqlite_schema",
+        "pages": 1,
+        "bytes": 4096,
+        "payload_bytes": 2749
+      },
+      {
+        "name": "sqlite_sequence",
+        "pages": 1,
+        "bytes": 4096,
+        "payload_bytes": 11
+      },
+      {
+        "name": "text_index_config",
+        "pages": 1,
+        "bytes": 4096,
+        "payload_bytes": 11
+      },
+      {
+        "name": "text_index_data",
+        "pages": 9319,
+        "bytes": 38170624,
+        "payload_bytes": 37600563
+      },
+      {
+        "name": "text_index_docsize",
+        "pages": 315,
+        "bytes": 1290240,
+        "payload_bytes": 697611
+      },
+      {
+        "name": "text_index_idx",
+        "pages": 4,
+        "bytes": 16384,
+        "payload_bytes": 8954
+      },
+      {
+        "name": "vector_index_base",
+        "pages": 293,
+        "bytes": 1200128,
+        "payload_bytes": 300000
+      },
+      {
+        "name": "vector_index_config",
+        "pages": 1,
+        "bytes": 4096,
+        "payload_bytes": 12
+      },
+      {
+        "name": "vector_index_idx",
+        "pages": 75295,
+        "bytes": 308408320,
+        "payload_bytes": 307607475
+      },
+      {
+        "name": "vector_index_idx_idx",
+        "pages": 3,
+        "bytes": 12288,
+        "payload_bytes": 3512
+      },
+      {
+        "name": "vector_index_meta",
+        "pages": 1,
+        "bytes": 4096,
+        "payload_bytes": 0
+      },
+      {
+        "name": "vector_index_model",
+        "pages": 1,
+        "bytes": 4096,
+        "payload_bytes": 27
+      }
+    ],
+    "node_meta": [
+      [
+        "metavertex",
+        5000,
+        59,
+        59,
+        64,
+        64
+      ],
+      [
+        "source",
+        100000,
+        44,
+        44,
+        64,
+        64
+      ],
+      [
+        "vertex",
+        95000,
+        59,
+        59,
+        64,
+        64
+      ]
+    ],
+    "edge_types": [
+      [
+        "external",
+        100000
+      ],
+      [
+        "includes",
+        5000
+      ],
+      [
+        "related",
+        395000
+      ]
+    ],
+    "additional_checks": {
+      "uuid_disjoint_nodes_edges": true,
+      "includes_sources_metavertices": true,
+      "includes_no_metavertex_targets_in_fixture": true
+    }
+  },
+  "runs": {
+    "load": {
+      "program_seconds": 21.638560333,
+      "real_seconds": 22.1,
+      "peak_rss_bytes": 34357248,
+      "peak_footprint_bytes": 31621528,
+      "queries": {}
+    },
+    "read": {
+      "program_seconds": 7.10387425,
+      "real_seconds": 7.11,
+      "peak_rss_bytes": 11976704,
+      "peak_footprint_bytes": 9830760,
+      "queries": {
+        "fts_rare": {
+          "service_ms": {
+            "n": 30,
+            "min": 0.026375,
+            "median": 0.0285205,
+            "p95": 0.049625,
+            "max": 0.320459
+          }
+        },
+        "fts_common": {
+          "service_ms": {
+            "n": 30,
+            "min": 59.746209,
+            "median": 61.1734165,
+            "p95": 63.759167000000005,
+            "max": 87.690291
+          }
+        },
+        "vector_k10": {
+          "service_ms": {
+            "n": 30,
+            "min": 45.473958,
+            "median": 46.281291499999995,
+            "p95": 51.333999999999996,
+            "max": 74.766125
+          }
+        },
+        "traverse_out": {
+          "service_ms": {
+            "n": 30,
+            "min": 0.17433300000000002,
+            "median": 0.21266649999999998,
+            "p95": 0.27625,
+            "max": 0.5058750000000001
+          }
+        },
+        "traverse_in": {
+          "service_ms": {
+            "n": 30,
+            "min": 0.145042,
+            "median": 0.17131200000000002,
+            "p95": 0.182583,
+            "max": 0.193292
+          }
+        }
+      }
+    },
+    "mixed": {
+      "program_seconds": 23.257469208,
+      "real_seconds": 23.71,
+      "peak_rss_bytes": 68272128,
+      "peak_footprint_bytes": 66240920,
+      "queries": {
+        "burst_10_readers": {
+          "service_ms": {
+            "n": 10,
+            "min": 1336.085208,
+            "median": 1764.795375,
+            "p95": 1774.304709,
+            "max": 1774.304709
+          }
+        },
+        "steady_10qps": {
+          "service_ms": {
+            "n": 150,
+            "min": 106.574833,
+            "median": 1239.814542,
+            "p95": 1292.9906250000001,
+            "max": 1334.740541
+          },
+          "dispatch_lag_ms": {
+            "n": 150,
+            "min": 0.353667,
+            "median": 1290.7619165,
+            "p95": 2999.743042,
+            "max": 3287.548625
+          },
+          "scheduled_to_finish_ms": {
+            "n": 150,
+            "min": 108.054833,
+            "median": 2553.8911664999996,
+            "p95": 4186.768667,
+            "max": 4503.097333
+          }
+        }
+      }
+    },
+    "readers_1": {
+      "program_seconds": 17.410069625,
+      "real_seconds": 17.81,
+      "peak_rss_bytes": 11698176,
+      "peak_footprint_bytes": 9699688,
+      "queries": {
+        "readers_1": {
+          "service_ms": {
+            "n": 150,
+            "min": 105.945583,
+            "median": 107.71185399999999,
+            "p95": 114.702916,
+            "max": 131.375667
+          },
+          "dispatch_lag_ms": {
+            "n": 150,
+            "min": 2.677,
+            "median": 621.89725,
+            "p95": 1231.8035,
+            "max": 1294.128042
+          },
+          "scheduled_to_finish_ms": {
+            "n": 150,
+            "min": 134.05266699999999,
+            "median": 733.6193125,
+            "p95": 1338.5351249999999,
+            "max": 1403.828
+          }
+        }
+      }
+    },
+    "readers_2": {
+      "program_seconds": 16.163983458,
+      "real_seconds": 16.16,
+      "peak_rss_bytes": 19677184,
+      "peak_footprint_bytes": 17662336,
+      "queries": {
+        "readers_2": {
+          "service_ms": {
+            "n": 150,
+            "min": 112.534125,
+            "median": 154.776104,
+            "p95": 205.943208,
+            "max": 220.315
+          },
+          "dispatch_lag_ms": {
+            "n": 150,
+            "min": 0.05,
+            "median": 2.779271,
+            "p95": 7.401667,
+            "max": 16.096959000000002
+          },
+          "scheduled_to_finish_ms": {
+            "n": 150,
+            "min": 116.4815,
+            "median": 158.69243799999998,
+            "p95": 208.10995899999998,
+            "max": 224.124
+          }
+        }
+      }
+    },
+    "readers_4": {
+      "program_seconds": 16.151232542,
+      "real_seconds": 16.15,
+      "peak_rss_bytes": 32669696,
+      "peak_footprint_bytes": 30638464,
+      "queries": {
+        "readers_4": {
+          "service_ms": {
+            "n": 150,
+            "min": 109.744417,
+            "median": 296.70275,
+            "p95": 475.337042,
+            "max": 511.00133299999993
+          },
+          "dispatch_lag_ms": {
+            "n": 150,
+            "min": 0.29275,
+            "median": 4.3055414999999995,
+            "p95": 99.46033299999999,
+            "max": 168.34616699999998
+          },
+          "scheduled_to_finish_ms": {
+            "n": 150,
+            "min": 110.829292,
+            "median": 303.765271,
+            "p95": 499.452417,
+            "max": 568.339042
+          }
+        }
+      }
+    }
+  }
+}

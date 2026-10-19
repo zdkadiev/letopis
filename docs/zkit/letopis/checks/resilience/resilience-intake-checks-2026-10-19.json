@@ -1,0 +1,50 @@
+{
+  "links": {
+    "exit_code": 0,
+    "stdout": "linked: letopis — 7 stage documents, 79 decisions, 8 reports\n",
+    "stderr": ""
+  },
+  "requirements": {
+    "exit_code": 0,
+    "stdout": "WARN   Must is 95% (42 of 44); say why in the doc or cut\nCLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 0 open question(s) in the log\n44 requirements, 8 constraints checked\n",
+    "stderr": ""
+  },
+  "resource-math": {
+    "exit_code": 0,
+    "stdout": "CLARITY 0 limit(s) failing in the expected scenario without a decision: -; 0 assumption(s) without a validation\n11 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n",
+    "stderr": ""
+  },
+  "contracts": {
+    "exit_code": 0,
+    "stdout": "CLARITY 0 consumed contract(s) serving a Must requirement and not verified: -; 0 open fork(s)\n10 boundaries, 10 spec files\n",
+    "stderr": ""
+  },
+  "data": {
+    "exit_code": 0,
+    "stdout": "CLARITY 0 entity(ies) without a volume figure or assumption; 0 open fork(s)\n12 entities, 4 memory regions\n",
+    "stderr": ""
+  },
+  "architecture": {
+    "exit_code": 0,
+    "stdout": "CLARITY 0 Must requirement(s) without a covering part: -; 0 open fork(s); 0 architectural assumption(s) without a validation; 0 boundary(ies) unhandled; 0 entity(ies) unowned\n6 parts, 12 interfaces, 6 scenarios, 52 requirements known\n",
+    "stderr": ""
+  },
+  "mechanics": {
+    "exit_code": 0,
+    "stdout": "CLARITY 0 high-risk mechanism(s) without an executable model: -; 0 open fork(s)\n7 mechanisms, 4 state machines, 3 executable models\n",
+    "stderr": ""
+  },
+  "after_round_freeze": {
+    "links": {
+      "exit_code": 0,
+      "stdout": "linked: letopis — 8 stage documents, 79 decisions, 8 reports\n",
+      "stderr": ""
+    },
+    "resilience": {
+      "exit_code": 1,
+      "stdout": "ERROR  no resilience_model.py in /private/tmp/letopis-resilience-ch34ophb/letopis\nCLARITY 0 target(s) of architecture/contracts/data not covered; 0 high-severity row(s) without a drill; 0 limit(s) failing in the expected scenario without a decision: -\n9 faults, 5 threats, 8 signals, 8 drills, 0 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n",
+      "stderr": ""
+    }
+  },
+  "scope": "Intake only; missing numeric model and unanswered R1 are intentional. No runtime/drills/measurements."
+}

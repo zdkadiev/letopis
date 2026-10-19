@@ -1,0 +1,34 @@
+classDiagram
+class DocumentService {
+  apply(Patch)
+  recover()
+  capture(SnapshotRequest)
+}
+class ProjectGate
+class WriteUnit
+class GitSnapshotPort {
+  harden(CanonicalSnapshot) DurableTree
+}
+class ProjectionPort {
+  prepare(ProjectionInput) PreparedProjection
+  publish(WriteUnit, PreparedProjection)
+}
+class EmbeddingExecutor {
+  reserve(seq)
+  publishIfCurrent(seq, vector)
+}
+class EmbeddingPort {
+  embed(texts) vectors
+}
+class IndexReadView
+class DiagnosticsPort
+DocumentService --> ProjectGate
+DocumentService --> GitSnapshotPort
+DocumentService --> WriteUnit
+DocumentService --> ProjectionPort
+ProjectionPort --> WriteUnit
+EmbeddingExecutor --> EmbeddingPort
+EmbeddingExecutor --> WriteUnit
+DocumentService --> DiagnosticsPort
+EmbeddingExecutor --> DiagnosticsPort
+IndexReadView ..> ProjectionPort : pinned published data

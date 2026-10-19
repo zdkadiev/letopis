@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-12",
+  "purpose": "throwaway Rust integration research; not product implementation",
+  "rustc": "1.95.0",
+  "cargo": "1.95.0",
+  "target": "aarch64-apple-darwin",
+  "profile": "release",
+  "rusqlite": "0.40.2",
+  "libsqlite3-sys": "0.38.2",
+  "sqlite": "3.53.2",
+  "features": [
+    "bundled",
+    "load_extension"
+  ],
+  "vec1": "0.8",
+  "vec1_info": "version 0.8 (NEON, multi-threaded)",
+  "vec1_source": "https://raw.githubusercontent.com/sqlite/sqlite/a27bcfe21c9b4e0989e86eec8fb34a3832cd23c7/ext/vec1/vec1.c",
+  "vec1_source_sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9",
+  "vec1_library_sha256": "fc49ed1742a08e4104372df3d530aaad20e2429a1451a3237fa2a51963a7f75d",
+  "dataset": {
+    "vectors": 50000,
+    "dimensions": 384,
+    "source": "Go probe dataset, read-only",
+    "query": "rowid=1 vector",
+    "queries": 5,
+    "k": 10
+  },
+  "linux_runtime_tested": false,
+  "power_loss_tested": false,
+  "embedding_runtime_tested": false,
+  "files_sha256": {
+    "Cargo.toml": "7a3df82c2b7fe1b4f4830eee18c9d14fc0af0d9ad95f14071b872392bfbd2dd5",
+    "Cargo.lock": "f922742524514ecb13acb0807f981c59a1623513935bb74140d7651558f2e389",
+    "results.txt": "9d748477eecb3b755facd0a4645a37a8decda5cc8ead64e2612c15810976ed41",
+    "README.md": "add42522407e184044944c37ed8d70166f16959602daf56150e95ae77ca49fc0",
+    "src/main.rs": "9a1e90c11c275f8e847d2b7b755624801adbff2e890972eb371b12cc466fea16"
+  }
+}

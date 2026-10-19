@@ -1,0 +1,33 @@
+{
+  "scope": "Logical design and syntax checks only; no runtime, inference, measurements or Git commits",
+  "checks": {
+    "links": {
+      "exit": 0,
+      "output": "linked: letopis — 7 stage documents, 75 decisions, 7 reports\n"
+    },
+    "requirements": {
+      "exit": 0,
+      "output": "WARN   Must is 95% (42 of 44); say why in the doc or cut\nCLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 0 open question(s) in the log\n44 requirements, 8 constraints checked\n"
+    },
+    "resource-math": {
+      "exit": 0,
+      "output": "CLARITY 0 limit(s) failing in the expected scenario without a decision: -; 0 assumption(s) without a validation\n11 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n"
+    },
+    "contracts": {
+      "exit": 0,
+      "output": "CLARITY 0 consumed contract(s) serving a Must requirement and not verified: -; 0 open fork(s)\n4 boundaries, 4 spec files\n"
+    },
+    "data": {
+      "exit": 0,
+      "output": "CLARITY 0 entity(ies) without a volume figure or assumption; 0 open fork(s)\n12 entities, 4 memory regions\n"
+    },
+    "architecture": {
+      "exit": 0,
+      "output": "CLARITY 0 Must requirement(s) without a covering part: -; 0 open fork(s); 0 architectural assumption(s) without a validation; 0 boundary(ies) unhandled; 0 entity(ies) unowned\n6 parts, 12 interfaces, 6 scenarios, 52 requirements known\n"
+    }
+  },
+  "diagrams_match_parsed_sources": true,
+  "resource_model_and_schemas_unchanged": true,
+  "independent_review": "Two findings resolved; no logical gate blockers or new product questions; D74/D75 assumed and deferred validations retained",
+  "logical_status": "agreed"
+}

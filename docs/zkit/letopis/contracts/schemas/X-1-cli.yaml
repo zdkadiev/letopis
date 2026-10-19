@@ -1,0 +1,1225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:letopis:contracts:cli:v1",
+  "title": "letopis v1 CLI JSON payload catalogue",
+  "x-boundary": "X-1",
+  "x-direction": "published",
+  "x-status": "draft",
+  "x-serves": [
+    "FR-1",
+    "FR-2",
+    "FR-3",
+    "FR-4",
+    "FR-5",
+    "FR-6",
+    "FR-7",
+    "FR-8",
+    "FR-9",
+    "FR-10",
+    "FR-11",
+    "FR-12",
+    "FR-13",
+    "FR-14",
+    "FR-15",
+    "FR-16",
+    "FR-17",
+    "FR-18",
+    "FR-19",
+    "FR-20",
+    "FR-21",
+    "FR-22",
+    "FR-23",
+    "FR-24",
+    "FR-25",
+    "FR-26",
+    "FR-27",
+    "FR-28",
+    "FR-29",
+    "FR-30",
+    "FR-31",
+    "FR-32",
+    "FR-33",
+    "FR-34",
+    "FR-35",
+    "FR-36",
+    "C-1"
+  ],
+  "x-limits": [],
+  "$defs": {
+    "UUID": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])",
+      "minLength": 36,
+      "maxLength": 36
+    },
+    "Hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "OID": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})(?![\\s\\S])"
+    },
+    "Text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)[^\\x00]+(?![\\s\\S])"
+    },
+    "Empty": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "Lines": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "type": "integer",
+          "minimum": 1
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "1-based inclusive; application also checks end >= start."
+    },
+    "Flags": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "stale",
+          "source_changed",
+          "source_not_found"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "Link": {
+      "type": "object",
+      "properties": {
+        "element_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "lines": {
+          "$ref": "#/$defs/Lines"
+        },
+        "revision": {
+          "$ref": "#/$defs/OID"
+        },
+        "flags": {
+          "$ref": "#/$defs/Flags"
+        }
+      },
+      "required": [
+        "element_id",
+        "path",
+        "revision",
+        "flags"
+      ],
+      "additionalProperties": false
+    },
+    "Diagnostic": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "enum": [
+            "invalid_request",
+            "not_found",
+            "conflict",
+            "validation_failed",
+            "embedding_failed",
+            "internal_error",
+            "cancelled"
+          ]
+        },
+        "message": {
+          "$ref": "#/$defs/Text"
+        },
+        "details": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "details"
+      ],
+      "additionalProperties": false
+    },
+    "Failure": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "$ref": "#/$defs/Diagnostic"
+        }
+      },
+      "required": [
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "Create": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "create"
+        },
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "base_hash": {
+          "$ref": "#/$defs/Hash"
+        },
+        "markdown": {
+          "$ref": "#/$defs/Text"
+        }
+      },
+      "required": [
+        "type",
+        "path",
+        "markdown"
+      ],
+      "additionalProperties": false
+    },
+    "Edit": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "edit"
+        },
+        "element_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "base_hash": {
+          "$ref": "#/$defs/Hash"
+        },
+        "markdown": {
+          "$ref": "#/$defs/Text"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/OID"
+        }
+      },
+      "required": [
+        "type",
+        "element_id",
+        "base_hash",
+        "markdown"
+      ],
+      "additionalProperties": false
+    },
+    "Delete": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "delete"
+        },
+        "element_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "base_hash": {
+          "$ref": "#/$defs/Hash"
+        }
+      },
+      "required": [
+        "type",
+        "element_id",
+        "base_hash"
+      ],
+      "additionalProperties": false
+    },
+    "ApplyInput": {
+      "type": "object",
+      "properties": {
+        "operations": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Create"
+              },
+              {
+                "$ref": "#/$defs/Edit"
+              },
+              {
+                "$ref": "#/$defs/Delete"
+              }
+            ]
+          },
+          "minItems": 1
+        },
+        "base_hashes": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/UUID"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/Hash"
+          }
+        }
+      },
+      "required": [
+        "operations"
+      ],
+      "additionalProperties": false
+    },
+    "ApplyOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "hash": {
+              "$ref": "#/$defs/Hash"
+            },
+            "ids": {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": {
+                "type": "string",
+                "pattern": "^tmp:[0-9a-f]{3}(?![\\s\\S])"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/UUID"
+              }
+            }
+          },
+          "required": [
+            "hash"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "CheckOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "paths": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Path"
+              },
+              "minItems": 0
+            },
+            "element_ids": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/UUID"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^tmp:[0-9a-f]{3}(?![\\s\\S])"
+                  }
+                ]
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "paths",
+            "element_ids"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "InspectInput": {
+      "type": "object",
+      "properties": {
+        "element_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UUID"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "element_ids"
+      ],
+      "additionalProperties": false
+    },
+    "Inspected": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "lines": {
+          "$ref": "#/$defs/Lines"
+        },
+        "hash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Hash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "file_hash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Hash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "hash",
+        "file_hash"
+      ],
+      "additionalProperties": false
+    },
+    "InspectOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "snapshot": {
+              "$ref": "#/$defs/OID"
+            },
+            "elements": {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "#/$defs/UUID"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/Inspected"
+              }
+            }
+          },
+          "required": [
+            "snapshot",
+            "elements"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "Filters": {
+      "type": "object",
+      "properties": {
+        "needs_recheck": {
+          "type": "boolean"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "minItems": 0
+        },
+        "source_revisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OID"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "SearchInput": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "$ref": "#/$defs/Text"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "filters": {
+          "$ref": "#/$defs/Filters"
+        }
+      },
+      "required": [
+        "query",
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "SearchOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/Link"
+              },
+              {
+                "required": [
+                  "lines"
+                ]
+              }
+            ]
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "TraverseInput": {
+      "type": "object",
+      "properties": {
+        "element_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UUID"
+          },
+          "minItems": 1
+        },
+        "mode": {
+          "enum": [
+            "relations",
+            "containment",
+            "both"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "outgoing",
+            "incoming",
+            "both"
+          ]
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "edge_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(?![\\s\\S])"
+          },
+          "minItems": 0
+        },
+        "edge_limit": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "element_ids",
+        "mode",
+        "direction",
+        "depth",
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "Edge": {
+      "type": "object",
+      "properties": {
+        "element_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(?![\\s\\S])"
+        },
+        "source": {
+          "$ref": "#/$defs/UUID"
+        },
+        "target": {
+          "$ref": "#/$defs/UUID"
+        }
+      },
+      "required": [
+        "element_id",
+        "type",
+        "source",
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "TraverseOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "elements": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Link"
+              },
+              "minItems": 0
+            },
+            "edges": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Edge"
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "elements"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ReindexInput": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Path"
+          },
+          "minItems": 0
+        },
+        "element_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UUID"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ReindexOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "revision": {
+              "$ref": "#/$defs/OID"
+            }
+          },
+          "required": [
+            "revision"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "CancelOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "revision": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/OID"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "revision"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "Lock": {
+      "type": "object",
+      "properties": {
+        "hash": {
+          "$ref": "#/$defs/Hash"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Path"
+          },
+          "minItems": 0
+        },
+        "element_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UUID"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "hash",
+        "paths",
+        "element_ids"
+      ],
+      "additionalProperties": false
+    },
+    "Progress": {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "$ref": "#/$defs/Text"
+        },
+        "completed": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "stage",
+        "completed"
+      ],
+      "additionalProperties": false
+    },
+    "StatusOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "revision": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/OID"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reindex": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Progress"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "embedding_jobs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "locks": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Lock"
+              },
+              "minItems": 0
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Diagnostic"
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "revision",
+            "reindex",
+            "embedding_jobs",
+            "locks",
+            "errors"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ErrorsOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "Parameters": {
+      "type": "object",
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://"
+        }
+      },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "api_key",
+            "authorization",
+            "Authorization"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "description": "Provider settings; base_url is client-only, credentials forbidden. Host/path validation is semantic.",
+      "required": [
+        "base_url"
+      ]
+    },
+    "Configuration": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "enum": [
+            "ollama",
+            "openai"
+          ]
+        },
+        "model": {
+          "$ref": "#/$defs/Text"
+        },
+        "parameters": {
+          "$ref": "#/$defs/Parameters"
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Additional attempts after the initial embedding job attempt; worker setting, not provider request data."
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "parameters",
+        "max_retries"
+      ],
+      "additionalProperties": false
+    },
+    "ConfigOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Configuration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ConfigSetOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/Empty"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/Failure"
+    },
+    {
+      "$ref": "#/$defs/ConfigOutput"
+    },
+    {
+      "$ref": "#/$defs/ApplyInput"
+    },
+    {
+      "$ref": "#/$defs/Empty"
+    },
+    {
+      "$ref": "#/$defs/Configuration"
+    },
+    {
+      "$ref": "#/$defs/InspectInput"
+    },
+    {
+      "$ref": "#/$defs/CancelOutput"
+    },
+    {
+      "$ref": "#/$defs/ReindexOutput"
+    },
+    {
+      "$ref": "#/$defs/CheckOutput"
+    },
+    {
+      "$ref": "#/$defs/ReindexInput"
+    },
+    {
+      "$ref": "#/$defs/ErrorsOutput"
+    },
+    {
+      "$ref": "#/$defs/StatusOutput"
+    },
+    {
+      "$ref": "#/$defs/SearchOutput"
+    },
+    {
+      "$ref": "#/$defs/TraverseInput"
+    },
+    {
+      "$ref": "#/$defs/TraverseOutput"
+    },
+    {
+      "$ref": "#/$defs/SearchInput"
+    },
+    {
+      "$ref": "#/$defs/ApplyOutput"
+    },
+    {
+      "$ref": "#/$defs/InspectOutput"
+    },
+    {
+      "$ref": "#/$defs/ConfigSetOutput"
+    }
+  ],
+  "x-commands": {
+    "apply": {
+      "input": {
+        "$ref": "#/$defs/ApplyInput"
+      },
+      "success": {
+        "$ref": "#/$defs/ApplyOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "none",
+      "description": "No persistent deduplication; after a lost reply inspect first.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "apply --check": {
+      "input": {
+        "$ref": "#/$defs/ApplyInput"
+      },
+      "success": {
+        "$ref": "#/$defs/CheckOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "natural",
+      "description": "No writes or identifier reservation.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "inspect": {
+      "input": {
+        "$ref": "#/$defs/InspectInput"
+      },
+      "success": {
+        "$ref": "#/$defs/InspectOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "natural",
+      "description": "Read current metadata; snapshot OID can vary with corpus.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "search": {
+      "input": {
+        "$ref": "#/$defs/SearchInput"
+      },
+      "success": {
+        "$ref": "#/$defs/SearchOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "natural",
+      "description": "Read; hybrid with FTS fallback; no timed truncation.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "traverse": {
+      "input": {
+        "$ref": "#/$defs/TraverseInput"
+      },
+      "success": {
+        "$ref": "#/$defs/TraverseOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "natural",
+      "description": "Read one published state; starting nodes excluded.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "reindex": {
+      "input": {
+        "$ref": "#/$defs/ReindexInput"
+      },
+      "success": {
+        "$ref": "#/$defs/ReindexOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "none",
+      "description": "Wait graph/FTS publication and job enqueue, not vector completion; no permanent response cache.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "reindex --cancel": {
+      "input": {
+        "$ref": "#/$defs/Empty"
+      },
+      "success": {
+        "$ref": "#/$defs/CancelOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "none",
+      "description": "Targets currently active rebuild; does not undo published state.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "status": {
+      "input": {
+        "$ref": "#/$defs/Empty"
+      },
+      "success": {
+        "$ref": "#/$defs/StatusOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "natural",
+      "description": "Read status; completed is current-stage percent.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "errors": {
+      "input": {
+        "$ref": "#/$defs/Empty"
+      },
+      "success": {
+        "$ref": "#/$defs/ErrorsOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "natural",
+      "description": "Read retained diagnostics.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "errors --clear": {
+      "input": {
+        "$ref": "#/$defs/Empty"
+      },
+      "success": {
+        "$ref": "#/$defs/ErrorsOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "none",
+      "description": "Clear completed unsuccessful diagnostics; preserve active errors and concurrent new diagnostics.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "config": {
+      "input": {
+        "$ref": "#/$defs/Empty"
+      },
+      "success": {
+        "$ref": "#/$defs/ConfigOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "natural",
+      "description": "Read active configuration; null before setup.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "config --set": {
+      "input": {
+        "$ref": "#/$defs/Configuration"
+      },
+      "success": {
+        "$ref": "#/$defs/ConfigSetOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "none",
+      "description": "Replace whole configuration, graph/FTS kept, vector/jobs protocol preserved. Same-content optimization not promised.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    }
+  }
+}

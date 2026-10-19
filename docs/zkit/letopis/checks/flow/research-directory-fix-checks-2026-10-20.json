@@ -1,0 +1,200 @@
+{
+  "test_suite": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-v"
+    ],
+    "cwd": "/Users/zdkadiev/Repos/zkit",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "test_artifact_directory_cannot_replace_a_cited_report (test_research_reports.ResearchReportTests) ... ok\ntest_checks_report_beside_artifact_directories_and_auxiliary_files (test_research_reports.ResearchReportTests) ... ok\ntest_document_errors_are_still_reported (test_research_reports.ResearchReportTests) ... ok\ntest_finds_a_cited_report (test_research_reports.ResearchReportTests) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 0.159s\n\nOK\n"
+  },
+  "requirements": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/requirements/scripts/check_requirements.py",
+      "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+    ],
+    "exit_code": 0,
+    "stdout": "WARN   Must is 95% (42 of 44); say why in the doc or cut\nCLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 0 open question(s) in the log\n44 requirements, 8 constraints checked\n",
+    "stderr": ""
+  },
+  "resource-math": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/resource-math/scripts/check_resource_math.py",
+      "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+    ],
+    "exit_code": 0,
+    "stdout": "CLARITY 0 limit(s) failing in the expected scenario without a decision: -; 0 assumption(s) without a validation\n11 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n",
+    "stderr": ""
+  },
+  "contracts": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/contracts/scripts/check_contracts.py",
+      "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+    ],
+    "exit_code": 0,
+    "stdout": "CLARITY 0 consumed contract(s) serving a Must requirement and not verified: -; 0 open fork(s)\n10 boundaries, 10 spec files\n",
+    "stderr": ""
+  },
+  "data": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/data/scripts/check_data.py",
+      "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+    ],
+    "exit_code": 0,
+    "stdout": "CLARITY 0 entity(ies) without a volume figure or assumption; 0 open fork(s)\n12 entities, 4 memory regions\n",
+    "stderr": ""
+  },
+  "architecture": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/architecture/scripts/check_architecture.py",
+      "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+    ],
+    "exit_code": 0,
+    "stdout": "CLARITY 0 Must requirement(s) without a covering part: -; 0 open fork(s); 0 architectural assumption(s) without a validation; 0 boundary(ies) unhandled; 0 entity(ies) unowned\n6 parts, 12 interfaces, 6 scenarios, 52 requirements known\n",
+    "stderr": ""
+  },
+  "mechanics": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/mechanics/scripts/check_mechanics.py",
+      "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+    ],
+    "exit_code": 0,
+    "stdout": "CLARITY 0 high-risk mechanism(s) without an executable model: -; 0 open fork(s)\n7 mechanisms, 4 state machines, 3 executable models\n",
+    "stderr": ""
+  },
+  "resilience": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/resilience/scripts/check_resilience.py",
+      "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+    ],
+    "exit_code": 0,
+    "stdout": "CLARITY 0 target(s) of architecture/contracts/data not covered; 0 high-severity row(s) without a drill; 0 limit(s) failing in the expected scenario without a decision: -\n9 faults, 5 threats, 8 signals, 8 drills, 6 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n",
+    "stderr": ""
+  },
+  "roadmap": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/roadmap/scripts/check_roadmap.py",
+      "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+    ],
+    "exit_code": 0,
+    "stdout": "CLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; 0 epic/task file(s) missing; expected scenario meets or has no the deadline\n5 phases, 5 gates, 45 tasks, 8 epics; hours 204 / 372 / 672; weeks 20.4 / 37.2 / 67.2\n",
+    "stderr": ""
+  },
+  "layout": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/flow/scripts/layout.py",
+      "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+    ],
+    "exit_code": 0,
+    "stdout": "OK: layout matches\n",
+    "stderr": ""
+  },
+  "weekly": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis/roadmap/schedule.py",
+      "--check"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"tasks\": 45, \"hours\": 372, \"task_cards\": 45, \"weeks\": 38, \"max_week_hours\": 10, \"last_week_hours\": 2, \"terminal\": \"TK-45\", \"dependency_errors\": 0, \"phase_gate_errors\": 0, \"unscheduled_tasks\": 0, \"runtime_calls\": 0, \"measurements\": 0}\n",
+    "stderr": ""
+  },
+  "project_unchanged_by_checks": true,
+  "compatibility_launcher_used": false,
+  "new_measurements": 0,
+  "reproduction": {
+    "skills/requirements/scripts/check_requirements.py": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/Repos/zkit/skills/requirements/scripts/check_requirements.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/Users/zdkadiev/Repos/zkit/skills/requirements/scripts/check_requirements.py\", line 91, in <module>\n    head_r = open(os.path.join(rdir, f), encoding=\"utf-8\").read().split(\"\\n## \")[0]\nIsADirectoryError: [Errno 21] Is a directory: '/Users/zdkadiev/Repos/letopis/docs/zkit/letopis/research/R-1-go-sqlite'\n"
+    },
+    "skills/architecture/scripts/check_architecture.py": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/Repos/zkit/skills/architecture/scripts/check_architecture.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/Users/zdkadiev/Repos/zkit/skills/architecture/scripts/check_architecture.py\", line 195, in <module>\n    rt = open(os.path.join(rdir, f), encoding=\"utf-8\").read()\nIsADirectoryError: [Errno 21] Is a directory: '/Users/zdkadiev/Repos/letopis/docs/zkit/letopis/research/R-1-go-sqlite'\n"
+    }
+  },
+  "red_tests": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-v"
+    ],
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "test_artifact_directory_cannot_replace_a_cited_report (test_research_reports.ResearchReportTests) ... test_checks_report_beside_artifact_directories_and_auxiliary_files (test_research_reports.ResearchReportTests) ... test_document_errors_are_still_reported (test_research_reports.ResearchReportTests) ... test_finds_a_cited_report (test_research_reports.ResearchReportTests) ... ok\n\n======================================================================\nFAIL: test_artifact_directory_cannot_replace_a_cited_report (test_research_reports.ResearchReportTests) (checker='requirements')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/tests/test_research_reports.py\", line 110, in test_artifact_directory_cannot_replace_a_cited_report\n    self.assertEqual(result.stderr, \"\")\nAssertionError: 'Traceback (most recent call last):\\n  Fil[382 chars]\\'\\n' != ''\n- Traceback (most recent call last):\n-   File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/skills/requirements/scripts/check_requirements.py\", line 91, in <module>\n-     head_r = open(os.path.join(rdir, f), encoding=\"utf-8\").read().split(\"\\n## \")[0]\n- IsADirectoryError: [Errno 21] Is a directory: '/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmpuaabwqfj/research/R-1-probe.md'\n\n\n======================================================================\nFAIL: test_artifact_directory_cannot_replace_a_cited_report (test_research_reports.ResearchReportTests) (checker='architecture')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/tests/test_research_reports.py\", line 110, in test_artifact_directory_cannot_replace_a_cited_report\n    self.assertEqual(result.stderr, \"\")\nAssertionError: 'Traceback (most recent call last):\\n  Fil[360 chars]\\'\\n' != ''\n- Traceback (most recent call last):\n-   File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/skills/architecture/scripts/check_architecture.py\", line 195, in <module>\n-     rt = open(os.path.join(rdir, f), encoding=\"utf-8\").read()\n- IsADirectoryError: [Errno 21] Is a directory: '/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmp_v9qzr43/research/R-1-probe.md'\n\n\n======================================================================\nFAIL: test_checks_report_beside_artifact_directories_and_auxiliary_files (test_research_reports.ResearchReportTests) (checker='requirements')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/tests/test_research_reports.py\", line 97, in test_checks_report_beside_artifact_directories_and_auxiliary_files\n    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)\nAssertionError: 1 != 0 : Traceback (most recent call last):\n  File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/skills/requirements/scripts/check_requirements.py\", line 91, in <module>\n    head_r = open(os.path.join(rdir, f), encoding=\"utf-8\").read().split(\"\\n## \")[0]\nIsADirectoryError: [Errno 21] Is a directory: '/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmpv6q3a0le/research/R-1-probe'\n\n\n======================================================================\nFAIL: test_checks_report_beside_artifact_directories_and_auxiliary_files (test_research_reports.ResearchReportTests) (checker='architecture')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/tests/test_research_reports.py\", line 97, in test_checks_report_beside_artifact_directories_and_auxiliary_files\n    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)\nAssertionError: 1 != 0 : Traceback (most recent call last):\n  File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/skills/architecture/scripts/check_architecture.py\", line 195, in <module>\n    rt = open(os.path.join(rdir, f), encoding=\"utf-8\").read()\nIsADirectoryError: [Errno 21] Is a directory: '/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmpaholbwgj/research/R-1-probe'\n\n\n======================================================================\nFAIL: test_document_errors_are_still_reported (test_research_reports.ResearchReportTests) (checker='requirements')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/tests/test_research_reports.py\", line 129, in test_document_errors_are_still_reported\n    self.assertEqual(result.stderr, \"\")\nAssertionError: 'Traceback (most recent call last):\\n  Fil[379 chars]\\'\\n' != ''\n- Traceback (most recent call last):\n-   File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/skills/requirements/scripts/check_requirements.py\", line 91, in <module>\n-     head_r = open(os.path.join(rdir, f), encoding=\"utf-8\").read().split(\"\\n## \")[0]\n- IsADirectoryError: [Errno 21] Is a directory: '/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmpqha9xnvh/research/R-1-probe'\n\n\n======================================================================\nFAIL: test_document_errors_are_still_reported (test_research_reports.ResearchReportTests) (checker='architecture')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/tests/test_research_reports.py\", line 129, in test_document_errors_are_still_reported\n    self.assertEqual(result.stderr, \"\")\nAssertionError: 'Traceback (most recent call last):\\n  Fil[357 chars]\\'\\n' != ''\n- Traceback (most recent call last):\n-   File \"/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/zkit-research-fix-11gq4eui/zkit/skills/architecture/scripts/check_architecture.py\", line 195, in <module>\n-     rt = open(os.path.join(rdir, f), encoding=\"utf-8\").read()\n- IsADirectoryError: [Errno 21] Is a directory: '/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmpakh_9m3n/research/R-1-probe'\n\n\n----------------------------------------------------------------------\nRan 4 tests in 0.158s\n\nFAILED (failures=6)\n"
+  },
+  "staged_green_tests": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-v"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "test_artifact_directory_cannot_replace_a_cited_report (test_research_reports.ResearchReportTests) ... ok\ntest_checks_report_beside_artifact_directories_and_auxiliary_files (test_research_reports.ResearchReportTests) ... ok\ntest_document_errors_are_still_reported (test_research_reports.ResearchReportTests) ... ok\ntest_finds_a_cited_report (test_research_reports.ResearchReportTests) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 0.149s\n\nOK\n"
+  },
+  "fix": {
+    "scope": "Local source and installed package only; no publication",
+    "files": [
+      "skills/requirements/scripts/check_requirements.py",
+      "skills/architecture/scripts/check_architecture.py"
+    ],
+    "regression_test": "tests/test_research_reports.py",
+    "package_version": "0.2.6",
+    "published": false,
+    "source_equals_installed": true,
+    "sha256": {
+      "skills/requirements/scripts/check_requirements.py": "80f1b96eb023f851b7c6339c32aad108abdfdc45b1ed2b7559fd0070c8a51996",
+      "skills/architecture/scripts/check_architecture.py": "bbde5c42dfc14ddbf916a6d36554869de5982f810186d2e0f8b6dcbb7cf852b3"
+    }
+  }
+}
