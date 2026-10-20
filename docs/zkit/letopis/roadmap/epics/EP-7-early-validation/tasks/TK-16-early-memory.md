@@ -29,6 +29,8 @@
 2. На целевом корпусе выполнить рабочий путь с worker/provider/runner и собрать memory evidence.
 3. Сопоставить результат с 1 ГБ и оформить pass/fail/not assessed, блокирующий G-1 при недостатке доказательств.
 
+Выполнить учёт памяти отдельно в backlog с работающим executor и в populated с 100k current vectors по TK-15/resource-math. Записать coverage/config/search_hash и queued/failed, не выдавать FTS fallback за populated.
+
 ## 4. Ожидаемый результат
 
 Первоначальная проверка ресурсной реализуемости всей связки на целевом масштабе.
@@ -38,6 +40,8 @@
 - [ ] На 4 ГБ оборудовании зафиксированы входы и метод учёта worker/provider/runner/shared buffers.
 - [ ] target-scale путь ≤1 ГБ без OOM.
 - [ ] Нет оборудования/достаточной проверки — not assessed, G-1 блокирует полный функционал.
+
+- [ ] Обе фазы backlog/populated имеют memory evidence и исходный byte/coverage профиль; populated содержит 100k current vectors. Недостаточное покрытие или отсутствие данных — not assessed и закрытие G-1 запрещено.
 
 ## 6. Как проверить
 

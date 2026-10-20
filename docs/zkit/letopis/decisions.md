@@ -97,6 +97,7 @@
 | [D-87](#D-87) | Одна задача — один файл с единым стандартом карточки | размещение принято пользователем; конкретный формат — предложение автора |
 | [D-88](#D-88) | Адаптация полного недельного плана к zkit 0.2.5 | принято пользователем — исправить замечания и адаптировать формат; группировка и точные формулировки — инженерная реализация |
 | [D-89](#D-89) | Перенос документов по структуре zkit 0.2.6 | принято пользователем — перенос, обновление ссылок/скриптов и повторные проверки; точное распределение файлов — инженерная реализация |
+| [D-90](#D-90) | Исправление четырёх findings полного аудита без расширения v1 | принято — пользователь поручил исправить все четыре finding |
 
 ## Решения
 
@@ -1729,4 +1730,23 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 
 <!-- links -->
 **Связи:** пока нигде не используется
+<!-- /links -->
+
+<a id="D-90"></a>
+### D-90: Исправление четырёх findings полного аудита без расширения v1
+> **Статус:** принято — пользователь поручил исправить все четыре finding · **Дата:** 2026-10-20
+
+**Основание:** пользователь: «Fix all four audit findings, update the affected documents, contracts, models and task cards, then rerun the checks. Keep YAGNI and KISS. No new benchmarks.» [Исходный аудит](checks/flow/full-audit-2026-10-20.md) сохраняется как исторический результат.
+
+1. Apply публикует разницу между захваченной опубликованной revision и итоговым after tree, включая отложенные внешние изменения. Paths файловой записи/отката остаются request paths. Обычная правка не требует полного reindex; при отсутствии прежней revision готовится полная проекция.
+2. Сохранённые status/errors/errors --clear сообщения содержат boolean details.active, полученный из существующего errors.active. Обе группы сохраняются до clear; в DB details второй копии нет. Непосредственная Failure.error остаётся без обязательной lifecycle-метки. Выбран projection state, поскольку active-only status скрыл бы завершённую query-embedding ошибку, которую требует FR-32.
+3. I-12 принимает generic element_ids и возвращает общие InspectedElement для узлов/source/рёбер из одного tree. Edge hash/lines вычисляются по канонической ссылке источника; unknown ID отклоняет весь batch. Публичный состав inspect не расширяется.
+4. TK-15/TK-16/TK-34/TK-35 и resource-math требуют backlog и populated-vector состояния, актуальность vectors по config/search_hash, queued/failed counts и фактический A-2 byte profile. Populated — 100k current vectors знаний; source не считаются. FTS-only результат не подменяет semantic test. Новых сроков drain/публичных counters нет.
+
+**Альтернатива:** оставить двусмысленные публикацию/диагностику/edge port/fixtures; она не обеспечивает уже принятые FR-13/FR-25/FR-28/FR-32 и ресурсную проверку. Новые сервисы, БД-колонки, команды, benchmarks/provider calls исключены. Статусы 45 задач, зависимости и недельные часы сохраняются.
+
+**Проверка:** новые schema cases и изолированные model guards сначала выявляют прежний дефект/отсутствующую защиту, затем проходят после исправлений. Итог и свежие результаты — [закрытие аудита](checks/flow/audit-fixes-2026-10-20.md).
+
+<!-- links -->
+**Связи:** [requirements.md](requirements.md): Changes since previous version; [resource-math.md](resource-math.md): Changes since previous version; [contracts.md](contracts.md): Changes since previous version; [data.md](data.md): Changes since previous version; [architecture.md](architecture.md): Changes since previous version; [mechanics.md](mechanics.md): Правка 2026-10-20; [resilience.md](resilience.md): Правка 2026-10-20; [roadmap.md](roadmap.md): Правка 2026-10-20
 <!-- /links -->

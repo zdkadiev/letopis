@@ -1,0 +1,327 @@
+{
+  "date": "2026-10-20",
+  "baseline_commit": "bf2a7abffb686a379f648006058759644692bade",
+  "scope": "A-1…A-4 design corrections; not product implementation",
+  "red_final_tests_against_original_models_schema": {
+    "external": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/private/tmp/letopis-audit-fixes-2026-10-20/red-final-tests/checks/contracts/check_contract_examples.py",
+        "/private/tmp/letopis-audit-fixes-2026-10-20/red-final-tests"
+      ],
+      "exit_code": 1,
+      "stdout": "{\n  \"scope\": \"schemas/examples and stated correspondence checks; not letopis implementation or crash validation\",\n  \"counts\": {\n    \"cli_examples\": 86,\n    \"provider_examples\": 6,\n    \"metadata_examples\": 8,\n    \"assertions\": 116\n  },\n  \"errors\": [\n    \"status success: invalid example unexpectedly accepted\",\n    \"status success: invalid example unexpectedly accepted\",\n    \"status success: invalid example unexpectedly accepted\",\n    \"status success: invalid example unexpectedly accepted\",\n    \"errors success: invalid example unexpectedly accepted\",\n    \"errors success: invalid example unexpectedly accepted\",\n    \"errors success: invalid example unexpectedly accepted\",\n    \"errors success: invalid example unexpectedly accepted\",\n    \"errors --clear success: invalid example unexpectedly accepted\",\n    \"errors --clear success: invalid example unexpectedly accepted\",\n    \"errors --clear success: invalid example unexpectedly accepted\",\n    \"errors --clear success: invalid example unexpectedly accepted\"\n  ],\n  \"runtime_calls\": 0,\n  \"measurements\": 0\n}\n",
+      "stderr": ""
+    },
+    "internal": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/private/tmp/letopis-audit-fixes-2026-10-20/red-final-tests/checks/mechanics/check_mechanics_artifacts.py",
+        "/private/tmp/letopis-audit-fixes-2026-10-20/red-final-tests"
+      ],
+      "exit_code": 1,
+      "stdout": "{\n  \"scope\": \"Schemas, model invariants and isolated guard removals; not implementation validation\",\n  \"counts\": {\n    \"internal_cases\": 88,\n    \"guard_mutations\": 17,\n    \"models\": 3\n  },\n  \"models\": {\n    \"model_commit.py\": {\n      \"normal\": [],\n      \"broken\": [\n        \"accepted source_snapshot became unreachable after Git GC\",\n        \"crash produced mixed file/DB state at cut 6\",\n        \"crash produced mixed file/DB state at cut 7\",\n        \"crash produced mixed file/DB state at cut 8\",\n        \"late reindex regressed a committed apply\",\n        \"reindex restored vectors/jobs from prior config\",\n        \"reindex target differs from live canonical snapshot\",\n        \"snapshot captured a mixed in-progress file group\",\n        \"two individually valid includes formed a cycle\",\n        \"two stale base hashes both committed: ('A_check', 'B_check', 'A_publish', 'B_publish')\",\n        \"two stale base hashes both committed: ('A_check', 'B_check', 'B_publish', 'A_publish')\",\n        \"two stale base hashes both committed: ('B_check', 'A_check', 'A_publish', 'B_publish')\",\n        \"two stale base hashes both committed: ('B_check', 'A_check', 'B_publish', 'A_publish')\"\n      ],\n      \"isolated_guards\": {\n        \"flush\": [\n          \"crash produced mixed file/DB state at cut 7\"\n        ],\n        \"journal\": [\n          \"crash produced mixed file/DB state at cut 6\",\n          \"crash produced mixed file/DB state at cut 7\"\n        ],\n        \"gate\": [\n          \"two individually valid includes formed a cycle\",\n          \"two stale base hashes both committed: ('A_check', 'B_check', 'A_publish', 'B_publish')\",\n          \"two stale base hashes both committed: ('A_check', 'B_check', 'B_publish', 'A_publish')\",\n          \"two stale base hashes both committed: ('B_check', 'A_check', 'A_publish', 'B_publish')\",\n          \"two stale base hashes both committed: ('B_check', 'A_check', 'B_publish', 'A_publish')\"\n        ],\n        \"reindex\": [\n          \"late reindex regressed a committed apply\",\n          \"reindex restored vectors/jobs from prior config\",\n          \"reindex target differs from live canonical snapshot\"\n        ],\n        \"snapshot\": [\n          \"snapshot captured a mixed in-progress file group\"\n        ],\n        \"retention\": [\n          \"accepted source_snapshot became unreachable after Git GC\"\n        ],\n        \"external_delta\": []\n      }\n    },\n    \"model_embedding.py\": {\n      \"normal\": [],\n      \"broken\": [\n        \"deleted node retained vector\",\n        \"old or cancelled vector published: cancel\",\n        \"old or cancelled vector published: config\",\n        \"old or cancelled vector published: delete\",\n        \"old or cancelled vector published: replace\",\n        \"old seq removed replacement job: config\",\n        \"old seq removed replacement job: replace\",\n        \"restart exceeded attempt budget 1\",\n        \"restart exceeded attempt budget 2\",\n        \"restart exceeded attempt budget 3\",\n        \"restart exceeded attempt budget 4\"\n      ],\n      \"isolated_guards\": {\n        \"seq\": [\n          \"deleted node retained vector\",\n          \"old or cancelled vector published: cancel\",\n          \"old or cancelled vector published: config\",\n          \"old or cancelled vector published: delete\",\n          \"old or cancelled vector published: replace\",\n          \"old seq removed replacement job: config\",\n          \"old seq removed replacement job: replace\"\n        ],\n        \"attempts\": [\n          \"restart exceeded attempt budget 1\",\n          \"restart exceeded attempt budget 2\",\n          \"restart exceeded attempt budget 3\",\n          \"restart exceeded attempt budget 4\"\n        ]\n      }\n    },\n    \"model_runtime.py\": {\n      \"normal\": [],\n      \"broken\": [\n        \"candidate unlinked a live worker endpoint\",\n        \"clear removed an active error\",\n        \"ready worker lost kernel/endpoint ownership\",\n        \"reindex waiter did not receive shared cancellation\",\n        \"retry left orphaned or duplicate active diagnostics\",\n        \"rollback diagnostic lost\",\n        \"served command before recovery completed\",\n        \"served while unfinished recovery journal exists\",\n        \"two worker owners admitted\"\n      ],\n      \"isolated_guards\": {\n        \"owner\": [\n          \"candidate unlinked a live worker endpoint\",\n          \"ready worker lost kernel/endpoint ownership\",\n          \"two worker owners admitted\"\n        ],\n        \"recovery\": [\n          \"served command before recovery completed\",\n          \"served while unfinished recovery journal exists\"\n        ],\n        \"journal\": [\n          \"rollback diagnostic lost\"\n        ],\n        \"clear\": [\n          \"clear removed an active error\"\n        ],\n        \"waiters\": [\n          \"reindex waiter did not receive shared cancellation\"\n        ],\n        \"diagnostic_owner\": [\n          \"retry left orphaned or duplicate active diagnostics\"\n        ],\n        \"diagnostic_state\": [],\n        \"edge_inspection\": []\n      }\n    }\n  },\n  \"errors\": [\n    \"Response: {'ok': True, 'result': {'revision': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'reindex': None, 'embedding_jobs': 0, 'l\",\n    \"Response: {'ok': True, 'result': {'revision': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'reindex': None, 'embedding_jobs': 0, 'l\",\n    \"Response: {'ok': True, 'result': {'revision': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'reindex': None, 'embedding_jobs': 0, 'l\",\n    \"Response: {'ok': True, 'result': {'revision': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'reindex': None, 'embedding_jobs': 0, 'l\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"model_commit.py isolated guard removal undetected: external_delta\",\n    \"model_runtime.py isolated guard removal undetected: diagnostic_state\",\n    \"model_runtime.py isolated guard removal undetected: edge_inspection\"\n  ],\n  \"measurements\": 0,\n  \"provider_calls\": 0\n}\n",
+      "stderr": ""
+    }
+  },
+  "initial_red_before_edits": {
+    "external": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/private/tmp/letopis-audit-fixes-2026-10-20/project/checks/contracts/check_contract_examples.py",
+        "/private/tmp/letopis-audit-fixes-2026-10-20/project"
+      ],
+      "exit_code": 1,
+      "stdout": "{\n  \"scope\": \"schemas/examples and stated correspondence checks; not letopis implementation or crash validation\",\n  \"counts\": {\n    \"cli_examples\": 87,\n    \"provider_examples\": 6,\n    \"metadata_examples\": 8,\n    \"assertions\": 117\n  },\n  \"errors\": [\n    \"status success: invalid example unexpectedly accepted\",\n    \"status success: invalid example unexpectedly accepted\",\n    \"status success: invalid example unexpectedly accepted\",\n    \"status success: invalid example unexpectedly accepted\",\n    \"errors success: invalid example unexpectedly accepted\",\n    \"errors success: invalid example unexpectedly accepted\",\n    \"errors success: invalid example unexpectedly accepted\",\n    \"errors success: invalid example unexpectedly accepted\",\n    \"errors --clear success: invalid example unexpectedly accepted\",\n    \"errors --clear success: invalid example unexpectedly accepted\",\n    \"errors --clear success: invalid example unexpectedly accepted\",\n    \"errors --clear success: invalid example unexpectedly accepted\"\n  ],\n  \"runtime_calls\": 0,\n  \"measurements\": 0\n}\n",
+      "stderr": ""
+    },
+    "internal": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/private/tmp/letopis-audit-fixes-2026-10-20/project/checks/mechanics/check_mechanics_artifacts.py",
+        "/private/tmp/letopis-audit-fixes-2026-10-20/project"
+      ],
+      "exit_code": 1,
+      "stdout": "{\n  \"scope\": \"Schemas, model invariants and isolated guard removals; not implementation validation\",\n  \"counts\": {\n    \"internal_cases\": 89,\n    \"guard_mutations\": 17,\n    \"models\": 3\n  },\n  \"models\": {\n    \"model_commit.py\": {\n      \"normal\": [],\n      \"broken\": [\n        \"accepted source_snapshot became unreachable after Git GC\",\n        \"crash produced mixed file/DB state at cut 6\",\n        \"crash produced mixed file/DB state at cut 7\",\n        \"crash produced mixed file/DB state at cut 8\",\n        \"late reindex regressed a committed apply\",\n        \"reindex restored vectors/jobs from prior config\",\n        \"reindex target differs from live canonical snapshot\",\n        \"snapshot captured a mixed in-progress file group\",\n        \"two individually valid includes formed a cycle\",\n        \"two stale base hashes both committed: ('A_check', 'B_check', 'A_publish', 'B_publish')\",\n        \"two stale base hashes both committed: ('A_check', 'B_check', 'B_publish', 'A_publish')\",\n        \"two stale base hashes both committed: ('B_check', 'A_check', 'A_publish', 'B_publish')\",\n        \"two stale base hashes both committed: ('B_check', 'A_check', 'B_publish', 'A_publish')\"\n      ],\n      \"isolated_guards\": {\n        \"flush\": [\n          \"crash produced mixed file/DB state at cut 7\"\n        ],\n        \"journal\": [\n          \"crash produced mixed file/DB state at cut 6\",\n          \"crash produced mixed file/DB state at cut 7\"\n        ],\n        \"gate\": [\n          \"two individually valid includes formed a cycle\",\n          \"two stale base hashes both committed: ('A_check', 'B_check', 'A_publish', 'B_publish')\",\n          \"two stale base hashes both committed: ('A_check', 'B_check', 'B_publish', 'A_publish')\",\n          \"two stale base hashes both committed: ('B_check', 'A_check', 'A_publish', 'B_publish')\",\n          \"two stale base hashes both committed: ('B_check', 'A_check', 'B_publish', 'A_publish')\"\n        ],\n        \"reindex\": [\n          \"late reindex regressed a committed apply\",\n          \"reindex restored vectors/jobs from prior config\",\n          \"reindex target differs from live canonical snapshot\"\n        ],\n        \"snapshot\": [\n          \"snapshot captured a mixed in-progress file group\"\n        ],\n        \"retention\": [\n          \"accepted source_snapshot became unreachable after Git GC\"\n        ],\n        \"external_delta\": []\n      }\n    },\n    \"model_embedding.py\": {\n      \"normal\": [],\n      \"broken\": [\n        \"deleted node retained vector\",\n        \"old or cancelled vector published: cancel\",\n        \"old or cancelled vector published: config\",\n        \"old or cancelled vector published: delete\",\n        \"old or cancelled vector published: replace\",\n        \"old seq removed replacement job: config\",\n        \"old seq removed replacement job: replace\",\n        \"restart exceeded attempt budget 1\",\n        \"restart exceeded attempt budget 2\",\n        \"restart exceeded attempt budget 3\",\n        \"restart exceeded attempt budget 4\"\n      ],\n      \"isolated_guards\": {\n        \"seq\": [\n          \"deleted node retained vector\",\n          \"old or cancelled vector published: cancel\",\n          \"old or cancelled vector published: config\",\n          \"old or cancelled vector published: delete\",\n          \"old or cancelled vector published: replace\",\n          \"old seq removed replacement job: config\",\n          \"old seq removed replacement job: replace\"\n        ],\n        \"attempts\": [\n          \"restart exceeded attempt budget 1\",\n          \"restart exceeded attempt budget 2\",\n          \"restart exceeded attempt budget 3\",\n          \"restart exceeded attempt budget 4\"\n        ]\n      }\n    },\n    \"model_runtime.py\": {\n      \"normal\": [],\n      \"broken\": [\n        \"candidate unlinked a live worker endpoint\",\n        \"clear removed an active error\",\n        \"ready worker lost kernel/endpoint ownership\",\n        \"reindex waiter did not receive shared cancellation\",\n        \"retry left orphaned or duplicate active diagnostics\",\n        \"rollback diagnostic lost\",\n        \"served command before recovery completed\",\n        \"served while unfinished recovery journal exists\",\n        \"two worker owners admitted\"\n      ],\n      \"isolated_guards\": {\n        \"owner\": [\n          \"candidate unlinked a live worker endpoint\",\n          \"ready worker lost kernel/endpoint ownership\",\n          \"two worker owners admitted\"\n        ],\n        \"recovery\": [\n          \"served command before recovery completed\",\n          \"served while unfinished recovery journal exists\"\n        ],\n        \"journal\": [\n          \"rollback diagnostic lost\"\n        ],\n        \"clear\": [\n          \"clear removed an active error\"\n        ],\n        \"waiters\": [\n          \"reindex waiter did not receive shared cancellation\"\n        ],\n        \"diagnostic_owner\": [\n          \"retry left orphaned or duplicate active diagnostics\"\n        ],\n        \"diagnostic_state\": [],\n        \"edge_inspection\": []\n      }\n    }\n  },\n  \"errors\": [\n    \"Response: {'ok': True, 'result': {'revision': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'reindex': None, 'embedding_jobs': 0, 'l\",\n    \"Response: {'ok': True, 'result': {'revision': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'reindex': None, 'embedding_jobs': 0, 'l\",\n    \"Response: {'ok': True, 'result': {'revision': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'reindex': None, 'embedding_jobs': 0, 'l\",\n    \"Response: {'ok': True, 'result': {'revision': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'reindex': None, 'embedding_jobs': 0, 'l\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"Response: {'ok': True, 'result': [{'code': 'embedding_failed', 'message': 'Provider unavailable', 'details': {'node_id': '08ff5c9e\",\n    \"model_commit.py isolated guard removal undetected: external_delta\",\n    \"model_runtime.py isolated guard removal undetected: diagnostic_state\",\n    \"model_runtime.py isolated guard removal undetected: edge_inspection\"\n  ],\n  \"measurements\": 0,\n  \"provider_calls\": 0\n}\n",
+      "stderr": ""
+    }
+  },
+  "repository_checks": {
+    "requirements": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/requirements/scripts/check_requirements.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "WARN   Must is 95% (42 of 44); say why in the doc or cut\nCLARITY 0 Must requirement(s) rest on unconfirmed assumptions: -; 0 open question(s) in the log\n44 requirements, 8 constraints checked\n",
+      "stderr": ""
+    },
+    "resource-math": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/resource-math/scripts/check_resource_math.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "CLARITY 0 limit(s) failing in the expected scenario without a decision: -; 0 assumption(s) without a validation\n11 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n",
+      "stderr": ""
+    },
+    "contracts": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/contracts/scripts/check_contracts.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "CLARITY 0 consumed contract(s) serving a Must requirement and not verified: -; 0 open fork(s)\n10 boundaries, 10 spec files\n",
+      "stderr": ""
+    },
+    "data": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/data/scripts/check_data.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "CLARITY 0 entity(ies) without a volume figure or assumption; 0 open fork(s)\n12 entities, 4 memory regions\n",
+      "stderr": ""
+    },
+    "architecture": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/architecture/scripts/check_architecture.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "CLARITY 0 Must requirement(s) without a covering part: -; 0 open fork(s); 0 architectural assumption(s) without a validation; 0 boundary(ies) unhandled; 0 entity(ies) unowned\n6 parts, 12 interfaces, 6 scenarios, 52 requirements known\n",
+      "stderr": ""
+    },
+    "mechanics": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/mechanics/scripts/check_mechanics.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "CLARITY 0 high-risk mechanism(s) without an executable model: -; 0 open fork(s)\n7 mechanisms, 4 state machines, 3 executable models\n",
+      "stderr": ""
+    },
+    "resilience": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/resilience/scripts/check_resilience.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "CLARITY 0 target(s) of architecture/contracts/data not covered; 0 high-severity row(s) without a drill; 0 limit(s) failing in the expected scenario without a decision: -\n9 faults, 5 threats, 8 signals, 8 drills, 6 assumptions, 0 limits; failing: best 0 | expected 0 | worst 0\n",
+      "stderr": ""
+    },
+    "roadmap": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/roadmap/scripts/check_roadmap.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "CLARITY 0 Must requirement(s) unserved; 0 drill(s) unplanned; 0 epic/task file(s) missing; expected scenario meets or has no the deadline\n5 phases, 5 gates, 45 tasks, 8 epics; hours 204 / 372 / 672; weeks 20.4 / 37.2 / 67.2\n",
+      "stderr": ""
+    },
+    "layout": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/flow/scripts/layout.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "OK: layout matches\n",
+      "stderr": ""
+    },
+    "weekly": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis/roadmap/schedule.py",
+        "--check"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "{\"tasks\": 45, \"hours\": 372, \"task_cards\": 45, \"weeks\": 38, \"max_week_hours\": 10, \"last_week_hours\": 2, \"terminal\": \"TK-45\", \"dependency_errors\": 0, \"phase_gate_errors\": 0, \"unscheduled_tasks\": 0, \"runtime_calls\": 0, \"measurements\": 0}\n",
+      "stderr": ""
+    },
+    "external": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis/checks/contracts/check_contract_examples.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "{\n  \"scope\": \"schemas/examples and stated correspondence checks; not letopis implementation or crash validation\",\n  \"counts\": {\n    \"cli_examples\": 86,\n    \"provider_examples\": 6,\n    \"metadata_examples\": 8,\n    \"assertions\": 116\n  },\n  \"errors\": [],\n  \"runtime_calls\": 0,\n  \"measurements\": 0\n}\n",
+      "stderr": ""
+    },
+    "internal": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis/checks/mechanics/check_mechanics_artifacts.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "{\n  \"scope\": \"Schemas, model invariants and isolated guard removals; not implementation validation\",\n  \"counts\": {\n    \"internal_cases\": 88,\n    \"guard_mutations\": 17,\n    \"models\": 3\n  },\n  \"models\": {\n    \"model_commit.py\": {\n      \"normal\": [],\n      \"broken\": [\n        \"accepted source_snapshot became unreachable after Git GC\",\n        \"crash produced mixed file/DB state at cut 6\",\n        \"crash produced mixed file/DB state at cut 7\",\n        \"crash produced mixed file/DB state at cut 8\",\n        \"late reindex regressed a committed apply\",\n        \"reindex restored vectors/jobs from prior config\",\n        \"reindex target differs from live canonical snapshot\",\n        \"repair apply recorded a revision with unpublished external delta\",\n        \"snapshot captured a mixed in-progress file group\",\n        \"two individually valid includes formed a cycle\",\n        \"two stale base hashes both committed: ('A_check', 'B_check', 'A_publish', 'B_publish')\",\n        \"two stale base hashes both committed: ('A_check', 'B_check', 'B_publish', 'A_publish')\",\n        \"two stale base hashes both committed: ('B_check', 'A_check', 'A_publish', 'B_publish')\",\n        \"two stale base hashes both committed: ('B_check', 'A_check', 'B_publish', 'A_publish')\"\n      ],\n      \"isolated_guards\": {\n        \"flush\": [\n          \"crash produced mixed file/DB state at cut 7\"\n        ],\n        \"journal\": [\n          \"crash produced mixed file/DB state at cut 6\",\n          \"crash produced mixed file/DB state at cut 7\"\n        ],\n        \"gate\": [\n          \"two individually valid includes formed a cycle\",\n          \"two stale base hashes both committed: ('A_check', 'B_check', 'A_publish', 'B_publish')\",\n          \"two stale base hashes both committed: ('A_check', 'B_check', 'B_publish', 'A_publish')\",\n          \"two stale base hashes both committed: ('B_check', 'A_check', 'A_publish', 'B_publish')\",\n          \"two stale base hashes both committed: ('B_check', 'A_check', 'B_publish', 'A_publish')\"\n        ],\n        \"reindex\": [\n          \"late reindex regressed a committed apply\",\n          \"reindex restored vectors/jobs from prior config\",\n          \"reindex target differs from live canonical snapshot\"\n        ],\n        \"snapshot\": [\n          \"snapshot captured a mixed in-progress file group\"\n        ],\n        \"retention\": [\n          \"accepted source_snapshot became unreachable after Git GC\"\n        ],\n        \"external_delta\": [\n          \"repair apply recorded a revision with unpublished external delta\"\n        ]\n      }\n    },\n    \"model_embedding.py\": {\n      \"normal\": [],\n      \"broken\": [\n        \"deleted node retained vector\",\n        \"old or cancelled vector published: cancel\",\n        \"old or cancelled vector published: config\",\n        \"old or cancelled vector published: delete\",\n        \"old or cancelled vector published: replace\",\n        \"old seq removed replacement job: config\",\n        \"old seq removed replacement job: replace\",\n        \"restart exceeded attempt budget 1\",\n        \"restart exceeded attempt budget 2\",\n        \"restart exceeded attempt budget 3\",\n        \"restart exceeded attempt budget 4\"\n      ],\n      \"isolated_guards\": {\n        \"seq\": [\n          \"deleted node retained vector\",\n          \"old or cancelled vector published: cancel\",\n          \"old or cancelled vector published: config\",\n          \"old or cancelled vector published: delete\",\n          \"old or cancelled vector published: replace\",\n          \"old seq removed replacement job: config\",\n          \"old seq removed replacement job: replace\"\n        ],\n        \"attempts\": [\n          \"restart exceeded attempt budget 1\",\n          \"restart exceeded attempt budget 2\",\n          \"restart exceeded attempt budget 3\",\n          \"restart exceeded attempt budget 4\"\n        ]\n      }\n    },\n    \"model_runtime.py\": {\n      \"normal\": [],\n      \"broken\": [\n        \"candidate unlinked a live worker endpoint\",\n        \"clear removed an active error\",\n        \"ready worker lost kernel/endpoint ownership\",\n        \"reindex waiter did not receive shared cancellation\",\n        \"retry left orphaned or duplicate active diagnostics\",\n        \"rollback diagnostic lost\",\n        \"served command before recovery completed\",\n        \"served while unfinished recovery journal exists\",\n        \"snapshot inspection omitted edge metadata or used a different view\",\n        \"status cannot distinguish failed from recovered diagnostics\",\n        \"two worker owners admitted\"\n      ],\n      \"isolated_guards\": {\n        \"owner\": [\n          \"candidate unlinked a live worker endpoint\",\n          \"ready worker lost kernel/endpoint ownership\",\n          \"two worker owners admitted\"\n        ],\n        \"recovery\": [\n          \"served command before recovery completed\",\n          \"served while unfinished recovery journal exists\"\n        ],\n        \"journal\": [\n          \"rollback diagnostic lost\"\n        ],\n        \"clear\": [\n          \"clear removed an active error\"\n        ],\n        \"waiters\": [\n          \"reindex waiter did not receive shared cancellation\"\n        ],\n        \"diagnostic_owner\": [\n          \"retry left orphaned or duplicate active diagnostics\"\n        ],\n        \"diagnostic_state\": [\n          \"status cannot distinguish failed from recovered diagnostics\"\n        ],\n        \"edge_inspection\": [\n          \"snapshot inspection omitted edge metadata or used a different view\"\n        ]\n      }\n    }\n  },\n  \"errors\": [],\n  \"measurements\": 0,\n  \"provider_calls\": 0\n}\n",
+      "stderr": ""
+    },
+    "resilience-arithmetic": {
+      "command": [
+        "/Users/zdkadiev/bin/python3",
+        "-B",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis/checks/resilience/check_resilience_arithmetic.py",
+        "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis"
+      ],
+      "cwd": "/Users/zdkadiev/Repos/letopis/docs/zkit/letopis",
+      "exit_code": 0,
+      "stdout": "{\n  \"scope\": \"Illustrative arithmetic only, not operational assessment\",\n  \"checks\": 17,\n  \"errors\": [],\n  \"scenarios\": {\n    \"best\": {\n      \"illustrative_restore_scope_h\": 0.1,\n      \"illustrative_incident_to_service_h\": 0.1,\n      \"illustrative_loss_window_h\": 0,\n      \"illustrative_downtime_h_month\": 0.0,\n      \"illustrative_availability_pct\": 100.0\n    },\n    \"expected\": {\n      \"illustrative_restore_scope_h\": 1,\n      \"illustrative_incident_to_service_h\": 26,\n      \"illustrative_loss_window_h\": 24,\n      \"illustrative_downtime_h_month\": 2.1666666666666665,\n      \"illustrative_availability_pct\": 99.70319634703196\n    },\n    \"worst\": {\n      \"illustrative_restore_scope_h\": \"unbounded\",\n      \"illustrative_incident_to_service_h\": \"unbounded\",\n      \"illustrative_loss_window_h\": \"unbounded\",\n      \"illustrative_downtime_h_month\": 730.0,\n      \"illustrative_availability_pct\": 0.0\n    }\n  },\n  \"measurements\": 0,\n  \"provider_calls\": 0\n}\n",
+      "stderr": ""
+    }
+  },
+  "linker": {
+    "command": [
+      "/Users/zdkadiev/bin/python3",
+      "-B",
+      "/Users/zdkadiev/.codex/plugins/cache/personal/zkit/0.2.6/skills/requirements/scripts/link_docs.py",
+      "/private/tmp/letopis-audit-fixes-2026-10-20/linked-final"
+    ],
+    "exit_code": 0,
+    "stdout": "linked: linked-final — 9 stage documents, 90 decisions, 9 reports\n",
+    "stderr": "",
+    "changed_files": []
+  },
+  "integrity": {
+    "local_link_references": 2669,
+    "new_missing_links": [],
+    "known_fictional_example_targets": [
+      {
+        "file": "appendix/requirements-pre-zkit.md",
+        "target": "knowledge.md#node-b"
+      },
+      {
+        "file": "contracts/legacy/contracts.md",
+        "target": "knowledge/file.md#ID"
+      },
+      {
+        "file": "contracts/legacy/contracts.md",
+        "target": "src/storage.go#L10-L25"
+      }
+    ],
+    "python_ast_files": 18,
+    "python_ast_errors": [],
+    "historical_week_allocations_unchanged": true,
+    "research_artifact_changes": [],
+    "new_measurements": 0,
+    "provider_calls": 0
+  },
+  "mermaid": {
+    "scope": "Syntax only; no rendering or runtime",
+    "results": [
+      {
+        "file": "architecture.md",
+        "line": 82,
+        "parsed": true,
+        "type": "flowchart-v2"
+      },
+      {
+        "file": "architecture.md",
+        "line": 102,
+        "parsed": true,
+        "type": "flowchart-v2"
+      },
+      {
+        "file": "architecture.md",
+        "line": 127,
+        "parsed": true,
+        "type": "flowchart-v2"
+      },
+      {
+        "file": "data.md",
+        "line": 42,
+        "parsed": true,
+        "type": "er"
+      },
+      {
+        "file": "diagrams/architecture-components.mmd",
+        "line": 1,
+        "parsed": true,
+        "type": "flowchart-v2"
+      },
+      {
+        "file": "diagrams/architecture-containers.mmd",
+        "line": 1,
+        "parsed": true,
+        "type": "flowchart-v2"
+      },
+      {
+        "file": "diagrams/architecture-context.mmd",
+        "line": 1,
+        "parsed": true,
+        "type": "flowchart-v2"
+      },
+      {
+        "file": "diagrams/mechanics-types.mmd",
+        "line": 1,
+        "parsed": true,
+        "type": "classDiagram"
+      },
+      {
+        "file": "mechanics.md",
+        "line": 199,
+        "parsed": true,
+        "type": "classDiagram"
+      }
+    ]
+  },
+  "independent_review": {
+    "verdict": "No actionable P1/P2 findings",
+    "scope": "Publication/rollback, diagnostic projection, edge inspection, vector-fixture criteria",
+    "fresh_checks": {
+      "cli_examples": 86,
+      "external_assertions": 116,
+      "internal_cases": 88,
+      "normal_models": 3,
+      "isolated_guard_mutations": 17
+    }
+  },
+  "schedule": {
+    "tasks": 45,
+    "epics": 8,
+    "expected_hours": 372,
+    "expected_weeks": 38,
+    "allocations_unchanged": true
+  },
+  "new_measurements": 0,
+  "provider_calls": 0,
+  "runtime_implementation": false
+}

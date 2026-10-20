@@ -1,8 +1,12 @@
 # letopis — устойчивость и безопасность
 
 > **Links:** [requirements](requirements.md) · [resource-math](resource-math.md) · [contracts](contracts.md) · [data](data.md) · [architecture](architecture.md) · [mechanics](mechanics.md) · [decisions](decisions.md)
-> **Status:** agreed · **Date:** 2026-10-19 · **Based on:** requirements.md (2026-10-19), resource-math.md (2026-10-19), contracts.md (2026-10-19), data.md (2026-10-19), architecture.md (2026-10-19), mechanics.md (2026-10-19)
+> **Status:** agreed · **Date:** 2026-10-20 · **Based on:** requirements.md (2026-10-20), resource-math.md (2026-10-20), contracts.md (2026-10-20), data.md (2026-10-20), architecture.md (2026-10-20), mechanics.md (2026-10-20)
 > **Counts:** 9 F · 5 T
+
+
+## Правка 2026-10-20
+По [D-90](decisions.md#D-90) repair apply не скрывает внешний delta, status различает active/completed ошибки, inspect покрывает рёбра. DR-4/DR-6 проверяют эти пути; RAM/search drills используют явную current-vector coverage по resource-math. Новые drills/лимиты не вводятся.
 
 ## 1. Summary
 
@@ -102,9 +106,9 @@ FR-36 agent skill должен трактовать найденный Markdown 
 | DR-1 | F-1, F-2, F-8 | Fault injection на всех durable границах; process kill и отдельный физический power-loss тест на macOS/Linux | Нет смешанного обслуживаемого состояния; до commit полный rollback, после commit успех сохранён; repeated recovery; failure = потерянная завершённая правка/удалённый journal до восстановления | roadmap P-3 |
 | DR-2 | F-3, F-4 | Restore на чистой машине из выбранной независимой копии без доступа к исходному диску | Проверены Git blobs/refs, source UUID/created_at, config, errors, queued/failed jobs, attempts/seq, reindex state и journal; recovery до обслуживания; восстановлен согласованный recovery point копии по [D-81](decisions.md#D-81) без обещанной максимальной давности; restore deadline не задан по [D-82](decisions.md#D-82); failure = восстановлен только Markdown без долговечного реестра | roadmap P-3 |
 | DR-3 | F-4, F-5 | Удалить/испортить Git object, recovery row, производный FTS/vector и отдельно registry | Повреждённый registry не подменяется новым; derived rebuild сохраняет source identity; невалидная публикация не заменяет последнюю корректную; failure = тихий reset/успех на неполных данных | roadmap P-3 |
-| DR-4 | F-5, T-4 | Git checkout/недописанная разметка/удалённый source, затем исправление и подтверждённая перепроверка | Flags/конфликты/refs стабильны, snapshots согласованы; исправление завершает active diagnostic; ложная семантика не выдаётся за автоматически проверенную | roadmap P-1/P-2/P-3 |
+| DR-4 | F-5, T-4 | Git checkout/недописанная разметка/удалённый source, invalid A + valid changed B, затем repair apply(A) и подтверждённая перепроверка | Flags/конфликты/refs стабильны, snapshots согласованы; repair apply публикует A/B/outstanding creates/deletes с общей revision, rollback не стирает внешние paths вне правки; исправление завершает active diagnostic и status показывает details.active=false; ложная семантика не выдаётся за автоматически проверенную | roadmap P-1/P-2/P-3 |
 | DR-5 | F-6, T-3 | Endpoint не отвечает/неверная длина/401/429, ключ-канарейка, local mode без внешней сети | Assumed client deadline 60s и cancel освобождают ожидание (фактическую задержку фиксирует drill), FTS доступен, attempts bounded, ключ отсутствует во всех артефактах; failure = зависший worker/утечка/несовместимый vector | roadmap P-2/P-3 |
-| DR-6 | F-7 | Replace/config/delete и restart между reservation/compute/CAS; два waiters reindex и SIGINT | Поздний result не удаляет новый seq; restart не пополняет бюджет; cancellation соответствует X-1 | roadmap P-2/P-3 |
+| DR-6 | F-7 | Replace/config/delete и restart между reservation/compute/CAS; два waiters reindex и SIGINT | Поздний result не удаляет новый seq; restart не пополняет бюджет; cancellation соответствует X-1; failed active=true и завершённая история active=false различимы в details при queued=0 | roadmap P-2/P-3 |
 | DR-7 | F-8, F-9, T-5 | Disk full, allocation failure, долгий reader/WAL и глубокий граф, несовместимая extension build | Controlled failure или recoverable crash без false success/потери registry; bounded retry; отсутствие RAM/latency verdict до измерения | roadmap P-2/P-3 |
 | DR-8 | F-9, T-1, T-2, T-3, T-4, T-5 | Path/symlink/argv/socket fixtures, malformed JSON/Markdown/provider, bad clock, valid malicious prose | Ни одной записи вне разрешённого корпуса; другой OS user не соединяется; запросы модели не исполняются; same-UID/semantic residuals названы, а не объявлены устранёнными | roadmap security drills |
 

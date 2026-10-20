@@ -29,6 +29,8 @@
 2. Проверить counts, валидные ссылки/includes и раскладку файлов.
 3. Загрузить корпус через production путь slice, сохранить seed/входы и способ воспроизведения.
 
+Подготовить/воспроизвести состояния backlog и populated по resource-math/D-90. Зафиксировать выбранную модель/конфигурацию, реальные A-2 byte statistics, knowledge/current-vector/queued/failed counts. Получение всех vectors проходит production executor; срок готовности не задаётся.
+
 ## 4. Ожидаемый результат
 
 Воспроизводимый target-scale fixture: 100k знаний, assumed 100k source и 500k рёбер.
@@ -37,6 +39,9 @@
 
 - [ ] Генератор test Markdown даёт 100k знаний, assumed 100k source и 500k рёбер с валидной разметкой, includes без циклов и профилем 10–50 элементов/файл.
 - [ ] Полная загрузка проходит через slice, а не обход production путей.
+
+- [ ] Payload соответствует выбранному A-2 сценарию; записаны точные UTF-8 byte sum/mean/min/max и seed, короткие заглушки не подменяют размер при том же node count.
+- [ ] Для populated доступны 100 000 current vectors знаний выбранной конфигурации/search_hash; source исключены. Backlog описан отдельно. Неполное покрытие фиксируется как not assessed populated, queued=0 само по себе не критерий.
 
 ## 6. Как проверить
 

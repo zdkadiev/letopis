@@ -30,6 +30,8 @@
 2. Добавить точки прерывания до/после durable шагов, неопределённого COMMIT и потери ответа.
 3. После каждого прерывания перезапустить recovery и сравнить все файлы/БД с ожидаемым before или after.
 
+Проверить repair apply после внешних invalid A + valid changed B, включая создание/удаление других файлов: publication delta берётся от опубликованной revision, rollback касается только request paths.
+
 ## 4. Ожидаемый результат
 
 Матрица crash cuts с точным oracle и воспроизводимый harness save/recovery.
@@ -39,6 +41,8 @@
 - [ ] На каждой process-crash границе до финальной фиксации восстановлен полный before, после неё сохранён полный after, включая потерю ответа и повторный recovery.
 - [ ] Uncertain COMMIT разрешается reopening SQLite и наличием recovery row.
 - [ ] Это не физический power-loss drill.
+
+- [ ] Repair apply(A) публикует весь outstanding delta A/B/созданий/удалений; crash/rollback сохраняет внешние изменения вне request paths и прежнюю DB revision.
 
 ## 6. Как проверить
 

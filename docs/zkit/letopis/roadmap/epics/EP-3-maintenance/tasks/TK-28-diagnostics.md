@@ -30,6 +30,8 @@
 2. Реализовать durable диагностику hash+paths и очистку только completed.
 3. Проверить append/clear гонку, restart и невозможность сохранить diagnostic при storage failure.
 
+Проецировать existing errors.active в обязательный boolean details.active каждого сохранённого сообщения status/errors/errors --clear, не сохраняя вторую копию в DB details. Query/rollback diagnostics остаются видимыми как completed.
+
 ## 4. Ожидаемый результат
 
 StateService, errors и безопасная согласованная очистка диагностики.
@@ -41,6 +43,8 @@ StateService, errors и безопасная согласованная очис
 - [ ] Concurrent append/clear не теряет новые active errors, --clear удаляет только completed.
 - [ ] storage failure не выдаётся за durable diagnostic.
 - [ ] Query embedding failure из TK-22 видна в CLI status при успешной FTS-only выдаче; отдельный query error не превращает поиск в ошибку.
+
+- [ ] При queued=0 failed provider error имеет details.active=true, а после успешной замены сохраняется с false; агент различает состояния без clear. Непосредственный ok:false не обязан иметь lifecycle-метку. Query embedding error виден в status с false; clear удаляет только completed.
 
 ## 6. Как проверить
 

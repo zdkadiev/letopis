@@ -8,6 +8,10 @@
 
 Полный материал перенесён без принятия новых решений. При расхождении раннего текста с поздним решением действует реестр decisions.md; нерешённые противоречия перечислены в migration.md.
 
+## Уточнение после аудита — 2026-10-20
+
+По [D-90](../decisions.md#D-90) текущий apply публикует весь outstanding delta от опубликованной revision до after tree, сохраняя request paths для записи/отката. Inspect покрывает узлы/source и рёбра общими snapshot metadata; собственный edge hash/lines берётся из канонической ссылки. Сохранённые status/errors сообщения проецируют existing errors.active как details.active без копии в DB details. Актуальные типы и критерии — в [mechanics](../mechanics.md), [I-12](../contracts/I-12-snapshot.md) и [X-1](../contracts/X-1-cli.md); исторические разделы ниже сохраняются.
+
 <!-- migrated-body:begin -->
 # letopis — доменная модель
 

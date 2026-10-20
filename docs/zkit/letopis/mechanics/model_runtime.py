@@ -121,6 +121,36 @@ def run(broken=False, fault=None):
             rows = [(i,o,False if o=='reindex' else a) for i,o,a in rows]
             if any(a for _,o,a in rows if o=='reindex'):
                 errors.append('successful rebuild could not resolve old diagnostic')
+    # Stored diagnostics keep their history, but expose the authoritative
+    # lifecycle bit in details. Immediate command errors need no such bit.
+    for active in (False, True):
+        stored = {'code': 'embedding_failed', 'details': {'node_id': 'N'},
+                  'active': active}
+        public = {'code': stored['code'], 'details': dict(stored['details'])}
+        if not bad('diagnostic_state'):
+            public['details']['active'] = stored['active']
+        if public['details'].get('active') is not active:
+            errors.append('status cannot distinguish failed from recovered diagnostics')
+        if 'active' in stored['details']:
+            errors.append('diagnostic projection duplicated lifecycle state in storage')
+
+    # Inspect can address nodes and edges in one canonical snapshot. Edge
+    # location/hash come from the link in its source fragment, not stale SQL.
+    canonical = {
+        'N': {'path': 'a.md', 'lines': (1, 5), 'hash': 'node-new'},
+        'E': {'path': 'a.md', 'lines': (3, 3), 'hash': 'edge-new'},
+        'S': {'path': 'missing.rs', 'hash': None},
+    }
+    for requested in [('N',), ('E',), ('N', 'E', 'S'), ('E', 'E'), ('E', 'unknown')]:
+        captured = {k:dict(v) for k,v in canonical.items()
+                    if not (bad('edge_inspection') and k == 'E')}
+        wanted = set(requested)
+        result = None if wanted - captured.keys() else {k:captured[k] for k in wanted}
+        if wanted <= canonical.keys():
+            if result != {k:canonical[k] for k in wanted}:
+                errors.append('snapshot inspection omitted edge metadata or used a different view')
+        elif result is not None:
+            errors.append('mixed inspect returned a partial batch for an unknown ID')
     return sorted(set(errors))
 
 

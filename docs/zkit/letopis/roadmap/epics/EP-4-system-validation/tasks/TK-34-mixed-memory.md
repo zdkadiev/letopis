@@ -29,6 +29,8 @@
 2. Запустить смешанные read/write/recovery десяти клиентов и публикации во время чтений.
 3. Собрать полную RAM/accounting и свидетельства согласованности каждого read view.
 
+Начать mixed run из populated 100k current vectors и отдельно проверить backlog/executor. Сохранять counts current vectors/queued/failed/config/search_hash до и во время изменений и полный A-2 byte profile из TK-15.
+
 ## 4. Ожидаемый результат
 
 Полная проверка NFR-2/NFR-4/NFR-7 с реальной mixed-client нагрузкой.
@@ -38,6 +40,8 @@
 - [ ] Полный функционал и target corpus на 4 ГБ оборудовании проходят mixed read/write/recovery десяти клиентов.
 - [ ] Вся связка ≤1 ГБ без OOM, каждый read view согласован при публикации.
 - [ ] Записаны метод учёта и failed/not assessed, если цель не выполнена.
+
+- [ ] RAM ≤1 ГБ проверяется в populated и backlog с десятью клиентами; отсутствие populated coverage не засчитывается как pass. При mixed writes временное отставание явно отражено, read views согласованы.
 
 ## 6. Как проверить
 

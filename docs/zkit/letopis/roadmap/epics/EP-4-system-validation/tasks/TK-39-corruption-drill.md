@@ -41,6 +41,8 @@ Corruption/freshness отчёт DR-3/DR-4 и доказательство коо
 - [ ] Координированный сценарий C-8 запрещает Git до окончания save/recovery и новые CLI во время Git.
 - [ ] После Git следующий CLI валидирует снимок, без перехвата произвольного Git.
 
+- [ ] Invalid external A + valid changed B, затем repair apply(A): вся проекция соответствует after revision, rollback касается только request paths, status различает active/completed diagnostics через details.active.
+
 ## 6. Как проверить
 
 1. Выполнить сценарии из разделов «Что сделать» и «Критерии приёмки» на подготовленных входах; для изменения кода запустить соответствующие unit/integration/contract checks созданной реализации.

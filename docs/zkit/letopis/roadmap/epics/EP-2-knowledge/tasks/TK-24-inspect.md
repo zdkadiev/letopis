@@ -26,8 +26,10 @@
 ## 3. Что сделать
 
 1. Завершить batch inspect по одному общему Git-снимку.
-2. Проверить metadata/lines/flags и отказ всего batch при неизвестном ID.
+2. Проверить metadata/lines/hash и отказ всего batch при неизвестном ID; flags относятся к search/traverse, не к inspect.
 3. Расширить навык полными сценариями source_snapshot, conflict/move/recheck и live reads.
+
+Для generic element_ids реализовать InspectedElement из I-12, включая рёбра: независимый edge hash и path/lines канонической ссылки, общий snapshot/file_hash. Не читать устаревшие hash/координаты из SQL вместо текущей разметки.
 
 ## 4. Ожидаемый результат
 
@@ -36,8 +38,10 @@
 ## 5. Критерии приёмки
 
 - [ ] Пакет ID читается по общему Git-снимку, unknown ID отклоняет весь запрос.
-- [ ] Актуальные хеши/lines/flags проверены.
+- [ ] Актуальные собственные хеши/lines и file_hash проверены; дополнительных полей flags в inspect нет.
 - [ ] Навык покрывает реализованные apply/check, search/traverse/inspect, source_snapshot средствами Git, конфликт/перенос/перепроверку и обычные live reads; поздние reindex/config/status/errors/cancel интегрируются в TK-29.
+
+- [ ] Смешанный batch node+edge+source, edge-only, повторные ID и исчезнувшее в текущем tree ребро проверены: дубли однократны, unknown отклоняет весь batch. Edge hash отличается от enclosing node hash и вычислен по собственной ссылке в общем snapshot.
 
 ## 6. Как проверить
 

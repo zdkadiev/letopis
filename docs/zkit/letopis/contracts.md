@@ -1,6 +1,6 @@
 # letopis — контракты
 
-> **Status:** draft · **Date:** 2026-10-19 · **Based on:** requirements.md (2026-10-19), resource-math.md (2026-10-19)
+> **Status:** draft · **Date:** 2026-10-20 · **Based on:** requirements.md (2026-10-20), resource-math.md (2026-10-20)
 > **Counts:** 4 X
 
 Миграция в zkit переносит уже принятые решения; статус `draft` означает незакрытую проверку этапа, а не отмену договорённостей. Текущие решения и явно открытые вопросы собраны в [decisions](decisions.md). Новая реализация или новые требования этой миграцией не утверждаются.
@@ -8,6 +8,7 @@
 > **Links:** [требования](requirements.md) · [решения](decisions.md) · [отчёт](appendix/migration.md)
 
 ## Changes since previous version
+2026-10-20: По [D-90](decisions.md#D-90) исправлены A-1…A-3: I-2 покрывает published→after delta, stored diagnostics имеют details.active, I-12/inspect адресуют также рёбра с собственными hash/lines. Новых команд и таблиц нет.
 2026-10-19: [D-83](decisions.md#D-83) формализует assumed внутренний provider client deadline 60s per attempt, без общего timeout search/reindex/recovery и без новых JSON/config полей. Timeout использует прежний embedding_failed/FTS fallback; redirect/неявные environment proxies отключены, HTTPS certificates проверяются. Реальное cancellation/resource release проверяется DR-5/DR-8, не объявляется пройденным.
 
 2026-10-19: по [D-78](decisions.md#D-78) в существующую конфигурацию добавлен обязательный max_retries (целое ≥ 0), отдельно от provider parameters. Это число дополнительных попыток после первой. Полная замена конфигурации сохраняется; особая операция обновления retry-политики не вводится. Механика уточнена по [D-79](decisions.md#D-79), принятые границы [D-76](decisions.md#D-76)/D-77 сохранены. Новых ресурсных замеров нет.

@@ -1,9 +1,13 @@
 # letopis — план выполнения по неделям
 
 > **Links:** [concept](concept.md) · [requirements](requirements.md) · [resource-math](resource-math.md) · [contracts](contracts.md) · [data](data.md) · [architecture](architecture.md) · [mechanics](mechanics.md) · [resilience](resilience.md) · [decisions](decisions.md)
-> **Status:** draft · **Date:** 2026-10-19 · **Based on:** requirements.md (2026-10-19), resource-math.md (2026-10-19), contracts.md (2026-10-19), data.md (2026-10-19), architecture.md (2026-10-19), mechanics.md (2026-10-19), resilience.md (2026-10-19)
+> **Status:** draft · **Date:** 2026-10-20 · **Based on:** requirements.md (2026-10-20), resource-math.md (2026-10-20), contracts.md (2026-10-20), data.md (2026-10-20), architecture.md (2026-10-20), mechanics.md (2026-10-20), resilience.md (2026-10-20)
 > **Counts:** 5 PH · 5 G · 45 TK · 8 EP
 > **Terminal:** TK-45
+
+
+## Правка 2026-10-20
+По [D-90](decisions.md#D-90) усилены существующие TK-2/TK-10/TK-24/TK-25/TK-28/TK-15/TK-16/TK-34/TK-35 для четырёх findings аудита. 45 задач, зависимости, оценки и недельное распределение сохранены; выполнение задач/новые замеры не заявляются.
 
 ## 1. Summary
 

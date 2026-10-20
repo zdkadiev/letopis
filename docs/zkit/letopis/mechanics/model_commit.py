@@ -165,6 +165,37 @@ def run(broken=False, fault=None):
     retained_after_gc = set(roots)
     if source_basis not in retained_after_gc:
         errors.append('accepted source_snapshot became unreachable after Git GC')
+    # Repairing an invalid external A must also publish outstanding changes
+    # to B, creations and deletions, while recovery touches only requested A.
+    indexed_before = {'A': 'A0', 'B': 'B0', 'D': 'D0'}
+    for change_b, create_c, delete_d in product((False, True), repeat=3):
+        external = dict(indexed_before, A='invalid')
+        if change_b: external['B'] = 'B1'
+        if create_c: external['C'] = 'C1'
+        if delete_d: external.pop('D')
+        after = dict(external, A='A2')
+        requested_paths = {'A'}
+        publication_paths = (requested_paths if bad('external_delta') else
+                             {p for p in indexed_before.keys() | after.keys()
+                              if indexed_before.get(p) != after.get(p)})
+        for committed in (False, True):
+            files, projection = dict(after), dict(indexed_before)
+            revision = dict(indexed_before)
+            if committed:
+                for path in publication_paths:
+                    if path in after: projection[path] = after[path]
+                    else: projection.pop(path, None)
+                revision = dict(after)
+                if projection != revision:
+                    errors.append('repair apply recorded a revision with unpublished external delta')
+            else:
+                # Rollback must preserve unrelated external B/C/D changes.
+                for path in requested_paths: files[path] = external[path]
+                if files != external or projection != indexed_before:
+                    errors.append('repair rollback overwrote unrelated external changes')
+            if committed and not (change_b or create_c or delete_d):
+                if publication_paths != requested_paths:
+                    errors.append('ordinary apply unnecessarily reindexed unchanged paths')
     return sorted(set(errors))
 
 

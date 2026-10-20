@@ -5,16 +5,19 @@
 ## Layout
 
 ```text
-SnapshotRequest { knowledge_ids: Set<Uuid>, source_ids: Set<Uuid>,
-  full_corpus: bool }
-CanonicalSnapshot { oid: TreeOid, elements: Vec<NodeMetadata>,
+SnapshotRequest { element_ids: Set<Uuid>, full_corpus: bool }
+InspectedElement { path: Path, lines: Option<InclusiveLines>,
+  hash: Option<Sha256>, file_hash: Option<Sha256> }
+CanonicalSnapshot { oid: TreeOid, elements: Map<Uuid, InspectedElement>,
   files: transient Map<Path, {blob_oid: GitOid, file_hash: Sha256}> }
 capture(request: SnapshotRequest) -> Result<CanonicalSnapshot, DomainError>
 read(snapshot: &CanonicalSnapshot, path: Path) -> ByteStream
 harden(snapshot: &CanonicalSnapshot) -> Result<DurableTree, DomainError>
 ```
 
-Snapshot снимается под project gate после автоматического recovery; один tree охватывает весь размеченный корпус и адресованные внешние source, явно запрошенные source без ссылок тоже включаются. Elements в ответе inspect ограничены запрошенными ID. Существование source/его created_at берётся из долговечного реестра, текущие bytes/hash/lines — из снимка. Отсутствующий source представлен null hash, файл в tree отсутствует. Неизвестный ID отклоняет пакет; read из удерживаемого tree не переключается на live path.
+Snapshot снимается под project gate после автоматического recovery; один tree охватывает весь размеченный корпус и адресованные внешние source, явно запрошенные source без ссылок тоже включаются. Element_ids адресуют вершины, метавершины, source и рёбра; повторные ID обрабатываются один раз. Elements содержит общие InspectedElement только запрошенных ID, без зависимости от NodeMetadata проекций. Полный tree/manifest остаётся входом prepare; NodeMetadata/EdgeMetadata строит кодек из его bytes, а не из ограниченного результата inspect. Существование source/его created_at берётся из долговечного реестра, текущие bytes/hash/lines — из снимка. Отсутствующий source представлен null hash, файл в tree отсутствует. Неизвестный ID отклоняет пакет; read из удерживаемого tree не переключается на live path.
+
+Ребро разрешается по его UUID в канонической ссылке размеченного источника в этом же tree. Path — путь источника; lines — включительный диапазон самой Markdown-ссылки, не всей вершины; hash = SHA-256(JCS({source, markdown})), где source — UUID вершины-источника, markdown — точные bytes ссылки как UTF-8 строка. File_hash общий для всех элементов того же файла. Устаревшие SQL hash/lines не подставляются. Если ребра уже нет в текущем tree, это not_found всей группы даже при старой строке в индексе. Пример смешанной группы inspect [N,E,S] возвращает метаданные узла N, ссылки E и зарегистрированного source S из одного снимка; неизвестный ID не даёт частичного ответа.
 
 Capture не выполняется из prepare I-2 повторно и не вызывает apply. Reindex получает snapshot один раз; publish проверяет актуальность target/base. Git snapshots, включая каждый принятый source_snapshot и возвращаемый inspect snapshot, отдельно удерживаются refs/letopis/snapshots/<oid>, не пользовательским commit или SQL-копией текста. harden должен гарантировать доступность всех blob/tree/refs после system crash до разрешения journal commit; plain subprocess exit 0 недостаточен. Платформенная реализация/полный flush — P-3, см. R-8/MC-2.
 

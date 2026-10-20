@@ -375,7 +375,8 @@
       "required": [
         "element_ids"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Batch IDs may address vertices, metavertices, sources and edges. Unknown current ID rejects the entire batch."
     },
     "Inspected": {
       "type": "object",
@@ -412,7 +413,8 @@
         "hash",
         "file_hash"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Metadata from the common canonical snapshot. For edges, path/lines address the source link and hash is its independent edge hash, not the enclosing node hash."
     },
     "InspectOutput": {
       "type": "object",
@@ -811,7 +813,7 @@
             "errors": {
               "type": "array",
               "items": {
-                "$ref": "#/$defs/Diagnostic"
+                "$ref": "#/$defs/StoredDiagnostic"
               },
               "minItems": 0
             }
@@ -841,7 +843,7 @@
         "result": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Diagnostic"
+            "$ref": "#/$defs/StoredDiagnostic"
           },
           "minItems": 0
         }
@@ -943,6 +945,30 @@
         "result"
       ],
       "additionalProperties": false
+    },
+    "StoredDiagnostic": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Diagnostic"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "details": {
+              "type": "object",
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "active"
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Stored status/errors diagnostic: details.active is projected from errors.active; immediate Failure.error remains Diagnostic."
     }
   },
   "anyOf": [

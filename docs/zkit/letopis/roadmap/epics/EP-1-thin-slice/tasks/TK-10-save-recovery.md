@@ -30,6 +30,8 @@
 3. Одной финальной SQLite unit сохранить graph/FTS/source metadata/revision/jobs и удалить recovery/lock. Успех выдавать только после подтверждённого durable commit.
 4. Подключить полный повторяемый rollback и startup recovery; uncertain COMMIT разрешать повторным открытием SQLite и проверкой журнала, при неопределимом исходе блокировать обслуживание. Перенести crash cases TK-2 в production integration checks.
 
+Для финальной unit вычислить всю разницу опубликованной revision → after tree, включая ранее не опубликованные внешние изменения; при отсутствии revision построить полную проекцию. Request file writes/recovery.paths не расширять до области публикации.
+
 ## 4. Ожидаемый результат
 
 Production save/recovery путь атомарной группы изменений с optimistic conflict checks.
@@ -41,6 +43,8 @@ Production save/recovery путь атомарной группы изменен
 - [ ] Git objects/refs надёжны до recovery row; file/directory sync выполнен до финального commit по MC-2, включая macOS flush.
 - [ ] Uncertain COMMIT разрешается чтением recovery row после reopening SQLite; неизвестный исход блокирует обслуживание, успех не откатывается из-за потери ответа.
 - [ ] Повторный crash во время rollback оставляет recovery доступным для следующего восстановления.
+
+- [ ] После invalid external A + changed B repair apply(A) публикует A2/B1 с корректной общей revision; следующий detection не маскирует пропущенный B. Включены внешние создания/удаления, смещения строк и сохранение чужих внешних изменений при rollback. Обычный apply без отставания индексирует только свой delta.
 
 ## 6. Как проверить
 

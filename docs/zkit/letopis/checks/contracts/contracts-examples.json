@@ -768,6 +768,387 @@
           "base_url": "http://127.0.0.1:11434/api"
         }
       }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reindex": null,
+          "embedding_jobs": 0,
+          "locks": [],
+          "errors": [
+            {
+              "code": "embedding_failed",
+              "message": "Provider unavailable",
+              "details": {
+                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reindex": null,
+          "embedding_jobs": 0,
+          "locks": [],
+          "errors": [
+            {
+              "code": "embedding_failed",
+              "message": "Provider unavailable",
+              "details": {
+                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+                "active": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reindex": null,
+          "embedding_jobs": 0,
+          "locks": [],
+          "errors": [
+            {
+              "code": "embedding_failed",
+              "message": "Provider unavailable",
+              "details": {
+                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+                "active": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reindex": null,
+          "embedding_jobs": 0,
+          "locks": [],
+          "errors": [
+            {
+              "code": "embedding_failed",
+              "message": "Provider unavailable",
+              "details": {
+                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+                "active": "false"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reindex": null,
+          "embedding_jobs": 0,
+          "locks": [],
+          "errors": [
+            {
+              "code": "embedding_failed",
+              "message": "Provider unavailable",
+              "details": {
+                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+                "active": 0
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reindex": null,
+          "embedding_jobs": 0,
+          "locks": [],
+          "errors": [
+            {
+              "code": "embedding_failed",
+              "message": "Provider unavailable",
+              "details": {
+                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+                "active": null
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "errors",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "errors",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "active": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "errors",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "active": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "errors",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "active": "false"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "errors",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "active": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "errors",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "active": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "errors --clear",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "errors --clear",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "active": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "errors --clear",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "active": "false"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "errors --clear",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "active": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "errors --clear",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "code": "embedding_failed",
+            "message": "Provider unavailable",
+            "details": {
+              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "active": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "element_ids": [
+          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+          "064f2964-77cc-41f0-87ac-d280c0ec59a7"
+        ]
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "elements": {
+            "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c": {
+              "path": "knowledge/a.md",
+              "lines": [
+                1,
+                5
+              ],
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            },
+            "064f2964-77cc-41f0-87ac-d280c0ec59a7": {
+              "path": "knowledge/a.md",
+              "lines": [
+                3,
+                3
+              ],
+              "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "file_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            }
+          }
+        }
+      }
     }
   ]
 }

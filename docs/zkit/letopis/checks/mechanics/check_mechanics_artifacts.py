@@ -48,9 +48,9 @@ for case in json.loads((root/'checks/contracts/contracts-examples.json').read_te
         check(case['value'],'Response',case['valid'])
 
 faults = {
-    'model_commit.py':['flush','journal','gate','reindex','snapshot','retention'],
+    'model_commit.py':['flush','journal','gate','reindex','snapshot','retention','external_delta'],
     'model_embedding.py':['seq','attempts'],
-    'model_runtime.py':['owner','recovery','journal','clear','waiters','diagnostic_owner'],
+    'model_runtime.py':['owner','recovery','journal','clear','waiters','diagnostic_owner','diagnostic_state','edge_inspection'],
 }
 model_results = {}
 for name, mutations in faults.items():
