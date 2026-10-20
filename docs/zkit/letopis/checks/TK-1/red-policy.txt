@@ -1,0 +1,36 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/lib.rs (target/debug/deps/letopis_storage_build-09f9c15a639c94df)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/storage.rs (target/debug/deps/storage-8fa69626bff279e5)
+
+running 3 tests
+
+thread 'rejects_sqlite_below_the_supported_floor' (5891631) panicked at tests/storage.rs:12:51:
+called `Result::unwrap_err()` on an `Ok` value: ()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test rejects_sqlite_below_the_supported_floor ... FAILED
+
+thread 'missing_extension_is_an_error' (5891630) panicked at tests/storage.rs:21:82:
+called `Result::unwrap_err()` on an `Ok` value: Connection { path: Some("/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/.tmp66TX7s/db") }
+test missing_extension_is_an_error ... FAILED
+
+thread 'checked_connection_enforces_the_storage_policy' (5891629) panicked at tests/storage.rs:31:5:
+assertion `left == right` failed
+  left: "delete"
+ right: "wal"
+test checked_connection_enforces_the_storage_policy ... FAILED
+
+failures:
+
+failures:
+    checked_connection_enforces_the_storage_policy
+    missing_extension_is_an_error
+    rejects_sqlite_below_the_supported_floor
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test storage`

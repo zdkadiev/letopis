@@ -1,0 +1,14 @@
+test_partial_write_is_not_visible_to_cache_readers (test_runner.SourceVerification.test_partial_write_is_not_visible_to_cache_readers) ... FAIL
+
+======================================================================
+FAIL: test_partial_write_is_not_visible_to_cache_readers (test_runner.SourceVerification.test_partial_write_is_not_visible_to_cache_readers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/20f1/letopis/tests/storage-build/test_runner.py", line 65, in test_partial_write_is_not_visible_to_cache_readers
+    self.assertFalse(destination.exists(), "a reader could consume partial source")
+AssertionError: True is not false : a reader could consume partial source
+
+----------------------------------------------------------------------
+Ran 1 test in 0.018s
+
+FAILED (failures=1)

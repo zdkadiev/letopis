@@ -1,0 +1,4 @@
+   Compiling letopis-storage-build v0.0.0 (/checks)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.70s
+     Running `target/linux-aarch64-nofts/debug/examples/check /checks/.build/tk1-8qu6gwhw/nofts.db /checks/.build/tk1-8qu6gwhw/vec1.so`
+unsupported storage build: FTS5 contentless-delete is required: no such module: fts5

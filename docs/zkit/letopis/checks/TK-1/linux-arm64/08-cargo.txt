@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running `target/linux-aarch64/debug/examples/check /checks/.build/tk1-8qu6gwhw/supported.db /checks/.build/tk1-8qu6gwhw/vec1.so`
+SQLite 3.53.2 / version 0.8 (NEON, multi-threaded): supported

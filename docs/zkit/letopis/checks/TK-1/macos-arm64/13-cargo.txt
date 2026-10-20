@@ -1,0 +1,2 @@
+    Checking letopis-storage-build v0.0.0 (/Users/zdkadiev/.codex/worktrees/20f1/letopis/tests/storage-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.20s

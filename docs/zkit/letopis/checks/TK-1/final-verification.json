@@ -1,0 +1,19 @@
+{
+  "original_docs_verified": 251,
+  "baseline_documents_changed": [
+    "docs/zkit/letopis/roadmap.md",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/epic.md",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-1-build.md"
+  ],
+  "platforms": [
+    "macos-arm64",
+    "linux-arm64"
+  ],
+  "rust_tests_per_platform": 10,
+  "python_tests_per_platform": 4,
+  "source_hashes_verified": true,
+  "new_document_links_verified": true,
+  "branch": "TK-1",
+  "committed": false,
+  "verification_stage": "before user-requested commit and merge"
+}

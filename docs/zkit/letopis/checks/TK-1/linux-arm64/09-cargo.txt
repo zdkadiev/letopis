@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running `target/linux-aarch64/debug/examples/check /checks/.build/tk1-8qu6gwhw/missing.db /checks/.build/tk1-8qu6gwhw/absent`
+unsupported storage build: vec1 extension could not be loaded: /checks/.build/tk1-8qu6gwhw/absent.so: cannot open shared object file: No such file or directory

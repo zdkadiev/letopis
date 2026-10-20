@@ -1,0 +1,4 @@
+   Compiling letopis-storage-build v0.0.0 (/Users/zdkadiev/.codex/worktrees/20f1/letopis/tests/storage-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.44s
+     Running `target/darwin-arm64-nofts/debug/examples/check /Users/zdkadiev/.codex/worktrees/20f1/letopis/tests/storage-build/.build/tk1-5179g1_f/nofts.db /Users/zdkadiev/.codex/worktrees/20f1/letopis/tests/storage-build/.build/tk1-5179g1_f/vec1.dylib`
+unsupported storage build: FTS5 contentless-delete is required: no such module: fts5
