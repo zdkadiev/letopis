@@ -1,0 +1,28 @@
+   Compiling letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.67s
+     Running tests/interruptions.rs (target/debug/deps/interruptions-b4cc1489dbbbedeb)
+
+running 2 tests
+
+thread 'publication_crash_matrix' (5985659) panicked at tests/support/mod.rs:124:37:
+assertion `left == right` failed
+  left: "done"
+ right: "checkpoint:detected"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'reindex_crash_matrix' (5985660) panicked at tests/support/mod.rs:124:37:
+assertion `left == right` failed
+  left: "done"
+ right: "checkpoint:locked"
+test publication_crash_matrix ... FAILED
+test reindex_crash_matrix ... FAILED
+
+failures:
+
+failures:
+    publication_crash_matrix
+    reindex_crash_matrix
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+error: test failed, to rerun pass `--test interruptions`

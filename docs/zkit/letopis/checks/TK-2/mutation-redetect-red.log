@@ -1,0 +1,40 @@
+--- original
++++ redetect
+@@ -48,13 +48,14 @@
+     checkpoint: &mut dyn FnMut(&str) -> CheckResult<()>,
+ ) -> CheckResult<()> {
+     let mut conn = cache(root)?;
+-    if !reindex && detect(root, &conn, false)?.is_empty() {
++    let prepared=detect(root, &conn, reindex)?;
++    if !reindex && prepared.is_empty() {
+         return Ok(());
+     }
+     checkpoint("detected")?;
+     let _lock = lock(root, checkpoint)?;
+     checkpoint("locked")?;
+-    let delta = detect(root, &conn, reindex)?;
++    let delta = prepared;
+     checkpoint("redetected")?;
+     if delta.is_empty() && !reindex {
+         return Ok(());
+
+   Compiling letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.35s
+     Running tests/concurrency.rs (target/debug/deps/concurrency-5df1e5fcb5a485cb)
+
+thread 'waiting_publisher_redetects_after_agent_edit' (6000767) panicked at tests/support/mod.rs:109:5:
+assertion `left == right` failed
+  left: [[String("a.md"), String("cefde2ce2684174dc04d121db9f53df7821acc9e20fc4dfe6fde151adcb585ec"), String("b1601f694b9d336c35fc456de5697dfde5e1b1ce4e8c40766fb6cb763aba91c7")], [String("b.md"), String("b75d9bd531588e222e33b9f685fa7759d0747f93fa2ca12c4fb36cd66bbdb163"), String("f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753")]]
+ right: [[String("a.md"), String("86094ec20fa662adae83720c4892771e6964349efad1f003d7daebc732f636eb"), String("304b4a90a76a1cbe4c112e074b30e75181f54df43d60f883597457844293b341")], [String("b.md"), String("b75d9bd531588e222e33b9f685fa7759d0747f93fa2ca12c4fb36cd66bbdb163"), String("f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753")]]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test concurrency`
+
+running 1 test
+test waiting_publisher_redetects_after_agent_edit ... FAILED
+
+failures:
+
+failures:
+    waiting_publisher_redetects_after_agent_edit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.44s

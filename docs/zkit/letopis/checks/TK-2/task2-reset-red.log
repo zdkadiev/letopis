@@ -1,0 +1,20 @@
+   Compiling letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.88s
+     Running tests/interruptions.rs (target/debug/deps/interruptions-b4cc1489dbbbedeb)
+
+running 1 test
+
+thread 'config_reset_crash_matrix' (5989258) panicked at tests/support/mod.rs:125:144:
+child checkpoint timeout/EOF: channel is empty and sending half is closed; stderr=publisher: unknown mode
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test config_reset_crash_matrix ... FAILED
+
+failures:
+
+failures:
+    config_reset_crash_matrix
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.27s
+
+error: test failed, to rerun pass `--test interruptions`

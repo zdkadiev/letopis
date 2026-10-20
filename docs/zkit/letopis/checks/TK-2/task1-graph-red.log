@@ -1,0 +1,26 @@
+   Compiling letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.36s
+     Running tests/publication.rs (target/debug/deps/publication-261aa1aaf3a3abb2)
+
+running 6 tests
+
+thread 'declared_edges_follow_target_lifecycle_and_cycles_terminate' (5981235) panicked at tests/publication.rs:71:5:
+assertion `left == right` failed
+  left: []
+ right: ["cycle:a.md->b.md->a.md", "dangling:a.md->gone.md"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test declared_edges_follow_target_lifecycle_and_cycles_terminate ... FAILED
+test same_tick_same_size_edit_is_hashed ... ok
+test unchanged_invocation_is_a_noop ... ok
+test new_deleted_and_renamed_files_update_fts ... ok
+test valid_delta_publishes_beside_invalid_file ... ok
+test fixed_and_deleted_files_clear_errors ... ok
+
+failures:
+
+failures:
+    declared_edges_follow_target_lifecycle_and_cycles_terminate
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `--test publication`

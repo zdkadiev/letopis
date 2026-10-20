@@ -1,0 +1,32 @@
+--- original
++++ reset-recheck
+@@ -29,7 +29,7 @@
+             r.get(0)
+         })
+         .optional()?;
+-    if old.as_deref() == Some(&identity) {
++    if false && old.as_deref() == Some(&identity) {
+         return Ok(());
+     }
+     tx.execute_batch("DROP TABLE IF EXISTS vector_index;
+
+   Compiling letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running tests/concurrency.rs (target/debug/deps/concurrency-5df1e5fcb5a485cb)
+
+thread 'competing_config_resets_recheck_identity' (6001825) panicked at tests/concurrency.rs:157:5:
+assertion `left == right` failed
+  left: Object {"failures": Array [], "keys": Array [], "meta": Array [Array [Number(1), String("9de2e0bee6027c3d5df68fbe9026496f523c2ea2434a4ac8844a42b7ddd50574")]], "schema": Array [Array [String("embed_failures"), String("table"), String("CREATE TABLE embed_failures(search_hash TEXT PRIMARY KEY,attempts INTEGER NOT NULL,error TEXT)")], Array [String("meta"), String("table"), String("CREATE TABLE meta(id INTEGER PRIMARY KEY CHECK(id=1),config_identity TEXT NOT NULL)")], Array [String("sqlite_autoindex_embed_failures_1"), String("index"), Null], Array [String("sqlite_autoindex_vector_keys_1"), String("index"), Null], Array [String("vector_index"), String("table"), String("CREATE VIRTUAL TABLE vector_index USING vec1(vector)")], Array [String("vector_index_base"), String("table"), String("CREATE TABLE 'vector_index_base'(id INTEGER PRIMARY KEY, vector BLOB)")], Array [String("vector_index_config"), String("table"), String("CREATE TABLE 'vector_index_config'(id INTEGER PRIMARY KEY, val ANY)")], Array [String("vector_index_idx"), String("table"), String("CREATE TABLE 'vector_index_idx'(id INTEGER PRIMARY KEY, bucket INTEGER, first INTEGER, last INTEGER, val BLOB)")], Array [String("vector_index_idx_idx"), String("index"), String("CREATE INDEX 'vector_index_idx_idx' ON 'vector_index_idx'(bucket, first, last)")], Array [String("vector_index_meta"), String("table"), String("CREATE TABLE 'vector_index_meta'(id INTEGER PRIMARY KEY, val BLOB)")], Array [String("vector_index_model"), String("table"), String("CREATE TABLE 'vector_index_model'(id INTEGER PRIMARY KEY, val BLOB)")], Array [String("vector_keys"), String("table"), String("CREATE TABLE vector_keys(row_id INTEGER PRIMARY KEY,search_hash TEXT NOT NULL UNIQUE)")]], "vectors": Array []}
+ right: Object {"failures": Array [Array [String("sentinel-failure"), Number(1), String("keep")]], "keys": Array [Array [Number(77), String("sentinel")]], "meta": Array [Array [Number(1), String("9de2e0bee6027c3d5df68fbe9026496f523c2ea2434a4ac8844a42b7ddd50574")]], "schema": Array [Array [String("embed_failures"), String("table"), String("CREATE TABLE embed_failures(search_hash TEXT PRIMARY KEY,attempts INTEGER NOT NULL,error TEXT)")], Array [String("meta"), String("table"), String("CREATE TABLE meta(id INTEGER PRIMARY KEY CHECK(id=1),config_identity TEXT NOT NULL)")], Array [String("sqlite_autoindex_embed_failures_1"), String("index"), Null], Array [String("sqlite_autoindex_vector_keys_1"), String("index"), Null], Array [String("vector_index"), String("table"), String("CREATE VIRTUAL TABLE vector_index USING vec1(vector)")], Array [String("vector_index_base"), String("table"), String("CREATE TABLE 'vector_index_base'(id INTEGER PRIMARY KEY, vector BLOB)")], Array [String("vector_index_config"), String("table"), String("CREATE TABLE 'vector_index_config'(id INTEGER PRIMARY KEY, val ANY)")], Array [String("vector_index_idx"), String("table"), String("CREATE TABLE 'vector_index_idx'(id INTEGER PRIMARY KEY, bucket INTEGER, first INTEGER, last INTEGER, val BLOB)")], Array [String("vector_index_idx_idx"), String("index"), String("CREATE INDEX 'vector_index_idx_idx' ON 'vector_index_idx'(bucket, first, last)")], Array [String("vector_index_meta"), String("table"), String("CREATE TABLE 'vector_index_meta'(id INTEGER PRIMARY KEY, val BLOB)")], Array [String("vector_index_model"), String("table"), String("CREATE TABLE 'vector_index_model'(id INTEGER PRIMARY KEY, val BLOB)")], Array [String("vector_keys"), String("table"), String("CREATE TABLE vector_keys(row_id INTEGER PRIMARY KEY,search_hash TEXT NOT NULL UNIQUE)")]], "vectors": Array [Array [Number(77), Array [Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(128), Number(63)]]]}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test concurrency`
+
+running 1 test
+test competing_config_resets_recheck_identity ... FAILED
+
+failures:
+
+failures:
+    competing_config_resets_recheck_identity
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.46s

@@ -1,0 +1,43 @@
+{
+  "base": "ea86eada6d45b5fee81b2d74ac5ed659f4d82723",
+  "branch": "TK-2",
+  "platforms": [
+    {
+      "platform": "macos-arm64",
+      "result": "PASS",
+      "integration_tests": 15,
+      "process_kill_cuts": 25,
+      "tk1_rust_tests": 10,
+      "tk1_python_tests": 4,
+      "fmt": "PASS",
+      "clippy": "PASS",
+      "source_hashes_match": true,
+      "manifest_sha256": "45a19ebeb7708d7acb8430af4198a5d2e469e0e02fecd2058848bb7953a622c3"
+    },
+    {
+      "platform": "linux-arm64",
+      "result": "PASS",
+      "integration_tests": 15,
+      "process_kill_cuts": 25,
+      "tk1_rust_tests": 10,
+      "tk1_python_tests": 4,
+      "fmt": "PASS",
+      "clippy": "PASS",
+      "source_hashes_match": true,
+      "manifest_sha256": "564b51be98af4a4442f256cee7bf42fd7aa481e40da203417580fd690e85af81"
+    }
+  ],
+  "mutations_detected": 4,
+  "mutation_sources_restored": true,
+  "original_checkout_files_preserved": 303,
+  "copied_baseline_only_expected_changes": [
+    "docs/zkit/letopis/roadmap.md",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/epic.md",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md"
+  ],
+  "linux_image": {
+    "image_id": "sha256:aebf49e1f99b1406d6db6e5c02ed44585f2174fde88fce56e985265e515c9bf7",
+    "os": "linux",
+    "architecture": "arm64"
+  }
+}

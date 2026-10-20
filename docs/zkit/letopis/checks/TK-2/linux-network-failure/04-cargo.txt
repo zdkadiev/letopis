@@ -1,0 +1,15 @@
+    Updating crates.io index
+warning: spurious network error (3 tries remaining): [28] Timeout was reached (Operation too slow. Less than 10 bytes/sec transferred the last 30 seconds)
+warning: spurious network error (2 tries remaining): [28] Timeout was reached (Operation too slow. Less than 10 bytes/sec transferred the last 30 seconds)
+warning: spurious network error (1 try remaining): [28] Timeout was reached (Operation too slow. Less than 10 bytes/sec transferred the last 30 seconds)
+error: failed to get `ryu` as a dependency of package `serde_json v1.0.145`
+    ... which satisfies dependency `serde_json = "=1.0.145"` (locked to 1.0.145) of package `letopis-publication-checks v0.0.0 (/repo/tests/publication)`
+
+Caused by:
+  download of 3/r/ryu failed
+
+Caused by:
+  failed to download from `https://index.crates.io/3/r/ryu`
+
+Caused by:
+  [28] Timeout was reached (Operation too slow. Less than 10 bytes/sec transferred the last 30 seconds)

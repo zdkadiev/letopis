@@ -1,0 +1,44 @@
+--- original
++++ early-fingerprints
+@@ -63,6 +63,17 @@
+         .iter()
+         .map(|(path, state)| (path.clone(), state.as_ref().map(|f| parse(path, &f.bytes))))
+         .collect();
++    for (path, state) in &delta {
++        match state {
++            None => {
++                conn.execute("DELETE FROM files WHERE path=?1", [path])?;
++            }
++            Some(f) => {
++                let error = parsed[path].as_ref().and_then(|p| p.as_ref().err());
++                conn.execute("INSERT INTO files VALUES(?1,?2,?3,?4,?5,?6,?7,?8) ON CONFLICT(path) DO UPDATE SET size=excluded.size,mtime_ns=excluded.mtime_ns,inode=excluded.inode,hash=excluded.hash,checked_at_ns=excluded.checked_at_ns,valid=excluded.valid,error=excluded.error",params![path,f.size,f.mtime,f.inode,f.hash,f.checked,error.is_none(),error])?;
++            }
++        }
++    }
+     let tx = conn.transaction()?;
+     checkpoint("begun")?;
+     // Preserve invalid files' old nodes, edges and FTS. A full reindex visits every
+
+   Compiling letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.62s
+     Running tests/interruptions.rs (target/debug/deps/interruptions-b4cc1489dbbbedeb)
+
+thread 'publication_crash_matrix' (6001286) panicked at tests/interruptions.rs:32:13:
+assertion `left == right` failed: cut=begun
+  left: Object {"edges": Array [], "files": Array [Array [String("a.md"), Number(24), Number(1792532560661694973), Number(49242629), String("4da96f5e3a37dfc7d385a06f37939f97412dbe66960d38f0e424ac4c7e225f8e"), Number(1792532560670581000), Number(0), String("invalid fixture metadata")], Array [String("b.md"), Number(27), Number(1792532560661852933), Number(49242630), String("dbe0488b2396e637b51a2b8c21da4cba979d328e1db99e4388ec88623ff4846a"), Number(1792532560670618000), Number(1), Null], Array [String("d.md"), Number(27), Number(1792532560662139893), Number(49242638), String("3c6c9bda2c092007b0679c8e823d1520ae8269f4146b47c0900a789904a3ff12"), Number(1792532560670657000), Number(1), Null]], "fts": Array [Array [String("alpha"), Number(1), String("text"), Number(0)], Array [String("beta"), Number(2), String("text"), Number(0)], Array [String("charlie"), Number(3), String("text"), Number(0)]], "nodes": Array [Array [Number(1), String("a.md"), String("vertex"), String("a.md"), String("0a17bcda99cbe8971bc0eb246ebe09c90a4e88bdf33afcc438615e7f737bf28c"), Number(0), Null, Number(1), Number(1), String("8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8")], Array [Number(2), String("b.md"), String("vertex"), String("b.md"), String("b75d9bd531588e222e33b9f685fa7759d0747f93fa2ca12c4fb36cd66bbdb163"), Number(0), Null, Number(1), Number(1), String("f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753")], Array [Number(3), String("c.md"), String("vertex"), String("c.md"), String("5555bcdece0caad8ed398a4ed41ae0c69d6585009c6f4425e9ee6ec41c4d6510"), Number(0), Null, Number(1), Number(1), String("b9dd960c1753459a78115d3cb845a57d924b6877e805b08bd01086ccdf34433c")]], "revision": Array [Array [Number(1), Number(1)]]}
+ right: Object {"edges": Array [], "files": Array [Array [String("a.md"), Number(27), Number(1792532560619659037), Number(49242629), String("0a17bcda99cbe8971bc0eb246ebe09c90a4e88bdf33afcc438615e7f737bf28c"), Number(1792532560632339000), Number(1), Null], Array [String("b.md"), Number(26), Number(1792532560619791246), Number(49242630), String("b75d9bd531588e222e33b9f685fa7759d0747f93fa2ca12c4fb36cd66bbdb163"), Number(1792532560632377000), Number(1), Null], Array [String("c.md"), Number(29), Number(1792532560619914372), Number(49242631), String("5555bcdece0caad8ed398a4ed41ae0c69d6585009c6f4425e9ee6ec41c4d6510"), Number(1792532560632414000), Number(1), Null]], "fts": Array [Array [String("alpha"), Number(1), String("text"), Number(0)], Array [String("beta"), Number(2), String("text"), Number(0)], Array [String("charlie"), Number(3), String("text"), Number(0)]], "nodes": Array [Array [Number(1), String("a.md"), String("vertex"), String("a.md"), String("0a17bcda99cbe8971bc0eb246ebe09c90a4e88bdf33afcc438615e7f737bf28c"), Number(0), Null, Number(1), Number(1), String("8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8")], Array [Number(2), String("b.md"), String("vertex"), String("b.md"), String("b75d9bd531588e222e33b9f685fa7759d0747f93fa2ca12c4fb36cd66bbdb163"), Number(0), Null, Number(1), Number(1), String("f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753")], Array [Number(3), String("c.md"), String("vertex"), String("c.md"), String("5555bcdece0caad8ed398a4ed41ae0c69d6585009c6f4425e9ee6ec41c4d6510"), Number(0), Null, Number(1), Number(1), String("b9dd960c1753459a78115d3cb845a57d924b6877e805b08bd01086ccdf34433c")]], "revision": Array [Array [Number(1), Number(1)]]}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test interruptions`
+
+running 1 test
+publication detected: committed oracle and next-call convergence PASS
+publication locked: committed oracle and next-call convergence PASS
+publication redetected: committed oracle and next-call convergence PASS
+test publication_crash_matrix ... FAILED
+
+failures:
+
+failures:
+    publication_crash_matrix
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.74s

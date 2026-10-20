@@ -1,0 +1,186 @@
+{
+  "started_utc": "2026-10-20T21:47:31.053728+00:00",
+  "platform": "Linux-7.0.0-22-generic-aarch64-with-glibc2.36",
+  "machine": "aarch64",
+  "result": "FAIL",
+  "commands": [
+    {
+      "argv": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "01-rustc.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64",
+        "CARGO_HOME": "/task-cargo",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.95.0-aarch64-unknown-linux-gnu"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "--version"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "02-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64",
+        "CARGO_HOME": "/task-cargo",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.95.0-aarch64-unknown-linux-gnu"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cc",
+        "--version"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "03-cc.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64",
+        "CARGO_HOME": "/task-cargo",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.95.0-aarch64-unknown-linux-gnu"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "04-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64",
+        "CARGO_HOME": "/task-cargo",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.95.0-aarch64-unknown-linux-gnu"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cc",
+        "-O2",
+        "-DNDEBUG",
+        "-fPIC",
+        "-shared",
+        "-I",
+        "/task-cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libsqlite3-sys-0.38.2/sqlite3",
+        "/repo/tests/publication/.build/vec1.c",
+        "-o",
+        "/repo/tests/publication/.build/native-mznuqmpe/vec1.so",
+        "-pthread",
+        "-lm"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "05-cc.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64",
+        "CARGO_HOME": "/task-cargo",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.95.0-aarch64-unknown-linux-gnu"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--bin",
+        "publisher",
+        "--",
+        "--versions"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "06-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64",
+        "LETOPIS_VEC1_EXTENSION": "/repo/tests/publication/.build/native-mznuqmpe/vec1.so",
+        "CARGO_HOME": "/task-cargo",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.95.0-aarch64-unknown-linux-gnu"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "07-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64",
+        "LETOPIS_VEC1_EXTENSION": "/repo/tests/publication/.build/native-mznuqmpe/vec1.so",
+        "CARGO_HOME": "/task-cargo",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.95.0-aarch64-unknown-linux-gnu"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--",
+        "--check"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "08-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64",
+        "LETOPIS_VEC1_EXTENSION": "/repo/tests/publication/.build/native-mznuqmpe/vec1.so",
+        "CARGO_HOME": "/task-cargo",
+        "CARGO_NET_OFFLINE": "true",
+        "RUSTUP_TOOLCHAIN": "1.95.0-aarch64-unknown-linux-gnu"
+      },
+      "exit_code": 1
+    }
+  ],
+  "vec1_url": "https://raw.githubusercontent.com/sqlite/sqlite/a27bcfe21c9b4e0989e86eec8fb34a3832cd23c7/ext/vec1/vec1.c",
+  "vec1_source_sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9",
+  "libsqlite3_sys": "0.38.2",
+  "sqlite_header_sha256": "9e69a1353a4288450b0d5239ede11fc7f1f4c8e5eb07491fc8317eacb5b7de7e",
+  "files_sha256": {
+    "../../docs/zkit/letopis/mechanics/storage-schema.sql": "cb59b6082d738a382ebb7450f7ee54552c8e1e26dd10217984c8de1f7f5db37c",
+    ".gitignore": "bedadf7a946f16555560ab12aadd87a52305a0b99bf5e49a3a452054ff39c3ea",
+    "Cargo.lock": "975b3826ecd97e177a4c7049a47ebfc36c3c7de7d49e3d452f04877fa2e6c7b2",
+    "Cargo.toml": "395569078e28ec25f586764eeadd00dd8dcd75b1fb358e42f9076015b69f692b",
+    "README.md": "043c115fc1b388edda0f11061318c4f895b7ca6ca0ab06f7c243ca9f6ef68873",
+    "run.py": "a614d8cee34981c1b320a3772f8d21e985df2ded164a2219a4f95c0f4ec0bd16",
+    "rust-toolchain.toml": "7d21c66a15f41bad66b82ed06a289f5dc8a6e3751951d2696bbf20ce296f2b0f",
+    "src/bin/publisher.rs": "4ac2dff37548e30e6b7904cd57773a880d444338a6a2eab380320d51454ef70f",
+    "src/config.rs": "b4d12cf5b4463fce375abcb96dcc1855ea9b29edef08eda2eace980b3a4a5796",
+    "src/corpus.rs": "5ed3ba76b6f9948fd0e1177a094153cc0bf56ddead2a742f0b0f29bb39f6af0e",
+    "src/graph.rs": "e9ee87eb10064ee916fd63b2c316500e961aee3ff965d6d5000a07c9cfb9be18",
+    "src/lib.rs": "28377bbdb42329f21ebea6eef50232e387ece134b0a701b79bf0412e18313840",
+    "src/publication.rs": "ebe51bca27e1d53136c2cde1c37d6fcceb4c58aaef898ef1ffb7a54439d0443e",
+    "tests/concurrency.rs": "c823a2d14f0749ee356320c53395249a9c4ae3bf44f061a8700dc65c9e26dd82",
+    "tests/interruptions.rs": "3445fcb90de3310442fd8422bbfe021af04fe8a28a4459b570f5843bc1fa2192",
+    "tests/publication.rs": "262262093642ba5a3a30e9a4ff71d4ccb32ceaec6591dd0a5d2b793c521b807f",
+    "tests/support/mod.rs": "8c02ad9a5861b7fd20c9c4bdaab0818f17113fc8cde90f8c3e87070f77137724",
+    "../storage-build/Cargo.lock": "1554c44255045d2e9a9036919d9dccd5073fe56e0a447c91bfa5b8d2a202019f",
+    "../storage-build/Cargo.toml": "f935a2f597816c0bc7a0409e6eadd13384253f1f417a6c4213cd7bedf613c890",
+    "../storage-build/run.py": "93d281e18e1173e89d2a7f13cbedcc16dfcc1b220ab3ea0a064535b929466c7f",
+    "../storage-build/rust-toolchain.toml": "7d21c66a15f41bad66b82ed06a289f5dc8a6e3751951d2696bbf20ce296f2b0f",
+    "../storage-build/src/lib.rs": "914e704f985a15caa30d607e454b8acb71e157cad627bc564dba8254a319c31c"
+  },
+  "vec1_library_sha256": "8f0f057fbf1f62135258808064db5c2adc316b95e16cc67f6f79c5a8475896ab",
+  "error": "command exited 1; see 08-cargo.txt",
+  "finished_utc": "2026-10-20T21:47:46.059894+00:00"
+}

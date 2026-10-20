@@ -1,0 +1,2 @@
+    Checking letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.32s

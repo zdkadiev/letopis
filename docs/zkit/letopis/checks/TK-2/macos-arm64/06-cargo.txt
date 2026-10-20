@@ -1,0 +1,4 @@
+   Compiling letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.59s
+     Running `target/darwin-arm64/debug/publisher --versions`
+SQLite 3.53.2; vec1 version 0.8 (NEON, multi-threaded)

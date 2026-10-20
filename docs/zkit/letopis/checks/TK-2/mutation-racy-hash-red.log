@@ -1,0 +1,41 @@
+--- original
++++ racy-hash
+@@ -111,7 +111,7 @@
+         let prev = old.get(&path);
+         let same = prev.is_some_and(|(s, t, i, _, _)| (*s, *t, *i) == (size, mtime, inode));
+         let racy = prev.is_some_and(|(_, t, _, _, checked)| *t >= checked - TICK_NS);
+-        if !all && same && !racy {
++        if !all && same {
+             delta.remove(&path);
+             continue;
+         }
+
+   Compiling letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication)
+warning: unused variable: `racy`
+   --> src/corpus.rs:113:13
+    |
+113 |         let racy = prev.is_some_and(|(_, t, _, _, checked)| *t >= checked - TICK_NS);
+    |             ^^^^ help: if this is intentional, prefix it with an underscore: `_racy`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `letopis-publication-checks` (lib) generated 1 warning (run `cargo fix --lib -p letopis-publication-checks` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.11s
+     Running tests/publication.rs (target/debug/deps/publication-7e40a53ffd227940)
+
+thread 'same_tick_same_size_edit_is_hashed' (6044888) panicked at tests/publication.rs:142:5:
+assertion `left == right` failed
+  left: []
+ right: ["a.md"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test publication`
+
+running 1 test
+test same_tick_same_size_edit_is_hashed ... FAILED
+
+failures:
+
+failures:
+    same_tick_same_size_edit_is_hashed
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.08s

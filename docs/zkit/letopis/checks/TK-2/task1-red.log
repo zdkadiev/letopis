@@ -1,0 +1,60 @@
+   Compiling libc v0.2.191
+   Compiling version_check v0.9.5
+   Compiling proc-macro2 v1.0.107
+   Compiling find-msvc-tools v0.1.15
+   Compiling shlex v2.0.1
+   Compiling pkg-config v0.3.34
+   Compiling quote v1.0.47
+   Compiling typenum v1.20.1
+   Compiling unicode-ident v1.0.27
+   Compiling vcpkg v0.2.15
+   Compiling serde_core v1.0.228
+   Compiling bitflags v2.13.2
+   Compiling cfg-if v1.0.5
+   Compiling serde_json v1.0.145
+   Compiling fallible-iterator v0.3.0
+   Compiling cc v1.9.0
+   Compiling getrandom v0.3.4
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling rustix v1.1.5
+   Compiling generic-array v0.14.7
+   Compiling serde v1.0.228
+   Compiling smallvec v1.16.3
+   Compiling ryu v1.0.23
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling once_cell v1.21.4
+   Compiling fastrand v2.5.0
+   Compiling libsqlite3-sys v0.38.2
+   Compiling syn v2.0.119
+   Compiling errno v0.3.14
+   Compiling cpufeatures v0.2.17
+   Compiling serde_derive v1.0.228
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling tempfile v3.23.0
+   Compiling rusqlite v0.40.2
+   Compiling letopis-storage-build v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build)
+   Compiling letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.15s
+     Running tests/publication.rs (target/debug/deps/publication-261aa1aaf3a3abb2)
+
+running 1 test
+
+thread 'valid_delta_publishes_beside_invalid_file' (5975377) panicked at tests/support/mod.rs:70:44:
+assertion `left == right` failed
+  left: []
+ right: [[String("a.md"), String("0a17bcda99cbe8971bc0eb246ebe09c90a4e88bdf33afcc438615e7f737bf28c"), String("8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8")], [String("b.md"), String("b75d9bd531588e222e33b9f685fa7759d0747f93fa2ca12c4fb36cd66bbdb163"), String("f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753")]]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test valid_delta_publishes_beside_invalid_file ... FAILED
+
+failures:
+
+failures:
+    valid_delta_publishes_beside_invalid_file
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+error: test failed, to rerun pass `--test publication`

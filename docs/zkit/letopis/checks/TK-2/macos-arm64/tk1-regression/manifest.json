@@ -1,0 +1,250 @@
+{
+  "started_utc": "2026-10-20T22:10:33.801478+00:00",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "vec1_url": "https://raw.githubusercontent.com/sqlite/sqlite/a27bcfe21c9b4e0989e86eec8fb34a3832cd23c7/ext/vec1/vec1.c",
+  "vec1_source_sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9",
+  "commands": [
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "-v",
+        "test_runner"
+      ],
+      "exit_code": 0,
+      "log": "01-python3.txt",
+      "expected_rejection": null,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication/.build/native-r23rqcz3/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "exit_code": 0,
+      "log": "02-rustc.txt",
+      "expected_rejection": null,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication/.build/native-r23rqcz3/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "--version"
+      ],
+      "exit_code": 0,
+      "log": "03-cargo.txt",
+      "expected_rejection": null,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication/.build/native-r23rqcz3/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cc",
+        "--version"
+      ],
+      "exit_code": 0,
+      "log": "04-cc.txt",
+      "expected_rejection": null,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication/.build/native-r23rqcz3/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--format-version",
+        "1"
+      ],
+      "exit_code": 0,
+      "log": "05-cargo.txt",
+      "expected_rejection": null,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication/.build/native-r23rqcz3/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cc",
+        "-O2",
+        "-DNDEBUG",
+        "-fPIC",
+        "-dynamiclib",
+        "-I",
+        "/Users/zdkadiev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libsqlite3-sys-0.38.2/sqlite3",
+        "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/vec1.c",
+        "-o",
+        "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/vec1.dylib",
+        "-pthread",
+        "-lm"
+      ],
+      "exit_code": 0,
+      "log": "06-cc.txt",
+      "expected_rejection": null,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/publication/.build/native-r23rqcz3/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "log": "07-cargo.txt",
+      "expected_rejection": null,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--example",
+        "check",
+        "--",
+        "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/supported.db",
+        "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/vec1.dylib"
+      ],
+      "exit_code": 0,
+      "log": "08-cargo.txt",
+      "expected_rejection": null,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--example",
+        "check",
+        "--",
+        "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/missing.db",
+        "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/absent"
+      ],
+      "exit_code": 1,
+      "log": "09-cargo.txt",
+      "expected_rejection": "vec1 extension",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--example",
+        "check",
+        "--",
+        "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/invalid.db",
+        "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/invalid.so"
+      ],
+      "exit_code": 1,
+      "log": "10-cargo.txt",
+      "expected_rejection": "vec1 extension",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--example",
+        "check",
+        "--",
+        "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/nofts.db",
+        "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/vec1.dylib"
+      ],
+      "exit_code": 1,
+      "log": "11-cargo.txt",
+      "expected_rejection": "FTS5 contentless-delete is required",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64-nofts",
+        "LIBSQLITE3_FLAGS": "-USQLITE_ENABLE_FTS5",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "12-cargo.txt",
+      "expected_rejection": null,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/vec1.dylib"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log": "13-cargo.txt",
+      "expected_rejection": null,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/4cf8/letopis/tests/storage-build/.build/tk1-73x_kaii/vec1.dylib"
+      }
+    }
+  ],
+  "result": "PASS",
+  "libsqlite3_sys": "0.38.2",
+  "sqlite_header_sha256": "9e69a1353a4288450b0d5239ede11fc7f1f4c8e5eb07491fc8317eacb5b7de7e",
+  "files_sha256": {
+    ".dockerignore": "08bb7a70af4ae5a9c15226f499f2e76055ebd521550f87eb102a1316cdb9df38",
+    ".gitignore": "bedadf7a946f16555560ab12aadd87a52305a0b99bf5e49a3a452054ff39c3ea",
+    "Cargo.lock": "1554c44255045d2e9a9036919d9dccd5073fe56e0a447c91bfa5b8d2a202019f",
+    "Cargo.toml": "f935a2f597816c0bc7a0409e6eadd13384253f1f417a6c4213cd7bedf613c890",
+    "Dockerfile": "a3580bc38a611664c4cd716ddb611214944c5a3b506a93dfb681bf66cd902c75",
+    "README.md": "c5d9ae43d356a5673793921512611181ddfa43fe0fb91961f7ad1d458eafaae5",
+    "examples/check.rs": "c95fcba6df67230673cf5da3f0ed23435b3b2b300035f01b8b9f291284260371",
+    "run.py": "93d281e18e1173e89d2a7f13cbedcc16dfcc1b220ab3ea0a064535b929466c7f",
+    "rust-toolchain.toml": "7d21c66a15f41bad66b82ed06a289f5dc8a6e3751951d2696bbf20ce296f2b0f",
+    "src/lib.rs": "914e704f985a15caa30d607e454b8acb71e157cad627bc564dba8254a319c31c",
+    "test_runner.py": "9dbe971837dabf436de07fee54e3b7062c7546cdb7958eff6698dc6ed5f56c9f",
+    "tests/storage.rs": "1b143601f72a6f8fd77cf6767fe806857a5a4088c710b4e71dcc7819b4c419a5"
+  },
+  "vec1_library_sha256": "0268d390e1af685f01dbefbbdf5032b7e9007893b59948fddfc99a7f203e853e",
+  "finished_utc": "2026-10-20T22:10:37.002965+00:00"
+}

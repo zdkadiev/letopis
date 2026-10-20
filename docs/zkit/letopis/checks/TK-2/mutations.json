@@ -1,0 +1,33 @@
+{
+  "mutations": [
+    {
+      "name": "redetect",
+      "exit_code": 101,
+      "source_sha256": "ebe51bca27e1d53136c2cde1c37d6fcceb4c58aaef898ef1ffb7a54439d0443e",
+      "test": "concurrency::waiting_publisher_redetects_after_agent_edit",
+      "log": "mutation-redetect-red.log"
+    },
+    {
+      "name": "early-fingerprints",
+      "exit_code": 101,
+      "source_sha256": "ebe51bca27e1d53136c2cde1c37d6fcceb4c58aaef898ef1ffb7a54439d0443e",
+      "test": "interruptions::publication_crash_matrix",
+      "log": "mutation-early-fingerprints-red.log"
+    },
+    {
+      "name": "reset-recheck",
+      "exit_code": 101,
+      "source_sha256": "b4d12cf5b4463fce375abcb96dcc1855ea9b29edef08eda2eace980b3a4a5796",
+      "test": "concurrency::competing_config_resets_recheck_identity",
+      "log": "mutation-reset-recheck-red.log"
+    },
+    {
+      "name": "racy-hash",
+      "exit_code": 101,
+      "source_sha256": "5ed3ba76b6f9948fd0e1177a094153cc0bf56ddead2a742f0b0f29bb39f6af0e",
+      "test": "publication::same_tick_same_size_edit_is_hashed",
+      "log": "mutation-racy-hash-red.log"
+    }
+  ],
+  "all_sources_restored": true
+}

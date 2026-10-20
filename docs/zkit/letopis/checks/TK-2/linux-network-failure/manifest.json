@@ -1,0 +1,64 @@
+{
+  "started_utc": "2026-10-20T21:43:47.062700+00:00",
+  "platform": "Linux-7.0.0-22-generic-aarch64-with-glibc2.36",
+  "machine": "aarch64",
+  "result": "FAIL",
+  "commands": [
+    {
+      "argv": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "01-rustc.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "--version"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "02-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cc",
+        "--version"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "03-cc.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "/repo/tests/publication",
+      "log": "04-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/repo/tests/publication/target/linux-aarch64"
+      },
+      "exit_code": 101
+    }
+  ],
+  "vec1_url": "https://raw.githubusercontent.com/sqlite/sqlite/a27bcfe21c9b4e0989e86eec8fb34a3832cd23c7/ext/vec1/vec1.c",
+  "vec1_source_sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9",
+  "error": "command exited 101; see 04-cargo.txt",
+  "finished_utc": "2026-10-20T21:46:00.325452+00:00"
+}

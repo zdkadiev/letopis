@@ -1,0 +1,10 @@
+info: syncing channel updates for 1.95.0-aarch64-unknown-linux-gnu
+info: latest update on 2026-04-16 for version 1.95.0 (59807616e 2026-04-14)
+info: downloading component clippy
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: aarch64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2

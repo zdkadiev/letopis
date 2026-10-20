@@ -1,0 +1,4 @@
+   Compiling letopis-publication-checks v0.0.0 (/repo/tests/publication)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.98s
+     Running `target/linux-aarch64/debug/publisher --versions`
+SQLite 3.53.2; vec1 version 0.8 (NEON, multi-threaded)

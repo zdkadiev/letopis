@@ -1,0 +1,2 @@
+    Checking letopis-publication-checks v0.0.0 (/repo/tests/publication)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.32s
