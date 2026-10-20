@@ -4,7 +4,7 @@
 > **Эпик:** [EP-6](../epic.md)
 > **Фаза:** PH-4
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 37 — 8 ч
+> **План:** неделя 32 — 3 ч; неделя 33 — 5 ч
 > **Зависимости:** [TK-43](TK-43-delivery.md), [TK-24](../../EP-2-knowledge/tasks/TK-24-inspect.md), [TK-40](../../EP-4-system-validation/tasks/TK-40-restore.md), [TK-41](../../EP-4-system-validation/tasks/TK-41-provider-drill.md)
 
 
@@ -26,7 +26,7 @@
 ## 3. Что сделать
 
 1. Установить и проверить полный навык из TK-29 в поставке TK-43; сверить существующие JSON-примеры с установленным CLI, без повторной реализации его содержания.
-2. Сверить инструкции snapshots/live reads, conflicts/recheck, config/cancel/errors и добавить эксплуатационный внешний restore по evidence TK-40.
+2. Сверить инструкции snapshots/live reads, висячих ссылок/перепроверки, config.json как файла/cancel/status и добавить эксплуатационный внешний restore по evidence TK-40.
 3. Дать исполнимый C-8 порядок координации и проверить documented scenario новым агентом.
 
 ## 4. Ожидаемый результат
@@ -35,9 +35,9 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Установленный coding-agent skill покрывает все CLI JSON входы/выходы, snapshots/live reads, conflicts/lost reply/recheck, status/errors/cancel/config и внешний backup/restore.
+- [ ] Установленный coding-agent skill покрывает все CLI JSON входы/выходы, snapshots/live reads, висячие ссылки/потерю ответа/перепроверку, status/cancel/config.json как файл и внешний backup/restore.
 - [ ] Новый агент выполняет documented scenario.
-- [ ] Протокол C-8: управляющий агент приостанавливает новые вызовы, дожидается окончания save/recovery, запускает Git без параллельного CLI, затем возобновляет CLI со сверкой.
+- [ ] Эксплуатация с Git: правки через Git обнаруживаются следующим вызовом (D-93); backup — Git/Markdown и config.json; затем возобновляет CLI со сверкой.
 - [ ] Никакого Git interceptor/новых команд/сервисов/ACL.
 
 ## 6. Как проверить

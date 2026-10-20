@@ -7,7 +7,7 @@
 ```text
 SourceAddress { uri: NormalizedUri, lines: Option<InclusiveLines> }
 SourceObservation { address: SourceAddress, hash: Option<Sha256> }
-BasisInput { knowledge: Uuid, source_snapshot: TreeOid,
+BasisInput { knowledge: KnowledgeId, source_snapshot: TreeOid,
   sources: Set<SourceAddress>, current: CanonicalSnapshot }
 validate_basis(input: BasisInput) -> Result<(), DomainError>      // I-4
 observe(knowledge: NodeMetadata, indexed: IndexReadView,
@@ -15,13 +15,13 @@ observe(knowledge: NodeMetadata, indexed: IndexReadView,
   -> Result<{flags: Set<X1Flag>, matches: bool}, DomainError>     // I-7
 ```
 
-InclusiveLines: start/end целые, 1≤start≤end, обе включительны. Без диапазона читаются bytes всего файла. Для новых источников validate_basis требует доступного полного диапазона и сравнивает bytes по всем итоговым связям в одном основании; conflict при изменении, validation_failed при недоступной новой привязке. Неверный тип OID — invalid_request, отсутствующий существующий по форме объект — not_found; повреждение Git — internal_error, не маскируется.
+InclusiveLines: start/end целые, 1≤start≤end, обе включительны. Без диапазона читаются bytes всего файла. Validate_basis не отказывает индексации [D-93](../decisions.md#D-93): он сравнивает bytes по всем связям знания в одном основании; несовпадение даёт флаг source_changed, недоступный tree или диапазон — диагностику file:<путь знания> и флаг перепроверки. Неверный тип OID — invalid_request, отсутствующий существующий по форме объект — not_found; повреждение Git — internal_error, не маскируется.
 
 Observe не подтверждает знание и не пишет новый source_snapshot. Flags из существующего X-1, совпадение source+revision проверяется на одной привязке; исторический hash вычисляется из Git, не берётся из текущего source hash. Без обнаруженной причины flags пуст; это не проверка истинности. Чтение одинакового path внутри вызова можно разделить временным владением, постоянного source cache нет. Веб-загрузчик в порт не входит.
 
-Вход-пример: source_snapshot=S1, source=src/a.rs#L2-L5; current=S2. Равные адресованные bytes дают matches=true для фильтра S1 даже при другом commit, неравные — source_changed. Исчезнувший диапазон даёт source_not_found и сохранение старого знания; новая привязка к нему отклоняется. Выход только метаданные/состояние, не исходный текст.
+Вход-пример: source_snapshot=S1, source=src/a.rs#L2-L5; current=S2. Равные адресованные bytes дают matches=true для фильтра S1 даже при другом commit, неравные — source_changed. Исчезнувший диапазон даёт source_not_found и сохранение знания; новая ссылка на него индексируется с этим флагом и диагностикой. Выход только метаданные/состояние, не исходный текст.
 
-До успешного сохранения validate_basis передаёт каждый принимаемый source_snapshot Git-порту для отдельного pin+harden в существующем refs namespace. Его равные адресованные bytes не означают равенства всего tree before/after; ссылочная достижимость basis обязательна независимо от них.
+При индексации validate_basis передаёт каждый найденный в метаданных source_snapshot Git-порту для pin в существующем refs namespace ([D-93](../decisions.md#D-93)); отсутствующий tree — диагностика и признак перепроверки, не отказ. Ссылочная достижимость basis обязательна независимо от совпадения bytes.
 
 ## Timing and limits
 

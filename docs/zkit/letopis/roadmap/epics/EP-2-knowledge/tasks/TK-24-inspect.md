@@ -3,9 +3,9 @@
 > **Статус:** planned
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
-> **Оценка, ч:** 6 / 8 / 12 (best / expected / worst)
-> **План:** неделя 20 — 4 ч; неделя 21 — 4 ч
-> **Зависимости:** [TK-19](TK-19-mutations.md), [TK-20](TK-20-source-identity.md), [TK-21](TK-21-provenance.md), [TK-22](TK-22-filters.md), [TK-23](TK-23-traversal.md)
+> **Оценка, ч:** 4 / 6 / 10 (best / expected / worst)
+> **План:** неделя 18 — 6 ч
+> **Зависимости:** [TK-19](TK-19-check-renames.md), [TK-20](TK-20-source-identity.md), [TK-21](TK-21-provenance.md), [TK-22](TK-22-filters.md), [TK-23](TK-23-traversal.md)
 
 
 ## 1. Цель
@@ -27,9 +27,9 @@
 
 1. Завершить batch inspect по одному общему Git-снимку.
 2. Проверить metadata/lines/hash и отказ всего batch при неизвестном ID; flags относятся к search/traverse, не к inspect.
-3. Расширить навык полными сценариями source_snapshot, conflict/move/recheck и live reads.
+3. Расширить навык полными сценариями source_snapshot, переименования/висячих ссылок/перепроверки и live reads.
 
-Для generic element_ids реализовать InspectedElement из I-12, включая рёбра: независимый edge hash и path/lines канонической ссылки, общий snapshot/file_hash. Не читать устаревшие hash/координаты из SQL вместо текущей разметки.
+Для element_ids знаний и source реализовать InspectedElement из I-12 (path/lines/hash, общий snapshot); рёбра inspect не адресует, они видны через traverse (D-93). Не читать устаревшие hash/координаты из SQL вместо текущей разметки.
 
 ## 4. Ожидаемый результат
 
@@ -38,10 +38,10 @@
 ## 5. Критерии приёмки
 
 - [ ] Пакет ID читается по общему Git-снимку, unknown ID отклоняет весь запрос.
-- [ ] Актуальные собственные хеши/lines и file_hash проверены; дополнительных полей flags в inspect нет.
-- [ ] Навык покрывает реализованные apply/check, search/traverse/inspect, source_snapshot средствами Git, конфликт/перенос/перепроверку и обычные live reads; поздние reindex/config/status/errors/cancel интегрируются в TK-29.
+- [ ] Актуальные собственные хеши/lines проверены; дополнительных полей flags в inspect нет.
+- [ ] Навык покрывает формат элемента (путь/якорь, метаданные, ссылки), check, search/traverse/inspect, source_snapshot средствами Git, переименование/висячие ссылки/перепроверку и обычные live reads; поздние reindex/config/status/cancel интегрируются в TK-29.
 
-- [ ] Смешанный batch node+edge+source, edge-only, повторные ID и исчезнувшее в текущем tree ребро проверены: дубли однократны, unknown отклоняет весь batch. Edge hash отличается от enclosing node hash и вычислен по собственной ссылке в общем snapshot.
+- [ ] Смешанный batch знаний и source, повторные ID и исчезнувший в текущем tree элемент проверены: дубли однократны, unknown или исчезнувший ID отклоняет весь batch.
 
 ## 6. Как проверить
 
@@ -53,12 +53,12 @@
 
 - **Входит:** Полный batch inspect и рабочий навык чтения/записи перед G-2. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Reindex/status/errors/cancel и полный навык этих команд — [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md)…[TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md); установка/операционные инструкции — [TK-44](../../EP-6-delivery/tasks/TK-44-operations.md).
-- **Интерфейсы — вход:** [TK-19](TK-19-mutations.md): Полные CRUD/перенос и optimistic conflict semantics согласованного CLI; [TK-20](TK-20-source-identity.md): Долговечный реестр source identity и корректные metadata доступности; [TK-21](TK-21-provenance.md): Проверка происхождения и оснований знания с корректными freshness flags; [TK-22](TK-22-filters.md): Полные поисковые фильтры и проверенная деградация query embedding; [TK-23](TK-23-traversal.md): Полный traverse CLI со ссылками на знания и опциональными пройденными рёбрами
+- **Интерфейсы — вход:** [TK-19](TK-19-check-renames.md): Полная проверка корпуса и обработка удалений/переименований согласованного CLI; [TK-20](TK-20-source-identity.md): Source identity по нормализованному URI, выводимая из ссылок (D-91), и корректные metadata доступности; [TK-21](TK-21-provenance.md): Проверка происхождения и оснований знания с корректными freshness flags; [TK-22](TK-22-filters.md): Полные поисковые фильтры и проверенная деградация query embedding; [TK-23](TK-23-traversal.md): Полный traverse CLI со ссылками на знания и опциональными пройденными рёбрами
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md), [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md), [TK-30](../../EP-5-final-pilot/tasks/TK-30-pilot-setup.md), [TK-44](../../EP-6-delivery/tasks/TK-44-operations.md).
 
 ## 8. Риски и примечания
 
-**Основание оценки 6 / 8 / 12 ч:** best — текущий snapshot и read/source порты уже поддерживают batch; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — согласование актуальных metadata/lines и примеров read/write при конфликте или исчезнувшем source. Это инженерный диапазон, не измеренная скорость.
+**Основание оценки 4 / 6 / 10 ч (пересчёт 2026-10-20):** после D-93 inspect не адресует рёбра и не возвращает file_hash, в навыке нет conflict-сценариев; best — текущий snapshot и read/source порты уже поддерживают batch; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — согласование актуальных metadata/lines и примеров read/write при конфликте или исчезнувшем source. Это инженерный диапазон, не измеренная скорость.
 
 **Риск и действие:** Согласование актуальных metadata/lines и примеров read/write при конфликте или исчезнувшем source. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
 

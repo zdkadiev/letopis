@@ -4,7 +4,7 @@
 > **Эпик:** [EP-7](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
-> **План:** неделя 14 — 8 ч
+> **План:** неделя 12 — 8 ч
 > **Зависимости:** [TK-15](TK-15-target-corpus.md), [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md)
 
 
@@ -26,7 +26,7 @@
 ## 3. Что сделать
 
 1. Подготовить минимальное 4 ГБ оборудование, модель и полный метод учёта общей памяти.
-2. На целевом корпусе выполнить рабочий путь с worker/provider/runner и собрать memory evidence.
+2. На целевом корпусе выполнить рабочий путь с процессами CLI/drain/provider/runner и собрать memory evidence.
 3. Сопоставить результат с 1 ГБ и оформить pass/fail/not assessed, блокирующий G-1 при недостатке доказательств.
 
 Выполнить учёт памяти отдельно в backlog с работающим executor и в populated с 100k current vectors по TK-15/resource-math. Записать coverage/config/search_hash и queued/failed, не выдавать FTS fallback за populated.
@@ -37,7 +37,7 @@
 
 ## 5. Критерии приёмки
 
-- [ ] На 4 ГБ оборудовании зафиксированы входы и метод учёта worker/provider/runner/shared buffers.
+- [ ] На 4 ГБ оборудовании зафиксированы входы и метод учёта процессов CLI/drain/provider/runner/shared buffers.
 - [ ] target-scale путь ≤1 ГБ без OOM.
 - [ ] Нет оборудования/достаточной проверки — not assessed, G-1 блокирует полный функционал.
 
@@ -53,7 +53,7 @@
 
 - **Входит:** Первоначальная проверка ресурсной реализуемости всей связки на целевом масштабе. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Полная mixed-client RAM — [TK-34](../../EP-4-system-validation/tasks/TK-34-mixed-memory.md); latency — [TK-35](../../EP-4-system-validation/tasks/TK-35-search-latency.md); изменение модели/архитектуры требует пересмотра gate, не скрытого redesign.
-- **Интерфейсы — вход:** [TK-15](TK-15-target-corpus.md): Воспроизводимый target-scale fixture: 100k знаний, assumed 100k source и 500k рёбер; [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md): Базовый embedding runtime и обработчик долговечных jobs
+- **Интерфейсы — вход:** [TK-15](TK-15-target-corpus.md): Воспроизводимый target-scale fixture: 100k знаний, assumed 100k source и 500k рёбер; [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md): Базовый embedding runtime и drain по текстам без вектора
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-17](TK-17-early-pilot.md), [TK-34](../../EP-4-system-validation/tasks/TK-34-mixed-memory.md).
 
 ## 8. Риски и примечания

@@ -4,7 +4,7 @@
 > **Эпик:** [EP-6](../epic.md)
 > **Фаза:** PH-4
 > **Оценка, ч:** 6 / 12 / 20 (best / expected / worst)
-> **План:** неделя 35 — 2 ч; неделя 36 — 10 ч
+> **План:** неделя 31 — 5 ч; неделя 32 — 7 ч
 > **Зависимости:** [TK-34](../../EP-4-system-validation/tasks/TK-34-mixed-memory.md), [TK-35](../../EP-4-system-validation/tasks/TK-35-search-latency.md), [TK-36](../../EP-4-system-validation/tasks/TK-36-disk-growth.md), [TK-37](../../EP-4-system-validation/tasks/TK-37-queue-drill.md), [TK-38](../../EP-4-system-validation/tasks/TK-38-power-loss.md), [TK-39](../../EP-4-system-validation/tasks/TK-39-corruption-drill.md), [TK-40](../../EP-4-system-validation/tasks/TK-40-restore.md), [TK-41](../../EP-4-system-validation/tasks/TK-41-provider-drill.md), [TK-42](../../EP-4-system-validation/tasks/TK-42-exhaustion.md)
 
 
@@ -26,7 +26,7 @@
 ## 3. Что сделать
 
 1. Собрать installable artifacts из зафиксированных исходников и зависимостей.
-2. На чистых macOS/Linux проверить установку, extension и локальные read/write/recovery сценарии.
+2. На чистых macOS/Linux проверить установку, extension и локальные сценарии чтения, check и публикации.
 3. Описать внешние Git/Ollama/веса и условия воспроизведения сборки.
 
 ## 4. Ожидаемый результат
@@ -36,7 +36,7 @@
 ## 5. Критерии приёмки
 
 - [ ] Локальные installable artifacts для macOS/Linux собраны из зафиксированных исходников/dependencies.
-- [ ] Чистая установка проходит CLI/SQLite/extension/local search/write/recovery smoke, внешние Git/Ollama/веса явно описаны.
+- [ ] Чистая установка проходит CLI/SQLite/extension/local search/check/publication smoke, внешние Git/Ollama/веса явно описаны.
 - [ ] Публикация наружу не выполняется автоматически.
 
 ## 6. Как проверить
@@ -49,7 +49,7 @@
 
 - **Входит:** Воспроизводимая локальная поставка v1 для macOS и Linux с install smoke evidence. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Доказательства G-3 — [TK-34](../../EP-4-system-validation/tasks/TK-34-mixed-memory.md)…[TK-42](../../EP-4-system-validation/tasks/TK-42-exhaustion.md); финальный навык/инструкции — [TK-44](TK-44-operations.md); приёмка — [TK-45](TK-45-acceptance.md); внешняя публикация не автоматическая.
-- **Интерфейсы — вход:** [TK-34](../../EP-4-system-validation/tasks/TK-34-mixed-memory.md): Полная проверка NFR-2/NFR-4/NFR-7 с реальной mixed-client нагрузкой; [TK-35](../../EP-4-system-validation/tasks/TK-35-search-latency.md): Latency отчёт полного поиска и решение по NFR-3 без обрезания результата по времени; [TK-36](../../EP-4-system-validation/tasks/TK-36-disk-growth.md): Обоснованная оценка годового диска и стоимости штатного Git обслуживания; [TK-37](../../EP-4-system-validation/tasks/TK-37-queue-drill.md): Полный queue/reader/cancellation отчёт P-2.4 и DR-6; [TK-38](../../EP-4-system-validation/tasks/TK-38-power-loss.md): Физические свидетельства аварийной атомарности DR-1, не только успех модели; [TK-39](../../EP-4-system-validation/tasks/TK-39-corruption-drill.md): Corruption/freshness отчёт DR-3/DR-4 и доказательство координированного C-8 сценария; [TK-40](../../EP-4-system-validation/tasks/TK-40-restore.md): Воспроизводимый внешний backup/restore drill с проверкой source identity и служебного состояния; [TK-41](../../EP-4-system-validation/tasks/TK-41-provider-drill.md): Provider/offline/security отчёт DR-5 и проверка NFR-6 на обеих платформах; [TK-42](../../EP-4-system-validation/tasks/TK-42-exhaustion.md): Exhaustion/trust-boundary отчёт DR-7/DR-8 и решение о допуске поставки
+- **Интерфейсы — вход:** [TK-34](../../EP-4-system-validation/tasks/TK-34-mixed-memory.md): Полная проверка NFR-2/NFR-4/NFR-7 с реальной mixed-client нагрузкой; [TK-35](../../EP-4-system-validation/tasks/TK-35-search-latency.md): Latency отчёт полного поиска и решение по NFR-3 без обрезания результата по времени; [TK-36](../../EP-4-system-validation/tasks/TK-36-disk-growth.md): Обоснованная оценка годового диска и стоимости штатного Git обслуживания; [TK-37](../../EP-4-system-validation/tasks/TK-37-queue-drill.md): Полный queue/reader/cancellation отчёт P-2.4 и DR-6; [TK-38](../../EP-4-system-validation/tasks/TK-38-power-loss.md): Физические свидетельства DR-1: прерванная публикация не оставляет смешанного кэша; [TK-39](../../EP-4-system-validation/tasks/TK-39-corruption-drill.md): Corruption/freshness отчёт DR-3/DR-4 и доказательство координированного C-8 сценария; [TK-40](../../EP-4-system-validation/tasks/TK-40-restore.md): Воспроизводимый внешний backup/restore drill с проверкой source identity и служебного состояния; [TK-41](../../EP-4-system-validation/tasks/TK-41-provider-drill.md): Provider/offline/security отчёт DR-5 и проверка NFR-6 на обеих платформах; [TK-42](../../EP-4-system-validation/tasks/TK-42-exhaustion.md): Exhaustion/trust-boundary отчёт DR-7/DR-8 и решение о допуске поставки
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-44](TK-44-operations.md), [TK-45](TK-45-acceptance.md).
 
 ## 8. Риски и примечания

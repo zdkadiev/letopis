@@ -49,7 +49,7 @@
 ## 7. Границы
 
 - **Входит:** Воспроизводимый build harness и отчёт о совместимости выбранной связки на двух ОС. Работа и собственные проверки перечислены в разделе 3.
-- **Не входит:** Production storage — [TK-9](../../EP-1-thin-slice/tasks/TK-9-storage.md); весь save/recovery — [TK-10](../../EP-1-thin-slice/tasks/TK-10-save-recovery.md); физический power loss — [TK-38](../../EP-4-system-validation/tasks/TK-38-power-loss.md).
+- **Не входит:** Production storage — [TK-9](../../EP-1-thin-slice/tasks/TK-9-storage.md); публикация — [TK-10](../../EP-1-thin-slice/tasks/TK-10-change-detection.md); физический power loss — [TK-38](../../EP-4-system-validation/tasks/TK-38-power-loss.md).
 - **Интерфейсы — вход:** Документы и принятые входы из раздела 2; предыдущей задачи нет.
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-2](TK-2-durability-harness.md), [TK-3](TK-3-vector-harness.md), [TK-4](TK-4-runtime-harness.md), [TK-6](TK-6-provider-harness.md), [TK-7](../../EP-1-thin-slice/tasks/TK-7-markdown.md).
 

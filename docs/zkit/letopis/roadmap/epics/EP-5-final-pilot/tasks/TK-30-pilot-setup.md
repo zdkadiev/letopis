@@ -4,7 +4,7 @@
 > **Эпик:** [EP-5](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 25 — 6 ч; неделя 26 — 2 ч
+> **План:** неделя 21 — 5 ч; неделя 22 — 3 ч
 > **Зависимости:** [TK-24](../../EP-2-knowledge/tasks/TK-24-inspect.md), [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md), [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md), [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md), [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md), [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md), [TK-5](../../EP-8-proofs/tasks/TK-5-pilot-protocol.md)
 
 
@@ -48,7 +48,7 @@
 
 - **Входит:** Зафиксированный набор задач и окружения финального сравнительного пилота. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Методика — [TK-5](../../EP-8-proofs/tasks/TK-5-pilot-protocol.md); baseline исполнение — [TK-31](TK-31-baseline.md); условие памяти — [TK-32](TK-32-memory-condition.md); анализ — [TK-33](TK-33-pilot-analysis.md).
-- **Интерфейсы — вход:** [TK-24](../../EP-2-knowledge/tasks/TK-24-inspect.md): Полный batch inspect и рабочий навык чтения/записи перед G-2; [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md): Координатор reindex и Git detection без фонового watcher; [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md): проверенные corruption/fail-closed ветви и диагностика; [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md): Полный lifecycle embedding jobs/config и ограниченные ретраи; [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md): StateService, errors и безопасная согласованная очистка диагностики; [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md): Полный протокол отмены и завершённый функциональный scope перед системными испытаниями; [TK-5](../../EP-8-proofs/tasks/TK-5-pilot-protocol.md): Исполнимый протокол P-1 и формы отчёта для раннего и финального пилота
+- **Интерфейсы — вход:** [TK-24](../../EP-2-knowledge/tasks/TK-24-inspect.md): Полный batch inspect и рабочий навык чтения/записи перед G-2; [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md): Полный reindex и Git detection без фонового watcher; [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md): проверенные corruption/fail-closed ветви и диагностика; [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md): Полный lifecycle config и embeddings с ограниченными ретраями; [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md): Status с текущими проблемами, выведенными из данных; [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md): Полный протокол отмены и завершённый функциональный scope перед системными испытаниями; [TK-5](../../EP-8-proofs/tasks/TK-5-pilot-protocol.md): Исполнимый протокол P-1 и формы отчёта для раннего и финального пилота
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-31](TK-31-baseline.md), [TK-32](TK-32-memory-condition.md).
 
 ## 8. Риски и примечания

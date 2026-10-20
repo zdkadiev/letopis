@@ -1,16 +1,16 @@
-# TK-27 — Завершить замену jobs/config и bounded retries
+# TK-27 — Завершить смену config и bounded retries
 
 > **Статус:** planned
 > **Эпик:** [EP-3](../epic.md)
 > **Фаза:** PH-2
-> **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
-> **План:** неделя 23 — 8 ч
+> **Оценка, ч:** 3 / 6 / 12 (best / expected / worst)
+> **План:** неделя 19 — 1 ч; неделя 20 — 5 ч
 > **Зависимости:** [TK-25](TK-25-reindexing.md), [TK-26](TK-26-corruption.md), [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md)
 
 
 ## 1. Цель
 
-Нужно довести принятые контракты и инварианты до полного v1 scope, сохранив общий путь сохранения/чтения. Конкретный результат этой задачи: полный lifecycle embedding jobs/config и ограниченные ретраи.
+Нужно довести принятые контракты и инварианты до полного v1 scope, сохранив общий путь сохранения/чтения. Конкретный результат этой задачи: полный lifecycle config и embeddings с ограниченными ретраями.
 
 ## 2. Контекст и входные данные
 
@@ -27,18 +27,18 @@
 
 ## 3. Что сделать
 
-1. Завершить seq replacement, полную config replacement и сброс несовместимых vectors/jobs.
-2. Сохранять attempts до вычисления и bounded retry budget через restart.
-3. Проверить failed, cancel и слишком длинный текст с сохранённым FTS без усечения.
+1. Завершить сброс при смене `.letopis/config.json`: отпечаток канонического JSON, сброс одной транзакцией vectors.db (BEGIN IMMEDIATE): повторная проверка identity, пересоздание vec1, очистка vector_keys и embed_failures, запись meta.config_identity; drain сверяет meta.config_identity перед записью вектора и при расхождении завершается; reuse векторов по search_hash после удаления кэша (D-92, D-95).
+2. Резервировать attempts в embed_failures до вычисления и держать bounded retry budget через restart.
+3. Проверить исчерпанные попытки, SIGINT и слишком длинный текст с сохранённым FTS без усечения.
 
 ## 4. Ожидаемый результат
 
-Полный lifecycle embedding jobs/config и ограниченные ретраи.
+Полный lifecycle config и embeddings с ограниченными ретраями (D-95).
 
 ## 5. Критерии приёмки
 
-- [ ] Каждая замена получает новый seq.
-- [ ] config replace атомарно очищает несовместимые vectors/jobs, reserve attempts переживает restart, max_retries=дополнительные попытки, failed не оживает сам.
+- [ ] Смена config.json очищает vectors.db и embed_failures, поздний результат прежней конфигурации отбрасывается; правка только пробелов или порядка ключей не сбрасывает векторы.
+- [ ] После удаления кэша считаются только тексты без вектора; attempts переживают restart, max_retries = дополнительные попытки, исчерпанный текст не возобновляется сам.
 - [ ] Длинный текст остаётся в FTS с ошибкой без усечения.
 
 ## 6. Как проверить
@@ -49,16 +49,16 @@
 
 ## 7. Границы
 
-- **Входит:** Полный lifecycle embedding jobs/config и ограниченные ретраи. Работа и собственные проверки перечислены в разделе 3.
+- **Входит:** Полный lifecycle config и embeddings с ограниченными ретраями. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Основной executor/provider — [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md); status/errors projection — [TK-28](TK-28-diagnostics.md); полная cancellation routing — [TK-29](TK-29-cancellation.md); масштабный DR-6 — [TK-37](../../EP-4-system-validation/tasks/TK-37-queue-drill.md).
-- **Интерфейсы — вход:** [TK-25](TK-25-reindexing.md): Координатор reindex и Git detection без фонового watcher; [TK-26](TK-26-corruption.md): проверенные corruption/fail-closed ветви и диагностика; [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md): Базовый embedding runtime и обработчик долговечных jobs
+- **Интерфейсы — вход:** [TK-25](TK-25-reindexing.md): Полный reindex и Git detection без фонового watcher; [TK-26](TK-26-corruption.md): проверенные corruption/fail-closed ветви и диагностика; [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md): Базовый embedding runtime и drain по текстам без вектора
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-28](TK-28-diagnostics.md), [TK-29](TK-29-cancellation.md), [TK-30](../../EP-5-final-pilot/tasks/TK-30-pilot-setup.md), [TK-37](../../EP-4-system-validation/tasks/TK-37-queue-drill.md), [TK-40](../../EP-4-system-validation/tasks/TK-40-restore.md), [TK-41](../../EP-4-system-validation/tasks/TK-41-provider-drill.md).
 
 ## 8. Риски и примечания
 
-**Основание оценки 4 / 8 / 16 ч:** best — seq CAS из TK-13 и vec1 proof TK-3 пригодны для полного lifecycle; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — гонки config replacement, retries после restart и недопустимый по длине текст. Это инженерный диапазон, не измеренная скорость.
+**Основание оценки 3 / 6 / 12 ч (пересчёт 2026-10-20):** после D-95 нет замены заданий и config --set: сброс по отпечатку config.json, попытки в embed_failures; best — seq CAS из TK-13 и vec1 proof TK-3 пригодны для полного lifecycle; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — гонки смены config с drain, retries после restart и недопустимый по длине текст. Это инженерный диапазон, не измеренная скорость.
 
-**Риск и действие:** Гонки config replacement, retries после restart и недопустимый по длине текст. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
+**Риск и действие:** Гонки смены config с drain, retries после restart и недопустимый по длине текст. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
 
 ## 9. Отчёт о выполнении
 

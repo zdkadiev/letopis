@@ -8,6 +8,10 @@
 > **Links:** [требования](requirements.md) · [решения](decisions.md) · [отчёт](appendix/migration.md)
 
 ## Changes since previous version
+2026-10-20: По [D-95](decisions.md#D-95) производное состояние не хранится. X-1: удалены errors, errors --clear, config --set, reindex --cancel и выборочный reindex; status = revision (счётчик публикаций), embedding_backlog, embedding_failed, locks, problems (текущие проблемы, без details.active); config только читает файл, который правится напрямую; Link.revision — счётчик, не OID. X-4: поле kind удалено, метавершина выводится. I-11 — текущие проблемы вместо хранения диагностики; I-2 без признака активности рёбер, заданий и Git-дерева публикации; I-8 без прогресса reindex; I-12 только для inspect. X-2: очередь заданий заменена текстами без вектора.
+2026-10-20: По [D-93](decisions.md#D-93) агенты правят корпус напрямую: apply/apply --check заменены командой check; ID знания — путь или путь#якорь (KnowledgeId), UUID и tmp-ID удалены из схем; рёбра — тройки без ID и created_at; inspect не адресует рёбра, file_hash убран; код conflict исключён. X-4 переписан: файл-элемент и раздел-элемент с якорем `{#anchor}`, метаданные {kind, created_at, source_snapshot}. По [D-94](decisions.md#D-94) удалён IPC-протокол worker (I-1-worker.yaml); status.locks — занятые flock index/embed с PID. Примеры обновлены.
+2026-10-20: По [D-92](decisions.md#D-92) config --set очищает `.letopis/vectors.db`; после удаления кэша векторы неизменных текстов переиспользуются. Поля и команды не меняются.
+2026-10-20: По [D-91](decisions.md#D-91) служебная БД — пересоздаваемый кэш. X-1: ID source — нормализованный адрес (новые `SourceId`/`ElementId` в схеме; inspect/traverse/Edge.target/Link принимают обе формы), config/config --set работают с `.letopis/config.json`. X-4: source существует, пока на него есть ссылка, created_at вычисляется из ссылок. Примеры дополнены SourceId-кейсами. Новых команд нет.
 2026-10-20: По [D-90](decisions.md#D-90) исправлены A-1…A-3: I-2 покрывает published→after delta, stored diagnostics имеют details.active, I-12/inspect адресуют также рёбра с собственными hash/lines. Новых команд и таблиц нет.
 2026-10-19: [D-83](decisions.md#D-83) формализует assumed внутренний provider client deadline 60s per attempt, без общего timeout search/reindex/recovery и без новых JSON/config полей. Timeout использует прежний embedding_failed/FTS fallback; redirect/неявные environment proxies отключены, HTTPS certificates проверяются. Реальное cancellation/resource release проверяется DR-5/DR-8, не объявляется пройденным.
 
@@ -27,34 +31,33 @@
 ## 1. Boundary map
 Четыре внешние границы сохраняются: JSON CLI, embedding-provider, Git и размеченный Markdown. Актуальные карточки ниже ссылаются на машиночитаемые схемы; [валидируемые примеры](checks/contracts/contracts-examples.json) содержат полные синтетические ID/OID/hash вместо исторических placeholders. HTTP/MCP интерфейс самого letopis не добавляется: HTTP в X-2 — потребляемый протокол provider.
 
-**Приоритет чтения:** принятые решения и текущие карточки/схемы определяют актуальный контракт. Перенесённая подробная часть ниже сохраняет контекст и ранние placeholders (node-a, <хеш> и т. п.); они не являются исполняемыми payload-примерами. Найденные противоречащие поздним решениям обещания исправлены. Новые карточки/схемы — проектируемая спецификация, не утверждение готовой реализации.
+**Приоритет чтения:** принятые решения и текущие карточки/схемы определяют актуальный контракт. После [D-93](decisions.md#D-93) всё, что ниже описывает apply, base_hash, tmp-ID, UUID знаний/рёбер, запись восстановления или откат, — история, а не действующий контракт. Перенесённая подробная часть ниже сохраняет контекст и ранние placeholders (node-a, <хеш> и т. п.); они не являются исполняемыми payload-примерами. Найденные противоречащие поздним решениям обещания исправлены. Новые карточки/схемы — проектируемая спецификация, не утверждение готовой реализации.
 
 Машинные формы: [CLI JSON Schema](contracts/schemas/X-1-cli.yaml), [provider OpenAPI](contracts/schemas/X-2-embeddings.yaml), [JSON Schema метаданных](contracts/schemas/X-4-metadata.yaml). Грамматика Markdown и семантические проверки описаны в X-4, consumed Git — в X-3.
 
 | ID | Boundary | Direction | Paradigm | Spec | Counterparty | Limits | Verified | Serves |
 |---|---|---|---|---|---|---|---|---|
-| X-1 | Агент ↔ CLI | published | JSON stdin/stdout | contracts/X-1-cli.md | Coding-агенты | Численные лимиты не заданы | — | FR-1…FR-36, C-1 |
+| X-1 | Агент ↔ CLI | published | JSON stdin/stdout | contracts/X-1-cli.md | Coding-агенты | Численные лимиты не заданы | — | FR-1…FR-6, FR-11…FR-13, FR-17…FR-36, C-1 |
 | X-2 | Embeddings | consumed | texts → vectors; протокол provider | contracts/X-2-embeddings.md | Ollama и OpenAI-совместимый endpoint | Квоты/батчи не определены | verified: используемое подмножество официальных API по X-2/R-7; не сертификация произвольного совместимого сервера | FR-22, FR-29, NFR-6 |
-| X-3 | Git | consumed | Объекты/деревья/refs и внешние Git-операции | contracts/X-3-git.md | Git проекта | Удержание бессрочно; бюджет не рассчитан | verified: форматы и команды по официальным manuals X-3; аварийная долговечность остаётся P-3 | FR-14, FR-18, FR-24, FR-34 |
+| X-3 | Git | consumed | Объекты/деревья/refs и внешние Git-операции | contracts/X-3-git.md | Git проекта | Удержание бессрочно; бюджет не рассчитан | verified: форматы и команды по официальным manuals X-3; аварийная долговечность остаётся P-3 | FR-18, FR-24, FR-34 |
 | X-4 | Markdown-корпус | published | Размеченные файлы и Markdown-ссылки | contracts/X-4-markdown.md | Агент/читатель документов | Размеры не определены | — | FR-3…FR-6, FR-35 |
 
 ## Internal contracts — mechanics
 
-Only internal ports, not additional public boundaries: [I-1-worker.yaml](contracts/I-1-worker.yaml), [I-2-projections.md](contracts/I-2-projections.md), [I-4-sources.md](contracts/I-4-sources.md), [I-8-read-view.md](contracts/I-8-read-view.md), [I-11-diagnostics.md](contracts/I-11-diagnostics.md), [I-12-snapshot.md](contracts/I-12-snapshot.md). Formats and ownership are detailed in mechanics.md.
+Only internal ports, not additional public boundaries (I-1 CLI → документы — внутрипроцессный вызов check без wire-формата после [D-94](decisions.md#D-94)): [I-2-projections.md](contracts/I-2-projections.md), [I-4-sources.md](contracts/I-4-sources.md), [I-8-read-view.md](contracts/I-8-read-view.md), [I-11-diagnostics.md](contracts/I-11-diagnostics.md), [I-12-snapshot.md](contracts/I-12-snapshot.md). Formats and ownership are detailed in mechanics.md.
 
 | ID | Direction | Spec | Serves |
 |---|---|---|---|
-| I-1 | internal | contracts/I-1-worker.yaml | FR-15, FR-16, FR-31 |
-| I-2 | internal | contracts/I-2-projections.md | FR-13, FR-27, FR-28, FR-29 |
+| I-2 | internal | contracts/I-2-projections.md | FR-5, FR-13, FR-27, FR-28, FR-29 |
 | I-4 | internal | contracts/I-4-sources.md | FR-17, FR-18, FR-19, FR-20, FR-23, FR-24 |
 | I-8 | internal | contracts/I-8-read-view.md | FR-21, FR-22, FR-26, FR-30, FR-32, NFR-7 |
-| I-11 | internal | contracts/I-11-diagnostics.md | FR-30, FR-32, FR-33 |
-| I-12 | internal | contracts/I-12-snapshot.md | FR-25, FR-27, FR-28, FR-34 |
+| I-11 | internal | contracts/I-11-diagnostics.md | FR-5, FR-11, FR-30, FR-32, FR-33 |
+| I-12 | internal | contracts/I-12-snapshot.md | FR-25, FR-34 |
 
 
 
 ## 2. Shared conventions and open gate
-Один JSON, ok/result либо ok/error, exit 0/1, UUID и отдельные хеши, Unix created_at, относительные корню пути. [D-3](decisions.md#D-3), [D-18](decisions.md#D-18), [D-20](decisions.md#D-20). Идемпотентность не обещается по хешу нового вызова: после потери ответа агент перечитывает состояние, [D-9](decisions.md#D-9). Удалённые URL в Markdown не объявляются поддержкой загрузки веб-источников. Ресурсные проверки остаются открытыми; машиночитаемые формы и используемое подмножество provider-протоколов записаны в карточках/схемах. Граница записи уточнена по [D-30](decisions.md#D-30): в v1 только create/edit/delete размеченных элементов. Общие файловые патчи, точная замена текста и произвольные вставки исключены.
+Один JSON, ok/result либо ok/error, exit 0/1, ID по пути/якорю ([D-93](decisions.md#D-93)) и отдельные хеши, Unix created_at, относительные корню пути. [D-3](decisions.md#D-3), [D-18](decisions.md#D-18), [D-20](decisions.md#D-20). Команды не пишут корпус, поэтому повтор после потери ответа идемпотентен, [D-93](decisions.md#D-93). Удалённые URL в Markdown не объявляются поддержкой загрузки веб-источников. Ресурсные проверки остаются открытыми; машиночитаемые формы и используемое подмножество provider-протоколов записаны в карточках/схемах.
 
 ## Принятые решения до раунда R1
 Пять ранее принятых решений не переоткрываются и не входят в новый счётчик R1.
@@ -79,15 +82,15 @@ Only internal ports, not additional public boundaries: [I-1-worker.yaml](contrac
 
 ### Работа по завершению этапа без расширения интервью
 - X-1: записать JSON Schema и валидные примеры команд, включая конфигурацию; проверить покрытие требований. Исправить устаревшие утверждения о задержке graph/FTS после успешного apply по [D-7](decisions.md#D-7), не спрашивая повторно.
-- X-2: проверить и формализовать используемое подмножество provider API, параметры и отображение ошибок в существующий каталог. Не вводить новый немедленный failed для отдельных ошибок: сохраняются принятые ограниченные ретраи и диагностика по [D-17](decisions.md#D-17)/D-61.
+- X-2: проверить и формализовать используемое подмножество provider API, параметры и отображение ошибок в существующий каталог. Не вводить новый немедленный failed для отдельных ошибок: сохраняются принятые ограниченные ретраи по [D-78](decisions.md#D-78) и диагностика по [D-61](decisions.md#D-61), [D-95](decisions.md#D-95).
 - X-3: проверить используемые Git-команды, форматы объектов и ошибки по документации. Физический аварийный протокол, взаимное исключение Git/записи и проверки потери питания относятся к mechanics/resilience.
 - X-4: формализовать принятую Markdown-грамматику, метаданные и примеры; проверки согласованных инвариантов не требуют нового пользовательского выбора.
 - Общая проверка: завершить схемы/примеры и независимую проверку этапа. Для полной проверки подготовлено временное окружение с PyYAML/jsonschema. X-2 и X-3 сверены с официальными источниками в пределах используемых payload/команд; работоспособность letopis и физическая долговечность этим не подтверждаются.
 
 ### Рабочие инженерные допущения для формализации
 Это допущения автора, не дополнительные принятые ответы пользователя.
-- Сохранение конфигурации проверяет структуру локально и не требует успешного сетевого inference до фиксации; доступность provider проверяется при фоновой работе/поиске. Проверка: контрактные сценарии недоступного provider без отмены согласованной фиксации конфигурации.
-- Обновлённое окружение worker применяется при обычном перезапуске; отдельный механизм горячей передачи секретов не добавляется. Проверка: сценарий старта/перезапуска с новым окружением на этапе mechanics. Новая команда жизненного цикла здесь не вводится.
+- Конфигурация правится как файл [D-95](decisions.md#D-95); её структура проверяется локально при вызове, без сетевого inference; доступность provider проверяется при фоновой работе/поиске. Проверка: контрактные сценарии недоступного provider и невалидного файла (проблема в status, поиск через FTS).
+- Ключ берётся из окружения процесса CLI; drain наследует окружение запустившего вызова, новый ключ действует со следующего запуска drain [D-94](decisions.md#D-94); отдельный механизм горячей передачи секретов не добавляется.
 - Числовые границы и пустые обязательные списки определяются из смысла уже согласованных операций при завершении схем; типизированные значения и неизменность служебного created_at проверяются без нового API. Изменения правил сверх принятых решений требуют отдельного выявленного вопроса в очереди.
 
 Resource-math остаётся draft / not assessed; вопросы R1 не ослабляют требования, не подтверждают вместимость и не запускают новые замеры.
@@ -95,11 +98,11 @@ Resource-math остаётся draft / not assessed; вопросы R1 не ос
 ## Проверка итерации contracts после R1
 Дата: 2026-10-18. Статус всего документа остаётся draft: resource-math имеет открытые ресурсные проверки, а рабочие инженерные допущения не превращаются в принятые пользователем гарантии. Закрытие R1 не меняет ранее согласованный scope.
 
-- Двенадцать CLI-команд/режимов имеют input/success/error и явную семантику повторов в JSON Schema. В схеме нет operation_id, purpose, adapter или новых публичных ID заданий.
+- CLI-команды/режимы (после [D-95](decisions.md#D-95) — восемь, включая внутреннюю embed --drain) имеют input/success/error и явную семантику повторов в JSON Schema. В схеме нет operation_id, purpose, adapter или новых публичных ID заданий.
 - Форма provider-запросов проверена по официальной документации, включая Ollama truncate:false. Проверка ответа учитывает соответствие числа/индексов векторов входам. Подтверждается контракт, не runtime.
 - JSON Schema метаданных дополнена грамматикой Markdown и перечнем проверок, которые должен выполнить валидатор приложения. Самой схемы недостаточно для ссылочной целостности и аварийной атомарности.
 - Проверочный скрипт: [check_contract_examples.py](checks/contracts/check_contract_examples.py). Результаты и независимое ревью записаны в [проверку итерации](checks/contracts/contracts-verification-2026-10-18.md). Новых замеров, вызовов inference, коммитов и изменений реализации нет.
-- Рабочие допущения: локальная валидация config без обязательного inference; обновление окружения после перезапуска worker; явный parameters.base_url без скрытого выбора сервера/модели; completed:null при неизвестном проценте. Их контрактная форма проверяется примерами, поведение приложения — при реализации.
+- Рабочие допущения: локальная валидация config без обязательного inference; новый ключ со следующего запуска drain; явный parameters.base_url без скрытого выбора сервера/модели. Их контрактная форма проверяется примерами, поведение приложения — при реализации.
 - Граница дальнейших этапов: data сверяет владение/срок жизни и начальное отсутствие конфигурации; mechanics — алгоритмы, конкуренцию, timeout/retry-настройку и crash-протокол; resilience — drills; roadmap сохраняет отложенные проверки P-1/P-2/P-3. Эти темы не добавляются в закрытый раунд.
 
 ## 3. Перенесённые подробные контракты

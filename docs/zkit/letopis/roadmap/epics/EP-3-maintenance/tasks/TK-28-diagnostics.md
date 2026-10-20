@@ -1,16 +1,16 @@
-# TK-28 — Реализовать status/errors и безопасный clear
+# TK-28 — Реализовать status с текущими проблемами
 
 > **Статус:** planned
 > **Эпик:** [EP-3](../epic.md)
 > **Фаза:** PH-2
-> **Оценка, ч:** 6 / 8 / 12 (best / expected / worst)
-> **План:** неделя 23 — 2 ч; неделя 24 — 6 ч
+> **Оценка, ч:** 4 / 6 / 10 (best / expected / worst)
+> **План:** неделя 20 — 5 ч; неделя 21 — 1 ч
 > **Зависимости:** [TK-26](TK-26-corruption.md), [TK-27](TK-27-embedding-lifecycle.md)
 
 
 ## 1. Цель
 
-Нужно довести принятые контракты и инварианты до полного v1 scope, сохранив общий путь сохранения/чтения. Конкретный результат этой задачи: stateService, errors и безопасная согласованная очистка диагностики.
+Нужно довести принятые контракты и инварианты до полного v1 scope, сохранив общий путь сохранения/чтения. Конкретный результат этой задачи: status с текущими проблемами, выведенными из данных.
 
 ## 2. Контекст и входные данные
 
@@ -26,25 +26,22 @@
 
 ## 3. Что сделать
 
-1. Собрать status из владельцев revision/progress/jobs/locks/errors.
-2. Реализовать durable диагностику hash+paths и очистку только completed.
-3. Проверить append/clear гонку, restart и невозможность сохранить diagnostic при storage failure.
+1. Собрать status: revision, занятость блокировок с PID, число текстов без вектора и исчерпавших попытки, текущие проблемы.
+2. Выводить проблемы из данных (D-95): ошибки файлов из files, висячие ссылки и циклы — запросом, embed_failures, валидность config.json.
+3. Проверить restart, удаление кэша и невозможность записать ошибку файла при storage failure.
 
-Проецировать existing errors.active в обязательный boolean details.active каждого сохранённого сообщения status/errors/errors --clear, не сохраняя вторую копию в DB details. Query/rollback diagnostics остаются видимыми как completed.
+Истории сообщений, active/completed и errors --clear нет; команда errors входит в status.
 
 ## 4. Ожидаемый результат
 
-StateService, errors и безопасная согласованная очистка диагностики.
+Status с текущими проблемами, выведенными из данных (D-95).
 
 ## 5. Критерии приёмки
 
-- [ ] Status даёт revision/progress/current-stage completed%/queued/failed/locks/errors.
-- [ ] Ошибки hash+paths переживают откат.
-- [ ] Concurrent append/clear не теряет новые active errors, --clear удаляет только completed.
-- [ ] storage failure не выдаётся за durable diagnostic.
-- [ ] Query embedding failure из TK-22 видна в CLI status при успешной FTS-only выдаче; отдельный query error не превращает поиск в ошибку.
-
-- [ ] При queued=0 failed provider error имеет details.active=true, а после успешной замены сохраняется с false; агент различает состояния без clear. Непосредственный ok:false не обязан иметь lifecycle-метку. Query embedding error виден в status с false; clear удаляет только completed.
+- [ ] Status даёт revision, блокировки с PID, отставание векторов, исчерпанные попытки и текущие проблемы.
+- [ ] Ошибка файла видна, пока файл невалиден, и исчезает после публикации исправленного файла; висячие ссылки и циклы появляются и исчезают вместе с причиной без пересчёта при публикации.
+- [ ] storage failure не выдаётся за сохранённую ошибку.
+- [ ] Query embedding failure из TK-22 и сбой запуска drain возвращаются предупреждением в ответе команды и не сохраняются; FTS-only выдача остаётся успешной.
 
 ## 6. Как проверить
 
@@ -54,16 +51,16 @@ StateService, errors и безопасная согласованная очис
 
 ## 7. Границы
 
-- **Входит:** StateService, errors и безопасная согласованная очистка диагностики. Работа и собственные проверки перечислены в разделе 3.
-- **Не входит:** Смысл active у reindex/embedding задают [TK-25](TK-25-reindexing.md)/[TK-27](TK-27-embedding-lifecycle.md); save/rollback diagnostic commit — [TK-10](../../EP-1-thin-slice/tasks/TK-10-save-recovery.md)/[TK-26](TK-26-corruption.md); request cancel — [TK-29](TK-29-cancellation.md).
-- **Интерфейсы — вход:** [TK-26](TK-26-corruption.md): проверенные corruption/fail-closed ветви и диагностика; [TK-27](TK-27-embedding-lifecycle.md): Полный lifecycle embedding jobs/config и ограниченные ретраи
+- **Входит:** Status с текущими проблемами, выведенными из данных. Работа и собственные проверки перечислены в разделе 3.
+- **Не входит:** Смысл active у reindex/embedding задают [TK-25](TK-25-reindexing.md)/[TK-27](TK-27-embedding-lifecycle.md); file diagnostic commit — [TK-10](../../EP-1-thin-slice/tasks/TK-10-change-detection.md)/[TK-26](TK-26-corruption.md); request cancel — [TK-29](TK-29-cancellation.md).
+- **Интерфейсы — вход:** [TK-26](TK-26-corruption.md): проверенные corruption/fail-closed ветви и диагностика; [TK-27](TK-27-embedding-lifecycle.md): Полный lifecycle config и embeddings с ограниченными ретраями
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-29](TK-29-cancellation.md), [TK-30](../../EP-5-final-pilot/tasks/TK-30-pilot-setup.md), [TK-36](../../EP-4-system-validation/tasks/TK-36-disk-growth.md), [TK-38](../../EP-4-system-validation/tasks/TK-38-power-loss.md), [TK-40](../../EP-4-system-validation/tasks/TK-40-restore.md), [TK-42](../../EP-4-system-validation/tasks/TK-42-exhaustion.md).
 
 ## 8. Риски и примечания
 
-**Основание оценки 6 / 8 / 12 ч:** best — владельцы уже поставляют принятые StateParts и error rows; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — гонка append/clear и I/O отказ при сохранении диагностики. Это инженерный диапазон, не измеренная скорость.
+**Основание оценки 4 / 6 / 10 ч (пересчёт 2026-10-20):** после D-95 нет истории ошибок, active/owner и errors --clear: status выводит текущие проблемы; best — владельцы уже поставляют принятые StateParts и error rows; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — полнота выводимой диагностики и I/O отказ при записи ошибки файла. Это инженерный диапазон, не измеренная скорость.
 
-**Риск и действие:** Гонка append/clear и I/O отказ при сохранении диагностики. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
+**Риск и действие:** Полнота выводимой диагностики и I/O отказ при записи ошибки файла. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
 
 ## 9. Отчёт о выполнении
 

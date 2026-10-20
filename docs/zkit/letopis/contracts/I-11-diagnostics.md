@@ -1,26 +1,20 @@
-# I-11 — общее хранение диагностики
+# I-11 — текущие проблемы
 > x-boundary: I-11 · x-direction: internal · x-status: draft
-> x-serves: FR-30, FR-32, FR-33 · x-limits: []
+> x-serves: FR-5, FR-11, FR-30, FR-32, FR-33 · x-limits: []
 
 ## Layout
 
 ```text
-Diagnostic { code: X1ErrorCode, message: SafeString,
-  details: JsonObject, active: bool, owner: Option<DiagnosticOwner> }
-append(unit: &mut WriteUnit, error: Diagnostic) -> InternalRowId
-complete(unit: &mut WriteUnit, id: InternalRowId) -> ()
-clear_completed(unit: &mut WriteUnit) -> ()
+Problem { code: X1ErrorCode, message: SafeString, details: JsonObject }
+current_problems(view: &StateReadView, config: ConfigCheck) -> Result<Vec<Problem>, DomainError>
+check_problems(view: &StateReadView, paths: Option<Set<Path>>) -> Result<Vec<Problem>, DomainError>
 ```
 
-InternalRowId — SQLite INTEGER, не пользовательский ID операции. DiagnosticOwner — внутренний enum Reindex либо Embedding(Uuid), кодируемый owner="reindex" / "embedding:<uuid>" в errors; owner не выходит в X-1 JSON. Для active owner обязателен, для завершённых rollback/query/validation diagnostics допускается null. Автор причины выбирает active и owner, storage B-2 не анализирует message. Ссылки error_id в jobs/reindex_state не нужны: владелец находит свою активную диагностику по owner даже после удаления работы или рестарта.
+Диагностика — только текущие проблемы, выводимые из данных ([D-95](../decisions.md#D-95)); отдельной таблицы ошибок, истории, active/owner и очистки нет. Источники проблем: строка files с текстом ошибки (невалидный файл; пишется в той же unit публикации, что и проекции, MC-2), запрос рёбер без существующей цели (висячая ссылка), обход includes-подграфа (цикл), отсутствующие в Git source_snapshot (поиск различных значений из метаданных при status/check), строки embed_failures в vectors.db с исчерпанными попытками, строка query_error(at, error) в vectors.db — последняя ошибка embedding запроса до следующего успешного, проверка `.letopis/config.json` при вызове. Исправленная причина исчезает из ответа без отдельного действия.
 
-Новая ошибка retry: в той же write unit прежние active того же owner становятся completed, затем добавляется новая active. Предыдущие сообщения не исчезают и остаются до clear; это не агрегация/дедупликация. Успех/замена/удаление embedding-работы завершает active owner данного узла в той же unit. Terminal failed job остаётся со своей active ошибкой; отмена завершает её и добавляет completed cancelled. Истощённый/невалидный reindex удаляет свою строку, но active owner="reindex" остаётся доступен в errors; успешная согласованная публикация исправленного графа завершает его. Отмена новой перестройки не стирает прежнюю неустранённую причину reindex. Обслуживающая подсистема читает/обновляет owner явно, без parsing message или отдельного журнала.
+details проблемы файла — {path, причина, target при висячей ссылке}; проблемы embeddings — {element_id или search_hash, безопасное сообщение}; для provider нет ключа, заголовков, полного запроса. Ошибка embedding поискового запроса записывается в query_error (одна строка, перезаписывается следующей ошибкой и удаляется успешным embedding запроса); search при этом отвечает через FTS (D-62). Сбой запуска drain — предупреждение (warnings) в ответе команды, не сохраняется. Конкретный error catalog — X-1.
 
-StoredDiagnostic для status/errors/errors --clear имеет прежние code/message/details; перед выдачей details.active принудительно устанавливается из row.active. Это зарезервированный служебный ключ ответа: в БД details он не сохраняется, caller не определяет его независимо от active. Обе группы сообщений возвращаются до clear, поэтому failed (true) отличим от устранённой причины (false), в том числе при queued=0. Query/rollback diagnostics имеют false и остаются видимыми. Непосредственная ошибка команды использует прежний Diagnostic без обязательного details.active.
-
-Rollback diagnostic хранит details={hash,paths}; для provider нет ключа, заголовков, полного запроса/патча. Конкретный error catalog — X-1. Если storage unit откатилась, её диагностика тоже не появилась: вызывающий возвращает безопасную ошибку и не утверждает durable запись. Удаление recovery без durable диагностики запрещено.
-
-Errors --clear: DELETE WHERE active=0 в одной tx. Active остаются. Завершение причины и clear сериализуются SQLite; append после clear остаётся. Повторное чтение status/errors ничего не удаляет. Пример: active provider error E1 + completed rollback E2 → clear оставляет только E1; поздний append E3 не удаляется прежним clear.
+Удаление кэша не теряет проблем: следующая индексация заново записывает files и находит висячие ссылки и циклы. Удаление vectors.db или смена конфигурации сбрасывают попытки и их ошибки (FR-30). Пример: файл A невалиден, B ссылается на удалённый C → status.problems = [A: validation_failed, B→C: висячая ссылка]; после исправления A и ссылки в B список пуст.
 
 ## Timing and limits
 

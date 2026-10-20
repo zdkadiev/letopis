@@ -1,8 +1,8 @@
 flowchart LR
     Human["👤 Developer"] --> Agent["🤖 Coding agents"]
     Agent -->|"X-1 CLI / JSON"| System["⚙️ letopis"]
-    Agent -->|"Read returned locations"| Docs["📄 Knowledge Markdown / X-4"]
-    System -->|"X-4 managed edits"| Docs
+    Agent -->|"Edit and read files"| Docs["📄 Knowledge Markdown / X-4"]
+    System -->|"X-4 read and check"| Docs
     System -->|"X-3 local commands"| Git["Git tool and object store"]
     Git -->|"Retained snapshots"| Docs
     System -->|"X-2 texts to vectors"| Provider["Embedding provider: local or explicitly configured remote"]

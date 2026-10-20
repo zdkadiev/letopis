@@ -47,4 +47,4 @@ D-49 разрешает пробу; исследовательские sub-agent
 <!-- собирается link_docs.py, не править вручную -->
 - [resource-math.md](../resource-math.md): Changes since previous version, Измеренные опоры, Sources
 - [data.md](../data.md): Sources
-- [architecture.md](../architecture.md): 8. Cross-cutting concerns, 11. Risks, assumptions and open questions, Sources
+- [architecture.md](../architecture.md): 11. Risks, assumptions and open questions, Sources

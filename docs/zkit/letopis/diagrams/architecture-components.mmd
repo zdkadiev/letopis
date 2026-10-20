@@ -1,23 +1,23 @@
 flowchart TB
-    B1["B-1 CLI"]
-    subgraph Worker["Components inside the one letopis worker"]
-        B2["B-2 Documents<br/>editor / recovery / commit ownership"]
-        B3["B-3 Indexing<br/>graph / FTS / embedding queue / config"]
+    B1["B-1 CLI<br/>command / JSON / locks / drain spawn"]
+    subgraph Proc["Components inside one letopis process"]
+        B2["B-2 Documents<br/>read / check / detect changes / snapshots"]
+        B3["B-3 Indexing<br/>per-file publish / embedding queue / config"]
         B4["B-4 Search<br/>search / inspect / traverse"]
         B5["B-5 Source validator"]
         B6["B-6 StateService<br/>read-only aggregation"]
         Domain["Shared knowledge model and invariants"]
         Codec["Markdown codec"]
-        Diag["Shared DiagnosticsPort<br/>E-10 storage owned by B-2"]
+        Diag["Derived diagnostics<br/>files errors, queries, embed_failures"]
         Embed["Shared EmbeddingsPort<br/>runtime and E-11 owned by B-3"]
-        Store["One database adapter / unit of work"]
+        Store["Cache and vector store adapters"]
         GitPort["Git / document adapters"]
     end
     B1 -->|"I-1"| B2
     B1 -->|"I-3"| B4
     B1 -->|"I-5"| B6
     B1 -->|"I-6"| B3
-    B2 -->|"I-2 prepare projection in common commit"| B3
+    B2 -->|"I-2 publish changed files"| B3
     B2 -->|"I-4"| B5
     B4 -->|"I-7"| B5
     B4 -->|"I-8 pin read view / config"| B3

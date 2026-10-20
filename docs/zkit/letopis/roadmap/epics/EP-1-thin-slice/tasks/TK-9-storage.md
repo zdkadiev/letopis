@@ -4,7 +4,7 @@
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 5 / 8 / 14 (best / expected / worst)
-> **План:** неделя 8 — 4 ч; неделя 9 — 4 ч
+> **План:** неделя 6 — 1 ч; неделя 7 — 7 ч
 > **Зависимости:** [TK-7](TK-7-markdown.md), [TK-8](TK-8-git-snapshots.md)
 
 
@@ -27,7 +27,7 @@
 ## 3. Что сделать
 
 1. Создать согласованную схему служебной БД и Rust storage ports.
-2. Настроить WAL/FULL/fullfsync/FK и адаптеры graph, FTS5, vec1, jobs/config/recovery/errors.
+2. Настроить WAL/FULL/fullfsync/FK и адаптеры graph, FTS5, files с ошибками файлов и vectors.db (vec1, embed_failures).
 3. Проверить ключи/CHECK, атомарные units и отсутствие копий исходных текстов в БД.
 
 ## 4. Ожидаемый результат
@@ -36,7 +36,7 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Согласованные таблицы/ключи/CHECK, nodes/edges/source projection, FTS/vec1, jobs/config/recovery/errors работают через порты.
+- [ ] Согласованные таблицы/ключи/CHECK, nodes/edges/source projection, FTS, files и vectors.db с embed_failures работают через порты; таблиц заданий и ошибок нет (D-95).
 - [ ] WAL/FULL/fullfsync/FK настроены.
 - [ ] raw документы/источники не копируются в БД.
 
@@ -49,9 +49,9 @@
 ## 7. Границы
 
 - **Входит:** Начальная схема SQLite и storage adapters для всех согласованных сущностей. Работа и собственные проверки перечислены в разделе 3.
-- **Не входит:** Apply/recovery orchestration — [TK-10](TK-10-save-recovery.md); rank/read-view — [TK-12](TK-12-search.md); lifecycle queue — [TK-13](TK-13-embeddings.md)/[TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md).
+- **Не входит:** Публикация по файлу — [TK-10](TK-10-change-detection.md); rank/read-view — [TK-12](TK-12-search.md); lifecycle queue — [TK-13](TK-13-embeddings.md)/[TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md).
 - **Интерфейсы — вход:** [TK-7](TK-7-markdown.md): Доменная модель и parser/serializer Markdown, отделённые от Git/SQLite/CLI адаптеров; [TK-8](TK-8-git-snapshots.md): Git adapter со снимками, служебными refs и тестами сохранности объектов
-- **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-10](TK-10-save-recovery.md), [TK-11](TK-11-cli-runtime.md), [TK-12](TK-12-search.md), [TK-13](TK-13-embeddings.md), [TK-14](TK-14-thin-slice.md), [TK-20](../../EP-2-knowledge/tasks/TK-20-source-identity.md).
+- **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-10](TK-10-change-detection.md), [TK-11](TK-11-cli-runtime.md), [TK-12](TK-12-search.md), [TK-13](TK-13-embeddings.md), [TK-14](TK-14-thin-slice.md), [TK-20](../../EP-2-knowledge/tasks/TK-20-source-identity.md).
 
 ## 8. Риски и примечания
 

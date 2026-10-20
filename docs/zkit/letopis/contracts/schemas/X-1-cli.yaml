@@ -12,16 +12,9 @@
     "FR-4",
     "FR-5",
     "FR-6",
-    "FR-7",
-    "FR-8",
-    "FR-9",
-    "FR-10",
     "FR-11",
     "FR-12",
     "FR-13",
-    "FR-14",
-    "FR-15",
-    "FR-16",
     "FR-17",
     "FR-18",
     "FR-19",
@@ -46,12 +39,6 @@
   ],
   "x-limits": [],
   "$defs": {
-    "UUID": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])",
-      "minLength": 36,
-      "maxLength": 36
-    },
     "Hash": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
@@ -108,7 +95,7 @@
       "type": "object",
       "properties": {
         "element_id": {
-          "$ref": "#/$defs/UUID"
+          "$ref": "#/$defs/ElementId"
         },
         "path": {
           "$ref": "#/$defs/Path"
@@ -117,7 +104,7 @@
           "$ref": "#/$defs/Lines"
         },
         "revision": {
-          "$ref": "#/$defs/OID"
+          "$ref": "#/$defs/Revision"
         },
         "flags": {
           "$ref": "#/$defs/Flags"
@@ -138,7 +125,6 @@
           "enum": [
             "invalid_request",
             "not_found",
-            "conflict",
             "validation_failed",
             "embedding_failed",
             "internal_error",
@@ -175,147 +161,6 @@
       ],
       "additionalProperties": false
     },
-    "Create": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "const": "create"
-        },
-        "path": {
-          "$ref": "#/$defs/Path"
-        },
-        "base_hash": {
-          "$ref": "#/$defs/Hash"
-        },
-        "markdown": {
-          "$ref": "#/$defs/Text"
-        }
-      },
-      "required": [
-        "type",
-        "path",
-        "markdown"
-      ],
-      "additionalProperties": false
-    },
-    "Edit": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "const": "edit"
-        },
-        "element_id": {
-          "$ref": "#/$defs/UUID"
-        },
-        "base_hash": {
-          "$ref": "#/$defs/Hash"
-        },
-        "markdown": {
-          "$ref": "#/$defs/Text"
-        },
-        "snapshot": {
-          "$ref": "#/$defs/OID"
-        }
-      },
-      "required": [
-        "type",
-        "element_id",
-        "base_hash",
-        "markdown"
-      ],
-      "additionalProperties": false
-    },
-    "Delete": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "const": "delete"
-        },
-        "element_id": {
-          "$ref": "#/$defs/UUID"
-        },
-        "base_hash": {
-          "$ref": "#/$defs/Hash"
-        }
-      },
-      "required": [
-        "type",
-        "element_id",
-        "base_hash"
-      ],
-      "additionalProperties": false
-    },
-    "ApplyInput": {
-      "type": "object",
-      "properties": {
-        "operations": {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "$ref": "#/$defs/Create"
-              },
-              {
-                "$ref": "#/$defs/Edit"
-              },
-              {
-                "$ref": "#/$defs/Delete"
-              }
-            ]
-          },
-          "minItems": 1
-        },
-        "base_hashes": {
-          "type": "object",
-          "propertyNames": {
-            "$ref": "#/$defs/UUID"
-          },
-          "additionalProperties": {
-            "$ref": "#/$defs/Hash"
-          }
-        }
-      },
-      "required": [
-        "operations"
-      ],
-      "additionalProperties": false
-    },
-    "ApplyOutput": {
-      "type": "object",
-      "properties": {
-        "ok": {
-          "const": true
-        },
-        "result": {
-          "type": "object",
-          "properties": {
-            "hash": {
-              "$ref": "#/$defs/Hash"
-            },
-            "ids": {
-              "type": "object",
-              "minProperties": 1,
-              "propertyNames": {
-                "type": "string",
-                "pattern": "^tmp:[0-9a-f]{3}(?![\\s\\S])"
-              },
-              "additionalProperties": {
-                "$ref": "#/$defs/UUID"
-              }
-            }
-          },
-          "required": [
-            "hash"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "ok",
-        "result"
-      ],
-      "additionalProperties": false
-    },
     "CheckOutput": {
       "type": "object",
       "properties": {
@@ -325,41 +170,34 @@
         "result": {
           "type": "object",
           "properties": {
-            "paths": {
+            "errors": {
               "type": "array",
               "items": {
-                "$ref": "#/$defs/Path"
-              },
-              "minItems": 0
-            },
-            "element_ids": {
-              "type": "array",
-              "items": {
-                "anyOf": [
-                  {
-                    "$ref": "#/$defs/UUID"
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^tmp:[0-9a-f]{3}(?![\\s\\S])"
-                  }
-                ]
+                "$ref": "#/$defs/Diagnostic"
               },
               "minItems": 0
             }
           },
           "required": [
-            "paths",
-            "element_ids"
+            "errors"
           ],
           "additionalProperties": false
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "minItems": 1,
+          "description": "D-95: non-fatal warnings of this call (drain not started); not stored. The last query-embedding error is a status problem (D-62)."
         }
       },
       "required": [
         "ok",
         "result"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Validation findings of the checked files: markup, duplicate anchors, nested elements, dangling links, includes cycles, missing created_at/source_snapshot problems. Empty list = valid."
     },
     "InspectInput": {
       "type": "object",
@@ -367,7 +205,7 @@
         "element_ids": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/UUID"
+            "$ref": "#/$defs/ElementId"
           },
           "minItems": 1
         }
@@ -376,7 +214,7 @@
         "element_ids"
       ],
       "additionalProperties": false,
-      "description": "Batch IDs may address vertices, metavertices, sources and edges. Unknown current ID rejects the entire batch."
+      "description": "Batch IDs may address knowledge elements and sources. Unknown current ID rejects the entire batch."
     },
     "Inspected": {
       "type": "object",
@@ -396,25 +234,14 @@
               "type": "null"
             }
           ]
-        },
-        "file_hash": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Hash"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "required": [
         "path",
-        "hash",
-        "file_hash"
+        "hash"
       ],
       "additionalProperties": false,
-      "description": "Metadata from the common canonical snapshot. For edges, path/lines address the source link and hash is its independent edge hash, not the enclosing node hash."
+      "description": "Metadata from the common canonical snapshot; hash is the element's (or addressed source bytes') SHA-256, null for an unavailable source."
     },
     "InspectOutput": {
       "type": "object",
@@ -431,11 +258,12 @@
             "elements": {
               "type": "object",
               "propertyNames": {
-                "$ref": "#/$defs/UUID"
+                "type": "string"
               },
               "additionalProperties": {
                 "$ref": "#/$defs/Inspected"
-              }
+              },
+              "description": "Keys are ElementId values (KnowledgeId or SourceId); propertyNames cannot use anyOf of patterns portably, so the application checks them."
             }
           },
           "required": [
@@ -443,6 +271,14 @@
             "elements"
           ],
           "additionalProperties": false
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "minItems": 1,
+          "description": "D-95: non-fatal warnings of this call (drain not started); not stored. The last query-embedding error is a status problem (D-62)."
         }
       },
       "required": [
@@ -516,6 +352,14 @@
             ]
           },
           "minItems": 0
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "minItems": 1,
+          "description": "D-95: non-fatal warnings of this call (drain not started); not stored. The last query-embedding error is a status problem (D-62)."
         }
       },
       "required": [
@@ -530,7 +374,7 @@
         "element_ids": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/UUID"
+            "$ref": "#/$defs/ElementId"
           },
           "minItems": 1
         },
@@ -581,27 +425,24 @@
     "Edge": {
       "type": "object",
       "properties": {
-        "element_id": {
-          "$ref": "#/$defs/UUID"
+        "source": {
+          "$ref": "#/$defs/KnowledgeId"
+        },
+        "target": {
+          "$ref": "#/$defs/ElementId"
         },
         "type": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*(?![\\s\\S])"
-        },
-        "source": {
-          "$ref": "#/$defs/UUID"
-        },
-        "target": {
-          "$ref": "#/$defs/UUID"
         }
       },
       "required": [
-        "element_id",
-        "type",
         "source",
-        "target"
+        "target",
+        "type"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "D-93: an edge is the triple (source, target, type); no edge ID or created_at."
     },
     "TraverseOutput": {
       "type": "object",
@@ -631,33 +472,20 @@
             "elements"
           ],
           "additionalProperties": false
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "minItems": 1,
+          "description": "D-95: non-fatal warnings of this call (drain not started); not stored. The last query-embedding error is a status problem (D-62)."
         }
       },
       "required": [
         "ok",
         "result"
       ],
-      "additionalProperties": false
-    },
-    "ReindexInput": {
-      "type": "object",
-      "properties": {
-        "paths": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Path"
-          },
-          "minItems": 0
-        },
-        "element_ids": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/UUID"
-          },
-          "minItems": 0
-        }
-      },
-      "required": [],
       "additionalProperties": false
     },
     "ReindexOutput": {
@@ -670,45 +498,21 @@
           "type": "object",
           "properties": {
             "revision": {
-              "$ref": "#/$defs/OID"
+              "$ref": "#/$defs/Revision"
             }
           },
           "required": [
             "revision"
           ],
           "additionalProperties": false
-        }
-      },
-      "required": [
-        "ok",
-        "result"
-      ],
-      "additionalProperties": false
-    },
-    "CancelOutput": {
-      "type": "object",
-      "properties": {
-        "ok": {
-          "const": true
         },
-        "result": {
-          "type": "object",
-          "properties": {
-            "revision": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/OID"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
           },
-          "required": [
-            "revision"
-          ],
-          "additionalProperties": false
+          "minItems": 1,
+          "description": "D-95: non-fatal warnings of this call (drain not started); not stored. The last query-embedding error is a status problem (D-62)."
         }
       },
       "required": [
@@ -720,55 +524,23 @@
     "Lock": {
       "type": "object",
       "properties": {
-        "hash": {
-          "$ref": "#/$defs/Hash"
-        },
-        "paths": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Path"
-          },
-          "minItems": 0
-        },
-        "element_ids": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/UUID"
-          },
-          "minItems": 0
-        }
-      },
-      "required": [
-        "hash",
-        "paths",
-        "element_ids"
-      ],
-      "additionalProperties": false
-    },
-    "Progress": {
-      "type": "object",
-      "properties": {
-        "stage": {
-          "$ref": "#/$defs/Text"
-        },
-        "completed": {
-          "anyOf": [
-            {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 100
-            },
-            {
-              "type": "null"
-            }
+        "name": {
+          "enum": [
+            "index",
+            "embed"
           ]
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "required": [
-        "stage",
-        "completed"
+        "name",
+        "pid"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "D-94: a held flock on .letopis/index.lock (publication/reindex) or .letopis/embed.lock (embedding drain) and the PID recorded by its holder."
     },
     "StatusOutput": {
       "type": "object",
@@ -782,24 +554,18 @@
             "revision": {
               "anyOf": [
                 {
-                  "$ref": "#/$defs/OID"
+                  "$ref": "#/$defs/Revision"
                 },
                 {
                   "type": "null"
                 }
               ]
             },
-            "reindex": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/Progress"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+            "embedding_backlog": {
+              "type": "integer",
+              "minimum": 0
             },
-            "embedding_jobs": {
+            "embedding_failed": {
               "type": "integer",
               "minimum": 0
             },
@@ -810,42 +576,31 @@
               },
               "minItems": 0
             },
-            "errors": {
+            "problems": {
               "type": "array",
               "items": {
-                "$ref": "#/$defs/StoredDiagnostic"
+                "$ref": "#/$defs/Diagnostic"
               },
               "minItems": 0
             }
           },
           "required": [
             "revision",
-            "reindex",
-            "embedding_jobs",
+            "embedding_backlog",
+            "embedding_failed",
             "locks",
-            "errors"
+            "problems"
           ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "ok",
-        "result"
-      ],
-      "additionalProperties": false
-    },
-    "ErrorsOutput": {
-      "type": "object",
-      "properties": {
-        "ok": {
-          "const": true
+          "additionalProperties": false,
+          "description": "D-95: current state only. problems = invalid files, dangling links, includes cycles, exhausted embedding attempts, invalid config.json; no history or lifecycle flag."
         },
-        "result": {
+        "warnings": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/StoredDiagnostic"
+            "$ref": "#/$defs/Diagnostic"
           },
-          "minItems": 0
+          "minItems": 1,
+          "description": "D-95: non-fatal warnings of this call (drain not started); not stored. The last query-embedding error is a status problem (D-62)."
         }
       },
       "required": [
@@ -896,7 +651,7 @@
         "max_retries": {
           "type": "integer",
           "minimum": 0,
-          "description": "Additional attempts after the initial embedding job attempt; worker setting, not provider request data."
+          "description": "Additional attempts after the initial embedding attempt; letopis setting, not provider request data."
         }
       },
       "required": [
@@ -905,7 +660,8 @@
         "parameters",
         "max_retries"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "D-95: content of .letopis/config.json, edited as a file; read by config."
     },
     "ConfigOutput": {
       "type": "object",
@@ -922,6 +678,14 @@
               "type": "null"
             }
           ]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "minItems": 1,
+          "description": "D-95: non-fatal warnings of this call (drain not started); not stored. The last query-embedding error is a status problem (D-62)."
         }
       },
       "required": [
@@ -930,7 +694,48 @@
       ],
       "additionalProperties": false
     },
-    "ConfigSetOutput": {
+    "SourceId": {
+      "type": "string",
+      "pattern": "^(?!/)[^\\x00-\\x1f#]+(?:#L[1-9][0-9]*-L[1-9][0-9]*)?(?![\\s\\S])",
+      "description": "D-91: a source's ID is its normalized address: a whole file or path#Lstart-Lend. end >= start is checked by the application. A path is either a corpus element or a source; the application resolves which."
+    },
+    "ElementId": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/KnowledgeId"
+        },
+        {
+          "$ref": "#/$defs/SourceId"
+        }
+      ],
+      "description": "Knowledge (path or path#anchor) or source (path or path#Lx-Ly) ID. No UUIDs (D-93)."
+    },
+    "KnowledgeId": {
+      "type": "string",
+      "pattern": "^(?!/)[^\\x00-\\x1f#]+\\.(?:md|markdown)(?:#(?!L[0-9]+-L[0-9]+(?![\\s\\S]))[A-Za-z][A-Za-z0-9_-]*)?(?![\\s\\S])",
+      "description": "D-93: a knowledge element's ID is its file path relative to the Git root, or path#anchor for a section element. The anchor is explicit, unique within the file and not shaped like L<n>-L<n>."
+    },
+    "CheckInput": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Path"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "description": "Empty or missing paths = whole corpus. Never writes files (D-93)."
+    },
+    "Revision": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "D-95: counter of index publications; not a Git OID."
+    },
+    "EmptyOutput": {
       "type": "object",
       "properties": {
         "ok": {
@@ -938,6 +743,14 @@
         },
         "result": {
           "$ref": "#/$defs/Empty"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "minItems": 1,
+          "description": "D-95: non-fatal warnings of this call (drain not started); not stored. The last query-embedding error is a status problem (D-62)."
         }
       },
       "required": [
@@ -945,30 +758,6 @@
         "result"
       ],
       "additionalProperties": false
-    },
-    "StoredDiagnostic": {
-      "allOf": [
-        {
-          "$ref": "#/$defs/Diagnostic"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "details": {
-              "type": "object",
-              "properties": {
-                "active": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "active"
-              ]
-            }
-          }
-        }
-      ],
-      "description": "Stored status/errors diagnostic: details.active is projected from errors.active; immediate Failure.error remains Diagnostic."
     }
   },
   "anyOf": [
@@ -977,9 +766,6 @@
     },
     {
       "$ref": "#/$defs/ConfigOutput"
-    },
-    {
-      "$ref": "#/$defs/ApplyInput"
     },
     {
       "$ref": "#/$defs/Empty"
@@ -991,19 +777,10 @@
       "$ref": "#/$defs/InspectInput"
     },
     {
-      "$ref": "#/$defs/CancelOutput"
-    },
-    {
       "$ref": "#/$defs/ReindexOutput"
     },
     {
       "$ref": "#/$defs/CheckOutput"
-    },
-    {
-      "$ref": "#/$defs/ReindexInput"
-    },
-    {
-      "$ref": "#/$defs/ErrorsOutput"
     },
     {
       "$ref": "#/$defs/StatusOutput"
@@ -1021,37 +798,19 @@
       "$ref": "#/$defs/SearchInput"
     },
     {
-      "$ref": "#/$defs/ApplyOutput"
-    },
-    {
       "$ref": "#/$defs/InspectOutput"
     },
     {
-      "$ref": "#/$defs/ConfigSetOutput"
+      "$ref": "#/$defs/CheckInput"
+    },
+    {
+      "$ref": "#/$defs/EmptyOutput"
     }
   ],
   "x-commands": {
-    "apply": {
+    "check": {
       "input": {
-        "$ref": "#/$defs/ApplyInput"
-      },
-      "success": {
-        "$ref": "#/$defs/ApplyOutput"
-      },
-      "error": {
-        "$ref": "#/$defs/Failure"
-      },
-      "x-idempotency": "none",
-      "description": "No persistent deduplication; after a lost reply inspect first.",
-      "stdout": "one JSON",
-      "exit": {
-        "success": 0,
-        "error": 1
-      }
-    },
-    "apply --check": {
-      "input": {
-        "$ref": "#/$defs/ApplyInput"
+        "$ref": "#/$defs/CheckInput"
       },
       "success": {
         "$ref": "#/$defs/CheckOutput"
@@ -1060,7 +819,7 @@
         "$ref": "#/$defs/Failure"
       },
       "x-idempotency": "natural",
-      "description": "No writes or identifier reservation.",
+      "description": "Validate the corpus or given paths; never writes files.",
       "stdout": "one JSON",
       "exit": {
         "success": 0,
@@ -1123,7 +882,7 @@
     },
     "reindex": {
       "input": {
-        "$ref": "#/$defs/ReindexInput"
+        "$ref": "#/$defs/Empty"
       },
       "success": {
         "$ref": "#/$defs/ReindexOutput"
@@ -1132,25 +891,7 @@
         "$ref": "#/$defs/Failure"
       },
       "x-idempotency": "none",
-      "description": "Wait graph/FTS publication and job enqueue, not vector completion; no permanent response cache.",
-      "stdout": "one JSON",
-      "exit": {
-        "success": 0,
-        "error": 1
-      }
-    },
-    "reindex --cancel": {
-      "input": {
-        "$ref": "#/$defs/Empty"
-      },
-      "success": {
-        "$ref": "#/$defs/CancelOutput"
-      },
-      "error": {
-        "$ref": "#/$defs/Failure"
-      },
-      "x-idempotency": "none",
-      "description": "Targets currently active rebuild; does not undo published state.",
+      "description": "Full rebuild under index.lock (D-95); waits graph/FTS publication, not vectors; SIGINT cancels, the previous cache stays.",
       "stdout": "one JSON",
       "exit": {
         "success": 0,
@@ -1168,43 +909,7 @@
         "$ref": "#/$defs/Failure"
       },
       "x-idempotency": "natural",
-      "description": "Read status; completed is current-stage percent.",
-      "stdout": "one JSON",
-      "exit": {
-        "success": 0,
-        "error": 1
-      }
-    },
-    "errors": {
-      "input": {
-        "$ref": "#/$defs/Empty"
-      },
-      "success": {
-        "$ref": "#/$defs/ErrorsOutput"
-      },
-      "error": {
-        "$ref": "#/$defs/Failure"
-      },
-      "x-idempotency": "natural",
-      "description": "Read retained diagnostics.",
-      "stdout": "one JSON",
-      "exit": {
-        "success": 0,
-        "error": 1
-      }
-    },
-    "errors --clear": {
-      "input": {
-        "$ref": "#/$defs/Empty"
-      },
-      "success": {
-        "$ref": "#/$defs/ErrorsOutput"
-      },
-      "error": {
-        "$ref": "#/$defs/Failure"
-      },
-      "x-idempotency": "none",
-      "description": "Clear completed unsuccessful diagnostics; preserve active errors and concurrent new diagnostics.",
+      "description": "Read current state: revision, embedding backlog/failed, held locks, current problems (D-95).",
       "stdout": "one JSON",
       "exit": {
         "success": 0,
@@ -1222,25 +927,26 @@
         "$ref": "#/$defs/Failure"
       },
       "x-idempotency": "natural",
-      "description": "Read active configuration; null before setup.",
+      "description": "Read .letopis/config.json; null before setup. Changed by editing the file (D-95).",
       "stdout": "one JSON",
       "exit": {
         "success": 0,
         "error": 1
       }
     },
-    "config --set": {
+    "embed --drain": {
       "input": {
-        "$ref": "#/$defs/Configuration"
+        "$ref": "#/$defs/Empty"
       },
       "success": {
-        "$ref": "#/$defs/ConfigSetOutput"
+        "$ref": "#/$defs/EmptyOutput"
       },
       "error": {
         "$ref": "#/$defs/Failure"
       },
-      "x-idempotency": "none",
-      "description": "Replace whole configuration, graph/FTS kept, vector/jobs protocol preserved. Same-content optimization not promised.",
+      "x-idempotency": "safe-retry",
+      "x-internal": true,
+      "description": "Internal, not for agents (D-94/D-95): detached drain under embed.lock of texts without a vector; exits 0 with an empty result when no work is left or another drain holds the lock.",
       "stdout": "one JSON",
       "exit": {
         "success": 0,

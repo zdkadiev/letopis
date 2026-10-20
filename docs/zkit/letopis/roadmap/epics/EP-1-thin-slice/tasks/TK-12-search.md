@@ -4,7 +4,7 @@
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 5 / 8 / 14 (best / expected / worst)
-> **План:** неделя 11 — 8 ч
+> **План:** неделя 9 — 8 ч
 > **Зависимости:** [TK-9](TK-9-storage.md), [TK-11](TK-11-cli-runtime.md)
 
 
@@ -25,7 +25,7 @@
 
 ## 3. Что сделать
 
-1. Закреплять SQLite read view на время search/inspect.
+1. Закреплять SQLite read view на время search/traverse (inspect читает Git-снимок I-12).
 2. Реализовать FTS и согласованное объединение с vector-каналом, сортировку и ссылки.
 3. Проверить отсутствие текста в выдаче, metadata/flags и FTS-only fallback.
 4. Для изолированной приёмки использовать подготовленные векторы и контрактный embedding-порт; живой provider подключается в TK-13/TK-14, новая реализация provider здесь не создаётся.
@@ -50,7 +50,7 @@
 
 - **Входит:** Базовый search/inspect с согласованными ссылками и гибридным ранжированием. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Живой provider port — [TK-13](TK-13-embeddings.md) и его сквозное подключение — [TK-14](TK-14-thin-slice.md); полные filters — [TK-22](../../EP-2-knowledge/tasks/TK-22-filters.md); batch inspect — [TK-24](../../EP-2-knowledge/tasks/TK-24-inspect.md).
-- **Интерфейсы — вход:** [TK-9](TK-9-storage.md): Начальная схема SQLite и storage adapters для всех согласованных сущностей; [TK-11](TK-11-cli-runtime.md): Рабочий CLI и один автоматически запускаемый worker проекта
+- **Интерфейсы — вход:** [TK-9](TK-9-storage.md): Начальная схема SQLite и storage adapters для всех согласованных сущностей; [TK-11](TK-11-cli-runtime.md): Рабочий CLI без постоянного процесса, с блокировками и запуском drain
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-14](TK-14-thin-slice.md), [TK-22](../../EP-2-knowledge/tasks/TK-22-filters.md), [TK-23](../../EP-2-knowledge/tasks/TK-23-traversal.md).
 
 ## 8. Риски и примечания

@@ -25,7 +25,7 @@
       "bearer": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Value comes from OPENAI_API_KEY in worker environment; never persisted."
+        "description": "Value comes from OPENAI_API_KEY in the environment of the letopis CLI process; the drain process inherits the environment of the call that started it; never persisted."
       }
     }
   },

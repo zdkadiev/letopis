@@ -1,8 +1,8 @@
 # EP-3 — Обслуживание и полный lifecycle
 
 > **Фаза:** PH-2
-> **Оценка, ч:** 24 / 40 / 72 (best / expected / worst)
-> **Зависимости:** [TK-10](../EP-1-thin-slice/tasks/TK-10-save-recovery.md), [TK-11](../EP-1-thin-slice/tasks/TK-11-cli-runtime.md), [TK-13](../EP-1-thin-slice/tasks/TK-13-embeddings.md), [TK-24](../EP-2-knowledge/tasks/TK-24-inspect.md)
+> **Оценка, ч:** 16 / 28 / 54 (best / expected / worst)
+> **Зависимости:** [TK-10](../EP-1-thin-slice/tasks/TK-10-change-detection.md), [TK-11](../EP-1-thin-slice/tasks/TK-11-cli-runtime.md), [TK-13](../EP-1-thin-slice/tasks/TK-13-embeddings.md), [TK-24](../EP-2-knowledge/tasks/TK-24-inspect.md)
 
 ## Цель
 
@@ -11,18 +11,18 @@ Reindex, диагностика, устойчивость к corruption, оче�
 ## Границы
 
 - **Входит:** Reindex, диагностика, устойчивость к corruption, очередь и отмена доведены до полного функционального G-2. Выполняются только задачи, перечисленные ниже.
-- **Не входит:** Здесь не создаётся заново durable save TK-10; provenance и read-алгоритмы — EP-2; масштабные и физические drills — EP-4.
+- **Не входит:** Здесь не создаётся заново публикация TK-10; provenance и read-алгоритмы — EP-2; масштабные и физические drills — EP-4.
 - **Интерфейсы:** точные входы/выходы и ссылки на потребителей заданы в карточках. Эпик не вводит отдельный процесс или runtime-сервис.
 
 ## Задачи
 
 Разделение следует проверяемым механизмам и артефактам, а не слоям design/code/test. Порядок определяется зависимостями и [недельным планом](../../../roadmap.md); G-2 закрывается последней задачей фазы.
 
-- [TK-25 — Реализовать full/selective reindex и Git detection](tasks/TK-25-reindexing.md): Координатор reindex и Git detection без фонового watcher.
-- [TK-26 — Проверить corruption и fail-closed восстановления](tasks/TK-26-corruption.md): Проверенные corruption/fail-closed ветви существующего recovery и долговечная диагностика.
-- [TK-27 — Завершить замену jobs/config и bounded retries](tasks/TK-27-embedding-lifecycle.md): Полный lifecycle embedding jobs/config и ограниченные ретраи.
-- [TK-28 — Реализовать status/errors и безопасный clear](tasks/TK-28-diagnostics.md): StateService, errors и безопасная согласованная очистка диагностики.
-- [TK-29 — Завершить отмену, waiters и потерю соединения](tasks/TK-29-cancellation.md): Полный протокол отмены и завершённый функциональный scope перед системными испытаниями.
+- [TK-25 — Реализовать полный reindex и Git detection](tasks/TK-25-reindexing.md): Полный reindex и Git detection без фонового watcher.
+- [TK-26 — Проверить повреждения Git, кэша и vectors.db](tasks/TK-26-corruption.md): Проверенные ветви повреждений: fail-closed для Git, пересборка для кэша и vectors.db.
+- [TK-27 — Завершить смену config и bounded retries](tasks/TK-27-embedding-lifecycle.md): Полный lifecycle config и embeddings с ограниченными ретраями.
+- [TK-28 — Реализовать status с текущими проблемами](tasks/TK-28-diagnostics.md): Status с текущими проблемами, выведенными из данных.
+- [TK-29 — Завершить отмену и параллельные процессы](tasks/TK-29-cancellation.md): Полный протокол отмены и завершённый функциональный scope перед системными испытаниями.
 
 ## Приёмка
 

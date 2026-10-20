@@ -17,6 +17,6 @@ No-index/cos — assumed baseline D-79 без training и premature flat опт�
 
 ## Используется в
 <!-- собирается link_docs.py, не править вручную -->
-- [mechanics.md](../mechanics.md): MC-2 — commit, rollback и reindex, MC-3 — embeddings, seq и попытки, Sources
+- [mechanics.md](../mechanics.md): MC-3 — embeddings: работа из данных и попытки, Sources
 - [resilience.md](../resilience.md): 4. Security and isolation design, Sources
 - [roadmap.md](../roadmap.md): TK-1, TK-3

@@ -56,6 +56,6 @@ Apple M4 Pro, 14 ядер, 48 ГиБ; macOS 26.6.2 arm64. Rust 1.95.0, rusqlite 
 <!-- собирается link_docs.py, не править вручную -->
 - [resource-math.md](../resource-math.md): Changes since previous version, Диагностика: размер без изменения хранения, Измеренные опоры, 6. Limits and verdicts, 9. Consistency check, Sources
 - [data.md](../data.md): 6. Storage classes and totals, Sources
-- [architecture.md](../architecture.md): Technology and constraints, 8. Cross-cutting concerns, 11. Risks, assumptions and open questions, Sources
+- [architecture.md](../architecture.md): Technology and constraints, 11. Risks, assumptions and open questions, Sources
 - [mechanics.md](../mechanics.md): Sources
 - [roadmap.md](../roadmap.md): 10. Согласование с исходными документами

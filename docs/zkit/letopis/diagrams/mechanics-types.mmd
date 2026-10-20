@@ -1,34 +1,35 @@
 classDiagram
 class DocumentService {
-  apply(Patch)
-  recover()
+  check(paths) Diagnostics
+  detectChanges() Delta
   capture(SnapshotRequest)
 }
-class ProjectGate
+class IndexLock
 class WriteUnit
 class GitSnapshotPort {
-  harden(CanonicalSnapshot) DurableTree
+  pin(CanonicalSnapshot) RetainedTree
 }
 class ProjectionPort {
   prepare(ProjectionInput) PreparedProjection
   publish(WriteUnit, PreparedProjection)
 }
-class EmbeddingExecutor {
-  reserve(seq)
-  publishIfCurrent(seq, vector)
+class EmbeddingDrain {
+  nextWork() search_hash
+  reserveAttempt(search_hash)
+  publishVector(search_hash, vector)
 }
 class EmbeddingPort {
   embed(texts) vectors
 }
 class IndexReadView
-class DiagnosticsPort
-DocumentService --> ProjectGate
+class StatusQuery {
+  problems() Problems
+}
+DocumentService --> IndexLock
 DocumentService --> GitSnapshotPort
 DocumentService --> WriteUnit
 DocumentService --> ProjectionPort
 ProjectionPort --> WriteUnit
-EmbeddingExecutor --> EmbeddingPort
-EmbeddingExecutor --> WriteUnit
-DocumentService --> DiagnosticsPort
-EmbeddingExecutor --> DiagnosticsPort
+EmbeddingDrain --> EmbeddingPort
+StatusQuery ..> IndexReadView
 IndexReadView ..> ProjectionPort : pinned published data

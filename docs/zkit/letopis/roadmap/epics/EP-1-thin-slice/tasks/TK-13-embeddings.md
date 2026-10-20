@@ -3,14 +3,14 @@
 > **Статус:** planned
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
-> **Оценка, ч:** 5 / 8 / 14 (best / expected / worst)
-> **План:** неделя 11 — 2 ч; неделя 12 — 6 ч
+> **Оценка, ч:** 4 / 6 / 12 (best / expected / worst)
+> **План:** неделя 9 — 1 ч; неделя 10 — 5 ч
 > **Зависимости:** [TK-3](../../EP-8-proofs/tasks/TK-3-vector-harness.md), [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md), [TK-9](TK-9-storage.md)
 
 
 ## 1. Цель
 
-Сквозной путь должен соединить реальные адаптеры; ранние RAM и usefulness результаты нужны до расширения полного функционала. Конкретный результат этой задачи: базовый embedding runtime и обработчик долговечных jobs.
+Сквозной путь должен соединить реальные адаптеры; ранние RAM и usefulness результаты нужны до расширения полного функционала. Конкретный результат этой задачи: базовый embedding runtime и drain по текстам без вектора.
 
 ## 2. Контекст и входные данные
 
@@ -25,18 +25,18 @@
 
 ## 3. Что сделать
 
-1. Подключить config provider/model/parameters/max_retries и env-only secret.
-2. Реализовать один executor и общий порт texts→vectors для документов/запросов.
-3. Вычислять вне write transaction, публиковать актуальный seq и удалять своё задание одной DB unit.
+1. Читать конфигурацию provider/model/parameters/max_retries из `.letopis/config.json` (правится как файл, D-95) и env-only secret.
+2. Реализовать один drain и общий порт texts→vectors для документов/запросов.
+3. Выбирать работу запросом (search_hash без вектора и без исчерпанных попыток), перечитывать файл и считать вектор только при совпавшем search_hash; вычислять вне write transaction; записывать вектор в vectors.db по search_hash (MC-3).
 
 ## 4. Ожидаемый результат
 
-Базовый embedding runtime и обработчик долговечных jobs.
+Базовый embedding runtime и drain по текстам без вектора (D-95).
 
 ## 5. Критерии приёмки
 
-- [ ] Config provider/model/parameters/max_retries, env key и один executor используют общий texts→vectors.
-- [ ] Вычисление вне DB write, seq CAS публикует vector и удаляет только своё задание одной транзакцией.
+- [ ] Config из `.letopis/config.json`, env key и один drain используют общий texts→vectors; невалидный файл даёт диагностику и FTS-only.
+- [ ] Вычисление вне DB write; вектор записан в vectors.db идемпотентно по search_hash; правка во время вычисления пропускается по search_hash; таблицы заданий и seq нет (D-95).
 
 ## 6. Как проверить
 
@@ -46,16 +46,16 @@
 
 ## 7. Границы
 
-- **Входит:** Базовый embedding runtime и обработчик долговечных jobs. Работа и собственные проверки перечислены в разделе 3.
+- **Входит:** Базовый embedding runtime и drain по текстам без вектора. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Полная замена config/retries/failed — [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md); rank — [TK-12](TK-12-search.md); реальная сквозная интеграция — [TK-14](TK-14-thin-slice.md).
-- **Интерфейсы — вход:** [TK-3](../../EP-8-proofs/tasks/TK-3-vector-harness.md): Регрессионные сценарии совместимости vec1/read view и защиты публикации по seq; [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md): Boundary harness двух API с воспроизводимыми негативными transport-сценариями; [TK-9](TK-9-storage.md): Начальная схема SQLite и storage adapters для всех согласованных сущностей
+- **Интерфейсы — вход:** [TK-3](../../EP-8-proofs/tasks/TK-3-vector-harness.md): Регрессионные сценарии vec1/read view и пропуска устаревшего текста по search_hash; [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md): Boundary harness двух API с воспроизводимыми негативными transport-сценариями; [TK-9](TK-9-storage.md): Начальная схема SQLite и storage adapters для всех согласованных сущностей
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-14](TK-14-thin-slice.md), [TK-16](../../EP-7-early-validation/tasks/TK-16-early-memory.md), [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md), [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md), [TK-41](../../EP-4-system-validation/tasks/TK-41-provider-drill.md).
 
 ## 8. Риски и примечания
 
-**Основание оценки 5 / 8 / 14 ч:** best — пробы transport/vec1 TK-3/TK-6 и storage TK-9 переиспользуются; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — стыковка HTTP, общего query/document порта и seq CAS без write transaction во время compute. Это инженерный диапазон, не измеренная скорость.
+**Основание оценки 4 / 6 / 12 ч (пересчёт 2026-10-20):** после D-95 нет таблицы заданий и seq: drain выбирает тексты без вектора, config читается из файла; best — пробы transport/vec1 TK-3/TK-6 и storage TK-9 переиспользуются; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — стыковка HTTP, общего query/document порта и выборки работы без write transaction во время compute. Это инженерный диапазон, не измеренная скорость.
 
-**Риск и действие:** Стыковка HTTP, общего query/document порта и seq CAS без write transaction во время compute. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
+**Риск и действие:** Стыковка HTTP, общего query/document порта и выборки работы без write transaction во время compute. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
 
 ## 9. Отчёт о выполнении
 

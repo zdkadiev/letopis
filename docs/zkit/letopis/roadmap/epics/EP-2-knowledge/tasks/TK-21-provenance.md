@@ -4,7 +4,7 @@
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
-> **План:** неделя 18 — 8 ч
+> **План:** неделя 15 — 3 ч; неделя 16 — 5 ч
 > **Зависимости:** [TK-8](../../EP-1-thin-slice/tasks/TK-8-git-snapshots.md), [TK-20](TK-20-source-identity.md)
 
 
@@ -25,7 +25,7 @@
 
 ## 3. Что сделать
 
-1. Проверять существование source_snapshot и равенство адресованных bytes при записи основания.
+1. При индексации проверять существование source_snapshot и равенство адресованных bytes: несовпадение — флаг source_changed, отсутствующий снимок — диагностика file:<путь> и флаг; найденный снимок закрепляется ref (D-93).
 2. Сохранять прежнее основание edit без snapshot и обновлять его только явно.
 3. Проверить changed/not_found, C1/C2 с одинаковыми bytes и чтение истории из Git.
 
@@ -35,7 +35,7 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Снимок реально существует и адресованные bytes совпадают при create/смене source.
+- [ ] При индексации существующий снимок закреплён ref, несовпадение bytes даёт source_changed, отсутствующий снимок — диагностику без отказа индексации.
 - [ ] edit без snapshot сохраняет основание.
 - [ ] Changed/not_found ставят flags.
 - [ ] C1/C2 с одинаковым адресованным содержимым равны для фильтра, история остаётся в Git.
@@ -49,8 +49,8 @@
 ## 7. Границы
 
 - **Входит:** Проверка происхождения и оснований знания с корректными freshness flags. Работа и собственные проверки перечислены в разделе 3.
-- **Не входит:** Git чтение/удержание — [TK-8](../../EP-1-thin-slice/tasks/TK-8-git-snapshots.md); source registry — [TK-20](TK-20-source-identity.md); поисковые filters — [TK-22](TK-22-filters.md).
-- **Интерфейсы — вход:** [TK-8](../../EP-1-thin-slice/tasks/TK-8-git-snapshots.md): Git adapter со снимками, служебными refs и тестами сохранности объектов; [TK-20](TK-20-source-identity.md): Долговечный реестр source identity и корректные metadata доступности
+- **Не входит:** Git чтение/удержание — [TK-8](../../EP-1-thin-slice/tasks/TK-8-git-snapshots.md); source identity — [TK-20](TK-20-source-identity.md); поисковые filters — [TK-22](TK-22-filters.md).
+- **Интерфейсы — вход:** [TK-8](../../EP-1-thin-slice/tasks/TK-8-git-snapshots.md): Git adapter со снимками, служебными refs и тестами сохранности объектов; [TK-20](TK-20-source-identity.md): Source identity по нормализованному URI, выводимая из ссылок (D-91), и корректные metadata доступности
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-22](TK-22-filters.md), [TK-23](TK-23-traversal.md), [TK-24](TK-24-inspect.md), [TK-39](../../EP-4-system-validation/tasks/TK-39-corruption-drill.md).
 
 ## 8. Риски и примечания

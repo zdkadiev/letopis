@@ -4,7 +4,7 @@
 > **Эпик:** [EP-4](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 32 — 4 ч; неделя 33 — 4 ч
+> **План:** неделя 28 — 5 ч; неделя 29 — 3 ч
 > **Зависимости:** [TK-38](TK-38-power-loss.md), [TK-21](../../EP-2-knowledge/tasks/TK-21-provenance.md), [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md), [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md)
 
 
@@ -25,9 +25,9 @@
 
 ## 3. Что сделать
 
-1. Раздельно повредить Git objects, journal/registry и производные индексы.
+1. Раздельно повредить Git objects, SQLite-кэш и vectors.db целиком.
 2. Проверить внешнюю Git-смену, invalid markup/source, freshness и исправление причины.
-3. Выполнить C-8 сценарий: дождаться save/recovery, Git без параллельного CLI, затем сверка.
+3. Выполнить Git checkout/rebase во время работы агентов и проверить, что следующий вызов публикует итоговое состояние по файлу (D-93).
 
 ## 4. Ожидаемый результат
 
@@ -35,13 +35,13 @@ Corruption/freshness отчёт DR-3/DR-4 и доказательство коо
 
 ## 5. Критерии приёмки
 
-- [ ] Missing Git object, повреждённый journal/registry и производный индекс дают предусмотренный fail-closed/rebuild без потери durable source identity.
+- [ ] Missing Git object даёт fail-closed, повреждённый или удалённый кэш — rebuild без потери source identity.
 - [ ] Внешняя Git-смена/invalid markup/удалённый source дают flags и последний корректный индекс.
-- [ ] Исправление снимает active cause.
-- [ ] Координированный сценарий C-8 запрещает Git до окончания save/recovery и новые CLI во время Git.
+- [ ] Исправление убирает проблему из status.
+- [ ] Git checkout во время работы агентов обнаруживается следующим вызовом как обычные изменения файлов.
 - [ ] После Git следующий CLI валидирует снимок, без перехвата произвольного Git.
 
-- [ ] Invalid external A + valid changed B, затем repair apply(A): вся проекция соответствует after revision, rollback касается только request paths, status различает active/completed diagnostics через details.active.
+- [ ] Невалидный A рядом с валидно изменённым B: B опубликован, A сохраняет прежнюю проекцию; исправление A убирает его ошибку из status (D-95).
 
 ## 6. Как проверить
 
@@ -52,15 +52,15 @@ Corruption/freshness отчёт DR-3/DR-4 и доказательство коо
 ## 7. Границы
 
 - **Входит:** Corruption/freshness отчёт DR-3/DR-4 и доказательство координированного C-8 сценария. Работа и собственные проверки перечислены в разделе 3.
-- **Не входит:** Recovery implementation — [TK-10](../../EP-1-thin-slice/tasks/TK-10-save-recovery.md)/[TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md); power loss — [TK-38](TK-38-power-loss.md); backup — [TK-40](TK-40-restore.md); эксплуатационное оформление C-8 — [TK-44](../../EP-6-delivery/tasks/TK-44-operations.md).
-- **Интерфейсы — вход:** [TK-38](TK-38-power-loss.md): Физические свидетельства аварийной атомарности DR-1, не только успех модели; [TK-21](../../EP-2-knowledge/tasks/TK-21-provenance.md): Проверка происхождения и оснований знания с корректными freshness flags; [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md): Координатор reindex и Git detection без фонового watcher; [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md): проверенные corruption/fail-closed ветви и диагностика
+- **Не входит:** Публикация — [TK-10](../../EP-1-thin-slice/tasks/TK-10-change-detection.md)/[TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md); power loss — [TK-38](TK-38-power-loss.md); backup — [TK-40](TK-40-restore.md); эксплуатационное оформление C-8 — [TK-44](../../EP-6-delivery/tasks/TK-44-operations.md).
+- **Интерфейсы — вход:** [TK-38](TK-38-power-loss.md): Физические свидетельства DR-1: прерванная публикация не оставляет смешанного кэша; [TK-21](../../EP-2-knowledge/tasks/TK-21-provenance.md): Проверка происхождения и оснований знания с корректными freshness flags; [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md): Полный reindex и Git detection без фонового watcher; [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md): проверенные corruption/fail-closed ветви и диагностика
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-40](TK-40-restore.md), [TK-42](TK-42-exhaustion.md), [TK-43](../../EP-6-delivery/tasks/TK-43-delivery.md).
 
 ## 8. Риски и примечания
 
-**Основание оценки 4 / 8 / 12 ч:** best — готовые fixtures позволяют раздельно инъецировать каждую corruption причину; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — проверка retained source identity и восстановления active/freshness после Git-смены. Это инженерный диапазон, не измеренная скорость.
+**Основание оценки 4 / 8 / 12 ч:** best — готовые fixtures позволяют раздельно инъецировать каждую corruption причину; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — проверка retained source identity и восстановления диагностики/freshness после Git-смены. Это инженерный диапазон, не измеренная скорость.
 
-**Риск и действие:** Проверка retained source identity и восстановления active/freshness после Git-смены. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
+**Риск и действие:** Проверка воспроизводимой source identity и восстановления диагностики/freshness после Git-смены. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
 
 ## 9. Отчёт о выполнении
 

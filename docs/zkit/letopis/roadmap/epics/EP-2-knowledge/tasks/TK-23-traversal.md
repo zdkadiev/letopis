@@ -4,7 +4,7 @@
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 6 / 8 / 16 (best / expected / worst)
-> **План:** неделя 19 — 2 ч; неделя 20 — 6 ч
+> **План:** неделя 17 — 7 ч; неделя 18 — 1 ч
 > **Зависимости:** [TK-18](TK-18-graph-validation.md), [TK-20](TK-20-source-identity.md), [TK-21](TK-21-provenance.md), [TK-12](../../EP-1-thin-slice/tasks/TK-12-search.md)
 
 
@@ -48,7 +48,7 @@
 
 - **Входит:** Полный traverse CLI со ссылками на знания и опциональными пройденными рёбрами. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Хранение/валидация includes — [TK-9](../../EP-1-thin-slice/tasks/TK-9-storage.md)/[TK-18](TK-18-graph-validation.md); search ranking — [TK-12](../../EP-1-thin-slice/tasks/TK-12-search.md); batch metadata — [TK-24](TK-24-inspect.md).
-- **Интерфейсы — вход:** [TK-18](TK-18-graph-validation.md): Полный доменный валидатор графа и atomic validation failures; [TK-20](TK-20-source-identity.md): Долговечный реестр source identity и корректные metadata доступности; [TK-21](TK-21-provenance.md): Проверка происхождения и оснований знания с корректными freshness flags; [TK-12](../../EP-1-thin-slice/tasks/TK-12-search.md): Базовый search/inspect с согласованными ссылками и гибридным ранжированием
+- **Интерфейсы — вход:** [TK-18](TK-18-graph-validation.md): Полный доменный валидатор графа с ошибками по файлу; [TK-20](TK-20-source-identity.md): Source identity по нормализованному URI, выводимая из ссылок (D-91), и корректные metadata доступности; [TK-21](TK-21-provenance.md): Проверка происхождения и оснований знания с корректными freshness flags; [TK-12](../../EP-1-thin-slice/tasks/TK-12-search.md): Базовый search/inspect с согласованными ссылками и гибридным ранжированием
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-24](TK-24-inspect.md).
 
 ## 8. Риски и примечания

@@ -4,7 +4,7 @@
 > **Эпик:** [EP-4](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 30 — 8 ч
+> **План:** неделя 26 — 7 ч; неделя 27 — 1 ч
 > **Зависимости:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md), [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md), [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md), [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md)
 
 
@@ -26,7 +26,7 @@
 ## 3. Что сделать
 
 1. Построить репрезентативную трассу правок на основе фактического профиля.
-2. Учесть sources/refs/objects/errors/jobs/WAL и пиковое место до/во время/после pack.
+2. Учесть sources/refs/objects/embed_failures/WAL и пиковое место до/во время/после pack.
 3. Обосновать годовую экстраполяцию диапазоном, не переносить коэффициент маленькой пробы автоматически.
 
 ## 4. Ожидаемый результат
@@ -35,7 +35,7 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Репрезентативная трасса правок учитывает whole-file sources, retained refs/objects, errors/failed/jobs, WAL и временное место до/во время/после Git pack.
+- [ ] Репрезентативная трасса правок учитывает whole-file sources, retained refs/objects, embed_failures, WAL и временное место до/во время/после Git pack.
 - [ ] Экстраполяция на год имеет диапазон и основания.
 - [ ] Сутки pack остаются расчётным условием, не новым таймером.
 
@@ -49,7 +49,7 @@
 
 - **Входит:** Обоснованная оценка годового диска и стоимости штатного Git обслуживания. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Генератор входов — [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md); измерение RAM/latency — [TK-34](TK-34-mixed-memory.md)/[TK-35](TK-35-search-latency.md); backup/restore — [TK-40](TK-40-restore.md); таймер Git pack не создаётся.
-- **Интерфейсы — вход:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md): Сравнительный отчёт P-1 и входные данные P-2.7 для ресурсной проверки; [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md): Воспроизводимый target-scale fixture: 100k знаний, assumed 100k source и 500k рёбер; [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md): Координатор reindex и Git detection без фонового watcher; [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md): StateService, errors и безопасная согласованная очистка диагностики
+- **Интерфейсы — вход:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md): Сравнительный отчёт P-1 и входные данные P-2.7 для ресурсной проверки; [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md): Воспроизводимый target-scale fixture: 100k знаний, assumed 100k source и 500k рёбер; [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md): Полный reindex и Git detection без фонового watcher; [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md): Status с текущими проблемами, выведенными из данных
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-42](TK-42-exhaustion.md), [TK-43](../../EP-6-delivery/tasks/TK-43-delivery.md).
 
 ## 8. Риски и примечания

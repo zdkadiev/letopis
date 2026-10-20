@@ -4,7 +4,7 @@
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
-> **План:** неделя 19 — 8 ч
+> **План:** неделя 16 — 5 ч; неделя 17 — 3 ч
 > **Зависимости:** [TK-12](../../EP-1-thin-slice/tasks/TK-12-search.md), [TK-20](TK-20-source-identity.md), [TK-21](TK-21-provenance.md)
 
 
@@ -27,7 +27,7 @@
 
 1. Реализовать комбинации filters с AND между полями и OR внутри списков.
 2. Сопоставлять source/revision в одной привязке и фильтровать до итогового limit.
-3. Проверить пустые списки, неизвестную revision и FTS fallback с передачей ошибки query embedding в существующий DiagnosticsPort; CLI status проверяет TK-28.
+3. Проверить пустые списки, неизвестную revision и FTS fallback с безопасным предупреждением query embedding в ответе search; совместно с TK-28.
 
 ## 4. Ожидаемый результат
 
@@ -37,7 +37,7 @@
 
 - [ ] Filters сочетаются AND, списки OR, пустые/отсутствующие списки равны.
 - [ ] source/revision совпадают в одной привязке.
-- [ ] Фильтрация до итогового limit, неизвестная revision даёт not_found, query failure передана через существующий порт диагностики при обычной FTS выдаче; её отображение CLI status совместно проверяет TK-28.
+- [ ] Фильтрация до итогового limit, неизвестная revision даёт not_found, query failure не превращает обычную FTS выдачу в ошибку; её показ совместно проверяет TK-28.
 
 ## 6. Как проверить
 
@@ -49,7 +49,7 @@
 
 - **Входит:** Полные поисковые фильтры и проверенная деградация query embedding. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Базовый rank — [TK-12](../../EP-1-thin-slice/tasks/TK-12-search.md); source matching — [TK-21](TK-21-provenance.md); общий status/error storage — [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md).
-- **Интерфейсы — вход:** [TK-12](../../EP-1-thin-slice/tasks/TK-12-search.md): Базовый search/inspect с согласованными ссылками и гибридным ранжированием; [TK-20](TK-20-source-identity.md): Долговечный реестр source identity и корректные metadata доступности; [TK-21](TK-21-provenance.md): Проверка происхождения и оснований знания с корректными freshness flags
+- **Интерфейсы — вход:** [TK-12](../../EP-1-thin-slice/tasks/TK-12-search.md): Базовый search/inspect с согласованными ссылками и гибридным ранжированием; [TK-20](TK-20-source-identity.md): Source identity по нормализованному URI, выводимая из ссылок (D-91), и корректные metadata доступности; [TK-21](TK-21-provenance.md): Проверка происхождения и оснований знания с корректными freshness flags
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-24](TK-24-inspect.md), [TK-35](../../EP-4-system-validation/tasks/TK-35-search-latency.md).
 
 ## 8. Риски и примечания

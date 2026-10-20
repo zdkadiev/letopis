@@ -4,7 +4,7 @@
 > **Эпик:** [EP-4](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 6 / 8 / 12 (best / expected / worst)
-> **План:** неделя 35 — 8 ч
+> **План:** неделя 30 — 3 ч; неделя 31 — 5 ч
 > **Зависимости:** [TK-34](TK-34-mixed-memory.md), [TK-35](TK-35-search-latency.md), [TK-36](TK-36-disk-growth.md), [TK-37](TK-37-queue-drill.md), [TK-38](TK-38-power-loss.md), [TK-39](TK-39-corruption-drill.md), [TK-40](TK-40-restore.md), [TK-41](TK-41-provider-drill.md), [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md)
 
 
@@ -16,7 +16,7 @@
 
 - План и расписание: [roadmap](../../../../roadmap.md).
 - Основание: P-3, DR-7/DR-8, A-AR1/A-AR2.
-- Покрывает: [FR-3, FR-14, FR-31, FR-33, NFR-1, NFR-5, DR-7, DR-8](../../../../requirements.md).
+- Покрывает: [FR-3, FR-31, FR-33, NFR-1, NFR-5, DR-7, DR-8](../../../../requirements.md).
 - [Требования и критерии системы](../../../../requirements.md).
 - [Архитектура и владельцы](../../../../architecture.md).
 - [Отказы и drills](../../../../resilience.md).
@@ -26,8 +26,8 @@
 ## 3. Что сделать
 
 1. Вызвать disk full/allocation failure, рост WAL/долгого reader и глубокий graph.
-2. Проверить malformed/path/symlink/socket/user/build/clock fixtures.
-3. Проверить смысл diagnostics при storage fault/clear/restart и зафиксировать G-3.
+2. Проверить malformed/path/symlink/lock-file/user/build/clock fixtures.
+3. Проверить выводимую диагностику при storage fault/restart и зафиксировать G-3.
 
 ## 4. Ожидаемый результат
 
@@ -35,8 +35,8 @@ Exhaustion/trust-boundary отчёт DR-7/DR-8 и решение о допуск
 
 ## 5. Критерии приёмки
 
-- [ ] Disk full, allocation failure, WAL/долгий reader, глубокий graph, bad build/clock, malformed inputs и path/symlink/socket/OS-user fixtures не дают false success/запись вне корпуса/тихий reset.
-- [ ] Append/clear/restart при storage fault сохраняют смысл diagnostics.
+- [ ] Disk full, allocation failure, WAL/долгий reader, глубокий graph, bad build/clock, malformed inputs и path/symlink/lock-file/OS-user fixtures не дают false success/запись вне корпуса/тихий reset.
+- [ ] Storage fault и restart не искажают выводимую диагностику (D-95).
 - [ ] same-UID/semantic poisoning residuals названы.
 - [ ] G-3 имеет evidence и решение.
 
@@ -50,7 +50,7 @@ Exhaustion/trust-boundary отчёт DR-7/DR-8 и решение о допуск
 
 - **Входит:** Exhaustion/trust-boundary отчёт DR-7/DR-8 и решение о допуске поставки. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Реализация механизмов принадлежит EP-1/EP-2/EP-3; physical power loss — [TK-38](TK-38-power-loss.md); provider security — [TK-41](TK-41-provider-drill.md); ACL не вводится.
-- **Интерфейсы — вход:** [TK-34](TK-34-mixed-memory.md): Полная проверка NFR-2/NFR-4/NFR-7 с реальной mixed-client нагрузкой; [TK-35](TK-35-search-latency.md): Latency отчёт полного поиска и решение по NFR-3 без обрезания результата по времени; [TK-36](TK-36-disk-growth.md): Обоснованная оценка годового диска и стоимости штатного Git обслуживания; [TK-37](TK-37-queue-drill.md): Полный queue/reader/cancellation отчёт P-2.4 и DR-6; [TK-38](TK-38-power-loss.md): Физические свидетельства аварийной атомарности DR-1, не только успех модели; [TK-39](TK-39-corruption-drill.md): Corruption/freshness отчёт DR-3/DR-4 и доказательство координированного C-8 сценария; [TK-40](TK-40-restore.md): Воспроизводимый внешний backup/restore drill с проверкой source identity и служебного состояния; [TK-41](TK-41-provider-drill.md): Provider/offline/security отчёт DR-5 и проверка NFR-6 на обеих платформах; [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md): StateService, errors и безопасная согласованная очистка диагностики
+- **Интерфейсы — вход:** [TK-34](TK-34-mixed-memory.md): Полная проверка NFR-2/NFR-4/NFR-7 с реальной mixed-client нагрузкой; [TK-35](TK-35-search-latency.md): Latency отчёт полного поиска и решение по NFR-3 без обрезания результата по времени; [TK-36](TK-36-disk-growth.md): Обоснованная оценка годового диска и стоимости штатного Git обслуживания; [TK-37](TK-37-queue-drill.md): Полный queue/reader/cancellation отчёт P-2.4 и DR-6; [TK-38](TK-38-power-loss.md): Физические свидетельства DR-1: прерванная публикация не оставляет смешанного кэша; [TK-39](TK-39-corruption-drill.md): Corruption/freshness отчёт DR-3/DR-4 и доказательство координированного C-8 сценария; [TK-40](TK-40-restore.md): Воспроизводимый внешний backup/restore drill с проверкой source identity и служебного состояния; [TK-41](TK-41-provider-drill.md): Provider/offline/security отчёт DR-5 и проверка NFR-6 на обеих платформах; [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md): Status с текущими проблемами, выведенными из данных
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-43](../../EP-6-delivery/tasks/TK-43-delivery.md), [TK-45](../../EP-6-delivery/tasks/TK-45-acceptance.md).
 
 ## 8. Риски и примечания

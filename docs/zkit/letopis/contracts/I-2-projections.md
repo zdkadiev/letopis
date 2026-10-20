@@ -1,28 +1,25 @@
 # I-2 — подготовка и публикация проекций
 > x-boundary: I-2 · x-direction: internal · x-status: draft
-> x-serves: FR-13, FR-27, FR-28, FR-29 · x-limits: []
+> x-serves: FR-5, FR-13, FR-27, FR-28, FR-29 · x-limits: []
 
 ## Layout
 
-Внутрипроцессный Rust-порт, не wire API. Все методы возвращают Result<T, DomainError>; DomainError имеет code из X-1, безопасные message и details. OID — полный существующий Git tree, UUID/hash — типы X-1; Paths — проверенные root-relative пути. Текст существует только во временных буферах.
+Внутрипроцессный Rust-порт, не wire API. Все методы возвращают Result<T, DomainError>; DomainError имеет code из X-1, безопасные message и details. ElementId/KnowledgeId/hash — типы X-1; revision — счётчик публикаций (u64); Paths — проверенные root-relative пути. Текст существует только во временных буферах.
 
 ```text
-ProjectionInput { snapshot: TreeOid, base_revision: Option<TreeOid>,
-  changed_paths: Set<Path>, changed_ids: Set<Uuid>, full: bool,
-  config_identity: Option<Sha256> }
-PreparedProjection { snapshot: TreeOid, base_revision: Option<TreeOid>,
-  config_identity: Option<Sha256>,
-  nodes: Vec<NodeMetadata>, edges: Vec<EdgeMetadata>, removed_ids: Set<Uuid>,
-  search: Vec<{id: Uuid, uri: NormalizedUri, search_hash: Sha256}> }
-prepare(input: ProjectionInput, snapshot: CanonicalSnapshot) -> PreparedProjection
+ProjectionInput { base_revision: Option<u64>, changed_paths: Set<Path>, full: bool }
+PreparedProjection { base_revision: Option<u64>,
+  nodes: Vec<NodeMetadata>, edges: Vec<EdgeMetadata>, removed_ids: Set<ElementId>,
+  files: Vec<FileRow>, search: Vec<{id: KnowledgeId, uri: NormalizedUri, search_hash: Sha256}> }
+prepare(input: ProjectionInput) -> PreparedProjection
 publish(unit: &mut WriteUnit, prepared: PreparedProjection) -> ()
 ```
 
-NodeMetadata — id/kind/uri/hash/created_at/source_snapshot/line_start/line_end/search_hash из storage-schema.sql, row_id сохраняется по UPSERT. EdgeMetadata — id/source_id/target_id/type/hash/created_at. Для отсутствующего source hash=null, source_snapshot=null, search_hash=null. Search хранит только адреса/хеши; prepare не удерживает Vec текстов полного корпуса. При publish immutable snapshot читается последовательно, одно собственное представление MC-1 за раз вставляется в FTS и освобождается. Повторного capture/I-12 нет: read обращается к уже закреплённому tree через Git-порт. Это не загрузка содержимого включённых знаний. Полный reindex может удерживать одну write unit дольше обычного delta apply; его atomic publication не превращается в обещание короткой фиксированной задержки. Removed IDs не включают долговечные source без ссылок.
+NodeMetadata — id/kind/uri/hash/created_at/source_snapshot/line_start/line_end/search_hash из storage-schema.sql, row_id сохраняется по UPSERT; id знания — путь или путь#якорь ([D-93](../decisions.md#D-93)); kind выводится: metavertex — знание с исходящими includes ([D-95](../decisions.md#D-95)). EdgeMetadata — source_id/target_id/type, ключ — тройка; хранятся все объявленные рёбра, без FK на цель и без признака активности. Висячие рёбра и includes-циклы отсекаются при чтении (MC-6) и показываются как проблемы I-11; publish рёбра других файлов не пересчитывает. FileRow — path/size/mtime/inode/hash и текст ошибки для невалидного файла. Для отсутствующего source hash=null, source_snapshot=null, search_hash=null. Search хранит только адреса/хеши; prepare не удерживает тексты полного корпуса.
 
-Подготовка не меняет БД и не получает новый snapshot через I-12. Publish присоединяется к переданной SQLite unit; не делает BEGIN/COMMIT, callback к редактору или модели. Caller проверяет канонический target/base в project gate. Для apply, как и для reindex, changed_paths/changed_ids и removed_ids покрывают всю разницу опубликованной base_revision → итоговый snapshot, включая отложенные внешние изменения и зависимые координаты/связи; при base_revision=None готовится полная проекция. Request write paths и recovery.paths остаются областью исходной правки, не областью индексации. Apply, исправляющий невалидный внешний A, обязан также опубликовать валидно изменённый B прежде чем записать общий snapshot в project.revision. Apply публикует также recovery deletion; reindex — reindex row deletion. Изменённые nodes/edges/FTS, несовместимые vectors, project revision и jobs согласованы атомарно. Никакой новый operation ID/история ответов не создаётся.
+Prepare читает изменённые файлы рабочей копии и не меняет БД; Git-снимок для публикации не создаётся (D-95). Publish присоединяется к переданной SQLite unit; не делает BEGIN/COMMIT, callback к редактору или модели. Caller держит flock index.lock и проверяет base ([D-94](../decisions.md#D-94)); unit увеличивает счётчик revision. changed_paths и removed_ids покрывают всю разницу опубликованного состояния → текущие файлы; при base_revision=None или full=true готовится полная проекция (reindex). Подготовка идёт по файлу ([D-93](../decisions.md#D-93)): невалидный файл сохраняет прежнюю проекцию, его FileRow получает текст ошибки. Задания embeddings не ставятся: работа выводится из search_hash без вектора (MC-3).
 
-Вход-пример: snapshot=S2, base_revision=S1, changed_ids={U1}, full=false. Выход: подготовленная строка U1 и собственный search text; после publish+caller COMMIT revision=S2 и queued job с новым seq, либо прежний vector при том же search_hash. При ошибке caller откатывает unit; канонические файлы восстанавливает MC-2. Все S/U здесь символы типов, не валидные wire OID/UUID.
+Вход-пример: base_revision=6, changed_paths={knowledge/a.md}, full=false. Выход: строки элементов a.md и их search text; после publish+caller COMMIT revision=7; если search_hash новый, drain найдёт его как текст без вектора, иначе используется прежний vector. При ошибке caller откатывает unit; файлы letopis не меняет.
 
 ## Timing and limits
 

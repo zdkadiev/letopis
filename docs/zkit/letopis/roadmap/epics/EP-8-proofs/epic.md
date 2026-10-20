@@ -1,7 +1,7 @@
 # EP-8 — Риски выбранных механизмов
 
 > **Фаза:** PH-0
-> **Оценка, ч:** 28 / 60 / 120 (best / expected / worst)
+> **Оценка, ч:** 22 / 46 / 92 (best / expected / worst)
 > **Зависимости:** —
 
 ## Цель
@@ -20,8 +20,8 @@
 
 - [TK-1 — Проверить сборку Rust/SQLite/FTS5/vec1 на macOS/Linux](tasks/TK-1-build.md): Воспроизводимый build harness и отчёт о совместимости выбранной связки на двух ОС.
 - [TK-2 — Проверить публикацию по файлу и прерывание процесса](tasks/TK-2-durability-harness.md): Матрица прерываний публикации с точным oracle и воспроизводимый harness обнаружения/публикации.
-- [TK-3 — Проверить vec1 reset, read snapshot и seq CAS](tasks/TK-3-vector-harness.md): Регрессионные сценарии совместимости vec1/read view и защиты публикации по seq.
-- [TK-4 — Проверить bootstrap, IPC и recovery barrier](tasks/TK-4-runtime-harness.md): Проверенный протокол одного worker и startup/recovery barrier с negative fixtures.
+- [TK-3 — Проверить vec1 reset, read snapshot и пропуск устаревшего текста](tasks/TK-3-vector-harness.md): Регрессионные сценарии vec1/read view и пропуска устаревшего текста по search_hash.
+- [TK-4 — Проверить flock и запуск drain](tasks/TK-4-runtime-harness.md): Проверенная координация процессов: одна публикация, один drain, отмена SIGINT с negative fixtures.
 - [TK-5 — Подготовить воспроизводимый протокол пилота](tasks/TK-5-pilot-protocol.md): Исполнимый протокол P-1 и формы отчёта для раннего и финального пилота.
 - [TK-6 — Проверить embedding transport и offline ошибки](tasks/TK-6-provider-harness.md): Boundary harness двух API с воспроизводимыми негативными transport-сценариями.
 

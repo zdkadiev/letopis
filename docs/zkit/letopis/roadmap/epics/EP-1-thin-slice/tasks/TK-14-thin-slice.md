@@ -4,8 +4,8 @@
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 5 / 8 / 14 (best / expected / worst)
-> **План:** неделя 12 — 4 ч; неделя 13 — 4 ч
-> **Зависимости:** [TK-7](TK-7-markdown.md), [TK-8](TK-8-git-snapshots.md), [TK-9](TK-9-storage.md), [TK-10](TK-10-save-recovery.md), [TK-11](TK-11-cli-runtime.md), [TK-12](TK-12-search.md), [TK-13](TK-13-embeddings.md)
+> **План:** неделя 10 — 5 ч; неделя 11 — 3 ч
+> **Зависимости:** [TK-7](TK-7-markdown.md), [TK-8](TK-8-git-snapshots.md), [TK-9](TK-9-storage.md), [TK-10](TK-10-change-detection.md), [TK-11](TK-11-cli-runtime.md), [TK-12](TK-12-search.md), [TK-13](TK-13-embeddings.md)
 
 
 ## 1. Цель
@@ -16,7 +16,7 @@
 
 - План и расписание: [roadmap](../../../../roadmap.md).
 - Основание: S-1…S-4, MC-1…MC-7.
-- Покрывает: [FR-1, FR-2, FR-7, FR-13, FR-14, FR-21, FR-22, FR-25, FR-36](../../../../requirements.md).
+- Покрывает: [FR-1, FR-2, FR-13, FR-21, FR-22, FR-25, FR-36](../../../../requirements.md).
 - [Требования и критерии системы](../../../../requirements.md).
 - [Архитектура и владельцы](../../../../architecture.md).
 - [Механизмы и внутренние контракты](../../../../mechanics.md).
@@ -25,7 +25,7 @@
 
 ## 3. Что сделать
 
-1. Соединить реальные адаптеры в единый путь CLI→Markdown/Git→graph/FTS/jobs.
+1. Соединить реальные адаптеры в единый путь CLI→Markdown/Git→graph/FTS→drain.
 2. В новой сессии сохранить знание/ссылку, найти и инспектировать его, дождаться актуального vector.
 3. Подготовить начальный навык и минимальную source projection/загрузку для целевого RAM-корпуса.
 
@@ -35,7 +35,7 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Новая сессия через реальный CLI сохраняет знание и ссылку, получает FTS-результат/inspect и актуальный embedding.
+- [ ] Агент новой сессии записывает знание и ссылку в файл; следующий вызов реального CLI находит изменение, даёт FTS-результат/inspect и актуальный embedding.
 - [ ] Сбой не смешивает файлы/БД.
 - [ ] Навык объясняет этот путь.
 - [ ] Базовая source projection и загрузка корпуса готовы для RAM-пробы.
@@ -50,7 +50,7 @@
 
 - **Входит:** Первый работающий сквозной slice и минимальная инструкция coding-агенту. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Доменная/SQL/provider реализация остаётся [TK-7](TK-7-markdown.md)…[TK-13](TK-13-embeddings.md); полный source lifecycle — [TK-20](../../EP-2-knowledge/tasks/TK-20-source-identity.md)/[TK-21](../../EP-2-knowledge/tasks/TK-21-provenance.md); генератор target corpus — [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md).
-- **Интерфейсы — вход:** [TK-7](TK-7-markdown.md): Доменная модель и parser/serializer Markdown, отделённые от Git/SQLite/CLI адаптеров; [TK-8](TK-8-git-snapshots.md): Git adapter со снимками, служебными refs и тестами сохранности объектов; [TK-9](TK-9-storage.md): Начальная схема SQLite и storage adapters для всех согласованных сущностей; [TK-10](TK-10-save-recovery.md): Production save/recovery путь атомарной группы изменений с optimistic conflict checks; [TK-11](TK-11-cli-runtime.md): Рабочий CLI и один автоматически запускаемый worker проекта; [TK-12](TK-12-search.md): Базовый search/inspect с согласованными ссылками и гибридным ранжированием; [TK-13](TK-13-embeddings.md): Базовый embedding runtime и обработчик долговечных jobs
+- **Интерфейсы — вход:** [TK-7](TK-7-markdown.md): Доменная модель и parser/serializer Markdown, отделённые от Git/SQLite/CLI адаптеров; [TK-8](TK-8-git-snapshots.md): Git adapter со снимками, служебными refs и тестами сохранности объектов; [TK-9](TK-9-storage.md): Начальная схема SQLite и storage adapters для всех согласованных сущностей; [TK-10](TK-10-change-detection.md): Production путь обнаружения изменений и публикации по файлу; [TK-11](TK-11-cli-runtime.md): Рабочий CLI без постоянного процесса, с блокировками и запуском drain; [TK-12](TK-12-search.md): Базовый search/inspect с согласованными ссылками и гибридным ранжированием; [TK-13](TK-13-embeddings.md): Базовый embedding runtime и drain по текстам без вектора
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md), [TK-17](../../EP-7-early-validation/tasks/TK-17-early-pilot.md).
 
 ## 8. Риски и примечания

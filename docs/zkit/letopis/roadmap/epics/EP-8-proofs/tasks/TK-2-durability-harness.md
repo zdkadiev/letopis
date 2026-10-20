@@ -3,8 +3,8 @@
 > **Статус:** done
 > **Эпик:** [EP-8](../epic.md)
 > **Фаза:** PH-0
-> **Оценка, ч:** 8 / 16 / 32 (best / expected / worst)
-> **План:** неделя 1 — 2 ч; неделя 2 — 10 ч; неделя 3 — 4 ч
+> **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
+> **План:** неделя 1 — 2 ч; неделя 2 — 6 ч
 > **Зависимости:** [TK-1](TK-1-build.md)
 > **Плановые данные:** опубликованный реестр до общего пересчёта — 8 / 16 / 32 ч, недели 1–3; локальный D-95 snapshot — 4 / 8 / 16 ч, недели 1–2. Общий пересчёт публикуется отдельно от результата TK-2.
 
@@ -53,9 +53,9 @@
 ## 7. Границы
 
 - **Входит:** Матрица прерываний публикации с точным oracle и воспроизводимый harness обнаружения/публикации. Работа и собственные проверки перечислены в разделе 3.
-- **Не входит:** Production публикация — [TK-10](../../EP-1-thin-slice/tasks/TK-10-save-recovery.md); corruption/fail-closed — [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md); физическая потеря питания — [TK-38](../../EP-4-system-validation/tasks/TK-38-power-loss.md).
+- **Не входит:** Production публикация — [TK-10](../../EP-1-thin-slice/tasks/TK-10-change-detection.md); corruption/fail-closed — [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md); физическая потеря питания — [TK-38](../../EP-4-system-validation/tasks/TK-38-power-loss.md).
 - **Интерфейсы — вход:** [TK-1](TK-1-build.md): Воспроизводимый build harness и отчёт о совместимости выбранной связки на двух ОС
-- **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-7](../../EP-1-thin-slice/tasks/TK-7-markdown.md), [TK-10](../../EP-1-thin-slice/tasks/TK-10-save-recovery.md).
+- **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-7](../../EP-1-thin-slice/tasks/TK-7-markdown.md), [TK-10](../../EP-1-thin-slice/tasks/TK-10-change-detection.md).
 
 ## 8. Риски и примечания
 

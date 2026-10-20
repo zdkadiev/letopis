@@ -1,75 +1,83 @@
-"""Bounded queue/config/cancel/restart interleavings; no provider calls."""
+"""Embedding work derived from data (D-92/D-95): texts without a vector, live
+re-read with search_hash check, attempts in vectors.db; no provider calls."""
 from itertools import permutations, product
+
+
+def drain(nodes, disk, vectors, config, broken=False, fault=None, budget=20):
+    """One drain run. nodes: id -> published search_hash (cache); disk: id ->
+    live text hash. Returns stored vectors {(config, hash): text_hash} and
+    whether the run terminated."""
+    bad = lambda name: broken or fault == name
+    skipped, steps = set(), 0
+    while True:
+        steps += 1
+        if steps > budget: return vectors, False
+        work = sorted(n for n, h in nodes.items()
+                      if (config, h) not in vectors and (bad('skip_once') or n not in skipped))
+        if not work: return vectors, True
+        node = work[0]; wanted = nodes[node]; live = disk[node]
+        if live != wanted and not bad('stale_text'):
+            skipped.add(node); continue          # the next call publishes the new text
+        vectors = dict(vectors); vectors[(config, wanted)] = live
 
 
 def run(broken=False, fault=None):
     bad = lambda name: broken or fault == name
     errors = []
-    for change in ['replace', 'config', 'cancel', 'delete']:
-        for order in permutations(['read', 'compute', change, 'publish']):
-            if not (order.index('read') < order.index('compute') < order.index('publish')):
-                continue
-            seq, config, text = 10, 'A', 'old'
-            row = (seq, config, text)
-            captured, vector, node_exists = None, None, True
-            for event in order:
-                if event == 'read': captured = row
-                if event == change:
-                    if change == 'replace':
-                        seq, text, vector = 11, 'new', None
-                        row = (seq, config, text)
-                    elif change == 'config':
-                        seq, config, vector = 11, 'B', None
-                        row = (seq, config, text)
-                    else:
-                        row = None
-                        if change == 'delete': node_exists = False; vector = None
-                if event == 'publish' and captured is not None:
-                    if bad("seq") or row == captured:
-                        vector = captured[1:]
-                        row = None
-            changed_after_read = order.index(change) > order.index('read')
-            changed_before_publish = order.index(change) < order.index('publish')
-            if changed_after_read and changed_before_publish:
-                if change in ('replace', 'config') and row is None:
-                    errors.append('old seq removed replacement job: ' + change)
-                if vector is not None:
-                    errors.append('old or cancelled vector published: ' + change)
-            if not node_exists and vector is not None:
-                errors.append('deleted node retained vector')
 
-    # Crash before HTTP, after HTTP, and after valid publish. A reserved slot
-    # is consumed even if no HTTP call could be observed. Retry exhaustion
-    # is checked again at restart BEFORE the next external call.
+    # 1. The agent edited n1 after the last publication: its live text no longer
+    # matches the published search_hash. Drain must not store the new text under
+    # the old key, and must still terminate.
+    vectors, done = drain({'n1': 'h1', 'n2': 'h2'}, {'n1': 'h1b', 'n2': 'h2'}, {}, 'A', broken, fault)
+    if any(key[1] != text for key, text in vectors.items()):
+        errors.append('vector stored under a search_hash of a different text')
+    if not done:
+        errors.append('drain looped on a stale text instead of skipping it once')
+    if ('A', 'h2') not in vectors:
+        errors.append('fresh text not embedded')
+
+    # 2. Config changes while a vector is computed: the result is stored only if
+    # vectors.db meta still holds the captured config identity.
+    for order in permutations(['read', 'reset', 'publish']):
+        if order.index('read') > order.index('publish'): continue
+        meta, store, captured = 'A', set(), None
+        for event in order:
+            if event == 'read': captured = meta
+            if event == 'reset': meta, store = 'B', set()
+            if event == 'publish' and (bad('config_meta') or meta == captured):
+                store.add((captured, 't'))
+        if any(c != meta for c, _ in store):
+            errors.append('vector of a previous config stored')
+
+    # 3. Two processes observed a stale identity; the second reset re-checks
+    # identity inside its vectors.db write transaction and keeps fresh vectors.
+    meta, store = 'B', set()             # first reset
+    store.add(('B', 't1'))               # drain stores under the new config
+    if bad('reset_recheck') or meta != 'B':
+        store = set()                    # duplicate reset from a stale observation
+    if ('B', 't1') not in store:
+        errors.append('duplicate reset wiped vectors of the current config')
+
+    # 4. Cache rebuilt with vectors.db intact: work is only texts without a vector;
+    # identical texts share one vector.
+    store = {('A', 't1'), ('A', 't2')}
+    nodes = {'n1': 't1', 'n2': 't2', 'n3': 't3', 'n4': 't1'}
+    work = {n for n, t in nodes.items() if bad('rebuild') or ('A', t) not in store}
+    if work != {'n3'}:
+        errors.append('unchanged text recomputed after cache rebuild')
+
+    # 5. Attempts are reserved in vectors.db before the HTTP call, so crashes and
+    # restarts never exceed 1+max_retries calls per text.
     for max_retries in range(4):
-        budget = 1 + max_retries
-        for crashes in product(['before_http', 'after_http', 'error'], repeat=budget+2):
-            attempts, calls, state = 0, 0, 'queued'
-            for crash in crashes:
-                if state == 'failed': break
-                if attempts >= budget:
-                    state = 'failed'; break
-                if not bad("attempts"): attempts += 1
-                if crash != 'before_http': calls += 1
-                if bad('attempts') and crash == 'error': attempts += 1
-            if calls > budget:
-                errors.append('restart exceeded attempt budget %d' % budget)
-            if not bad("attempts") and attempts > budget:
-                errors.append('reserved more than allowed attempts')
-        # Crash after vector+delete transaction: no queue row to replay.
-        row, vector = None, ('A', 'same')
-        for _ in range(2):
-            if row is not None: errors.append('successful job replayed after restart')
-        if vector != ('A', 'same'): errors.append('restart lost committed vector')
-
-    # Different node IDs are independent; replacing one never wipes the queue.
-    queue = {'A': 10, 'B': 20}; queue['A'] = 21
-    if queue != {'A': 21, 'B': 20}: errors.append('replacement damaged other node')
-    # An unrelated apply changes project revision but not this text/config.
-    captured, row = (10, 'A', 'same'), (10, 'A', 'same')
-    project_revision = 'later-unrelated-tree'
-    if row != captured or not project_revision:
-        errors.append('unchanged text could not retain applicable work')
+        limit = 1 + max_retries
+        for events in product(['before_http', 'after_http', 'error'], repeat=limit + 2):
+            attempts, calls = 0, 0
+            for event in events:
+                if attempts >= limit: break
+                if not bad('attempts'): attempts += 1
+                if event != 'before_http': calls += 1
+            if calls > limit:
+                errors.append('restart exceeded attempt budget %d' % limit)
     return sorted(set(errors))
 
 

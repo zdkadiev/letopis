@@ -2,97 +2,12 @@
   "note": "Schema examples only, no runtime or performance evidence. IDs/hashes are synthetic valid-shape values.",
   "cases": [
     {
-      "command": "apply",
-      "kind": "input",
-      "valid": true,
-      "value": {
-        "operations": [
-          {
-            "type": "create",
-            "path": "knowledge/new.md",
-            "markdown": "<!-- letopis: {\"id\":\"tmp:000\",\"kind\":\"vertex\"} -->\nТекст знания.\n<!-- /letopis -->\n"
-          }
-        ]
-      }
-    },
-    {
-      "command": "apply",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": {
-          "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "ids": {
-            "tmp:000": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
-          }
-        }
-      }
-    },
-    {
-      "command": "apply",
-      "kind": "error",
-      "valid": true,
-      "value": {
-        "ok": false,
-        "error": {
-          "code": "internal_error",
-          "message": "Ошибка операции",
-          "details": {}
-        }
-      }
-    },
-    {
-      "command": "apply --check",
-      "kind": "input",
-      "valid": true,
-      "value": {
-        "operations": [
-          {
-            "type": "edit",
-            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-            "base_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "markdown": "<!-- letopis: {\"id\":\"08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c\",\"kind\":\"vertex\"} -->\nТекст знания.\n<!-- /letopis -->\n"
-          }
-        ]
-      }
-    },
-    {
-      "command": "apply --check",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": {
-          "paths": [
-            "knowledge/new.md"
-          ],
-          "element_ids": [
-            "tmp:000"
-          ]
-        }
-      }
-    },
-    {
-      "command": "apply --check",
-      "kind": "error",
-      "valid": true,
-      "value": {
-        "ok": false,
-        "error": {
-          "code": "internal_error",
-          "message": "Ошибка операции",
-          "details": {}
-        }
-      }
-    },
-    {
       "command": "inspect",
       "kind": "input",
       "valid": true,
       "value": {
         "element_ids": [
-          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+          "knowledge/design.md"
         ]
       }
     },
@@ -105,10 +20,9 @@
         "result": {
           "snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "elements": {
-            "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c": {
+            "src/storage.rs#L10-L25": {
               "path": "src/storage.rs",
               "hash": null,
-              "file_hash": null,
               "lines": [
                 10,
                 25
@@ -151,13 +65,13 @@
         "ok": true,
         "result": [
           {
-            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+            "element_id": "knowledge/design.md",
             "path": "knowledge/design.md",
             "lines": [
               1,
               5
             ],
-            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "revision": 7,
             "flags": []
           }
         ]
@@ -182,7 +96,7 @@
       "valid": true,
       "value": {
         "element_ids": [
-          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+          "knowledge/design.md"
         ],
         "mode": "both",
         "direction": "outgoing",
@@ -200,22 +114,21 @@
         "result": {
           "elements": [
             {
-              "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+              "element_id": "knowledge/design.md",
               "path": "knowledge/design.md",
               "lines": [
                 1,
                 5
               ],
-              "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "revision": 7,
               "flags": []
             }
           ],
           "edges": [
             {
-              "element_id": "064f2964-77cc-41f0-87ac-d280c0ec59a7",
-              "type": "depends_on",
-              "source": "521eb6f0-bd63-4d44-9aaf-c2d9be2bb5e4",
-              "target": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+              "source": "knowledge/decisions.md#cache-role",
+              "target": "knowledge/design.md",
+              "type": "depends_on"
             }
           ]
         }
@@ -238,9 +151,14 @@
       "command": "reindex",
       "kind": "input",
       "valid": true,
+      "value": {}
+    },
+    {
+      "command": "reindex",
+      "kind": "input",
+      "valid": false,
       "value": {
-        "paths": [],
-        "element_ids": []
+        "paths": []
       }
     },
     {
@@ -250,132 +168,12 @@
       "value": {
         "ok": true,
         "result": {
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          "revision": 7
         }
       }
     },
     {
       "command": "reindex",
-      "kind": "error",
-      "valid": true,
-      "value": {
-        "ok": false,
-        "error": {
-          "code": "internal_error",
-          "message": "Ошибка операции",
-          "details": {}
-        }
-      }
-    },
-    {
-      "command": "reindex --cancel",
-      "kind": "input",
-      "valid": true,
-      "value": {}
-    },
-    {
-      "command": "reindex --cancel",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": {
-          "revision": null
-        }
-      }
-    },
-    {
-      "command": "reindex --cancel",
-      "kind": "error",
-      "valid": true,
-      "value": {
-        "ok": false,
-        "error": {
-          "code": "internal_error",
-          "message": "Ошибка операции",
-          "details": {}
-        }
-      }
-    },
-    {
-      "command": "status",
-      "kind": "input",
-      "valid": true,
-      "value": {}
-    },
-    {
-      "command": "status",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": {
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reindex": null,
-          "embedding_jobs": 3,
-          "locks": [],
-          "errors": []
-        }
-      }
-    },
-    {
-      "command": "status",
-      "kind": "error",
-      "valid": true,
-      "value": {
-        "ok": false,
-        "error": {
-          "code": "internal_error",
-          "message": "Ошибка операции",
-          "details": {}
-        }
-      }
-    },
-    {
-      "command": "errors",
-      "kind": "input",
-      "valid": true,
-      "value": {}
-    },
-    {
-      "command": "errors",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": []
-      }
-    },
-    {
-      "command": "errors",
-      "kind": "error",
-      "valid": true,
-      "value": {
-        "ok": false,
-        "error": {
-          "code": "internal_error",
-          "message": "Ошибка операции",
-          "details": {}
-        }
-      }
-    },
-    {
-      "command": "errors --clear",
-      "kind": "input",
-      "valid": true,
-      "value": {}
-    },
-    {
-      "command": "errors --clear",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": []
-      }
-    },
-    {
-      "command": "errors --clear",
       "kind": "error",
       "valid": true,
       "value": {
@@ -416,75 +214,19 @@
       }
     },
     {
-      "command": "config --set",
-      "kind": "input",
-      "valid": true,
-      "value": {
-        "provider": "ollama",
-        "model": "embeddinggemma:300m-qat-q4_0",
-        "parameters": {
-          "base_url": "http://localhost:11434/api"
-        },
-        "max_retries": 3
-      }
-    },
-    {
-      "command": "config --set",
+      "command": "config",
       "kind": "success",
       "valid": true,
       "value": {
         "ok": true,
-        "result": {}
-      }
-    },
-    {
-      "command": "config --set",
-      "kind": "error",
-      "valid": true,
-      "value": {
-        "ok": false,
-        "error": {
-          "code": "internal_error",
-          "message": "Ошибка операции",
-          "details": {}
+        "result": {
+          "provider": "ollama",
+          "model": "embeddinggemma:300m-qat-q4_0",
+          "parameters": {
+            "base_url": "http://localhost:11434/api"
+          },
+          "max_retries": 3
         }
-      }
-    },
-    {
-      "command": "apply",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "operations": []
-      }
-    },
-    {
-      "command": "apply",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "operations": [
-          {
-            "type": "edit",
-            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-            "markdown": "<!-- letopis: {\"id\":\"tmp:000\",\"kind\":\"vertex\"} -->\nТекст знания.\n<!-- /letopis -->\n"
-          }
-        ]
-      }
-    },
-    {
-      "command": "apply",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "operations": [
-          {
-            "type": "delete",
-            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-            "base_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          }
-        ],
-        "operation_id": "extra"
       }
     },
     {
@@ -501,8 +243,8 @@
       "valid": true,
       "value": {
         "element_ids": [
-          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+          "knowledge/design.md",
+          "knowledge/design.md"
         ]
       }
     },
@@ -537,13 +279,13 @@
         "ok": true,
         "result": [
           {
-            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+            "element_id": "knowledge/design.md",
             "path": "knowledge/design.md",
             "lines": [
               1,
               5
             ],
-            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "revision": 7,
             "flags": [],
             "text": "forbidden"
           }
@@ -556,7 +298,7 @@
       "valid": false,
       "value": {
         "element_ids": [
-          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
+          "knowledge/design.md"
         ],
         "mode": "both",
         "direction": "outgoing",
@@ -566,53 +308,44 @@
       }
     },
     {
-      "command": "status",
+      "command": "config",
       "kind": "success",
       "valid": false,
       "value": {
         "ok": true,
         "result": {
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reindex": {
-            "stage": "graph",
-            "completed": 101
-          },
-          "embedding_jobs": 3,
-          "locks": [],
-          "errors": []
+          "provider": "ollama"
         }
       }
     },
     {
-      "command": "config --set",
-      "kind": "input",
+      "command": "config",
+      "kind": "success",
       "valid": false,
       "value": {
-        "provider": "ollama"
+        "ok": true,
+        "result": {
+          "provider": "ollama",
+          "model": "embeddinggemma:300m-qat-q4_0",
+          "parameters": {
+            "api_key": "fake-placeholder"
+          },
+          "max_retries": 3
+        }
       }
     },
     {
-      "command": "config --set",
-      "kind": "input",
+      "command": "config",
+      "kind": "success",
       "valid": false,
       "value": {
-        "provider": "ollama",
-        "model": "embeddinggemma:300m-qat-q4_0",
-        "parameters": {
-          "api_key": "fake-placeholder"
-        },
-        "max_retries": 3
-      }
-    },
-    {
-      "command": "config --set",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "provider": "ollama",
-        "model": "embeddinggemma:300m-qat-q4_0",
-        "parameters": [],
-        "max_retries": 3
+        "ok": true,
+        "result": {
+          "provider": "ollama",
+          "model": "embeddinggemma:300m-qat-q4_0",
+          "parameters": [],
+          "max_retries": 3
+        }
       }
     },
     {
@@ -623,44 +356,10 @@
         "ok": true,
         "result": [
           {
-            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
+            "element_id": "knowledge/design.md",
             "path": "knowledge/design.md",
-            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "revision": 7,
             "flags": []
-          }
-        ]
-      }
-    },
-    {
-      "command": "inspect",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "element_ids": [
-          "08FF5C9E-D4C6-4F73-B0F4-58FD455C6C5C"
-        ]
-      }
-    },
-    {
-      "command": "inspect",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "element_ids": [
-          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c\n"
-        ]
-      }
-    },
-    {
-      "command": "apply",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "operations": [
-          {
-            "type": "delete",
-            "element_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-            "base_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
           }
         ]
       }
@@ -680,432 +379,114 @@
       }
     },
     {
-      "command": "config --set",
-      "kind": "input",
-      "valid": true,
-      "value": {
-        "provider": "ollama",
-        "model": "fixture",
-        "parameters": {
-          "base_url": "http://127.0.0.1:11434/api"
-        },
-        "max_retries": 0
-      }
-    },
-    {
-      "command": "config --set",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "provider": "ollama",
-        "model": "fixture",
-        "parameters": {
-          "base_url": "http://127.0.0.1:11434/api"
-        },
-        "max_retries": -1
-      }
-    },
-    {
-      "command": "config --set",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "provider": "ollama",
-        "model": "fixture",
-        "parameters": {
-          "base_url": "http://127.0.0.1:11434/api"
-        },
-        "max_retries": 1.5
-      }
-    },
-    {
-      "command": "config --set",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "provider": "ollama",
-        "model": "fixture",
-        "parameters": {
-          "base_url": "http://127.0.0.1:11434/api"
-        },
-        "max_retries": true
-      }
-    },
-    {
-      "command": "config --set",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "provider": "ollama",
-        "model": "fixture",
-        "parameters": {
-          "base_url": "http://127.0.0.1:11434/api"
-        },
-        "max_retries": "3"
-      }
-    },
-    {
-      "command": "config --set",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "provider": "ollama",
-        "model": "fixture",
-        "parameters": {
-          "base_url": "http://127.0.0.1:11434/api"
-        },
-        "max_retries": null
-      }
-    },
-    {
-      "command": "config --set",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "provider": "ollama",
-        "model": "fixture",
-        "parameters": {
-          "base_url": "http://127.0.0.1:11434/api"
-        }
-      }
-    },
-    {
-      "command": "status",
-      "kind": "success",
-      "valid": false,
-      "value": {
-        "ok": true,
-        "result": {
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reindex": null,
-          "embedding_jobs": 0,
-          "locks": [],
-          "errors": [
-            {
-              "code": "embedding_failed",
-              "message": "Provider unavailable",
-              "details": {
-                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "command": "status",
+      "command": "config",
       "kind": "success",
       "valid": true,
       "value": {
         "ok": true,
         "result": {
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reindex": null,
-          "embedding_jobs": 0,
-          "locks": [],
-          "errors": [
-            {
-              "code": "embedding_failed",
-              "message": "Provider unavailable",
-              "details": {
-                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-                "active": true
-              }
-            }
-          ]
+          "provider": "ollama",
+          "model": "fixture",
+          "parameters": {
+            "base_url": "http://127.0.0.1:11434/api"
+          },
+          "max_retries": 0
         }
       }
     },
     {
-      "command": "status",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": {
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reindex": null,
-          "embedding_jobs": 0,
-          "locks": [],
-          "errors": [
-            {
-              "code": "embedding_failed",
-              "message": "Provider unavailable",
-              "details": {
-                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-                "active": false
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "command": "status",
+      "command": "config",
       "kind": "success",
       "valid": false,
       "value": {
         "ok": true,
         "result": {
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reindex": null,
-          "embedding_jobs": 0,
-          "locks": [],
-          "errors": [
-            {
-              "code": "embedding_failed",
-              "message": "Provider unavailable",
-              "details": {
-                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-                "active": "false"
-              }
-            }
-          ]
+          "provider": "ollama",
+          "model": "fixture",
+          "parameters": {
+            "base_url": "http://127.0.0.1:11434/api"
+          },
+          "max_retries": -1
         }
       }
     },
     {
-      "command": "status",
+      "command": "config",
       "kind": "success",
       "valid": false,
       "value": {
         "ok": true,
         "result": {
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reindex": null,
-          "embedding_jobs": 0,
-          "locks": [],
-          "errors": [
-            {
-              "code": "embedding_failed",
-              "message": "Provider unavailable",
-              "details": {
-                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-                "active": 0
-              }
-            }
-          ]
+          "provider": "ollama",
+          "model": "fixture",
+          "parameters": {
+            "base_url": "http://127.0.0.1:11434/api"
+          },
+          "max_retries": 1.5
         }
       }
     },
     {
-      "command": "status",
+      "command": "config",
       "kind": "success",
       "valid": false,
       "value": {
         "ok": true,
         "result": {
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reindex": null,
-          "embedding_jobs": 0,
-          "locks": [],
-          "errors": [
-            {
-              "code": "embedding_failed",
-              "message": "Provider unavailable",
-              "details": {
-                "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-                "active": null
-              }
-            }
-          ]
+          "provider": "ollama",
+          "model": "fixture",
+          "parameters": {
+            "base_url": "http://127.0.0.1:11434/api"
+          },
+          "max_retries": true
         }
       }
     },
     {
-      "command": "errors",
+      "command": "config",
       "kind": "success",
       "valid": false,
       "value": {
         "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
-            }
-          }
-        ]
+        "result": {
+          "provider": "ollama",
+          "model": "fixture",
+          "parameters": {
+            "base_url": "http://127.0.0.1:11434/api"
+          },
+          "max_retries": "3"
+        }
       }
     },
     {
-      "command": "errors",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-              "active": true
-            }
-          }
-        ]
-      }
-    },
-    {
-      "command": "errors",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-              "active": false
-            }
-          }
-        ]
-      }
-    },
-    {
-      "command": "errors",
+      "command": "config",
       "kind": "success",
       "valid": false,
       "value": {
         "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-              "active": "false"
-            }
-          }
-        ]
+        "result": {
+          "provider": "ollama",
+          "model": "fixture",
+          "parameters": {
+            "base_url": "http://127.0.0.1:11434/api"
+          },
+          "max_retries": null
+        }
       }
     },
     {
-      "command": "errors",
+      "command": "config",
       "kind": "success",
       "valid": false,
       "value": {
         "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-              "active": 0
-            }
+        "result": {
+          "provider": "ollama",
+          "model": "fixture",
+          "parameters": {
+            "base_url": "http://127.0.0.1:11434/api"
           }
-        ]
-      }
-    },
-    {
-      "command": "errors",
-      "kind": "success",
-      "valid": false,
-      "value": {
-        "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-              "active": null
-            }
-          }
-        ]
-      }
-    },
-    {
-      "command": "errors --clear",
-      "kind": "success",
-      "valid": false,
-      "value": {
-        "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "command": "errors --clear",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-              "active": true
-            }
-          }
-        ]
-      }
-    },
-    {
-      "command": "errors --clear",
-      "kind": "success",
-      "valid": false,
-      "value": {
-        "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-              "active": "false"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "command": "errors --clear",
-      "kind": "success",
-      "valid": false,
-      "value": {
-        "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-              "active": 0
-            }
-          }
-        ]
-      }
-    },
-    {
-      "command": "errors --clear",
-      "kind": "success",
-      "valid": false,
-      "value": {
-        "ok": true,
-        "result": [
-          {
-            "code": "embedding_failed",
-            "message": "Provider unavailable",
-            "details": {
-              "node_id": "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-              "active": null
-            }
-          }
-        ]
+        }
       }
     },
     {
@@ -1114,8 +495,8 @@
       "valid": true,
       "value": {
         "element_ids": [
-          "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c",
-          "064f2964-77cc-41f0-87ac-d280c0ec59a7"
+          "knowledge/design.md",
+          "knowledge/decisions.md#sqlite-wal"
         ]
       }
     },
@@ -1128,25 +509,517 @@
         "result": {
           "snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "elements": {
-            "08ff5c9e-d4c6-4f73-b0f4-58fd455c6c5c": {
+            "knowledge/design.md": {
               "path": "knowledge/a.md",
               "lines": [
                 1,
                 5
               ],
-              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-              "file_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
             },
-            "064f2964-77cc-41f0-87ac-d280c0ec59a7": {
+            "knowledge/decisions.md#sqlite-wal": {
               "path": "knowledge/a.md",
               "lines": [
                 3,
                 3
               ],
-              "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "file_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+              "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
             }
           }
+        }
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "element_ids": [
+          "src/storage.rs#L10-L25",
+          "src/storage.rs",
+          "knowledge/design.md"
+        ]
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "element_ids": [
+          "/abs/src/storage.rs"
+        ]
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "element_ids": [
+          "src/storage.rs#L10"
+        ]
+      }
+    },
+    {
+      "command": "check",
+      "kind": "input",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "command": "check",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "paths": [
+          "knowledge/decisions.md"
+        ]
+      }
+    },
+    {
+      "command": "check",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "paths": [
+          "/abs/knowledge.md"
+        ]
+      }
+    },
+    {
+      "command": "check",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "operations": []
+      }
+    },
+    {
+      "command": "check",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "errors": []
+        }
+      }
+    },
+    {
+      "command": "check",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "errors": [
+            {
+              "code": "validation_failed",
+              "message": "Dangling link",
+              "details": {
+                "path": "knowledge/design.md",
+                "target": "knowledge/gone.md"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "check",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "errors": [
+            {
+              "code": "conflict",
+              "message": "stale",
+              "details": {}
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "check",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "element_ids": [
+          "knowledge/design.md",
+          "knowledge/decisions.md#sqlite-wal",
+          "src/storage.rs#L10-L25",
+          "src/storage.rs"
+        ]
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "element_ids": [
+          "knowledge/decisions.md#L10-L20"
+        ]
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "element_ids": [
+          "knowledge/decisions.md#1bad"
+        ]
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "element_ids": [
+          "knowledge/design.md\n"
+        ]
+      }
+    },
+    {
+      "command": "traverse",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "elements": [],
+          "edges": [
+            {
+              "element_id": "x",
+              "source": "knowledge/decisions.md#cache-role",
+              "target": "knowledge/design.md",
+              "type": "depends_on"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "inspect",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "element_ids": [
+          "knowledge/decisions.md#sqlite wal"
+        ]
+      }
+    },
+    {
+      "command": "embed --drain",
+      "kind": "input",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "command": "embed --drain",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "wait": true
+      }
+    },
+    {
+      "command": "embed --drain",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {}
+      }
+    },
+    {
+      "command": "embed --drain",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "input",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "command": "status",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "internal_error",
+          "message": "Ошибка операции",
+          "details": {}
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": 7,
+          "embedding_backlog": 3,
+          "embedding_failed": 0,
+          "locks": [],
+          "problems": []
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": null,
+          "embedding_backlog": 0,
+          "embedding_failed": 0,
+          "locks": [],
+          "problems": []
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": 7,
+          "embedding_backlog": 3,
+          "embedding_failed": 1,
+          "locks": [
+            {
+              "name": "index",
+              "pid": 4242
+            },
+            {
+              "name": "embed",
+              "pid": 4243
+            }
+          ],
+          "problems": [
+            {
+              "code": "validation_failed",
+              "message": "Висячая ссылка",
+              "details": {
+                "path": "knowledge/a.md",
+                "target": "knowledge/gone.md"
+              }
+            },
+            {
+              "code": "embedding_failed",
+              "message": "Provider unavailable",
+              "details": {
+                "element_id": "knowledge/design.md"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": 7,
+          "embedding_backlog": 3,
+          "embedding_failed": 0,
+          "locks": [],
+          "problems": [],
+          "errors": []
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": 7,
+          "embedding_backlog": 3,
+          "embedding_failed": 0,
+          "locks": [],
+          "problems": [],
+          "reindex": {
+            "stage": "graph",
+            "completed": 40
+          }
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "embedding_backlog": 3,
+          "embedding_failed": 0,
+          "locks": [],
+          "problems": []
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": 7,
+          "embedding_backlog": -1,
+          "embedding_failed": 0,
+          "locks": [],
+          "problems": []
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": 7,
+          "embedding_backlog": 3,
+          "embedding_failed": 0,
+          "locks": [
+            {
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "paths": [],
+              "element_ids": []
+            }
+          ],
+          "problems": []
+        }
+      }
+    },
+    {
+      "command": "search",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": [
+          {
+            "element_id": "knowledge/design.md",
+            "path": "knowledge/design.md",
+            "lines": [
+              1,
+              5
+            ],
+            "revision": 7,
+            "flags": []
+          }
+        ],
+        "warnings": [
+          {
+            "code": "internal_error",
+            "message": "Drain not started",
+            "details": {}
+          }
+        ]
+      }
+    },
+    {
+      "command": "search",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": [],
+        "warnings": []
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": 7,
+          "embedding_backlog": 0,
+          "embedding_failed": 0,
+          "locks": [],
+          "problems": [
+            {
+              "code": "not_found",
+              "message": "source_snapshot отсутствует в Git",
+              "details": {
+                "path": "knowledge/a.md",
+                "source_snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "command": "status",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": 7,
+          "embedding_backlog": 0,
+          "embedding_failed": 0,
+          "locks": [],
+          "problems": [
+            {
+              "code": "embedding_failed",
+              "message": "Query embedding failed",
+              "details": {
+                "at": 1792285200
+              }
+            }
+          ]
         }
       }
     }

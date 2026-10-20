@@ -4,7 +4,7 @@
 > **Эпик:** [EP-6](../epic.md)
 > **Фаза:** PH-4
 > **Оценка, ч:** 2 / 4 / 8 (best / expected / worst)
-> **План:** неделя 37 — 2 ч; неделя 38 — 2 ч
+> **План:** неделя 33 — 4 ч
 > **Зависимости:** [TK-43](TK-43-delivery.md), [TK-44](TK-44-operations.md), [TK-42](../../EP-4-system-validation/tasks/TK-42-exhaustion.md), [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md)
 
 
@@ -15,8 +15,8 @@
 ## 2. Контекст и входные данные
 
 - План и расписание: [roadmap](../../../../roadmap.md).
-- Основание: G-4, FR-1…FR-36, NFR-1…NFR-8, C-1…C-8.
-- Покрывает: [FR-1…FR-36, NFR-1…NFR-8, C-1…C-8](../../../../requirements.md).
+- Основание: G-4, FR-1…FR-6, FR-11…FR-13, FR-17…FR-36, NFR-1…NFR-8, C-1…C-8.
+- Покрывает: [FR-1…FR-6, FR-11…FR-13, FR-17…FR-36, NFR-1…NFR-8, C-1…C-8](../../../../requirements.md).
 - [Требования и критерии системы](../../../../requirements.md).
 - [Архитектура и владельцы](../../../../architecture.md).
 - [Отказы и drills](../../../../resilience.md).
@@ -37,7 +37,7 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Приёмочный отчёт по конкретной сборке подтверждает все Must и C, закрытые G-0…G-4, schema/integration/platform/offline/concurrency/recovery/restore evidence и поставленный навык, включая evidence координации Git/save/recovery C-8.
+- [ ] Приёмочный отчёт по конкретной сборке подтверждает все Must и C, закрытые G-0…G-4, schema/integration/platform/offline/concurrency/recovery/restore evidence и поставленный навык, включая evidence обнаружения Git-правок C-8.
 - [ ] NFR-3/NFR-8 имеют результаты и явное решение по отклонениям.
 - [ ] Resource-math/contracts и инструкции обновлены по фактам, нет открытого блокирующего дефекта.
 - [ ] Только при выполнении критериев фиксируется «v1 готова»; иначе задача остаётся незавершённой и описан блокер.

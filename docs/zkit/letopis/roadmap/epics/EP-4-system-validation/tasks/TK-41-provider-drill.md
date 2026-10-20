@@ -4,7 +4,7 @@
 > **Эпик:** [EP-4](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 34 — 8 ч
+> **План:** неделя 29 — 1 ч; неделя 30 — 7 ч
 > **Зависимости:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md), [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md), [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md), [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md), [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md)
 
 
@@ -50,7 +50,7 @@ Provider/offline/security отчёт DR-5 и проверка NFR-6 на обе�
 
 - **Входит:** Provider/offline/security отчёт DR-5 и проверка NFR-6 на обеих платформах. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Transport harness — [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md); production adapters — [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md)/[TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md); filesystem/socket boundary — [TK-42](TK-42-exhaustion.md).
-- **Интерфейсы — вход:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md): Сравнительный отчёт P-1 и входные данные P-2.7 для ресурсной проверки; [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md): Boundary harness двух API с воспроизводимыми негативными transport-сценариями; [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md): Базовый embedding runtime и обработчик долговечных jobs; [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md): Полный lifecycle embedding jobs/config и ограниченные ретраи; [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md): Полный протокол отмены и завершённый функциональный scope перед системными испытаниями
+- **Интерфейсы — вход:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md): Сравнительный отчёт P-1 и входные данные P-2.7 для ресурсной проверки; [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md): Boundary harness двух API с воспроизводимыми негативными transport-сценариями; [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md): Базовый embedding runtime и drain по текстам без вектора; [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md): Полный lifecycle config и embeddings с ограниченными ретраями; [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md): Полный протокол отмены и завершённый функциональный scope перед системными испытаниями
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-42](TK-42-exhaustion.md), [TK-43](../../EP-6-delivery/tasks/TK-43-delivery.md), [TK-44](../../EP-6-delivery/tasks/TK-44-operations.md).
 
 ## 8. Риски и примечания

@@ -2,7 +2,7 @@
   "scope": "Expected development plan only; no execution or measurements",
   "capacity_hours_per_week": 10,
   "task_count": 45,
-  "total_hours": 372,
+  "total_hours": 329,
   "weeks": [
     {
       "week": 1,
@@ -29,25 +29,13 @@
       "allocations": [
         {
           "task": "TK-2",
-          "hours": 10,
-          "cumulative": 12
-        }
-      ],
-      "finishes": []
-    },
-    {
-      "week": 3,
-      "hours": 10,
-      "allocations": [
-        {
-          "task": "TK-2",
-          "hours": 4,
-          "cumulative": 16
+          "hours": 6,
+          "cumulative": 8
         },
         {
           "task": "TK-3",
-          "hours": 6,
-          "cumulative": 6
+          "hours": 4,
+          "cumulative": 4
         }
       ],
       "finishes": [
@@ -55,22 +43,42 @@
       ]
     },
     {
-      "week": 4,
+      "week": 3,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-3",
-          "hours": 6,
-          "cumulative": 12
+          "hours": 4,
+          "cumulative": 8
         },
         {
           "task": "TK-4",
-          "hours": 4,
-          "cumulative": 4
+          "hours": 6,
+          "cumulative": 6
         }
       ],
       "finishes": [
-        "TK-3"
+        "TK-3",
+        "TK-4"
+      ]
+    },
+    {
+      "week": 4,
+      "hours": 10,
+      "allocations": [
+        {
+          "task": "TK-5",
+          "hours": 8,
+          "cumulative": 8
+        },
+        {
+          "task": "TK-6",
+          "hours": 2,
+          "cumulative": 2
+        }
+      ],
+      "finishes": [
+        "TK-5"
       ]
     },
     {
@@ -78,18 +86,18 @@
       "hours": 10,
       "allocations": [
         {
-          "task": "TK-4",
-          "hours": 4,
+          "task": "TK-6",
+          "hours": 6,
           "cumulative": 8
         },
         {
-          "task": "TK-5",
-          "hours": 6,
-          "cumulative": 6
+          "task": "TK-7",
+          "hours": 4,
+          "cumulative": 4
         }
       ],
       "finishes": [
-        "TK-4"
+        "TK-6"
       ]
     },
     {
@@ -97,19 +105,24 @@
       "hours": 10,
       "allocations": [
         {
-          "task": "TK-5",
-          "hours": 2,
+          "task": "TK-7",
+          "hours": 4,
           "cumulative": 8
         },
         {
-          "task": "TK-6",
-          "hours": 8,
-          "cumulative": 8
+          "task": "TK-8",
+          "hours": 5,
+          "cumulative": 5
+        },
+        {
+          "task": "TK-9",
+          "hours": 1,
+          "cumulative": 1
         }
       ],
       "finishes": [
-        "TK-5",
-        "TK-6"
+        "TK-7",
+        "TK-8"
       ]
     },
     {
@@ -117,52 +130,14 @@
       "hours": 10,
       "allocations": [
         {
-          "task": "TK-7",
-          "hours": 8,
-          "cumulative": 8
-        },
-        {
-          "task": "TK-8",
-          "hours": 2,
-          "cumulative": 2
-        }
-      ],
-      "finishes": [
-        "TK-7"
-      ]
-    },
-    {
-      "week": 8,
-      "hours": 10,
-      "allocations": [
-        {
-          "task": "TK-8",
-          "hours": 6,
-          "cumulative": 8
-        },
-        {
           "task": "TK-9",
-          "hours": 4,
-          "cumulative": 4
-        }
-      ],
-      "finishes": [
-        "TK-8"
-      ]
-    },
-    {
-      "week": 9,
-      "hours": 10,
-      "allocations": [
-        {
-          "task": "TK-9",
-          "hours": 4,
+          "hours": 7,
           "cumulative": 8
         },
         {
           "task": "TK-10",
-          "hours": 6,
-          "cumulative": 6
+          "hours": 3,
+          "cumulative": 3
         }
       ],
       "finishes": [
@@ -170,29 +145,33 @@
       ]
     },
     {
-      "week": 10,
+      "week": 8,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-10",
-          "hours": 2,
+          "hours": 5,
           "cumulative": 8
         },
         {
           "task": "TK-11",
-          "hours": 8,
-          "cumulative": 8
+          "hours": 5,
+          "cumulative": 5
         }
       ],
       "finishes": [
-        "TK-10",
-        "TK-11"
+        "TK-10"
       ]
     },
     {
-      "week": 11,
+      "week": 9,
       "hours": 10,
       "allocations": [
+        {
+          "task": "TK-11",
+          "hours": 1,
+          "cumulative": 6
+        },
         {
           "task": "TK-12",
           "hours": 8,
@@ -200,27 +179,28 @@
         },
         {
           "task": "TK-13",
-          "hours": 2,
-          "cumulative": 2
+          "hours": 1,
+          "cumulative": 1
         }
       ],
       "finishes": [
+        "TK-11",
         "TK-12"
       ]
     },
     {
-      "week": 12,
+      "week": 10,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-13",
-          "hours": 6,
-          "cumulative": 8
+          "hours": 5,
+          "cumulative": 6
         },
         {
           "task": "TK-14",
-          "hours": 4,
-          "cumulative": 4
+          "hours": 5,
+          "cumulative": 5
         }
       ],
       "finishes": [
@@ -228,18 +208,18 @@
       ]
     },
     {
-      "week": 13,
+      "week": 11,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-14",
-          "hours": 4,
+          "hours": 3,
           "cumulative": 8
         },
         {
           "task": "TK-15",
-          "hours": 6,
-          "cumulative": 6
+          "hours": 7,
+          "cumulative": 7
         }
       ],
       "finishes": [
@@ -247,18 +227,23 @@
       ]
     },
     {
-      "week": 14,
+      "week": 12,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-15",
-          "hours": 2,
+          "hours": 1,
           "cumulative": 8
         },
         {
           "task": "TK-16",
           "hours": 8,
           "cumulative": 8
+        },
+        {
+          "task": "TK-17",
+          "hours": 1,
+          "cumulative": 1
         }
       ],
       "finishes": [
@@ -267,18 +252,18 @@
       ]
     },
     {
-      "week": 15,
+      "week": 13,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-17",
-          "hours": 8,
+          "hours": 7,
           "cumulative": 8
         },
         {
           "task": "TK-18",
-          "hours": 2,
-          "cumulative": 2
+          "hours": 3,
+          "cumulative": 3
         }
       ],
       "finishes": [
@@ -286,18 +271,18 @@
       ]
     },
     {
-      "week": 16,
+      "week": 14,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-18",
-          "hours": 6,
+          "hours": 5,
           "cumulative": 8
         },
         {
           "task": "TK-19",
-          "hours": 4,
-          "cumulative": 4
+          "hours": 5,
+          "cumulative": 5
         }
       ],
       "finishes": [
@@ -305,57 +290,62 @@
       ]
     },
     {
-      "week": 17,
+      "week": 15,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-19",
-          "hours": 4,
-          "cumulative": 8
+          "hours": 1,
+          "cumulative": 6
         },
         {
           "task": "TK-20",
           "hours": 6,
           "cumulative": 6
-        }
-      ],
-      "finishes": [
-        "TK-19"
-      ]
-    },
-    {
-      "week": 18,
-      "hours": 10,
-      "allocations": [
-        {
-          "task": "TK-20",
-          "hours": 2,
-          "cumulative": 8
         },
         {
           "task": "TK-21",
-          "hours": 8,
-          "cumulative": 8
+          "hours": 3,
+          "cumulative": 3
         }
       ],
       "finishes": [
-        "TK-20",
+        "TK-19",
+        "TK-20"
+      ]
+    },
+    {
+      "week": 16,
+      "hours": 10,
+      "allocations": [
+        {
+          "task": "TK-21",
+          "hours": 5,
+          "cumulative": 8
+        },
+        {
+          "task": "TK-22",
+          "hours": 5,
+          "cumulative": 5
+        }
+      ],
+      "finishes": [
         "TK-21"
       ]
     },
     {
-      "week": 19,
+      "week": 17,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-22",
-          "hours": 8,
+          "hours": 3,
           "cumulative": 8
         },
         {
           "task": "TK-23",
-          "hours": 2,
-          "cumulative": 2
+          "hours": 7,
+          "cumulative": 7
         }
       ],
       "finishes": [
@@ -363,56 +353,48 @@
       ]
     },
     {
-      "week": 20,
+      "week": 18,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-23",
-          "hours": 6,
+          "hours": 1,
           "cumulative": 8
         },
         {
           "task": "TK-24",
-          "hours": 4,
-          "cumulative": 4
-        }
-      ],
-      "finishes": [
-        "TK-23"
-      ]
-    },
-    {
-      "week": 21,
-      "hours": 10,
-      "allocations": [
-        {
-          "task": "TK-24",
-          "hours": 4,
-          "cumulative": 8
+          "hours": 6,
+          "cumulative": 6
         },
         {
           "task": "TK-25",
-          "hours": 6,
-          "cumulative": 6
+          "hours": 3,
+          "cumulative": 3
         }
       ],
       "finishes": [
+        "TK-23",
         "TK-24"
       ]
     },
     {
-      "week": 22,
+      "week": 19,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-25",
-          "hours": 2,
-          "cumulative": 8
+          "hours": 3,
+          "cumulative": 6
         },
         {
           "task": "TK-26",
-          "hours": 8,
-          "cumulative": 8
+          "hours": 6,
+          "cumulative": 6
+        },
+        {
+          "task": "TK-27",
+          "hours": 1,
+          "cumulative": 1
         }
       ],
       "finishes": [
@@ -421,18 +403,18 @@
       ]
     },
     {
-      "week": 23,
+      "week": 20,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-27",
-          "hours": 8,
-          "cumulative": 8
+          "hours": 5,
+          "cumulative": 6
         },
         {
           "task": "TK-28",
-          "hours": 2,
-          "cumulative": 2
+          "hours": 5,
+          "cumulative": 5
         }
       ],
       "finishes": [
@@ -440,67 +422,58 @@
       ]
     },
     {
-      "week": 24,
+      "week": 21,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-28",
-          "hours": 6,
-          "cumulative": 8
+          "hours": 1,
+          "cumulative": 6
         },
         {
           "task": "TK-29",
           "hours": 4,
           "cumulative": 4
-        }
-      ],
-      "finishes": [
-        "TK-28"
-      ]
-    },
-    {
-      "week": 25,
-      "hours": 10,
-      "allocations": [
-        {
-          "task": "TK-29",
-          "hours": 4,
-          "cumulative": 8
         },
         {
           "task": "TK-30",
-          "hours": 6,
-          "cumulative": 6
+          "hours": 5,
+          "cumulative": 5
         }
       ],
       "finishes": [
+        "TK-28",
         "TK-29"
       ]
     },
     {
-      "week": 26,
+      "week": 22,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-30",
-          "hours": 2,
+          "hours": 3,
           "cumulative": 8
         },
         {
           "task": "TK-31",
-          "hours": 8,
-          "cumulative": 8
+          "hours": 7,
+          "cumulative": 7
         }
       ],
       "finishes": [
-        "TK-30",
-        "TK-31"
+        "TK-30"
       ]
     },
     {
-      "week": 27,
+      "week": 23,
       "hours": 10,
       "allocations": [
+        {
+          "task": "TK-31",
+          "hours": 1,
+          "cumulative": 8
+        },
         {
           "task": "TK-32",
           "hours": 8,
@@ -508,27 +481,28 @@
         },
         {
           "task": "TK-33",
-          "hours": 2,
-          "cumulative": 2
+          "hours": 1,
+          "cumulative": 1
         }
       ],
       "finishes": [
+        "TK-31",
         "TK-32"
       ]
     },
     {
-      "week": 28,
+      "week": 24,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-33",
-          "hours": 6,
+          "hours": 7,
           "cumulative": 8
         },
         {
           "task": "TK-34",
-          "hours": 4,
-          "cumulative": 4
+          "hours": 3,
+          "cumulative": 3
         }
       ],
       "finishes": [
@@ -536,18 +510,18 @@
       ]
     },
     {
-      "week": 29,
+      "week": 25,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-34",
-          "hours": 4,
+          "hours": 5,
           "cumulative": 8
         },
         {
           "task": "TK-35",
-          "hours": 6,
-          "cumulative": 6
+          "hours": 5,
+          "cumulative": 5
         }
       ],
       "finishes": [
@@ -555,57 +529,62 @@
       ]
     },
     {
-      "week": 30,
+      "week": 26,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-35",
-          "hours": 2,
+          "hours": 3,
           "cumulative": 8
         },
         {
           "task": "TK-36",
-          "hours": 8,
-          "cumulative": 8
+          "hours": 7,
+          "cumulative": 7
         }
       ],
       "finishes": [
-        "TK-35",
-        "TK-36"
+        "TK-35"
       ]
     },
     {
-      "week": 31,
+      "week": 27,
       "hours": 10,
       "allocations": [
         {
-          "task": "TK-37",
-          "hours": 8,
+          "task": "TK-36",
+          "hours": 1,
           "cumulative": 8
         },
         {
+          "task": "TK-37",
+          "hours": 6,
+          "cumulative": 6
+        },
+        {
           "task": "TK-38",
-          "hours": 2,
-          "cumulative": 2
+          "hours": 3,
+          "cumulative": 3
         }
       ],
       "finishes": [
+        "TK-36",
         "TK-37"
       ]
     },
     {
-      "week": 32,
+      "week": 28,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-38",
-          "hours": 6,
+          "hours": 5,
           "cumulative": 8
         },
         {
           "task": "TK-39",
-          "hours": 4,
-          "cumulative": 4
+          "hours": 5,
+          "cumulative": 5
         }
       ],
       "finishes": [
@@ -613,57 +592,62 @@
       ]
     },
     {
-      "week": 33,
+      "week": 29,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-39",
-          "hours": 4,
+          "hours": 3,
           "cumulative": 8
         },
         {
           "task": "TK-40",
           "hours": 6,
           "cumulative": 6
-        }
-      ],
-      "finishes": [
-        "TK-39"
-      ]
-    },
-    {
-      "week": 34,
-      "hours": 10,
-      "allocations": [
-        {
-          "task": "TK-40",
-          "hours": 2,
-          "cumulative": 8
         },
         {
           "task": "TK-41",
-          "hours": 8,
-          "cumulative": 8
+          "hours": 1,
+          "cumulative": 1
         }
       ],
       "finishes": [
-        "TK-40",
+        "TK-39",
+        "TK-40"
+      ]
+    },
+    {
+      "week": 30,
+      "hours": 10,
+      "allocations": [
+        {
+          "task": "TK-41",
+          "hours": 7,
+          "cumulative": 8
+        },
+        {
+          "task": "TK-42",
+          "hours": 3,
+          "cumulative": 3
+        }
+      ],
+      "finishes": [
         "TK-41"
       ]
     },
     {
-      "week": 35,
+      "week": 31,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-42",
-          "hours": 8,
+          "hours": 5,
           "cumulative": 8
         },
         {
           "task": "TK-43",
-          "hours": 2,
-          "cumulative": 2
+          "hours": 5,
+          "cumulative": 5
         }
       ],
       "finishes": [
@@ -671,13 +655,18 @@
       ]
     },
     {
-      "week": 36,
+      "week": 32,
       "hours": 10,
       "allocations": [
         {
           "task": "TK-43",
-          "hours": 10,
+          "hours": 7,
           "cumulative": 12
+        },
+        {
+          "task": "TK-44",
+          "hours": 3,
+          "cumulative": 3
         }
       ],
       "finishes": [
@@ -685,35 +674,22 @@
       ]
     },
     {
-      "week": 37,
-      "hours": 10,
+      "week": 33,
+      "hours": 9,
       "allocations": [
         {
           "task": "TK-44",
-          "hours": 8,
+          "hours": 5,
           "cumulative": 8
         },
         {
           "task": "TK-45",
-          "hours": 2,
-          "cumulative": 2
-        }
-      ],
-      "finishes": [
-        "TK-44"
-      ]
-    },
-    {
-      "week": 38,
-      "hours": 2,
-      "allocations": [
-        {
-          "task": "TK-45",
-          "hours": 2,
+          "hours": 4,
           "cumulative": 4
         }
       ],
       "finishes": [
+        "TK-44",
         "TK-45"
       ]
     }

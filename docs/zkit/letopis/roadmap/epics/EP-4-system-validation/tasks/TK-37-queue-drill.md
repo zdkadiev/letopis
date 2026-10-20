@@ -3,8 +3,8 @@
 > **Статус:** planned
 > **Эпик:** [EP-4](../epic.md)
 > **Фаза:** PH-3
-> **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 31 — 8 ч
+> **Оценка, ч:** 3 / 6 / 10 (best / expected / worst)
+> **План:** неделя 27 — 6 ч
 > **Зависимости:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md), [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md), [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md), [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md)
 
 
@@ -27,18 +27,18 @@
 
 ## 3. Что сделать
 
-1. Прогнать полный ввод и гонки replace/config/delete/cancel/restart.
-2. Сверить late result, seq, attempts/failed, старые reader views и reindex waiters.
+1. Прогнать полный ввод и гонки правки/config/удаления/SIGINT/restart во время вычисления.
+2. Сверить late result, пропуск по search_hash, attempts в embed_failures, старые reader views и единственность drain.
 3. Подтвердить сохранность FTS и отсутствие искусственного срока опустошения очереди.
 
 ## 4. Ожидаемый результат
 
-Полный queue/reader/cancellation отчёт P-2.4 и DR-6.
+Полный queue/reader/cancellation отчёт P-2.4 и DR-6 (D-95).
 
 ## 5. Критерии приёмки
 
-- [ ] Ввод 100k, replace/config/delete/cancel/restart между reserve/compute/CAS не публикуют старый vector и не удаляют новый seq.
-- [ ] failed/retry budget, старый FTS/vec1 reader и waiters корректны.
+- [ ] Ввод 100k, правка/config/удаление/SIGINT/restart между резервированием, вычислением и записью вектора не публикуют вектор под новым текстом и не теряют новый текст (D-95).
+- [ ] Retry budget в embed_failures, старый FTS/vec1 reader и единственность drain корректны.
 - [ ] Deadline опустошения очереди не назначается.
 
 ## 6. Как проверить
@@ -51,14 +51,14 @@
 
 - **Входит:** Полный queue/reader/cancellation отчёт P-2.4 и DR-6. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** CAS/retry реализация — [TK-13](../../EP-1-thin-slice/tasks/TK-13-embeddings.md)/[TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md), cancellation — [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md); методика узкого proof — [TK-3](../../EP-8-proofs/tasks/TK-3-vector-harness.md).
-- **Интерфейсы — вход:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md): Сравнительный отчёт P-1 и входные данные P-2.7 для ресурсной проверки; [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md): Полный lifecycle embedding jobs/config и ограниченные ретраи; [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md): Полный протокол отмены и завершённый функциональный scope перед системными испытаниями; [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md): Воспроизводимый target-scale fixture: 100k знаний, assumed 100k source и 500k рёбер
+- **Интерфейсы — вход:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md): Сравнительный отчёт P-1 и входные данные P-2.7 для ресурсной проверки; [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md): Полный lifecycle config и embeddings с ограниченными ретраями; [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md): Полный протокол отмены и завершённый функциональный scope перед системными испытаниями; [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md): Воспроизводимый target-scale fixture: 100k знаний, assumed 100k source и 500k рёбер
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-42](TK-42-exhaustion.md), [TK-43](../../EP-6-delivery/tasks/TK-43-delivery.md).
 
 ## 8. Риски и примечания
 
-**Основание оценки 4 / 8 / 12 ч:** best — готовые race fixtures масштабируются на целевой ввод; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — редкие replace/config/cancel/restart interleavings и удержанные vec1 readers. Это инженерный диапазон, не измеренная скорость.
+**Основание оценки 3 / 6 / 10 ч (пересчёт 2026-10-20):** после D-95 нет гонок seq: проверяется пропуск по search_hash и embed_failures; best — готовые race fixtures масштабируются на целевой ввод; expected включает работу раздела 3, собственные проверки и передачу результата; неопределённость worst — редкие interleavings правки/config/restart и удержанные vec1 readers. Это инженерный диапазон, не измеренная скорость.
 
-**Риск и действие:** Редкие replace/config/cancel/restart interleavings и удержанные vec1 readers. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
+**Риск и действие:** Редкие interleavings правки/config/restart и удержанные vec1 readers. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
 
 ## 9. Отчёт о выполнении
 

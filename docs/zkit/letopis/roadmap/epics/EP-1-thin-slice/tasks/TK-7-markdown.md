@@ -4,7 +4,7 @@
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 5 / 8 / 14 (best / expected / worst)
-> **План:** неделя 7 — 8 ч
+> **План:** неделя 5 — 4 ч; неделя 6 — 4 ч
 > **Зависимости:** [TK-1](../../EP-8-proofs/tasks/TK-1-build.md), [TK-2](../../EP-8-proofs/tasks/TK-2-durability-harness.md), [TK-3](../../EP-8-proofs/tasks/TK-3-vector-harness.md), [TK-4](../../EP-8-proofs/tasks/TK-4-runtime-harness.md), [TK-5](../../EP-8-proofs/tasks/TK-5-pilot-protocol.md), [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md)
 
 
@@ -16,7 +16,7 @@
 
 - План и расписание: [roadmap](../../../../roadmap.md).
 - Основание: MC-1, B-2, X-4.
-- Покрывает: [FR-3, FR-4, FR-5, FR-6, FR-10, FR-35, C-7](../../../../requirements.md).
+- Покрывает: [FR-3, FR-4, FR-5, FR-6, FR-35, C-7](../../../../requirements.md).
 - [Требования и критерии системы](../../../../requirements.md).
 - [Архитектура и владельцы](../../../../architecture.md).
 - [Механизмы и внутренние контракты](../../../../mechanics.md).
@@ -26,8 +26,8 @@
 ## 3. Что сделать
 
 1. Создать доменные типы и codec актуальной грамматики Markdown X-4.
-2. Реализовать границы фрагментов, UUID/tmp ID, created_at, directed links/includes и source URI.
-3. Добавить fixtures точных байтов/хешей, fenced code, неперекрытия и ошибок разметки.
+2. Реализовать файл-элементы и раздел-элементы с якорями, ID по пути/якорю, created_at, рёбра-тройки/includes и source URI (D-93).
+3. Добавить fixtures точных байтов/хешей, fenced code, вложенности, дублей якорей и ошибок разметки.
 
 ## 4. Ожидаемый результат
 
@@ -35,7 +35,7 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Markdown codec распознаёт границы и актуальные маркеры/title X-4 (letopis: / /letopis, letopis:id=…), UUID/tmp ID, вершины/метавершины, ссылки и source URI.
+- [ ] Markdown codec распознаёт элементы и title X-4 (`<!-- letopis: {...} -->`, `{#anchor}`, `letopis:type=…`), ID по пути/якорю, ссылки и source URI; метавершина выводится по исходящим includes, поля kind нет (D-95).
 - [ ] Точные байты/SHA-256 и created_at проходят fixtures.
 - [ ] domain отделён от адаптеров.
 
@@ -49,8 +49,8 @@
 
 - **Входит:** Доменная модель и parser/serializer Markdown, отделённые от Git/SQLite/CLI адаптеров. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Git adapter — [TK-8](TK-8-git-snapshots.md); SQL projection — [TK-9](TK-9-storage.md); полный итоговый graph validator — [TK-18](../../EP-2-knowledge/tasks/TK-18-graph-validation.md).
-- **Интерфейсы — вход:** [TK-1](../../EP-8-proofs/tasks/TK-1-build.md): Воспроизводимый build harness и отчёт о совместимости выбранной связки на двух ОС; [TK-2](../../EP-8-proofs/tasks/TK-2-durability-harness.md): Матрица crash cuts с точным oracle и воспроизводимый harness save/recovery; [TK-3](../../EP-8-proofs/tasks/TK-3-vector-harness.md): Регрессионные сценарии совместимости vec1/read view и защиты публикации по seq; [TK-4](../../EP-8-proofs/tasks/TK-4-runtime-harness.md): Проверенный протокол одного worker и startup/recovery barrier с negative fixtures; [TK-5](../../EP-8-proofs/tasks/TK-5-pilot-protocol.md): Исполнимый протокол P-1 и формы отчёта для раннего и финального пилота; [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md): Boundary harness двух API с воспроизводимыми негативными transport-сценариями
-- **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-8](TK-8-git-snapshots.md), [TK-9](TK-9-storage.md), [TK-10](TK-10-save-recovery.md), [TK-14](TK-14-thin-slice.md), [TK-18](../../EP-2-knowledge/tasks/TK-18-graph-validation.md).
+- **Интерфейсы — вход:** [TK-1](../../EP-8-proofs/tasks/TK-1-build.md): Воспроизводимый build harness и отчёт о совместимости выбранной связки на двух ОС; [TK-2](../../EP-8-proofs/tasks/TK-2-durability-harness.md): Матрица прерываний публикации с точным oracle и воспроизводимый harness обнаружения/публикации; [TK-3](../../EP-8-proofs/tasks/TK-3-vector-harness.md): Регрессионные сценарии vec1/read view и пропуска устаревшего текста по search_hash; [TK-4](../../EP-8-proofs/tasks/TK-4-runtime-harness.md): Проверенная координация процессов: одна публикация, один drain, отмена SIGINT с negative fixtures; [TK-5](../../EP-8-proofs/tasks/TK-5-pilot-protocol.md): Исполнимый протокол P-1 и формы отчёта для раннего и финального пилота; [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md): Boundary harness двух API с воспроизводимыми негативными transport-сценариями
+- **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-8](TK-8-git-snapshots.md), [TK-9](TK-9-storage.md), [TK-10](TK-10-change-detection.md), [TK-14](TK-14-thin-slice.md), [TK-18](../../EP-2-knowledge/tasks/TK-18-graph-validation.md).
 
 ## 8. Риски и примечания
 
