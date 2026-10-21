@@ -1,0 +1,108 @@
+{
+  "status": "platform_checks_pass_review_pending",
+  "recorded_at_utc": "2026-10-21T20:09:13.332801+00:00",
+  "base_commit": "48b8ed8e47df2bc6b5df18a4048f50a840b63d6c",
+  "source_sha256": {
+    "Cargo.toml": "1e9e07a7d1b25b2037c90486ed48676e348817924375390ce4f0b99b5f8f69cb",
+    "Cargo.lock": "f15fc9e94b7d8d5fe693b1d92a5c95fe635cc0fc845e63655d7ae01f3e62d1b9",
+    "rust-toolchain.toml": "12dc5d64dbd96c1b07be2943241d52d9f6127a79ba47a820455ba7b873fc896a",
+    ".gitignore": "306fd52e74fca6746e12acc750f232de15e71da917756a1270d74c91f5eb7368",
+    ".gitattributes": "9e85c5294a3c58dedf79c4f4d745fff0fb11e41fa6f837821e062163199da1d5",
+    ".dockerignore": "51be957cca39d09b4387fb0ccd752f1f9195202a2b9702af298c753aa2de91a7",
+    "tests/markdown/Dockerfile": "cc22425c4b2073c54d46af47dc01daad5e1583b31adfaa5de71043a4729e4afe",
+    "src/adapters/markdown/links.rs": "6e9d85eeac1936572b531ecbe77c988658f94fe5712ea019c43dc5591fa20fb6",
+    "src/adapters/markdown/metadata.rs": "f9ff829174265d73a4201a6f12c8f3854f3dde97f0bd33d020aea1a4c9bf165b",
+    "src/adapters/markdown/mod.rs": "ecc22211f2a04c87d2c408286defe7e08dc8ec01e1c60695d49a911a2e77d7fb",
+    "src/adapters/markdown/scan.rs": "03ff176965194e7040015996b91db7ff3dfc2103a2461d3d4c7931e4f24e614e",
+    "src/adapters/markdown/search.rs": "4d4e458d340b120a43116cb99889c664d4675568110ae3f3d8bbeb79ef4c4870",
+    "src/adapters/mod.rs": "8818b43d222b80255318d4df3c7eaa43cd994e173b7d158f31cdfda97cf0aab9",
+    "src/domain/graph.rs": "46dcc956d100b1b4f9a914e92bfe23c8470c6179d1ec88dd6d6be66d3a6fcc02",
+    "src/domain/identity.rs": "c0cd49ebc37c04028c96c33df2d49280a2f52878969c9355554071b875a10ee8",
+    "src/domain/mod.rs": "c666739586dd118ddd98868b69f20c12f0713eef14da52caa6facdcfe5db6fbb",
+    "src/domain/value.rs": "ca77789c2396b5282aa77e1b3ec82cb7d84378165c3bc9f7fd95bc64bb597368",
+    "src/lib.rs": "e3e66abf976611f3d82e522937a00087c4534798a69d35354144f006c2eec326",
+    "tests/domain_values.rs": "3024dbf9c045383e1e0f06f1b157b33b73781b6ea682452b8cb26f8b0fc3bee4",
+    "tests/markdown_elements.rs": "329afb427a92b509015595c369c512096f309cf94420ed1d9e8831548626ce58",
+    "tests/markdown_links.rs": "64b43a1afb20d9d08d3a49aebcbf61eacb4159b615891fee3409229967f0025b",
+    "tests/markdown_search.rs": "d493df36d35eff5ba7d2a1a8f29bfbb930aa31ef98f8c3af42a8d3ead4337059",
+    "tests/support/mod.rs": "eb9f619811b6f1543139ba73a8403b829ca58d87e4a8a1a2f82773cf22df530b",
+    "tests/fixtures/markdown/code.md": "745c2910661730dbb4d8c94076b522837299017f8971f71cd8df368523512c62",
+    "tests/fixtures/markdown/crlf.md": "eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864",
+    "tests/fixtures/markdown/expected.json": "f457e2a05174ac9dcdd05a55646d90060098ebfc17b7ed2edaf4ece9b8719c26",
+    "tests/fixtures/markdown/no-final-newline.md": "8ae8dc48443c3b9132365da3e83a1862fe8c1be55da7ee6a9bbf478703fe58d2",
+    "tests/fixtures/markdown/references.md": "d6e82fad5e4dbf755ce529593be584a870855af446678ad18f31ddc00b408e97",
+    "tests/fixtures/markdown/sections.md": "142b27a765adec526a7dd8d33ab2dc8965c50fbbdc16916075d24c1bbcf53283",
+    "tests/fixtures/markdown/unicode.md": "8910a8d29ec22cd6a6a67bfddedd14f15dd0e8a9857b20f8372fb03a2ea5f4e7",
+    "tests/fixtures/markdown/whole.md": "69310cd742978c3cef6fa8c6ff86fb69981333c5eada345da90a83a5343cc70f"
+  },
+  "platforms": {
+    "macos-arm64": {
+      "integration_tests": 27,
+      "failed": 0,
+      "test_fmt_clippy": "PASS",
+      "log": "macos-arm64.log",
+      "log_sha256": "4b9d091c8f68f99954cf56064af9c63c72b8876fb6194def256100e9b5c1bb84",
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "commands": [
+        [
+          "cargo",
+          "test",
+          "--locked"
+        ],
+        [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        [
+          "cargo",
+          "clippy",
+          "--locked",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        [
+          "cargo",
+          "tree",
+          "--locked"
+        ]
+      ]
+    },
+    "linux-arm64": {
+      "integration_tests": 27,
+      "failed": 0,
+      "test_fmt_clippy": "PASS",
+      "log": "linux-arm64.log",
+      "log_sha256": "81a608f71d9ce98a195caddfd9386b43495d95b4f0fb548153eecea0bd382f20",
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "sha256:8d65adfbf0abd6fa2113aede8463d0f52b62e94928a7b78f86644e6bee00ecd2"
+      ],
+      "image_id": "sha256:8d65adfbf0abd6fa2113aede8463d0f52b62e94928a7b78f86644e6bee00ecd2",
+      "exit_code": 0
+    }
+  },
+  "review": null,
+  "limits": [
+    "No x86_64 runtime",
+    "No CLI/Git/SQL/model integration",
+    "No filesystem/symlink/source-bytes safety proof",
+    "No full graph validation or resource/utility claim"
+  ],
+  "schedule": {
+    "tasks": 45,
+    "hours": 333,
+    "weeks": 34,
+    "status": "PASS"
+  }
+}

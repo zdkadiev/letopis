@@ -1,6 +1,6 @@
 # TK-7 — доменные значения и Markdown X-4
 
-Дата: 2026-10-21. Статус: реализация проверена на обеих платформах; ожидается финальное ревью. Ветка `TK-7`, исходный `main@48b8ed8`. Слияния, push и изменения GitHub issue не выполнялись.
+Дата: 2026-10-21. Статус: done в локальной ветке TK-7; финальные проверки и исправления ревью завершены. Ветка `TK-7`, исходный `main@48b8ed8`. Слияния, push и изменения GitHub issue не выполнялись.
 
 ## Результат
 
@@ -18,7 +18,7 @@
 | Точные bytes/SHA-256/created_at | golden_elements_have_exact_bytes_and_metadata; unicode_crlf_and_eof_have_exact_spans; snapshot_metadata_preserves_full_oid_and_zero_created_at; markdown_search | macOS PASS; Linux PASS |
 | Domain отделён от адаптеров | зависимости/импорты src/domain и cargo tree; чистый input/output parse без I/O | проверено по исходникам; нет pulldown/serde/SQL/HTTP/Git imports в domain |
 
-27 тестов: 6 domain + 9 elements + 4 links + 8 search. macOS ARM64: cargo test --locked, cargo fmt --all --check, cargo clippy --locked --all-targets -- -D warnings PASS; [полный лог](macos-arm64.log). Linux glibc ARM64: те же 27 tests, fmt/clippy PASS в `docker run --rm --network none`; [лог](linux-arm64.log). Подготовка dependencies выполнялась с сетью, сам прогон — без неё. Точные source/log SHA-256, версии и argv/image ID — [verification.json](verification.json).
+30 тестов: 6 domain + 10 elements + 6 links + 8 search. macOS ARM64: cargo test --locked, cargo fmt --all --check, cargo clippy --locked --all-targets -- -D warnings PASS; [полный лог](macos-arm64.log). Linux glibc ARM64: те же 30 tests, fmt/clippy PASS в `docker run --rm --network none`; [лог](linux-arm64.log). Подготовка dependencies выполнялась с сетью, сам прогон — без неё. Точные source/log SHA-256, версии и argv/image ID — [verification.json](verification.json).
 
 ## Доказательства TDD и найденный случай
 
@@ -40,4 +40,8 @@ CRLF дал отдельный дефект: pulldown выдаёт newline сл�
 
 ## Финальное ревью
 
-Ожидается один свежий independent reviewer по Native workflow; task status не будет done до рассмотрения findings и проверок обеих платформ.
+Один свежий reviewer gpt-6-astra/high проверил всю ветку: 2 Important, 0 Critical/Minor. Оба Important подтверждены локальными RED и исправлены за один проход: metadata внутри raw HTML больше не объявляет элемент; ссылка в image alt не создаёт ребро, а ссылка вокруг Image сохраняется. [Исходные findings, решения и RED→GREEN](review.md). После исправлений полный suite **30/30**, fmt/clippy PASS на macOS и Linux ARM64. Повторного ревью не было; исправления доказаны regression tests и полными прогонами. Отложенных minor нет.
+
+Исторические receipts до исправлений (27 tests) сохранены в [before-review-fixes/](before-review-fixes/). Текущий verification.json относится к исправленному коду. [Журнал исполнения](execution-ledger.md) содержит все решения Native и переходы RED→GREEN; технический summary task-done с «0 tests» — последний пустой doctest target, а не суммарное число integration tests.
+
+Код исправлений: `3aff95f`; текущие SHA-256 исходников/fixtures и log receipts закреплены в verification.json. Ветка сохраняется для интеграции по решению пользователя; main/GitHub issue не изменялись. Расписание: 45 tasks, 333 expected hours, 34 weeks; оценки/зависимости сохранены.

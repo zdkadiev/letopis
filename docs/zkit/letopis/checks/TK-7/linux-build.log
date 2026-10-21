@@ -5,7 +5,7 @@
 #1 DONE 0.0s
 
 #2 [internal] load metadata for docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
-#2 DONE 5.1s
+#2 DONE 4.8s
 
 #3 [internal] load .dockerignore
 #3 transferring context: 364B done
@@ -15,18 +15,18 @@
 #4 resolve docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1 done
 #4 DONE 0.0s
 
-#5 [2/9] RUN rustup component add rustfmt clippy
-#5 CACHED
+#5 [internal] load build context
+#5 transferring context: 20.06kB done
+#5 DONE 0.0s
 
-#6 [3/9] WORKDIR /repo
-#6 DONE 0.0s
+#6 [2/9] RUN rustup component add rustfmt clippy
+#6 CACHED
 
-#7 [internal] load build context
-#7 transferring context: 55.18kB done
-#7 DONE 0.0s
+#7 [3/9] WORKDIR /repo
+#7 CACHED
 
 #8 [4/9] COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
-#8 DONE 0.0s
+#8 CACHED
 
 #9 [5/9] COPY src ./src
 #9 DONE 0.0s
@@ -41,38 +41,38 @@
 #12 DONE 0.0s
 
 #13 [9/9] RUN cargo fetch --locked
-#13 0.106     Updating crates.io index
-#13 61.00  Downloading crates ...
-#13 66.07   Downloaded cpufeatures v0.2.17
-#13 73.35   Downloaded block-buffer v0.10.4
-#13 73.82   Downloaded crypto-common v0.1.7
-#13 73.96   Downloaded cfg-if v1.0.5
-#13 75.63   Downloaded itoa v1.0.18
-#13 76.40   Downloaded version_check v0.9.5
-#13 77.75   Downloaded quote v1.0.47
-#13 78.08   Downloaded generic-array v0.14.7
-#13 79.58   Downloaded unicase v2.10.0
-#13 80.08   Downloaded digest v0.10.7
-#13 83.12   Downloaded sha2 v0.10.9
-#13 86.98   Downloaded unicode-ident v1.0.27
-#13 91.92   Downloaded serde_core v1.0.228
-#13 92.66   Downloaded proc-macro2 v1.0.107
-#13 93.62   Downloaded bitflags v2.13.2
-#13 95.24   Downloaded serde v1.0.228
-#13 96.01   Downloaded ryu v1.0.23
-#13 96.76   Downloaded serde_derive v1.0.228
-#13 99.96   Downloaded typenum v1.20.1
-#13 102.0   Downloaded memchr v2.8.3
-#13 104.8   Downloaded pulldown-cmark v0.13.4
-#13 105.9   Downloaded serde_json v1.0.145
-#13 109.1   Downloaded syn v2.0.119
-#13 117.6   Downloaded libc v0.2.191
-#13 DONE 117.7s
+#13 0.101     Updating crates.io index
+#13 17.33  Downloading crates ...
+#13 18.99   Downloaded block-buffer v0.10.4
+#13 20.31   Downloaded cpufeatures v0.2.17
+#13 20.88   Downloaded cfg-if v1.0.5
+#13 20.91   Downloaded crypto-common v0.1.7
+#13 21.24   Downloaded itoa v1.0.18
+#13 21.35   Downloaded generic-array v0.14.7
+#13 21.37   Downloaded version_check v0.9.5
+#13 21.84   Downloaded digest v0.10.7
+#13 22.15   Downloaded ryu v1.0.23
+#13 23.19   Downloaded unicase v2.10.0
+#13 23.42   Downloaded sha2 v0.10.9
+#13 23.56   Downloaded quote v1.0.47
+#13 24.06   Downloaded bitflags v2.13.2
+#13 24.66   Downloaded unicode-ident v1.0.27
+#13 24.77   Downloaded serde_derive v1.0.228
+#13 25.37   Downloaded serde_core v1.0.228
+#13 25.42   Downloaded proc-macro2 v1.0.107
+#13 26.40   Downloaded serde v1.0.228
+#13 26.87   Downloaded memchr v2.8.3
+#13 27.05   Downloaded typenum v1.20.1
+#13 27.77   Downloaded serde_json v1.0.145
+#13 27.92   Downloaded pulldown-cmark v0.13.4
+#13 29.49   Downloaded syn v2.0.119
+#13 32.73   Downloaded libc v0.2.191
+#13 DONE 32.8s
 
 #14 exporting to image
 #14 exporting layers 0.1s done
-#14 writing image sha256:8d65adfbf0abd6fa2113aede8463d0f52b62e94928a7b78f86644e6bee00ecd2 done
+#14 writing image sha256:677a81656ca628f6e4515df5fd78ace0ad986f929052f3525e3e0f239311d75c done
 #14 naming to docker.io/library/letopis-tk7-check done
 #14 DONE 0.1s
 
-View build details: docker-desktop://dashboard/build/avito/avito/l4s47vt502ysyt9eie183b1km
+View build details: docker-desktop://dashboard/build/avito/avito/r143j0wwv9efa2xzmwg64lpm8

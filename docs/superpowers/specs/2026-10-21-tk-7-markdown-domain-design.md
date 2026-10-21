@@ -1,6 +1,6 @@
 # TK-7 — доменные типы и Markdown-парсер
 
-Дата: 2026-10-21. Статус: согласована пользователем сообщением «Go on»; реализация проходит финальное ревью.
+Дата: 2026-10-21. Статус: согласована пользователем сообщением «Go on»; реализована и проверена в ветке TK-7.
 Ветка: `TK-7`, отдельный worktree от `main@48b8ed8e47df2bc6b5df18a4048f50a840b63d6c`.
 
 ## Основание и приоритет источников
@@ -102,4 +102,4 @@ Git snapshots/refs — TK-8; SQL/vec1 — TK-9; обнаружение изме�
 
 Спецификация и [план](../plans/2026-10-21-tk-7-markdown-domain.md) одобрены пользователем; выбран Native. Builder check спецификации: `nothing important left`. В начале ветки свежие 8 Rust protocol tests TK-6 прошли на базовом коде; это отдельный baseline, не тесты parser.
 
-Реализованы domain и Markdown adapter; 27 новых integration tests, fmt и clippy прошли на macOS/Linux ARM64. Linux test runtime — без сети. [Отчёт и доказательства](../../zkit/letopis/checks/TK-7/report.md). Финальное whole-branch ревью ещё ожидается; задача не объявлена done до рассмотрения findings.
+Реализованы domain и Markdown adapter; 30 integration tests, fmt и clippy прошли на macOS/Linux ARM64. Linux test runtime — без сети. [Отчёт и доказательства](../../zkit/letopis/checks/TK-7/report.md). Одно финальное whole-branch ревью выявило 2 Important; оба исправлены RED→GREEN, после чего полный suite повторён на обеих платформах. Отложенных minor нет; приёмка TK-7 завершена локально, интеграция отдельным действием.

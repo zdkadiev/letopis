@@ -1,6 +1,6 @@
 {
-  "status": "platform_checks_pass_review_pending",
-  "recorded_at_utc": "2026-10-21T20:09:13.332801+00:00",
+  "status": "PASS",
+  "recorded_at_utc": "2026-10-21T20:20:49.526381+00:00",
   "base_commit": "48b8ed8e47df2bc6b5df18a4048f50a840b63d6c",
   "source_sha256": {
     "Cargo.toml": "1e9e07a7d1b25b2037c90486ed48676e348817924375390ce4f0b99b5f8f69cb",
@@ -10,10 +10,10 @@
     ".gitattributes": "9e85c5294a3c58dedf79c4f4d745fff0fb11e41fa6f837821e062163199da1d5",
     ".dockerignore": "51be957cca39d09b4387fb0ccd752f1f9195202a2b9702af298c753aa2de91a7",
     "tests/markdown/Dockerfile": "cc22425c4b2073c54d46af47dc01daad5e1583b31adfaa5de71043a4729e4afe",
-    "src/adapters/markdown/links.rs": "6e9d85eeac1936572b531ecbe77c988658f94fe5712ea019c43dc5591fa20fb6",
+    "src/adapters/markdown/links.rs": "046167c860f4ce0c0f2b5fdedb8994705634b3f30be8f3ce0e3beaf0761e75f4",
     "src/adapters/markdown/metadata.rs": "f9ff829174265d73a4201a6f12c8f3854f3dde97f0bd33d020aea1a4c9bf165b",
     "src/adapters/markdown/mod.rs": "ecc22211f2a04c87d2c408286defe7e08dc8ec01e1c60695d49a911a2e77d7fb",
-    "src/adapters/markdown/scan.rs": "03ff176965194e7040015996b91db7ff3dfc2103a2461d3d4c7931e4f24e614e",
+    "src/adapters/markdown/scan.rs": "b418e2de928523d7efa8af603d7233e6d206d6936aedd8ba019463cecaaadd2c",
     "src/adapters/markdown/search.rs": "4d4e458d340b120a43116cb99889c664d4675568110ae3f3d8bbeb79ef4c4870",
     "src/adapters/mod.rs": "8818b43d222b80255318d4df3c7eaa43cd994e173b7d158f31cdfda97cf0aab9",
     "src/domain/graph.rs": "46dcc956d100b1b4f9a914e92bfe23c8470c6179d1ec88dd6d6be66d3a6fcc02",
@@ -22,8 +22,8 @@
     "src/domain/value.rs": "ca77789c2396b5282aa77e1b3ec82cb7d84378165c3bc9f7fd95bc64bb597368",
     "src/lib.rs": "e3e66abf976611f3d82e522937a00087c4534798a69d35354144f006c2eec326",
     "tests/domain_values.rs": "3024dbf9c045383e1e0f06f1b157b33b73781b6ea682452b8cb26f8b0fc3bee4",
-    "tests/markdown_elements.rs": "329afb427a92b509015595c369c512096f309cf94420ed1d9e8831548626ce58",
-    "tests/markdown_links.rs": "64b43a1afb20d9d08d3a49aebcbf61eacb4159b615891fee3409229967f0025b",
+    "tests/markdown_elements.rs": "ba9327b6aaf31f88dc9b4a1b209651b4df2a088a3e76b5800db049e0346d8a1d",
+    "tests/markdown_links.rs": "7da3a287ea946b24040a6b296a99ef2cee64ecd0c8aaeccec9f44931eb41172a",
     "tests/markdown_search.rs": "d493df36d35eff5ba7d2a1a8f29bfbb930aa31ef98f8c3af42a8d3ead4337059",
     "tests/support/mod.rs": "eb9f619811b6f1543139ba73a8403b829ca58d87e4a8a1a2f82773cf22df530b",
     "tests/fixtures/markdown/code.md": "745c2910661730dbb4d8c94076b522837299017f8971f71cd8df368523512c62",
@@ -37,11 +37,11 @@
   },
   "platforms": {
     "macos-arm64": {
-      "integration_tests": 27,
+      "integration_tests": 30,
       "failed": 0,
       "test_fmt_clippy": "PASS",
       "log": "macos-arm64.log",
-      "log_sha256": "4b9d091c8f68f99954cf56064af9c63c72b8876fb6194def256100e9b5c1bb84",
+      "log_sha256": "721d969fbdbe669d176277b154ae18fdb7264e30bada07d701d30686c068e016",
       "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
       "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
       "commands": [
@@ -73,11 +73,11 @@
       ]
     },
     "linux-arm64": {
-      "integration_tests": 27,
+      "integration_tests": 30,
       "failed": 0,
       "test_fmt_clippy": "PASS",
       "log": "linux-arm64.log",
-      "log_sha256": "81a608f71d9ce98a195caddfd9386b43495d95b4f0fb548153eecea0bd382f20",
+      "log_sha256": "3bf297a58f81cc9b678d1681c57478d90d2bbbb8b844ebb35b5058103bbb52aa",
       "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
       "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
       "argv": [
@@ -86,13 +86,29 @@
         "--rm",
         "--network",
         "none",
-        "sha256:8d65adfbf0abd6fa2113aede8463d0f52b62e94928a7b78f86644e6bee00ecd2"
+        "sha256:677a81656ca628f6e4515df5fd78ace0ad986f929052f3525e3e0f239311d75c"
       ],
-      "image_id": "sha256:8d65adfbf0abd6fa2113aede8463d0f52b62e94928a7b78f86644e6bee00ecd2",
+      "image_id": "sha256:677a81656ca628f6e4515df5fd78ace0ad986f929052f3525e3e0f239311d75c",
       "exit_code": 0
     }
   },
-  "review": null,
+  "review": {
+    "model": "gpt-6-astra/high",
+    "reviewed_head": "79cc52df9737424dfbfab7b85e4e862b9f6b63f7",
+    "initial_verdict": "With fixes",
+    "critical": 0,
+    "important_found": 2,
+    "important_fixed": 2,
+    "minor_deferred": 0,
+    "fix_passes": 1,
+    "re_review": false,
+    "fix_commit": "3aff95fee481603157f509a371f9e5fcba14a99c",
+    "regressions": [
+      "raw_html_content_does_not_declare_metadata",
+      "image_alt_links_do_not_declare_edges"
+    ],
+    "report": "review.md"
+  },
   "limits": [
     "No x86_64 runtime",
     "No CLI/Git/SQL/model integration",
@@ -104,5 +120,29 @@
     "hours": 333,
     "weeks": 34,
     "status": "PASS"
+  },
+  "implementation_commit": "3aff95fee481603157f509a371f9e5fcba14a99c",
+  "evidence_sha256": {
+    "before-review-fixes/linux-arm64.log": "81a608f71d9ce98a195caddfd9386b43495d95b4f0fb548153eecea0bd382f20",
+    "before-review-fixes/linux-build.log": "3aac73ffb4abdd2ccf67af022f0b4e5fb460aed9e873cb01c410590b5a1fa77b",
+    "before-review-fixes/macos-arm64.log": "4b9d091c8f68f99954cf56064af9c63c72b8876fb6194def256100e9b5c1bb84",
+    "linux-arm64.log": "3bf297a58f81cc9b678d1681c57478d90d2bbbb8b844ebb35b5058103bbb52aa",
+    "linux-build.log": "8492cf634824fe18f5050c3da20bd87ac0ec74a7fe60ca732523c0dcbad018d9",
+    "macos-arm64.log": "721d969fbdbe669d176277b154ae18fdb7264e30bada07d701d30686c068e016",
+    "tdd/crlf-red.log": "a1c15a897446c0feb8eedea7c09e07a1ebac716c3aa2579fc38a8927ccfe4298",
+    "tdd/review-fixes-clippy.log": "60dba499d4a062dcc12acbf915680fe3c0eea8c11079ebf94ca1f977081bf555",
+    "tdd/review-fixes-green.log": "02427ca60487d0dbbaef33d0572020ece441dfdafd2e4b5dbabdab27c786335b",
+    "tdd/review-html-green.log": "4aba24764acdc983ba13a9f16a105f871ff9981805face7eb4e8c395c22285cf",
+    "tdd/review-html-red.log": "6892bf9194f1eb080314ed8e19ed2dcd79b24f77e0272867b3bbfdba2119f420",
+    "tdd/review-image-red.log": "79559b3938cf0db1643c948b881df692454a4cb0b674d540d2ea2ad6f273e70e",
+    "tdd/task1-green.log": "27bba2a35c22d510847ef8748dbac8e05e2c7c012d4d88c82d28cde4a8bfa1c2",
+    "tdd/task1-red.log": "c46c65bbc541290778caf1c62670e0e0943a8046f504afe532e4a7e393bf0af6",
+    "tdd/task2-green.log": "afb712b72b9cf7d3c9fa4fe418760bbed12a704fa038b7cb384a346f880032e0",
+    "tdd/task2-links-red.log": "54abb89f3cde3db50d1c7d26050f86685e04a9a57cc5ad64e922698d47bce3c7",
+    "tdd/task2-red.log": "47a0bc82a0ec1ab47920457e9a96a05e110ba986942291ab0552f907e51dea0e",
+    "tdd/task3-green.log": "721d61d4d695a5d28c8f7324faadfdf0a03e19a5f445bd4dcfcea58d247cd414",
+    "tdd/task3-red.log": "97a77286f1ebb542077048ca19d614fd0726c9294143bf5804d6419864c3586e",
+    "review.md": "e6d0ddc5fb1a0c7d0d48fd9b63c095c9ecc6e5bf74f51f96f7ecccb6cff7d4be",
+    "execution-ledger.md": "5f0e69d3a51af6bd63028abcbd1036dfcbe01c5e247b341ac2d1e5957708c8a6"
   }
 }
