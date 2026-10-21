@@ -1,0 +1,11 @@
+count: compiled, named behavioral assertion detected mutation
+dimensions: compiled, named behavioral assertion detected mutation
+indices: compiled, named behavioral assertion detected mutation
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/negative_controls.py", line 93, in <module>
+    main()
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/negative_controls.py", line 77, in main
+    require_detection(build.returncode, result.returncode, output, witness)
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/run.py", line 33, in require_detection
+    raise RuntimeError('Mutation was not detected by its named behavioral test')
+RuntimeError: Mutation was not detected by its named behavioral test

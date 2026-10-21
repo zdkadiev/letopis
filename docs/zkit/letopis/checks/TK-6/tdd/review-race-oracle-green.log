@@ -1,0 +1,6 @@
+test_sigint_after_output_never_prints_second_json (test_transport.TransportTests.test_sigint_after_output_never_prints_second_json) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.021s
+
+OK

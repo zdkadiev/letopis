@@ -1,0 +1,180 @@
+{
+  "result": "FAIL",
+  "started_utc": "2026-10-21T18:48:15.533158+00:00",
+  "source_before_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "c7b87031103036709b1f9fe73ac5490375533492f34631ab2ace4c7184f6017e",
+    "fixtures.py": "8c12998ed97355f9f5e2033b87274c1edca5402bc71863068f9d937daa14428d",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "d02cdb11625fb9e13e2df2b2a05e8f22a6d1ea526674c81ca6f2353ef9130859",
+    "run.py": "b44ab76c8a2db3c05a35f2aa2e4520b06b07fc4f43a867404171ed17928b18eb",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "4e238f792097f219a65d9563ab2bd6271c4539c94f5ec0132ed6c50b4896edc9",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "controls": [
+    {
+      "name": "count",
+      "result": "DETECTED",
+      "test": "malformed_native_vectors_are_never_success",
+      "original_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      },
+      "mutated_sha256": {
+        "src/protocol.rs": "0e3e251a8ddd0746b4ca45d629c12b71441316a679b0b964b4058fefe8c47169"
+      },
+      "build_exit": 0,
+      "test_exit": 101,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-zev9b06p/transport/Cargo.toml",
+        "--test",
+        "protocol",
+        "malformed_native_vectors_are_never_success",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "witness": "test malformed_native_vectors_are_never_success ... FAILED",
+      "restored_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      }
+    },
+    {
+      "name": "dimensions",
+      "result": "DETECTED",
+      "test": "malformed_native_vectors_are_never_success",
+      "original_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      },
+      "mutated_sha256": {
+        "src/protocol.rs": "9de4dc6b0420815aa5ea17307cce5ec5456a6067777c898bc7fc06303e87299f"
+      },
+      "build_exit": 0,
+      "test_exit": 101,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-zev9b06p/transport/Cargo.toml",
+        "--test",
+        "protocol",
+        "malformed_native_vectors_are_never_success",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "witness": "test malformed_native_vectors_are_never_success ... FAILED",
+      "restored_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      }
+    },
+    {
+      "name": "indices",
+      "result": "DETECTED",
+      "test": "compatible_indices_must_bijectively_cover_inputs",
+      "original_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      },
+      "mutated_sha256": {
+        "src/protocol.rs": "40f961bea5d4aedde7940e005e7e76fcca1b4c1bda72a2e68731afcd3595afbe"
+      },
+      "build_exit": 0,
+      "test_exit": 101,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-zev9b06p/transport/Cargo.toml",
+        "--test",
+        "protocol",
+        "compatible_indices_must_bijectively_cover_inputs",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "witness": "test compatible_indices_must_bijectively_cover_inputs ... FAILED",
+      "restored_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      }
+    },
+    {
+      "name": "redirects",
+      "result": "FAIL",
+      "test": "test_redirect_sink_receives_no_request_or_key",
+      "original_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      },
+      "mutated_sha256": {
+        "src/client.rs": "b551bd01dfd5b04f74b2e0d98abe5262acd072e3d4e71e54639347749f336d6a"
+      },
+      "build_exit": 0,
+      "test_exit": 0,
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_redirect_sink_receives_no_request_or_key",
+        "-v"
+      ],
+      "witness": "FAIL: test_redirect_sink_receives_no_request_or_key"
+    }
+  ],
+  "system_trust_control": "Linux container-specific; macOS trust store is not modified",
+  "source_after_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "c7b87031103036709b1f9fe73ac5490375533492f34631ab2ace4c7184f6017e",
+    "fixtures.py": "8c12998ed97355f9f5e2033b87274c1edca5402bc71863068f9d937daa14428d",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "d02cdb11625fb9e13e2df2b2a05e8f22a6d1ea526674c81ca6f2353ef9130859",
+    "run.py": "b44ab76c8a2db3c05a35f2aa2e4520b06b07fc4f43a867404171ed17928b18eb",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "4e238f792097f219a65d9563ab2bd6271c4539c94f5ec0132ed6c50b4896edc9",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "finished_utc": "2026-10-21T18:48:24.928770+00:00",
+  "evidence_sha256": {
+    "count-build.log": "6962aae556bae513e0b7d94d7d6229544ea3df25696a2e0a6a4848ff8e633aa9",
+    "count-test.log": "bd600004066ec69ae0c3ff2086059dbae217a7a0eadb9112f60efc771b96c6b3",
+    "dimensions-build.log": "817d905a5e84eb040db345c412373ee27eff82dfea322d207f2493d54d8eb58a",
+    "dimensions-test.log": "f09010b963d8a3158b1850d1a425dba97f648036506718820f67facbcb68ea7e",
+    "indices-build.log": "5f4bfc42104bf468d55012c6048782e7afba08f484e0dc6719d6a109655f9da8",
+    "indices-test.log": "8d5aa4a74c280e85e97a7af06f161585bca500d1bb1cab260252adf3fdb15c51",
+    "redirects-build.log": "5f4bfc42104bf468d55012c6048782e7afba08f484e0dc6719d6a109655f9da8",
+    "redirects-test.log": "682c9e0a33db4af794740e7c24300b7bdc5a2f8d6392cee24b3278001c3db0db"
+  }
+}

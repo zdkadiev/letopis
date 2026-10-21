@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "docker",
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "-e",
+    "CARGO_NET_OFFLINE=true",
+    "-e",
+    "CARGO_TARGET_DIR=/build",
+    "-v",
+    "/Users/zdkadiev/.cargo/registry:/usr/local/cargo/registry:ro",
+    "-v",
+    "/Users/zdkadiev/.codex/worktrees/tk-6/letopis:/repo:ro",
+    "-v",
+    "/Users/zdkadiev/Repos/letopis/.git:/Users/zdkadiev/Repos/letopis/.git:ro",
+    "-v",
+    "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/.superpowers/sdd/2026-10-21-tk-6-embedding-transport/linux-target:/build",
+    "-v",
+    "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/docs/zkit/letopis/checks/TK-6:/evidence",
+    "letopis-tk6:rust-1.95.0",
+    "python3",
+    "-B",
+    "tests/transport/run.py",
+    "--evidence",
+    "/evidence/linux-arm64"
+  ],
+  "image_id": "sha256:06bd75ae1a471b3bd913beb1a4de2501137c872488d4e6df2e3751ce37954b9d",
+  "dependencies_fetched_before_offline_run": true,
+  "host_CA_store_modified": false
+}

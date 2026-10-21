@@ -1,0 +1,86 @@
+test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) ... 
+  test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='HTTP_PROXY') ... FAIL
+  test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='http_proxy') ... FAIL
+  test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='HTTPS_PROXY') ... FAIL
+  test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='https_proxy') ... FAIL
+  test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='ALL_PROXY') ... FAIL
+  test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='all_proxy') ... FAIL
+
+======================================================================
+FAIL: test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='HTTP_PROXY')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tk6-controls-g9vdea30/transport/test_transport.py", line 176, in test_proxy_environment_cannot_change_http_or_https_route
+    else: self.assertEqual(result[0], 0, result[2:])
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ('{"error":{"code":"embedding_failed","details":{},"message":"embedding_failed: connection failed"},"ok":false}\n', '')
+
+======================================================================
+FAIL: test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='http_proxy')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tk6-controls-g9vdea30/transport/test_transport.py", line 176, in test_proxy_environment_cannot_change_http_or_https_route
+    else: self.assertEqual(result[0], 0, result[2:])
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ('{"error":{"code":"embedding_failed","details":{},"message":"embedding_failed: connection failed"},"ok":false}\n', '')
+
+======================================================================
+FAIL: test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='HTTPS_PROXY')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tk6-controls-g9vdea30/transport/test_transport.py", line 177, in test_proxy_environment_cannot_change_http_or_https_route
+    self.assertEqual(trap['requests'], [])
+AssertionError: Lists differ: [{'method': 'CONNECT', 'path': '127.0.0.1:[105 chars]e'}}] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+{'method': 'CONNECT', 'path': '127.0.0.1:41461', 'headers': {'Host': '127.0.0.1:41461', 'User-Agent': 'ureq/3.4.2', 'Proxy-Connection': 'Keep-Alive'}}
+
++ []
+- [{'headers': {'Host': '127.0.0.1:41461',
+-               'Proxy-Connection': 'Keep-Alive',
+-               'User-Agent': 'ureq/3.4.2'},
+-   'method': 'CONNECT',
+-   'path': '127.0.0.1:41461'}]
+
+======================================================================
+FAIL: test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='https_proxy')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tk6-controls-g9vdea30/transport/test_transport.py", line 177, in test_proxy_environment_cannot_change_http_or_https_route
+    self.assertEqual(trap['requests'], [])
+AssertionError: Lists differ: [{'method': 'CONNECT', 'path': '127.0.0.1:[105 chars]e'}}] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+{'method': 'CONNECT', 'path': '127.0.0.1:38429', 'headers': {'Host': '127.0.0.1:38429', 'User-Agent': 'ureq/3.4.2', 'Proxy-Connection': 'Keep-Alive'}}
+
++ []
+- [{'headers': {'Host': '127.0.0.1:38429',
+-               'Proxy-Connection': 'Keep-Alive',
+-               'User-Agent': 'ureq/3.4.2'},
+-   'method': 'CONNECT',
+-   'path': '127.0.0.1:38429'}]
+
+======================================================================
+FAIL: test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='ALL_PROXY')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tk6-controls-g9vdea30/transport/test_transport.py", line 176, in test_proxy_environment_cannot_change_http_or_https_route
+    else: self.assertEqual(result[0], 0, result[2:])
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ('{"error":{"code":"embedding_failed","details":{},"message":"embedding_failed: connection failed"},"ok":false}\n', '')
+
+======================================================================
+FAIL: test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) (variable='all_proxy')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tk6-controls-g9vdea30/transport/test_transport.py", line 176, in test_proxy_environment_cannot_change_http_or_https_route
+    else: self.assertEqual(result[0], 0, result[2:])
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ('{"error":{"code":"embedding_failed","details":{},"message":"embedding_failed: connection failed"},"ok":false}\n', '')
+
+----------------------------------------------------------------------
+Ran 1 test in 0.092s
+
+FAILED (failures=6)

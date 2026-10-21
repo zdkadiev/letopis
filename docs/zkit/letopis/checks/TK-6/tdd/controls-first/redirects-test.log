@@ -1,0 +1,6 @@
+test_redirect_sink_receives_no_request_or_key (test_transport.TransportTests.test_redirect_sink_receives_no_request_or_key) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.438s
+
+OK

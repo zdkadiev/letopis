@@ -1,0 +1,68 @@
+letopis-transport-checks v0.0.0 (/repo/tests/transport)
+serde v1.0.228
+serde_core v1.0.228
+serde_derive v1.0.228 (proc-macro)
+proc-macro2 v1.0.107
+unicode-ident v1.0.27
+quote v1.0.47
+proc-macro2 v1.0.107 (*)
+syn v2.0.119
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+unicode-ident v1.0.27
+serde_json v1.0.145
+itoa v1.0.18
+memchr v2.8.3
+ryu v1.0.23
+serde_core v1.0.228
+signal-hook v0.3.18
+libc v0.2.191
+signal-hook-registry v1.4.8
+errno v0.3.14
+libc v0.2.191
+libc v0.2.191
+ureq v3.4.2
+base64 v0.23.1
+log v0.4.34
+percent-encoding v2.3.2
+rustls v0.23.46
+log v0.4.34
+once_cell v1.21.4
+ring v0.17.14
+cfg-if v1.0.5
+getrandom v0.2.17
+cfg-if v1.0.5
+libc v0.2.191
+libc v0.2.191
+untrusted v0.9.0
+cc v1.9.0
+find-msvc-tools v0.1.15
+shlex v2.0.1
+rustls-pki-types v1.15.1
+zeroize v1.9.1
+rustls-webpki v0.103.16
+ring v0.17.14 (*)
+rustls-pki-types v1.15.1 (*)
+untrusted v0.9.0
+subtle v2.6.1
+zeroize v1.9.1
+rustls-pki-types v1.15.1 (*)
+rustls-platform-verifier v0.7.1
+log v0.4.34
+rustls v0.23.46 (*)
+rustls-native-certs v0.8.5
+openssl-probe v0.2.1
+rustls-pki-types v1.15.1 (*)
+rustls-webpki v0.103.16 (*)
+serde v1.0.228 (*)
+serde_json v1.0.145 (*)
+ureq-proto v0.6.5
+base64 v0.23.1
+http v1.5.0
+bytes v1.12.1
+itoa v1.0.18
+httparse v1.10.1
+log v0.4.34
+utf8-zero v0.8.1
+webpki-roots v1.0.10
+rustls-pki-types v1.15.1 (*)

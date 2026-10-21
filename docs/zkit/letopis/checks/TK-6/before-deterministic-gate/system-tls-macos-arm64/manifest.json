@@ -1,0 +1,19 @@
+{
+  "result": "PASS",
+  "argv": [
+    "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/target/debug/transport_client",
+    "--tls-probe"
+  ],
+  "exit_code": 0,
+  "utc": "2026-10-21T19:02:36.236814+00:00",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "endpoint": "https://example.com/",
+  "method": "GET",
+  "credentials_sent": false,
+  "knowledge_sent": false,
+  "inference": false,
+  "fixture_ca_override": false,
+  "host_trust_store_modified": false,
+  "binary_sha256": "6f513d5e15e5e86b69719aeb3bbf18b861d990a1f15d543e64b5885d1ca310b8"
+}

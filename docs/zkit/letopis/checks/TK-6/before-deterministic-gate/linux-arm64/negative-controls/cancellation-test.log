@@ -1,0 +1,24 @@
+test_foreground_sigint_is_one_cancelled_outcome (test_transport.TransportTests.test_foreground_sigint_is_one_cancelled_outcome) ... 
+  test_foreground_sigint_is_one_cancelled_outcome (test_transport.TransportTests.test_foreground_sigint_is_one_cancelled_outcome) (mode='silent_headers') ... FAIL
+  test_foreground_sigint_is_one_cancelled_outcome (test_transport.TransportTests.test_foreground_sigint_is_one_cancelled_outcome) (mode='silent_body') ... FAIL
+
+======================================================================
+FAIL: test_foreground_sigint_is_one_cancelled_outcome (test_transport.TransportTests.test_foreground_sigint_is_one_cancelled_outcome) (mode='silent_headers')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tk6-controls-g9vdea30/transport/test_transport.py", line 98, in test_foreground_sigint_is_one_cancelled_outcome
+    self.assertEqual(p.returncode, 1, (out, err))
+AssertionError: -2 != 1 : ('', '')
+
+======================================================================
+FAIL: test_foreground_sigint_is_one_cancelled_outcome (test_transport.TransportTests.test_foreground_sigint_is_one_cancelled_outcome) (mode='silent_body')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tk6-controls-g9vdea30/transport/test_transport.py", line 98, in test_foreground_sigint_is_one_cancelled_outcome
+    self.assertEqual(p.returncode, 1, (out, err))
+AssertionError: -2 != 1 : ('', '')
+
+----------------------------------------------------------------------
+Ran 1 test in 0.029s
+
+FAILED (failures=2)

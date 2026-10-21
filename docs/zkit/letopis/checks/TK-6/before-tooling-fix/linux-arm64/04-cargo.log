@@ -1,0 +1,34 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+test compatible_request_is_literal_and_requires_safe_bearer ... ok
+test api_prefix_appends_exactly_one_separator ... ok
+test compatible_indices_must_bijectively_cover_inputs ... ok
+test malformed_native_vectors_are_never_success ... ok
+test response_order_and_optional_fields_follow_each_protocol ... ok
+test request_validation_rejects_empty_input_and_wrong_documented_types ... ok
+test native_request_is_literal_and_cannot_be_overridden ... ok
+test strict_configuration_rejects_invalid_shapes_without_defaulting ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Compiling letopis-transport-checks v0.0.0 (/repo/tests/transport)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.91s
+     Running unittests src/lib.rs (/build/debug/deps/letopis_transport_checks-06c571d659e84a0a)
+     Running unittests src/bin/transport_client.rs (/build/debug/deps/transport_client-08903a8a6a49f695)
+     Running tests/protocol.rs (/build/debug/deps/protocol-d7716eb4e57be75b)
+   Doc-tests letopis_transport_checks

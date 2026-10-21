@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/embed", "headers": {"content-length": "105", "user-agent": "ureq/3.4.2", "accept": "*/*", "host": "127.0.0.1:33079", "content-type": "application/json; charset=utf-8"}, "body": {"input": ["KNOWLEDGE_CANARY", "βeta"], "model": "fixture-model", "truncate": false}}

@@ -1,0 +1,24 @@
+test_exact_native_and_compatible_wire (test_transport.TransportTests.test_exact_native_and_compatible_wire) ... 
+  test_exact_native_and_compatible_wire (test_transport.TransportTests.test_exact_native_and_compatible_wire) (provider='ollama') ... FAIL
+  test_exact_native_and_compatible_wire (test_transport.TransportTests.test_exact_native_and_compatible_wire) (provider='openai') ... FAIL
+
+======================================================================
+FAIL: test_exact_native_and_compatible_wire (test_transport.TransportTests.test_exact_native_and_compatible_wire) (provider='ollama')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/test_transport.py", line 28, in test_exact_native_and_compatible_wire
+    self.assertEqual(code, 0, (out, err))
+AssertionError: 1 != 0 : ('{"ok":false,"error":{"code":"embedding_failed","message":"not implemented","details":{}}}\n', '')
+
+======================================================================
+FAIL: test_exact_native_and_compatible_wire (test_transport.TransportTests.test_exact_native_and_compatible_wire) (provider='openai')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/test_transport.py", line 28, in test_exact_native_and_compatible_wire
+    self.assertEqual(code, 0, (out, err))
+AssertionError: 1 != 0 : ('{"ok":false,"error":{"code":"embedding_failed","message":"not implemented","details":{}}}\n', '')
+
+----------------------------------------------------------------------
+Ran 1 test in 0.308s
+
+FAILED (failures=2)

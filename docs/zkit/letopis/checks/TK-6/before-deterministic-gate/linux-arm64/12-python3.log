@@ -1,0 +1,16 @@
+count: compiled, named behavioral assertion detected mutation
+dimensions: compiled, named behavioral assertion detected mutation
+indices: compiled, named behavioral assertion detected mutation
+redirects: compiled, named behavioral assertion detected mutation
+proxies: compiled, named behavioral assertion detected mutation
+deadline: compiled, named behavioral assertion detected mutation
+cancellation: compiled, named behavioral assertion detected mutation
+stdout-once: compiled, named behavioral assertion detected mutation
+Traceback (most recent call last):
+  File "/repo/tests/transport/negative_controls.py", line 94, in <module>
+    main()
+  File "/repo/tests/transport/negative_controls.py", line 78, in main
+    require_detection(build.returncode, result.returncode, output, witness)
+  File "/repo/tests/transport/run.py", line 33, in require_detection
+    raise RuntimeError('Mutation was not detected by its named behavioral test')
+RuntimeError: Mutation was not detected by its named behavioral test

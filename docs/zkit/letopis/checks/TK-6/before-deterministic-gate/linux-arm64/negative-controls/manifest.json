@@ -1,0 +1,317 @@
+{
+  "result": "FAIL",
+  "started_utc": "2026-10-21T19:02:40.052626+00:00",
+  "source_before_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "10762e73c4e20eacf9fd782e85986877c1d9c7bd7d12c901c086ac179e5b5cc3",
+    "README.md": "e8a50dfc18e8ed91af597586b4ff00391889dfa048724e43208bac52ddd87239",
+    "fixtures.py": "8c10c3a69335df04f1addf51b61513ea27dfcb95d60ccd43c4d1d879c9c0b6b2",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "1559f6809e0a1a2f3ee7bb69b151e813c9f1fc9df5c365d3718b47d417d6c970",
+    "run.py": "6416f4278c75220b18888c76eb4d1334755c8ba0768726491920c15490fd1278",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "74a751cde166efaff49fe08e042c502e90833d29e7d9f37d74ace3aea5d2371f",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "09c4e4b122d218d5c85f19db05d21c3984a8da3a80ae439e5d9fd32886b5a42f",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "controls": [
+    {
+      "name": "count",
+      "result": "DETECTED",
+      "test": "malformed_native_vectors_are_never_success",
+      "original_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      },
+      "mutated_sha256": {
+        "src/protocol.rs": "0e3e251a8ddd0746b4ca45d629c12b71441316a679b0b964b4058fefe8c47169"
+      },
+      "build_exit": 0,
+      "test_exit": 101,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/tmp/tk6-controls-g9vdea30/transport/Cargo.toml",
+        "--test",
+        "protocol",
+        "malformed_native_vectors_are_never_success",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "witness": "test malformed_native_vectors_are_never_success ... FAILED",
+      "restored_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      }
+    },
+    {
+      "name": "dimensions",
+      "result": "DETECTED",
+      "test": "malformed_native_vectors_are_never_success",
+      "original_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      },
+      "mutated_sha256": {
+        "src/protocol.rs": "9de4dc6b0420815aa5ea17307cce5ec5456a6067777c898bc7fc06303e87299f"
+      },
+      "build_exit": 0,
+      "test_exit": 101,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/tmp/tk6-controls-g9vdea30/transport/Cargo.toml",
+        "--test",
+        "protocol",
+        "malformed_native_vectors_are_never_success",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "witness": "test malformed_native_vectors_are_never_success ... FAILED",
+      "restored_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      }
+    },
+    {
+      "name": "indices",
+      "result": "DETECTED",
+      "test": "compatible_indices_must_bijectively_cover_inputs",
+      "original_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      },
+      "mutated_sha256": {
+        "src/protocol.rs": "40f961bea5d4aedde7940e005e7e76fcca1b4c1bda72a2e68731afcd3595afbe"
+      },
+      "build_exit": 0,
+      "test_exit": 101,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/tmp/tk6-controls-g9vdea30/transport/Cargo.toml",
+        "--test",
+        "protocol",
+        "compatible_indices_must_bijectively_cover_inputs",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "witness": "test compatible_indices_must_bijectively_cover_inputs ... FAILED",
+      "restored_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      }
+    },
+    {
+      "name": "redirects",
+      "result": "DETECTED",
+      "test": "test_redirect_sink_receives_no_request_or_key",
+      "original_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      },
+      "mutated_sha256": {
+        "src/client.rs": "b551bd01dfd5b04f74b2e0d98abe5262acd072e3d4e71e54639347749f336d6a"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_redirect_sink_receives_no_request_or_key",
+        "-v"
+      ],
+      "witness": "FAIL: test_redirect_sink_receives_no_request_or_key",
+      "restored_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      }
+    },
+    {
+      "name": "proxies",
+      "result": "DETECTED",
+      "test": "test_proxy_environment_cannot_change_http_or_https_route",
+      "original_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      },
+      "mutated_sha256": {
+        "src/client.rs": "aabcc3790f8ed4ca133dbca1a230a78342b676bde81c2b9bf372577957995ccb"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route",
+        "-v"
+      ],
+      "witness": "FAIL: test_proxy_environment_cannot_change_http_or_https_route",
+      "restored_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      }
+    },
+    {
+      "name": "deadline",
+      "result": "DETECTED",
+      "test": "test_short_deadline_covers_headers_body_and_trickle",
+      "original_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      },
+      "mutated_sha256": {
+        "src/client.rs": "514cab24dbd503a67bd483cde95b8fc1d4091a9558d2aae77f875ba9f267bbdb"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_short_deadline_covers_headers_body_and_trickle",
+        "-v"
+      ],
+      "witness": "FAIL: test_short_deadline_covers_headers_body_and_trickle",
+      "restored_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      }
+    },
+    {
+      "name": "cancellation",
+      "result": "DETECTED",
+      "test": "test_foreground_sigint_is_one_cancelled_outcome",
+      "original_sha256": {
+        "src/bin/transport_client.rs": "09c4e4b122d218d5c85f19db05d21c3984a8da3a80ae439e5d9fd32886b5a42f"
+      },
+      "mutated_sha256": {
+        "src/bin/transport_client.rs": "6fdf2d048ede7363ec6b10c2ed6c5dc2d32cbd9d768f78d4ff1c9436192a6376"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_foreground_sigint_is_one_cancelled_outcome",
+        "-v"
+      ],
+      "witness": "FAIL: test_foreground_sigint_is_one_cancelled_outcome",
+      "restored_sha256": {
+        "src/bin/transport_client.rs": "09c4e4b122d218d5c85f19db05d21c3984a8da3a80ae439e5d9fd32886b5a42f"
+      }
+    },
+    {
+      "name": "stdout-once",
+      "result": "DETECTED",
+      "test": "test_sigint_after_output_never_prints_second_json",
+      "original_sha256": {
+        "src/bin/transport_client.rs": "09c4e4b122d218d5c85f19db05d21c3984a8da3a80ae439e5d9fd32886b5a42f"
+      },
+      "mutated_sha256": {
+        "src/bin/transport_client.rs": "bc158e6af711dbbefd4cff7e0ad7fed6db3947ae53c61996d99761ae72c64f34"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_sigint_after_output_never_prints_second_json",
+        "-v"
+      ],
+      "witness": "FAIL: test_sigint_after_output_never_prints_second_json",
+      "restored_sha256": {
+        "src/bin/transport_client.rs": "09c4e4b122d218d5c85f19db05d21c3984a8da3a80ae439e5d9fd32886b5a42f"
+      }
+    },
+    {
+      "name": "cancelled-exit",
+      "result": "FAIL",
+      "test": "test_cancelled_output_wins_exit_status_when_http_finishes_later",
+      "original_sha256": {
+        "src/bin/transport_client.rs": "09c4e4b122d218d5c85f19db05d21c3984a8da3a80ae439e5d9fd32886b5a42f"
+      },
+      "mutated_sha256": {
+        "src/bin/transport_client.rs": "6d414cd90cd44bb65259c8dbfcdb6523626c00d7010f27050e08976cf93c55e0"
+      },
+      "build_exit": 0,
+      "test_exit": 0,
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_cancelled_output_wins_exit_status_when_http_finishes_later",
+        "-v"
+      ],
+      "witness": "FAIL: test_cancelled_output_wins_exit_status_when_http_finishes_later"
+    }
+  ],
+  "system_trust_control": "Linux container-specific; macOS trust store is not modified",
+  "source_after_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "10762e73c4e20eacf9fd782e85986877c1d9c7bd7d12c901c086ac179e5b5cc3",
+    "README.md": "e8a50dfc18e8ed91af597586b4ff00391889dfa048724e43208bac52ddd87239",
+    "fixtures.py": "8c10c3a69335df04f1addf51b61513ea27dfcb95d60ccd43c4d1d879c9c0b6b2",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "1559f6809e0a1a2f3ee7bb69b151e813c9f1fc9df5c365d3718b47d417d6c970",
+    "run.py": "6416f4278c75220b18888c76eb4d1334755c8ba0768726491920c15490fd1278",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "74a751cde166efaff49fe08e042c502e90833d29e7d9f37d74ace3aea5d2371f",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "09c4e4b122d218d5c85f19db05d21c3984a8da3a80ae439e5d9fd32886b5a42f",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "finished_utc": "2026-10-21T19:03:23.029405+00:00",
+  "evidence_sha256": {
+    "cancellation-build.log": "4dfc90733d481d510dda9cdea740db239e93389a0e8914aa189bf1ecf78e7d28",
+    "cancellation-test.log": "fdf555c0f1c267e2a32531113273421ccb0fc98a9733c9d1c2f19f56af0b17fd",
+    "cancelled-exit-build.log": "64f0359954863ce497f430b1a97148a7c6fea3537fd77cdcf8e38d3a526947e5",
+    "cancelled-exit-test.log": "8876314d55686d518283558f4d23be0deabbc3a0c201b13f34b0c6e5e0d17779",
+    "count-build.log": "6fc094eda8bdacac5ae0e37a6b9079e749045a4dcde5b8e75c5fa0d3da8ecc7b",
+    "count-test.log": "749e8eb92579c0ab643a5ede7a044d211e0d9ae66e2476858881d97893abe5ac",
+    "deadline-build.log": "918af3953c6ae56a915d9df65addb64b11fabece69c30df6698237536a3202f3",
+    "deadline-test.log": "aa77daa3ed3f9609dd0cc13f175ff5ff2159e680018ad4a55652607342f8ba36",
+    "dimensions-build.log": "8ed168ae1311f624e36a86cb5a03c82b1cce279e504f45810a7f8ad37319cfd3",
+    "dimensions-test.log": "614e0f8c5d7c8a9ffea0570ae8912e5732c75c43895dacaf73bc8d1504616c23",
+    "indices-build.log": "a9b6a2417f98d1bd17c41d188655f6ca33c68c2f1f2d0f044ce481624192d91e",
+    "indices-test.log": "8544c051f52aee32ac0b4c13c0ac4681d7e2245fead8c6891fa4ac1dd4355b97",
+    "proxies-build.log": "ca83b56366ca162459d398cc03f9d1f77e1dc44579c4b6182a6a43e6c71e4b8a",
+    "proxies-test.log": "c07e7f21b5da909ba1166c282804dd589cf75c74333d6b0a973d3830ff199982",
+    "redirects-build.log": "a9b6a2417f98d1bd17c41d188655f6ca33c68c2f1f2d0f044ce481624192d91e",
+    "redirects-test.log": "5dcc02657dd93544e3200592a54a092a338da9399e9afaf1b3cb970a0c6ef7a1",
+    "stdout-once-build.log": "f9fdc2842dbc8d53f786fa45837f0676f6f0c55fbaf32b7eae0dff731e326fec",
+    "stdout-once-test.log": "209e194059c810eec303c0ee9313e5d36dd590bb69e7ac4e61b6d695e93fee54"
+  }
+}

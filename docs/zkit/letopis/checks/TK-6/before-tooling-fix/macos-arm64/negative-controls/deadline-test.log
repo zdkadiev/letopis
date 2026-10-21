@@ -1,0 +1,87 @@
+test_short_deadline_covers_headers_body_and_trickle (test_transport.TransportTests.test_short_deadline_covers_headers_body_and_trickle) ... 
+  test_short_deadline_covers_headers_body_and_trickle (test_transport.TransportTests.test_short_deadline_covers_headers_body_and_trickle) (mode='silent_headers') ... FAIL
+  test_short_deadline_covers_headers_body_and_trickle (test_transport.TransportTests.test_short_deadline_covers_headers_body_and_trickle) (mode='silent_body') ... FAIL
+  test_short_deadline_covers_headers_body_and_trickle (test_transport.TransportTests.test_short_deadline_covers_headers_body_and_trickle) (mode='trickle') ... FAIL
+
+======================================================================
+FAIL: test_short_deadline_covers_headers_body_and_trickle (test_transport.TransportTests.test_short_deadline_covers_headers_body_and_trickle) (mode='silent_headers')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 62, in test_short_deadline_covers_headers_body_and_trickle
+    result = invoke(payload(server['url']), ['--deadline-ms', '250'], timeout=4)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/fixtures.py", line 44, in invoke
+    out, err = p.communicate(timeout=timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1209, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 2109, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1253, in _check_timeout
+    raise TimeoutExpired(
+subprocess.TimeoutExpired: Command '['/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/target/negative-cache/debug/transport_client', '--deadline-ms', '250']' timed out after 4 seconds
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 65, in test_short_deadline_covers_headers_body_and_trickle
+    self.fail('HTTP attempt survived its deadline and outer safety timeout')
+AssertionError: HTTP attempt survived its deadline and outer safety timeout
+
+======================================================================
+FAIL: test_short_deadline_covers_headers_body_and_trickle (test_transport.TransportTests.test_short_deadline_covers_headers_body_and_trickle) (mode='silent_body')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 62, in test_short_deadline_covers_headers_body_and_trickle
+    result = invoke(payload(server['url']), ['--deadline-ms', '250'], timeout=4)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/fixtures.py", line 44, in invoke
+    out, err = p.communicate(timeout=timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1209, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 2109, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1253, in _check_timeout
+    raise TimeoutExpired(
+subprocess.TimeoutExpired: Command '['/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/target/negative-cache/debug/transport_client', '--deadline-ms', '250']' timed out after 4 seconds
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 65, in test_short_deadline_covers_headers_body_and_trickle
+    self.fail('HTTP attempt survived its deadline and outer safety timeout')
+AssertionError: HTTP attempt survived its deadline and outer safety timeout
+
+======================================================================
+FAIL: test_short_deadline_covers_headers_body_and_trickle (test_transport.TransportTests.test_short_deadline_covers_headers_body_and_trickle) (mode='trickle')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 62, in test_short_deadline_covers_headers_body_and_trickle
+    result = invoke(payload(server['url']), ['--deadline-ms', '250'], timeout=4)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/fixtures.py", line 44, in invoke
+    out, err = p.communicate(timeout=timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1209, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 2109, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py", line 1253, in _check_timeout
+    raise TimeoutExpired(
+subprocess.TimeoutExpired: Command '['/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/target/negative-cache/debug/transport_client', '--deadline-ms', '250']' timed out after 4 seconds
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 65, in test_short_deadline_covers_headers_body_and_trickle
+    self.fail('HTTP attempt survived its deadline and outer safety timeout')
+AssertionError: HTTP attempt survived its deadline and outer safety timeout
+
+----------------------------------------------------------------------
+Ran 1 test in 12.046s
+
+FAILED (failures=3)

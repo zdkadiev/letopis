@@ -1,6 +1,6 @@
 # TK-6 — Проверить embedding transport и offline ошибки
 
-> **Статус:** planned
+> **Статус:** done
 > **Эпик:** [EP-8](../epic.md)
 > **Фаза:** PH-0
 > **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
@@ -36,9 +36,9 @@ Boundary harness двух API с воспроизводимыми негатив
 
 ## 5. Критерии приёмки
 
-- [ ] Harness Ollama и OpenAI-совместимого API проверяет форму vectors, silent endpoint, deadline/cancel и безопасные ошибки без ключа/response body.
-- [ ] local mode не использует внешний endpoint.
-- [ ] Redirect не выполняется, `HTTPS_PROXY`/`HTTP_PROXY` не меняют маршрут, сертификат проверяется системным хранилищем; дерево зависимостей не содержит tokio (D-96).
+- [x] Harness Ollama и OpenAI-совместимого API проверяет форму vectors, silent endpoint, deadline/cancel и безопасные ошибки без ключа/response body.
+- [x] local mode не использует внешний endpoint.
+- [x] Redirect не выполняется, `HTTPS_PROXY`/`HTTP_PROXY` не меняют маршрут, сертификат проверяется системным хранилищем; дерево зависимостей не содержит tokio (D-96).
 
 ## 6. Как проверить
 
@@ -61,6 +61,21 @@ Boundary harness двух API с воспроизводимыми негатив
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
+Выполнено 2026-10-21 в отдельном worktree `TK-6` от main@cc82a8f.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+[Полный отчёт и G-0](../../../../checks/TK-6/report.md),
+[независимое ревью и RED→GREEN исправления](../../../../checks/TK-6/review.md).
+Изолированный код — `tests/transport/`; Superpowers spec/plan сохранены.
+
+macOS ARM64 и Linux glibc ARM64: 8 Rust + 19 Python тестов PASS,
+10/11 compiling negative controls DETECTED, fmt/clippy и дерево зависимостей PASS.
+Linux runner — `--network none`; системный CA проверен только внутри disposable
+контейнера, отдельный macOS public HTTPS probe PASS без изменения Keychain.
+Все исходники/receipts SHA256 сверены; TK-1…TK-5 совпадают с десятью committed
+PASS manifests. G-0: continue → TK-7.
+
+Ревью нашло cancelled JSON/exit0 при гонке и неверный oracle success/exit1;
+оба исправлены с воспроизводимым RED→GREEN. Исторические FAIL/PASS сохранены.
+Deferred minors: none. Полная inference/utility/x86_64/production cancellation
+не объявляется выполненной. Ollama client 0.40.7 установлен, embedding-вызов
+не выполнялся; минимум версии не доказан. Интеграция Git и закрытие issue #6 разрешены последующим отдельным запросом пользователя; фактический результат проверяется после push.

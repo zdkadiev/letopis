@@ -1,0 +1,18 @@
+
+running 1 test
+test malformed_native_vectors_are_never_success ... FAILED
+
+failures:
+
+failures:
+    malformed_native_vectors_are_never_success
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running tests/protocol.rs (/build/negative-cache/debug/deps/protocol-d7716eb4e57be75b)
+
+thread 'malformed_native_vectors_are_never_success' (3236) panicked at tests/protocol.rs:177:59:
+called `Result::unwrap_err()` on an `Ok` value: [[], []]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test protocol`

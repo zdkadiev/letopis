@@ -1,0 +1,24 @@
+test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) ... ok
+test_existing_evidence_is_rejected_without_changes (test_runner.RunnerTests.test_existing_evidence_is_rejected_without_changes) ... ok
+test_named_behavioral_assertion_is_required (test_runner.RunnerTests.test_named_behavioral_assertion_is_required) ... ok
+test_actual_default_deadline_is_60_seconds (test_transport.TransportTests.test_actual_default_deadline_is_60_seconds) ... ok
+test_cancelled_output_wins_exit_status_over_completed_http_success (test_transport.TransportTests.test_cancelled_output_wins_exit_status_over_completed_http_success) ... ok
+test_drain_sigint_retains_default_signal_death (test_transport.TransportTests.test_drain_sigint_retains_default_signal_death) ... ok
+test_exact_native_and_compatible_wire (test_transport.TransportTests.test_exact_native_and_compatible_wire) ... ok
+test_foreground_sigint_is_one_cancelled_outcome (test_transport.TransportTests.test_foreground_sigint_is_one_cancelled_outcome) ... ok
+test_http_errors_and_non_200_are_not_success_or_retried (test_transport.TransportTests.test_http_errors_and_non_200_are_not_success_or_retried) ... ok
+test_invalid_url_and_credentials_fail_without_traffic (test_transport.TransportTests.test_invalid_url_and_credentials_fail_without_traffic) ... ok
+test_malformed_body_and_provider_error_are_safe (test_transport.TransportTests.test_malformed_body_and_provider_error_are_safe) ... ok
+test_proxy_environment_cannot_change_http_or_https_route (test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route) ... ok
+test_query_is_preserved_but_never_leaks_on_failure (test_transport.TransportTests.test_query_is_preserved_but_never_leaks_on_failure) ... ok
+test_redirect_sink_receives_no_request_or_key (test_transport.TransportTests.test_redirect_sink_receives_no_request_or_key) ... ok
+test_refusal_reset_and_truncated_response (test_transport.TransportTests.test_refusal_reset_and_truncated_response) ... ok
+test_short_deadline_covers_headers_body_and_trickle (test_transport.TransportTests.test_short_deadline_covers_headers_body_and_trickle) ... ok
+test_sigint_after_output_never_prints_second_json (test_transport.TransportTests.test_sigint_after_output_never_prints_second_json) ... ok
+test_sigint_response_race_has_one_complete_outcome (test_transport.TransportTests.test_sigint_response_race_has_one_complete_outcome) ... ok
+test_untrusted_tls_is_rejected (test_transport.TransportTests.test_untrusted_tls_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 64.925s
+
+OK

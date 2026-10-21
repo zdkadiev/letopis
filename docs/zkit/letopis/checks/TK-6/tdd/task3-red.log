@@ -1,0 +1,60 @@
+test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) ... 
+  test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) (output='FAIL: target\nAssertionError') ... FAIL
+  test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) (output='FAIL: target\nAssertionError') ... FAIL
+  test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) (output='ImportError: target') ... FAIL
+  test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) (output='FAIL: other\nAssertionError') ... FAIL
+test_existing_evidence_is_rejected_without_changes (test_runner.RunnerTests.test_existing_evidence_is_rejected_without_changes) ... FAIL
+test_named_behavioral_assertion_is_required (test_runner.RunnerTests.test_named_behavioral_assertion_is_required) ... FAIL
+
+======================================================================
+FAIL: test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) (output='FAIL: target\nAssertionError')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/test_runner.py", line 27, in test_build_or_unrelated_failure_cannot_count_as_detection
+    with self.subTest(output=output), self.assertRaises(RuntimeError):
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) (output='FAIL: target\nAssertionError')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/test_runner.py", line 27, in test_build_or_unrelated_failure_cannot_count_as_detection
+    with self.subTest(output=output), self.assertRaises(RuntimeError):
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) (output='ImportError: target')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/test_runner.py", line 27, in test_build_or_unrelated_failure_cannot_count_as_detection
+    with self.subTest(output=output), self.assertRaises(RuntimeError):
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) (output='FAIL: other\nAssertionError')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/test_runner.py", line 27, in test_build_or_unrelated_failure_cannot_count_as_detection
+    with self.subTest(output=output), self.assertRaises(RuntimeError):
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_existing_evidence_is_rejected_without_changes (test_runner.RunnerTests.test_existing_evidence_is_rejected_without_changes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/test_runner.py", line 22, in test_existing_evidence_is_rejected_without_changes
+    self.assertNotEqual(result.returncode, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_named_behavioral_assertion_is_required (test_runner.RunnerTests.test_named_behavioral_assertion_is_required)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/test_runner.py", line 32, in test_named_behavioral_assertion_is_required
+    with self.assertRaises(RuntimeError):
+AssertionError: RuntimeError not raised
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.016s
+
+FAILED (failures=6)

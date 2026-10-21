@@ -1,0 +1,6 @@
+test_cancelled_output_wins_exit_status_when_http_finishes_later (test_transport.TransportTests.test_cancelled_output_wins_exit_status_when_http_finishes_later) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.018s
+
+OK

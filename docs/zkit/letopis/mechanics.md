@@ -158,7 +158,13 @@ source_snapshot знания пишет агент в метаданные ([D-9
 
 Две Important-проблемы стенда исправлены: adopted peer выполняет self-SIGKILL по своему fixture connection, без сигнала по Event PID; mutation runner работает в disposable copies, вложенные команды остаются в его owned group. Это проверки harness, не продуктовый IPC. Третье, Minor, замечание о syscall boundary закрыто указанным наблюдением; второго независимого ревью нет.
 
-TK-11 переносит эти примитивы в CLI без повторного index lock вокруг TK-2 publish; TK-29 проверяет обработанную отмену с ответом cancelled, TK-42 — системные boundary drills. Fairness, общий liveness и concurrent orphan reclamation не доказаны. Работа в окне между последним empty query и exit drain может ждать следующего вызова. Power loss, stat-10k/RAM/latency, real provider и другие платформы сохраняют отдельные gates. G-0 остаётся открытым до TK-6.
+TK-11 переносит эти примитивы в CLI без повторного index lock вокруг TK-2 publish; TK-29 проверяет обработанную отмену с ответом cancelled, TK-42 — системные boundary drills. Fairness, общий liveness и concurrent orphan reclamation не доказаны. Работа в окне между последним empty query и exit drain может ждать следующего вызова. Power loss, stat-10k/RAM/latency, real provider и другие платформы сохраняют отдельные gates. G-0 после [TK-6](checks/TK-6/report.md) пройден: continue → TK-7; это допуск к основной разработке в границах узких proofs.
+
+#### MC-5 — результаты TK-6: HTTP и код выхода при отмене
+
+2026-10-21: [TK-6 transport proof](checks/TK-6/report.md) подтвердил выбранный блокирующий ureq/platform TLS и обработанный SIGINT при ожидании HTTP на macOS/Linux ARM64. [Ревью](checks/TK-6/review.md) выявило гонку: один stdout once-guard предотвращал второй JSON, но main мог завершиться с exit 0 после уже напечатанного cancelled. Обычный путь теперь учитывает, выиграл ли он право на вывод; проиграв cancelled, он завершает процесс с exit 1. Сам guard удерживается до окончания write/flush. После уже напечатанного успеха SIGINT допускает exit 1 без второго JSON; до обработки сигнала обычное завершение имеет exit 0.
+
+Чередование проверено детерминированно: HTTP success получен, main удерживается перед выводом, поток сигнала печатает cancelled, затем main освобождается. Compiling mutation, убирающая согласование кода выхода, должна упасть на этом oracle. Gate и флаги относятся только к fixture CLI, не добавляют IPC/config API продукту. Полная интеграция пяти команд, SQL/flock/git и stdout backpressure остаётся TK-29; остановка remote compute не обещается.
 
 ### MC-6 — чтение, поиск и обход
 

@@ -1,0 +1,167 @@
+{
+  "result": "FAIL",
+  "scope": "Synthetic X-2 transport; no real model inference/utility pilot",
+  "started_utc": "2026-10-21T18:51:07.376522+00:00",
+  "platform": "Linux-7.0.0-22-generic-aarch64-with-glibc2.36",
+  "machine": "aarch64",
+  "python": "3.11.2 (main, Apr  8 2026, 01:58:00) [GCC 12.2.0]",
+  "provider_calls": 0,
+  "ollama_inference": false,
+  "ollama_version_exercised": null,
+  "x86_64_status": "assumed until TK-43",
+  "source_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "c7b87031103036709b1f9fe73ac5490375533492f34631ab2ace4c7184f6017e",
+    "README.md": "0d059155ba62bbf5bda0784014140f223f8421d0cb0537ea60dce33088b44c75",
+    "fixtures.py": "cba71967f35f0505b5d06e650d5a0bf7f3cb07a5d0058e9b0e3d7d58f86eb6d7",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "d02cdb11625fb9e13e2df2b2a05e8f22a6d1ea526674c81ca6f2353ef9130859",
+    "run.py": "b44ab76c8a2db3c05a35f2aa2e4520b06b07fc4f43a867404171ed17928b18eb",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "20f69d340fe4e392ffa2fa36878512d62087d5653ed8a733f925ea46f484cec6",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "commands": [
+    {
+      "argv": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "cwd": "/repo",
+      "log": "01-rustc.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "git",
+        "-c",
+        "safe.directory=/repo",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/repo",
+      "log": "02-git.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "--version"
+      ],
+      "cwd": "/repo",
+      "log": "03-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/repo/tests/transport/Cargo.toml"
+      ],
+      "cwd": "/repo",
+      "log": "04-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "/repo/tests/transport/Cargo.toml",
+        "--bin",
+        "transport_client"
+      ],
+      "cwd": "/repo",
+      "log": "05-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "/repo/tests/transport",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/repo",
+      "log": "06-python3.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "/repo/tests/transport/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "cwd": "/repo",
+      "log": "07-cargo.log",
+      "exit_code": 1
+    }
+  ],
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: aarch64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "base_commit": "cc82a8f1da7ff8dc6b53dc682462a09fe851f458",
+  "error": "Command failed: 07-cargo.log",
+  "finished_utc": "2026-10-21T18:52:10.942922+00:00",
+  "source_after_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "c7b87031103036709b1f9fe73ac5490375533492f34631ab2ace4c7184f6017e",
+    "README.md": "0d059155ba62bbf5bda0784014140f223f8421d0cb0537ea60dce33088b44c75",
+    "fixtures.py": "cba71967f35f0505b5d06e650d5a0bf7f3cb07a5d0058e9b0e3d7d58f86eb6d7",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "d02cdb11625fb9e13e2df2b2a05e8f22a6d1ea526674c81ca6f2353ef9130859",
+    "run.py": "b44ab76c8a2db3c05a35f2aa2e4520b06b07fc4f43a867404171ed17928b18eb",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "20f69d340fe4e392ffa2fa36878512d62087d5653ed8a733f925ea46f484cec6",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "evidence_sha256": {
+    "01-rustc.log": "9e52f76a6e81c8cce82c76c2ee87a3c9999e56d92106b19142416460b9d2c727",
+    "02-git.log": "c1c0b88b833a3e6d8fc336d8a1e3b418729936e7a353cb644c49aa5d26e27ec6",
+    "03-cargo.log": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+    "04-cargo.log": "8d2c4a513e283ffa989e5a55ea64b214ebd1b6d1c6a4e8a5213c18cfedd529af",
+    "05-cargo.log": "f0788aa36d1c86b6ccdfb7f4042a5574102d82061c046422a2d42e008a1e4710",
+    "06-python3.log": "5e587c2de55551b2dffbdd9745a49d56510a18e249f0c7106431f7c7be52b96f",
+    "07-cargo.log": "814cfb62e1ffa0a842c682565f7c64152e8fbd091fb48625679b20e730294dda",
+    "requests.jsonl": "9b1adcff82e515216dbd0dd1a863e14448cdfbb636166fc03a902926d4450b73"
+  }
+}

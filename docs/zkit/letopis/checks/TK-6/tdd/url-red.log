@@ -1,0 +1,24 @@
+   Compiling letopis-transport-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running tests/protocol.rs (tests/transport/target/debug/deps/protocol-4f8c595b85e226a2)
+
+running 1 test
+test api_prefix_appends_exactly_one_separator ... FAILED
+
+failures:
+
+---- api_prefix_appends_exactly_one_separator stdout ----
+
+thread 'api_prefix_appends_exactly_one_separator' (12111344) panicked at tests/protocol.rs:81:9:
+assertion `left == right` failed
+  left: "http://localhost:12345//embed"
+ right: "http://localhost:12345/embed"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    api_prefix_appends_exactly_one_separator
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test protocol`

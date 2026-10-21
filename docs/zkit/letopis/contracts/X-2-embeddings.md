@@ -31,6 +31,12 @@ Provider/model/parameters заменяются целиком, без merge, D-6
 
 Проверка `.letopis/config.json` при вызове локальна, обязательного inference нет (рабочее допущение); команда config только показывает файл (D-95). Новый ключ действует со следующего запуска drain: окружение процесса CLI, drain наследует окружение запустившего вызова (рабочее допущение); отдельная горячая ротация/.env/хранилище ключей не добавляется. Новый запуск drain не обнуляет счётчик попыток и не возобновляет failed автоматически.
 
+## Результаты TK-6
+
+2026-10-21: [transport harness и evidence](../checks/TK-6/report.md) — PASS на macOS/Linux glibc ARM64: по 8 Rust и 19 Python тестов, 10/11 compiling negative controls. Проверены обе формы API, HTTP 200 и обязательные поля, число/размерность/конечные f32 и индексы, настоящий deadline 60 s, silent headers/body/trickle, SIGINT, безопасные ошибки и отсутствие redirect/environment proxy. Linux-прогон выполнен с `--network none`.
+
+Системный CA принят и hostname mismatch отвергнут в disposable Linux-контейнере; на macOS отдельно проверен публичный HTTPS endpoint через тот же Agent factory, без изменения Keychain. Реальные модели, минимальная совместимая версия Ollama, произвольные compatible servers и полные DR-5/DR-8 этим стендом не подтверждены; итоговые drills остаются TK-41. Это boundary proof выбранного адаптера, а не production-интеграция.
+
 ## Verification and sources
 Проверено чтением 2026-10-18: [Ollama /api/embed](https://docs.ollama.com/api/embed) — model/input, embeddings, truncate:false и входные параметры; [OpenAI create embeddings](https://developers.openai.com/api/reference/resources/embeddings/methods/create) — model/input, float encoding, data/index/embedding и условная поддержка dimensions; [Ollama compatibility](https://docs.ollama.com/api/openai-compatibility) и закреплённый код — R-7. Verified означает проверку описанного протокола по источникам; вызовы модели, работоспособность letopis, соответствие произвольного совместимого сервера и ресурсные цели не проверены этим статусом. Перед подключением другого совместимого сервера проверяется требуемое подмножество и отсутствие молчаливого усечения.
 

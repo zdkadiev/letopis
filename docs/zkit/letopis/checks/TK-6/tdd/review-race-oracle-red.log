@@ -1,0 +1,16 @@
+test_sigint_after_output_never_prints_second_json (test_transport.TransportTests.test_sigint_after_output_never_prints_second_json) ... FAIL
+
+======================================================================
+FAIL: test_sigint_after_output_never_prints_second_json (test_transport.TransportTests.test_sigint_after_output_never_prints_second_json)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/test_transport.py", line 117, in test_sigint_after_output_never_prints_second_json
+    self.assert_race_outcome(p.returncode, first + rest, err)
+  File "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/test_transport.py", line 16, in assert_race_outcome
+    self.assertEqual(code, 0 if value['ok'] else 1)
+AssertionError: 1 != 0
+
+----------------------------------------------------------------------
+Ran 1 test in 0.019s
+
+FAILED (failures=1)

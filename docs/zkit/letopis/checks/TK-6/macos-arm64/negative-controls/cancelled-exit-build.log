@@ -1,0 +1,12 @@
+   Compiling letopis-transport-checks v0.0.0 (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-d97zatpr/transport)
+warning: unused variable: `won_output`
+   --> src/bin/transport_client.rs:151:9
+    |
+151 |     let won_output = output.write_once(&value);
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_won_output`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `letopis-transport-checks` (bin "transport_client" test) generated 1 warning (run `cargo fix --bin "transport_client" -p letopis-transport-checks --tests` to apply 1 suggestion)
+warning: `letopis-transport-checks` (bin "transport_client") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.43s

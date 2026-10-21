@@ -1,0 +1,416 @@
+{
+  "result": "PASS",
+  "scope": "Synthetic X-2 transport; no real model inference/utility pilot",
+  "started_utc": "2026-10-21T18:54:38.712026+00:00",
+  "platform": "Linux-7.0.0-22-generic-aarch64-with-glibc2.36",
+  "machine": "aarch64",
+  "python": "3.11.2 (main, Apr  8 2026, 01:58:00) [GCC 12.2.0]",
+  "provider_calls": 0,
+  "ollama_inference": false,
+  "ollama_version_exercised": null,
+  "x86_64_status": "assumed until TK-43",
+  "source_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "10762e73c4e20eacf9fd782e85986877c1d9c7bd7d12c901c086ac179e5b5cc3",
+    "README.md": "0d059155ba62bbf5bda0784014140f223f8421d0cb0537ea60dce33088b44c75",
+    "fixtures.py": "cba71967f35f0505b5d06e650d5a0bf7f3cb07a5d0058e9b0e3d7d58f86eb6d7",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "d02cdb11625fb9e13e2df2b2a05e8f22a6d1ea526674c81ca6f2353ef9130859",
+    "run.py": "6416f4278c75220b18888c76eb4d1334755c8ba0768726491920c15490fd1278",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "20f69d340fe4e392ffa2fa36878512d62087d5653ed8a733f925ea46f484cec6",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "commands": [
+    {
+      "argv": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "cwd": "/repo",
+      "log": "01-rustc.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "git",
+        "-c",
+        "safe.directory=/repo",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/repo",
+      "log": "02-git.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "--version"
+      ],
+      "cwd": "/repo",
+      "log": "03-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/repo/tests/transport/Cargo.toml"
+      ],
+      "cwd": "/repo",
+      "log": "04-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "/repo/tests/transport/Cargo.toml",
+        "--bin",
+        "transport_client"
+      ],
+      "cwd": "/repo",
+      "log": "05-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "/repo/tests/transport",
+        "-p",
+        "test_runner.py",
+        "-v"
+      ],
+      "cwd": "/repo",
+      "log": "06-python3.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "/repo/tests/transport/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "cwd": "/repo",
+      "log": "07-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "/repo/tests/transport/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/repo",
+      "log": "08-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "tree",
+        "--locked",
+        "--manifest-path",
+        "/repo/tests/transport/Cargo.toml",
+        "--prefix",
+        "none"
+      ],
+      "cwd": "/repo",
+      "log": "09-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "tree",
+        "--locked",
+        "--manifest-path",
+        "/repo/tests/transport/Cargo.toml",
+        "-e",
+        "features"
+      ],
+      "cwd": "/repo",
+      "log": "10-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/repo/tests/transport/linux_trust.py"
+      ],
+      "cwd": "/repo",
+      "log": "11-python3.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/repo/tests/transport/negative_controls.py",
+        "--evidence",
+        "/evidence/linux-arm64/negative-controls"
+      ],
+      "cwd": "/repo",
+      "log": "12-python3.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "/repo/tests/transport",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/repo",
+      "log": "13-python3.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/repo/docs/zkit/letopis/roadmap/schedule.py",
+        "--check"
+      ],
+      "cwd": "/repo",
+      "log": "14-python3.log",
+      "exit_code": 0
+    }
+  ],
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: aarch64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "base_commit": "cc82a8f1da7ff8dc6b53dc682462a09fe851f458",
+  "system_trust": {
+    "result": "PASS",
+    "untrusted_issuer": {
+      "error": {
+        "code": "embedding_failed",
+        "details": {},
+        "message": "embedding_failed: connection failed"
+      },
+      "ok": false
+    },
+    "system_CA_accepted": {
+      "ok": true,
+      "result": [
+        [
+          1.0,
+          2.0,
+          3.0
+        ],
+        [
+          4.0,
+          5.0,
+          6.0
+        ]
+      ]
+    },
+    "hostname_mismatch": {
+      "error": {
+        "code": "embedding_failed",
+        "details": {},
+        "message": "embedding_failed: connection failed"
+      },
+      "ok": false
+    },
+    "store": "disposable Linux container system store",
+    "fixture_CA_override": false
+  },
+  "prior_proofs": [
+    {
+      "task": "TK-1",
+      "platform": "macos-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-1/macos-arm64/manifest.json",
+      "manifest_sha256": "7c9e48b99cc01428ec6276796d6f959c08b894e659768f46d8fb9e1b8007722a",
+      "source_files": 12,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-1",
+      "platform": "linux-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-1/linux-arm64/manifest.json",
+      "manifest_sha256": "af12bdc32054248a5c59e81d3461ee4e985d0a8b81f580f6d138f35b915b352c",
+      "source_files": 12,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-2",
+      "platform": "macos-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-2/macos-arm64/manifest.json",
+      "manifest_sha256": "45a19ebeb7708d7acb8430af4198a5d2e469e0e02fecd2058848bb7953a622c3",
+      "source_files": 24,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-2",
+      "platform": "linux-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-2/linux-arm64/manifest.json",
+      "manifest_sha256": "564b51be98af4a4442f256cee7bf42fd7aa481e40da203417580fd690e85af81",
+      "source_files": 24,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-3",
+      "platform": "macos-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-3/macos-arm64/manifest.json",
+      "manifest_sha256": "483f7aabeb4fba2460722398a6a3a89369913b698ba8afc65a7b482281b60398",
+      "source_files": 46,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-3",
+      "platform": "linux-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-3/linux-arm64/manifest.json",
+      "manifest_sha256": "86192f575641a87d4a7a6d9e66ec579f31defb42f6674509c2a4cc5d857090ae",
+      "source_files": 46,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-4",
+      "platform": "macos-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-4/macos-arm64/manifest.json",
+      "manifest_sha256": "9f8c5b1dca43f04e9a2006e35b5ba7b9b7a4273420fabc7b51a5419b3cb30b86",
+      "source_files": 60,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-4",
+      "platform": "linux-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-4/linux-arm64/manifest.json",
+      "manifest_sha256": "6663b126c83739670e38edf3fd0b6cb8af19e71ea7bcad90cbb261eee591874a",
+      "source_files": 60,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-5",
+      "platform": "macos",
+      "manifest": "docs/zkit/letopis/checks/TK-5/macos/manifest.json",
+      "manifest_sha256": "3dd82c45a2b2db2650e2d339f0672f75edf77d08185d0dc33664aaca3357c700",
+      "source_files": 22,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-5",
+      "platform": "linux",
+      "manifest": "docs/zkit/letopis/checks/TK-5/linux/manifest.json",
+      "manifest_sha256": "a6865d94a30c9f2837e4b7b4a3e7e5f2a513631427487a6790fae17f7d94e248",
+      "source_files": 22,
+      "mismatches": [],
+      "result": "PASS"
+    }
+  ],
+  "finished_utc": "2026-10-21T18:56:35.718033+00:00",
+  "source_after_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "10762e73c4e20eacf9fd782e85986877c1d9c7bd7d12c901c086ac179e5b5cc3",
+    "README.md": "0d059155ba62bbf5bda0784014140f223f8421d0cb0537ea60dce33088b44c75",
+    "fixtures.py": "cba71967f35f0505b5d06e650d5a0bf7f3cb07a5d0058e9b0e3d7d58f86eb6d7",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "d02cdb11625fb9e13e2df2b2a05e8f22a6d1ea526674c81ca6f2353ef9130859",
+    "run.py": "6416f4278c75220b18888c76eb4d1334755c8ba0768726491920c15490fd1278",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "20f69d340fe4e392ffa2fa36878512d62087d5653ed8a733f925ea46f484cec6",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "evidence_sha256": {
+    "01-rustc.log": "9e52f76a6e81c8cce82c76c2ee87a3c9999e56d92106b19142416460b9d2c727",
+    "02-git.log": "c1c0b88b833a3e6d8fc336d8a1e3b418729936e7a353cb644c49aa5d26e27ec6",
+    "03-cargo.log": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+    "04-cargo.log": "117e13b0ce8a808f6fbe8642533ff7a24df91fead0209233b5883b774ca870c6",
+    "05-cargo.log": "a41051563a4cb5fc1b1bcdd9aa0ba28ca80f7736d629d90cc138218756e8e3a9",
+    "06-python3.log": "67ed3d7e578dd29dee679b77567cecbc1e73dfe026969a15dd7dcfd47bac844b",
+    "07-cargo.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "08-cargo.log": "4d68da87c331db2aecc03b19fc3f5751ed27f9fed08890df8eee73346a4e1ccd",
+    "09-cargo.log": "26660f074644527f4bf65ec3a746fee46dfe19730b7a64f8e5d727d8b5540587",
+    "10-cargo.log": "8c5e48bf5efbafea0ceba653e0937dc5cedca6da02fed17ba4696ce9d4a94e41",
+    "11-python3.log": "7e898b289a0ec08807f6884a2fa117be5c5a5b0b3160425b8f1b862caa9de1cb",
+    "12-python3.log": "e82eb094a2d2cefcfc83378cef355036aaf5b28fc6ab6662750aef683aefd362",
+    "13-python3.log": "7eb06982a1e4edd70d43854c803258a8bac90e1c3a9897a86159247b9e1edfcb",
+    "14-python3.log": "4efa4fd61eb534429a5d236ff298352511e81bc69674152b05e6789628d4e6eb",
+    "negative-controls/cancellation-build.log": "9f22cd80c31ff388baf16f6caa7f2b8592e34ea6066159e33d985ce72cf4ecee",
+    "negative-controls/cancellation-test.log": "34b485da1ca4815da0fb0662ade0272b33df4829457f38e1fc364058dfd76c4a",
+    "negative-controls/count-build.log": "1a9d027b9fec866988c7dd693944ea36c03330347a3cfcc513f66b33dd99b0d5",
+    "negative-controls/count-test.log": "e0f30ad0b8fdcf6f0477ac02526f64ceaf46c07829530fd699231df0f0a03350",
+    "negative-controls/deadline-build.log": "c137837e8a85cc94956db2d9ba3010d863143b408b5902b98baecd171df54efb",
+    "negative-controls/deadline-test.log": "5503c534b4309aaf2bd0a2b9b16e91b50eebd43e83cac19af407c4e39f8097d5",
+    "negative-controls/dimensions-build.log": "1ee8b7645e2b23789bfff314204c8a28ce0a87d727b3bf3a63a67f6a7e8fa49d",
+    "negative-controls/dimensions-test.log": "032d876c8b2010e6e531206999ec898719419012154ce9642453f63f1b693a38",
+    "negative-controls/indices-build.log": "7a736c99e2a5668d409b06125bd957bba650d971db8242228bc0845c6cc78b9f",
+    "negative-controls/indices-test.log": "aafdb1f74140219ff8c79dd45b175b85516cf3361fb07b08e9fc38af2fe11634",
+    "negative-controls/manifest.json": "b45d66b4544e18df2428b11bfd996a24290b1338546550885738e80a30f0c725",
+    "negative-controls/proxies-build.log": "6216031164e1d18a4f4de153125b4edbe9069e86dba33a76c437fe1f7a3c89bb",
+    "negative-controls/proxies-test.log": "8859a2899b53e51b986014b6bdec3f17166681b65c2a00d3c663f06e5f8be6a4",
+    "negative-controls/redaction-build.log": "fbb7f2adf36220297b12fcf2b420a5bc6637cba20cd9fb42116b687c6a8a4e77",
+    "negative-controls/redaction-test.log": "b38614e5d864bbe52104250e55583b44622c6d954c2a58c4c2966d15e6561cbd",
+    "negative-controls/redirects-build.log": "d058866a4b6f01341cd08ba6d0db7579f2911c5a7690d5151803ac1903d241fe",
+    "negative-controls/redirects-test.log": "ef984162a09c640941eb0f352327faa14974f401155d2709bd1e198eb24fe92c",
+    "negative-controls/stdout-once-build.log": "dd7f2e8366dd7aa87535e718dd558d11b7ecfc8747cb52e36bf3d8b07922dc01",
+    "negative-controls/stdout-once-test.log": "59321a4efa58d980a3aaa4c68ddc91b14cb023ac7a65f72ce5e5bb2310df62ac",
+    "negative-controls/system-trust-build.log": "6cce6fc2127e3b81c7f5c09de49bcd048f651937a56e880ce78ee2be3a501d58",
+    "negative-controls/system-trust-test.log": "d231fc9cce31af98c21460fc5597224e03bbc372edcfbc4599918cbf84693f86",
+    "requests.jsonl": "8573a87fca548af80aec95df64a68b99ba4c61a977010f4e7c2fb70b73877b9b"
+  }
+}

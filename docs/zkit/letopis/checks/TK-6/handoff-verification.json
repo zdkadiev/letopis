@@ -1,0 +1,12 @@
+{
+  "result": "PASS",
+  "engram_revision": 31,
+  "engram_task_status": "resolved",
+  "engram_artifact_hashes": "read back and matched",
+  "github_comment": "https://github.com/zaurkadiev/letopis/issues/6#issuecomment-6324289147",
+  "github_comment_readback": "exact body matched",
+  "g0": "continue to TK-7",
+  "git_delivery": "uncommitted TK-6, worktree preserved",
+  "integration": "not requested",
+  "plan_scratch_cleanup": "only this plan workspace removed after ledger/evidence preservation"
+}

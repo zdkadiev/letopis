@@ -1,0 +1,320 @@
+{
+  "result": "PASS",
+  "started_utc": "2026-10-21T18:53:51.038196+00:00",
+  "source_before_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "10762e73c4e20eacf9fd782e85986877c1d9c7bd7d12c901c086ac179e5b5cc3",
+    "README.md": "0d059155ba62bbf5bda0784014140f223f8421d0cb0537ea60dce33088b44c75",
+    "fixtures.py": "cba71967f35f0505b5d06e650d5a0bf7f3cb07a5d0058e9b0e3d7d58f86eb6d7",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "d02cdb11625fb9e13e2df2b2a05e8f22a6d1ea526674c81ca6f2353ef9130859",
+    "run.py": "6416f4278c75220b18888c76eb4d1334755c8ba0768726491920c15490fd1278",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "20f69d340fe4e392ffa2fa36878512d62087d5653ed8a733f925ea46f484cec6",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "controls": [
+    {
+      "name": "count",
+      "result": "DETECTED",
+      "test": "malformed_native_vectors_are_never_success",
+      "original_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      },
+      "mutated_sha256": {
+        "src/protocol.rs": "0e3e251a8ddd0746b4ca45d629c12b71441316a679b0b964b4058fefe8c47169"
+      },
+      "build_exit": 0,
+      "test_exit": 101,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-_e336s2b/transport/Cargo.toml",
+        "--test",
+        "protocol",
+        "malformed_native_vectors_are_never_success",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "witness": "test malformed_native_vectors_are_never_success ... FAILED",
+      "restored_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      }
+    },
+    {
+      "name": "dimensions",
+      "result": "DETECTED",
+      "test": "malformed_native_vectors_are_never_success",
+      "original_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      },
+      "mutated_sha256": {
+        "src/protocol.rs": "9de4dc6b0420815aa5ea17307cce5ec5456a6067777c898bc7fc06303e87299f"
+      },
+      "build_exit": 0,
+      "test_exit": 101,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-_e336s2b/transport/Cargo.toml",
+        "--test",
+        "protocol",
+        "malformed_native_vectors_are_never_success",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "witness": "test malformed_native_vectors_are_never_success ... FAILED",
+      "restored_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      }
+    },
+    {
+      "name": "indices",
+      "result": "DETECTED",
+      "test": "compatible_indices_must_bijectively_cover_inputs",
+      "original_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      },
+      "mutated_sha256": {
+        "src/protocol.rs": "40f961bea5d4aedde7940e005e7e76fcca1b4c1bda72a2e68731afcd3595afbe"
+      },
+      "build_exit": 0,
+      "test_exit": 101,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-_e336s2b/transport/Cargo.toml",
+        "--test",
+        "protocol",
+        "compatible_indices_must_bijectively_cover_inputs",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "witness": "test compatible_indices_must_bijectively_cover_inputs ... FAILED",
+      "restored_sha256": {
+        "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680"
+      }
+    },
+    {
+      "name": "redirects",
+      "result": "DETECTED",
+      "test": "test_redirect_sink_receives_no_request_or_key",
+      "original_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      },
+      "mutated_sha256": {
+        "src/client.rs": "b551bd01dfd5b04f74b2e0d98abe5262acd072e3d4e71e54639347749f336d6a"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_redirect_sink_receives_no_request_or_key",
+        "-v"
+      ],
+      "witness": "FAIL: test_redirect_sink_receives_no_request_or_key",
+      "restored_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      }
+    },
+    {
+      "name": "proxies",
+      "result": "DETECTED",
+      "test": "test_proxy_environment_cannot_change_http_or_https_route",
+      "original_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      },
+      "mutated_sha256": {
+        "src/client.rs": "aabcc3790f8ed4ca133dbca1a230a78342b676bde81c2b9bf372577957995ccb"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_proxy_environment_cannot_change_http_or_https_route",
+        "-v"
+      ],
+      "witness": "FAIL: test_proxy_environment_cannot_change_http_or_https_route",
+      "restored_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      }
+    },
+    {
+      "name": "deadline",
+      "result": "DETECTED",
+      "test": "test_short_deadline_covers_headers_body_and_trickle",
+      "original_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      },
+      "mutated_sha256": {
+        "src/client.rs": "514cab24dbd503a67bd483cde95b8fc1d4091a9558d2aae77f875ba9f267bbdb"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_short_deadline_covers_headers_body_and_trickle",
+        "-v"
+      ],
+      "witness": "FAIL: test_short_deadline_covers_headers_body_and_trickle",
+      "restored_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      }
+    },
+    {
+      "name": "cancellation",
+      "result": "DETECTED",
+      "test": "test_foreground_sigint_is_one_cancelled_outcome",
+      "original_sha256": {
+        "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90"
+      },
+      "mutated_sha256": {
+        "src/bin/transport_client.rs": "41f64d24a34406335714d29105112e5ea4ecdab0a3ad69357c6dadfa1ec2ebc7"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_foreground_sigint_is_one_cancelled_outcome",
+        "-v"
+      ],
+      "witness": "FAIL: test_foreground_sigint_is_one_cancelled_outcome",
+      "restored_sha256": {
+        "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90"
+      }
+    },
+    {
+      "name": "stdout-once",
+      "result": "DETECTED",
+      "test": "test_sigint_after_output_never_prints_second_json",
+      "original_sha256": {
+        "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90"
+      },
+      "mutated_sha256": {
+        "src/bin/transport_client.rs": "ff377848d6921266715058e85124d6850f77559ff6a1987a62e224dbf3265b7c"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_sigint_after_output_never_prints_second_json",
+        "-v"
+      ],
+      "witness": "FAIL: test_sigint_after_output_never_prints_second_json",
+      "restored_sha256": {
+        "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90"
+      }
+    },
+    {
+      "name": "redaction",
+      "result": "DETECTED",
+      "test": "test_http_errors_and_non_200_are_not_success_or_retried",
+      "original_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      },
+      "mutated_sha256": {
+        "src/client.rs": "92f2bc396373fef323b2d720d1ca31c627e32210b4e654dab41a8183b9ed5e42"
+      },
+      "build_exit": 0,
+      "test_exit": 1,
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "test_transport.TransportTests.test_http_errors_and_non_200_are_not_success_or_retried",
+        "-v"
+      ],
+      "witness": "FAIL: test_http_errors_and_non_200_are_not_success_or_retried",
+      "restored_sha256": {
+        "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771"
+      }
+    }
+  ],
+  "system_trust_control": "Linux container-specific; macOS trust store is not modified",
+  "source_after_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "10762e73c4e20eacf9fd782e85986877c1d9c7bd7d12c901c086ac179e5b5cc3",
+    "README.md": "0d059155ba62bbf5bda0784014140f223f8421d0cb0537ea60dce33088b44c75",
+    "fixtures.py": "cba71967f35f0505b5d06e650d5a0bf7f3cb07a5d0058e9b0e3d7d58f86eb6d7",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "d02cdb11625fb9e13e2df2b2a05e8f22a6d1ea526674c81ca6f2353ef9130859",
+    "run.py": "6416f4278c75220b18888c76eb4d1334755c8ba0768726491920c15490fd1278",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "20f69d340fe4e392ffa2fa36878512d62087d5653ed8a733f925ea46f484cec6",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "36d7ea52df69cb040f9e3481e5d73c08b8c0ddc974421aa4e50e590f87d0eb90",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "finished_utc": "2026-10-21T18:54:10.836643+00:00",
+  "evidence_sha256": {
+    "cancellation-build.log": "07d74be5b0dd5ccb34cc144ce08e52f8e4722c8e9d2366c6de7a4aec4f8ed4af",
+    "cancellation-test.log": "e1f07a207b66821c00de0d6e59205418fb58807939c3714895a634c292e10c6d",
+    "count-build.log": "e1232d36fce4db82602712d60bb858116831339b466727de92dc2a3914aa6847",
+    "count-test.log": "dad31e4c811ff96c541063b8be1a9fcbf492507f4468a8f3c8ef1077b1d070d7",
+    "deadline-build.log": "ce1a3598a9562c0cae704462f4b5f4c5c637b0e00e5b3ada92609b7ac0620c3f",
+    "deadline-test.log": "0b7fca82fff3bc5e5cc5de67e32924f34f63bcc35315510a99058ff7324e89aa",
+    "dimensions-build.log": "46f0e6ffed154fba961ff5426017941ff3937b51cd2d8b011d7169808b2cf9c4",
+    "dimensions-test.log": "ec59ca7c02e9357e5036888b7e83a46fc88662283ec847b0d91c4f2235f62d75",
+    "indices-build.log": "bd08f874c40e9db881e73d141c48452f4fef98647e4f777dd15ef976efb129be",
+    "indices-test.log": "33f69d2d215ac061339a3ef3220cb3272da91fd18488c6a875f60924837c6bee",
+    "proxies-build.log": "ce1a3598a9562c0cae704462f4b5f4c5c637b0e00e5b3ada92609b7ac0620c3f",
+    "proxies-test.log": "9af01fd3858164c4482f7ebdf4cac3f10ec1dcd3636aa7127d7fec5275befef7",
+    "redaction-build.log": "445f25f59ec4bb18a8616dfda3b5d44e8ae1499611b7aec9056bcc4c9fac4a0c",
+    "redaction-test.log": "eeb16d288c2573bbc33d278d8ec6f05c9302c6a078fe3eac1e6ed79d072ebdd1",
+    "redirects-build.log": "ddb5b3716a334d9b499631f3bd486dc1718d4b118320207e7575c7968d198b20",
+    "redirects-test.log": "8b12702c97866ca124d6bfca50fdaf050134a72dc1816514ef7a78d50c38e7cf",
+    "stdout-once-build.log": "445f25f59ec4bb18a8616dfda3b5d44e8ae1499611b7aec9056bcc4c9fac4a0c",
+    "stdout-once-test.log": "d46e30650a2764c7b6051208bbc621bdb14a10ad8662bd4c6d0824c378d8af1d"
+  }
+}

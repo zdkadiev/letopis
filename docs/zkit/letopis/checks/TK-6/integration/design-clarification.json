@@ -1,0 +1,19 @@
+{
+  "result": "PASS",
+  "scope": "TK-6 canonical design clarification; no transport-source changes after final review/fix",
+  "documents": {
+    "docs/zkit/letopis/architecture.md": "f895e7fc021c3b307f08724c21e0f77448fd992f01410f2259833ec4dffaf302",
+    "docs/zkit/letopis/mechanics.md": "817df34a64b3df66b676257cf60591f5b7e67ec9d1860e2a7e92ce8bba97e1f7",
+    "docs/zkit/letopis/decisions.md": "099649621e16d93b6457d9a2c0f7a3bd67766041720f914b13b1ff5438a3b099",
+    "docs/zkit/letopis/contracts/X-1-cli.md": "1527f6be9543adc7a3ca1cc414b9ac8481d739a0af9f34a99dd432e9f5048a86",
+    "docs/zkit/letopis/contracts/X-2-embeddings.md": "0c69b4db55a852bb28978299b75311314f87aaed4ea1761c4417e3032ebc7a37"
+  },
+  "rules": [
+    "cancelled output always exits1 even if normal completion loses stdout guard",
+    "printed success followed by handled SIGINT may exit1 without second JSON",
+    "G0 continue to TK7; fixtures do not establish real inference or product-wide cancellation"
+  ],
+  "historical_receipts": "preserved unchanged; final-verification.json remains the earlier documentation snapshot",
+  "link_check": "Markdown prose only; excludes fenced/inline code so existing literal link-syntax examples are not treated as files",
+  "base_commit": "cc82a8f1da7ff8dc6b53dc682462a09fe851f458"
+}

@@ -1,0 +1,19 @@
+
+running 1 test
+test compatible_indices_must_bijectively_cover_inputs ... FAILED
+
+failures:
+
+failures:
+    compatible_indices_must_bijectively_cover_inputs
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running tests/protocol.rs (/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/target/negative-cache/debug/deps/protocol-c0df866991836d00)
+
+thread 'compatible_indices_must_bijectively_cover_inputs' (12548777) panicked at tests/protocol.rs:198:9:
+assertion failed: decode(Provider::Openai, &serde_json::to_vec(&json!({"data":data})).unwrap(),
+        2, 3).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test protocol`

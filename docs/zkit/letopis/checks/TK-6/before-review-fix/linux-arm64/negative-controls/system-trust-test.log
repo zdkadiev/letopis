@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/tmp/tk6-controls-84072yc8/transport/linux_trust.py", line 41, in <module>
+    main()
+  File "/tmp/tk6-controls-84072yc8/transport/linux_trust.py", line 28, in main
+    assert after[0] == 0 and after[1]['result'] == [[1, 2, 3], [4, 5, 6]], ('system_CA_accepted', after)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ('system_CA_accepted', (1, {'error': {'code': 'embedding_failed', 'details': {}, 'message': 'embedding_failed: connection failed'}, 'ok': False}, '{"error":{"code":"embedding_failed","details":{},"message":"embedding_failed: connection failed"},"ok":false}\n', ''))

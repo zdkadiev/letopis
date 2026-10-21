@@ -1,0 +1,17 @@
+test_cancelled_output_wins_exit_status_when_http_finishes_later (test_transport.TransportTests.test_cancelled_output_wins_exit_status_when_http_finishes_later) ... FAIL
+
+======================================================================
+FAIL: test_cancelled_output_wins_exit_status_when_http_finishes_later (test_transport.TransportTests.test_cancelled_output_wins_exit_status_when_http_finishes_later)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-f46dlo0y/transport/test_transport.py", line 147, in test_cancelled_output_wins_exit_status_when_http_finishes_later
+    self.assert_race_outcome(p.returncode, first + rest, err)
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-f46dlo0y/transport/test_transport.py", line 17, in assert_race_outcome
+    else: self.assertEqual(code, 1)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1
+
+----------------------------------------------------------------------
+Ran 1 test in 0.401s
+
+FAILED (failures=1)

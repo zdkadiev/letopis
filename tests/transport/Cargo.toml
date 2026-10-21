@@ -1,0 +1,11 @@
+[package]
+name = "letopis-transport-checks"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.145"
+ureq = { version = "=3.4.2", default-features = false, features = ["rustls", "json", "platform-verifier"] }
+signal-hook = "=0.3.18"

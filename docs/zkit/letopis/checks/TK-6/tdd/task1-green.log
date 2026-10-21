@@ -1,0 +1,15 @@
+   Compiling letopis-transport-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.99s
+     Running tests/protocol.rs (tests/transport/target/debug/deps/protocol-4f8c595b85e226a2)
+
+running 7 tests
+test response_order_and_optional_fields_follow_each_protocol ... ok
+test native_request_is_literal_and_cannot_be_overridden ... ok
+test compatible_request_is_literal_and_requires_safe_bearer ... ok
+test compatible_indices_must_bijectively_cover_inputs ... ok
+test malformed_native_vectors_are_never_success ... ok
+test request_validation_rejects_empty_input_and_wrong_documented_types ... ok
+test strict_configuration_rejects_invalid_shapes_without_defaulting ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

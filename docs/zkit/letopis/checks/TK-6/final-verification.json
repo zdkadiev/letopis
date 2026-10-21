@@ -1,0 +1,49 @@
+{
+  "result": "PASS",
+  "source_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "10762e73c4e20eacf9fd782e85986877c1d9c7bd7d12c901c086ac179e5b5cc3",
+    "README.md": "e8a50dfc18e8ed91af597586b4ff00391889dfa048724e43208bac52ddd87239",
+    "fixtures.py": "ff0a9dd31b6effd0480d99e3b8a43c09ea3bc940f06a2fa8d216f33d7938d846",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "4cd9466161888fab4714bdecd839a01178607020a766071021bb4e9160ab6c16",
+    "run.py": "6416f4278c75220b18888c76eb4d1334755c8ba0768726491920c15490fd1278",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "ce6a499214dd43e8474247e33c81e6d4ea79a35de4997417c74805df094610ab",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "5279af5a2a6eb338d719b36ca659f5ae43acf198f57eb2125b6ede444c744c23",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "documentation_sha256": {
+    "docs/superpowers/plans/2026-10-21-tk-6-embedding-transport.md": "da5c557b33b4bcda5bdcd6edab008b51d9920b318e23537cd15b5378313bf3ba",
+    "docs/superpowers/specs/2026-10-21-tk-6-embedding-transport-design.md": "e0ab5ed70f12ee6255cb3738cbdbda38f7fdf827b57e90e78e97d1e42f8d4463",
+    "docs/zkit/letopis/checks/TK-6/report.md": "5fe7ca3e26f60f9c023a05c7592011b999605efd0f07429a590506d66fd5abce",
+    "docs/zkit/letopis/checks/TK-6/review.md": "21e4364e85cc3e10ac5e36829441866829fca0c943b51b3faf9e7b1d9e1a99c6",
+    "docs/zkit/letopis/roadmap.md": "906137678ba2b7b9e5253607c4abfb791729ffed82805bf4128eb466b636f76b",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/epic.md": "a39a74c8a2d4d8b9402aaeb1fbc1ef1f53c53f2ed90c50905f6439ab20000b25",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md": "a9eb6a9f669b91a1d105861c183a9fe94babaa00a0d7560305d5bc74d2861142"
+  },
+  "checks": [
+    "local Markdown links",
+    "whitespace",
+    "current source and receipts SHA256",
+    "positive macOS TLS binary SHA256",
+    "10 committed earlier PASS manifests/current source hashes",
+    "TK-6 status/plan completion",
+    "roadmap schedule --check"
+  ],
+  "g0": "continue to TK-7",
+  "review": "one fresh independent reviewer; two Important fixed RED-to-GREEN; no deferred minors"
+}

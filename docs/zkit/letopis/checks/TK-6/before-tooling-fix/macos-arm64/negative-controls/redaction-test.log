@@ -1,0 +1,39 @@
+test_http_errors_and_non_200_are_not_success_or_retried (test_transport.TransportTests.test_http_errors_and_non_200_are_not_success_or_retried) ... 
+  test_http_errors_and_non_200_are_not_success_or_retried (test_transport.TransportTests.test_http_errors_and_non_200_are_not_success_or_retried) (status=401) ... FAIL
+  test_http_errors_and_non_200_are_not_success_or_retried (test_transport.TransportTests.test_http_errors_and_non_200_are_not_success_or_retried) (status=429) ... FAIL
+  test_http_errors_and_non_200_are_not_success_or_retried (test_transport.TransportTests.test_http_errors_and_non_200_are_not_success_or_retried) (status=500) ... FAIL
+
+======================================================================
+FAIL: test_http_errors_and_non_200_are_not_success_or_retried (test_transport.TransportTests.test_http_errors_and_non_200_are_not_success_or_retried) (status=401)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 40, in test_http_errors_and_non_200_are_not_success_or_retried
+    self.assert_safe_failure(invoke(payload(server['url'])))
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 19, in assert_safe_failure
+    self.assertNotIn(canary, out + err)
+AssertionError: 'RESPONSE_BODY_CANARY' unexpectedly found in '{"error":{"code":"embedding_failed","details":{},"message":"embedding_failed: HTTP 401"},"ok":false}\nRESPONSE_BODY_CANARY\n'
+
+======================================================================
+FAIL: test_http_errors_and_non_200_are_not_success_or_retried (test_transport.TransportTests.test_http_errors_and_non_200_are_not_success_or_retried) (status=429)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 40, in test_http_errors_and_non_200_are_not_success_or_retried
+    self.assert_safe_failure(invoke(payload(server['url'])))
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 19, in assert_safe_failure
+    self.assertNotIn(canary, out + err)
+AssertionError: 'RESPONSE_BODY_CANARY' unexpectedly found in '{"error":{"code":"embedding_failed","details":{},"message":"embedding_failed: HTTP 429"},"ok":false}\nRESPONSE_BODY_CANARY\n'
+
+======================================================================
+FAIL: test_http_errors_and_non_200_are_not_success_or_retried (test_transport.TransportTests.test_http_errors_and_non_200_are_not_success_or_retried) (status=500)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 40, in test_http_errors_and_non_200_are_not_success_or_retried
+    self.assert_safe_failure(invoke(payload(server['url'])))
+  File "/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk6-controls-ycdt7236/transport/test_transport.py", line 19, in assert_safe_failure
+    self.assertNotIn(canary, out + err)
+AssertionError: 'RESPONSE_BODY_CANARY' unexpectedly found in '{"error":{"code":"embedding_failed","details":{},"message":"embedding_failed: HTTP 500"},"ok":false}\nRESPONSE_BODY_CANARY\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.474s
+
+FAILED (failures=3)

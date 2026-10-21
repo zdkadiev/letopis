@@ -1,0 +1,23 @@
+{
+  "result": "PASS",
+  "rust_tests": 8,
+  "python_transport_runner_tests": 19,
+  "pilot_regressions": 31,
+  "docs_sha256": {
+    "docs/zkit/letopis/architecture.md": "f895e7fc021c3b307f08724c21e0f77448fd992f01410f2259833ec4dffaf302",
+    "docs/zkit/letopis/mechanics.md": "817df34a64b3df66b676257cf60591f5b7e67ec9d1860e2a7e92ce8bba97e1f7",
+    "docs/zkit/letopis/decisions.md": "099649621e16d93b6457d9a2c0f7a3bd67766041720f914b13b1ff5438a3b099",
+    "docs/zkit/letopis/contracts/X-1-cli.md": "1527f6be9543adc7a3ca1cc414b9ac8481d739a0af9f34a99dd432e9f5048a86",
+    "docs/zkit/letopis/contracts/X-2-embeddings.md": "0c69b4db55a852bb28978299b75311314f87aaed4ea1761c4417e3032ebc7a37",
+    "docs/zkit/letopis/roadmap.md": "906137678ba2b7b9e5253607c4abfb791729ffed82805bf4128eb466b636f76b",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/epic.md": "a39a74c8a2d4d8b9402aaeb1fbc1ef1f53c53f2ed90c50905f6439ab20000b25",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md": "cb3681d9f9c6d52c7d28b3059492cb147ada4721228e4c506e67a06d92068956",
+    "docs/superpowers/plans/2026-10-21-tk-6-embedding-transport.md": "cea3724fae49af6b192e2c139f8f2ae3fd3ac1ede5e56b2bffaf2a37476dee9a",
+    "docs/superpowers/specs/2026-10-21-tk-6-embedding-transport-design.md": "e0ab5ed70f12ee6255cb3738cbdbda38f7fdf827b57e90e78e97d1e42f8d4463"
+  },
+  "commands": "pre-commit *.log and schedule JSON in same directory",
+  "historical_linux_receipts": "unchanged source hashes match final linux-arm64 PASS, no new Linux run claimed",
+  "staged_paths": 349,
+  "whitespace_check": "PASS for source/config/Markdown/JSON; immutable captured .log/.txt excluded (unittest retains trailing spaces)",
+  "raw_evidence": "bytes unchanged, recorded SHA256 remain valid"
+}

@@ -1,0 +1,155 @@
+    Updating crates.io index
+     Locking 118 packages to latest Rust 1.95.0 compatible versions
+      Adding serde v1.0.228 (available: v1.0.229)
+      Adding serde_core v1.0.228 (available: v1.0.229)
+      Adding serde_derive v1.0.228 (available: v1.0.229)
+      Adding serde_json v1.0.145 (available: v1.0.154)
+      Adding signal-hook v0.3.18 (available: v0.4.5)
+      Adding ureq v3.4.2 (available: v3.5.0)
+ Downloading crates ...
+  Downloaded zerofrom-derive v0.1.8
+  Downloaded untrusted v0.9.0
+  Downloaded time-core v0.1.9
+  Downloaded equivalent v1.0.3
+  Downloaded num-conv v0.2.2
+  Downloaded document-features v0.2.12
+  Downloaded displaydoc v0.2.7
+  Downloaded security-framework-sys v2.17.0
+  Downloaded subtle v2.6.1
+  Downloaded idna_adapter v1.2.2
+  Downloaded powerfmt v0.2.1
+  Downloaded zerofrom v0.1.8
+  Downloaded core-foundation v0.10.1
+  Downloaded tinystr v0.8.4
+  Downloaded yoke-derive v0.8.4
+  Downloaded utf8-zero v0.8.1
+  Downloaded signal-hook-registry v1.4.8
+  Downloaded potential_utf v0.1.6
+  Downloaded cookie_store v0.22.1
+  Downloaded deranged v0.5.9
+  Downloaded zeroize v1.9.1
+  Downloaded zerovec-derive v0.11.6
+  Downloaded cookie v0.18.2
+  Downloaded yoke v0.8.3
+  Downloaded http v1.5.0
+  Downloaded litemap v0.8.3
+  Downloaded writeable v0.6.4
+  Downloaded time-macros v0.2.32
+  Downloaded rustls-pki-types v1.15.1
+  Downloaded getrandom v0.2.17
+  Downloaded synstructure v0.14.0
+  Downloaded icu_provider v2.3.1
+  Downloaded ureq-proto v0.6.5
+  Downloaded rustls-platform-verifier v0.7.1
+  Downloaded icu_normalizer_data v2.3.0
+  Downloaded litrs v1.0.1
+  Downloaded base64 v0.23.1
+  Downloaded icu_locale_core v2.3.0
+  Downloaded zerotrie v0.2.5
+  Downloaded indexmap v2.14.2
+  Downloaded url v2.5.8
+  Downloaded rustls-webpki v0.103.16
+  Downloaded icu_collections v2.3.0
+  Downloaded bytes v1.12.1
+  Downloaded icu_properties v2.3.0
+  Downloaded security-framework v3.7.0
+  Downloaded zerovec v0.11.8
+  Downloaded log v0.4.34
+  Downloaded hashbrown v0.17.1
+  Downloaded icu_properties_data v2.3.0
+  Downloaded webpki-roots v1.0.10
+  Downloaded time v0.3.55
+  Downloaded syn v3.0.9
+  Downloaded rustls v0.23.46
+  Downloaded icu_normalizer v2.3.0
+  Downloaded ring v0.17.14
+   Compiling libc v0.2.191
+   Compiling find-msvc-tools v0.1.15
+   Compiling shlex v2.0.1
+   Compiling proc-macro2 v1.0.107
+   Compiling cfg-if v1.0.5
+   Compiling zeroize v1.9.1
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.27
+   Compiling serde_core v1.0.228
+   Compiling core-foundation-sys v0.8.7
+   Compiling untrusted v0.9.0
+   Compiling itoa v1.0.18
+   Compiling httparse v1.10.1
+   Compiling log v0.4.34
+   Compiling rustls v0.23.46
+   Compiling rustls-pki-types v1.15.1
+   Compiling serde_json v1.0.145
+   Compiling serde v1.0.228
+   Compiling subtle v2.6.1
+   Compiling cc v1.9.0
+   Compiling once_cell v1.21.4
+   Compiling bitflags v2.13.2
+   Compiling bytes v1.12.1
+   Compiling signal-hook v0.3.18
+   Compiling base64 v0.23.1
+   Compiling ryu v1.0.23
+   Compiling memchr v2.8.3
+   Compiling webpki-roots v1.0.10
+   Compiling http v1.5.0
+   Compiling percent-encoding v2.3.2
+   Compiling utf8-zero v0.8.1
+   Compiling ring v0.17.14
+   Compiling ureq-proto v0.6.5
+   Compiling syn v2.0.119
+   Compiling getrandom v0.2.17
+   Compiling security-framework-sys v2.17.0
+   Compiling core-foundation v0.10.1
+   Compiling errno v0.3.14
+   Compiling signal-hook-registry v1.4.8
+   Compiling serde_derive v1.0.228
+   Compiling security-framework v3.7.0
+   Compiling rustls-webpki v0.103.16
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling ureq v3.4.2
+   Compiling letopis-transport-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.71s
+     Running tests/protocol.rs (tests/transport/target/debug/deps/protocol-4f8c595b85e226a2)
+
+running 7 tests
+test strict_configuration_rejects_invalid_shapes_without_defaulting ... ok
+test malformed_native_vectors_are_never_success ... ok
+test compatible_indices_must_bijectively_cover_inputs ... ok
+test request_validation_rejects_empty_input_and_wrong_documented_types ... FAILED
+test native_request_is_literal_and_cannot_be_overridden ... FAILED
+test response_order_and_optional_fields_follow_each_protocol ... FAILED
+test compatible_request_is_literal_and_requires_safe_bearer ... FAILED
+
+failures:
+
+---- request_validation_rejects_empty_input_and_wrong_documented_types stdout ----
+
+thread 'request_validation_rejects_empty_input_and_wrong_documented_types' (12093349) panicked at tests/protocol.rs:7:88:
+called `Result::unwrap()` on an `Err` value: TransportError
+
+---- native_request_is_literal_and_cannot_be_overridden stdout ----
+
+thread 'native_request_is_literal_and_cannot_be_overridden' (12093348) panicked at tests/protocol.rs:7:88:
+called `Result::unwrap()` on an `Err` value: TransportError
+
+---- response_order_and_optional_fields_follow_each_protocol stdout ----
+
+thread 'response_order_and_optional_fields_follow_each_protocol' (12093350) panicked at tests/protocol.rs:79:52:
+called `Result::unwrap()` on an `Err` value: TransportError
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- compatible_request_is_literal_and_requires_safe_bearer stdout ----
+
+thread 'compatible_request_is_literal_and_requires_safe_bearer' (12093346) panicked at tests/protocol.rs:7:88:
+called `Result::unwrap()` on an `Err` value: TransportError
+
+
+failures:
+    compatible_request_is_literal_and_requires_safe_bearer
+    native_request_is_literal_and_cannot_be_overridden
+    request_validation_rejects_empty_input_and_wrong_documented_types
+    response_order_and_optional_fields_follow_each_protocol
+
+test result: FAILED. 3 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test protocol`

@@ -1,0 +1,8 @@
+test_build_or_unrelated_failure_cannot_count_as_detection (test_runner.RunnerTests.test_build_or_unrelated_failure_cannot_count_as_detection) ... ok
+test_existing_evidence_is_rejected_without_changes (test_runner.RunnerTests.test_existing_evidence_is_rejected_without_changes) ... ok
+test_named_behavioral_assertion_is_required (test_runner.RunnerTests.test_named_behavioral_assertion_is_required) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.031s
+
+OK

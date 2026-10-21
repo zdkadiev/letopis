@@ -1,0 +1,373 @@
+{
+  "result": "PASS",
+  "scope": "Synthetic X-2 transport; no real model inference/utility pilot",
+  "started_utc": "2026-10-21T19:06:14.167594+00:00",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "python": "3.12.0 (v3.12.0:0fb18b02c8, Oct  2 2023, 09:45:56) [Clang 13.0.0 (clang-1300.0.29.30)]",
+  "provider_calls": 0,
+  "ollama_inference": false,
+  "ollama_version_exercised": null,
+  "x86_64_status": "assumed until TK-43",
+  "source_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "10762e73c4e20eacf9fd782e85986877c1d9c7bd7d12c901c086ac179e5b5cc3",
+    "README.md": "e8a50dfc18e8ed91af597586b4ff00391889dfa048724e43208bac52ddd87239",
+    "fixtures.py": "ff0a9dd31b6effd0480d99e3b8a43c09ea3bc940f06a2fa8d216f33d7938d846",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "4cd9466161888fab4714bdecd839a01178607020a766071021bb4e9160ab6c16",
+    "run.py": "6416f4278c75220b18888c76eb4d1334755c8ba0768726491920c15490fd1278",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "ce6a499214dd43e8474247e33c81e6d4ea79a35de4997417c74805df094610ab",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "5279af5a2a6eb338d719b36ca659f5ae43acf198f57eb2125b6ede444c744c23",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "commands": [
+    {
+      "argv": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "01-rustc.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "git",
+        "-c",
+        "safe.directory=/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "02-git.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "--version"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "03-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/Cargo.toml"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "04-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/Cargo.toml",
+        "--bin",
+        "transport_client"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "05-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport",
+        "-p",
+        "test_runner.py",
+        "-v"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "06-python3.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "07-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "08-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "tree",
+        "--locked",
+        "--manifest-path",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/Cargo.toml",
+        "--prefix",
+        "none"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "09-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "tree",
+        "--locked",
+        "--manifest-path",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/Cargo.toml",
+        "-e",
+        "features"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "10-cargo.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport/negative_controls.py",
+        "--evidence",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/docs/zkit/letopis/checks/TK-6/macos-arm64/negative-controls"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "11-python3.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/tests/transport",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "12-python3.log",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-6/letopis/docs/zkit/letopis/roadmap/schedule.py",
+        "--check"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-6/letopis",
+      "log": "13-python3.log",
+      "exit_code": 0
+    }
+  ],
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: aarch64-apple-darwin\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "base_commit": "cc82a8f1da7ff8dc6b53dc682462a09fe851f458",
+  "system_trust": {
+    "local_untrusted_issuer": "PASS",
+    "positive_system_trust": "separate public-HTTPS receipt required; no host Keychain edits"
+  },
+  "prior_proofs": [
+    {
+      "task": "TK-1",
+      "platform": "macos-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-1/macos-arm64/manifest.json",
+      "manifest_sha256": "7c9e48b99cc01428ec6276796d6f959c08b894e659768f46d8fb9e1b8007722a",
+      "source_files": 12,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-1",
+      "platform": "linux-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-1/linux-arm64/manifest.json",
+      "manifest_sha256": "af12bdc32054248a5c59e81d3461ee4e985d0a8b81f580f6d138f35b915b352c",
+      "source_files": 12,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-2",
+      "platform": "macos-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-2/macos-arm64/manifest.json",
+      "manifest_sha256": "45a19ebeb7708d7acb8430af4198a5d2e469e0e02fecd2058848bb7953a622c3",
+      "source_files": 24,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-2",
+      "platform": "linux-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-2/linux-arm64/manifest.json",
+      "manifest_sha256": "564b51be98af4a4442f256cee7bf42fd7aa481e40da203417580fd690e85af81",
+      "source_files": 24,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-3",
+      "platform": "macos-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-3/macos-arm64/manifest.json",
+      "manifest_sha256": "483f7aabeb4fba2460722398a6a3a89369913b698ba8afc65a7b482281b60398",
+      "source_files": 46,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-3",
+      "platform": "linux-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-3/linux-arm64/manifest.json",
+      "manifest_sha256": "86192f575641a87d4a7a6d9e66ec579f31defb42f6674509c2a4cc5d857090ae",
+      "source_files": 46,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-4",
+      "platform": "macos-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-4/macos-arm64/manifest.json",
+      "manifest_sha256": "9f8c5b1dca43f04e9a2006e35b5ba7b9b7a4273420fabc7b51a5419b3cb30b86",
+      "source_files": 60,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-4",
+      "platform": "linux-arm64",
+      "manifest": "docs/zkit/letopis/checks/TK-4/linux-arm64/manifest.json",
+      "manifest_sha256": "6663b126c83739670e38edf3fd0b6cb8af19e71ea7bcad90cbb261eee591874a",
+      "source_files": 60,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-5",
+      "platform": "macos",
+      "manifest": "docs/zkit/letopis/checks/TK-5/macos/manifest.json",
+      "manifest_sha256": "3dd82c45a2b2db2650e2d339f0672f75edf77d08185d0dc33664aaca3357c700",
+      "source_files": 22,
+      "mismatches": [],
+      "result": "PASS"
+    },
+    {
+      "task": "TK-5",
+      "platform": "linux",
+      "manifest": "docs/zkit/letopis/checks/TK-5/linux/manifest.json",
+      "manifest_sha256": "a6865d94a30c9f2837e4b7b4a3e7e5f2a513631427487a6790fae17f7d94e248",
+      "source_files": 22,
+      "mismatches": [],
+      "result": "PASS"
+    }
+  ],
+  "finished_utc": "2026-10-21T19:07:48.165988+00:00",
+  "source_after_sha256": {
+    ".gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+    "Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+    "Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+    "Dockerfile": "10762e73c4e20eacf9fd782e85986877c1d9c7bd7d12c901c086ac179e5b5cc3",
+    "README.md": "e8a50dfc18e8ed91af597586b4ff00391889dfa048724e43208bac52ddd87239",
+    "fixtures.py": "ff0a9dd31b6effd0480d99e3b8a43c09ea3bc940f06a2fa8d216f33d7938d846",
+    "linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+    "negative_controls.py": "4cd9466161888fab4714bdecd839a01178607020a766071021bb4e9160ab6c16",
+    "run.py": "6416f4278c75220b18888c76eb4d1334755c8ba0768726491920c15490fd1278",
+    "test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+    "test_transport.py": "ce6a499214dd43e8474247e33c81e6d4ea79a35de4997417c74805df094610ab",
+    "certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+    "certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+    "certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+    "certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+    "certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+    "certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+    "certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+    "certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+    "src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+    "src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+    "src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+    "src/bin/transport_client.rs": "5279af5a2a6eb338d719b36ca659f5ae43acf198f57eb2125b6ede444c744c23",
+    "tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "evidence_sha256": {
+    "01-rustc.log": "e61cba8ded8c60e985f759f74a221c4773649021477d00b44c7af411eb8c218c",
+    "02-git.log": "c1c0b88b833a3e6d8fc336d8a1e3b418729936e7a353cb644c49aa5d26e27ec6",
+    "03-cargo.log": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+    "04-cargo.log": "f4c0d4b7ad6c3a8d49fb0e5e14963e4edd520d867a3c0e39d44da91d48e859fa",
+    "05-cargo.log": "736e2582f563605dd272e5fb977840b0c0767377d27b6940c440caf75eec7157",
+    "06-python3.log": "e39ea4ce0535a228e35ceded1c0525f7bb5b560c9251151ef91eac882d0bfd88",
+    "07-cargo.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "08-cargo.log": "d81649d435edd3f272c406464628845ace151d8deeebc70ec22122cf17fa9027",
+    "09-cargo.log": "95eaf9ee16cbe4a541cc1a539ef70ace0b2feb347f7c1e3f56b13e886e851fa4",
+    "10-cargo.log": "409ede2f24b5397474cdd62e22ea2d66574fec7c258f658a96d102084a67326f",
+    "11-python3.log": "6537f2967677efc663a41a012c1d515790c6b51ab5a1ca84f2b9c369e8036f28",
+    "12-python3.log": "f9a2e164660c10815631f5d94e730224ff4daa924f5eecc58a86cd6b468981be",
+    "13-python3.log": "4efa4fd61eb534429a5d236ff298352511e81bc69674152b05e6789628d4e6eb",
+    "negative-controls/cancellation-build.log": "83e56492c0dfd39a068952dbdcdc92ab8d799cdfdf4c4967f9cc8f09718e9b72",
+    "negative-controls/cancellation-test.log": "0cc492363eff1026c622712b42179fcbfafcf49959eaf5027465b476b63ab85a",
+    "negative-controls/cancelled-exit-build.log": "85d2f762ed7c1c90070dcff816acc5df19ebfa591c9783258694fef00885a230",
+    "negative-controls/cancelled-exit-test.log": "44fdbb5e4ba1bbb73b8878d5366f691b2293b1cb91b57773052ea8ff967c4a09",
+    "negative-controls/count-build.log": "1e667b0f26bfe67262e9e1e662bbc8b6669994de3f425f6069e7fa7fe1508cf0",
+    "negative-controls/count-test.log": "e97e68909cb4df3c855958ffb0e66836f56bab4f4aa299be0e3383d5e493e231",
+    "negative-controls/deadline-build.log": "a7d8b7ee83ab140fa569ecd9692f1b679c2eca6726a7703849f4ed3fe6eb81cc",
+    "negative-controls/deadline-test.log": "30c10b2ddd93cd2ff0e0ba640a463b95a66bf36d48cdab12b6541dff4f82956f",
+    "negative-controls/dimensions-build.log": "e906ea83e3d244529519638e0b6002f510c7c8550ff8c744a09c552929c1c278",
+    "negative-controls/dimensions-test.log": "c7d66ac89e13dd87ee2d13e4ce660d718fb7ade4c262af43c4805acc75a3f555",
+    "negative-controls/indices-build.log": "e906ea83e3d244529519638e0b6002f510c7c8550ff8c744a09c552929c1c278",
+    "negative-controls/indices-test.log": "8262761c54bbbb5d6696eee7ce946723f4cd785118de54fadff208977fc91ea6",
+    "negative-controls/manifest.json": "3c237099999631d30640aa74588a6e259f5d626cb4da37b6f98544a1d84f8315",
+    "negative-controls/proxies-build.log": "e906ea83e3d244529519638e0b6002f510c7c8550ff8c744a09c552929c1c278",
+    "negative-controls/proxies-test.log": "ee757d63ea3f9aaad0068d3b15e08a6e3e603f9ddaa1d2c251fbe472ad363164",
+    "negative-controls/redaction-build.log": "46db4bf254992a65cf4f0dafd89a7398b293bcdf0f50c4d4fd08d0666c61144b",
+    "negative-controls/redaction-test.log": "132ec1e23c246fe83db87f9acafe354221b7b644a37008f4342ae124e7154a19",
+    "negative-controls/redirects-build.log": "a7d8b7ee83ab140fa569ecd9692f1b679c2eca6726a7703849f4ed3fe6eb81cc",
+    "negative-controls/redirects-test.log": "e068fe95cfedacdd49b2211b51a727bcaf5c2c979f76d70d8d1ca3595bbe89e7",
+    "negative-controls/stdout-once-build.log": "35db254c5c42cd6e68e4fee63ad03fad7496fc1634449d9799f3cd66a1209071",
+    "negative-controls/stdout-once-test.log": "4b8d5048634503a2ae382a5ea7cd0b2c492a5e97e82841075394e13a3be5e8dc",
+    "requests.jsonl": "7ac4d23d45e1db3758aa19dcf5418a8a7cf20ea30d292ff61bb2c828d256a49f"
+  }
+}

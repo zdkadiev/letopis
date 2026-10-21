@@ -1,0 +1,29 @@
+{
+  "revision": 31,
+  "commit_id": "5a1649a0b06f464b66382e87195e7c380218c943",
+  "task": "entity_d825bb41f4a146939ad50ffe21eb349d",
+  "observation": "entity_f258e3186e1e4d8798ce16f0975e7442",
+  "artifact_ids": {
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-6-provider-harness.md": "entity_bb3809c7dbd24ac19d468edc53ebe736",
+    "docs/zkit/letopis/contracts/X-2-embeddings.md": "entity_aa5894d5bc9e499899e3e4318a5828c2",
+    "docs/zkit/letopis/architecture.md": "entity_b8be1e547cb743d6884f373e5ea62df3",
+    "docs/zkit/letopis/roadmap.md": "entity_ca41fdb88fab4776a891449526a7e867",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/epic.md": "entity_20dedd4701064fdcbe85dd713d5c64bf",
+    "docs/superpowers/specs/2026-10-21-tk-6-embedding-transport-design.md": "entity_2ef929a155d64513ba1c24e865d5332c",
+    "docs/superpowers/plans/2026-10-21-tk-6-embedding-transport.md": "entity_a2084c80877d40bb8e79bfe33ed225cf",
+    "docs/zkit/letopis/checks/TK-6/report.md": "entity_0cfe146b154549b1a1dc05814cda96b6",
+    "docs/zkit/letopis/checks/TK-6/review.md": "entity_2ed58991681e4358ad921e436c801875",
+    "docs/zkit/letopis/checks/TK-6/execution-ledger.md": "entity_07eef7bc5e314a6784a9696a63ed9d5d",
+    "docs/zkit/letopis/checks/TK-6/final-verification.json": "entity_d4136d3ed09643f6a9a87a4bddb68b9d",
+    "docs/zkit/letopis/checks/TK-6/macos-arm64/manifest.json": "entity_4bfb8d84b3f14b6e85c7c00f5f82e54c",
+    "docs/zkit/letopis/checks/TK-6/linux-arm64/manifest.json": "entity_1551a8e2a5324a7cafcb601e864a7f7f",
+    "docs/zkit/letopis/checks/TK-6/system-tls-macos-arm64/manifest.json": "entity_13b5cfaccf0d49d7ab38c21710e0580a",
+    "docs/zkit/letopis/checks/TK-6/github-issue-comment.md": "entity_c02dc4087d444b97a8299766a1041f80",
+    "tests/transport": "entity_7a7ae1f190b84e3cbb2971ad8c027efc"
+  },
+  "summary": {
+    "created_count": 56,
+    "updated_count": 8,
+    "deleted_count": 0
+  }
+}

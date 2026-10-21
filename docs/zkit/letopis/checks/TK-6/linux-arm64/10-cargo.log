@@ -1,0 +1,201 @@
+letopis-transport-checks v0.0.0 (/repo/tests/transport)
+├── serde feature "default"
+│   ├── serde v1.0.228
+│   │   ├── serde_core feature "result"
+│   │   │   └── serde_core v1.0.228
+│   │   └── serde_derive feature "default"
+│   │       └── serde_derive v1.0.228 (proc-macro)
+│   │           ├── proc-macro2 feature "proc-macro"
+│   │           │   └── proc-macro2 v1.0.107
+│   │           │       └── unicode-ident feature "default"
+│   │           │           └── unicode-ident v1.0.27
+│   │           ├── quote feature "proc-macro"
+│   │           │   ├── quote v1.0.47
+│   │           │   │   └── proc-macro2 v1.0.107 (*)
+│   │           │   └── proc-macro2 feature "proc-macro" (*)
+│   │           ├── syn feature "clone-impls"
+│   │           │   └── syn v2.0.119
+│   │           │       ├── proc-macro2 v1.0.107 (*)
+│   │           │       ├── quote v1.0.47 (*)
+│   │           │       └── unicode-ident feature "default" (*)
+│   │           ├── syn feature "derive"
+│   │           │   └── syn v2.0.119 (*)
+│   │           ├── syn feature "parsing"
+│   │           │   └── syn v2.0.119 (*)
+│   │           ├── syn feature "printing"
+│   │           │   └── syn v2.0.119 (*)
+│   │           └── syn feature "proc-macro"
+│   │               ├── syn v2.0.119 (*)
+│   │               ├── proc-macro2 feature "proc-macro" (*)
+│   │               └── quote feature "proc-macro" (*)
+│   └── serde feature "std"
+│       ├── serde v1.0.228 (*)
+│       └── serde_core feature "std"
+│           └── serde_core v1.0.228
+├── serde feature "derive"
+│   ├── serde v1.0.228 (*)
+│   └── serde feature "serde_derive"
+│       └── serde v1.0.228 (*)
+├── serde_json feature "default"
+│   ├── serde_json v1.0.145
+│   │   ├── memchr v2.8.3
+│   │   ├── serde_core v1.0.228
+│   │   ├── itoa feature "default"
+│   │   │   └── itoa v1.0.18
+│   │   └── ryu feature "default"
+│   │       └── ryu v1.0.23
+│   └── serde_json feature "std"
+│       ├── serde_json v1.0.145 (*)
+│       ├── serde_core feature "std" (*)
+│       └── memchr feature "std"
+│           ├── memchr v2.8.3
+│           └── memchr feature "alloc"
+│               └── memchr v2.8.3
+├── signal-hook feature "default"
+│   ├── signal-hook v0.3.18
+│   │   ├── libc feature "default"
+│   │   │   ├── libc v0.2.191
+│   │   │   └── libc feature "std"
+│   │   │       └── libc v0.2.191
+│   │   └── signal-hook-registry feature "default"
+│   │       └── signal-hook-registry v1.4.8
+│   │           ├── libc feature "default" (*)
+│   │           └── errno feature "default"
+│   │               ├── errno v0.3.14
+│   │               │   └── libc v0.2.191
+│   │               └── errno feature "std"
+│   │                   ├── errno v0.3.14 (*)
+│   │                   └── libc feature "std" (*)
+│   ├── signal-hook feature "channel"
+│   │   └── signal-hook v0.3.18 (*)
+│   └── signal-hook feature "iterator"
+│       ├── signal-hook v0.3.18 (*)
+│       └── signal-hook feature "channel" (*)
+├── ureq feature "json"
+│   └── ureq v3.4.2
+│       ├── rustls-platform-verifier v0.7.1
+│       │   ├── rustls-webpki v0.103.16
+│       │   │   ├── ring v0.17.14
+│       │   │   │   ├── cfg-if v1.0.5
+│       │   │   │   ├── libc v0.2.191
+│       │   │   │   ├── getrandom feature "default"
+│       │   │   │   │   └── getrandom v0.2.17
+│       │   │   │   │       ├── libc v0.2.191
+│       │   │   │   │       └── cfg-if feature "default"
+│       │   │   │   │           └── cfg-if v1.0.5
+│       │   │   │   └── untrusted feature "default"
+│       │   │   │       └── untrusted v0.9.0
+│       │   │   │   [build-dependencies]
+│       │   │   │   └── cc v1.9.0
+│       │   │   │       ├── find-msvc-tools feature "default"
+│       │   │   │       │   └── find-msvc-tools v0.1.15
+│       │   │   │       └── shlex feature "default"
+│       │   │   │           ├── shlex v2.0.1
+│       │   │   │           └── shlex feature "std"
+│       │   │   │               └── shlex v2.0.1
+│       │   │   ├── rustls-pki-types v1.15.1
+│       │   │   │   └── zeroize feature "default"
+│       │   │   │       ├── zeroize v1.9.1
+│       │   │   │       └── zeroize feature "alloc"
+│       │   │   │           └── zeroize v1.9.1
+│       │   │   └── untrusted feature "default" (*)
+│       │   ├── log feature "default"
+│       │   │   └── log v0.4.34
+│       │   ├── rustls feature "std"
+│       │   │   ├── rustls v0.23.46
+│       │   │   │   ├── subtle v2.6.1
+│       │   │   │   ├── log feature "default" (*)
+│       │   │   │   ├── once_cell feature "alloc"
+│       │   │   │   │   ├── once_cell v1.21.4
+│       │   │   │   │   └── once_cell feature "race"
+│       │   │   │   │       └── once_cell v1.21.4
+│       │   │   │   ├── once_cell feature "race" (*)
+│       │   │   │   ├── ring feature "default"
+│       │   │   │   │   ├── ring v0.17.14 (*)
+│       │   │   │   │   ├── ring feature "alloc"
+│       │   │   │   │   │   └── ring v0.17.14 (*)
+│       │   │   │   │   └── ring feature "dev_urandom_fallback"
+│       │   │   │   │       └── ring v0.17.14 (*)
+│       │   │   │   ├── rustls-pki-types feature "alloc"
+│       │   │   │   │   └── rustls-pki-types v1.15.1 (*)
+│       │   │   │   ├── rustls-pki-types feature "default"
+│       │   │   │   │   ├── rustls-pki-types v1.15.1 (*)
+│       │   │   │   │   └── rustls-pki-types feature "alloc" (*)
+│       │   │   │   ├── zeroize feature "default" (*)
+│       │   │   │   └── rustls-webpki feature "alloc"
+│       │   │   │       ├── rustls-webpki v0.103.16 (*)
+│       │   │   │       ├── ring feature "alloc" (*)
+│       │   │   │       └── rustls-pki-types feature "alloc" (*)
+│       │   │   ├── once_cell feature "std"
+│       │   │   │   ├── once_cell v1.21.4
+│       │   │   │   └── once_cell feature "alloc" (*)
+│       │   │   ├── rustls-pki-types feature "std"
+│       │   │   │   ├── rustls-pki-types v1.15.1 (*)
+│       │   │   │   └── rustls-pki-types feature "alloc" (*)
+│       │   │   └── rustls-webpki feature "std"
+│       │   │       ├── rustls-webpki v0.103.16 (*)
+│       │   │       ├── rustls-pki-types feature "std" (*)
+│       │   │       └── rustls-webpki feature "alloc" (*)
+│       │   └── rustls-native-certs feature "default"
+│       │       └── rustls-native-certs v0.8.5
+│       │           ├── rustls-pki-types feature "default" (*)
+│       │           ├── rustls-pki-types feature "std" (*)
+│       │           └── openssl-probe feature "default"
+│       │               └── openssl-probe v0.2.1
+│       ├── webpki-roots v1.0.10
+│       │   └── rustls-pki-types v1.15.1 (*)
+│       ├── serde feature "std" (*)
+│       ├── serde_json feature "std" (*)
+│       ├── base64 feature "std"
+│       │   ├── base64 v0.23.1
+│       │   └── base64 feature "alloc"
+│       │       └── base64 v0.23.1
+│       ├── log feature "default" (*)
+│       ├── percent-encoding feature "default"
+│       │   ├── percent-encoding v2.3.2
+│       │   └── percent-encoding feature "std"
+│       │       ├── percent-encoding v2.3.2
+│       │       └── percent-encoding feature "alloc"
+│       │           └── percent-encoding v2.3.2
+│       ├── rustls feature "logging"
+│       │   ├── rustls v0.23.46 (*)
+│       │   └── rustls feature "log"
+│       │       └── rustls v0.23.46 (*)
+│       ├── rustls feature "std" (*)
+│       ├── rustls feature "tls12"
+│       │   └── rustls v0.23.46 (*)
+│       ├── rustls-pki-types feature "std" (*)
+│       ├── ureq-proto feature "client"
+│       │   └── ureq-proto v0.6.5
+│       │       ├── httparse v1.10.1
+│       │       ├── base64 feature "std" (*)
+│       │       ├── log feature "default" (*)
+│       │       └── http feature "std"
+│       │           └── http v1.5.0
+│       │               ├── itoa feature "default" (*)
+│       │               └── bytes feature "default"
+│       │                   ├── bytes v1.12.1
+│       │                   └── bytes feature "std"
+│       │                       └── bytes v1.12.1
+│       └── utf8-zero feature "default"
+│           ├── utf8-zero v0.8.1
+│           └── utf8-zero feature "std"
+│               └── utf8-zero v0.8.1
+├── ureq feature "platform-verifier"
+│   └── ureq v3.4.2 (*)
+└── ureq feature "rustls"
+    ├── ureq v3.4.2 (*)
+    ├── ureq feature "_ring"
+    │   ├── ureq v3.4.2 (*)
+    │   └── rustls feature "ring"
+    │       ├── rustls v0.23.46 (*)
+    │       └── rustls-webpki feature "ring"
+    │           └── rustls-webpki v0.103.16 (*)
+    ├── ureq feature "rustls-no-provider"
+    │   ├── ureq v3.4.2 (*)
+    │   ├── ureq feature "_rustls"
+    │   │   └── ureq v3.4.2 (*)
+    │   └── ureq feature "_tls"
+    │       └── ureq v3.4.2 (*)
+    └── ureq feature "rustls-webpki-roots"
+        └── ureq v3.4.2 (*)

@@ -1,0 +1,39 @@
+{
+  "result": "PASS",
+  "base_commit": "cc82a8f1da7ff8dc6b53dc682462a09fe851f458",
+  "task_cards": [
+    {
+      "task": "TK-1",
+      "card": "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-1-build.md",
+      "status": "done",
+      "unchecked_criteria": 0
+    },
+    {
+      "task": "TK-2",
+      "card": "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-2-durability-harness.md",
+      "status": "done",
+      "unchecked_criteria": 0
+    },
+    {
+      "task": "TK-3",
+      "card": "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-3-vector-harness.md",
+      "status": "done",
+      "unchecked_criteria": 0
+    },
+    {
+      "task": "TK-4",
+      "card": "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-4-runtime-harness.md",
+      "status": "done",
+      "unchecked_criteria": 0
+    },
+    {
+      "task": "TK-5",
+      "card": "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-5-pilot-protocol.md",
+      "status": "done",
+      "unchecked_criteria": 0
+    }
+  ],
+  "proofs": "See prior_proofs in final macos-arm64/linux-arm64 manifests: both original platforms checked against committed manifest bytes and current source hashes.",
+  "scope": "Historical suites not rerun except fresh 31 pilot tests; current hashes and previous acceptance preserved.",
+  "g0": "continue to TK-7 after final fixed-code TK-6 PASS and one review/fix pass"
+}

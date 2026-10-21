@@ -1,0 +1,10 @@
+count: compiled, named behavioral assertion detected mutation
+dimensions: compiled, named behavioral assertion detected mutation
+indices: compiled, named behavioral assertion detected mutation
+redirects: compiled, named behavioral assertion detected mutation
+proxies: compiled, named behavioral assertion detected mutation
+deadline: compiled, named behavioral assertion detected mutation
+cancellation: compiled, named behavioral assertion detected mutation
+stdout-once: compiled, named behavioral assertion detected mutation
+redaction: compiled, named behavioral assertion detected mutation
+system-trust: compiled, named behavioral assertion detected mutation

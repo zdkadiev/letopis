@@ -1,0 +1,6 @@
+test_exact_native_and_compatible_wire (test_transport.TransportTests.test_exact_native_and_compatible_wire) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.037s
+
+OK
