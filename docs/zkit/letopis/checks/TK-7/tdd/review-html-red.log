@@ -1,0 +1,22 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-7/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.54s
+     Running tests/markdown_elements.rs (target/debug/deps/markdown_elements-24ddbdb81e6974cd)
+
+running 1 test
+test raw_html_content_does_not_declare_metadata ... FAILED
+
+failures:
+
+---- raw_html_content_does_not_declare_metadata stdout ----
+
+thread 'raw_html_content_does_not_declare_metadata' (13583370) panicked at tests/support/mod.rs:8:10:
+called `Result::unwrap()` on an `Err` value: [Diagnostic { kind: OrphanMetadata, bytes: Some(ByteSpan { start: 63, end: 98 }), message: "metadata does not immediately follow an anchored heading" }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    raw_html_content_does_not_declare_metadata
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test markdown_elements`

@@ -22,9 +22,16 @@ pub(super) fn scan(
     let comments: Vec<_> = events
         .iter()
         .filter_map(|(event, range)| match event {
-            Event::Html(s) | Event::InlineHtml(s)
-                if s.trim_start().starts_with("<!-- letopis:") =>
+            // Html events are raw lines inside a block, including script/style data.
+            // Only a block that itself starts with our comment declares metadata.
+            Event::Start(Tag::HtmlBlock)
+                if text[range.clone()]
+                    .trim_start()
+                    .starts_with("<!-- letopis:") =>
             {
+                Some(range.clone())
+            }
+            Event::InlineHtml(s) if s.trim_start().starts_with("<!-- letopis:") => {
                 Some(range.clone())
             }
             _ => None,

@@ -200,3 +200,30 @@ fn metadata_must_fit_exactly_one_standalone_line() {
         );
     }
 }
+
+#[test]
+fn raw_html_content_does_not_declare_metadata() {
+    for (open, close) in [
+        ("<script>", "</script>"),
+        ("<style>", "</style>"),
+        ("<textarea>", "</textarea>"),
+        ("<pre>", "</pre>"),
+        ("<!-- example", "-->"),
+    ] {
+        let raw = format!(
+            "{open}\nconst example = `\n<!-- letopis: {{\"created_at\":2}} -->\n`;\n{close}\n"
+        );
+        let got = parsed("a.md", &whole(&format!("\n{raw}")));
+        assert_eq!(got.elements.len(), 1, "{open}");
+        assert!(
+            got.elements[0].search_text.contains("created_at\":2"),
+            "{open}"
+        );
+        assert!(
+            parse(&RepoPath::parse("a.md").unwrap(), raw.as_bytes())
+                .unwrap()
+                .is_none(),
+            "{open}"
+        );
+    }
+}

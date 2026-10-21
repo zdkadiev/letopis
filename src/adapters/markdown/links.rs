@@ -1,6 +1,6 @@
 use super::{Diagnostic, DiagnosticKind, Events};
 use crate::domain::{Edge, EdgeTarget, EdgeType, Element, KnowledgeId, SourceUri, ValueError};
-use pulldown_cmark::{Event, LinkType, Tag};
+use pulldown_cmark::{Event, LinkType, Tag, TagEnd};
 use std::collections::BTreeSet;
 
 pub(super) fn collect(
@@ -8,7 +8,23 @@ pub(super) fn collect(
     elements: &[Element],
 ) -> Result<BTreeSet<Edge>, Diagnostic> {
     let mut edges = BTreeSet::new();
+    let mut image_depth = 0usize;
     for (event, range) in events {
+        match event {
+            Event::Start(Tag::Image { .. }) => {
+                image_depth += 1;
+                continue;
+            }
+            Event::End(TagEnd::Image) => {
+                image_depth -= 1;
+                continue;
+            }
+            _ => {}
+        }
+        // An image's alt text is searchable content, not a graph declaration.
+        if image_depth != 0 {
+            continue;
+        }
         let Event::Start(Tag::Link {
             link_type: LinkType::Inline,
             dest_url,

@@ -91,3 +91,32 @@ fn links_outside_elements_are_only_navigation() {
     assert_eq!(got.edges.len(), 1);
     assert_eq!(got.edges.first().unwrap().source().as_str(), "a.md#a");
 }
+
+#[test]
+fn image_alt_links_do_not_declare_edges() {
+    let got = parsed(
+        "a.md",
+        &whole("![see [target](b.md \"letopis:type=includes\")](img.png)\n"),
+    );
+    assert_eq!(got.elements[0].search_text, "see target");
+    assert!(
+        got.edges.is_empty(),
+        "image alt cannot declare graph edges: {:?}",
+        got.edges
+    );
+    assert_eq!(
+        kind_for(&got.elements[0].element.id, &got.edges),
+        ElementKind::Vertex
+    );
+}
+
+#[test]
+fn links_wrapping_images_still_declare_edges() {
+    let got = parsed(
+        "a.md",
+        &whole("[![alt](img.png)](b.md \"letopis:type=includes\")"),
+    );
+    assert_eq!(got.edges.len(), 1);
+    assert_eq!(got.edges.first().unwrap().target().as_str(), "b.md");
+    assert_eq!(got.elements[0].search_text, "alt");
+}
