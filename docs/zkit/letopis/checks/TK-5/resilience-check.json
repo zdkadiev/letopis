@@ -1,0 +1,30 @@
+{
+  "scope": "Illustrative arithmetic only, not operational assessment",
+  "checks": 17,
+  "errors": [],
+  "scenarios": {
+    "best": {
+      "illustrative_restore_scope_h": 0.1,
+      "illustrative_incident_to_service_h": 0.1,
+      "illustrative_loss_window_h": 0,
+      "illustrative_downtime_h_month": 0.0,
+      "illustrative_availability_pct": 100.0
+    },
+    "expected": {
+      "illustrative_restore_scope_h": 1,
+      "illustrative_incident_to_service_h": 26,
+      "illustrative_loss_window_h": 24,
+      "illustrative_downtime_h_month": 2.1666666666666665,
+      "illustrative_availability_pct": 99.70319634703196
+    },
+    "worst": {
+      "illustrative_restore_scope_h": "unbounded",
+      "illustrative_incident_to_service_h": "unbounded",
+      "illustrative_loss_window_h": "unbounded",
+      "illustrative_downtime_h_month": 730.0,
+      "illustrative_availability_pct": 0.0
+    }
+  },
+  "measurements": 0,
+  "provider_calls": 0
+}

@@ -1,0 +1,33 @@
+test_all_planned_slots_and_unique_actual_sessions_are_required (test_validation.ValidationTests.test_all_planned_slots_and_unique_actual_sessions_are_required) ... ok
+test_complete_request_inventory_and_nonnegative_normalized_usage (test_validation.ValidationTests.test_complete_request_inventory_and_nonnegative_normalized_usage) ... ok
+test_correctness_and_common_check_coverage_cannot_be_relabelled (test_validation.ValidationTests.test_correctness_and_common_check_coverage_cannot_be_relabelled) ... ok
+test_early_and_final_shapes_accept_independent_trajectories (test_validation.ValidationTests.test_early_and_final_shapes_accept_independent_trajectories) ... ok
+test_empty_memory_and_within_chain_memory_continuity_are_required (test_validation.ValidationTests.test_empty_memory_and_within_chain_memory_continuity_are_required) ... ok
+test_evidence_is_hashed_confined_regular_and_mandatory (test_validation.ValidationTests.test_evidence_is_hashed_confined_regular_and_mandatory) ... ok
+test_failed_predecessor_requires_explicit_not_run_followups (test_validation.ValidationTests.test_failed_predecessor_requires_explicit_not_run_followups) ... ok
+test_model_names_are_opaque_and_malformed_types_raise_value_error (test_validation.ValidationTests.test_model_names_are_opaque_and_malformed_types_raise_value_error) ... ERROR
+test_research_and_agreement_annotations_require_prior_facts_and_opportunities (test_validation.ValidationTests.test_research_and_agreement_annotations_require_prior_facts_and_opportunities) ... ok
+test_shared_inputs_and_code_continuity_are_enforced (test_validation.ValidationTests.test_shared_inputs_and_code_continuity_are_enforced) ... ok
+test_study_rejects_wrong_samples_or_unfrozen_configuration (test_validation.ValidationTests.test_study_rejects_wrong_samples_or_unfrozen_configuration) ... ok
+
+======================================================================
+ERROR: test_model_names_are_opaque_and_malformed_types_raise_value_error (test_validation.ValidationTests.test_model_names_are_opaque_and_malformed_types_raise_value_error)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/test_validation.py", line 118, in test_model_names_are_opaque_and_malformed_types_raise_value_error
+    validate(self.study, self.sessions, self.root)
+  File "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/validation.py", line 101, in validate
+    auxiliaries = identifiers(agent["auxiliary_models"], "agent.auxiliary_models")
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/validation.py", line 50, in identifiers
+    identifier(item, where)
+  File "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/validation.py", line 28, in identifier
+    require(isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]*", value),
+  File "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/validation.py", line 13, in require
+    raise ValueError(f"{where}: {message}")
+ValueError: agent.auxiliary_models: expected stable identifier
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.091s
+
+FAILED (errors=1)

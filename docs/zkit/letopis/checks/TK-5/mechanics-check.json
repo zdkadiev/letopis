@@ -1,0 +1,101 @@
+{
+  "scope": "Schemas, model invariants and isolated guard removals; not implementation validation",
+  "counts": {
+    "internal_cases": 0,
+    "guard_mutations": 15,
+    "models": 3
+  },
+  "models": {
+    "model_publish.py": {
+      "normal": [],
+      "broken": [
+        "crash left a change that is never republished",
+        "dangling link not reported",
+        "edge of an unchanged file not usable after its target appeared",
+        "referenced source_snapshot became unreachable after Git GC",
+        "same-tick edit missed by the stat prefilter",
+        "stale prepared delta overwrote a newer publication: p1_detect,p2_detect,edit,p1_publish,p2_publish",
+        "valid file blocked by an invalid one"
+      ],
+      "isolated_guards": {
+        "per_file": [
+          "dangling link not reported",
+          "edge of an unchanged file not usable after its target appeared",
+          "valid file blocked by an invalid one"
+        ],
+        "file_error": [
+          "invalid file is not reported while it stays invalid"
+        ],
+        "dangling": [
+          "traverse returned an edge to a missing target"
+        ],
+        "cycle": [
+          "includes cycle made traverse run forever"
+        ],
+        "redetect": [
+          "stale prepared delta overwrote a newer publication: p1_detect,p2_detect,edit,p1_publish,p2_publish"
+        ],
+        "prefilter": [
+          "crash left a change that is never republished"
+        ],
+        "racy": [
+          "same-tick edit missed by the stat prefilter"
+        ],
+        "retention": [
+          "referenced source_snapshot became unreachable after Git GC"
+        ]
+      }
+    },
+    "model_embedding.py": {
+      "normal": [],
+      "broken": [
+        "duplicate reset wiped vectors of the current config",
+        "restart exceeded attempt budget 1",
+        "restart exceeded attempt budget 2",
+        "restart exceeded attempt budget 3",
+        "restart exceeded attempt budget 4",
+        "unchanged text recomputed after cache rebuild",
+        "vector of a previous config stored",
+        "vector stored under a search_hash of a different text"
+      ],
+      "isolated_guards": {
+        "stale_text": [
+          "vector stored under a search_hash of a different text"
+        ],
+        "skip_once": [
+          "drain looped on a stale text instead of skipping it once",
+          "fresh text not embedded"
+        ],
+        "config_meta": [
+          "vector of a previous config stored"
+        ],
+        "reset_recheck": [
+          "duplicate reset wiped vectors of the current config"
+        ],
+        "rebuild": [
+          "unchanged text recomputed after cache rebuild"
+        ],
+        "attempts": [
+          "restart exceeded attempt budget 1",
+          "restart exceeded attempt budget 2",
+          "restart exceeded attempt budget 3",
+          "restart exceeded attempt budget 4"
+        ]
+      }
+    },
+    "model_runtime.py": {
+      "normal": [],
+      "broken": [
+        "stale lock file blocked every candidate after a crash"
+      ],
+      "isolated_guards": {
+        "owner": [
+          "stale lock file blocked every candidate after a crash"
+        ]
+      }
+    }
+  },
+  "errors": [],
+  "measurements": 0,
+  "provider_calls": 0
+}

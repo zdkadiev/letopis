@@ -1,0 +1,51 @@
+{
+  "study_id": "<fill>",
+  "chain_id": "<fill chain ID>",
+  "task_id": "<fill task ID>",
+  "condition": "<fill baseline or memory>",
+  "session_id": "<fill new session>",
+  "agent_config_sha256": "<fill>",
+  "prompt_sha256": "<fill actual prompt_sha256>",
+  "code_before_sha256": "<fill actual code_before_sha256>",
+  "code_after_sha256": "<fill actual code_after_sha256>",
+  "memory_before": {
+    "items": null,
+    "sha256": "<fill actual memory inventory SHA256>"
+  },
+  "memory_after": {
+    "items": null,
+    "sha256": "<fill actual memory inventory SHA256>"
+  },
+  "outcome": "incomplete",
+  "reason": "<fill evidence-backed outcome>",
+  "trace": {
+    "path": "<fill relative evidence path>",
+    "sha256": "<fill SHA256>",
+    "locator": "<fill exact source location>"
+  },
+  "checks": [
+    {
+      "id": "<fill every planned check ID>",
+      "passed": null,
+      "evidence": null
+    }
+  ],
+  "request_inventory": {
+    "ids": [],
+    "evidence": {
+      "path": "<fill relative evidence path>",
+      "sha256": "<fill SHA256>",
+      "locator": "<fill exact source location>"
+    }
+  },
+  "requests": [],
+  "research": [],
+  "agreements": [
+    {
+      "id": "<fill every applicable agreement ID>",
+      "violated": null,
+      "evidence": null
+    }
+  ],
+  "workload_profile": []
+}

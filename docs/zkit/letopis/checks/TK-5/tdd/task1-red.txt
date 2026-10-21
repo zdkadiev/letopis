@@ -1,0 +1,21 @@
+test_validation (unittest.loader._FailedTest.test_validation) ... ERROR
+
+======================================================================
+ERROR: test_validation (unittest.loader._FailedTest.test_validation)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_validation
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/unittest/loader.py", line 382, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/unittest/loader.py", line 325, in _get_module_from_name
+    __import__(name)
+  File "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/test_validation.py", line 7, in <module>
+    from validation import validate
+ModuleNotFoundError: No module named 'validation'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)

@@ -1,0 +1,15 @@
+test_all_planned_slots_and_unique_actual_sessions_are_required (test_validation.ValidationTests.test_all_planned_slots_and_unique_actual_sessions_are_required) ... ok
+test_complete_request_inventory_and_nonnegative_normalized_usage (test_validation.ValidationTests.test_complete_request_inventory_and_nonnegative_normalized_usage) ... ok
+test_correctness_and_common_check_coverage_cannot_be_relabelled (test_validation.ValidationTests.test_correctness_and_common_check_coverage_cannot_be_relabelled) ... ok
+test_early_and_final_shapes_accept_independent_trajectories (test_validation.ValidationTests.test_early_and_final_shapes_accept_independent_trajectories) ... ok
+test_empty_memory_and_within_chain_memory_continuity_are_required (test_validation.ValidationTests.test_empty_memory_and_within_chain_memory_continuity_are_required) ... ok
+test_evidence_is_hashed_confined_regular_and_mandatory (test_validation.ValidationTests.test_evidence_is_hashed_confined_regular_and_mandatory) ... ok
+test_failed_predecessor_requires_explicit_not_run_followups (test_validation.ValidationTests.test_failed_predecessor_requires_explicit_not_run_followups) ... ok
+test_research_and_agreement_annotations_require_prior_facts_and_opportunities (test_validation.ValidationTests.test_research_and_agreement_annotations_require_prior_facts_and_opportunities) ... ok
+test_shared_inputs_and_code_continuity_are_enforced (test_validation.ValidationTests.test_shared_inputs_and_code_continuity_are_enforced) ... ok
+test_study_rejects_wrong_samples_or_unfrozen_configuration (test_validation.ValidationTests.test_study_rejects_wrong_samples_or_unfrozen_configuration) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.108s
+
+OK

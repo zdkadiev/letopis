@@ -1,0 +1,140 @@
+{
+  "study_id": "demo-early",
+  "chain_id": "C2",
+  "task_id": "C2-T2",
+  "condition": "memory",
+  "session_id": "S-memory-C2-T2",
+  "agent_config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "prompt_sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+  "code_before_sha256": "caf439277e87c7ef559436bafca383de0c0df3e9f83f406511c1fbdcc52a63f7",
+  "code_after_sha256": "e54db9014f884a6fe6ab0e5745c1785e50b48f861c1d8074a9eb50c8a2ef606f",
+  "memory_before": {
+    "items": 1,
+    "sha256": "a36b4d8bff5ed4cfa9cdc188cd43c7bf8cac4c886dcede025745fa6e428b408f"
+  },
+  "memory_after": {
+    "items": 2,
+    "sha256": "735a0efa32977b1426b79c2de6b418d51211228d19c9981a159d019d54a1e424"
+  },
+  "outcome": "correct",
+  "reason": null,
+  "trace": {
+    "path": "evidence/demonstration.txt",
+    "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+    "locator": "S-memory-C2-T2 full transcript"
+  },
+  "checks": [
+    {
+      "id": "functional",
+      "passed": true,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-memory-C2-T2 functional"
+      }
+    },
+    {
+      "id": "regression",
+      "passed": true,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-memory-C2-T2 regression"
+      }
+    }
+  ],
+  "request_inventory": {
+    "ids": [
+      "S-memory-C2-T2:agent",
+      "S-memory-C2-T2:embed"
+    ],
+    "evidence": {
+      "path": "evidence/demonstration.txt",
+      "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+      "locator": "S-memory-C2-T2 independent request inventory"
+    }
+  },
+  "requests": [
+    {
+      "id": "S-memory-C2-T2:agent",
+      "model": "fake-agent",
+      "purpose": "agent",
+      "input_tokens": 70,
+      "output_tokens": 20,
+      "cached_input_tokens": 4,
+      "reasoning_output_tokens": 2,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-memory-C2-T2 raw agent usage"
+      }
+    },
+    {
+      "id": "S-memory-C2-T2:embed",
+      "model": "fake-embedding",
+      "purpose": "embedding",
+      "input_tokens": 3,
+      "output_tokens": 0,
+      "cached_input_tokens": 0,
+      "reasoning_output_tokens": 0,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-memory-C2-T2 raw embedding usage"
+      }
+    }
+  ],
+  "research": [
+    {
+      "id": "S-memory-C2-T2:research",
+      "fact_id": "C2:fact",
+      "kind": "revalidation",
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-memory-C2-T2 annotated investigation"
+      }
+    }
+  ],
+  "agreements": [
+    {
+      "id": "public_api",
+      "violated": false,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-memory-C2-T2 annotated agreement"
+      }
+    }
+  ],
+  "workload_profile": [
+    {
+      "operation": "create",
+      "uri": "knowledge/C2-T2.md#fact",
+      "bytes": 80,
+      "timestamp_ms": 1100,
+      "elapsed_ms": 2,
+      "group_id": "S-memory-C2-T2:edit",
+      "error": null,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-memory-C2-T2 observed file mutation"
+      }
+    },
+    {
+      "operation": "read",
+      "uri": "knowledge/C2-T1.md#fact",
+      "bytes": 100,
+      "timestamp_ms": 1101,
+      "elapsed_ms": 2,
+      "group_id": null,
+      "error": null,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-memory-C2-T2 observed read"
+      }
+    }
+  ]
+}

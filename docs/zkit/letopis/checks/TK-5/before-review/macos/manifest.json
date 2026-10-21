@@ -1,0 +1,282 @@
+{
+  "result": "PASS",
+  "scope": "synthetic protocol verification only",
+  "started_utc": "2026-10-21T15:35:33.771187+00:00",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.12.0 (v3.12.0:0fb18b02c8, Oct  2 2023, 09:45:56) [Clang 13.0.0 (clang-1300.0.29.30)]",
+  "agent_executions": 0,
+  "provider_calls": 0,
+  "utility_pilot_runs": 0,
+  "commands": [
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "log": "unit-tests.txt",
+      "expected_exit": 0,
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/check.py",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/examples/demonstration/study.json",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/examples/demonstration/sessions",
+        "--evidence-root",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/examples/demonstration"
+      ],
+      "log": "early-example.json",
+      "expected_exit": 0,
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/check.py",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/final-demonstration/study.json",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/final-demonstration/sessions",
+        "--evidence-root",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/final-demonstration"
+      ],
+      "log": "final-example.json",
+      "expected_exit": 0,
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/check.py",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/missing-request/study.json",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/missing-request/sessions",
+        "--evidence-root",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/missing-request"
+      ],
+      "log": "missing-request.json",
+      "expected_exit": 2,
+      "exit_code": 2
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/check.py",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/reused-session/study.json",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/reused-session/sessions",
+        "--evidence-root",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/reused-session"
+      ],
+      "log": "reused-session.json",
+      "expected_exit": 2,
+      "exit_code": 2
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/check.py",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/prefilled-memory/study.json",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/prefilled-memory/sessions",
+        "--evidence-root",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/prefilled-memory"
+      ],
+      "log": "prefilled-memory.json",
+      "expected_exit": 2,
+      "exit_code": 2
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/check.py",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/corrupt-evidence/study.json",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/corrupt-evidence/sessions",
+        "--evidence-root",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/corrupt-evidence"
+      ],
+      "log": "corrupt-evidence.json",
+      "expected_exit": 2,
+      "exit_code": 2
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/tests/pilot_protocol/check.py",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/suppressed-failed-task/study.json",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/suppressed-failed-task/sessions",
+        "--evidence-root",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/checks/TK-5/macos/cases/suppressed-failed-task"
+      ],
+      "log": "suppressed-failed-task.json",
+      "expected_exit": 2,
+      "exit_code": 2
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-5/letopis/docs/zkit/letopis/roadmap/schedule.py",
+        "--check"
+      ],
+      "log": "roadmap.json",
+      "expected_exit": 0,
+      "exit_code": 0
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "missing-request",
+      "result": "DETECTED",
+      "expected_error": "request_inventory",
+      "actual_error": "sessions.baseline.C1-T1.request_inventory: request inventory coverage mismatch"
+    },
+    {
+      "name": "reused-session",
+      "result": "DETECTED",
+      "expected_error": "session_id",
+      "actual_error": "sessions.baseline.C1-T2.session_id: fresh sessions required"
+    },
+    {
+      "name": "prefilled-memory",
+      "result": "DETECTED",
+      "expected_error": "memory_before",
+      "actual_error": "sessions.memory.C1-T1.memory_before: prefill or memory discontinuity"
+    },
+    {
+      "name": "corrupt-evidence",
+      "result": "DETECTED",
+      "expected_error": "checksum",
+      "actual_error": "scoring_guide.sha256: evidence checksum mismatch"
+    },
+    {
+      "name": "suppressed-failed-task",
+      "result": "DETECTED",
+      "expected_error": "missing planned slot",
+      "actual_error": "sessions: missing planned slot(s): [('baseline', 'C1', 'C1-T1')]"
+    }
+  ],
+  "source_sha256": {
+    "docs/zkit/letopis/pilot/protocol.md": "cdb1bb49de7ea5e64e451b59128ddfea58ff8a20613dce9b7de0f350765592cd",
+    "docs/zkit/letopis/pilot/templates/report.md": "0df25436e29e23484fa62bf555bffe8e4a952919f3b5cab248c516d01a269343",
+    "docs/zkit/letopis/pilot/templates/session.json": "e840217ecc9b84c444a4fea833c71122cf55d49a00343422ab09e55c3b4244bb",
+    "docs/zkit/letopis/pilot/templates/study.json": "12d5adf4185b2a97cb9ffe3a2d38c407157baeed9a39a761a6576bcd8244fe7b",
+    "tests/pilot_protocol/.gitignore": "325c20f7594cad889e077d57b32a38a99823ce676886be1e31c681c71056d86e",
+    "tests/pilot_protocol/README.md": "95d8b621e76cbe87cb4b4a4828d68084023c3c613ec4ed3f73421373808d3f7c",
+    "tests/pilot_protocol/check.py": "09d9505464de8bffecd441665d29fe64c0ae9f93dada3099176348078fb89bd4",
+    "tests/pilot_protocol/examples/demonstration/evidence/demonstration.txt": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+    "tests/pilot_protocol/examples/demonstration/sessions/baseline-C1-T1.json": "c904d2b2e372c4c704ed3ac7b291d8fe6a4c71f5289b5bc3d2709df4c6fd040e",
+    "tests/pilot_protocol/examples/demonstration/sessions/baseline-C1-T2.json": "3099ec190adc6a29f7cd6898dd248711ff7db522751d6650217653aeafd3d3c3",
+    "tests/pilot_protocol/examples/demonstration/sessions/baseline-C2-T1.json": "683d867b1f0cb2af12064a9cbcef3fec14dbf7be8cdd62b845f91e48c77efea5",
+    "tests/pilot_protocol/examples/demonstration/sessions/baseline-C2-T2.json": "7684cbb2f4099f86c8f8959b77b946ae47509c5133c92f0d68b2e28a7cec5b6c",
+    "tests/pilot_protocol/examples/demonstration/sessions/memory-C1-T1.json": "4d9d6b03fadd9f3839a0da470f4b11a7e8f4b0157b2fff469e6025af5f96b288",
+    "tests/pilot_protocol/examples/demonstration/sessions/memory-C1-T2.json": "9667e894d959b59d4deda06ec0d825d475b1eedc49f5b4087c967b6251270f3c",
+    "tests/pilot_protocol/examples/demonstration/sessions/memory-C2-T1.json": "ac5f66738e8c2673428bc33dae305171cead0e4c4bcc7db64d004ffc3f1d20cd",
+    "tests/pilot_protocol/examples/demonstration/sessions/memory-C2-T2.json": "c01c8bc0ee2e6b6027dd1e5140c85149f410fa07c3b9b3bd1e7547829c992fac",
+    "tests/pilot_protocol/examples/demonstration/study.json": "16e3b8ae5afdd1fdba9b1cdbdfffa3e783abae92b48189c8b1a58d05497afb34",
+    "tests/pilot_protocol/fixtures.py": "665f94823705a97b4dc13ff4307850c34aefef13b9994b64346d9f845c62e0dd",
+    "tests/pilot_protocol/run.py": "515eaa5009ab768c4fee04d8f41a170c759c8482a44e17afbced2d9627d025d7",
+    "tests/pilot_protocol/test_check.py": "c2b4067fa24475c315bf81cbc83342670b92fa3bddd9a7e005422985de4937b0",
+    "tests/pilot_protocol/test_validation.py": "b4603fda557267aa41a5ab3c6b5d98c1510dd074fe1fe9f6d944c6e31bde83a6",
+    "tests/pilot_protocol/validation.py": "eba11616632b06e364788c66c0593e34fbf58d05b8af088084602ddb9af0aef4"
+  },
+  "early_example": "demonstration_only",
+  "final_example_slots": 18,
+  "legacy": {
+    "source_files_match_prior_pass": 60,
+    "receipt_sha256": "9f8c5b1dca43f04e9a2006e35b5ba7b9b7a4273420fabc7b51a5419b3cb30b86",
+    "legacy_executions": 0
+  },
+  "finished_utc": "2026-10-21T15:35:34.505697+00:00",
+  "evidence_sha256": {
+    "cases/corrupt-evidence/evidence/demonstration.txt": "1328059a97968c018961c973d50c0a0b4699410d74ed204c84a1715fdfe73122",
+    "cases/corrupt-evidence/sessions/baseline-C1-T1.json": "c904d2b2e372c4c704ed3ac7b291d8fe6a4c71f5289b5bc3d2709df4c6fd040e",
+    "cases/corrupt-evidence/sessions/baseline-C1-T2.json": "3099ec190adc6a29f7cd6898dd248711ff7db522751d6650217653aeafd3d3c3",
+    "cases/corrupt-evidence/sessions/baseline-C2-T1.json": "683d867b1f0cb2af12064a9cbcef3fec14dbf7be8cdd62b845f91e48c77efea5",
+    "cases/corrupt-evidence/sessions/baseline-C2-T2.json": "7684cbb2f4099f86c8f8959b77b946ae47509c5133c92f0d68b2e28a7cec5b6c",
+    "cases/corrupt-evidence/sessions/memory-C1-T1.json": "4d9d6b03fadd9f3839a0da470f4b11a7e8f4b0157b2fff469e6025af5f96b288",
+    "cases/corrupt-evidence/sessions/memory-C1-T2.json": "9667e894d959b59d4deda06ec0d825d475b1eedc49f5b4087c967b6251270f3c",
+    "cases/corrupt-evidence/sessions/memory-C2-T1.json": "ac5f66738e8c2673428bc33dae305171cead0e4c4bcc7db64d004ffc3f1d20cd",
+    "cases/corrupt-evidence/sessions/memory-C2-T2.json": "c01c8bc0ee2e6b6027dd1e5140c85149f410fa07c3b9b3bd1e7547829c992fac",
+    "cases/corrupt-evidence/study.json": "16e3b8ae5afdd1fdba9b1cdbdfffa3e783abae92b48189c8b1a58d05497afb34",
+    "cases/missing-request/evidence/demonstration.txt": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+    "cases/missing-request/sessions/baseline-C1-T1.json": "849731ec6f7ca2596b4957d0e881f8f79605353c2666b30c35609385010043ca",
+    "cases/missing-request/sessions/baseline-C1-T2.json": "3099ec190adc6a29f7cd6898dd248711ff7db522751d6650217653aeafd3d3c3",
+    "cases/missing-request/sessions/baseline-C2-T1.json": "683d867b1f0cb2af12064a9cbcef3fec14dbf7be8cdd62b845f91e48c77efea5",
+    "cases/missing-request/sessions/baseline-C2-T2.json": "7684cbb2f4099f86c8f8959b77b946ae47509c5133c92f0d68b2e28a7cec5b6c",
+    "cases/missing-request/sessions/memory-C1-T1.json": "4d9d6b03fadd9f3839a0da470f4b11a7e8f4b0157b2fff469e6025af5f96b288",
+    "cases/missing-request/sessions/memory-C1-T2.json": "9667e894d959b59d4deda06ec0d825d475b1eedc49f5b4087c967b6251270f3c",
+    "cases/missing-request/sessions/memory-C2-T1.json": "ac5f66738e8c2673428bc33dae305171cead0e4c4bcc7db64d004ffc3f1d20cd",
+    "cases/missing-request/sessions/memory-C2-T2.json": "c01c8bc0ee2e6b6027dd1e5140c85149f410fa07c3b9b3bd1e7547829c992fac",
+    "cases/missing-request/study.json": "16e3b8ae5afdd1fdba9b1cdbdfffa3e783abae92b48189c8b1a58d05497afb34",
+    "cases/prefilled-memory/evidence/demonstration.txt": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+    "cases/prefilled-memory/sessions/baseline-C1-T1.json": "c904d2b2e372c4c704ed3ac7b291d8fe6a4c71f5289b5bc3d2709df4c6fd040e",
+    "cases/prefilled-memory/sessions/baseline-C1-T2.json": "3099ec190adc6a29f7cd6898dd248711ff7db522751d6650217653aeafd3d3c3",
+    "cases/prefilled-memory/sessions/baseline-C2-T1.json": "683d867b1f0cb2af12064a9cbcef3fec14dbf7be8cdd62b845f91e48c77efea5",
+    "cases/prefilled-memory/sessions/baseline-C2-T2.json": "7684cbb2f4099f86c8f8959b77b946ae47509c5133c92f0d68b2e28a7cec5b6c",
+    "cases/prefilled-memory/sessions/memory-C1-T1.json": "e7e4f19e0e4c7f33b023b65f9fd90803dd3833f8a66165998e58f8713d38b0a8",
+    "cases/prefilled-memory/sessions/memory-C1-T2.json": "9667e894d959b59d4deda06ec0d825d475b1eedc49f5b4087c967b6251270f3c",
+    "cases/prefilled-memory/sessions/memory-C2-T1.json": "ac5f66738e8c2673428bc33dae305171cead0e4c4bcc7db64d004ffc3f1d20cd",
+    "cases/prefilled-memory/sessions/memory-C2-T2.json": "c01c8bc0ee2e6b6027dd1e5140c85149f410fa07c3b9b3bd1e7547829c992fac",
+    "cases/prefilled-memory/study.json": "16e3b8ae5afdd1fdba9b1cdbdfffa3e783abae92b48189c8b1a58d05497afb34",
+    "cases/reused-session/evidence/demonstration.txt": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+    "cases/reused-session/sessions/baseline-C1-T1.json": "c904d2b2e372c4c704ed3ac7b291d8fe6a4c71f5289b5bc3d2709df4c6fd040e",
+    "cases/reused-session/sessions/baseline-C1-T2.json": "1adf3c715ccbf5af2453944af44e2b97eaeb8d4cae24df14072180a5715f4744",
+    "cases/reused-session/sessions/baseline-C2-T1.json": "683d867b1f0cb2af12064a9cbcef3fec14dbf7be8cdd62b845f91e48c77efea5",
+    "cases/reused-session/sessions/baseline-C2-T2.json": "7684cbb2f4099f86c8f8959b77b946ae47509c5133c92f0d68b2e28a7cec5b6c",
+    "cases/reused-session/sessions/memory-C1-T1.json": "4d9d6b03fadd9f3839a0da470f4b11a7e8f4b0157b2fff469e6025af5f96b288",
+    "cases/reused-session/sessions/memory-C1-T2.json": "9667e894d959b59d4deda06ec0d825d475b1eedc49f5b4087c967b6251270f3c",
+    "cases/reused-session/sessions/memory-C2-T1.json": "ac5f66738e8c2673428bc33dae305171cead0e4c4bcc7db64d004ffc3f1d20cd",
+    "cases/reused-session/sessions/memory-C2-T2.json": "c01c8bc0ee2e6b6027dd1e5140c85149f410fa07c3b9b3bd1e7547829c992fac",
+    "cases/reused-session/study.json": "16e3b8ae5afdd1fdba9b1cdbdfffa3e783abae92b48189c8b1a58d05497afb34",
+    "cases/suppressed-failed-task/evidence/demonstration.txt": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+    "cases/suppressed-failed-task/sessions/baseline-C1-T2.json": "3099ec190adc6a29f7cd6898dd248711ff7db522751d6650217653aeafd3d3c3",
+    "cases/suppressed-failed-task/sessions/baseline-C2-T1.json": "683d867b1f0cb2af12064a9cbcef3fec14dbf7be8cdd62b845f91e48c77efea5",
+    "cases/suppressed-failed-task/sessions/baseline-C2-T2.json": "7684cbb2f4099f86c8f8959b77b946ae47509c5133c92f0d68b2e28a7cec5b6c",
+    "cases/suppressed-failed-task/sessions/memory-C1-T1.json": "4d9d6b03fadd9f3839a0da470f4b11a7e8f4b0157b2fff469e6025af5f96b288",
+    "cases/suppressed-failed-task/sessions/memory-C1-T2.json": "9667e894d959b59d4deda06ec0d825d475b1eedc49f5b4087c967b6251270f3c",
+    "cases/suppressed-failed-task/sessions/memory-C2-T1.json": "ac5f66738e8c2673428bc33dae305171cead0e4c4bcc7db64d004ffc3f1d20cd",
+    "cases/suppressed-failed-task/sessions/memory-C2-T2.json": "c01c8bc0ee2e6b6027dd1e5140c85149f410fa07c3b9b3bd1e7547829c992fac",
+    "cases/suppressed-failed-task/study.json": "16e3b8ae5afdd1fdba9b1cdbdfffa3e783abae92b48189c8b1a58d05497afb34",
+    "corrupt-evidence.json": "8a4186f474d11b1cb26b11be617661fe5afdb30e4d1141ed4ba48f1360238ee3",
+    "early-example.json": "c85bb7e5614f8711c26714b339b083d9865d6af247c1106a0d34ea9a3059e7d8",
+    "final-demonstration/evidence/demonstration.txt": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+    "final-demonstration/sessions/baseline-C1-T1.json": "373962d8aaea7b0368016c0850881c82d2e9740226438183e5b3fa0ac661488b",
+    "final-demonstration/sessions/baseline-C1-T2.json": "6bbe512afa0f5afa979ea0e852e631964565361bb7e75fcfe28282b89ae98451",
+    "final-demonstration/sessions/baseline-C1-T3.json": "ef219a299b3437e2dcdff0910c442ff6d352107be01d6f7ebbd571274825c150",
+    "final-demonstration/sessions/baseline-C2-T1.json": "9ba5167555f9be34cc12f0b49c99eefed474e0da636de0dde05db0baf9404459",
+    "final-demonstration/sessions/baseline-C2-T2.json": "0b5325674ac99064e15b15ddfaca0550cf6a4c2047282bd4ff7653c20234a649",
+    "final-demonstration/sessions/baseline-C2-T3.json": "cf4c37ea1cdcbc365cc50491744b2ffbeef8fe050d37039f2f74bd4c3bbf924d",
+    "final-demonstration/sessions/baseline-C3-T1.json": "62a6a7fec5fa3f589f04477b0ff59b679a6bf41c358103c81ec524491996cc2a",
+    "final-demonstration/sessions/baseline-C3-T2.json": "50bb1c9512d5592f6bef6c214617fa61d706e9359c8e6417f302896397073337",
+    "final-demonstration/sessions/baseline-C3-T3.json": "71ab669ec8f1b39c696e1777b442075d51d388b1157acae2ca7681d9a0c97139",
+    "final-demonstration/sessions/memory-C1-T1.json": "e31b4d43e02feabc0e576210aa3a70d3eefaa1d61d6cdd87a2bad484077b3aa4",
+    "final-demonstration/sessions/memory-C1-T2.json": "e0fd171dd9df455ec3dc3a23dc422b26d1ca573aa6ece14870d17c03e45e0b82",
+    "final-demonstration/sessions/memory-C1-T3.json": "7c199fbdeff1032ba9431457b74c5361d92afeae0c75a9f9cf6204eab1e3a782",
+    "final-demonstration/sessions/memory-C2-T1.json": "0f364605655c563f85a483e19139fbdbe2cf3c991a06daefc7968ba4e82a93ae",
+    "final-demonstration/sessions/memory-C2-T2.json": "41ad112c17cfb458d9be3502023f20f383371228175f7ea6155f86f54d4af47a",
+    "final-demonstration/sessions/memory-C2-T3.json": "ca05c57786a983896a8199781e7288d209dad76c99c35945c8711940166afb62",
+    "final-demonstration/sessions/memory-C3-T1.json": "e2b9f713eca7a25ab36c128fd405371d9f4aa0ae53d3cc45d7114cd15672d894",
+    "final-demonstration/sessions/memory-C3-T2.json": "fd1f178d7cfaebeae088b8e64f478f16dcd5cae212a89da85adaabfb9048394d",
+    "final-demonstration/sessions/memory-C3-T3.json": "1e72a5480be76e0a10dbb6a6acb8c1d593cad39550e1f6f852352adcc9b0d63b",
+    "final-demonstration/study.json": "b27f01dd82e93ef09b49be2f23e468c9436ca6dc9c19b45213197998abdc1d31",
+    "final-example.json": "61eef1b1acc32769653fa198cc80c2b64f5dfc63048b49db4d3b995e6a9cbd83",
+    "missing-request.json": "0e7b8a111798a637c7fe01c371f84c5626797cde49076e6f8957f11e18916466",
+    "prefilled-memory.json": "c04185f19cd1fef5e3c0b814bbf42457fc02349891884564a881530191652daa",
+    "reused-session.json": "ca25d7090110cdd8d111b1410bf2696e4e6417d8f688fd516dba24e60a0de34d",
+    "roadmap.json": "89e438b49478c05fb21591dc2de62efb68351f35ee06135ed9b09d68ded2c04c",
+    "suppressed-failed-task.json": "d25589440d73a3d9844da094495653cb6704c7d54aeb749d70af68acffbba524",
+    "unit-tests.txt": "fb5d6f3560b1eb85e0aa44dd11e6ebdbd71d3290968aac934771e0a4c29643ef"
+  }
+}

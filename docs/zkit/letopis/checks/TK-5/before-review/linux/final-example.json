@@ -1,0 +1,445 @@
+{
+  "agent_executions": 0,
+  "conditions": {
+    "baseline": {
+      "agreements": {
+        "assessed": 9,
+        "not_run": 0,
+        "planned": 9,
+        "unresolved": 0,
+        "violation_rate": 0.1111111111111111,
+        "violations": 1
+      },
+      "outcomes": {
+        "correct": 9,
+        "failed": 0,
+        "incomplete": 0,
+        "not_run": 0
+      },
+      "research": {
+        "first": 3,
+        "repeat": 6,
+        "repeat_count": 6,
+        "revalidation": 0,
+        "unresolved": 0
+      },
+      "tokens": {
+        "by_model": {
+          "fake-agent": {
+            "cached_input_tokens": 36,
+            "complete": true,
+            "input_tokens": 900,
+            "known_total": 1080,
+            "output_tokens": 180,
+            "reasoning_output_tokens": 18,
+            "request_count": 9,
+            "total": 1080,
+            "unknown_request_ids": []
+          }
+        },
+        "by_purpose": {
+          "agent": {
+            "cached_input_tokens": 36,
+            "complete": true,
+            "input_tokens": 900,
+            "known_total": 1080,
+            "output_tokens": 180,
+            "reasoning_output_tokens": 18,
+            "request_count": 9,
+            "total": 1080,
+            "unknown_request_ids": []
+          }
+        },
+        "cached_input_tokens": 36,
+        "complete": true,
+        "input_tokens": 900,
+        "known_total": 1080,
+        "output_tokens": 180,
+        "reasoning_output_tokens": 18,
+        "request_count": 9,
+        "total": 1080,
+        "unknown_request_ids": []
+      },
+      "workload_profile": {
+        "by_operation": {},
+        "complete": true,
+        "events": 0,
+        "known_bytes": 0,
+        "records": []
+      }
+    },
+    "memory": {
+      "agreements": {
+        "assessed": 9,
+        "not_run": 0,
+        "planned": 9,
+        "unresolved": 0,
+        "violation_rate": 0.0,
+        "violations": 0
+      },
+      "outcomes": {
+        "correct": 9,
+        "failed": 0,
+        "incomplete": 0,
+        "not_run": 0
+      },
+      "research": {
+        "first": 3,
+        "repeat": 0,
+        "repeat_count": 0,
+        "revalidation": 6,
+        "unresolved": 0
+      },
+      "tokens": {
+        "by_model": {
+          "fake-agent": {
+            "cached_input_tokens": 36,
+            "complete": true,
+            "input_tokens": 750,
+            "known_total": 945,
+            "output_tokens": 195,
+            "reasoning_output_tokens": 18,
+            "request_count": 9,
+            "total": 945,
+            "unknown_request_ids": []
+          },
+          "fake-embedding": {
+            "cached_input_tokens": 0,
+            "complete": true,
+            "input_tokens": 27,
+            "known_total": 27,
+            "output_tokens": 0,
+            "reasoning_output_tokens": 0,
+            "request_count": 9,
+            "total": 27,
+            "unknown_request_ids": []
+          }
+        },
+        "by_purpose": {
+          "agent": {
+            "cached_input_tokens": 36,
+            "complete": true,
+            "input_tokens": 750,
+            "known_total": 945,
+            "output_tokens": 195,
+            "reasoning_output_tokens": 18,
+            "request_count": 9,
+            "total": 945,
+            "unknown_request_ids": []
+          },
+          "embedding": {
+            "cached_input_tokens": 0,
+            "complete": true,
+            "input_tokens": 27,
+            "known_total": 27,
+            "output_tokens": 0,
+            "reasoning_output_tokens": 0,
+            "request_count": 9,
+            "total": 27,
+            "unknown_request_ids": []
+          }
+        },
+        "cached_input_tokens": 36,
+        "complete": true,
+        "input_tokens": 777,
+        "known_total": 972,
+        "output_tokens": 195,
+        "reasoning_output_tokens": 18,
+        "request_count": 18,
+        "total": 972,
+        "unknown_request_ids": []
+      },
+      "workload_profile": {
+        "by_operation": {
+          "create": 9,
+          "read": 6
+        },
+        "complete": true,
+        "events": 15,
+        "known_bytes": 1320,
+        "records": [
+          {
+            "bytes": 80,
+            "chain_id": "C1",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C1-T1 observed file mutation",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": "S-memory-C1-T1:edit",
+            "operation": "create",
+            "session_id": "S-memory-C1-T1",
+            "task_id": "C1-T1",
+            "timestamp_ms": 1000,
+            "uri": "knowledge/C1-T1.md#fact"
+          },
+          {
+            "bytes": 80,
+            "chain_id": "C1",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C1-T2 observed file mutation",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": "S-memory-C1-T2:edit",
+            "operation": "create",
+            "session_id": "S-memory-C1-T2",
+            "task_id": "C1-T2",
+            "timestamp_ms": 1100,
+            "uri": "knowledge/C1-T2.md#fact"
+          },
+          {
+            "bytes": 100,
+            "chain_id": "C1",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C1-T2 observed read",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": null,
+            "operation": "read",
+            "session_id": "S-memory-C1-T2",
+            "task_id": "C1-T2",
+            "timestamp_ms": 1101,
+            "uri": "knowledge/C1-T1.md#fact"
+          },
+          {
+            "bytes": 80,
+            "chain_id": "C1",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C1-T3 observed file mutation",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": "S-memory-C1-T3:edit",
+            "operation": "create",
+            "session_id": "S-memory-C1-T3",
+            "task_id": "C1-T3",
+            "timestamp_ms": 1200,
+            "uri": "knowledge/C1-T3.md#fact"
+          },
+          {
+            "bytes": 100,
+            "chain_id": "C1",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C1-T3 observed read",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": null,
+            "operation": "read",
+            "session_id": "S-memory-C1-T3",
+            "task_id": "C1-T3",
+            "timestamp_ms": 1201,
+            "uri": "knowledge/C1-T1.md#fact"
+          },
+          {
+            "bytes": 80,
+            "chain_id": "C2",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C2-T1 observed file mutation",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": "S-memory-C2-T1:edit",
+            "operation": "create",
+            "session_id": "S-memory-C2-T1",
+            "task_id": "C2-T1",
+            "timestamp_ms": 1000,
+            "uri": "knowledge/C2-T1.md#fact"
+          },
+          {
+            "bytes": 80,
+            "chain_id": "C2",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C2-T2 observed file mutation",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": "S-memory-C2-T2:edit",
+            "operation": "create",
+            "session_id": "S-memory-C2-T2",
+            "task_id": "C2-T2",
+            "timestamp_ms": 1100,
+            "uri": "knowledge/C2-T2.md#fact"
+          },
+          {
+            "bytes": 100,
+            "chain_id": "C2",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C2-T2 observed read",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": null,
+            "operation": "read",
+            "session_id": "S-memory-C2-T2",
+            "task_id": "C2-T2",
+            "timestamp_ms": 1101,
+            "uri": "knowledge/C2-T1.md#fact"
+          },
+          {
+            "bytes": 80,
+            "chain_id": "C2",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C2-T3 observed file mutation",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": "S-memory-C2-T3:edit",
+            "operation": "create",
+            "session_id": "S-memory-C2-T3",
+            "task_id": "C2-T3",
+            "timestamp_ms": 1200,
+            "uri": "knowledge/C2-T3.md#fact"
+          },
+          {
+            "bytes": 100,
+            "chain_id": "C2",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C2-T3 observed read",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": null,
+            "operation": "read",
+            "session_id": "S-memory-C2-T3",
+            "task_id": "C2-T3",
+            "timestamp_ms": 1201,
+            "uri": "knowledge/C2-T1.md#fact"
+          },
+          {
+            "bytes": 80,
+            "chain_id": "C3",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C3-T1 observed file mutation",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": "S-memory-C3-T1:edit",
+            "operation": "create",
+            "session_id": "S-memory-C3-T1",
+            "task_id": "C3-T1",
+            "timestamp_ms": 1000,
+            "uri": "knowledge/C3-T1.md#fact"
+          },
+          {
+            "bytes": 80,
+            "chain_id": "C3",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C3-T2 observed file mutation",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": "S-memory-C3-T2:edit",
+            "operation": "create",
+            "session_id": "S-memory-C3-T2",
+            "task_id": "C3-T2",
+            "timestamp_ms": 1100,
+            "uri": "knowledge/C3-T2.md#fact"
+          },
+          {
+            "bytes": 100,
+            "chain_id": "C3",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C3-T2 observed read",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": null,
+            "operation": "read",
+            "session_id": "S-memory-C3-T2",
+            "task_id": "C3-T2",
+            "timestamp_ms": 1101,
+            "uri": "knowledge/C3-T1.md#fact"
+          },
+          {
+            "bytes": 80,
+            "chain_id": "C3",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C3-T3 observed file mutation",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": "S-memory-C3-T3:edit",
+            "operation": "create",
+            "session_id": "S-memory-C3-T3",
+            "task_id": "C3-T3",
+            "timestamp_ms": 1200,
+            "uri": "knowledge/C3-T3.md#fact"
+          },
+          {
+            "bytes": 100,
+            "chain_id": "C3",
+            "elapsed_ms": 2,
+            "error": null,
+            "evidence": {
+              "locator": "S-memory-C3-T3 observed read",
+              "path": "evidence/demonstration.txt",
+              "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8"
+            },
+            "group_id": null,
+            "operation": "read",
+            "session_id": "S-memory-C3-T3",
+            "task_id": "C3-T3",
+            "timestamp_ms": 1201,
+            "uri": "knowledge/C3-T1.md#fact"
+          }
+        ]
+      }
+    }
+  },
+  "correctness_preserved": true,
+  "data_complete": true,
+  "kind": "demonstration",
+  "limits": [
+    "No utility threshold, winner, causal or statistical-significance conclusion.",
+    "Checksums do not attest OS isolation, actual model configuration or annotation truth.",
+    "Raw token counts across different model tokenizers are bookkeeping, not equal compute.",
+    "Unknown workload fields remain incomplete inputs for P-2.7, separately from P-1."
+  ],
+  "paired_correct_slots": [
+    "C1-T1",
+    "C1-T2",
+    "C1-T3",
+    "C2-T1",
+    "C2-T2",
+    "C2-T3",
+    "C3-T1",
+    "C3-T2",
+    "C3-T3"
+  ],
+  "protocol_valid": true,
+  "scope": "supplied-record validation and descriptive accounting only",
+  "stage": "final",
+  "status": "demonstration_only",
+  "study_id": "demo-final"
+}

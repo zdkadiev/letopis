@@ -1,0 +1,173 @@
+{
+  "protocol_version": 1,
+  "kind": "pilot",
+  "stage": "early",
+  "study_id": "<fill>",
+  "repository": "letopis",
+  "token_accounting": "input_includes_cached_output_includes_reasoning",
+  "agent": {
+    "name": "<fill agent name>",
+    "version": "<fill agent version>",
+    "model": "<fill agent model>",
+    "model_revision": "<fill agent model_revision>",
+    "config_sha256": "<fill agent config_sha256>",
+    "auxiliary_models": [
+      "<fill model/revision; use [] when none>"
+    ]
+  },
+  "scoring_guide": {
+    "path": "<fill relative evidence path>",
+    "sha256": "<fill SHA256>",
+    "locator": "<fill exact source location>"
+  },
+  "conditions": {
+    "baseline": {
+      "workspace_id": "<fill distinct workspace>",
+      "home_id": "<fill distinct home>",
+      "memory_store_id": null,
+      "initial_memory": "empty",
+      "external_memory_disabled": true,
+      "instruction": {
+        "path": "<fill relative evidence path>",
+        "sha256": "<fill SHA256>",
+        "locator": "<fill exact source location>"
+      },
+      "isolation": {
+        "path": "<fill relative evidence path>",
+        "sha256": "<fill SHA256>",
+        "locator": "<fill exact source location>"
+      }
+    },
+    "memory": {
+      "workspace_id": "<fill distinct workspace>",
+      "home_id": "<fill distinct home>",
+      "memory_store_id": "<fill isolated memory store>",
+      "initial_memory": "empty",
+      "external_memory_disabled": true,
+      "instruction": {
+        "path": "<fill relative evidence path>",
+        "sha256": "<fill SHA256>",
+        "locator": "<fill exact source location>"
+      },
+      "isolation": {
+        "path": "<fill relative evidence path>",
+        "sha256": "<fill SHA256>",
+        "locator": "<fill exact source location>"
+      }
+    }
+  },
+  "chains": [
+    {
+      "id": "<fill chain 1 ID>",
+      "base_commit": "<fill actual Git commit>",
+      "starting_code_sha256": "<fill frozen code inventory SHA256>",
+      "real_tasks": null,
+      "selection_rationale": "<fill prospective real-task rationale>",
+      "selection_evidence": {
+        "path": "<fill relative evidence path>",
+        "sha256": "<fill SHA256>",
+        "locator": "<fill exact source location>"
+      },
+      "tasks": [
+        {
+          "id": "<fill chain 1 task 1 ID>",
+          "prompt": {
+            "path": "<fill relative evidence path>",
+            "sha256": "<fill SHA256>",
+            "locator": "<fill exact source location>"
+          },
+          "acceptance": {
+            "path": "<fill relative evidence path>",
+            "sha256": "<fill SHA256>",
+            "locator": "<fill exact source location>"
+          },
+          "check_ids": [
+            "<fill frozen acceptance check IDs>"
+          ],
+          "agreement_ids": [
+            "<fill applicable agreement IDs; [] if none>"
+          ],
+          "reuse_from": []
+        },
+        {
+          "id": "<fill chain 1 task 2 ID>",
+          "prompt": {
+            "path": "<fill relative evidence path>",
+            "sha256": "<fill SHA256>",
+            "locator": "<fill exact source location>"
+          },
+          "acceptance": {
+            "path": "<fill relative evidence path>",
+            "sha256": "<fill SHA256>",
+            "locator": "<fill exact source location>"
+          },
+          "check_ids": [
+            "<fill frozen acceptance check IDs>"
+          ],
+          "agreement_ids": [
+            "<fill applicable agreement IDs; [] if none>"
+          ],
+          "reuse_from": [
+            "<fill chain 1 earlier task ID>"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "<fill chain 2 ID>",
+      "base_commit": "<fill actual Git commit>",
+      "starting_code_sha256": "<fill frozen code inventory SHA256>",
+      "real_tasks": null,
+      "selection_rationale": "<fill prospective real-task rationale>",
+      "selection_evidence": {
+        "path": "<fill relative evidence path>",
+        "sha256": "<fill SHA256>",
+        "locator": "<fill exact source location>"
+      },
+      "tasks": [
+        {
+          "id": "<fill chain 2 task 1 ID>",
+          "prompt": {
+            "path": "<fill relative evidence path>",
+            "sha256": "<fill SHA256>",
+            "locator": "<fill exact source location>"
+          },
+          "acceptance": {
+            "path": "<fill relative evidence path>",
+            "sha256": "<fill SHA256>",
+            "locator": "<fill exact source location>"
+          },
+          "check_ids": [
+            "<fill frozen acceptance check IDs>"
+          ],
+          "agreement_ids": [
+            "<fill applicable agreement IDs; [] if none>"
+          ],
+          "reuse_from": []
+        },
+        {
+          "id": "<fill chain 2 task 2 ID>",
+          "prompt": {
+            "path": "<fill relative evidence path>",
+            "sha256": "<fill SHA256>",
+            "locator": "<fill exact source location>"
+          },
+          "acceptance": {
+            "path": "<fill relative evidence path>",
+            "sha256": "<fill SHA256>",
+            "locator": "<fill exact source location>"
+          },
+          "check_ids": [
+            "<fill frozen acceptance check IDs>"
+          ],
+          "agreement_ids": [
+            "<fill applicable agreement IDs; [] if none>"
+          ],
+          "reuse_from": [
+            "<fill chain 2 earlier task ID>"
+          ]
+        }
+      ]
+    }
+  ]
+}

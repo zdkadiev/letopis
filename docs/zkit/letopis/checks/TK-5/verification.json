@@ -1,0 +1,67 @@
+{
+  "platforms": [
+    {
+      "platform": "macos",
+      "system": "macOS-26.6.2-arm64-arm-64bit",
+      "python": "3.12.0",
+      "result": "PASS",
+      "tests": 31,
+      "negative_controls": 5,
+      "source_files": 22,
+      "artifact_files": 78,
+      "agent_executions": 0,
+      "provider_calls": 0,
+      "utility_pilot_runs": 0
+    },
+    {
+      "platform": "linux",
+      "system": "Linux-7.0.0-22-generic-aarch64-with-glibc2.36",
+      "python": "3.11.2",
+      "result": "PASS",
+      "tests": 31,
+      "negative_controls": 5,
+      "source_files": 22,
+      "artifact_files": 78,
+      "agent_executions": 0,
+      "provider_calls": 0,
+      "utility_pilot_runs": 0
+    }
+  ],
+  "same_inputs": true,
+  "legacy_sources_match_existing_pass": 60,
+  "legacy_executions": 0,
+  "base_commit": "6fd2d188b22408211c3f6e388db5290665b98e21",
+  "delivery": "TK-5 branch; merge/push/issue closure pending a separate integration request",
+  "review": "one independent review; all three Important findings fixed in one RED-to-GREEN pass; no deferred minors",
+  "verified_utc": "2026-10-21T15:53:34.627625+00:00",
+  "current_manifest_sha256": {
+    "macos": "3dd82c45a2b2db2650e2d339f0672f75edf77d08185d0dc33664aaca3357c700",
+    "linux": "a6865d94a30c9f2837e4b7b4a3e7e5f2a513631427487a6790fae17f7d94e248"
+  },
+  "document_checks": {
+    "roadmap": {
+      "result": "PASS",
+      "counts": {}
+    },
+    "mechanics": {
+      "result": "PASS",
+      "counts": {
+        "internal_cases": 0,
+        "guard_mutations": 15,
+        "models": 3
+      }
+    },
+    "resilience": {
+      "result": "PASS",
+      "counts": 17
+    }
+  },
+  "local_links_checked": 332,
+  "new_and_changed_source_whitespace": "PASS",
+  "changed_tracked_files": [
+    "docs/zkit/letopis/roadmap.md",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/epic.md",
+    "docs/zkit/letopis/roadmap/epics/EP-8-proofs/tasks/TK-5-pilot-protocol.md"
+  ],
+  "new_files": 354
+}

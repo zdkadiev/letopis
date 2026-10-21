@@ -1,0 +1,96 @@
+{
+  "study_id": "demo-final",
+  "chain_id": "C3",
+  "task_id": "C3-T2",
+  "condition": "baseline",
+  "session_id": "S-baseline-C3-T2",
+  "agent_config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "prompt_sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+  "code_before_sha256": "ef3e5e63ce5582fd0a1a7abd7492ee6e71ed3deb12f13faccf905ae86dc79323",
+  "code_after_sha256": "a3e2cff26aea93f1e334573f7ebe3bbdefe5f2458c912d520c08ffd417df72bd",
+  "memory_before": {
+    "items": 0,
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "memory_after": {
+    "items": 0,
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "outcome": "correct",
+  "reason": null,
+  "trace": {
+    "path": "evidence/demonstration.txt",
+    "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+    "locator": "S-baseline-C3-T2 full transcript"
+  },
+  "checks": [
+    {
+      "id": "functional",
+      "passed": true,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-baseline-C3-T2 functional"
+      }
+    },
+    {
+      "id": "regression",
+      "passed": true,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-baseline-C3-T2 regression"
+      }
+    }
+  ],
+  "request_inventory": {
+    "ids": [
+      "S-baseline-C3-T2:agent"
+    ],
+    "evidence": {
+      "path": "evidence/demonstration.txt",
+      "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+      "locator": "S-baseline-C3-T2 independent request inventory"
+    }
+  },
+  "requests": [
+    {
+      "id": "S-baseline-C3-T2:agent",
+      "model": "fake-agent",
+      "purpose": "agent",
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "cached_input_tokens": 4,
+      "reasoning_output_tokens": 2,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-baseline-C3-T2 raw agent usage"
+      }
+    }
+  ],
+  "research": [
+    {
+      "id": "S-baseline-C3-T2:research",
+      "fact_id": "C3:fact",
+      "kind": "repeat",
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-baseline-C3-T2 annotated investigation"
+      }
+    }
+  ],
+  "agreements": [
+    {
+      "id": "public_api",
+      "violated": false,
+      "evidence": {
+        "path": "evidence/demonstration.txt",
+        "sha256": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "locator": "S-baseline-C3-T2 annotated agreement"
+      }
+    }
+  ],
+  "workload_profile": []
+}
