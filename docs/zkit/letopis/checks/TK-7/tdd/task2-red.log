@@ -1,0 +1,80 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-7/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.67s
+     Running tests/markdown_elements.rs (target/debug/deps/markdown_elements-d3a6e241f2d32258)
+
+running 9 tests
+test metadata_must_fit_exactly_one_standalone_line ... FAILED
+test unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected ... FAILED
+test unicode_crlf_and_eof_have_exact_spans ... FAILED
+test code_examples_do_not_declare_elements ... FAILED
+test file_errors_never_return_partial_elements ... FAILED
+test snapshot_metadata_preserves_full_oid_and_zero_created_at ... FAILED
+test anchors_are_unique_across_real_headings ... FAILED
+test nested_elements_and_orphan_metadata_are_rejected ... FAILED
+test golden_elements_have_exact_bytes_and_metadata ... FAILED
+
+failures:
+
+---- metadata_must_fit_exactly_one_standalone_line stdout ----
+
+thread 'metadata_must_fit_exactly_one_standalone_line' (13291960) panicked at tests/markdown_elements.rs:82:191:
+<!-- letopis: {
+"created_at":1} -->
+
+
+---- unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected stdout ----
+
+thread 'unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected' (13291964) panicked at tests/support/mod.rs:7:23:
+invalid file must never yield a partial projection: None
+
+---- unicode_crlf_and_eof_have_exact_spans stdout ----
+
+thread 'unicode_crlf_and_eof_have_exact_spans' (13291963) panicked at tests/markdown_elements.rs:27:73:
+called `Option::unwrap()` on a `None` value
+
+---- code_examples_do_not_declare_elements stdout ----
+
+thread 'code_examples_do_not_declare_elements' (13291957) panicked at tests/support/mod.rs:3:107:
+called `Option::unwrap()` on a `None` value
+
+---- file_errors_never_return_partial_elements stdout ----
+
+thread 'file_errors_never_return_partial_elements' (13291958) panicked at tests/support/mod.rs:7:23:
+invalid file must never yield a partial projection: None
+
+---- snapshot_metadata_preserves_full_oid_and_zero_created_at stdout ----
+
+thread 'snapshot_metadata_preserves_full_oid_and_zero_created_at' (13291962) panicked at tests/support/mod.rs:3:107:
+called `Option::unwrap()` on a `None` value
+
+---- anchors_are_unique_across_real_headings stdout ----
+
+thread 'anchors_are_unique_across_real_headings' (13291956) panicked at tests/support/mod.rs:7:23:
+invalid file must never yield a partial projection: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- nested_elements_and_orphan_metadata_are_rejected stdout ----
+
+thread 'nested_elements_and_orphan_metadata_are_rejected' (13291961) panicked at tests/support/mod.rs:7:23:
+invalid file must never yield a partial projection: None
+
+---- golden_elements_have_exact_bytes_and_metadata stdout ----
+
+thread 'golden_elements_have_exact_bytes_and_metadata' (13291959) panicked at tests/markdown_elements.rs:10:99:
+called `Option::unwrap()` on a `None` value
+
+
+failures:
+    anchors_are_unique_across_real_headings
+    code_examples_do_not_declare_elements
+    file_errors_never_return_partial_elements
+    golden_elements_have_exact_bytes_and_metadata
+    metadata_must_fit_exactly_one_standalone_line
+    nested_elements_and_orphan_metadata_are_rejected
+    snapshot_metadata_preserves_full_oid_and_zero_created_at
+    unicode_crlf_and_eof_have_exact_spans
+    unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected
+
+test result: FAILED. 0 passed; 9 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test markdown_elements`

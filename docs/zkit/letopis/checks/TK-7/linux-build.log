@@ -1,0 +1,78 @@
+#0 building with "avito" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 675B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#2 DONE 4.8s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 364B done
+#3 DONE 0.0s
+
+#4 [1/9] FROM docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#4 resolve docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1 done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 20.06kB done
+#5 DONE 0.0s
+
+#6 [2/9] RUN rustup component add rustfmt clippy
+#6 CACHED
+
+#7 [3/9] WORKDIR /repo
+#7 CACHED
+
+#8 [4/9] COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+#8 CACHED
+
+#9 [5/9] COPY src ./src
+#9 DONE 0.0s
+
+#10 [6/9] COPY tests/domain_values.rs tests/markdown_elements.rs tests/markdown_links.rs tests/markdown_search.rs ./tests/
+#10 DONE 0.0s
+
+#11 [7/9] COPY tests/support ./tests/support
+#11 DONE 0.0s
+
+#12 [8/9] COPY tests/fixtures/markdown ./tests/fixtures/markdown
+#12 DONE 0.0s
+
+#13 [9/9] RUN cargo fetch --locked
+#13 0.101     Updating crates.io index
+#13 17.33  Downloading crates ...
+#13 18.99   Downloaded block-buffer v0.10.4
+#13 20.31   Downloaded cpufeatures v0.2.17
+#13 20.88   Downloaded cfg-if v1.0.5
+#13 20.91   Downloaded crypto-common v0.1.7
+#13 21.24   Downloaded itoa v1.0.18
+#13 21.35   Downloaded generic-array v0.14.7
+#13 21.37   Downloaded version_check v0.9.5
+#13 21.84   Downloaded digest v0.10.7
+#13 22.15   Downloaded ryu v1.0.23
+#13 23.19   Downloaded unicase v2.10.0
+#13 23.42   Downloaded sha2 v0.10.9
+#13 23.56   Downloaded quote v1.0.47
+#13 24.06   Downloaded bitflags v2.13.2
+#13 24.66   Downloaded unicode-ident v1.0.27
+#13 24.77   Downloaded serde_derive v1.0.228
+#13 25.37   Downloaded serde_core v1.0.228
+#13 25.42   Downloaded proc-macro2 v1.0.107
+#13 26.40   Downloaded serde v1.0.228
+#13 26.87   Downloaded memchr v2.8.3
+#13 27.05   Downloaded typenum v1.20.1
+#13 27.77   Downloaded serde_json v1.0.145
+#13 27.92   Downloaded pulldown-cmark v0.13.4
+#13 29.49   Downloaded syn v2.0.119
+#13 32.73   Downloaded libc v0.2.191
+#13 DONE 32.8s
+
+#14 exporting to image
+#14 exporting layers 0.1s done
+#14 writing image sha256:677a81656ca628f6e4515df5fd78ace0ad986f929052f3525e3e0f239311d75c done
+#14 naming to docker.io/library/letopis-tk7-check done
+#14 DONE 0.1s
+
+View build details: docker-desktop://dashboard/build/avito/avito/r143j0wwv9efa2xzmwg64lpm8

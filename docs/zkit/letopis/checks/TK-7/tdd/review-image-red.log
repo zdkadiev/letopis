@@ -1,0 +1,23 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-7/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running tests/markdown_links.rs (target/debug/deps/markdown_links-1125cbdf0c8cd752)
+
+running 2 tests
+test links_wrapping_images_still_declare_edges ... ok
+test image_alt_links_do_not_declare_edges ... FAILED
+
+failures:
+
+---- image_alt_links_do_not_declare_edges stdout ----
+
+thread 'image_alt_links_do_not_declare_edges' (13583637) panicked at tests/markdown_links.rs:99:5:
+image alt cannot declare graph edges: {Edge { source: KnowledgeId("a.md"), target: Knowledge(KnowledgeId("b.md")), edge_type: EdgeType("includes") }}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    image_alt_links_do_not_declare_edges
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test markdown_links`

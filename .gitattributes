@@ -1,0 +1,2 @@
+tests/fixtures/markdown/*.md -text whitespace=cr-at-eol
+docs/zkit/letopis/checks/TK-7/**/*.log whitespace=-blank-at-eof

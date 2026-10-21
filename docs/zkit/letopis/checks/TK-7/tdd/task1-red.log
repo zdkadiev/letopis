@@ -1,0 +1,88 @@
+    Updating crates.io index
+     Locking 21 packages to latest Rust 1.95.0 compatible versions
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding serde v1.0.228 (available: v1.0.229)
+      Adding serde_core v1.0.228 (available: v1.0.229)
+      Adding serde_derive v1.0.228 (available: v1.0.229)
+      Adding serde_json v1.0.145 (available: v1.0.154)
+      Adding sha2 v0.10.9 (available: v0.11.1)
+   Compiling version_check v0.9.5
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling typenum v1.20.1
+   Compiling unicode-ident v1.0.27
+   Compiling libc v0.2.191
+   Compiling serde_core v1.0.228
+   Compiling serde_json v1.0.145
+   Compiling serde v1.0.228
+   Compiling memchr v2.8.3
+   Compiling ryu v1.0.23
+   Compiling itoa v1.0.18
+   Compiling cfg-if v1.0.5
+   Compiling generic-array v0.14.7
+   Compiling syn v2.0.119
+   Compiling cpufeatures v0.2.17
+   Compiling serde_derive v1.0.228
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-7/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.69s
+     Running tests/domain_values.rs (target/debug/deps/domain_values-08670b177d4fe5e4)
+
+running 6 tests
+test ids_and_sources_normalize_from_git_root ... FAILED
+test sha256_uses_exact_bytes ... FAILED
+test edge_identity_and_kind_are_derived ... FAILED
+test anchors_and_ranges_reject_invalid_values ... FAILED
+test edge_targets_and_self_loops_are_checked ... FAILED
+test tree_oids_are_full_lowercase_hex ... FAILED
+
+failures:
+
+---- ids_and_sources_normalize_from_git_root stdout ----
+
+thread 'ids_and_sources_normalize_from_git_root' (13245728) panicked at tests/domain_values.rs:7:42:
+called `Result::unwrap()` on an `Err` value: ValueError
+
+---- sha256_uses_exact_bytes stdout ----
+
+thread 'sha256_uses_exact_bytes' (13245729) panicked at tests/domain_values.rs:35:5:
+assertion `left == right` failed
+  left: ""
+ right: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+
+---- edge_identity_and_kind_are_derived stdout ----
+
+thread 'edge_identity_and_kind_are_derived' (13245726) panicked at tests/domain_values.rs:42:38:
+called `Result::unwrap()` on an `Err` value: ValueError
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- anchors_and_ranges_reject_invalid_values stdout ----
+
+thread 'anchors_and_ranges_reject_invalid_values' (13245725) panicked at tests/domain_values.rs:17:56:
+a
+
+---- edge_targets_and_self_loops_are_checked stdout ----
+
+thread 'edge_targets_and_self_loops_are_checked' (13245727) panicked at tests/domain_values.rs:54:38:
+called `Result::unwrap()` on an `Err` value: ValueError
+
+---- tree_oids_are_full_lowercase_hex stdout ----
+
+thread 'tree_oids_are_full_lowercase_hex' (13245730) panicked at tests/domain_values.rs:29:66:
+called `Result::unwrap()` on an `Err` value: ValueError
+
+
+failures:
+    anchors_and_ranges_reject_invalid_values
+    edge_identity_and_kind_are_derived
+    edge_targets_and_self_loops_are_checked
+    ids_and_sources_normalize_from_git_root
+    sha256_uses_exact_bytes
+    tree_oids_are_full_lowercase_hex
+
+test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test domain_values`

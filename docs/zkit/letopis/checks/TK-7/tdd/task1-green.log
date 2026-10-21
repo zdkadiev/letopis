@@ -1,0 +1,31 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-7/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running tests/domain_values.rs (target/debug/deps/domain_values-08670b177d4fe5e4)
+
+running 6 tests
+test edge_identity_and_kind_are_derived ... ok
+test anchors_and_ranges_reject_invalid_values ... ok
+test sha256_uses_exact_bytes ... ok
+test ids_and_sources_normalize_from_git_root ... ok
+test tree_oids_are_full_lowercase_hex ... ok
+test edge_targets_and_self_loops_are_checked ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+    Checking typenum v1.20.1
+    Checking cfg-if v1.0.5
+    Checking ryu v1.0.23
+    Checking itoa v1.0.18
+    Checking memchr v2.8.3
+    Checking libc v0.2.191
+    Checking serde_core v1.0.228
+    Checking generic-array v0.14.7
+    Checking cpufeatures v0.2.17
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.7
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking serde_json v1.0.145
+    Checking serde v1.0.228
+    Checking letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-7/letopis)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.97s

@@ -1,6 +1,6 @@
 # TK-7 — Реализовать разметку, ID, хеши и доменные типы
 
-> **Статус:** planned
+> **Статус:** done
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 5 / 8 / 14 (best / expected / worst)
@@ -35,9 +35,9 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Markdown codec распознаёт элементы и title X-4 (`<!-- letopis: {...} -->`, `{#anchor}`, `letopis:type=…`), ID по пути/якорю, ссылки и source URI; метавершина выводится по исходящим includes, поля kind нет (D-95).
-- [ ] Точные байты/SHA-256 и created_at проходят fixtures.
-- [ ] domain отделён от адаптеров.
+- [x] Markdown codec распознаёт элементы и title X-4 (`<!-- letopis: {...} -->`, `{#anchor}`, `letopis:type=…`), ID по пути/якорю, ссылки и source URI; метавершина выводится по исходящим includes, поля kind нет (D-95).
+- [x] Точные байты/SHA-256 и created_at проходят fixtures.
+- [x] domain отделён от адаптеров.
 
 ## 6. Как проверить
 
@@ -60,6 +60,10 @@
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
+Выполнена 2026-10-21 в отдельной ветке TK-7 от main@48b8ed8. Создан корневой Rust library crate letopis: domain в src/domain, read-only parser X-4 и единый search renderer в src/adapters/markdown. Доменные типы не зависят от Markdown/JSON/Git/SQL/HTTP/CLI; parser принимает path+bytes и не выполняет I/O. Возвращаются ID, точные byte/line ranges и raw SHA-256, created_at/source_snapshot, рёбра-тройки и временный search text/hash; никаких serializer/UUID/kind-полей.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+[Согласованная спецификация](../../../../../../superpowers/specs/2026-10-21-tk-7-markdown-domain-design.md), [выполненный план](../../../../../../superpowers/plans/2026-10-21-tk-7-markdown-domain.md), [отчёт](../../../../checks/TK-7/report.md), [верификация](../../../../checks/TK-7/verification.json), [ревью](../../../../checks/TK-7/review.md). Коммиты реализации: 0c32513 (domain), 524231f (parser), 79cc52d (search/evidence), 3aff95f (context fixes).
+
+Все три критерия подтверждены: 30 integration tests (6 domain, 10 elements, 6 links, 8 search), fmt и clippy PASS на macOS ARM64 и Linux glibc ARM64; Linux runtime без сети. Точные байты/хеши, LF/CRLF/Unicode/EOF, metadata/errors, fenced/indented/HTML context, anchors, нормализация адресов, links и search invariants проверены воспроизводимыми fixtures. Один свежий reviewer нашёл 2 Important, оба подтверждены RED→GREEN и исправлены, suite повторён на обеих платформах; Critical/отложенных Minor нет.
+
+Git adapter/SQL projection/CLI/полный graph validator и реальные FS/symlink/source bytes остаются следующим задачам, согласно границам выше. Ресурсные цели и x86_64 не объявляются проверенными. Оценки/расписание не менялись. Приёмка завершена локально; merge/push/изменение GitHub issue выполняются отдельно по запросу пользователя.

@@ -1,0 +1,76 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-7/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.81s
+     Running tests/markdown_search.rs (target/debug/deps/markdown_search-6489c879d9b3bc3f)
+
+running 7 tests
+test code_examples_remain_searchable ... FAILED
+test search_text_preserves_word_and_block_boundaries ... FAILED
+test moving_path_preserves_text_hashes ... FAILED
+test metadata_and_link_changes_keep_search_hash ... FAILED
+test own_text_label_and_code_change_search_hash ... FAILED
+test reference_labels_use_whole_file_context ... FAILED
+test golden_search_representations ... FAILED
+
+failures:
+
+---- code_examples_remain_searchable stdout ----
+
+thread 'code_examples_remain_searchable' (13364139) panicked at tests/markdown_search.rs:56:5:
+assertion failed: text.contains("<!-- letopis: {\"created_at\":8} -->")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- search_text_preserves_word_and_block_boundaries stdout ----
+
+thread 'search_text_preserves_word_and_block_boundaries' (13364145) panicked at tests/markdown_search.rs:71:9:
+assertion `left == right` failed: hel**lo**
+  left: ""
+ right: "hello"
+
+---- moving_path_preserves_text_hashes stdout ----
+
+thread 'moving_path_preserves_text_hashes' (13364142) panicked at tests/markdown_search.rs:49:5:
+assertion `left == right` failed
+  left: ""
+ right: "Stable text."
+
+---- metadata_and_link_changes_keep_search_hash stdout ----
+
+thread 'metadata_and_link_changes_keep_search_hash' (13364141) panicked at tests/markdown_search.rs:25:5:
+assertion `left == right` failed
+  left: ""
+ right: "WAL\nUse safe SQLite."
+
+---- own_text_label_and_code_change_search_hash stdout ----
+
+thread 'own_text_label_and_code_change_search_hash' (13364143) panicked at tests/markdown_search.rs:39:9:
+assertion `left != right` failed
+  left: Sha256([227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65, 228, 100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85])
+ right: Sha256([227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65, 228, 100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85])
+
+---- reference_labels_use_whole_file_context stdout ----
+
+thread 'reference_labels_use_whole_file_context' (13364144) panicked at tests/markdown_search.rs:65:5:
+assertion `left == right` failed
+  left: ""
+ right: "Note\nShown"
+
+---- golden_search_representations stdout ----
+
+thread 'golden_search_representations' (13364140) panicked at tests/markdown_search.rs:12:13:
+assertion `left == right` failed: code.md
+  left: ""
+ right: "Example.\n## Fake {#fake}\n<!-- letopis: {\"created_at\":8} -->\n[x](missing.md \"letopis:type=includes\")\n## Indented {#indented}\n<!-- letopis: {\"created_at\":9} -->\n<!-- letopis: {\"created_at\":4} -->"
+
+
+failures:
+    code_examples_remain_searchable
+    golden_search_representations
+    metadata_and_link_changes_keep_search_hash
+    moving_path_preserves_text_hashes
+    own_text_label_and_code_change_search_hash
+    reference_labels_use_whole_file_context
+    search_text_preserves_word_and_block_boundaries
+
+test result: FAILED. 0 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test markdown_search`
