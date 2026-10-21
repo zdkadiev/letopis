@@ -26,7 +26,8 @@ fn golden_elements_have_exact_bytes_and_metadata() {
             expected.as_array().unwrap().len(),
             "{name}"
         );
-        for (got, want) in result.elements.iter().zip(expected.as_array().unwrap()) {
+        for (parsed_element, want) in result.elements.iter().zip(expected.as_array().unwrap()) {
+            let got = &parsed_element.element;
             assert_eq!(got.id.as_str(), want["id"].as_str().unwrap(), "{name}");
             assert_eq!(
                 got.bytes.start() as u64,
@@ -67,15 +68,15 @@ fn unicode_crlf_and_eof_have_exact_spans() {
         let got = parse(&RepoPath::parse("a.md").unwrap(), bytes)
             .unwrap()
             .unwrap();
-        assert_eq!(got.elements[0].bytes.end(), bytes.len());
-        assert_eq!(got.elements[0].lines.end(), 3);
+        assert_eq!(got.elements[0].element.bytes.end(), bytes.len());
+        assert_eq!(got.elements[0].element.lines.end(), 3);
     }
     let got = parsed(
         "a.md",
         std::str::from_utf8(include_bytes!("fixtures/markdown/unicode.md")).unwrap(),
     );
-    assert_eq!(got.elements[0].bytes.start(), 11);
-    assert_eq!(got.elements[0].lines.start(), 3);
+    assert_eq!(got.elements[0].element.bytes.start(), 11);
+    assert_eq!(got.elements[0].element.lines.start(), 3);
 }
 
 #[test]
@@ -172,9 +173,10 @@ fn snapshot_metadata_preserves_full_oid_and_zero_created_at() {
             "a.markdown",
             &format!("<!-- letopis: {{\"created_at\":0,\"source_snapshot\":\"{oid}\"}} -->\nX"),
         );
-        assert_eq!(got.elements[0].metadata.created_at, 0);
+        assert_eq!(got.elements[0].element.metadata.created_at, 0);
         assert_eq!(
             got.elements[0]
+                .element
                 .metadata
                 .source_snapshot
                 .as_ref()

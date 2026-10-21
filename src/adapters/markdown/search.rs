@@ -1,0 +1,35 @@
+use super::Events;
+use crate::domain::ByteSpan;
+use pulldown_cmark::{Event, TagEnd};
+use std::ops::Range;
+
+/// Render the element's own visible text from the already parsed full document.
+pub(super) fn render(
+    events: &Events<'_>,
+    span: ByteSpan,
+    metadata_ranges: &[Range<usize>],
+) -> String {
+    let mut text = String::new();
+    for (event, range) in events {
+        if range.start < span.start()
+            || range.end > span.end()
+            || metadata_ranges
+                .iter()
+                .any(|m| range.start >= m.start && range.end <= m.end)
+        {
+            continue;
+        }
+        match event {
+            Event::Text(s) | Event::Code(s) => text.push_str(s),
+            Event::Html(s) | Event::InlineHtml(s) => text.push_str(s),
+            Event::SoftBreak
+            | Event::HardBreak
+            | Event::Rule
+            | Event::End(
+                TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::CodeBlock | TagEnd::Item,
+            ) if !text.ends_with('\n') => text.push('\n'),
+            _ => {}
+        }
+    }
+    text.trim_matches('\n').to_owned()
+}

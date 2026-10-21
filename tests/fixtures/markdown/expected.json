@@ -7,7 +7,9 @@
       "line_start": 1,
       "line_end": 2,
       "hash": "69310cd742978c3cef6fa8c6ff86fb69981333c5eada345da90a83a5343cc70f",
-      "created_at": 0
+      "created_at": 0,
+      "search_text": "X",
+      "search_hash": "4b68ab3847feda7d6c62c1fbcbeebfa35eab7351ed5e78f4ddadea5df64b8015"
     }
   ],
   "sections.md": [
@@ -18,7 +20,9 @@
       "line_start": 3,
       "line_end": 8,
       "hash": "4ca8f91e2e8b4e7af4edf635b9ffa41afb9c8a0d58f3d08fa940a8df9b093bf1",
-      "created_at": 7
+      "created_at": 7,
+      "search_text": "A\nAlpha.\nsub\nOwn.",
+      "search_hash": "2a3513240433a1433f055a25c6b5d737e5c9e10f32e3c45ba6db2bec46e8cc0b"
     },
     {
       "id": "knowledge/sections.md#b",
@@ -27,7 +31,9 @@
       "line_start": 12,
       "line_end": 14,
       "hash": "574f4e33ed4f8ca7a0bb8ac35e26a1713d6db719457076f509f609f8f4c58596",
-      "created_at": 9
+      "created_at": 9,
+      "search_text": "B\nBeta.",
+      "search_hash": "5bf5d4f2410badbca68a818539e817acb2fbb0427825f1b812fee9188db46b64"
     }
   ],
   "crlf.md": [
@@ -38,7 +44,9 @@
       "line_start": 1,
       "line_end": 3,
       "hash": "eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864",
-      "created_at": 7
+      "created_at": 7,
+      "search_text": "A\nHi",
+      "search_hash": "721a6c2b3771ce05f98b3b33fb8d8f09e4d987e7c3c6e07b26882fcbc4876fbe"
     }
   ],
   "unicode.md": [
@@ -49,7 +57,9 @@
       "line_start": 3,
       "line_end": 5,
       "hash": "99f2ad88e68feb8a1341ea4aec0bf046d236ef8c25953a45c1ee33dad5113a11",
-      "created_at": 7
+      "created_at": 7,
+      "search_text": "Память\nСодержимое.",
+      "search_hash": "64ac6c68f3e1a640767f8fe39dce8eea5642fb266483b1ce81903d49c9754931"
     }
   ],
   "no-final-newline.md": [
@@ -60,7 +70,9 @@
       "line_start": 1,
       "line_end": 3,
       "hash": "8ae8dc48443c3b9132365da3e83a1862fe8c1be55da7ee6a9bbf478703fe58d2",
-      "created_at": 2
+      "created_at": 2,
+      "search_text": "E\nEnd",
+      "search_hash": "3f3f3631d3c031f7e67bf0d22fe01c0003e7a0a3e48e5fa5df49010f0a688f0d"
     }
   ],
   "code.md": [
@@ -71,7 +83,9 @@
       "line_start": 1,
       "line_end": 13,
       "hash": "745c2910661730dbb4d8c94076b522837299017f8971f71cd8df368523512c62",
-      "created_at": 3
+      "created_at": 3,
+      "search_text": "Example.\n## Fake {#fake}\n<!-- letopis: {\"created_at\":8} -->\n[x](missing.md \"letopis:type=includes\")\n## Indented {#indented}\n<!-- letopis: {\"created_at\":9} -->\n<!-- letopis: {\"created_at\":4} -->",
+      "search_hash": "98e58fd4914a8712944688d1c49c16ef0f67626cbaccacb206d597d17ad80058"
     }
   ],
   "references.md": [
@@ -82,7 +96,9 @@
       "line_start": 1,
       "line_end": 4,
       "hash": "3dc555f0c5080574cd76b853d2a8dc07247f29b39c3c657a7ece9a41d31996e1",
-      "created_at": 4
+      "created_at": 4,
+      "search_text": "Note\nShown",
+      "search_hash": "a8a564e62cacfb25f3af8177731a4f1a19964da4038aba51304dc78643fb5e15"
     }
   ]
 }

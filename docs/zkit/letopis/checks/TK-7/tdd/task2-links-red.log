@@ -1,0 +1,56 @@
+    Updating crates.io index
+     Locking 3 packages to latest Rust 1.95.0 compatible versions
+      Adding bitflags v2.13.2
+      Adding pulldown-cmark v0.13.4 (available: v0.13.5)
+      Adding unicase v2.10.0
+ Downloading crates ...
+  Downloaded unicase v2.10.0
+  Downloaded pulldown-cmark v0.13.4
+   Compiling memchr v2.8.3
+   Compiling pulldown-cmark v0.13.4
+   Compiling unicase v2.10.0
+   Compiling bitflags v2.13.2
+   Compiling serde_json v1.0.145
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-7/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.34s
+     Running tests/markdown_links.rs (target/debug/deps/markdown_links-1125cbdf0c8cd752)
+
+running 4 tests
+test sources_are_normalized_without_loading_destinations ... FAILED
+test links_outside_elements_are_only_navigation ... FAILED
+test only_inline_links_declare_edges ... FAILED
+test invalid_graph_titles_and_targets_fail_file ... FAILED
+
+failures:
+
+---- sources_are_normalized_without_loading_destinations stdout ----
+
+thread 'sources_are_normalized_without_loading_destinations' (13298068) panicked at tests/support/mod.rs:3:107:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- links_outside_elements_are_only_navigation stdout ----
+
+thread 'links_outside_elements_are_only_navigation' (13298066) panicked at tests/support/mod.rs:3:107:
+called `Option::unwrap()` on a `None` value
+
+---- only_inline_links_declare_edges stdout ----
+
+thread 'only_inline_links_declare_edges' (13298067) panicked at tests/support/mod.rs:3:107:
+called `Option::unwrap()` on a `None` value
+
+---- invalid_graph_titles_and_targets_fail_file stdout ----
+
+thread 'invalid_graph_titles_and_targets_fail_file' (13298065) panicked at tests/support/mod.rs:7:23:
+invalid file must never yield a partial projection: None
+
+
+failures:
+    invalid_graph_titles_and_targets_fail_file
+    links_outside_elements_are_only_navigation
+    only_inline_links_declare_edges
+    sources_are_normalized_without_loading_destinations
+
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test markdown_links`

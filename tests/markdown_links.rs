@@ -10,7 +10,7 @@ fn only_inline_links_declare_edges() {
     let got = parsed("a.md", &s);
     assert_eq!(got.edges.len(), 2);
     assert_eq!(
-        kind_for(&got.elements[0].id, &got.edges),
+        kind_for(&got.elements[0].element.id, &got.edges),
         ElementKind::Metavertex
     );
     let triples: Vec<_> = got
@@ -47,7 +47,7 @@ fn sources_are_normalized_without_loading_destinations() {
     assert!(got.edges.iter().any(
         |e| matches!(e.target(),EdgeTarget::Knowledge(k) if k.as_str()=="knowledge/missing.md#x")
     ));
-    assert!(got.elements[0].metadata.source_snapshot.is_none());
+    assert!(got.elements[0].element.metadata.source_snapshot.is_none());
 }
 
 #[test]

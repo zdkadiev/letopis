@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 
 pub(super) struct Layout {
     pub elements: Vec<Element>,
+    pub metadata_ranges: Vec<std::ops::Range<usize>>,
 }
 struct Heading {
     start: usize,
@@ -72,6 +73,7 @@ pub(super) fn scan(
         }
     }
     let mut elements: Vec<Element> = Vec::new();
+    let mut metadata_ranges = Vec::new();
     for range in comments {
         let start = line_start(text, range.start);
         let after = line_after(text, start);
@@ -81,6 +83,7 @@ pub(super) fn scan(
             return Err(Diagnostic::at(DiagnosticKind::InvalidMetadata, range));
         }
         let metadata = metadata::parse(line, start..after)?;
+        metadata_ranges.push(start..after);
         let (begin, end, anchor) = if start == 0 {
             (0, text.len(), None)
         } else {
@@ -113,7 +116,10 @@ pub(super) fn scan(
             hash: Sha256::digest(&text.as_bytes()[begin..end]),
         });
     }
-    Ok(Some(Layout { elements }))
+    Ok(Some(Layout {
+        elements,
+        metadata_ranges,
+    }))
 }
 fn line_start(text: &str, at: usize) -> usize {
     text.as_bytes()[..at]

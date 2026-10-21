@@ -1,0 +1,65 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-7/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.73s
+     Running unittests src/lib.rs (target/debug/deps/letopis-3048ed1b85800ea9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/domain_values.rs (target/debug/deps/domain_values-0124417f61be22b8)
+
+running 6 tests
+test tree_oids_are_full_lowercase_hex ... ok
+test ids_and_sources_normalize_from_git_root ... ok
+test edge_targets_and_self_loops_are_checked ... ok
+test edge_identity_and_kind_are_derived ... ok
+test sha256_uses_exact_bytes ... ok
+test anchors_and_ranges_reject_invalid_values ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_elements.rs (target/debug/deps/markdown_elements-24ddbdb81e6974cd)
+
+running 9 tests
+test unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected ... ok
+test metadata_must_fit_exactly_one_standalone_line ... ok
+test snapshot_metadata_preserves_full_oid_and_zero_created_at ... ok
+test unicode_crlf_and_eof_have_exact_spans ... ok
+test anchors_are_unique_across_real_headings ... ok
+test code_examples_do_not_declare_elements ... ok
+test nested_elements_and_orphan_metadata_are_rejected ... ok
+test file_errors_never_return_partial_elements ... ok
+test golden_elements_have_exact_bytes_and_metadata ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_links.rs (target/debug/deps/markdown_links-1125cbdf0c8cd752)
+
+running 4 tests
+test sources_are_normalized_without_loading_destinations ... ok
+test links_outside_elements_are_only_navigation ... ok
+test only_inline_links_declare_edges ... ok
+test invalid_graph_titles_and_targets_fail_file ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_search.rs (target/debug/deps/markdown_search-6489c879d9b3bc3f)
+
+running 8 tests
+test moving_path_preserves_text_hashes ... ok
+test own_text_label_and_code_change_search_hash ... ok
+test code_examples_remain_searchable ... ok
+test reference_labels_use_whole_file_context ... ok
+test crlf_metadata_line_does_not_add_search_whitespace ... ok
+test metadata_and_link_changes_keep_search_hash ... ok
+test golden_search_representations ... ok
+test search_text_preserves_word_and_block_boundaries ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests letopis
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
