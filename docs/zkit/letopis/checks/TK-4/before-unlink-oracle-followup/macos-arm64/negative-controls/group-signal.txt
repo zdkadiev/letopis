@@ -1,0 +1,18 @@
+
+running 1 test
+test sigint_waiter_leaves_owner_and_drain_alive ... FAILED
+
+failures:
+
+failures:
+    sigint_waiter_leaves_owner_and_drain_alive
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.42s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/cancellation.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-0g0d3g7r/target/debug/deps/cancellation-d54eb8bc29e09e7d)
+
+thread 'sigint_waiter_leaves_owner_and_drain_alive' (8074658) panicked at tests/cancellation.rs:72:5:
+SIGINT waiter killed foreign publication owner
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test cancellation`

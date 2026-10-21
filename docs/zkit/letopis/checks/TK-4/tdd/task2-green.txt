@@ -1,0 +1,52 @@
+   Compiling letopis-runtime-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running unittests src/lib.rs (tests/runtime/target/debug/deps/letopis_runtime_checks-0e265aa306c08e1b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests ../embedding/src/bin/embedder.rs (tests/runtime/target/debug/deps/embedder-a28436d75ffbf2df)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests ../publication/src/bin/publisher.rs (tests/runtime/target/debug/deps/publisher-d6b622f7ffe279b4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/runtime.rs (tests/runtime/target/debug/deps/runtime-e8a67b33dae30b1a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cancellation.rs (tests/runtime/target/debug/deps/cancellation-1ee9c7b33af855b6)
+
+running 4 tests
+test sigint_after_commit_keeps_new_cache ... ok
+test sigint_waiter_leaves_owner_and_drain_alive ... ok
+test failed_or_lost_spawn_keeps_work_recoverable ... ok
+test sigint_before_commit_keeps_exact_cache ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.39s
+
+     Running tests/contention.rs (tests/runtime/target/debug/deps/contention-6514e137da44ee14)
+
+running 4 tests
+test ten_commands_publish_one_delta ... ok
+test launcher_exit_does_not_wait_or_leak_locks ... ok
+test dead_owners_and_stale_pids_do_not_block ... ok
+test ten_probe_winners_admit_one_drain ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+   Doc-tests letopis_runtime_checks
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

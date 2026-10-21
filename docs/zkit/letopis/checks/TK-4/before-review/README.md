@@ -1,0 +1,1 @@
+These passing receipts describe the 59-file source snapshot inspected by the fresh reviewer before the two Important fixes. Their hashes deliberately differ from the final source. Final platform receipts live one directory above; TDD failure/green records explain both fixes. Do not treat these historical receipts as verification of final code.

@@ -1,0 +1,20 @@
+
+running 1 test
+test launcher_exit_does_not_wait_or_leak_locks ... FAILED
+
+failures:
+
+failures:
+    launcher_exit_does_not_wait_or_leak_locks
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.41s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/contention.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-0g0d3g7r/target/debug/deps/contention-9c434ba3a8be66a2)
+
+thread 'launcher_exit_does_not_wait_or_leak_locks' (8076814) panicked at tests/contention.rs:209:9:
+assertion `left == right` failed
+  left: Number(33152)
+ right: Number(8630)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test contention`

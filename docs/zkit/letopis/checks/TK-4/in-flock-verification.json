@@ -1,0 +1,94 @@
+{
+  "result": "PASS",
+  "test": "sigint_inside_blocking_flock_leaves_other_processes_alive",
+  "modes": [
+    "publish",
+    "reindex"
+  ],
+  "platforms": [
+    {
+      "platform": "macos-arm64",
+      "method": {
+        "method": "native macOS sample call-stack frame",
+        "executable": "/usr/bin/sample",
+        "executable_sha256": "cb256ff7588e0767aa9f72b1c2471aba71896ccc7e5662134a65aaa2dd03485a"
+      },
+      "observations": {
+        "publish": {
+          "before-flock": [
+            "flock-observations/publish-before-flock-Ep6ppv.txt",
+            "flock-observations/publish-before-flock-OfEDO2.txt",
+            "flock-observations/publish-before-flock-d2u3ZX.txt"
+          ],
+          "inside-flock": [
+            "flock-observations/publish-inside-flock-s7zgE1.txt",
+            "flock-observations/publish-inside-flock-xPOTzi.txt"
+          ]
+        },
+        "reindex": {
+          "before-flock": [
+            "flock-observations/reindex-before-flock-HCshq6.txt",
+            "flock-observations/reindex-before-flock-ZHWO04.txt"
+          ],
+          "inside-flock": [
+            "flock-observations/reindex-inside-flock-VurELl.txt",
+            "flock-observations/reindex-inside-flock-fot1LA.txt"
+          ]
+        }
+      },
+      "artifact_hashes": {
+        "flock-observations/publish-before-flock-Ep6ppv.txt": "b2c2754ff2a8d772f5244c59ef4efacd37e604ca778a8b6971d14450cd9712b7",
+        "flock-observations/publish-before-flock-OfEDO2.txt": "8956d7669a3beca0db858e7b8bac0a83d02e863b7ff7aa9e16889d6477102efc",
+        "flock-observations/publish-before-flock-d2u3ZX.txt": "d5931ac8a358809fa9e79dd9dbbd089278367b60bdc08c57ddd2ef9aa3e97072",
+        "flock-observations/publish-inside-flock-s7zgE1.txt": "53bfe56009e5460645fbddf940b327e083a7b963a424fc7202f7d4964917c3f2",
+        "flock-observations/publish-inside-flock-xPOTzi.txt": "3390d5a0e9b93c075b10f1f8ee3b30aaa200587349fcf37d67f4ac47306e73c8",
+        "flock-observations/reindex-before-flock-HCshq6.txt": "0d3f0bcf988ec9edc8c16c6f347eff2a153b79c4c674de869c21a1c71eaf3f44",
+        "flock-observations/reindex-before-flock-ZHWO04.txt": "6482e47bd3e207de20dc28edce17619e8635f7bd5a1bda32141579731fef68d7",
+        "flock-observations/reindex-inside-flock-VurELl.txt": "8185b7f80161049f3e6546853da13b55ecd5e4295a5582db3b664bf13897e082",
+        "flock-observations/reindex-inside-flock-fot1LA.txt": "4d63ada9d431aa758b6c92933316fb037b2a2621a873daa7ac78413841dd7f54"
+      },
+      "pre_flock_pause_mutation": "DETECTED (compile exit 0, assertion exit 101)"
+    },
+    {
+      "platform": "linux-arm64",
+      "method": {
+        "method": "Linux /proc syscall number, LOCK_EX argument and matching index.lock fd device/inode"
+      },
+      "observations": {
+        "publish": {
+          "before-flock": [
+            "flock-observations/publish-before-flock-94WPld.txt",
+            "flock-observations/publish-before-flock-YKIcRF.txt",
+            "flock-observations/publish-before-flock-sqrQzt.txt"
+          ],
+          "inside-flock": [
+            "flock-observations/publish-inside-flock-Q9hFZJ.txt",
+            "flock-observations/publish-inside-flock-zWPgzL.txt"
+          ]
+        },
+        "reindex": {
+          "before-flock": [
+            "flock-observations/reindex-before-flock-45MfTY.txt",
+            "flock-observations/reindex-before-flock-FI7i2l.txt"
+          ],
+          "inside-flock": [
+            "flock-observations/reindex-inside-flock-gQOR6p.txt",
+            "flock-observations/reindex-inside-flock-hGu66i.txt"
+          ]
+        }
+      },
+      "artifact_hashes": {
+        "flock-observations/publish-before-flock-94WPld.txt": "fc5b1b5a51583cdf10db2d8a06b4d557961215bb5f68464c52b34e1790e61f9b",
+        "flock-observations/publish-before-flock-YKIcRF.txt": "9ef3b719c3c312bed5fe27424c41924133139fec8caf7d61927b7ca3545c379f",
+        "flock-observations/publish-before-flock-sqrQzt.txt": "e0eef6ca3798a2902c0ac3f305d487a5692ef6b0901ab31bf67e913e11faf471",
+        "flock-observations/publish-inside-flock-Q9hFZJ.txt": "a68ea83135e01991887501c8bdca4f34a8bd156a14b8276af599b0ff1e8215b0",
+        "flock-observations/publish-inside-flock-zWPgzL.txt": "189d75be1e180bb9085e8e84329d3b4519a6a5641637fc6c8829a02074ef6966",
+        "flock-observations/reindex-before-flock-45MfTY.txt": "3c932226d75dd07bca321a82b1b61433b5b09fa4c6b52d721bd6f093a5dbbfd1",
+        "flock-observations/reindex-before-flock-FI7i2l.txt": "2147337660bdd60d1993d16a21c38bc1775b189d507e29ea41acf1076538902c",
+        "flock-observations/reindex-inside-flock-gQOR6p.txt": "1e7f94f4d13abafd1f44669246948382ad8c37384ab49f1c052df551ced6e6d1",
+        "flock-observations/reindex-inside-flock-hGu66i.txt": "38f90876cc0f3dd2f1c982284e3494ae4aee3daa670a3967b5e4e2d430044d38"
+      },
+      "pre_flock_pause_mutation": "DETECTED (compile exit 0, assertion exit 101)"
+    }
+  ]
+}

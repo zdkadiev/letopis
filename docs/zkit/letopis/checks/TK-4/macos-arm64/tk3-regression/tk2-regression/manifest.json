@@ -1,0 +1,212 @@
+{
+  "started_utc": "2026-10-21T14:53:58.712493+00:00",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "result": "PASS",
+  "commands": [
+    {
+      "argv": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication",
+      "log": "01-rustc.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "--version"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication",
+      "log": "02-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cc",
+        "--version"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication",
+      "log": "03-cc.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication",
+      "log": "04-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cc",
+        "-O2",
+        "-DNDEBUG",
+        "-fPIC",
+        "-dynamiclib",
+        "-I",
+        "/Users/zdkadiev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libsqlite3-sys-0.38.2/sqlite3",
+        "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/.build/vec1.c",
+        "-o",
+        "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/.build/native-p2g89pgy/vec1.dylib",
+        "-pthread",
+        "-lm"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication",
+      "log": "05-cc.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--bin",
+        "publisher",
+        "--",
+        "--versions"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication",
+      "log": "06-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/.build/native-p2g89pgy/vec1.dylib"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication",
+      "log": "07-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/.build/native-p2g89pgy/vec1.dylib"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--",
+        "--check"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication",
+      "log": "08-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/.build/native-p2g89pgy/vec1.dylib"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication",
+      "log": "09-cargo.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/.build/native-p2g89pgy/vec1.dylib"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/storage-build/run.py",
+        "--evidence",
+        "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-macos-oracle-fixed/tk3-regression/tk2-regression/tk1-regression"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/storage-build",
+      "log": "10-python3.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/.build/native-p2g89pgy/vec1.dylib"
+      },
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+        "-B",
+        "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/docs/zkit/letopis/roadmap/schedule.py",
+        "--check"
+      ],
+      "cwd": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis",
+      "log": "11-python3.txt",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/target/darwin-arm64",
+        "LETOPIS_VEC1_EXTENSION": "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/publication/.build/native-p2g89pgy/vec1.dylib"
+      },
+      "exit_code": 0
+    }
+  ],
+  "vec1_url": "https://raw.githubusercontent.com/sqlite/sqlite/a27bcfe21c9b4e0989e86eec8fb34a3832cd23c7/ext/vec1/vec1.c",
+  "vec1_source_sha256": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9",
+  "libsqlite3_sys": "0.38.2",
+  "sqlite_header_sha256": "9e69a1353a4288450b0d5239ede11fc7f1f4c8e5eb07491fc8317eacb5b7de7e",
+  "files_sha256": {
+    ".dockerignore": "08bb7a70af4ae5a9c15226f499f2e76055ebd521550f87eb102a1316cdb9df38",
+    ".gitignore": "bedadf7a946f16555560ab12aadd87a52305a0b99bf5e49a3a452054ff39c3ea",
+    "Cargo.lock": "975b3826ecd97e177a4c7049a47ebfc36c3c7de7d49e3d452f04877fa2e6c7b2",
+    "Cargo.toml": "395569078e28ec25f586764eeadd00dd8dcd75b1fb358e42f9076015b69f692b",
+    "Dockerfile": "f6cc3f1e04d89740a742132eb60f017fb1fb232056376e549c784144501d3eb8",
+    "README.md": "98195523fad8977cacf0b6a4e11860815add6e4a2f10f29573d925033d9af3f8",
+    "run.py": "b0bc19c73c70c53329f4dd6fb980631c3e8bb8b82d8845d9cbf5a25a791f1f7f",
+    "rust-toolchain.toml": "7d21c66a15f41bad66b82ed06a289f5dc8a6e3751951d2696bbf20ce296f2b0f",
+    "schema.sql": "cb59b6082d738a382ebb7450f7ee54552c8e1e26dd10217984c8de1f7f5db37c",
+    "src/bin/publisher.rs": "4ac2dff37548e30e6b7904cd57773a880d444338a6a2eab380320d51454ef70f",
+    "src/config.rs": "b4d12cf5b4463fce375abcb96dcc1855ea9b29edef08eda2eace980b3a4a5796",
+    "src/corpus.rs": "5ed3ba76b6f9948fd0e1177a094153cc0bf56ddead2a742f0b0f29bb39f6af0e",
+    "src/graph.rs": "e9ee87eb10064ee916fd63b2c316500e961aee3ff965d6d5000a07c9cfb9be18",
+    "src/lib.rs": "b9b2c92ab0393fedbd850f7650ac7a8735f19bd276f451768dc7eb766660fd12",
+    "src/publication.rs": "ebe51bca27e1d53136c2cde1c37d6fcceb4c58aaef898ef1ffb7a54439d0443e",
+    "tests/concurrency.rs": "c823a2d14f0749ee356320c53395249a9c4ae3bf44f061a8700dc65c9e26dd82",
+    "tests/interruptions.rs": "3445fcb90de3310442fd8422bbfe021af04fe8a28a4459b570f5843bc1fa2192",
+    "tests/publication.rs": "f4cfc648794e957ee309f44ea63f9600237208a86903f4fbe464c5adf08f3a9a",
+    "tests/support/mod.rs": "8c02ad9a5861b7fd20c9c4bdaab0818f17113fc8cde90f8c3e87070f77137724",
+    "../storage-build/Cargo.lock": "1554c44255045d2e9a9036919d9dccd5073fe56e0a447c91bfa5b8d2a202019f",
+    "../storage-build/Cargo.toml": "f935a2f597816c0bc7a0409e6eadd13384253f1f417a6c4213cd7bedf613c890",
+    "../storage-build/run.py": "93d281e18e1173e89d2a7f13cbedcc16dfcc1b220ab3ea0a064535b929466c7f",
+    "../storage-build/rust-toolchain.toml": "7d21c66a15f41bad66b82ed06a289f5dc8a6e3751951d2696bbf20ce296f2b0f",
+    "../storage-build/src/lib.rs": "914e704f985a15caa30d607e454b8acb71e157cad627bc564dba8254a319c31c"
+  },
+  "vec1_library_sha256": "28b045a63f84a6dd67f0c4f4da68d00be03a2af598a60c5e7972aa60f3b08536",
+  "finished_utc": "2026-10-21T14:54:05.874650+00:00"
+}

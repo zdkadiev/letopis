@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/runtime/negative_controls.py", line 122, in <module>
+    main()
+  File "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/runtime/negative_controls.py", line 118, in main
+    check_mutations(work, evidence, env)
+  File "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/runtime/negative_controls.py", line 89, in check_mutations
+    raise RuntimeError(f"{name}: expected assertion was not detected")
+RuntimeError: unlink-held-file: expected assertion was not detected
+unguarded-drain: DETECTED (ten_probe_winners_admit_one_drain)
+pid-file-ownership: DETECTED (dead_owners_and_stale_pids_do_not_block)

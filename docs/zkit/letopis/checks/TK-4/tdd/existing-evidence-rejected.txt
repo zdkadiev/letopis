@@ -1,0 +1,1 @@
+TK-4 failed: [Errno 17] File exists: '/Users/zdkadiev/.codex/worktrees/tk-4/letopis/docs/zkit/letopis/checks/TK-4/macos-arm64'

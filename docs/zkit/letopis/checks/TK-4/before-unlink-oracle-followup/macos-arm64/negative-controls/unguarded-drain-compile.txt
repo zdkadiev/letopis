@@ -1,0 +1,44 @@
+   Compiling libc v0.2.191
+   Compiling version_check v0.9.5
+   Compiling find-msvc-tools v0.1.15
+   Compiling shlex v2.0.1
+   Compiling proc-macro2 v1.0.107
+   Compiling pkg-config v0.3.34
+   Compiling typenum v1.20.1
+   Compiling vcpkg v0.2.15
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.27
+   Compiling bitflags v2.13.2
+   Compiling serde_core v1.0.228
+   Compiling cfg-if v1.0.5
+   Compiling smallvec v1.16.3
+   Compiling serde v1.0.228
+   Compiling serde_json v1.0.145
+   Compiling fallible-iterator v0.3.0
+   Compiling cc v1.9.0
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling ryu v1.0.23
+   Compiling generic-array v0.14.7
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling rustix v1.1.5
+   Compiling getrandom v0.3.4
+   Compiling once_cell v1.21.4
+   Compiling fastrand v2.5.0
+   Compiling libsqlite3-sys v0.38.2
+   Compiling syn v2.0.119
+   Compiling serde_derive v1.0.228
+   Compiling cpufeatures v0.2.17
+   Compiling errno v0.3.14
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling tempfile v3.23.0
+   Compiling rusqlite v0.40.2
+   Compiling letopis-storage-build v0.0.0 (/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-0g0d3g7r/tests/storage-build)
+   Compiling letopis-publication-checks v0.0.0 (/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-0g0d3g7r/tests/publication)
+   Compiling letopis-embedding-checks v0.0.0 (/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-0g0d3g7r/tests/embedding)
+   Compiling letopis-runtime-checks v0.0.0 (/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-0g0d3g7r/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.70s
+  Executable tests/contention.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-0g0d3g7r/target/debug/deps/contention-9c434ba3a8be66a2)

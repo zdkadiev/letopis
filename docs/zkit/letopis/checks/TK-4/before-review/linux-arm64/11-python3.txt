@@ -1,0 +1,243 @@
+$ rustc --version --verbose
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: aarch64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+$ cargo --version
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+$ cc --version
+cc (Debian 12.2.0-14+deb12u1) 12.2.0
+Copyright (C) 2022 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+$ cargo metadata --locked --format-version 1
+Cargo metadata saved in 04-cargo.txt
+$ cc -O2 -DNDEBUG -fPIC -shared -I /task-cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libsqlite3-sys-0.38.2/sqlite3 /repo/tests/embedding/.build/vec1.c -o /repo/tests/embedding/.build/native-zp22deqw/vec1.so -pthread -lm
+$ cargo run --locked --bin embedder -- --versions
+   Compiling version_check v0.9.5
+   Compiling shlex v2.0.1
+   Compiling proc-macro2 v1.0.107
+   Compiling find-msvc-tools v0.1.15
+   Compiling pkg-config v0.3.34
+   Compiling quote v1.0.47
+   Compiling typenum v1.20.1
+   Compiling cc v1.9.0
+   Compiling vcpkg v0.2.15
+   Compiling generic-array v0.14.7
+   Compiling unicode-ident v1.0.27
+   Compiling serde_core v1.0.228
+   Compiling libc v0.2.191
+   Compiling fallible-iterator v0.3.0
+   Compiling serde_json v1.0.145
+   Compiling bitflags v2.13.2
+   Compiling smallvec v1.16.3
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling serde v1.0.228
+   Compiling syn v2.0.119
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling libsqlite3-sys v0.38.2
+   Compiling digest v0.10.7
+   Compiling cfg-if v1.0.5
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling ryu v1.0.23
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling serde_derive v1.0.228
+   Compiling rusqlite v0.40.2
+   Compiling letopis-storage-build v0.0.0 (/repo/tests/storage-build)
+   Compiling letopis-publication-checks v0.0.0 (/repo/tests/publication)
+   Compiling letopis-embedding-checks v0.0.0 (/repo/tests/embedding)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.69s
+     Running `target/linux-aarch64/debug/embedder --versions`
+SQLite 3.53.2; vec1 version 0.8 (NEON, multi-threaded)
+$ cargo test --locked -- --nocapture
+   Compiling bitflags v2.13.2
+   Compiling getrandom v0.3.4
+   Compiling rustix v1.1.5
+   Compiling linux-raw-sys v0.12.1
+   Compiling once_cell v1.21.4
+   Compiling fastrand v2.5.0
+   Compiling rusqlite v0.40.2
+   Compiling letopis-storage-build v0.0.0 (/repo/tests/storage-build)
+   Compiling letopis-publication-checks v0.0.0 (/repo/tests/publication)
+   Compiling letopis-embedding-checks v0.0.0 (/repo/tests/embedding)
+   Compiling tempfile v3.23.0
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.79s
+     Running unittests src/lib.rs (target/linux-aarch64/debug/deps/letopis_embedding_checks-71cf39b46cd09f01)
+     Running unittests src/bin/embedder.rs (target/linux-aarch64/debug/deps/embedder-8ec22e2ea1dc4e4b)
+     Running tests/drain.rs (target/linux-aarch64/debug/deps/drain-807e006bb73e8e43)
+     Running tests/snapshots.rs (target/linux-aarch64/debug/deps/snapshots-f47f2956cab0a593)
+   Doc-tests letopis_embedding_checks
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test stale_before_compute_spends_no_attempt ... ok
+restart selected max_retries=0: 2 SIGKILL cuts, durable budget PASS
+test same_text_is_shared_and_sources_are_not_work ... ok
+test late_result_never_represents_new_text ... ok
+restart reserved max_retries=0: 1 SIGKILL cuts, durable budget PASS
+restart before_request max_retries=0: 1 SIGKILL cuts, durable budget PASS
+restart after_response max_retries=0: 1 SIGKILL cuts, durable budget PASS
+restart store_key max_retries=0: 1 SIGKILL cuts, durable budget PASS
+test errors_and_invalid_vectors_consume_budget ... ok
+restart store_vector max_retries=0: 1 SIGKILL cuts, durable budget PASS
+test config_change_rejects_stale_reservation_success_and_error ... ok
+restart before_store_commit max_retries=0: 1 SIGKILL cuts, durable budget PASS
+restart after_store_commit max_retries=0: 1 SIGKILL cuts, durable budget PASS
+restart selected max_retries=2: 2 SIGKILL cuts, durable budget PASS
+restart reserved max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart before_request max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart after_response max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart store_key max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart store_vector max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart before_store_commit max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart after_store_commit max_retries=2: 1 SIGKILL cuts, durable budget PASS
+test restart_respects_attempt_budget ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s
+
+
+running 5 tests
+test reset_rollback_preserves_old_and_fresh_views ... ok
+test attached_vec1_round_trip_and_dimension_rejection ... ok
+test pinned_reader_survives_dimension_reset ... ok
+test late_vector_snapshot_checks_identity ... ok
+test reservation_is_durable_and_exhaustion_excludes_work ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ /usr/bin/python3 -B -m unittest discover -s tests -p test_processes.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 5.300s
+
+OK
+$ cargo fmt -- --check
+$ cargo clippy --locked --all-targets -- -D warnings
+    Checking typenum v1.20.1
+    Checking libc v0.2.191
+    Checking bitflags v2.13.2
+    Checking cfg-if v1.0.5
+    Checking serde_core v1.0.228
+    Checking libsqlite3-sys v0.38.2
+    Checking fallible-iterator v0.3.0
+    Checking fallible-streaming-iterator v0.1.9
+    Checking smallvec v1.16.3
+    Checking memchr v2.8.3
+    Checking ryu v1.0.23
+    Checking itoa v1.0.18
+    Checking linux-raw-sys v0.12.1
+    Checking rusqlite v0.40.2
+    Checking fastrand v2.5.0
+    Checking once_cell v1.21.4
+    Checking rustix v1.1.5
+    Checking generic-array v0.14.7
+    Checking cpufeatures v0.2.17
+    Checking getrandom v0.3.4
+    Checking letopis-storage-build v0.0.0 (/repo/tests/storage-build)
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking serde v1.0.228
+    Checking serde_json v1.0.145
+    Checking tempfile v3.23.0
+    Checking letopis-publication-checks v0.0.0 (/repo/tests/publication)
+    Checking letopis-embedding-checks v0.0.0 (/repo/tests/embedding)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.14s
+$ /usr/bin/python3 -B /repo/tests/publication/run.py --evidence /repo/docs/zkit/letopis/checks/TK-4/linux-arm64/tk3-regression/tk2-regression
+without_losing_existing_rows ... ok
+test fts_contentless_delete_and_committed_writes_survive_reopen ... ok
+test vectors_use_cosine_distance_and_persist_committed_changes ... ok
+test fts_and_vectors_commit_and_roll_back_together ... ok
+test fts_insert_update_delete_roll_back_explicitly_and_on_drop ... ok
+test vector_insert_update_delete_roll_back_explicitly_and_on_drop ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ cargo run --locked --example check -- /repo/tests/storage-build/.build/tk1-3re40rmw/supported.db /repo/tests/storage-build/.build/tk1-3re40rmw/vec1.so
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running `target/linux-aarch64/debug/examples/check /repo/tests/storage-build/.build/tk1-3re40rmw/supported.db /repo/tests/storage-build/.build/tk1-3re40rmw/vec1.so`
+SQLite 3.53.2 / version 0.8 (NEON, multi-threaded): supported
+$ cargo run --locked --example check -- /repo/tests/storage-build/.build/tk1-3re40rmw/missing.db /repo/tests/storage-build/.build/tk1-3re40rmw/absent
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running `target/linux-aarch64/debug/examples/check /repo/tests/storage-build/.build/tk1-3re40rmw/missing.db /repo/tests/storage-build/.build/tk1-3re40rmw/absent`
+unsupported storage build: vec1 extension could not be loaded: /repo/tests/storage-build/.build/tk1-3re40rmw/absent.so: cannot open shared object file: No such file or directory
+$ cargo run --locked --example check -- /repo/tests/storage-build/.build/tk1-3re40rmw/invalid.db /repo/tests/storage-build/.build/tk1-3re40rmw/invalid.so
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running `target/linux-aarch64/debug/examples/check /repo/tests/storage-build/.build/tk1-3re40rmw/invalid.db /repo/tests/storage-build/.build/tk1-3re40rmw/invalid.so`
+unsupported storage build: vec1 extension could not be loaded: /repo/tests/storage-build/.build/tk1-3re40rmw/invalid.so.so: cannot open shared object file: No such file or directory
+$ cargo run --locked --example check -- /repo/tests/storage-build/.build/tk1-3re40rmw/nofts.db /repo/tests/storage-build/.build/tk1-3re40rmw/vec1.so
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.15
+   Compiling pkg-config v0.3.34
+   Compiling vcpkg v0.2.15
+   Compiling bitflags v2.13.2
+   Compiling libc v0.2.191
+   Compiling getrandom v0.3.4
+   Compiling cc v1.9.0
+   Compiling rustix v1.1.5
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling cfg-if v1.0.5
+   Compiling smallvec v1.16.3
+   Compiling fallible-iterator v0.3.0
+   Compiling linux-raw-sys v0.12.1
+   Compiling once_cell v1.21.4
+   Compiling fastrand v2.5.0
+   Compiling libsqlite3-sys v0.38.2
+   Compiling tempfile v3.23.0
+   Compiling rusqlite v0.40.2
+   Compiling letopis-storage-build v0.0.0 (/repo/tests/storage-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.67s
+     Running `target/linux-aarch64-nofts/debug/examples/check /repo/tests/storage-build/.build/tk1-3re40rmw/nofts.db /repo/tests/storage-build/.build/tk1-3re40rmw/vec1.so`
+unsupported storage build: FTS5 contentless-delete is required: no such module: fts5
+$ cargo fmt -- --check
+$ cargo clippy --locked --all-targets -- -D warnings
+    Checking bitflags v2.13.2
+    Checking linux-raw-sys v0.12.1
+    Checking fallible-iterator v0.3.0
+    Checking libc v0.2.191
+    Checking fallible-streaming-iterator v0.1.9
+    Checking cfg-if v1.0.5
+    Checking libsqlite3-sys v0.38.2
+    Checking smallvec v1.16.3
+    Checking fastrand v2.5.0
+    Checking once_cell v1.21.4
+    Checking rustix v1.1.5
+    Checking rusqlite v0.40.2
+    Checking getrandom v0.3.4
+    Checking letopis-storage-build v0.0.0 (/repo/tests/storage-build)
+    Checking tempfile v3.23.0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.68s
+TK-1 PASS: /repo/docs/zkit/letopis/checks/TK-4/linux-arm64/tk3-regression/tk2-regression/tk1-regression
+$ /usr/bin/python3 -B /repo/docs/zkit/letopis/roadmap/schedule.py --check
+{"tasks": 45, "hours": 329, "task_cards": 45, "weeks": 33, "max_week_hours": 10, "last_week_hours": 9, "terminal": "TK-45", "dependency_errors": 0, "phase_gate_errors": 0, "unscheduled_tasks": 0, "runtime_calls": 0, "measurements": 0}
+TK-2 PASS: /repo/docs/zkit/letopis/checks/TK-4/linux-arm64/tk3-regression/tk2-regression
+$ /usr/bin/python3 -B /repo/docs/zkit/letopis/roadmap/schedule.py --check
+{"tasks": 45, "hours": 329, "task_cards": 45, "weeks": 33, "max_week_hours": 10, "last_week_hours": 9, "terminal": "TK-45", "dependency_errors": 0, "phase_gate_errors": 0, "unscheduled_tasks": 0, "runtime_calls": 0, "measurements": 0}
+TK-3 PASS: /repo/docs/zkit/letopis/checks/TK-4/linux-arm64/tk3-regression

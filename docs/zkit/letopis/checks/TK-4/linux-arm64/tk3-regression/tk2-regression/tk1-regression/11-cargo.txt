@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running `target/linux-aarch64-nofts/debug/examples/check /repo/tests/storage-build/.build/tk1-vpxxq7fp/nofts.db /repo/tests/storage-build/.build/tk1-vpxxq7fp/vec1.so`
+unsupported storage build: FTS5 contentless-delete is required: no such module: fts5

@@ -1,0 +1,23 @@
+   Compiling letopis-runtime-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s
+     Running tests/contention.rs (tests/runtime/target/debug/deps/contention-6514e137da44ee14)
+
+running 4 tests
+test ten_commands_publish_one_delta ... ok
+Error: "checkpoint timeout (20s)"
+test ten_probe_winners_admit_one_drain ... FAILED
+Error: "checkpoint timeout (20s)"
+test launcher_exit_does_not_wait_or_leak_locks ... FAILED
+Error: "checkpoint timeout (20s)"
+test dead_owners_and_stale_pids_do_not_block ... FAILED
+
+failures:
+
+failures:
+    dead_owners_and_stale_pids_do_not_block
+    launcher_exit_does_not_wait_or_leak_locks
+    ten_probe_winners_admit_one_drain
+
+test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.83s
+
+error: test failed, to rerun pass `--test contention`

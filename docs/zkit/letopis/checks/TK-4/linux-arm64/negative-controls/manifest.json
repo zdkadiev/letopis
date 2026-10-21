@@ -1,0 +1,248 @@
+{
+  "result": "PASS",
+  "cases": [
+    {
+      "name": "unguarded-drain",
+      "file": "src/launch.rs",
+      "original_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35",
+      "test": "ten_probe_winners_admit_one_drain",
+      "mutated_sha256": "f6ed8e03d91cacaa6b92b956e786212215afe3358bae1844ec3daa8b54ed9940",
+      "compile_argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "--no-run"
+      ],
+      "compile_exit": 0,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "ten_probe_winners_admit_one_drain",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "invariant": "assertion failed: held",
+      "accepted_invariants": [
+        "assertion failed: held"
+      ],
+      "result": "DETECTED",
+      "restored_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35"
+    },
+    {
+      "name": "pid-file-ownership",
+      "file": "src/launch.rs",
+      "original_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35",
+      "test": "dead_owners_and_stale_pids_do_not_block",
+      "mutated_sha256": "924c8ff37c39d2498257b959d9afaf3150a4cf5d9e8e9ebb8854f5edba5a46fc",
+      "compile_argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "--no-run"
+      ],
+      "compile_exit": 0,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "dead_owners_and_stale_pids_do_not_block",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "invariant": "PID contents blocked free kernel lease",
+      "accepted_invariants": [
+        "PID contents blocked free kernel lease"
+      ],
+      "result": "DETECTED",
+      "restored_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35"
+    },
+    {
+      "name": "unlink-held-file",
+      "file": "src/launch.rs",
+      "original_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35",
+      "test": "ten_probe_winners_admit_one_drain",
+      "mutated_sha256": "c7e7714526b01b7ae076eeb95a1aade040f8f1aa925c4c501586348b210aa00d",
+      "compile_argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "--no-run"
+      ],
+      "compile_exit": 0,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "ten_probe_winners_admit_one_drain",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "invariant": "assertion failed: held",
+      "accepted_invariants": [
+        "assertion failed: held",
+        "second active drain"
+      ],
+      "result": "DETECTED",
+      "restored_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35"
+    },
+    {
+      "name": "group-signal",
+      "file": "tests/support/mod.rs",
+      "original_sha256": "e62fc9f06e4fe69479dd4c288fa3c0cc635695d42f5d58be007f63b1296f0736",
+      "test": "sigint_waiter_leaves_owner_and_drain_alive",
+      "mutated_sha256": "ad0d862428911c8b67fbc9dee2c9cc5fedbd4847532963d41913d99fa8dd9628",
+      "compile_argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "cancellation",
+        "--no-run"
+      ],
+      "compile_exit": 0,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "cancellation",
+        "sigint_waiter_leaves_owner_and_drain_alive",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "invariant": "SIGINT waiter killed foreign publication owner",
+      "accepted_invariants": [
+        "SIGINT waiter killed foreign publication owner"
+      ],
+      "result": "DETECTED",
+      "restored_sha256": "e62fc9f06e4fe69479dd4c288fa3c0cc635695d42f5d58be007f63b1296f0736"
+    },
+    {
+      "name": "inherited-session",
+      "file": "src/launch.rs",
+      "original_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35",
+      "test": "launcher_exit_does_not_wait_or_leak_locks",
+      "mutated_sha256": "26bd08eef7430c9e097e3c51e8d611f691422c1ccc4168374c976ccabb3b8b80",
+      "compile_argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "--no-run"
+      ],
+      "compile_exit": 0,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "launcher_exit_does_not_wait_or_leak_locks",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "invariant": "assertion `left != right` failed",
+      "accepted_invariants": [
+        "assertion `left != right` failed"
+      ],
+      "result": "DETECTED",
+      "restored_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35"
+    },
+    {
+      "name": "inherited-stdout",
+      "file": "src/launch.rs",
+      "original_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35",
+      "test": "launcher_exit_does_not_wait_or_leak_locks",
+      "mutated_sha256": "095c5a147edcfd798f73849cb8c084f78125eca295d20ec7c2db7f7fe81720a0",
+      "compile_argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "--no-run"
+      ],
+      "compile_exit": 0,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "launcher_exit_does_not_wait_or_leak_locks",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "invariant": "assertion `left == right` failed",
+      "accepted_invariants": [
+        "assertion `left == right` failed"
+      ],
+      "result": "DETECTED",
+      "restored_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35"
+    },
+    {
+      "name": "pre-flock-pause",
+      "file": "tests/cancellation.rs",
+      "original_sha256": "245c55986a52215d1bfc1026dba9752f6224a46d372ff2263a8c3b58351f1534",
+      "test": "sigint_inside_blocking_flock_leaves_other_processes_alive",
+      "mutated_sha256": "417e2eefe1436822936642d7d16dc9714c08fd4d22e003cf8d2835a216d65946",
+      "compile_argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "cancellation",
+        "--no-run"
+      ],
+      "compile_exit": 0,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "cancellation",
+        "sigint_inside_blocking_flock_leaves_other_processes_alive",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "invariant": "waiter never entered blocking flock",
+      "accepted_invariants": [
+        "waiter never entered blocking flock"
+      ],
+      "result": "DETECTED",
+      "restored_sha256": "245c55986a52215d1bfc1026dba9752f6224a46d372ff2263a8c3b58351f1534"
+    }
+  ],
+  "disposable_workspace": "/tmp/tk4-mutants-_rz_gdyk/tests/runtime",
+  "build_target": "/tmp/tk4-mutants-_rz_gdyk/target",
+  "nested_commands_inherit_group": true,
+  "restored_suite_exit": 0
+}

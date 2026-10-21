@@ -1,0 +1,58 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test sigint_after_commit_keeps_new_cache ... ok
+test sigint_waiter_leaves_owner_and_drain_alive ... ok
+test failed_or_lost_spawn_keeps_work_recoverable ... ok
+test sigint_before_commit_keeps_exact_cache ... ok
+flock-observation:publish-before-flock-:/Users/zdkadiev/.codex/worktrees/tk-4/letopis/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-macos-oracle-fixed/flock-observations/publish-before-flock-OfEDO2.txt
+flock-observation:publish-inside-flock-:/Users/zdkadiev/.codex/worktrees/tk-4/letopis/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-macos-oracle-fixed/flock-observations/publish-inside-flock-xPOTzi.txt
+flock-observation:reindex-before-flock-:/Users/zdkadiev/.codex/worktrees/tk-4/letopis/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-macos-oracle-fixed/flock-observations/reindex-before-flock-HCshq6.txt
+flock-observation:reindex-inside-flock-:/Users/zdkadiev/.codex/worktrees/tk-4/letopis/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-macos-oracle-fixed/flock-observations/reindex-inside-flock-VurELl.txt
+test sigint_inside_blocking_flock_leaves_other_processes_alive ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s
+
+
+running 5 tests
+test expired_or_mislabelled_event_never_signals_pid ... ok
+test launcher_exit_does_not_wait_or_leak_locks ... ok
+test dead_owners_and_stale_pids_do_not_block ... ok
+test ten_probe_winners_admit_one_drain ... ok
+test ten_commands_publish_one_delta ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Compiling letopis-runtime-checks v0.0.0 (/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-37uc6bvo/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.39s
+     Running unittests src/lib.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-37uc6bvo/target/debug/deps/letopis_runtime_checks-4b8d03f297259ebe)
+     Running unittests ../embedding/src/bin/embedder.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-37uc6bvo/target/debug/deps/embedder-a09d56a2c091f5b5)
+     Running unittests ../publication/src/bin/publisher.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-37uc6bvo/target/debug/deps/publisher-8c041ea5d89ce9bc)
+     Running unittests src/bin/runtime.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-37uc6bvo/target/debug/deps/runtime-abb8c94f0731c413)
+     Running tests/cancellation.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-37uc6bvo/target/debug/deps/cancellation-5ce5bd3b9f13679f)
+     Running tests/contention.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-37uc6bvo/target/debug/deps/contention-8f9bfd061816b97a)
+   Doc-tests letopis_runtime_checks

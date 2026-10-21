@@ -1,0 +1,3 @@
+   Compiling letopis-runtime-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.37s
+  Executable tests/cancellation.rs (target/darwin-arm64/debug/deps/cancellation-1ee9c7b33af855b6)

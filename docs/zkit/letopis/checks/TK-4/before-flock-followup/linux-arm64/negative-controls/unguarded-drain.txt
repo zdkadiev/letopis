@@ -1,0 +1,18 @@
+
+running 1 test
+test ten_probe_winners_admit_one_drain ... FAILED
+
+failures:
+
+failures:
+    ten_probe_winners_admit_one_drain
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.06s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running tests/contention.rs (/tmp/tk4-mutants-npz04fy3/target/debug/deps/contention-35d06ac3e87c490e)
+
+thread 'ten_probe_winners_admit_one_drain' (2011) panicked at tests/contention.rs:90:17:
+assertion failed: held(r, "embed.lock")?
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test contention`

@@ -1,0 +1,18 @@
+
+running 1 test
+test dead_owners_and_stale_pids_do_not_block ... FAILED
+
+failures:
+
+failures:
+    dead_owners_and_stale_pids_do_not_block
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.08s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/contention.rs (/tmp/tk4-mutants-npz04fy3/target/debug/deps/contention-35d06ac3e87c490e)
+
+thread 'dead_owners_and_stale_pids_do_not_block' (2440) panicked at tests/contention.rs:144:17:
+PID contents blocked free kernel lease
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test contention`

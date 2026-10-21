@@ -1,0 +1,52 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test sigint_after_commit_keeps_new_cache ... ok
+test sigint_waiter_leaves_owner_and_drain_alive ... ok
+test failed_or_lost_spawn_keeps_work_recoverable ... ok
+test sigint_before_commit_keeps_exact_cache ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+
+running 4 tests
+test launcher_exit_does_not_wait_or_leak_locks ... ok
+test ten_commands_publish_one_delta ... ok
+test ten_probe_winners_admit_one_drain ... ok
+test dead_owners_and_stale_pids_do_not_block ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Compiling letopis-runtime-checks v0.0.0 (/repo/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.35s
+     Running unittests src/lib.rs (target/linux-aarch64/debug/deps/letopis_runtime_checks-e7ce109037e604c2)
+     Running unittests ../embedding/src/bin/embedder.rs (target/linux-aarch64/debug/deps/embedder-54d3c03964f59a87)
+     Running unittests ../publication/src/bin/publisher.rs (target/linux-aarch64/debug/deps/publisher-fca402c4128304ff)
+     Running unittests src/bin/runtime.rs (target/linux-aarch64/debug/deps/runtime-73385eeef9299fde)
+     Running tests/cancellation.rs (target/linux-aarch64/debug/deps/cancellation-07fc673e7289c66d)
+     Running tests/contention.rs (target/linux-aarch64/debug/deps/contention-903a15e171a1c22a)
+   Doc-tests letopis_runtime_checks

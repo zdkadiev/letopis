@@ -1,0 +1,57 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/darwin-arm64/debug/deps/letopis_runtime_checks-0e265aa306c08e1b)
+     Running unittests ../embedding/src/bin/embedder.rs (target/darwin-arm64/debug/deps/embedder-a28436d75ffbf2df)
+     Running unittests ../publication/src/bin/publisher.rs (target/darwin-arm64/debug/deps/publisher-d6b622f7ffe279b4)
+     Running unittests src/bin/runtime.rs (target/darwin-arm64/debug/deps/runtime-e8a67b33dae30b1a)
+     Running tests/cancellation.rs (target/darwin-arm64/debug/deps/cancellation-1ee9c7b33af855b6)
+     Running tests/contention.rs (target/darwin-arm64/debug/deps/contention-6514e137da44ee14)
+   Doc-tests letopis_runtime_checks
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test sigint_after_commit_keeps_new_cache ... ok
+test sigint_waiter_leaves_owner_and_drain_alive ... ok
+test failed_or_lost_spawn_keeps_work_recoverable ... ok
+test sigint_before_commit_keeps_exact_cache ... ok
+flock-observation:publish-before-flock-:/Users/zdkadiev/.codex/worktrees/tk-4/letopis/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-macos-oracle-fixed/flock-observations/publish-before-flock-d2u3ZX.txt
+flock-observation:publish-inside-flock-:/Users/zdkadiev/.codex/worktrees/tk-4/letopis/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-macos-oracle-fixed/flock-observations/publish-inside-flock-s7zgE1.txt
+flock-observation:reindex-before-flock-:/Users/zdkadiev/.codex/worktrees/tk-4/letopis/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-macos-oracle-fixed/flock-observations/reindex-before-flock-ZHWO04.txt
+flock-observation:reindex-inside-flock-:/Users/zdkadiev/.codex/worktrees/tk-4/letopis/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-macos-oracle-fixed/flock-observations/reindex-inside-flock-fot1LA.txt
+test sigint_inside_blocking_flock_leaves_other_processes_alive ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.03s
+
+
+running 5 tests
+test expired_or_mislabelled_event_never_signals_pid ... ok
+test launcher_exit_does_not_wait_or_leak_locks ... ok
+test dead_owners_and_stale_pids_do_not_block ... ok
+test ten_commands_publish_one_delta ... ok
+test ten_probe_winners_admit_one_drain ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

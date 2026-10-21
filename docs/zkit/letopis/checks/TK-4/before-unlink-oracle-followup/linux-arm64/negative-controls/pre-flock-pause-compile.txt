@@ -1,0 +1,3 @@
+   Compiling letopis-runtime-checks v0.0.0 (/tmp/tk4-mutants-15ugk98l/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+  Executable tests/cancellation.rs (/tmp/tk4-mutants-15ugk98l/target/debug/deps/cancellation-ef1eed9972b7f009)

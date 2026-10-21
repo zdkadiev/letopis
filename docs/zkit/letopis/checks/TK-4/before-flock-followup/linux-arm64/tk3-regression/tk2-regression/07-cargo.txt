@@ -1,0 +1,77 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running unittests src/lib.rs (target/linux-aarch64/debug/deps/letopis_publication_checks-0a397e4b4a321fa6)
+     Running unittests src/bin/publisher.rs (target/linux-aarch64/debug/deps/publisher-eae0a7b1c062b192)
+     Running tests/concurrency.rs (target/linux-aarch64/debug/deps/concurrency-b9057c16a57fef20)
+     Running tests/interruptions.rs (target/linux-aarch64/debug/deps/interruptions-614e0b645cf52a27)
+     Running tests/publication.rs (target/linux-aarch64/debug/deps/publication-649cc074983e3daa)
+   Doc-tests letopis_publication_checks
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test killed_lock_owner_does_not_block_next_process ... ok
+test reindex_serializes_with_publish ... ok
+test same_delta_is_not_published_twice ... ok
+test competing_config_resets_recheck_identity ... ok
+test config_formatting_does_not_reset_vectors ... ok
+test waiting_publisher_redetects_after_agent_edit ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+
+running 3 tests
+publication detected: committed oracle and next-call convergence PASS
+reindex locked: old reader, committed oracle and retry PASS
+config reset reset_detected: vector oracle, cache isolation and retry PASS
+reindex redetected: old reader, committed oracle and retry PASS
+publication locked: committed oracle and next-call convergence PASS
+reindex begun: old reader, committed oracle and retry PASS
+publication redetected: committed oracle and next-call convergence PASS
+config reset reset_begun: vector oracle, cache isolation and retry PASS
+reindex cleared: old reader, committed oracle and retry PASS
+publication begun: committed oracle and next-call convergence PASS
+config reset reset_cleared: vector oracle, cache isolation and retry PASS
+reindex projections: old reader, committed oracle and retry PASS
+publication cleared: committed oracle and next-call convergence PASS
+publication projections: committed oracle and next-call convergence PASS
+reindex fts: old reader, committed oracle and retry PASS
+config reset reset_identity: vector oracle, cache isolation and retry PASS
+publication fts: committed oracle and next-call convergence PASS
+reindex fingerprints: old reader, committed oracle and retry PASS
+config reset reset_before_commit: vector oracle, cache isolation and retry PASS
+reindex before_commit: old reader, committed oracle and retry PASS
+publication fingerprints: committed oracle and next-call convergence PASS
+publication before_commit: committed oracle and next-call convergence PASS
+reindex after_commit: old reader, committed oracle and retry PASS
+test reindex_crash_matrix ... ok
+config reset reset_after_commit: vector oracle, cache isolation and retry PASS
+test config_reset_crash_matrix ... ok
+publication after_commit: committed oracle and next-call convergence PASS
+test publication_crash_matrix ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+
+running 6 tests
+test new_deleted_and_renamed_files_update_fts ... ok
+test same_tick_same_size_edit_is_hashed ... ok
+test fixed_and_deleted_files_clear_errors ... ok
+test declared_edges_follow_target_lifecycle_and_cycles_terminate ... ok
+test valid_delta_publishes_beside_invalid_file ... ok
+test unchanged_invocation_is_a_noop ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,3 @@
+   Compiling letopis-runtime-checks v0.0.0 (/repo/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.65s
+  Executable tests/contention.rs (target/linux-aarch64/debug/deps/contention-903a15e171a1c22a)

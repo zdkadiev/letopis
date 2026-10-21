@@ -1,0 +1,12 @@
+   Compiling letopis-runtime-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running tests/contention.rs (tests/runtime/target/debug/deps/contention-6514e137da44ee14)
+
+running 4 tests
+test ten_commands_publish_one_delta ... ok
+test launcher_exit_does_not_wait_or_leak_locks ... ok
+test ten_probe_winners_admit_one_drain ... ok
+test dead_owners_and_stale_pids_do_not_block ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+

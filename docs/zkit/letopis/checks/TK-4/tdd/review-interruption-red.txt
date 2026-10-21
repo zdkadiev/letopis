@@ -1,0 +1,21 @@
+{"changed_sources": ["src/launch.rs"], "nested_command_eof": false, "runner_exit": -2, "nested_group": 9774, "mutation_group": 9773}
+F
+======================================================================
+FAIL: test_outer_interrupt_keeps_sources_and_terminates_nested_command (test_interruptions.Interruption.test_outer_interrupt_keeps_sources_and_terminates_nested_command)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/runtime/tests/test_interruptions.py", line 60, in test_outer_interrupt_keeps_sources_and_terminates_nested_command
+    self.assertEqual(changed, [], "outer interruption left a mutant in original sources")
+AssertionError: Lists differ: ['src/launch.rs'] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+'src/launch.rs'
+
+- ['src/launch.rs']
++ [] : outer interruption left a mutant in original sources
+
+----------------------------------------------------------------------
+Ran 1 test in 14.903s
+
+FAILED (failures=1)

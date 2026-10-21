@@ -1,0 +1,19 @@
+
+running 1 test
+flock-observation:publish-before-flock-:/repo/docs/zkit/letopis/checks/TK-4/linux-arm64/flock-observations/publish-before-flock-L0G6AI.txt
+test sigint_inside_blocking_flock_leaves_other_processes_alive ... FAILED
+
+failures:
+
+failures:
+    sigint_inside_blocking_flock_leaves_other_processes_alive
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 5.04s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/cancellation.rs (/tmp/tk4-mutants-15ugk98l/target/debug/deps/cancellation-ef1eed9972b7f009)
+
+thread 'sigint_inside_blocking_flock_leaves_other_processes_alive' (4321) panicked at tests/support/mod.rs:419:13:
+waiter never entered blocking flock: {"index_fd":null,"pid":4324,"same_lock_inode":false,"syscall":"207 0x3 0xb1fc05b46ee0 0x2000 0x0 0x0 0x0 0xfffff5116000 0xe834ece4e218\n","wchan":"unix_stream_data_wait"}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test cancellation`

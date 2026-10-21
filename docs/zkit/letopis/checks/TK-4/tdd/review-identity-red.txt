@@ -1,0 +1,19 @@
+   Compiling letopis-runtime-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.84s
+     Running tests/contention.rs (tests/runtime/target/debug/deps/contention-6514e137da44ee14)
+
+running 1 test
+
+thread 'expired_or_mislabelled_event_never_signals_pid' (7877771) panicked at tests/contention.rs:243:5:
+disconnected event attempted numeric-PID signal
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test expired_or_mislabelled_event_never_signals_pid ... FAILED
+
+failures:
+
+failures:
+    expired_or_mislabelled_event_never_signals_pid
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.42s
+
+error: test failed, to rerun pass `--test contention`

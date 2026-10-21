@@ -1,0 +1,48 @@
+{
+  "platforms": [
+    {
+      "platform": "macos-arm64",
+      "system": "macOS-26.6.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "result": "PASS",
+      "input_files": 60,
+      "source_hash_mismatches": [],
+      "commands": 13,
+      "rust_tests": 10,
+      "python_interruption_tests": 1,
+      "mutations_detected": 7,
+      "flock_observations": 9
+    },
+    {
+      "platform": "linux-arm64",
+      "system": "Linux-7.0.0-22-generic-aarch64-with-glibc2.36",
+      "machine": "aarch64",
+      "result": "PASS",
+      "input_files": 60,
+      "source_hash_mismatches": [],
+      "commands": 13,
+      "rust_tests": 10,
+      "python_interruption_tests": 1,
+      "mutations_detected": 7,
+      "flock_observations": 9
+    }
+  ],
+  "same_inputs": true,
+  "legacy_sources_unchanged": true,
+  "review": {
+    "important_fixed": 2,
+    "minor_deferred": 0,
+    "minor_closed_by_user_followup": 1,
+    "second_review": false
+  },
+  "pre_integration_oracle_followup": {
+    "root_cause": "unlink-held-file can correctly fail either held-lock or second-active-drain assertion first; runner previously accepted only the former",
+    "fix": "Two exact accepted assertion signatures for this mutation only; record actual matched signature; compile failures and unrelated test failures rejected",
+    "red": "tdd/unlink-oracle-red/",
+    "both_platforms_after_fix": "PASS",
+    "second_independent_review": false
+  },
+  "base_commit": "c8f414b6e0f739015728b62cccbecbfc54deafd8",
+  "delivery": "User requested commit and local merge into main; commit hashes and merged-result checks recorded separately in Git and shared Engram; no push or GitHub closure.",
+  "verified_utc": "2026-10-21T14:55:04.322062+00:00"
+}

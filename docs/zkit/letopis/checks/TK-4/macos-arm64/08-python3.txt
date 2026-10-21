@@ -1,0 +1,7 @@
+unguarded-drain: DETECTED (ten_probe_winners_admit_one_drain)
+pid-file-ownership: DETECTED (dead_owners_and_stale_pids_do_not_block)
+unlink-held-file: DETECTED (ten_probe_winners_admit_one_drain)
+group-signal: DETECTED (sigint_waiter_leaves_owner_and_drain_alive)
+inherited-session: DETECTED (launcher_exit_does_not_wait_or_leak_locks)
+inherited-stdout: DETECTED (launcher_exit_does_not_wait_or_leak_locks)
+pre-flock-pause: DETECTED (sigint_inside_blocking_flock_leaves_other_processes_alive)

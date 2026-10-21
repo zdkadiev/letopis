@@ -1,0 +1,1 @@
+{"index_fd":"/tmp/.tmp7Q0MN0/.letopis/index.lock","pid":4739,"same_lock_inode":true,"syscall":"32 0x7 0x2 0x0 0x0 0x0 0xffffc626fa90 0xffffc6270a70 0xfb495435e24c\n","wchan":"locks_lock_inode_wait"}

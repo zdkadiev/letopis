@@ -1,0 +1,1 @@
+Historical PASS receipts after the two Important fixes, before the user requested closing the remaining in-syscall SIGINT gap. They cover nine Rust tests, one Python interruption regression and six negative controls. Their input hashes are historical; the current platform receipts one directory above supersede them.

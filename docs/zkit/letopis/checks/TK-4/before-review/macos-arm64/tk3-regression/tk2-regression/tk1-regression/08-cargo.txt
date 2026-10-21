@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/darwin-arm64/debug/examples/check /Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/storage-build/.build/tk1-be6ok5zv/supported.db /Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/storage-build/.build/tk1-be6ok5zv/vec1.dylib`
+SQLite 3.53.2 / version 0.8 (NEON, multi-threaded): supported

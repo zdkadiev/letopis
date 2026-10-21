@@ -1,0 +1,37 @@
+{
+  "platforms": [
+    {
+      "platform": "macos-arm64",
+      "system": "macOS-26.6.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "result": "PASS",
+      "input_files": 60,
+      "source_hash_mismatches": [],
+      "commands": 13,
+      "rust_tests": 9,
+      "python_interruption_tests": 1,
+      "mutations_detected": 6
+    },
+    {
+      "platform": "linux-arm64",
+      "system": "Linux-7.0.0-22-generic-aarch64-with-glibc2.36",
+      "machine": "aarch64",
+      "result": "PASS",
+      "input_files": 60,
+      "source_hash_mismatches": [],
+      "commands": 13,
+      "rust_tests": 9,
+      "python_interruption_tests": 1,
+      "mutations_detected": 6
+    }
+  ],
+  "same_inputs": true,
+  "legacy_sources_unchanged": true,
+  "review": {
+    "important_fixed": 2,
+    "minor_deferred": 1,
+    "second_review": false
+  },
+  "base_commit": "c8f414b6e0f739015728b62cccbecbfc54deafd8",
+  "delivery": "uncommitted TK-4 worktree; no merge/push/GitHub closure"
+}

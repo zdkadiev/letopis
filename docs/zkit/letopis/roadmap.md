@@ -216,7 +216,7 @@ TK-1…TK-6 — ограниченные proof harnesses, а не паралле
 
 План покрывает весь принятый scope. Условны оценки часов, доступность оборудования/весов и успешность будущих gates; конкретные sample coding-задачи выбираются в уже назначенных TK-5/TK-30 по протоколу. Реальная неисправность или отрицательное измерение могут породить исправление/перепланирование, что нельзя честно перечислить как заранее известные дефекты. Это не оставленные на потом эпики. Конечная задача TK-45 не закрывается до фактической готовности.
 
-Карточки распределены по roadmap/epics/EP-n-<slug>/tasks/TK-n-<slug>.md по [D-88](decisions.md#D-88); один файл соответствует одной задаче, у каждого эпика есть epic.md. Стандарт — [task-template.md](roadmap/task-template.md); действия/приёмка/результат/отчёт находятся в карточках. Проверки и review — [task-cards-checks.json](checks/roadmap/task-cards-checks.json) и [task-cards-review](checks/roadmap/task-cards-review-2026-10-19.md). TK-1/TK-2 — done; TK-3…TK-45 остаются planned. G-0 ещё не закрыт.
+Карточки распределены по roadmap/epics/EP-n-<slug>/tasks/TK-n-<slug>.md по [D-88](decisions.md#D-88); один файл соответствует одной задаче, у каждого эпика есть epic.md. Стандарт — [task-template.md](roadmap/task-template.md); действия/приёмка/результат/отчёт находятся в карточках. Проверки и review — [task-cards-checks.json](checks/roadmap/task-cards-checks.json) и [task-cards-review](checks/roadmap/task-cards-review-2026-10-19.md). TK-1…TK-4 — done ([TK-4 evidence](checks/TK-4/report.md)); TK-5…TK-45 остаются planned. G-0 ещё не закрыт.
 
 ## 12. Проверка согласованности
 

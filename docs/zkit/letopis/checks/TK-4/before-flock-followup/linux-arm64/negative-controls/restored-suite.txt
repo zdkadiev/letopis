@@ -1,0 +1,53 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test sigint_after_commit_keeps_new_cache ... ok
+test sigint_waiter_leaves_owner_and_drain_alive ... ok
+test failed_or_lost_spawn_keeps_work_recoverable ... ok
+test sigint_before_commit_keeps_exact_cache ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+running 5 tests
+test expired_or_mislabelled_event_never_signals_pid ... ok
+test launcher_exit_does_not_wait_or_leak_locks ... ok
+test ten_probe_winners_admit_one_drain ... ok
+test ten_commands_publish_one_delta ... ok
+test dead_owners_and_stale_pids_do_not_block ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Compiling letopis-runtime-checks v0.0.0 (/tmp/tk4-mutants-npz04fy3/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.69s
+     Running unittests src/lib.rs (/tmp/tk4-mutants-npz04fy3/target/debug/deps/letopis_runtime_checks-46d69be0bc2497c6)
+     Running unittests ../embedding/src/bin/embedder.rs (/tmp/tk4-mutants-npz04fy3/target/debug/deps/embedder-08465be2df1f1d58)
+     Running unittests ../publication/src/bin/publisher.rs (/tmp/tk4-mutants-npz04fy3/target/debug/deps/publisher-d4bb060ccfc39633)
+     Running unittests src/bin/runtime.rs (/tmp/tk4-mutants-npz04fy3/target/debug/deps/runtime-75603634783a6a3b)
+     Running tests/cancellation.rs (/tmp/tk4-mutants-npz04fy3/target/debug/deps/cancellation-72c0c4a51737e7da)
+     Running tests/contention.rs (/tmp/tk4-mutants-npz04fy3/target/debug/deps/contention-35d06ac3e87c490e)
+   Doc-tests letopis_runtime_checks

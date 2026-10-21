@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/darwin-arm64/debug/runtime --versions`
+SQLite 3.53.2; vec1 version 0.8 (NEON, multi-threaded)

@@ -1,0 +1,58 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+flock-observation:publish-before-flock-:/repo/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-linux-oracle-fixed/flock-observations/publish-before-flock-94WPld.txt
+flock-observation:publish-inside-flock-:/repo/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-linux-oracle-fixed/flock-observations/publish-inside-flock-Q9hFZJ.txt
+test sigint_after_commit_keeps_new_cache ... ok
+test sigint_waiter_leaves_owner_and_drain_alive ... ok
+flock-observation:reindex-before-flock-:/repo/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-linux-oracle-fixed/flock-observations/reindex-before-flock-FI7i2l.txt
+flock-observation:reindex-inside-flock-:/repo/.superpowers/sdd/2026-10-21-tk-4-runtime/pre-commit-linux-oracle-fixed/flock-observations/reindex-inside-flock-hGu66i.txt
+test sigint_inside_blocking_flock_leaves_other_processes_alive ... ok
+test failed_or_lost_spawn_keeps_work_recoverable ... ok
+test sigint_before_commit_keeps_exact_cache ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 5 tests
+test expired_or_mislabelled_event_never_signals_pid ... ok
+test launcher_exit_does_not_wait_or_leak_locks ... ok
+test ten_probe_winners_admit_one_drain ... ok
+test ten_commands_publish_one_delta ... ok
+test dead_owners_and_stale_pids_do_not_block ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Compiling letopis-runtime-checks v0.0.0 (/tmp/tk4-mutants-_rz_gdyk/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+     Running unittests src/lib.rs (/tmp/tk4-mutants-_rz_gdyk/target/debug/deps/letopis_runtime_checks-92de6d69627708af)
+     Running unittests ../embedding/src/bin/embedder.rs (/tmp/tk4-mutants-_rz_gdyk/target/debug/deps/embedder-81b9ad69c3358602)
+     Running unittests ../publication/src/bin/publisher.rs (/tmp/tk4-mutants-_rz_gdyk/target/debug/deps/publisher-666437cfc8c116cf)
+     Running unittests src/bin/runtime.rs (/tmp/tk4-mutants-_rz_gdyk/target/debug/deps/runtime-ad771ba845be96a2)
+     Running tests/cancellation.rs (/tmp/tk4-mutants-_rz_gdyk/target/debug/deps/cancellation-03bb59b64e2afd0f)
+     Running tests/contention.rs (/tmp/tk4-mutants-_rz_gdyk/target/debug/deps/contention-a40de296b4edc1c9)
+   Doc-tests letopis_runtime_checks

@@ -150,6 +150,14 @@ source_snapshot знания пишет агент в метаданные ([D-9
 
 Нет общего execution timeout в 1 секунду, TTL, lifecycle-команд, TCP API, IPC и process registry. Команды letopis не меняют корпус, поэтому потеря ответа безопасна: повтор вызова идемпотентен.
 
+#### MC-5 — результаты TK-4 и передача реализации
+
+2026-10-21: [все выводы и ограничения TK-4](checks/TK-4/findings.md), [отчёт](checks/TK-4/report.md) и [ревью](checks/TK-4/review.md) дополняют исполняемую модель проверкой настоящих процессов и неизменённых TK-2/TK-3 на macOS/Linux ARM64. На каждой ОС PASS: 10 Rust tests, 1 Python interruption test, 7 compiling negative controls; совпадают все 60 входных SHA256. Проверены сериализация десяти publishers, один владелец drain после десяти успешных освобождённых probes, persistent lock после SIGKILL/stale PID, setsid/null fd 0/1/2, rollback до commit и сохранение публикации после commit. Для publish/reindex SIGINT внутри blocking flock подтверждён независимым native observer; pre-flock hook отвергается тем же oracle.
+
+Две Important-проблемы стенда исправлены: adopted peer выполняет self-SIGKILL по своему fixture connection, без сигнала по Event PID; mutation runner работает в disposable copies, вложенные команды остаются в его owned group. Это проверки harness, не продуктовый IPC. Третье, Minor, замечание о syscall boundary закрыто указанным наблюдением; второго независимого ревью нет.
+
+TK-11 переносит эти примитивы в CLI без повторного index lock вокруг TK-2 publish; TK-29 проверяет request cancellation, TK-42 — системные boundary drills. Fairness, общий liveness и concurrent orphan reclamation не доказаны. Работа в окне между последним empty query и exit drain может ждать следующего вызова. Power loss, stat-10k/RAM/latency, real provider и другие платформы сохраняют отдельные gates. G-0 остаётся открытым до TK-6.
+
 ### MC-6 — чтение, поиск и обход
 
 Search/traverse после обнаружения изменений (MC-2) открывают read-транзакцию; BEGIN и первое чтение project.revision закрепляют один read snapshot кэша; vectors.db читается в той же транзакции. Конфигурация берётся из `.letopis/config.json` и принимается, только если её identity совпадает с meta.config_identity, иначе FTS-only. Query embedding вызывается напрямую с этой конфигурацией, без write lock; при ошибке выполняется один FTS-поиск, ответ содержит предупреждение, а ошибка записывается в единственную строку vec.query_error; успешный query embedding её удаляет ([D-62](decisions.md#D-62)). Read view освобождается при результате/отмене/error.

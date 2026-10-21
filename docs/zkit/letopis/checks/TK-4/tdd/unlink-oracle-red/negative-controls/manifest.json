@@ -1,0 +1,100 @@
+{
+  "result": "FAIL",
+  "cases": [
+    {
+      "name": "unguarded-drain",
+      "file": "src/launch.rs",
+      "original_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35",
+      "test": "ten_probe_winners_admit_one_drain",
+      "mutated_sha256": "f6ed8e03d91cacaa6b92b956e786212215afe3358bae1844ec3daa8b54ed9940",
+      "compile_argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "--no-run"
+      ],
+      "compile_exit": 0,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "ten_probe_winners_admit_one_drain",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "invariant": "assertion failed: held",
+      "result": "DETECTED",
+      "restored_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35"
+    },
+    {
+      "name": "pid-file-ownership",
+      "file": "src/launch.rs",
+      "original_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35",
+      "test": "dead_owners_and_stale_pids_do_not_block",
+      "mutated_sha256": "924c8ff37c39d2498257b959d9afaf3150a4cf5d9e8e9ebb8854f5edba5a46fc",
+      "compile_argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "--no-run"
+      ],
+      "compile_exit": 0,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "dead_owners_and_stale_pids_do_not_block",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "invariant": "PID contents blocked free kernel lease",
+      "result": "DETECTED",
+      "restored_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35"
+    },
+    {
+      "name": "unlink-held-file",
+      "file": "src/launch.rs",
+      "original_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35",
+      "test": "ten_probe_winners_admit_one_drain",
+      "mutated_sha256": "c7e7714526b01b7ae076eeb95a1aade040f8f1aa925c4c501586348b210aa00d",
+      "compile_argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "--no-run"
+      ],
+      "compile_exit": 0,
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "contention",
+        "ten_probe_winners_admit_one_drain",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "invariant": "assertion failed: held",
+      "restored_sha256": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35"
+    }
+  ],
+  "disposable_workspace": "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-tiuquljh/tests/runtime",
+  "build_target": "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-tiuquljh/target",
+  "nested_commands_inherit_group": true
+}

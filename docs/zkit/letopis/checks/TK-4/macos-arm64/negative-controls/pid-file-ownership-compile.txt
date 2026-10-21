@@ -1,0 +1,3 @@
+   Compiling letopis-runtime-checks v0.0.0 (/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-37uc6bvo/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.45s
+  Executable tests/contention.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk4-mutants-37uc6bvo/target/debug/deps/contention-8f9bfd061816b97a)

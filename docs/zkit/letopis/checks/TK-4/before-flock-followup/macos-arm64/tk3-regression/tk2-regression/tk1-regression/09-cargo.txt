@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/darwin-arm64/debug/examples/check /Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/storage-build/.build/tk1-miradqfd/missing.db /Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/storage-build/.build/tk1-miradqfd/absent`
+unsupported storage build: vec1 extension could not be loaded: dlopen(/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/storage-build/.build/tk1-miradqfd/absent.dylib, 0x000A): tried: '/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/storage-build/.build/tk1-miradqfd/absent.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/Users/zdkadiev/.codex/worktrees/tk-4/letopis/tests/storage-build/.build/tk1-miradqfd/absent.dylib' (no such file

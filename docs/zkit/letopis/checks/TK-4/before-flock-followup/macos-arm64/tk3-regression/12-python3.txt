@@ -1,0 +1,1 @@
+{"tasks": 45, "hours": 329, "task_cards": 45, "weeks": 33, "max_week_hours": 10, "last_week_hours": 9, "terminal": "TK-45", "dependency_errors": 0, "phase_gate_errors": 0, "unscheduled_tasks": 0, "runtime_calls": 0, "measurements": 0}
