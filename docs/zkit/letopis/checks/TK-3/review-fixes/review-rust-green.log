@@ -1,0 +1,13 @@
+   Compiling letopis-embedding-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/embedding)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.36s
+     Running tests/drain.rs (target/darwin-arm64/debug/deps/drain-064f249bfc6ad8c9)
+
+running 6 tests
+test stale_before_compute_spends_no_attempt ... ok
+test same_text_is_shared_and_sources_are_not_work ... ok
+test late_result_never_represents_new_text ... ok
+test errors_and_invalid_vectors_consume_budget ... ok
+test config_change_rejects_stale_reservation_success_and_error ... ok
+test restart_respects_attempt_budget ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.13s

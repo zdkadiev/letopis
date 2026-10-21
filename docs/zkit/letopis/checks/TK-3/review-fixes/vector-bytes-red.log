@@ -1,0 +1,21 @@
+
+running 1 test
+test late_result_never_represents_new_text ... FAILED
+
+failures:
+
+failures:
+    late_result_never_represents_new_text
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.41s
+
+   Compiling letopis-embedding-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/embedding)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.37s
+     Running tests/drain.rs (target/darwin-arm64/debug/deps/drain-064f249bfc6ad8c9)
+
+thread 'late_result_never_represents_new_text' (6278715) panicked at tests/drain.rs:59:9:
+assertion `left == right` failed
+  left: {"8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8": [0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63]}
+ right: {"8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8": [0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0]}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test drain`

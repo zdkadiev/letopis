@@ -1,0 +1,58 @@
+   Compiling letopis-embedding-checks v0.0.0 (/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk3-review-1qz_1h75/tests/embedding)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.43s
+     Running unittests src/lib.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk3-review-1qz_1h75/target/debug/deps/letopis_embedding_checks-5c9b3feb2b13df68)
+     Running unittests src/bin/embedder.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk3-review-1qz_1h75/target/debug/deps/embedder-272542df5eb3c07c)
+     Running tests/drain.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk3-review-1qz_1h75/target/debug/deps/drain-4c92c5444db13ec5)
+     Running tests/snapshots.rs (/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk3-review-1qz_1h75/target/debug/deps/snapshots-9168a275b6559154)
+   Doc-tests letopis_embedding_checks
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test stale_before_compute_spends_no_attempt ... ok
+test same_text_is_shared_and_sources_are_not_work ... ok
+restart selected max_retries=0: 2 SIGKILL cuts, durable budget PASS
+restart reserved max_retries=0: 1 SIGKILL cuts, durable budget PASS
+test late_result_never_represents_new_text ... ok
+restart before_request max_retries=0: 1 SIGKILL cuts, durable budget PASS
+restart after_response max_retries=0: 1 SIGKILL cuts, durable budget PASS
+restart store_key max_retries=0: 1 SIGKILL cuts, durable budget PASS
+test config_change_rejects_stale_reservation_success_and_error ... ok
+test errors_and_invalid_vectors_consume_budget ... ok
+restart store_vector max_retries=0: 1 SIGKILL cuts, durable budget PASS
+restart before_store_commit max_retries=0: 1 SIGKILL cuts, durable budget PASS
+restart after_store_commit max_retries=0: 1 SIGKILL cuts, durable budget PASS
+restart selected max_retries=2: 2 SIGKILL cuts, durable budget PASS
+restart reserved max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart before_request max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart after_response max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart store_key max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart store_vector max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart before_store_commit max_retries=2: 3 SIGKILL cuts, durable budget PASS
+restart after_store_commit max_retries=2: 1 SIGKILL cuts, durable budget PASS
+test restart_respects_attempt_budget ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.15s
+
+
+running 5 tests
+test reset_rollback_preserves_old_and_fresh_views ... ok
+test attached_vec1_round_trip_and_dimension_rejection ... ok
+test pinned_reader_survives_dimension_reset ... ok
+test late_vector_snapshot_checks_identity ... ok
+test reservation_is_durable_and_exhaustion_excludes_work ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

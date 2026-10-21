@@ -1,0 +1,70 @@
+   Compiling libc v0.2.191
+   Compiling version_check v0.9.5
+   Compiling shlex v2.0.1
+   Compiling proc-macro2 v1.0.107
+   Compiling find-msvc-tools v0.1.15
+   Compiling unicode-ident v1.0.27
+   Compiling typenum v1.20.1
+   Compiling pkg-config v0.3.34
+   Compiling quote v1.0.47
+   Compiling vcpkg v0.2.15
+   Compiling bitflags v2.13.2
+   Compiling serde_core v1.0.228
+   Compiling cfg-if v1.0.5
+   Compiling fallible-iterator v0.3.0
+   Compiling serde_json v1.0.145
+   Compiling cc v1.9.0
+   Compiling smallvec v1.16.3
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling serde v1.0.228
+   Compiling rustix v1.1.5
+   Compiling generic-array v0.14.7
+   Compiling getrandom v0.3.4
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling ryu v1.0.23
+   Compiling fastrand v2.5.0
+   Compiling once_cell v1.21.4
+   Compiling libsqlite3-sys v0.38.2
+   Compiling syn v2.0.119
+   Compiling serde_derive v1.0.228
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling cpufeatures v0.2.17
+   Compiling errno v0.3.14
+   Compiling sha2 v0.10.9
+   Compiling tempfile v3.23.0
+   Compiling rusqlite v0.40.2
+   Compiling letopis-storage-build v0.0.0 (/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build)
+   Compiling letopis-publication-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/publication)
+   Compiling letopis-embedding-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/embedding)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.14s
+     Running tests/snapshots.rs (target/darwin-arm64/debug/deps/snapshots-e175af248378fdce)
+
+running 4 tests
+
+thread 'attached_vec1_round_trip_and_dimension_rejection' (6240339) panicked at tests/snapshots.rs:9:2:
+assertion `left == right` failed
+  left: FtsOnly
+ right: Vectors(["a.md"])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test attached_vec1_round_trip_and_dimension_rejection ... FAILED
+test reset_rollback_preserves_old_and_fresh_views ... ok
+
+thread 'pinned_reader_survives_dimension_reset' (6240341) panicked at tests/snapshots.rs:24:2:
+assertion `left == right` failed
+  left: FtsOnly
+ right: Vectors(["a.md"])
+test late_vector_snapshot_checks_identity ... ok
+test pinned_reader_survives_dimension_reset ... FAILED
+
+failures:
+
+failures:
+    attached_vec1_round_trip_and_dimension_rejection
+    pinned_reader_survives_dimension_reset
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+error: test failed, to rerun pass `--test snapshots`

@@ -1,0 +1,149 @@
+$ rustc --version --verbose
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: aarch64-apple-darwin
+release: 1.95.0
+LLVM version: 22.1.2
+$ cargo --version
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+$ cc --version
+Apple clang version 21.0.0 (clang-2100.1.1.101)
+Target: arm64-apple-darwin25.6.0
+Thread model: posix
+InstalledDir: /Library/Developer/CommandLineTools/usr/bin
+$ cargo metadata --locked --format-version 1
+Cargo metadata saved in 04-cargo.txt
+$ cc -O2 -DNDEBUG -fPIC -dynamiclib -I /Users/zdkadiev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libsqlite3-sys-0.38.2/sqlite3 /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/publication/.build/vec1.c -o /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/publication/.build/native-1gqtwr87/vec1.dylib -pthread -lm
+$ cargo run --locked --bin publisher -- --versions
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/darwin-arm64/debug/publisher --versions`
+SQLite 3.53.2; vec1 version 0.8 (NEON, multi-threaded)
+$ cargo test --locked -- --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/darwin-arm64/debug/deps/letopis_publication_checks-77a0201e0219981f)
+     Running unittests src/bin/publisher.rs (target/darwin-arm64/debug/deps/publisher-8714d5d93b1af01a)
+     Running tests/concurrency.rs (target/darwin-arm64/debug/deps/concurrency-5414027bdb0cb8b9)
+     Running tests/interruptions.rs (target/darwin-arm64/debug/deps/interruptions-c8c435b90400c0f2)
+     Running tests/publication.rs (target/darwin-arm64/debug/deps/publication-02fa01d9d6bf1c5e)
+   Doc-tests letopis_publication_checks
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test reindex_serializes_with_publish ... ok
+test same_delta_is_not_published_twice ... ok
+test killed_lock_owner_does_not_block_next_process ... ok
+test competing_config_resets_recheck_identity ... ok
+test config_formatting_does_not_reset_vectors ... ok
+test waiting_publisher_redetects_after_agent_edit ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+
+
+running 3 tests
+publication detected: committed oracle and next-call convergence PASS
+reindex locked: old reader, committed oracle and retry PASS
+reindex redetected: old reader, committed oracle and retry PASS
+publication locked: committed oracle and next-call convergence PASS
+config reset reset_detected: vector oracle, cache isolation and retry PASS
+reindex begun: old reader, committed oracle and retry PASS
+publication redetected: committed oracle and next-call convergence PASS
+publication begun: committed oracle and next-call convergence PASS
+reindex cleared: old reader, committed oracle and retry PASS
+config reset reset_begun: vector oracle, cache isolation and retry PASS
+reindex projections: old reader, committed oracle and retry PASS
+publication cleared: committed oracle and next-call convergence PASS
+publication projections: committed oracle and next-call convergence PASS
+reindex fts: old reader, committed oracle and retry PASS
+config reset reset_cleared: vector oracle, cache isolation and retry PASS
+publication fts: committed oracle and next-call convergence PASS
+reindex fingerprints: old reader, committed oracle and retry PASS
+reindex before_commit: old reader, committed oracle and retry PASS
+publication fingerprints: committed oracle and next-call convergence PASS
+config reset reset_identity: vector oracle, cache isolation and retry PASS
+publication before_commit: committed oracle and next-call convergence PASS
+reindex after_commit: old reader, committed oracle and retry PASS
+test reindex_crash_matrix ... ok
+publication after_commit: committed oracle and next-call convergence PASS
+config reset reset_before_commit: vector oracle, cache isolation and retry PASS
+test publication_crash_matrix ... ok
+config reset reset_after_commit: vector oracle, cache isolation and retry PASS
+test config_reset_crash_matrix ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.21s
+
+
+running 6 tests
+test unchanged_invocation_is_a_noop ... ok
+test same_tick_same_size_edit_is_hashed ... ok
+test valid_delta_publishes_beside_invalid_file ... ok
+test new_deleted_and_renamed_files_update_fts ... ok
+test declared_edges_follow_target_lifecycle_and_cycles_terminate ... ok
+test fixed_and_deleted_files_clear_errors ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ cargo fmt -- --check
+$ cargo clippy --locked --all-targets -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s
+$ /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 -B /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/run.py --evidence /Users/zdkadiev/.codex/worktrees/4148/letopis/docs/zkit/letopis/checks/TK-3/macos-arm64/tk2-regression/tk1-regression
+lt: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+test rejects_sqlite_below_the_supported_floor ... ok
+test missing_extension_is_an_error ... ok
+test checked_connection_enforces_the_storage_policy ... ok
+test checked_connection_enforces_foreign_keys ... ok
+test vectors_use_cosine_distance_and_persist_committed_changes ... ok
+test vector_dimension_mismatch_is_rejected_without_losing_existing_rows ... ok
+test fts_contentless_delete_and_committed_writes_survive_reopen ... ok
+test fts_and_vectors_commit_and_roll_back_together ... ok
+test fts_insert_update_delete_roll_back_explicitly_and_on_drop ... ok
+test vector_insert_update_delete_roll_back_explicitly_and_on_drop ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ cargo run --locked --example check -- /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/supported.db /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/vec1.dylib
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/darwin-arm64/debug/examples/check /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/supported.db /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/vec1.dylib`
+SQLite 3.53.2 / version 0.8 (NEON, multi-threaded): supported
+$ cargo run --locked --example check -- /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/missing.db /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/absent
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/darwin-arm64/debug/examples/check /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/missing.db /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/absent`
+unsupported storage build: vec1 extension could not be loaded: dlopen(/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/absent.dylib, 0x000A): tried: '/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/absent.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/absent.dylib' (no such file
+$ cargo run --locked --example check -- /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/invalid.db /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/invalid.so
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/darwin-arm64/debug/examples/check /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/invalid.db /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/invalid.so`
+unsupported storage build: vec1 extension could not be loaded: dlopen(/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/invalid.so.dylib, 0x000A): tried: '/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/invalid.so.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/invalid.so.dylib' (no s
+$ cargo run --locked --example check -- /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/nofts.db /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/vec1.dylib
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/darwin-arm64-nofts/debug/examples/check /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/nofts.db /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/vec1.dylib`
+unsupported storage build: FTS5 contentless-delete is required: no such module: fts5
+$ cargo fmt -- --check
+$ cargo clippy --locked --all-targets -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+TK-1 PASS: /Users/zdkadiev/.codex/worktrees/4148/letopis/docs/zkit/letopis/checks/TK-3/macos-arm64/tk2-regression/tk1-regression
+$ /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 -B /Users/zdkadiev/.codex/worktrees/4148/letopis/docs/zkit/letopis/roadmap/schedule.py --check
+{"tasks": 45, "hours": 329, "task_cards": 45, "weeks": 33, "max_week_hours": 10, "last_week_hours": 9, "terminal": "TK-45", "dependency_errors": 0, "phase_gate_errors": 0, "unscheduled_tasks": 0, "runtime_calls": 0, "measurements": 0}
+TK-2 PASS: /Users/zdkadiev/.codex/worktrees/4148/letopis/docs/zkit/letopis/checks/TK-3/macos-arm64/tk2-regression

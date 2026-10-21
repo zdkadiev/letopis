@@ -1,0 +1,70 @@
+[
+  {
+    "mutation": "live-hash",
+    "exit_code": 101,
+    "assertion_failed": true,
+    "restored_sha256": "06eb466901e1273a5da89762990eb3ffb33288e6555a64f072458e68a8243d6a",
+    "file": "tests/embedding/src/drain.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "drain",
+      "stale_before_compute_spends_no_attempt",
+      "--",
+      "--nocapture"
+    ]
+  },
+  {
+    "mutation": "hash-join",
+    "exit_code": 101,
+    "assertion_failed": true,
+    "restored_sha256": "d744f56cf2c4af314f3f8abe3b2765a3836eaa8a7b8c171c3cf02cdae0f3e223",
+    "file": "tests/embedding/src/vectors.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "drain",
+      "late_result_never_represents_new_text",
+      "--",
+      "--nocapture"
+    ]
+  },
+  {
+    "mutation": "config-identity",
+    "exit_code": 101,
+    "assertion_failed": true,
+    "restored_sha256": "d744f56cf2c4af314f3f8abe3b2765a3836eaa8a7b8c171c3cf02cdae0f3e223",
+    "file": "tests/embedding/src/vectors.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "drain",
+      "config_change_rejects_stale_reservation_success_and_error",
+      "--",
+      "--nocapture"
+    ]
+  },
+  {
+    "mutation": "durable-attempt",
+    "exit_code": 101,
+    "assertion_failed": true,
+    "restored_sha256": "d744f56cf2c4af314f3f8abe3b2765a3836eaa8a7b8c171c3cf02cdae0f3e223",
+    "file": "tests/embedding/src/vectors.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "snapshots",
+      "reservation_is_durable_and_exhaustion_excludes_work",
+      "--",
+      "--nocapture"
+    ]
+  }
+]

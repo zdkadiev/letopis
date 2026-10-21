@@ -1,0 +1,21 @@
+{
+  "macos-arm64": {
+    "result": "PASS",
+    "tk3_python_tests": 2,
+    "tk3_tests": 11,
+    "tk3_sigkill_cuts": 30,
+    "input_hashes_checked": 46,
+    "manifest_sha256": "483f7aabeb4fba2460722398a6a3a89369913b698ba8afc65a7b482281b60398"
+  },
+  "linux-arm64": {
+    "result": "PASS",
+    "tk3_python_tests": 2,
+    "tk3_tests": 11,
+    "tk3_sigkill_cuts": 30,
+    "input_hashes_checked": 46,
+    "manifest_sha256": "86192f575641a87d4a7a6d9e66ec579f31defb42f6674509c2a4cc5d857090ae"
+  },
+  "mutations_detected": 6,
+  "legacy_packages_unchanged": true,
+  "main_tracked_files_unchanged": true
+}

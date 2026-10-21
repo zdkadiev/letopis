@@ -1,0 +1,4 @@
+Runner exits 1 on shortened 0.5s timeout; spawned sleep process still alive: 37895
+$ rustc --version --verbose
+TK-3 FAIL: /private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk3-review-1qz_1h75/timeout-evidence
+TK-3 failed: command timed out; see 01-rustc.txt

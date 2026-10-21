@@ -1,0 +1,30 @@
+
+running 1 test
+test config_change_rejects_stale_reservation_success_and_error ... FAILED
+
+failures:
+
+failures:
+    config_change_rejects_stale_reservation_success_and_error
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.83s
+
+   Compiling letopis-embedding-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/embedding)
+warning: unused variable: `config`
+   --> src/vectors.rs:120:36
+    |
+120 | pub fn record_failure(root: &Path, config: &Config, hash: &str, error: &str) -> CheckResult<bool> {
+    |                                    ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `letopis-embedding-checks` (lib) generated 1 warning (run `cargo fix --lib -p letopis-embedding-checks` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.87s
+     Running tests/drain.rs (target/darwin-arm64/debug/deps/drain-064f249bfc6ad8c9)
+
+thread 'config_change_rejects_stale_reservation_success_and_error' (6278230) panicked at tests/drain.rs:171:13:
+assertion `left == right` failed: stale mutation at after_response/error/three
+  left: Object {"failures": Array [Array [String("8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8"), Number(1), String("fixture provider error")]], "identity": String("b720c253667af3e4524350d7dd84cec3d276a6f838e51bbf7d4466acd08a09db"), "keys": Array [Array [Number(1), String("2b7847b7b705781d7cf21a05e9c1bb37cbf078aea103bc3edcc6aca52ab65453")]], "vectors": Array [Array [Number(1), Array [Number(0), Number(0), Number(128), Number(63), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0)]]]}
+ right: Object {"failures": Array [Array [String("8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8"), Number(1), String("new-config-sentinel")]], "identity": String("b720c253667af3e4524350d7dd84cec3d276a6f838e51bbf7d4466acd08a09db"), "keys": Array [Array [Number(1), String("2b7847b7b705781d7cf21a05e9c1bb37cbf078aea103bc3edcc6aca52ab65453")]], "vectors": Array [Array [Number(1), Array [Number(0), Number(0), Number(128), Number(63), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0)]]]}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test drain`

@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running `target/linux-aarch64/debug/examples/check /repo/tests/storage-build/.build/tk1-xvn4khfc/supported.db /repo/tests/storage-build/.build/tk1-xvn4khfc/vec1.so`
+SQLite 3.53.2 / version 0.8 (NEON, multi-threaded): supported

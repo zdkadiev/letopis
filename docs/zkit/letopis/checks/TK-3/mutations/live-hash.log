@@ -1,0 +1,30 @@
+
+running 1 test
+test stale_before_compute_spends_no_attempt ... FAILED
+
+failures:
+
+failures:
+    stale_before_compute_spends_no_attempt
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.15s
+
+   Compiling letopis-embedding-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/embedding)
+warning: unused variable: `actual`
+  --> src/drain.rs:84:13
+   |
+84 |         let actual = format!("{:x}", Sha256::digest(text.as_bytes()));
+   |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_actual`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `letopis-embedding-checks` (lib) generated 1 warning (run `cargo fix --lib -p letopis-embedding-checks` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.56s
+     Running tests/drain.rs (target/darwin-arm64/debug/deps/drain-064f249bfc6ad8c9)
+
+thread 'stale_before_compute_spends_no_attempt' (6254040) panicked at tests/drain.rs:23:5:
+assertion `left == right` failed
+  left: ["bravo", "beta"]
+ right: ["beta"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test drain`

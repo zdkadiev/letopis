@@ -1,0 +1,4 @@
+   Compiling letopis-embedding-checks v0.0.0 (/repo/tests/embedding)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.51s
+     Running `target/linux-aarch64/debug/embedder --versions`
+SQLite 3.53.2; vec1 version 0.8 (NEON, multi-threaded)

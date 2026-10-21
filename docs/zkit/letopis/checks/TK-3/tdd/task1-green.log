@@ -1,0 +1,11 @@
+   Compiling letopis-embedding-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/embedding)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.00s
+     Running tests/snapshots.rs (target/darwin-arm64/debug/deps/snapshots-e175af248378fdce)
+
+running 4 tests
+test attached_vec1_round_trip_and_dimension_rejection ... ok
+test reset_rollback_preserves_old_and_fresh_views ... ok
+test pinned_reader_survives_dimension_reset ... ok
+test late_vector_snapshot_checks_identity ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s

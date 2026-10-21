@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/darwin-arm64-nofts/debug/examples/check /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/nofts.db /Users/zdkadiev/.codex/worktrees/4148/letopis/tests/storage-build/.build/tk1-f90vklx4/vec1.dylib`
+unsupported storage build: FTS5 contentless-delete is required: no such module: fts5

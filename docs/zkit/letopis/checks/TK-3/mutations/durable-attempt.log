@@ -1,0 +1,21 @@
+
+running 1 test
+test reservation_is_durable_and_exhaustion_excludes_work ... FAILED
+
+failures:
+
+failures:
+    reservation_is_durable_and_exhaustion_excludes_work
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.08s
+
+   Compiling letopis-embedding-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/embedding)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.28s
+     Running tests/snapshots.rs (target/darwin-arm64/debug/deps/snapshots-df6de90053c874ce)
+
+thread 'reservation_is_durable_and_exhaustion_excludes_work' (6255278) panicked at tests/snapshots.rs:140:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test snapshots`

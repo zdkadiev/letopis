@@ -1,0 +1,18 @@
+[
+  {
+    "mutation": "late-failure-identity",
+    "exit_code": 101,
+    "assertion_failed": true,
+    "restored_sha256": "d744f56cf2c4af314f3f8abe3b2765a3836eaa8a7b8c171c3cf02cdae0f3e223",
+    "file": "tests/embedding/src/vectors.rs",
+    "test": "config_change_rejects_stale_reservation_success_and_error"
+  },
+  {
+    "mutation": "vector-bytes",
+    "exit_code": 101,
+    "assertion_failed": true,
+    "restored_sha256": "d744f56cf2c4af314f3f8abe3b2765a3836eaa8a7b8c171c3cf02cdae0f3e223",
+    "file": "tests/embedding/src/vectors.rs",
+    "test": "late_result_never_represents_new_text"
+  }
+]

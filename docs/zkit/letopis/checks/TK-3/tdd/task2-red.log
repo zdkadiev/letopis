@@ -1,0 +1,56 @@
+   Compiling letopis-embedding-checks v0.0.0 (/Users/zdkadiev/.codex/worktrees/4148/letopis/tests/embedding)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.03s
+     Running tests/drain.rs (target/darwin-arm64/debug/deps/drain-064f249bfc6ad8c9)
+
+running 6 tests
+
+thread 'stale_before_compute_spends_no_attempt' (6245209) panicked at tests/drain.rs:8:2:
+assertion `left == right` failed
+  left: []
+ right: ["beta"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test stale_before_compute_spends_no_attempt ... FAILED
+
+thread 'restart_respects_attempt_budget' (6245207) panicked at tests/support/mod.rs:39:33:
+assertion `left == right` failed
+  left: "done"
+ right: "checkpoint:selected"
+
+thread 'late_result_never_represents_new_text' (6245206) panicked at tests/support/mod.rs:39:33:
+assertion `left == right` failed
+  left: "done"
+ right: "checkpoint:after_response"
+
+thread 'config_change_rejects_stale_reservation_success_and_error' (6245204) panicked at tests/support/mod.rs:39:33:
+assertion `left == right` failed
+  left: "done"
+ right: "checkpoint:selected"
+test restart_respects_attempt_budget ... FAILED
+test late_result_never_represents_new_text ... FAILED
+test config_change_rejects_stale_reservation_success_and_error ... FAILED
+
+thread 'errors_and_invalid_vectors_consume_budget' (6245205) panicked at tests/drain.rs:72:42:
+assertion `left == right` failed
+  left: 0
+ right: 2
+test errors_and_invalid_vectors_consume_budget ... FAILED
+
+thread 'same_text_is_shared_and_sources_are_not_work' (6245208) panicked at tests/drain.rs:35:2:
+assertion `left == right` failed
+  left: 0
+ right: 1
+test same_text_is_shared_and_sources_are_not_work ... FAILED
+
+failures:
+
+failures:
+    config_change_rejects_stale_reservation_success_and_error
+    errors_and_invalid_vectors_consume_budget
+    late_result_never_represents_new_text
+    restart_respects_attempt_budget
+    same_text_is_shared_and_sources_are_not_work
+    stale_before_compute_spends_no_attempt
+
+test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+error: test failed, to rerun pass `--test drain`

@@ -1,0 +1,2 @@
+    Checking letopis-embedding-checks v0.0.0 (/repo/tests/embedding)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.38s
