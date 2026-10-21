@@ -1,0 +1,262 @@
+{
+  "task": "TK-8",
+  "fix_round": 1,
+  "fix_base": "2df19b12e0aeb20ba3ccab030326678ad61adee6",
+  "versions": {
+    "git": "git version 2.50.1 (Apple Git-155)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "host": "Darwin arm64"
+  },
+  "image": {
+    "Id": "sha256:5df3cfade229b5a574a2c6efd9f65a1d1a9d8d94c746b12f2f3ed6f08fdf29d9",
+    "Architecture": "arm64",
+    "Os": "linux"
+  },
+  "commands": [
+    {
+      "name": "version-git",
+      "argv": [
+        "git",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.011,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/version-git.log"
+    },
+    {
+      "name": "version-rustc",
+      "argv": [
+        "rustc",
+        "+1.95.0",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.015,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/version-rustc.log"
+    },
+    {
+      "name": "version-cargo",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.013,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/version-cargo.log"
+    },
+    {
+      "name": "version-host",
+      "argv": [
+        "uname",
+        "-sm"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.002,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/version-host.log"
+    },
+    {
+      "name": "host-test",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.433,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/host-test.log"
+    },
+    {
+      "name": "host-fmt",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.059,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/host-fmt.log"
+    },
+    {
+      "name": "host-clippy",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.23,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/host-clippy.log"
+    },
+    {
+      "name": "linux-build",
+      "argv": [
+        "docker",
+        "build",
+        "-f",
+        "tests/git/Dockerfile",
+        "-t",
+        "letopis-tk8-check",
+        "."
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.406,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/linux-build.log"
+    },
+    {
+      "name": "linux-image",
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "letopis-tk8-check",
+        "--format",
+        "{{json .}}"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.015,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/linux-image.log"
+    },
+    {
+      "name": "linux-run",
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "letopis-tk8-check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.54,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/linux-run.log"
+    },
+    {
+      "name": "fix-source-diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "2df19b12e0aeb20ba3ccab030326678ad61adee6",
+        "--check",
+        "--",
+        "src"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.016,
+      "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/fix-source-diff-check.log"
+    }
+  ],
+  "behavioral_red": {
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "adapters::git::tests::discovers_trailing_newline_repository_without_touching_sibling",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/red.log"
+  },
+  "focused_green_exit_code": 0,
+  "root_test_counts": {
+    "private_git": 7,
+    "existing_integration": 30,
+    "snapshot_integration": 5,
+    "retention_integration": 8,
+    "total": 50,
+    "failed": 0,
+    "ignored": 0
+  },
+  "prior_receipt": "docs/zkit/letopis/checks/TK-8/verification.json",
+  "prior_receipt_sha256": "b66b365dd43052eb8e48017efb0faab9882d581cc4110efa4221d9dd008018b6",
+  "source_sha256": {
+    ".dockerignore": "f6116c2f7a114f18906fb3aa57e5a8935b678c824eddecc670acd11282dd0427",
+    "Cargo.lock": "f15fc9e94b7d8d5fe693b1d92a5c95fe635cc0fc845e63655d7ae01f3e62d1b9",
+    "Cargo.toml": "1e9e07a7d1b25b2037c90486ed48676e348817924375390ce4f0b99b5f8f69cb",
+    "rust-toolchain.toml": "12dc5d64dbd96c1b07be2943241d52d9f6127a79ba47a820455ba7b873fc896a",
+    "src/adapters/git/mod.rs": "c6459c2a9dfae2d034623332f9d6a2a14f0b8f545912be7aae00272a192e88a0",
+    "src/adapters/git/objects.rs": "53616ab6b9e2f9f163da17b71e558571d4ad02fab2f2608f69617a7247e97286",
+    "src/adapters/git/process.rs": "26ae0d6cc7140767cf7ca2d34212b709a4cbb02878bec2a1da882ce888de40a8",
+    "src/adapters/git/refs.rs": "8bd6472a6402cd96d168513bef405d0c51436efc0ab2ee2052f57ae218cea710",
+    "src/adapters/git/tests.rs": "9da320f4b4f9cb628280cfd11b6ac68ebfd7e59c667e7efdd517a3b8618dafb7",
+    "src/adapters/markdown/links.rs": "046167c860f4ce0c0f2b5fdedb8994705634b3f30be8f3ce0e3beaf0761e75f4",
+    "src/adapters/markdown/metadata.rs": "f9ff829174265d73a4201a6f12c8f3854f3dde97f0bd33d020aea1a4c9bf165b",
+    "src/adapters/markdown/mod.rs": "ecc22211f2a04c87d2c408286defe7e08dc8ec01e1c60695d49a911a2e77d7fb",
+    "src/adapters/markdown/scan.rs": "b418e2de928523d7efa8af603d7233e6d206d6936aedd8ba019463cecaaadd2c",
+    "src/adapters/markdown/search.rs": "4d4e458d340b120a43116cb99889c664d4675568110ae3f3d8bbeb79ef4c4870",
+    "src/adapters/mod.rs": "1411d7b21b2e7da62cb313cb692cb8203c6cd91846e779242f621868e5fee825",
+    "src/domain/graph.rs": "46dcc956d100b1b4f9a914e92bfe23c8470c6179d1ec88dd6d6be66d3a6fcc02",
+    "src/domain/identity.rs": "c0cd49ebc37c04028c96c33df2d49280a2f52878969c9355554071b875a10ee8",
+    "src/domain/mod.rs": "c666739586dd118ddd98868b69f20c12f0713eef14da52caa6facdcfe5db6fbb",
+    "src/domain/value.rs": "ca77789c2396b5282aa77e1b3ec82cb7d84378165c3bc9f7fd95bc64bb597368",
+    "src/lib.rs": "b14f4c4dd63e0f08900b5091bddb8c948ff6eaaf7efc544f186de8ec513e089c",
+    "src/service/mod.rs": "3e11679ea7260e9fa86ce883c79afdc912736214f6aefe2b638fedfeb02d1e5e",
+    "src/service/ports/git.rs": "a4011ba10ae8f088e20f324bdab2f9c6b5e6becb52882788ef94eb565cd249e5",
+    "src/service/ports/mod.rs": "441b43560994e843ee2c196f85ec0074bed387f6f2569a2ba59954d1ca68487c",
+    "tests/domain_values.rs": "3024dbf9c045383e1e0f06f1b157b33b73781b6ea682452b8cb26f8b0fc3bee4",
+    "tests/fixtures/markdown/code.md": "745c2910661730dbb4d8c94076b522837299017f8971f71cd8df368523512c62",
+    "tests/fixtures/markdown/crlf.md": "eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864",
+    "tests/fixtures/markdown/expected.json": "f457e2a05174ac9dcdd05a55646d90060098ebfc17b7ed2edaf4ece9b8719c26",
+    "tests/fixtures/markdown/no-final-newline.md": "8ae8dc48443c3b9132365da3e83a1862fe8c1be55da7ee6a9bbf478703fe58d2",
+    "tests/fixtures/markdown/references.md": "d6e82fad5e4dbf755ce529593be584a870855af446678ad18f31ddc00b408e97",
+    "tests/fixtures/markdown/sections.md": "142b27a765adec526a7dd8d33ab2dc8965c50fbbdc16916075d24c1bbcf53283",
+    "tests/fixtures/markdown/unicode.md": "8910a8d29ec22cd6a6a67bfddedd14f15dd0e8a9857b20f8372fb03a2ea5f4e7",
+    "tests/fixtures/markdown/whole.md": "69310cd742978c3cef6fa8c6ff86fb69981333c5eada345da90a83a5343cc70f",
+    "tests/git/Dockerfile": "9394f7197e40edaec1f785019f6f4af5b4d2905bd85a0c6186f8d0f4edd55f50",
+    "tests/git/README.md": "65f6fc252ce7af0ae63dcf41baa0dc10f6e7068bd68ec77ee44e006212bf8fc4",
+    "tests/git_retention.rs": "7425995314680b43bea3fe6aae94eb8fce8450b439669916745daa617611289a",
+    "tests/git_snapshots.rs": "be158afc711ed989f7de42a4e78f24035da9365676c9fa939be1a488bef8f9d0",
+    "tests/markdown_elements.rs": "ba9327b6aaf31f88dc9b4a1b209651b4df2a088a3e76b5800db049e0346d8a1d",
+    "tests/markdown_links.rs": "7da3a287ea946b24040a6b296a99ef2cee64ecd0c8aaeccec9f44931eb41172a",
+    "tests/markdown_search.rs": "d493df36d35eff5ba7d2a1a8f29bfbb930aa31ef98f8c3af42a8d3ead4337059",
+    "tests/support/git.rs": "ee221d63f13f5c13453f91b337e28033b40a080adb8a875fb6c30f5ecf2a8935",
+    "tests/support/mod.rs": "eb9f619811b6f1543139ba73a8403b829ca58d87e4a8a1a2f82773cf22df530b"
+  },
+  "evidence_sha256": {
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/fix-source-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/green.log": "865aa661ba7fb3ddb67a8b8cc3bb11be813ed410f180c5f3623200952e10eef2",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/host-clippy.log": "1831a61c20b8629478b26992d4ae39fc8b7ff39a81eb11b5ec39333a8273862e",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/host-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/host-test.log": "afd8d2b2ffe2c203050d9eb432a9bf0e7f9e9766845b378a8020c9bbbc20d623",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/linux-build.log": "ce8a27dd5c1401e80a506d28f323f268078cf1e32322bdfe7fe4a713b5c34f1e",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/linux-image.log": "42b3c4a9d3747b9f5ecccf459ec50d77827ddb8838c2148792e8db693c75b9e2",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/linux-run.log": "d9016ff8a5e9759fae805ed012c6bb04c0cfdf95edd651cb61a33cada04e5e74",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/red.log": "4a2a2e37b692bb12709b2e6b604aa9201fc6b2385203f84cb1a5af9fda27f472",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/report.md": "acf1784bbacc42ebcfbf6be865962b9308640bf24fc9be9bb404f59f4e9054b3",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/version-cargo.log": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/version-git.log": "0a72a762b37a3800276a1004e2c169aed0610d4a3ba601ba59e70e1c4d9f3200",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/version-host.log": "16b8cd028eb757aab907ab404e1656e01783846457156eec99372a91fc1b104d",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/version-rustc.log": "f4d034f5660bb49f22bfcba3f3445be67e25b704c193ff421b53863b4faee148"
+  },
+  "implementation_commit": "fa1fff52e459eecc2afb43d460c524320902cc2c",
+  "focused_green": {
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "adapters::git::tests::discovers_trailing_newline_repository_without_touching_sibling",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "log": "docs/zkit/letopis/checks/TK-8/fix-round-1/green.log"
+  }
+}

@@ -1,0 +1,148 @@
+git version 2.39.5
+rustc 1.95.0 (59807616e 2026-04-14)
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+Linux aarch64
+   Compiling version_check v0.9.5
+   Compiling proc-macro2 v1.0.107
+   Compiling typenum v1.20.1
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling libc v0.2.191
+   Compiling serde_core v1.0.228
+   Compiling pulldown-cmark v0.13.4
+   Compiling serde_json v1.0.145
+   Compiling generic-array v0.14.7
+   Compiling memchr v2.8.3
+   Compiling serde v1.0.228
+   Compiling itoa v1.0.18
+   Compiling bitflags v2.13.2
+   Compiling ryu v1.0.23
+   Compiling unicase v2.10.0
+   Compiling cfg-if v1.0.5
+   Compiling syn v2.0.119
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling serde_derive v1.0.228
+   Compiling letopis v0.0.0 (/repo)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.67s
+     Running unittests src/lib.rs (target/debug/deps/letopis-7af0193d8ff1d997)
+
+running 7 tests
+test adapters::git::tests::version_gate ... ok
+test adapters::git::tests::open_rejects_old_git_before_object_calls ... ok
+test adapters::git::tests::open_rejects_non_repository_and_bare ... ok
+test adapters::git::tests::subprocess_drains_and_reaps_on_io_failure ... ok
+test adapters::git::tests::process_removes_inherited_overrides_and_hardens_writes ... ok
+test adapters::git::tests::discovers_root_from_subdirectory ... ok
+test adapters::git::tests::discovers_trailing_newline_repository_without_touching_sibling ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/domain_values.rs (target/debug/deps/domain_values-1de5d5ba841dd8ef)
+
+running 6 tests
+test ids_and_sources_normalize_from_git_root ... ok
+test edge_identity_and_kind_are_derived ... ok
+test anchors_and_ranges_reject_invalid_values ... ok
+test sha256_uses_exact_bytes ... ok
+test edge_targets_and_self_loops_are_checked ... ok
+test tree_oids_are_full_lowercase_hex ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/git_retention.rs (target/debug/deps/git_retention-0e7465e34efd0c08)
+
+running 8 tests
+test conflicting_descendant_types_do_not_pin ... ok
+test gitlinks_are_retained_without_dereferencing ... ok
+test concurrent_pin_is_idempotent ... ok
+test promisor_miss_never_fetches ... ok
+test unretained_unique_tree_is_collectable ... ok
+test symbolic_and_conflicting_refs_are_rejected ... ok
+test retained_snapshots_survive_gc ... ok
+test incomplete_tree_and_ref_failure_do_not_pin ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/git_snapshots.rs (target/debug/deps/git_snapshots-39c3626419a206f3)
+
+running 5 tests
+test empty_tree_and_invalid_paths ... ok
+test replacement_refs_do_not_change_bytes ... ok
+test tree_types_and_missing_objects_are_distinct ... ok
+test paths_are_literal_and_never_shell_input ... ok
+test exact_bytes_without_index_or_commit ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/markdown_elements.rs (target/debug/deps/markdown_elements-d7b823dbb32b270d)
+
+running 10 tests
+test metadata_must_fit_exactly_one_standalone_line ... ok
+test code_examples_do_not_declare_elements ... ok
+test anchors_are_unique_across_real_headings ... ok
+test nested_elements_and_orphan_metadata_are_rejected ... ok
+test raw_html_content_does_not_declare_metadata ... ok
+test file_errors_never_return_partial_elements ... ok
+test golden_elements_have_exact_bytes_and_metadata ... ok
+test unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected ... ok
+test snapshot_metadata_preserves_full_oid_and_zero_created_at ... ok
+test unicode_crlf_and_eof_have_exact_spans ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_links.rs (target/debug/deps/markdown_links-2cd7cbb8658e78bf)
+
+running 6 tests
+test links_wrapping_images_still_declare_edges ... ok
+test image_alt_links_do_not_declare_edges ... ok
+test only_inline_links_declare_edges ... ok
+test links_outside_elements_are_only_navigation ... ok
+test sources_are_normalized_without_loading_destinations ... ok
+test invalid_graph_titles_and_targets_fail_file ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_search.rs (target/debug/deps/markdown_search-20b31c42861c9b85)
+
+running 8 tests
+test reference_labels_use_whole_file_context ... ok
+test moving_path_preserves_text_hashes ... ok
+test code_examples_remain_searchable ... ok
+test crlf_metadata_line_does_not_add_search_whitespace ... ok
+test own_text_label_and_code_change_search_hash ... ok
+test metadata_and_link_changes_keep_search_hash ... ok
+test search_text_preserves_word_and_block_boundaries ... ok
+test golden_search_representations ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests letopis
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+    Checking typenum v1.20.1
+    Checking memchr v2.8.3
+    Checking serde_core v1.0.228
+    Checking libc v0.2.191
+    Checking unicase v2.10.0
+    Checking bitflags v2.13.2
+    Checking cfg-if v1.0.5
+    Checking ryu v1.0.23
+    Checking itoa v1.0.18
+    Checking pulldown-cmark v0.13.4
+    Checking generic-array v0.14.7
+    Checking cpufeatures v0.2.17
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.7
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking serde_json v1.0.145
+    Checking serde v1.0.228
+    Checking letopis v0.0.0 (/repo)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.89s
