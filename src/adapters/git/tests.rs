@@ -139,3 +139,78 @@ fn process_removes_inherited_overrides_and_hardens_writes() {
         assert!(text.contains(flag), "missing {flag}");
     }
 }
+
+#[test]
+fn discovers_trailing_newline_repository_without_touching_sibling() {
+    use crate::{
+        domain::RepoPath,
+        open_git_snapshots,
+        service::ports::git::{GitSnapshotPort, SnapshotFile},
+    };
+    for format in fixture::FORMATS {
+        let parent = TempRepo::new(format);
+        let sibling = parent.root().join("repo");
+        let target = parent.root().join("repo\n");
+        for root in [&sibling, &target] {
+            parent.ok(
+                &[
+                    "init",
+                    "-q",
+                    match format {
+                        ObjectFormat::Sha1 => "--object-format=sha1",
+                        ObjectFormat::Sha256 => "--object-format=sha256",
+                    },
+                    root.to_str().unwrap(),
+                ],
+                None,
+            );
+        }
+        let sibling_objects = parent.ok(
+            &["-C", sibling.to_str().unwrap(), "count-objects", "-v"],
+            None,
+        );
+        let sibling_refs = parent.ok(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None);
+        let git = open_git_snapshots(&target).unwrap();
+        let path = RepoPath::parse("captured.md").unwrap();
+        let tree = git
+            .create_tree(&[SnapshotFile {
+                path: &path,
+                bytes: b"newline repository isolation\0",
+            }])
+            .unwrap();
+        git.pin(&tree).unwrap();
+        assert_eq!(
+            parent.ok(
+                &["-C", sibling.to_str().unwrap(), "count-objects", "-v"],
+                None
+            ),
+            sibling_objects,
+            "opening repo\\n must not write objects into sibling repo"
+        );
+        assert_eq!(
+            parent.ok(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None),
+            sibling_refs,
+            "opening repo\\n must not pin a ref in sibling repo"
+        );
+        let name = format!("refs/letopis/snapshots/{}", tree.as_str());
+        let actual = parent.git(
+            &[
+                "-C",
+                target.to_str().unwrap(),
+                "show-ref",
+                "--verify",
+                &name,
+            ],
+            None,
+        );
+        assert!(
+            actual.status.success(),
+            "snapshot must be retained in the requested newline-suffixed repository"
+        );
+        assert_eq!(
+            git.read_blob(&tree, &path).unwrap(),
+            b"newline repository isolation\0"
+        );
+        assert_eq!(GitCliAdapter::open(&target).unwrap().root, target);
+    }
+}

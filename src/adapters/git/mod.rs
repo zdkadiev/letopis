@@ -24,7 +24,8 @@ impl GitCliAdapter {
         let root = PathBuf::from(
             String::from_utf8(raw)
                 .map_err(|_| SnapshotError::new(InternalError, "invalid Git root"))?
-                .trim_end_matches('\n'),
+                .strip_suffix('\n')
+                .ok_or_else(|| SnapshotError::new(InternalError, "invalid Git root response"))?,
         );
         if !root.is_absolute() {
             return Err(SnapshotError::new(InternalError, "invalid Git root"));
