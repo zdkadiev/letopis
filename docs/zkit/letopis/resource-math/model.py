@@ -23,7 +23,7 @@ ASSUMPTIONS = {
             "best": 5, "expected": 5, "worst": 5},
     "A-9": {"label": "reference interval between Git packing", "unit": "hours",
             "best": 24, "expected": 24, "worst": 24},
-    "A-10": {"label": "saved diagnostic reports per day; not individual retries or requests", "unit": "reports/day",
+    "A-10": {"label": "reference diagnostic reports per day; D-95 stores only current problems, no history", "unit": "reports/day",
              "best": 10, "expected": 100, "worst": 1000},
     "A-11": {"label": "mean diagnostic report payload; excludes SQLite overhead", "unit": "bytes/report",
              "best": 4000, "expected": 4000, "worst": 4000},
@@ -54,11 +54,11 @@ UNITS = {
     "known_storage_payload_mb": "MB",
     "changed_elements_per_second": "nodes/s",
     "changed_markdown_kb_per_second": "KB/s",
-    "embedding_job_rows_upper": "rows",
+    "embedding_work_rows_upper": "rows",
     "bulk_input_minutes_reference": "minutes",
     "diagnostics_daily_payload_mb": "MB/day",
-    "diagnostics_horizon_reports": "reports",
-    "diagnostics_horizon_payload_mb": "MB",
+    "diagnostics_horizon_reports_reference": "reports",
+    "diagnostics_horizon_payload_reference_mb": "MB",
 }
 
 
@@ -84,7 +84,7 @@ def compute(a):
     known_storage_payload_mb = canonical_markdown_mb + vectors_payload_mb + model_blob_mb
     changed_elements_per_second = a["A-3"] / 60            # Input flow, not completed jobs.
     changed_markdown_kb_per_second = a["A-3"] * a["A-2"] / 60 / 1000
-    embedding_job_rows_upper = a["A-1"]                    # Upper bound: texts without a vector + embed_failures rows (D-95); no sources.
+    embedding_work_rows_upper = a["A-1"]                    # Upper bound: texts without a vector + embed_failures rows (D-95); no sources.
     bulk_input_minutes = a["A-1"] / ASSUMPTIONS["A-3"]["worst"]  # D-59: one full input at heavy rate; not vector readiness.
     return {
         "edit_group_publish_per_second": edit_group_publish_per_second,
@@ -107,12 +107,12 @@ def compute(a):
         "known_storage_payload_mb": known_storage_payload_mb,
         "changed_elements_per_second": changed_elements_per_second,
         "changed_markdown_kb_per_second": changed_markdown_kb_per_second,
-        "embedding_job_rows_upper": embedding_job_rows_upper,
+        "embedding_work_rows_upper": embedding_work_rows_upper,
         "bulk_input_minutes_reference": bulk_input_minutes,
         # No manual clearing over A-7. Scenario rates and mean payload are not hard bounds.
         "diagnostics_daily_payload_mb": a["A-10"] * a["A-11"] / 1000000,
-        "diagnostics_horizon_reports": a["A-10"] * a["A-7"],
-        "diagnostics_horizon_payload_mb": a["A-10"] * a["A-11"] * a["A-7"] / 1000000,
+        "diagnostics_horizon_reports_reference": a["A-10"] * a["A-7"],
+        "diagnostics_horizon_payload_reference_mb": a["A-10"] * a["A-11"] * a["A-7"] / 1000000,
     }
 
 

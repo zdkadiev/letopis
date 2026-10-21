@@ -4,7 +4,7 @@
 > **Эпик:** [EP-4](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 3 / 6 / 10 (best / expected / worst)
-> **План:** неделя 27 — 6 ч
+> **План:** неделя 27 — 5 ч; неделя 28 — 1 ч
 > **Зависимости:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md), [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md), [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md), [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md)
 
 

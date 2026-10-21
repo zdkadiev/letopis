@@ -10,7 +10,7 @@
 
 ## 1. Цель
 
-Сквозной путь должен соединить реальные адаптеры; ранние RAM и usefulness результаты нужны до расширения полного функционала. Конкретный результат этой задачи: доменная модель и parser/serializer Markdown, отделённые от Git/SQLite/CLI адаптеров.
+Сквозной путь должен соединить реальные адаптеры; ранние RAM и usefulness результаты нужны до расширения полного функционала. Конкретный результат этой задачи: доменная модель и parser Markdown (без сериализатора: letopis не пишет корпус, D-93), отделённые от Git/SQLite/CLI адаптеров.
 
 ## 2. Контекст и входные данные
 
@@ -25,13 +25,13 @@
 
 ## 3. Что сделать
 
-1. Создать доменные типы и codec актуальной грамматики Markdown X-4.
+1. Создать доменные типы и разбор актуальной грамматики Markdown X-4 на `pulldown-cmark` (`into_offset_iter`, `ENABLE_HEADING_ATTRIBUTES`, D-96).
 2. Реализовать файл-элементы и раздел-элементы с якорями, ID по пути/якорю, created_at, рёбра-тройки/includes и source URI (D-93).
 3. Добавить fixtures точных байтов/хешей, fenced code, вложенности, дублей якорей и ошибок разметки.
 
 ## 4. Ожидаемый результат
 
-Доменная модель и parser/serializer Markdown, отделённые от Git/SQLite/CLI адаптеров.
+Доменная модель и parser Markdown (без сериализатора: letopis не пишет корпус, D-93), отделённые от Git/SQLite/CLI адаптеров.
 
 ## 5. Критерии приёмки
 
@@ -47,7 +47,7 @@
 
 ## 7. Границы
 
-- **Входит:** Доменная модель и parser/serializer Markdown, отделённые от Git/SQLite/CLI адаптеров. Работа и собственные проверки перечислены в разделе 3.
+- **Входит:** Доменная модель и parser Markdown (без сериализатора: letopis не пишет корпус, D-93), отделённые от Git/SQLite/CLI адаптеров. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Git adapter — [TK-8](TK-8-git-snapshots.md); SQL projection — [TK-9](TK-9-storage.md); полный итоговый graph validator — [TK-18](../../EP-2-knowledge/tasks/TK-18-graph-validation.md).
 - **Интерфейсы — вход:** [TK-1](../../EP-8-proofs/tasks/TK-1-build.md): Воспроизводимый build harness и отчёт о совместимости выбранной связки на двух ОС; [TK-2](../../EP-8-proofs/tasks/TK-2-durability-harness.md): Матрица прерываний публикации с точным oracle и воспроизводимый harness обнаружения/публикации; [TK-3](../../EP-8-proofs/tasks/TK-3-vector-harness.md): Регрессионные сценарии vec1/read view и пропуска устаревшего текста по search_hash; [TK-4](../../EP-8-proofs/tasks/TK-4-runtime-harness.md): Проверенная координация процессов: одна публикация, один drain, отмена SIGINT с negative fixtures; [TK-5](../../EP-8-proofs/tasks/TK-5-pilot-protocol.md): Исполнимый протокол P-1 и формы отчёта для раннего и финального пилота; [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md): Boundary harness двух API с воспроизводимыми негативными transport-сценариями
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-8](TK-8-git-snapshots.md), [TK-9](TK-9-storage.md), [TK-10](TK-10-change-detection.md), [TK-14](TK-14-thin-slice.md), [TK-18](../../EP-2-knowledge/tasks/TK-18-graph-validation.md).

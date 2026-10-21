@@ -4,7 +4,7 @@
 > **Эпик:** [EP-3](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 3 / 6 / 12 (best / expected / worst)
-> **План:** неделя 19 — 6 ч
+> **План:** неделя 19 — 5 ч; неделя 20 — 1 ч
 > **Зависимости:** [TK-25](TK-25-reindexing.md), [TK-10](../../EP-1-thin-slice/tasks/TK-10-change-detection.md)
 
 

@@ -1,5 +1,7 @@
 -- Physical design, not a migration or production bootstrap.
--- Existing SQLite >=3.51.3 + FTS5 + native vec1; extension build verified later.
+-- Bundled SQLite >=3.51.3 + FTS5 + native vec1 (TK-1 proved it as a loaded file); the product
+-- links vec1 statically via sqlite3_auto_extension, no load_extension; static build is
+-- verified by TK-9/TK-43 (D-96).
 PRAGMA foreign_keys=ON;
 -- D-91: the whole database is a rebuildable cache. Deleting it and reindexing
 -- restores everything. Vectors live in .letopis/vectors.db (below) and survive (D-92).

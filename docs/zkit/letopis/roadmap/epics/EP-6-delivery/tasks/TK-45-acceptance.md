@@ -4,7 +4,7 @@
 > **Эпик:** [EP-6](../epic.md)
 > **Фаза:** PH-4
 > **Оценка, ч:** 2 / 4 / 8 (best / expected / worst)
-> **План:** неделя 33 — 4 ч
+> **План:** неделя 33 — 1 ч; неделя 34 — 3 ч
 > **Зависимости:** [TK-43](TK-43-delivery.md), [TK-44](TK-44-operations.md), [TK-42](../../EP-4-system-validation/tasks/TK-42-exhaustion.md), [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md)
 
 
@@ -15,8 +15,8 @@
 ## 2. Контекст и входные данные
 
 - План и расписание: [roadmap](../../../../roadmap.md).
-- Основание: G-4, FR-1…FR-6, FR-11…FR-13, FR-17…FR-36, NFR-1…NFR-8, C-1…C-8.
-- Покрывает: [FR-1…FR-6, FR-11…FR-13, FR-17…FR-36, NFR-1…NFR-8, C-1…C-8](../../../../requirements.md).
+- Основание: G-4, FR-1…FR-6, FR-11…FR-13, FR-17…FR-36, NFR-1…NFR-8, C-1…C-10.
+- Покрывает: [FR-1…FR-6, FR-11…FR-13, FR-17…FR-36, NFR-1…NFR-8, C-1…C-10](../../../../requirements.md).
 - [Требования и критерии системы](../../../../requirements.md).
 - [Архитектура и владельцы](../../../../architecture.md).
 - [Отказы и drills](../../../../resilience.md).

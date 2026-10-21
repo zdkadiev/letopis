@@ -15,11 +15,11 @@ read_document_state(view: &StateReadView) -> Result<DocumentState, DomainError> 
 read_index_state(view: &StateReadView) -> Result<IndexState, DomainError> // I-10
 ```
 
-Configuration — X-1 с max_retries, без credentials; прочитанная конфигурация не подменяется глобальной после model switch. IndexReadView владеет одной SQLite read tx, первое чтение закрепляет revision кэша и meta.config_identity vectors.db (в кэше identity нет, [D-95](../decisions.md#D-95)); сама конфигурация читается из `.letopis/config.json` и принимается, только если её SHA-256 канонического JSON (JCS) равен config_identity (D-91), иначе вызов выполняет сброс MC-3 одной транзакцией vectors.db без блокировок; FTS и vec1 читаются в ней же, закрытие по RAII при успехе/ошибке/отмене. Нельзя использовать соединение параллельно или делать в нём diagnostics write. Один запрос — один read view, не история generations.
+Configuration — X-1 с max_retries, без credentials; прочитанная конфигурация не подменяется глобальной после model switch. IndexReadView владеет одной SQLite read tx, первое чтение закрепляет revision кэша и meta.config_identity vectors.db (в кэше identity нет, [D-95](../decisions.md#D-95)); сама конфигурация читается из `.letopis/config.json` и принимается, только если её SHA-256 канонического JSON (JCS) равен config_identity (D-91), иначе вызов выполняет сброс MC-3 одной транзакцией vectors.db без блокировок; FTS и vec1 читаются в ней же, закрытие по RAII при успехе/ошибке/отмене. Нельзя использовать соединение параллельно или писать через него. Один запрос — один read view, не история generations.
 
 StateReadView — та же идея короткого read tx для одного status, без отдельного долговечного состояния. embedding_backlog = число опубликованных search_hash без вектора и без исчерпанных попыток, embedding_failed = число с исчерпанными попытками (embed_failures в vectors.db, тот же read tx); прогресса reindex нет ([D-95](../decisions.md#D-95)). Problems вычисляются I-11 в том же read tx; locks — занятые flock с PID.
 
-Пример: A закрепляет revision 6 и модель M1; пользователь меняет `.letopis/config.json` на M2, следующий вызов сбрасывает векторы и публикует revision 7. A дочитывает 6/M1; B получает 7/M2. Ни одному запросу не подсовывается vector другой модели. Отдельные файловые чтения агента используют I-12/Git по D-77.
+Пример: A закрепляет revision 6 и модель M1; пользователь меняет `.letopis/config.json` на M2, следующий вызов сбрасывает только vectors.db (revision кэша — счётчик публикаций graph/FTS — от сброса не растёт и остаётся 6). A дочитывает 6/M1; B получает 6/M2 и до пересчёта векторов ищет по FTS. Ни одному запросу не подсовывается vector другой модели. Отдельные файловые чтения агента используют I-12/Git по D-77.
 
 ## Timing and limits
 
@@ -27,4 +27,4 @@ Synchronous in-process call; no independent deadline or quota. The caller owns t
 
 ## Errors
 
-Storage/Git failures propagate as Result error using the existing X-1 code/message/details; no successful result is fabricated after I/O failure. Caller releases its read view or rolls back the write unit. No mutation replay is performed by this port.
+Storage/Git failures propagate as Result error using the existing X-1 code/message/details; no successful result is fabricated after I/O failure. Caller releases its read view or rolls back the write unit.

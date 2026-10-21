@@ -4,7 +4,7 @@
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 5 / 8 / 14 (best / expected / worst)
-> **План:** неделя 10 — 5 ч; неделя 11 — 3 ч
+> **План:** неделя 10 — 3 ч; неделя 11 — 5 ч
 > **Зависимости:** [TK-7](TK-7-markdown.md), [TK-8](TK-8-git-snapshots.md), [TK-9](TK-9-storage.md), [TK-10](TK-10-change-detection.md), [TK-11](TK-11-cli-runtime.md), [TK-12](TK-12-search.md), [TK-13](TK-13-embeddings.md)
 
 
@@ -50,7 +50,7 @@
 
 - **Входит:** Первый работающий сквозной slice и минимальная инструкция coding-агенту. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Доменная/SQL/provider реализация остаётся [TK-7](TK-7-markdown.md)…[TK-13](TK-13-embeddings.md); полный source lifecycle — [TK-20](../../EP-2-knowledge/tasks/TK-20-source-identity.md)/[TK-21](../../EP-2-knowledge/tasks/TK-21-provenance.md); генератор target corpus — [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md).
-- **Интерфейсы — вход:** [TK-7](TK-7-markdown.md): Доменная модель и parser/serializer Markdown, отделённые от Git/SQLite/CLI адаптеров; [TK-8](TK-8-git-snapshots.md): Git adapter со снимками, служебными refs и тестами сохранности объектов; [TK-9](TK-9-storage.md): Начальная схема SQLite и storage adapters для всех согласованных сущностей; [TK-10](TK-10-change-detection.md): Production путь обнаружения изменений и публикации по файлу; [TK-11](TK-11-cli-runtime.md): Рабочий CLI без постоянного процесса, с блокировками и запуском drain; [TK-12](TK-12-search.md): Базовый search/inspect с согласованными ссылками и гибридным ранжированием; [TK-13](TK-13-embeddings.md): Базовый embedding runtime и drain по текстам без вектора
+- **Интерфейсы — вход:** [TK-7](TK-7-markdown.md): Доменная модель и parser Markdown (без сериализатора: letopis не пишет корпус, D-93), отделённые от Git/SQLite/CLI адаптеров; [TK-8](TK-8-git-snapshots.md): Git adapter со снимками, служебными refs и тестами сохранности объектов; [TK-9](TK-9-storage.md): Начальная схема SQLite и storage adapters для всех согласованных сущностей; [TK-10](TK-10-change-detection.md): Production путь обнаружения изменений и публикации по файлу; [TK-11](TK-11-cli-runtime.md): Рабочий CLI без постоянного процесса, с блокировками и запуском drain; [TK-12](TK-12-search.md): Базовый search/inspect с согласованными ссылками и гибридным ранжированием; [TK-13](TK-13-embeddings.md): Базовый embedding runtime и drain по текстам без вектора
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md), [TK-17](../../EP-7-early-validation/tasks/TK-17-early-pilot.md).
 
 ## 8. Риски и примечания

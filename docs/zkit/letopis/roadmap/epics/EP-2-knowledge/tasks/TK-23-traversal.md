@@ -4,7 +4,7 @@
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 6 / 8 / 16 (best / expected / worst)
-> **План:** неделя 17 — 7 ч; неделя 18 — 1 ч
+> **План:** неделя 17 — 5 ч; неделя 18 — 3 ч
 > **Зависимости:** [TK-18](TK-18-graph-validation.md), [TK-20](TK-20-source-identity.md), [TK-21](TK-21-provenance.md), [TK-12](../../EP-1-thin-slice/tasks/TK-12-search.md)
 
 

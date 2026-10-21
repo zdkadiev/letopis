@@ -5,17 +5,17 @@
 ## Layout
 
 ```text
-SnapshotRequest { element_ids: Set<ElementId>, full_corpus: bool }
+SnapshotRequest { element_ids: Set<ElementId> }
 InspectedElement { path: Path, lines: Option<InclusiveLines>,
   hash: Option<Sha256> }
 CanonicalSnapshot { oid: TreeOid, elements: Map<ElementId, InspectedElement>,
-  files: transient Map<Path, {blob_oid: GitOid, file_hash: Sha256}> }
+  files: transient Map<Path, {blob_oid: GitOid}> }
 capture(request: SnapshotRequest) -> Result<CanonicalSnapshot, DomainError>
 read(snapshot: &CanonicalSnapshot, path: Path) -> ByteStream
 pin(snapshot: &CanonicalSnapshot) -> Result<RetainedTree, DomainError>
 ```
 
-Snapshot снимается с текущих файлов рабочей копии ([D-93](../decisions.md#D-93)); правка агента, идущая в этот момент, может попасть в снимок частично, как при любом чтении живых файлов; один tree охватывает весь размеченный корпус и адресованные внешние source. Source без текущих ссылок не существует (D-91): его адрес — неизвестный ID. Element_ids адресуют вершины, метавершины и source; повторные ID обрабатываются один раз. Elements содержит общие InspectedElement только запрошенных ID, без зависимости от NodeMetadata проекций. Полный tree/manifest остаётся входом prepare; NodeMetadata/EdgeMetadata строит кодек из его bytes, а не из ограниченного результата inspect. Существование source и его created_at (минимум created_at его external-ссылок) выводятся из канонических ссылок этого же tree, текущие bytes/hash/lines — из снимка; реестра source в БД нет, D-91. Отсутствующий source представлен null hash, файл в tree отсутствует. Неизвестный ID отклоняет пакет; read из удерживаемого tree не переключается на live path.
+Snapshot снимается с текущих файлов рабочей копии ([D-93](../decisions.md#D-93)); правка агента, идущая в этот момент, может попасть в снимок частично, как при любом чтении живых файлов; один tree охватывает весь размеченный корпус и адресованные внешние source. Source без текущих ссылок не существует (D-91): его адрес — неизвестный ID. Element_ids адресуют вершины, метавершины и source; повторные ID обрабатываются один раз. Elements содержит общие InspectedElement только запрошенных ID, без зависимости от NodeMetadata проекций. Существование source и его created_at (минимум created_at его external-ссылок) выводятся из канонических ссылок этого же tree, текущие bytes/hash/lines — из снимка; реестра source в БД нет, D-91. Отсутствующий source представлен null hash, файл в tree отсутствует. Неизвестный ID отклоняет пакет; read из удерживаемого tree не переключается на live path.
 
 Рёбра inspect не адресует: ребро — тройка (источник, цель, тип) без собственного ID и хеша, его видно через traverse ([D-93](../decisions.md#D-93)). Для знания path/lines — диапазон элемента в этом tree, hash — SHA-256 его байтов; для source — адресованные байты или null. Устаревшие SQL hash/lines не подставляются. Если элемента уже нет в текущем tree, это not_found всей группы даже при старой строке в индексе. Пример смешанной группы inspect [N, S] возвращает метаданные знания N и source S из одного снимка; неизвестный ID не даёт частичного ответа.
 
@@ -29,4 +29,4 @@ Synchronous in-process call; no independent deadline or quota. The caller owns t
 
 ## Errors
 
-Storage/Git failures propagate as Result error using the existing X-1 code/message/details; no successful result is fabricated after I/O failure. Caller releases its read view or rolls back the write unit. No mutation replay is performed by this port.
+Storage/Git failures propagate as Result error using the existing X-1 code/message/details; no successful result is fabricated after I/O failure. Caller releases its read view or rolls back the write unit.

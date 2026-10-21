@@ -4,7 +4,7 @@
 > **Эпик:** [EP-4](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 6 / 8 / 12 (best / expected / worst)
-> **План:** неделя 30 — 3 ч; неделя 31 — 5 ч
+> **План:** неделя 31 — 8 ч
 > **Зависимости:** [TK-34](TK-34-mixed-memory.md), [TK-35](TK-35-search-latency.md), [TK-36](TK-36-disk-growth.md), [TK-37](TK-37-queue-drill.md), [TK-38](TK-38-power-loss.md), [TK-39](TK-39-corruption-drill.md), [TK-40](TK-40-restore.md), [TK-41](TK-41-provider-drill.md), [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md)
 
 

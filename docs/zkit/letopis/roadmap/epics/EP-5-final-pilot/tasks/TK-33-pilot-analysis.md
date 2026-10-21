@@ -4,7 +4,7 @@
 > **Эпик:** [EP-5](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 23 — 1 ч; неделя 24 — 7 ч
+> **План:** неделя 24 — 7 ч; неделя 25 — 1 ч
 > **Зависимости:** [TK-31](TK-31-baseline.md), [TK-32](TK-32-memory-condition.md), [TK-17](../../EP-7-early-validation/tasks/TK-17-early-pilot.md)
 
 

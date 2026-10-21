@@ -4,7 +4,7 @@
 > **Эпик:** [EP-5](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 21 — 5 ч; неделя 22 — 3 ч
+> **План:** неделя 21 — 1 ч; неделя 22 — 7 ч
 > **Зависимости:** [TK-24](../../EP-2-knowledge/tasks/TK-24-inspect.md), [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md), [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md), [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md), [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md), [TK-29](../../EP-3-maintenance/tasks/TK-29-cancellation.md), [TK-5](../../EP-8-proofs/tasks/TK-5-pilot-protocol.md)
 
 

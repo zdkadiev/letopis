@@ -4,7 +4,7 @@
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 13 — 3 ч; неделя 14 — 5 ч
+> **План:** неделя 13 — 1 ч; неделя 14 — 7 ч
 > **Зависимости:** [TK-17](../../EP-7-early-validation/tasks/TK-17-early-pilot.md), [TK-7](../../EP-1-thin-slice/tasks/TK-7-markdown.md), [TK-10](../../EP-1-thin-slice/tasks/TK-10-change-detection.md)
 
 
@@ -49,7 +49,7 @@
 
 - **Входит:** Полный доменный валидатор графа с ошибками по файлу. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Грамматика — [TK-7](../../EP-1-thin-slice/tasks/TK-7-markdown.md); публикация — [TK-10](../../EP-1-thin-slice/tasks/TK-10-change-detection.md); check/удаления/переименования — [TK-19](TK-19-check-renames.md); source identity — [TK-20](TK-20-source-identity.md).
-- **Интерфейсы — вход:** [TK-17](../../EP-7-early-validation/tasks/TK-17-early-pilot.md): Отчёт раннего пилота и решение, допустимо ли расширять slice до полного scope; [TK-7](../../EP-1-thin-slice/tasks/TK-7-markdown.md): Доменная модель и parser/serializer Markdown, отделённые от Git/SQLite/CLI адаптеров; [TK-10](../../EP-1-thin-slice/tasks/TK-10-change-detection.md): Production путь обнаружения изменений и публикации по файлу
+- **Интерфейсы — вход:** [TK-17](../../EP-7-early-validation/tasks/TK-17-early-pilot.md): Отчёт раннего пилота и решение, допустимо ли расширять slice до полного scope; [TK-7](../../EP-1-thin-slice/tasks/TK-7-markdown.md): Доменная модель и parser Markdown (без сериализатора: letopis не пишет корпус, D-93), отделённые от Git/SQLite/CLI адаптеров; [TK-10](../../EP-1-thin-slice/tasks/TK-10-change-detection.md): Production путь обнаружения изменений и публикации по файлу
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-19](TK-19-check-renames.md), [TK-20](TK-20-source-identity.md), [TK-23](TK-23-traversal.md).
 
 ## 8. Риски и примечания

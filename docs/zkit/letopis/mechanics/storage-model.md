@@ -6,6 +6,10 @@
 
 Полный перенесённый документ; принятые решения и предложения внутри сохраняют прежний статус. Общие этапы zkit не считаются завершёнными по наличию этого подробного материала.
 
+## Уточнение D-96 — 2026-10-21
+
+По [D-96](../decisions.md#D-96) стек и поставка закреплены: rusqlite `=0.40.2` с bundled SQLite, vec1 компилируется в бинарник и регистрируется `sqlite3_auto_extension` без `load_extension`. Места ниже, где версии крейтов и способ включения расширения «уточняются отдельно» или названы только исследовательской базой, — история.
+
 ## Уточнение D-95 — 2026-10-20
 
 По [D-95](../decisions.md#D-95) таблиц embedding_jobs, errors и reindex_state больше нет: работа embeddings — тексты без вектора, попытки — vec.embed_failures, диагностика вычисляется из files.error, рёбер без цели, includes-циклов и embed_failures. Всё ниже про seq, jobs, active/owner и reindex_state — история; актуальный DDL — [storage-schema.sql](storage-schema.sql).
@@ -16,9 +20,13 @@
 
 ## Уточнение D-91 — 2026-10-20
 
+История: части этого уточнения про `.letopis/recovery.json` и лок в памяти worker сняты D-93/D-94 (уточнения выше).
+
 По [D-91](../decisions.md#D-91) служебная БД — пересоздаваемый кэш. Это перекрывает все места ниже, где source UUID/created_at, embedding_config, recovery или locks описаны как долговечное состояние БД: ID source — нормализованный uri, created_at source выводится из ссылок, конфигурация — `.letopis/config.json`, recovery — `.letopis/recovery.json`, лок — память worker. Действующая схема — [storage-schema.sql](storage-schema.sql), протокол — [mechanics MC-2](../mechanics.md).
 
 ## Уточнение после аудита — 2026-10-20
+
+История: снято D-93/D-95 (apply, edge hash/lines и хранимые ошибки больше не существуют).
 
 По [D-90](../decisions.md#D-90) текущий apply публикует весь outstanding delta от опубликованной revision до after tree, сохраняя request paths для записи/отката. Inspect покрывает узлы/source и рёбра общими snapshot metadata; собственный edge hash/lines берётся из канонической ссылки. Сохранённые status/errors сообщения проецируют existing errors.active как details.active без копии в DB details. Актуальные типы и критерии — в [mechanics](../mechanics.md), [I-12](../contracts/I-12-snapshot.md) и [X-1](../contracts/X-1-cli.md); исторические разделы ниже сохраняются.
 

@@ -4,7 +4,7 @@
 > **Эпик:** [EP-4](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 28 — 5 ч; неделя 29 — 3 ч
+> **План:** неделя 28 — 1 ч; неделя 29 — 7 ч
 > **Зависимости:** [TK-38](TK-38-power-loss.md), [TK-21](../../EP-2-knowledge/tasks/TK-21-provenance.md), [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md), [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md)
 
 

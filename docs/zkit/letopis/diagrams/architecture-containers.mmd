@@ -12,7 +12,7 @@ flowchart LR
         Drain --> Vectors
         CLI -->|"flock"| Locks["🔒 .letopis/index.lock<br/>.letopis/embed.lock"]
         Drain -->|"flock"| Locks
-        CLI -->|"config file"| Files["📄 .letopis/config.json"]
+        CLI -->|"read config file"| Files["📄 .letopis/config.json"]
         CLI -->|"X-4 read / check"| Markdown["📄 Knowledge Markdown"]
         CLI -->|"X-3 raw snapshots"| Objects["Git objects and service refs"]
     end

@@ -1,7 +1,7 @@
 # EP-3 — Обслуживание и полный lifecycle
 
 > **Фаза:** PH-2
-> **Оценка, ч:** 16 / 28 / 54 (best / expected / worst)
+> **Оценка, ч:** 17 / 30 / 56 (best / expected / worst)
 > **Зависимости:** [TK-10](../EP-1-thin-slice/tasks/TK-10-change-detection.md), [TK-11](../EP-1-thin-slice/tasks/TK-11-cli-runtime.md), [TK-13](../EP-1-thin-slice/tasks/TK-13-embeddings.md), [TK-24](../EP-2-knowledge/tasks/TK-24-inspect.md)
 
 ## Цель

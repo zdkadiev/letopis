@@ -4,7 +4,7 @@
 > **Эпик:** [EP-4](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
-> **План:** неделя 26 — 7 ч; неделя 27 — 1 ч
+> **План:** неделя 26 — 3 ч; неделя 27 — 5 ч
 > **Зависимости:** [TK-33](../../EP-5-final-pilot/tasks/TK-33-pilot-analysis.md), [TK-15](../../EP-7-early-validation/tasks/TK-15-target-corpus.md), [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md), [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md)
 
 

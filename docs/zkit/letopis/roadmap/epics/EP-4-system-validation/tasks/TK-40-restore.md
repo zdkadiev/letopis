@@ -4,7 +4,7 @@
 > **Эпик:** [EP-4](../epic.md)
 > **Фаза:** PH-3
 > **Оценка, ч:** 3 / 6 / 12 (best / expected / worst)
-> **План:** неделя 29 — 6 ч
+> **План:** неделя 29 — 3 ч; неделя 30 — 3 ч
 > **Зависимости:** [TK-39](TK-39-corruption-drill.md), [TK-28](../../EP-3-maintenance/tasks/TK-28-diagnostics.md), [TK-27](../../EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md)
 
 

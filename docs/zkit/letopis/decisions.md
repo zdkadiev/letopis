@@ -14,7 +14,7 @@
 | [D-4](#D-4) | Метавершины и includes без метарёбер | принято (перенесено), уточнено D-95 |
 | [D-5](#D-5) | Минимальный контракт apply | заменено [D-93](#D-93) |
 | [D-6](#D-6) | Удаление и перенос подготавливает агент | принято (перенесено) |
-| [D-7](#D-7) | Файлы, граф и FTS синхронно; embeddings допускают отставание | принято (перенесено) |
+| [D-7](#D-7) | Файлы, граф и FTS синхронно; embeddings допускают отставание | принято (перенесено), уточнено D-93, D-95 |
 | [D-8](#D-8) | Запись восстановления и полный откат | заменено [D-93](#D-93) |
 | [D-9](#D-9) | Нет бессрочной дедупликации по хешу | заменено [D-93](#D-93) |
 | [D-10](#D-10) | Источники — узлы той же nodes | принято (перенесено) |
@@ -23,13 +23,13 @@
 | [D-13](#D-13) | Модульные embeddings с общим texts → vectors | принято (перенесено) |
 | [D-14](#D-14) | Фильтр ревизий по адресованным байтам | принято (перенесено) |
 | [D-15](#D-15) | Один traverse с тремя режимами | принято (перенесено) |
-| [D-16](#D-16) | Обнаружение при вызове и точечное индексирование | принято (перенесено) |
+| [D-16](#D-16) | Обнаружение при вызове и точечное индексирование | принято (перенесено), уточнено D-93, D-95 |
 | [D-17](#D-17) | Очередь embeddings с заменой задания | заменено [D-95](#D-95) |
 | [D-18](#D-18) | Общий JSON, status и errors | принято (перенесено), уточнено D-95 |
-| [D-19](#D-19) | Содержимое и снимки хранит Git | принято (перенесено) |
+| [D-19](#D-19) | Содержимое и снимки хранит Git | принято (перенесено), уточнено D-93, D-95 |
 | [D-20](#D-20) | Создание с Unix created_at | принято (перенесено) |
 | [D-21](#D-21) | Границы первой версии и нагрузка | принято (перенесено) |
-| [D-22](#D-22) | Rust и SQLite с FTS5/vec1 | принято (перенесено) |
+| [D-22](#D-22) | Rust и SQLite с FTS5/vec1 | принято (перенесено), уточнено D-92, D-96 |
 | [D-23](#D-23) | YAGNI и KISS | принято (перенесено) |
 | [D-24](#D-24) | DDD и hexagonal в одном процессе | принято (перенесено) |
 | [D-25](#D-25) | Первая проверка пользы — против агента без накопленной памяти | принято |
@@ -84,13 +84,13 @@
 | [D-74](#D-74) | Локальный IPC CLI и worker | заменено [D-94](#D-94) |
 | [D-75](#D-75) | Общий DiagnosticsPort с владельцем хранения B-2 | заменено [D-95](#D-95) |
 | [D-76](#D-76) | Одна защищённая фаза сохранения/восстановления на проект | заменено [D-93](#D-93) |
-| [D-77](#D-77) | Согласованное многофайловое чтение по Git-снимку | принято пользователем |
+| [D-77](#D-77) | Согласованное многофайловое чтение по Git-снимку | принято пользователем, уточнено D-93, D-95 |
 | [D-78](#D-78) | max_retries в существующей конфигурации проекта | принято пользователем |
-| [D-79](#D-79) | Простые механизмы реализации после закрытия mechanics R1 | assumed — инженерные решения автора с проверками, уточнено D-95 |
+| [D-79](#D-79) | Простые механизмы реализации после закрытия mechanics R1 | assumed — инженерные решения автора с проверками, уточнено D-93, D-94, D-95 |
 | [D-80](#D-80) | Backup и restore v1 выполняются внешними инструментами | принято пользователем |
 | [D-81](#D-81) | Нет фиксированного loss window после permanent storage failure | принято пользователем |
 | [D-82](#D-82) | Нет фиксированного restore-time deadline v1 | принято пользователем |
-| [D-83](#D-83) | Минимальная операционная устойчивость без backup-сервиса | assumed — инженерные уточнения автора с проверками |
+| [D-83](#D-83) | Минимальная операционная устойчивость без backup-сервиса | assumed — инженерные уточнения автора с проверками, уточнено D-95, D-96 |
 | [D-84](#D-84) | Доступность разработки 10 часов в неделю | принято пользователем |
 | [D-85](#D-85) | Нет фиксированного delivery deadline полной v1 | принято пользователем |
 | [D-86](#D-86) | Полный недельный план задач до готовности v1 | принято пользователем |
@@ -98,11 +98,12 @@
 | [D-88](#D-88) | Адаптация полного недельного плана к zkit 0.2.5 | принято пользователем — исправить замечания и адаптировать формат; группировка и точные формулировки — инженерная реализация |
 | [D-89](#D-89) | Перенос документов по структуре zkit 0.2.6 | принято пользователем — перенос, обновление ссылок/скриптов и повторные проверки; точное распределение файлов — инженерная реализация |
 | [D-90](#D-90) | Исправление четырёх findings полного аудита без расширения v1 | принято — пользователь поручил исправить все четыре finding |
-| [D-91](#D-91) | Служебная БД — пересоздаваемый кэш | принято пользователем |
-| [D-92](#D-92) | Векторы не пересчитываются при неизменном тексте элемента | принято пользователем |
+| [D-91](#D-91) | Служебная БД — пересоздаваемый кэш | принято пользователем, уточнено D-95 |
+| [D-92](#D-92) | Векторы не пересчитываются при неизменном тексте элемента | принято пользователем, уточнено D-95 |
 | [D-93](#D-93) | Агенты правят корпус напрямую; знание адресуется путём или путём с якорем | принято пользователем, уточнено D-95 |
-| [D-94](#D-94) | Без постоянного worker; блокировки flock и фоновый drain embeddings | принято пользователем, уточнено D-95 |
+| [D-94](#D-94) | Без постоянного worker; блокировки flock и фоновый drain embeddings | принято пользователем, уточнено D-95, D-96 |
 | [D-95](#D-95) | Состояние выводится из данных: рёбра, очередь embeddings и диагностика без отдельного жизненного цикла | принято пользователем |
+| [D-96](#D-96) | Стек зависимостей v1: синхронный Rust без async runtime | принято пользователем |
 
 ## Решения
 
@@ -210,11 +211,11 @@ Create добавляет один/несколько элементов в ко
 
 <a id="D-7"></a>
 ### D-7: Файлы, граф и FTS синхронно; embeddings допускают отставание
-> **Статус:** принято (перенесено) · **Дата:** 2026-10-18
+> **Статус:** принято (перенесено), уточнено D-93, D-95 · **Дата:** 2026-10-18
 
 > **Уточнено [D-93](#D-93), 2026-10-20:** агенты правят корпус напрямую; ID знания — путь или путь#якорь; действующие формулировки см. в D-93.
 
-Apply синхронно фиксирует файлы и финальную транзакцию графа/FTS/ревизии/служебного состояния/embedding_jobs. Векторы вычисляются позже. Одна транзакция чтения SQLite закрепляет search/traverse; готовый применимый вектор публикуется отдельной короткой транзакцией.
+Apply синхронно фиксирует файлы и финальную транзакцию графа/FTS/ревизии/служебного состояния/embedding_jobs. *Уточнено D-95: таблицы embedding_jobs нет — работа embeddings выводится из текстов без вектора в vectors.db.* Векторы вычисляются позже. Одна транзакция чтения SQLite закрепляет search/traverse; готовый применимый вектор публикуется отдельной короткой транзакцией.
 
 **Альтернативы:** Публикация только после всех embeddings; асинхронная запись канонических файлов.
 
@@ -360,11 +361,11 @@ Relations/containment/both; out/in/both; глубина по переходам,
 
 <a id="D-16"></a>
 ### D-16: Обнаружение при вызове и точечное индексирование
-> **Статус:** принято (перенесено) · **Дата:** 2026-10-18
+> **Статус:** принято (перенесено), уточнено D-93, D-95 · **Дата:** 2026-10-18
 
 > **Уточнено [D-93](#D-93), 2026-10-20:** агенты правят корпус напрямую; ID знания — путь или путь#якорь; действующие формулировки см. в D-93.
 
-Постоянного watcher нет. Изменения Git обнаруживаются при CLI-вызове; изменения apply известны сразу и индексируются по затронутым элементам/зависимостям. Reindex полный/выборочный ждёт результата и может присоединиться к подходящей работе.
+Постоянного watcher нет. Изменения Git обнаруживаются при CLI-вызове; изменения apply известны сразу и индексируются по затронутым элементам/зависимостям. Reindex полный/выборочный ждёт результата и может присоединиться к подходящей работе. *Уточнено D-95: reindex только полный, держит index.lock всё время; выборочного reindex нет.*
 
 **Альтернативы:** Полная переиндексация после каждой правки; обязательное фоновое наблюдение.
 
@@ -398,6 +399,8 @@ Embedding_jobs: одна строка на node_id, новый AUTOINCREMENT seq
 
 Один JSON stdout, успех 0, ошибка/обработанная отмена 1; неизвестные поля отклоняются. Status показывает ревизию, прогресс этапа в процентах, очередь, локи и errors. Errors --clear очищает завершённые неуспешные сообщения проекта, активные сохраняет. SIGINT и reindex --cancel поддерживаются.
 
+> **Уточнено D-95, 2026-10-20:** errors входит в status и показывает только текущие проблемы; errors --clear, прогресса этапа и reindex --cancel нет, занятость блокировок с PID status показывает (D-94); отмена — SIGINT своего процесса (механизм — D-96).
+
 **Альтернативы:** Отдельный журнал ответов; clear как команда; прогресс строками в stdout.
 
 **Почему:** Агент надёжно разбирает ответ и наблюдает ход/ошибки через единый формат.
@@ -410,11 +413,13 @@ Embedding_jobs: одна строка на node_id, новый AUTOINCREMENT seq
 
 <a id="D-19"></a>
 ### D-19: Содержимое и снимки хранит Git
-> **Статус:** принято (перенесено) · **Дата:** 2026-10-18
+> **Статус:** принято (перенесено), уточнено D-93, D-95 · **Дата:** 2026-10-18
 
 > **Уточнено [D-93](#D-93), 2026-10-20:** агенты правят корпус напрямую; ID знания — путь или путь#якорь; действующие формулировки см. в D-93.
 
 letopis не хранит Markdown/код в БД и не делает автоматических коммитов. Прежние байты, снимки индексации и основания — в Git; используемые/выданные деревья закрепляются служебными refs бессрочно. Git-изменения и защищённая запись/восстановление CLI взаимно исключены. Физическое закрепление/долговечность ещё проектируются.
+
+> **Уточнено D-95, 2026-10-21:** Git хранит содержимое, историю и основания, а также деревья выданных inspect-снимков и source_snapshot, закреплённые `refs/letopis/snapshots/<oid>`. Снимков индексации и деревьев на каждую публикацию нет; защищённой записи и восстановления CLI нет (D-93), поэтому и их взаимного исключения с Git-изменениями.
 
 **Альтернативы:** Текстовые копии или собственная история в БД; автоматический коммит на apply.
 
@@ -464,9 +469,11 @@ letopis автоматически назначает created_at в секунд
 
 <a id="D-22"></a>
 ### D-22: Rust и SQLite с FTS5/vec1
-> **Статус:** принято (перенесено) · **Дата:** 2026-10-18
+> **Статус:** принято (перенесено), уточнено D-92, D-96 · **Дата:** 2026-10-18
 
 Rust + rusqlite, единая SQLite 3.51.3+, WAL/FULL/fullfsync macOS. FTS5 contentless-delete, нативный vec1. Выбор flat/cosine остаётся предложением. SQLite не заменяет межфайловый протокол восстановления.
+
+> **Уточнено D-92, D-96, 2026-10-21:** векторы лежат в отдельном `.letopis/vectors.db` (D-92), а не в единой БД; индекс vec1 — no-index/cos по D-79, flat-предложение снято. Точный стек (версии, features) и статическая сборка vec1 в бинарник — D-96. Межфайлового протокола восстановления больше нет (D-93).
 
 **Альтернативы:** Go-драйверы; ORM; отдельное серверное графовое/векторное хранилище.
 
@@ -475,7 +482,7 @@ Rust + rusqlite, единая SQLite 3.51.3+, WAL/FULL/fullfsync macOS. FTS5 con
 **Подробности:** [документ](research/R-2-rust-sqlite.md).
 
 <!-- links -->
-**Связи:** [requirements.md](requirements.md): C-4, C-5; [data.md](data.md): 6. Storage classes and totals; [architecture.md](architecture.md): 3. Key decisions, Technology and constraints, NFR-4, 9. Traceability
+**Связи:** [requirements.md](requirements.md): C-4, C-5; [data.md](data.md): 6. Storage classes and totals; [architecture.md](architecture.md): 3. Key decisions, Technology and constraints, NFR-4, 9. Traceability; [D-96](#D-96): упоминает
 <!-- /links -->
 
 <a id="D-23"></a>
@@ -1277,7 +1284,7 @@ Rust + rusqlite, единая SQLite 3.51.3+, WAL/FULL/fullfsync macOS. FTS5 con
 **Подробности:** [требования](requirements.md), [ресурсный расчёт](resource-math.md), [CLI](contracts/X-1-cli.md), [embeddings](contracts/X-2-embeddings.md).
 
 <!-- links -->
-**Связи:** [requirements.md](requirements.md): Changes since previous version, FR-22, FR-32; [resource-math.md](resource-math.md): 7. Consequences for the design; [data.md](data.md): Работа embeddings и смена модели; [architecture.md](architecture.md): 6. Interfaces; [mechanics.md](mechanics.md): MC-6 — чтение, поиск и обход, MC-7 — текущие проблемы и status; [resilience.md](resilience.md): O-5; [D-61](#D-61): упоминает; [D-66](#D-66): упоминает; [D-95](#D-95): упоминает
+**Связи:** [requirements.md](requirements.md): Changes since previous version, FR-22, FR-32; [resource-math.md](resource-math.md): 7. Consequences for the design; [data.md](data.md): Работа embeddings и смена модели; [architecture.md](architecture.md): 6. Interfaces, S-1; [mechanics.md](mechanics.md): MC-6 — чтение, поиск и обход, MC-7 — текущие проблемы и status; [resilience.md](resilience.md): O-5; [D-61](#D-61): упоминает; [D-66](#D-66): упоминает; [D-95](#D-95): упоминает
 <!-- /links -->
 
 <a id="D-63"></a>
@@ -1438,7 +1445,7 @@ Rust + rusqlite, единая SQLite 3.51.3+, WAL/FULL/fullfsync macOS. FTS5 con
 ### D-71: Явный reindex ждёт граф/FTS и постановку заданий, а не embeddings
 > **Статус:** принято, уточнено D-95 · **Дата:** 2026-10-18
 
-В фиксированном раунде contracts R1 пользователь выбрал вариант 1 для G2. Явный полный или выборочный reindex возвращает успех после проверки и публикации согласованных графа/FTS и постановки необходимых заданий embeddings в той же транзакции. result.revision — Git tree OID опубликованного состояния. Векторы вычисляются в фоне; их готовность в этот успех не входит. До настройки модели действует D-70.
+В фиксированном раунде contracts R1 пользователь выбрал вариант 1 для G2. Явный полный или выборочный reindex возвращает успех после проверки и публикации согласованных графа/FTS и постановки необходимых заданий embeddings в той же транзакции. result.revision — Git tree OID опубликованного состояния. *Уточнено D-95: reindex только полный, заданий embeddings не ставит (работа выводится из данных), project.revision — целочисленный счётчик публикаций.* Векторы вычисляются в фоне; их готовность в этот успех не входит. До настройки модели действует D-70.
 
 **Альтернатива:** при настроенной модели ждать также векторы выбранной области, связывая исход reindex с их вычислением.
 
@@ -1541,7 +1548,9 @@ E-10 имеет одного владельца хранения в сущест
 
 <a id="D-77"></a>
 ### D-77: Согласованное многофайловое чтение по Git-снимку
-> **Статус:** принято пользователем · **Дата:** 2026-10-19
+> **Статус:** принято пользователем, уточнено D-93, D-95 · **Дата:** 2026-10-19
+
+> **Уточнено D-93, D-95, 2026-10-21:** согласованный снимок — tree текущих файлов, который выдаёт inspect (I-12 capture используется только inspect); его ref `refs/letopis/snapshots/<oid>`. Абзацы «Граница», «Способ правки» и «Проверка» ниже — история: защищённой фазы, журнала, отката, записи через CLI и jobs больше нет (D-93, D-95).
 
 В mechanics R1 Q2/3 пользователь подтвердил: согласованный просмотр нескольких документов выполняется по одному неизменяемому Git-снимку; обычное чтение живых файлов не получает межфайловой гарантии согласованности. Используется существующий snapshot, возвращаемый inspect; агент читает нужные пути стандартными средствами Git из одного tree OID. Если требуется состояние конкретной выдачи, используется соответствующий удерживаемый снимок, а не смешение файлов разных ревизий.
 
@@ -1575,7 +1584,9 @@ E-10 имеет одного владельца хранения в сущест
 
 <a id="D-79"></a>
 ### D-79: Простые механизмы реализации после закрытия mechanics R1
-> **Статус:** assumed — инженерные решения автора с проверками, уточнено D-95 · **Дата:** 2026-10-19
+> **Статус:** assumed — инженерные решения автора с проверками, уточнено D-93, D-94, D-95 · **Дата:** 2026-10-19
+
+> **Уточнено D-93, D-94, D-95, 2026-10-21:** project gate, singleton lock/socket, строка recovery id=1, правка по байтовым диапазонам, seq, owner в errors, jobs и reindex_state — история. Действуют flock index.lock/embed.lock (D-94), embed_failures(search_hash, attempts, error) вместо attempts в jobs, полный reindex под index.lock и текущие проблемы без хранения (D-95); vec1 no-index/cos, RRF и BFS сохраняются.
 
 Не новые пользовательские ответы: один process-held project gate для сохранения/восстановления/снятия канонического снимка, короткая единица записи SQLite, отдельное read-only соединение на запрос. Recovery использует единственную строку id=1 с hash/snapshot/paths, без текста и истории успехов. Файлы меняются по байтовым диапазонам размеченных фрагментов; операция не требует замены файлов через rename. Имена singleton lock/socket определяются каноническим Git-root и UID, удерживаемый kernel lock проверяется до удаления stale socket; протокол D-74 уточнён без публичного сервера.
 
@@ -1588,7 +1599,7 @@ E-10 имеет одного владельца хранения в сущест
 **Проверки:** MC-2 crash/order/reindex model; MC-3 seq/config/cancel/attempt-budget model; MC-5 singleton/cancel и MC-7 diagnostics model. Diagnostics использует один внутренний owner в errors (reindex либо embedding:<uuid>), без error_id в jobs/reindex_state и без нового реестра: active причина остаётся находимой после удаления работы. Новая retry-ошибка завершает прежнюю active того же owner и сохраняет новое сообщение; сообщения не агрегируются и не удаляются. Internal schema examples, Mermaid syntax, затем независимый review. Реальный Git/filesystem/vec1 power-loss, multi-process signals, полная RAM/качество — P-1/P-2/P-3. Без доступа к требуемому durable-примитиву нельзя молча выдавать ослабленную запись за успешную. Не введены новый брокер, архив индексов, долговечный replay-cache или копия текста в SQLite.
 
 <!-- links -->
-**Связи:** [requirements.md](requirements.md): Changes since previous version; [contracts.md](contracts.md): Changes since previous version; [data.md](data.md): Changes since previous version; [architecture.md](architecture.md): Changes since previous version; [mechanics.md](mechanics.md): Фиксированный раунд mechanics R1, 7. Reconciliation with earlier steps, 8. Risks, assumptions and open questions; [D-78](#D-78): упоминает; [D-95](#D-95): упоминает
+**Связи:** [requirements.md](requirements.md): Changes since previous version; [contracts.md](contracts.md): Changes since previous version; [data.md](data.md): Changes since previous version; [architecture.md](architecture.md): Changes since previous version; [mechanics.md](mechanics.md): Фиксированный раунд mechanics R1, 7. Reconciliation with earlier steps, 8. Risks, assumptions and open questions; [D-22](#D-22): упоминает; [D-78](#D-78): упоминает; [D-95](#D-95): упоминает; [D-96](#D-96): упоминает
 <!-- /links -->
 
 <a id="D-80"></a>
@@ -1608,7 +1619,7 @@ E-10 имеет одного владельца хранения в сущест
 **Раунд:** закрыто 1/3 в R1, G2/G3 открыты, очередь 0. Новых измерений, реализации или внешнего копирования этим решением не выполнялось.
 
 <!-- links -->
-**Связи:** [resilience.md](resilience.md): Правка 2026-10-20, 1. Summary, Фиксированный раунд R1, F-3, 4. Security and isolation design, Внешняя согласованная copy/restore-процедура, O-3, O-7, 11. Reconciliation with earlier steps, 12. Risks, assumptions and open questions; [roadmap.md](roadmap.md): TK-40, TK-44; [D-81](#D-81): упоминает; [D-82](#D-82): упоминает; [D-91](#D-91): упоминает
+**Связи:** [resilience.md](resilience.md): Правка 2026-10-21, 1. Summary, Фиксированный раунд R1, F-3, 4. Security and isolation design, Внешняя согласованная copy/restore-процедура, O-3, O-7, 11. Reconciliation with earlier steps, 12. Risks, assumptions and open questions; [roadmap.md](roadmap.md): TK-40, TK-44; [D-81](#D-81): упоминает; [D-82](#D-82): упоминает; [D-91](#D-91): упоминает
 <!-- /links -->
 
 <a id="D-81"></a>
@@ -1644,12 +1655,14 @@ E-10 имеет одного владельца хранения в сущест
 **Итог раунда:** R1 закрыт 3/3; всего три пользовательских решения resilience D-80…D-82, очередь новых вопросов 0. Финальная модель/проверки отдельно от интервью; никаких новых измерений или восстановления данных этим решением не выполнялось.
 
 <!-- links -->
-**Связи:** [resilience.md](resilience.md): Правка 2026-10-20, 1. Summary, Фиксированный раунд R1, F-3, Внешняя согласованная copy/restore-процедура, DR-2, 9. Limits and verdicts, 11. Reconciliation with earlier steps, 12. Risks, assumptions and open questions; [roadmap.md](roadmap.md): TK-40; [D-83](#D-83): упоминает; [D-85](#D-85): упоминает; [D-91](#D-91): упоминает
+**Связи:** [resilience.md](resilience.md): Правка 2026-10-21, 1. Summary, Фиксированный раунд R1, F-3, Внешняя согласованная copy/restore-процедура, DR-2, 9. Limits and verdicts, 11. Reconciliation with earlier steps, 12. Risks, assumptions and open questions; [roadmap.md](roadmap.md): TK-40; [D-83](#D-83): упоминает; [D-85](#D-85): упоминает; [D-91](#D-91): упоминает
 <!-- /links -->
 
 <a id="D-83"></a>
 ### D-83: Минимальная операционная устойчивость без backup-сервиса
-> **Статус:** assumed — инженерные уточнения автора с проверками · **Дата:** 2026-10-19
+> **Статус:** assumed — инженерные уточнения автора с проверками, уточнено D-95, D-96 · **Дата:** 2026-10-19
+
+> **Уточнено D-95, D-96, 2026-10-21:** внешняя копия охватывает Markdown/рабочую копию, Git objects/refs (включая refs/letopis) и `.letopis/config.json`; служебная БД и vectors.db не копируются и пересоздаются reindex и drain (D-91, D-92). Writer/worker, socket, registry и seq больше нет. Попытки считает embed_failures, а не job (D-95). Настройки HTTP-клиента (без redirects и env proxy, 60 s, проверка сертификата системным хранилищем) закреплены в D-96.
 
 Внешняя backup-процедура использует остановленный, не изменяемый агентами/Git проект. Полностью остановлены writer/worker и новые CLI-запуски на время копирования; копируются Markdown/рабочая копия, реальные Git objects/refs включая refs/letopis, служебная SQLite с её существующим WAL/journal. Runtime socket/kernel ownership не переносятся. Restore производится в изолированное неиспользуемое место с закрытой БД; в существующий работающий проект файлы не подменяются. Проверяются объекты, durable registry/config/errors/attempts/seq, затем обычный recovery до обслуживания; только производные индексы могут быть пересобраны без сброса реестра. Это процедура оператора, не новая команда или feature live-backup. Основание безопасного копирования SQLite — R-9, проверка DR-2/P-3.
 
@@ -1662,7 +1675,7 @@ Embedding transport имеет assumed client deadline 60 секунд на од
 Новых сервисов, файлов состояния, backup schedules, retention TTL, ролей, alerts/push, сторонней telemetry, публичных commands/flags и дополнительных config knobs не добавлено. Нормальные MC-2/MC-3/MC-5/MC-7 и сроки хранения E-n сохраняются. Offline copy/restore, corrupt registry, power-loss и реальные времена — DR/P-3; RAM/retrieval — P-1/P-2.
 
 <!-- links -->
-**Связи:** [contracts.md](contracts.md): Changes since previous version; [mechanics.md](mechanics.md): 7. Reconciliation with earlier steps; [resilience.md](resilience.md): F-6, Практические границы без новых сервисов, 7. Assumptions, RA-1, 11. Reconciliation with earlier steps, 12. Risks, assumptions and open questions; [roadmap.md](roadmap.md): TK-6, TK-41
+**Связи:** [contracts.md](contracts.md): Changes since previous version; [architecture.md](architecture.md): Technology and constraints; [mechanics.md](mechanics.md): 7. Reconciliation with earlier steps; [resilience.md](resilience.md): F-6, Практические границы без новых сервисов, 7. Assumptions, RA-1, 11. Reconciliation with earlier steps, 12. Risks, assumptions and open questions; [roadmap.md](roadmap.md): TK-6, TK-41; [D-96](#D-96): упоминает
 <!-- /links -->
 
 <a id="D-84"></a>
@@ -1777,12 +1790,12 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 **Проверка:** новые schema cases и изолированные model guards сначала выявляют прежний дефект/отсутствующую защиту, затем проходят после исправлений. Итог и свежие результаты — [закрытие аудита](checks/flow/audit-fixes-2026-10-20.md).
 
 <!-- links -->
-**Связи:** [requirements.md](requirements.md): Changes since previous version; [resource-math.md](resource-math.md): Changes since previous version; [contracts.md](contracts.md): Changes since previous version; [data.md](data.md): Changes since previous version; [architecture.md](architecture.md): Changes since previous version; [mechanics.md](mechanics.md): Правка 2026-10-20; [resilience.md](resilience.md): Правка 2026-10-20; [roadmap.md](roadmap.md): Правка 2026-10-20
+**Связи:** [requirements.md](requirements.md): Changes since previous version; [resource-math.md](resource-math.md): Changes since previous version; [contracts.md](contracts.md): Changes since previous version; [data.md](data.md): Changes since previous version; [architecture.md](architecture.md): Changes since previous version; [mechanics.md](mechanics.md): Правка 2026-10-20; [resilience.md](resilience.md): Правка 2026-10-21; [roadmap.md](roadmap.md): Правка 2026-10-21
 <!-- /links -->
 
 <a id="D-91"></a>
 ### D-91: Служебная БД — пересоздаваемый кэш
-> **Статус:** принято пользователем · **Дата:** 2026-10-20
+> **Статус:** принято пользователем, уточнено D-95 · **Дата:** 2026-10-20
 
 > **Уточнено [D-93](#D-93), 2026-10-20:** агенты правят корпус напрямую; ID знания — путь или путь#якорь; действующие формулировки см. в D-93.
 
@@ -1792,9 +1805,11 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 
 1. Служебная SQLite хранит только данные, воспроизводимые из Markdown/Git, файла конфигурации и provider: граф, FTS, векторы, очередь embeddings, состояние reindex, диагностику. Удаление файла БД и reindex всегда восстанавливают рабочее состояние без потери канонических знаний; векторы вычисляются заново и могут отставать, FTS доступен сразу после публикации.
 2. Идентичность source — нормализованный адрес (path или path#Lx-Ly), он же ID source в inspect/traverse/filters. UUID у source нет. created_at source вычисляется как минимальный created_at его текущих external-рёбер. Source без текущих ссылок не является узлом графа. Это заменяет сохранение UUID/created_at source в БД из D-10/D-20; выбрана альтернатива D-10 «удалять идентичность при исчезновении последней ссылки».
-3. Конфигурация embeddings (provider, model, parameters, max_retries) хранится в файле `.letopis/config.json` в Git-корне, не в БД. config --set атомарно заменяет файл (временный файл + fsync + rename) и сбрасывает несовместимые векторы/очередь в кэше. Коммитить ли файл в Git, решает разработчик. API-ключ по-прежнему только в окружении (D-67).
+3. Конфигурация embeddings (provider, model, parameters, max_retries) хранится в файле `.letopis/config.json` в Git-корне, не в БД. config --set атомарно заменяет файл (временный файл + fsync + rename) и сбрасывает несовместимые векторы/очередь в кэше. *Уточнено D-95: config --set нет — файл правят агент или пользователь, letopis только читает его и по смене отпечатка сбрасывает vectors.db.* Коммитить ли файл в Git, решает разработчик. API-ключ по-прежнему только в окружении (D-67).
 4. Состояние незавершённого сохранения (запись восстановления) хранится вне БД, в долговечном файле `.letopis/recovery.json`; точный протокол — mechanics. Потеря кэша не теряет возможность отката. *Уточнено [D-93](#D-93): записи восстановления и отката больше нет, letopis не пишет корпус.*
 5. Диагностика, failed-состояние и счётчики попыток embeddings переживают рестарт вместе с кэшем; явное удаление кэша их сбрасывает (повторные попытки допустимы). Это не ослабляет FR-30/FR-33 для перезапуска.
+
+> Уточнено D-95: очереди и состояния reindex в кэше нет (работа выводится из данных, reindex только полный); попытки embeddings лежат в embed_failures в vectors.db — их сбрасывает удаление vectors.db или смена конфигурации, а не удаление кэша.
 6. Backup служебной БД не требуется: внешняя копия охватывает Markdown/Git и `.letopis/config.json`; БД восстанавливается reindex. Уточняет D-80…D-82.
 
 **Альтернативы:** сохранять source UUID/created_at, конфигурацию, журнал и диагностику в БД (прежнее состояние: БД не пересоздаваема, требует backup и согласованного восстановления); реестр source UUID в отдельном файле (ещё один канонический файл с атомарной записью).
@@ -1804,27 +1819,29 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 **Последствия:** source, потерявший все ссылки, исчезает из графа и при новой ссылке получает текущий created_at первого ребра. Остальные решения (Markdown/Git, запись только через CLI, worker, provenance по source_snapshot) не меняются этим решением. *Позже запись через CLI и worker сняты [D-93](#D-93) и [D-94](#D-94).*
 
 <!-- links -->
-**Связи:** [concept.md](concept.md): Changes since previous version; [requirements.md](requirements.md): Changes since previous version, FR-17, FR-27, C-9, 12. Consistency check; [resource-math.md](resource-math.md): Changes since previous version, 7. Consequences for the design, 8. Risks, assumptions and open questions; [contracts.md](contracts.md): Changes since previous version; [data.md](data.md): Changes since previous version, 1. Summary, E-6, 3. Relations, Что восстанавливается и что требует сохранности, 6. Storage classes and totals, 7. Findings and consequences; [architecture.md](architecture.md): Changes since previous version, 1. Summary, 3. Key decisions, 9. Traceability; [mechanics.md](mechanics.md): Правка 2026-10-20, MC-3 — embeddings: работа из данных и попытки, MC-4 — источники и актуальность, 9. Deferred; [resilience.md](resilience.md): Правка 2026-10-20, F-3, F-4, Внешняя согласованная copy/restore-процедура, DR-3; [roadmap.md](roadmap.md): Правка 2026-10-20; [D-10](#D-10): упоминает; [D-13](#D-13): упоминает; [D-20](#D-20): упоминает; [D-80](#D-80): упоминает; [D-92](#D-92): упоминает; [D-93](#D-93): упоминает; [D-94](#D-94): упоминает
+**Связи:** [concept.md](concept.md): Changes since previous version; [requirements.md](requirements.md): Changes since previous version, FR-17, FR-27, C-9, 12. Consistency check; [resource-math.md](resource-math.md): Changes since previous version, 7. Consequences for the design, 8. Risks, assumptions and open questions; [contracts.md](contracts.md): Changes since previous version; [data.md](data.md): Changes since previous version, 1. Summary, E-6, 3. Relations, Что восстанавливается и что требует сохранности, 6. Storage classes and totals, 7. Findings and consequences; [architecture.md](architecture.md): Changes since previous version, 1. Summary, 3. Key decisions, 9. Traceability; [mechanics.md](mechanics.md): Правка 2026-10-20, MC-3 — embeddings: работа из данных и попытки, MC-4 — источники и актуальность, 9. Deferred; [resilience.md](resilience.md): Правка 2026-10-21, F-3, F-4, Внешняя согласованная copy/restore-процедура, DR-3; [roadmap.md](roadmap.md): Правка 2026-10-21; [D-10](#D-10): упоминает; [D-13](#D-13): упоминает; [D-20](#D-20): упоминает; [D-80](#D-80): упоминает; [D-83](#D-83): упоминает; [D-92](#D-92): упоминает; [D-93](#D-93): упоминает; [D-94](#D-94): упоминает
 <!-- /links -->
 
 <a id="D-92"></a>
 ### D-92: Векторы не пересчитываются при неизменном тексте элемента
-> **Статус:** принято пользователем · **Дата:** 2026-10-20
+> **Статус:** принято пользователем, уточнено D-95 · **Дата:** 2026-10-20
 
 **Основание:** пользователь: «if element hash is not changed then embeddings are not recomputed». Правило уже действовало при обычной работе (reuse по search_hash, mechanics MC-1/MC-3), но по D-91 удаление кэша уничтожало все векторы.
 
 1. Векторы хранятся в отдельном файле `.letopis/vectors.db` (SQLite + vec1), вне пересоздаваемого кэша. Ключ — search_hash (хеш поискового текста элемента) при активной конфигурации; вектор описывает текст, а не узел, одинаковые тексты делят один вектор.
 2. Задание embeddings создаётся только для элемента, у search_hash которого нет вектора активной конфигурации. Удаление или перестройка кэша не затрагивает vectors.db: после reindex вычисляются только новые или изменённые тексты.
 3. Ключ — search_hash, а не hash элемента: hash элемента меняется и при изменении только метаданных (source_snapshot при перепроверке, адрес ссылки), search_hash — только при изменении текста, отправляемого модели. Неизменный hash элемента всегда означает неизменный search_hash, поэтому правило пользователя выполняется строго, с меньшим числом вычислений.
-4. Смена конфигурации очищает vectors.db и записывает в него новую identity конфигурации; поздний результат прежней конфигурации отбрасывается. Поздний результат для прежнего текста сохраняется под его search_hash и не может представлять новый текст; seq защищает только задание в кэше от удаления.
+4. Смена конфигурации очищает vectors.db и записывает в него новую identity конфигурации; поздний результат прежней конфигурации отбрасывается. Поздний результат для прежнего текста сохраняется под его search_hash и не может представлять новый текст; seq защищает только задание в кэше от удаления. *Уточнено D-95: заданий и seq нет; drain пишет вектор, только если отпечаток конфигурации в vectors.db совпал.*
 5. vectors.db — тоже пересоздаваемые данные: backup не требуется; его удаление или повреждение означает повторное вычисление всех векторов без потери знаний. Векторы без ссылающихся узлов не попадают в выдачу и удаляются при публикации и полным reindex.
+
+> Уточнено D-95: векторы в unit публикации не входят; векторы без ссылающихся узлов удаляет drain (MC-3).
 
 **Альтернативы:** держать векторы в общем кэше и пересчитывать их после его удаления (прежнее D-91); хранить векторы в общем кэше, но никогда не удалять кэш целиком (не выполняет правило при повреждении/удалении кэша).
 
 **Почему:** вычисление embeddings — самая дорогая часть пересборки (100 000 знаний × вызов модели); правило делает удаление кэша дешёвым и упрощает защиту от устаревших результатов.
 
 <!-- links -->
-**Связи:** [concept.md](concept.md): Changes since previous version; [requirements.md](requirements.md): Changes since previous version, FR-27, FR-29, C-9; [resource-math.md](resource-math.md): Changes since previous version, 8. Risks, assumptions and open questions; [contracts.md](contracts.md): Changes since previous version; [data.md](data.md): Changes since previous version, 1. Summary, E-5, Что восстанавливается и что требует сохранности, 6. Storage classes and totals; [architecture.md](architecture.md): Changes since previous version, 1. Summary, 3. Key decisions, Technology and constraints, 9. Traceability; [mechanics.md](mechanics.md): Правка 2026-10-20, MC-1 — элементы и граф, MC-3 — embeddings: работа из данных и попытки, MC-6 — чтение, поиск и обход; [resilience.md](resilience.md): Правка 2026-10-20, F-3, F-4, Внешняя согласованная copy/restore-процедура; [roadmap.md](roadmap.md): Правка 2026-10-20; [D-91](#D-91): упоминает; [D-94](#D-94): упоминает; [D-95](#D-95): упоминает
+**Связи:** [concept.md](concept.md): Changes since previous version; [requirements.md](requirements.md): Changes since previous version, FR-27, FR-29, C-9; [resource-math.md](resource-math.md): Changes since previous version, 8. Risks, assumptions and open questions; [contracts.md](contracts.md): Changes since previous version; [data.md](data.md): Changes since previous version, 1. Summary, E-5, Что восстанавливается и что требует сохранности, 6. Storage classes and totals; [architecture.md](architecture.md): Changes since previous version, 1. Summary, 3. Key decisions, Technology and constraints, 9. Traceability; [mechanics.md](mechanics.md): Правка 2026-10-20, MC-1 — элементы и граф, MC-3 — embeddings: работа из данных и попытки, MC-6 — чтение, поиск и обход; [resilience.md](resilience.md): Правка 2026-10-21, F-3, F-4, Внешняя согласованная copy/restore-процедура; [roadmap.md](roadmap.md): Правка 2026-10-21; [D-22](#D-22): упоминает; [D-83](#D-83): упоминает; [D-91](#D-91): упоминает; [D-94](#D-94): упоминает; [D-95](#D-95): упоминает
 <!-- /links -->
 
 <a id="D-93"></a>
@@ -1838,6 +1855,8 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 3. **Метаданные.** kind, created_at и необязательный source_snapshot записываются агентом в служебный комментарий элемента (`<!-- letopis: {...} -->`); created_at — Unix seconds, назначает агент, сохраняется при правке и переименовании.
 4. **Рёбра.** Ссылка `[текст](цель "letopis:type=<type>")` внутри элемента. Ребро = (ID источника, ID цели, тип); повтор той же тройки — одно ребро. ID и created_at у рёбер нет. created_at source = минимальный created_at знаний, которые на него ссылаются (уточняет D-91).
 5. **Ошибки по файлу.** Невалидный файл (разметка, дубль якоря, вложенные элементы) сохраняет в индексе свою прежнюю валидную проекцию и даёт активную диагностику; остальные изменения публикуются. Висячая ссылка публикуется без ребра с активной диагностикой. Includes-ребро, замыкающее цикл, не публикуется, диагностика активна. Удаление или переименование, оставившее входящие ссылки, проявляется как висячие ссылки других файлов.
+
+> Уточнено D-95: висячие и замыкающие цикл includes-рёбра хранятся, но не обходятся; check и status находят их запросом, признака «активно» нет.
 6. **Свежесть.** Каждый вызов search/traverse/inspect/check перед ответом обнаруживает изменённые файлы и публикует их валидные изменения в граф/FTS; векторы могут отставать.
 7. **Основание.** source_snapshot пишет агент; letopis при индексации проверяет существование tree, закрепляет его ref и вычисляет flags; отсутствующий снимок — диагностика, не отказ записи.
 
@@ -1850,12 +1869,12 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 **Уточнение после сверки 2026-10-20** (части об активности рёбер и tree публикации позже сняты [D-95](#D-95)): кэш хранил все объявленные рёбра с признаком active. Ребро активно, если цель существует и оно не замыкает includes-цикл (рёбра принимаются в порядке source_id, target_id). Появление или удаление цели пересчитывает входящие рёбра неизменённых файлов и их диагностики; разрыв цикла не зависит от порядка публикаций (MC-2, model_publish.py: incoming, cycle_order). Tree каждой публикации удерживается ref, пока на него ссылаются jobs. config_identity — SHA-256 канонического JSON; сброс конфигурации шёл под index.lock и embed.lock (после D-95 — одна транзакция vectors.db с повторной проверкой identity, без блокировок).
 
 <!-- links -->
-**Связи:** [concept.md](concept.md): Changes since previous version, 1. Summary, 7. Scope, 8. Approaches; [requirements.md](requirements.md): Changes since previous version, 2. Preconditions and scope, FR-3, FR-4, FR-6, FR-11, FR-12, FR-13, FR-18, FR-19, FR-25, FR-26, FR-28, FR-33, FR-35, FR-36, NFR-1, C-8, C-9, 8. Журнал вопросов, 10. Conflicts, risks and open questions, 11. Deferred to design, 12. Consistency check; [resource-math.md](resource-math.md): Changes since previous version, 7. Consequences for the design; [contracts.md](contracts.md): Changes since previous version, 1. Boundary map, 2. Shared conventions and open gate; [data.md](data.md): Changes since previous version, 1. Summary, Что восстанавливается и что требует сохранности; [architecture.md](architecture.md): Changes since previous version, 1. Summary, 3. Key decisions, S-2, 9. Traceability, 10. Reconciliation with earlier steps, 11. Risks, assumptions and open questions, 13. Consistency check; [mechanics.md](mechanics.md): Правка 2026-10-20, 1. Summary, Фиксированный раунд mechanics R1, MC-1 — элементы и граф, MC-4 — источники и актуальность, MC-6 — чтение, поиск и обход, 7. Reconciliation with earlier steps, 8. Risks, assumptions and open questions, 10. Consistency check; [resilience.md](resilience.md): Правка 2026-10-20, 1. Summary, Практические границы без новых сервисов, 9. Limits and verdicts; [roadmap.md](roadmap.md): Правка 2026-10-20, 1. Summary; [D-2](#D-2): упоминает; [D-3](#D-3): упоминает; [D-5](#D-5): упоминает; [D-6](#D-6): упоминает; [D-7](#D-7): упоминает; [D-8](#D-8): упоминает; [D-9](#D-9): упоминает; [D-16](#D-16): упоминает; [D-19](#D-19): упоминает; [D-20](#D-20): упоминает; [D-30](#D-30): упоминает; [D-76](#D-76): упоминает; [D-79](#D-79): упоминает; [D-91](#D-91): упоминает; [D-95](#D-95): упоминает
+**Связи:** [concept.md](concept.md): Changes since previous version, 1. Summary, 7. Scope, 8. Approaches, 10. Risks and open questions; [requirements.md](requirements.md): Changes since previous version, 2. Preconditions and scope, FR-3, FR-4, FR-6, FR-11, FR-12, FR-13, FR-18, FR-19, FR-25, FR-26, FR-28, FR-33, FR-35, FR-36, NFR-1, C-8, C-9, 8. Журнал вопросов, 10. Conflicts, risks and open questions, 11. Deferred to design, 12. Consistency check; [resource-math.md](resource-math.md): Changes since previous version, 7. Consequences for the design; [contracts.md](contracts.md): Changes since previous version, 1. Boundary map, 2. Shared conventions and open gate, Работа по завершению этапа без расширения интервью; [data.md](data.md): Changes since previous version, 1. Summary, Что восстанавливается и что требует сохранности; [architecture.md](architecture.md): Changes since previous version, 1. Summary, 3. Key decisions, S-2, 9. Traceability, 10. Reconciliation with earlier steps, 11. Risks, assumptions and open questions, 13. Consistency check; [mechanics.md](mechanics.md): Правка 2026-10-20, 1. Summary, Фиксированный раунд mechanics R1, MC-1 — элементы и граф, MC-4 — источники и актуальность, MC-6 — чтение, поиск и обход, 7. Reconciliation with earlier steps, 8. Risks, assumptions and open questions, 10. Consistency check; [resilience.md](resilience.md): Правка 2026-10-21, 1. Summary, Практические границы без новых сервисов, 9. Limits and verdicts; [roadmap.md](roadmap.md): Правка 2026-10-21, 1. Summary; [D-2](#D-2): упоминает; [D-3](#D-3): упоминает; [D-5](#D-5): упоминает; [D-6](#D-6): упоминает; [D-7](#D-7): упоминает; [D-8](#D-8): упоминает; [D-9](#D-9): упоминает; [D-16](#D-16): упоминает; [D-19](#D-19): упоминает; [D-20](#D-20): упоминает; [D-22](#D-22): упоминает; [D-30](#D-30): упоминает; [D-76](#D-76): упоминает; [D-77](#D-77): упоминает; [D-79](#D-79): упоминает; [D-91](#D-91): упоминает; [D-95](#D-95): упоминает; [D-96](#D-96): упоминает
 <!-- /links -->
 
 <a id="D-94"></a>
 ### D-94: Без постоянного worker; блокировки flock и фоновый drain embeddings
-> **Статус:** принято пользователем, уточнено D-95 · **Дата:** 2026-10-20
+> **Статус:** принято пользователем, уточнено D-95, D-96 · **Дата:** 2026-10-20
 
 **Основание:** дизайн-ревью 2026-10-20, рекомендация №3; пользователь: «2 и 3 согласен»; ответ на уточняющий вопрос: фоновый drain.
 
@@ -1865,6 +1884,8 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 4. Отмена: SIGINT завершает собственный процесс, незавершённая транзакция SQLite откатывается. reindex --cancel посылает SIGINT процессу, PID которого записан в lock-файле.
 5. Блокировку держит ядро: после падения процесса она снимается автоматически. Status показывает занятость блокировок и прогресс reindex из кэша.
 
+> Уточнено D-95: «задания» п. 3 — тексты без вектора в vectors.db; reindex --cancel и прогресс reindex в кэше (п. 4–5) сняты, отмена — SIGINT своего процесса. Уточнено D-96: SIGINT обрабатывается — единственный ответ `cancelled` и выход в любой точке вызова; у drain обработчика нет.
+
 **Альтернативы:** постоянный worker с Unix socket (D-74); вычисление embeddings только по явной команде.
 
 **Почему:** модель живёт в Ollama, SQLite WAL обслуживает параллельных читателей, после D-91/D-92 всё состояние пересоздаваемо; worker больше не даёт выигрыша, но требует IPC, bootstrap и протокола отмены.
@@ -1872,7 +1893,7 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 **Заменяет:** D-74. **Уточняет:** D-24, D-75 (владелец хранения диагностики — код B-2 в любом процессе).
 
 <!-- links -->
-**Связи:** [concept.md](concept.md): Changes since previous version; [requirements.md](requirements.md): Changes since previous version, NFR-1, NFR-3, C-7, 11. Deferred to design, 12. Consistency check; [resource-math.md](resource-math.md): Changes since previous version, 8. Risks, assumptions and open questions; [contracts.md](contracts.md): Changes since previous version, Internal contracts — mechanics, Рабочие инженерные допущения для формализации; [data.md](data.md): Changes since previous version, E-9, M-4, 6. Storage classes and totals; [architecture.md](architecture.md): Changes since previous version, 1. Summary, 3. Key decisions, Technology and constraints, Level 2 — Containers, 9. Traceability, NFR-5, 11. Risks, assumptions and open questions, 13. Consistency check, Sources; [mechanics.md](mechanics.md): Правка 2026-10-20, 1. Summary, Фиксированный раунд mechanics R1, MC-5 — процессы, блокировки и отмена, 4. Internal contracts, 8. Risks, assumptions and open questions, 10. Consistency check; [resilience.md](resilience.md): Правка 2026-10-20, 1. Summary; [roadmap.md](roadmap.md): Правка 2026-10-20, 1. Summary; [D-24](#D-24): упоминает; [D-67](#D-67): упоминает; [D-74](#D-74): упоминает; [D-91](#D-91): упоминает; [D-95](#D-95): упоминает
+**Связи:** [concept.md](concept.md): Changes since previous version; [requirements.md](requirements.md): Changes since previous version, NFR-1, NFR-3, C-7, 11. Deferred to design, 12. Consistency check; [resource-math.md](resource-math.md): Changes since previous version, 8. Risks, assumptions and open questions; [contracts.md](contracts.md): Changes since previous version, Internal contracts — mechanics, Рабочие инженерные допущения для формализации; [data.md](data.md): Changes since previous version, E-9, M-4, 6. Storage classes and totals; [architecture.md](architecture.md): Changes since previous version, 1. Summary, 3. Key decisions, Technology and constraints, Level 2 — Containers, 9. Traceability, NFR-5, 11. Risks, assumptions and open questions, 13. Consistency check, Sources; [mechanics.md](mechanics.md): Правка 2026-10-20, 1. Summary, Фиксированный раунд mechanics R1, MC-5 — процессы, блокировки и отмена, 4. Internal contracts, 8. Risks, assumptions and open questions, 10. Consistency check; [resilience.md](resilience.md): Правка 2026-10-21, 1. Summary; [roadmap.md](roadmap.md): Правка 2026-10-21, 1. Summary; [D-18](#D-18): упоминает; [D-24](#D-24): упоминает; [D-67](#D-67): упоминает; [D-74](#D-74): упоминает; [D-79](#D-79): упоминает; [D-91](#D-91): упоминает; [D-95](#D-95): упоминает; [D-96](#D-96): упоминает
 <!-- /links -->
 
 <a id="D-95"></a>
@@ -1895,5 +1916,38 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 **Заменяет:** D-17, D-75. **Уточняет:** D-4 (kind выводится), D-18 (errors входит в status), D-69 (замена целиком — правкой файла), D-71 (только полный reindex), D-79 (seq и attempts заменены embed_failures), D-93 (уточнение после сверки об активности рёбер и tree публикации снято), D-94 (п. 4–5: нет reindex --cancel и прогресса reindex в кэше).
 
 <!-- links -->
-**Связи:** [concept.md](concept.md): Changes since previous version; [requirements.md](requirements.md): Changes since previous version, FR-5, FR-22, FR-27, FR-29, FR-30, FR-31, FR-32, FR-33, 12. Consistency check; [resource-math.md](resource-math.md): Changes since previous version, 7. Consequences for the design; [contracts.md](contracts.md): Changes since previous version, Работа по завершению этапа без расширения интервью, Рабочие инженерные допущения для формализации, Проверка итерации contracts после R1; [data.md](data.md): Changes since previous version, 1. Summary, E-3, E-6, E-7, E-10, Что восстанавливается и что требует сохранности, 6. Storage classes and totals; [architecture.md](architecture.md): Changes since previous version, 3. Key decisions, Technology and constraints, 4. Parts, I-5, I-6, 8. Cross-cutting concerns, 9. Traceability, 10. Reconciliation with earlier steps, 11. Risks, assumptions and open questions; [mechanics.md](mechanics.md): Правка 2026-10-20, 1. Summary, MC-1 — элементы и граф, MC-2 — состояния reindex, MC-3 — embeddings: работа из данных и попытки, MC-5 — процесс drain, MC-6 — чтение, поиск и обход, MC-7 — текущие проблемы и status, 7. Reconciliation with earlier steps, 10. Consistency check; [resilience.md](resilience.md): Правка 2026-10-20, 1. Summary, Внешняя согласованная copy/restore-процедура, O-2; [roadmap.md](roadmap.md): Правка 2026-10-20, 1. Summary; [D-4](#D-4): упоминает; [D-17](#D-17): упоминает; [D-18](#D-18): упоминает; [D-69](#D-69): упоминает; [D-71](#D-71): упоминает; [D-75](#D-75): упоминает; [D-79](#D-79): упоминает; [D-93](#D-93): упоминает; [D-94](#D-94): упоминает
+**Связи:** [concept.md](concept.md): Changes since previous version; [requirements.md](requirements.md): Changes since previous version, FR-5, FR-6, FR-22, FR-27, FR-29, FR-30, FR-31, FR-32, FR-33, 12. Consistency check; [resource-math.md](resource-math.md): Changes since previous version, 2. Workload, A-10, Диагностика: размер без изменения хранения, 7. Consequences for the design; [contracts.md](contracts.md): Changes since previous version, Работа по завершению этапа без расширения интервью, Рабочие инженерные допущения для формализации, Проверка итерации contracts после R1; [data.md](data.md): Changes since previous version, 1. Summary, E-3, E-6, E-7, E-10, Что восстанавливается и что требует сохранности, 6. Storage classes and totals; [architecture.md](architecture.md): Changes since previous version, 2. Drivers, 3. Key decisions, Technology and constraints, 4. Parts, I-5, I-6, 6. Interfaces, 8. Cross-cutting concerns, 9. Traceability, 10. Reconciliation with earlier steps, 11. Risks, assumptions and open questions; [mechanics.md](mechanics.md): Правка 2026-10-20, 1. Summary, Фиксированный раунд mechanics R1, MC-1 — элементы и граф, MC-2 — состояния reindex, MC-3 — embeddings: работа из данных и попытки, MC-4 — источники и актуальность, MC-5 — процесс drain, MC-6 — чтение, поиск и обход, MC-7 — текущие проблемы и status, 7. Reconciliation with earlier steps, 10. Consistency check; [resilience.md](resilience.md): Правка 2026-10-21, 1. Summary, T-2, Практические границы без новых сервисов, Внешняя согласованная copy/restore-процедура, O-2; [roadmap.md](roadmap.md): Правка 2026-10-21, 1. Summary; [D-4](#D-4): упоминает; [D-7](#D-7): упоминает; [D-16](#D-16): упоминает; [D-17](#D-17): упоминает; [D-18](#D-18): упоминает; [D-19](#D-19): упоминает; [D-69](#D-69): упоминает; [D-71](#D-71): упоминает; [D-75](#D-75): упоминает; [D-77](#D-77): упоминает; [D-79](#D-79): упоминает; [D-83](#D-83): упоминает; [D-91](#D-91): упоминает; [D-92](#D-92): упоминает; [D-93](#D-93): упоминает; [D-94](#D-94): упоминает
+<!-- /links -->
+
+<a id="D-96"></a>
+### D-96: Стек зависимостей v1: синхронный Rust без async runtime
+> **Статус:** принято пользователем · **Дата:** 2026-10-21
+
+**Основание:** сверка библиотек и инструментов 2026-10-21. Пользователь выбрал: HTTP-клиент `ureq`, обработанную отмену по SIGINT, vec1 статически в бинарнике, системное хранилище сертификатов TLS.
+
+| Область | Выбор | Почему | Проверка |
+|---|---|---|---|
+| Toolchain | Rust 1.95.0 (rust-toolchain), edition 2024; MSRV равен закреплённой версии | `std::fs::File::lock` есть с 1.89; одна версия для сборки и проверок | TK-1…TK-4 (harness), TK-9 (crate продукта) |
+| SQLite | rusqlite `=0.40.2` с `bundled`, FTS5 contentless-delete; системная SQLite не используется; feature `load_extension` в продукте не включается | C-5 требует 3.51.3+, системные сборки старше и без нужных опций | TK-1 |
+| Векторы | vec1 из `ext/vec1` закреплённого коммита SQLite (`a27bcfe2…`, SHA-256 файла как в TK-1) компилируется build.rs (build-dependency `cc`) вместе с bundled SQLite и регистрируется `sqlite3_auto_extension`; таблица `vec1(vector)` с `{index:"none",distance:"cos"}` по D-79 | Один бинарник, нет пути к расширению и загрузки расширений в runtime | TK-1 (vec1 как загружаемый файл), TK-9 (статическая сборка), TK-43 |
+| HTTP к provider (X-2) | `ureq` 3, блокирующий; `max_redirects(0)`, прокси из окружения не используются, таймаут попытки 60 s (D-83); повторы и attempts — код letopis (embed_failures) | Последовательные вызовы; `reqwest` даже в blocking-режиме запускает tokio | TK-6 |
+| TLS | rustls + `rustls-platform-verifier` (системное хранилище сертификатов) | Корпоративные CA из Keychain/системы работают без настройки; OpenSSL не нужен | TK-6, TK-41 |
+| Git (X-3) | CLI `git` как подпроцесс, argv/stdin без shell; минимум Git 2.29 (assumed: SHA-256-репозитории) | Тот же Git, что у пользователя; без libgit2/gix | TK-8 |
+| Markdown (X-4) | `pulldown-cmark`: `into_offset_iter` для байтовых диапазонов, `ENABLE_HEADING_ATTRIBUTES` для `{#anchor}`; только разбор, сериализатора нет | CommonMark-разбор кода, заголовков и ссылок; letopis не пишет корпус (D-93) | TK-7 |
+| JSON, канон, хеш | `serde` + `serde_json` (`deny_unknown_fields` для строгого ввода), `serde_json_canonicalizer` (RFC 8785) для отпечатка config.json, `sha2` для SHA-256 | Свой JCS ошибается на числах с плавающей точкой | TK-11, TK-27 |
+| CLI | argv разбирается std: имя команды и немного флагов, тело — JSON из stdin | Восемь команд не оправдывают парсер аргументов | TK-11 |
+| Процессы и сигналы | `std::fs::File::lock`/`try_lock` для index.lock и embed.lock; `libc::setsid` и 0/1/2 → /dev/null для drain; `signal-hook` (поток `Signals`): по SIGINT поток печатает единственный ответ `ok:false`/`cancelled` (once-guard на stdout: если результат уже напечатан, второго JSON нет) и завершает процесс с exit 1 в любой точке — SQL-шаг, ожидание flock, подпроцесс git, HTTP; незафиксированная транзакция откатывается как после сбоя, зафиксированная публикация остаётся; `InterruptHandle` не нужен; у отсоединённого drain обработчика нет | Одно правило для всех ожиданий, ответ наблюдаем в JSON (X-1); откат делает SQLite WAL, блокировки снимает ядро | TK-2 (откат после сбоя), TK-4 (снятие flock при смерти по сигналу, `libc::flock`), TK-29 (обработанный ответ) |
+| Платформы | macOS и Linux (glibc), arm64 и x86_64; x86_64 — assumed до TK-43; Windows и NFS не поддерживаются | flock, setsid и Unix-права файлов | TK-43 |
+| Внешние программы | Ollama: версия из R-4 (0.40.6) — проверенная, минимум не гарантируется (assumed, TK-6); Python 3.11+ только для моделей и проверок, stdlib | Минимальную совместимую версию не измеряли | TK-6 |
+
+Сознательно отсутствуют: async runtime (tokio), `reqwest`, HTTP-сервер, IPC, ORM, библиотека concurrency, парсер YAML, `clap`; `tempfile` — только в dev-dependencies. Версии крейтов закрепляются точно (`=x.y.z`) при добавлении в TK-задаче, которая их впервые использует.
+
+**Альтернативы:** `reqwest` (тянет tokio); свой HTTP поверх `std::net` (TLS); webpki-roots (не видит корпоративные CA); отдельная `.so/.dylib` vec1 через `load_extension` (два файла и включённая загрузка расширений); смерть процесса по SIGINT без ответа (проще, но X-1 обещает `cancelled`); `git2`/`gix`; свой парсер Markdown; `clap`.
+
+**Почему:** каждый вызов — отдельный короткий процесс (D-94), SQLite и flock блокирующие, provider вызывается последовательно; async-слой не сокращает ни одного ожидания и не отменяет блокирующий вызов SQLite. Названный стек не даёт зависимостям прийти неявно.
+
+**Уточняет:** D-22 (точный стек и поставка vec1), D-83 (настройки клиента), D-94 (механизм отмены).
+
+<!-- links -->
+**Связи:** [requirements.md](requirements.md): Changes since previous version, C-4, C-5, C-10; [contracts.md](contracts.md): Changes since previous version; [architecture.md](architecture.md): Changes since previous version, 3. Key decisions, Technology and constraints, S-6, NFR-5, 9. Traceability, 11. Risks, assumptions and open questions; [mechanics.md](mechanics.md): Правка 2026-10-20, MC-5 — процесс drain, MC-5 — результаты TK-4 и передача реализации, 5. Timing, memory and concurrency rules, 9. Deferred; [resilience.md](resilience.md): Правка 2026-10-21, T-2, DR-5; [roadmap.md](roadmap.md): Правка 2026-10-21, 1. Summary, TK-9, 9. Риски плана; [D-18](#D-18): упоминает; [D-22](#D-22): упоминает; [D-83](#D-83): упоминает; [D-94](#D-94): упоминает
 <!-- /links -->

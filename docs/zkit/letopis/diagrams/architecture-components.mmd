@@ -7,7 +7,7 @@ flowchart TB
         B5["B-5 Source validator"]
         B6["B-6 StateService<br/>read-only aggregation"]
         Domain["Shared knowledge model and invariants"]
-        Codec["Markdown codec"]
+        Codec["Markdown parser (pulldown-cmark)"]
         Diag["Derived diagnostics<br/>files errors, queries, embed_failures"]
         Embed["Shared EmbeddingsPort<br/>runtime and E-11 owned by B-3"]
         Store["Cache and vector store adapters"]
@@ -23,12 +23,11 @@ flowchart TB
     B4 -->|"I-8 pin read view / config"| B3
     B6 -->|"I-9"| B2
     B6 -->|"I-10"| B3
-    B3 -->|"I-12 obtain immutable snapshot"| B2
     B4 -->|"I-12 current canonical snapshot for inspect"| B2
-    B3 -->|"I-11"| Diag
-    B4 -->|"I-11"| Diag
-    B5 -->|"I-11"| Diag
+    B6 -->|"I-11 current problems"| Diag
     B2 --> Diag
+    B3 --> Diag
+    B4 --> Diag
     B2 --> Codec
     B3 --> Codec
     Codec --> Domain

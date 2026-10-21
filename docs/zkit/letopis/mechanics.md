@@ -1,11 +1,13 @@
 # letopis — механика
 
 > **Links:** [requirements](requirements.md) · [resource-math](resource-math.md) · [contracts](contracts.md) · [data](data.md) · [architecture](architecture.md) · [decisions](decisions.md) · [подробная модель хранения](mechanics/storage-model.md)
-> **Status:** agreed · **Date:** 2026-10-20 · **Based on:** requirements.md (2026-10-20), resource-math.md (2026-10-20), contracts.md (2026-10-20), data.md (2026-10-20), architecture.md (2026-10-20)
+> **Status:** agreed · **Date:** 2026-10-21 · **Based on:** requirements.md (2026-10-21), resource-math.md (2026-10-21), contracts.md (2026-10-21), data.md (2026-10-21), architecture.md (2026-10-21)
 > **Counts:** 7 MC
 
 
 ## Правка 2026-10-20
+
+2026-10-21 ([D-96](decisions.md#D-96)): назван стек зависимостей. MC-5 — обработанная отмена (поток signal-hook печатает один ответ cancelled и завершает процесс; InterruptHandle не используется); в §5 — синхронный стек без async runtime, `std::fs::File::lock`, `libc::setsid`; версии крейтов и поставка vec1 закреплены в [D-96](decisions.md#D-96).
 
 2026-10-20 ([D-95](decisions.md#D-95)): состояние выводится из данных. Рёбра хранятся без признака активности, висячие ссылки и циклы находит запрос; очередь embeddings — тексты без вектора, drain перечитывает файл и сверяет search_hash, попытки в embed_failures (vectors.db); таблиц заданий, errors и reindex_state нет; reindex только полный под index.lock; config правится как файл; kind выводится. Модели переписаны: 15 изолированных защит.
 
@@ -28,7 +30,7 @@
 | G2 | [D-77](decisions.md#D-77): согласованное чтение по одному Git-снимку | Обычное live-file чтение не имеет межфайловой гарантии; reader locks нет | closed |
 | G3 | [D-78](decisions.md#D-78): max_retries в существующей конфигурации | Четвёртое обязательное поле, целое ≥ 0; провайдеру не отправляется | closed |
 
-Закрыто **3/3 в R1**, всего три пользовательских решения, новых вопросов в очереди **0**. [D-79](decisions.md#D-79) — отдельно отмеченные инженерные starting choices с проверками, не дополнительные пользовательские ответы. Assumed IPC worker заменён [D-94](decisions.md#D-94); [D-75](decisions.md#D-75) остаётся assumed. Отсутствие продуктовых вопросов не подменяет проверку протоколов. [Intake](checks/mechanics/mechanics-round-1-audit-2026-10-19.md) хранит прежние 0/3, 1/3 и 2/3 как историю интервью.
+Закрыто **3/3 в R1**, всего три пользовательских решения, новых вопросов в очереди **0**. [D-79](decisions.md#D-79) — отдельно отмеченные инженерные starting choices с проверками, не дополнительные пользовательские ответы. Assumed IPC worker заменён [D-94](decisions.md#D-94); [D-75](decisions.md#D-75) заменено [D-95](decisions.md#D-95). Отсутствие продуктовых вопросов не подменяет проверку протоколов. [Intake](checks/mechanics/mechanics-round-1-audit-2026-10-19.md) хранит прежние 0/3, 1/3 и 2/3 как историю интервью.
 
 ## 2. Mechanisms
 
@@ -118,7 +120,7 @@ Source URI — стабильный нормализованный адрес ф
 
 source_snapshot знания пишет агент в метаданные ([D-93](decisions.md#D-93)). При публикации Git-порт проверяет существование и тип tree и закрепляет его ref; отсутствующий или неизвестный снимок — текущая проблема (status и check проверяют в Git различные значения source_snapshot) и признак перепроверки, не отказ. Адресованные bytes снимка сравниваются с текущими: неравенство — flag source_changed. Правка без изменения snapshot не обновляет основание; удалённые старые основания доступны по удерживаемым Git-деревьям, history-table нет.
 
-В поиске/обходе flags вычисляются по индексным метаданным, текущему согласованному снимку проверки и источникам. Несовпадение текущего Markdown/hash/координат с индексом даёт stale; отсутствие адресованного источника — source_not_found; отличие от source_snapshot — source_changed. Один источник/несколько причин не дублируют flags. Пустой flags означает только отсутствие обнаруженной причины. Filters.source_revisions сравнивает адресованные bytes пары source+revision, а не commit OID и не разные external-привязки. Неверный формат/тип Git OID отличается от отсутствующего корректного объекта по X-3. Файл, изменившийся после снятия снимка проверки, требует следующей перепроверки; абсолютная актуальность live bytes на весь срок запроса не обещается.
+В поиске/обходе flags вычисляются по индексным метаданным, текущим файлам рабочей копии и Git-объектам по source_snapshot; CanonicalSnapshot используется только inspect ([D-95](decisions.md#D-95)). Несовпадение текущего Markdown/hash/координат с индексом даёт stale; отсутствие адресованного источника — source_not_found; отличие от source_snapshot — source_changed. Один источник/несколько причин не дублируют flags. Пустой flags означает только отсутствие обнаруженной причины. Filters.source_revisions сравнивает адресованные bytes пары source+revision, а не commit OID и не разные external-привязки. Неверный формат/тип Git OID отличается от отсутствующего корректного объекта по X-3. Файл, изменившийся после чтения, требует следующей перепроверки; абсолютная актуальность live bytes на весь срок запроса не обещается.
 
 ### MC-5 — процессы, блокировки и отмена
 
@@ -129,7 +131,7 @@ source_snapshot знания пишет агент в метаданные ([D-9
 | command (initial) | finished | есть тексты без вектора (MC-3) | probing | попробовать try-lock embed.lock |
 | command | finished | работы нет | exited | — |
 | probing | try-lock busy | drain уже работает | exited | ничего не запускать |
-| probing | try-lock free | — | spawning | отпустить пробную блокировку; запустить `letopis embed --drain` отсоединённо (setsid, без stdin/stdout) |
+| probing | try-lock free | — | spawning | отпустить пробную блокировку; запустить `letopis embed --drain` отсоединённо (`libc::setsid`, fd 0/1/2 → /dev/null) |
 | spawning | drain started | — | exited | ответ команды не ждёт drain |
 | spawning | spawn failure / crash | — | exited | предупреждение в ответе; работу найдёт следующий вызов |
 | exited (final) | — | — | — | процесс завершён |
@@ -146,21 +148,21 @@ source_snapshot знания пишет агент в метаданные ([D-9
 
 Гонка двух вызывающих процессов при запуске drain безопасна: лишний drain не получит embed.lock и сразу завершится. Блокировку определяет только ядро: наличие lock-файла или PID в нём ничего не значит (model_runtime.py, guard owner).
 
-**Отмена.** SIGINT завершает собственный процесс (search, reindex); незафиксированная транзакция откатывается, частичного результата нет. Отмены чужого процесса по PID нет ([D-95](decisions.md#D-95)); status показывает PID держателя index.lock, и пользователь при необходимости завершает его средствами ОС.
+**Отмена.** SIGINT отменяет собственный процесс (search, traverse, inspect, check, reindex); незафиксированная транзакция откатывается, частичного результата нет. Отмена обрабатывается (D-96): поток `signal-hook` принимает SIGINT, печатает единственный ответ ok:false/cancelled (once-guard на stdout: если результат уже напечатан, второй JSON не печатается) и завершает процесс с exit 1 в любой точке — SQL-шаг, ожидание flock, git-подпроцесс, HTTP. Незафиксированная транзакция SQLite откатывается как после сбоя (WAL, доказано TK-2), flock снимает ядро, оставленные git-объекты безвредны и чистятся как после сбоя; зафиксированная публикация остаётся (late SIGINT). InterruptHandle не используется. У отсоединённого drain обработчика нет: сигнал завершает его по умолчанию, ответа нет, attempts в embed_failures сохранены. Обработанный ответ во всех пяти командах, в том числе во время ожидания flock, git и HTTP, и ровно один JSON проверяет TK-29. Отмены чужого процесса по PID нет ([D-95](decisions.md#D-95)); status показывает PID держателя index.lock, и пользователь при необходимости завершает его средствами ОС.
 
 Нет общего execution timeout в 1 секунду, TTL, lifecycle-команд, TCP API, IPC и process registry. Команды letopis не меняют корпус, поэтому потеря ответа безопасна: повтор вызова идемпотентен.
 
 #### MC-5 — результаты TK-4 и передача реализации
 
-2026-10-21: [все выводы и ограничения TK-4](checks/TK-4/findings.md), [отчёт](checks/TK-4/report.md) и [ревью](checks/TK-4/review.md) дополняют исполняемую модель проверкой настоящих процессов и неизменённых TK-2/TK-3 на macOS/Linux ARM64. На каждой ОС PASS: 10 Rust tests, 1 Python interruption test, 7 compiling negative controls; совпадают все 60 входных SHA256. Проверены сериализация десяти publishers, один владелец drain после десяти успешных освобождённых probes, persistent lock после SIGKILL/stale PID, setsid/null fd 0/1/2, rollback до commit и сохранение публикации после commit. Для publish/reindex SIGINT внутри blocking flock подтверждён независимым native observer; pre-flock hook отвергается тем же oracle.
+2026-10-21: [все выводы и ограничения TK-4](checks/TK-4/findings.md), [отчёт](checks/TK-4/report.md) и [ревью](checks/TK-4/review.md) дополняют исполняемую модель проверкой настоящих процессов и неизменённых TK-2/TK-3 на macOS/Linux ARM64. На каждой ОС PASS: 10 Rust tests, 1 Python interruption test, 7 compiling negative controls; совпадают все 60 входных SHA256. Проверены сериализация десяти publishers, один владелец drain после десяти успешных освобождённых probes, persistent lock после SIGKILL/stale PID, setsid/null fd 0/1/2, rollback до commit и сохранение публикации после commit. Для publish/reindex SIGINT внутри blocking flock подтверждён независимым native observer; pre-flock hook отвергается тем же oracle. Эти PASS относятся к смерти процесса по сигналу по умолчанию и к `libc::flock`; обработанную отмену [D-96](decisions.md#D-96) с ответом cancelled и `File::lock` проверяют TK-29 и TK-11.
 
 Две Important-проблемы стенда исправлены: adopted peer выполняет self-SIGKILL по своему fixture connection, без сигнала по Event PID; mutation runner работает в disposable copies, вложенные команды остаются в его owned group. Это проверки harness, не продуктовый IPC. Третье, Minor, замечание о syscall boundary закрыто указанным наблюдением; второго независимого ревью нет.
 
-TK-11 переносит эти примитивы в CLI без повторного index lock вокруг TK-2 publish; TK-29 проверяет request cancellation, TK-42 — системные boundary drills. Fairness, общий liveness и concurrent orphan reclamation не доказаны. Работа в окне между последним empty query и exit drain может ждать следующего вызова. Power loss, stat-10k/RAM/latency, real provider и другие платформы сохраняют отдельные gates. G-0 остаётся открытым до TK-6.
+TK-11 переносит эти примитивы в CLI без повторного index lock вокруг TK-2 publish; TK-29 проверяет обработанную отмену с ответом cancelled, TK-42 — системные boundary drills. Fairness, общий liveness и concurrent orphan reclamation не доказаны. Работа в окне между последним empty query и exit drain может ждать следующего вызова. Power loss, stat-10k/RAM/latency, real provider и другие платформы сохраняют отдельные gates. G-0 остаётся открытым до TK-6.
 
 ### MC-6 — чтение, поиск и обход
 
-Search/traverse после обнаружения изменений (MC-2) открывают read-транзакцию; BEGIN и первое чтение project.revision закрепляют один read snapshot кэша; vectors.db читается в той же транзакции. Конфигурация берётся из `.letopis/config.json` и принимается, только если её identity совпадает с meta.config_identity, иначе FTS-only. Query embedding вызывается напрямую с этой конфигурацией, без write lock; при ошибке выполняется один FTS-поиск, ответ содержит предупреждение, а ошибка записывается в единственную строку vec.query_error; успешный query embedding её удаляет ([D-62](decisions.md#D-62)). Read view освобождается при результате/отмене/error.
+Search/traverse после обнаружения изменений (MC-2) открывают read-транзакцию; BEGIN и первое чтение project.revision закрепляют один read snapshot кэша; vectors.db читается в той же транзакции. Конфигурация берётся из `.letopis/config.json` и принимается, только если её identity совпадает с meta.config_identity, иначе FTS-only. Query embedding вызывается напрямую с этой конфигурацией, без write lock; при ошибке выполняется один FTS-поиск с обычным успешным ответом без предупреждения, а ошибка записывается в единственную строку vec.query_error и видна только в status.problems; успешный query embedding её удаляет ([D-62](decisions.md#D-62)). Read view освобождается при результате/отмене/error.
 
 Фильтры разных полей объединяются И, внутри списков — хотя бы одно совпадение; пустой/отсутствующий список одинаковы. Source и source_revision проверяются на одной привязке. Полный eligible-набор формируется до итогового limit, включая динамическую проверку источников. Source не самостоятельный search text, но доступен inspect/traverse. FTS возвращает все подходящие совпадения, vec1 exact — все доступные подходящие vectors; преждевременный LIMIT перед фильтрами запрещён. Первый baseline допускает полный перебор метаданных и векторов, без необоснованного oversampling.
 
@@ -233,10 +235,10 @@ IndexReadView ..> ProjectionPort : pinned published data
 
 ## 5. Timing, memory and concurrency rules
 
-- Две блокировки ядра: index.lock (публикация/reindex) и embed.lock (drain). DB write unit кэша берётся под index.lock; drain пишет только в vectors.db короткими транзакциями без index.lock. Query блокировки не держит и не ждёт, если дельта пуста.
+- Две блокировки ядра (`std::fs::File::lock`/`try_lock`, [D-96](decisions.md#D-96)): index.lock (публикация/reindex) и embed.lock (drain). DB write unit кэша берётся под index.lock; drain пишет только в vectors.db короткими транзакциями без index.lock. Query блокировки не держит и не ждёт, если дельта пуста.
 - SQLite WAL/FULL, macOS fullfsync и foreign_keys=ON на каждом соединении; vectors.db подключается ATTACH. Каждый процесс открывает свои соединения; пула и долгоживущих соединений нет. Config DDL/vec1 reader coexistence требует P-2/P-3. Длительный reader может увеличить WAL, что учитывается в P-2.
-- Синхронный Rust I/O и std threads без async runtime. До 10 одновременных процессов — профиль, не скрытый отказ одиннадцатому. Нового admission API, broker или concurrency knobs нет.
-- Retry reservation durable; задержка assumed 1s не обещает срок опустошения очереди. Wall-clock Unix seconds используется только для created_at (пишет агент), elapsed/backoff — монотонное время. Отмена проверяется между SQL-итерациями.
+- Синхронный Rust I/O и std threads без async runtime; HTTP к provider — блокирующий `ureq` (D-96). До 10 одновременных процессов — профиль, не скрытый отказ одиннадцатому. Нового admission API, broker или concurrency knobs нет.
+- Retry reservation durable; задержка assumed 1s не обещает срок опустошения очереди. Wall-clock Unix seconds используется только для created_at (пишет агент), elapsed/backoff — монотонное время. Отмена: поток SIGINT печатает ответ cancelled и завершает процесс в любой точке, откат — как после сбоя (MC-5).
 - Обнаружение изменений на каждом вызове: stat всех файлов корпуса (2 000–10 000 по A-5) и хеш изменённых/racy. Стоимость измеряется в P-2; при превышении бюджета — сначала `git status`-подобный кэш каталогов, не watcher.
 - M-1 хранит IDs/ranks/visited и read view, M-2 один временный текст/вектор и конфигурацию; M-3 работает по изменённым файлам, reindex читает файлы последовательно. Модель живёт в provider и не загружается процессами letopis. Суммарные 1 ГБ приложения+модель на 4 ГБ машине остаются целью, не доказанным бюджетом.
 - Resource-math: A-1…A-11 и 0 L; новый timeout/квота не выводятся из расчётных средних. Прогретая секунда — оптимизация, результат не обрезается по времени. Allocation failure до commit не меняет данные; SIGKILL не обязан вернуть JSON.
@@ -281,7 +283,7 @@ IndexReadView ..> ProjectionPort : pinned published data
 
 → resilience: реестр faults/threats, backup Git/Markdown и `.letopis/config.json` (БД — кэш, [D-91](decisions.md#D-91)), corruption, secrets/permissions, RPO/RTO и эксплуатационная координация Git.
 
-→ roadmap: P-1/P-2/P-3, A-AR1…A-AR5, версия parser/crates и extension build, FTS/vec1 snapshot/config-reset tests, стоимость обнаружения, прерывание публикации, agent skill с [D-77](decisions.md#D-77). Ресурсные измерения сейчас не запускаются.
+→ roadmap: P-1/P-2/P-3, A-AR1…A-AR5, точные версии крейтов (D-96) в TK, которая их первой добавляет, статическая сборка vec1, FTS/vec1 snapshot/config-reset tests, стоимость обнаружения, прерывание публикации, agent skill с [D-77](decisions.md#D-77). Ресурсные измерения сейчас не запускаются.
 
 ## 10. Consistency check
 

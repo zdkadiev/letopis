@@ -4,7 +4,7 @@
 > **Эпик:** [EP-7](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
-> **План:** неделя 12 — 1 ч; неделя 13 — 7 ч
+> **План:** неделя 13 — 8 ч
 > **Зависимости:** [TK-5](../../EP-8-proofs/tasks/TK-5-pilot-protocol.md), [TK-14](../../EP-1-thin-slice/tasks/TK-14-thin-slice.md), [TK-16](TK-16-early-memory.md)
 
 

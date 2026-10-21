@@ -4,7 +4,7 @@
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 6 / 8 / 14 (best / expected / worst)
-> **План:** неделя 7 — 3 ч; неделя 8 — 5 ч
+> **План:** неделя 7 — 1 ч; неделя 8 — 7 ч
 > **Зависимости:** [TK-7](TK-7-markdown.md), [TK-8](TK-8-git-snapshots.md), [TK-9](TK-9-storage.md), [TK-2](../../EP-8-proofs/tasks/TK-2-durability-harness.md)
 
 
@@ -53,7 +53,7 @@ Production путь обнаружения изменений и публика�
 
 - **Входит:** Production путь обнаружения изменений и публикации по файлу. Работа и собственные проверки перечислены в разделе 3.
 - **Не входит:** Дополнительные corruption/fail-closed регрессии — [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md); полный check и переименования — [TK-19](../../EP-2-knowledge/tasks/TK-19-check-renames.md); физические доказательства — [TK-38](../../EP-4-system-validation/tasks/TK-38-power-loss.md).
-- **Интерфейсы — вход:** [TK-7](TK-7-markdown.md): Доменная модель и parser/serializer Markdown, отделённые от Git/SQLite/CLI адаптеров; [TK-8](TK-8-git-snapshots.md): Git adapter со снимками, служебными refs и тестами сохранности объектов; [TK-9](TK-9-storage.md): Начальная схема SQLite и storage adapters для всех согласованных сущностей; [TK-2](../../EP-8-proofs/tasks/TK-2-durability-harness.md): Матрица прерываний публикации с точным oracle и воспроизводимый harness обнаружения/публикации
+- **Интерфейсы — вход:** [TK-7](TK-7-markdown.md): Доменная модель и parser Markdown (без сериализатора: letopis не пишет корпус, D-93), отделённые от Git/SQLite/CLI адаптеров; [TK-8](TK-8-git-snapshots.md): Git adapter со снимками, служебными refs и тестами сохранности объектов; [TK-9](TK-9-storage.md): Начальная схема SQLite и storage adapters для всех согласованных сущностей; [TK-2](../../EP-8-proofs/tasks/TK-2-durability-harness.md): Матрица прерываний публикации с точным oracle и воспроизводимый harness обнаружения/публикации
 - **Интерфейсы — выход:** Результат раздела 4 и воспроизводимые проверки получают [TK-11](TK-11-cli-runtime.md), [TK-14](TK-14-thin-slice.md), [TK-18](../../EP-2-knowledge/tasks/TK-18-graph-validation.md), [TK-19](../../EP-2-knowledge/tasks/TK-19-check-renames.md), [TK-25](../../EP-3-maintenance/tasks/TK-25-reindexing.md), [TK-26](../../EP-3-maintenance/tasks/TK-26-corruption.md).
 
 ## 8. Риски и примечания
