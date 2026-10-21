@@ -1,0 +1,408 @@
+{
+  "task": "TK-8",
+  "wave": "final-fix-wave",
+  "fix_base": "a6af7d7b6536a65d85f11f6f02807a906b0e640a",
+  "implementation_commit": "92cf8bd72708e9c91c506b3e342c14bc1ea18b78",
+  "commands": [
+    {
+      "name": "version-git",
+      "argv": [
+        "git",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.012,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-git.log"
+    },
+    {
+      "name": "version-rustc",
+      "argv": [
+        "rustc",
+        "+1.95.0",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.098,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-rustc.log"
+    },
+    {
+      "name": "version-cargo",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.03,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-cargo.log"
+    },
+    {
+      "name": "version-host",
+      "argv": [
+        "uname",
+        "-sm"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.003,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-host.log"
+    },
+    {
+      "name": "host-test",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 11.374,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/host-test.log"
+    },
+    {
+      "name": "host-fmt",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.066,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/host-fmt.log"
+    },
+    {
+      "name": "host-clippy",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.35,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/host-clippy.log"
+    },
+    {
+      "name": "linux-build",
+      "argv": [
+        "docker",
+        "build",
+        "-f",
+        "tests/git/Dockerfile",
+        "-t",
+        "letopis-tk8-check",
+        "."
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.485,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/linux-build.log"
+    },
+    {
+      "name": "linux-image",
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "letopis-tk8-check",
+        "--format",
+        "{{json .}}"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.014,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/linux-image.log"
+    },
+    {
+      "name": "linux-run",
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "letopis-tk8-check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.711,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/linux-run.log"
+    },
+    {
+      "name": "source-prose-diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "a6af7d7b6536a65d85f11f6f02807a906b0e640a",
+        "--check",
+        "--",
+        "src",
+        "tests",
+        "docs/superpowers/specs/2026-10-22-tk-8-git-snapshots-design.md"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.023,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/source-prose-diff-check.log"
+    }
+  ],
+  "focused_red_green": [
+    {
+      "test": "shared_clone_is_refused_before_donor_gc_can_break_retention",
+      "phase": "red",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--test",
+        "git_retention",
+        "shared_clone_is_refused_before_donor_gc_can_break_retention",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/shared-clone-red.log"
+    },
+    {
+      "test": "shared_clone_is_refused_before_donor_gc_can_break_retention",
+      "phase": "green",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--test",
+        "git_retention",
+        "shared_clone_is_refused_before_donor_gc_can_break_retention",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/shared-clone-green.log"
+    },
+    {
+      "test": "alternates_added_after_open_refuse_operations_without_writes",
+      "phase": "red",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--test",
+        "git_retention",
+        "alternates_added_after_open_refuse_operations_without_writes",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/late-alternates-red.log"
+    },
+    {
+      "test": "alternates_added_after_open_refuse_operations_without_writes",
+      "phase": "green",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--test",
+        "git_retention",
+        "alternates_added_after_open_refuse_operations_without_writes",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/late-alternates-green.log"
+    },
+    {
+      "test": "linked_worktree_checks_common_object_store_and_refuses_inactive_alternates",
+      "phase": "red",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--test",
+        "git_retention",
+        "linked_worktree_checks_common_object_store_and_refuses_inactive_alternates",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/linked-alternates-red.log"
+    },
+    {
+      "test": "linked_worktree_checks_common_object_store_and_refuses_inactive_alternates",
+      "phase": "green",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--test",
+        "git_retention",
+        "linked_worktree_checks_common_object_store_and_refuses_inactive_alternates",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/linked-alternates-green.log"
+    }
+  ],
+  "root_test_counts": {
+    "private_git": 7,
+    "existing_integration": 30,
+    "snapshot_integration": 5,
+    "retention_integration": 11,
+    "total": 53,
+    "failed": 0,
+    "ignored": 0
+  },
+  "versions": {
+    "git": "git version 2.50.1 (Apple Git-155)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "host": "Darwin arm64"
+  },
+  "image": {
+    "Id": "sha256:295896e484d95fab93c6e9493605f8a48c056d8aeef7d1a666627d442508798d",
+    "Os": "linux",
+    "Architecture": "arm64"
+  },
+  "source_sha256": {
+    ".dockerignore": "f6116c2f7a114f18906fb3aa57e5a8935b678c824eddecc670acd11282dd0427",
+    "Cargo.lock": "f15fc9e94b7d8d5fe693b1d92a5c95fe635cc0fc845e63655d7ae01f3e62d1b9",
+    "Cargo.toml": "1e9e07a7d1b25b2037c90486ed48676e348817924375390ce4f0b99b5f8f69cb",
+    "rust-toolchain.toml": "12dc5d64dbd96c1b07be2943241d52d9f6127a79ba47a820455ba7b873fc896a",
+    "src/adapters/git/mod.rs": "c03e6875e74092e3b682bc672c8fb376aa55d6140f9e6cbef9a9d1f57e166565",
+    "src/adapters/git/objects.rs": "53616ab6b9e2f9f163da17b71e558571d4ad02fab2f2608f69617a7247e97286",
+    "src/adapters/git/process.rs": "26ae0d6cc7140767cf7ca2d34212b709a4cbb02878bec2a1da882ce888de40a8",
+    "src/adapters/git/refs.rs": "8bd6472a6402cd96d168513bef405d0c51436efc0ab2ee2052f57ae218cea710",
+    "src/adapters/git/tests.rs": "9da320f4b4f9cb628280cfd11b6ac68ebfd7e59c667e7efdd517a3b8618dafb7",
+    "src/adapters/markdown/links.rs": "046167c860f4ce0c0f2b5fdedb8994705634b3f30be8f3ce0e3beaf0761e75f4",
+    "src/adapters/markdown/metadata.rs": "f9ff829174265d73a4201a6f12c8f3854f3dde97f0bd33d020aea1a4c9bf165b",
+    "src/adapters/markdown/mod.rs": "ecc22211f2a04c87d2c408286defe7e08dc8ec01e1c60695d49a911a2e77d7fb",
+    "src/adapters/markdown/scan.rs": "b418e2de928523d7efa8af603d7233e6d206d6936aedd8ba019463cecaaadd2c",
+    "src/adapters/markdown/search.rs": "4d4e458d340b120a43116cb99889c664d4675568110ae3f3d8bbeb79ef4c4870",
+    "src/adapters/mod.rs": "1411d7b21b2e7da62cb313cb692cb8203c6cd91846e779242f621868e5fee825",
+    "src/domain/graph.rs": "46dcc956d100b1b4f9a914e92bfe23c8470c6179d1ec88dd6d6be66d3a6fcc02",
+    "src/domain/identity.rs": "c0cd49ebc37c04028c96c33df2d49280a2f52878969c9355554071b875a10ee8",
+    "src/domain/mod.rs": "c666739586dd118ddd98868b69f20c12f0713eef14da52caa6facdcfe5db6fbb",
+    "src/domain/value.rs": "ca77789c2396b5282aa77e1b3ec82cb7d84378165c3bc9f7fd95bc64bb597368",
+    "src/lib.rs": "0d02bb74725adab2850ec2a04f5f418bea0be6596b9e55a66ac4bc900526a1e3",
+    "src/service/mod.rs": "3e11679ea7260e9fa86ce883c79afdc912736214f6aefe2b638fedfeb02d1e5e",
+    "src/service/ports/git.rs": "a4011ba10ae8f088e20f324bdab2f9c6b5e6becb52882788ef94eb565cd249e5",
+    "src/service/ports/mod.rs": "441b43560994e843ee2c196f85ec0074bed387f6f2569a2ba59954d1ca68487c",
+    "tests/domain_values.rs": "3024dbf9c045383e1e0f06f1b157b33b73781b6ea682452b8cb26f8b0fc3bee4",
+    "tests/fixtures/markdown/code.md": "745c2910661730dbb4d8c94076b522837299017f8971f71cd8df368523512c62",
+    "tests/fixtures/markdown/crlf.md": "eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864",
+    "tests/fixtures/markdown/expected.json": "f457e2a05174ac9dcdd05a55646d90060098ebfc17b7ed2edaf4ece9b8719c26",
+    "tests/fixtures/markdown/no-final-newline.md": "8ae8dc48443c3b9132365da3e83a1862fe8c1be55da7ee6a9bbf478703fe58d2",
+    "tests/fixtures/markdown/references.md": "d6e82fad5e4dbf755ce529593be584a870855af446678ad18f31ddc00b408e97",
+    "tests/fixtures/markdown/sections.md": "142b27a765adec526a7dd8d33ab2dc8965c50fbbdc16916075d24c1bbcf53283",
+    "tests/fixtures/markdown/unicode.md": "8910a8d29ec22cd6a6a67bfddedd14f15dd0e8a9857b20f8372fb03a2ea5f4e7",
+    "tests/fixtures/markdown/whole.md": "69310cd742978c3cef6fa8c6ff86fb69981333c5eada345da90a83a5343cc70f",
+    "tests/git/Dockerfile": "9394f7197e40edaec1f785019f6f4af5b4d2905bd85a0c6186f8d0f4edd55f50",
+    "tests/git/README.md": "477d6685ed4c8b85b55f8b2e53074d5d214e3b580613c0e3062ae6a433e1013b",
+    "tests/git_retention.rs": "ebe91a61120c13265f746ca28240bae1db2e6c1cc469f1732846f81f6fa2068c",
+    "tests/git_snapshots.rs": "be158afc711ed989f7de42a4e78f24035da9365676c9fa939be1a488bef8f9d0",
+    "tests/markdown_elements.rs": "ba9327b6aaf31f88dc9b4a1b209651b4df2a088a3e76b5800db049e0346d8a1d",
+    "tests/markdown_links.rs": "7da3a287ea946b24040a6b296a99ef2cee64ecd0c8aaeccec9f44931eb41172a",
+    "tests/markdown_search.rs": "d493df36d35eff5ba7d2a1a8f29bfbb930aa31ef98f8c3af42a8d3ead4337059",
+    "tests/support/git.rs": "29031923f2cfd7b2a7d5a6728048dc21c310007c2faf2cec62e41058fcf06203",
+    "tests/support/mod.rs": "eb9f619811b6f1543139ba73a8403b829ca58d87e4a8a1a2f82773cf22df530b"
+  },
+  "amended_documents_sha256": {
+    "docs/superpowers/specs/2026-10-22-tk-8-git-snapshots-design.md": "f393d097a38f713e29ebfb8d35d677a1be53f551e8e9b7d7a1037317867a35f7",
+    ".superpowers/sdd/2026-10-22-tk-8-git-snapshots/task-1-report.md": "277162b6b4e80a1691c56d2c60be88eff7427f88a6b3bc0610305ac3c44fdc6c"
+  },
+  "prior_receipts_sha256": {
+    "docs/zkit/letopis/checks/TK-8/verification.json": "b66b365dd43052eb8e48017efb0faab9882d581cc4110efa4221d9dd008018b6",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/verification.json": "94fe158d9918a4a2d019e3f53316f83d0fbbc661c04b4d8447e6196560d4e8e2"
+  },
+  "historical_evidence_preserved_sha256": {
+    "docs/zkit/letopis/checks/TK-8/README.md": "ef0428386bfb86f059e54c9c616e95e600da7b0a745693d982eda7b07d47919a",
+    "docs/zkit/letopis/checks/TK-8/logs/architecture-command-location.log": "e65a44360eb651c2903906852e4e31321f51111325598c43a5e51b114cd9b26f",
+    "docs/zkit/letopis/checks/TK-8/logs/final-source-prose-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/logs/host-clippy.log": "cae74a485ffbe1664651afd181b4422d25b5bf9c2d07f670ae1a8e42d0b65b8e",
+    "docs/zkit/letopis/checks/TK-8/logs/host-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/logs/host-routing.log": "a89074564c6d16f6b1d374b5a050fad837ac08639d5ff2ea9b58b80f4fc4f8e6",
+    "docs/zkit/letopis/checks/TK-8/logs/host-test.log": "5e568a7fc75a32bfb2afb41149b36ee500e06b1a5e99d9392451552115ae7e1b",
+    "docs/zkit/letopis/checks/TK-8/logs/linux-build.log": "532ed0a7bbf67cbef69d7281236815217cac226b314ecb6458c3bdfde692b034",
+    "docs/zkit/letopis/checks/TK-8/logs/linux-image.log": "1dbf3c14aec64c49507fa31130f0765ab87cb272df9c7b20abebd5f54c5d1e8e",
+    "docs/zkit/letopis/checks/TK-8/logs/linux-run.log": "7c4bec2231ded1aa16adffc7d11083ccb21e5c74233d3c5f2481775e5bb38825",
+    "docs/zkit/letopis/checks/TK-8/logs/routing-trap-setup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/logs/routing-trap-unchanged.log": "8c92280dac39d5762a98e3f5b1395af6b516025b6a36187660205a7d6ad31035",
+    "docs/zkit/letopis/checks/TK-8/logs/source-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/logs/version-cargo.log": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+    "docs/zkit/letopis/checks/TK-8/logs/version-git.log": "0a72a762b37a3800276a1004e2c169aed0610d4a3ba601ba59e70e1c4d9f3200",
+    "docs/zkit/letopis/checks/TK-8/logs/version-host.log": "16b8cd028eb757aab907ab404e1656e01783846457156eec99372a91fc1b104d",
+    "docs/zkit/letopis/checks/TK-8/logs/version-rustc.log": "f4d034f5660bb49f22bfcba3f3445be67e25b704c193ff421b53863b4faee148",
+    "docs/zkit/letopis/checks/TK-8/report.md": "ff6b0136e21b4f4e896f1a8ec3adcf722bae7bfa25b9d3806c5ab0c5c3f0591d",
+    "docs/zkit/letopis/checks/TK-8/tdd/A-final-green.log": "7e29aab3008f59ca381ac8cb5c70ac66a82066f41eb507b2b4756ca78b5e202b",
+    "docs/zkit/letopis/checks/TK-8/tdd/A-green.log": "f9a29cc7ad4f2807d00cc4ba4c9ab411974880599ba7c416362cd1c64c5bf5dd",
+    "docs/zkit/letopis/checks/TK-8/tdd/A-red.log": "7101bc97a211641fa06e8b2400026eb209c8321ca88178a8031f0dc07747a340",
+    "docs/zkit/letopis/checks/TK-8/tdd/B-full-green.log": "c7494afb2658c0778dddbfe9063996cf9325a3f6e85eed6dd632206cb0388d04",
+    "docs/zkit/letopis/checks/TK-8/tdd/B-green.log": "bc6e550b1d8ebe51e8b6b7878908770aa8ed69c0e7b4c8ae25e91ecef0f85bde",
+    "docs/zkit/letopis/checks/TK-8/tdd/B-red.log": "d3e093306435570f9cc3953624520780746c57355fccf6bd3054c10bdb75f787",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-conflicting-types-green.log": "adc49a3f5912fc1f21aabcdfb3c193b5ca3c81c68ee52a6ba878cf261fc5a32e",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-conflicting-types-red.log": "a3dfc08ac0425e4b938f6d3d2a942a10ac8fa7639135d0febffdbe776142a8e2",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-dangling-symbolic-green.log": "e203d902335fbeb90558e82861d7c327b6318ab0fc4702f12a0df5561d2699c8",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-dangling-symbolic-red.log": "561a394ce75964fc66292b8fd00425d7130a672c41bed0b884b4de95958f2d60",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-green.log": "2282871f1a26c5c04054e1fefefde99f5b5fe74009f53ad221b08e901b27a994",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-red.log": "a63c2e1c63dd3985c9e7ec8d6ce664037b82d98be82184c3c548f00cc65d0ddc",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/fix-source-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/green.log": "865aa661ba7fb3ddb67a8b8cc3bb11be813ed410f180c5f3623200952e10eef2",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/host-clippy.log": "1831a61c20b8629478b26992d4ae39fc8b7ff39a81eb11b5ec39333a8273862e",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/host-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/host-test.log": "afd8d2b2ffe2c203050d9eb432a9bf0e7f9e9766845b378a8020c9bbbc20d623",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/linux-build.log": "ce8a27dd5c1401e80a506d28f323f268078cf1e32322bdfe7fe4a713b5c34f1e",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/linux-image.log": "42b3c4a9d3747b9f5ecccf459ec50d77827ddb8838c2148792e8db693c75b9e2",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/linux-run.log": "d9016ff8a5e9759fae805ed012c6bb04c0cfdf95edd651cb61a33cada04e5e74",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/red.log": "4a2a2e37b692bb12709b2e6b604aa9201fc6b2385203f84cb1a5af9fda27f472",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/report.md": "acf1784bbacc42ebcfbf6be865962b9308640bf24fc9be9bb404f59f4e9054b3",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/version-cargo.log": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/version-git.log": "0a72a762b37a3800276a1004e2c169aed0610d4a3ba601ba59e70e1c4d9f3200",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/version-host.log": "16b8cd028eb757aab907ab404e1656e01783846457156eec99372a91fc1b104d",
+    "docs/zkit/letopis/checks/TK-8/fix-round-1/version-rustc.log": "f4d034f5660bb49f22bfcba3f3445be67e25b704c193ff421b53863b4faee148"
+  },
+  "evidence_sha256": {
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/commands.json": "27062ca9c77cc4e2f37c0f8b2fdd8bce8e7f52a0b13490f44bc23dfff7ed339e",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/host-clippy.log": "4c334015a7d788a381ba10c5e102fddf35a5b0e8540e754e19dac92def3b2c9e",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/host-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/host-test.log": "305fc99a101286f9606a474e9e2734c7e99c8a61a80b24398012383cd1d4b8c5",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/late-alternates-green.log": "9416a40c1217de7ae2ac453564fc90f085d66a1ac5a915649384e52eca349239",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/late-alternates-red.log": "0309f62eb5d62f8090473bfdcbcdd3797d3496fdf00642d58291f55136a4e96b",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/linked-alternates-green.log": "e01872c7dc2fc8fb30e05bfc91639715f16c9bc67c30cc60fc94399f487f11f0",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/linked-alternates-red.log": "91f42b4726d88eb4157343b03dba3c110f028f8a31205f2b4fca2f44a2b90bdb",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/linux-build.log": "aaca72727385dbe216a2ff03cc13ca67345baedfe4a296338ef8c0a09df3cd47",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/linux-image.log": "cc2778cd7f05b22749893236e15f2593a972fcb8b610f08d59dab7706f078d4e",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/linux-run.log": "77af21d87041ca2fc287e88523dedf61eb165d4fca9f4e5d7091aa3ab48aed5e",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/report.md": "ecbda67758c7a937883b6ae170997e43fb12f5b7c862075a24bd820ef0049480",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/shared-clone-green.log": "f79597e314b2fd99240e2107c6ca3b928eb5dffa973ca3f86b3385f39a79e4b2",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/shared-clone-red.log": "c899cea8a3b5ca3049af20b8d20ba2b5dcd89dcd0ea4a06ba23a23b1009f719b",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/source-prose-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-cargo.log": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-git.log": "0a72a762b37a3800276a1004e2c169aed0610d4a3ba601ba59e70e1c4d9f3200",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-host.log": "16b8cd028eb757aab907ab404e1656e01783846457156eec99372a91fc1b104d",
+    "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-rustc.log": "f4d034f5660bb49f22bfcba3f3445be67e25b704c193ff421b53863b4faee148"
+  },
+  "task_report_prior_sha256": "e3926f570fe3753df8d051c8380ab23fc696be150070ce44e6315a53586cd9e2",
+  "acceptance_status": "pending_controller_scoped_final_review"
+}

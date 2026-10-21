@@ -1,0 +1,9 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.06s
+     Running tests/git_retention.rs (target/debug/deps/git_retention-d70be889e54ec0fc)
+
+running 1 test
+test shared_clone_is_refused_before_donor_gc_can_break_retention ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.58s
+
