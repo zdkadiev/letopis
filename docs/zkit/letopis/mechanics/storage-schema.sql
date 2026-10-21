@@ -41,6 +41,8 @@ CREATE INDEX nodes_search_hash ON nodes(search_hash) WHERE search_hash IS NOT NU
 CREATE VIRTUAL TABLE text_index USING fts5(text, content='', contentless_delete=1);
 -- D-93: change detection. Updated only in the publication unit; an invalid file
 -- gets its current hash and error with the previous projection kept (D-95).
+-- D-97: one row per Markdown candidate from git ls-files (with .gitignore), marked or not;
+-- an unmarked file has valid=1 and no nodes, so the stat prefilter skips it next time.
 CREATE TABLE files(
  path TEXT NOT NULL PRIMARY KEY,
  size INTEGER NOT NULL, mtime_ns INTEGER NOT NULL, inode INTEGER NOT NULL,
