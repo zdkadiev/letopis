@@ -1,0 +1,1 @@
+tests/fixtures/markdown/*.md -text whitespace=cr-at-eol
