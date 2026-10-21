@@ -35,3 +35,17 @@ Minimum Git 2.29 is covered by version-gate tests and the documented command
 subset; these commands do not claim an actual Git 2.29 execution. Physical
 power-loss durability, x86_64, resource limits and atomic live filesystem capture
 remain outside TK-8. Recorded evidence lives in `docs/zkit/letopis/checks/TK-8/`.
+
+
+The adapter requires a self-contained object store. It rejects any existing
+`objects/info/alternates` path, including empty/inactive files and symlinks,
+at open and before every create/read/pin. Git resolves the path through its
+actual gitdir/common-dir; linked layout is covered without adding multi-worktree
+product semantics. Shared/reference clones need a self-contained clone; inactive
+alternates configuration must be removed separately. The adapter neither reads
+donor paths into diagnostics nor materializes/repacks objects. Regressions cover
+an ordinary shared clone, actual donor GC, late configuration and inactive
+common-dir alternates in both formats. Concurrent object-store configuration
+changes during an operation remain outside the accepted same-UID-writer scope.
+Checkout roots with non-UTF-8 names remain safely unsupported; no byte-path API
+is provided.

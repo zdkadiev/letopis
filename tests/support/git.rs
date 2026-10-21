@@ -72,6 +72,22 @@ impl TempRepo {
         fs::write(repo.root.join("live.md"), b"unstaged live\n").unwrap();
         repo
     }
+    pub fn shared_clone(&self) -> Self {
+        let root = self.root.join("BORROWER_PATH_CANARY");
+        self.ok(
+            &[
+                "clone",
+                "-q",
+                "--shared",
+                self.root.to_str().unwrap(),
+                root.to_str().unwrap(),
+            ],
+            None,
+        );
+        let subdir = root.join("subdir");
+        fs::create_dir(&subdir).unwrap();
+        Self { root, subdir }
+    }
     pub fn root(&self) -> &Path {
         &self.root
     }

@@ -337,3 +337,188 @@ fn gitlinks_are_retained_without_dereferencing() {
         assert!(repo.fsck_strict_no_reflogs().success());
     }
 }
+
+fn assert_alternates_error(error: &letopis::service::ports::git::SnapshotError, donor: &TempRepo) {
+    assert_eq!(error.kind(), InternalError);
+    assert!(error.message().contains("alternates"));
+    let diagnostic = format!("{error} {error:?}");
+    assert!(!diagnostic.contains(donor.root().to_str().unwrap()));
+    assert!(!diagnostic.contains("CANARY"));
+}
+
+#[test]
+fn shared_clone_is_refused_before_donor_gc_can_break_retention() {
+    let mut refused = Vec::new();
+    for format in FORMATS {
+        let donor = TempRepo::new(format);
+        let bytes = b"ALTERNATE_PAYLOAD_CANARY unique unreferenced blob\0";
+        let blob = donor.oid(&["hash-object", "-w", "--stdin"], Some(bytes));
+        let borrower = donor.shared_clone();
+        let donor_before = donor.head_index_config_and_live_snapshot();
+        let borrower_before = borrower.head_index_config_and_live_snapshot();
+        let alternates = borrower.root().join(".git/objects/info/alternates");
+        let configuration = fs::read(&alternates).unwrap();
+        assert!(
+            borrower
+                .git(&["cat-file", "-e", &blob], None)
+                .status
+                .success()
+        );
+        let local_blob =
+            borrower
+                .root()
+                .join(format!(".git/objects/{}/{}", &blob[..2], &blob[2..]));
+        assert!(
+            !local_blob.exists(),
+            "the ordinary shared clone borrows this blob"
+        );
+        let opened = open_git_snapshots(borrower.root());
+        let p = path("captured");
+        let accepted = match opened {
+            Ok(git) => {
+                // On the unfixed adapter this recreates the public-API failure:
+                // hash-object -w reuses the donor blob and pin appears successful.
+                let tree = git
+                    .create_tree(&[SnapshotFile { path: &p, bytes }])
+                    .unwrap();
+                git.pin(&tree).unwrap();
+                assert_eq!(git.read_blob(&tree, &p).unwrap(), bytes);
+                assert!(
+                    !local_blob.exists(),
+                    "hash-object -w must not be mistaken for materialization"
+                );
+                Some((git, tree))
+            }
+            Err(error) => {
+                assert_alternates_error(&error, &donor);
+                None
+            }
+        };
+        donor.expire_reflogs_gc_prune_now_and_pack_refs();
+        assert!(
+            !donor.git(&["cat-file", "-e", &blob], None).status.success(),
+            "donor GC really removed the unreferenced blob"
+        );
+        assert!(
+            !borrower
+                .git(&["cat-file", "-e", &blob], None)
+                .status
+                .success()
+        );
+        if let Some((git, tree)) = &accepted {
+            assert_eq!(git.read_blob(tree, &p).unwrap_err().kind(), InternalError);
+            assert_eq!(borrower.direct_ref(tree.as_str()), tree.as_str());
+            eprintln!(
+                "{format:?}: accepted shared snapshot lost its donor blob after GC while its service ref remained exact"
+            );
+        } else {
+            assert!(
+                borrower
+                    .ok(&["for-each-ref", "refs/letopis/snapshots/"], None)
+                    .is_empty()
+            );
+        }
+        assert_eq!(donor.head_index_config_and_live_snapshot(), donor_before);
+        assert_eq!(
+            borrower.head_index_config_and_live_snapshot(),
+            borrower_before
+        );
+        assert_eq!(fs::read(&alternates).unwrap(), configuration);
+        refused.push(accepted.is_none());
+    }
+    assert!(
+        refused.iter().all(|r| *r),
+        "shared clones must be refused before any snapshot is accepted: {refused:?}"
+    );
+}
+
+#[test]
+fn alternates_added_after_open_refuse_operations_without_writes() {
+    for format in FORMATS {
+        let donor = TempRepo::new(format);
+        let repo = TempRepo::new(format);
+        let git = open_git_snapshots(repo.root()).unwrap();
+        let p = path("captured");
+        let tree = git
+            .create_tree(&[SnapshotFile {
+                path: &p,
+                bytes: b"local bytes",
+            }])
+            .unwrap();
+        let alternates = repo.root().join(".git/objects/info/alternates");
+        let configuration = format!("{}\n", donor.root().join(".git/objects").display());
+        fs::write(&alternates, &configuration).unwrap();
+        let before = repo.head_index_config_and_live_snapshot();
+        let objects = repo.ok(&["count-objects", "-v"], None);
+        let create = git.create_tree(&[SnapshotFile {
+            path: &p,
+            bytes: b"new ALTERNATE_PAYLOAD_CANARY",
+        }]);
+        let pin = git.pin(&tree);
+        let read = git.read_blob(&tree, &p);
+        for error in [create.err(), pin.err(), read.err()] {
+            assert_alternates_error(
+                &error.expect("alternates introduced after open must be refused"),
+                &donor,
+            );
+        }
+        assert_no_ref(&repo, &tree);
+        assert_eq!(repo.ok(&["count-objects", "-v"], None), objects);
+        assert_eq!(repo.head_index_config_and_live_snapshot(), before);
+        assert_eq!(fs::read(&alternates).unwrap(), configuration.as_bytes());
+    }
+}
+
+#[test]
+fn linked_worktree_checks_common_object_store_and_refuses_inactive_alternates() {
+    for format in FORMATS {
+        let repo = TempRepo::new(format);
+        let linked = repo.root().join("linked");
+        repo.ok(
+            &[
+                "worktree",
+                "add",
+                "-q",
+                "--detach",
+                linked.to_str().unwrap(),
+            ],
+            None,
+        );
+        let git = open_git_snapshots(&linked).unwrap();
+        let p = path("linked");
+        let tree = git
+            .create_tree(&[SnapshotFile {
+                path: &p,
+                bytes: b"linked bytes",
+            }])
+            .unwrap();
+        git.pin(&tree).unwrap();
+        assert_eq!(git.read_blob(&tree, &p).unwrap(), b"linked bytes");
+        let alternates = repo.root().join(".git/objects/info/alternates");
+        let before = repo.head_index_config_and_live_snapshot();
+        let refs = repo.ok(&["for-each-ref"], None);
+        let objects = repo.ok(&["count-objects", "-v"], None);
+        for configuration in [b"".as_slice(), b"/ABSENT_DONOR_PATH_CANARY/objects\n"] {
+            fs::write(&alternates, configuration).unwrap();
+            match open_git_snapshots(&linked) {
+                Ok(_) => {
+                    panic!("linked worktree must reject even empty/inactive common alternates")
+                }
+                Err(error) => assert_alternates_error(&error, &repo),
+            }
+            assert_alternates_error(&git.pin(&tree).unwrap_err(), &repo);
+            assert_eq!(fs::read(&alternates).unwrap(), configuration);
+            assert_eq!(repo.head_index_config_and_live_snapshot(), before);
+            assert_eq!(repo.ok(&["for-each-ref"], None), refs);
+        }
+        fs::remove_file(alternates).unwrap();
+        assert_eq!(repo.ok(&["count-objects", "-v"], None), objects);
+        assert_eq!(
+            open_git_snapshots(&linked)
+                .unwrap()
+                .read_blob(&tree, &p)
+                .unwrap(),
+            b"linked bytes"
+        );
+    }
+}
