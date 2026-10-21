@@ -1,0 +1,19 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.43s
+     Running tests/git_retention.rs (target/debug/deps/git_retention-d70be889e54ec0fc)
+
+running 1 test
+
+thread 'conflicting_descendant_types_do_not_pin' (15047798) panicked at tests/git_retention.rs:313:35:
+called `Result::unwrap_err()` on an `Ok` value: RetainedTree { oid: TreeOid("00d058e1c5f009d538f5af852699349917d71fd9") }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test conflicting_descendant_types_do_not_pin ... FAILED
+
+failures:
+
+failures:
+    conflicting_descendant_types_do_not_pin
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.31s
+
+error: test failed, to rerun pass `--test git_retention`

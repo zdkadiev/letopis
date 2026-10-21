@@ -1,0 +1,24 @@
+warning: associated function `new` is never used
+  --> src/service/ports/git.rs:62:19
+   |
+61 | impl RetainedTree {
+   | ----------------- associated function in this implementation
+62 |     pub(crate) fn new(oid:TreeOid)->Self { Self{oid} }
+   |                   ^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `letopis` (lib) generated 1 warning
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running tests/git_snapshots.rs (target/debug/deps/git_snapshots-d44226562c1740cb)
+
+running 5 tests
+test empty_tree_and_invalid_paths ... ok
+test replacement_refs_do_not_change_bytes ... ok
+test tree_types_and_missing_objects_are_distinct ... ok
+test paths_are_literal_and_never_shell_input ... ok
+test exact_bytes_without_index_or_commit ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.71s
+

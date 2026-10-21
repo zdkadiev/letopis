@@ -1,0 +1,33 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8/letopis)
+warning: field `process` is never read
+ --> src/adapters/git/mod.rs:7:49
+  |
+7 | pub(crate) struct GitCliAdapter { root:PathBuf, process:GitProcess, oid_len:usize }
+  |                   -------------                 ^^^^^^^
+  |                   |
+  |                   field in this struct
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `new` is never used
+  --> src/service/ports/git.rs:62:19
+   |
+61 | impl RetainedTree {
+   | ----------------- associated function in this implementation
+62 |     pub(crate) fn new(oid:TreeOid)->Self { Self{oid} }
+   |                   ^^^
+
+warning: `letopis` (lib test) generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/letopis-3048ed1b85800ea9)
+
+running 6 tests
+test adapters::git::tests::version_gate ... ok
+test adapters::git::tests::open_rejects_non_repository_and_bare ... ok
+test adapters::git::tests::subprocess_drains_and_reaps_on_io_failure ... ok
+test adapters::git::tests::discovers_root_from_subdirectory ... ok
+test adapters::git::tests::open_rejects_old_git_before_object_calls ... ok
+test adapters::git::tests::process_removes_inherited_overrides_and_hardens_writes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+

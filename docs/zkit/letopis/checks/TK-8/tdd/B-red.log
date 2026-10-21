@@ -1,0 +1,58 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8/letopis)
+warning: fields `root`, `process`, and `oid_len` are never read
+ --> src/adapters/git/mod.rs:7:35
+  |
+7 | pub(crate) struct GitCliAdapter { root:PathBuf, process:GitProcess, oid_len:usize }
+  |                   -------------   ^^^^          ^^^^^^^             ^^^^^^^
+  |                   |
+  |                   fields in this struct
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `new` is never used
+  --> src/service/ports/git.rs:62:19
+   |
+61 | impl RetainedTree {
+   | ----------------- associated function in this implementation
+62 |     pub(crate) fn new(oid:TreeOid)->Self { Self{oid} }
+   |                   ^^^
+
+warning: `letopis` (lib) generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.52s
+     Running tests/git_snapshots.rs (target/debug/deps/git_snapshots-d44226562c1740cb)
+
+running 5 tests
+
+thread 'replacement_refs_do_not_change_bytes' (14951686) panicked at tests/git_snapshots.rs:55:191:
+called `Result::unwrap()` on an `Err` value: SnapshotError { kind: InternalError, message: "tree creation unavailable", cause: None }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'tree_types_and_missing_objects_are_distinct' (14951687) panicked at tests/git_snapshots.rs:42:147:
+called `Result::unwrap_err()` on an `Ok` value: []
+
+thread 'paths_are_literal_and_never_shell_input' (14951685) panicked at tests/git_snapshots.rs:29:221:
+called `Result::unwrap()` on an `Err` value: SnapshotError { kind: InternalError, message: "tree creation unavailable", cause: None }
+
+thread 'empty_tree_and_invalid_paths' (14951683) panicked at tests/git_snapshots.rs:33:139:
+called `Result::unwrap()` on an `Err` value: SnapshotError { kind: InternalError, message: "tree creation unavailable", cause: None }
+test replacement_refs_do_not_change_bytes ... FAILED
+test empty_tree_and_invalid_paths ... FAILED
+test paths_are_literal_and_never_shell_input ... FAILED
+test tree_types_and_missing_objects_are_distinct ... FAILED
+
+thread 'exact_bytes_without_index_or_commit' (14951684) panicked at tests/git_snapshots.rs:18:40:
+called `Result::unwrap()` on an `Err` value: SnapshotError { kind: InternalError, message: "tree creation unavailable", cause: None }
+test exact_bytes_without_index_or_commit ... FAILED
+
+failures:
+
+failures:
+    empty_tree_and_invalid_paths
+    exact_bytes_without_index_or_commit
+    paths_are_literal_and_never_shell_input
+    replacement_refs_do_not_change_bytes
+    tree_types_and_missing_objects_are_distinct
+
+test result: FAILED. 0 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+error: test failed, to rerun pass `--test git_snapshots`

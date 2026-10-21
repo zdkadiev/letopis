@@ -1,0 +1,4 @@
+src/adapters/git/process.rs:9:    process::{Command, ExitStatus, Stdio},
+src/adapters/git/process.rs:78:        let mut command = Command::new(&self.program);
+src/adapters/git/tests.rs:59:    let empty = std::env::temp_dir().join(format!("letopis-empty-{}", std::process::id()));
+src/adapters/git/tests.rs:82:        !std::process::Command::new("kill")
