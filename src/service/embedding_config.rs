@@ -2,11 +2,13 @@ use super::{EmbeddingError, EmbeddingErrorKind, EmbeddingResult};
 use crate::domain::Sha256;
 use serde::{
     Deserialize, Deserializer,
-    de::{self, MapAccess, SeqAccess, Visitor},
+    de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor},
 };
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, value::RawValue};
 use std::{fmt, num::NonZeroUsize};
 
+// Preserve serde_json's default nesting budget across borrowed-token parsers.
+const MAX_JSON_DEPTH: usize = 128;
 const MIN_DIMENSIONS: usize = 2;
 const MAX_DIMENSIONS: usize = 4096;
 const ROOT_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retries"];
@@ -187,10 +189,47 @@ fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
 struct UniqueValue(Value);
 impl<'de> Deserialize<'de> for UniqueValue {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_any(UniqueVisitor)
+        UniqueValueSeed { depth: 0 }.deserialize(deserializer)
     }
 }
-struct UniqueVisitor;
+struct UniqueValueSeed {
+    depth: usize,
+}
+impl<'de> DeserializeSeed<'de> for UniqueValueSeed {
+    type Value = UniqueValue;
+    fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+        if self.depth >= MAX_JSON_DEPTH {
+            return Err(de::Error::custom("JSON nesting exceeds supported limit"));
+        }
+        let raw = <&RawValue>::deserialize(deserializer)?;
+        if !has_supported_integer_token(raw.get()) {
+            return Err(de::Error::custom("integer outside supported range"));
+        }
+        let mut parser = serde_json::Deserializer::from_str(raw.get());
+        parser
+            .deserialize_any(UniqueVisitor { depth: self.depth })
+            .map_err(de::Error::custom)
+    }
+}
+// RawValue borrows the original token; serde_json would otherwise turn an
+// overflowing integer into f64 before the visitor can check its exact value.
+fn has_supported_integer_token(raw: &str) -> bool {
+    let is_number = raw
+        .as_bytes()
+        .first()
+        .is_some_and(|first| first.is_ascii_digit() || *first == b'-');
+    if !is_number || raw.contains(['.', 'e', 'E']) {
+        return true;
+    }
+    if raw.starts_with('-') {
+        raw.parse::<i64>().is_ok()
+    } else {
+        raw.parse::<u64>().is_ok()
+    }
+}
+struct UniqueVisitor {
+    depth: usize,
+}
 impl<'de> Visitor<'de> for UniqueVisitor {
     type Value = UniqueValue;
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -218,18 +257,38 @@ impl<'de> Visitor<'de> for UniqueVisitor {
     }
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Self::Value, A::Error> {
         let mut values = Vec::new();
-        while let Some(UniqueValue(value)) = sequence.next_element()? {
+        while let Some(UniqueValue(value)) = sequence.next_element_seed(UniqueValueSeed {
+            depth: self.depth + 1,
+        })? {
             values.push(value);
         }
         Ok(UniqueValue(Value::Array(values)))
     }
     fn visit_map<A: MapAccess<'de>>(self, mut object: A) -> Result<Self::Value, A::Error> {
         let mut values = Map::new();
-        while let Some((key, UniqueValue(value))) = object.next_entry::<String, UniqueValue>()? {
+        while let Some(key) = object.next_key::<String>()? {
+            let UniqueValue(value) = object.next_value_seed(UniqueValueSeed {
+                depth: self.depth + 1,
+            })?;
             if values.insert(key, value).is_some() {
                 return Err(de::Error::custom("duplicate key"));
             }
         }
         Ok(UniqueValue(Value::Object(values)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::UniqueValue;
+
+    #[test]
+    fn bounds_raw_token_traversal_before_canonicalization() {
+        // Arrange
+        let nested = format!("{}0{}", "[".repeat(130), "]".repeat(130));
+        // Act
+        let result = serde_json::from_str::<UniqueValue>(&nested);
+        // Assert
+        assert!(result.is_err());
     }
 }

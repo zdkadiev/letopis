@@ -693,3 +693,67 @@ fn preserves_exact_large_option_integers_and_rejects_nested_array_rounding() {
     );
     assert!(result.is_err());
 }
+
+#[test]
+fn rejects_integer_tokens_above_unsigned_range_before_rounding() {
+    for integer in [
+        "18446744073709551616",
+        "18446744073709551617",
+        "18446744073709551618",
+    ] {
+        // Arrange
+        let bytes = format!(
+            r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","options":{{"seed":{integer}}}}},"max_retries":3}}"#
+        );
+        // Act
+        let result = EmbeddingConfig::parse(bytes.as_bytes());
+        // Assert
+        let error = result.expect_err("overflowing integer token must remain detectable");
+        assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidConfig);
+        assert!(!format!("{error} {error:?}").contains(integer));
+    }
+}
+#[test]
+fn rejects_integer_tokens_below_signed_range_inside_nested_arrays() {
+    for integer in ["-9223372036854775809", "-9223372036854775810"] {
+        // Arrange
+        let bytes = format!(
+            r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","options":{{"future":[{{"seed":{integer}}}]}}}},"max_retries":3}}"#
+        );
+        // Act
+        let result = EmbeddingConfig::parse(bytes.as_bytes());
+        // Assert
+        let error = result.expect_err("overflowing integer token must remain detectable");
+        assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidConfig);
+        assert!(!format!("{error} {error:?}").contains(integer));
+    }
+}
+
+#[test]
+fn preserves_numeric_strings_and_large_noninteger_spellings() {
+    // Arrange
+    let first = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","options":{"text":"18446744073709551617","scale":1e30}},"max_retries":3}"#;
+    let second = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","options":{"text":"18446744073709551617","scale":1E+30}},"max_retries":3}"#;
+    // Act
+    let original = parse_config(first);
+    let equivalent = parse_config(second);
+    // Assert
+    assert_eq!(original.get_identity(), equivalent.get_identity());
+    assert_eq!(
+        original.get_parameters()["options"]["text"],
+        "18446744073709551617"
+    );
+}
+
+#[test]
+fn retains_bounded_json_nesting_while_preserving_raw_integer_tokens() {
+    // Arrange
+    let nested = format!("{}0{}", "[".repeat(130), "]".repeat(130));
+    let bytes = format!(
+        r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","future":{nested}}},"max_retries":3}}"#
+    );
+    // Act
+    let result = EmbeddingConfig::parse(bytes.as_bytes());
+    // Assert
+    assert!(result.is_err());
+}
