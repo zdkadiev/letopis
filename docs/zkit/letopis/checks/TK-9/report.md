@@ -1,11 +1,12 @@
 # TK-9 storage acceptance evidence
 
-Implementation and platform checks passed; fresh Task 6 and whole-branch reviews
-remain parent-owned and pending. No integration, push or issue closure was done.
+Implementation, platform checks and independent task/whole-branch reviews passed.
+The final scoped re-review addressed all four findings; see [review outcome](review.md). No integration, push or issue closure was done.
 
 ## Sources and receipts
 
-Final platform source: `b0a5aeaa0cd5c51bfbdb008cf1f3870b28c49b16`.
+Current tested source: `60fc1f0cd9f4be62c62d486632cd52446a9c46a0`; current receipts are linked in the final-review section below.
+Initial platform source: `b0a5aeaa0cd5c51bfbdb008cf1f3870b28c49b16`.
 Executable/runner/native-test code: `eac2e38c9e20445f84b31d463f0ba4fa4ead7766`.
 The followup changes only Docker context allowlisting. Receipts capture the actual
 source commit and dirty documentation status; this later evidence commit was not
@@ -18,7 +19,7 @@ executed. Exact product/build/vendor/test input SHA-256 values are in each manif
 - [Initial Linux build failure](linux-arm64-initial/docker-build.log): `.dockerignore` excluded required COPY inputs. Minimal allowlist correction enabled the planned source build. [Initial host receipt](macos-arm64-initial/manifest.json) is retained.
 - [Tasks 1–5 reports and original RED/GREEN logs](history/): archived before ignored SDD scratch removal; no source/vendor/target duplication. Task 4's report includes its captured command output.
 
-## Exact execution and results
+## Initial execution and results (before final review fixes)
 
 `/opt/homebrew/bin/python3 -B -m unittest discover -s tests/storage -p test_runner.py -v`:
 3 passed. The tests catch swallowed exit 42, evidence overwrite, and a timed-out
@@ -102,7 +103,7 @@ no false behavioral RED is claimed.
 
 Unclaimed: physical power loss, x86_64, old minimum Git, resource capacity, model
 quality, full CLI/publication/ranking/provider/drain, historical proof-harness reruns.
-The final fresh reviews and Engram outcome recording are parent-owned and pending.
+Final reviews and Engram outcome recording are complete; see [review outcome](review.md).
 
 
 ## Final-review fix wave (source 60fc1f0)
@@ -112,8 +113,8 @@ or native C: preparation failures retain FAIL manifests; negative-control Git
 commands retain logs/exits; concurrent bootstrap errors require SQLite contention
 and at least one initializer succeeds; observed native versions are distinguished
 from assertions; an executable canonical-DDL check and deliberate-drift regression
-now retain the approved design parity requirement. Parent scoped re-review remains
-pending; this paragraph does not claim its outcome.
+now retain the approved design parity requirement. The final scoped re-review confirmed all four findings addressed with no new
+breakage; its outcome and limits are recorded in [review outcome](review.md).
 
 Fresh receipts, tied to source commit
 `60fc1f0cd9f4be62c62d486632cd52446a9c46a0`:
@@ -134,3 +135,8 @@ now hashed and copied explicitly. Source dirty logs contain only new receipt
 paths. Earlier receipts and initial failures remain unchanged. Later evidence/doc
 commits did not run these suites; applicability rests on the recorded source/hash
 correspondence. Prior platform/product limits above continue to apply.
+
+
+## Final handoff
+
+All six task gates, whole-branch review and the single final scoped re-review are complete. No open review findings remain. Engram outcome and current boundaries are recorded at graph revision 77. The task is implemented on local branch TK-9; integration, push and GitHub issue closure await the delivery choice.

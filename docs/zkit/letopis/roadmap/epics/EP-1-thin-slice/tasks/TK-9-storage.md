@@ -1,6 +1,6 @@
 # TK-9 — Реализовать служебную SQLite и storage ports
 
-> **Статус:** in_progress
+> **Статус:** done
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 6 / 10 / 16 (best / expected / worst)
@@ -70,8 +70,6 @@
 
 ## 9. Отчёт о выполнении
 
-Реализация и собственные проверки завершены на source commit `b0a5aeaa0cd5c51bfbdb008cf1f3870b28c49b16`: 106 Rust tests и strict Rustdoc прошли на macOS ARM64 и Linux glibc ARM64; copied executable работает без файла расширения, оба negative controls подтверждены. Три Python runner checks прошли. Критерии подтверждены [отчётом и evidence](../../../../checks/TK-9/report.md).
+Реализация и проверки завершены на source commit `60fc1f0cd9f4be62c62d486632cd52446a9c46a0`: 106 Rust tests, семь Python checks, strict Rustdoc, canonical-DDL parity, copied executable и negative controls прошли на macOS ARM64 и source-built Linux glibc ARM64 без сети. Критерии подтверждены [отчётом и evidence](../../../../checks/TK-9/report.md).
 
-Статус остаётся `in_progress` до свежих Task 6 и whole-branch reviews, которые выполняет контроллер. Отложенный minor по проверке concurrent initializer остаётся на broad review. Physical power loss, x86_64, resource/quality, полный CLI/publication/ranking/drain не заявлены. Merge/push/issue closure не выполнялись.
-
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+Все шесть независимых task reviews, whole-branch review и финальный scoped re-review завершены; четыре замечания исправлены, новых проблем нет. [Результат review и принятые решения](../../../../checks/TK-9/review.md). Итог записан в Engram, revision 77. Physical power loss, x86_64, resource/quality и полный CLI/publication/ranking/drain не заявлены. Merge/push/issue closure ожидают отдельного указания по доставке.

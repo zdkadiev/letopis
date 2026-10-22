@@ -1,0 +1,25 @@
+{
+  "doc_links": 94,
+  "anchors": 12,
+  "plan_done": 44,
+  "plan_pending": 0,
+  "current_input_correspondence": [
+    {
+      "receipt": "macos-arm64",
+      "status": "PASS",
+      "inputs_checked": 182
+    },
+    {
+      "receipt": "linux-arm64/container",
+      "status": "PASS",
+      "inputs_checked": 77
+    },
+    {
+      "receipt": "negative-controls",
+      "status": "PASS",
+      "inputs_checked": 0
+    }
+  ],
+  "vec1_pin": "PASS",
+  "product_changes_after_platform_runs": "none (only closing docs)"
+}

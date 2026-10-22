@@ -1,14 +1,14 @@
 # TK-9 — SQLite storage, static vec1, and responsibility-based modules
 
 > **Date:** 2026-10-22
-> **Status:** approved for implementation; the user approved the written plan and selected Subagent-driven execution on 2026-10-22.
+> **Status:** implemented and verified on 2026-10-22; all task, whole-branch and final scoped reviews complete.
 > **Branch:** TK-9, based on local main `5869ffd6e7fb148f79c5eec2f1c7856913c662fd` (includes D-98).
 
 ## 1. Intent and design authority
 
 Implement the production storage foundation required by the thin slice: the agreed cache schema, vectors.db, typed application interfaces, and statically linked vec1. Subsequent services must be able to use it without knowing SQLite. Keep the design synchronous, small, and explicit.
 
-The user approved one Storage interface, one concrete SqliteStorage implementation, private modules by responsibility, inward dependencies, and lib.rs wiring. Later refinements remove Port/Adapter from type names and directory names, remove contracts/, place interfaces in mod.rs, and put each concrete implementation with its struct in a separate file. These naming/file decisions are recorded in [D-99](../../zkit/letopis/decisions.md#D-99). The user subsequently approved this written specification for planning on 2026-10-22. The resulting implementation plan remains a separate review gate.
+The user approved one Storage interface, one concrete SqliteStorage implementation, private modules by responsibility, inward dependencies, and lib.rs wiring. Later refinements remove Port/Adapter from type names and directory names, remove contracts/, place interfaces in mod.rs, and put each concrete implementation with its struct in a separate file. These naming/file decisions are recorded in [D-99](../../zkit/letopis/decisions.md#D-99). The user subsequently approved this written specification for planning on 2026-10-22. The user subsequently approved the written plan and selected Subagent-driven execution; that gate is complete.
 
 Sources, in precedence order:
 
@@ -172,11 +172,11 @@ Run the product/static-link checks on macOS ARM64 and Linux glibc ARM64 with pla
 
 A fresh pre-change baseline on the branch passed ./scripts/check-rust.sh: formatting, compiler checks, Clippy, and 53 root tests. This is context for the existing tree, not evidence that TK-9 storage already exists.
 
-This specification records the agreed intent, module/file refinements, and concrete storage behavior. The user approved the written specification with “go on” on 2026-10-22. Product code remains unchanged at the planning stage. The [implementation plan](../plans/2026-10-22-tk-9-storage.md) enumerates signatures, cohesive tasks, exact test commands, static-build plumbing, and evidence locations. The user reviews that written plan and chooses its execution method before product implementation begins.
+This specification records the agreed intent, module/file refinements, and concrete storage behavior. The user approved the written specification with “go on” on 2026-10-22. The baseline was captured before implementation; all six implementation tasks are now complete. The [implementation plan](../plans/2026-10-22-tk-9-storage.md) enumerates signatures, cohesive tasks, exact test commands, static-build plumbing, and evidence locations. The user approved that plan and chose Subagent-driven execution before implementation began.
 
 ## Implementation evidence (2026-10-22)
 
-Implementation and platform validation are recorded in the [TK-9 report](../../zkit/letopis/checks/TK-9/report.md): 106 Rust tests per platform, strict Rustdoc, three runner checks, copied native executable and two disposable-source negative controls. Final platform source is `b0a5aeaa0cd5c51bfbdb008cf1f3870b28c49b16`; later documentation commits are not claimed as executed. Task 6 and final fresh reviews remain pending with the controller. No integration or deferred product scope is claimed.
+Implementation and platform validation are recorded in the [TK-9 report](../../zkit/letopis/checks/TK-9/report.md): 106 Rust tests and seven Python checks per platform, strict Rustdoc, canonical-DDL parity with deliberate drift rejection, copied native executable and two disposable-source negative controls. Current tested source is `60fc1f0cd9f4be62c62d486632cd52446a9c46a0`; earlier receipts remain historical. All six independent task gates, broad final review and the single fix-wave re-review passed; all four findings are addressed. Engram outcome is recorded at revision 77. Later documentation commits are not claimed as executed. Integration and later roadmap scopes remain separate.
 
 
 ### Final-review evidence clarification
