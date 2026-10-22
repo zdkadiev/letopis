@@ -111,4 +111,19 @@ review; these untested boundaries remain explicit rather than implied proven.
 
 Host manifest SHA-256: ac6ad8191830f05ffd0e4779569399f43c4fa71c7cac06ba390cc356e4523071.
 Linux inner manifest SHA-256: f374794cbe694f549bdfeddc5c21d8c9ebb3e90e3c08993ad8e544e468a69ef8.
-Branch remains separate from main; no merge/push is part of this implementation.
+At implementation handoff, the branch remained separate from main; subsequent
+integration is recorded below.
+
+## Subsequent integration — 2026-10-22
+
+User authorized commit and merge. Implementation was already committed through
+7fc4fdf; merged into main as6e260d903d44dde51d0999d518e93195b057926b.
+The merge tree exactly matches the reviewed branch. The host acceptance runner
+was rerun from the main checkout at `.artifacts/query-builder/merged-main`:
+all15 commands exit0,112 Rust tests and8 Python checks PASS, with strict Rustdoc,
+format/compiler/Clippy, canonical schema parity, native/copied executable and
+linkage checks. All78 shared input hashes still match the earlier Linux run;
+Linux was not rebuilt for an identical merge tree. Source receipts were copied
+byte-for-byte to ignored `.artifacts/query-builder/feature` before worktree cleanup.
+The user's untracked skills-lock.json was preserved; it is not part of this work.
+No push was requested or performed for this integration.
