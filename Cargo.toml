@@ -6,6 +6,7 @@ rust-version = "1.95.0"
 publish = false
 
 [dependencies]
+sea-query = { version = "=1.0.2", default-features = false, features = ["backend-sqlite", "derive"] }
 rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
 libsqlite3-sys = { version = "=0.38.2", default-features = false, features = ["bundled"] }
 sha2 = "=0.10.9"

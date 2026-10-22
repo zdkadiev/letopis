@@ -1,4 +1,7 @@
-use super::connection::map_sqlite;
+use super::{
+    connection::map_sqlite,
+    query::{Project, build_query},
+};
 use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256},
     service::{
@@ -6,7 +9,8 @@ use crate::{
         StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
     },
 };
-use rusqlite::{Connection, OptionalExtension, Transaction};
+use rusqlite::{Connection, OptionalExtension, Transaction, params_from_iter};
+use sea_query::{Expr, ExprTrait, Query};
 
 pub struct SqliteRead<'a> {
     transaction: Transaction<'a>,
@@ -16,10 +20,14 @@ pub struct SqliteRead<'a> {
 impl<'a> SqliteRead<'a> {
     pub(super) fn begin(connection: &'a mut Connection) -> StorageResult<Self> {
         let transaction = connection.transaction().map_err(map_sqlite)?;
+        let (sql, values) = build_query(
+            Query::select()
+                .column(Project::Revision)
+                .from(Project::Table)
+                .and_where(Expr::col(Project::Id).eq(1)),
+        )?;
         let revision: i64 = transaction
-            .query_row("SELECT revision FROM project WHERE id=1", [], |row| {
-                row.get(0)
-            })
+            .query_row(&sql, params_from_iter(values), |row| row.get(0))
             .map_err(map_sqlite)?;
         let revision = u64::try_from(revision).map_err(|error| {
             StorageError::new_with_cause(
