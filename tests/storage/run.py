@@ -43,7 +43,8 @@ def run_command(argv: list[str], *, cwd: Path, env: dict[str, str],
 
 def hash_inputs(root):
     paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs',
-              'rust-toolchain.toml', 'clippy.toml')]
+              'rust-toolchain.toml', 'clippy.toml', '.dockerignore',
+              'docs/zkit/letopis/mechanics/storage-schema.sql')]
     for name in ('src', 'vendor', 'examples', 'tests', 'scripts'):
         paths.extend(p for p in (root / name).rglob('*') if p.is_file()
                      and '__pycache__' not in p.parts)
@@ -52,6 +53,10 @@ def hash_inputs(root):
 
 
 def run_host(root, evidence, execute):
+    execute([sys.executable, '-B', 'tests/storage/check_schema.py', str(root)],
+            'schema-parity.log')
+    execute([sys.executable, '-B', '-m', 'unittest', 'discover', '-s',
+             'tests/storage', '-p', 'test_runner.py', '-v'], 'runner-tests.log')
     for tool in (['rustc', '-vV'], ['cargo', '--version'], ['git', '--version'],
                  [sys.executable, '--version'], ['uname', '-a']):
         execute(tool, 'version-' + Path(tool[0]).name + '.log')
@@ -118,13 +123,14 @@ def main():
     root = Path(__file__).resolve().parents[2]
     manifest = {'status': 'FAIL', 'platform': platform.platform(),
                 'machine': platform.machine(), 'python': sys.version,
-                'inputs': hash_inputs(root), 'commands': COMMANDS}
+                'inputs': {}, 'commands': COMMANDS}
 
     def execute(argv, name, *, cwd=root, extra=None):
         run_command(argv, cwd=cwd, env={**os.environ, **(extra or {})},
                     log=evidence / name, timeout=1800)
 
     try:
+        manifest['inputs'] = hash_inputs(root)
         if (root / '.git').exists():
             execute(['git', 'rev-parse', 'HEAD'], 'source-commit.log')
             execute(['git', 'status', '--short'], 'source-dirty.log')

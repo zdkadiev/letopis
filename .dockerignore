@@ -30,3 +30,9 @@
 !tests/storage_*.rs
 !tests/storage/
 !tests/storage/**
+!docs/
+!docs/zkit/
+!docs/zkit/letopis/
+!docs/zkit/letopis/mechanics/
+!docs/zkit/letopis/mechanics/storage-schema.sql
+!.dockerignore

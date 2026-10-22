@@ -2,7 +2,6 @@
 """Run destructive controls only inside disposable git-archive copies."""
 import argparse
 import hashlib
-import io
 import json
 import os
 from pathlib import Path
@@ -19,14 +18,18 @@ def main():
     create_evidence(args.evidence)
     evidence = args.evidence.resolve()
     root = Path(__file__).resolve().parents[2]
-    commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
-    archive = subprocess.check_output(['git', 'archive', commit], cwd=root)
-    results = {'commit': commit, 'commands': COMMANDS, 'status': 'FAIL'}
+    results = {'commands': COMMANDS, 'status': 'FAIL'}
     try:
+        run_command(['git', 'rev-parse', 'HEAD'], cwd=root, env=dict(os.environ),
+                    log=evidence / 'source-commit.log', timeout=60)
+        commit = (evidence / 'source-commit.log').read_text().strip()
+        results['commit'] = commit
+        run_command(['git', 'archive', '--format=tar.gz', commit], cwd=root, env=dict(os.environ),
+                    log=evidence / 'source.tar.gz', timeout=60)
         for control in ('checksum', 'registration'):
             with tempfile.TemporaryDirectory(prefix='tk9-control-') as directory:
                 copy = Path(directory)
-                with tarfile.open(fileobj=io.BytesIO(archive)) as source:
+                with tarfile.open(evidence / 'source.tar.gz') as source:
                     source.extractall(copy, filter='data')
                 path = copy / ('vendor/vec1/vec1.c' if control == 'checksum' else 'src/storage/native.rs')
                 if control == 'checksum':
@@ -56,6 +59,9 @@ def main():
                 else:
                     raise AssertionError(control + ' unexpectedly passed')
         results['status'] = 'PASS'
+    except BaseException as error:
+        results['error'] = repr(error)
+        raise
     finally:
         (evidence / 'manifest.json').write_text(json.dumps(results, indent=2) + '\n')
 

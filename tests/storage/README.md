@@ -19,7 +19,13 @@ client process-group cleanup. Logs and receipts contain synthetic fixture data.
 The copied executable accepts exactly one nonexistent scratch directory and checks
 FTS, revision, native vector bytes/shared IDs, and persistence through public APIs.
 Dynamic-link inspection rejects vec1/SQLite shared dependencies. Native unit tests
-assert capabilities and read-back PRAGMAs before printing their provenance.
+assert SQLite >=3.51.3, the vec1 version 0.8 prefix, FTS capabilities and
+read-back PRAGMAs before printing their provenance. SQLite 3.53.2 and the exact
+vec1 NEON/multi-threaded description are observed values, not exact assertions.
+The host runner also executes the focused Python suite and canonical-DDL parity
+check. Parity compares the fixed cache/vector fixtures after removing comments
+and the intentional project seed; its regression test deliberately changes a
+column type and requires rejection. This is not a general SQL parser.
 Negative controls archive committed sources, never modify the worktree, and use
 fresh targets. Registration mutation must compile before its runtime rejection.
 

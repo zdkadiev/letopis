@@ -158,23 +158,40 @@ fn parallel_initializers_leave_a_complete_schema() {
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
     let barrier = Arc::new(Barrier::new(2));
-    std::thread::scope(|scope| {
+    let successes = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..2)
             .map(|_| {
                 let barrier = Arc::clone(&barrier);
                 let (cache, vectors) = (&cache, &vectors);
                 scope.spawn(move || {
                     barrier.wait();
-                    if let Err(error) = open_storage(cache, vectors) {
-                        assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
+                    match open_storage(cache, vectors) {
+                        Ok(_) => true,
+                        Err(error) => {
+                            assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
+                            let cause = std::error::Error::source(&error)
+                                .unwrap()
+                                .downcast_ref::<rusqlite::Error>()
+                                .unwrap();
+                            assert!(matches!(
+                                cause.sqlite_error_code(),
+                                Some(
+                                    rusqlite::ErrorCode::DatabaseBusy
+                                        | rusqlite::ErrorCode::DatabaseLocked
+                                )
+                            ));
+                            false
+                        }
                     }
                 })
             })
             .collect();
-        for handle in handles {
-            handle.join().unwrap();
-        }
+        handles
+            .into_iter()
+            .map(|handle| usize::from(handle.join().unwrap()))
+            .sum::<usize>()
     });
+    assert!(successes >= 1, "neither initializer succeeded");
     let mut storage = open_storage(&cache, &vectors).unwrap();
     assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
 }
