@@ -178,6 +178,12 @@ fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
         if !entry.ends_with(b".md") && !entry.ends_with(b".markdown") {
             continue;
         }
+        if entry
+            .split(|byte| *byte == b'/')
+            .any(|part| part == b".git" || part == b".letopis")
+        {
+            continue;
+        }
         let text = std::str::from_utf8(entry).map_err(|cause| {
             DocumentError::new_with_cause(
                 DocumentErrorKind::InvalidRequest,
@@ -192,13 +198,6 @@ fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
                 cause,
             )
         })?;
-        if path
-            .as_str()
-            .split('/')
-            .any(|part| part == ".git" || part == ".letopis")
-        {
-            continue;
-        }
         candidates.insert(path);
     }
     Ok(candidates.into_iter().collect())

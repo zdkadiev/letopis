@@ -331,3 +331,43 @@ fn candidates_deduplicate_unmerged_index_stages() {
         ["conflict.md", "live.md"]
     );
 }
+
+#[test]
+fn candidates_exclude_metadata_before_validating_paths() {
+    use crate::service::CorpusFiles;
+    for raw in [
+        b".letopis/bad#anchor.md".as_slice(),
+        b".letopis/bad\xff.md",
+        b"nested/.letopis/bad\xff.markdown",
+    ] {
+        // Arrange: Git can list metadata names unsupported by the corpus model.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        fs::write(repo.get_root().join(".letopis-notes.md"), b"candidate").unwrap();
+        let oid = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+        let mut entry = format!("100644 {oid}\t").into_bytes();
+        entry.extend(raw);
+        entry.push(0);
+        repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
+        let git = GitCli::open(repo.get_root()).unwrap();
+        // Act
+        let candidates = git.list_candidates().unwrap();
+        // Assert
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            [".letopis-notes.md", "live.md"]
+        );
+    }
+}
+
+#[test]
+fn candidates_exclude_raw_git_metadata_components() {
+    // Arrange: Git itself forbids adding .git paths to its real index.
+    let raw = b".git/bad#anchor.md\0nested/.git/bad\xff.markdown\0.git-notes.md\0";
+    // Act
+    let candidates = super::parse_candidates(raw).unwrap();
+    // Assert
+    assert_eq!(
+        candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+        [".git-notes.md"]
+    );
+}
