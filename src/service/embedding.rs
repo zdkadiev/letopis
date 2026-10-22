@@ -51,6 +51,8 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
     }
 
     fn prepare_text(&self, work: &EmbeddingWork) -> EmbeddingResult<Option<String>> {
+        #[cfg(test)]
+        tests::checkpoint("prepare");
         let path = RepoPath::parse(work.id.as_str().split('#').next().unwrap_or_default())
             .map_err(|cause| {
                 EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, cause)
@@ -174,6 +176,8 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
             VectorOutcome::Current(false) => return Ok(DrainOutcome::Complete),
             VectorOutcome::Current(true) => {}
         }
+        #[cfg(test)]
+        tests::checkpoint("reserved");
         let text = match text {
             Ok(text) => text,
             Err(error) => return self.finish_failure(config, &work.search_hash, &error),

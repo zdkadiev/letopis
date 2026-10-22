@@ -64,7 +64,12 @@ def run_host(root, evidence, execute):
     for tool in (['rustc', '-vV'], ['cargo', '--version'], ['git', '--version'],
                  [sys.executable, '--version'], ['uname', '-a']):
         execute(tool, 'version-' + Path(tool[0]).name + '.log')
-    execute(['./scripts/check-rust.sh'], 'rust-check.log')
+    process_env = {'LETOPIS_TEST_EVIDENCE': str(evidence / 'process')}
+    execute(['./scripts/check-rust.sh'], 'rust-check.log', extra=process_env)
+    execute(['cargo', 'test', '--locked', '--offline', '--test',
+             'embedding_provider', 'attempt_obeys_real_sixty_second_deadline',
+             '--', '--ignored', '--exact', '--nocapture'],
+            'provider-real-deadline.log', extra=process_env)
     execute(['cargo', 'doc', '--locked', '--offline', '--no-deps'],
             'rustdoc.log', extra={'RUSTDOCFLAGS': '-D warnings'})
     execute(['cargo', 'test', '--locked', '--offline',

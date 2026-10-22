@@ -4,7 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from run import create_evidence, hash_inputs, run_command
+from run import create_evidence, hash_inputs, run_command, run_host
 
 
 class RunnerTests(unittest.TestCase):
@@ -149,3 +149,25 @@ class InputInventoryTests(unittest.TestCase):
             self.assertEqual(set(actual), set(sources))
             self.assertEqual(actual['src/lib.rs'],
                              'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+
+
+class ProcessEvidenceTests(unittest.TestCase):
+    def test_process_receipt_environment_and_real_deadline_are_explicit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            calls = []
+            def execute(argv, name, **kwargs):
+                calls.append((argv, name, kwargs))
+                if name == 'build.log':
+                    raise RuntimeError('stop before standalone fixture')
+            with self.assertRaisesRegex(RuntimeError, 'stop before'):
+                run_host(evidence, evidence, execute)
+            root = next(call for call in calls if call[1] == 'rust-check.log')
+            deadline = next(call for call in calls if call[1] == 'provider-real-deadline.log')
+            self.assertEqual(root[2]['extra'],
+                             {'LETOPIS_TEST_EVIDENCE': str(evidence / 'process')})
+            self.assertEqual(deadline[2]['extra'], root[2]['extra'])
+            self.assertEqual(deadline[0], ['cargo', 'test', '--locked', '--offline',
+                '--test', 'embedding_provider', 'attempt_obeys_real_sixty_second_deadline',
+                '--', '--ignored', '--exact', '--nocapture'])
+            self.assertEqual(len([call for call in calls if call[1] == deadline[1]]), 1)

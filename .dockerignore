@@ -36,3 +36,7 @@
 !docs/zkit/letopis/mechanics/
 !docs/zkit/letopis/mechanics/storage-schema.sql
 !.dockerignore
+
+!tests/embedding_provider.rs
+!tests/embedding_service.rs
+!tests/embedding_files.rs

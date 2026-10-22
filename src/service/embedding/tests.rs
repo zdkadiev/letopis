@@ -297,3 +297,9 @@ fn rejected_vector_input_drops_poisoned_unit_before_recording_failure() {
     assert_eq!(service.files.documents, documents);
     assert_eq!(read.match_text("knowledge").unwrap().len(), 1);
 }
+
+mod process;
+
+pub(super) fn checkpoint(stage: &str) {
+    process::checkpoint(stage);
+}

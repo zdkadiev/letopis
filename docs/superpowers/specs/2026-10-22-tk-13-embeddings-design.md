@@ -1,6 +1,6 @@
 # TK-13 — Configuration and synchronous embedding executor
 
-Status: written specification approved by the user on 2026-10-22. The [implementation plan](../plans/2026-10-22-tk-13-embeddings.md) awaits user review and execution-method selection; no product implementation is approved yet.
+Status: written specification approved by the user on 2026-10-22. The [implementation plan](../plans/2026-10-22-tk-13-embeddings.md) was approved on the same date with Subagent-driven execution; implementation and independent review are in progress.
 
 ## Intent and accepted scope
 
@@ -79,6 +79,8 @@ This persistence uses the pinned vec1 implementation already vendored in this re
 
 A query embedding does not insert a document vector or cache a query vector. With no established index dimension, validate its own response shape and any explicit dimension; an empty vector index contributes no vector matches. Durable size is established by the first stored document vector. Two first writers must be resolved by the native vector write transaction: an incompatible second response must not leave a partial key, vector or dimension change.
 
+Execution clarification: a successful query response is checked against a fresh pinned identity/dimension observation after HTTP and before its guarded query-error update. This detects a first document insertion during inference. Returning a query vector does not freeze the index for its future consumer: TK-12 must validate it against the search read view and use FTS when incompatible. No extra vector-write capability or query-vector cache is introduced.
+
 A failed/rolled-back first insertion does not establish a dimension. A reset clears the previous native dimension transactionally. A provider that changes the response size under unchanged config produces a safe embedding failure; the service must not reset the index automatically to accept that response.
 
 ## Drain flow and consistency
@@ -147,3 +149,5 @@ TK-13 delivers the library service, provider implementations, configuration read
 CLI argv/JSON formatting, detached spawning and foreground cancellation ownership stay with TK-11/TK-29; search/ranking/read-view integration with TK-12; the full agent path with TK-14; broad config/rebuild/corruption lifecycle acceptance with TK-25/TK-26/TK-27; current status presentation with TK-28; model/resource/security drills with TK-16/TK-41 and later tasks. No existing task is silently marked done by these library interfaces.
 
 After user review of this written specification, use Superpowers writing-plans to define exact interfaces, files, ordered tasks, focused RED/GREEN checks, evidence ownership and the parallel integration check. The user then reviews that written plan and selects the execution method before product implementation. Merge, push and GitHub issue publication require the corresponding user authorization.
+
+Execution update 2026-10-22: Tasks 1–4 passed their per-task reviews. Task 5 process acceptance and compiling/restored negative controls passed; macOS/Linux receipts and independent final review remain pending. Accepted query observation ruling is retained in the implementation plan; TK-12 must validate against its pinned index read.
