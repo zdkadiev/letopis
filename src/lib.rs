@@ -8,8 +8,13 @@ use crate::service::{
     GitSnapshots, SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
-use std::path::Path;
+use std::{
+    ffi::OsString,
+    io::{Read, Write},
+    path::Path,
+};
 
+mod cli;
 pub mod domain;
 mod filesystem;
 mod git;
@@ -75,4 +80,18 @@ pub fn open_documents(start: &Path) -> DocumentResult<impl Documents + use<>> {
         MarkdownParser::new(),
         storage,
     ))
+}
+
+/// Parse and run one CLI request, emitting one complete JSON envelope.
+/// Returns 0 only for successfully written success output, otherwise 1.
+/// Current check, inspect and drain services are unavailable in this build.
+pub fn run_cli(
+    args: impl IntoIterator<Item = OsString>,
+    input: &mut impl Read,
+    output: &mut impl Write,
+) -> u8 {
+    let args = args.into_iter().collect::<Vec<_>>();
+    let response = cli::parse_request(&args, input)
+        .and_then(|request| cli::Handlers::new(None, None, None).execute(request));
+    cli::write_response(output, response)
 }
