@@ -102,11 +102,17 @@ impl StorageRead for SqliteRead<'_> {
     fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
         super::graph::read_node(&self.transaction, id)
     }
+    fn list_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
+        super::graph::list_nodes(&self.transaction)
+    }
     fn list_edges(&mut self, source: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>> {
         super::graph::list_edges(&self.transaction, source)
     }
     fn read_file(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
         super::files::read_file(&self.transaction, path)
+    }
+    fn list_files(&mut self) -> StorageResult<Vec<FileRow>> {
+        super::files::list_files(&self.transaction)
     }
     fn match_text(&mut self, expression: &str) -> StorageResult<Vec<TextMatch>> {
         super::fts::match_text(&self.transaction, expression)

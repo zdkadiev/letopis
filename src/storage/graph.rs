@@ -134,6 +134,24 @@ pub(super) fn read_node(db: &Connection, id: &EdgeTarget) -> StorageResult<Optio
         .map_err(map_sqlite)?
         .transpose()
 }
+pub(super) fn list_nodes(db: &Connection) -> StorageResult<Vec<StoredNode>> {
+    let (sql, values) = build_query(
+        Query::select()
+            .column(Nodes::RowId)
+            .columns(NODE_COLUMNS)
+            .from(Nodes::Table)
+            .order_by(Nodes::Id, Order::Asc),
+    )?;
+    let mut statement = db.prepare(&sql).map_err(map_sqlite)?;
+    let mut rows = statement
+        .query(params_from_iter(values))
+        .map_err(map_sqlite)?;
+    let mut nodes = Vec::new();
+    while let Some(row) = rows.next().map_err(map_sqlite)? {
+        nodes.push(decode_node(row)?);
+    }
+    Ok(nodes)
+}
 fn decode_node(row: &Row<'_>) -> StorageResult<StoredNode> {
     let id: String = row.get(1).map_err(map_sqlite)?;
     let kind: String = row.get(2).map_err(map_sqlite)?;

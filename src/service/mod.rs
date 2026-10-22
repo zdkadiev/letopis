@@ -94,6 +94,11 @@ pub trait StorageRead {
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
     fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>>;
+    /// List all published node metadata in ascending normalized identity order.
+    ///
+    /// # Errors
+    /// Returns an internal error for I/O or malformed persisted values.
+    fn list_nodes(&mut self) -> StorageResult<Vec<StoredNode>>;
     /// List all declared edges, optionally restricted to their source.
     ///
     /// # Errors
@@ -104,6 +109,11 @@ pub trait StorageRead {
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
     fn read_file(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>>;
+    /// List all candidate file states in ascending exact path order.
+    ///
+    /// # Errors
+    /// Returns an internal error for I/O or malformed persisted values.
+    fn list_files(&mut self) -> StorageResult<Vec<FileRow>>;
     /// Execute an already-prepared FTS expression without a candidate limit.
     ///
     /// # Errors
