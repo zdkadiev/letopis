@@ -1,6 +1,6 @@
 # TK-11 — CLI process, locks and JSON
 
-Status: written design for user review. The user approved the new worktree/branch, TK-11/TK-13 ownership split, and check/inspect task-card corrections on 2026-10-22. The independent builder check identified only the now-resolved ownership question. Approval of this complete written design is the next Superpowers gate; no product code or dependency changes have been made.
+Status: complete written design approved by the user on 2026-10-22: «Да, утверждаю. Продолжай к плану реализации TK-11 по Superpowers». The branch/worktree, ownership split, corrected task cards and two labelled builder calls are accepted. The [implementation plan](../plans/2026-10-22-tk-11-cli-runtime.md) is prepared and author-reviewed; product implementation waits for review of that plan and execution-method selection.
 
 ## Intent and starting state
 
@@ -44,11 +44,11 @@ A process-fixture test can establish detachment, descriptor isolation and lock e
 
 Implement the current CLI boundary for check/inspect and the internal drain command. Their consumer-driven interfaces and typed transport tests are a TK-11 deliverable; no dummy business service is introduced. Search/traverse, full reindex/status and future lifecycle commands retain their roadmap owners. Do not return empty fake inspection/check results or claim a command is operational merely because its parser accepts it.
 
-Builder call for review: until a concrete read/check service is wired by its owning task, a recognized and valid check/inspect request fails closed with the existing `internal_error` envelope and a fixed safe message that the operation is unavailable in this build. It never returns `ok:true`, runs a fake business service or creates a new error code. Parsing failures still return `invalid_request` before service dispatch. This is an incremental-build limitation, not a change to the final X-1 contract or acceptance of the missing command. Remove the unavailable route when TK-12/TK-19 supplies the real service. The real embedding route must similarly remain unavailable until TK-13 is connected; a fixture child is test-only.
+Accepted builder call: until a concrete read/check service is wired by its owning task, a recognized and valid check/inspect request fails closed with the existing `internal_error` envelope and a fixed safe message that the operation is unavailable in this build. It never returns `ok:true`, runs a fake business service or creates a new error code. Parsing failures still return `invalid_request` before service dispatch. This is an incremental-build limitation, not a change to the final X-1 contract or acceptance of the missing command. Remove the unavailable route when TK-12/TK-19 supplies the real service. The real embedding route must similarly remain unavailable until TK-13 is connected; a fixture child is test-only.
 
 For public commands, require the documented JSON object; `{}` is the empty request. Do not invent numerical payload limits, a global execution deadline, environment config loading or a help/version protocol as part of TK-11.
 
-Builder call for review: the internal `embed --drain` invocation accepts empty stdin as the empty internal request because its fd 0 is `/dev/null` by the accepted runtime design. If an explicit JSON body is supplied, validate it as the strict empty object. This exception does not extend to public command payloads.
+Accepted builder call: the internal `embed --drain` invocation accepts empty stdin as the empty internal request because its fd 0 is `/dev/null` by the accepted runtime design. If an explicit JSON body is supplied, validate it as the strict empty object. This exception does not extend to public command payloads.
 
 ## Responses and diagnostics
 
@@ -87,7 +87,7 @@ TK-13 owns the drain's lock for its entire execution. Agree the shared capabilit
 - `lib.rs` constructs the concrete adapters, services and handlers; declarations/reexports alone do not count as assembly.
 - `main.rs` forwards process I/O/argv into that assembly and returns the selected exit status.
 
-Use the pinned Rust toolchain and project Rust conventions: explicit imports, verb-form methods, meaningful local constants, focused functions aiming at 40 lines and no more than 60, typed failures, minimal visibility and Arrange/Act/Assert tests. Add no speculative future interfaces or generic plugin/framework abstraction. The exact signatures and smallest useful physical file set are builder choices to freeze in the implementation plan in the implementation plan; the task ownership below is settled.
+Use the pinned Rust toolchain and project Rust conventions: explicit imports, verb-form methods, meaningful local constants, focused functions aiming at 40 lines and no more than 60, typed failures, minimal visibility and Arrange/Act/Assert tests. Add no speculative future interfaces or generic plugin/framework abstraction. The exact signatures and smallest useful physical file set are builder choices to freeze in the implementation plan; the task ownership below is settled.
 
 ## Accepted delivery boundaries
 
@@ -117,4 +117,4 @@ Run `./scripts/check-rust.sh` on the changed product tree and focused executable
 
 Meaningful negative controls should compile and fail at the intended behavioral oracle, then restore exact original source and pass. Prioritize an inherited-output-fd/detachment control and loss of kernel exclusion. No x86, target RAM/latency, actual model quality, physical power loss or full TK-29 cancellation evidence is promised here.
 
-No task is marked done with fake or pending acceptance. Record the actual dependency and remaining work explicitly. The user-approved card correction resolves the builder check's only question. Present this complete written design, including the two labelled builder calls (internal drain EOF and unavailable incremental routes), for user review before Superpowers writing-plans. The next plan fixes concrete interfaces/files, RED/GREEN checks and integration evidence, then receives its own review/execution-method selection before implementation. No product code, dependency installation, merge, push or issue publication happens at this brainstorming stage.
+No task is marked done with fake or pending acceptance. Record the actual dependency and remaining work explicitly. The user-approved card correction resolves the builder check's only question. The user approved this full design, including the two labelled builder calls (internal drain EOF and unavailable incremental routes). The implementation plan fixes concrete interfaces/files, RED/GREEN checks and integration evidence, then receives its own review/execution-method selection before implementation. No product code, dependency installation, merge, push or issue publication happens at this brainstorming stage.
