@@ -50,8 +50,9 @@ pub(crate) use document::DocumentService;
 mod model;
 pub use error::{StorageError, StorageErrorKind, StorageResult};
 pub use model::{
-    EmbeddingFailure, FileRow, KnowledgeMetadata, NodeMetadata, QueryError, SourceMetadata,
-    StoredNode, StoredVectorKey, TextMatch, VectorMatch, VectorOutcome,
+    Diagnostic, DiagnosticKind, EmbeddingFailure, EmbeddingWork, FileRow, KnowledgeMetadata,
+    NodeMetadata, ParsedElement, ParsedFile, QueryError, SourceMetadata, StoredNode,
+    StoredVectorKey, TextMatch, VectorMatch, VectorOutcome,
 };
 
 /// Synchronous storage with exclusive scoped capabilities.
@@ -94,6 +95,24 @@ pub trait Storage {
 }
 /// Observations pinned within one read transaction.
 pub trait StorageRead {
+    /// Read the first eligible knowledge ID strictly after the optional cursor.
+    ///
+    /// # Errors
+    /// Rejects zero or unrepresentable attempt budgets; reports I/O or invalid data.
+    fn read_next_embedding_work(
+        &mut self,
+        expected: &Sha256,
+        max_attempts: u64,
+        after: Option<&KnowledgeId>,
+    ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>>;
+    /// Observe the native vector dimension under the pinned configuration identity.
+    ///
+    /// # Errors
+    /// Reports malformed native metadata or database failures.
+    fn read_vector_dimensions(
+        &mut self,
+        expected: &Sha256,
+    ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>>;
     /// Read typed metadata by normalized identity.
     ///
     /// # Errors
@@ -209,6 +228,12 @@ pub trait CacheWrite: Sized {
 
 /// Caller-owned atomic vector write; any failed mutation prevents commit.
 pub trait VectorWrite: Sized {
+    /// Remove vectors and failures absent from this transaction's cache observation.
+    /// Concurrent publication can leave recomputable missing vectors until next drain.
+    ///
+    /// # Errors
+    /// Reports database failures and prevents commit of a failed unit.
+    fn prune_unreferenced(&mut self) -> StorageResult<()>;
     /// Reserve one durable attempt within the caller's total budget.
     /// Commit before calling the provider; an unsent reservation still counts.
     ///
@@ -249,9 +274,7 @@ pub trait VectorWrite: Sized {
 }
 
 pub use error::{DocumentError, DocumentErrorKind, DocumentResult};
-pub use model::{
-    CapturedFile, Diagnostic, DiagnosticKind, FileStat, ParsedElement, ParsedFile, RefreshOutcome,
-};
+pub use model::{CapturedFile, FileStat, RefreshOutcome};
 
 /// Synchronous document publication operations.
 pub trait Documents {
@@ -294,12 +317,68 @@ pub trait FileSystem {
     /// Reports unsafe service paths, lock replacement or filesystem/locking failures.
     fn lock_index(&self) -> DocumentResult<Self::IndexLock>;
 }
-/// Pure X-4 parsing, independent of technology and publication.
-pub trait Markdown {
-    /// Parse a complete file or identify unmarked Markdown.
+mod embedding_config;
+mod embedding_error;
+pub use embedding_config::{EmbeddingConfig, ProviderKind};
+pub use embedding_error::{EmbeddingError, EmbeddingErrorKind, EmbeddingResult};
+use std::num::NonZeroUsize;
+
+/// Synchronous texts-to-vectors boundary shared by documents and queries.
+pub trait EmbeddingProvider {
+    /// Validate the complete local endpoint/protocol configuration without inference.
     ///
     /// # Errors
-    /// Returns per-file diagnostics without a partial projection.
+    /// Returns invalid configuration when the endpoint or protocol is unsupported.
+    fn validate_config(&self, config: &EmbeddingConfig) -> EmbeddingResult<()>;
+    /// Compute one attempt and validate every vector before returning it.
+    ///
+    /// # Errors
+    /// Reports invalid config/input, credentials, transport or malformed output.
+    fn embed(
+        &self,
+        config: &EmbeddingConfig,
+        texts: &[&str],
+        dimensions: Option<NonZeroUsize>,
+    ) -> EmbeddingResult<Vec<Vec<f32>>>;
+}
+
+/// Confined synchronous file, clock and drain-lock operations.
+pub trait EmbeddingFiles {
+    /// Exclusive drain ownership, released when dropped.
+    type EmbedLock;
+    /// Read configuration bytes without decoding them; stable absence is `None`.
+    ///
+    /// # Errors
+    /// Reports unsafe paths, observed replacement or I/O failure.
+    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
+    /// Read a current regular document beneath the pinned checkout.
+    ///
+    /// # Errors
+    /// Reports unsafe paths, observed replacement or I/O failure.
+    fn read_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>>;
+    /// Try persistent kernel drain ownership without waiting; busy is `None`.
+    ///
+    /// # Errors
+    /// Reports unsafe service paths, observed replacement or I/O failure.
+    fn try_lock_embed(&self) -> EmbeddingResult<Option<Self::EmbedLock>>;
+    /// Read Unix seconds from the system clock.
+    ///
+    /// # Errors
+    /// Reports a system clock before the Unix epoch.
+    fn get_time_secs(&self) -> EmbeddingResult<u64>;
+    /// Wait synchronously for a caller-selected retry delay.
+    ///
+    /// # Errors
+    /// Reserved for environment failures while waiting.
+    fn wait(&self, delay: std::time::Duration) -> EmbeddingResult<()>;
+}
+
+/// Pure shared Markdown projection and search-text codec.
+pub trait Markdown {
+    /// Parse a whole file atomically; unmarked Markdown produces `None`.
+    ///
+    /// # Errors
+    /// Returns safe local diagnostics for invalid UTF-8, metadata or graph markup.
     fn parse_file(
         &self,
         path: &RepoPath,
@@ -373,4 +452,27 @@ pub trait Background {
     /// # Errors
     /// Reports an unavailable executor or execution failures.
     fn drain(&mut self) -> CommandResult<()>;
+}
+
+mod embedding;
+pub use embedding::EmbeddingService;
+pub use model::{ConfigState, DrainOutcome, QueryEmbedding};
+
+/// Synchronous embedding application operations.
+pub trait Embeddings {
+    /// Reread, validate and synchronize ready configuration.
+    ///
+    /// # Errors
+    /// Reports storage failures; unreadable configuration is a typed invalid state.
+    fn read_configuration(&mut self) -> EmbeddingResult<ConfigState>;
+    /// Drain current eligible documents using durable bounded attempts.
+    ///
+    /// # Errors
+    /// Reports storage or environment failures that prevent safe coordination.
+    fn drain(&mut self) -> EmbeddingResult<DrainOutcome>;
+    /// Compute one transient query vector, persisting only a safe diagnostic.
+    ///
+    /// # Errors
+    /// Reports storage or clock failures; ordinary provider errors are unavailable.
+    fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding>;
 }

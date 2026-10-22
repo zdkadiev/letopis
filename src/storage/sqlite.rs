@@ -1,8 +1,8 @@
 use super::{
     cache_write::SqliteCacheWrite,
     connection::{
-        CACHE_DATABASE, ConfinedDirectory, VECTOR_DATABASE, attach_vectors, open_database,
-        prepare_paths,
+        CACHE_DATABASE, ConfinedDirectory, VECTOR_DATABASE, attach_cache, attach_vectors,
+        open_database, prepare_paths,
     },
     read::SqliteRead,
     schema::{bootstrap_cache, bootstrap_vectors},
@@ -19,9 +19,11 @@ use std::path::Path;
 
 /// `SQLite` implementation of the application storage contract.
 pub struct SqliteStorage {
+    // Drop the read-only cache attachment before its last writable connection,
+    // so normal SQLite closure can checkpoint and remove cache WAL sidecars.
+    vector_writer: Connection,
     read: Connection,
     cache_writer: Connection,
-    vector_writer: Connection,
 }
 impl SqliteStorage {
     /// Open distinct cache/vector files and recognize or initialize their schemas.
@@ -35,6 +37,7 @@ impl SqliteStorage {
         bootstrap_cache(&mut cache_writer)?;
         let mut vector_writer = open_database(&vectors)?;
         bootstrap_vectors(&mut vector_writer)?;
+        attach_cache(&vector_writer, &cache)?;
 
         let read = open_database(&cache)?;
         attach_vectors(&read, &vectors)?;
@@ -52,6 +55,7 @@ impl SqliteStorage {
         let mut vector_writer = paths.open_database(VECTOR_DATABASE)?;
         paths.verify()?;
         bootstrap_vectors(&mut vector_writer)?;
+        paths.attach_cache(&vector_writer)?;
         let read = paths.open_database(CACHE_DATABASE)?;
         paths.attach_vectors(&read)?;
         Ok(Self {
@@ -89,7 +93,43 @@ mod tests {
         domain::Sha256,
         service::{Storage, StorageRead, VectorOutcome, VectorWrite},
     };
+    use std::fs::File;
     use tempfile::TempDir;
+
+    #[test]
+    fn confined_vector_pruning_uses_read_only_cache_and_closes_cleanly() {
+        // Arrange: only the confined production opener is under test.
+        let root = TempDir::new().unwrap();
+        let path = root.path().canonicalize().unwrap();
+        let pinned = File::open(&path).unwrap();
+        let mut storage = SqliteStorage::open_confined(&path, &pinned).unwrap();
+        let identity = Sha256::digest(b"confined");
+        seed_vector(&mut storage, &identity);
+        // Act: pruning requires the cache attachment added by TK-13.
+        let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        unit.prune_unreferenced().unwrap();
+        unit.commit().unwrap();
+        // Assert both native deletion and lifetime/permission policy.
+        assert_eq!(
+            unwrap_current(
+                storage
+                    .begin_read()
+                    .unwrap()
+                    .read_vector(&identity, &identity)
+                    .unwrap()
+            ),
+            None
+        );
+        assert!(
+            storage
+                .vector_writer
+                .execute_batch("DELETE FROM cache.nodes")
+                .is_err()
+        );
+        drop(storage);
+        assert!(!path.join("cache.db-wal").exists());
+        assert!(!path.join("cache.db-shm").exists());
+    }
 
     fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
         match outcome {

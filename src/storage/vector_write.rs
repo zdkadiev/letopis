@@ -29,6 +29,11 @@ impl<'a> SqliteVectorWrite<'a> {
     }
 }
 impl VectorWrite for SqliteVectorWrite<'_> {
+    fn prune_unreferenced(&mut self) -> StorageResult<()> {
+        let result = super::work::prune_unreferenced(&self.transaction);
+        self.failed |= result.is_err();
+        result
+    }
     fn reserve_attempt(&mut self, hash: &Sha256, max_attempts: u64) -> StorageResult<bool> {
         let result = vectors::reserve_attempt(&self.transaction, hash, max_attempts);
         self.failed |= result.is_err();

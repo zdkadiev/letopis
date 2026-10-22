@@ -1,13 +1,15 @@
 //! Read-only knowledge graph foundations for Letopis.
 
+use crate::embedding::{HttpProviders, Ollama, Openai};
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
 use crate::markdown::MarkdownParser;
 use crate::process::DetachedProcess;
 use crate::service::{
     Background, BackgroundService, CommandError, CommandErrorKind, CommandResult, DocumentError,
-    DocumentErrorKind, DocumentResult, DocumentService, Documents, EmbedLocks, EmbeddingTasks,
-    FileSystem, GitSnapshots, SnapshotError, Storage, StorageResult,
+    DocumentErrorKind, DocumentResult, DocumentService, Documents, EmbedLocks, EmbeddingError,
+    EmbeddingErrorKind, EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService,
+    EmbeddingTasks, Embeddings, FileSystem, GitSnapshots, SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use std::{
@@ -19,11 +21,13 @@ use std::{
 
 mod cli;
 pub mod domain;
+mod embedding;
 mod filesystem;
 mod git;
 pub mod markdown;
 mod process;
 mod storage;
+mod utils;
 
 pub mod service;
 
@@ -137,4 +141,47 @@ pub fn open_background<'a>(
         files,
         DetachedProcess::new(executable.to_path_buf(), root.to_path_buf()),
     ))
+}
+
+/// Construct the synchronous provider pair, capturing compatible credentials once.
+/// Does not perform inference or require a key for native Ollama.
+///
+/// # Errors
+/// Reserved for failures constructing the provider boundary.
+pub fn open_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + use<>> {
+    let key = std::env::var("OPENAI_API_KEY").ok();
+    Ok(HttpProviders::new(Ollama::new(), Openai::new(key)))
+}
+
+/// Open confined embedding file reads and persistent drain exclusion.
+/// The checkout directory is pinned and `.letopis` is protected with mode 0700.
+///
+/// # Errors
+/// Reports unsafe service paths, observed replacements or filesystem failures.
+pub fn open_embedding_files(root: &Path) -> EmbeddingResult<impl EmbeddingFiles + use<>> {
+    let files = LocalFileSystem::open(root).map_err(map_embedding_files)?;
+    files
+        .open_service_directory()
+        .map_err(map_embedding_files)?;
+    Ok(files)
+}
+
+/// Assemble synchronous embeddings with explicit caller-owned storage.
+///
+/// # Errors
+/// Reports confined filesystem or provider construction failures.
+pub fn open_embeddings<S: Storage>(
+    root: &Path,
+    storage: S,
+) -> EmbeddingResult<impl Embeddings + use<S>> {
+    Ok(EmbeddingService::new(
+        storage,
+        open_embedding_files(root)?,
+        MarkdownParser::new(),
+        open_embedding_provider()?,
+    ))
+}
+
+fn map_embedding_files(error: DocumentError) -> EmbeddingError {
+    EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
 }

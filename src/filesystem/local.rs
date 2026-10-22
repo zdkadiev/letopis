@@ -1,23 +1,28 @@
+use super::{
+    confined::{map_io, read_stat, require_identity, verify_entry},
+    read::read_regular,
+};
 use crate::{
     domain::RepoPath,
     service::{
-        CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, EmbedLocks, FileStat,
-        FileSystem,
+        CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, EmbedLocks, EmbeddingFiles,
+        EmbeddingResult, FileStat, FileSystem,
     },
 };
 use rustix::{
     fd::{AsFd, OwnedFd},
-    fs::{AtFlags, FileType, Mode, OFlags, Stat, fstat, mkdirat, open, openat, statat},
+    fs::{AtFlags, FileType, Mode, OFlags, Stat, fchmod, fstat, mkdirat, open, openat, statat},
     io::Errno,
 };
 #[cfg(test)]
 use std::cell::RefCell;
 use std::{
+    cell::OnceCell,
     error::Error,
     fs::{File, TryLockError},
     io::{self, Read, Seek, SeekFrom, Write},
     path::Path,
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 
 const SERVICE_DIRECTORY: &str = ".letopis";
@@ -45,7 +50,8 @@ thread_local! {
 }
 
 pub(crate) struct LocalFileSystem {
-    root: OwnedFd,
+    root: File,
+    service: OnceCell<File>,
     #[cfg(test)]
     test_time: Option<i64>,
     #[cfg(test)]
@@ -71,7 +77,8 @@ impl LocalFileSystem {
         let root = open(root, DIRECTORY_FLAGS, Mode::empty())
             .map_err(|cause| fail_io("cannot open document root", cause))?;
         let filesystem = Self {
-            root,
+            root: File::from(root),
+            service: OnceCell::new(),
             #[cfg(test)]
             test_time: None,
             #[cfg(test)]
@@ -153,30 +160,88 @@ impl LocalFileSystem {
     }
 
     pub(crate) fn open_service_directory(&self) -> DocumentResult<OwnedFd> {
+        let directory = self.get_service_directory()?;
+        directory
+            .try_clone()
+            .map(OwnedFd::from)
+            .map_err(|cause| fail_io("cannot duplicate service directory", cause))
+    }
+
+    fn get_service_directory(&self) -> DocumentResult<&File> {
+        if self.service.get().is_none() {
+            let directory = self.create_service_directory()?;
+            let _ = self.service.set(directory);
+        }
+        let directory = self.service.get().ok_or_else(fail_changed)?;
+        let pinned =
+            fstat(directory).map_err(|cause| fail_io("cannot observe service directory", cause))?;
+        verify_entry(&self.root, SERVICE_DIRECTORY, &pinned)
+            .map_err(|cause| fail_io("service directory changed", cause))?;
+        Ok(directory)
+    }
+
+    fn create_service_directory(&self) -> DocumentResult<File> {
         match mkdirat(&self.root, SERVICE_DIRECTORY, Mode::RWXU) {
             Ok(()) | Err(Errno::EXIST) => {}
             Err(cause) => return Err(fail_io("cannot create service directory", cause)),
         }
-        openat(
-            &self.root,
-            SERVICE_DIRECTORY,
-            DIRECTORY_FLAGS,
-            Mode::empty(),
-        )
-        .map_err(|cause| fail_io("cannot open service directory", cause))
+        let before = statat(&self.root, SERVICE_DIRECTORY, AtFlags::SYMLINK_NOFOLLOW)
+            .map_err(|cause| fail_io("cannot observe service directory", cause))?;
+        let file = File::from(
+            openat(
+                &self.root,
+                SERVICE_DIRECTORY,
+                DIRECTORY_FLAGS,
+                Mode::empty(),
+            )
+            .map_err(|cause| fail_io("cannot open service directory", cause))?,
+        );
+        let opened =
+            fstat(&file).map_err(|cause| fail_io("cannot observe service directory", cause))?;
+        require_identity(&before, &opened)
+            .map_err(|cause| fail_io("service directory changed", cause))?;
+        fchmod(&file, Mode::RWXU)
+            .map_err(|cause| fail_io("cannot protect service directory", cause))?;
+        Ok(file)
     }
 
     fn open_lock_file(&self, name: &str) -> DocumentResult<File> {
+        self.open_lock_with(name, || {})
+    }
+
+    fn open_lock_with(&self, name: &str, observe: impl FnOnce()) -> DocumentResult<File> {
         let directory = self.open_service_directory()?;
-        let created = openat(
-            &directory,
-            name,
-            LOCK_FILE_FLAGS | OFlags::CREATE,
-            Mode::RUSR | Mode::WUSR,
-        );
-        reopen_concurrently_created_lock(&directory, name, created)
+        let before = read_stat(self.get_service_directory()?, name)
+            .map_err(|cause| fail_io("cannot observe coordination lock", cause))?;
+        if let Some(stat) = &before {
+            build_file_stat(stat)?;
+        }
+        observe();
+        let opened = match before {
+            Some(_) => openat(&directory, name, LOCK_FILE_FLAGS, Mode::empty()),
+            None => create_lock_file(&directory, name),
+        };
+        let file = opened
             .map(File::from)
-            .map_err(|cause| fail_io("cannot open coordination lock", cause))
+            .map_err(|cause| fail_io("cannot open coordination lock", cause))?;
+        let current =
+            fstat(&file).map_err(|cause| fail_io("cannot observe coordination lock", cause))?;
+        if let Some(before) = before {
+            require_identity(&before, &current)
+                .map_err(|cause| fail_io("coordination lock changed", cause))?;
+        }
+        observe_lock_descriptor(&file)?;
+        self.verify_lock(&file, name)?;
+        Ok(file)
+    }
+
+    fn verify_lock(&self, file: &File, name: &str) -> DocumentResult<()> {
+        let directory = self.get_service_directory()?;
+        let pinned =
+            fstat(file).map_err(|cause| fail_io("cannot observe coordination lock", cause))?;
+        verify_entry(directory, name, &pinned)
+            .map(|_| ())
+            .map_err(|cause| fail_io("coordination lock changed", cause))
     }
 
     fn try_acquire_lock(&self, file: &File) -> DocumentResult<bool> {
@@ -203,6 +268,7 @@ impl LocalFileSystem {
     ) -> DocumentResult<PersistentLock> {
         // Own the unlock fallback before any fallible verification or PID writes.
         let mut guard = PersistentLock { file };
+        self.verify_lock(&guard.file, name)?;
         let path = format!("{SERVICE_DIRECTORY}/{name}");
         let Some(current) = self.observe_file(&path)? else {
             return Err(fail_changed());
@@ -211,12 +277,15 @@ impl LocalFileSystem {
             return Err(fail_changed());
         }
         observe_lock_descriptor(&guard.file)?;
+        fchmod(&guard.file, Mode::RUSR | Mode::WUSR)
+            .map_err(|cause| fail_io("cannot protect coordination lock", cause))?;
         guard
             .file
             .set_len(0)
             .and_then(|()| guard.file.seek(SeekFrom::Start(0)))
             .and_then(|_| writeln!(guard.file, "{}", std::process::id()))
             .map_err(|cause| fail_io("cannot write coordination lock owner", cause))?;
+        self.verify_lock(&guard.file, name)?;
         Ok(guard)
     }
 }
@@ -290,9 +359,54 @@ impl EmbedLocks for LocalFileSystem {
         let file = self.open_lock_file(EMBED_LOCK)?;
         let before = observe_lock_descriptor(&file)?;
         if !self.try_acquire_lock(&file)? {
+            self.verify_lock(&file, EMBED_LOCK)?;
             return Ok(None);
         }
         self.finish_lock(file, EMBED_LOCK, before).map(Some)
+    }
+}
+
+impl EmbeddingFiles for LocalFileSystem {
+    type EmbedLock = PersistentLock;
+
+    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+        let directory = self.get_service_directory().map_err(map_io)?;
+        let bytes = read_regular(directory, "config.json", |_| {})?;
+        self.get_service_directory().map_err(map_io)?;
+        Ok(bytes)
+    }
+
+    fn read_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>> {
+        read_regular(&self.root, path.as_str(), |_| {})
+    }
+
+    fn try_lock_embed(&self) -> EmbeddingResult<Option<Self::EmbedLock>> {
+        EmbedLocks::try_lock_embed(self).map_err(map_io)
+    }
+
+    fn get_time_secs(&self) -> EmbeddingResult<u64> {
+        Ok(SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_err(map_io)?
+            .as_secs())
+    }
+
+    fn wait(&self, delay: Duration) -> EmbeddingResult<()> {
+        std::thread::sleep(delay);
+        Ok(())
+    }
+}
+
+fn create_lock_file(directory: &impl AsFd, name: &str) -> Result<OwnedFd, Errno> {
+    let created = openat(
+        directory,
+        name,
+        LOCK_FILE_FLAGS | OFlags::CREATE | OFlags::EXCL,
+        Mode::RUSR | Mode::WUSR,
+    );
+    match created {
+        Err(Errno::EXIST) => openat(directory, name, LOCK_FILE_FLAGS, Mode::empty()),
+        result => reopen_concurrently_created_lock(directory, name, result),
     }
 }
 
@@ -1084,14 +1198,12 @@ mod tests {
                         scope.spawn(move || {
                             barrier.wait();
                             // Act
-                            let guard = filesystem.try_lock_embed().unwrap();
-                            let inode = filesystem
-                                .observe_file(".letopis/embed.lock")
-                                .unwrap()
-                                .unwrap()
-                                .inode;
+                            let guard = filesystem.try_lock_embed();
+                            let observed = filesystem.observe_file(".letopis/embed.lock");
+                            // Release the peer even when opening failed, so the
+                            // assertion reports the error instead of hanging.
                             barrier.wait();
-                            (inode, guard.is_some())
+                            (observed.unwrap().unwrap().inode, guard.unwrap().is_some())
                         })
                     })
                     .collect();
@@ -1240,3 +1352,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "local_tests.rs"]
+mod embedding_tests;
