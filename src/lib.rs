@@ -4,8 +4,8 @@ use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
 use crate::markdown::MarkdownParser;
 use crate::service::{
-    DocumentError, DocumentErrorKind, DocumentResult, DocumentService, Documents, FileSystem,
-    GitSnapshots, SnapshotError, Storage, StorageResult,
+    DocumentError, DocumentErrorKind, DocumentResult, DocumentService, Documents, EmbedLocks,
+    FileSystem, GitSnapshots, SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use std::{
@@ -44,11 +44,11 @@ pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage 
     SqliteStorage::open(cache, vectors)
 }
 
-/// Open confined regular-file observations and persistent index locking.
+/// Open confined regular-file observations and persistent index/embedding locking.
 ///
 /// # Errors
 /// Reports an inaccessible or non-directory root, including a symlink root.
-pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + use<>> {
+pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLocks + use<>> {
     LocalFileSystem::open(root)
 }
 
