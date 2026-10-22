@@ -98,4 +98,3 @@ consumer, rather than deferring it to Task 2: deny(warnings) rejects an unused
 private bridge in an otherwise complete intermediate commit. This changes only
 commit sequencing; revision/read-snapshot regressions remain the check against
 an unintended behavioral change.
-
