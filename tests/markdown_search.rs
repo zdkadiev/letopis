@@ -1,5 +1,5 @@
 mod support;
-use letopis::{adapters::markdown::parse, domain::RepoPath};
+use letopis::{domain::RepoPath, markdown::parse};
 use support::{build_whole_file, parse_file};
 
 #[test]

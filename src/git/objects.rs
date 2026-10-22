@@ -1,5 +1,5 @@
 use super::{
-    GitCliAdapter,
+    GitCli,
     constants::{
         BLOB_KIND, COMMIT_KIND, EXECUTABLE_FILE_MODE, GITLINK_KIND, GITLINK_MODE,
         REGULAR_FILE_MODE, SYMLINK_MODE, TREE_KIND, TREE_MODE,
@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     domain::{RepoPath, TreeOid},
-    service::ports::git::{SnapshotError, SnapshotErrorKind, SnapshotFile},
+    service::{SnapshotError, SnapshotErrorKind, SnapshotFile},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -15,7 +15,7 @@ use std::{
 };
 
 pub(super) struct ObjectDb<'a> {
-    pub(super) git: &'a GitCliAdapter,
+    pub(super) git: &'a GitCli,
 }
 pub(super) struct Entry {
     pub(super) kind: String,

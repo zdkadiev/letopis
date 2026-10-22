@@ -7,7 +7,7 @@ use git::{
 use letopis::{
     domain::{RepoPath, TreeOid},
     open_git_snapshots,
-    service::ports::git::{GitSnapshotPort, SnapshotError, SnapshotErrorKind, SnapshotFile},
+    service::{GitSnapshots, SnapshotError, SnapshotErrorKind, SnapshotFile},
 };
 use std::{
     ffi::OsString,
@@ -414,7 +414,7 @@ fn try_borrowed_snapshot(
     p: &RepoPath,
     bytes: &[u8],
     local_blob: &Path,
-) -> Option<(impl GitSnapshotPort, TreeOid)> {
+) -> Option<(impl GitSnapshots, TreeOid)> {
     // Act
     let opened = open_git_snapshots(borrower.get_root());
     match opened {
@@ -442,7 +442,7 @@ fn assert_shared_clone_gc_outcome(
     borrower: &TempRepo,
     blob: &str,
     p: &RepoPath,
-    accepted: &Option<(impl GitSnapshotPort, TreeOid)>,
+    accepted: &Option<(impl GitSnapshots, TreeOid)>,
     format: ObjectFormat,
 ) {
     assert!(

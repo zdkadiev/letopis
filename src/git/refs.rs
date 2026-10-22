@@ -1,16 +1,16 @@
 use super::{
-    GitCliAdapter,
+    GitCli,
     constants::{BLOB_KIND, GITLINK_KIND, SNAPSHOT_REF_PREFIX, TREE_KIND},
     objects::ObjectDb,
     process::is_exit_code,
 };
 use crate::{
     domain::TreeOid,
-    service::ports::git::{RetainedTree, SnapshotError, SnapshotErrorKind},
+    service::{RetainedTree, SnapshotError, SnapshotErrorKind},
 };
 use std::collections::BTreeMap;
 pub(super) struct Retainer<'a> {
-    pub(super) git: &'a GitCliAdapter,
+    pub(super) git: &'a GitCli,
 }
 impl Retainer<'_> {
     pub(super) fn pin(&self, oid: &TreeOid) -> Result<RetainedTree, SnapshotError> {

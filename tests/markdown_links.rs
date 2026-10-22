@@ -1,7 +1,7 @@
 mod support;
 use letopis::{
-    adapters::markdown::{DiagnosticKind, parse},
     domain::{EdgeTarget, ElementKind, RepoPath, derive_element_kind},
+    markdown::{DiagnosticKind, parse},
 };
 use support::{assert_error, build_whole_file, parse_file};
 

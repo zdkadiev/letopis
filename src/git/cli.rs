@@ -1,16 +1,11 @@
-mod constants;
-mod objects;
-mod process;
-mod refs;
 #[cfg(test)]
 mod tests;
+use super::process::{GitProcess, check_version};
+use super::{objects, refs};
 use crate::{
     domain::{RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN, TreeOid},
-    service::ports::git::{
-        GitSnapshotPort, RetainedTree, SnapshotError, SnapshotErrorKind, SnapshotFile,
-    },
+    service::{GitSnapshots, RetainedTree, SnapshotError, SnapshotErrorKind, SnapshotFile},
 };
-use process::{GitProcess, check_version};
 use std::{
     ffi::OsString,
     fs,
@@ -18,13 +13,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub struct GitCliAdapter {
-    root: PathBuf,
-    process: GitProcess,
-    oid_len: usize,
+pub(crate) struct GitCli {
+    pub(super) root: PathBuf,
+    pub(super) process: GitProcess,
+    pub(super) oid_len: usize,
 }
-impl GitCliAdapter {
-    pub fn open(start: &Path) -> Result<Self, SnapshotError> {
+impl GitCli {
+    pub(crate) fn open(start: &Path) -> Result<Self, SnapshotError> {
         Self::open_with_process(start, GitProcess::new())
     }
     fn open_with_process(start: &Path, process: GitProcess) -> Result<Self, SnapshotError> {
@@ -121,7 +116,7 @@ impl GitCliAdapter {
     }
 }
 
-impl GitSnapshotPort for GitCliAdapter {
+impl GitSnapshots for GitCli {
     fn create_tree(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
         self.require_self_contained_objects()?;
         objects::ObjectDb { git: self }.create_tree(files)

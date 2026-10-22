@@ -1,5 +1,5 @@
 use super::constants::MIN_GIT_VERSION;
-use crate::service::ports::git::{SnapshotError, SnapshotErrorKind};
+use crate::service::{SnapshotError, SnapshotErrorKind};
 use std::{
     env,
     error::Error,

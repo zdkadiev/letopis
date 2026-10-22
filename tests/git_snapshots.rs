@@ -7,7 +7,7 @@ use git::{
 use letopis::{
     domain::{RepoPath, TreeOid},
     open_git_snapshots,
-    service::ports::git::{GitSnapshotPort, SnapshotErrorKind, SnapshotFile},
+    service::{GitSnapshots, SnapshotErrorKind, SnapshotFile},
 };
 use std::fs;
 

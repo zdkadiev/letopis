@@ -1,8 +1,12 @@
 //! Read-only knowledge graph foundations for Letopis.
 
-use crate::adapters::git::GitCliAdapter;
-pub mod adapters;
+use crate::git::GitCli;
+use crate::service::{GitSnapshots, SnapshotError};
+use std::path::Path;
+
 pub mod domain;
+mod git;
+pub mod markdown;
 
 pub mod service;
 
@@ -14,8 +18,6 @@ pub mod service;
 /// # Errors
 /// Returns a snapshot error when Git or the working repository is unsupported,
 /// the checkout root cannot be decoded, an alternates path exists, or Git I/O fails.
-pub fn open_git_snapshots(
-    start: &std::path::Path,
-) -> Result<impl service::ports::git::GitSnapshotPort, service::ports::git::SnapshotError> {
-    GitCliAdapter::open(start)
+pub fn open_git_snapshots(start: &Path) -> Result<impl GitSnapshots, SnapshotError> {
+    GitCli::open(start)
 }

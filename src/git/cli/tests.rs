@@ -1,12 +1,12 @@
-use super::{
-    GitCliAdapter,
+use super::GitCli;
+use crate::git::{
     constants::SNAPSHOT_REF_PREFIX,
     process::{GitProcess, check_version},
 };
 use crate::{
     domain::{RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN},
     open_git_snapshots,
-    service::ports::git::{GitSnapshotPort, SnapshotErrorKind, SnapshotFile},
+    service::{GitSnapshots, SnapshotErrorKind, SnapshotFile},
 };
 #[path = "../../../tests/support/git.rs"]
 mod fixture;
@@ -44,7 +44,7 @@ fn open_rejects_old_git_before_object_calls() {
     );
     let process = GitProcess::new_with_executable(exe);
     // Act
-    let error = GitCliAdapter::open_with_process(repo.get_root(), process)
+    let error = GitCli::open_with_process(repo.get_root(), process)
         .err()
         .unwrap();
     let calls = fs::read_to_string(repo.get_root().join("calls")).unwrap();
@@ -63,7 +63,7 @@ fn discovers_root_from_subdirectory() {
             ObjectFormat::Sha256 => SHA256_OID_HEX_LEN,
         };
         // Act
-        let git = GitCliAdapter::open(repo.get_subdir()).unwrap();
+        let git = GitCli::open(repo.get_subdir()).unwrap();
         // Assert
         assert_eq!(git.root, repo.get_root());
         assert_eq!(git.oid_len, expected_length);
@@ -79,8 +79,8 @@ fn open_rejects_non_repository_and_bare() {
     let empty = std::env::temp_dir().join(format!("letopis-empty-{}", std::process::id()));
     fs::create_dir(&empty).unwrap();
     // Act
-    let bare_result = GitCliAdapter::open(&bare);
-    let empty_result = GitCliAdapter::open(&empty);
+    let bare_result = GitCli::open(&bare);
+    let empty_result = GitCli::open(&empty);
     // Assert
     assert!(bare_result.is_err());
     assert!(empty_result.is_err());
@@ -92,7 +92,7 @@ fn subprocess_drains_and_reaps_on_io_failure() {
     if std::env::var_os("LETOPIS_IO_WORKER").is_none() {
         // Arrange / Act / Assert: supervisor runs this exact worker and checks its exit.
         fixture::supervise_test(
-            "adapters::git::tests::subprocess_drains_and_reaps_on_io_failure",
+            "git::cli::tests::subprocess_drains_and_reaps_on_io_failure",
             &[("LETOPIS_IO_WORKER", "1")],
         );
         return;
@@ -121,7 +121,7 @@ fn subprocess_drains_and_reaps_on_io_failure() {
 
 fn supervise_policy_worker() {
     fixture::supervise_test(
-        "adapters::git::tests::process_removes_inherited_overrides_and_hardens_writes",
+        "git::cli::tests::process_removes_inherited_overrides_and_hardens_writes",
         &[
             ("LETOPIS_POLICY_WORKER", "1"),
             ("GIT_DIR", "CANARY_DIR"),
@@ -224,7 +224,7 @@ fn discovers_trailing_newline_repository_without_touching_sibling() {
             None,
         );
         let bytes = git.read_blob(&tree, &path).unwrap();
-        let discovered_root = GitCliAdapter::open(&target).unwrap().root;
+        let discovered_root = GitCli::open(&target).unwrap().root;
         // Assert
         assert_eq!(
             objects_after, sibling_objects,

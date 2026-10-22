@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use letopis::{
-    adapters::markdown::{Diagnostic, DiagnosticKind, ParsedFile, parse},
     domain::RepoPath,
+    markdown::{Diagnostic, DiagnosticKind, ParsedFile, parse},
 };
 pub fn parse_file(path: &str, s: &str) -> ParsedFile {
     parse(&RepoPath::parse(path).unwrap(), s.as_bytes())
