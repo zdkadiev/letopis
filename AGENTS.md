@@ -22,7 +22,7 @@ The directory structure must reflect responsibilities and dependency boundaries:
 
 Use `trait` for component interfaces and concrete `struct`/`impl` for implementations. Name types by responsibility or technology (`Storage`, `SqliteStorage`, `GitSnapshots`, `GitCli`), without `Port`/`Adapter` suffixes. Do not introduce `ports/`, `adapters/`, or `contracts/` directory layers. A module's `mod.rs` defines its interface, declares children, and explicitly reexports the necessary types. Put each concrete implementation's struct, inherent methods, and trait implementations together in its own file, for example `git/cli.rs` or `storage/sqlite.rs`; keep implementation bodies out of `mod.rs`. If interfaces grow, split them by responsibility into private files and reexport them from `mod.rs`. Keep implementation details private and expose only the necessary API. Add modules with real functionality; do not scaffold future subsystems or trivial forwarding services. These rules describe the target layout; the TK-9 plan must include moving the existing Git/Markdown modules and updating their imports.
 
-Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful helpers. Keep domain rules and technology-specific behavior in their owners; utilities must not bypass module boundaries.
+Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful helpers; see [code reading order](#code-reading-order) for when to extract them. Keep domain rules and technology-specific behavior in their owners; utilities must not bypass module boundaries.
 
 ## Rust conventions
 
@@ -36,6 +36,16 @@ Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful
 - Compose ordinary storage queries with SeaQuery and typed table/column identifiers; execute through rusqlite using bound values from the private storage/query.rs helper. Keep builder types inside storage. Raw SQL is reserved for schemas, SQLite introspection/PRAGMAs/native probes, and specialized FTS5/vec1 search or native commands; format substantial SQL across readable lines. Never interpolate user values or render them into SQL with to_string.
 - Keep I/O synchronous according to the design; do not add an async runtime without an agreed requirement. Product Git commands belong in the Git process adapter and use argv/stdin, never shell interpolation.
 - Standard Clippy checks and the explicitly selected pedantic checks in `Cargo.toml` are enabled; see the development guide for each rule and its purpose. `dbg!`, `todo!`, and `unimplemented!` are denied. Do not enable all of `restriction`, `pedantic`, or `nursery` indiscriminately. Fix the underlying finding rather than adding a blanket allowance; any exception must be narrow and explain its reason. Public fallible APIs document `# Errors`, and public APIs that can panic document `# Panics`.
+
+## Code reading order
+
+Code reads top to bottom, from abstract to concrete. Apply these rules to new and touched code only; do not reorder untouched code just to conform.
+
+- A caller is defined above everything it calls. A function or method must not call one defined above it. Type and constant definitions are not calls and may be referenced from above.
+- Group by level of abstraction: orchestration and abstract calls first, then intermediate steps, then low-level details. Keep methods of the same level adjacent.
+- Within an `impl`, public methods come first and private helpers last, in the order they are first called. A public method that calls another public method stays above it.
+- Within a file, order items as constants, types, `impl` blocks with the public API, trait implementations, then private free functions. Trait implementations such as `Display` stay next to their type. `#[cfg(test)]` modules go last, with test helpers after the tests.
+- Place a helper by its consumers: one file keeps it as a private function at the bottom of that file; several files of one module share the module-local `utils.rs`; several modules share `src/utils.rs`. Extract only when there are at least two consumers. `utils.rs` files follow the same top-to-bottom order.
 
 ## Verification
 
