@@ -1,5 +1,60 @@
 # TK-13 product embedding acceptance
 
+## Final combined-fix acceptance — bcd405c0d9c6
+
+Status: all final-review findings I1/I2, M1–M4 and controller C1 are fixed and verified; independent scoped re-review and controller approval remain pending. Runtime/test source is `bcd405c0d9c6cd5d68e4d57f16b2aafebce048fa`, comprising `ca8bfe3` combined fixes plus `bcd405c` request-consuming process fixture. Later documentation changes do not alter receipt inputs. No merge/push, Engram write or TK-10 integration occurred.
+
+Fresh exact commands (run at the TK-13 worktree):
+
+```sh
+/opt/homebrew/bin/python3 -B tests/storage/run.py --platform host --evidence .artifacts/tk13/host-bcd405c0d9c6
+/opt/homebrew/bin/python3 -B tests/storage/run.py --platform linux --evidence .artifacts/tk13/linux-bcd405c0d9c6
+/opt/homebrew/bin/python3 -B .artifacts/tk13/mutations-bcd405c0d9c6/reproduce.py
+```
+
+| Final receipt | Inspected results | Input reconciliation |
+|---|---|---|
+| macOS 26.6.2 ARM64 / Python 3.14.7 / Rust 1.95.0 | PASS; 16/16 commands zero; root **219 passed, 0 failed, 2 ignored**; separately selected real60s **1 PASS, 60.00s** | 207 current input hashes match |
+| Linux 7.0.0 glibc 2.36 ARM64 / Python 3.11 / Rust 1.95.0 | PASS; inner 14/14 and outer 8/8 commands zero; root **219 passed, 0 failed, 2 ignored**; separately selected real60s **1 PASS, 62.96s** | 102 inner / 207 outer current input hashes match |
+
+All **102 common inputs** are byte-identical. Explicit inclusion checks cover the three embedding integration targets, their support, private filesystem/process/config tests and the new `src/utils.rs`. The source process test SHA256 is `8591fe5335814560c331e7f42c8ad95e0451daf5729d65bbf84473d0c4af29e4`; utility SHA256 is `9b4ff028c6113517799875fd841d2ce927d61ebd415510ea2bfda05984ec0732`. Cargo.lock remains `0116d9a5353b1aed6435649e6520603870f8a43c079fab4c982ef48a42acbf95`. Implementer and controller independently reconciled manifests against current files.
+
+Both receipts execute `./scripts/check-rust.sh` (fmt, compiler, Clippy, all root tests), strict `RUSTDOCFLAGS='-D warnings' cargo doc --locked --offline --no-deps`, nine runner regressions, native probes and the standalone storage executable, all PASS. Each final platform run explicitly executes the real60s case once. Docker acceptance runs with `--network none`; preparation uses the existing build/fetch phase.
+
+Counting: prior source had 211 root passes/2 ignores; final source adds six provider cases, one config unit case and one forced-watchdog case, for 219 root passes/2 ignores. Both counts include two inert older child entrypoints; final remaining ordinary/parent cases number 217. Final root logs contain eight filtered provider-child passes, counted separately and never added to 219. Filesystem nested output is captured. The five process parents still own nine separate process logs (eight successful child completions and one intentionally killed owner). The explicit real60s test is separate from the root ignore and from these child invocations.
+
+### Findings and exact covering tests
+
+| Finding | Final change and executed coverage |
+|---|---|
+| I1 | Shared explicit **10 MiB** response bound under the unchanged single deadline; BodyExceedsLimit → safe InvalidResponse. `embedding_provider::bounds_both_protocol_bodies_with_and_without_content_length` tests real oversized valid payloads over Content-Length and close-delimited framing for both protocols, one request, no accepted vector, safe diagnostics, plus ordinary bounded success. No new config or chunking. |
+| I2 | Private literal JSON visitor prevents RawValue-key object reinterpretation at HTTP and canonical verification boundaries. `preserves_reserved_key_objects_in_unknown_config_parameters`; `rejects_object_wire_components_indices_and_wrapped_responses` (both protocols, whole wrappers and compatible index); `preserves_decimal_and_exponent_values_with_large_integer_jcs_spelling`; `rejects_trailing_response_tokens_and_excessive_depth`; config unit `rejects_trailing_json_after_configuration`. Original recursive duplicates/raw integer overflow/depth/JCS collision cases remain green. Original integer tokens retain strict checking; legal decimal/exponent values may canonicalize to large integer spellings. |
+| M1 | Renamed helpers to reject_config, map_config_error, reject_response and updated all call sites. |
+| M2 | Private filesystem/mutator/external/integration child output goes into owned temporary captures; completed failures expose at most 64 KiB diagnostics. `embedding_files` (8 passes) and private filesystem (8 passes) cover real subprocess paths; root logs no longer contain their nested summaries. |
+| M3 | Dedicated outer process group, inherited by mutator/descendants, is terminated on watchdog cleanup; direct child is reaped. `filesystem::test_support::forced_watchdog_terminates_nested_descendants` initially failed because the descendant-held lock survived, then passed after group cleanup. Existing rustix process feature is dev-only; no package/version/lockfile change. The test establishes descendant-held lease release, not non-parent wait() of orphan zombies. |
+| M4 | `service::embedding::tests::process::edit_before_send_skips_stale_hash_without_reservation` counts/serves unexpected requests, drains pending connections and asserts **zero HTTP** after unchanged-state/cache checks. It consumes headers/body before reply to preserve the stored-vector mutation oracle. |
+| C1 | Native Ollama response model must be present, a nonempty string; aliases are accepted without request equality. `rejects_missing_empty_and_wrong_type_native_model`; positive alias controls and all current native success fixtures include valid metadata. I1/I2/vector-negative fixtures include metadata so missing model cannot mask their assertions. TK-3/TK-6 historical inputs remain unchanged. |
+
+Exact execution rulings 4/5 are appended verbatim to the durable [plan](../../../../superpowers/plans/2026-10-22-tk-13-embeddings.md), retaining rulings 1–3; the [specification](../../../../superpowers/specs/2026-10-22-tk-13-embeddings-design.md) clarifies transport policy, literal types, integer semantics and schema precedence over old omitted fixture fields.
+
+### Fresh guard controls and development evidence
+
+New `.artifacts/tk13/mutations-bcd405c0d9c6/manifest.json` records both controls: compile exit **0**, exact behavioral test exit **101**, byte restoration, same exact test exit **0**. Both RED assertions observe `Current(Some([1.0, 2.0, 3.0]))` instead of `Current(None)`. Guard file before/restored/shared/current hashes match the original hashes in the historical control table below; altered fixture/process source is separately pinned by the final receipts. The new reproduction script is an owned copy; original `mutations/` remains unchanged.
+
+`.artifacts/tk13/final-fix-development/` retains provider RED (34 pass, four behavioral failures, one ignore), provider GREEN, forced-watchdog RED (`descendant survived watchdog`), focused filesystem/integration/process GREEN and full check logs. Two intermediate full-check attempts caught new-test Clippy issues (match_same_arms and semicolon_if_nothing_returned), fixed without allowances. Final platform checks cover the corrected tree.
+
+Preliminary `mutations-ca8bfe382d52/` is **not accepted**: its hash control failed on an attempt count because the fixture closed an unread HTTP request, rather than on the requested stored-vector assertion. That prompted `bcd405c` and both fresh controls above. Preliminary `host-ca8bfe382d52/` and `linux-ca8bfe382d52/` are likewise excluded from final acceptance because the fixture changed during that wave. No earlier receipt is relabeled as proving current source.
+
+### Final physical review and limits
+
+Reviewed concrete provider implementations, configuration parsing, shared private JSON utility, module visibility/import direction and unchanged `lib.rs` constructor assembly. Public interfaces stay frozen; protocol rules stay in embedding, config rules in service, and utility owns only literal JSON parsing. No SQL/native identifiers enter service/domain, no technology adapter orchestrates another, and no runtime/registry/schema/batching/process product feature was added. The existing rustix process feature is used only by test supervision. Changed covering files respect the 60-line function limit. Independent scoped re-review remains a controller gate.
+
+Existing limits below still apply: no merged TK-10, x86_64, live model/quality/corporate-CA, performance/RAM, physical-power-loss, hostile atomic filesystem confinement or downstream CLI/lifecycle/search acceptance. The documented cap deliberately rejects larger valid responses; nonconforming native shims omitting model are rejected, aliases accepted. Query vector validation at the future search read remains TK-12.
+
+## Historical Task 5 evidence — source 8d39c11ca5ad
+
+The following earlier receipt/results/matrix are retained as provenance for their captured source. They do **not** prove amended source or supersede the final results above. Their previous claim of bounded HTTP responses was incorrect until I1 was fixed. Deferred findings listed below are historical and are resolved by the final fix dispositions above; independent final approval remains pending.
+
 Status: implementation and implementer verification recorded below; independent Task 5 review and controller final whole-branch gate remain pending. The task card remains `in_progress`. This report does not mark TK-10 or any downstream task accepted.
 
 ## Source, commands and receipt ownership
@@ -76,7 +131,7 @@ Sensitive controls ran in disposable copied trees, never in the primary/TK-10 tr
 
 Reviewed `src/service/mod.rs`, `embedding_config.rs`, `embedding_error.rs`, `model.rs` and `embedding.rs`: application-owned traits/typed states, synchronous orchestration, domain values and interface dependencies. Concrete storage/HTTP/filesystem imports appear only in test modules, not product service bodies. No SQL builder or native vec1 identifiers enter the product service/domain. Config JCS/validation belongs to application configuration, transport validation to provider; finite dispatch is `ProviderKind`/`HttpProviders`.
 
-Reviewed `src/embedding/{mod,http,ollama,openai,provider}.rs`: Ollama, Openai and HttpProviders each implement `EmbeddingProvider` with implementation bodies beside their structs; private HTTP policy owns no proxies/redirects/retries, 60s attempt limit and bounded responses. `src/filesystem/{mod,local,confined,read}.rs`: LocalFileSystem implements EmbeddingFiles, owns confined handles/regular reads and stable explicitly-unlocked lock guard. `src/markdown/parser.rs`: MarkdownParser implements Markdown using the shared codec and application-owned models. `src/storage/{mod,sqlite,read,vector_write,work,vectors,query}.rs`: concrete Storage/StorageRead/VectorWrite implementations retain explicit transactions and typed/bound ordinary SQL; native dimension metadata stays private. No technology adapter orchestrates another adapter.
+Reviewed `src/embedding/{mod,http,ollama,openai,provider}.rs`: Ollama, Openai and HttpProviders each implement `EmbeddingProvider` with implementation bodies beside their structs; private HTTP policy owns no proxies/redirects/retries, 60s attempt limit; the earlier bounded-response claim was disproved by I1 and is corrected only in the final source above. `src/filesystem/{mod,local,confined,read}.rs`: LocalFileSystem implements EmbeddingFiles, owns confined handles/regular reads and stable explicitly-unlocked lock guard. `src/markdown/parser.rs`: MarkdownParser implements Markdown using the shared codec and application-owned models. `src/storage/{mod,sqlite,read,vector_write,work,vectors,query}.rs`: concrete Storage/StorageRead/VectorWrite implementations retain explicit transactions and typed/bound ordinary SQL; native dimension metadata stays private. No technology adapter orchestrates another adapter.
 
 `src/lib.rs` contains actual constructor calls: `open_storage` constructs SqliteStorage; `open_embedding_provider` constructs Ollama/Openai/HttpProviders and captures compatible credentials; `open_embeddings` passes caller storage, LocalFileSystem, MarkdownParser and that provider into EmbeddingService. Visibility is limited to required exports; no new CLI/main/daemon/async runtime, model registry, dimension column, jobs/seq table or interface change was introduced by Task 5. Test-only process fixtures may import concrete technology to inspect real integration.
 

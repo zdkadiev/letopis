@@ -162,3 +162,6 @@ Each HTTP response is limited to 10 MiB (10 * 1024 * 1024 bytes), explicitly ret
 The canonical X-2 native response subset requires `model` to be present, a string and nonempty. Its value need not equal the requested model: aliases are accepted. This schema requirement overrides omitted metadata in earlier implementation fixtures. Current native success and vector-validation fixtures include model metadata; historical TK-3/TK-6 inputs and evidence remain unchanged.
 
 The final combined fix wave includes inherited child-output isolation, forced-watchdog descendant cleanup, helper verb names and an independent zero-HTTP stale-hash assertion. Fresh checks and evidence are required for the changed tree; independent scoped re-review and controller approval remain pending.
+
+
+Final amended-source verification (`bcd405c0d9c6`): both macOS/Linux root suites pass 219 cases with two ignores; the real60s case passes separately once in each final platform receipt. Strict docs, runner9, native/standalone and both restored compiling guard controls pass; 102 common input hashes match. See the [acceptance report](../../zkit/letopis/checks/TK-13/report.md). Independent scoped re-review/controller approval remain pending; earlier 8d39/preliminary ca8 receipts are not proof of the amended source.
