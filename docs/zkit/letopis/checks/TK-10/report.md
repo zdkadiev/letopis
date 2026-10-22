@@ -1,8 +1,8 @@
 # TK-10 — Production refresh acceptance
 
-Date: 2026-10-22. Production implementation and process acceptance pass on macOS ARM64 and source-built Linux ARM64. Tasks 1–4 have independent approval; final whole-branch review and the final Engram record remain pending.
+Date: 2026-10-22. The original Tasks 1–4 acceptance below is historical evidence for source `2378731`. The final whole-branch review identified startup contention (I1) and dependency wording (M1); the correction is source `15fcc196b554c5a77b8b83818ddc2274d916fb70`. A separate final-review correction section records its verification. Focused fix review and the final Engram record remain controller responsibilities.
 
-Source checkpoint: `23787312a8b7e714280158d04bc9ea19f1d72006` (`test(documents): prove process death and concurrent publication`). Tasks 1–3 end at `ac30e180c6efa4922c306dc0231c89606d996dc5`. Only the controller's three documentation edits were dirty during platform runs. All 191 host input hashes still match the restored current source tree after negative controls.
+Source checkpoint: `23787312a8b7e714280158d04bc9ea19f1d72006` (`test(documents): prove process death and concurrent publication`). Tasks 1–3 end at `ac30e180c6efa4922c306dc0231c89606d996dc5`. Only the controller's three documentation edits were dirty during platform runs. All 191 host input hashes matched that restored source tree after the original negative controls; this is a statement about the captured historical revision.
 
 Design: [approved specification](../../../../superpowers/specs/2026-10-22-tk-10-change-detection-design.md), [task](../../roadmap/epics/EP-1-thin-slice/tasks/TK-10-change-detection.md), [architecture](../../architecture.md#program-structure), [MC-2](../../mechanics.md), [I-2](../../contracts/I-2-projections.md), [D-101](../../decisions.md#D-101).
 
@@ -112,6 +112,130 @@ late-boundary regressions and scoped re-review confirm the fix. Task 4: no findi
 reviewer independently checked full process assertions, mutation failures,
 receipt counts and source equality without repeating the suites.
 
-Final whole-branch review is pending. The controller's three implementation
+The final whole-branch review identified I1 and M1. The correction and new evidence are recorded below; focused fix review remains pending. The controller's implementation
 rulings and their costs are preserved in the
 [plan](../../../../superpowers/plans/2026-10-22-tk-10-change-detection.md#execution-rulings).
+
+## Final-review correction and new acceptance
+
+The consolidated correction addresses I1 and M1 from the final whole-branch
+review. Source checkpoint **`15fcc196b554c5a77b8b83818ddc2274d916fb70`** was
+committed before either new platform run. The older `2378731` receipts and
+publication negative controls above remain unchanged historical evidence.
+
+Initialized cache/vector schemas are now validated in one coherent read-only
+transaction. Only a confirmed absent schema requests initialization write
+ownership, then rechecks the schema after acquiring it. WAL readiness reads can
+encounter `SQLITE_BUSY_RECOVERY` during concurrent startup; the initial journal
+probe and coherent schema probe handle that readiness condition. The private
+initialization helper retries only SQLite BUSY/LOCKED, at one-millisecond polling
+intervals, with a five-second budget **per readiness probe or ownership-acquisition
+step**. This is not a five-second limit on the entire open/CLI command. Failed read
+transactions drop before retrying. Connection `busy_timeout` remains zero;
+ordinary cache/vector writes receive no retry. A prolonged competing initializer
+can still cause a safe error after the budget; a later caller can retry. No startup
+index lock or new schema/dependency/runtime was added by this correction.
+
+The normal concurrent first-refresh regression also exposed a macOS creation
+race: two `openat` calls against the same live directory descriptor with
+`O_CREAT|O_NOFOLLOW` can produce one success and one ENOENT while the file exists.
+A standalone Python reproducer isolates it without SQLite/Git/Rust orchestration.
+The index-lock opener now handles only that creation ENOENT by reopening once
+against the same pinned directory/name, retaining the flags except CREATE.
+NOFOLLOW/NONBLOCK and regular-file/path-identity checks remain. There is no sleep,
+unlink, repeated creation, or fallback for other errors. If the file remains
+absent or unsafe, the operation fails safely. The reproducer, original/repeated
+observations and development failures are preserved under
+`.artifacts/tk10/final-fix-development/`.
+
+### Covering regressions
+
+- `normal_open_waits_at_index_lock_during_cache_write_then_redetects`: A pauses at
+  real `begun`; B invokes normal `open_documents`, acknowledges opening, reaches
+  real kernel-lock contention, then redetects A's commit and returns a no-op.
+- `normal_open_redetects_after_active_cache_writer_is_killed`: the same opening
+  schedule, followed by a newer edit and owner SIGKILL; B publishes exactly the
+  latest complete state. Both tests compare full nodes/row IDs/source metadata,
+  edges, FileRows, revision and FTS tokens, plus preserved vectors/corpus/Git.
+- `normal_open_and_noop_finish_during_vector_write_and_held_index_lock`: a normal
+  opener/no-op finishes while both independent owners are still active.
+- `existing_schemas_validate_on_query_only_connections`: both schemas validate
+  while SQLite forbids writes.
+- `waiting_initializer_rechecks_committed_schema_for_both_databases` and
+  `waiting_initializer_rejects_incompatible_schema_committed_by_owner`: channel
+  acknowledgements after real SQLite contention prove the ownership recheck.
+- `initialization_contention_expires_and_can_be_retried_safely`: the bound returns
+  BUSY without partial schema, and a later retry succeeds with zero busy timeout.
+- `parallel_initializers_leave_a_complete_schema`: both virgin openers must succeed;
+  the previous allowance for one or both contention failures is removed.
+- `initialized_open_succeeds_but_cache_write_still_returns_busy`: replaces the
+  historical expectation that opening during an active writer itself must fail.
+- `simultaneous_document_openers_initialize_and_publish_once`: two normal first
+  invocations both initialize and refresh successfully, committing once.
+- `concurrent_first_lock_creation_preserves_one_regular_file`: twenty actual
+  two-caller creation schedules preserve one lock inode. The selected ENOENT-path
+  tests cover exact existing bytes/inode, no fallback for ACCESS, and rejection of
+  absent/symlink/FIFO/directory names. The full suites also rerun held-lock no-op,
+  schema rejection, static/late database path and other confinement regressions.
+
+Before the implementation fix, the three normal-open regressions, query-only
+validation and strict simultaneous initialization all failed. Removing the schema
+recheck as a compiling negative control makes both deterministic recheck tests
+fail (exit 101). Removing the lock reopen makes the selected-error-path regression
+fail (exit 101). Both files were restored byte-for-byte, then the complete gate
+passed. Restored SHA-256: schema.rs
+`06c657bd749f6ef42f3fa2f8bd76aee7be6ded504893106d91d6db30b3a29b13`;
+filesystem/local.rs
+`8330e0d3f8f515b244495c874fbfe64ac4379634b52ddfcfe62e8ba70f5cdd95`.
+The old publication mutations were not rerun against the new checkpoint.
+
+### New commands and receipts
+
+```sh
+./scripts/check-rust.sh
+/opt/homebrew/bin/python3 -B tests/storage/run.py --platform host --evidence .artifacts/tk10/host-final-15fcc19
+/opt/homebrew/bin/python3 -B tests/storage/run.py --platform linux --evidence .artifacts/tk10/linux-final-15fcc19
+```
+
+All three commands exit 0. Each platform passes **172 Rust tests** (58 unit plus
+114 integration, with one ignored child entry explicitly driven by parent tests)
+and **nine Python runner tests**. Host manifest: 15 commands, all zero exits;
+outer Linux: 8, all zero; inner source-built Linux: 13, all zero. Formatting,
+compiler, Clippy, strict Rustdoc, schema parity, native capabilities, standalone
+copied executable and dynamic-dependency checks pass. Each platform retains
+**35 child receipts: 14 SIGKILL and 21 normal exits**. Linux acceptance runs with
+network disabled after the source image build; image SHA-256 is
+`7e93fb8d3475abf9224004d527ab413b155e41988a9c5c4028ecd906f9d42ce5`.
+
+| Receipt | Manifest SHA-256 |
+|---|---|
+| `host-final-15fcc19/manifest.json` | `34bf4ce50b4780847cf003d12549dd8ecf858ca6bdd114b92635769adb01b94f` |
+| `linux-final-15fcc19/manifest.json` | `857bb2360133bbeeb16bc572147da068ea837300e371a3dfdda352f7f6258929` |
+| `linux-final-15fcc19/container/manifest.json` | `b733d1a8b655ddd7771c9a7a577c41e01f063f0edafe6bd24b1bcfd9fc08db7e` |
+
+All **191 host inputs** match the committed checkpoint blobs and current files.
+All **86 common host/inner-Linux inputs** match; the 105 host-only files are the
+existing unselected historical/other harness inputs, with zero Linux-only files.
+The sorted compact common-map SHA-256 is
+`cb8376a01f87dcca94da409b3f11bef1378bacd8cd911a92244a251857ab7304`.
+Copied executable hashes: macOS
+`c01b9ae950849c1782043390ef6d115304bea252e554e17a49c65303234a5c9d`;
+Linux `ebd3f881165ab8e97df4df845ccac1bc81cb4ad0ba26912308fc31d58b451709`.
+`.artifacts/tk10/final-fix-summary.json` records the complete hash audit, per-command
+results, receipt hashes and host-only list. Only the controller's plan document
+was dirty when platform runners captured source state; no source changed after
+the checkpoint. Subsequent acceptance/controller document edits do not change
+those runner inputs.
+
+The architecture check inspected the actual constructor path in lib.rs, service
+interfaces/imports, storage ownership and private filesystem helper. No public
+API/trait wiring changed; the new storage coordination stays inside storage and
+the one lock-creation recovery stays inside filesystem. All added control hooks
+remain `cfg(test)`/private. M1 is corrected above: the branch's direct pinned
+rustix dependency is acknowledged without claiming a locked-version upgrade.
+
+The existing live-read/timestamp, hostile ancestor-rename, physical power-loss,
+CLI integration, platform and resource limits still apply. The new bound does
+not guarantee opening when an initializer stays contended beyond its budget.
+Focused independent fix review remains pending; this report does not claim that
+review, merge, push, or GitHub issue work has occurred.
