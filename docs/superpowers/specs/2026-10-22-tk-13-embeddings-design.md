@@ -150,4 +150,6 @@ CLI argv/JSON formatting, detached spawning and foreground cancellation ownershi
 
 After user review of this written specification, use Superpowers writing-plans to define exact interfaces, files, ordered tasks, focused RED/GREEN checks, evidence ownership and the parallel integration check. The user then reviews that written plan and selects the execution method before product implementation. Merge, push and GitHub issue publication require the corresponding user authorization.
 
-Execution update 2026-10-22: Tasks 1–4 passed their per-task reviews. Task 5 process acceptance and compiling/restored negative controls passed; macOS/Linux receipts and independent final review remain pending. Accepted query observation ruling is retained in the implementation plan; TK-12 must validate against its pinned index read.
+Execution update 2026-10-22: Tasks 1–4 passed their per-task reviews. Task 5 process acceptance and compiling/restored negative controls passed; macOS/Linux receipts passed at `8d39c11ca5ad`; independent Task 5/final review remains pending. Accepted query observation ruling is retained in the implementation plan; TK-12 must validate against its pinned index read.
+
+[Production acceptance report](../../zkit/letopis/checks/TK-13/report.md) maps every acceptance row to executed assertions and records source hashes, real60s execution, process/mutation counts, architecture self-review and deferred findings. Acceptance rows requiring independent review remain open until the controller gate.
