@@ -1,0 +1,7 @@
+{
+  "agent_rule_links_valid": 6,
+  "function_target": 40,
+  "clippy_code_line_limit": 60,
+  "test_structure": "Arrange/Act/Assert",
+  "named_constants": true
+}

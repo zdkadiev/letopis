@@ -1,0 +1,21 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running unittests src/lib.rs (target/debug/deps/letopis-3048ed1b85800ea9)
+
+running 1 test
+
+thread 'adapters::git::tests::discovers_trailing_newline_repository_without_touching_sibling' (15257386) panicked at src/adapters/git/tests.rs:159:9:
+assertion `left == right` failed: opening repo\n must not write objects into sibling repo
+  left: [99, 111, 117, 110, 116, 58, 32, 50, 10, 115, 105, 122, 101, 58, 32, 56, 10, 105, 110, 45, 112, 97, 99, 107, 58, 32, 48, 10, 112, 97, 99, 107, 115, 58, 32, 48, 10, 115, 105, 122, 101, 45, 112, 97, 99, 107, 58, 32, 48, 10, 112, 114, 117, 110, 101, 45, 112, 97, 99, 107, 97, 98, 108, 101, 58, 32, 48, 10, 103, 97, 114, 98, 97, 103, 101, 58, 32, 48, 10, 115, 105, 122, 101, 45, 103, 97, 114, 98, 97, 103, 101, 58, 32, 48, 10]
+ right: [99, 111, 117, 110, 116, 58, 32, 48, 10, 115, 105, 122, 101, 58, 32, 48, 10, 105, 110, 45, 112, 97, 99, 107, 58, 32, 48, 10, 112, 97, 99, 107, 115, 58, 32, 48, 10, 115, 105, 122, 101, 45, 112, 97, 99, 107, 58, 32, 48, 10, 112, 114, 117, 110, 101, 45, 112, 97, 99, 107, 97, 98, 108, 101, 58, 32, 48, 10, 103, 97, 114, 98, 97, 103, 101, 58, 32, 48, 10, 115, 105, 122, 101, 45, 103, 97, 114, 98, 97, 103, 101, 58, 32, 48, 10]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::git::tests::discovers_trailing_newline_repository_without_touching_sibling ... FAILED
+
+failures:
+
+failures:
+    adapters::git::tests::discovers_trailing_newline_repository_without_touching_sibling
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.33s
+
+error: test failed, to rerun pass `--lib`

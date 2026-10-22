@@ -1,0 +1,2284 @@
+--- before/src/adapters/git/mod.rs
++++ after/src/adapters/git/mod.rs
+@@ -25,7 +25,7 @@
+ }
+ impl GitCliAdapter {
+     pub fn open(start: &Path) -> Result<Self, SnapshotError> {
+-        Self::open_with_process(start, GitProcess::system())
++        Self::open_with_process(start, GitProcess::new())
+     }
+     fn open_with_process(start: &Path, process: GitProcess) -> Result<Self, SnapshotError> {
+         check_version(&process.run(start, &["--version".into()], None)?)?;
+--- before/src/adapters/git/objects.rs
++++ after/src/adapters/git/objects.rs
+@@ -22,7 +22,7 @@
+     pub(super) oid: String,
+     pub(super) name: Vec<u8>,
+ }
+-fn integrity() -> SnapshotError {
++fn make_integrity_error() -> SnapshotError {
+     SnapshotError::new(
+         SnapshotErrorKind::InternalError,
+         "Git object integrity failed",
+@@ -42,12 +42,12 @@
+     }
+     fn parse_oid(&self, raw: &[u8]) -> Result<TreeOid, SnapshotError> {
+         let text = std::str::from_utf8(raw)
+-            .map_err(|_| integrity())?
++            .map_err(|_| make_integrity_error())?
+             .trim_end_matches('\n');
+         if text.len() != self.git.oid_len {
+-            return Err(integrity());
+-        }
+-        TreeOid::parse(text).map_err(|_| integrity())
++            return Err(make_integrity_error());
++        }
++        TreeOid::parse(text).map_err(|_| make_integrity_error())
+     }
+     pub(super) fn validate_tree(&self, oid: &TreeOid) -> Result<(), SnapshotError> {
+         if oid.as_str().len() != self.git.oid_len {
+@@ -56,7 +56,7 @@
+                 "OID does not match repository object format",
+             ));
+         }
+-        self.verified(
++        self.verify_object(
+             oid.as_str(),
+             TREE_KIND,
+             SnapshotErrorKind::NotFound,
+@@ -66,7 +66,7 @@
+     }
+     // Check type without peeling, read raw bytes and independently rehash without
+     // writing. A decodable loose object under the wrong OID must never be trusted.
+-    pub(super) fn verified(
++    pub(super) fn verify_object(
+         &self,
+         oid: &str,
+         kind: &str,
+@@ -80,29 +80,29 @@
+         if info == format!("{oid} missing\n").as_bytes() {
+             return Err(SnapshotError::new(missing, "Git object is missing"));
+         }
+-        let info = std::str::from_utf8(&info).map_err(|_| integrity())?;
++        let info = std::str::from_utf8(&info).map_err(|_| make_integrity_error())?;
+         let fields: Vec<_> = info.split_whitespace().collect();
+         if fields.len() != 3 || fields[0] != oid || fields[2].parse::<usize>().is_err() {
+-            return Err(integrity());
++            return Err(make_integrity_error());
+         }
+         if fields[1] != kind {
+             return Err(SnapshotError::new(wrong_type, "unexpected Git object type"));
+         }
+         let bytes = self.run(&["cat-file", kind, oid], None)?;
+         if fields[2].parse::<usize>().ok() != Some(bytes.len()) {
+-            return Err(integrity());
++            return Err(make_integrity_error());
+         }
+         let actual = self.parse_oid(&self.run(
+             &["hash-object", "-t", kind, "--no-filters", "--stdin"],
+             Some(&bytes),
+         )?)?;
+         if actual.as_str() != oid {
+-            return Err(integrity());
++            return Err(make_integrity_error());
+         }
+         Ok(bytes)
+     }
+-    pub(super) fn entries(&self, oid: &str) -> Result<Vec<Entry>, SnapshotError> {
+-        self.verified(
++    pub(super) fn read_entries(&self, oid: &str) -> Result<Vec<Entry>, SnapshotError> {
++        self.verify_object(
+             oid,
+             TREE_KIND,
+             SnapshotErrorKind::InternalError,
+@@ -114,18 +114,18 @@
+             let tab = record
+                 .iter()
+                 .position(|b| *b == b'\t')
+-                .ok_or_else(integrity)?;
+-            let head = std::str::from_utf8(&record[..tab]).map_err(|_| integrity())?;
++                .ok_or_else(make_integrity_error)?;
++            let head = std::str::from_utf8(&record[..tab]).map_err(|_| make_integrity_error())?;
+             let parts: Vec<_> = head.split(' ').collect();
+             if parts.len() != 3 {
+-                return Err(integrity());
++                return Err(make_integrity_error());
+             }
+             self.parse_oid(parts[2].as_bytes())?;
+             let kind = match (parts[0], parts[1]) {
+                 (TREE_MODE, TREE_KIND) => TREE_KIND,
+                 (REGULAR_FILE_MODE | EXECUTABLE_FILE_MODE | SYMLINK_MODE, BLOB_KIND) => BLOB_KIND,
+                 (GITLINK_MODE, COMMIT_KIND) => GITLINK_KIND,
+-                _ => return Err(integrity()),
++                _ => return Err(make_integrity_error()),
+             };
+             entries.push(Entry {
+                 kind: kind.into(),
+@@ -145,7 +145,7 @@
+         let mut parts = path.as_str().split('/').peekable();
+         while let Some(part) = parts.next() {
+             let entry = self
+-                .entries(&current)?
++                .read_entries(&current)?
+                 .into_iter()
+                 .find(|e| e.name == part.as_bytes())
+                 .ok_or_else(|| {
+@@ -158,7 +158,7 @@
+                         "snapshot path is not a blob",
+                     ));
+                 }
+-                return self.verified(
++                return self.verify_object(
+                     &entry.oid,
+                     BLOB_KIND,
+                     SnapshotErrorKind::InternalError,
+--- before/src/adapters/git/process.rs
++++ after/src/adapters/git/process.rs
+@@ -30,8 +30,8 @@
+     }
+ }
+ impl Error for SafeCause {}
+-fn io_error(message: &'static str, error: io::Error) -> SnapshotError {
+-    SnapshotError::with_cause(message, SafeCause::Io(error))
++fn make_io_error(message: &'static str, error: io::Error) -> SnapshotError {
++    SnapshotError::new_with_cause(message, SafeCause::Io(error))
+ }
+ pub(super) fn is_exit_code(error: &SnapshotError, code: i32) -> bool {
+     matches!(error.source().and_then(|cause|cause.downcast_ref::<SafeCause>()),Some(SafeCause::Exit(status)) if status.code()==Some(code))
+@@ -69,10 +69,10 @@
+     program: PathBuf,
+ }
+ impl GitProcess {
+-    pub(super) fn system() -> Self {
+-        Self::with_executable("git".into())
++    pub(super) fn new() -> Self {
++        Self::new_with_executable("git".into())
+     }
+-    pub(super) fn with_executable(program: PathBuf) -> Self {
++    pub(super) fn new_with_executable(program: PathBuf) -> Self {
+         Self { program }
+     }
+     pub(super) fn run(
+@@ -82,13 +82,13 @@
+         input: Option<&[u8]>,
+     ) -> Result<Vec<u8>, SnapshotError> {
+         let mut child = self
+-            .command(cwd, args)
++            .build_command(cwd, args)
+             .spawn()
+-            .map_err(|e| io_error("Git spawn failed", e))?;
++            .map_err(|e| make_io_error("Git spawn failed", e))?;
+         exchange_pipes(&mut child, input)
+     }
+ 
+-    fn command(&self, cwd: &Path, args: &[OsString]) -> Command {
++    fn build_command(&self, cwd: &Path, args: &[OsString]) -> Command {
+         let mut command = Command::new(&self.program);
+         command.current_dir(cwd);
+         for (key, _) in env::vars_os() {
+@@ -147,9 +147,9 @@
+         let written = writer.join();
+         let read = reader.join();
+         let drained = drainer.join();
+-        let status = status.map_err(|e| io_error("Git wait failed", e))?;
++        let status = status.map_err(|e| make_io_error("Git wait failed", e))?;
+         if !status.success() {
+-            return Err(SnapshotError::with_cause(
++            return Err(SnapshotError::new_with_cause(
+                 "Git command failed",
+                 SafeCause::Exit(status),
+             ));
+@@ -158,15 +158,15 @@
+             .map_err(|_| {
+                 SnapshotError::new(SnapshotErrorKind::InternalError, "Git stdin worker failed")
+             })?
+-            .map_err(|e| io_error("Git stdin failed", e))?;
++            .map_err(|e| make_io_error("Git stdin failed", e))?;
+         drained
+             .map_err(|_| {
+                 SnapshotError::new(SnapshotErrorKind::InternalError, "Git stderr worker failed")
+             })?
+-            .map_err(|e| io_error("Git stderr failed", e))?;
++            .map_err(|e| make_io_error("Git stderr failed", e))?;
+         read.map_err(|_| {
+             SnapshotError::new(SnapshotErrorKind::InternalError, "Git stdout worker failed")
+         })?
+-        .map_err(|e| io_error("Git stdout failed", e))
++        .map_err(|e| make_io_error("Git stdout failed", e))
+     })
+ }
+--- before/src/adapters/git/refs.rs
++++ after/src/adapters/git/refs.rs
+@@ -29,13 +29,13 @@
+                 continue;
+             }
+             if kind == TREE_KIND {
+-                for entry in db.entries(&oid)? {
++                for entry in db.read_entries(&oid)? {
+                     if entry.kind != GITLINK_KIND {
+                         pending.push((entry.oid, entry.kind));
+                     }
+                 }
+             } else {
+-                db.verified(
++                db.verify_object(
+                     &oid,
+                     BLOB_KIND,
+                     SnapshotErrorKind::InternalError,
+@@ -44,7 +44,7 @@
+             }
+         }
+         let name = format!("{SNAPSHOT_REF_PREFIX}{}", oid.as_str());
+-        if self.exact_ref(&db, &name, oid)? {
++        if self.has_exact_ref(&db, &name, oid)? {
+             return Ok(RetainedTree::new(oid.clone()));
+         }
+         let zero = "0".repeat(self.git.oid_len);
+@@ -54,12 +54,12 @@
+         ) {
+             Ok(_) => {}
+             Err(cause) => {
+-                if !self.exact_ref(&db, &name, oid)? {
++                if !self.has_exact_ref(&db, &name, oid)? {
+                     return Err(cause);
+                 }
+             }
+         }
+-        if !self.exact_ref(&db, &name, oid)? {
++        if !self.has_exact_ref(&db, &name, oid)? {
+             return Err(SnapshotError::new(
+                 SnapshotErrorKind::InternalError,
+                 "snapshot ref was not confirmed",
+@@ -68,7 +68,7 @@
+         Ok(RetainedTree::new(oid.clone()))
+     }
+     // Only an exact, direct ref to this exact tree is idempotent success.
+-    fn exact_ref(
++    fn has_exact_ref(
+         &self,
+         db: &ObjectDb<'_>,
+         name: &str,
+--- before/src/adapters/git/tests.rs
++++ after/src/adapters/git/tests.rs
+@@ -30,7 +30,7 @@
+         // Act
+         let error = check_version(output).unwrap_err();
+         // Assert
+-        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
++        assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+     }
+ }
+ 
+@@ -38,18 +38,18 @@
+ fn open_rejects_old_git_before_object_calls() {
+     // Arrange
+     let repo = TempRepo::new(ObjectFormat::Sha1);
+-    let exe = repo.script(
++    let exe = repo.write_script(
+         "old-git",
+         "#!/bin/sh\nprintf '%s\\n' \"$*\" >> calls\necho 'git version 2.28.7'\n",
+     );
+-    let process = GitProcess::with_executable(exe);
+-    // Act
+-    let error = GitCliAdapter::open_with_process(repo.root(), process)
++    let process = GitProcess::new_with_executable(exe);
++    // Act
++    let error = GitCliAdapter::open_with_process(repo.get_root(), process)
+         .err()
+         .unwrap();
+-    let calls = fs::read_to_string(repo.root().join("calls")).unwrap();
+-    // Assert
+-    assert!(error.message().contains("2.29"));
++    let calls = fs::read_to_string(repo.get_root().join("calls")).unwrap();
++    // Assert
++    assert!(error.get_message().contains("2.29"));
+     assert_eq!(calls, "-c core.hooksPath=/dev/null --version\n");
+ }
+ 
+@@ -63,9 +63,9 @@
+             ObjectFormat::Sha256 => SHA256_OID_HEX_LEN,
+         };
+         // Act
+-        let git = GitCliAdapter::open(repo.subdir()).unwrap();
+-        // Assert
+-        assert_eq!(git.root, repo.root());
++        let git = GitCliAdapter::open(repo.get_subdir()).unwrap();
++        // Assert
++        assert_eq!(git.root, repo.get_root());
+         assert_eq!(git.oid_len, expected_length);
+     }
+ }
+@@ -74,8 +74,8 @@
+ fn open_rejects_non_repository_and_bare() {
+     // Arrange
+     let repo = TempRepo::new(ObjectFormat::Sha1);
+-    let bare = repo.root().join("bare");
+-    repo.ok(&["init", "-q", "--bare", bare.to_str().unwrap()], None);
++    let bare = repo.get_root().join("bare");
++    repo.run_git_successfully(&["init", "-q", "--bare", bare.to_str().unwrap()], None);
+     let empty = std::env::temp_dir().join(format!("letopis-empty-{}", std::process::id()));
+     fs::create_dir(&empty).unwrap();
+     // Act
+@@ -91,7 +91,7 @@
+ fn subprocess_drains_and_reaps_on_io_failure() {
+     if std::env::var_os("LETOPIS_IO_WORKER").is_none() {
+         // Arrange / Act / Assert: supervisor runs this exact worker and checks its exit.
+-        fixture::supervised_test(
++        fixture::supervise_test(
+             "adapters::git::tests::subprocess_drains_and_reaps_on_io_failure",
+             &[("LETOPIS_IO_WORKER", "1")],
+         );
+@@ -99,13 +99,13 @@
+     }
+     // Arrange
+     let repo = TempRepo::new(ObjectFormat::Sha1);
+-    let exe = repo.script("failing-git", "#!/bin/sh\necho $$ > child-pid\nhead -c 262144 /dev/zero >&2\necho STDERR_CANARY >&2\nhead -c 262144 /dev/zero\nhead -c 1048576 > /dev/null\nexit 7\n");
+-    let process = GitProcess::with_executable(exe);
++    let exe = repo.write_script("failing-git", "#!/bin/sh\necho $$ > child-pid\nhead -c 262144 /dev/zero >&2\necho STDERR_CANARY >&2\nhead -c 262144 /dev/zero\nhead -c 1048576 > /dev/null\nexit 7\n");
++    let process = GitProcess::new_with_executable(exe);
+     let input = b"STDIN_CANARY".repeat(100000);
+     // Act
+-    let error = process.run(repo.root(), &[], Some(&input)).unwrap_err();
++    let error = process.run(repo.get_root(), &[], Some(&input)).unwrap_err();
+     let safe = format!("{error} {error:?}");
+-    let pid = fs::read_to_string(repo.root().join("child-pid")).unwrap();
++    let pid = fs::read_to_string(repo.get_root().join("child-pid")).unwrap();
+     let child_exists = Command::new("kill")
+         .args(["-0", pid.trim()])
+         .output()
+@@ -115,12 +115,12 @@
+     // Assert
+     assert!(!safe.contains("STDIN_CANARY"));
+     assert!(!safe.contains("STDERR_CANARY"));
+-    assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
++    assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+     assert!(!child_exists, "Git child must be reaped");
+ }
+ 
+ fn supervise_policy_worker() {
+-    fixture::supervised_test(
++    fixture::supervise_test(
+         "adapters::git::tests::process_removes_inherited_overrides_and_hardens_writes",
+         &[
+             ("LETOPIS_POLICY_WORKER", "1"),
+@@ -145,14 +145,14 @@
+     }
+     // Arrange
+     let repo = TempRepo::new(ObjectFormat::Sha1);
+-    let exe = repo.script(
++    let exe = repo.write_script(
+         "policy-git",
+         "#!/bin/sh\nenv | sort\nprintf 'ARG=%s\\n' \"$@\"\n",
+     );
+-    let process = GitProcess::with_executable(exe);
++    let process = GitProcess::new_with_executable(exe);
+     let args = ["hash-object".into(), "-w".into(), "--stdin".into()];
+     // Act
+-    let output = process.run(repo.root(), &args, None).unwrap();
++    let output = process.run(repo.get_root(), &args, None).unwrap();
+     let text = String::from_utf8(output).unwrap();
+     // Assert
+     assert!(!text.contains("CANARY"));
+@@ -172,12 +172,12 @@
+     }
+ }
+ 
+-fn newline_repository_pair(parent: &TempRepo, format: ObjectFormat) -> (PathBuf, PathBuf) {
+-    let sibling = parent.root().join("repo");
+-    let target = parent.root().join("repo\n");
++fn create_newline_repository_pair(parent: &TempRepo, format: ObjectFormat) -> (PathBuf, PathBuf) {
++    let sibling = parent.get_root().join("repo");
++    let target = parent.get_root().join("repo\n");
+     for root in [&sibling, &target] {
+-        parent.ok(
+-            &["init", "-q", format.init_arg(), root.to_str().unwrap()],
++        parent.run_git_successfully(
++            &["init", "-q", format.to_init_arg(), root.to_str().unwrap()],
+             None,
+         );
+     }
+@@ -189,12 +189,13 @@
+     // Arrange
+     for format in fixture::FORMATS {
+         let parent = TempRepo::new(format);
+-        let (sibling, target) = newline_repository_pair(&parent, format);
+-        let sibling_objects = parent.ok(
++        let (sibling, target) = create_newline_repository_pair(&parent, format);
++        let sibling_objects = parent.run_git_successfully(
+             &["-C", sibling.to_str().unwrap(), "count-objects", "-v"],
+             None,
+         );
+-        let sibling_refs = parent.ok(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None);
++        let sibling_refs =
++            parent.run_git_successfully(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None);
+         let path = RepoPath::parse("captured.md").unwrap();
+         // Act
+         let git = open_git_snapshots(&target).unwrap();
+@@ -205,13 +206,14 @@
+             }])
+             .unwrap();
+         git.pin(&tree).unwrap();
+-        let objects_after = parent.ok(
++        let objects_after = parent.run_git_successfully(
+             &["-C", sibling.to_str().unwrap(), "count-objects", "-v"],
+             None,
+         );
+-        let refs_after = parent.ok(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None);
++        let refs_after =
++            parent.run_git_successfully(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None);
+         let name = format!("{SNAPSHOT_REF_PREFIX}{}", tree.as_str());
+-        let actual = parent.git(
++        let actual = parent.run_git(
+             &[
+                 "-C",
+                 target.to_str().unwrap(),
+--- before/src/adapters/markdown/links.rs
++++ after/src/adapters/markdown/links.rs
+@@ -36,7 +36,7 @@
+         };
+         let Some(element) = elements
+             .iter()
+-            .find(|e| range.start >= e.bytes.start() && range.end <= e.bytes.end())
++            .find(|e| range.start >= e.bytes.get_start() && range.end <= e.bytes.get_end())
+         else {
+             continue;
+         };
+@@ -46,15 +46,15 @@
+         let edge_type = title
+             .strip_prefix("letopis:type=")
+             .and_then(|s| EdgeType::parse(s).ok())
+-            .ok_or_else(|| Diagnostic::at(DiagnosticKind::InvalidLinkTitle, range.clone()))?;
++            .ok_or_else(|| Diagnostic::new_at(DiagnosticKind::InvalidLinkTitle, range.clone()))?;
+         let target = if edge_type.as_str() == "external" {
+             SourceUri::parse(dest_url).map(EdgeTarget::Source)
+         } else {
+             KnowledgeId::parse(dest_url).map(EdgeTarget::Knowledge)
+         }
+-        .map_err(|_| Diagnostic::at(DiagnosticKind::InvalidTarget, range.clone()))?;
++        .map_err(|_| Diagnostic::new_at(DiagnosticKind::InvalidTarget, range.clone()))?;
+         let edge = Edge::new(element.id.clone(), target, edge_type).map_err(|e| {
+-            Diagnostic::at(
++            Diagnostic::new_at(
+                 if e == ValueError::SelfLoop {
+                     DiagnosticKind::SelfLoop
+                 } else {
+--- before/src/adapters/markdown/metadata.rs
++++ after/src/adapters/markdown/metadata.rs
+@@ -7,16 +7,16 @@
+ #[serde(deny_unknown_fields)]
+ struct Metadata {
+     created_at: u64,
+-    #[serde(default, deserialize_with = "optional_oid")]
++    #[serde(default, deserialize_with = "deserialize_optional_oid")]
+     source_snapshot: Option<TreeOid>,
+ }
+-fn optional_oid<'de, D: Deserializer<'de>>(d: D) -> Result<Option<TreeOid>, D::Error> {
++fn deserialize_optional_oid<'de, D: Deserializer<'de>>(d: D) -> Result<Option<TreeOid>, D::Error> {
+     // The field may be absent, but a present JSON null is forbidden by X-4.
+     let raw = String::deserialize(d)?;
+     TreeOid::parse(&raw).map(Some).map_err(D::Error::custom)
+ }
+ pub(super) fn parse(line: &str, range: Range<usize>) -> Result<ElementMetadata, Diagnostic> {
+-    let invalid = || Diagnostic::at(DiagnosticKind::InvalidMetadata, range.clone());
++    let invalid = || Diagnostic::new_at(DiagnosticKind::InvalidMetadata, range.clone());
+     let json = line
+         .strip_prefix("<!-- letopis: ")
+         .and_then(|s| s.strip_suffix(" -->"))
+--- before/src/adapters/markdown/mod.rs
++++ after/src/adapters/markdown/mod.rs
+@@ -30,7 +30,7 @@
+     pub message: String,
+ }
+ impl Diagnostic {
+-    fn at(kind: DiagnosticKind, range: Range<usize>) -> Self {
++    fn new_at(kind: DiagnosticKind, range: Range<usize>) -> Self {
+         Self {
+             kind,
+             bytes: ByteSpan::new(range.start, range.end).ok(),
+@@ -70,7 +70,7 @@
+ /// `Ok(None)` is unmarked Markdown; errors never carry a partial valid projection.
+ pub fn parse(path: &RepoPath, bytes: &[u8]) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
+     let text = std::str::from_utf8(bytes).map_err(|e| {
+-        vec![Diagnostic::at(
++        vec![Diagnostic::new_at(
+             DiagnosticKind::InvalidUtf8,
+             e.valid_up_to()..bytes.len(),
+         )]
+--- before/src/adapters/markdown/scan.rs
++++ after/src/adapters/markdown/scan.rs
+@@ -19,17 +19,17 @@
+     text: &str,
+     events: &Events<'_>,
+ ) -> Result<Option<Layout>, Diagnostic> {
+-    let comments = metadata_comments(text, events);
++    let comments = collect_metadata_comments(text, events);
+     if comments.is_empty() {
+         return Ok(None);
+     }
+     KnowledgeId::new(path.clone(), None)
+-        .map_err(|_| Diagnostic::at(DiagnosticKind::InvalidTarget, 0..text.len()))?;
++        .map_err(|_| Diagnostic::new_at(DiagnosticKind::InvalidTarget, 0..text.len()))?;
+     let headings = collect_headings(text, events)?;
+     build_layout(path, text, &headings, comments).map(Some)
+ }
+ 
+-fn metadata_comments(text: &str, events: &Events<'_>) -> Vec<Range<usize>> {
++fn collect_metadata_comments(text: &str, events: &Events<'_>) -> Vec<Range<usize>> {
+     events
+         .iter()
+         .filter_map(|(event, range)| match event {
+@@ -55,22 +55,24 @@
+     let mut anchors = BTreeSet::new();
+     for (event, range) in events {
+         if let Event::Start(Tag::Heading { level, id, .. }) = event {
+-            let start = line_start(text, range.start);
++            let start = find_line_start(text, range.start);
+             let raw = &text[start..range.end];
+-            let anchor =
+-                match id {
+-                    Some(id) => Some(Anchor::parse(id).map_err(|_| {
+-                        Diagnostic::at(DiagnosticKind::InvalidAnchor, range.clone())
+-                    })?),
+-                    None if raw.trim_end().ends_with("{#}") => {
+-                        return Err(Diagnostic::at(DiagnosticKind::InvalidAnchor, range.clone()));
+-                    }
+-                    None => None,
+-                };
++            let anchor = match id {
++                Some(id) => Some(Anchor::parse(id).map_err(|_| {
++                    Diagnostic::new_at(DiagnosticKind::InvalidAnchor, range.clone())
++                })?),
++                None if raw.trim_end().ends_with("{#}") => {
++                    return Err(Diagnostic::new_at(
++                        DiagnosticKind::InvalidAnchor,
++                        range.clone(),
++                    ));
++                }
++                None => None,
++            };
+             if let Some(a) = &anchor
+                 && !anchors.insert(a.clone())
+             {
+-                return Err(Diagnostic::at(
++                return Err(Diagnostic::new_at(
+                     DiagnosticKind::DuplicateAnchor,
+                     range.clone(),
+                 ));
+@@ -78,7 +80,7 @@
+             let after = if text.as_bytes().get(range.end.wrapping_sub(1)) == Some(&b'\n') {
+                 range.end
+             } else {
+-                line_after(text, range.end)
++                find_line_end(text, range.end)
+             };
+             headings.push(Heading {
+                 start,
+@@ -100,25 +102,28 @@
+     let mut elements: Vec<Element> = Vec::new();
+     let mut metadata_ranges = Vec::new();
+     for range in comments {
+-        let start = line_start(text, range.start);
+-        let after = line_after(text, start);
++        let start = find_line_start(text, range.start);
++        let after = find_line_end(text, start);
+         let line = text[start..after].trim_end_matches(['\r', '\n']);
+         // A service comment must occupy the complete, standalone raw line.
+         if range.start != start || range.end > after {
+-            return Err(Diagnostic::at(DiagnosticKind::InvalidMetadata, range));
++            return Err(Diagnostic::new_at(DiagnosticKind::InvalidMetadata, range));
+         }
+         let metadata = metadata::parse(line, start..after)?;
+         metadata_ranges.push(start..after);
+-        let (begin, end, anchor) = element_bounds(text, headings, start, after)?;
+-        if elements.last().is_some_and(|e| e.bytes.end() > begin) {
+-            return Err(Diagnostic::at(DiagnosticKind::NestedElement, begin..end));
++        let (begin, end, anchor) = find_element_bounds(text, headings, start, after)?;
++        if elements.last().is_some_and(|e| e.bytes.get_end() > begin) {
++            return Err(Diagnostic::new_at(
++                DiagnosticKind::NestedElement,
++                begin..end,
++            ));
+         }
+         let id = KnowledgeId::new(path.clone(), anchor)
+-            .map_err(|_| Diagnostic::at(DiagnosticKind::InvalidTarget, begin..end))?;
++            .map_err(|_| Diagnostic::new_at(DiagnosticKind::InvalidTarget, begin..end))?;
+         let bytes = ByteSpan::new(begin, end).expect("heading ranges are ordered");
+         let lines = LineRange::new(
+-            line_number(text, begin),
+-            line_number(text, end.saturating_sub(1)),
++            calculate_line_number(text, begin),
++            calculate_line_number(text, end.saturating_sub(1)),
+         )
+         .expect("nonempty element lines are ordered");
+         elements.push(Element {
+@@ -134,7 +139,7 @@
+         metadata_ranges,
+     })
+ }
+-fn element_bounds(
++fn find_element_bounds(
+     text: &str,
+     headings: &[Heading],
+     start: usize,
+@@ -146,7 +151,7 @@
+     let heading = headings
+         .iter()
+         .find(|h| h.after == start && h.anchor.is_some())
+-        .ok_or_else(|| Diagnostic::at(DiagnosticKind::OrphanMetadata, start..after))?;
++        .ok_or_else(|| Diagnostic::new_at(DiagnosticKind::OrphanMetadata, start..after))?;
+     let end = headings
+         .iter()
+         .find(|next| next.start > heading.start && next.level <= heading.level)
+@@ -154,19 +159,19 @@
+     Ok((heading.start, end, heading.anchor.clone()))
+ }
+ 
+-fn line_start(text: &str, at: usize) -> usize {
++fn find_line_start(text: &str, at: usize) -> usize {
+     text.as_bytes()[..at]
+         .iter()
+         .rposition(|&c| c == b'\n')
+         .map_or(0, |p| p + 1)
+ }
+-fn line_after(text: &str, at: usize) -> usize {
++fn find_line_end(text: &str, at: usize) -> usize {
+     text.as_bytes()[at..]
+         .iter()
+         .position(|&c| c == b'\n')
+         .map_or(text.len(), |p| at + p + 1)
+ }
+-fn line_number(text: &str, at: usize) -> u64 {
++fn calculate_line_number(text: &str, at: usize) -> u64 {
+     text.as_bytes()[..at]
+         .iter()
+         .filter(|&&c| c == b'\n')
+--- before/src/adapters/markdown/search.rs
++++ after/src/adapters/markdown/search.rs
+@@ -11,8 +11,8 @@
+ ) -> String {
+     let mut text = String::new();
+     for (event, range) in events {
+-        if range.start < span.start()
+-            || range.end > span.end()
++        if range.start < span.get_start()
++            || range.end > span.get_end()
+             || metadata_ranges
+                 .iter()
+                 .any(|m| range.start >= m.start && range.end <= m.end)
+--- before/src/domain/graph.rs
++++ after/src/domain/graph.rs
+@@ -65,15 +65,15 @@
+         })
+     }
+     /// The containing knowledge element.
+-    pub fn source(&self) -> &KnowledgeId {
++    pub fn get_source(&self) -> &KnowledgeId {
+         &self.source
+     }
+     /// The declared target, whether or not it currently exists.
+-    pub fn target(&self) -> &EdgeTarget {
++    pub fn get_target(&self) -> &EdgeTarget {
+         &self.target
+     }
+     /// The declared relation type.
+-    pub fn edge_type(&self) -> &EdgeType {
++    pub fn get_edge_type(&self) -> &EdgeType {
+         &self.edge_type
+     }
+ }
+@@ -85,10 +85,10 @@
+     Metavertex,
+ }
+ /// An element is a metavertex exactly when it has an outgoing includes edge.
+-pub fn kind_for(id: &KnowledgeId, edges: &BTreeSet<Edge>) -> ElementKind {
++pub fn derive_element_kind(id: &KnowledgeId, edges: &BTreeSet<Edge>) -> ElementKind {
+     if edges
+         .iter()
+-        .any(|e| e.source() == id && e.edge_type().as_str() == "includes")
++        .any(|e| e.get_source() == id && e.get_edge_type().as_str() == "includes")
+     {
+         ElementKind::Metavertex
+     } else {
+--- before/src/domain/identity.rs
++++ after/src/domain/identity.rs
+@@ -39,7 +39,7 @@
+         let reserved = raw
+             .strip_prefix('L')
+             .and_then(|r| r.split_once("-L"))
+-            .is_some_and(|(a, b)| digits(a) && digits(b));
++            .is_some_and(|(a, b)| contains_only_ascii_digits(a) && contains_only_ascii_digits(b));
+         if !raw.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+             || !raw
+                 .bytes()
+@@ -55,7 +55,7 @@
+         &self.0
+     }
+ }
+-fn digits(s: &str) -> bool {
++fn contains_only_ascii_digits(s: &str) -> bool {
+     !s.is_empty() && s.bytes().all(|c| c.is_ascii_digit())
+ }
+ 
+@@ -104,14 +104,14 @@
+                 .strip_prefix('L')
+                 .and_then(|f| f.split_once("-L"))
+                 .ok_or(ValueError::InvalidRange)?;
+-            if !digits(a) || !digits(b) {
++            if !contains_only_ascii_digits(a) || !contains_only_ascii_digits(b) {
+                 return Err(ValueError::InvalidRange);
+             }
+             let range = LineRange::new(
+                 a.parse().map_err(|_| ValueError::InvalidRange)?,
+                 b.parse().map_err(|_| ValueError::InvalidRange)?,
+             )?;
+-            out.push_str(&format!("#L{}-L{}", range.start(), range.end()));
++            out.push_str(&format!("#L{}-L{}", range.get_start(), range.get_end()));
+         }
+         Ok(Self(out))
+     }
+--- before/src/domain/value.rs
++++ after/src/domain/value.rs
+@@ -42,11 +42,11 @@
+         Ok(Self { start, end })
+     }
+     /// First included byte offset.
+-    pub fn start(&self) -> usize {
++    pub fn get_start(&self) -> usize {
+         self.start
+     }
+     /// First excluded byte offset.
+-    pub fn end(&self) -> usize {
++    pub fn get_end(&self) -> usize {
+         self.end
+     }
+ }
+@@ -66,11 +66,11 @@
+         Ok(Self { start, end })
+     }
+     /// First included line.
+-    pub fn start(&self) -> u64 {
++    pub fn get_start(&self) -> u64 {
+         self.start
+     }
+     /// Last included line.
+-    pub fn end(&self) -> u64 {
++    pub fn get_end(&self) -> u64 {
+         self.end
+     }
+ }
+--- before/src/service/ports/git.rs
++++ after/src/service/ports/git.rs
+@@ -36,7 +36,7 @@
+             cause: None,
+         }
+     }
+-    pub(crate) fn with_cause(
++    pub(crate) fn new_with_cause(
+         message: &'static str,
+         cause: impl Error + Send + Sync + 'static,
+     ) -> Self {
+@@ -47,11 +47,11 @@
+         }
+     }
+     /// Classification suitable for application error mapping.
+-    pub fn kind(&self) -> SnapshotErrorKind {
++    pub fn get_kind(&self) -> SnapshotErrorKind {
+         self.kind
+     }
+     /// Static operation context, without repository paths or file bytes.
+-    pub fn message(&self) -> &str {
++    pub fn get_message(&self) -> &str {
+         self.message
+     }
+ }
+@@ -83,7 +83,7 @@
+         Self { oid }
+     }
+     /// The exact retained tree OID.
+-    pub fn oid(&self) -> &TreeOid {
++    pub fn get_oid(&self) -> &TreeOid {
+         &self.oid
+     }
+ }
+--- before/tests/domain_values.rs
++++ after/tests/domain_values.rs
+@@ -1,6 +1,6 @@
+ use letopis::domain::{
+     Anchor, ByteSpan, Edge, EdgeTarget, EdgeType, ElementKind, ElementMetadata, KnowledgeId,
+-    LineRange, Sha256, SourceUri, TreeOid, kind_for,
++    LineRange, Sha256, SourceUri, TreeOid, derive_element_kind,
+ };
+ use std::collections::BTreeSet;
+ 
+@@ -159,8 +159,8 @@
+     .unwrap();
+     // Act
+     edges.insert(other);
+-    let source_kind = kind_for(&a, &edges);
+-    let target_kind = kind_for(&b, &edges);
++    let source_kind = derive_element_kind(&a, &edges);
++    let target_kind = derive_element_kind(&b, &edges);
+     // Assert
+     assert_eq!(edges.len(), 2);
+     assert_eq!(source_kind, ElementKind::Metavertex);
+--- before/tests/git_retention.rs
++++ after/tests/git_retention.rs
+@@ -17,35 +17,37 @@
+     thread,
+     time::{Duration, Instant},
+ };
+-fn path(s: &str) -> RepoPath {
++fn parse_path(s: &str) -> RepoPath {
+     RepoPath::parse(s).unwrap()
+ }
+-fn oid(s: &str) -> TreeOid {
++fn parse_tree_oid(s: &str) -> TreeOid {
+     TreeOid::parse(s).unwrap()
+ }
+-fn external(repo: &TempRepo, child: &str, name: &str, kind: &str) -> TreeOid {
+-    oid(&repo.oid(
+-        &["mktree", "-z", "--missing"],
+-        Some(
+-            format!(
+-                "{} {kind} {child}\t{name}\0",
+-                if kind == TREE_KIND {
+-                    TREE_MODE
+-                } else {
+-                    REGULAR_FILE_MODE
+-                }
+-            )
+-            .as_bytes(),
++fn create_external_tree(repo: &TempRepo, child: &str, name: &str, kind: &str) -> TreeOid {
++    parse_tree_oid(
++        &repo.read_oid(
++            &["mktree", "-z", "--missing"],
++            Some(
++                format!(
++                    "{} {kind} {child}\t{name}\0",
++                    if kind == TREE_KIND {
++                        TREE_MODE
++                    } else {
++                        REGULAR_FILE_MODE
++                    }
++                )
++                .as_bytes(),
++            ),
+         ),
+-    ))
+-}
+-fn reference(tree: &TreeOid) -> String {
++    )
++}
++fn build_snapshot_ref(tree: &TreeOid) -> String {
+     format!("{SNAPSHOT_REF_PREFIX}{}", tree.as_str())
+ }
+ fn assert_no_ref(repo: &TempRepo, tree: &TreeOid) {
+     assert!(
+         !repo
+-            .git(&["show-ref", "--verify", &reference(tree)], None)
++            .run_git(&["show-ref", "--verify", &build_snapshot_ref(tree)], None)
+             .status
+             .success()
+     );
+@@ -55,43 +57,43 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let git = open_git_snapshots(repo.subdir()).unwrap();
+-        let p = path("nested/x");
++        let git = open_git_snapshots(repo.get_subdir()).unwrap();
++        let p = parse_path("nested/x");
+         let s1 = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+                 bytes: b"inspect unique\0",
+             }])
+             .unwrap();
+-        let blob = repo.oid(
++        let blob = repo.read_oid(
+             &["hash-object", "-w", "--stdin"],
+             Some(b"external basis\r\n"),
+         );
+-        let nested = external(&repo, &blob, "x", BLOB_KIND);
+-        let basis = external(&repo, nested.as_str(), "nested", TREE_KIND);
+-        let before = repo.head_index_config_and_live_snapshot();
++        let nested = create_external_tree(&repo, &blob, "x", BLOB_KIND);
++        let basis = create_external_tree(&repo, nested.as_str(), "nested", TREE_KIND);
++        let before = repo.capture_fixture_state();
+         for tree in [&s1, &basis] {
+             // Act
+             let first = git.pin(tree).unwrap();
+-            let actual_ref = repo.direct_ref(tree.as_str());
++            let actual_ref = repo.read_direct_ref(tree.as_str());
+             let second = git.pin(tree).unwrap();
+             // Assert
+-            assert_eq!(first.oid(), tree);
++            assert_eq!(first.get_oid(), tree);
+             assert_eq!(actual_ref, tree.as_str());
+-            assert_eq!(second.oid(), tree);
+-        }
+-        assert_eq!(repo.head_index_config_and_live_snapshot(), before);
++            assert_eq!(second.get_oid(), tree);
++        }
++        assert_eq!(repo.capture_fixture_state(), before);
+         // Act: collect and repack, then reopen the retained trees.
+         repo.expire_reflogs_gc_prune_now_and_pack_refs();
+-        let reopened = open_git_snapshots(repo.root()).unwrap();
++        let reopened = open_git_snapshots(repo.get_root()).unwrap();
+         let inspect_bytes = reopened.read_blob(&s1, &p).unwrap();
+         let basis_bytes = reopened.read_blob(&basis, &p).unwrap();
+         let retained = reopened.pin(&basis).unwrap();
+-        let integrity = repo.fsck_strict_no_reflogs();
++        let integrity = repo.run_fsck_strict_no_reflogs();
+         // Assert
+         assert_eq!(inspect_bytes, b"inspect unique\0");
+         assert_eq!(basis_bytes, b"external basis\r\n");
+-        assert_eq!(retained.oid(), &basis);
++        assert_eq!(retained.get_oid(), &basis);
+         assert!(integrity.success());
+     }
+ }
+@@ -100,8 +102,8 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let git = open_git_snapshots(repo.root()).unwrap();
+-        let p = path("unique");
++        let git = open_git_snapshots(repo.get_root()).unwrap();
++        let p = parse_path("unique");
+         let s = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+@@ -115,7 +117,7 @@
+         // Act
+         repo.expire_reflogs_gc_prune_now_and_pack_refs();
+         let exists = repo
+-            .git(&["cat-file", "-e", s.as_str()], None)
++            .run_git(&["cat-file", "-e", s.as_str()], None)
+             .status
+             .success();
+         // Assert
+@@ -127,25 +129,25 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let git = open_git_snapshots(repo.root()).unwrap();
+-        let p = path("x");
+-        let length = repo.oid(&["rev-parse", "HEAD"], None).len();
++        let git = open_git_snapshots(repo.get_root()).unwrap();
++        let p = parse_path("x");
++        let length = repo.read_oid(&["rev-parse", "HEAD"], None).len();
+         let missing = "1".repeat(length);
+-        let incomplete = external(&repo, &missing, "x", BLOB_KIND);
++        let incomplete = create_external_tree(&repo, &missing, "x", BLOB_KIND);
+         // Act
+         let error = git.pin(&incomplete).unwrap_err();
+         // Assert
+-        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
++        assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+         assert_no_ref(&repo, &incomplete);
+         // Arrange: replace an existing loose object with different bytes.
+-        let blob = repo.oid(&["hash-object", "-w", "--stdin"], Some(b"expected"));
+-        let other = repo.oid(&["hash-object", "-w", "--stdin"], Some(b"CORRUPT_CANARY"));
+-        let corrupt = external(&repo, &blob, "x", BLOB_KIND);
++        let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"expected"));
++        let other = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"CORRUPT_CANARY"));
++        let corrupt = create_external_tree(&repo, &blob, "x", BLOB_KIND);
+         repo.replace_loose_object(&blob, &other);
+         // Act
+         let error = git.pin(&corrupt).unwrap_err();
+         // Assert
+-        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
++        assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+         assert_no_ref(&repo, &corrupt);
+         // Arrange: a fixture-owned lock forces update-ref to fail.
+         let tree = git
+@@ -154,13 +156,15 @@
+                 bytes: b"forced ref failure",
+             }])
+             .unwrap();
+-        let lock = repo.root().join(format!(".git/{}.lock", reference(&tree)));
++        let lock = repo
++            .get_root()
++            .join(format!(".git/{}.lock", build_snapshot_ref(&tree)));
+         fs::create_dir_all(lock.parent().unwrap()).unwrap();
+         fs::write(&lock, b"fixture owned lock").unwrap();
+         // Act
+         let error = git.pin(&tree).unwrap_err();
+         // Assert
+-        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
++        assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+         assert_no_ref(&repo, &tree);
+         assert!(!format!("{error:?} {error}").contains("fixture owned lock"));
+     }
+@@ -171,24 +175,24 @@
+     for format in FORMATS {
+         for conflict in ["symbolic", "dangling-symbolic", "other", "corrupt"] {
+             let repo = TempRepo::new(format);
+-            let git = open_git_snapshots(repo.root()).unwrap();
++            let git = open_git_snapshots(repo.get_root()).unwrap();
+             let tree = git.create_tree(&[]).unwrap();
+-            let before = repo.head_index_config_and_live_snapshot();
+-            let name = reference(&tree);
++            let before = repo.capture_fixture_state();
++            let name = build_snapshot_ref(&tree);
+             match conflict {
+                 "dangling-symbolic" => {
+-                    repo.ok(&["symbolic-ref", &name, "refs/heads/absent"], None);
++                    repo.run_git_successfully(&["symbolic-ref", &name, "refs/heads/absent"], None);
+                 }
+                 "symbolic" => {
+-                    let branch = repo.oid(&["symbolic-ref", "HEAD"], None);
+-                    repo.ok(&["symbolic-ref", &name, &branch], None);
++                    let branch = repo.read_oid(&["symbolic-ref", "HEAD"], None);
++                    repo.run_git_successfully(&["symbolic-ref", &name, &branch], None);
+                 }
+                 "other" => {
+-                    let head = repo.oid(&["rev-parse", "HEAD"], None);
+-                    repo.ok(&["update-ref", &name, &head], None);
++                    let head = repo.read_oid(&["rev-parse", "HEAD"], None);
++                    repo.run_git_successfully(&["update-ref", &name, &head], None);
+                 }
+                 _ => {
+-                    let dest = repo.root().join(format!(".git/{name}"));
++                    let dest = repo.get_root().join(format!(".git/{name}"));
+                     fs::create_dir_all(dest.parent().unwrap()).unwrap();
+                     fs::write(dest, b"CORRUPT_REF_CANARY\n").unwrap();
+                 }
+@@ -196,16 +200,16 @@
+             // Act
+             let err = git.pin(&tree).unwrap_err();
+             // Assert
+-            assert_eq!(err.kind(), SnapshotErrorKind::InternalError);
++            assert_eq!(err.get_kind(), SnapshotErrorKind::InternalError);
+             assert!(!format!("{err} {err:?}").contains("CANARY"));
+-            assert_eq!(repo.head_index_config_and_live_snapshot(), before);
++            assert_eq!(repo.capture_fixture_state(), before);
+         }
+     }
+ }
+ fn pin_worker(root: OsString) {
+     // Arrange: announce readiness, then wait for the parent barrier.
+     let root = PathBuf::from(root);
+-    let tree = oid(&std::env::var("LETOPIS_PIN_OID").unwrap());
++    let tree = parse_tree_oid(&std::env::var("LETOPIS_PIN_OID").unwrap());
+     let id = std::env::var("LETOPIS_PIN_WORKER").unwrap();
+     fs::write(root.join(format!("ready-{id}")), b"ready").unwrap();
+     let deadline = Instant::now() + Duration::from_secs(20);
+@@ -217,14 +221,14 @@
+     let git = open_git_snapshots(&root).unwrap();
+     let retained = git.pin(&tree).unwrap();
+     // Assert
+-    assert_eq!(retained.oid(), &tree);
++    assert_eq!(retained.get_oid(), &tree);
+ }
+ 
+ fn spawn_pin_workers(root: &Path, tree: &TreeOid) -> Vec<git::OwnedChild> {
+     let mut children = Vec::new();
+     for id in ["a", "b"] {
+         let mut c = Command::new(std::env::current_exe().unwrap());
+-        git::isolated(&mut c);
++        git::isolate_command(&mut c);
+         c.args(["--exact", "concurrent_pin_is_idempotent", "--nocapture"])
+             .env("LETOPIS_PIN_ROOT", root)
+             .env("LETOPIS_PIN_OID", tree.as_str())
+@@ -245,20 +249,22 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let tree = open_git_snapshots(repo.root())
++        let tree = open_git_snapshots(repo.get_root())
+             .unwrap()
+             .create_tree(&[])
+             .unwrap();
+-        let children = spawn_pin_workers(repo.root(), &tree);
++        let children = spawn_pin_workers(repo.get_root(), &tree);
+         let deadline = Instant::now() + Duration::from_secs(25);
+-        while !(repo.root().join("ready-a").exists() && repo.root().join("ready-b").exists()) {
++        while !(repo.get_root().join("ready-a").exists()
++            && repo.get_root().join("ready-b").exists())
++        {
+             if Instant::now() > deadline {
+                 panic!("workers not ready");
+             }
+             thread::sleep(Duration::from_millis(5));
+         }
+         // Act: release both workers together and wait for their results.
+-        fs::write(repo.root().join("start"), b"go").unwrap();
++        fs::write(repo.get_root().join("start"), b"go").unwrap();
+         let outputs: Vec<_> = children
+             .into_iter()
+             .map(|child| child.wait(deadline))
+@@ -272,14 +278,14 @@
+                 String::from_utf8_lossy(&out.stderr)
+             );
+         }
+-        assert_eq!(repo.direct_ref(tree.as_str()), tree.as_str());
++        assert_eq!(repo.read_direct_ref(tree.as_str()), tree.as_str());
+     }
+ }
+ #[test]
+ fn promisor_miss_never_fetches() {
+     if std::env::var_os("LETOPIS_PROMISOR_WORKER").is_none() {
+         // Arrange / Act / Assert: execute and validate this exact isolated worker.
+-        git::supervised_test(
++        git::supervise_test(
+             "promisor_miss_never_fetches",
+             &[("LETOPIS_PROMISOR_WORKER", "1")],
+         );
+@@ -289,18 +295,18 @@
+     for format in FORMATS {
+         let remote = TempRepo::new(format);
+         let repo = TempRepo::new(format);
+-        let blob = remote.oid(
++        let blob = remote.read_oid(
+             &["hash-object", "-w", "--stdin"],
+             Some(b"promised remote bytes"),
+         );
+-        let tree = external(&repo, &blob, "missing", BLOB_KIND);
+-        let marker = repo.root().join("FETCH_RAN");
+-        let script = repo.script(
++        let tree = create_external_tree(&repo, &blob, "missing", BLOB_KIND);
++        let marker = repo.get_root().join("FETCH_RAN");
++        let script = repo.write_script(
+             "transport",
+             "#!/bin/sh\ntouch \"$(dirname \"$0\")/FETCH_RAN\"\nexec git-upload-pack \"$1\"\n",
+         );
+-        let url = format!("ext::{} {}", script.display(), remote.root().display());
+-        repo.ok(
++        let url = format!("ext::{} {}", script.display(), remote.get_root().display());
++        repo.run_git_successfully(
+             &["-c", "protocol.ext.allow=always", "ls-remote", &url],
+             None,
+         );
+@@ -315,20 +321,20 @@
+             ("protocol.ext.allow", "always"),
+             ("protocol.file.allow", "always"),
+         ] {
+-            repo.ok(&["config", key, value], None);
+-        }
+-        let git = open_git_snapshots(repo.root()).unwrap();
+-        // Act
+-        let read = git.read_blob(&tree, &path("missing")).unwrap_err();
++            repo.run_git_successfully(&["config", key, value], None);
++        }
++        let git = open_git_snapshots(repo.get_root()).unwrap();
++        // Act
++        let read = git.read_blob(&tree, &parse_path("missing")).unwrap_err();
+         let pin = git.pin(&tree).unwrap_err();
+         // Assert
+-        assert_eq!(read.kind(), SnapshotErrorKind::InternalError);
+-        assert_eq!(pin.kind(), SnapshotErrorKind::InternalError);
++        assert_eq!(read.get_kind(), SnapshotErrorKind::InternalError);
++        assert_eq!(pin.get_kind(), SnapshotErrorKind::InternalError);
+         assert_no_ref(&repo, &tree);
+         assert!(!marker.exists(), "no lazy transport is permitted");
+         assert!(
+             !repo
+-                .root()
++                .get_root()
+                 .join(format!(".git/objects/{}/{}", &blob[..2], &blob[2..]))
+                 .exists()
+         );
+@@ -340,8 +346,8 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let git = open_git_snapshots(repo.root()).unwrap();
+-        let blob = repo.oid(
++        let git = open_git_snapshots(repo.get_root()).unwrap();
++        let blob = repo.read_oid(
+             &["hash-object", "-w", "--stdin"],
+             Some(b"shared oid type confusion"),
+         );
+@@ -354,7 +360,7 @@
+         raw.extend_from_slice(&binary);
+         raw.extend_from_slice(b"100644 z\0");
+         raw.extend_from_slice(&binary);
+-        let tree = oid(&repo.oid(
++        let tree = parse_tree_oid(&repo.read_oid(
+             &[
+                 "hash-object",
+                 "-w",
+@@ -368,7 +374,7 @@
+         // Act
+         let error = git.pin(&tree).unwrap_err();
+         // Assert
+-        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
++        assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+         assert_no_ref(&repo, &tree);
+     }
+ }
+@@ -377,28 +383,28 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let missing = "1".repeat(repo.oid(&["rev-parse", "HEAD"], None).len());
+-        let tree = oid(&repo.oid(
++        let missing = "1".repeat(repo.read_oid(&["rev-parse", "HEAD"], None).len());
++        let tree = parse_tree_oid(&repo.read_oid(
+             &["mktree", "--missing", "-z"],
+             Some(format!("{GITLINK_MODE} {COMMIT_KIND} {missing}\tmodule\0").as_bytes()),
+         ));
+-        let git = open_git_snapshots(repo.root()).unwrap();
++        let git = open_git_snapshots(repo.get_root()).unwrap();
+         // Act
+         let retained = git.pin(&tree).unwrap();
+-        let read = git.read_blob(&tree, &path("module")).unwrap_err();
+-        let integrity = repo.fsck_strict_no_reflogs();
+-        // Assert
+-        assert_eq!(retained.oid(), &tree);
+-        assert_eq!(read.kind(), SnapshotErrorKind::InvalidRequest);
++        let read = git.read_blob(&tree, &parse_path("module")).unwrap_err();
++        let integrity = repo.run_fsck_strict_no_reflogs();
++        // Assert
++        assert_eq!(retained.get_oid(), &tree);
++        assert_eq!(read.get_kind(), SnapshotErrorKind::InvalidRequest);
+         assert!(integrity.success());
+     }
+ }
+ 
+ fn assert_alternates_error(error: &SnapshotError, donor: &TempRepo) {
+-    assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
+-    assert!(error.message().contains("alternates"));
++    assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
++    assert!(error.get_message().contains("alternates"));
+     let diagnostic = format!("{error} {error:?}");
+-    assert!(!diagnostic.contains(donor.root().to_str().unwrap()));
++    assert!(!diagnostic.contains(donor.get_root().to_str().unwrap()));
+     assert!(!diagnostic.contains("CANARY"));
+ }
+ 
+@@ -410,7 +416,7 @@
+     local_blob: &Path,
+ ) -> Option<(impl GitSnapshotPort, TreeOid)> {
+     // Act
+-    let opened = open_git_snapshots(borrower.root());
++    let opened = open_git_snapshots(borrower.get_root());
+     match opened {
+         Ok(git) => {
+             // On the unfixed adapter this recreates the public-API failure:
+@@ -440,28 +446,31 @@
+     format: ObjectFormat,
+ ) {
+     assert!(
+-        !donor.git(&["cat-file", "-e", blob], None).status.success(),
++        !donor
++            .run_git(&["cat-file", "-e", blob], None)
++            .status
++            .success(),
+         "donor GC really removed the unreferenced blob"
+     );
+     assert!(
+         !borrower
+-            .git(&["cat-file", "-e", blob], None)
++            .run_git(&["cat-file", "-e", blob], None)
+             .status
+             .success()
+     );
+     if let Some((git, tree)) = accepted {
+         assert_eq!(
+-            git.read_blob(tree, p).unwrap_err().kind(),
++            git.read_blob(tree, p).unwrap_err().get_kind(),
+             SnapshotErrorKind::InternalError
+         );
+-        assert_eq!(borrower.direct_ref(tree.as_str()), tree.as_str());
++        assert_eq!(borrower.read_direct_ref(tree.as_str()), tree.as_str());
+         eprintln!(
+             "{format:?}: accepted shared snapshot lost its donor blob after GC while its service ref remained exact"
+         );
+     } else {
+         assert!(
+             borrower
+-                .ok(&["for-each-ref", SNAPSHOT_REF_PREFIX], None)
++                .run_git_successfully(&["for-each-ref", SNAPSHOT_REF_PREFIX], None)
+                 .is_empty()
+         );
+     }
+@@ -474,39 +483,36 @@
+     for format in FORMATS {
+         let donor = TempRepo::new(format);
+         let bytes = b"ALTERNATE_PAYLOAD_CANARY unique unreferenced blob\0";
+-        let blob = donor.oid(&["hash-object", "-w", "--stdin"], Some(bytes));
+-        let borrower = donor.shared_clone();
+-        let donor_before = donor.head_index_config_and_live_snapshot();
+-        let borrower_before = borrower.head_index_config_and_live_snapshot();
+-        let alternates = borrower.root().join(".git/objects/info/alternates");
++        let blob = donor.read_oid(&["hash-object", "-w", "--stdin"], Some(bytes));
++        let borrower = donor.create_shared_clone();
++        let donor_before = donor.capture_fixture_state();
++        let borrower_before = borrower.capture_fixture_state();
++        let alternates = borrower.get_root().join(".git/objects/info/alternates");
+         let configuration = fs::read(&alternates).unwrap();
+         // Fixture checks: the shared clone borrows the donor blob.
+         assert!(
+             borrower
+-                .git(&["cat-file", "-e", &blob], None)
++                .run_git(&["cat-file", "-e", &blob], None)
+                 .status
+                 .success()
+         );
+         let local_blob =
+             borrower
+-                .root()
++                .get_root()
+                 .join(format!(".git/objects/{}/{}", &blob[..2], &blob[2..]));
+         assert!(
+             !local_blob.exists(),
+             "the ordinary shared clone borrows this blob"
+         );
+-        let p = path("captured");
++        let p = parse_path("captured");
+         // Act: the helper preserves the unfixed adapter's accepted-snapshot path.
+         let accepted = try_borrowed_snapshot(&donor, &borrower, &p, bytes, &local_blob);
+         // Act: actually remove the donor object before checking the outcome.
+         donor.expire_reflogs_gc_prune_now_and_pack_refs();
+         // Assert
+         assert_shared_clone_gc_outcome(&donor, &borrower, &blob, &p, &accepted, format);
+-        assert_eq!(donor.head_index_config_and_live_snapshot(), donor_before);
+-        assert_eq!(
+-            borrower.head_index_config_and_live_snapshot(),
+-            borrower_before
+-        );
++        assert_eq!(donor.capture_fixture_state(), donor_before);
++        assert_eq!(borrower.capture_fixture_state(), borrower_before);
+         assert_eq!(fs::read(&alternates).unwrap(), configuration);
+         refused.push(accepted.is_none());
+     }
+@@ -523,19 +529,19 @@
+     for format in FORMATS {
+         let donor = TempRepo::new(format);
+         let repo = TempRepo::new(format);
+-        let git = open_git_snapshots(repo.root()).unwrap();
+-        let p = path("captured");
++        let git = open_git_snapshots(repo.get_root()).unwrap();
++        let p = parse_path("captured");
+         let tree = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+                 bytes: b"local bytes",
+             }])
+             .unwrap();
+-        let alternates = repo.root().join(".git/objects/info/alternates");
+-        let configuration = format!("{}\n", donor.root().join(".git/objects").display());
++        let alternates = repo.get_root().join(".git/objects/info/alternates");
++        let configuration = format!("{}\n", donor.get_root().join(".git/objects").display());
+         fs::write(&alternates, &configuration).unwrap();
+-        let before = repo.head_index_config_and_live_snapshot();
+-        let objects = repo.ok(&["count-objects", "-v"], None);
++        let before = repo.capture_fixture_state();
++        let objects = repo.run_git_successfully(&["count-objects", "-v"], None);
+         // Act
+         let create = git.create_tree(&[SnapshotFile {
+             path: &p,
+@@ -551,8 +557,11 @@
+             );
+         }
+         assert_no_ref(&repo, &tree);
+-        assert_eq!(repo.ok(&["count-objects", "-v"], None), objects);
+-        assert_eq!(repo.head_index_config_and_live_snapshot(), before);
++        assert_eq!(
++            repo.run_git_successfully(&["count-objects", "-v"], None),
++            objects
++        );
++        assert_eq!(repo.capture_fixture_state(), before);
+         assert_eq!(fs::read(&alternates).unwrap(), configuration.as_bytes());
+     }
+ }
+@@ -562,8 +571,8 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let linked = repo.root().join("linked");
+-        repo.ok(
++        let linked = repo.get_root().join("linked");
++        repo.run_git_successfully(
+             &[
+                 "worktree",
+                 "add",
+@@ -574,7 +583,7 @@
+             None,
+         );
+         let git = open_git_snapshots(&linked).unwrap();
+-        let p = path("linked");
++        let p = parse_path("linked");
+         let tree = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+@@ -584,10 +593,10 @@
+         // Fixture checks: the linked checkout works before alternates are added.
+         git.pin(&tree).unwrap();
+         assert_eq!(git.read_blob(&tree, &p).unwrap(), b"linked bytes");
+-        let alternates = repo.root().join(".git/objects/info/alternates");
+-        let before = repo.head_index_config_and_live_snapshot();
+-        let refs = repo.ok(&["for-each-ref"], None);
+-        let objects = repo.ok(&["count-objects", "-v"], None);
++        let alternates = repo.get_root().join(".git/objects/info/alternates");
++        let before = repo.capture_fixture_state();
++        let refs = repo.run_git_successfully(&["for-each-ref"], None);
++        let objects = repo.run_git_successfully(&["count-objects", "-v"], None);
+         // Arrange
+         for configuration in [b"".as_slice(), b"/ABSENT_DONOR_PATH_CANARY/objects\n"] {
+             fs::write(&alternates, configuration).unwrap();
+@@ -603,8 +612,8 @@
+             }
+             assert_alternates_error(&pin.unwrap_err(), &repo);
+             assert_eq!(fs::read(&alternates).unwrap(), configuration);
+-            assert_eq!(repo.head_index_config_and_live_snapshot(), before);
+-            assert_eq!(repo.ok(&["for-each-ref"], None), refs);
++            assert_eq!(repo.capture_fixture_state(), before);
++            assert_eq!(repo.run_git_successfully(&["for-each-ref"], None), refs);
+         }
+         // Arrange: removing the inactive configuration restores access.
+         fs::remove_file(alternates).unwrap();
+@@ -614,7 +623,10 @@
+             .read_blob(&tree, &p)
+             .unwrap();
+         // Assert
+-        assert_eq!(repo.ok(&["count-objects", "-v"], None), objects);
++        assert_eq!(
++            repo.run_git_successfully(&["count-objects", "-v"], None),
++            objects
++        );
+         assert_eq!(bytes, b"linked bytes");
+     }
+ }
+--- before/tests/git_snapshots.rs
++++ after/tests/git_snapshots.rs
+@@ -11,33 +11,39 @@
+ };
+ use std::fs;
+ 
+-fn path(s: &str) -> RepoPath {
++fn parse_path(s: &str) -> RepoPath {
+     RepoPath::parse(s).unwrap()
+ }
+-fn oid(s: &str) -> TreeOid {
++fn parse_tree_oid(s: &str) -> TreeOid {
+     TreeOid::parse(s).unwrap()
+ }
+-fn external_tree(repo: &TempRepo, mode: &str, kind: &str, child: &str, name: &str) -> TreeOid {
+-    oid(&repo.oid(
++fn create_external_tree(
++    repo: &TempRepo,
++    mode: &str,
++    kind: &str,
++    child: &str,
++    name: &str,
++) -> TreeOid {
++    parse_tree_oid(&repo.read_oid(
+         &["mktree", "-z", "--missing"],
+         Some(format!("{mode} {kind} {child}\t{name}\0").as_bytes()),
+     ))
+ }
+ fn configure_filter_trap(repo: &TempRepo) {
+-    let filter = repo.script("filter", "#!/bin/sh\ntouch FILTER_RAN\ncat\n");
+-    repo.ok(
++    let filter = repo.write_script("filter", "#!/bin/sh\ntouch FILTER_RAN\ncat\n");
++    repo.run_git_successfully(
+         &["config", "filter.canary.clean", filter.to_str().unwrap()],
+         None,
+     );
+-    repo.ok(&["config", "filter.canary.required", "true"], None);
+-    repo.ok(&["config", "core.autocrlf", "true"], None);
++    repo.run_git_successfully(&["config", "filter.canary.required", "true"], None);
++    repo.run_git_successfully(&["config", "core.autocrlf", "true"], None);
+     fs::write(
+-        repo.root().join(".gitattributes"),
++        repo.get_root().join(".gitattributes"),
+         b"* filter=canary text eol=crlf\n",
+     )
+     .unwrap();
+ }
+-fn captured_inputs() -> ([RepoPath; 6], [&'static [u8]; 6]) {
++fn build_captured_inputs() -> ([RepoPath; 6], [&'static [u8]; 6]) {
+     (
+         [
+             "live.md",
+@@ -47,7 +53,7 @@
+             "lf",
+             "crlf",
+         ]
+-        .map(path),
++        .map(parse_path),
+         [
+             b"no final newline",
+             b"",
+@@ -65,9 +71,9 @@
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         configure_filter_trap(&repo);
+-        let before = repo.head_index_config_and_live_snapshot();
+-        let git = open_git_snapshots(repo.subdir()).unwrap();
+-        let (paths, bytes) = captured_inputs();
++        let before = repo.capture_fixture_state();
++        let git = open_git_snapshots(repo.get_subdir()).unwrap();
++        let (paths, bytes) = build_captured_inputs();
+         let mut files: Vec<_> = paths
+             .iter()
+             .zip(bytes)
+@@ -81,14 +87,14 @@
+             .collect();
+         files.reverse();
+         let reordered = git.create_tree(&files).unwrap();
+-        let after = repo.head_index_config_and_live_snapshot();
++        let after = repo.capture_fixture_state();
+         // Assert
+         for (actual, expected) in captured.iter().zip(bytes) {
+             assert_eq!(actual, expected);
+         }
+         assert_eq!(reordered, first);
+         assert_eq!(after, before);
+-        assert!(!repo.root().join("FILTER_RAN").exists());
++        assert!(!repo.get_root().join("FILTER_RAN").exists());
+ 
+         // Arrange: mutate and remove live files after capturing their bytes.
+         repo.change_and_delete_live_files("live.md");
+@@ -101,7 +107,8 @@
+             }])
+             .unwrap();
+         let after_new_tree = git.read_blob(&first, &paths[0]).unwrap();
+-        let listing = repo.ok(&["ls-tree", "-rz", "--name-only", first.as_str()], None);
++        let listing =
++            repo.run_git_successfully(&["ls-tree", "-rz", "--name-only", first.as_str()], None);
+         // Assert
+         assert_eq!(after_live_change, bytes[0]);
+         assert_ne!(first, second);
+@@ -118,7 +125,7 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let git = open_git_snapshots(repo.subdir()).unwrap();
++        let git = open_git_snapshots(repo.get_subdir()).unwrap();
+         let paths = [
+             "dir/a:b",
+             "-name",
+@@ -126,7 +133,7 @@
+             "$(touch SENTINEL).md",
+             "space dir/a b",
+         ]
+-        .map(path);
++        .map(parse_path);
+         let files: Vec<_> = paths
+             .iter()
+             .map(|p| SnapshotFile {
+@@ -144,8 +151,8 @@
+         for bytes in captured {
+             assert_eq!(bytes, b"literal");
+         }
+-        assert!(!repo.root().join("SENTINEL").exists());
+-        assert!(!repo.subdir().join("SENTINEL").exists());
++        assert!(!repo.get_root().join("SENTINEL").exists());
++        assert!(!repo.get_subdir().join("SENTINEL").exists());
+     }
+ }
+ 
+@@ -154,10 +161,10 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let git = open_git_snapshots(repo.root()).unwrap();
++        let git = open_git_snapshots(repo.get_root()).unwrap();
+         // Act
+         let empty = git.create_tree(&[]).unwrap();
+-        let listing = repo.ok(&["ls-tree", empty.as_str()], None);
++        let listing = repo.run_git_successfully(&["ls-tree", empty.as_str()], None);
+         // Assert
+         assert!(listing.is_empty());
+ 
+@@ -169,7 +176,7 @@
+             vec!["dir/.git/x"],
+             vec![".letopis/x"],
+         ] {
+-            let paths: Vec<_> = names.into_iter().map(path).collect();
++            let paths: Vec<_> = names.into_iter().map(parse_path).collect();
+             let files: Vec<_> = paths
+                 .iter()
+                 .map(|p| SnapshotFile {
+@@ -177,20 +184,20 @@
+                     bytes: b"UNIQUE_INVALID_CANARY",
+                 })
+                 .collect();
+-            let before = repo.ok(&["count-objects", "-v"], None);
++            let before = repo.run_git_successfully(&["count-objects", "-v"], None);
+             // Act
+             let error = git.create_tree(&files).unwrap_err();
+-            let after = repo.ok(&["count-objects", "-v"], None);
++            let after = repo.run_git_successfully(&["count-objects", "-v"], None);
+             // Assert
+-            assert_eq!(error.kind(), SnapshotErrorKind::InvalidRequest);
++            assert_eq!(error.get_kind(), SnapshotErrorKind::InvalidRequest);
+             assert!(!format!("{error:?} {error}").contains("CANARY"));
+             assert_eq!(before, after, "invalid input must not write objects");
+         }
+     }
+ }
+ 
+-fn tree_error_cases(repo: &TempRepo, empty: &TreeOid) -> Vec<(TreeOid, SnapshotErrorKind)> {
+-    let commit = repo.oid(&["rev-parse", "HEAD"], None);
++fn build_tree_error_cases(repo: &TempRepo, empty: &TreeOid) -> Vec<(TreeOid, SnapshotErrorKind)> {
++    let commit = repo.read_oid(&["rev-parse", "HEAD"], None);
+     let wrong_length = match commit.len() {
+         40 => 64,
+         64 => 40,
+@@ -199,41 +206,41 @@
+     let tag_body = format!(
+         "object {commit}\ntype commit\ntag fixture\ntagger Fixture <fixture@example.invalid> 1 +0000\n\nfixture\n"
+     );
+-    let tag = repo.oid(
++    let tag = repo.read_oid(
+         &["hash-object", "-w", "-t", TAG_KIND, "--stdin"],
+         Some(tag_body.as_bytes()),
+     );
+     let missing = "1".repeat(commit.len());
+     vec![
+         (
+-            oid(&"0".repeat(wrong_length)),
++            parse_tree_oid(&"0".repeat(wrong_length)),
+             SnapshotErrorKind::InvalidRequest,
+         ),
+-        (oid(&commit), SnapshotErrorKind::InvalidRequest),
+-        (oid(&tag), SnapshotErrorKind::InvalidRequest),
+-        (oid(&missing), SnapshotErrorKind::NotFound),
++        (parse_tree_oid(&commit), SnapshotErrorKind::InvalidRequest),
++        (parse_tree_oid(&tag), SnapshotErrorKind::InvalidRequest),
++        (parse_tree_oid(&missing), SnapshotErrorKind::NotFound),
+         (empty.clone(), SnapshotErrorKind::NotFound),
+         (
+-            external_tree(repo, REGULAR_FILE_MODE, BLOB_KIND, &missing, "leaf"),
++            create_external_tree(repo, REGULAR_FILE_MODE, BLOB_KIND, &missing, "leaf"),
+             SnapshotErrorKind::InternalError,
+         ),
+         (
+-            external_tree(repo, TREE_MODE, TREE_KIND, empty.as_str(), "leaf"),
++            create_external_tree(repo, TREE_MODE, TREE_KIND, empty.as_str(), "leaf"),
+             SnapshotErrorKind::InvalidRequest,
+         ),
+         (
+-            external_tree(repo, GITLINK_MODE, COMMIT_KIND, &commit, "leaf"),
++            create_external_tree(repo, GITLINK_MODE, COMMIT_KIND, &commit, "leaf"),
+             SnapshotErrorKind::InvalidRequest,
+         ),
+     ]
+ }
+-fn corrupted_blob_tree(repo: &TempRepo) -> TreeOid {
+-    let blob = repo.oid(&["hash-object", "-w", "--stdin"], Some(b"valid expected"));
+-    let other = repo.oid(
++fn create_corrupted_blob_tree(repo: &TempRepo) -> TreeOid {
++    let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"valid expected"));
++    let other = repo.read_oid(
+         &["hash-object", "-w", "--stdin"],
+         Some(b"different CORRUPT_CANARY bytes"),
+     );
+-    let tree = external_tree(repo, REGULAR_FILE_MODE, BLOB_KIND, &blob, "leaf");
++    let tree = create_external_tree(repo, REGULAR_FILE_MODE, BLOB_KIND, &blob, "leaf");
+     repo.replace_loose_object(&blob, &other);
+     tree
+ }
+@@ -243,21 +250,21 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let git = open_git_snapshots(repo.root()).unwrap();
+-        let leaf = path("leaf");
++        let git = open_git_snapshots(repo.get_root()).unwrap();
++        let leaf = parse_path("leaf");
+         let empty = git.create_tree(&[]).unwrap();
+-        for (tree, expected) in tree_error_cases(&repo, &empty) {
++        for (tree, expected) in build_tree_error_cases(&repo, &empty) {
+             // Act
+             let error = git.read_blob(&tree, &leaf).unwrap_err();
+             // Assert
+-            assert_eq!(error.kind(), expected);
++            assert_eq!(error.get_kind(), expected);
+         }
+         // Arrange
+-        let tree = corrupted_blob_tree(&repo);
++        let tree = create_corrupted_blob_tree(&repo);
+         // Act
+         let error = git.read_blob(&tree, &leaf).unwrap_err();
+         // Assert
+-        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
++        assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+         assert!(!format!("{error} {error:?}").contains("CORRUPT_CANARY"));
+     }
+ }
+@@ -267,8 +274,8 @@
+     // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+-        let git = open_git_snapshots(repo.root()).unwrap();
+-        let p = path("x");
++        let git = open_git_snapshots(repo.get_root()).unwrap();
++        let p = parse_path("x");
+         let original = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+@@ -281,7 +288,7 @@
+                 bytes: b"replacement",
+             }])
+             .unwrap();
+-        repo.ok(&["replace", original.as_str(), replacement.as_str()], None);
++        repo.run_git_successfully(&["replace", original.as_str(), replacement.as_str()], None);
+         // Act
+         let bytes = git.read_blob(&original, &p).unwrap();
+         // Assert
+--- before/tests/markdown_elements.rs
++++ after/tests/markdown_elements.rs
+@@ -3,28 +3,28 @@
+     adapters::markdown::{DiagnosticKind, ParsedElement, parse},
+     domain::RepoPath,
+ };
+-use support::{assert_error, parsed, whole};
++use support::{assert_error, build_whole_file, parse_file};
+ 
+ fn assert_golden_element(parsed: &ParsedElement, want: &serde_json::Value, name: &str) {
+     let got = &parsed.element;
+     assert_eq!(got.id.as_str(), want["id"].as_str().unwrap(), "{name}");
+     assert_eq!(
+-        got.bytes.start() as u64,
++        got.bytes.get_start() as u64,
+         want["start"].as_u64().unwrap(),
+         "{name}"
+     );
+     assert_eq!(
+-        got.bytes.end() as u64,
++        got.bytes.get_end() as u64,
+         want["end"].as_u64().unwrap(),
+         "{name}"
+     );
+     assert_eq!(
+-        got.lines.start(),
++        got.lines.get_start(),
+         want["line_start"].as_u64().unwrap(),
+         "{name}"
+     );
+     assert_eq!(
+-        got.lines.end(),
++        got.lines.get_end(),
+         want["line_end"].as_u64().unwrap(),
+         "{name}"
+     );
+@@ -73,16 +73,16 @@
+         // Act
+         let got = parse(&path, bytes).unwrap().unwrap();
+         // Assert
+-        assert_eq!(got.elements[0].element.bytes.end(), bytes.len());
+-        assert_eq!(got.elements[0].element.lines.end(), 3);
++        assert_eq!(got.elements[0].element.bytes.get_end(), bytes.len());
++        assert_eq!(got.elements[0].element.lines.get_end(), 3);
+     }
+     // Arrange
+     let text = std::str::from_utf8(include_bytes!("fixtures/markdown/unicode.md")).unwrap();
+     // Act
+-    let got = parsed("a.md", text);
+-    // Assert
+-    assert_eq!(got.elements[0].element.bytes.start(), 11);
+-    assert_eq!(got.elements[0].element.lines.start(), 3);
++    let got = parse_file("a.md", text);
++    // Assert
++    assert_eq!(got.elements[0].element.bytes.get_start(), 11);
++    assert_eq!(got.elements[0].element.lines.get_start(), 3);
+ }
+ 
+ #[test]
+@@ -115,7 +115,7 @@
+     // Arrange
+     let text = std::str::from_utf8(include_bytes!("fixtures/markdown/code.md")).unwrap();
+     // Act
+-    let got = parsed("a.md", text);
++    let got = parse_file("a.md", text);
+     // Assert
+     assert_eq!(got.elements.len(), 1);
+     assert!(got.edges.is_empty());
+@@ -214,7 +214,7 @@
+         let text =
+             format!("<!-- letopis: {{\"created_at\":0,\"source_snapshot\":\"{oid}\"}} -->\nX");
+         // Act
+-        let got = parsed("a.markdown", &text);
++        let got = parse_file("a.markdown", &text);
+         // Assert
+         assert_eq!(got.elements[0].element.metadata.created_at, 0);
+         assert_eq!(
+@@ -260,9 +260,9 @@
+         let raw = format!(
+             "{open}\nconst example = `\n<!-- letopis: {{\"created_at\":2}} -->\n`;\n{close}\n"
+         );
+-        let marked = whole(&format!("\n{raw}"));
+-        // Act
+-        let got = parsed("a.md", &marked);
++        let marked = build_whole_file(&format!("\n{raw}"));
++        // Act
++        let got = parse_file("a.md", &marked);
+         let unmarked = parse(&path, raw.as_bytes());
+         // Assert
+         assert_eq!(got.elements.len(), 1, "{open}");
+--- before/tests/markdown_links.rs
++++ after/tests/markdown_links.rs
+@@ -1,33 +1,33 @@
+ mod support;
+ use letopis::{
+     adapters::markdown::{DiagnosticKind, parse},
+-    domain::{EdgeTarget, ElementKind, RepoPath, kind_for},
++    domain::{EdgeTarget, ElementKind, RepoPath, derive_element_kind},
+ };
+-use support::{assert_error, parsed, whole};
++use support::{assert_error, build_whole_file, parse_file};
+ 
+ #[test]
+ fn only_inline_links_declare_edges() {
+     // Arrange
+-    let s = whole(
++    let s = build_whole_file(
+         "[a](b.md \"letopis:type=includes\") [same](b.md \"letopis:type=includes\") [different](b.md \"letopis:type=depends_on\")\n![image](z.md \"letopis:type=includes\") [ref][r] [r][] [r] <https://example.com> [nav](https://example.com \"ordinary\")\n\n[r]: z.md \"letopis:type=includes\"\n",
+     );
+     // Act
+-    let got = parsed("a.md", &s);
++    let got = parse_file("a.md", &s);
+     let triples: Vec<_> = got
+         .edges
+         .iter()
+         .map(|e| {
+             (
+-                e.source().as_str(),
+-                e.target().as_str(),
+-                e.edge_type().as_str(),
++                e.get_source().as_str(),
++                e.get_target().as_str(),
++                e.get_edge_type().as_str(),
+             )
+         })
+         .collect();
+     // Assert
+     assert_eq!(got.edges.len(), 2);
+     assert_eq!(
+-        kind_for(&got.elements[0].element.id, &got.edges),
++        derive_element_kind(&got.elements[0].element.id, &got.edges),
+         ElementKind::Metavertex
+     );
+     assert_eq!(
+@@ -39,20 +39,20 @@
+ #[test]
+ fn sources_are_normalized_without_loading_destinations() {
+     // Arrange
+-    let text = &whole(
++    let text = &build_whole_file(
+         "[code](./src/../src/a.rs#L010-L025 \"letopis:type=external\") [missing](knowledge/missing.md#x \"letopis:type=depends_on\")",
+     );
+     // Act
+-    let got = parsed("knowledge/a.md", text);
++    let got = parse_file("knowledge/a.md", text);
+     // Assert
+     assert_eq!(got.edges.len(), 2);
+     assert!(
+-        got.edges
+-            .iter()
+-            .any(|e| matches!(e.target(),EdgeTarget::Source(s) if s.as_str()=="src/a.rs#L10-L25"))
++        got.edges.iter().any(
++            |e| matches!(e.get_target(),EdgeTarget::Source(s) if s.as_str()=="src/a.rs#L10-L25")
++        )
+     );
+     assert!(got.edges.iter().any(
+-        |e| matches!(e.target(),EdgeTarget::Knowledge(k) if k.as_str()=="knowledge/missing.md#x")
++        |e| matches!(e.get_target(),EdgeTarget::Knowledge(k) if k.as_str()=="knowledge/missing.md#x")
+     ));
+     assert!(got.elements[0].element.metadata.source_snapshot.is_none());
+ }
+@@ -67,7 +67,7 @@
+         "letopis:type=good;extra",
+         "letopis:other=x",
+     ] {
+-        let text = whole(&format!("[x](b.md \"{title}\")"));
++        let text = build_whole_file(&format!("[x](b.md \"{title}\")"));
+         // Act
+         let result = parse(&path, text.as_bytes());
+         // Assert
+@@ -82,14 +82,14 @@
+         ("x.rs#L2-L1", "external"),
+         ("x.rs#anchor", "external"),
+     ] {
+-        let text = whole(&format!("[x]({target} \"letopis:type={kind}\")"));
++        let text = build_whole_file(&format!("[x]({target} \"letopis:type={kind}\")"));
+         // Act
+         let result = parse(&path, text.as_bytes());
+         // Assert
+         assert_error(result, DiagnosticKind::InvalidTarget);
+     }
+     // Arrange
+-    let text = whole("[x](./knowledge/a.md \"letopis:type=depends_on\")");
++    let text = build_whole_file("[x](./knowledge/a.md \"letopis:type=depends_on\")");
+     // Act
+     let result = parse(&path, text.as_bytes());
+     // Assert
+@@ -101,18 +101,18 @@
+     // Arrange
+     let text = "[outside](../escape.md \"letopis:type=BAD\")\n\n## A {#a}\n<!-- letopis: {\"created_at\":1} -->\n[ok](b.md \"letopis:type=includes\")\n\n## End\n[x](b.md \"letopis:type=other\")\n";
+     // Act
+-    let got = parsed("a.md", text);
++    let got = parse_file("a.md", text);
+     // Assert
+     assert_eq!(got.edges.len(), 1);
+-    assert_eq!(got.edges.first().unwrap().source().as_str(), "a.md#a");
++    assert_eq!(got.edges.first().unwrap().get_source().as_str(), "a.md#a");
+ }
+ 
+ #[test]
+ fn image_alt_links_do_not_declare_edges() {
+     // Arrange
+-    let text = &whole("![see [target](b.md \"letopis:type=includes\")](img.png)\n");
++    let text = &build_whole_file("![see [target](b.md \"letopis:type=includes\")](img.png)\n");
+     // Act
+-    let got = parsed("a.md", text);
++    let got = parse_file("a.md", text);
+     // Assert
+     assert_eq!(got.elements[0].search_text, "see target");
+     assert!(
+@@ -121,7 +121,7 @@
+         got.edges
+     );
+     assert_eq!(
+-        kind_for(&got.elements[0].element.id, &got.edges),
++        derive_element_kind(&got.elements[0].element.id, &got.edges),
+         ElementKind::Vertex
+     );
+ }
+@@ -129,11 +129,11 @@
+ #[test]
+ fn links_wrapping_images_still_declare_edges() {
+     // Arrange
+-    let text = &whole("[![alt](img.png)](b.md \"letopis:type=includes\")");
++    let text = &build_whole_file("[![alt](img.png)](b.md \"letopis:type=includes\")");
+     // Act
+-    let got = parsed("a.md", text);
++    let got = parse_file("a.md", text);
+     // Assert
+     assert_eq!(got.edges.len(), 1);
+-    assert_eq!(got.edges.first().unwrap().target().as_str(), "b.md");
++    assert_eq!(got.edges.first().unwrap().get_target().as_str(), "b.md");
+     assert_eq!(got.elements[0].search_text, "alt");
+ }
+--- before/tests/markdown_search.rs
++++ after/tests/markdown_search.rs
+@@ -1,6 +1,6 @@
+ mod support;
+ use letopis::{adapters::markdown::parse, domain::RepoPath};
+-use support::{parsed, whole};
++use support::{build_whole_file, parse_file};
+ 
+ #[test]
+ fn golden_search_representations() {
+@@ -32,7 +32,7 @@
+     }
+ }
+ 
+-fn note(anchor: &str, created: u64, snapshot: &str, target: &str, kind: &str) -> String {
++fn build_note(anchor: &str, created: u64, snapshot: &str, target: &str, kind: &str) -> String {
+     format!(
+         "## WAL {{#{anchor}}}\n<!-- letopis: {{\"created_at\":{created},\"source_snapshot\":\"{snapshot}\"}} -->\nUse **safe** [SQLite]({target} \"letopis:type={kind}\").\n"
+     )
+@@ -43,22 +43,22 @@
+     let oid = "a".repeat(40);
+     let other = "b".repeat(40);
+     // Act: establish the baseline projection.
+-    let base = parsed(
++    let base = parse_file(
+         "a.md",
+-        &note("wal", 0, &oid, "knowledge/db.md", "depends_on"),
++        &build_note("wal", 0, &oid, "knowledge/db.md", "depends_on"),
+     );
+     // Assert
+     assert_eq!(base.elements[0].search_text, "WAL\nUse safe SQLite.");
+     // Arrange: change one metadata/link field per case.
+     for changed in [
+-        note("wal", 1, &oid, "knowledge/db.md", "depends_on"),
+-        note("wal", 0, &other, "knowledge/db.md", "depends_on"),
+-        note("wal", 0, &oid, "knowledge/other.md", "depends_on"),
+-        note("wal", 0, &oid, "knowledge/db.md", "includes"),
+-        note("new", 0, &oid, "knowledge/db.md", "depends_on"),
++        build_note("wal", 1, &oid, "knowledge/db.md", "depends_on"),
++        build_note("wal", 0, &other, "knowledge/db.md", "depends_on"),
++        build_note("wal", 0, &oid, "knowledge/other.md", "depends_on"),
++        build_note("wal", 0, &oid, "knowledge/db.md", "includes"),
++        build_note("new", 0, &oid, "knowledge/db.md", "depends_on"),
+     ] {
+         // Act
+-        let next = parsed("a.md", &changed);
++        let next = parse_file("a.md", &changed);
+         // Assert
+         assert_ne!(base.elements[0].element.hash, next.elements[0].element.hash);
+         assert_eq!(base.elements[0].search_text, next.elements[0].search_text);
+@@ -69,9 +69,10 @@
+ #[test]
+ fn own_text_label_and_code_change_search_hash() {
+     // Arrange
+-    let original =
+-        whole("Own text [Label](b.md \"letopis:type=depends_on\").\n\n```rs\nlet a = 1;\n```\n");
+-    let base = parsed("a.md", &original);
++    let original = build_whole_file(
++        "Own text [Label](b.md \"letopis:type=depends_on\").\n\n```rs\nlet a = 1;\n```\n",
++    );
++    let base = parse_file("a.md", &original);
+     // Fixture baseline supplies the expected search hash.
+     for changed in [
+         original.replace("Own text", "New text"),
+@@ -79,7 +80,7 @@
+         original.replace("a = 1", "a = 2"),
+     ] {
+         // Act
+-        let next = parsed("a.md", &changed);
++        let next = parse_file("a.md", &changed);
+         // Assert
+         assert_ne!(base.elements[0].search_hash, next.elements[0].search_hash);
+     }
+@@ -88,10 +89,10 @@
+ #[test]
+ fn moving_path_preserves_text_hashes() {
+     // Arrange
+-    let text = whole("Stable text.");
++    let text = build_whole_file("Stable text.");
+     // Act
+-    let a = parsed("a.md", &text);
+-    let b = parsed("b.md", &text);
++    let a = parse_file("a.md", &text);
++    let b = parse_file("b.md", &text);
+     // Assert
+     assert_ne!(a.elements[0].element.id, b.elements[0].element.id);
+     assert_eq!(a.elements[0].element.hash, b.elements[0].element.hash);
+@@ -104,7 +105,7 @@
+     // Arrange
+     let source = std::str::from_utf8(include_bytes!("fixtures/markdown/code.md")).unwrap();
+     // Act
+-    let got = parsed("a.md", source);
++    let got = parse_file("a.md", source);
+     // Assert
+     let text = &got.elements[0].search_text;
+     assert!(text.contains("<!-- letopis: {\"created_at\":8} -->"));
+@@ -118,7 +119,7 @@
+     // Arrange
+     let source = std::str::from_utf8(include_bytes!("fixtures/markdown/references.md")).unwrap();
+     // Act
+-    let got = parsed("a.md", source);
++    let got = parse_file("a.md", source);
+     // Assert
+     assert_eq!(got.elements[0].search_text, "Note\nShown");
+     assert!(got.edges.is_empty());
+@@ -137,9 +138,9 @@
+         ("A &amp; B", "A & B"),
+         ("- one\n- two", "one\ntwo"),
+     ] {
+-        let text = whole(body);
++        let text = build_whole_file(body);
+         // Act
+-        let got = parsed("a.md", &text);
++        let got = parse_file("a.md", &text);
+         // Assert
+         assert_eq!(got.elements[0].search_text, want, "{body}");
+     }
+@@ -151,8 +152,8 @@
+     let lf = "## A {#a}\n<!-- letopis: {\"created_at\":7} -->\nHi\n";
+     let crlf = lf.replace('\n', "\r\n");
+     // Act
+-    let a = parsed("a.md", lf);
+-    let b = parsed("a.md", &crlf);
++    let a = parse_file("a.md", lf);
++    let b = parse_file("a.md", &crlf);
+     // Assert
+     assert_eq!(b.elements[0].search_text, "A\nHi");
+     assert_eq!(a.elements[0].search_hash, b.elements[0].search_hash);
+--- before/tests/support/git.rs
++++ after/tests/support/git.rs
+@@ -15,7 +15,7 @@
+     Sha256,
+ }
+ impl ObjectFormat {
+-    pub fn init_arg(self) -> &'static str {
++    pub fn to_init_arg(self) -> &'static str {
+         match self {
+             Self::Sha1 => "--object-format=sha1",
+             Self::Sha256 => "--object-format=sha256",
+@@ -43,7 +43,7 @@
+     refs: Vec<u8>,
+     live: Vec<(String, Vec<u8>)>,
+ }
+-pub fn isolated(command: &mut Command) {
++pub fn isolate_command(command: &mut Command) {
+     for (k, _) in env::vars_os() {
+         if k.to_string_lossy().starts_with("GIT_") {
+             command.env_remove(k);
+@@ -66,21 +66,21 @@
+         let root = fs::canonicalize(root).unwrap();
+         let subdir = root.join("subdir");
+         let repo = Self { root, subdir };
+-        repo.ok(&["init", "-q", format.init_arg()], None);
+-        repo.ok(&["config", "user.name", "Fixture"], None);
+-        repo.ok(&["config", "user.email", "fixture@example.invalid"], None);
+-        fs::create_dir(repo.subdir()).unwrap();
++        repo.run_git_successfully(&["init", "-q", format.to_init_arg()], None);
++        repo.run_git_successfully(&["config", "user.name", "Fixture"], None);
++        repo.run_git_successfully(&["config", "user.email", "fixture@example.invalid"], None);
++        fs::create_dir(repo.get_subdir()).unwrap();
+         fs::write(repo.root.join("live.md"), b"original live\n").unwrap();
+-        repo.ok(&["add", "live.md"], None);
+-        repo.ok(&["commit", "-qm", "fixture"], None);
++        repo.run_git_successfully(&["add", "live.md"], None);
++        repo.run_git_successfully(&["commit", "-qm", "fixture"], None);
+         fs::write(repo.root.join("live.md"), b"staged live\n").unwrap();
+-        repo.ok(&["add", "live.md"], None);
++        repo.run_git_successfully(&["add", "live.md"], None);
+         fs::write(repo.root.join("live.md"), b"unstaged live\n").unwrap();
+         repo
+     }
+-    pub fn shared_clone(&self) -> Self {
++    pub fn create_shared_clone(&self) -> Self {
+         let root = self.root.join("BORROWER_PATH_CANARY");
+-        self.ok(
++        self.run_git_successfully(
+             &[
+                 "clone",
+                 "-q",
+@@ -94,15 +94,15 @@
+         fs::create_dir(&subdir).unwrap();
+         Self { root, subdir }
+     }
+-    pub fn root(&self) -> &Path {
++    pub fn get_root(&self) -> &Path {
+         &self.root
+     }
+-    pub fn subdir(&self) -> &Path {
++    pub fn get_subdir(&self) -> &Path {
+         &self.subdir
+     }
+-    pub fn git(&self, args: &[&str], input: Option<&[u8]>) -> Output {
++    pub fn run_git(&self, args: &[&str], input: Option<&[u8]>) -> Output {
+         let mut c = Command::new("git");
+-        isolated(&mut c);
++        isolate_command(&mut c);
+         c.current_dir(&self.root)
+             .args(args)
+             .stdin(Stdio::piped())
+@@ -121,8 +121,8 @@
+             output
+         })
+     }
+-    pub fn ok(&self, args: &[&str], input: Option<&[u8]>) -> Vec<u8> {
+-        let out = self.git(args, input);
++    pub fn run_git_successfully(&self, args: &[&str], input: Option<&[u8]>) -> Vec<u8> {
++        let out = self.run_git(args, input);
+         assert!(
+             out.status.success(),
+             "fixture Git {args:?}: {}",
+@@ -130,19 +130,19 @@
+         );
+         out.stdout
+     }
+-    pub fn oid(&self, args: &[&str], input: Option<&[u8]>) -> String {
+-        String::from_utf8(self.ok(args, input))
++    pub fn read_oid(&self, args: &[&str], input: Option<&[u8]>) -> String {
++        String::from_utf8(self.run_git_successfully(args, input))
+             .unwrap()
+             .trim()
+             .to_owned()
+     }
+-    pub fn head_index_config_and_live_snapshot(&self) -> FixtureState {
++    pub fn capture_fixture_state(&self) -> FixtureState {
+         FixtureState {
+             head: fs::read(self.root.join(".git/HEAD")).unwrap(),
+             index: fs::read(self.root.join(".git/index")).unwrap(),
+             config: fs::read(self.root.join(".git/config")).unwrap(),
+             refs: self
+-                .ok(&["for-each-ref", "--format=%(refname) %(objectname)"], None)
++                .run_git_successfully(&["for-each-ref", "--format=%(refname) %(objectname)"], None)
+                 .split_inclusive(|b| *b == b'\n')
+                 .filter(|line| !line.starts_with(SNAPSHOT_REF_PREFIX.as_bytes()))
+                 .flatten()
+@@ -160,28 +160,29 @@
+             fs::remove_file(self.root.join(path)).unwrap();
+         }
+     }
+-    pub fn direct_ref(&self, oid: &str) -> String {
+-        self.oid(&["rev-parse", &format!("{SNAPSHOT_REF_PREFIX}{oid}")], None)
+-    }
+-    pub fn object_path(&self, oid: &str) -> PathBuf {
++    pub fn read_direct_ref(&self, oid: &str) -> String {
++        self.read_oid(&["rev-parse", &format!("{SNAPSHOT_REF_PREFIX}{oid}")], None)
++    }
++    pub fn build_object_path(&self, oid: &str) -> PathBuf {
+         self.root
+             .join(format!(".git/objects/{}/{}", &oid[..2], &oid[2..]))
+     }
+     pub fn replace_loose_object(&self, expected: &str, replacement: &str) {
+-        let destination = self.object_path(expected);
++        let destination = self.build_object_path(expected);
+         fs::remove_file(&destination).unwrap();
+-        fs::copy(self.object_path(replacement), destination).unwrap();
++        fs::copy(self.build_object_path(replacement), destination).unwrap();
+     }
+     pub fn expire_reflogs_gc_prune_now_and_pack_refs(&self) {
+-        self.ok(&["reflog", "expire", "--expire=now", "--all"], None);
+-        self.ok(&["gc", "--prune=now"], None);
+-        self.ok(&["prune", "--expire=now"], None);
+-        self.ok(&["pack-refs", "--all"], None);
+-    }
+-    pub fn fsck_strict_no_reflogs(&self) -> ExitStatus {
+-        self.git(&["fsck", "--strict", "--no-reflogs"], None).status
+-    }
+-    pub fn script(&self, name: &str, text: &str) -> PathBuf {
++        self.run_git_successfully(&["reflog", "expire", "--expire=now", "--all"], None);
++        self.run_git_successfully(&["gc", "--prune=now"], None);
++        self.run_git_successfully(&["prune", "--expire=now"], None);
++        self.run_git_successfully(&["pack-refs", "--all"], None);
++    }
++    pub fn run_fsck_strict_no_reflogs(&self) -> ExitStatus {
++        self.run_git(&["fsck", "--strict", "--no-reflogs"], None)
++            .status
++    }
++    pub fn write_script(&self, name: &str, text: &str) -> PathBuf {
+         use std::os::unix::fs::PermissionsExt;
+         let path = self.root.join(name);
+         fs::write(&path, text).unwrap();
+@@ -220,7 +221,7 @@
+         }
+     }
+ }
+-pub fn supervised_test(name: &str, envs: &[(&str, &str)]) {
++pub fn supervise_test(name: &str, envs: &[(&str, &str)]) {
+     let mut c = Command::new(env::current_exe().unwrap());
+     c.args(["--exact", name, "--nocapture"])
+         .envs(envs.iter().copied())
+--- before/tests/support/mod.rs
++++ after/tests/support/mod.rs
+@@ -3,12 +3,12 @@
+     adapters::markdown::{Diagnostic, DiagnosticKind, ParsedFile, parse},
+     domain::RepoPath,
+ };
+-pub fn parsed(path: &str, s: &str) -> ParsedFile {
++pub fn parse_file(path: &str, s: &str) -> ParsedFile {
+     parse(&RepoPath::parse(path).unwrap(), s.as_bytes())
+         .unwrap()
+         .unwrap()
+ }
+-pub fn whole(body: &str) -> String {
++pub fn build_whole_file(body: &str) -> String {
+     format!("<!-- letopis: {{\"created_at\":1}} -->\n{body}")
+ }
+ pub fn assert_error(result: Result<Option<ParsedFile>, Vec<Diagnostic>>, want: DiagnosticKind) {
+--- before/AGENTS.md
++++ after/AGENTS.md
+@@ -28,6 +28,7 @@
+ 
+ - Follow the pinned toolchain in `rust-toolchain.toml` and lint policy in `Cargo.toml`; [development guide](docs/development.md) explains the checks.
+ - Import types with `use` instead of repeating long `crate::...` paths at call sites. Write enum variants through the imported type, for example `SnapshotErrorKind::InternalError`. Prefer explicit imports over wildcard imports.
++- Name custom functions and methods with verbs or verb forms describing their action: `read_entries`, `build_command`, `verify_object`, `get_kind`, `is_empty`, `has_exact_ref`. Use `get_` for custom accessors rather than bare nouns. Keep established Rust constructor/conversion forms (`new`, `new_with_cause`, `as_str`, `to_hex`, `into_inner`) and names required by implemented traits (`fmt`, `source`, `drop`). Apply the rule to test helpers; test names describe the behavior being verified.
+ - Replace meaningful repeated domain/protocol literals with clearly named constants near their owning module; use SCREAMING_SNAKE_CASE. Do not replace literals mechanically or collect unrelated constants in a global bag.
+ - Keep functions and methods focused: aim for about 40 lines, with 60 lines as the upper limit. Split longer implementations into cohesive named helpers, not arbitrary wrappers or compressed formatting. Apply the same rule to tests and test helpers.
+ - Use ownership and borrowing deliberately; add cloning, shared ownership, locks, or dynamic dispatch only for an actual need.
+--- before/docs/development.md
++++ after/docs/development.md
+@@ -41,3 +41,7 @@
+ Тесты оформлять по Arrange / Act / Assert: подготовка данных, вызов проверяемого поведения, проверка результата. Для последовательных сценариев повторять этапы; проверку корректности fixture явно отличать от проверяемого поведения. Варианты таблицы проходят те же этапы внутри цикла. Сохранять независимость тестов, изоляцию изменяемого состояния и existing failure-path assertions.
+ 
+ Значимые повторяющиеся значения протокола/предметной области выносить в именованные константы SCREAMING_SNAKE_CASE рядом с владельцем. Например, строковые Git object kinds, object modes, длины OID и snapshot ref prefix. Не заменять каждый литерал механически и не создавать общий набор несвязанных constants.
++
++## Имена функций и методов
++
++Имена пользовательских функций и методов должны быть глаголами или глагольными формами, описывающими действие: `read_entries`, `build_command`, `verify_object`, `get_kind`. Для собственных accessors использовать `get_`, для предикатов — `is_` / `has_` или другой ясный глагол. Сохранять общепринятые Rust-формы конструкторов и преобразований (`new`, `new_with_cause`, `as_str`, `to_hex`, `into_inner`) и имена, заданные реализуемым trait (`fmt`, `source`, `drop`). Правило действует и для тестовых helpers; имена самих тестов описывают проверяемое поведение.

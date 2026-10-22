@@ -36,7 +36,7 @@ pub(super) fn collect(
         };
         let Some(element) = elements
             .iter()
-            .find(|e| range.start >= e.bytes.start() && range.end <= e.bytes.end())
+            .find(|e| range.start >= e.bytes.get_start() && range.end <= e.bytes.get_end())
         else {
             continue;
         };
@@ -46,15 +46,15 @@ pub(super) fn collect(
         let edge_type = title
             .strip_prefix("letopis:type=")
             .and_then(|s| EdgeType::parse(s).ok())
-            .ok_or_else(|| Diagnostic::at(DiagnosticKind::InvalidLinkTitle, range.clone()))?;
+            .ok_or_else(|| Diagnostic::new_at(DiagnosticKind::InvalidLinkTitle, range.clone()))?;
         let target = if edge_type.as_str() == "external" {
             SourceUri::parse(dest_url).map(EdgeTarget::Source)
         } else {
             KnowledgeId::parse(dest_url).map(EdgeTarget::Knowledge)
         }
-        .map_err(|_| Diagnostic::at(DiagnosticKind::InvalidTarget, range.clone()))?;
+        .map_err(|_| Diagnostic::new_at(DiagnosticKind::InvalidTarget, range.clone()))?;
         let edge = Edge::new(element.id.clone(), target, edge_type).map_err(|e| {
-            Diagnostic::at(
+            Diagnostic::new_at(
                 if e == ValueError::SelfLoop {
                     DiagnosticKind::SelfLoop
                 } else {

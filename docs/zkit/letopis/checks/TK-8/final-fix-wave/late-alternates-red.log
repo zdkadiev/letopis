@@ -1,0 +1,18 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/git_retention.rs (target/debug/deps/git_retention-d70be889e54ec0fc)
+
+running 1 test
+
+thread 'alternates_added_after_open_refuse_operations_without_writes' (15430603) panicked at tests/git_retention.rs:417:44:
+alternates introduced after open must be refused
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test alternates_added_after_open_refuse_operations_without_writes ... FAILED
+
+failures:
+
+failures:
+    alternates_added_after_open_refuse_operations_without_writes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.54s
+
+error: test failed, to rerun pass `--test git_retention`

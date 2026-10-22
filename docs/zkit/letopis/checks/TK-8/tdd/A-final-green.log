@@ -1,0 +1,14 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running unittests src/lib.rs (target/debug/deps/letopis-3048ed1b85800ea9)
+
+running 6 tests
+test adapters::git::tests::version_gate ... ok
+test adapters::git::tests::open_rejects_non_repository_and_bare ... ok
+test adapters::git::tests::process_removes_inherited_overrides_and_hardens_writes ... ok
+test adapters::git::tests::discovers_root_from_subdirectory ... ok
+test adapters::git::tests::subprocess_drains_and_reaps_on_io_failure ... ok
+test adapters::git::tests::open_rejects_old_git_before_object_calls ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+

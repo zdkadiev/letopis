@@ -1,0 +1,81 @@
+#0 building with "avito" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 839B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#2 DONE 0.4s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 414B done
+#3 DONE 0.0s
+
+#4 [ 1/10] FROM docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#4 resolve docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1 done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 12.34kB done
+#5 DONE 0.0s
+
+#6 [ 2/10] RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+#6 CACHED
+
+#7 [ 3/10] RUN rustup component add rustfmt clippy
+#7 CACHED
+
+#8 [ 4/10] WORKDIR /repo
+#8 CACHED
+
+#9 [ 5/10] COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+#9 CACHED
+
+#10 [ 6/10] COPY src ./src
+#10 DONE 0.0s
+
+#11 [ 7/10] COPY tests/domain_values.rs tests/markdown_elements.rs tests/markdown_links.rs tests/markdown_search.rs tests/git_snapshots.rs tests/git_retention.rs ./tests/
+#11 DONE 0.0s
+
+#12 [ 8/10] COPY tests/support ./tests/support
+#12 DONE 0.0s
+
+#13 [ 9/10] COPY tests/fixtures/markdown ./tests/fixtures/markdown
+#13 DONE 0.0s
+
+#14 [10/10] RUN cargo fetch --locked
+#14 0.099     Updating crates.io index
+#14 1.040  Downloading crates ...
+#14 1.323   Downloaded version_check v0.9.5
+#14 1.390   Downloaded block-buffer v0.10.4
+#14 1.399   Downloaded itoa v1.0.18
+#14 1.403   Downloaded cpufeatures v0.2.17
+#14 1.409   Downloaded sha2 v0.10.9
+#14 1.438   Downloaded cfg-if v1.0.5
+#14 1.440   Downloaded crypto-common v0.1.7
+#14 1.449   Downloaded quote v1.0.47
+#14 1.455   Downloaded generic-array v0.14.7
+#14 1.458   Downloaded unicase v2.10.0
+#14 1.460   Downloaded digest v0.10.7
+#14 1.488   Downloaded bitflags v2.13.2
+#14 1.499   Downloaded serde_core v1.0.228
+#14 1.502   Downloaded proc-macro2 v1.0.107
+#14 1.505   Downloaded ryu v1.0.23
+#14 1.508   Downloaded unicode-ident v1.0.27
+#14 1.511   Downloaded serde_derive v1.0.228
+#14 1.516   Downloaded serde v1.0.228
+#14 1.520   Downloaded memchr v2.8.3
+#14 1.524   Downloaded typenum v1.20.1
+#14 1.537   Downloaded pulldown-cmark v0.13.4
+#14 1.542   Downloaded serde_json v1.0.145
+#14 1.547   Downloaded syn v2.0.119
+#14 1.569   Downloaded libc v0.2.191
+#14 DONE 1.6s
+
+#15 exporting to image
+#15 exporting layers 0.1s done
+#15 writing image sha256:5df3cfade229b5a574a2c6efd9f65a1d1a9d8d94c746b12f2f3ed6f08fdf29d9 done
+#15 naming to docker.io/library/letopis-tk8-check done
+#15 DONE 0.1s
+
+View build details: docker-desktop://dashboard/build/avito/avito/n590p282szxbbxpcpozsdx0zq

@@ -1,0 +1,3583 @@
+Review baseline: pre-refactor working-copy snapshot; prior user edits are included in baseline.
+Files changed:
+.dockerignore
+src/adapters/git/constants.rs
+src/adapters/git/mod.rs
+src/adapters/git/objects.rs
+src/adapters/git/process.rs
+src/adapters/git/refs.rs
+src/adapters/git/tests.rs
+src/adapters/markdown/scan.rs
+src/domain/mod.rs
+src/domain/value.rs
+tests/domain_values.rs
+tests/git/Dockerfile
+tests/git/README.md
+tests/git_retention.rs
+tests/git_snapshots.rs
+tests/markdown_elements.rs
+tests/markdown_links.rs
+tests/markdown_search.rs
+tests/support/git.rs
+tests/support/mod.rs
+
+--- before/.dockerignore
++++ after/.dockerignore
+@@ -1,15 +1,16 @@
+ **
+ !Cargo.toml
+ !Cargo.lock
++!clippy.toml
+ !rust-toolchain.toml
+ !src/
+ !src/**
+ !tests/
+ !tests/domain_values.rs
+ !tests/markdown_elements.rs
+ !tests/markdown_links.rs
+ !tests/markdown_search.rs
+ !tests/support/
+ !tests/support/**
+ !tests/fixtures/
+ !tests/fixtures/markdown/
+--- before/src/adapters/git/constants.rs
++++ after/src/adapters/git/constants.rs
+@@ -0,0 +1,12 @@
++// Git wire values shared by object parsing, writing, retention and discovery.
++pub(super) const BLOB_KIND: &str = "blob";
++pub(super) const TREE_KIND: &str = "tree";
++pub(super) const COMMIT_KIND: &str = "commit";
++pub(super) const GITLINK_KIND: &str = "gitlink";
++pub(super) const TREE_MODE: &str = "040000";
++pub(super) const REGULAR_FILE_MODE: &str = "100644";
++pub(super) const EXECUTABLE_FILE_MODE: &str = "100755";
++pub(super) const SYMLINK_MODE: &str = "120000";
++pub(super) const GITLINK_MODE: &str = "160000";
++pub(super) const MIN_GIT_VERSION: (u32, u32) = (2, 29);
++pub(super) const SNAPSHOT_REF_PREFIX: &str = "refs/letopis/snapshots/";
+--- before/src/adapters/git/mod.rs
++++ after/src/adapters/git/mod.rs
+@@ -1,19 +1,20 @@
++mod constants;
+ mod objects;
+ mod process;
+ mod refs;
+ #[cfg(test)]
+ mod tests;
+ use crate::{
+-    domain::{RepoPath, TreeOid},
++    domain::{RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN, TreeOid},
+     service::ports::git::{
+         GitSnapshotPort, RetainedTree, SnapshotError, SnapshotErrorKind, SnapshotFile,
+     },
+ };
+ use process::{GitProcess, check_version};
+ use std::{
+     ffi::OsString,
+     fs,
+     io::ErrorKind,
+     path::{Path, PathBuf},
+ };
+ 
+@@ -56,26 +57,26 @@
+         if inside != b"true\n" {
+             return Err(SnapshotError::new(
+                 SnapshotErrorKind::InternalError,
+                 "Git working copy required",
+             ));
+         }
+         let format = process.run(
+             &root,
+             &[OsString::from("rev-parse"), "--show-object-format".into()],
+             None,
+         )?;
+         let oid_len = match format.as_slice() {
+-            b"sha1\n" => 40,
+-            b"sha256\n" => 64,
++            b"sha1\n" => SHA1_OID_HEX_LEN,
++            b"sha256\n" => SHA256_OID_HEX_LEN,
+             _ => {
+                 return Err(SnapshotError::new(
+                     SnapshotErrorKind::InternalError,
+                     "unsupported Git object format",
+                 ));
+             }
+         };
+         let git = Self {
+             root,
+             process,
+             oid_len,
+         };
+--- before/src/adapters/git/objects.rs
++++ after/src/adapters/git/objects.rs
+@@ -1,13 +1,19 @@
+-use super::GitCliAdapter;
++use super::{
++    GitCliAdapter,
++    constants::{
++        BLOB_KIND, COMMIT_KIND, EXECUTABLE_FILE_MODE, GITLINK_KIND, GITLINK_MODE,
++        REGULAR_FILE_MODE, SYMLINK_MODE, TREE_KIND, TREE_MODE,
++    },
++};
+ use crate::{
+     domain::{RepoPath, TreeOid},
+     service::ports::git::{SnapshotError, SnapshotErrorKind, SnapshotFile},
+ };
+ use std::{
+     collections::{BTreeMap, BTreeSet},
+     ffi::OsString,
+ };
+ 
+ pub(super) struct ObjectDb<'a> {
+     pub(super) git: &'a GitCliAdapter,
+ }
+@@ -43,25 +49,25 @@
+         }
+         TreeOid::parse(text).map_err(|_| integrity())
+     }
+     pub(super) fn validate_tree(&self, oid: &TreeOid) -> Result<(), SnapshotError> {
+         if oid.as_str().len() != self.git.oid_len {
+             return Err(SnapshotError::new(
+                 SnapshotErrorKind::InvalidRequest,
+                 "OID does not match repository object format",
+             ));
+         }
+         self.verified(
+             oid.as_str(),
+-            "tree",
++            TREE_KIND,
+             SnapshotErrorKind::NotFound,
+             SnapshotErrorKind::InvalidRequest,
+         )
+         .map(|_| ())
+     }
+     // Check type without peeling, read raw bytes and independently rehash without
+     // writing. A decodable loose object under the wrong OID must never be trusted.
+     pub(super) fn verified(
+         &self,
+         oid: &str,
+         kind: &str,
+         missing: SnapshotErrorKind,
+@@ -89,45 +95,45 @@
+         let actual = self.parse_oid(&self.run(
+             &["hash-object", "-t", kind, "--no-filters", "--stdin"],
+             Some(&bytes),
+         )?)?;
+         if actual.as_str() != oid {
+             return Err(integrity());
+         }
+         Ok(bytes)
+     }
+     pub(super) fn entries(&self, oid: &str) -> Result<Vec<Entry>, SnapshotError> {
+         self.verified(
+             oid,
+-            "tree",
++            TREE_KIND,
+             SnapshotErrorKind::InternalError,
+             SnapshotErrorKind::InternalError,
+         )?;
+         let raw = self.run(&["ls-tree", "-z", oid], None)?;
+         let mut entries = Vec::new();
+         for record in raw.split(|b| *b == 0).filter(|r| !r.is_empty()) {
+             let tab = record
+                 .iter()
+                 .position(|b| *b == b'\t')
+                 .ok_or_else(integrity)?;
+             let head = std::str::from_utf8(&record[..tab]).map_err(|_| integrity())?;
+             let parts: Vec<_> = head.split(' ').collect();
+             if parts.len() != 3 {
+                 return Err(integrity());
+             }
+             self.parse_oid(parts[2].as_bytes())?;
+             let kind = match (parts[0], parts[1]) {
+-                ("040000", "tree") => "tree",
+-                ("100644" | "100755" | "120000", "blob") => "blob",
+-                ("160000", "commit") => "gitlink",
++                (TREE_MODE, TREE_KIND) => TREE_KIND,
++                (REGULAR_FILE_MODE | EXECUTABLE_FILE_MODE | SYMLINK_MODE, BLOB_KIND) => BLOB_KIND,
++                (GITLINK_MODE, COMMIT_KIND) => GITLINK_KIND,
+                 _ => return Err(integrity()),
+             };
+             entries.push(Entry {
+                 kind: kind.into(),
+                 oid: parts[2].into(),
+                 name: record[tab + 1..].to_vec(),
+             });
+         }
+         Ok(entries)
+     }
+     pub(super) fn read_blob(
+         &self,
+@@ -137,38 +143,38 @@
+         self.validate_tree(oid)?;
+         let mut current = oid.as_str().to_owned();
+         let mut parts = path.as_str().split('/').peekable();
+         while let Some(part) = parts.next() {
+             let entry = self
+                 .entries(&current)?
+                 .into_iter()
+                 .find(|e| e.name == part.as_bytes())
+                 .ok_or_else(|| {
+                     SnapshotError::new(SnapshotErrorKind::NotFound, "snapshot path is missing")
+                 })?;
+             if parts.peek().is_none() {
+-                if entry.kind != "blob" {
++                if entry.kind != BLOB_KIND {
+                     return Err(SnapshotError::new(
+                         SnapshotErrorKind::InvalidRequest,
+                         "snapshot path is not a blob",
+                     ));
+                 }
+                 return self.verified(
+                     &entry.oid,
+-                    "blob",
++                    BLOB_KIND,
+                     SnapshotErrorKind::InternalError,
+                     SnapshotErrorKind::InternalError,
+                 );
+             }
+-            if entry.kind != "tree" {
++            if entry.kind != TREE_KIND {
+                 return Err(SnapshotError::new(
+                     SnapshotErrorKind::NotFound,
+                     "snapshot path is missing",
+                 ));
+             }
+             current = entry.oid;
+         }
+         Err(SnapshotError::new(
+             SnapshotErrorKind::NotFound,
+             "snapshot path is missing",
+         ))
+     }
+@@ -217,21 +223,25 @@
+ impl<'a> Directory<'a> {
+     fn insert(&mut self, path: &'a str, oid: TreeOid) {
+         match path.split_once('/') {
+             Some((dir, rest)) => self.dirs.entry(dir).or_default().insert(rest, oid),
+             None => {
+                 self.files.insert(path, oid);
+             }
+         }
+     }
+     fn write(&self, db: &ObjectDb<'_>) -> Result<TreeOid, SnapshotError> {
+         let mut input = Vec::new();
+         for (name, oid) in &self.files {
+-            input.extend_from_slice(format!("100644 blob {}\t{name}\0", oid.as_str()).as_bytes());
++            input.extend_from_slice(
++                format!("{REGULAR_FILE_MODE} {BLOB_KIND} {}\t{name}\0", oid.as_str()).as_bytes(),
++            );
+         }
+         for (name, dir) in &self.dirs {
+             let oid = dir.write(db)?;
+-            input.extend_from_slice(format!("040000 tree {}\t{name}\0", oid.as_str()).as_bytes());
++            input.extend_from_slice(
++                format!("{TREE_MODE} {TREE_KIND} {}\t{name}\0", oid.as_str()).as_bytes(),
++            );
+         }
+         db.parse_oid(&db.run(&["mktree", "-z"], Some(&input))?)
+     }
+ }
+--- before/src/adapters/git/process.rs
++++ after/src/adapters/git/process.rs
+@@ -1,21 +1,22 @@
++use super::constants::MIN_GIT_VERSION;
+ use crate::service::ports::git::{SnapshotError, SnapshotErrorKind};
+ use std::{
+     env,
+     error::Error,
+     ffi::OsString,
+     fmt,
+     io::{self, Read, Write},
+     path::{Path, PathBuf},
+-    process::{Command, ExitStatus, Stdio},
++    process::{Child, Command, ExitStatus, Stdio},
+     thread,
+ };
+ 
+ // Preserve the original cause privately; every diagnostic surface is redacted.
+ enum SafeCause {
+     Io(io::Error),
+     Exit(ExitStatus),
+ }
+ impl fmt::Debug for SafeCause {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+         fmt::Display::fmt(self, f)
+     }
+@@ -50,112 +51,122 @@
+         .split_whitespace()
+         .next()
+         .ok_or_else(unsupported)?;
+     let mut parts = version.split('.');
+     let major = parts
+         .next()
+         .and_then(|s| s.parse::<u32>().ok())
+         .ok_or_else(unsupported)?;
+     let minor = parts
+         .next()
+         .and_then(|s| s.parse::<u32>().ok())
+         .ok_or_else(unsupported)?;
+-    if (major, minor) < (2, 29) {
++    if (major, minor) < MIN_GIT_VERSION {
+         return Err(unsupported());
+     }
+     Ok(())
+ }
+ pub(super) struct GitProcess {
+     program: PathBuf,
+ }
+ impl GitProcess {
+     pub(super) fn system() -> Self {
+         Self::with_executable("git".into())
+     }
+     pub(super) fn with_executable(program: PathBuf) -> Self {
+         Self { program }
+     }
+     pub(super) fn run(
+         &self,
+         cwd: &Path,
+         args: &[OsString],
+         input: Option<&[u8]>,
+     ) -> Result<Vec<u8>, SnapshotError> {
++        let mut child = self
++            .command(cwd, args)
++            .spawn()
++            .map_err(|e| io_error("Git spawn failed", e))?;
++        exchange_pipes(&mut child, input)
++    }
++
++    fn command(&self, cwd: &Path, args: &[OsString]) -> Command {
+         let mut command = Command::new(&self.program);
+         command.current_dir(cwd);
+         for (key, _) in env::vars_os() {
+             if key.to_string_lossy().starts_with("GIT_") {
+                 command.env_remove(key);
+             }
+         }
+         command
+             .env("GIT_NO_REPLACE_OBJECTS", "1")
+             .env("GIT_ALLOW_PROTOCOL", "")
+             .env("GIT_NO_LAZY_FETCH", "1")
+             .env("GIT_TERMINAL_PROMPT", "0")
+             .env("LC_ALL", "C");
+         command.args(["-c", "core.hooksPath=/dev/null"]);
+         let writes = args.first().is_some_and(|a| {
+             a == "mktree"
+                 || a == "update-ref"
+                 || (a == "hash-object" && args.iter().any(|a| a == "-w"))
+         });
+         if writes {
+             command.args(["-c", "core.fsync=all", "-c", "core.fsyncMethod=fsync"]);
+         }
+-        let mut child = command
++        command
+             .args(args)
+             .stdin(Stdio::piped())
+             .stdout(Stdio::piped())
+-            .stderr(Stdio::piped())
+-            .spawn()
+-            .map_err(|e| io_error("Git spawn failed", e))?;
+-        let mut stdin = child.stdin.take().expect("piped stdin");
+-        let mut stdout = child.stdout.take().expect("piped stdout");
+-        let mut stderr = child.stderr.take().expect("piped stderr");
+-        // All pipes progress concurrently. Even a broken stdin is reported only after
+-        // draining both outputs and waiting for this owned child.
+-        thread::scope(|scope| {
+-            let writer = scope.spawn(move || -> io::Result<()> {
+-                if let Some(bytes) = input {
+-                    stdin.write_all(bytes)?;
+-                }
+-                Ok(())
+-            });
+-            let reader = scope.spawn(move || {
+-                let mut bytes = Vec::new();
+-                stdout.read_to_end(&mut bytes).map(|_| bytes)
+-            });
+-            let drainer = scope.spawn(move || io::copy(&mut stderr, &mut io::sink()));
+-            let status = child.wait();
+-            if status.is_err() {
+-                // A wait failure must not leave a live child holding the pipes.
+-                let _ = child.kill();
+-                let _ = child.wait();
+-            }
+-            let written = writer.join();
+-            let read = reader.join();
+-            let drained = drainer.join();
+-            let status = status.map_err(|e| io_error("Git wait failed", e))?;
+-            if !status.success() {
+-                return Err(SnapshotError::with_cause(
+-                    "Git command failed",
+-                    SafeCause::Exit(status),
+-                ));
+-            }
+-            written
+-                .map_err(|_| {
+-                    SnapshotError::new(SnapshotErrorKind::InternalError, "Git stdin worker failed")
+-                })?
+-                .map_err(|e| io_error("Git stdin failed", e))?;
+-            drained
+-                .map_err(|_| {
+-                    SnapshotError::new(SnapshotErrorKind::InternalError, "Git stderr worker failed")
+-                })?
+-                .map_err(|e| io_error("Git stderr failed", e))?;
+-            read.map_err(|_| {
+-                SnapshotError::new(SnapshotErrorKind::InternalError, "Git stdout worker failed")
+-            })?
+-            .map_err(|e| io_error("Git stdout failed", e))
+-        })
++            .stderr(Stdio::piped());
++        command
+     }
+ }
++
++fn exchange_pipes(child: &mut Child, input: Option<&[u8]>) -> Result<Vec<u8>, SnapshotError> {
++    let mut stdin = child.stdin.take().expect("piped stdin");
++    let mut stdout = child.stdout.take().expect("piped stdout");
++    let mut stderr = child.stderr.take().expect("piped stderr");
++    // All pipes progress concurrently. Even a broken stdin is reported only after
++    // draining both outputs and waiting for this owned child.
++    thread::scope(|scope| {
++        let writer = scope.spawn(move || -> io::Result<()> {
++            if let Some(bytes) = input {
++                stdin.write_all(bytes)?;
++            }
++            Ok(())
++        });
++        let reader = scope.spawn(move || {
++            let mut bytes = Vec::new();
++            stdout.read_to_end(&mut bytes).map(|_| bytes)
++        });
++        let drainer = scope.spawn(move || io::copy(&mut stderr, &mut io::sink()));
++        let status = child.wait();
++        if status.is_err() {
++            // A wait failure must not leave a live child holding the pipes.
++            let _ = child.kill();
++            let _ = child.wait();
++        }
++        let written = writer.join();
++        let read = reader.join();
++        let drained = drainer.join();
++        let status = status.map_err(|e| io_error("Git wait failed", e))?;
++        if !status.success() {
++            return Err(SnapshotError::with_cause(
++                "Git command failed",
++                SafeCause::Exit(status),
++            ));
++        }
++        written
++            .map_err(|_| {
++                SnapshotError::new(SnapshotErrorKind::InternalError, "Git stdin worker failed")
++            })?
++            .map_err(|e| io_error("Git stdin failed", e))?;
++        drained
++            .map_err(|_| {
++                SnapshotError::new(SnapshotErrorKind::InternalError, "Git stderr worker failed")
++            })?
++            .map_err(|e| io_error("Git stderr failed", e))?;
++        read.map_err(|_| {
++            SnapshotError::new(SnapshotErrorKind::InternalError, "Git stdout worker failed")
++        })?
++        .map_err(|e| io_error("Git stdout failed", e))
++    })
++}
+--- before/src/adapters/git/refs.rs
++++ after/src/adapters/git/refs.rs
+@@ -1,53 +1,58 @@
+-use super::{GitCliAdapter, objects::ObjectDb, process::is_exit_code};
++use super::{
++    GitCliAdapter,
++    constants::{BLOB_KIND, GITLINK_KIND, SNAPSHOT_REF_PREFIX, TREE_KIND},
++    objects::ObjectDb,
++    process::is_exit_code,
++};
+ use crate::{
+     domain::TreeOid,
+     service::ports::git::{RetainedTree, SnapshotError, SnapshotErrorKind},
+ };
+ use std::collections::BTreeMap;
+ pub(super) struct Retainer<'a> {
+     pub(super) git: &'a GitCliAdapter,
+ }
+ impl Retainer<'_> {
+     pub(super) fn pin(&self, oid: &TreeOid) -> Result<RetainedTree, SnapshotError> {
+         let db = ObjectDb { git: self.git };
+         db.validate_tree(oid)?;
+-        let mut pending = vec![(oid.as_str().to_owned(), "tree".to_owned())];
++        let mut pending = vec![(oid.as_str().to_owned(), TREE_KIND.to_owned())];
+         let mut visited = BTreeMap::new();
+         while let Some((oid, kind)) = pending.pop() {
+             if let Some(previous) = visited.insert(oid.clone(), kind.clone()) {
+                 if previous != kind {
+                     return Err(SnapshotError::new(
+                         SnapshotErrorKind::InternalError,
+                         "conflicting Git object types",
+                     ));
+                 }
+                 continue;
+             }
+-            if kind == "tree" {
++            if kind == TREE_KIND {
+                 for entry in db.entries(&oid)? {
+-                    if entry.kind != "gitlink" {
++                    if entry.kind != GITLINK_KIND {
+                         pending.push((entry.oid, entry.kind));
+                     }
+                 }
+             } else {
+                 db.verified(
+                     &oid,
+-                    "blob",
++                    BLOB_KIND,
+                     SnapshotErrorKind::InternalError,
+                     SnapshotErrorKind::InternalError,
+                 )?;
+             }
+         }
+-        let name = format!("refs/letopis/snapshots/{}", oid.as_str());
++        let name = format!("{SNAPSHOT_REF_PREFIX}{}", oid.as_str());
+         if self.exact_ref(&db, &name, oid)? {
+             return Ok(RetainedTree::new(oid.clone()));
+         }
+         let zero = "0".repeat(self.git.oid_len);
+         match db.run(
+             &["update-ref", "--no-deref", &name, oid.as_str(), &zero],
+             None,
+         ) {
+             Ok(_) => {}
+             Err(cause) => {
+                 if !self.exact_ref(&db, &name, oid)? {
+                     return Err(cause);
+--- before/src/adapters/git/tests.rs
++++ after/src/adapters/git/tests.rs
+@@ -1,216 +1,242 @@
+ use super::{
+     GitCliAdapter,
++    constants::SNAPSHOT_REF_PREFIX,
+     process::{GitProcess, check_version},
+ };
+-use crate::service::ports::git::SnapshotErrorKind;
++use crate::{
++    domain::{RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN},
++    open_git_snapshots,
++    service::ports::git::{GitSnapshotPort, SnapshotErrorKind, SnapshotFile},
++};
+ #[path = "../../../tests/support/git.rs"]
+ mod fixture;
+ use fixture::{ObjectFormat, TempRepo};
++use std::{fs, path::PathBuf, process::Command};
++
+ #[test]
+ fn version_gate() {
+-    assert!(check_version(b"git version 2.29.0\n").is_ok());
+-    assert!(check_version(b"git version 2.50.1 (Apple Git-155)\n").is_ok());
+-    assert_eq!(
+-        check_version(b"git version 2.28.7\n").unwrap_err().kind(),
+-        SnapshotErrorKind::InternalError
+-    );
+-    assert_eq!(
+-        check_version(b"unknown\n").unwrap_err().kind(),
+-        SnapshotErrorKind::InternalError
+-    );
+-}
++    // Arrange
++    for output in [
++        b"git version 2.29.0\n".as_slice(),
++        b"git version 2.50.1 (Apple Git-155)\n",
++    ] {
++        // Act
++        let result = check_version(output);
++        // Assert
++        assert!(result.is_ok());
++    }
++    // Arrange
++    for output in [b"git version 2.28.7\n".as_slice(), b"unknown\n"] {
++        // Act
++        let error = check_version(output).unwrap_err();
++        // Assert
++        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
++    }
++}
++
+ #[test]
+ fn open_rejects_old_git_before_object_calls() {
++    // Arrange
+     let repo = TempRepo::new(ObjectFormat::Sha1);
+     let exe = repo.script(
+         "old-git",
+         "#!/bin/sh\nprintf '%s\\n' \"$*\" >> calls\necho 'git version 2.28.7'\n",
+     );
+-    let error = GitCliAdapter::open_with_process(repo.root(), GitProcess::with_executable(exe))
++    let process = GitProcess::with_executable(exe);
++    // Act
++    let error = GitCliAdapter::open_with_process(repo.root(), process)
+         .err()
+         .unwrap();
++    let calls = fs::read_to_string(repo.root().join("calls")).unwrap();
++    // Assert
+     assert!(error.message().contains("2.29"));
+-    assert_eq!(
+-        std::fs::read_to_string(repo.root().join("calls")).unwrap(),
+-        "-c core.hooksPath=/dev/null --version\n"
+-    );
+-}
++    assert_eq!(calls, "-c core.hooksPath=/dev/null --version\n");
++}
++
+ #[test]
+ fn discovers_root_from_subdirectory() {
++    // Arrange
+     for format in fixture::FORMATS {
+         let repo = TempRepo::new(format);
++        let expected_length = match format {
++            ObjectFormat::Sha1 => SHA1_OID_HEX_LEN,
++            ObjectFormat::Sha256 => SHA256_OID_HEX_LEN,
++        };
++        // Act
+         let git = GitCliAdapter::open(repo.subdir()).unwrap();
++        // Assert
+         assert_eq!(git.root, repo.root());
+-        assert_eq!(
+-            git.oid_len,
+-            match format {
+-                ObjectFormat::Sha1 => 40,
+-                ObjectFormat::Sha256 => 64,
+-            }
+-        );
+-    }
+-}
++        assert_eq!(git.oid_len, expected_length);
++    }
++}
++
+ #[test]
+ fn open_rejects_non_repository_and_bare() {
++    // Arrange
+     let repo = TempRepo::new(ObjectFormat::Sha1);
+     let bare = repo.root().join("bare");
+     repo.ok(&["init", "-q", "--bare", bare.to_str().unwrap()], None);
+-    assert!(GitCliAdapter::open(&bare).is_err());
+     let empty = std::env::temp_dir().join(format!("letopis-empty-{}", std::process::id()));
+-    std::fs::create_dir(&empty).unwrap();
+-    assert!(GitCliAdapter::open(&empty).is_err());
+-    std::fs::remove_dir(empty).unwrap();
+-}
++    fs::create_dir(&empty).unwrap();
++    // Act
++    let bare_result = GitCliAdapter::open(&bare);
++    let empty_result = GitCliAdapter::open(&empty);
++    // Assert
++    assert!(bare_result.is_err());
++    assert!(empty_result.is_err());
++    fs::remove_dir(empty).unwrap();
++}
++
+ #[test]
+ fn subprocess_drains_and_reaps_on_io_failure() {
+-    let name = "adapters::git::tests::subprocess_drains_and_reaps_on_io_failure";
+     if std::env::var_os("LETOPIS_IO_WORKER").is_none() {
+-        fixture::supervised_test(name, &[("LETOPIS_IO_WORKER", "1")]);
++        // Arrange / Act / Assert: supervisor runs this exact worker and checks its exit.
++        fixture::supervised_test(
++            "adapters::git::tests::subprocess_drains_and_reaps_on_io_failure",
++            &[("LETOPIS_IO_WORKER", "1")],
++        );
+         return;
+     }
+-    let repo = TempRepo::new(ObjectFormat::Sha1);
+-    let exe=repo.script("failing-git","#!/bin/sh\necho $$ > child-pid\nhead -c 262144 /dev/zero >&2\necho STDERR_CANARY >&2\nhead -c 262144 /dev/zero\nhead -c 1048576 > /dev/null\nexit 7\n");
++    // Arrange
++    let repo = TempRepo::new(ObjectFormat::Sha1);
++    let exe = repo.script("failing-git", "#!/bin/sh\necho $$ > child-pid\nhead -c 262144 /dev/zero >&2\necho STDERR_CANARY >&2\nhead -c 262144 /dev/zero\nhead -c 1048576 > /dev/null\nexit 7\n");
+     let process = GitProcess::with_executable(exe);
+     let input = b"STDIN_CANARY".repeat(100000);
++    // Act
+     let error = process.run(repo.root(), &[], Some(&input)).unwrap_err();
+     let safe = format!("{error} {error:?}");
++    let pid = fs::read_to_string(repo.root().join("child-pid")).unwrap();
++    let child_exists = Command::new("kill")
++        .args(["-0", pid.trim()])
++        .output()
++        .unwrap()
++        .status
++        .success();
++    // Assert
+     assert!(!safe.contains("STDIN_CANARY"));
+     assert!(!safe.contains("STDERR_CANARY"));
+     assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
+-    let pid = std::fs::read_to_string(repo.root().join("child-pid")).unwrap();
+-    assert!(
+-        !std::process::Command::new("kill")
+-            .args(["-0", pid.trim()])
+-            .output()
+-            .unwrap()
+-            .status
+-            .success(),
+-        "Git child must be reaped"
++    assert!(!child_exists, "Git child must be reaped");
++}
++
++fn supervise_policy_worker() {
++    fixture::supervised_test(
++        "adapters::git::tests::process_removes_inherited_overrides_and_hardens_writes",
++        &[
++            ("LETOPIS_POLICY_WORKER", "1"),
++            ("GIT_DIR", "CANARY_DIR"),
++            ("GIT_WORK_TREE", "CANARY_WORKTREE"),
++            ("GIT_INDEX_FILE", "CANARY_INDEX"),
++            ("GIT_OBJECT_DIRECTORY", "CANARY_OBJECTS"),
++            ("GIT_CONFIG_COUNT", "1"),
++            ("GIT_CONFIG_KEY_0", "core.bare"),
++            ("GIT_CONFIG_VALUE_0", "true"),
++            ("GIT_CONFIG_PARAMETERS", "CANARY_CONFIG"),
++        ],
+     );
+ }
+ 
+ #[test]
+ fn process_removes_inherited_overrides_and_hardens_writes() {
+-    let name = "adapters::git::tests::process_removes_inherited_overrides_and_hardens_writes";
+     if std::env::var_os("LETOPIS_POLICY_WORKER").is_none() {
+-        fixture::supervised_test(
+-            name,
+-            &[
+-                ("LETOPIS_POLICY_WORKER", "1"),
+-                ("GIT_DIR", "CANARY_DIR"),
+-                ("GIT_WORK_TREE", "CANARY_WORKTREE"),
+-                ("GIT_INDEX_FILE", "CANARY_INDEX"),
+-                ("GIT_OBJECT_DIRECTORY", "CANARY_OBJECTS"),
+-                ("GIT_CONFIG_COUNT", "1"),
+-                ("GIT_CONFIG_KEY_0", "core.bare"),
+-                ("GIT_CONFIG_VALUE_0", "true"),
+-                ("GIT_CONFIG_PARAMETERS", "CANARY_CONFIG"),
+-            ],
+-        );
++        // Arrange / Act / Assert: exercise inherited overrides in a supervised worker.
++        supervise_policy_worker();
+         return;
+     }
++    // Arrange
+     let repo = TempRepo::new(ObjectFormat::Sha1);
+     let exe = repo.script(
+         "policy-git",
+         "#!/bin/sh\nenv | sort\nprintf 'ARG=%s\\n' \"$@\"\n",
+     );
+-    let p = GitProcess::with_executable(exe);
+-    let out = p
+-        .run(
+-            repo.root(),
+-            &["hash-object".into(), "-w".into(), "--stdin".into()],
+-            None,
+-        )
+-        .unwrap();
+-    let text = String::from_utf8(out).unwrap();
++    let process = GitProcess::with_executable(exe);
++    let args = ["hash-object".into(), "-w".into(), "--stdin".into()];
++    // Act
++    let output = process.run(repo.root(), &args, None).unwrap();
++    let text = String::from_utf8(output).unwrap();
++    // Assert
+     assert!(!text.contains("CANARY"));
+     assert!(!text.contains("GIT_CONFIG_COUNT="));
+     assert!(!text.contains("GIT_CONFIG_KEY_0="));
+     for flag in [
+         "GIT_NO_REPLACE_OBJECTS=1",
+         "GIT_ALLOW_PROTOCOL=\n",
+         "GIT_NO_LAZY_FETCH=1",
+         "GIT_TERMINAL_PROMPT=0",
+         "LC_ALL=C",
+         "ARG=core.hooksPath=/dev/null",
+         "ARG=core.fsync=all",
+         "ARG=core.fsyncMethod=fsync",
+     ] {
+         assert!(text.contains(flag), "missing {flag}");
+     }
+ }
+ 
++fn newline_repository_pair(parent: &TempRepo, format: ObjectFormat) -> (PathBuf, PathBuf) {
++    let sibling = parent.root().join("repo");
++    let target = parent.root().join("repo\n");
++    for root in [&sibling, &target] {
++        parent.ok(
++            &["init", "-q", format.init_arg(), root.to_str().unwrap()],
++            None,
++        );
++    }
++    (sibling, target)
++}
++
+ #[test]
+ fn discovers_trailing_newline_repository_without_touching_sibling() {
+-    use crate::{
+-        domain::RepoPath,
+-        open_git_snapshots,
+-        service::ports::git::{GitSnapshotPort, SnapshotFile},
+-    };
++    // Arrange
+     for format in fixture::FORMATS {
+         let parent = TempRepo::new(format);
+-        let sibling = parent.root().join("repo");
+-        let target = parent.root().join("repo\n");
+-        for root in [&sibling, &target] {
+-            parent.ok(
+-                &[
+-                    "init",
+-                    "-q",
+-                    match format {
+-                        ObjectFormat::Sha1 => "--object-format=sha1",
+-                        ObjectFormat::Sha256 => "--object-format=sha256",
+-                    },
+-                    root.to_str().unwrap(),
+-                ],
+-                None,
+-            );
+-        }
++        let (sibling, target) = newline_repository_pair(&parent, format);
+         let sibling_objects = parent.ok(
+             &["-C", sibling.to_str().unwrap(), "count-objects", "-v"],
+             None,
+         );
+         let sibling_refs = parent.ok(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None);
++        let path = RepoPath::parse("captured.md").unwrap();
++        // Act
+         let git = open_git_snapshots(&target).unwrap();
+-        let path = RepoPath::parse("captured.md").unwrap();
+         let tree = git
+             .create_tree(&[SnapshotFile {
+                 path: &path,
+                 bytes: b"newline repository isolation\0",
+             }])
+             .unwrap();
+         git.pin(&tree).unwrap();
+-        assert_eq!(
+-            parent.ok(
+-                &["-C", sibling.to_str().unwrap(), "count-objects", "-v"],
+-                None
+-            ),
+-            sibling_objects,
+-            "opening repo\\n must not write objects into sibling repo"
+-        );
+-        assert_eq!(
+-            parent.ok(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None),
+-            sibling_refs,
+-            "opening repo\\n must not pin a ref in sibling repo"
+-        );
+-        let name = format!("refs/letopis/snapshots/{}", tree.as_str());
++        let objects_after = parent.ok(
++            &["-C", sibling.to_str().unwrap(), "count-objects", "-v"],
++            None,
++        );
++        let refs_after = parent.ok(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None);
++        let name = format!("{SNAPSHOT_REF_PREFIX}{}", tree.as_str());
+         let actual = parent.git(
+             &[
+                 "-C",
+                 target.to_str().unwrap(),
+                 "show-ref",
+                 "--verify",
+                 &name,
+             ],
+             None,
+         );
++        let bytes = git.read_blob(&tree, &path).unwrap();
++        let discovered_root = GitCliAdapter::open(&target).unwrap().root;
++        // Assert
++        assert_eq!(
++            objects_after, sibling_objects,
++            "opening repo\\n must not write objects into sibling repo"
++        );
++        assert_eq!(
++            refs_after, sibling_refs,
++            "opening repo\\n must not pin a ref in sibling repo"
++        );
+         assert!(
+             actual.status.success(),
+             "snapshot must be retained in the requested newline-suffixed repository"
+         );
+-        assert_eq!(
+-            git.read_blob(&tree, &path).unwrap(),
+-            b"newline repository isolation\0"
+-        );
+-        assert_eq!(GitCliAdapter::open(&target).unwrap().root, target);
+-    }
+-}
++        assert_eq!(bytes, b"newline repository isolation\0");
++        assert_eq!(discovered_root, target);
++    }
++}
+--- before/src/adapters/markdown/scan.rs
++++ after/src/adapters/markdown/scan.rs
+@@ -1,56 +1,65 @@
+ use super::{Diagnostic, DiagnosticKind, Events, metadata};
+ use crate::domain::{Anchor, ByteSpan, Element, KnowledgeId, LineRange, RepoPath, Sha256};
+ use pulldown_cmark::{Event, Tag};
+-use std::collections::BTreeSet;
++use std::{collections::BTreeSet, ops::Range};
+ 
+ pub(super) struct Layout {
+     pub elements: Vec<Element>,
+-    pub metadata_ranges: Vec<std::ops::Range<usize>>,
++    pub metadata_ranges: Vec<Range<usize>>,
+ }
+ struct Heading {
+     start: usize,
+     after: usize,
+     level: u8,
+     anchor: Option<Anchor>,
+ }
+ 
+ pub(super) fn scan(
+     path: &RepoPath,
+     text: &str,
+     events: &Events<'_>,
+ ) -> Result<Option<Layout>, Diagnostic> {
+-    let comments: Vec<_> = events
++    let comments = metadata_comments(text, events);
++    if comments.is_empty() {
++        return Ok(None);
++    }
++    KnowledgeId::new(path.clone(), None)
++        .map_err(|_| Diagnostic::at(DiagnosticKind::InvalidTarget, 0..text.len()))?;
++    let headings = collect_headings(text, events)?;
++    build_layout(path, text, &headings, comments).map(Some)
++}
++
++fn metadata_comments(text: &str, events: &Events<'_>) -> Vec<Range<usize>> {
++    events
+         .iter()
+         .filter_map(|(event, range)| match event {
+             // Html events are raw lines inside a block, including script/style data.
+             // Only a block that itself starts with our comment declares metadata.
+             Event::Start(Tag::HtmlBlock)
+                 if text[range.clone()]
+                     .trim_start()
+                     .starts_with("<!-- letopis:") =>
+             {
+                 Some(range.clone())
+             }
+             Event::InlineHtml(s) if s.trim_start().starts_with("<!-- letopis:") => {
+                 Some(range.clone())
+             }
+             _ => None,
+         })
+-        .collect();
+-    if comments.is_empty() {
+-        return Ok(None);
+-    }
+-    KnowledgeId::new(path.clone(), None)
+-        .map_err(|_| Diagnostic::at(DiagnosticKind::InvalidTarget, 0..text.len()))?;
++        .collect()
++}
++
++fn collect_headings(text: &str, events: &Events<'_>) -> Result<Vec<Heading>, Diagnostic> {
+     let mut headings = Vec::new();
+     let mut anchors = BTreeSet::new();
+     for (event, range) in events {
+         if let Event::Start(Tag::Heading { level, id, .. }) = event {
+             let start = line_start(text, range.start);
+             let raw = &text[start..range.end];
+             let anchor =
+                 match id {
+                     Some(id) => Some(Anchor::parse(id).map_err(|_| {
+                         Diagnostic::at(DiagnosticKind::InvalidAnchor, range.clone())
+                     })?),
+                     None if raw.trim_end().ends_with("{#}") => {
+@@ -70,73 +79,90 @@
+                 range.end
+             } else {
+                 line_after(text, range.end)
+             };
+             headings.push(Heading {
+                 start,
+                 after,
+                 level: *level as u8,
+                 anchor,
+             });
+         }
+     }
++    Ok(headings)
++}
++
++fn build_layout(
++    path: &RepoPath,
++    text: &str,
++    headings: &[Heading],
++    comments: Vec<Range<usize>>,
++) -> Result<Layout, Diagnostic> {
+     let mut elements: Vec<Element> = Vec::new();
+     let mut metadata_ranges = Vec::new();
+     for range in comments {
+         let start = line_start(text, range.start);
+         let after = line_after(text, start);
+         let line = text[start..after].trim_end_matches(['\r', '\n']);
+         // A service comment must occupy the complete, standalone raw line.
+         if range.start != start || range.end > after {
+             return Err(Diagnostic::at(DiagnosticKind::InvalidMetadata, range));
+         }
+         let metadata = metadata::parse(line, start..after)?;
+         metadata_ranges.push(start..after);
+-        let (begin, end, anchor) = if start == 0 {
+-            (0, text.len(), None)
+-        } else {
+-            let h = headings
+-                .iter()
+-                .find(|h| h.after == start && h.anchor.is_some())
+-                .ok_or_else(|| Diagnostic::at(DiagnosticKind::OrphanMetadata, start..after))?;
+-            let end = headings
+-                .iter()
+-                .find(|next| next.start > h.start && next.level <= h.level)
+-                .map_or(text.len(), |h| h.start);
+-            (h.start, end, h.anchor.clone())
+-        };
++        let (begin, end, anchor) = element_bounds(text, headings, start, after)?;
+         if elements.last().is_some_and(|e| e.bytes.end() > begin) {
+             return Err(Diagnostic::at(DiagnosticKind::NestedElement, begin..end));
+         }
+         let id = KnowledgeId::new(path.clone(), anchor)
+             .map_err(|_| Diagnostic::at(DiagnosticKind::InvalidTarget, begin..end))?;
+         let bytes = ByteSpan::new(begin, end).expect("heading ranges are ordered");
+         let lines = LineRange::new(
+             line_number(text, begin),
+             line_number(text, end.saturating_sub(1)),
+         )
+         .expect("nonempty element lines are ordered");
+         elements.push(Element {
+             id,
+             metadata,
+             bytes,
+             lines,
+             hash: Sha256::digest(&text.as_bytes()[begin..end]),
+         });
+     }
+-    Ok(Some(Layout {
++    Ok(Layout {
+         elements,
+         metadata_ranges,
+-    }))
++    })
+ }
++fn element_bounds(
++    text: &str,
++    headings: &[Heading],
++    start: usize,
++    after: usize,
++) -> Result<(usize, usize, Option<Anchor>), Diagnostic> {
++    if start == 0 {
++        return Ok((0, text.len(), None));
++    }
++    let heading = headings
++        .iter()
++        .find(|h| h.after == start && h.anchor.is_some())
++        .ok_or_else(|| Diagnostic::at(DiagnosticKind::OrphanMetadata, start..after))?;
++    let end = headings
++        .iter()
++        .find(|next| next.start > heading.start && next.level <= heading.level)
++        .map_or(text.len(), |h| h.start);
++    Ok((heading.start, end, heading.anchor.clone()))
++}
++
+ fn line_start(text: &str, at: usize) -> usize {
+     text.as_bytes()[..at]
+         .iter()
+         .rposition(|&c| c == b'\n')
+         .map_or(0, |p| p + 1)
+ }
+ fn line_after(text: &str, at: usize) -> usize {
+     text.as_bytes()[at..]
+         .iter()
+         .position(|&c| c == b'\n')
+         .map_or(text.len(), |p| at + p + 1)
+ }
+--- before/src/domain/mod.rs
++++ after/src/domain/mod.rs
+@@ -1,7 +1,8 @@
+ //! Validated knowledge identities and graph values, independent of adapters.
+ mod graph;
+ mod identity;
+ mod value;
+ pub use graph::*;
+ pub use identity::*;
+ pub use value::*;
++pub(crate) use value::{SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN};
+--- before/src/domain/value.rs
++++ after/src/domain/value.rs
+@@ -66,31 +66,34 @@
+         Ok(Self { start, end })
+     }
+     /// First included line.
+     pub fn start(&self) -> u64 {
+         self.start
+     }
+     /// Last included line.
+     pub fn end(&self) -> u64 {
+         self.end
+     }
+ }
+ 
++pub(crate) const SHA1_OID_HEX_LEN: usize = 40;
++pub(crate) const SHA256_OID_HEX_LEN: usize = 64;
++
+ /// A full SHA-1 or SHA-256 Git tree OID; existence/type require a Git adapter.
+ #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+ pub struct TreeOid(String);
+ impl TreeOid {
+     /// Accept exactly 40 or 64 lowercase hexadecimal characters.
+     pub fn parse(raw: &str) -> Result<Self, ValueError> {
+-        if ![40, 64].contains(&raw.len())
++        if ![SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN].contains(&raw.len())
+             || !raw
+                 .bytes()
+                 .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+         {
+             return Err(ValueError::InvalidOid);
+         }
+         Ok(Self(raw.into()))
+     }
+     /// The unmodified full OID.
+     pub fn as_str(&self) -> &str {
+         &self.0
+     }
+--- before/tests/domain_values.rs
++++ after/tests/domain_values.rs
+@@ -1,162 +1,215 @@
+-use letopis::domain::*;
++use letopis::domain::{
++    Anchor, ByteSpan, Edge, EdgeTarget, EdgeType, ElementKind, ElementMetadata, KnowledgeId,
++    LineRange, Sha256, SourceUri, TreeOid, kind_for,
++};
+ use std::collections::BTreeSet;
+ 
+ #[test]
+ fn ids_and_sources_normalize_from_git_root() {
++    // Arrange: each case supplies raw input and its canonical form.
+     for (raw, want) in [
+         ("./src/../src/a.rs#L010-L025", "src/a.rs#L10-L25"),
+         ("src/A.rs", "src/A.rs"),
+         ("src/тест.rs#L1-L1", "src/тест.rs#L1-L1"),
+     ] {
+-        assert_eq!(SourceUri::parse(raw).unwrap().as_str(), want);
+-    }
++        // Act
++        let source = SourceUri::parse(raw).unwrap();
++        // Assert
++        assert_eq!(source.as_str(), want);
++    }
++    // Arrange
+     for (raw, want) in [
+         ("./knowledge/a.md#wal", "knowledge/a.md#wal"),
+         ("A.markdown", "A.markdown"),
+         ("a/../b.md", "b.md"),
+     ] {
+-        assert_eq!(KnowledgeId::parse(raw).unwrap().as_str(), want);
++        // Act
++        let id = KnowledgeId::parse(raw).unwrap();
++        // Assert
++        assert_eq!(id.as_str(), want);
+     }
+ }
+ 
+ #[test]
+ fn anchors_and_ranges_reject_invalid_values() {
++    // Arrange
+     for raw in ["", "1start", "L01-L02", "has space", "a.b", "якорь"] {
+-        assert!(Anchor::parse(raw).is_err(), "{raw}");
+-    }
++        // Act
++        let anchor = Anchor::parse(raw);
++        // Assert
++        assert!(anchor.is_err(), "{raw}");
++    }
++    // Arrange
+     for raw in ["a", "WAL", "a_b-12", "L1", "Lx-Ly"] {
+-        assert!(Anchor::parse(raw).is_ok(), "{raw}");
+-    }
++        // Act
++        let anchor = Anchor::parse(raw);
++        // Assert
++        assert!(anchor.is_ok(), "{raw}");
++    }
++    // Arrange
+     for raw in [
+         "/tmp/a.rs",
+         "../a.rs",
+         "a/../../b.rs",
+         "a.rs#L0-L2",
+         "a.rs#L3-L2",
+         "a.rs#L1-Lx",
+         "a.rs#L9999999999999999999999999999-L2",
+         "",
+         ".",
+         "a\n.rs",
+         "a.rs#L1-L2#bad",
+     ] {
+-        assert!(SourceUri::parse(raw).is_err(), "{raw:?}");
+-    }
++        // Act
++        let source = SourceUri::parse(raw);
++        // Assert
++        assert!(source.is_err(), "{raw:?}");
++    }
++    // Arrange
+     for raw in ["src/a.rs", "a.md#L1-L2", "a.md#", "a.md#x#y"] {
+-        assert!(KnowledgeId::parse(raw).is_err(), "{raw}");
+-    }
+-    assert!(ByteSpan::new(2, 1).is_err());
+-    assert!(LineRange::new(0, 1).is_err());
+-    assert!(LineRange::new(2, 1).is_err());
++        // Act
++        let id = KnowledgeId::parse(raw);
++        // Assert
++        assert!(id.is_err(), "{raw}");
++    }
++    // Act: invalid byte and line ranges have independent constructors.
++    let bytes = ByteSpan::new(2, 1);
++    let zero_line = LineRange::new(0, 1);
++    let reversed_lines = LineRange::new(2, 1);
++    // Assert
++    assert!(bytes.is_err());
++    assert!(zero_line.is_err());
++    assert!(reversed_lines.is_err());
+ }
+ 
+ #[test]
+ fn tree_oids_are_full_lowercase_hex() {
++    // Arrange: these independent wire-length oracles cover both Git formats.
+     for n in [40, 64] {
+-        assert_eq!(
+-            TreeOid::parse(&"a".repeat(n)).unwrap().as_str(),
+-            "a".repeat(n)
+-        );
+-    }
+-    for s in [
++        let raw = "a".repeat(n);
++        // Act
++        let oid = TreeOid::parse(&raw).unwrap();
++        // Assert
++        assert_eq!(oid.as_str(), raw);
++    }
++    // Arrange
++    for raw in [
+         "a".repeat(39),
+         "a".repeat(41),
+         "A".repeat(40),
+         "g".repeat(64),
+         format!("{}\n", "a".repeat(40)),
+     ] {
+-        assert!(TreeOid::parse(&s).is_err());
++        // Act
++        let oid = TreeOid::parse(&raw);
++        // Assert
++        assert!(oid.is_err());
+     }
+ }
+ 
+ #[test]
+ fn sha256_uses_exact_bytes() {
+-    assert_eq!(
+-        Sha256::digest(b"abc").to_hex(),
+-        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+-    );
+-    assert_eq!(
+-        Sha256::digest(b"").to_hex(),
+-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+-    );
+-    assert_ne!(Sha256::digest(b"x\n"), Sha256::digest(b"x\r\n"));
++    // Arrange
++    for (bytes, expected) in [
++        (
++            b"abc".as_slice(),
++            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
++        ),
++        (
++            b"".as_slice(),
++            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++        ),
++    ] {
++        // Act
++        let hash = Sha256::digest(bytes);
++        // Assert
++        assert_eq!(hash.to_hex(), expected);
++    }
++    // Arrange
++    let lf = b"x\n";
++    let crlf = b"x\r\n";
++    // Act
++    let hashes = (Sha256::digest(lf), Sha256::digest(crlf));
++    // Assert
++    assert_ne!(hashes.0, hashes.1);
+ }
+ 
+ #[test]
+ fn edge_identity_and_kind_are_derived() {
++    // Arrange
+     let a = KnowledgeId::parse("a.md").unwrap();
+     let b = KnowledgeId::parse("b.md").unwrap();
+-    let e = Edge::new(
++    let edge = Edge::new(
+         a.clone(),
+         EdgeTarget::Knowledge(b.clone()),
+         EdgeType::parse("includes").unwrap(),
+     )
+     .unwrap();
+-    let mut edges = BTreeSet::from([e.clone(), e]);
++    // Act
++    let mut edges = BTreeSet::from([edge.clone(), edge]);
++    // Assert
+     assert_eq!(edges.len(), 1);
+-    edges.insert(
+-        Edge::new(
+-            a.clone(),
+-            EdgeTarget::Knowledge(b.clone()),
+-            EdgeType::parse("depends_on").unwrap(),
+-        )
+-        .unwrap(),
+-    );
++
++    // Arrange
++    let other = Edge::new(
++        a.clone(),
++        EdgeTarget::Knowledge(b.clone()),
++        EdgeType::parse("depends_on").unwrap(),
++    )
++    .unwrap();
++    // Act
++    edges.insert(other);
++    let source_kind = kind_for(&a, &edges);
++    let target_kind = kind_for(&b, &edges);
++    // Assert
+     assert_eq!(edges.len(), 2);
+-    assert_eq!(kind_for(&a, &edges), ElementKind::Metavertex);
+-    assert_eq!(kind_for(&b, &edges), ElementKind::Vertex);
++    assert_eq!(source_kind, ElementKind::Metavertex);
++    assert_eq!(target_kind, ElementKind::Vertex);
++
++    // Arrange / Act: metadata accepts the epoch without a snapshot.
+     let metadata = ElementMetadata {
+         created_at: 0,
+         source_snapshot: None,
+     };
++    // Assert
+     assert_eq!(metadata.created_at, 0);
+ }
+ 
+ #[test]
+ fn edge_targets_and_self_loops_are_checked() {
++    // Arrange
+     let a = KnowledgeId::parse("a.md").unwrap();
+     let b = KnowledgeId::parse("b.md").unwrap();
+-    assert!(
+-        Edge::new(
+-            a.clone(),
+-            EdgeTarget::Knowledge(a.clone()),
+-            EdgeType::parse("depends_on").unwrap()
+-        )
+-        .is_err()
+-    );
+-    assert!(
+-        Edge::new(
+-            a.clone(),
++    for (target, kind, valid) in [
++        (EdgeTarget::Knowledge(a.clone()), "depends_on", false),
++        (
+             EdgeTarget::Source(SourceUri::parse("a.md").unwrap()),
+-            EdgeType::parse("external").unwrap()
+-        )
+-        .is_err()
+-    );
+-    assert!(
+-        Edge::new(
+-            a.clone(),
++            "external",
++            false,
++        ),
++        (
+             EdgeTarget::Source(SourceUri::parse("x.rs").unwrap()),
+-            EdgeType::parse("includes").unwrap()
+-        )
+-        .is_err()
+-    );
+-    assert!(
+-        Edge::new(
+-            a.clone(),
+-            EdgeTarget::Knowledge(b),
+-            EdgeType::parse("external").unwrap()
+-        )
+-        .is_err()
+-    );
+-    assert!(
+-        Edge::new(
+-            a,
++            "includes",
++            false,
++        ),
++        (EdgeTarget::Knowledge(b), "external", false),
++        (
+             EdgeTarget::Source(SourceUri::parse("x.rs#L1-L2").unwrap()),
+-            EdgeType::parse("external").unwrap()
+-        )
+-        .is_ok()
+-    );
++            "external",
++            true,
++        ),
++    ] {
++        let edge_type = EdgeType::parse(kind).unwrap();
++        // Act
++        let edge = Edge::new(a.clone(), target, edge_type);
++        // Assert
++        assert_eq!(edge.is_ok(), valid);
++    }
++    // Arrange
+     for raw in ["", "Includes", "a-b", "a b", "1a"] {
+-        assert!(EdgeType::parse(raw).is_err());
+-    }
+-}
++        // Act
++        let kind = EdgeType::parse(raw);
++        // Assert
++        assert!(kind.is_err());
++    }
++}
+--- before/tests/git/Dockerfile
++++ after/tests/git/Dockerfile
+@@ -1,11 +1,11 @@
+ FROM rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+ RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+ RUN rustup component add rustfmt clippy
+ WORKDIR /repo
+-COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
++COPY Cargo.toml Cargo.lock rust-toolchain.toml clippy.toml ./
+ COPY src ./src
+ COPY tests/domain_values.rs tests/markdown_elements.rs tests/markdown_links.rs tests/markdown_search.rs tests/git_snapshots.rs tests/git_retention.rs ./tests/
+ COPY tests/support ./tests/support
+ COPY tests/fixtures/markdown ./tests/fixtures/markdown
+ RUN cargo fetch --locked
+ CMD ["sh", "-c", "git --version && rustc --version && cargo --version && uname -sm && cargo test --locked --offline && cargo fmt --all --check && cargo clippy --locked --offline --all-targets -- -D warnings"]
+--- before/tests/git/README.md
++++ after/tests/git/README.md
+@@ -3,25 +3,26 @@
+ From the repository root:
+ 
+ ```sh
+ cargo +1.95.0 test --locked --offline
+ cargo +1.95.0 fmt --all --check
+ cargo +1.95.0 clippy --locked --offline --all-targets -- -D warnings
+ docker build -f tests/git/Dockerfile -t letopis-tk8-check .
+ docker run --rm --network none letopis-tk8-check
+ ```
+ 
+ Build installs Git, rustfmt and Clippy and fetches locked Rust dependencies.
+ Runtime recompiles the copied source and executes the complete root suite,
+-format and lint checks offline. It does not mount host binaries. The Rust base
++format and lint checks offline. The build copies `clippy.toml` so Linux enforces
++the same 60-code-line function limit as the host. It does not mount host binaries. The Rust base
+ image is digest-pinned; the actual Debian Git version and resulting image ID
+ are recorded with each verification receipt.
+ 
+ The public snapshot and retention tests run against both SHA-1 and SHA-256
+ repositories, with isolated fixture configuration and staged/unstaged files.
+ Only disposable test repositories undergo reflog expiry, GC/prune or corruption.
+ Owned child supervisors bound the I/O, lazy-fetch and concurrent-pin fixtures;
+ there is no production timeout. The transport test first proves its disposable
+ remote/helper is reachable, then checks that snapshot operations never invoke it.
+ 
+ A separate hostile-routing run can use temporary trap locations:
+ 
+--- before/tests/git_retention.rs
++++ after/tests/git_retention.rs
+@@ -1,160 +1,182 @@
+ #[path = "support/git.rs"]
+ mod git;
+-use git::{FORMATS, TempRepo};
++use git::{
++    BLOB_KIND, COMMIT_KIND, FORMATS, GITLINK_MODE, ObjectFormat, REGULAR_FILE_MODE,
++    SNAPSHOT_REF_PREFIX, TREE_KIND, TREE_MODE, TempRepo,
++};
+ use letopis::{
+     domain::{RepoPath, TreeOid},
+     open_git_snapshots,
+-    service::ports::git::{GitSnapshotPort, SnapshotErrorKind::InternalError, SnapshotFile},
++    service::ports::git::{GitSnapshotPort, SnapshotError, SnapshotErrorKind, SnapshotFile},
+ };
+ use std::{
++    ffi::OsString,
+     fs,
++    path::{Path, PathBuf},
+     process::{Command, Stdio},
+     thread,
+     time::{Duration, Instant},
+ };
+ fn path(s: &str) -> RepoPath {
+     RepoPath::parse(s).unwrap()
+ }
+ fn oid(s: &str) -> TreeOid {
+     TreeOid::parse(s).unwrap()
+ }
+ fn external(repo: &TempRepo, child: &str, name: &str, kind: &str) -> TreeOid {
+     oid(&repo.oid(
+         &["mktree", "-z", "--missing"],
+         Some(
+             format!(
+                 "{} {kind} {child}\t{name}\0",
+-                if kind == "tree" { "040000" } else { "100644" }
++                if kind == TREE_KIND {
++                    TREE_MODE
++                } else {
++                    REGULAR_FILE_MODE
++                }
+             )
+             .as_bytes(),
+         ),
+     ))
+ }
+ fn reference(tree: &TreeOid) -> String {
+-    format!("refs/letopis/snapshots/{}", tree.as_str())
++    format!("{SNAPSHOT_REF_PREFIX}{}", tree.as_str())
+ }
+ fn assert_no_ref(repo: &TempRepo, tree: &TreeOid) {
+     assert!(
+         !repo
+             .git(&["show-ref", "--verify", &reference(tree)], None)
+             .status
+             .success()
+     );
+ }
+ #[test]
+ fn retained_snapshots_survive_gc() {
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let git = open_git_snapshots(repo.subdir()).unwrap();
+         let p = path("nested/x");
+         let s1 = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+                 bytes: b"inspect unique\0",
+             }])
+             .unwrap();
+         let blob = repo.oid(
+             &["hash-object", "-w", "--stdin"],
+             Some(b"external basis\r\n"),
+         );
+-        let nested = external(&repo, &blob, "x", "blob");
+-        let basis = external(&repo, nested.as_str(), "nested", "tree");
++        let nested = external(&repo, &blob, "x", BLOB_KIND);
++        let basis = external(&repo, nested.as_str(), "nested", TREE_KIND);
+         let before = repo.head_index_config_and_live_snapshot();
+         for tree in [&s1, &basis] {
+-            assert_eq!(git.pin(tree).unwrap().oid(), tree);
+-            assert_eq!(repo.direct_ref(tree.as_str()), tree.as_str());
+-            assert_eq!(git.pin(tree).unwrap().oid(), tree);
++            // Act
++            let first = git.pin(tree).unwrap();
++            let actual_ref = repo.direct_ref(tree.as_str());
++            let second = git.pin(tree).unwrap();
++            // Assert
++            assert_eq!(first.oid(), tree);
++            assert_eq!(actual_ref, tree.as_str());
++            assert_eq!(second.oid(), tree);
+         }
+         assert_eq!(repo.head_index_config_and_live_snapshot(), before);
++        // Act: collect and repack, then reopen the retained trees.
+         repo.expire_reflogs_gc_prune_now_and_pack_refs();
+         let reopened = open_git_snapshots(repo.root()).unwrap();
+-        assert_eq!(reopened.read_blob(&s1, &p).unwrap(), b"inspect unique\0");
+-        assert_eq!(
+-            reopened.read_blob(&basis, &p).unwrap(),
+-            b"external basis\r\n"
+-        );
+-        assert_eq!(reopened.pin(&basis).unwrap().oid(), &basis);
+-        assert!(repo.fsck_strict_no_reflogs().success());
++        let inspect_bytes = reopened.read_blob(&s1, &p).unwrap();
++        let basis_bytes = reopened.read_blob(&basis, &p).unwrap();
++        let retained = reopened.pin(&basis).unwrap();
++        let integrity = repo.fsck_strict_no_reflogs();
++        // Assert
++        assert_eq!(inspect_bytes, b"inspect unique\0");
++        assert_eq!(basis_bytes, b"external basis\r\n");
++        assert_eq!(retained.oid(), &basis);
++        assert!(integrity.success());
+     }
+ }
+ #[test]
+ fn unretained_unique_tree_is_collectable() {
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let git = open_git_snapshots(repo.root()).unwrap();
+         let p = path("unique");
+         let s = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+                 bytes: b"UNRETAINED unique object\0",
+             }])
+             .unwrap();
+-        assert_eq!(
+-            git.read_blob(&s, &p).unwrap(),
+-            b"UNRETAINED unique object\0"
+-        );
++        // Fixture checks: the unique object exists and has no retention ref.
++        let bytes = git.read_blob(&s, &p).unwrap();
++        assert_eq!(bytes, b"UNRETAINED unique object\0");
+         assert_no_ref(&repo, &s);
++        // Act
+         repo.expire_reflogs_gc_prune_now_and_pack_refs();
+-        assert!(
+-            !repo
+-                .git(&["cat-file", "-e", s.as_str()], None)
+-                .status
+-                .success()
+-        );
++        let exists = repo
++            .git(&["cat-file", "-e", s.as_str()], None)
++            .status
++            .success();
++        // Assert
++        assert!(!exists);
+     }
+ }
+ #[test]
+ fn incomplete_tree_and_ref_failure_do_not_pin() {
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let git = open_git_snapshots(repo.root()).unwrap();
+         let p = path("x");
+         let length = repo.oid(&["rev-parse", "HEAD"], None).len();
+         let missing = "1".repeat(length);
+-        let incomplete = external(&repo, &missing, "x", "blob");
+-        assert_eq!(git.pin(&incomplete).unwrap_err().kind(), InternalError);
++        let incomplete = external(&repo, &missing, "x", BLOB_KIND);
++        // Act
++        let error = git.pin(&incomplete).unwrap_err();
++        // Assert
++        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
+         assert_no_ref(&repo, &incomplete);
++        // Arrange: replace an existing loose object with different bytes.
+         let blob = repo.oid(&["hash-object", "-w", "--stdin"], Some(b"expected"));
+         let other = repo.oid(&["hash-object", "-w", "--stdin"], Some(b"CORRUPT_CANARY"));
+-        let corrupt = external(&repo, &blob, "x", "blob");
+-        let dest = repo
+-            .root()
+-            .join(format!(".git/objects/{}/{}", &blob[..2], &blob[2..]));
+-        fs::remove_file(&dest).unwrap();
+-        fs::copy(
+-            repo.root()
+-                .join(format!(".git/objects/{}/{}", &other[..2], &other[2..])),
+-            dest,
+-        )
+-        .unwrap();
+-        assert_eq!(git.pin(&corrupt).unwrap_err().kind(), InternalError);
++        let corrupt = external(&repo, &blob, "x", BLOB_KIND);
++        repo.replace_loose_object(&blob, &other);
++        // Act
++        let error = git.pin(&corrupt).unwrap_err();
++        // Assert
++        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
+         assert_no_ref(&repo, &corrupt);
++        // Arrange: a fixture-owned lock forces update-ref to fail.
+         let tree = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+                 bytes: b"forced ref failure",
+             }])
+             .unwrap();
+         let lock = repo.root().join(format!(".git/{}.lock", reference(&tree)));
+         fs::create_dir_all(lock.parent().unwrap()).unwrap();
+         fs::write(&lock, b"fixture owned lock").unwrap();
++        // Act
+         let error = git.pin(&tree).unwrap_err();
+-        assert_eq!(error.kind(), InternalError);
++        // Assert
++        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
+         assert_no_ref(&repo, &tree);
+         assert!(!format!("{error:?} {error}").contains("fixture owned lock"));
+     }
+ }
+ #[test]
+ fn symbolic_and_conflicting_refs_are_rejected() {
++    // Arrange
+     for format in FORMATS {
+         for conflict in ["symbolic", "dangling-symbolic", "other", "corrupt"] {
+             let repo = TempRepo::new(format);
+             let git = open_git_snapshots(repo.root()).unwrap();
+             let tree = git.create_tree(&[]).unwrap();
+             let before = repo.head_index_config_and_live_snapshot();
+             let name = reference(&tree);
+             match conflict {
+                 "dangling-symbolic" => {
+                     repo.ok(&["symbolic-ref", &name, "refs/heads/absent"], None);
+                 }
+                 "symbolic" => {
+@@ -162,363 +184,437 @@
+                     repo.ok(&["symbolic-ref", &name, &branch], None);
+                 }
+                 "other" => {
+                     let head = repo.oid(&["rev-parse", "HEAD"], None);
+                     repo.ok(&["update-ref", &name, &head], None);
+                 }
+                 _ => {
+                     let dest = repo.root().join(format!(".git/{name}"));
+                     fs::create_dir_all(dest.parent().unwrap()).unwrap();
+                     fs::write(dest, b"CORRUPT_REF_CANARY\n").unwrap();
+                 }
+             }
++            // Act
+             let err = git.pin(&tree).unwrap_err();
+-            assert_eq!(err.kind(), InternalError);
++            // Assert
++            assert_eq!(err.kind(), SnapshotErrorKind::InternalError);
+             assert!(!format!("{err} {err:?}").contains("CANARY"));
+             assert_eq!(repo.head_index_config_and_live_snapshot(), before);
+         }
+     }
+ }
++fn pin_worker(root: OsString) {
++    // Arrange: announce readiness, then wait for the parent barrier.
++    let root = PathBuf::from(root);
++    let tree = oid(&std::env::var("LETOPIS_PIN_OID").unwrap());
++    let id = std::env::var("LETOPIS_PIN_WORKER").unwrap();
++    fs::write(root.join(format!("ready-{id}")), b"ready").unwrap();
++    let deadline = Instant::now() + Duration::from_secs(20);
++    while !root.join("start").exists() {
++        assert!(Instant::now() < deadline);
++        thread::sleep(Duration::from_millis(5));
++    }
++    // Act
++    let git = open_git_snapshots(&root).unwrap();
++    let retained = git.pin(&tree).unwrap();
++    // Assert
++    assert_eq!(retained.oid(), &tree);
++}
++
++fn spawn_pin_workers(root: &Path, tree: &TreeOid) -> Vec<git::OwnedChild> {
++    let mut children = Vec::new();
++    for id in ["a", "b"] {
++        let mut c = Command::new(std::env::current_exe().unwrap());
++        git::isolated(&mut c);
++        c.args(["--exact", "concurrent_pin_is_idempotent", "--nocapture"])
++            .env("LETOPIS_PIN_ROOT", root)
++            .env("LETOPIS_PIN_OID", tree.as_str())
++            .env("LETOPIS_PIN_WORKER", id)
++            .stdout(Stdio::piped())
++            .stderr(Stdio::piped());
++        children.push(git::OwnedChild::spawn(&mut c));
++    }
++    children
++}
++
+ #[test]
+ fn concurrent_pin_is_idempotent() {
+     if let Some(root) = std::env::var_os("LETOPIS_PIN_ROOT") {
+-        let root = std::path::PathBuf::from(root);
+-        let tree = oid(&std::env::var("LETOPIS_PIN_OID").unwrap());
+-        let id = std::env::var("LETOPIS_PIN_WORKER").unwrap();
+-        fs::write(root.join(format!("ready-{id}")), b"ready").unwrap();
+-        let deadline = Instant::now() + Duration::from_secs(20);
+-        while !root.join("start").exists() {
+-            assert!(Instant::now() < deadline);
+-            thread::sleep(Duration::from_millis(5));
+-        }
+-        assert_eq!(
+-            open_git_snapshots(&root).unwrap().pin(&tree).unwrap().oid(),
+-            &tree
+-        );
++        pin_worker(root);
+         return;
+     }
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let tree = open_git_snapshots(repo.root())
+             .unwrap()
+             .create_tree(&[])
+             .unwrap();
+-        let mut children = Vec::new();
+-        for id in ["a", "b"] {
+-            let mut c = Command::new(std::env::current_exe().unwrap());
+-            git::isolated(&mut c);
+-            c.args(["--exact", "concurrent_pin_is_idempotent", "--nocapture"])
+-                .env("LETOPIS_PIN_ROOT", repo.root())
+-                .env("LETOPIS_PIN_OID", tree.as_str())
+-                .env("LETOPIS_PIN_WORKER", id)
+-                .stdout(Stdio::piped())
+-                .stderr(Stdio::piped());
+-            children.push(git::OwnedChild::spawn(&mut c));
+-        }
++        let children = spawn_pin_workers(repo.root(), &tree);
+         let deadline = Instant::now() + Duration::from_secs(25);
+         while !(repo.root().join("ready-a").exists() && repo.root().join("ready-b").exists()) {
+             if Instant::now() > deadline {
+                 panic!("workers not ready");
+             }
+             thread::sleep(Duration::from_millis(5));
+         }
++        // Act: release both workers together and wait for their results.
+         fs::write(repo.root().join("start"), b"go").unwrap();
+         let outputs: Vec<_> = children
+             .into_iter()
+             .map(|child| child.wait(deadline))
+             .collect();
++        // Assert
+         for out in outputs {
+             assert!(
+                 out.status.success(),
+                 "{} {}",
+                 String::from_utf8_lossy(&out.stdout),
+                 String::from_utf8_lossy(&out.stderr)
+             );
+         }
+         assert_eq!(repo.direct_ref(tree.as_str()), tree.as_str());
+     }
+ }
+ #[test]
+ fn promisor_miss_never_fetches() {
+     if std::env::var_os("LETOPIS_PROMISOR_WORKER").is_none() {
++        // Arrange / Act / Assert: execute and validate this exact isolated worker.
+         git::supervised_test(
+             "promisor_miss_never_fetches",
+             &[("LETOPIS_PROMISOR_WORKER", "1")],
+         );
+         return;
+     }
++    // Arrange
+     for format in FORMATS {
+         let remote = TempRepo::new(format);
+         let repo = TempRepo::new(format);
+         let blob = remote.oid(
+             &["hash-object", "-w", "--stdin"],
+             Some(b"promised remote bytes"),
+         );
+-        let tree = external(&repo, &blob, "missing", "blob");
++        let tree = external(&repo, &blob, "missing", BLOB_KIND);
+         let marker = repo.root().join("FETCH_RAN");
+         let script = repo.script(
+             "transport",
+             "#!/bin/sh\ntouch \"$(dirname \"$0\")/FETCH_RAN\"\nexec git-upload-pack \"$1\"\n",
+         );
+         let url = format!("ext::{} {}", script.display(), remote.root().display());
+         repo.ok(
+             &["-c", "protocol.ext.allow=always", "ls-remote", &url],
+             None,
+         );
++        // Fixture check: prove the remote transport trap is reachable.
+         assert!(marker.exists(), "transport trap must be reachable");
+         fs::remove_file(&marker).unwrap();
+         for (key, value) in [
+             ("remote.origin.url", url.as_str()),
+             ("remote.origin.promisor", "true"),
+             ("remote.origin.partialclonefilter", "blob:none"),
+             ("extensions.partialClone", "origin"),
+             ("protocol.ext.allow", "always"),
+             ("protocol.file.allow", "always"),
+         ] {
+             repo.ok(&["config", key, value], None);
+         }
+         let git = open_git_snapshots(repo.root()).unwrap();
+-        assert_eq!(
+-            git.read_blob(&tree, &path("missing")).unwrap_err().kind(),
+-            InternalError
+-        );
+-        assert_eq!(git.pin(&tree).unwrap_err().kind(), InternalError);
++        // Act
++        let read = git.read_blob(&tree, &path("missing")).unwrap_err();
++        let pin = git.pin(&tree).unwrap_err();
++        // Assert
++        assert_eq!(read.kind(), SnapshotErrorKind::InternalError);
++        assert_eq!(pin.kind(), SnapshotErrorKind::InternalError);
+         assert_no_ref(&repo, &tree);
+         assert!(!marker.exists(), "no lazy transport is permitted");
+         assert!(
+             !repo
+                 .root()
+                 .join(format!(".git/objects/{}/{}", &blob[..2], &blob[2..]))
+                 .exists()
+         );
+     }
+ }
+ 
+ #[test]
+ fn conflicting_descendant_types_do_not_pin() {
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let git = open_git_snapshots(repo.root()).unwrap();
+         let blob = repo.oid(
+             &["hash-object", "-w", "--stdin"],
+             Some(b"shared oid type confusion"),
+         );
+         let binary: Vec<_> = blob
+             .as_bytes()
+             .chunks_exact(2)
+             .map(|h| u8::from_str_radix(std::str::from_utf8(h).unwrap(), 16).unwrap())
+             .collect();
+         let mut raw = b"40000 a\0".to_vec();
+         raw.extend_from_slice(&binary);
+         raw.extend_from_slice(b"100644 z\0");
+         raw.extend_from_slice(&binary);
+         let tree = oid(&repo.oid(
+-            &["hash-object", "-w", "--literally", "-t", "tree", "--stdin"],
++            &[
++                "hash-object",
++                "-w",
++                "--literally",
++                "-t",
++                TREE_KIND,
++                "--stdin",
++            ],
+             Some(&raw),
+         ));
+-        assert_eq!(git.pin(&tree).unwrap_err().kind(), InternalError);
++        // Act
++        let error = git.pin(&tree).unwrap_err();
++        // Assert
++        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
+         assert_no_ref(&repo, &tree);
+     }
+ }
+ #[test]
+ fn gitlinks_are_retained_without_dereferencing() {
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let missing = "1".repeat(repo.oid(&["rev-parse", "HEAD"], None).len());
+         let tree = oid(&repo.oid(
+             &["mktree", "--missing", "-z"],
+-            Some(format!("160000 commit {missing}\tmodule\0").as_bytes()),
++            Some(format!("{GITLINK_MODE} {COMMIT_KIND} {missing}\tmodule\0").as_bytes()),
+         ));
+         let git = open_git_snapshots(repo.root()).unwrap();
+-        assert_eq!(git.pin(&tree).unwrap().oid(), &tree);
+-        assert_eq!(
+-            git.read_blob(&tree, &path("module")).unwrap_err().kind(),
+-            letopis::service::ports::git::SnapshotErrorKind::InvalidRequest
+-        );
+-        assert!(repo.fsck_strict_no_reflogs().success());
+-    }
+-}
+-
+-fn assert_alternates_error(error: &letopis::service::ports::git::SnapshotError, donor: &TempRepo) {
+-    assert_eq!(error.kind(), InternalError);
++        // Act
++        let retained = git.pin(&tree).unwrap();
++        let read = git.read_blob(&tree, &path("module")).unwrap_err();
++        let integrity = repo.fsck_strict_no_reflogs();
++        // Assert
++        assert_eq!(retained.oid(), &tree);
++        assert_eq!(read.kind(), SnapshotErrorKind::InvalidRequest);
++        assert!(integrity.success());
++    }
++}
++
++fn assert_alternates_error(error: &SnapshotError, donor: &TempRepo) {
++    assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
+     assert!(error.message().contains("alternates"));
+     let diagnostic = format!("{error} {error:?}");
+     assert!(!diagnostic.contains(donor.root().to_str().unwrap()));
+     assert!(!diagnostic.contains("CANARY"));
+ }
+ 
++fn try_borrowed_snapshot(
++    donor: &TempRepo,
++    borrower: &TempRepo,
++    p: &RepoPath,
++    bytes: &[u8],
++    local_blob: &Path,
++) -> Option<(impl GitSnapshotPort, TreeOid)> {
++    // Act
++    let opened = open_git_snapshots(borrower.root());
++    match opened {
++        Ok(git) => {
++            // On the unfixed adapter this recreates the public-API failure:
++            // hash-object -w reuses the donor blob and pin appears successful.
++            let tree = git.create_tree(&[SnapshotFile { path: p, bytes }]).unwrap();
++            git.pin(&tree).unwrap();
++            assert_eq!(git.read_blob(&tree, p).unwrap(), bytes);
++            assert!(
++                !local_blob.exists(),
++                "hash-object -w must not be mistaken for materialization"
++            );
++            Some((git, tree))
++        }
++        Err(error) => {
++            assert_alternates_error(&error, donor);
++            None
++        }
++    }
++}
++
++fn assert_shared_clone_gc_outcome(
++    donor: &TempRepo,
++    borrower: &TempRepo,
++    blob: &str,
++    p: &RepoPath,
++    accepted: &Option<(impl GitSnapshotPort, TreeOid)>,
++    format: ObjectFormat,
++) {
++    assert!(
++        !donor.git(&["cat-file", "-e", blob], None).status.success(),
++        "donor GC really removed the unreferenced blob"
++    );
++    assert!(
++        !borrower
++            .git(&["cat-file", "-e", blob], None)
++            .status
++            .success()
++    );
++    if let Some((git, tree)) = accepted {
++        assert_eq!(
++            git.read_blob(tree, p).unwrap_err().kind(),
++            SnapshotErrorKind::InternalError
++        );
++        assert_eq!(borrower.direct_ref(tree.as_str()), tree.as_str());
++        eprintln!(
++            "{format:?}: accepted shared snapshot lost its donor blob after GC while its service ref remained exact"
++        );
++    } else {
++        assert!(
++            borrower
++                .ok(&["for-each-ref", SNAPSHOT_REF_PREFIX], None)
++                .is_empty()
++        );
++    }
++}
++
+ #[test]
+ fn shared_clone_is_refused_before_donor_gc_can_break_retention() {
+     let mut refused = Vec::new();
++    // Arrange
+     for format in FORMATS {
+         let donor = TempRepo::new(format);
+         let bytes = b"ALTERNATE_PAYLOAD_CANARY unique unreferenced blob\0";
+         let blob = donor.oid(&["hash-object", "-w", "--stdin"], Some(bytes));
+         let borrower = donor.shared_clone();
+         let donor_before = donor.head_index_config_and_live_snapshot();
+         let borrower_before = borrower.head_index_config_and_live_snapshot();
+         let alternates = borrower.root().join(".git/objects/info/alternates");
+         let configuration = fs::read(&alternates).unwrap();
++        // Fixture checks: the shared clone borrows the donor blob.
+         assert!(
+             borrower
+                 .git(&["cat-file", "-e", &blob], None)
+                 .status
+                 .success()
+         );
+         let local_blob =
+             borrower
+                 .root()
+                 .join(format!(".git/objects/{}/{}", &blob[..2], &blob[2..]));
+         assert!(
+             !local_blob.exists(),
+             "the ordinary shared clone borrows this blob"
+         );
+-        let opened = open_git_snapshots(borrower.root());
+         let p = path("captured");
+-        let accepted = match opened {
+-            Ok(git) => {
+-                // On the unfixed adapter this recreates the public-API failure:
+-                // hash-object -w reuses the donor blob and pin appears successful.
+-                let tree = git
+-                    .create_tree(&[SnapshotFile { path: &p, bytes }])
+-                    .unwrap();
+-                git.pin(&tree).unwrap();
+-                assert_eq!(git.read_blob(&tree, &p).unwrap(), bytes);
+-                assert!(
+-                    !local_blob.exists(),
+-                    "hash-object -w must not be mistaken for materialization"
+-                );
+-                Some((git, tree))
+-            }
+-            Err(error) => {
+-                assert_alternates_error(&error, &donor);
+-                None
+-            }
+-        };
++        // Act: the helper preserves the unfixed adapter's accepted-snapshot path.
++        let accepted = try_borrowed_snapshot(&donor, &borrower, &p, bytes, &local_blob);
++        // Act: actually remove the donor object before checking the outcome.
+         donor.expire_reflogs_gc_prune_now_and_pack_refs();
+-        assert!(
+-            !donor.git(&["cat-file", "-e", &blob], None).status.success(),
+-            "donor GC really removed the unreferenced blob"
+-        );
+-        assert!(
+-            !borrower
+-                .git(&["cat-file", "-e", &blob], None)
+-                .status
+-                .success()
+-        );
+-        if let Some((git, tree)) = &accepted {
+-            assert_eq!(git.read_blob(tree, &p).unwrap_err().kind(), InternalError);
+-            assert_eq!(borrower.direct_ref(tree.as_str()), tree.as_str());
+-            eprintln!(
+-                "{format:?}: accepted shared snapshot lost its donor blob after GC while its service ref remained exact"
+-            );
+-        } else {
+-            assert!(
+-                borrower
+-                    .ok(&["for-each-ref", "refs/letopis/snapshots/"], None)
+-                    .is_empty()
+-            );
+-        }
++        // Assert
++        assert_shared_clone_gc_outcome(&donor, &borrower, &blob, &p, &accepted, format);
+         assert_eq!(donor.head_index_config_and_live_snapshot(), donor_before);
+         assert_eq!(
+             borrower.head_index_config_and_live_snapshot(),
+             borrower_before
+         );
+         assert_eq!(fs::read(&alternates).unwrap(), configuration);
+         refused.push(accepted.is_none());
+     }
++    // Assert: neither object format may accept a borrowed snapshot.
+     assert!(
+         refused.iter().all(|r| *r),
+         "shared clones must be refused before any snapshot is accepted: {refused:?}"
+     );
+ }
+ 
+ #[test]
+ fn alternates_added_after_open_refuse_operations_without_writes() {
++    // Arrange
+     for format in FORMATS {
+         let donor = TempRepo::new(format);
+         let repo = TempRepo::new(format);
+         let git = open_git_snapshots(repo.root()).unwrap();
+         let p = path("captured");
+         let tree = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+                 bytes: b"local bytes",
+             }])
+             .unwrap();
+         let alternates = repo.root().join(".git/objects/info/alternates");
+         let configuration = format!("{}\n", donor.root().join(".git/objects").display());
+         fs::write(&alternates, &configuration).unwrap();
+         let before = repo.head_index_config_and_live_snapshot();
+         let objects = repo.ok(&["count-objects", "-v"], None);
++        // Act
+         let create = git.create_tree(&[SnapshotFile {
+             path: &p,
+             bytes: b"new ALTERNATE_PAYLOAD_CANARY",
+         }]);
+         let pin = git.pin(&tree);
+         let read = git.read_blob(&tree, &p);
++        // Assert
+         for error in [create.err(), pin.err(), read.err()] {
+             assert_alternates_error(
+                 &error.expect("alternates introduced after open must be refused"),
+                 &donor,
+             );
+         }
+         assert_no_ref(&repo, &tree);
+         assert_eq!(repo.ok(&["count-objects", "-v"], None), objects);
+         assert_eq!(repo.head_index_config_and_live_snapshot(), before);
+         assert_eq!(fs::read(&alternates).unwrap(), configuration.as_bytes());
+     }
+ }
+ 
+ #[test]
+ fn linked_worktree_checks_common_object_store_and_refuses_inactive_alternates() {
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let linked = repo.root().join("linked");
+         repo.ok(
+             &[
+                 "worktree",
+                 "add",
+                 "-q",
+                 "--detach",
+                 linked.to_str().unwrap(),
+             ],
+             None,
+         );
+         let git = open_git_snapshots(&linked).unwrap();
+         let p = path("linked");
+         let tree = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+                 bytes: b"linked bytes",
+             }])
+             .unwrap();
++        // Fixture checks: the linked checkout works before alternates are added.
+         git.pin(&tree).unwrap();
+         assert_eq!(git.read_blob(&tree, &p).unwrap(), b"linked bytes");
+         let alternates = repo.root().join(".git/objects/info/alternates");
+         let before = repo.head_index_config_and_live_snapshot();
+         let refs = repo.ok(&["for-each-ref"], None);
+         let objects = repo.ok(&["count-objects", "-v"], None);
++        // Arrange
+         for configuration in [b"".as_slice(), b"/ABSENT_DONOR_PATH_CANARY/objects\n"] {
+             fs::write(&alternates, configuration).unwrap();
+-            match open_git_snapshots(&linked) {
++            // Act
++            let opened = open_git_snapshots(&linked);
++            let pin = git.pin(&tree);
++            // Assert
++            match opened {
+                 Ok(_) => {
+                     panic!("linked worktree must reject even empty/inactive common alternates")
+                 }
+                 Err(error) => assert_alternates_error(&error, &repo),
+             }
+-            assert_alternates_error(&git.pin(&tree).unwrap_err(), &repo);
++            assert_alternates_error(&pin.unwrap_err(), &repo);
+             assert_eq!(fs::read(&alternates).unwrap(), configuration);
+             assert_eq!(repo.head_index_config_and_live_snapshot(), before);
+             assert_eq!(repo.ok(&["for-each-ref"], None), refs);
+         }
++        // Arrange: removing the inactive configuration restores access.
+         fs::remove_file(alternates).unwrap();
++        // Act
++        let bytes = open_git_snapshots(&linked)
++            .unwrap()
++            .read_blob(&tree, &p)
++            .unwrap();
++        // Assert
+         assert_eq!(repo.ok(&["count-objects", "-v"], None), objects);
+-        assert_eq!(
+-            open_git_snapshots(&linked)
+-                .unwrap()
+-                .read_blob(&tree, &p)
+-                .unwrap(),
+-            b"linked bytes"
+-        );
+-    }
+-}
++        assert_eq!(bytes, b"linked bytes");
++    }
++}
+--- before/tests/git_snapshots.rs
++++ after/tests/git_snapshots.rs
+@@ -1,244 +1,290 @@
+ #[path = "support/git.rs"]
+ mod git;
+-use git::{FORMATS, ObjectFormat, TempRepo};
++use git::{
++    BLOB_KIND, COMMIT_KIND, FORMATS, GITLINK_MODE, REGULAR_FILE_MODE, TAG_KIND, TREE_KIND,
++    TREE_MODE, TempRepo,
++};
+ use letopis::{
+     domain::{RepoPath, TreeOid},
+     open_git_snapshots,
+-    service::ports::git::{GitSnapshotPort, SnapshotErrorKind::*, SnapshotFile},
++    service::ports::git::{GitSnapshotPort, SnapshotErrorKind, SnapshotFile},
+ };
+ use std::fs;
++
+ fn path(s: &str) -> RepoPath {
+     RepoPath::parse(s).unwrap()
+ }
+ fn oid(s: &str) -> TreeOid {
+     TreeOid::parse(s).unwrap()
+ }
+ fn external_tree(repo: &TempRepo, mode: &str, kind: &str, child: &str, name: &str) -> TreeOid {
+     oid(&repo.oid(
+         &["mktree", "-z", "--missing"],
+         Some(format!("{mode} {kind} {child}\t{name}\0").as_bytes()),
+     ))
+ }
+-#[test]
+-fn exact_bytes_without_index_or_commit() {
+-    for format in FORMATS {
+-        let repo = TempRepo::new(format);
+-        let filter = repo.script("filter", "#!/bin/sh\ntouch FILTER_RAN\ncat\n");
+-        repo.ok(
+-            &["config", "filter.canary.clean", filter.to_str().unwrap()],
+-            None,
+-        );
+-        repo.ok(&["config", "filter.canary.required", "true"], None);
+-        repo.ok(&["config", "core.autocrlf", "true"], None);
+-        fs::write(
+-            repo.root().join(".gitattributes"),
+-            b"* filter=canary text eol=crlf\n",
+-        )
+-        .unwrap();
+-        let before = repo.head_index_config_and_live_snapshot();
+-        let git = open_git_snapshots(repo.subdir()).unwrap();
+-        let paths = [
+-            path("live.md"),
+-            path("nested/empty"),
+-            path("nested/binary"),
+-            path("文档/й.md"),
+-            path("lf"),
+-            path("crlf"),
+-        ];
+-        let bytes: [&[u8]; 6] = [
++fn configure_filter_trap(repo: &TempRepo) {
++    let filter = repo.script("filter", "#!/bin/sh\ntouch FILTER_RAN\ncat\n");
++    repo.ok(
++        &["config", "filter.canary.clean", filter.to_str().unwrap()],
++        None,
++    );
++    repo.ok(&["config", "filter.canary.required", "true"], None);
++    repo.ok(&["config", "core.autocrlf", "true"], None);
++    fs::write(
++        repo.root().join(".gitattributes"),
++        b"* filter=canary text eol=crlf\n",
++    )
++    .unwrap();
++}
++fn captured_inputs() -> ([RepoPath; 6], [&'static [u8]; 6]) {
++    (
++        [
++            "live.md",
++            "nested/empty",
++            "nested/binary",
++            "文档/й.md",
++            "lf",
++            "crlf",
++        ]
++        .map(path),
++        [
+             b"no final newline",
+             b"",
+             b"\0\xff\x01\r\n",
+             "Привет 🌳\n".as_bytes(),
+             b"a\nb\n",
+             b"a\r\nb\r\n",
+-        ];
++        ],
++    )
++}
++
++#[test]
++fn exact_bytes_without_index_or_commit() {
++    // Arrange
++    for format in FORMATS {
++        let repo = TempRepo::new(format);
++        configure_filter_trap(&repo);
++        let before = repo.head_index_config_and_live_snapshot();
++        let git = open_git_snapshots(repo.subdir()).unwrap();
++        let (paths, bytes) = captured_inputs();
+         let mut files: Vec<_> = paths
+             .iter()
+             .zip(bytes)
+             .map(|(path, bytes)| SnapshotFile { path, bytes })
+             .collect();
+-        let s1 = git.create_tree(&files).unwrap();
+-        for (p, b) in paths.iter().zip(bytes) {
+-            assert_eq!(git.read_blob(&s1, p).unwrap(), b);
+-        }
++        // Act
++        let first = git.create_tree(&files).unwrap();
++        let captured: Vec<_> = paths
++            .iter()
++            .map(|p| git.read_blob(&first, p).unwrap())
++            .collect();
+         files.reverse();
+-        assert_eq!(git.create_tree(&files).unwrap(), s1);
+-        assert_eq!(repo.head_index_config_and_live_snapshot(), before);
++        let reordered = git.create_tree(&files).unwrap();
++        let after = repo.head_index_config_and_live_snapshot();
++        // Assert
++        for (actual, expected) in captured.iter().zip(bytes) {
++            assert_eq!(actual, expected);
++        }
++        assert_eq!(reordered, first);
++        assert_eq!(after, before);
+         assert!(!repo.root().join("FILTER_RAN").exists());
++
++        // Arrange: mutate and remove live files after capturing their bytes.
+         repo.change_and_delete_live_files("live.md");
+-        assert_eq!(git.read_blob(&s1, &paths[0]).unwrap(), bytes[0]);
+-        let s2 = git
++        // Act
++        let after_live_change = git.read_blob(&first, &paths[0]).unwrap();
++        let second = git
+             .create_tree(&[SnapshotFile {
+                 path: &paths[0],
+                 bytes: b"new",
+             }])
+             .unwrap();
+-        assert_ne!(s1, s2);
+-        assert_eq!(git.read_blob(&s1, &paths[0]).unwrap(), bytes[0]);
+-        let listing = repo.ok(&["ls-tree", "-rz", "--name-only", s1.as_str()], None);
++        let after_new_tree = git.read_blob(&first, &paths[0]).unwrap();
++        let listing = repo.ok(&["ls-tree", "-rz", "--name-only", first.as_str()], None);
++        // Assert
++        assert_eq!(after_live_change, bytes[0]);
++        assert_ne!(first, second);
++        assert_eq!(after_new_tree, bytes[0]);
+         assert_eq!(
+             listing.split(|b| *b == 0).filter(|s| !s.is_empty()).count(),
+             6
+         );
+     }
+ }
++
+ #[test]
+ fn paths_are_literal_and_never_shell_input() {
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let git = open_git_snapshots(repo.subdir()).unwrap();
+         let paths = [
+             "dir/a:b",
+             "-name",
+             "literal*.md",
+             "$(touch SENTINEL).md",
+             "space dir/a b",
+         ]
+         .map(path);
+         let files: Vec<_> = paths
+             .iter()
+             .map(|p| SnapshotFile {
+                 path: p,
+                 bytes: b"literal",
+             })
+             .collect();
++        // Act
+         let tree = git.create_tree(&files).unwrap();
+-        for p in &paths {
+-            assert_eq!(git.read_blob(&tree, p).unwrap(), b"literal");
++        let captured: Vec<_> = paths
++            .iter()
++            .map(|p| git.read_blob(&tree, p).unwrap())
++            .collect();
++        // Assert
++        for bytes in captured {
++            assert_eq!(bytes, b"literal");
+         }
+         assert!(!repo.root().join("SENTINEL").exists());
+         assert!(!repo.subdir().join("SENTINEL").exists());
+     }
+ }
++
+ #[test]
+ fn empty_tree_and_invalid_paths() {
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let git = open_git_snapshots(repo.root()).unwrap();
++        // Act
+         let empty = git.create_tree(&[]).unwrap();
+-        assert!(repo.ok(&["ls-tree", empty.as_str()], None).is_empty());
++        let listing = repo.ok(&["ls-tree", empty.as_str()], None);
++        // Assert
++        assert!(listing.is_empty());
++
++        // Arrange
+         for names in [
+             vec!["a", "a"],
+             vec!["a", "a/b"],
+             vec![".git/x"],
+             vec!["dir/.git/x"],
+             vec![".letopis/x"],
+         ] {
+             let paths: Vec<_> = names.into_iter().map(path).collect();
+             let files: Vec<_> = paths
+                 .iter()
+                 .map(|p| SnapshotFile {
+                     path: p,
+                     bytes: b"UNIQUE_INVALID_CANARY",
+                 })
+                 .collect();
+             let before = repo.ok(&["count-objects", "-v"], None);
+-            let err = git.create_tree(&files).unwrap_err();
+-            assert_eq!(err.kind(), InvalidRequest);
+-            assert!(!format!("{err:?} {err}").contains("CANARY"));
+-            assert_eq!(
+-                before,
+-                repo.ok(&["count-objects", "-v"], None),
+-                "invalid input must not write objects"
+-            );
+-        }
+-    }
+-}
++            // Act
++            let error = git.create_tree(&files).unwrap_err();
++            let after = repo.ok(&["count-objects", "-v"], None);
++            // Assert
++            assert_eq!(error.kind(), SnapshotErrorKind::InvalidRequest);
++            assert!(!format!("{error:?} {error}").contains("CANARY"));
++            assert_eq!(before, after, "invalid input must not write objects");
++        }
++    }
++}
++
++fn tree_error_cases(repo: &TempRepo, empty: &TreeOid) -> Vec<(TreeOid, SnapshotErrorKind)> {
++    let commit = repo.oid(&["rev-parse", "HEAD"], None);
++    let wrong_length = match commit.len() {
++        40 => 64,
++        64 => 40,
++        _ => panic!("fixture Git uses an unsupported OID length"),
++    };
++    let tag_body = format!(
++        "object {commit}\ntype commit\ntag fixture\ntagger Fixture <fixture@example.invalid> 1 +0000\n\nfixture\n"
++    );
++    let tag = repo.oid(
++        &["hash-object", "-w", "-t", TAG_KIND, "--stdin"],
++        Some(tag_body.as_bytes()),
++    );
++    let missing = "1".repeat(commit.len());
++    vec![
++        (
++            oid(&"0".repeat(wrong_length)),
++            SnapshotErrorKind::InvalidRequest,
++        ),
++        (oid(&commit), SnapshotErrorKind::InvalidRequest),
++        (oid(&tag), SnapshotErrorKind::InvalidRequest),
++        (oid(&missing), SnapshotErrorKind::NotFound),
++        (empty.clone(), SnapshotErrorKind::NotFound),
++        (
++            external_tree(repo, REGULAR_FILE_MODE, BLOB_KIND, &missing, "leaf"),
++            SnapshotErrorKind::InternalError,
++        ),
++        (
++            external_tree(repo, TREE_MODE, TREE_KIND, empty.as_str(), "leaf"),
++            SnapshotErrorKind::InvalidRequest,
++        ),
++        (
++            external_tree(repo, GITLINK_MODE, COMMIT_KIND, &commit, "leaf"),
++            SnapshotErrorKind::InvalidRequest,
++        ),
++    ]
++}
++fn corrupted_blob_tree(repo: &TempRepo) -> TreeOid {
++    let blob = repo.oid(&["hash-object", "-w", "--stdin"], Some(b"valid expected"));
++    let other = repo.oid(
++        &["hash-object", "-w", "--stdin"],
++        Some(b"different CORRUPT_CANARY bytes"),
++    );
++    let tree = external_tree(repo, REGULAR_FILE_MODE, BLOB_KIND, &blob, "leaf");
++    repo.replace_loose_object(&blob, &other);
++    tree
++}
++
+ #[test]
+ fn tree_types_and_missing_objects_are_distinct() {
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let git = open_git_snapshots(repo.root()).unwrap();
+-        let p = path("leaf");
+-        let wrong = match format {
+-            ObjectFormat::Sha1 => "0".repeat(64),
+-            ObjectFormat::Sha256 => "0".repeat(40),
+-        };
+-        assert_eq!(
+-            git.read_blob(&oid(&wrong), &p).unwrap_err().kind(),
+-            InvalidRequest
+-        );
+-        let commit = repo.oid(&["rev-parse", "HEAD"], None);
+-        assert_eq!(
+-            git.read_blob(&oid(&commit), &p).unwrap_err().kind(),
+-            InvalidRequest
+-        );
+-        let tag_body = format!(
+-            "object {commit}\ntype commit\ntag fixture\ntagger Fixture <fixture@example.invalid> 1 +0000\n\nfixture\n"
+-        );
+-        let tag = repo.oid(
+-            &["hash-object", "-w", "-t", "tag", "--stdin"],
+-            Some(tag_body.as_bytes()),
+-        );
+-        assert_eq!(
+-            git.read_blob(&oid(&tag), &p).unwrap_err().kind(),
+-            InvalidRequest
+-        );
+-        let missing = "1".repeat(commit.len());
+-        assert_eq!(
+-            git.read_blob(&oid(&missing), &p).unwrap_err().kind(),
+-            NotFound
+-        );
++        let leaf = path("leaf");
+         let empty = git.create_tree(&[]).unwrap();
+-        assert_eq!(git.read_blob(&empty, &p).unwrap_err().kind(), NotFound);
+-        let dangling = external_tree(&repo, "100644", "blob", &missing, "leaf");
+-        assert_eq!(
+-            git.read_blob(&dangling, &p).unwrap_err().kind(),
+-            InternalError
+-        );
+-        let tree_leaf = external_tree(&repo, "040000", "tree", empty.as_str(), "leaf");
+-        assert_eq!(
+-            git.read_blob(&tree_leaf, &p).unwrap_err().kind(),
+-            InvalidRequest
+-        );
+-        let gitlink = external_tree(&repo, "160000", "commit", &commit, "leaf");
+-        assert_eq!(
+-            git.read_blob(&gitlink, &p).unwrap_err().kind(),
+-            InvalidRequest
+-        );
+-        let blob = repo.oid(&["hash-object", "-w", "--stdin"], Some(b"valid expected"));
+-        let other = repo.oid(
+-            &["hash-object", "-w", "--stdin"],
+-            Some(b"different CORRUPT_CANARY bytes"),
+-        );
+-        let tree = external_tree(&repo, "100644", "blob", &blob, "leaf");
+-        fs::remove_file(
+-            repo.root()
+-                .join(format!(".git/objects/{}/{}", &blob[..2], &blob[2..])),
+-        )
+-        .unwrap();
+-        fs::copy(
+-            repo.root()
+-                .join(format!(".git/objects/{}/{}", &other[..2], &other[2..])),
+-            repo.root()
+-                .join(format!(".git/objects/{}/{}", &blob[..2], &blob[2..])),
+-        )
+-        .unwrap();
+-        let error = git.read_blob(&tree, &p).unwrap_err();
+-        assert_eq!(error.kind(), InternalError);
++        for (tree, expected) in tree_error_cases(&repo, &empty) {
++            // Act
++            let error = git.read_blob(&tree, &leaf).unwrap_err();
++            // Assert
++            assert_eq!(error.kind(), expected);
++        }
++        // Arrange
++        let tree = corrupted_blob_tree(&repo);
++        // Act
++        let error = git.read_blob(&tree, &leaf).unwrap_err();
++        // Assert
++        assert_eq!(error.kind(), SnapshotErrorKind::InternalError);
+         assert!(!format!("{error} {error:?}").contains("CORRUPT_CANARY"));
+     }
+ }
++
+ #[test]
+ fn replacement_refs_do_not_change_bytes() {
++    // Arrange
+     for format in FORMATS {
+         let repo = TempRepo::new(format);
+         let git = open_git_snapshots(repo.root()).unwrap();
+         let p = path("x");
+-        let s1 = git
++        let original = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+                 bytes: b"original",
+             }])
+             .unwrap();
+-        let s2 = git
++        let replacement = git
+             .create_tree(&[SnapshotFile {
+                 path: &p,
+                 bytes: b"replacement",
+             }])
+             .unwrap();
+-        repo.ok(&["replace", s1.as_str(), s2.as_str()], None);
+-        assert_eq!(git.read_blob(&s1, &p).unwrap(), b"original");
+-    }
+-}
++        repo.ok(&["replace", original.as_str(), replacement.as_str()], None);
++        // Act
++        let bytes = git.read_blob(&original, &p).unwrap();
++        // Assert
++        assert_eq!(bytes, b"original");
++    }
++}
+--- before/tests/markdown_elements.rs
++++ after/tests/markdown_elements.rs
+@@ -1,229 +1,275 @@
+ mod support;
+ use letopis::{
+-    adapters::markdown::{DiagnosticKind::*, parse},
+-    domain::*,
++    adapters::markdown::{DiagnosticKind, ParsedElement, parse},
++    domain::RepoPath,
+ };
+-use support::*;
++use support::{assert_error, parsed, whole};
++
++fn assert_golden_element(parsed: &ParsedElement, want: &serde_json::Value, name: &str) {
++    let got = &parsed.element;
++    assert_eq!(got.id.as_str(), want["id"].as_str().unwrap(), "{name}");
++    assert_eq!(
++        got.bytes.start() as u64,
++        want["start"].as_u64().unwrap(),
++        "{name}"
++    );
++    assert_eq!(
++        got.bytes.end() as u64,
++        want["end"].as_u64().unwrap(),
++        "{name}"
++    );
++    assert_eq!(
++        got.lines.start(),
++        want["line_start"].as_u64().unwrap(),
++        "{name}"
++    );
++    assert_eq!(
++        got.lines.end(),
++        want["line_end"].as_u64().unwrap(),
++        "{name}"
++    );
++    assert_eq!(got.hash.to_hex(), want["hash"].as_str().unwrap(), "{name}");
++    assert_eq!(
++        got.metadata.created_at,
++        want["created_at"].as_u64().unwrap(),
++        "{name}"
++    );
++}
+ 
+ #[test]
+ fn golden_elements_have_exact_bytes_and_metadata() {
++    // Arrange
+     let golden: serde_json::Value =
+         serde_json::from_str(include_str!("fixtures/markdown/expected.json")).unwrap();
+     for (name, expected) in golden.as_object().unwrap() {
+         let bytes = std::fs::read(format!(
+             "{}/tests/fixtures/markdown/{name}",
+             env!("CARGO_MANIFEST_DIR")
+         ))
+         .unwrap();
+-        let result = parse(
+-            &RepoPath::parse(&format!("knowledge/{name}")).unwrap(),
+-            &bytes,
+-        )
+-        .unwrap()
+-        .unwrap();
++        let path = RepoPath::parse(&format!("knowledge/{name}")).unwrap();
++        // Act
++        let result = parse(&path, &bytes).unwrap().unwrap();
++        // Assert
+         assert_eq!(
+             result.elements.len(),
+             expected.as_array().unwrap().len(),
+             "{name}"
+         );
+-        for (parsed_element, want) in result.elements.iter().zip(expected.as_array().unwrap()) {
+-            let got = &parsed_element.element;
+-            assert_eq!(got.id.as_str(), want["id"].as_str().unwrap(), "{name}");
+-            assert_eq!(
+-                got.bytes.start() as u64,
+-                want["start"].as_u64().unwrap(),
+-                "{name}"
+-            );
+-            assert_eq!(
+-                got.bytes.end() as u64,
+-                want["end"].as_u64().unwrap(),
+-                "{name}"
+-            );
+-            assert_eq!(
+-                got.lines.start(),
+-                want["line_start"].as_u64().unwrap(),
+-                "{name}"
+-            );
+-            assert_eq!(
+-                got.lines.end(),
+-                want["line_end"].as_u64().unwrap(),
+-                "{name}"
+-            );
+-            assert_eq!(got.hash.to_hex(), want["hash"].as_str().unwrap(), "{name}");
+-            assert_eq!(
+-                got.metadata.created_at,
+-                want["created_at"].as_u64().unwrap(),
+-                "{name}"
+-            );
++        for (got, want) in result.elements.iter().zip(expected.as_array().unwrap()) {
++            assert_golden_element(got, want, name);
+         }
+     }
+ }
+ 
+ #[test]
+ fn unicode_crlf_and_eof_have_exact_spans() {
++    // Arrange
++    let path = RepoPath::parse("a.md").unwrap();
+     for bytes in [
+         include_bytes!("fixtures/markdown/crlf.md").as_slice(),
+         include_bytes!("fixtures/markdown/no-final-newline.md").as_slice(),
+     ] {
+-        let got = parse(&RepoPath::parse("a.md").unwrap(), bytes)
+-            .unwrap()
+-            .unwrap();
++        // Act
++        let got = parse(&path, bytes).unwrap().unwrap();
++        // Assert
+         assert_eq!(got.elements[0].element.bytes.end(), bytes.len());
+         assert_eq!(got.elements[0].element.lines.end(), 3);
+     }
+-    let got = parsed(
+-        "a.md",
+-        std::str::from_utf8(include_bytes!("fixtures/markdown/unicode.md")).unwrap(),
+-    );
++    // Arrange
++    let text = std::str::from_utf8(include_bytes!("fixtures/markdown/unicode.md")).unwrap();
++    // Act
++    let got = parsed("a.md", text);
++    // Assert
+     assert_eq!(got.elements[0].element.bytes.start(), 11);
+     assert_eq!(got.elements[0].element.lines.start(), 3);
+ }
+ 
+ #[test]
+ fn unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected() {
+-    assert!(
+-        parse(&RepoPath::parse("a.md").unwrap(), b"# plain\nText.\n")
+-            .unwrap()
+-            .is_none()
+-    );
+-    error(b"\xff", InvalidUtf8);
++    // Arrange
++    let path = RepoPath::parse("a.md").unwrap();
++    // Act
++    let plain = parse(&path, b"# plain\nText.\n");
++    let invalid_utf8 = parse(&path, b"\xff");
++    // Assert
++    assert!(plain.unwrap().is_none());
++    assert_error(invalid_utf8, DiagnosticKind::InvalidUtf8);
+ }
+ 
+ #[test]
+ fn code_examples_do_not_declare_elements() {
+-    for s in [
++    // Arrange
++    let path = RepoPath::parse("a.md").unwrap();
++    for text in [
+         "```md\n## A {#a}\n<!-- letopis: {} -->\n```\n",
+         "    ## A {#a}\n    <!-- letopis: {} -->\n",
+         "`<!-- letopis: {} -->`\n",
+         "```md\n## A {#a}\n<!-- letopis: {} -->\n",
+     ] {
+-        assert!(
+-            parse(&RepoPath::parse("a.md").unwrap(), s.as_bytes())
+-                .unwrap()
+-                .is_none(),
+-            "{s}"
+-        );
+-    }
+-    let got = parsed(
+-        "a.md",
+-        std::str::from_utf8(include_bytes!("fixtures/markdown/code.md")).unwrap(),
+-    );
++        // Act
++        let result = parse(&path, text.as_bytes());
++        // Assert
++        assert!(result.unwrap().is_none(), "{text}");
++    }
++    // Arrange
++    let text = std::str::from_utf8(include_bytes!("fixtures/markdown/code.md")).unwrap();
++    // Act
++    let got = parsed("a.md", text);
++    // Assert
+     assert_eq!(got.elements.len(), 1);
+     assert!(got.edges.is_empty());
+ }
+ 
+ #[test]
+ fn file_errors_never_return_partial_elements() {
++    // Arrange
++    let path = RepoPath::parse("knowledge/a.md").unwrap();
+     let prefix = "## Valid {#valid}\n<!-- letopis: {\"created_at\":1} -->\nOK.\n\n";
+     for json in [
+         "{}",
+         "{",
+         "{\"created_at\":-1}",
+         "{\"created_at\":1.5}",
+         "{\"created_at\":18446744073709551616}",
+         "{\"created_at\":0,\"kind\":\"vertex\"}",
+         "{\"created_at\":0,\"source_snapshot\":null}",
+         "{\"created_at\":0,\"source_snapshot\":\"BAD\"}",
+         "{\"created_at\":0,\"created_at\":1}",
+     ] {
+-        error(
+-            format!("{prefix}## Bad {{#bad}}\n<!-- letopis: {json} -->\nOops.\n").as_bytes(),
+-            InvalidMetadata,
+-        );
+-    }
+-    error(format!("{prefix}## A {{#a}}\n<!-- letopis: {{\"created_at\":2}} -->\n[self](./knowledge/../knowledge/a.md#a \"letopis:type=depends_on\")\n").as_bytes(),SelfLoop);
++        let text = format!("{prefix}## Bad {{#bad}}\n<!-- letopis: {json} -->\nOops.\n");
++        // Act
++        let result = parse(&path, text.as_bytes());
++        // Assert
++        assert_error(result, DiagnosticKind::InvalidMetadata);
++    }
++    // Arrange
++    let text = format!(
++        "{prefix}## A {{#a}}\n<!-- letopis: {{\"created_at\":2}} -->\n[self](./knowledge/../knowledge/a.md#a \"letopis:type=depends_on\")\n"
++    );
++    // Act
++    let result = parse(&path, text.as_bytes());
++    // Assert
++    assert_error(result, DiagnosticKind::SelfLoop);
+ }
+ 
+ #[test]
+ fn nested_elements_and_orphan_metadata_are_rejected() {
+-    for s in [
+-        "## A {#a}\n<!-- letopis: {\"created_at\":1} -->\n### B {#b}\n<!-- letopis: {\"created_at\":2} -->\n",
+-        "<!-- letopis: {\"created_at\":1} -->\n## B {#b}\n<!-- letopis: {\"created_at\":2} -->\n",
+-    ] {
+-        error(s.as_bytes(), NestedElement);
+-    }
+-    for s in [
+-        "intro\n<!-- letopis: {\"created_at\":1} -->\n",
+-        "## A {#a}\n\n<!-- letopis: {\"created_at\":1} -->\n",
+-        "## A\n<!-- letopis: {\"created_at\":1} -->\n",
+-    ] {
+-        error(s.as_bytes(), OrphanMetadata);
++    // Arrange
++    let path = RepoPath::parse("knowledge/a.md").unwrap();
++    for (text, kind) in [
++        (
++            "## A {#a}\n<!-- letopis: {\"created_at\":1} -->\n### B {#b}\n<!-- letopis: {\"created_at\":2} -->\n",
++            DiagnosticKind::NestedElement,
++        ),
++        (
++            "<!-- letopis: {\"created_at\":1} -->\n## B {#b}\n<!-- letopis: {\"created_at\":2} -->\n",
++            DiagnosticKind::NestedElement,
++        ),
++        (
++            "intro\n<!-- letopis: {\"created_at\":1} -->\n",
++            DiagnosticKind::OrphanMetadata,
++        ),
++        (
++            "## A {#a}\n\n<!-- letopis: {\"created_at\":1} -->\n",
++            DiagnosticKind::OrphanMetadata,
++        ),
++        (
++            "## A\n<!-- letopis: {\"created_at\":1} -->\n",
++            DiagnosticKind::OrphanMetadata,
++        ),
++    ] {
++        // Act
++        let result = parse(&path, text.as_bytes());
++        // Assert
++        assert_error(result, kind);
+     }
+ }
+ 
+ #[test]
+ fn anchors_are_unique_across_real_headings() {
+-    error(
+-        b"## A {#a}\n<!-- letopis: {\"created_at\":1} -->\n## B {#a}\n",
+-        DuplicateAnchor,
+-    );
++    // Arrange
++    let path = RepoPath::parse("knowledge/a.md").unwrap();
++    let duplicate = b"## A {#a}\n<!-- letopis: {\"created_at\":1} -->\n## B {#a}\n";
++    // Act
++    let result = parse(&path, duplicate);
++    // Assert
++    assert_error(result, DiagnosticKind::DuplicateAnchor);
++
++    // Arrange
+     for anchor in ["L1-L2", "1bad", ""] {
+-        error(
+-            format!("## A {{#{anchor}}}\n<!-- letopis: {{\"created_at\":1}} -->\n").as_bytes(),
+-            InvalidAnchor,
+-        );
++        let text = format!("## A {{#{anchor}}}\n<!-- letopis: {{\"created_at\":1}} -->\n");
++        // Act
++        let result = parse(&path, text.as_bytes());
++        // Assert
++        assert_error(result, DiagnosticKind::InvalidAnchor);
+     }
+ }
+ 
+ #[test]
+ fn snapshot_metadata_preserves_full_oid_and_zero_created_at() {
++    // Arrange: independent expected lengths cover both Git wire formats.
+     for n in [40, 64] {
+         let oid = "a".repeat(n);
+-        let got = parsed(
+-            "a.markdown",
+-            &format!("<!-- letopis: {{\"created_at\":0,\"source_snapshot\":\"{oid}\"}} -->\nX"),
+-        );
++        let text =
++            format!("<!-- letopis: {{\"created_at\":0,\"source_snapshot\":\"{oid}\"}} -->\nX");
++        // Act
++        let got = parsed("a.markdown", &text);
++        // Assert
+         assert_eq!(got.elements[0].element.metadata.created_at, 0);
+         assert_eq!(
+             got.elements[0]
+                 .element
+                 .metadata
+                 .source_snapshot
+                 .as_ref()
+                 .unwrap()
+                 .as_str(),
+             oid
+         );
+     }
+ }
+ 
+ #[test]
+ fn metadata_must_fit_exactly_one_standalone_line() {
+-    for s in [
++    // Arrange
++    let path = RepoPath::parse("a.md").unwrap();
++    for text in [
+         "<!-- letopis: {\n\"created_at\":1} -->\n",
+         "<!-- letopis: {\"created_at\":1} --> trailing\n",
+         "<!-- letopis: {\"created_at\":1} --> <!-- letopis: {\"created_at\":2} -->\n",
+     ] {
+-        assert!(
+-            parse(&RepoPath::parse("a.md").unwrap(), s.as_bytes()).is_err(),
+-            "{s}"
+-        );
++        // Act
++        let result = parse(&path, text.as_bytes());
++        // Assert
++        assert!(result.is_err(), "{text}");
+     }
+ }
+ 
+ #[test]
+ fn raw_html_content_does_not_declare_metadata() {
++    // Arrange
++    let path = RepoPath::parse("a.md").unwrap();
+     for (open, close) in [
+         ("<script>", "</script>"),
+         ("<style>", "</style>"),
+         ("<textarea>", "</textarea>"),
+         ("<pre>", "</pre>"),
+         ("<!-- example", "-->"),
+     ] {
+         let raw = format!(
+             "{open}\nconst example = `\n<!-- letopis: {{\"created_at\":2}} -->\n`;\n{close}\n"
+         );
+-        let got = parsed("a.md", &whole(&format!("\n{raw}")));
++        let marked = whole(&format!("\n{raw}"));
++        // Act
++        let got = parsed("a.md", &marked);
++        let unmarked = parse(&path, raw.as_bytes());
++        // Assert
+         assert_eq!(got.elements.len(), 1, "{open}");
+         assert!(
+             got.elements[0].search_text.contains("created_at\":2"),
+             "{open}"
+         );
+-        assert!(
+-            parse(&RepoPath::parse("a.md").unwrap(), raw.as_bytes())
+-                .unwrap()
+-                .is_none(),
+-            "{open}"
+-        );
+-    }
+-}
++        assert!(unmarked.unwrap().is_none(), "{open}");
++    }
++}
+--- before/tests/markdown_links.rs
++++ after/tests/markdown_links.rs
+@@ -1,122 +1,139 @@
+ mod support;
+-use letopis::{adapters::markdown::DiagnosticKind::*, domain::*};
+-use support::*;
++use letopis::{
++    adapters::markdown::{DiagnosticKind, parse},
++    domain::{EdgeTarget, ElementKind, RepoPath, kind_for},
++};
++use support::{assert_error, parsed, whole};
+ 
+ #[test]
+ fn only_inline_links_declare_edges() {
++    // Arrange
+     let s = whole(
+         "[a](b.md \"letopis:type=includes\") [same](b.md \"letopis:type=includes\") [different](b.md \"letopis:type=depends_on\")\n![image](z.md \"letopis:type=includes\") [ref][r] [r][] [r] <https://example.com> [nav](https://example.com \"ordinary\")\n\n[r]: z.md \"letopis:type=includes\"\n",
+     );
++    // Act
+     let got = parsed("a.md", &s);
+-    assert_eq!(got.edges.len(), 2);
+-    assert_eq!(
+-        kind_for(&got.elements[0].element.id, &got.edges),
+-        ElementKind::Metavertex
+-    );
+     let triples: Vec<_> = got
+         .edges
+         .iter()
+         .map(|e| {
+             (
+                 e.source().as_str(),
+                 e.target().as_str(),
+                 e.edge_type().as_str(),
+             )
+         })
+         .collect();
++    // Assert
++    assert_eq!(got.edges.len(), 2);
++    assert_eq!(
++        kind_for(&got.elements[0].element.id, &got.edges),
++        ElementKind::Metavertex
++    );
+     assert_eq!(
+         triples,
+         vec![("a.md", "b.md", "depends_on"), ("a.md", "b.md", "includes")]
+     );
+ }
+ 
+ #[test]
+ fn sources_are_normalized_without_loading_destinations() {
+-    let got = parsed(
+-        "knowledge/a.md",
+-        &whole(
+-            "[code](./src/../src/a.rs#L010-L025 \"letopis:type=external\") [missing](knowledge/missing.md#x \"letopis:type=depends_on\")",
+-        ),
++    // Arrange
++    let text = &whole(
++        "[code](./src/../src/a.rs#L010-L025 \"letopis:type=external\") [missing](knowledge/missing.md#x \"letopis:type=depends_on\")",
+     );
++    // Act
++    let got = parsed("knowledge/a.md", text);
++    // Assert
+     assert_eq!(got.edges.len(), 2);
+     assert!(
+         got.edges
+             .iter()
+             .any(|e| matches!(e.target(),EdgeTarget::Source(s) if s.as_str()=="src/a.rs#L10-L25"))
+     );
+     assert!(got.edges.iter().any(
+         |e| matches!(e.target(),EdgeTarget::Knowledge(k) if k.as_str()=="knowledge/missing.md#x")
+     ));
+     assert!(got.elements[0].element.metadata.source_snapshot.is_none());
+ }
+ 
+ #[test]
+ fn invalid_graph_titles_and_targets_fail_file() {
++    // Arrange
++    let path = RepoPath::parse("knowledge/a.md").unwrap();
+     for title in [
+         "letopis:type=",
+         "letopis:type=Includes",
+         "letopis:type=good;extra",
+         "letopis:other=x",
+     ] {
+-        error(
+-            whole(&format!("[x](b.md \"{title}\")")).as_bytes(),
+-            InvalidLinkTitle,
+-        );
++        let text = whole(&format!("[x](b.md \"{title}\")"));
++        // Act
++        let result = parse(&path, text.as_bytes());
++        // Assert
++        assert_error(result, DiagnosticKind::InvalidLinkTitle);
+     }
++    // Arrange
+     for (target, kind) in [
+         ("../b.md", "depends_on"),
+         ("/tmp/b.md", "depends_on"),
+         ("b.md#L1-L2", "includes"),
+         ("x.rs#L0-L1", "external"),
+         ("x.rs#L2-L1", "external"),
+         ("x.rs#anchor", "external"),
+     ] {
+-        error(
+-            whole(&format!("[x]({target} \"letopis:type={kind}\")")).as_bytes(),
+-            InvalidTarget,
+-        );
++        let text = whole(&format!("[x]({target} \"letopis:type={kind}\")"));
++        // Act
++        let result = parse(&path, text.as_bytes());
++        // Assert
++        assert_error(result, DiagnosticKind::InvalidTarget);
+     }
+-    error(
+-        whole("[x](./knowledge/a.md \"letopis:type=depends_on\")").as_bytes(),
+-        SelfLoop,
+-    );
++    // Arrange
++    let text = whole("[x](./knowledge/a.md \"letopis:type=depends_on\")");
++    // Act
++    let result = parse(&path, text.as_bytes());
++    // Assert
++    assert_error(result, DiagnosticKind::SelfLoop);
+ }
+ 
+ #[test]
+ fn links_outside_elements_are_only_navigation() {
+-    let got = parsed(
+-        "a.md",
+-        "[outside](../escape.md \"letopis:type=BAD\")\n\n## A {#a}\n<!-- letopis: {\"created_at\":1} -->\n[ok](b.md \"letopis:type=includes\")\n\n## End\n[x](b.md \"letopis:type=other\")\n",
+-    );
++    // Arrange
++    let text = "[outside](../escape.md \"letopis:type=BAD\")\n\n## A {#a}\n<!-- letopis: {\"created_at\":1} -->\n[ok](b.md \"letopis:type=includes\")\n\n## End\n[x](b.md \"letopis:type=other\")\n";
++    // Act
++    let got = parsed("a.md", text);
++    // Assert
+     assert_eq!(got.edges.len(), 1);
+     assert_eq!(got.edges.first().unwrap().source().as_str(), "a.md#a");
+ }
+ 
+ #[test]
+ fn image_alt_links_do_not_declare_edges() {
+-    let got = parsed(
+-        "a.md",
+-        &whole("![see [target](b.md \"letopis:type=includes\")](img.png)\n"),
+-    );
++    // Arrange
++    let text = &whole("![see [target](b.md \"letopis:type=includes\")](img.png)\n");
++    // Act
++    let got = parsed("a.md", text);
++    // Assert
+     assert_eq!(got.elements[0].search_text, "see target");
+     assert!(
+         got.edges.is_empty(),
+         "image alt cannot declare graph edges: {:?}",
+         got.edges
+     );
+     assert_eq!(
+         kind_for(&got.elements[0].element.id, &got.edges),
+         ElementKind::Vertex
+     );
+ }
+ 
+ #[test]
+ fn links_wrapping_images_still_declare_edges() {
+-    let got = parsed(
+-        "a.md",
+-        &whole("[![alt](img.png)](b.md \"letopis:type=includes\")"),
+-    );
++    // Arrange
++    let text = &whole("[![alt](img.png)](b.md \"letopis:type=includes\")");
++    // Act
++    let got = parsed("a.md", text);
++    // Assert
+     assert_eq!(got.edges.len(), 1);
+     assert_eq!(got.edges.first().unwrap().target().as_str(), "b.md");
+     assert_eq!(got.elements[0].search_text, "alt");
+ }
+--- before/tests/markdown_search.rs
++++ after/tests/markdown_search.rs
+@@ -1,143 +1,160 @@
+ mod support;
+ use letopis::{adapters::markdown::parse, domain::RepoPath};
+-use support::*;
++use support::{parsed, whole};
+ 
+ #[test]
+ fn golden_search_representations() {
++    // Arrange
+     let expected: serde_json::Value =
+         serde_json::from_str(include_str!("fixtures/markdown/expected.json")).unwrap();
+     for (name, rows) in expected.as_object().unwrap() {
+         let bytes = std::fs::read(format!(
+             "{}/tests/fixtures/markdown/{name}",
+             env!("CARGO_MANIFEST_DIR")
+         ))
+         .unwrap();
+-        let got = parse(
+-            &RepoPath::parse(&format!("knowledge/{name}")).unwrap(),
+-            &bytes,
+-        )
+-        .unwrap()
+-        .unwrap();
++        let path = RepoPath::parse(&format!("knowledge/{name}")).unwrap();
++        // Act
++        let got = parse(&path, &bytes).unwrap().unwrap();
++        // Assert
+         for (element, want) in got.elements.iter().zip(rows.as_array().unwrap()) {
+             assert_eq!(
+                 element.search_text,
+                 want["search_text"].as_str().unwrap(),
+                 "{name}"
+             );
+             assert_eq!(
+                 element.search_hash.to_hex(),
+                 want["search_hash"].as_str().unwrap(),
+                 "{name}"
+             );
+         }
+     }
+ }
+ 
+ fn note(anchor: &str, created: u64, snapshot: &str, target: &str, kind: &str) -> String {
+     format!(
+         "## WAL {{#{anchor}}}\n<!-- letopis: {{\"created_at\":{created},\"source_snapshot\":\"{snapshot}\"}} -->\nUse **safe** [SQLite]({target} \"letopis:type={kind}\").\n"
+     )
+ }
+ #[test]
+ fn metadata_and_link_changes_keep_search_hash() {
++    // Arrange
+     let oid = "a".repeat(40);
+     let other = "b".repeat(40);
++    // Act: establish the baseline projection.
+     let base = parsed(
+         "a.md",
+         &note("wal", 0, &oid, "knowledge/db.md", "depends_on"),
+     );
++    // Assert
+     assert_eq!(base.elements[0].search_text, "WAL\nUse safe SQLite.");
++    // Arrange: change one metadata/link field per case.
+     for changed in [
+         note("wal", 1, &oid, "knowledge/db.md", "depends_on"),
+         note("wal", 0, &other, "knowledge/db.md", "depends_on"),
+         note("wal", 0, &oid, "knowledge/other.md", "depends_on"),
+         note("wal", 0, &oid, "knowledge/db.md", "includes"),
+         note("new", 0, &oid, "knowledge/db.md", "depends_on"),
+     ] {
++        // Act
+         let next = parsed("a.md", &changed);
++        // Assert
+         assert_ne!(base.elements[0].element.hash, next.elements[0].element.hash);
+         assert_eq!(base.elements[0].search_text, next.elements[0].search_text);
+         assert_eq!(base.elements[0].search_hash, next.elements[0].search_hash);
+     }
+ }
+ 
+ #[test]
+ fn own_text_label_and_code_change_search_hash() {
++    // Arrange
+     let original =
+         whole("Own text [Label](b.md \"letopis:type=depends_on\").\n\n```rs\nlet a = 1;\n```\n");
+     let base = parsed("a.md", &original);
++    // Fixture baseline supplies the expected search hash.
+     for changed in [
+         original.replace("Own text", "New text"),
+         original.replace("Label", "Other label"),
+         original.replace("a = 1", "a = 2"),
+     ] {
+-        assert_ne!(
+-            base.elements[0].search_hash,
+-            parsed("a.md", &changed).elements[0].search_hash
+-        );
++        // Act
++        let next = parsed("a.md", &changed);
++        // Assert
++        assert_ne!(base.elements[0].search_hash, next.elements[0].search_hash);
+     }
+ }
+ 
+ #[test]
+ fn moving_path_preserves_text_hashes() {
++    // Arrange
+     let text = whole("Stable text.");
++    // Act
+     let a = parsed("a.md", &text);
+     let b = parsed("b.md", &text);
++    // Assert
+     assert_ne!(a.elements[0].element.id, b.elements[0].element.id);
+     assert_eq!(a.elements[0].element.hash, b.elements[0].element.hash);
+     assert_eq!(a.elements[0].search_hash, b.elements[0].search_hash);
+     assert_eq!(a.elements[0].search_text, "Stable text.");
+ }
+ 
+ #[test]
+ fn code_examples_remain_searchable() {
+-    let got = parsed(
+-        "a.md",
+-        std::str::from_utf8(include_bytes!("fixtures/markdown/code.md")).unwrap(),
+-    );
++    // Arrange
++    let source = std::str::from_utf8(include_bytes!("fixtures/markdown/code.md")).unwrap();
++    // Act
++    let got = parsed("a.md", source);
++    // Assert
+     let text = &got.elements[0].search_text;
+     assert!(text.contains("<!-- letopis: {\"created_at\":8} -->"));
+     assert!(text.contains("## Fake {#fake}"));
+     assert!(text.contains("letopis:type=includes"));
+     assert!(!text.contains("created_at\":3"));
+ }
+ 
+ #[test]
+ fn reference_labels_use_whole_file_context() {
+-    let got = parsed(
+-        "a.md",
+-        std::str::from_utf8(include_bytes!("fixtures/markdown/references.md")).unwrap(),
+-    );
++    // Arrange
++    let source = std::str::from_utf8(include_bytes!("fixtures/markdown/references.md")).unwrap();
++    // Act
++    let got = parsed("a.md", source);
++    // Assert
+     assert_eq!(got.elements[0].search_text, "Note\nShown");
+     assert!(got.edges.is_empty());
+ }
+ 
+ #[test]
+ fn search_text_preserves_word_and_block_boundaries() {
++    // Arrange
+     for (body, want) in [
+         ("hel**lo**", "hello"),
+         ("one\n\ntwo", "one\ntwo"),
+         ("a\nb  \nc", "a\nb\nc"),
+         ("Text `code` after.", "Text code after."),
+         ("<b>safe</b>", "<b>safe</b>"),
+         ("![alt text](img.png)", "alt text"),
+         ("A &amp; B", "A & B"),
+         ("- one\n- two", "one\ntwo"),
+     ] {
+-        assert_eq!(
+-            parsed("a.md", &whole(body)).elements[0].search_text,
+-            want,
+-            "{body}"
+-        );
++        let text = whole(body);
++        // Act
++        let got = parsed("a.md", &text);
++        // Assert
++        assert_eq!(got.elements[0].search_text, want, "{body}");
+     }
+ }
+ 
+ #[test]
+ fn crlf_metadata_line_does_not_add_search_whitespace() {
++    // Arrange
+     let lf = "## A {#a}\n<!-- letopis: {\"created_at\":7} -->\nHi\n";
++    let crlf = lf.replace('\n', "\r\n");
++    // Act
+     let a = parsed("a.md", lf);
+-    let b = parsed("a.md", &lf.replace('\n', "\r\n"));
++    let b = parsed("a.md", &crlf);
++    // Assert
+     assert_eq!(b.elements[0].search_text, "A\nHi");
+     assert_eq!(a.elements[0].search_hash, b.elements[0].search_hash);
+     assert_ne!(a.elements[0].element.hash, b.elements[0].element.hash);
+ }
+--- before/tests/support/git.rs
++++ after/tests/support/git.rs
+@@ -5,24 +5,40 @@
+     path::{Path, PathBuf},
+     process::{Child, Command, ExitStatus, Output, Stdio},
+     sync::atomic::{AtomicUsize, Ordering},
+     thread,
+     time::{Duration, Instant},
+ };
+ static NEXT: AtomicUsize = AtomicUsize::new(0);
+ #[derive(Clone, Copy, Debug)]
+ pub enum ObjectFormat {
+     Sha1,
+     Sha256,
+ }
++impl ObjectFormat {
++    pub fn init_arg(self) -> &'static str {
++        match self {
++            Self::Sha1 => "--object-format=sha1",
++            Self::Sha256 => "--object-format=sha256",
++        }
++    }
++}
++pub const SNAPSHOT_REF_PREFIX: &str = "refs/letopis/snapshots/";
++pub const BLOB_KIND: &str = "blob";
++pub const TREE_KIND: &str = "tree";
++pub const COMMIT_KIND: &str = "commit";
++pub const TAG_KIND: &str = "tag";
++pub const TREE_MODE: &str = "040000";
++pub const REGULAR_FILE_MODE: &str = "100644";
++pub const GITLINK_MODE: &str = "160000";
+ pub const FORMATS: [ObjectFormat; 2] = [ObjectFormat::Sha1, ObjectFormat::Sha256];
+ pub struct TempRepo {
+     root: PathBuf,
+     subdir: PathBuf,
+ }
+ #[derive(Debug, PartialEq, Eq)]
+ pub struct FixtureState {
+     head: Vec<u8>,
+     index: Vec<u8>,
+     config: Vec<u8>,
+     refs: Vec<u8>,
+     live: Vec<(String, Vec<u8>)>,
+@@ -41,35 +57,25 @@
+ }
+ impl TempRepo {
+     pub fn new(format: ObjectFormat) -> Self {
+         let root = env::temp_dir().join(format!(
+             "letopis-git-{}-{}",
+             std::process::id(),
+             NEXT.fetch_add(1, Ordering::Relaxed)
+         ));
+         fs::create_dir(&root).unwrap();
+         let root = fs::canonicalize(root).unwrap();
+         let subdir = root.join("subdir");
+         let repo = Self { root, subdir };
+-        repo.ok(
+-            &[
+-                "init",
+-                "-q",
+-                match format {
+-                    ObjectFormat::Sha1 => "--object-format=sha1",
+-                    ObjectFormat::Sha256 => "--object-format=sha256",
+-                },
+-            ],
+-            None,
+-        );
++        repo.ok(&["init", "-q", format.init_arg()], None);
+         repo.ok(&["config", "user.name", "Fixture"], None);
+         repo.ok(&["config", "user.email", "fixture@example.invalid"], None);
+         fs::create_dir(repo.subdir()).unwrap();
+         fs::write(repo.root.join("live.md"), b"original live\n").unwrap();
+         repo.ok(&["add", "live.md"], None);
+         repo.ok(&["commit", "-qm", "fixture"], None);
+         fs::write(repo.root.join("live.md"), b"staged live\n").unwrap();
+         repo.ok(&["add", "live.md"], None);
+         fs::write(repo.root.join("live.md"), b"unstaged live\n").unwrap();
+         repo
+     }
+     pub fn shared_clone(&self) -> Self {
+@@ -129,45 +135,51 @@
+             .unwrap()
+             .trim()
+             .to_owned()
+     }
+     pub fn head_index_config_and_live_snapshot(&self) -> FixtureState {
+         FixtureState {
+             head: fs::read(self.root.join(".git/HEAD")).unwrap(),
+             index: fs::read(self.root.join(".git/index")).unwrap(),
+             config: fs::read(self.root.join(".git/config")).unwrap(),
+             refs: self
+                 .ok(&["for-each-ref", "--format=%(refname) %(objectname)"], None)
+                 .split_inclusive(|b| *b == b'\n')
+-                .filter(|line| !line.starts_with(b"refs/letopis/snapshots/"))
++                .filter(|line| !line.starts_with(SNAPSHOT_REF_PREFIX.as_bytes()))
+                 .flatten()
+                 .copied()
+                 .collect(),
+             live: ["live.md", ".gitattributes"]
+                 .into_iter()
+                 .filter_map(|p| fs::read(self.root.join(p)).ok().map(|b| (p.to_owned(), b)))
+                 .collect(),
+         }
+     }
+     pub fn change_and_delete_live_files(&self, path: &str) {
+         fs::write(self.root.join("live.md"), b"changed").unwrap();
+         if self.root.join(path).is_file() {
+             fs::remove_file(self.root.join(path)).unwrap();
+         }
+     }
+     pub fn direct_ref(&self, oid: &str) -> String {
+-        self.oid(
+-            &["rev-parse", &format!("refs/letopis/snapshots/{oid}")],
+-            None,
+-        )
++        self.oid(&["rev-parse", &format!("{SNAPSHOT_REF_PREFIX}{oid}")], None)
++    }
++    pub fn object_path(&self, oid: &str) -> PathBuf {
++        self.root
++            .join(format!(".git/objects/{}/{}", &oid[..2], &oid[2..]))
++    }
++    pub fn replace_loose_object(&self, expected: &str, replacement: &str) {
++        let destination = self.object_path(expected);
++        fs::remove_file(&destination).unwrap();
++        fs::copy(self.object_path(replacement), destination).unwrap();
+     }
+     pub fn expire_reflogs_gc_prune_now_and_pack_refs(&self) {
+         self.ok(&["reflog", "expire", "--expire=now", "--all"], None);
+         self.ok(&["gc", "--prune=now"], None);
+         self.ok(&["prune", "--expire=now"], None);
+         self.ok(&["pack-refs", "--all"], None);
+     }
+     pub fn fsck_strict_no_reflogs(&self) -> ExitStatus {
+         self.git(&["fsck", "--strict", "--no-reflogs"], None).status
+     }
+     pub fn script(&self, name: &str, text: &str) -> PathBuf {
+         use std::os::unix::fs::PermissionsExt;
+--- before/tests/support/mod.rs
++++ after/tests/support/mod.rs
+@@ -1,21 +1,20 @@
+ #![allow(dead_code)]
+ use letopis::{
+-    adapters::markdown::{DiagnosticKind, ParsedFile, parse},
++    adapters::markdown::{Diagnostic, DiagnosticKind, ParsedFile, parse},
+     domain::RepoPath,
+ };
+ pub fn parsed(path: &str, s: &str) -> ParsedFile {
+     parse(&RepoPath::parse(path).unwrap(), s.as_bytes())
+         .unwrap()
+         .unwrap()
+ }
+ pub fn whole(body: &str) -> String {
+     format!("<!-- letopis: {{\"created_at\":1}} -->\n{body}")
+ }
+-pub fn error(input: &[u8], want: DiagnosticKind) {
+-    let result = parse(&RepoPath::parse("knowledge/a.md").unwrap(), input);
++pub fn assert_error(result: Result<Option<ParsedFile>, Vec<Diagnostic>>, want: DiagnosticKind) {
+     let errors = result.expect_err("invalid file must never yield a partial projection");
+     assert!(
+         errors.iter().any(|e| e.kind == want),
+         "expected {want:?}, got {errors:?}"
+     );
+ }

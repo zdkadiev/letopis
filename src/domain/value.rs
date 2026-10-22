@@ -35,6 +35,9 @@ pub struct ByteSpan {
 }
 impl ByteSpan {
     /// Reject reversed ranges; empty ranges are allowed.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::InvalidRange`] when `start > end`.
     pub fn new(start: usize, end: usize) -> Result<Self, ValueError> {
         if start > end {
             return Err(ValueError::InvalidRange);
@@ -42,11 +45,11 @@ impl ByteSpan {
         Ok(Self { start, end })
     }
     /// First included byte offset.
-    pub fn start(&self) -> usize {
+    pub fn get_start(&self) -> usize {
         self.start
     }
     /// First excluded byte offset.
-    pub fn end(&self) -> usize {
+    pub fn get_end(&self) -> usize {
         self.end
     }
 }
@@ -59,6 +62,10 @@ pub struct LineRange {
 }
 impl LineRange {
     /// Reject line zero and reversed ranges.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::InvalidRange`] when `start` is zero or greater
+    /// than `end`.
     pub fn new(start: u64, end: u64) -> Result<Self, ValueError> {
         if start == 0 || start > end {
             return Err(ValueError::InvalidRange);
@@ -66,22 +73,29 @@ impl LineRange {
         Ok(Self { start, end })
     }
     /// First included line.
-    pub fn start(&self) -> u64 {
+    pub fn get_start(&self) -> u64 {
         self.start
     }
     /// Last included line.
-    pub fn end(&self) -> u64 {
+    pub fn get_end(&self) -> u64 {
         self.end
     }
 }
+
+pub(crate) const SHA1_OID_HEX_LEN: usize = 40;
+pub(crate) const SHA256_OID_HEX_LEN: usize = 64;
 
 /// A full SHA-1 or SHA-256 Git tree OID; existence/type require a Git adapter.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TreeOid(String);
 impl TreeOid {
     /// Accept exactly 40 or 64 lowercase hexadecimal characters.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::InvalidOid`] for any other length or for a
+    /// non-lowercase-hexadecimal character. Repository existence is not checked.
     pub fn parse(raw: &str) -> Result<Self, ValueError> {
-        if ![40, 64].contains(&raw.len())
+        if ![SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN].contains(&raw.len())
             || !raw
                 .bytes()
                 .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))

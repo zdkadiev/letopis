@@ -1,0 +1,146 @@
+[
+  {
+    "name": "version-git",
+    "argv": [
+      "git",
+      "--version"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.012,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-git.log"
+  },
+  {
+    "name": "version-rustc",
+    "argv": [
+      "rustc",
+      "+1.95.0",
+      "--version"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.098,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-rustc.log"
+  },
+  {
+    "name": "version-cargo",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "--version"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.03,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-cargo.log"
+  },
+  {
+    "name": "version-host",
+    "argv": [
+      "uname",
+      "-sm"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/version-host.log"
+  },
+  {
+    "name": "host-test",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 11.374,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/host-test.log"
+  },
+  {
+    "name": "host-fmt",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.066,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/host-fmt.log"
+  },
+  {
+    "name": "host-clippy",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.35,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/host-clippy.log"
+  },
+  {
+    "name": "linux-build",
+    "argv": [
+      "docker",
+      "build",
+      "-f",
+      "tests/git/Dockerfile",
+      "-t",
+      "letopis-tk8-check",
+      "."
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.485,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/linux-build.log"
+  },
+  {
+    "name": "linux-image",
+    "argv": [
+      "docker",
+      "image",
+      "inspect",
+      "letopis-tk8-check",
+      "--format",
+      "{{json .}}"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.014,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/linux-image.log"
+  },
+  {
+    "name": "linux-run",
+    "argv": [
+      "docker",
+      "run",
+      "--rm",
+      "--network",
+      "none",
+      "letopis-tk8-check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.711,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/linux-run.log"
+  },
+  {
+    "name": "source-prose-diff-check",
+    "argv": [
+      "git",
+      "diff",
+      "a6af7d7b6536a65d85f11f6f02807a906b0e640a",
+      "--check",
+      "--",
+      "src",
+      "tests",
+      "docs/superpowers/specs/2026-10-22-tk-8-git-snapshots-design.md"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.023,
+    "log": "docs/zkit/letopis/checks/TK-8/final-fix-wave/source-prose-diff-check.log"
+  }
+]

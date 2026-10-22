@@ -1,6 +1,7 @@
 **
 !Cargo.toml
 !Cargo.lock
+!clippy.toml
 !rust-toolchain.toml
 !src/
 !src/**
@@ -16,3 +17,6 @@
 !tests/fixtures/markdown/**
 !tests/markdown/
 !tests/markdown/Dockerfile
+!tests/git_*.rs
+!tests/git/
+!tests/git/Dockerfile

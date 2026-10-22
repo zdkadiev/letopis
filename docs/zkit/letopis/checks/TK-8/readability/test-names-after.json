@@ -1,0 +1,69 @@
+{
+  "src/adapters/git/tests.rs": [
+    "version_gate",
+    "open_rejects_old_git_before_object_calls",
+    "discovers_root_from_subdirectory",
+    "open_rejects_non_repository_and_bare",
+    "subprocess_drains_and_reaps_on_io_failure",
+    "process_removes_inherited_overrides_and_hardens_writes",
+    "discovers_trailing_newline_repository_without_touching_sibling"
+  ],
+  "tests/markdown_links.rs": [
+    "only_inline_links_declare_edges",
+    "sources_are_normalized_without_loading_destinations",
+    "invalid_graph_titles_and_targets_fail_file",
+    "links_outside_elements_are_only_navigation",
+    "image_alt_links_do_not_declare_edges",
+    "links_wrapping_images_still_declare_edges"
+  ],
+  "tests/git_snapshots.rs": [
+    "exact_bytes_without_index_or_commit",
+    "paths_are_literal_and_never_shell_input",
+    "empty_tree_and_invalid_paths",
+    "tree_types_and_missing_objects_are_distinct",
+    "replacement_refs_do_not_change_bytes"
+  ],
+  "tests/domain_values.rs": [
+    "ids_and_sources_normalize_from_git_root",
+    "anchors_and_ranges_reject_invalid_values",
+    "tree_oids_are_full_lowercase_hex",
+    "sha256_uses_exact_bytes",
+    "edge_identity_and_kind_are_derived",
+    "edge_targets_and_self_loops_are_checked"
+  ],
+  "tests/markdown_search.rs": [
+    "golden_search_representations",
+    "metadata_and_link_changes_keep_search_hash",
+    "own_text_label_and_code_change_search_hash",
+    "moving_path_preserves_text_hashes",
+    "code_examples_remain_searchable",
+    "reference_labels_use_whole_file_context",
+    "search_text_preserves_word_and_block_boundaries",
+    "crlf_metadata_line_does_not_add_search_whitespace"
+  ],
+  "tests/markdown_elements.rs": [
+    "golden_elements_have_exact_bytes_and_metadata",
+    "unicode_crlf_and_eof_have_exact_spans",
+    "unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected",
+    "code_examples_do_not_declare_elements",
+    "file_errors_never_return_partial_elements",
+    "nested_elements_and_orphan_metadata_are_rejected",
+    "anchors_are_unique_across_real_headings",
+    "snapshot_metadata_preserves_full_oid_and_zero_created_at",
+    "metadata_must_fit_exactly_one_standalone_line",
+    "raw_html_content_does_not_declare_metadata"
+  ],
+  "tests/git_retention.rs": [
+    "retained_snapshots_survive_gc",
+    "unretained_unique_tree_is_collectable",
+    "incomplete_tree_and_ref_failure_do_not_pin",
+    "symbolic_and_conflicting_refs_are_rejected",
+    "concurrent_pin_is_idempotent",
+    "promisor_miss_never_fetches",
+    "conflicting_descendant_types_do_not_pin",
+    "gitlinks_are_retained_without_dereferencing",
+    "shared_clone_is_refused_before_donor_gc_can_break_retention",
+    "alternates_added_after_open_refuse_operations_without_writes",
+    "linked_worktree_checks_common_object_store_and_refuses_inactive_alternates"
+  ]
+}

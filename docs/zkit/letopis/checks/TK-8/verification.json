@@ -1,0 +1,311 @@
+{
+  "task": "TK-8",
+  "base": "2a29ab16603569bb95e0e5d63ce4942180050686",
+  "versions": {
+    "git": "git version 2.50.1 (Apple Git-155)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "host": "Darwin arm64"
+  },
+  "image": {
+    "Id": "sha256:53b869cc11b204ee9ff7baad617ef81276652a1da279826b1d21f6b1629f2a04",
+    "Architecture": "arm64",
+    "Os": "linux"
+  },
+  "commands": [
+    {
+      "name": "version-git",
+      "argv": [
+        "git",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.01,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/version-git.log"
+    },
+    {
+      "name": "version-rustc",
+      "argv": [
+        "rustc",
+        "+1.95.0",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.014,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/version-rustc.log"
+    },
+    {
+      "name": "version-cargo",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.013,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/version-cargo.log"
+    },
+    {
+      "name": "version-host",
+      "argv": [
+        "uname",
+        "-sm"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.002,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/version-host.log"
+    },
+    {
+      "name": "host-test",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 8.946,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/host-test.log"
+    },
+    {
+      "name": "host-fmt",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.068,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/host-fmt.log"
+    },
+    {
+      "name": "host-clippy",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.3,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/host-clippy.log"
+    },
+    {
+      "name": "routing-trap-setup",
+      "argv": [
+        "git",
+        "init",
+        "--bare",
+        "--quiet",
+        "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-routing-trap-065sx6vb/git"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.015,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/routing-trap-setup.log"
+    },
+    {
+      "name": "host-routing",
+      "argv": [
+        "env",
+        "GIT_DIR=/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-routing-trap-065sx6vb/git",
+        "GIT_WORK_TREE=/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-routing-trap-065sx6vb/work",
+        "GIT_INDEX_FILE=/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-routing-trap-065sx6vb/index",
+        "GIT_OBJECT_DIRECTORY=/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/letopis-routing-trap-065sx6vb/objects",
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--test",
+        "git_snapshots",
+        "--test",
+        "git_retention"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.011,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/host-routing.log"
+    },
+    {
+      "name": "linux-build",
+      "argv": [
+        "docker",
+        "build",
+        "-f",
+        "tests/git/Dockerfile",
+        "-t",
+        "letopis-tk8-check",
+        "."
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.291,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/linux-build.log"
+    },
+    {
+      "name": "linux-image",
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "letopis-tk8-check",
+        "--format",
+        "{{json .}}"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.015,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/linux-image.log"
+    },
+    {
+      "name": "linux-run",
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "letopis-tk8-check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.567,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/linux-run.log"
+    },
+    {
+      "name": "architecture-command-location",
+      "argv": [
+        "rg",
+        "-n",
+        "Command|std::process",
+        "src"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.011,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/architecture-command-location.log"
+    },
+    {
+      "name": "source-diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.018,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/source-diff-check.log"
+    },
+    {
+      "name": "final-source-prose-diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "2a29ab16603569bb95e0e5d63ce4942180050686",
+        "--check",
+        "--",
+        ".",
+        ":!docs/zkit/letopis/checks/TK-8/logs",
+        ":!docs/zkit/letopis/checks/TK-8/tdd"
+      ],
+      "exit_code": 0,
+      "log": "docs/zkit/letopis/checks/TK-8/logs/final-source-prose-diff-check.log"
+    }
+  ],
+  "source_sha256": {
+    ".dockerignore": "f6116c2f7a114f18906fb3aa57e5a8935b678c824eddecc670acd11282dd0427",
+    "Cargo.lock": "f15fc9e94b7d8d5fe693b1d92a5c95fe635cc0fc845e63655d7ae01f3e62d1b9",
+    "Cargo.toml": "1e9e07a7d1b25b2037c90486ed48676e348817924375390ce4f0b99b5f8f69cb",
+    "rust-toolchain.toml": "12dc5d64dbd96c1b07be2943241d52d9f6127a79ba47a820455ba7b873fc896a",
+    "src/adapters/git/mod.rs": "7032e6bab15a28c0e493a46de5728624f9774e7f050fd9174dc9e6242abe858b",
+    "src/adapters/git/objects.rs": "53616ab6b9e2f9f163da17b71e558571d4ad02fab2f2608f69617a7247e97286",
+    "src/adapters/git/process.rs": "26ae0d6cc7140767cf7ca2d34212b709a4cbb02878bec2a1da882ce888de40a8",
+    "src/adapters/git/refs.rs": "8bd6472a6402cd96d168513bef405d0c51436efc0ab2ee2052f57ae218cea710",
+    "src/adapters/git/tests.rs": "6d4934d5ebab0c4c0895ef9bd7642a4ae404f709d3d4b95a98d3a3bee2c7f26d",
+    "src/adapters/markdown/links.rs": "046167c860f4ce0c0f2b5fdedb8994705634b3f30be8f3ce0e3beaf0761e75f4",
+    "src/adapters/markdown/metadata.rs": "f9ff829174265d73a4201a6f12c8f3854f3dde97f0bd33d020aea1a4c9bf165b",
+    "src/adapters/markdown/mod.rs": "ecc22211f2a04c87d2c408286defe7e08dc8ec01e1c60695d49a911a2e77d7fb",
+    "src/adapters/markdown/scan.rs": "b418e2de928523d7efa8af603d7233e6d206d6936aedd8ba019463cecaaadd2c",
+    "src/adapters/markdown/search.rs": "4d4e458d340b120a43116cb99889c664d4675568110ae3f3d8bbeb79ef4c4870",
+    "src/adapters/mod.rs": "1411d7b21b2e7da62cb313cb692cb8203c6cd91846e779242f621868e5fee825",
+    "src/domain/graph.rs": "46dcc956d100b1b4f9a914e92bfe23c8470c6179d1ec88dd6d6be66d3a6fcc02",
+    "src/domain/identity.rs": "c0cd49ebc37c04028c96c33df2d49280a2f52878969c9355554071b875a10ee8",
+    "src/domain/mod.rs": "c666739586dd118ddd98868b69f20c12f0713eef14da52caa6facdcfe5db6fbb",
+    "src/domain/value.rs": "ca77789c2396b5282aa77e1b3ec82cb7d84378165c3bc9f7fd95bc64bb597368",
+    "src/lib.rs": "b14f4c4dd63e0f08900b5091bddb8c948ff6eaaf7efc544f186de8ec513e089c",
+    "src/service/mod.rs": "3e11679ea7260e9fa86ce883c79afdc912736214f6aefe2b638fedfeb02d1e5e",
+    "src/service/ports/git.rs": "a4011ba10ae8f088e20f324bdab2f9c6b5e6becb52882788ef94eb565cd249e5",
+    "src/service/ports/mod.rs": "441b43560994e843ee2c196f85ec0074bed387f6f2569a2ba59954d1ca68487c",
+    "tests/domain_values.rs": "3024dbf9c045383e1e0f06f1b157b33b73781b6ea682452b8cb26f8b0fc3bee4",
+    "tests/fixtures/markdown/code.md": "745c2910661730dbb4d8c94076b522837299017f8971f71cd8df368523512c62",
+    "tests/fixtures/markdown/crlf.md": "eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864",
+    "tests/fixtures/markdown/expected.json": "f457e2a05174ac9dcdd05a55646d90060098ebfc17b7ed2edaf4ece9b8719c26",
+    "tests/fixtures/markdown/no-final-newline.md": "8ae8dc48443c3b9132365da3e83a1862fe8c1be55da7ee6a9bbf478703fe58d2",
+    "tests/fixtures/markdown/references.md": "d6e82fad5e4dbf755ce529593be584a870855af446678ad18f31ddc00b408e97",
+    "tests/fixtures/markdown/sections.md": "142b27a765adec526a7dd8d33ab2dc8965c50fbbdc16916075d24c1bbcf53283",
+    "tests/fixtures/markdown/unicode.md": "8910a8d29ec22cd6a6a67bfddedd14f15dd0e8a9857b20f8372fb03a2ea5f4e7",
+    "tests/fixtures/markdown/whole.md": "69310cd742978c3cef6fa8c6ff86fb69981333c5eada345da90a83a5343cc70f",
+    "tests/git/Dockerfile": "9394f7197e40edaec1f785019f6f4af5b4d2905bd85a0c6186f8d0f4edd55f50",
+    "tests/git/README.md": "65f6fc252ce7af0ae63dcf41baa0dc10f6e7068bd68ec77ee44e006212bf8fc4",
+    "tests/git_retention.rs": "7425995314680b43bea3fe6aae94eb8fce8450b439669916745daa617611289a",
+    "tests/git_snapshots.rs": "be158afc711ed989f7de42a4e78f24035da9365676c9fa939be1a488bef8f9d0",
+    "tests/markdown_elements.rs": "ba9327b6aaf31f88dc9b4a1b209651b4df2a088a3e76b5800db049e0346d8a1d",
+    "tests/markdown_links.rs": "7da3a287ea946b24040a6b296a99ef2cee64ecd0c8aaeccec9f44931eb41172a",
+    "tests/markdown_search.rs": "d493df36d35eff5ba7d2a1a8f29bfbb930aa31ef98f8c3af42a8d3ead4337059",
+    "tests/support/git.rs": "ee221d63f13f5c13453f91b337e28033b40a080adb8a875fb6c30f5ecf2a8935",
+    "tests/support/mod.rs": "eb9f619811b6f1543139ba73a8403b829ca58d87e4a8a1a2f82773cf22df530b"
+  },
+  "evidence_sha256": {
+    "docs/zkit/letopis/checks/TK-8/README.md": "ef0428386bfb86f059e54c9c616e95e600da7b0a745693d982eda7b07d47919a",
+    "docs/zkit/letopis/checks/TK-8/logs/architecture-command-location.log": "e65a44360eb651c2903906852e4e31321f51111325598c43a5e51b114cd9b26f",
+    "docs/zkit/letopis/checks/TK-8/logs/final-source-prose-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/logs/host-clippy.log": "cae74a485ffbe1664651afd181b4422d25b5bf9c2d07f670ae1a8e42d0b65b8e",
+    "docs/zkit/letopis/checks/TK-8/logs/host-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/logs/host-routing.log": "a89074564c6d16f6b1d374b5a050fad837ac08639d5ff2ea9b58b80f4fc4f8e6",
+    "docs/zkit/letopis/checks/TK-8/logs/host-test.log": "5e568a7fc75a32bfb2afb41149b36ee500e06b1a5e99d9392451552115ae7e1b",
+    "docs/zkit/letopis/checks/TK-8/logs/linux-build.log": "532ed0a7bbf67cbef69d7281236815217cac226b314ecb6458c3bdfde692b034",
+    "docs/zkit/letopis/checks/TK-8/logs/linux-image.log": "1dbf3c14aec64c49507fa31130f0765ab87cb272df9c7b20abebd5f54c5d1e8e",
+    "docs/zkit/letopis/checks/TK-8/logs/linux-run.log": "7c4bec2231ded1aa16adffc7d11083ccb21e5c74233d3c5f2481775e5bb38825",
+    "docs/zkit/letopis/checks/TK-8/logs/routing-trap-setup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/logs/routing-trap-unchanged.log": "8c92280dac39d5762a98e3f5b1395af6b516025b6a36187660205a7d6ad31035",
+    "docs/zkit/letopis/checks/TK-8/logs/source-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/zkit/letopis/checks/TK-8/logs/version-cargo.log": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+    "docs/zkit/letopis/checks/TK-8/logs/version-git.log": "0a72a762b37a3800276a1004e2c169aed0610d4a3ba601ba59e70e1c4d9f3200",
+    "docs/zkit/letopis/checks/TK-8/logs/version-host.log": "16b8cd028eb757aab907ab404e1656e01783846457156eec99372a91fc1b104d",
+    "docs/zkit/letopis/checks/TK-8/logs/version-rustc.log": "f4d034f5660bb49f22bfcba3f3445be67e25b704c193ff421b53863b4faee148",
+    "docs/zkit/letopis/checks/TK-8/report.md": "ff6b0136e21b4f4e896f1a8ec3adcf722bae7bfa25b9d3806c5ab0c5c3f0591d",
+    "docs/zkit/letopis/checks/TK-8/tdd/A-final-green.log": "7e29aab3008f59ca381ac8cb5c70ac66a82066f41eb507b2b4756ca78b5e202b",
+    "docs/zkit/letopis/checks/TK-8/tdd/A-green.log": "f9a29cc7ad4f2807d00cc4ba4c9ab411974880599ba7c416362cd1c64c5bf5dd",
+    "docs/zkit/letopis/checks/TK-8/tdd/A-red.log": "7101bc97a211641fa06e8b2400026eb209c8321ca88178a8031f0dc07747a340",
+    "docs/zkit/letopis/checks/TK-8/tdd/B-full-green.log": "c7494afb2658c0778dddbfe9063996cf9325a3f6e85eed6dd632206cb0388d04",
+    "docs/zkit/letopis/checks/TK-8/tdd/B-green.log": "bc6e550b1d8ebe51e8b6b7878908770aa8ed69c0e7b4c8ae25e91ecef0f85bde",
+    "docs/zkit/letopis/checks/TK-8/tdd/B-red.log": "d3e093306435570f9cc3953624520780746c57355fccf6bd3054c10bdb75f787",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-conflicting-types-green.log": "adc49a3f5912fc1f21aabcdfb3c193b5ca3c81c68ee52a6ba878cf261fc5a32e",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-conflicting-types-red.log": "a3dfc08ac0425e4b938f6d3d2a942a10ac8fa7639135d0febffdbe776142a8e2",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-dangling-symbolic-green.log": "e203d902335fbeb90558e82861d7c327b6318ab0fc4702f12a0df5561d2699c8",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-dangling-symbolic-red.log": "561a394ce75964fc66292b8fd00425d7130a672c41bed0b884b4de95958f2d60",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-green.log": "2282871f1a26c5c04054e1fefefde99f5b5fe74009f53ad221b08e901b27a994",
+    "docs/zkit/letopis/checks/TK-8/tdd/C-red.log": "a63c2e1c63dd3985c9e7ec8d6ce664037b82d98be82184c3c548f00cc65d0ddc"
+  },
+  "limits": [
+    "No actual Git 2.29 run",
+    "No physical power-loss or full-flush proof",
+    "No x86_64 verification",
+    "No atomic live capture or resource-limit proof",
+    "Independent whole-branch review remains controller-owned"
+  ],
+  "implementation_commit": "9d9413ba415648dea76a2adc41cb275c7dee089f",
+  "root_test_counts": {
+    "private_git": 6,
+    "existing_integration": 30,
+    "snapshot_integration": 5,
+    "retention_integration": 8,
+    "total": 49,
+    "failed": 0,
+    "ignored": 0
+  },
+  "routing_test_count": 13
+}

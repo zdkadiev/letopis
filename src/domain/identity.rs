@@ -4,7 +4,11 @@ use super::{LineRange, ValueError};
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RepoPath(String);
 impl RepoPath {
-    /// Resolve dot components and reject absolute paths, controls and root escapes.
+    /// Resolve dot components and reject absolute paths, C0 controls and root escapes.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::InvalidPath`] for absolute paths, C0 control characters,
+    /// `#`, root escapes, or a path that normalizes to an empty string.
     pub fn parse(raw: &str) -> Result<Self, ValueError> {
         if raw.starts_with('/') || raw.chars().any(|c| c <= '\u{1f}' || c == '#') {
             return Err(ValueError::InvalidPath);
@@ -35,11 +39,16 @@ impl RepoPath {
 pub struct Anchor(String);
 impl Anchor {
     /// Validate ASCII anchor grammar and its reserved line-range form.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::InvalidAnchor`] unless the anchor starts with an
+    /// ASCII letter and contains only ASCII letters, digits, `_` or `-`.
+    /// The source line-range form `L<digits>-L<digits>` is also rejected.
     pub fn parse(raw: &str) -> Result<Self, ValueError> {
         let reserved = raw
             .strip_prefix('L')
             .and_then(|r| r.split_once("-L"))
-            .is_some_and(|(a, b)| digits(a) && digits(b));
+            .is_some_and(|(a, b)| contains_only_ascii_digits(a) && contains_only_ascii_digits(b));
         if !raw.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
             || !raw
                 .bytes()
@@ -55,7 +64,7 @@ impl Anchor {
         &self.0
     }
 }
-fn digits(s: &str) -> bool {
+fn contains_only_ascii_digits(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(|c| c.is_ascii_digit())
 }
 
@@ -64,6 +73,11 @@ fn digits(s: &str) -> bool {
 pub struct KnowledgeId(String);
 impl KnowledgeId {
     /// Parse a root-relative Markdown path and optional explicit anchor.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::InvalidPath`] for an invalid path or a path without
+    /// a `.md` or `.markdown` suffix, and [`ValueError::InvalidAnchor`] for an
+    /// invalid explicit anchor.
     pub fn parse(raw: &str) -> Result<Self, ValueError> {
         let (path, anchor) = match raw.split_once('#') {
             Some((p, a)) => (p, Some(Anchor::parse(a)?)),
@@ -72,6 +86,10 @@ impl KnowledgeId {
         Self::new(RepoPath::parse(path)?, anchor)
     }
     /// Build a knowledge identity from validated components.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::InvalidPath`] when the path does not end in `.md`
+    /// or `.markdown`.
     pub fn new(path: RepoPath, anchor: Option<Anchor>) -> Result<Self, ValueError> {
         if !path.as_str().ends_with(".md") && !path.as_str().ends_with(".markdown") {
             return Err(ValueError::InvalidPath);
@@ -94,6 +112,11 @@ impl KnowledgeId {
 pub struct SourceUri(String);
 impl SourceUri {
     /// Normalize dot components and line numbers without reading source bytes.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::InvalidPath`] for an invalid source path, or
+    /// [`ValueError::InvalidRange`] for a malformed, overflowing, zero-based or
+    /// reversed `L<start>-L<end>` fragment.
     pub fn parse(raw: &str) -> Result<Self, ValueError> {
         let (path, fragment) = raw
             .split_once('#')
@@ -104,14 +127,14 @@ impl SourceUri {
                 .strip_prefix('L')
                 .and_then(|f| f.split_once("-L"))
                 .ok_or(ValueError::InvalidRange)?;
-            if !digits(a) || !digits(b) {
+            if !contains_only_ascii_digits(a) || !contains_only_ascii_digits(b) {
                 return Err(ValueError::InvalidRange);
             }
             let range = LineRange::new(
                 a.parse().map_err(|_| ValueError::InvalidRange)?,
                 b.parse().map_err(|_| ValueError::InvalidRange)?,
             )?;
-            out.push_str(&format!("#L{}-L{}", range.start(), range.end()));
+            out.push_str(&format!("#L{}-L{}", range.get_start(), range.get_end()));
         }
         Ok(Self(out))
     }

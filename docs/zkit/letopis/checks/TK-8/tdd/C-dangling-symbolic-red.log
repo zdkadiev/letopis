@@ -1,0 +1,19 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.14s
+     Running tests/git_retention.rs (target/debug/deps/git_retention-d70be889e54ec0fc)
+
+running 1 test
+
+thread 'symbolic_and_conflicting_refs_are_rejected' (15030592) panicked at tests/git_retention.rs:35:32:
+called `Result::unwrap_err()` on an `Ok` value: RetainedTree { oid: TreeOid("4b825dc642cb6eb9a060e54bf8d69288fbee4904") }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test symbolic_and_conflicting_refs_are_rejected ... FAILED
+
+failures:
+
+failures:
+    symbolic_and_conflicting_refs_are_rejected
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.48s
+
+error: test failed, to rerun pass `--test git_retention`

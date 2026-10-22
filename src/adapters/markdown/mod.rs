@@ -30,7 +30,7 @@ pub struct Diagnostic {
     pub message: String,
 }
 impl Diagnostic {
-    fn at(kind: DiagnosticKind, range: Range<usize>) -> Self {
+    fn new_at(kind: DiagnosticKind, range: Range<usize>) -> Self {
         Self {
             kind,
             bytes: ByteSpan::new(range.start, range.end).ok(),
@@ -68,9 +68,13 @@ pub struct ParsedElement {
 
 /// Parse one root-relative Markdown file without accessing disk, Git, SQL or a model.
 /// `Ok(None)` is unmarked Markdown; errors never carry a partial valid projection.
+///
+/// # Errors
+/// Returns local diagnostics for invalid UTF-8 or invalid knowledge metadata,
+/// anchors, element layout or declared graph links.
 pub fn parse(path: &RepoPath, bytes: &[u8]) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
     let text = std::str::from_utf8(bytes).map_err(|e| {
-        vec![Diagnostic::at(
+        vec![Diagnostic::new_at(
             DiagnosticKind::InvalidUtf8,
             e.valid_up_to()..bytes.len(),
         )]

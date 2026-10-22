@@ -1,0 +1,15 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/git_retention.rs (target/debug/deps/git_retention-d70be889e54ec0fc)
+
+running 8 tests
+test conflicting_descendant_types_do_not_pin ... ok
+test concurrent_pin_is_idempotent ... ok
+test gitlinks_are_retained_without_dereferencing ... ok
+test unretained_unique_tree_is_collectable ... ok
+test promisor_miss_never_fetches ... ok
+test incomplete_tree_and_ref_failure_do_not_pin ... ok
+test symbolic_and_conflicting_refs_are_rejected ... ok
+test retained_snapshots_survive_gc ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.32s
+
