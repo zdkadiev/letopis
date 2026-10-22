@@ -1,0 +1,14 @@
+{
+  "merge_commit": "ec96a8e5ab0e7f64938b9eb76a8cb3887619d728",
+  "feature_head": "81bfb693b3cf2a852bd9571d6b4b2f5a13455fce",
+  "status": "PASS",
+  "rust_tests": 106,
+  "python_tests": 7,
+  "commands": 15,
+  "recorded_hashes": 11225,
+  "prior_host_inputs_unchanged": 182,
+  "prior_linux_inputs_unchanged": 77,
+  "historical_build_caches_hashed": true,
+  "historical_harnesses_rerun": false,
+  "remote_push": false
+}
