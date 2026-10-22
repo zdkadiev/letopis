@@ -3,8 +3,10 @@
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
 use crate::markdown::MarkdownParser;
+use crate::process::DetachedProcess;
 use crate::service::{
-    DocumentError, DocumentErrorKind, DocumentResult, DocumentService, Documents, EmbedLocks,
+    Background, BackgroundService, CommandError, CommandErrorKind, CommandResult, DocumentError,
+    DocumentErrorKind, DocumentResult, DocumentService, Documents, EmbedLocks, EmbeddingTasks,
     FileSystem, GitSnapshots, SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
@@ -19,6 +21,7 @@ pub mod domain;
 mod filesystem;
 mod git;
 pub mod markdown;
+mod process;
 mod storage;
 
 pub mod service;
@@ -94,4 +97,27 @@ pub fn run_cli(
     let response = cli::parse_request(&args, input)
         .and_then(|request| cli::Handlers::new(None, None, None).execute(request));
     cli::write_response(output, response)
+}
+
+/// Open background orchestration with an optional embedding executor.
+///
+/// # Errors
+/// Reports an inaccessible or unsafe root directory.
+pub fn open_background<'a>(
+    root: &Path,
+    executable: &Path,
+    tasks: Option<&'a mut dyn EmbeddingTasks>,
+) -> CommandResult<impl Background + use<'a>> {
+    let files = LocalFileSystem::open(root).map_err(|cause| {
+        CommandError::new_with_cause(
+            CommandErrorKind::InternalError,
+            "cannot open background root",
+            cause,
+        )
+    })?;
+    Ok(BackgroundService::new(
+        tasks,
+        files,
+        DetachedProcess::new(executable.to_path_buf(), root.to_path_buf()),
+    ))
 }

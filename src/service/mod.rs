@@ -1,4 +1,6 @@
 //! Application contracts.
+mod background;
+pub(crate) use background::BackgroundService;
 mod retained_tree;
 mod snapshot_error;
 

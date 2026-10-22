@@ -181,6 +181,7 @@ name = "letopis"
 version = "0.0.0"
 dependencies = [
  "cc",
+ "libc",
  "libsqlite3-sys",
  "pulldown-cmark",
  "rusqlite",
