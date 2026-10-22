@@ -7,6 +7,7 @@ mod scan;
 mod search;
 
 pub use crate::service::{Diagnostic, DiagnosticKind, ParsedElement, ParsedFile};
+pub(crate) use parser::MarkdownParser;
 pub use parser::parse;
 use pulldown_cmark::Event;
 use std::ops::Range;

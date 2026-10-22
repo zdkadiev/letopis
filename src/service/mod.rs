@@ -40,8 +40,11 @@ pub trait GitSnapshots {
     fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError>;
 }
 
+mod document;
 mod error;
+mod projection;
 use crate::domain::{Edge, EdgeTarget, KnowledgeId, Sha256};
+pub(crate) use document::DocumentService;
 mod model;
 pub use error::{StorageError, StorageErrorKind, StorageResult};
 pub use model::{

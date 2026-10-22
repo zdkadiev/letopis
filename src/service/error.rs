@@ -125,3 +125,13 @@ impl Error for DocumentError {
 }
 /// A document operation's typed outcome.
 pub type DocumentResult<T> = Result<T, DocumentError>;
+
+impl From<StorageError> for DocumentError {
+    fn from(cause: StorageError) -> Self {
+        Self::new_with_cause(
+            DocumentErrorKind::InternalError,
+            "document storage operation failed",
+            cause,
+        )
+    }
+}

@@ -113,18 +113,22 @@ impl LocalFileSystem {
         Ok(())
     }
 
-    fn open_lock_file(&self) -> DocumentResult<OwnedFd> {
+    pub(crate) fn open_service_directory(&self) -> DocumentResult<OwnedFd> {
         match mkdirat(&self.root, SERVICE_DIRECTORY, Mode::RWXU) {
             Ok(()) | Err(Errno::EXIST) => {}
             Err(cause) => return Err(fail_io("cannot create service directory", cause)),
         }
-        let directory = openat(
+        openat(
             &self.root,
             SERVICE_DIRECTORY,
             DIRECTORY_FLAGS,
             Mode::empty(),
         )
-        .map_err(|cause| fail_io("cannot open service directory", cause))?;
+        .map_err(|cause| fail_io("cannot open service directory", cause))
+    }
+
+    fn open_lock_file(&self) -> DocumentResult<OwnedFd> {
+        let directory = self.open_service_directory()?;
         openat(
             directory,
             INDEX_LOCK,

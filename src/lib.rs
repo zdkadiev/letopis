@@ -2,8 +2,10 @@
 
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
+use crate::markdown::MarkdownParser;
 use crate::service::{
-    DocumentResult, FileSystem, GitSnapshots, SnapshotError, Storage, StorageResult,
+    DocumentError, DocumentErrorKind, DocumentResult, DocumentService, Documents, FileSystem,
+    GitSnapshots, SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use std::path::Path;
@@ -43,4 +45,37 @@ pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage 
 /// Reports an inaccessible or non-directory root, including a symlink root.
 pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + use<>> {
     LocalFileSystem::open(root)
+}
+
+/// Open document refresh operations for the working copy containing `start`.
+///
+/// # Errors
+/// Reports unsupported repositories, unsafe service paths, or storage/I/O failures.
+pub fn open_documents(start: &Path) -> DocumentResult<impl Documents + use<>> {
+    let git = GitCli::open(start).map_err(|cause| {
+        DocumentError::new_with_cause(
+            DocumentErrorKind::InternalError,
+            "cannot open document repository",
+            cause,
+        )
+    })?;
+    let filesystem = LocalFileSystem::open(git.get_root())?;
+    filesystem.open_service_directory()?;
+    let storage = SqliteStorage::open(
+        &git.get_root().join(".letopis/cache.db"),
+        &git.get_root().join(".letopis/vectors.db"),
+    )
+    .map_err(|cause| {
+        DocumentError::new_with_cause(
+            DocumentErrorKind::InternalError,
+            "cannot open document storage",
+            cause,
+        )
+    })?;
+    Ok(DocumentService::new(
+        git,
+        filesystem,
+        MarkdownParser::new(),
+        storage,
+    ))
 }

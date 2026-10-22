@@ -144,9 +144,14 @@ pub struct CapturedFile {
 /// Counts for one refresh publication; all counts are zero for a no-op.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RefreshOutcome {
+    /// Publication revision visible when this refresh returns.
     pub revision: u64,
+    /// Whether this call committed a publication.
     pub published: bool,
+    /// Added or changed file observations, including invalid files.
     pub files_updated: usize,
+    /// Previously stored candidates removed by this publication.
     pub files_removed: usize,
+    /// Invalid observations among `files_updated`.
     pub invalid_files_updated: usize,
 }

@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+pub mod documents;
 use letopis::{
     domain::RepoPath,
     markdown::{Diagnostic, DiagnosticKind, ParsedFile, parse},
