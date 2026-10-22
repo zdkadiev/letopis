@@ -1,4 +1,8 @@
-use crate::domain::{ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, SourceUri, TreeOid};
+use crate::domain::{
+    ByteSpan, Edge, Element, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, SourceUri,
+    TreeOid,
+};
+use std::collections::BTreeSet;
 /// Searchable knowledge metadata; document text is never retained here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeMetadata {
@@ -92,4 +96,40 @@ pub struct QueryError {
 pub struct EmbeddingWork {
     pub id: KnowledgeId,
     pub search_hash: Sha256,
+}
+
+/// A whole valid file's projection; raw Markdown is not retained.
+#[derive(Debug)]
+pub struct ParsedFile {
+    pub elements: Vec<ParsedElement>,
+    pub edges: BTreeSet<Edge>,
+}
+
+/// One parsed element with transient shared search text and its fingerprint.
+#[derive(Debug)]
+pub struct ParsedElement {
+    pub element: Element,
+    pub search_text: String,
+    pub search_hash: Sha256,
+}
+
+/// Local diagnostic reasons; the CLI maps these into its existing error envelope.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum DiagnosticKind {
+    InvalidUtf8,
+    InvalidMetadata,
+    InvalidAnchor,
+    DuplicateAnchor,
+    OrphanMetadata,
+    NestedElement,
+    InvalidLinkTitle,
+    InvalidTarget,
+    SelfLoop,
+}
+/// A file error with source coordinates where available and a fixed local message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Diagnostic {
+    pub kind: DiagnosticKind,
+    pub bytes: Option<ByteSpan>,
+    pub message: String,
 }

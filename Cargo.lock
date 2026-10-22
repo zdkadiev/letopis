@@ -488,6 +488,7 @@ dependencies = [
  "libsqlite3-sys",
  "pulldown-cmark",
  "rusqlite",
+ "rustix",
  "sea-query",
  "serde",
  "serde_json",

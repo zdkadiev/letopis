@@ -48,3 +48,16 @@ pub fn open_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + use
     let key = std::env::var("OPENAI_API_KEY").ok();
     Ok(HttpProviders::new(Ollama::new(), Openai::new(key)))
 }
+
+mod filesystem;
+use crate::filesystem::LocalFileSystem;
+use crate::service::EmbeddingFiles;
+
+/// Open confined embedding file reads and persistent drain exclusion.
+/// The checkout directory is pinned and `.letopis` is protected with mode 0700.
+///
+/// # Errors
+/// Reports unsafe service paths, observed replacements or filesystem failures.
+pub fn open_embedding_files(root: &Path) -> EmbeddingResult<impl EmbeddingFiles + use<>> {
+    LocalFileSystem::open(root)
+}

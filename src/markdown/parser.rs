@@ -1,22 +1,7 @@
 use super::{Diagnostic, DiagnosticKind, Events, links, scan, search};
-use crate::domain::{Edge, Element, RepoPath, Sha256};
+use crate::domain::{RepoPath, Sha256};
+use crate::service::{Markdown, ParsedElement, ParsedFile};
 use pulldown_cmark::{Options, Parser};
-use std::collections::BTreeSet;
-
-/// A whole valid file's projection; raw Markdown is not retained.
-#[derive(Debug)]
-pub struct ParsedFile {
-    pub elements: Vec<ParsedElement>,
-    pub edges: BTreeSet<Edge>,
-}
-
-/// One parsed element with transient shared search text and its fingerprint.
-#[derive(Debug)]
-pub struct ParsedElement {
-    pub element: Element,
-    pub search_text: String,
-    pub search_hash: Sha256,
-}
 
 /// Parse one root-relative Markdown file without accessing disk, Git, SQL or a model.
 /// `Ok(None)` is unmarked Markdown; errors never carry a partial valid projection.
@@ -54,4 +39,16 @@ pub fn parse(path: &RepoPath, bytes: &[u8]) -> Result<Option<ParsedFile>, Vec<Di
             .collect(),
         edges,
     }))
+}
+
+/// The shared X-4 Markdown codec used by application services.
+pub struct MarkdownParser;
+impl Markdown for MarkdownParser {
+    fn parse_file(
+        &self,
+        path: &RepoPath,
+        bytes: &[u8],
+    ) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
+        parse(path, bytes)
+    }
 }
