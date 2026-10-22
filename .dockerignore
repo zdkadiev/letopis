@@ -36,3 +36,9 @@
 !docs/zkit/letopis/mechanics/
 !docs/zkit/letopis/mechanics/storage-schema.sql
 !.dockerignore
+!tests/cli_*.rs
+!tests/cli/
+!tests/cli/**
+!docs/zkit/letopis/contracts/
+!docs/zkit/letopis/contracts/schemas/
+!docs/zkit/letopis/contracts/schemas/X-1-cli.yaml

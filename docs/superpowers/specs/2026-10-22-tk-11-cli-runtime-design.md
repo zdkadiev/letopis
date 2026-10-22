@@ -118,3 +118,20 @@ Run `./scripts/check-rust.sh` on the changed product tree and focused executable
 Meaningful negative controls should compile and fail at the intended behavioral oracle, then restore exact original source and pass. Prioritize an inherited-output-fd/detachment control and loss of kernel exclusion. No x86, target RAM/latency, actual model quality, physical power loss or full TK-29 cancellation evidence is promised here.
 
 No task is marked done with fake or pending acceptance. Record the actual dependency and remaining work explicitly. The user-approved card correction resolves the builder check's only question. The user approved this full design, including the two labelled builder calls (internal drain EOF and unavailable incremental routes). The implementation plan fixes concrete interfaces/files, RED/GREEN checks and integration evidence, then receives its own review/execution-method selection before implementation. No product code, dependency installation, merge, push or issue publication happens at this brainstorming stage.
+
+
+## Task 4 implementation checkpoint — 2026-10-22
+
+The executable and real background composition now implement the accepted runtime
+boundary. [Acceptance report](../../zkit/letopis/checks/TK-11/report.md): root gate
+224 PASS / 0 failures / 2 parent-driven child helpers; host and Linux ARM64 receipts
+have 88 identical input hashes; both compiling controls fail their intended oracle
+and pass after exact restoration. Actual check/inspect/drain requests still return
+explicit unavailable errors; successful injected-handler output is separately
+labelled. Malformed input precedes composition; cwd lookup failure uses one safe
+envelope. No product fixture switch or duplicate executor was introduced.
+
+TK-11 remains partial: Task 5 real drain integration/acceptance and real-service
+idempotency remain open. The runtime fixtures do not waive those gates; real
+inspect/check acceptance remains with TK-12/TK-19. Historical baseline receipts
+above retain their original revision and meaning.

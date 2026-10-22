@@ -252,6 +252,10 @@ mod transport_tests {
         let mut values = serde_json::Deserializer::from_slice(&output).into_iter::<Value>();
         let value = values.next().unwrap().unwrap();
         assert!(values.next().is_none());
+        println!(
+            "CLI_RESPONSE {}",
+            serde_json::json!({"exit":exit,"response":value})
+        );
         (exit, value)
     }
     #[test]

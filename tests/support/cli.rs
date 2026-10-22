@@ -199,7 +199,9 @@ impl Drain {
             0,
             "expected child event"
         );
-        serde_json::from_str(&line).unwrap()
+        let event: Value = serde_json::from_str(&line).unwrap();
+        println!("CLI_OBSERVER {event}");
+        event
     }
     pub fn send_command(&mut self, command: &str) {
         writeln!(self.0.get_mut(), "{command}").unwrap();
@@ -227,7 +229,9 @@ pub fn finish_foreground(child: &mut OwnedChild) -> Value {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(output.stderr.is_empty());
-    serde_json::from_slice(&output.stdout).unwrap()
+    let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+    println!("CLI_FOREGROUND {response}");
+    response
 }
 
 // The socket may close before the dying process releases its lock descriptor.

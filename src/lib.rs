@@ -11,6 +11,7 @@ use crate::service::{
 };
 use crate::storage::SqliteStorage;
 use std::{
+    env,
     ffi::OsString,
     io::{Read, Write},
     path::Path,
@@ -94,8 +95,24 @@ pub fn run_cli(
     output: &mut impl Write,
 ) -> u8 {
     let args = args.into_iter().collect::<Vec<_>>();
-    let response = cli::parse_request(&args, input)
-        .and_then(|request| cli::Handlers::new(None, None, None).execute(request));
+    let response = cli::parse_request(&args, input).and_then(|request| {
+        let root = env::current_dir().map_err(|cause| {
+            CommandError::new_with_cause(
+                CommandErrorKind::InternalError,
+                "cannot locate command directory",
+                cause,
+            )
+        })?;
+        let executable = env::current_exe().map_err(|cause| {
+            CommandError::new_with_cause(
+                CommandErrorKind::InternalError,
+                "cannot locate command executable",
+                cause,
+            )
+        })?;
+        let mut background = open_background(&root, &executable, None)?;
+        cli::Handlers::new(None, None, Some(&mut background)).execute(request)
+    });
     cli::write_response(output, response)
 }
 
