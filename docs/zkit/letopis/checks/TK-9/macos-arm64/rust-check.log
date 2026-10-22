@@ -1,0 +1,181 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.02s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.04s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running unittests src/lib.rs (target/debug/deps/letopis-bbfd9e64c18a55e3)
+
+running 12 tests
+test git::cli::tests::version_gate ... ok
+test storage::connection::tests::both_database_connections_enforce_policy ... ok
+test storage::native::tests::native_capabilities_match_pinned_stack ... ok
+test storage::cache_write::tests::caught_sql_failure_poisoning_restores_metadata_and_index ... ok
+test storage::sqlite::tests::success_deletes_failure_atomically_and_corrupt_key_poisoning_rolls_back ... ok
+test storage::sqlite::tests::reset_late_meta_failure_preserves_identity_key_vector_and_query_error ... ok
+test git::cli::tests::open_rejects_non_repository_and_bare ... ok
+test git::cli::tests::discovers_root_from_subdirectory ... ok
+test git::cli::tests::process_removes_inherited_overrides_and_hardens_writes ... ok
+test git::cli::tests::subprocess_drains_and_reaps_on_io_failure ... ok
+test git::cli::tests::open_rejects_old_git_before_object_calls ... ok
+test git::cli::tests::discovers_trailing_newline_repository_without_touching_sibling ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
+
+     Running tests/domain_values.rs (target/debug/deps/domain_values-620d67b029d62e45)
+
+running 7 tests
+test edge_identity_and_kind_are_derived ... ok
+test anchors_and_ranges_reject_invalid_values ... ok
+test edge_targets_and_self_loops_are_checked ... ok
+test tree_oids_are_full_lowercase_hex ... ok
+test sha256_hex_round_trip_and_invalid_inputs ... ok
+test ids_and_sources_normalize_from_git_root ... ok
+test sha256_uses_exact_bytes ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/git_retention.rs (target/debug/deps/git_retention-634f6a34fe6c4286)
+
+running 11 tests
+test conflicting_descendant_types_do_not_pin ... ok
+test shared_clone_is_refused_before_donor_gc_can_break_retention ... ok
+test alternates_added_after_open_refuse_operations_without_writes ... ok
+test unretained_unique_tree_is_collectable ... ok
+test concurrent_pin_is_idempotent ... ok
+test gitlinks_are_retained_without_dereferencing ... ok
+test promisor_miss_never_fetches ... ok
+test incomplete_tree_and_ref_failure_do_not_pin ... ok
+test linked_worktree_checks_common_object_store_and_refuses_inactive_alternates ... ok
+test symbolic_and_conflicting_refs_are_rejected ... ok
+test retained_snapshots_survive_gc ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.53s
+
+     Running tests/git_snapshots.rs (target/debug/deps/git_snapshots-2a04b859e12e0dc6)
+
+running 5 tests
+test empty_tree_and_invalid_paths ... ok
+test replacement_refs_do_not_change_bytes ... ok
+test tree_types_and_missing_objects_are_distinct ... ok
+test paths_are_literal_and_never_shell_input ... ok
+test exact_bytes_without_index_or_commit ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.82s
+
+     Running tests/markdown_elements.rs (target/debug/deps/markdown_elements-c9010d80cf40e981)
+
+running 10 tests
+test unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected ... ok
+test metadata_must_fit_exactly_one_standalone_line ... ok
+test anchors_are_unique_across_real_headings ... ok
+test unicode_crlf_and_eof_have_exact_spans ... ok
+test code_examples_do_not_declare_elements ... ok
+test snapshot_metadata_preserves_full_oid_and_zero_created_at ... ok
+test nested_elements_and_orphan_metadata_are_rejected ... ok
+test raw_html_content_does_not_declare_metadata ... ok
+test file_errors_never_return_partial_elements ... ok
+test golden_elements_have_exact_bytes_and_metadata ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_links.rs (target/debug/deps/markdown_links-9e1f6072a4ac075b)
+
+running 6 tests
+test image_alt_links_do_not_declare_edges ... ok
+test links_outside_elements_are_only_navigation ... ok
+test sources_are_normalized_without_loading_destinations ... ok
+test links_wrapping_images_still_declare_edges ... ok
+test only_inline_links_declare_edges ... ok
+test invalid_graph_titles_and_targets_fail_file ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_search.rs (target/debug/deps/markdown_search-419746c5e3f8e263)
+
+running 8 tests
+test code_examples_remain_searchable ... ok
+test crlf_metadata_line_does_not_add_search_whitespace ... ok
+test moving_path_preserves_text_hashes ... ok
+test reference_labels_use_whole_file_context ... ok
+test own_text_label_and_code_change_search_hash ... ok
+test search_text_preserves_word_and_block_boundaries ... ok
+test metadata_and_link_changes_keep_search_hash ... ok
+test golden_search_representations ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/storage_bootstrap.rs (target/debug/deps/storage_bootstrap-ba0e64613360acef)
+
+running 14 tests
+test non_utf8_attachment_path_is_rejected ... ok
+test missing_parent_and_nul_paths_are_rejected ... ok
+test symlink_and_hardlink_aliases_are_rejected ... ok
+test owned_storage_outlives_path_arguments ... ok
+test independent_thread_connections_register_native_vec1 ... ok
+test same_database_path_is_rejected ... ok
+test literal_unicode_quote_and_question_mark_paths_open ... ok
+test sqlite_like_prefix_does_not_hide_extra_user_tables ... ok
+test parallel_initializers_leave_a_complete_schema ... ok
+test busy_bootstrap_returns_typed_error_without_retry ... ok
+test fresh_storage_reopens_with_empty_identity ... ok
+test malformed_stored_observations_return_safe_typed_errors ... ok
+test vector_schema_and_unversioned_user_data_are_not_recreated ... ok
+test unknown_or_partial_schema_is_not_recreated ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+     Running tests/storage_cache.rs (target/debug/deps/storage_cache-0ffadcf304b5dfa5)
+
+running 18 tests
+test caught_mutation_error_poisoned_unit_cannot_commit ... ok
+test late_fts_error_rolls_back_all_changes ... ok
+test dropped_unit_rolls_back ... ok
+test source_missing_bytes_and_declared_targets_round_trip ... ok
+test revision_overflow_rolls_back ... ok
+test duplicate_edges_and_invalid_checks_are_rejected ... ok
+test contentless_fts_does_not_return_original_text ... ok
+test fts_matches_use_native_score_then_id_without_candidate_limit ... ok
+test cache_commit_preserves_node_row_id ... ok
+test deleting_node_removes_fts_and_refuses_remaining_outgoing_edges ... ok
+test empty_cache_publications_preserve_vector_identity_and_state ... ok
+test malformed_persisted_values_return_internal_errors ... ok
+test incoming_edges_survive_target_delete_and_reappear ... ok
+test knowledge_and_source_optional_fields_survive_reopen ... ok
+test source_time_and_line_overflow_poison_the_unit ... ok
+test unsigned_values_do_not_wrap ... ok
+test valid_invalid_and_unmarked_file_rows_round_trip ... ok
+test source_projection_can_be_recomputed_and_removed ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+
+     Running tests/storage_failures.rs (target/debug/deps/storage_failures-2955ced9e7b7be0f)
+
+running 7 tests
+test absent_failure_is_not_created_by_error ... ok
+test maximum_persisted_attempt_is_not_incremented_or_wrapped ... ok
+test success_clears_only_its_failure ... ok
+test stale_identity_cannot_reserve_or_record_or_store ... ok
+test query_error_replaces_and_clears_without_history ... ok
+test invalid_budget_and_timestamp_poison_units_without_partial_writes ... ok
+test reservation_is_durable_only_after_commit_and_survives_reopen ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+     Running tests/storage_vectors.rs (target/debug/deps/storage_vectors-fa0da5eb883374c6)
+
+running 8 tests
+test vectors_require_matching_identity ... ok
+test dimension_reset_and_rollback ... ok
+test current_node_hash_excludes_old_vector ... ok
+test nearest_validates_query_and_orders_all_candidates_by_distance_then_id ... ok
+test text_hash_shares_one_vector ... ok
+test old_reader_survives_reset_and_late_reader_rejects_captured_old_identity ... ok
+test cache_and_vector_writers_are_independent ... ok
+test caught_vector_error_cannot_commit_key_or_prior_write ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+   Doc-tests letopis
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

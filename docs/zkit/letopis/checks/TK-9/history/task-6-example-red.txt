@@ -1,0 +1,4 @@
+Observed command: cargo run --locked --offline --example storage_check -- /tmp/tk9-absent-example
+Exit: 101
+error: no example target named `storage_check` in default-run packages
+This is missing-target RED, not a behavioral failure.

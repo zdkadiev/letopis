@@ -1,0 +1,181 @@
+letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-9/letopis)
+├── pulldown-cmark v0.13.4
+│   ├── bitflags feature "default"
+│   │   └── bitflags v2.13.2
+│   ├── memchr feature "default"
+│   │   ├── memchr v2.8.3
+│   │   └── memchr feature "std"
+│   │       ├── memchr v2.8.3
+│   │       └── memchr feature "alloc"
+│   │           └── memchr v2.8.3
+│   └── unicase feature "default"
+│       └── unicase v2.10.0
+├── libsqlite3-sys feature "bundled"
+│   ├── libsqlite3-sys v0.38.2
+│   │   [build-dependencies]
+│   │   ├── cc feature "default"
+│   │   │   └── cc v1.9.0
+│   │   │       ├── find-msvc-tools feature "default"
+│   │   │       │   └── find-msvc-tools v0.1.15
+│   │   │       └── shlex feature "default"
+│   │   │           ├── shlex v2.0.1
+│   │   │           └── shlex feature "std"
+│   │   │               └── shlex v2.0.1
+│   │   ├── pkg-config feature "default"
+│   │   │   └── pkg-config v0.3.34
+│   │   └── vcpkg feature "default"
+│   │       └── vcpkg v0.2.15
+│   ├── libsqlite3-sys feature "bundled_bindings"
+│   │   └── libsqlite3-sys v0.38.2 (*)
+│   └── libsqlite3-sys feature "cc"
+│       └── libsqlite3-sys v0.38.2 (*)
+├── rusqlite feature "bundled"
+│   ├── rusqlite v0.40.2
+│   │   ├── libsqlite3-sys feature "default"
+│   │   │   ├── libsqlite3-sys v0.38.2 (*)
+│   │   │   └── libsqlite3-sys feature "min_sqlite_version_3_34_1"
+│   │   │       ├── libsqlite3-sys v0.38.2 (*)
+│   │   │       ├── libsqlite3-sys feature "pkg-config"
+│   │   │       │   └── libsqlite3-sys v0.38.2 (*)
+│   │   │       └── libsqlite3-sys feature "vcpkg"
+│   │   │           └── libsqlite3-sys v0.38.2 (*)
+│   │   ├── bitflags feature "default" (*)
+│   │   ├── fallible-iterator feature "default"
+│   │   │   ├── fallible-iterator v0.3.0
+│   │   │   └── fallible-iterator feature "alloc"
+│   │   │       └── fallible-iterator v0.3.0
+│   │   ├── fallible-streaming-iterator feature "default"
+│   │   │   └── fallible-streaming-iterator v0.1.9
+│   │   └── smallvec feature "default"
+│   │       └── smallvec v1.16.3
+│   ├── libsqlite3-sys feature "bundled" (*)
+│   └── rusqlite feature "modern_sqlite"
+│       ├── rusqlite v0.40.2 (*)
+│       └── libsqlite3-sys feature "bundled_bindings" (*)
+├── serde feature "default"
+│   ├── serde v1.0.228
+│   │   ├── serde_core feature "result"
+│   │   │   └── serde_core v1.0.228
+│   │   └── serde_derive feature "default"
+│   │       └── serde_derive v1.0.228 (proc-macro)
+│   │           ├── proc-macro2 feature "proc-macro"
+│   │           │   └── proc-macro2 v1.0.107
+│   │           │       └── unicode-ident feature "default"
+│   │           │           └── unicode-ident v1.0.27
+│   │           ├── quote feature "proc-macro"
+│   │           │   ├── quote v1.0.47
+│   │           │   │   └── proc-macro2 v1.0.107 (*)
+│   │           │   └── proc-macro2 feature "proc-macro" (*)
+│   │           ├── syn feature "clone-impls"
+│   │           │   └── syn v2.0.119
+│   │           │       ├── proc-macro2 v1.0.107 (*)
+│   │           │       ├── quote v1.0.47 (*)
+│   │           │       └── unicode-ident feature "default" (*)
+│   │           ├── syn feature "derive"
+│   │           │   └── syn v2.0.119 (*)
+│   │           ├── syn feature "parsing"
+│   │           │   └── syn v2.0.119 (*)
+│   │           ├── syn feature "printing"
+│   │           │   └── syn v2.0.119 (*)
+│   │           └── syn feature "proc-macro"
+│   │               ├── syn v2.0.119 (*)
+│   │               ├── proc-macro2 feature "proc-macro" (*)
+│   │               └── quote feature "proc-macro" (*)
+│   └── serde feature "std"
+│       ├── serde v1.0.228 (*)
+│       └── serde_core feature "std"
+│           └── serde_core v1.0.228
+├── serde feature "derive"
+│   ├── serde v1.0.228 (*)
+│   └── serde feature "serde_derive"
+│       └── serde v1.0.228 (*)
+├── serde_json feature "default"
+│   ├── serde_json v1.0.145
+│   │   ├── memchr v2.8.3
+│   │   ├── serde_core v1.0.228
+│   │   ├── itoa feature "default"
+│   │   │   └── itoa v1.0.18
+│   │   └── ryu feature "default"
+│   │       └── ryu v1.0.23
+│   └── serde_json feature "std"
+│       ├── serde_json v1.0.145 (*)
+│       ├── memchr feature "std" (*)
+│       └── serde_core feature "std" (*)
+└── sha2 feature "default"
+    ├── sha2 v0.10.9
+    │   ├── cfg-if feature "default"
+    │   │   └── cfg-if v1.0.5
+    │   ├── cpufeatures feature "default"
+    │   │   └── cpufeatures v0.2.17
+    │   │       └── libc v0.2.191
+    │   └── digest feature "default"
+    │       ├── digest v0.10.7
+    │       │   ├── block-buffer feature "default"
+    │       │   │   └── block-buffer v0.10.4
+    │       │   │       └── generic-array feature "default"
+    │       │   │           └── generic-array v0.14.7
+    │       │   │               └── typenum feature "default"
+    │       │   │                   └── typenum v1.20.1
+    │       │   │               [build-dependencies]
+    │       │   │               └── version_check feature "default"
+    │       │   │                   └── version_check v0.9.5
+    │       │   └── crypto-common feature "default"
+    │       │       └── crypto-common v0.1.7
+    │       │           ├── generic-array feature "default" (*)
+    │       │           ├── generic-array feature "more_lengths"
+    │       │           │   └── generic-array v0.14.7 (*)
+    │       │           └── typenum feature "default" (*)
+    │       └── digest feature "core-api"
+    │           ├── digest v0.10.7 (*)
+    │           └── digest feature "block-buffer"
+    │               └── digest v0.10.7 (*)
+    └── sha2 feature "std"
+        ├── sha2 v0.10.9 (*)
+        └── digest feature "std"
+            ├── digest v0.10.7 (*)
+            ├── digest feature "alloc"
+            │   └── digest v0.10.7 (*)
+            └── crypto-common feature "std"
+                └── crypto-common v0.1.7 (*)
+[build-dependencies]
+├── cc feature "default" (*)
+└── sha2 feature "default" (*)
+[dev-dependencies]
+└── tempfile feature "default"
+    ├── tempfile v3.23.0
+    │   ├── getrandom v0.3.4
+    │   │   ├── libc v0.2.191
+    │   │   └── cfg-if feature "default" (*)
+    │   ├── fastrand feature "default"
+    │   │   ├── fastrand v2.5.0
+    │   │   └── fastrand feature "std"
+    │   │       ├── fastrand v2.5.0
+    │   │       └── fastrand feature "alloc"
+    │   │           └── fastrand v2.5.0
+    │   ├── once_cell feature "std"
+    │   │   ├── once_cell v1.21.4
+    │   │   └── once_cell feature "alloc"
+    │   │       ├── once_cell v1.21.4
+    │   │       └── once_cell feature "race"
+    │   │           └── once_cell v1.21.4
+    │   ├── rustix feature "default"
+    │   │   ├── rustix v1.1.5
+    │   │   │   ├── bitflags v2.13.2
+    │   │   │   ├── errno v0.3.14
+    │   │   │   │   └── libc v0.2.191
+    │   │   │   └── libc v0.2.191
+    │   │   └── rustix feature "std"
+    │   │       ├── rustix v1.1.5 (*)
+    │   │       ├── bitflags feature "std"
+    │   │       │   └── bitflags v2.13.2
+    │   │       ├── libc feature "std"
+    │   │       │   └── libc v0.2.191
+    │   │       ├── rustix feature "alloc"
+    │   │       │   └── rustix v1.1.5 (*)
+    │   │       └── errno feature "std"
+    │   │           ├── errno v0.3.14 (*)
+    │   │           └── libc feature "std" (*)
+    │   └── rustix feature "fs"
+    │       └── rustix v1.1.5 (*)
+    └── tempfile feature "getrandom"
+        └── tempfile v3.23.0 (*)

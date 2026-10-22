@@ -1,7 +1,7 @@
 # TK-9 — SQLite storage, static vec1, and responsibility-based modules
 
 > **Date:** 2026-10-22
-> **Status:** approved for implementation planning by the user (“go on”, 2026-10-22); product implementation awaits written-plan review and execution-method selection.
+> **Status:** approved for implementation; the user approved the written plan and selected Subagent-driven execution on 2026-10-22.
 > **Branch:** TK-9, based on local main `5869ffd6e7fb148f79c5eec2f1c7856913c662fd` (includes D-98).
 
 ## 1. Intent and design authority
@@ -173,3 +173,7 @@ Run the product/static-link checks on macOS ARM64 and Linux glibc ARM64 with pla
 A fresh pre-change baseline on the branch passed ./scripts/check-rust.sh: formatting, compiler checks, Clippy, and 53 root tests. This is context for the existing tree, not evidence that TK-9 storage already exists.
 
 This specification records the agreed intent, module/file refinements, and concrete storage behavior. The user approved the written specification with “go on” on 2026-10-22. Product code remains unchanged at the planning stage. The [implementation plan](../plans/2026-10-22-tk-9-storage.md) enumerates signatures, cohesive tasks, exact test commands, static-build plumbing, and evidence locations. The user reviews that written plan and chooses its execution method before product implementation begins.
+
+## Implementation evidence (2026-10-22)
+
+Implementation and platform validation are recorded in the [TK-9 report](../../zkit/letopis/checks/TK-9/report.md): 106 Rust tests per platform, strict Rustdoc, three runner checks, copied native executable and two disposable-source negative controls. Final platform source is `b0a5aeaa0cd5c51bfbdb008cf1f3870b28c49b16`; later documentation commits are not claimed as executed. Task 6 and final fresh reviews remain pending with the controller. No integration or deferred product scope is claimed.

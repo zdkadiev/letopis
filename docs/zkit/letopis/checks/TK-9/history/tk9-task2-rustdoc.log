@@ -1,0 +1,8 @@
+   Compiling libc v0.2.191
+    Checking rusqlite v0.40.2
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-9/letopis)
+ Documenting letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-9/letopis)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.42s
+   Generated /Users/zdkadiev/.codex/worktrees/tk-9/letopis/target/doc/letopis/index.html
