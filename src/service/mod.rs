@@ -326,3 +326,26 @@ pub trait Markdown {
         bytes: &[u8],
     ) -> Result<Option<ParsedFile>, Vec<Diagnostic>>;
 }
+
+mod embedding;
+pub use embedding::EmbeddingService;
+pub use model::{ConfigState, DrainOutcome, QueryEmbedding};
+
+/// Synchronous embedding application operations.
+pub trait Embeddings {
+    /// Reread, validate and synchronize ready configuration.
+    ///
+    /// # Errors
+    /// Reports storage failures; unreadable configuration is a typed invalid state.
+    fn read_configuration(&mut self) -> EmbeddingResult<ConfigState>;
+    /// Drain current eligible documents using durable bounded attempts.
+    ///
+    /// # Errors
+    /// Reports storage or environment failures that prevent safe coordination.
+    fn drain(&mut self) -> EmbeddingResult<DrainOutcome>;
+    /// Compute one transient query vector, persisting only a safe diagnostic.
+    ///
+    /// # Errors
+    /// Reports storage or clock failures; ordinary provider errors are unavailable.
+    fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding>;
+}

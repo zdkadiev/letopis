@@ -61,3 +61,22 @@ use crate::service::EmbeddingFiles;
 pub fn open_embedding_files(root: &Path) -> EmbeddingResult<impl EmbeddingFiles + use<>> {
     LocalFileSystem::open(root)
 }
+
+use crate::markdown::MarkdownParser;
+use crate::service::{EmbeddingService, Embeddings};
+
+/// Assemble synchronous embeddings with explicit caller-owned storage.
+///
+/// # Errors
+/// Reports confined filesystem or provider construction failures.
+pub fn open_embeddings<S: Storage>(
+    root: &Path,
+    storage: S,
+) -> EmbeddingResult<impl Embeddings + use<S>> {
+    Ok(EmbeddingService::new(
+        storage,
+        LocalFileSystem::open(root)?,
+        MarkdownParser,
+        open_embedding_provider()?,
+    ))
+}

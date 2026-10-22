@@ -1,3 +1,4 @@
+use super::{EmbeddingConfig, EmbeddingErrorKind};
 use crate::domain::{
     ByteSpan, Edge, Element, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, SourceUri,
     TreeOid,
@@ -132,4 +133,37 @@ pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub bytes: Option<ByteSpan>,
     pub message: String,
+}
+
+/// Current readiness after validating and synchronizing configuration.
+#[derive(Debug)]
+pub enum ConfigState {
+    /// No configuration file exists.
+    Missing,
+    /// Configuration cannot currently be used; existing vectors remain intact.
+    Invalid(EmbeddingErrorKind),
+    /// Validated configuration synchronized with vector storage.
+    Ready(EmbeddingConfig),
+}
+
+/// Result of one synchronous document drain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DrainOutcome {
+    /// All eligible work is stored, skipped, or exhausted.
+    Complete,
+    /// Configuration is absent or invalid.
+    Unavailable,
+    /// Another process owns the drain lock.
+    AlreadyRunning,
+    /// Committed vector identity changed during this invocation.
+    ConfigChanged,
+}
+
+/// Query vectors remain transient and never consume document reservations.
+#[derive(Debug, PartialEq)]
+pub enum QueryEmbedding {
+    /// A validated vector under its captured configuration identity.
+    Available { identity: Sha256, vector: Vec<f32> },
+    /// Search can continue without vector ranking.
+    Unavailable,
 }
