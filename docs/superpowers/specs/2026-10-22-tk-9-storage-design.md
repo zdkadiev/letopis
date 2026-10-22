@@ -1,14 +1,14 @@
 # TK-9 — SQLite storage, static vec1, and responsibility-based modules
 
 > **Date:** 2026-10-22
-> **Status:** written design for user review; implementation plan and product implementation are not authorized by this document alone.
+> **Status:** approved for implementation planning by the user (“go on”, 2026-10-22); product implementation awaits written-plan review and execution-method selection.
 > **Branch:** TK-9, based on local main `5869ffd6e7fb148f79c5eec2f1c7856913c662fd` (includes D-98).
 
 ## 1. Intent and design authority
 
 Implement the production storage foundation required by the thin slice: the agreed cache schema, vectors.db, typed application interfaces, and statically linked vec1. Subsequent services must be able to use it without knowing SQLite. Keep the design synchronous, small, and explicit.
 
-The user approved one Storage interface, one concrete SqliteStorage implementation, private modules by responsibility, inward dependencies, and lib.rs wiring. Later refinements remove Port/Adapter from type names and directory names, remove contracts/, place interfaces in mod.rs, and put each concrete implementation with its struct in a separate file. These naming/file decisions are recorded in [D-99](../../zkit/letopis/decisions.md#D-99). The detailed storage behavior below remains subject to review of this written specification.
+The user approved one Storage interface, one concrete SqliteStorage implementation, private modules by responsibility, inward dependencies, and lib.rs wiring. Later refinements remove Port/Adapter from type names and directory names, remove contracts/, place interfaces in mod.rs, and put each concrete implementation with its struct in a separate file. These naming/file decisions are recorded in [D-99](../../zkit/letopis/decisions.md#D-99). The user subsequently approved this written specification for planning on 2026-10-22. The resulting implementation plan remains a separate review gate.
 
 Sources, in precedence order:
 
@@ -172,4 +172,4 @@ Run the product/static-link checks on macOS ARM64 and Linux glibc ARM64 with pla
 
 A fresh pre-change baseline on the branch passed ./scripts/check-rust.sh: formatting, compiler checks, Clippy, and 53 root tests. This is context for the existing tree, not evidence that TK-9 storage already exists.
 
-This specification records the agreed intent, module/file refinements, and concrete storage behavior for written review. Product code is unchanged at this stage. After the user reviews/approves this file, use writing-plans to enumerate signatures, cohesive implementation tasks, exact test commands, static-build plumbing, and source/evidence locations. The user then reviews the written plan and chooses its execution method before product implementation begins.
+This specification records the agreed intent, module/file refinements, and concrete storage behavior. The user approved the written specification with “go on” on 2026-10-22. Product code remains unchanged at the planning stage. The [implementation plan](../plans/2026-10-22-tk-9-storage.md) enumerates signatures, cohesive tasks, exact test commands, static-build plumbing, and evidence locations. The user reviews that written plan and chooses its execution method before product implementation begins.
