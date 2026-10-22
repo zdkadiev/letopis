@@ -32,7 +32,7 @@ Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful
 - Replace meaningful repeated domain/protocol literals with clearly named constants near their owning module; use SCREAMING_SNAKE_CASE. Do not replace literals mechanically or collect unrelated constants in a global bag.
 - Keep functions and methods focused: aim for about 40 lines, with 60 lines as the upper limit. Split longer implementations into cohesive named helpers, not arbitrary wrappers or compressed formatting. Apply the same rule to tests and test helpers.
 - Use ownership and borrowing deliberately; add cloning, shared ownership, locks, or dynamic dispatch only for an actual need.
-- Model finite alternatives with enums and expected failures with typed `Result`. Document public APIs. Preserve useful internal error causes while keeping public diagnostics free of secrets and raw knowledge/provider/subprocess payloads.
+- Model finite alternatives with enums and expected failures with typed `Result`. Document public APIs as described in [readability and documentation](#readability-and-documentation). Preserve useful internal error causes while keeping public diagnostics free of secrets and raw knowledge/provider/subprocess payloads.
 - Compose ordinary storage queries with SeaQuery and typed table/column identifiers; execute through rusqlite using bound values from the private storage/query.rs helper. Keep builder types inside storage. Raw SQL is reserved for schemas, SQLite introspection/PRAGMAs/native probes, and specialized FTS5/vec1 search or native commands; format substantial SQL across readable lines. Never interpolate user values or render them into SQL with to_string.
 - Keep I/O synchronous according to the design; do not add an async runtime without an agreed requirement. Product Git commands belong in the Git process adapter and use argv/stdin, never shell interpolation.
 - Standard Clippy checks and the explicitly selected pedantic checks in `Cargo.toml` are enabled; see the development guide for each rule and its purpose. `dbg!`, `todo!`, and `unimplemented!` are denied. Do not enable all of `restriction`, `pedantic`, or `nursery` indiscriminately. Fix the underlying finding rather than adding a blanket allowance; any exception must be narrow and explain its reason. Public fallible APIs document `# Errors`, and public APIs that can panic document `# Panics`.
@@ -46,6 +46,22 @@ Code reads top to bottom, from abstract to concrete. Apply these rules to new an
 - Within an `impl`, public methods come first and private helpers last, in the order they are first called. A public method that calls another public method stays above it.
 - Within a file, order items as constants, types, `impl` blocks with the public API, trait implementations, then private free functions. Trait implementations such as `Display` stay next to their type. `#[cfg(test)]` modules go last, with test helpers after the tests.
 - Place a helper by its consumers: one file keeps it as a private function at the bottom of that file; several files of one module share the module-local `utils.rs`; several modules share `src/utils.rs`. Extract only when there are at least two consumers. `utils.rs` files follow the same top-to-bottom order.
+
+## Readability and documentation
+
+Apply these rules to new and touched code only.
+
+- Prefer early exits: `let Some(x) = value else { return ... };` and `?` over nested `match` and `if let`. Keep nesting to two levels.
+- Use newtypes and enums instead of bare primitives: `SnapshotId(String)` rather than `String`, an enum rather than `bool` flags.
+- Group more than three or four parameters into a request struct.
+- Use iterator chains while they read well (three or four steps); split longer chains into named steps instead of a manual loop or one long expression.
+- Write explicit types in signatures; do not use `impl Trait` where it hides meaning.
+- Keep files focused on one responsibility, roughly 300-500 lines; split a file that grows far beyond that.
+- Comments explain why, not what: required for `unsafe`, platform workarounds, and non-obvious invariants. Do not narrate the body line by line or repeat the method name.
+- Document every `pub` and interface method (traits in `service/mod.rs`, `mod.rs` re-exports) and every private method whose purpose is not clear from its name and signature. Trivial accessors and obvious one-liners need no comment.
+- A method comment starts with one sentence saying what it does, then states the contract: preconditions, what is returned, side effects, and guarantees such as atomicity or idempotence, plus `# Errors` and `# Panics` where they apply.
+- Document a trait's contract on the trait itself: what every implementation must guarantee, not only the current one. An `impl` comment covers only what is specific to that implementation, such as SQLite or Git behavior.
+- Update a comment in the same commit that changes the behavior it describes.
 
 ## Verification
 
