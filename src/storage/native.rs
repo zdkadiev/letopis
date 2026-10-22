@@ -33,17 +33,42 @@ pub(super) fn register_vec1() -> StorageResult<()> {
 #[cfg(test)]
 mod tests {
     use super::register_vec1;
-    use rusqlite::Connection;
 
     #[test]
     fn native_capabilities_match_pinned_stack() {
         register_vec1().unwrap();
-        let connection = Connection::open_in_memory().unwrap();
+        let root = tempfile::TempDir::new().unwrap();
+        let connection =
+            super::super::connection::open_database(&root.path().join("native.db")).unwrap();
         assert!(rusqlite::version_number() >= 3_051_003);
         let info: String = connection
             .query_row("SELECT vec1_info()", [], |row| row.get(0))
             .unwrap();
         assert!(info.starts_with("version 0.8"), "{info}");
+        println!("SQLite={} vec1={info}", rusqlite::version());
+        for (pragma, expected) in [
+            ("journal_mode", "wal"),
+            ("synchronous", "2"),
+            ("foreign_keys", "1"),
+        ] {
+            let value: String = connection
+                .query_row(
+                    &format!("SELECT CAST({pragma} AS TEXT) FROM pragma_{pragma}"),
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(value, expected);
+            println!("{pragma}={value}");
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let value: i64 = connection
+                .pragma_query_value(None, "fullfsync", |row| row.get(0))
+                .unwrap();
+            assert_eq!(value, 1);
+            println!("fullfsync={value}");
+        }
         connection.execute_batch("CREATE VIRTUAL TABLE f USING fts5(text, content='', contentless_delete=1); INSERT INTO f(rowid,text) VALUES(1,'secret'); DELETE FROM f WHERE rowid=1;").unwrap();
         let count: i64 = connection
             .query_row("SELECT count(*) FROM f", [], |row| row.get(0))
