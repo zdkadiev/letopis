@@ -1,4 +1,4 @@
-use letopis::open_storage;
+use letopis::{open_storage, service::EmbedLocks};
 use serde_json::Value;
 use std::{
     env, fs,
@@ -228,4 +228,17 @@ pub fn finish_foreground(child: &mut OwnedChild) -> Value {
     );
     assert!(output.stderr.is_empty());
     serde_json::from_slice(&output.stdout).unwrap()
+}
+
+// The socket may close before the dying process releases its lock descriptor.
+// Only an acquired lease is a lock-release completion observation.
+pub fn wait_for_embed_lock<F: EmbedLocks>(files: &F) -> F::EmbedLock {
+    let deadline = Instant::now() + WAIT;
+    loop {
+        if let Some(lease) = files.try_lock_embed().unwrap() {
+            return lease;
+        }
+        assert!(Instant::now() < deadline, "embedding lock release timeout");
+        thread::yield_now();
+    }
 }

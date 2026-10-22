@@ -1,8 +1,11 @@
 #[path = "support/cli.rs"]
 mod cli;
-use cli::{Fixture, finish_foreground};
-use letopis::{open_filesystem, service::EmbedLocks};
-use std::{fs, os::unix::fs::MetadataExt};
+use cli::{Fixture, finish_foreground, wait_for_embed_lock};
+use letopis::{
+    open_filesystem,
+    service::{DocumentResult, EmbedLocks},
+};
+use std::{cell::RefCell, fs, os::unix::fs::MetadataExt};
 
 #[test]
 fn detached_child_has_exact_context_null_fds_and_no_service_descriptors() {
@@ -77,10 +80,7 @@ fn owned_sigkill_and_stale_pid_preserve_inode_and_release_lock() {
     // Only this owned fixture self-signals; no PID from a file is ever signalled.
     drain.send_command("crash");
     drain.expect_eof();
-    let lease = files
-        .try_lock_embed()
-        .unwrap()
-        .expect("SIGKILL released lock");
+    let lease = wait_for_embed_lock(&files);
     assert_eq!(fs::metadata(&lock).unwrap().ino(), inode);
     drop(lease);
     fs::write(&lock, "999999999\n").unwrap();
@@ -100,4 +100,45 @@ fn exec_failure_returns_safe_warning() {
     assert!(response["warning"]["message"].is_string());
     assert_eq!(response["warning"]["details"], serde_json::json!({}));
     assert!(!response.to_string().contains("secret"));
+}
+
+struct ReleaseAfterBusyProbe<F: EmbedLocks> {
+    files: F,
+    owner: RefCell<Option<F::EmbedLock>>,
+}
+impl<F: EmbedLocks> EmbedLocks for ReleaseAfterBusyProbe<F> {
+    type EmbedLock = F::EmbedLock;
+
+    fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>> {
+        let result = self.files.try_lock_embed()?;
+        if result.is_none() {
+            // Deterministically model cleanup after an observer saw an earlier
+            // completion event: this first real probe must still report busy.
+            self.owner.borrow_mut().take();
+        }
+        Ok(result)
+    }
+}
+
+#[test]
+fn lock_release_wait_retries_busy_probe_and_retains_acquired_lease() {
+    // Arrange: the observer initially sees a genuinely occupied kernel lock.
+    let root = tempfile::tempdir().unwrap();
+    let files = open_filesystem(root.path()).unwrap();
+    let owner = files.try_lock_embed().unwrap().unwrap();
+    let lock = root.path().join(".letopis/embed.lock");
+    let inode = fs::metadata(&lock).unwrap().ino();
+    let delayed = ReleaseAfterBusyProbe {
+        files,
+        owner: RefCell::new(Some(owner)),
+    };
+
+    // Act: the first failed probe permits the independent owner to release.
+    let lease = wait_for_embed_lock(&delayed);
+
+    // Assert: completion requires an actual lease, retained through observation.
+    assert_eq!(fs::metadata(&lock).unwrap().ino(), inode);
+    assert!(delayed.files.try_lock_embed().unwrap().is_none());
+    drop(lease);
+    assert!(delayed.files.try_lock_embed().unwrap().is_some());
 }
