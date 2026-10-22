@@ -96,3 +96,35 @@ fn convert_count(value: u64) -> Result<u8, TryFromIntError> {
 Небольшие интерфейсы приложения объявлять в service/mod.rs. mod.rs также объявляет дочерние модули и явно реэкспортирует необходимые имена. Каждую конкретную реализацию держать в отдельном файле вместе со структурой и её inherent/trait impl: git/cli.rs, storage/sqlite.rs, отдельный файл для каждого реализованного сервиса. Реализации не складывать в mod.rs. При росте интерфейсов выделять приватные файлы по ответственности и сохранять короткий публичный путь через реэкспорт. Будущие пустые компоненты не создавать.
 
 Зависимости направлены к domain и принадлежащим service интерфейсам; конкретные реализации связывает lib.rs. Документация описывает целевую раскладку D-99, а перенос существующего кода выполняется по плану TK-9.
+
+
+## Построение SQL-запросов
+
+Обычные SELECT/INSERT/UPDATE/DELETE собираются fluent API SeaQuery с типизированными
+именами таблиц и колонок ([D-100](zkit/letopis/decisions.md#D-100)). SeaQuery остаётся
+деталью `src/storage/`: сервисы и domain не импортируют его типы. Пример формы:
+
+```rust
+let query = Query::select()
+    .columns([Nodes::Id, Nodes::Kind, Nodes::Uri])
+    .from(Nodes::Table)
+    .and_where(Expr::col(Nodes::Id).eq(id.as_str()))
+    .to_owned();
+let (sql, values) = build_query(&query)?;
+```
+
+Приватный `storage/query.rs` преобразует параметры в значения rusqlite с проверкой
+целочисленного диапазона; исполняющий код передаёт их через `params_from_iter` в
+существующую Connection/Transaction. Не применять `to_string` для SQL с
+пользовательскими значениями. Builder не проверяет существование колонок или
+схему реальной БД на этапе компиляции: это проверяют storage tests.
+
+Версии rusqlite и bundled SQLite сохраняются. Публичный sea-query-rusqlite 0.8.0
+требует rusqlite ^0.38 и не подключается к нашему =0.40.2; маленькое преобразование
+значений не требует второго драйвера, ORM или async runtime.
+
+DDL остаётся в cache.sql/vectors.sql. SQL для introspection, PRAGMA/ATTACH/native
+probes, FTS MATCH/bm25 и vec1 search/reset-команд остаётся явным и читаемым.
+Обычный CRUD метаданных вокруг FTS/vec1 всё равно использует builder. SQL fixtures
+тестов можно сохранять как независимый oracle. Миграция не меняет схему,
+транзакционные границы, правила ошибок и типы application-owned интерфейсов.

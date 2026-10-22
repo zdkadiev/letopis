@@ -82,5 +82,6 @@ compiler, Clippy and all 106 Rust tests on macOS ARM64.
 - [SeaQuery documentation](https://docs.rs/sea-query/1.0.2/sea_query/)
 - [Published binder dependencies](https://docs.rs/crate/sea-query-rusqlite/0.8.0)
 
-Compatibility is established from published manifests/source inspection; the
-proposed binding helper has not yet been compiled or implemented.
+At planning time, compatibility was established from published manifest/source
+inspection. The helper is now implemented and verified on source8f19ba9; the
+[implementation plan](../plans/2026-10-22-storage-query-builder.md#verification-and-implementation-record) records commands, results and limits.
