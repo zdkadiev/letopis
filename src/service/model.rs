@@ -1,4 +1,8 @@
-use crate::domain::{ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, SourceUri, TreeOid};
+use crate::domain::{
+    ByteSpan, Edge, Element, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, SourceUri,
+    TreeOid,
+};
+use std::collections::BTreeSet;
 /// Searchable knowledge metadata; document text is never retained here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeMetadata {
@@ -85,4 +89,64 @@ pub struct EmbeddingFailure {
 pub struct QueryError {
     pub at: u64,
     pub error: String,
+}
+
+/// A whole valid file's projection; raw Markdown is not retained.
+#[derive(Debug)]
+pub struct ParsedFile {
+    pub elements: Vec<ParsedElement>,
+    pub edges: BTreeSet<Edge>,
+}
+
+/// One parsed element with transient shared search text and its fingerprint.
+#[derive(Debug)]
+pub struct ParsedElement {
+    pub element: Element,
+    pub search_text: String,
+    pub search_hash: Sha256,
+}
+
+/// Local diagnostic reasons; the CLI maps these into its existing error envelope.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum DiagnosticKind {
+    InvalidUtf8,
+    InvalidMetadata,
+    InvalidAnchor,
+    DuplicateAnchor,
+    OrphanMetadata,
+    NestedElement,
+    InvalidLinkTitle,
+    InvalidTarget,
+    SelfLoop,
+}
+/// A file error with source coordinates where available and a fixed local message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Diagnostic {
+    pub kind: DiagnosticKind,
+    pub bytes: Option<ByteSpan>,
+    pub message: String,
+}
+/// Root-relative regular-file observation used by change detection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileStat {
+    pub size: u64,
+    pub mtime_ns: i64,
+    pub inode: u64,
+    pub device: u64,
+}
+/// Exact file bytes with a verified observation and pre-read clock sample.
+#[derive(Debug)]
+pub struct CapturedFile {
+    pub bytes: Vec<u8>,
+    pub stat: FileStat,
+    pub checked_at_ns: i64,
+}
+/// Counts for one refresh publication; all counts are zero for a no-op.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RefreshOutcome {
+    pub revision: u64,
+    pub published: bool,
+    pub files_updated: usize,
+    pub files_removed: usize,
+    pub invalid_files_updated: usize,
 }

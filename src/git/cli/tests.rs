@@ -242,3 +242,92 @@ fn discovers_trailing_newline_repository_without_touching_sibling() {
         assert_eq!(discovered_root, target);
     }
 }
+
+#[test]
+fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
+    use crate::service::CorpusFiles;
+    // Arrange
+    let repo = TempRepo::new(ObjectFormat::Sha1);
+    for path in [
+        "deleted.md",
+        "tracked-ignored.md",
+        "space name.markdown",
+        "ignored.md",
+        "plain.txt",
+    ] {
+        fs::write(repo.get_root().join(path), b"bytes").unwrap();
+    }
+    repo.run_git_successfully(&["add", "deleted.md", "tracked-ignored.md"], None);
+    fs::remove_file(repo.get_root().join("deleted.md")).unwrap();
+    fs::write(repo.get_root().join(".gitignore"), b"*ignored.md\n").unwrap();
+    fs::create_dir(repo.get_root().join(".letopis")).unwrap();
+    fs::write(repo.get_root().join(".letopis/private.md"), b"private").unwrap();
+    let before = repo.capture_fixture_state();
+    let objects = repo.run_git_successfully(&["count-objects", "-v"], None);
+    let refs = repo.run_git_successfully(&["show-ref"], None);
+    let git = GitCli::open(repo.get_root()).unwrap();
+    // Act
+    let candidates = git.list_candidates().unwrap();
+    // Assert
+    assert_eq!(
+        candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+        [
+            "deleted.md",
+            "live.md",
+            "space name.markdown",
+            "tracked-ignored.md"
+        ]
+    );
+    assert_eq!(repo.capture_fixture_state(), before);
+    assert_eq!(
+        repo.run_git_successfully(&["count-objects", "-v"], None),
+        objects
+    );
+    assert_eq!(repo.run_git_successfully(&["show-ref"], None), refs);
+}
+
+#[test]
+fn candidates_reject_unsupported_raw_paths() {
+    use crate::service::{CorpusFiles, DocumentErrorKind};
+    for raw in [
+        b"bad\xff.md".to_vec(),
+        b"bad#anchor.md".to_vec(),
+        b"bad\nline.md".to_vec(),
+    ] {
+        // Arrange
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        // Git's index supports raw paths even when the host filesystem rejects them.
+        let oid = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+        let mut entry = format!("100644 {oid}\t").into_bytes();
+        entry.extend(raw);
+        entry.push(0);
+        repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
+        let git = GitCli::open(repo.get_root()).unwrap();
+        // Act
+        let error = git.list_candidates().unwrap_err();
+        // Assert
+        assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+        assert!(!error.to_string().contains("bad"));
+    }
+}
+
+#[test]
+fn candidates_deduplicate_unmerged_index_stages() {
+    use crate::service::CorpusFiles;
+    // Arrange
+    let repo = TempRepo::new(ObjectFormat::Sha1);
+    let oid = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"conflict"));
+    let entries = format!(
+        "0 {}\tconflict.md\n100644 {oid} 1\tconflict.md\n100644 {oid} 2\tconflict.md\n100644 {oid} 3\tconflict.md\n",
+        "0".repeat(40)
+    );
+    repo.run_git_successfully(&["update-index", "--index-info"], Some(entries.as_bytes()));
+    let git = GitCli::open(repo.get_root()).unwrap();
+    // Act
+    let candidates = git.list_candidates().unwrap();
+    // Assert
+    assert_eq!(
+        candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+        ["conflict.md", "live.md"]
+    );
+}

@@ -242,3 +242,62 @@ pub trait VectorWrite: Sized {
     /// Rejects poisoned units or reports database failures, rolling back.
     fn commit(self) -> StorageResult<()>;
 }
+
+pub use error::{DocumentError, DocumentErrorKind, DocumentResult};
+pub use model::{
+    CapturedFile, Diagnostic, DiagnosticKind, FileStat, ParsedElement, ParsedFile, RefreshOutcome,
+};
+
+/// Synchronous document publication operations.
+pub trait Documents {
+    /// Detect and atomically publish changed file projections.
+    ///
+    /// # Errors
+    /// Reports unsafe paths, concurrent changes, or Git, filesystem and storage failures.
+    fn refresh(&mut self) -> DocumentResult<RefreshOutcome>;
+}
+/// Repository-owned discovery of Markdown candidate paths.
+pub trait CorpusFiles {
+    /// List normalized, deduplicated candidates including deleted tracked files.
+    ///
+    /// # Errors
+    /// Reports unsupported candidate paths or Git failures.
+    fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>>;
+}
+/// Confined synchronous file observations and publication exclusion.
+pub trait FileSystem {
+    /// Exclusive kernel lock released when its guard is dropped.
+    type IndexLock;
+    /// Observe a regular file without reading its body; stable absence is `None`.
+    ///
+    /// # Errors
+    /// Rejects symlinks, nonregular paths, observed changes and I/O failures.
+    fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>>;
+    /// Capture exact regular-file bytes, checking identity and stat around the read.
+    ///
+    /// # Errors
+    /// Rejects unsafe paths, observed replacements or edits, clock and I/O failures.
+    fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>>;
+    /// Observe wall-clock nanoseconds since the Unix epoch with checked conversion.
+    ///
+    /// # Errors
+    /// Reports clocks before the epoch or values outside the supported range.
+    fn get_time_ns(&self) -> DocumentResult<i64>;
+    /// Acquire the persistent exclusive index lock; never removes its file.
+    ///
+    /// # Errors
+    /// Reports unsafe service paths, lock replacement or filesystem/locking failures.
+    fn lock_index(&self) -> DocumentResult<Self::IndexLock>;
+}
+/// Pure X-4 parsing, independent of technology and publication.
+pub trait Markdown {
+    /// Parse a complete file or identify unmarked Markdown.
+    ///
+    /// # Errors
+    /// Returns per-file diagnostics without a partial projection.
+    fn parse_file(
+        &self,
+        path: &RepoPath,
+        bytes: &[u8],
+    ) -> Result<Option<ParsedFile>, Vec<Diagnostic>>;
+}

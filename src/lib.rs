@@ -1,12 +1,18 @@
 //! Read-only knowledge graph foundations for Letopis.
 
+use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
-use crate::service::{GitSnapshots, SnapshotError};
+use crate::service::{
+    DocumentResult, FileSystem, GitSnapshots, SnapshotError, Storage, StorageResult,
+};
+use crate::storage::SqliteStorage;
 use std::path::Path;
 
 pub mod domain;
+mod filesystem;
 mod git;
 pub mod markdown;
+mod storage;
 
 pub mod service;
 
@@ -22,10 +28,6 @@ pub fn open_git_snapshots(start: &Path) -> Result<impl GitSnapshots, SnapshotErr
     GitCli::open(start)
 }
 
-mod storage;
-use crate::service::{Storage, StorageResult};
-use crate::storage::SqliteStorage;
-
 /// Open the disk cache and independent vector database.
 ///
 /// # Errors
@@ -33,4 +35,12 @@ use crate::storage::SqliteStorage;
 /// for unsupported capabilities, incompatible schemas, contention or I/O errors.
 pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage + use<>> {
     SqliteStorage::open(cache, vectors)
+}
+
+/// Open confined regular-file observations and persistent index locking.
+///
+/// # Errors
+/// Reports an inaccessible or non-directory root, including a symlink root.
+pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + use<>> {
+    LocalFileSystem::open(root)
 }
