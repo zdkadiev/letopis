@@ -1,6 +1,6 @@
 # TK-13 — Configuration and synchronous embedding executor
 
-Status: conversational design agreed on 2026-10-22; written specification awaiting user review. No implementation plan or product implementation is approved yet.
+Status: written specification approved by the user on 2026-10-22. The [implementation plan](../plans/2026-10-22-tk-13-embeddings.md) awaits user review and execution-method selection; no product implementation is approved yet.
 
 ## Intent and accepted scope
 
