@@ -102,7 +102,7 @@ impl Fixture {
     }
     fn accept_http(&self) -> TcpStream {
         let start = Instant::now();
-        let mut stream = loop {
+        let stream = loop {
             match self.listener.accept() {
                 Ok((stream, _)) => break stream,
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -112,28 +112,7 @@ impl Fixture {
                 Err(error) => panic!("HTTP accept: {error}"),
             }
         };
-        stream.set_nonblocking(false).unwrap();
-        stream.set_read_timeout(Some(LIMIT)).unwrap();
-        stream.set_write_timeout(Some(LIMIT)).unwrap();
-        let mut bytes = Vec::new();
-        while !bytes.ends_with(b"\r\n\r\n") {
-            let mut byte = [0];
-            stream.read_exact(&mut byte).unwrap();
-            bytes.push(byte[0]);
-            assert!(bytes.len() < 16384);
-        }
-        let headers = String::from_utf8(bytes).unwrap();
-        let length: usize = headers
-            .lines()
-            .find_map(|line| {
-                let (key, value) = line.split_once(':')?;
-                key.eq_ignore_ascii_case("content-length")
-                    .then(|| value.trim().parse().unwrap())
-            })
-            .unwrap();
-        assert!(length < 16384);
-        stream.read_exact(&mut vec![0; length]).unwrap();
-        stream
+        read_http_request(stream)
     }
     fn assert_state(
         &self,
@@ -277,6 +256,31 @@ impl Drop for Process {
         let _ = self.child.wait();
     }
 }
+fn read_http_request(mut stream: TcpStream) -> TcpStream {
+    stream.set_nonblocking(false).unwrap();
+    stream.set_read_timeout(Some(LIMIT)).unwrap();
+    stream.set_write_timeout(Some(LIMIT)).unwrap();
+    let mut bytes = Vec::new();
+    while !bytes.ends_with(b"\r\n\r\n") {
+        let mut byte = [0];
+        stream.read_exact(&mut byte).unwrap();
+        bytes.push(byte[0]);
+        assert!(bytes.len() < 16384);
+    }
+    let headers = String::from_utf8(bytes).unwrap();
+    let length: usize = headers
+        .lines()
+        .find_map(|line| {
+            let (key, value) = line.split_once(':')?;
+            key.eq_ignore_ascii_case("content-length")
+                .then(|| value.trim().parse().unwrap())
+        })
+        .unwrap();
+    assert!(length < 16384);
+    stream.read_exact(&mut vec![0; length]).unwrap();
+    stream
+}
+
 fn reply(mut stream: TcpStream, body: &str) {
     write!(
         stream,
@@ -348,14 +352,14 @@ fn edit_before_send_skips_stale_hash_without_reservation() {
     while child.child.try_wait().unwrap().is_none() && start.elapsed() < LIMIT {
         if let Ok((stream, _)) = fixture.listener.accept() {
             requests += 1;
-            reply(stream, SUCCESS);
+            reply(read_http_request(stream), SUCCESS);
         }
         thread::sleep(Duration::from_millis(5));
     }
     child.finish();
     while let Ok((stream, _)) = fixture.listener.accept() {
         requests += 1;
-        reply(stream, SUCCESS);
+        reply(read_http_request(stream), SUCCESS);
     }
     // Assert stored state first to retain the compiling mutation oracle.
     fixture.assert_state(&fixture.config, None, None);
