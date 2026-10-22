@@ -1,0 +1,149 @@
+   Compiling version_check v0.9.5
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+    Checking typenum v1.20.1
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.228
+   Compiling libc v0.2.191
+    Checking memchr v2.8.3
+   Compiling serde_json v1.0.145
+   Compiling pulldown-cmark v0.13.4
+   Compiling serde v1.0.228
+    Checking cfg-if v1.0.5
+    Checking itoa v1.0.18
+    Checking unicase v2.10.0
+    Checking ryu v1.0.23
+    Checking bitflags v2.13.2
+   Compiling generic-array v0.14.7
+   Compiling syn v2.0.119
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking digest v0.10.7
+   Compiling serde_derive v1.0.228
+    Checking cpufeatures v0.2.17
+    Checking sha2 v0.10.9
+    Checking letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8-integration/letopis)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.25s
+    Checking letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8-integration/letopis)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.46s
+   Compiling typenum v1.20.1
+   Compiling memchr v2.8.3
+   Compiling bitflags v2.13.2
+   Compiling unicase v2.10.0
+   Compiling itoa v1.0.18
+   Compiling ryu v1.0.23
+   Compiling serde_core v1.0.228
+   Compiling libc v0.2.191
+   Compiling cfg-if v1.0.5
+   Compiling pulldown-cmark v0.13.4
+   Compiling generic-array v0.14.7
+   Compiling cpufeatures v0.2.17
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling serde_json v1.0.145
+   Compiling serde v1.0.228
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-8-integration/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.70s
+     Running unittests src/lib.rs (target/debug/deps/letopis-3048ed1b85800ea9)
+
+running 7 tests
+test adapters::git::tests::version_gate ... ok
+test adapters::git::tests::open_rejects_non_repository_and_bare ... ok
+test adapters::git::tests::open_rejects_old_git_before_object_calls ... ok
+test adapters::git::tests::discovers_root_from_subdirectory ... ok
+test adapters::git::tests::process_removes_inherited_overrides_and_hardens_writes ... ok
+test adapters::git::tests::subprocess_drains_and_reaps_on_io_failure ... ok
+test adapters::git::tests::discovers_trailing_newline_repository_without_touching_sibling ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.68s
+
+     Running tests/domain_values.rs (target/debug/deps/domain_values-0124417f61be22b8)
+
+running 6 tests
+test anchors_and_ranges_reject_invalid_values ... ok
+test edge_targets_and_self_loops_are_checked ... ok
+test edge_identity_and_kind_are_derived ... ok
+test ids_and_sources_normalize_from_git_root ... ok
+test sha256_uses_exact_bytes ... ok
+test tree_oids_are_full_lowercase_hex ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/git_retention.rs (target/debug/deps/git_retention-d70be889e54ec0fc)
+
+running 11 tests
+test conflicting_descendant_types_do_not_pin ... ok
+test shared_clone_is_refused_before_donor_gc_can_break_retention ... ok
+test alternates_added_after_open_refuse_operations_without_writes ... ok
+test concurrent_pin_is_idempotent ... ok
+test unretained_unique_tree_is_collectable ... ok
+test gitlinks_are_retained_without_dereferencing ... ok
+test promisor_miss_never_fetches ... ok
+test incomplete_tree_and_ref_failure_do_not_pin ... ok
+test linked_worktree_checks_common_object_store_and_refuses_inactive_alternates ... ok
+test symbolic_and_conflicting_refs_are_rejected ... ok
+test retained_snapshots_survive_gc ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.65s
+
+     Running tests/git_snapshots.rs (target/debug/deps/git_snapshots-d44226562c1740cb)
+
+running 5 tests
+test empty_tree_and_invalid_paths ... ok
+test replacement_refs_do_not_change_bytes ... ok
+test tree_types_and_missing_objects_are_distinct ... ok
+test paths_are_literal_and_never_shell_input ... ok
+test exact_bytes_without_index_or_commit ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.64s
+
+     Running tests/markdown_elements.rs (target/debug/deps/markdown_elements-24ddbdb81e6974cd)
+
+running 10 tests
+test unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected ... ok
+test code_examples_do_not_declare_elements ... ok
+test metadata_must_fit_exactly_one_standalone_line ... ok
+test unicode_crlf_and_eof_have_exact_spans ... ok
+test snapshot_metadata_preserves_full_oid_and_zero_created_at ... ok
+test anchors_are_unique_across_real_headings ... ok
+test nested_elements_and_orphan_metadata_are_rejected ... ok
+test raw_html_content_does_not_declare_metadata ... ok
+test file_errors_never_return_partial_elements ... ok
+test golden_elements_have_exact_bytes_and_metadata ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_links.rs (target/debug/deps/markdown_links-1125cbdf0c8cd752)
+
+running 6 tests
+test links_wrapping_images_still_declare_edges ... ok
+test sources_are_normalized_without_loading_destinations ... ok
+test only_inline_links_declare_edges ... ok
+test image_alt_links_do_not_declare_edges ... ok
+test links_outside_elements_are_only_navigation ... ok
+test invalid_graph_titles_and_targets_fail_file ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_search.rs (target/debug/deps/markdown_search-6489c879d9b3bc3f)
+
+running 8 tests
+test reference_labels_use_whole_file_context ... ok
+test code_examples_remain_searchable ... ok
+test moving_path_preserves_text_hashes ... ok
+test crlf_metadata_line_does_not_add_search_whitespace ... ok
+test own_text_label_and_code_change_search_hash ... ok
+test search_text_preserves_word_and_block_boundaries ... ok
+test metadata_and_link_changes_keep_search_hash ... ok
+test golden_search_representations ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests letopis
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
