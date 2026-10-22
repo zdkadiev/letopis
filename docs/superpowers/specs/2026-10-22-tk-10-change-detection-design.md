@@ -1,6 +1,6 @@
 # TK-10 — Change detection and atomic per-file publication
 
-Status: proposed for user review; product implementation has not started.
+Status: approved by the user on 2026-10-22; product implementation has not started.
 Base: main@bf9b6b9c46ddc9af0864a3a3924e8d0826da5abb.
 Workspace: separate native worktree on branch TK-10.
 
@@ -95,7 +95,7 @@ means deletion, including a missing new tracked path for which no row exists.
 The latter alone is not a publication delta. A later reappearance is an addition.
 
 Compare size, mtime_ns and inode. Read and hash new/stat-changed files and racy
-files. As an implementation choice, use the conservative one-second racy window
+files. As an approved implementation choice, use the conservative one-second racy window
 already exercised by TK-2: recorded mtime >= recorded checked_at minus one second.
 Use checked arithmetic and handle clock regression conservatively by hashing.
 Do not claim correctness for timestamp resolution coarser than one second or edits
@@ -115,7 +115,7 @@ failure. An unavailable candidate must not silently become an invalid Markdown
 file or wipe its old knowledge. Missing files observed consistently are deletions.
 Live edits are not an atomic corpus snapshot (D-77).
 
-Implementation choice requiring visibility at review: reject candidate symlinks,
+Approved path policy: reject candidate symlinks,
 nonregular files and paths traversing a symlink with a safe typed error, preserving
 the old cache. Do not follow a link outside the root or inherit the proof harness's
 fixture-only skip policy. Unsupported/non-UTF8 candidate paths likewise fail
@@ -163,14 +163,14 @@ source addresses without creating a source registry. Source freshness on unrelat
 external-file edits and full provenance validation are TK-20/TK-21 responsibilities.
 No snapshot creation or embedding provider call occurs in publication.
 
-Proposed I-2 clarification for approval: its illustrative PreparedProjection.search
+Approved I-2 clarification: its illustrative PreparedProjection.search
 currently lists only id/uri/search_hash, although its example also requires FTS
 text. Keep prepare/publish and caller-owned unit/commit semantics, but make the
 per-file search entry explicitly carry transient search_text until synchronous
 publish completes. Prepare/apply one file at a time in the enclosing publication
-unit; do not accumulate the corpus text. This is a proposed internal contract
-clarification, not a change to SQLite schema or CLI wire formats. Update I-2 with
-the approved wording before implementation; do not silently invent a second
+unit; do not accumulate the corpus text. This is an approved internal contract
+clarification, not a change to SQLite schema or CLI wire formats. Align I-2 with
+this wording before implementation; do not silently invent a second
 parser pass, a SQL body column or a callback from storage to Markdown.
 
 Return a typed refresh outcome with committed/current revision and safe file
@@ -213,12 +213,15 @@ imports, trait implementations and lib.rs constructor wiring.
 
 ## Approval and next step
 
-The policy additions above are proposals, not retrospective user decisions.
-Fresh independent builder check completed: the only consequential question was
-the I-2 transient-text refinement, now explicitly proposed above. No other
-consequential unanswered questions were reported. Baseline ./scripts/check-rust.sh
-passed on macOS ARM64: formatting, compiler, Clippy and 112 Rust tests; log:
-/tmp/letopis-tk10-baseline.log. Linux has not been rerun for this documentation
-stage. Local document links were checked. After user approval, save a concrete
-implementation plan under docs/superpowers/plans/ and proceed through the selected
-Superpowers execution workflow. No product source is changed in this stage.
+The user approved the full specification on 2026-10-22, including symlink
+rejection, the conservative one-second racy window and the I-2 transient-text
+clarification. The fresh independent builder check found only the I-2 question;
+that clarification was made explicit before approval. No other consequential
+unanswered questions were reported.
+
+Baseline ./scripts/check-rust.sh passed on macOS ARM64: formatting, compiler,
+Clippy and 112 Rust tests; log: /tmp/letopis-tk10-baseline.log. Linux has not been
+rerun for the documentation stage. See the [implementation plan](../plans/2026-10-22-tk-10-change-detection.md)
+for concrete interfaces, file ownership and verification. Plan review/execution
+method selection precede implementation under the requested Superpowers workflow.
+No product source is changed in this stage.
