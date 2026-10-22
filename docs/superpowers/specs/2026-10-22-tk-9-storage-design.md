@@ -103,7 +103,7 @@ TK-9 supplies storage-level scoped reads needed to test these primitives, not th
 
 ## 5. Cache schema and primitive behavior
 
-Use the current DDL as the normative schema. Product SQL files live with storage and are executable bootstrap inputs, not a second divergent model. Keep a schema parity check against the canonical design. Initial schema setup is transactional per database and safe to repeat; reopen never recreates valid tables or silently destroys an unsupported/damaged schema. Surface a safe failure so later maintenance commands can rebuild deliberately.
+Use the current DDL as the normative schema. Product SQL files live with storage and are executable bootstrap inputs, not a second divergent model. Keep a schema parity check against the canonical design. The retained check is `tests/storage/check_schema.py`, run by each source-built platform acceptance runner; its regression changes a disposable column type and requires rejection. It compares the fixed DDL fixtures with comments and the intentional project seed excluded, without a general SQL parser. Initial schema setup is transactional per database and safe to repeat; reopen never recreates valid tables or silently destroys an unsupported/damaged schema. Surface a safe failure so later maintenance commands can rebuild deliberately.
 
 - project: singleton revision counter, initialized once; checked integer conversion and overflow handling.
 - nodes: unique canonical ID, stable row_id on UPSERT, agreed kind/URI/hash/time/source snapshot/line/search-hash constraints. Knowledge nodes carry searchable hashes; source nodes carry no search_hash/source_snapshot. Source ID equals normalized URI and missing source bytes may have hash=NULL.
@@ -177,3 +177,12 @@ This specification records the agreed intent, module/file refinements, and concr
 ## Implementation evidence (2026-10-22)
 
 Implementation and platform validation are recorded in the [TK-9 report](../../zkit/letopis/checks/TK-9/report.md): 106 Rust tests per platform, strict Rustdoc, three runner checks, copied native executable and two disposable-source negative controls. Final platform source is `b0a5aeaa0cd5c51bfbdb008cf1f3870b28c49b16`; later documentation commits are not claimed as executed. Task 6 and final fresh reviews remain pending with the controller. No integration or deferred product scope is claimed.
+
+
+### Final-review evidence clarification
+
+Native receipts observe SQLite 3.53.2 and vec1 `version 0.8 (NEON, multi-threaded)`;
+assertions require SQLite >=3.51.3, vec1's version 0.8 prefix, FTS capabilities and
+the connection policy. Exact patch/NEON/thread-description strings are not asserted.
+Fresh source-linked receipts are in `docs/zkit/letopis/checks/TK-9/final-review/`;
+historical receipts remain evidence for their original revisions.

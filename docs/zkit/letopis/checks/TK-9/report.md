@@ -44,8 +44,10 @@ macOS 26.6.2 ARM64 used Python 3.14.7, Rust 1.95.0. Linux glibc ARM64 used Pytho
 Pinned base digest is in `tests/storage/Dockerfile`. Runtime command explicitly
 uses `--network none`; dependencies are fetched at image build, and Cargo runtime
 commands are locked/offline. No host target mount or extension path is accepted.
-Both platforms assert SQLite **3.53.2**, vec1 **0.8 (NEON, multi-threaded)**,
-WAL, synchronous=2 and foreign_keys=1; macOS additionally asserts fullfsync=1.
+Both platforms observed SQLite **3.53.2** and vec1 **0.8 (NEON, multi-threaded)**.
+Assertions require SQLite **>=3.51.3**, a vec1 **version 0.8** prefix, FTS
+capabilities, WAL, synchronous=2 and foreign_keys=1; macOS additionally asserts
+fullfsync=1. Exact SQLite patch and vec1 implementation strings are observations.
 The both-database policy test checks writable cache/vector and attached connections.
 The copied Mac executable links libSystem only; Linux links ordinary glibc/libm/
 libgcc libraries, with no SQLite/vec1 shared dependency.
@@ -68,8 +70,8 @@ libgcc libraries, with no SQLite/vec1 shared dependency.
 2. Partial schemas/competing initializers: `unknown_or_partial_schema_is_not_recreated`,
    `vector_schema_and_unversioned_user_data_are_not_recreated`,
    `parallel_initializers_leave_a_complete_schema`, `busy_bootstrap_returns_typed_error_without_retry`.
-   Deferred minor: concurrent initializer test permits any InternalError; parent
-   broad review will assess whether that assertion should be narrowed.
+   Final-review fix: competing initialization accepts only SQLite DatabaseBusy or
+   DatabaseLocked causes, counts at least one success, and retains complete reopen.
 3. Caught mutation/late failures: `caught_mutation_error_poisoned_unit_cannot_commit`,
    `late_fts_error_rolls_back_all_changes`, `dropped_unit_rolls_back`,
    `caught_vector_error_cannot_commit_key_or_prior_write`,
@@ -101,3 +103,34 @@ no false behavioral RED is claimed.
 Unclaimed: physical power loss, x86_64, old minimum Git, resource capacity, model
 quality, full CLI/publication/ranking/provider/drain, historical proof-harness reruns.
 The final fresh reviews and Engram outcome recording are parent-owned and pending.
+
+
+## Final-review fix wave (source 60fc1f0)
+
+The four minor broad-review findings were addressed without changing product Rust
+or native C: preparation failures retain FAIL manifests; negative-control Git
+commands retain logs/exits; concurrent bootstrap errors require SQLite contention
+and at least one initializer succeeds; observed native versions are distinguished
+from assertions; an executable canonical-DDL check and deliberate-drift regression
+now retain the approved design parity requirement. Parent scoped re-review remains
+pending; this paragraph does not claim its outcome.
+
+Fresh receipts, tied to source commit
+`60fc1f0cd9f4be62c62d486632cd52446a9c46a0`:
+
+- [macOS manifest](final-review/macos-arm64/manifest.json), [root checks](final-review/macos-arm64/rust-check.log), [strict Rustdoc](final-review/macos-arm64/rustdoc.log), [Python checks](final-review/macos-arm64/runner-tests.log), [parity](final-review/macos-arm64/schema-parity.log).
+- [Linux outer manifest](final-review/linux-arm64/manifest.json), [runtime manifest](final-review/linux-arm64/container/manifest.json), [root checks](final-review/linux-arm64/container/rust-check.log), [Python checks](final-review/linux-arm64/container/runner-tests.log), [parity](final-review/linux-arm64/container/schema-parity.log).
+- [Negative controls](final-review/negative-controls/manifest.json) record successful `git rev-parse`/`git archive`, the expected checksum rejection (exit 101), successful registration compilation, and expected missing-function rejection (exit 101).
+- [Focused RED](final-review/focused/red.log), [GREEN](final-review/focused/green.log), [explicit drift rejection](final-review/focused/parity-drift.log), [input correspondence](final-review/focused/input-correspondence.json).
+
+Both platforms pass 106 root tests, 0 failures, 0 doc tests, strict Rustdoc, seven
+Python scenarios, parity, native assertions, standalone execution and linkage
+inspection. Source-built Linux image ID is
+`sha256:fc24635a1a3c77dc2104f3217f37d3ad562cadc743f7df86d4c9b653ce8f385e`;
+runtime uses `--network none`. All 77 copied Linux inputs match their host hashes;
+the host manifest additionally hashes historical tests/harnesses outside the
+Docker allowlist (182 host inputs). The canonical fixture and `.dockerignore` are
+now hashed and copied explicitly. Source dirty logs contain only new receipt
+paths. Earlier receipts and initial failures remain unchanged. Later evidence/doc
+commits did not run these suites; applicability rests on the recorded source/hash
+correspondence. Prior platform/product limits above continue to apply.
