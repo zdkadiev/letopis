@@ -6,7 +6,7 @@
 
 **Architecture:** One synchronous DocumentService implements Documents and owns lock/redetect/publication orchestration. Application-owned interfaces connect GitCli, LocalFileSystem, MarkdownParser and SqliteStorage; lib.rs constructs them. Pure parser/domain rules stay independent of filesystem, Git and SQLite.
 
-**Tech Stack:** Rust 1.95.0, existing pinned SeaQuery 1.0.2/rusqlite 0.40.2/native vec1 stack, Git argv/stdin, kernel flock. Proposed direct dependency: rustix = "=1.1.5", default-features = false, features = ["fs", "std"], already in Cargo.lock through tempfile; its cached source supplies safe openat/statat/flock on the target Unix platforms. No package version upgrade is planned.
+**Tech Stack:** Rust 1.95.0, existing pinned SeaQuery 1.0.2/rusqlite 0.40.2/native vec1 stack, Git argv/stdin, kernel flock. Approved direct dependency: rustix = "=1.1.5", default-features = false, features = ["fs", "std"], already in Cargo.lock through tempfile; its cached source supplies safe openat/statat/flock on the target Unix platforms. The implementation retains all previously locked package versions.
 
 **Spec:** [Approved TK-10 specification](../specs/2026-10-22-tk-10-change-detection-design.md), approved by the user on 2026-10-22. Plan approved via Go on; the user explicitly selected Subagent-driven execution on2026-10-22.
 
@@ -164,10 +164,10 @@ Private service projection types implement I-2's role: PreparedProjection carrie
 - [x] Interfaces match across tasks; model relocation preserves old Markdown API paths. No service imports a concrete technology module.
 - [x] Five review-focus cases have named tests in their owning tasks. Ordinary CRUD uses typed/bound SeaQuery.
 - [x] Scope exclusions retained: full reindex command/corruption, full CLI handlers, source basis validation, embedding/drain and physical power loss are later tasks.
-- [x] Documentation validation:828 local links resolve; D-101 anchor is unique; whitespace check passes. The actual changed tree contains only documentation.
+- [x] Planning-stage documentation validation: 828 local links resolved; D-101 anchor was unique and whitespace checks passed. That planning-stage tree contained only documentation.
 - [x] Baseline at bf9b6b9: ./scripts/check-rust.sh PASS on macOS ARM64,112 Rust tests, fmt/compiler/Clippy. No product changes or Linux execution occurred during planning.
 - [x] User approved plan and explicitly selected Subagent-driven execution on2026-10-22.
-- [x] Tasks 1–4 implemented and independently approved; final whole-branch review remains pending.
+- [x] Tasks 1–4 implemented and independently approved; final review fixes await scoped re-review.
 
 
 ## Execution Rulings
@@ -195,12 +195,32 @@ visible for review:
    this change. If wrong, atomic protection against actively hostile concurrent
    ancestor renames remains unproved; this residual limit must be reported.
 
+4. **Initialization-only contention bound.** Schema/WAL initialization and its first
+   read-only readiness probes each have a five-second bound, including
+   `BUSY_RECOVERY` during competing startup. Each initialization-ownership step
+   also has its own five-second bound; this is not a global open/CLI deadline. Recheck schema after obtaining
+   initialization ownership. Already-ready ordinary opens perform no writes;
+   ordinary writes retain zero busy timeout and no retries. No unconditional
+   startup index lock is introduced. Mechanics defines no global CLI deadline. If this bound is too
+   short, initialization can fail safely and require retry; success beyond five
+   seconds is not guaranteed.
+
+5. **Concurrent lock-file creation on macOS.** An independent two-thread
+   `openat` reproducer against the same live directory descriptor shows that
+   competing `O_CREAT | O_NOFOLLOW` opens can return `ENOENT` after the other
+   creator succeeds. For this creation error alone, reopen once through the
+   same directory/name with identical flags except `CREATE`, retaining
+   `NOFOLLOW`, `NONBLOCK` and regular-file/path identity checks. Do not unlink,
+   sleep or add a general retry. If this diagnosis is incomplete, a remaining
+   transient failure is safe; arbitrary filesystem-race success is not promised.
+
 ## Verification and Review Record
 
-Production checkpoint `2378731`; acceptance report commit `8e29067`.
+Initial production checkpoint `2378731`; initial acceptance report `8e29067`
+are retained as historical evidence. Final source checkpoint: `15fcc19`.
 See the [durable report](../../zkit/letopis/checks/TK-10/report.md) for exact
 commands, source hashes, counts, limits and criterion mapping. Each platform
-(macOS ARM64 and source-built Linux ARM64) passed 161 Rust tests and nine Python
+(macOS ARM64 and source-built Linux ARM64) passed 172 Rust tests and nine Python
 runner tests, formatting/compiler/Clippy, strict Rustdoc, schema/native and
 copied-executable checks. All 86 common input hashes match.
 
@@ -209,4 +229,9 @@ validation order and Task 3's automatic database-symlink opening were corrected,
 tested and independently re-reviewed. Task 4 review found no issues and checked
 raw receipts, both compiling negative controls, exact crash oracles and real
 flock contention. No open task-review findings remain. Final whole-branch review
-is pending. No merge, push or GitHub mutation has been performed for TK-10.
+found startup-contention and dependency-wording findings. The consolidated fix
+now validates ready schemas read-only, coordinates missing-schema initialization
+with recheck and bounded readiness probes, and handles the reproduced macOS
+lock-create race without weakening path protections. Both platforms pass on the
+amended source; scoped re-review is pending. No merge, push or GitHub mutation
+has been performed for TK-10.
