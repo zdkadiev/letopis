@@ -32,6 +32,8 @@ const FILE_FLAGS: OFlags = OFlags::RDONLY
 pub(crate) struct LocalFileSystem {
     root: OwnedFd,
     #[cfg(test)]
+    test_time: Option<i64>,
+    #[cfg(test)]
     after_read: RefCell<Option<Box<dyn FnOnce() + Send>>>,
     #[cfg(test)]
     before_open: RefCell<Option<Box<dyn FnOnce() + Send>>>,
@@ -56,12 +58,20 @@ impl LocalFileSystem {
         Ok(Self {
             root,
             #[cfg(test)]
+            test_time: None,
+            #[cfg(test)]
             after_read: RefCell::new(None),
             #[cfg(test)]
             before_open: RefCell::new(None),
             #[cfg(test)]
             on_contention: RefCell::new(None),
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn configure_process_test(&mut self, time: i64, hook: Box<dyn FnOnce() + Send>) {
+        self.test_time = Some(time);
+        self.on_contention.replace(Some(hook));
     }
 
     fn open_parent(&self, path: &str) -> Result<(OwnedFd, String), Errno> {
@@ -193,6 +203,10 @@ impl FileSystem for LocalFileSystem {
     }
 
     fn get_time_ns(&self) -> DocumentResult<i64> {
+        #[cfg(test)]
+        if let Some(time) = self.test_time {
+            return Ok(time);
+        }
         let duration = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_err(|cause| fail_io("unsupported document clock", cause))?;

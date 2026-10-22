@@ -324,3 +324,5 @@ fn read_fts_blocks(root: &Path) -> Vec<(i64, Vec<u8>)> {
         .collect::<Result<Vec<_>, _>>()
         .unwrap()
 }
+
+pub(super) mod process;

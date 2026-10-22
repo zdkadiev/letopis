@@ -130,7 +130,9 @@ def main():
                 'inputs': {}, 'commands': COMMANDS}
 
     def execute(argv, name, *, cwd=root, extra=None):
-        run_command(argv, cwd=cwd, env={**os.environ, **(extra or {})},
+        run_command(argv, cwd=cwd, env={**os.environ,
+                    'LETOPIS_TEST_EVIDENCE': str(evidence / 'process'),
+                    **(extra or {})},
                     log=evidence / name, timeout=1800)
 
     try:

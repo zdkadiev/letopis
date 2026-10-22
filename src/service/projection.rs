@@ -272,19 +272,27 @@ pub(super) fn publish<W: CacheWrite>(
     for id in prepared.removed {
         unit.delete_node(&EdgeTarget::Knowledge(id))?;
     }
+    #[cfg(test)]
+    super::document::checkpoint("cleared");
     for text in &prepared.search {
         unit.upsert_node(&NodeMetadata::Knowledge(text.metadata.clone()))?;
     }
     for edge in &prepared.edges {
         unit.insert_edge(edge)?;
     }
+    #[cfg(test)]
+    super::document::checkpoint("projections");
     for text in prepared.search {
         unit.replace_text(&text.metadata.id, &text.search_text)?;
     }
+    #[cfg(test)]
+    super::document::checkpoint("fts");
     match prepared.file {
         FileChange::Upsert(row) => unit.upsert_file(&row)?,
         FileChange::Remove(path) => unit.delete_file(&path)?,
     }
+    #[cfg(test)]
+    super::document::checkpoint("fingerprints");
     Ok(())
 }
 

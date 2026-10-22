@@ -97,6 +97,8 @@ impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> DocumentService<G, 
             EffectiveGraph::read(&mut read)?
         };
         let mut unit = self.storage.begin_cache_write()?;
+        #[cfg(test)]
+        checkpoint("begun");
         let mut outcome = build_outcome(state.revision, true);
         for (path, check_missing) in delta.removed {
             if check_missing && self.filesystem.stat_file(&path)?.is_some() {
@@ -118,7 +120,13 @@ impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> DocumentService<G, 
             apply_projection(&mut unit, &mut graph, prepared, &mut outcome)?;
         }
         graph.reconcile_sources(&self.filesystem, &mut unit)?;
+        #[cfg(test)]
+        checkpoint("before_commit");
+        #[cfg(test)]
+        tests::process::fail_late(&mut unit)?;
         outcome.revision = unit.commit()?;
+        #[cfg(test)]
+        checkpoint("after_commit");
         Ok(outcome)
     }
 }
@@ -130,10 +138,16 @@ impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> Documents
         if self.detect_changes(&preliminary)?.is_empty() && preliminary.revision != 0 {
             return Ok(build_outcome(preliminary.revision, false));
         }
+        #[cfg(test)]
+        checkpoint("detected");
         drop(preliminary);
         let _lock = self.filesystem.lock_index()?;
+        #[cfg(test)]
+        checkpoint("locked");
         let state = self.read_file_state()?;
         let delta = self.detect_changes(&state)?;
+        #[cfg(test)]
+        checkpoint("redetected");
         if delta.is_empty() && state.revision != 0 {
             return Ok(build_outcome(state.revision, false));
         }
@@ -212,3 +226,6 @@ pub(super) fn fail_changed() -> DocumentError {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub(super) use tests::process::checkpoint;

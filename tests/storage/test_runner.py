@@ -8,6 +8,26 @@ from run import create_evidence, hash_inputs, run_command
 
 
 class RunnerTests(unittest.TestCase):
+    def test_child_receipts_use_current_evidence_and_keep_command_overrides(self):
+        import run
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory) / 'receipt'
+            argv = ['run.py', '--platform', 'host', '--evidence', str(evidence)]
+
+            def execute_probe(_root, _evidence, execute):
+                execute(['probe'], 'probe.log', extra={'RUSTDOCFLAGS': '-D warnings'})
+
+            with patch.object(sys, 'argv', argv), \
+                    patch.object(run, 'hash_inputs', return_value={}), \
+                    patch.object(run, 'run_host', side_effect=execute_probe), \
+                    patch.object(run, 'run_command') as command:
+                run.main()
+            environment = command.call_args.kwargs['env']
+            self.assertEqual(environment.get('LETOPIS_TEST_EVIDENCE'),
+                             str(evidence.resolve() / 'process'))
+            self.assertEqual(environment.get('RUSTDOCFLAGS'), '-D warnings')
+
     def test_nonzero_command_prevents_pass_manifest(self):
         # Catches swallowed subprocess errors.
         with tempfile.TemporaryDirectory() as directory:
