@@ -77,7 +77,7 @@ coverage, exact existing storage_failures test target, helper type consistency,
 all five review-focus cases and plan/spec proportion; six local links resolve.
 
 Execution authorized by the user's go on after this handoff; native execution.
-Tasks 1–3 implemented. Final independent branch review remains to be recorded.
+Tasks 1–3 implemented. Final independent branch review completed; no product correctness or architecture findings.
 
 ## Verification and implementation record
 
@@ -86,7 +86,7 @@ Tasks 1–3 implemented. Final independent branch review remains to be recorded.
 - Task 2: two public parity regressions passed against pre-migration queries. After migration:20 cache+7 failure+8 vector tests passed; full root suite112 passed. Existing SQL reset-failure and poisoned-unit tests ran as part of the root suite.
 - Host: `/opt/homebrew/bin/python3 -B tests/storage/run.py --platform host --evidence .artifacts/query-builder/host` PASS, macOS ARM64. Includes `./scripts/check-rust.sh` (112 Rust tests), strict Rustdoc,8 Python runner tests, schema parity, native capabilities, copied executable and linkage.
 - Linux: same runner with `--platform linux --evidence .artifacts/query-builder/linux` PASS, source-built Linux glibc ARM64. Runtime uses `--network none`;112 Rust+8 Python tests and all corresponding native/strict/standalone checks passed.
-- All15 host and15 Linux inner command exits are0. All78 shared source-input SHA-256 values match. Raw manifests/logs remain ignored locally; no new generated evidence tree is committed.
+- All15 host and13 Linux inner command exits are0; the Linux outer manifest separately records8 successful orchestration commands. All78 shared source-input SHA-256 values match. Raw manifests/logs remain ignored locally; no new generated evidence tree is committed.
 - Existing locked package/version pairs retained, including rusqlite0.40.2 and libsqlite3-sys0.38.2. No ORM/async runtime added. Native C, build.rs, connection/bootstrap SQL, public domain/service API and lib.rs are unchanged.
 - Raw SQL exceptions audited: schemas/introspection/connection/native probes and formatted FTS/vec1 native queries/commands. Ordinary CRUD uses the builder. Query construction and its identifier/binding helper are private to storage.
 - Historical TK-9 evidence unchanged. Not claimed: physical power loss, x86_64, resource/model-quality gates, full CLI or rerun of unrelated historical proof harnesses.
@@ -98,3 +98,17 @@ consumer, rather than deferring it to Task 2: deny(warnings) rejects an unused
 private bridge in an otherwise complete intermediate commit. This changes only
 commit sequencing; revision/read-snapshot regressions remain the check against
 an unintended behavioral change.
+
+## Final independent review
+
+Reviewed range: 360bbf7..7b9c587, fresh independent reviewer. Critical/Important
+findings: none. Minor: the Linux inner command count above incorrectly said15;
+it is13 (host15, Linux outer8), verified against all three manifests and corrected.
+No product code changed after dual-platform verification; all78 shared build-input
+hashes still match the checkout. Physical power loss/x86_64, resource/model-quality,
+full CLI and unrelated historical proof harnesses were outside this refactor's
+review; these untested boundaries remain explicit rather than implied proven.
+
+Host manifest SHA-256: ac6ad8191830f05ffd0e4779569399f43c4fa71c7cac06ba390cc356e4523071.
+Linux inner manifest SHA-256: f374794cbe694f549bdfeddc5c21d8c9ebb3e90e3c08993ad8e544e468a69ef8.
+Branch remains separate from main; no merge/push is part of this implementation.
