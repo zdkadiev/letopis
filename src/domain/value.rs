@@ -1,9 +1,9 @@
-use sha2::Digest;
 use std::fmt;
 
 /// A violation of an identity or graph value's local invariants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueError {
+    InvalidHash,
     InvalidPath,
     InvalidAnchor,
     InvalidRange,
@@ -15,6 +15,7 @@ pub enum ValueError {
 impl fmt::Display for ValueError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
+            Self::InvalidHash => "invalid SHA-256 hash",
             Self::InvalidPath => "invalid root-relative path",
             Self::InvalidAnchor => "invalid anchor",
             Self::InvalidRange => "invalid range",
@@ -107,25 +108,5 @@ impl TreeOid {
     /// The unmodified full OID.
     pub fn as_str(&self) -> &str {
         &self.0
-    }
-}
-
-/// SHA-256 of exact input bytes, without normalization.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Sha256([u8; 32]);
-impl Sha256 {
-    /// Hash the supplied bytes exactly.
-    pub fn digest(bytes: &[u8]) -> Self {
-        Self(sha2::Sha256::digest(bytes).into())
-    }
-    /// Encode lowercase hex without adding a codec dependency.
-    pub fn to_hex(&self) -> String {
-        const HEX: &[u8; 16] = b"0123456789abcdef";
-        let mut out = String::with_capacity(64);
-        for b in self.0 {
-            out.push(HEX[(b >> 4) as usize] as char);
-            out.push(HEX[(b & 15) as usize] as char);
-        }
-        out
     }
 }

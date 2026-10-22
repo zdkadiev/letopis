@@ -21,3 +21,16 @@ pub mod service;
 pub fn open_git_snapshots(start: &Path) -> Result<impl GitSnapshots, SnapshotError> {
     GitCli::open(start)
 }
+
+mod storage;
+use crate::service::{Storage, StorageResult};
+use crate::storage::SqliteStorage;
+
+/// Open the disk cache and independent vector database.
+///
+/// # Errors
+/// Returns an invalid request for aliased or invalid paths, or an internal error
+/// for unsupported capabilities, incompatible schemas, contention or I/O errors.
+pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage + use<>> {
+    SqliteStorage::open(cache, vectors)
+}

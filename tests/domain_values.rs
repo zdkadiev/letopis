@@ -1,6 +1,6 @@
 use letopis::domain::{
     Anchor, ByteSpan, Edge, EdgeTarget, EdgeType, ElementKind, ElementMetadata, KnowledgeId,
-    LineRange, Sha256, SourceUri, TreeOid, derive_element_kind,
+    LineRange, Sha256, SourceUri, TreeOid, ValueError, derive_element_kind,
 };
 use std::collections::BTreeSet;
 
@@ -211,5 +211,14 @@ fn edge_targets_and_self_loops_are_checked() {
         let kind = EdgeType::parse(raw);
         // Assert
         assert!(kind.is_err());
+    }
+}
+
+#[test]
+fn sha256_hex_round_trip_and_invalid_inputs() {
+    let hash = Sha256::digest(b"alpha");
+    assert_eq!(Sha256::parse(&hash.to_hex()), Ok(hash));
+    for raw in ["A".repeat(64), "a".repeat(63), "g".repeat(64)] {
+        assert_eq!(Sha256::parse(&raw), Err(ValueError::InvalidHash));
     }
 }

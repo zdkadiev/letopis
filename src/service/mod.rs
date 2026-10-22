@@ -39,3 +39,27 @@ pub trait GitSnapshots {
     /// or corrupt closure, repository policy, Git I/O or ref publication failure.
     fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError>;
 }
+
+mod error;
+use crate::domain::Sha256;
+pub use error::{StorageError, StorageErrorKind, StorageResult};
+
+/// Synchronous storage with exclusive scoped capabilities.
+pub trait Storage {
+    /// An owned read transaction borrowing this storage exclusively.
+    type Read<'a>: StorageRead
+    where
+        Self: 'a;
+    /// Begin and pin a read of cache revision and vector identity.
+    ///
+    /// # Errors
+    /// Returns an internal error if the snapshot cannot be opened or decoded.
+    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>>;
+}
+/// Observations pinned within one read transaction.
+pub trait StorageRead {
+    /// Publication revision observed by this read.
+    fn get_revision(&self) -> u64;
+    /// Vector configuration identity observed by this read.
+    fn get_config_identity(&self) -> Option<Sha256>;
+}
