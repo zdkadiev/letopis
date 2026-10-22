@@ -1,6 +1,6 @@
 # TK-11 — CLI process, locks and JSON
 
-Status: complete written design approved by the user on 2026-10-22: «Да, утверждаю. Продолжай к плану реализации TK-11 по Superpowers». The branch/worktree, ownership split, corrected task cards and two labelled builder calls are accepted. The [implementation plan](../plans/2026-10-22-tk-11-cli-runtime.md) is prepared and author-reviewed; product implementation waits for review of that plan and execution-method selection.
+Status: complete written design approved by the user on 2026-10-22: «Да, утверждаю. Продолжай к плану реализации TK-11 по Superpowers». The branch/worktree, ownership split, corrected task cards and two labelled builder calls are accepted. The [implementation plan](../plans/2026-10-22-tk-11-cli-runtime.md) is prepared and author-reviewed; the user approved it and selected Subagent-driven execution on 2026-10-22. Product implementation is authorized within that plan.
 
 ## Intent and starting state
 

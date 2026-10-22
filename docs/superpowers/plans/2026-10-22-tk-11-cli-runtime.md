@@ -8,7 +8,7 @@
 
 **Tech Stack:** Pinned Rust 1.95.0/edition 2024, std argv and synchronous I/O, existing serde/serde_json/rustix, std File locks, direct libc pinned to the already locked `=0.2.191` for setsid. Config/JCS/HTTP dependencies are reused from TK-13 rather than introduced independently.
 
-**Spec:** [Approved TK-11 design](../specs/2026-10-22-tk-11-cli-runtime-design.md), approved 2026-10-22. Branch `TK-11`, worktree `/Users/zdkadiev/.codex/worktrees/tk-11/letopis`; initial main `12c5ad0`, specification/card commit `1bac8cb`. No execution method has yet been selected for this plan.
+**Spec:** [Approved TK-11 design](../specs/2026-10-22-tk-11-cli-runtime-design.md), approved 2026-10-22. Branch `TK-11`, worktree `/Users/zdkadiev/.codex/worktrees/tk-11/letopis`; initial main `12c5ad0`, specification/card commit `1bac8cb`. The user approved this plan and selected Subagent-driven execution on 2026-10-22: «План утверждаю. Давай Subagent-driven».
 
 ## Global Constraints
 
@@ -98,9 +98,9 @@ Composition in `lib.rs`: public `open_background<'a>(root: &Path, executable: &P
 
 ## Execution preflight
 
-- [ ] Verify branch TK-11, exact status and this approved specification; keep all changes in the named worktree. Preserve unrelated/other-writer files.
-- [ ] Retain the unchanged baseline: 172 Rust passes plus fmt/compiler/Clippy, `.artifacts/tk11/start/check-rust.log`. Run a new baseline only if source/dependency state changed since that capture.
-- [ ] Read rust-skills plus AGENTS; verify current TK-13 integration state read-only. Do not assume its plan or passing branch tests establish a compatible combined tree. Do not install dependencies or write product code before this plan's review/execution selection.
+- [x] Verify branch TK-11, exact status and this approved specification; keep all changes in the named worktree. Preserve unrelated/other-writer files.
+- [x] Retain the unchanged baseline: 172 Rust passes plus fmt/compiler/Clippy, `.artifacts/tk11/start/check-rust.log`. Run a new baseline only if source/dependency state changed since that capture.
+- [x] Read rust-skills plus AGENTS; verify current TK-13 integration state read-only. Do not assume its plan or passing branch tests establish a compatible combined tree. Do not install dependencies or write product code before this plan's review/execution selection.
 
 ### Task 1: Strict command transport and service handlers
 
@@ -167,7 +167,7 @@ Composition in `lib.rs`: public `open_background<'a>(root: &Path, executable: &P
 | Lost response/idempotence, corpus/user Git state preserved | 4/5, real read semantics12/19 |
 | Platform inputs, failure controls, accurate evidence/limits | 4/5 |
 
-The plan is ready for user review, not execution. Tasks 1–4 can be implemented independently of unfinished read algorithms and TK-13. Task 5 and TK-11's final real-drain checkbox remain pending until its integration gate is satisfied. Recommended execution: Native, because the tasks share tightly coupled interfaces and a single coordinated implementation reduces integration churn; one independent whole-branch review remains required by that workflow. The user may select Subagent-driven instead.
+The user approved the plan and selected Subagent-driven execution on 2026-10-22; execution is active. Tasks 1–4 can be implemented independently of unfinished read algorithms and TK-13. Task 5 and TK-11's final real-drain checkbox remain pending until its integration gate is satisfied. The earlier Native recommendation is superseded by the user’s explicit Subagent-driven selection. Use fresh implementers, task-scoped spec/quality gates and the final whole-branch review.
 
 ## Planning self-review
 
