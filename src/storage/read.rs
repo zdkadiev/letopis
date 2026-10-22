@@ -1,12 +1,14 @@
 use super::connection::map_sqlite;
 use crate::{
-    domain::Sha256,
-    service::{StorageError, StorageErrorKind, StorageRead, StorageResult},
+    domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256},
+    service::{
+        FileRow, StorageError, StorageErrorKind, StorageRead, StorageResult, StoredNode, TextMatch,
+    },
 };
 use rusqlite::{Connection, OptionalExtension, Transaction};
 
 pub struct SqliteRead<'a> {
-    _transaction: Transaction<'a>,
+    transaction: Transaction<'a>,
     revision: u64,
     config_identity: Option<Sha256>,
 }
@@ -44,13 +46,25 @@ impl<'a> SqliteRead<'a> {
                 )
             })?;
         Ok(Self {
-            _transaction: transaction,
+            transaction,
             revision,
             config_identity,
         })
     }
 }
 impl StorageRead for SqliteRead<'_> {
+    fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
+        super::graph::read_node(&self.transaction, id)
+    }
+    fn list_edges(&mut self, source: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>> {
+        super::graph::list_edges(&self.transaction, source)
+    }
+    fn read_file(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
+        super::files::read_file(&self.transaction, path)
+    }
+    fn match_text(&mut self, expression: &str) -> StorageResult<Vec<TextMatch>> {
+        super::fts::match_text(&self.transaction, expression)
+    }
     fn get_revision(&self) -> u64 {
         self.revision
     }

@@ -5,3 +5,8 @@ mod read;
 mod schema;
 mod sqlite;
 pub use sqlite::SqliteStorage;
+
+mod cache_write;
+mod files;
+mod fts;
+mod graph;
