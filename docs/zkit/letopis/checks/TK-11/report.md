@@ -135,3 +135,26 @@ service idempotency/refresh acceptance. Task 5 must verify the real executor,
 competing drain and queue exhaustion after TK-13 integration. Handled SIGINT,
 x86_64, Windows/NFS, target RAM/latency, real model quality, power loss and historical
 standalone proof harnesses were not exercised by this task.
+
+
+## Independent review and integration gate — 2026-10-22
+
+Task 4 source `a5e2b7319158c707b33f1ab336e203475876d10b` passed independent
+specification and code-quality review with no Critical/Important findings. Tasks
+1–3 also passed their scoped gates; the final whole-branch review remains pending
+with Task 5. Evidence totals and scope above are unchanged.
+
+One Minor finding is deferred to that final review: `tests/cli/negative_controls.py`
+currently assumes `target/debug/examples/cli_runtime_fixture`; an inherited
+`CARGO_BUILD_TARGET` changes Cargo's artifact directory. Resolve the control's
+executable through Cargo JSON. It fails closed and does not invalidate the captured
+runs, which used no explicit build target.
+
+Task 5 was not started. The read-only dependency checkpoint found TK-13 at
+`00bb62a1e68b6b5e837b2775bdc307b7d8918d18`: its committed card/report still state
+`in_progress`, pending its independent Task 5 and final whole-branch reviews.
+TK-13 is absent from this integration tree. The approved plan additionally requires
+authorized integration and forbids an implicit merge/rebase. Resume after the
+completed TK-13 is available through that gate, reconcile the shared filesystem
+and service contracts, then execute real-drain and combined-tree acceptance. No
+final TK-11 completion or publication is claimed.

@@ -135,3 +135,11 @@ TK-11 remains partial: Task 5 real drain integration/acceptance and real-service
 idempotency remain open. The runtime fixtures do not waive those gates; real
 inspect/check acceptance remains with TK-12/TK-19. Historical baseline receipts
 above retain their original revision and meaning.
+
+
+Task 4 independent review approved specification and quality at `a5e2b73`; one
+non-blocking control-runner artifact-path finding is retained in the
+[report](../../zkit/letopis/checks/TK-11/report.md#independent-review-and-integration-gate--2026-10-22).
+Tasks 1–4 are accepted as scoped increments. Task 5 and the whole-branch gate remain
+open: the latest read-only TK-13 checkpoint is not finally reviewed/completed and
+is absent from this tree. The accepted integration gate remains unchanged.
