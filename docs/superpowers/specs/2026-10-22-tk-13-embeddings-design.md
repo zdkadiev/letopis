@@ -1,6 +1,6 @@
 # TK-13 — Configuration and synchronous embedding executor
 
-Status: written specification approved by the user on 2026-10-22. The [implementation plan](../plans/2026-10-22-tk-13-embeddings.md) was approved on the same date with Subagent-driven execution; implementation and independent review are in progress.
+Status: approved specification and plan implemented on TK-13; all five task reviews and the final broad review/fix/scoped verification are complete. Current source and acceptance are recorded in the [report](../../zkit/letopis/checks/TK-13/report.md).
 
 ## Intent and accepted scope
 
@@ -12,7 +12,7 @@ The user selected an independent branch/worktree from local `main`, alongside TK
 - Managed worktree: `/Users/zdkadiev/.codex/worktrees/tk-13/letopis`.
 - Starting main commit: `bf9b6b9c46ddc9af0864a3a3924e8d0826da5abb`.
 - Product baseline: Markdown/domain, Git snapshots, SQLite storage and typed SeaQuery helpers from completed TK-3/TK-6/TK-9 inputs; TK-10 is a separate unmerged development line.
-- This specification and its task card are the only intended Git changes at this stage. Existing primary-worktree edits and TK-10 changes are preserved.
+- The specification and task card captured the initial design stage. Production changes, review fixes and current acceptance are recorded in the report; this independent branch retains its original main line.
 
 ## Authority and traceability
 
@@ -165,3 +165,9 @@ The final combined fix wave includes inherited child-output isolation, forced-wa
 
 
 Final amended-source verification (`bcd405c0d9c6`): both macOS/Linux root suites pass 219 cases with two ignores; the real60s case passes separately once in each final platform receipt. Strict docs, runner9, native/standalone and both restored compiling guard controls pass; 102 common input hashes match. See the [acceptance report](../../zkit/letopis/checks/TK-13/report.md). Independent scoped re-review/controller approval remain pending; earlier 8d39/preliminary ca8 receipts are not proof of the amended source.
+
+## Final controller acceptance
+
+2026-10-22: all five tasks completed; independent final scoped re-review marked I1/I2, M1–M4 and C1 addressed with no new breakage. Accepted runtime/test source is `bcd405c0d9c6cd5d68e4d57f16b2aafebce048fa`: macOS/Linux ARM64 root219 PASS/2 ignored each; real60s explicitly1 PASS each, runner9/strict docs/native/standalone PASS,102 shared input hashes equal. Both compiling guard mutations fail stored-state assertions then pass after exact restoration. Later controller changes are documentation-only. Engram records the decisions/reviews/evidence.
+
+Execution ledger, briefs, reviews and development receipts are preserved locally in `.artifacts/tk13/execution-ledger-final-aebf196`; large raw receipts remain ignored. The task is complete on TK-13, awaiting the user's integration choice. Current main advanced independently to `ce41b48`; its newer caller-before-callee rule must be reconciled during integration. The six execution rulings and their costs are retained verbatim in the plan. Combined TK-10/current-main behavior, the TK-12 later read view and all other scope exclusions above remain unverified by this branch.

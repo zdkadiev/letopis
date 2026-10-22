@@ -255,10 +255,10 @@ Implement private fake counters/barriers, fixture publication and inspection hel
 
 ## Controller final checks and handoff
 
-- [ ] Review the actual final diff against main and the approved spec, including physical module boundaries, public visibility, all new concrete trait implementations, selected dependencies and lib.rs constructor calls. Follow the user-selected execution workflow; carry every review finding/fix/deferred limit into the report.
-- [ ] Verify source hashes still match the accepted receipts. Count parent tests, explicitly invoked ignored children and mutation checks separately; do not infer platform success from one subprocess exit or an agent summary.
-- [ ] Record decisions, changes, review and verification to the existing Engram store through CLI with `ENGRAM_DB=/Users/zdkadiev/Repos/letopis`, fresh clean status/expected-parent and preserved attributes. Do not initialize a worktree store or commit/discard another writer's dirty graph. Serialize writes.
-- [ ] Preserve evidence and the final execution ledger; update the task/spec/plan honestly. Keep this worktree/branch available for user review. Offer integration choices only after completion; no merge/push/issue publication without authorization.
+- [x] Review the actual final diff against main and the approved spec, including physical module boundaries, public visibility, all new concrete trait implementations, selected dependencies and lib.rs constructor calls. Follow the user-selected execution workflow; carry every review finding/fix/deferred limit into the report.
+- [x] Verify source hashes still match the accepted receipts. Count parent tests, explicitly invoked ignored children and mutation checks separately; do not infer platform success from one subprocess exit or an agent summary.
+- [x] Record decisions, changes, review and verification to the existing Engram store through CLI with `ENGRAM_DB=/Users/zdkadiev/Repos/letopis`, fresh clean status/expected-parent and preserved attributes. Do not initialize a worktree store or commit/discard another writer's dirty graph. Serialize writes.
+- [x] Preserve evidence and the final execution ledger; update the task/spec/plan honestly. Keep this worktree/branch available for user review. Offer integration choices only after completion; no merge/push/issue publication without authorization.
 
 ## Planning self-review
 
@@ -266,7 +266,7 @@ All spec sections map to Tasks 1–5: configuration/credentials/provider validat
 
 Dependency verification at planning time: [serde_json_canonicalizer 0.3.2 documentation](https://docs.rs/serde_json_canonicalizer/0.3.2/) confirms the selected JCS API; [RFC 8785 section 3.1](https://www.rfc-editor.org/rfc/rfc8785.html#section-3.1) explains unique-property and binary64 input requirements. Native 2..=4096 and first-insertion persistence were read in this repo's pinned `vendor/vec1/vec1.c`, not inferred from a different release. Build compatibility and executable behavior remain execution checks, not planning evidence.
 
-Status: plan approved by the user on 2026-10-22 with “go subagent”; Subagent-driven execution selected. Baseline 112 root tests/fmt/compiler/Clippy PASS; Task 1 complete after one reviewed fix round; Task 2 complete with clean review; Task 3 complete with reviewed minor test-harness findings deferred; Task 4 complete with clean review; Task 5 implementer acceptance recorded and independent Task 5/final review pending. Execution ledger: `.superpowers/sdd/2026-10-22-tk-13-embeddings/progress.md`.
+Status: implementation and all task/final review gates complete on TK-13. Final source `bcd405c0d9c6`; macOS/Linux root219 PASS/2 ignored each plus explicit real60s1 PASS each. Review fixes, typed boundaries, current hashes and two restored compiling controls verified. Execution archive: `.artifacts/tk13/execution-ledger-final-aebf196`. Branch/worktree preserved for the user's integration choice.
 
 ## Execution rulings
 
@@ -291,3 +291,11 @@ Final combined fix wave covers final-review I1/I2, M1–M4 and controller C1. Th
 
 
 Final combined-fix verification at `bcd405c0d9c6`: I1/I2, M1–M4 and controller C1 addressed together. Fresh macOS/Linux root **219 PASS + 2 ignored**, explicit real60s **1 PASS each** (60.00s / 62.96s), runner9/strict Rustdoc/native/standalone PASS; all 102 common hashes identical (host207 inputs/16 exits, outer207/8, inner102/14). Two compiling controls fail on stored stale vector, restore exact bytes and pass the same oracle. Receipts: `.artifacts/tk13/{host,linux,mutations}-bcd405c0d9c6/`; [acceptance report](../../zkit/letopis/checks/TK-13/report.md). Old 8d39 receipts remain historical; preliminary ca8 receipts excluded. Process fixture consumes HTTP requests before reply so TCP reset cannot replace the stored-vector mutation oracle. Independent scoped re-review/controller approval, Engram/controller handoff and all integration checkboxes above remain pending. No product suite was repeated for later documentation-only edits.
+
+## Final controller handoff
+
+All five task gates and the final whole-branch review/fix/scoped verification are complete. The scoped reviewer marked I1/I2, M1–M4 and C1 addressed, with no new breakage. Earlier pending/deferred statements in checkpoint notes describe their captured stages; none remains a task finding. Current acceptance is the linked report's `bcd405c` section, not historical8d39 or preliminaryca8 receipts. Controller independently checked all command exits,219 root passes/2 ignores, explicit real60s cases, mutation assertions/restoration and102 common hashes. Engram contains the review/decision/evidence record; the ignored execution workspace is archived at `.artifacts/tk13/execution-ledger-final-aebf196`. No further product tests were required for these documentation-only status changes.
+
+Ruling: Apply the captured TK-13 AGENTS.md to this reviewed branch and carry primary main's newer caller-before-callee rules into the later integration check — main advanced independently after branch creation and this task deliberately kept its own main line — cost if wrong: touched test helpers may need ordering-only changes before integration into current main.
+
+The branch remains independently based on `bf9b6b9`; main now has later changes at `ce41b48`. Reconcile newer instructions and the actual combined tree when integration is authorized. No merge, push or issue update is part of this completed execution.

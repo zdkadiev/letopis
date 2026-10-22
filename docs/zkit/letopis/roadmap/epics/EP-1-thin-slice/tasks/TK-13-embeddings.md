@@ -1,6 +1,6 @@
 # TK-13 — Реализовать config и базовый embedding executor
 
-> **Статус:** in_progress
+> **Статус:** done
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 4 / 6 / 12 (best / expected / worst)
@@ -37,10 +37,10 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Config из `.letopis/config.json`, env key и один drain используют общий texts→vectors; невалидный файл даёт диагностику и FTS-only.
-- [ ] Вычисление вне DB write; вектор записан в vectors.db идемпотентно по search_hash; правка во время вычисления пропускается по search_hash; таблицы заданий и seq нет (D-95).
+- [x] Config из `.letopis/config.json`, env key и один drain используют общий texts→vectors; невалидный файл даёт диагностику и FTS-only.
+- [x] Вычисление вне DB write; вектор записан в vectors.db идемпотентно по search_hash; правка во время вычисления пропускается по search_hash; таблицы заданий и seq нет (D-95).
 
-- [ ] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
+- [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
 ## 6. Как проверить
 
@@ -65,15 +65,10 @@
 
 ## 9. Отчёт о выполнении
 
-2026-10-22: начато проектирование через Superpowers brainstorming. Пользователь выбрал отдельную ветку `TK-13` и managed worktree от main (`bf9b6b9c46ddc9af0864a3a3924e8d0826da5abb`) параллельно TK-10. Согласованы границы компонентов, синхронный flow, проверка search_hash/identity, attempts и политика начальной размерности; применяется project-local rust-skills с приоритетом AGENTS.md и закреплённого Rust 1.95.0.
+2026-10-22: задача завершена в отдельной ветке `TK-13`/worktree от `bf9b6b9`, по одобренным [спецификации](../../../../../../superpowers/specs/2026-10-22-tk-13-embeddings-design.md) и [плану](../../../../../../superpowers/plans/2026-10-22-tk-13-embeddings.md) через Subagent-driven. Реализованы config/JCS/env-only key, синхронные Ollama/OpenAI providers, короткие guarded storage units, native dimension bootstrap, confined file reads и persistent kernel lock, общий Markdown codec и EmbeddingService с drain/query. Trait-интерфейсы принадлежат service, реализации разделены по ответственностям; lib.rs делает реальные constructor calls.
 
-[Письменная спецификация TK-13](../../../../../../superpowers/specs/2026-10-22-tk-13-embeddings-design.md) одобрена пользователем. [Implementation plan](../../../../../../superpowers/plans/2026-10-22-tk-13-embeddings.md) одобрен; пользователь выбрал Subagent-driven. Baseline: 112 root Rust tests, fmt/compiler/Clippy PASS. Начата реализация Task 1; проверки новой реализации, остальные задачи и независимые ревью ещё впереди. Критерии приёмки остаются неотмеченными. CLI запуск/интеграция остаются TK-11/TK-14; полный lifecycle — TK-27.
+[Итоговый отчёт и evidence](../../../../checks/TK-13/report.md): исходники `bcd405c0d9c6`, macOS ARM64/Linux glibc ARM64 — root219 PASS/2 ignored на каждой платформе, реальный60s тест отдельно1 PASS, runner9/strict Rustdoc/native/standalone PASS;102 общих SHA256 совпадают. Пять real-process parent cases проверяют lock/crash/reservation/hash/config/query races; обе compiling guard mutations выявлены по сохранённому stale vector, точные байты восстановлены, те же проверки GREEN. Root totals включают два старых inert child entrypoints; child executions и ignores учтены отдельно. Исходные отчёты8d39 сохранены исторически, промежуточныеca8 не считаются итоговой приёмкой.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+Все пять task reviews и итоговое broad review + общая волна fixes + scoped re-review завершены. I1/I2, M1–M4 и C1 закрыты без новых дефектов: ограничен ответHTTP10MiB, сохранены literal JSON types и unknown config objects, проверяется обязательный native model, исправлены имена/child output/descendant cleanup/zero-request oracle. Шесть решений и их риски записаны в плане, решения/изменения/ревью/проверки — в существующем Engram. Execution ledger сохранён локально в `.artifacts/tk13/execution-ledger-final-aebf196`.
 
-2026-10-22, Task 5: Tasks 1–4 реализованы и прошли отдельные ревью. Пять process parent cases проверяют реальный root/SQLite/HTTP путь; один ignored child вызывается явно. Две компилирующиеся мутации пойманы по сохранённому устаревшему вектору, исходники восстановлены byte-for-byte. Runner: 9 PASS. Платформенная приёмка и итоговое независимое ревью ещё впереди; критерии и статус остаются открытыми.
-
-2026-10-22, платформенная проверка: [отчёт TK-13](../../../../checks/TK-13/report.md), исходники `8d39c11ca5ad`. macOS ARM64 и Linux glibc ARM64: root211 PASS+2ignored; два pass — старые inert child entrypoints. Реальный 60s deadline запущен отдельно и PASS на каждой платформе; runner9/strictdocs/native/standalone PASS. Все 101 общих входа совпадают по SHA256. Независимое Task 5/итоговое ревью, отложенные замечания и controller handoff остаются открытыми, поэтому статус и критерии приёмки пока не закрыты.
-
-
-2026-10-22, общая волна final-fix: исправлены I1/I2, M1–M4 и C1 — явный лимит HTTP 10 MiB, literal wire JSON и допустимые unknown config objects, обязательный непустой native model без проверки alias equality, имена helpers, изоляция вывода дочерних тестов, очистка потомков при watchdog и независимый zero-HTTP oracle. Исходники `bcd405c0d9c6`; [обновлённый отчёт](../../../../checks/TK-13/report.md). Свежие macOS/Linux receipts: root219 PASS+2ignored, real60s отдельно1 PASS на каждой платформе, runner9/strictdocs/native/standalone PASS; 102 общих SHA256 совпадают. Обе compiling мутации выявлены по сохранённому stale vector, точные байты восстановлены, те же проверки GREEN. Старые 8d39 receipts сохранены как история; предварительные ca8 исключены из итоговой приёмки. Независимое scoped re-review и controller approval ещё ожидаются; статус in_progress и критерии остаются открытыми. TK-10 не интегрирован.
+При неготовом embedding библиотека возвращает typed unavailable/diagnostic и сохраняет corpus/graph/FTS/revision; фактический search/ranking — TK-12. CLI запуск — TK-11/TK-14, полный lifecycle — TK-27. TK-10/current main не интегрированы; новые правила порядка кода из main `ce41b48` проверяются при интеграции. Реальные модели/качество/RAM/performance/x86/power-loss/system-TLS drill этой задачей не заявлены. Ветка и worktree сохранены; merge/push/GitHub update ожидают отдельного указания пользователя.

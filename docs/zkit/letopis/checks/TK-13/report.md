@@ -2,7 +2,7 @@
 
 ## Final combined-fix acceptance — bcd405c0d9c6
 
-Status: all final-review findings I1/I2, M1–M4 and controller C1 are fixed and verified; independent scoped re-review and controller approval remain pending. Runtime/test source is `bcd405c0d9c6cd5d68e4d57f16b2aafebce048fa`, comprising `ca8bfe3` combined fixes plus `bcd405c` request-consuming process fixture. Later documentation changes do not alter receipt inputs. No merge/push, Engram write or TK-10 integration occurred.
+Status: **accepted on TK-13**. All five task gates and final broad/fix/scoped review are complete. I1/I2, M1–M4 and controller C1 are addressed, with no new breakage. Runtime/test source is `bcd405c0d9c6cd5d68e4d57f16b2aafebce048fa`, comprising `ca8bfe3` combined fixes plus `bcd405c` request-consuming process fixture. Later documentation changes do not alter receipt inputs. No merge/push, Engram write or TK-10 integration occurred.
 
 Fresh exact commands (run at the TK-13 worktree):
 
@@ -47,13 +47,13 @@ Preliminary `mutations-ca8bfe382d52/` is **not accepted**: its hash control fail
 
 ### Final physical review and limits
 
-Reviewed concrete provider implementations, configuration parsing, shared private JSON utility, module visibility/import direction and unchanged `lib.rs` constructor assembly. Public interfaces stay frozen; protocol rules stay in embedding, config rules in service, and utility owns only literal JSON parsing. No SQL/native identifiers enter service/domain, no technology adapter orchestrates another, and no runtime/registry/schema/batching/process product feature was added. The existing rustix process feature is used only by test supervision. Changed covering files respect the 60-line function limit. Independent scoped re-review remains a controller gate.
+Reviewed concrete provider implementations, configuration parsing, shared private JSON utility, module visibility/import direction and unchanged `lib.rs` constructor assembly. Public interfaces stay frozen; protocol rules stay in embedding, config rules in service, and utility owns only literal JSON parsing. No SQL/native identifiers enter service/domain, no technology adapter orchestrates another, and no runtime/registry/schema/batching/process product feature was added. The existing rustix process feature is used only by test supervision. Changed covering files respect the 60-line function limit. Independent scoped re-review has passed; controller acceptance is recorded below.
 
 Existing limits below still apply: no merged TK-10, x86_64, live model/quality/corporate-CA, performance/RAM, physical-power-loss, hostile atomic filesystem confinement or downstream CLI/lifecycle/search acceptance. The documented cap deliberately rejects larger valid responses; nonconforming native shims omitting model are rejected, aliases accepted. Query vector validation at the future search read remains TK-12.
 
 ## Historical Task 5 evidence — source 8d39c11ca5ad
 
-The following earlier receipt/results/matrix are retained as provenance for their captured source. They do **not** prove amended source or supersede the final results above. Their previous claim of bounded HTTP responses was incorrect until I1 was fixed. Deferred findings listed below are historical and are resolved by the final fix dispositions above; independent final approval remains pending.
+The following earlier receipt/results/matrix are retained as provenance for their captured source. They do **not** prove amended source or supersede the final results above. Their previous claim of bounded HTTP responses was incorrect until I1 was fixed. Deferred findings and pending-status statements below describe the captured pre-review stage; all are superseded by the final dispositions and controller acceptance.
 
 Status: implementation and implementer verification recorded below; independent Task 5 review and controller final whole-branch gate remain pending. The task card remains `in_progress`. This report does not mark TK-10 or any downstream task accepted.
 
@@ -144,3 +144,11 @@ Carry into independent final review: Task 1 M1 helper verb naming, M2 serde_json
 TK-10 remains unmerged/unmodified. Future integration must reconcile service/mod.rs, lib.rs and concrete filesystem/storage capabilities, preserve the single shared Markdown codec and rerun the combined tree. TK-12 must validate query vectors against its pinned index observation. Historical TK-3/TK-6 evidence is preserved against its captured revision; those separate proof manifests were not rerun. In particular TK-6's prior system-TLS evidence is not a fresh TK-13 corporate-CA/real-model/system-drill result.
 
 No x86_64, real inference/model quality, performance/RAM, physical power loss, hostile ancestor-rename atomicity, full CLI/TK-27/TK-41 or merged-TK-10 acceptance is claimed. SIGKILL verifies process death, not power loss. The five parents combine reservation-death and stable-lock-release in one case. The existing Dockerfile needed no edit because its COPY inputs already cover the allowlisted files. These are explicit implementation choices and evidence limits, not omitted acceptance gates.
+
+## Final controller acceptance and integration handoff
+
+2026-10-22: fresh scoped re-review of `00bb62a..aebf196` marked I1,I2,M1,M2,M3,M4,C1 addressed, with no new Critical/Important/Minor breakage. Earlier five task-scoped reviews also passed; the broad review's two Important defects and four Minor findings are all resolved. Controller independently matched actual amended source to all final manifests, command exits and mutation assertions; only documentation changed after accepted runtime/test source `bcd405c`. No task finding remains.
+
+The nonblocking instruction-version observation is preserved: primary main at `ce41b48` has new caller-before-callee ordering rules absent from the captured TK-13 AGENTS. Apply that new rule and test the actual combined tree during eventual integration. This branch has not imported current main/TK-10 implicitly. All six controller rulings/costs are retained in the plan.
+
+Raw ledger/briefs/implementation and review reports are preserved in ignored local `.artifacts/tk13/execution-ledger-final-aebf196`; accepted platform/mutation receipts remain at their exact paths above. Engram records the decisions, changes and verification. Branch `TK-13` and `/Users/zdkadiev/.codex/worktrees/tk-13/letopis` are retained for review and the user's integration choice. GH issue publication, merge and push are separate actions.
