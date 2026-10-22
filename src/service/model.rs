@@ -50,3 +50,25 @@ pub struct TextMatch {
     pub row_id: i64,
     pub bm25: f64,
 }
+
+/// Expected configuration comparison outcome, distinct from storage failures.
+#[derive(Debug, Clone, PartialEq)]
+pub enum VectorOutcome<T> {
+    /// The operation used the expected configuration identity.
+    Current(T),
+    /// The pinned configuration differs from the caller's identity.
+    ConfigChanged,
+}
+/// Stable text-addressed vector key and whether this unit inserted it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredVectorKey {
+    pub row_id: i64,
+    pub inserted: bool,
+}
+/// A native cosine match joined to a currently published knowledge element.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VectorMatch {
+    pub id: KnowledgeId,
+    pub search_hash: Sha256,
+    pub distance: f64,
+}

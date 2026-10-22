@@ -44,7 +44,10 @@ mod error;
 use crate::domain::{Edge, EdgeTarget, KnowledgeId, Sha256};
 mod model;
 pub use error::{StorageError, StorageErrorKind, StorageResult};
-pub use model::{FileRow, KnowledgeMetadata, NodeMetadata, SourceMetadata, StoredNode, TextMatch};
+pub use model::{
+    FileRow, KnowledgeMetadata, NodeMetadata, SourceMetadata, StoredNode, StoredVectorKey,
+    TextMatch, VectorMatch, VectorOutcome,
+};
 
 /// Synchronous storage with exclusive scoped capabilities.
 pub trait Storage {
@@ -56,6 +59,23 @@ pub trait Storage {
     type CacheWrite<'a>: CacheWrite
     where
         Self: 'a;
+    /// An atomic vector-file write capability.
+    type VectorWrite<'a>: VectorWrite
+    where
+        Self: 'a;
+    /// Begin a write only when the pinned vector identity matches.
+    ///
+    /// # Errors
+    /// Reports contention or database failures.
+    fn begin_vector_write(
+        &mut self,
+        expected: &Sha256,
+    ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>>;
+    /// Atomically clear vectors for a changed identity; return whether changed.
+    ///
+    /// # Errors
+    /// Reports contention, schema or database failures, rolling back all changes.
+    fn reset_vectors(&mut self, identity: &Sha256) -> StorageResult<bool>;
     /// Begin an exclusive cache publication transaction.
     ///
     /// # Errors
@@ -89,6 +109,25 @@ pub trait StorageRead {
     /// # Errors
     /// Returns an invalid request for malformed expressions, or an internal error for I/O.
     fn match_text(&mut self, expression: &str) -> StorageResult<Vec<TextMatch>>;
+    /// Read a text-addressed vector under the expected pinned identity.
+    ///
+    /// # Errors
+    /// Reports malformed stored vectors or database failures.
+    fn read_vector(
+        &mut self,
+        expected: &Sha256,
+        hash: &Sha256,
+    ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>>;
+    /// Find native cosine matches joined to current node search hashes.
+    ///
+    /// # Errors
+    /// Rejects invalid query vectors or reports database/integrity failures.
+    fn find_nearest_vectors(
+        &mut self,
+        expected: &Sha256,
+        query: &[f32],
+        dimensions: usize,
+    ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>>;
     /// Publication revision observed by this read.
     fn get_revision(&self) -> u64;
     /// Vector configuration identity observed by this read.
@@ -137,4 +176,23 @@ pub trait CacheWrite: Sized {
     /// # Errors
     /// Rejects failed units, revision overflow, and database failures, rolling back.
     fn commit(self) -> StorageResult<u64>;
+}
+
+/// Caller-owned atomic vector write; any failed mutation prevents commit.
+pub trait VectorWrite: Sized {
+    /// Store one text vector, preserving an existing key and vector.
+    ///
+    /// # Errors
+    /// Rejects empty, nonfinite or mismatched vectors and reports database corruption/I/O.
+    fn store_vector(
+        &mut self,
+        hash: &Sha256,
+        vector: &[f32],
+        dimensions: usize,
+    ) -> StorageResult<StoredVectorKey>;
+    /// Commit all writes atomically.
+    ///
+    /// # Errors
+    /// Rejects poisoned units or reports database failures, rolling back.
+    fn commit(self) -> StorageResult<()>;
 }

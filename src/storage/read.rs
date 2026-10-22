@@ -3,6 +3,7 @@ use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256},
     service::{
         FileRow, StorageError, StorageErrorKind, StorageRead, StorageResult, StoredNode, TextMatch,
+        VectorMatch, VectorOutcome,
     },
 };
 use rusqlite::{Connection, OptionalExtension, Transaction};
@@ -53,6 +54,28 @@ impl<'a> SqliteRead<'a> {
     }
 }
 impl StorageRead for SqliteRead<'_> {
+    fn read_vector(
+        &mut self,
+        expected: &Sha256,
+        hash: &Sha256,
+    ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>> {
+        if self.config_identity != Some(*expected) {
+            return Ok(VectorOutcome::ConfigChanged);
+        }
+        super::vectors::read_vector(&self.transaction, hash).map(VectorOutcome::Current)
+    }
+    fn find_nearest_vectors(
+        &mut self,
+        expected: &Sha256,
+        query: &[f32],
+        dimensions: usize,
+    ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
+        if self.config_identity != Some(*expected) {
+            return Ok(VectorOutcome::ConfigChanged);
+        }
+        super::vectors::find_nearest_vectors(&self.transaction, query, dimensions)
+            .map(VectorOutcome::Current)
+    }
     fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
         super::graph::read_node(&self.transaction, id)
     }

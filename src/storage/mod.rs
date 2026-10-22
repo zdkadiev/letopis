@@ -10,3 +10,6 @@ mod cache_write;
 mod files;
 mod fts;
 mod graph;
+
+mod vector_write;
+mod vectors;
