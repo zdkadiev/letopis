@@ -156,7 +156,7 @@ Private service projection types implement I-2's role: PreparedProjection carrie
 - [x] **Step 4 — Prove test sensitivity.** Temporarily remove redetection and require the newer-edit schedule to fail; separately make FileRow writes escape the unit and require the crash oracle to reject it. Mutations must compile, be made one at a time, restore byte-for-byte, and rerun the same tests GREEN. Keep mutation evidence outside Git. If a particular mutation cannot be applied safely, record that gap rather than claiming it tested.
 - [x] **Step 5 — Run production acceptance on both platforms.** From the worktree use /opt/homebrew/bin/python3 -B tests/storage/run.py --platform host --evidence .artifacts/tk10/host-<unique> and the same command with --platform linux and a separate evidence directory. The existing Linux path builds source with Cargo dependencies prepared and runs acceptance without network; all new root/unit subprocess tests must execute there. Compare common input hashes, record actual counts/toolchain/platform/exit statuses, run strict Rustdoc and schema/native/copied-executable checks supplied by that runner. If a suite fails, investigate before marking acceptance complete.
 - [x] **Step 6 — Review architecture and report.** Inspect physical files, visibility, import direction, struct/impl placement and actual constructors in lib.rs. Record how every TK-10 criterion is proved, including why CLI command integration remains TK-11/TK-14. Document symlink/one-second timestamp/live-read limits, unrun physical/x86/resource/model/historical suites. Preserve raw receipts under ignored .artifacts and summarize reproducible commands/source hashes in checks/TK-10/report.md.
-- [ ] **Step 7 — Update docs/memory and review.** Check task acceptance boxes only after evidence exists; record Engram findings/changes/verification, keeping historical provenance and other writers intact. Complete the selected workflow's independent code review and resolve consequential findings. Commit intended code/test/report/task/plan paths only, without raw receipts. Merge/push/GitHub changes remain explicit follow-up actions unless the user authorizes them for TK-10.
+- [x] **Step 7 — Update docs/memory and review.** Check task acceptance boxes only after evidence exists; record Engram findings/changes/verification, keeping historical provenance and other writers intact. Complete the selected workflow's independent code review and resolve consequential findings. Commit intended code/test/report/task/plan paths only, without raw receipts. Merge/push/GitHub changes remain explicit follow-up actions unless the user authorizes them for TK-10.
 
 ## Plan Self-Review and Current State
 
@@ -167,7 +167,7 @@ Private service projection types implement I-2's role: PreparedProjection carrie
 - [x] Planning-stage documentation validation: 828 local links resolved; D-101 anchor was unique and whitespace checks passed. That planning-stage tree contained only documentation.
 - [x] Baseline at bf9b6b9: ./scripts/check-rust.sh PASS on macOS ARM64,112 Rust tests, fmt/compiler/Clippy. No product changes or Linux execution occurred during planning.
 - [x] User approved plan and explicitly selected Subagent-driven execution on2026-10-22.
-- [x] Tasks 1–4 implemented and independently approved; final review fixes await scoped re-review.
+- [x] Tasks 1–4 implemented and independently approved; final review fixes independently approved.
 
 
 ## Execution Rulings
@@ -233,5 +233,14 @@ found startup-contention and dependency-wording findings. The consolidated fix
 now validates ready schemas read-only, coordinates missing-schema initialization
 with recheck and bounded readiness probes, and handles the reproduced macOS
 lock-create race without weakening path protections. Both platforms pass on the
-amended source; scoped re-review is pending. No merge, push or GitHub mutation
+amended source; scoped re-review confirmed I1/M1 addressed and no new breakage. No merge, push or GitHub mutation
 has been performed for TK-10.
+
+Final gate: complete on 2026-10-22. Independent whole-branch review and its
+single consolidated fix wave are complete; the scoped re-review approved
+I1/M1 and the additional lock-creation correction with no new findings.
+There are no parked or deferred review findings. Five execution rulings are
+listed above. Raw workflow reports/ledger/diff packages are archived under
+`.artifacts/tk10/workflow/`; earlier logs under `.artifacts/tk10/prior-task-logs/`.
+The existing shared Engram task records results, decisions and verification;
+branch `TK-10` is complete locally and remains unmerged/unpushed.

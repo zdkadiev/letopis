@@ -112,7 +112,7 @@ late-boundary regressions and scoped re-review confirm the fix. Task 4: no findi
 reviewer independently checked full process assertions, mutation failures,
 receipt counts and source equality without repeating the suites.
 
-The final whole-branch review identified I1 and M1. The correction and new evidence are recorded below; focused fix review remains pending. The controller's implementation
+The final whole-branch review identified I1 and M1. The correction and new evidence are recorded below; focused fix review confirmed both addressed with no new breakage. The controller's five implementation
 rulings and their costs are preserved in the
 [plan](../../../../superpowers/plans/2026-10-22-tk-10-change-detection.md#execution-rulings).
 
@@ -237,5 +237,21 @@ rustix dependency is acknowledged without claiming a locked-version upgrade.
 The existing live-read/timestamp, hostile ancestor-rename, physical power-loss,
 CLI integration, platform and resource limits still apply. The new bound does
 not guarantee opening when an initializer stays contended beyond its budget.
-Focused independent fix review remains pending; this report does not claim that
-review, merge, push, or GitHub issue work has occurred.
+Focused independent fix review is complete and approved. Merge, push and GitHub
+issue work have not occurred.
+
+
+## Final Review Disposition
+
+Final whole-branch review identified I1 (opening an initialized schema during an
+active writer) and M1 (dependency wording). The single consolidated fix and
+macOS lock-creation correction are independently approved: I1/M1 addressed, no
+new Critical/Important/Minor findings or out-of-scope observations. The reviewer
+audited covering assertions, all command outcomes, receipt hashes and all
+191 current/86 common platform input hashes without rerunning unchanged suites.
+
+Final source remains `15fcc196b554c5a77b8b83818ddc2274d916fb70`; later commits
+change documentation only. All prior limits and historical evidence remain
+explicit. Workflow reports, ledger and review packages are retained under
+`.artifacts/tk10/workflow/`. The task/spec/plan and existing Engram task record
+completion. `TK-10` remains local; no merge, push or GitHub mutation was performed.

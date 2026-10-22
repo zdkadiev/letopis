@@ -1,6 +1,6 @@
 # TK-10 — Change detection and atomic per-file publication
 
-Status: approved by the user on 2026-10-22; implementation and platform checks complete; final review fixes await scoped re-review.
+Status: approved by the user on 2026-10-22; implementation, platform checks and independent final review complete.
 Base: main@bf9b6b9c46ddc9af0864a3a3924e8d0826da5abb.
 Workspace: separate native worktree on branch TK-10.
 
@@ -242,8 +242,8 @@ hashes match.
 Tasks 1–4 have independent approval, including scoped fixes for raw metadata
 exclusion ordering and automatic service-database symlink protection. The final whole-branch review found initialized-schema startup contention and
 a dependency-description error. Both are corrected, including deterministic
-first-initialization/recheck and macOS lock-creation regressions; scoped re-review
-is pending. These results do not yet claim that final gate is complete. Execution rulings and their costs are preserved in the
+first-initialization/recheck and macOS lock-creation regressions. Scoped re-review
+confirmed both findings addressed and no new breakage; the final gate is complete. Execution rulings and their costs are preserved in the
 [plan](../plans/2026-10-22-tk-10-change-detection.md#execution-rulings).
 
 CLI command integration remains TK-11/TK-14. The report retains the one-second
