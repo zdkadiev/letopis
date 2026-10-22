@@ -1,7 +1,10 @@
 use super::connection::map_sqlite;
 use crate::{
     domain::{KnowledgeId, Sha256},
-    service::{StorageError, StorageErrorKind, StorageResult, StoredVectorKey, VectorMatch},
+    service::{
+        EmbeddingFailure, QueryError, StorageError, StorageErrorKind, StorageResult,
+        StoredVectorKey, VectorMatch,
+    },
 };
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 
@@ -145,4 +148,109 @@ pub(super) fn find_nearest_vectors(
         })
     })
     .collect()
+}
+
+pub(super) fn reserve_attempt(
+    connection: &Connection,
+    hash: &Sha256,
+    max_attempts: u64,
+) -> StorageResult<bool> {
+    let budget = encode_unsigned(max_attempts)?;
+    if budget == 0 {
+        return Err(StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "attempt budget must be positive",
+        ));
+    }
+    connection.execute(
+        "INSERT INTO embed_failures(search_hash,attempts) VALUES(?1,1) ON CONFLICT(search_hash) DO UPDATE SET attempts=attempts+1 WHERE attempts<?2",
+        params![hash.to_hex(), budget],
+    ).map(|changed| changed == 1).map_err(map_sqlite)
+}
+pub(super) fn record_failure(
+    connection: &Connection,
+    hash: &Sha256,
+    safe_error: &str,
+) -> StorageResult<bool> {
+    connection
+        .execute(
+            "UPDATE embed_failures SET error=?2 WHERE search_hash=?1",
+            params![hash.to_hex(), safe_error],
+        )
+        .map(|changed| changed == 1)
+        .map_err(map_sqlite)
+}
+pub(super) fn set_query_error(
+    connection: &Connection,
+    at: u64,
+    safe_error: &str,
+) -> StorageResult<()> {
+    let at = encode_unsigned(at)?;
+    connection.execute("INSERT INTO query_error(id,at,error) VALUES(1,?1,?2) ON CONFLICT(id) DO UPDATE SET at=excluded.at,error=excluded.error", params![at, safe_error]).map_err(map_sqlite)?;
+    Ok(())
+}
+pub(super) fn clear_query_error(connection: &Connection) -> StorageResult<()> {
+    connection
+        .execute("DELETE FROM query_error WHERE id=1", [])
+        .map_err(map_sqlite)?;
+    Ok(())
+}
+pub(super) fn read_failure(
+    connection: &Connection,
+    hash: &Sha256,
+) -> StorageResult<Option<EmbeddingFailure>> {
+    let value = connection
+        .query_row(
+            "SELECT attempts,error FROM vec.embed_failures WHERE search_hash=?1",
+            [hash.to_hex()],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
+        )
+        .optional()
+        .map_err(map_sqlite)?;
+    value
+        .map(|(attempts, error)| {
+            let attempts = decode_unsigned(attempts)?;
+            if attempts == 0 {
+                return Err(invalid_diagnostic());
+            }
+            Ok(EmbeddingFailure {
+                search_hash: *hash,
+                attempts,
+                error,
+            })
+        })
+        .transpose()
+}
+pub(super) fn read_query_error(connection: &Connection) -> StorageResult<Option<QueryError>> {
+    let value = connection
+        .query_row(
+            "SELECT at,error FROM vec.query_error WHERE id=1",
+            [],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+        )
+        .optional()
+        .map_err(map_sqlite)?;
+    value
+        .map(|(at, error)| {
+            Ok(QueryError {
+                at: decode_unsigned(at)?,
+                error,
+            })
+        })
+        .transpose()
+}
+fn encode_unsigned(value: u64) -> StorageResult<i64> {
+    i64::try_from(value).map_err(|cause| {
+        StorageError::new_with_cause(
+            StorageErrorKind::InvalidRequest,
+            "unsupported diagnostic number",
+            cause,
+        )
+    })
+}
+fn decode_unsigned(value: i64) -> StorageResult<u64> {
+    u64::try_from(value).map_err(|_| invalid_diagnostic())
+}
+fn invalid_diagnostic() -> StorageError {
+    StorageError::new(StorageErrorKind::InternalError, "invalid stored diagnostic")
 }

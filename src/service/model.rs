@@ -72,3 +72,17 @@ pub struct VectorMatch {
     pub search_hash: Sha256,
     pub distance: f64,
 }
+
+/// Durable reservation count and the latest safe failure for one search hash.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmbeddingFailure {
+    pub search_hash: Sha256,
+    pub attempts: u64,
+    pub error: Option<String>,
+}
+/// Latest safe query embedding failure, retained until explicit successful clear.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QueryError {
+    pub at: u64,
+    pub error: String,
+}

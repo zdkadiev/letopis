@@ -29,6 +29,26 @@ impl<'a> SqliteVectorWrite<'a> {
     }
 }
 impl VectorWrite for SqliteVectorWrite<'_> {
+    fn reserve_attempt(&mut self, hash: &Sha256, max_attempts: u64) -> StorageResult<bool> {
+        let result = vectors::reserve_attempt(&self.transaction, hash, max_attempts);
+        self.failed |= result.is_err();
+        result
+    }
+    fn record_failure(&mut self, hash: &Sha256, safe_error: &str) -> StorageResult<bool> {
+        let result = vectors::record_failure(&self.transaction, hash, safe_error);
+        self.failed |= result.is_err();
+        result
+    }
+    fn set_query_error(&mut self, at: u64, safe_error: &str) -> StorageResult<()> {
+        let result = vectors::set_query_error(&self.transaction, at, safe_error);
+        self.failed |= result.is_err();
+        result
+    }
+    fn clear_query_error(&mut self) -> StorageResult<()> {
+        let result = vectors::clear_query_error(&self.transaction);
+        self.failed |= result.is_err();
+        result
+    }
     fn store_vector(
         &mut self,
         hash: &Sha256,

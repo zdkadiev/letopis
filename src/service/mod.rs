@@ -45,8 +45,8 @@ use crate::domain::{Edge, EdgeTarget, KnowledgeId, Sha256};
 mod model;
 pub use error::{StorageError, StorageErrorKind, StorageResult};
 pub use model::{
-    FileRow, KnowledgeMetadata, NodeMetadata, SourceMetadata, StoredNode, StoredVectorKey,
-    TextMatch, VectorMatch, VectorOutcome,
+    EmbeddingFailure, FileRow, KnowledgeMetadata, NodeMetadata, QueryError, SourceMetadata,
+    StoredNode, StoredVectorKey, TextMatch, VectorMatch, VectorOutcome,
 };
 
 /// Synchronous storage with exclusive scoped capabilities.
@@ -128,6 +128,20 @@ pub trait StorageRead {
         query: &[f32],
         dimensions: usize,
     ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>>;
+    /// Read durable attempts and the latest failure under the pinned identity.
+    ///
+    /// # Errors
+    /// Reports malformed persisted values or database failures.
+    fn read_failure(
+        &mut self,
+        expected: &Sha256,
+        hash: &Sha256,
+    ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>>;
+    /// Read the last query embedding failure, independent of model resets.
+    ///
+    /// # Errors
+    /// Reports malformed persisted values or database failures.
+    fn read_query_error(&mut self) -> StorageResult<Option<QueryError>>;
     /// Publication revision observed by this read.
     fn get_revision(&self) -> u64;
     /// Vector configuration identity observed by this read.
@@ -180,6 +194,28 @@ pub trait CacheWrite: Sized {
 
 /// Caller-owned atomic vector write; any failed mutation prevents commit.
 pub trait VectorWrite: Sized {
+    /// Reserve one durable attempt within the caller's total budget.
+    /// Commit before calling the provider; an unsent reservation still counts.
+    ///
+    /// # Errors
+    /// Rejects zero or budgets above `i64::MAX` and reports database failures.
+    fn reserve_attempt(&mut self, hash: &Sha256, max_attempts: u64) -> StorageResult<bool>;
+    /// Replace an existing reservation's error with the caller's safe message.
+    /// Returns false when no reservation exists; never creates an attempt.
+    ///
+    /// # Errors
+    /// Reports database failures.
+    fn record_failure(&mut self, hash: &Sha256, safe_error: &str) -> StorageResult<bool>;
+    /// Replace the singleton query failure with an already-safe message.
+    ///
+    /// # Errors
+    /// Rejects timestamps above `i64::MAX` and reports database failures.
+    fn set_query_error(&mut self, at: u64, safe_error: &str) -> StorageResult<()>;
+    /// Clear the singleton error after a successful query embedding.
+    ///
+    /// # Errors
+    /// Reports database failures.
+    fn clear_query_error(&mut self) -> StorageResult<()>;
     /// Store one text vector, preserving an existing key and vector.
     ///
     /// # Errors
