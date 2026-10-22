@@ -4,7 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from run import create_evidence, run_command
+from run import create_evidence, hash_inputs, run_command
 
 
 class RunnerTests(unittest.TestCase):
@@ -115,3 +115,37 @@ class SchemaParityTests(unittest.TestCase):
             bad = subprocess.run([sys.executable, str(script), str(root)], capture_output=True)
             self.assertNotEqual(bad.returncode, 0)
             self.assertIn(b'canonical DDL differs', bad.stderr)
+
+
+class InputInventoryTests(unittest.TestCase):
+    def test_inventory_excludes_nested_build_caches_and_keeps_source_hashes(self):
+        # Catches inventories bloated by ignored historical Cargo/build output.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sources = (
+                'Cargo.toml', 'Cargo.lock', 'build.rs', 'rust-toolchain.toml',
+                'clippy.toml', '.dockerignore',
+                'docs/zkit/letopis/mechanics/storage-schema.sql',
+                'src/lib.rs', 'tests/storage/test_runner.py',
+                'tests/fixtures/target-name.txt', 'vendor/vec1/vec1.c',
+            )
+            for name in sources:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('abc')
+            caches = ('tests/runtime/target/debug/build.o',
+                      'tests/storage-build/.build/sqlite3.c',
+                      'tests/storage/__pycache__/run.pyc',
+                      'src/nested/target/ignored.rs')
+            for name in caches:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'generated build output')
+
+            # Act.
+            actual = hash_inputs(root)
+
+            # Assert: legitimate source names survive; generated trees do not.
+            self.assertEqual(set(actual), set(sources))
+            self.assertEqual(actual['src/lib.rs'],
+                             'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')

@@ -4,11 +4,14 @@ Use Python 3.11+ (macOS: `/opt/homebrew/bin/python3`):
 
 ```sh
 /opt/homebrew/bin/python3 -B -m unittest discover -s tests/storage -p test_runner.py -v
-/opt/homebrew/bin/python3 -B tests/storage/run.py --platform host --evidence NEW_DIRECTORY
-/opt/homebrew/bin/python3 -B tests/storage/run.py --platform linux --evidence OTHER_NEW_DIRECTORY
-/opt/homebrew/bin/python3 -B tests/storage/negative_controls.py --evidence CONTROL_NEW_DIRECTORY
+/opt/homebrew/bin/python3 -B tests/storage/run.py --platform host --evidence .artifacts/tk-9/host-NEW
+/opt/homebrew/bin/python3 -B tests/storage/run.py --platform linux --evidence .artifacts/tk-9/linux-NEW
+/opt/homebrew/bin/python3 -B tests/storage/negative_controls.py --evidence .artifacts/tk-9/controls-NEW
 ```
 
+Keep raw receipts under ignored `.artifacts/` locally or in CI artifacts.
+Commit only concise final reports and source-hash summaries under `docs/`.
+Input inventories prune `target/`, `.build/`, and `__pycache__/` directories.
 Evidence paths must not exist. Commands, exits, versions and SHA-256 input hashes
 are retained with a fail-closed manifest. Host dependencies must already be fetched.
 Linux image preparation may use network; runtime uses `--network none`, builds

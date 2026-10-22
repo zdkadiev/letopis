@@ -15,6 +15,7 @@ import tempfile
 import uuid
 
 COMMANDS = []
+IGNORED_INPUT_DIRECTORIES = frozenset({'target', '.build', '__pycache__'})
 
 
 def create_evidence(path: Path) -> None:
@@ -46,8 +47,11 @@ def hash_inputs(root):
               'rust-toolchain.toml', 'clippy.toml', '.dockerignore',
               'docs/zkit/letopis/mechanics/storage-schema.sql')]
     for name in ('src', 'vendor', 'examples', 'tests', 'scripts'):
-        paths.extend(p for p in (root / name).rglob('*') if p.is_file()
-                     and '__pycache__' not in p.parts)
+        for directory, children, files in os.walk(root / name):
+            children[:] = [child for child in children
+                           if child not in IGNORED_INPUT_DIRECTORIES]
+            paths.extend(Path(directory) / filename for filename in files
+                         if (Path(directory) / filename).is_file())
     return {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted(paths)}
 
