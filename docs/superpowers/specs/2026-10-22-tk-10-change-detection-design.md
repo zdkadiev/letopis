@@ -248,5 +248,7 @@ confirmed both findings addressed and no new breakage; the final gate is complet
 
 CLI command integration remains TK-11/TK-14. The report retains the one-second
 timestamp/live-read limits, hostile ancestor-rename residual, and the limits
-of process-death checks versus physical power loss. No merge, push or GitHub
-issue update has occurred for TK-10.
+of process-death checks versus physical power loss. At the initial acceptance gate, no integration had occurred. The user has since
+authorized integration, and `TK-10@352eace` is merged into `main` as `64b2188`.
+The merged root gate passes all 172 Rust tests; see the plan integration record
+and GitHub issue #10 for publication provenance.

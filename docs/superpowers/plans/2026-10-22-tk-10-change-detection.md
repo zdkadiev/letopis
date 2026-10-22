@@ -233,8 +233,8 @@ found startup-contention and dependency-wording findings. The consolidated fix
 now validates ready schemas read-only, coordinates missing-schema initialization
 with recheck and bounded readiness probes, and handles the reproduced macOS
 lock-create race without weakening path protections. Both platforms pass on the
-amended source; scoped re-review confirmed I1/M1 addressed and no new breakage. No merge, push or GitHub mutation
-has been performed for TK-10.
+amended source; scoped re-review confirmed I1/M1 addressed and no new breakage. At that initial acceptance gate, no merge, push or GitHub mutation
+had been performed for TK-10.
 
 Final gate: complete on 2026-10-22. Independent whole-branch review and its
 single consolidated fix wave are complete; the scoped re-review approved
@@ -243,4 +243,21 @@ There are no parked or deferred review findings. Five execution rulings are
 listed above. Raw workflow reports/ledger/diff packages are archived under
 `.artifacts/tk10/workflow/`; earlier logs under `.artifacts/tk10/prior-task-logs/`.
 The existing shared Engram task records results, decisions and verification;
-branch `TK-10` is complete locally and remains unmerged/unpushed.
+the initial branch acceptance is complete. Integration into `main` is recorded below.
+
+## Integration into main — 2026-10-22
+
+User authorized commit, merge, GitHub issue update and push. The reviewed
+`TK-10@352eace` was merged with preserved history as
+`64b218801f6a74c0eada0295bb4b7f91d7006dcf`. The committed merge tree exactly
+matches the reviewed branch. On that result, `./scripts/check-rust.sh` passes
+formatting, compiler diagnostics, Clippy and 172 Rust tests; one private child
+entry is ignored by the outer harness and invoked explicitly by parent tests.
+The unrelated primary `.gitignore` edit is byte-for-byte preserved and excluded
+from these commits. Receipt: `.artifacts/tk10/integration-352eace/verification.json`.
+
+The earlier Linux/macOS platform receipts remain pinned to their captured
+source revisions; this integration reruns the root gate on macOS and does not
+claim another Linux platform run. Publication and issue outcome are recorded in
+[GitHub issue #10](https://github.com/zaurkadiev/letopis/issues/10) and Engram.
+The managed task worktree is retained with its ignored evidence.

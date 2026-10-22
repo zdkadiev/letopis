@@ -237,8 +237,8 @@ rustix dependency is acknowledged without claiming a locked-version upgrade.
 The existing live-read/timestamp, hostile ancestor-rename, physical power-loss,
 CLI integration, platform and resource limits still apply. The new bound does
 not guarantee opening when an initializer stays contended beyond its budget.
-Focused independent fix review is complete and approved. Merge, push and GitHub
-issue work have not occurred.
+Focused independent fix review is complete and approved. At that pre-integration gate, merge, push and GitHub
+issue work had not occurred.
 
 
 ## Final Review Disposition
@@ -254,4 +254,25 @@ Final source remains `15fcc196b554c5a77b8b83818ddc2274d916fb70`; later commits
 change documentation only. All prior limits and historical evidence remain
 explicit. Workflow reports, ledger and review packages are retained under
 `.artifacts/tk10/workflow/`. The task/spec/plan and existing Engram task record
-completion. `TK-10` remains local; no merge, push or GitHub mutation was performed.
+completion. At initial acceptance, `TK-10` remained local. The subsequent authorized
+integration is recorded below.
+
+
+## Integration verification — 2026-10-22
+
+Reviewed branch tip `352eacebd5ecbe32acd82bb956b38b8f96833bfc` is merged into
+`main` as `64b218801f6a74c0eada0295bb4b7f91d7006dcf`, without rewriting the
+feature commits. The merge's committed tree equals the reviewed TK-10 tree.
+`./scripts/check-rust.sh` on the main checkout exits 0: formatting, compiler
+diagnostics, Clippy and **172 Rust tests**, zero failures, one outer ignored child
+explicitly driven by parent tests. Local receipt:
+`.artifacts/tk10/integration-352eace/verification.json`; root log SHA-256
+`d696a707efa0de065878b8b5d859f3f08dafbaaeab920bf82dbe64bc356c37c8`.
+
+The primary `.gitignore` modification is byte-for-byte preserved and is not
+committed with TK-10. No product code changed after the reviewed checkpoint.
+Previous platform receipts retain their original source pins; Linux and Python
+runner suites were not repeated merely for this merge. The managed TK-10
+worktree and ignored proof receipts are retained. Remote publication and issue
+closure are tracked in [issue #10](https://github.com/zaurkadiev/letopis/issues/10)
+and the existing Engram task.
