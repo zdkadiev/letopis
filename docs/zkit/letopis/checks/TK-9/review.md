@@ -25,10 +25,15 @@ The scoped reviewer recomputed all 182 host and 77 container input hashes agains
 - Rename planned nearest_vectors to find_nearest_vectors: the direct user rule requires verb-based custom methods. Cost if wrong: a small API/call-site rename; no stored-data or behavior change.
 - Add narrow Docker ignore exceptions for required native/product/test inputs: the initial source-built Linux attempt failed because COPY inputs were excluded. Cost if wrong: unintended extra build-context files; the allowlist remains limited. The failed receipt is retained and corrected source runs passed.
 
-Controller closing checks also passed: 94 local document targets, 12 anchors, all 44 plan steps checked, current 182/77 input hashes unchanged, and the pinned native-source digest. `final-review/closure.json` retains the compact result. No source inputs changed after the platform runs.
+Controller closing checks also passed: 94 local document targets, 12 anchors, all 44 plan steps checked, current 182/77 input hashes unchanged, and the pinned native-source digest. That closing check is preserved in the historical Git snapshot; [verification.json](verification.json) now retains the compact final results. No source inputs changed after the platform runs.
 
 ## Limits and handoff
 
 Exhaustive upstream C audit, physical power loss, x86_64/Windows/minimum Git execution, full publication/source reconciliation/process locks/permissions, configuration/traversal/final ranking/provider/drain, resource/model-quality/exhaustive float accuracy, hostile path replacement/arbitrary external SQL corruption, and historical harness reruns remain outside the accepted TK-9 evidence. The current report retains these limits.
 
-Engram task entity_4c54ca8539f34b1eb5ab8220c34be9a3 is resolved at graph revision 77 (c62694d663579c6a064b9da3da1ebcf2516cedbf), with code boundaries, invariants and source artifacts recorded. Integration, push and GitHub issue closure await the user's delivery choice. Later documentation commits are not described as executed test revisions.
+Engram task entity_4c54ca8539f34b1eb5ab8220c34be9a3 is resolved at graph revision 77 (c62694d663579c6a064b9da3da1ebcf2516cedbf), with code boundaries, invariants and source artifacts recorded. TK-9 was subsequently merged locally as ec96a8e and issue #9 closed; push remains pending. Later documentation commits are not described as executed test revisions.
+
+
+## Evidence cleanup
+
+The approved bounded cleanup archived raw evidence locally and retained one final summary. A real RED/GREEN regression excludes build caches from input hashing; both platforms pass 106 Rust and eight Python tests at c93a2f9. This leaves the original implementation/review findings and native inputs unchanged. See [current verification](verification.json) and [retention policy](report.md#evidence-retention).

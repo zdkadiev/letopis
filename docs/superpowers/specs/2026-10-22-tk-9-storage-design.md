@@ -176,7 +176,7 @@ This specification records the agreed intent, module/file refinements, and concr
 
 ## Implementation evidence (2026-10-22)
 
-Implementation and platform validation are recorded in the [TK-9 report](../../zkit/letopis/checks/TK-9/report.md): 106 Rust tests and seven Python checks per platform, strict Rustdoc, canonical-DDL parity with deliberate drift rejection, copied native executable and two disposable-source negative controls. Current tested source is `60fc1f0cd9f4be62c62d486632cd52446a9c46a0`; earlier receipts remain historical. All six independent task gates, broad final review and the single fix-wave re-review passed; all four findings are addressed. Engram outcome is recorded at revision 77. Later documentation commits are not claimed as executed. Integration and later roadmap scopes remain separate.
+Implementation and platform validation are recorded in the [TK-9 report](../../zkit/letopis/checks/TK-9/report.md): 106 Rust tests and eight Python checks per platform, strict Rustdoc, canonical-DDL parity with deliberate drift rejection, copied native executable and two disposable-source negative controls. Current runner-cleanup source is `c93a2f9d795da1ea211e3ef5e7cdb939447aa255`; original implementation review source was `60fc1f0cd9f4be62c62d486632cd52446a9c46a0`; earlier receipts remain historical. All six independent task gates, broad final review and the single fix-wave re-review passed; all four findings are addressed. Engram outcome is recorded at revision 77. Later documentation commits are not claimed as executed. Integration and later roadmap scopes remain separate.
 
 
 ### Final-review evidence clarification
@@ -184,5 +184,4 @@ Implementation and platform validation are recorded in the [TK-9 report](../../z
 Native receipts observe SQLite 3.53.2 and vec1 `version 0.8 (NEON, multi-threaded)`;
 assertions require SQLite >=3.51.3, vec1's version 0.8 prefix, FTS capabilities and
 the connection policy. Exact patch/NEON/thread-description strings are not asserted.
-Fresh source-linked receipts are in `docs/zkit/letopis/checks/TK-9/final-review/`;
-historical receipts remain evidence for their original revisions.
+The compact final summary is [verification.json](../../zkit/letopis/checks/TK-9/verification.json). Raw receipts are retained outside the tracked tree; the report records their archive checksum and original Git revision.

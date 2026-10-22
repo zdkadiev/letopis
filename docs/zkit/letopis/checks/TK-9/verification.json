@@ -1,13 +1,106 @@
 {
+  "schema_version": 1,
+  "task": "TK-9",
   "status": "PASS",
-  "platform": "Linux-7.0.0-22-generic-aarch64-with-glibc2.36",
-  "machine": "aarch64",
-  "python": "3.11.2 (main, Apr  8 2026, 01:58:00) [GCC 12.2.0]",
-  "inputs": {
+  "tested_source_commit": "c93a2f9d795da1ea211e3ef5e7cdb939447aa255",
+  "platforms": {
+    "macos_arm64": {
+      "status": "PASS",
+      "tested_source_commit": "c93a2f9d795da1ea211e3ef5e7cdb939447aa255",
+      "rust_tests": 106,
+      "python_tests": 8,
+      "checks_passed": [
+        "format",
+        "compiler",
+        "clippy",
+        "rust_tests",
+        "python_tests",
+        "strict_rustdoc",
+        "canonical_ddl_parity",
+        "native_capabilities",
+        "standalone_executable",
+        "dynamic_linkage"
+      ],
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "python_version": "3.14.7",
+      "input_count": 182,
+      "inventory_sha256": "2fb687cbc40edb6d98632a9fd4f8dffdb1fabc6fa118fbcb4ea6c18aaf6cd885",
+      "local_receipts": ".artifacts/tk-9/cleanup-host"
+    },
+    "linux_glibc_arm64": {
+      "status": "PASS",
+      "tested_source_commit": "c93a2f9d795da1ea211e3ef5e7cdb939447aa255",
+      "rust_tests": 106,
+      "python_tests": 8,
+      "checks_passed": [
+        "format",
+        "compiler",
+        "clippy",
+        "rust_tests",
+        "python_tests",
+        "strict_rustdoc",
+        "canonical_ddl_parity",
+        "native_capabilities",
+        "standalone_executable",
+        "dynamic_linkage"
+      ],
+      "platform": "Linux-7.0.0-22-generic-aarch64-with-glibc2.36",
+      "python_version": "3.11.2",
+      "input_count": 77,
+      "inventory_sha256": "48d0476cea2590b4f6eb321fa1c64a032419e518c50fc1f1fddbc3405a44ae53",
+      "local_receipts": ".artifacts/tk-9/cleanup-linux-verified/container",
+      "image_id": "sha256:a75e0bc125273a317b37048f101d623b035726a37b0c3b511a4abf7b0432e990",
+      "runtime_network": "none"
+    }
+  },
+  "observed_native": {
+    "sqlite": "3.53.2",
+    "vec1": "version 0.8 (NEON, multi-threaded)"
+  },
+  "asserted_native": {
+    "minimum_sqlite": "3.51.3",
+    "vec1_version_prefix": "version 0.8",
+    "wal": true,
+    "synchronous": "FULL",
+    "foreign_keys": true,
+    "macos_fullfsync": true
+  },
+  "negative_controls": {
+    "status": "PASS",
+    "tested_source_commit": "60fc1f0cd9f4be62c62d486632cd52446a9c46a0",
+    "command_exit_codes": [
+      0,
+      0,
+      101,
+      0,
+      101
+    ],
+    "checksum_mutant_sha256": "345b37e88c32220e427d090e4f928c307c4e4cff9f504b1f00fa34fe52bc44e7",
+    "registration_mutant_sha256": "027b022ec6966fa1c8fdaa53aa851f6c99779bbbc1b34a66fd9744881eaa33c6",
+    "native_inputs_unchanged": true,
+    "rerun_for_inventory_cleanup": false
+  },
+  "local_merge_commit": "ec96a8e5ab0e7f64938b9eb76a8cb3887619d728",
+  "github_issue": {
+    "url": "https://github.com/zaurkadiev/letopis/issues/9",
+    "state": "CLOSED"
+  },
+  "pushed": false,
+  "historical_evidence_archive": {
+    "archive": ".artifacts/tk-9/raw-evidence-4813a3f.tar.gz",
+    "sha256": "6bd1d66f2472f828891ffe09bd1c9b0bbf2cb572b59ed76685656346ca638fea",
+    "files": 167,
+    "uncompressed_bytes": 6080868,
+    "source_git_commit": "4813a3fd1e426012eb80ac120bc5d309367d4dc8",
+    "verified_byte_for_byte": true
+  },
+  "source_inputs_sha256": {
+    ".dockerignore": "d2d1253f1a6e2255afc7a3c2d3d3d7a060f30f8d38f4ca511080b65ebe11954d",
     "Cargo.lock": "c5a2dc19df8ec5dcd6ab105f32401b8f5f4051225df8a1ff6484161b123260f4",
     "Cargo.toml": "4e90e07238956819f9b90fc5683f6c8cd6fc23163044ef75e25f0dca88bb0739",
     "build.rs": "a0ab764d71f2bea064d74cdaf545960f29fa5cc109f2eb17983da49e96009ae7",
     "clippy.toml": "b9df5373d8d4335f6354c51dbf2e704af609848241f2bedfdae4c4d2581d6d4c",
+    "docs/zkit/letopis/mechanics/storage-schema.sql": "7650679cd48676c97316b01f9d3e85b036d310e9b924c22b1e2a1cac1c7d4281",
     "examples/storage_check.rs": "88469b545b2e577fbfe0704a30910cc2b722cadad74b33a3e748f86e1af0fe0c",
     "rust-toolchain.toml": "12dc5d64dbd96c1b07be2943241d52d9f6127a79ba47a820455ba7b873fc896a",
     "scripts/check-rust.sh": "f5692d290676a019e1048fcb9f99fdfa17ba3fea572348d555c7d56fb8466528",
@@ -64,12 +157,13 @@
     "tests/markdown_elements.rs": "7414f5ac71f7e4667a39db1f56edea64c4339ffb1019f23fd32e809b6ecf0846",
     "tests/markdown_links.rs": "759f87d5a6dadcfa52011a2aa878eab9f9bbb2a6e6b965d7b7ef7d37598c35d5",
     "tests/markdown_search.rs": "7d005874d5a61ed5807bbbb0072604288cc956707182a3f7737651fa47af5d70",
-    "tests/storage/Dockerfile": "44120ce3e8d491e82b5edadfd40bf67baeaa73a465503ceadde7a9f76c61933d",
-    "tests/storage/README.md": "b53a7c65daa5fdf2523f7d5150b32d32a4f81244dfce4a381c99890020ce3784",
-    "tests/storage/negative_controls.py": "e01c1a29725fa7c6adfbdd628a11aa9b881cd3cc4b1225b54e3768220c4254a8",
-    "tests/storage/run.py": "1bb61f135b532bad4235c7e84b6b79a94f429c1330b33dcda8c02dcaf7fc9caa",
-    "tests/storage/test_runner.py": "6aed8ba7961b2ff8e5a90fb17d11cf731bacb8d000fae8974e8fa0e536c3d2db",
-    "tests/storage_bootstrap.rs": "dce0127673a5c8b2846a94eb898e59d7bac5fcd2ece21a48e71b9771dd00d2d7",
+    "tests/storage/Dockerfile": "1d01797cf8eb952fe921544366b959af86f7fcc90f6e45dc23fa56c549d883c8",
+    "tests/storage/README.md": "e003457b77ab3dab368b6b289e21f17627c7ebceb02578ecd6bad63ce5528a87",
+    "tests/storage/check_schema.py": "bbd0a1c0a7fd3aacfe283331e840747fecb0c386e69d178d013264cdff08a8d7",
+    "tests/storage/negative_controls.py": "6dae1b6980c3d1d8cb3ce5f0a7a0ee97a6a34dd1eead4e0a063d942ac68a1b4a",
+    "tests/storage/run.py": "44e1246d6e3240eb5bba1b0d4ba490e7ff09685b50628e19552e3f6529c38bd7",
+    "tests/storage/test_runner.py": "2588798db74b1ab951d0bc7b90169f34af875b5d202e3e11095d578a29fe32e4",
+    "tests/storage_bootstrap.rs": "8e7122539da17d717db9a28a494a98dcb78658ad0349441e3be5c48b990b5cdb",
     "tests/storage_cache.rs": "606c0cbe89b543084d483530604a5431a8206d7a23ac6981ee9b930b44142094",
     "tests/storage_failures.rs": "791a63e4d150b370d6e400a0204e29911ae34b9c06ec46a0e5dd5778c147e4b7",
     "tests/storage_vectors.rs": "2c36077bd3254c7db268e6497ed0d85f2a37f8c1646c4e2cb3c8b1aefd78e0ec",
@@ -78,119 +172,5 @@
     "tests/support/storage.rs": "dca5d5da8eee0876ae9c004b417fcb1e050af70c43bf9c3ac7046744fdc438cd",
     "vendor/vec1/README.md": "c08ea3a67ff0c5720cea90dc7d2a9fcfc363e0fe61e92b8a9583511ddb7ce6aa",
     "vendor/vec1/vec1.c": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9"
-  },
-  "commands": [
-    {
-      "argv": [
-        "rustc",
-        "-vV"
-      ],
-      "cwd": "/repo",
-      "log": "version-rustc.log",
-      "exit_code": 0
-    },
-    {
-      "argv": [
-        "cargo",
-        "--version"
-      ],
-      "cwd": "/repo",
-      "log": "version-cargo.log",
-      "exit_code": 0
-    },
-    {
-      "argv": [
-        "git",
-        "--version"
-      ],
-      "cwd": "/repo",
-      "log": "version-git.log",
-      "exit_code": 0
-    },
-    {
-      "argv": [
-        "/usr/bin/python3",
-        "--version"
-      ],
-      "cwd": "/repo",
-      "log": "version-python3.log",
-      "exit_code": 0
-    },
-    {
-      "argv": [
-        "uname",
-        "-a"
-      ],
-      "cwd": "/repo",
-      "log": "version-uname.log",
-      "exit_code": 0
-    },
-    {
-      "argv": [
-        "./scripts/check-rust.sh"
-      ],
-      "cwd": "/repo",
-      "log": "rust-check.log",
-      "exit_code": 0
-    },
-    {
-      "argv": [
-        "cargo",
-        "doc",
-        "--locked",
-        "--offline",
-        "--no-deps"
-      ],
-      "cwd": "/repo",
-      "log": "rustdoc.log",
-      "exit_code": 0
-    },
-    {
-      "argv": [
-        "cargo",
-        "test",
-        "--locked",
-        "--offline",
-        "storage::native::tests::native_capabilities_match_pinned_stack",
-        "--",
-        "--nocapture"
-      ],
-      "cwd": "/repo",
-      "log": "native.log",
-      "exit_code": 0
-    },
-    {
-      "argv": [
-        "cargo",
-        "build",
-        "--locked",
-        "--offline",
-        "--example",
-        "storage_check",
-        "--message-format=json"
-      ],
-      "cwd": "/repo",
-      "log": "build.log",
-      "exit_code": 0
-    },
-    {
-      "argv": [
-        "ldd",
-        "/tmp/tk9-standalone-hp2cv4yx/storage_check"
-      ],
-      "cwd": "/repo",
-      "log": "dynamic.log",
-      "exit_code": 0
-    },
-    {
-      "argv": [
-        "/tmp/tk9-standalone-hp2cv4yx/storage_check",
-        "/tmp/tk9-standalone-hp2cv4yx/scratch"
-      ],
-      "cwd": "/tmp/tk9-standalone-hp2cv4yx",
-      "log": "standalone.log",
-      "exit_code": 0
-    }
-  ],
-  "source_commit": "b0a5aeaa0cd5c51bfbdb008cf1f3870b28c49b16"
+  }
 }

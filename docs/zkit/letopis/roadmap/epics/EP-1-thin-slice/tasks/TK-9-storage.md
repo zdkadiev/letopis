@@ -73,3 +73,7 @@
 Реализация и проверки завершены на source commit `60fc1f0cd9f4be62c62d486632cd52446a9c46a0`: 106 Rust tests, семь Python checks, strict Rustdoc, canonical-DDL parity, copied executable и negative controls прошли на macOS ARM64 и source-built Linux glibc ARM64 без сети. Критерии подтверждены [отчётом и evidence](../../../../checks/TK-9/report.md).
 
 Все шесть независимых task reviews, whole-branch review и финальный scoped re-review завершены; четыре замечания исправлены, новых проблем нет. [Результат review и принятые решения](../../../../checks/TK-9/review.md). Итог записан в Engram, revision 77. Physical power loss, x86_64, resource/quality и полный CLI/publication/ranking/drain не заявлены. Merge/push/issue closure ожидают отдельного указания по доставке.
+
+### Уплотнение evidence после интеграции
+
+По согласованию с пользователем сохранены краткий отчёт, review и [единый итог с SHA-256 исходников](../../../../checks/TK-9/verification.json). Сырые receipts архивированы локально вне Git; их исходная версия доступна в истории. Inventory исключает build caches; актуальные проверки c93a2f9: 106 Rust + восемь Python tests на каждой платформе. Ветка слита локально в main, issue #9 закрыта; push ожидается отдельно.

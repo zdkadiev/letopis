@@ -1,8 +1,0 @@
-test_existing_evidence_directory_is_rejected (test_runner.RunnerTests.test_existing_evidence_directory_is_rejected) ... ok
-test_nonzero_command_prevents_pass_manifest (test_runner.RunnerTests.test_nonzero_command_prevents_pass_manifest) ... ok
-test_timeout_reaps_owned_process (test_runner.RunnerTests.test_timeout_reaps_owned_process) ... ok
-
-----------------------------------------------------------------------
-Ran 3 tests in 1.025s
-
-OK

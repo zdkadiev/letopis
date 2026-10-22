@@ -1,4 +1,0 @@
-   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-9/letopis)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
-     Running `target/debug/examples/storage_check /tmp/tk9-task6-oracle-green`
-PASS: copied executable, FTS, shared native vector, exact bytes, reopen, revision=1
