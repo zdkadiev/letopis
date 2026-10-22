@@ -232,3 +232,28 @@ pub trait VectorWrite: Sized {
     /// Rejects poisoned units or reports database failures, rolling back.
     fn commit(self) -> StorageResult<()>;
 }
+
+mod embedding_config;
+mod embedding_error;
+pub use embedding_config::{EmbeddingConfig, ProviderKind};
+pub use embedding_error::{EmbeddingError, EmbeddingErrorKind, EmbeddingResult};
+use std::num::NonZeroUsize;
+
+/// Synchronous texts-to-vectors boundary shared by documents and queries.
+pub trait EmbeddingProvider {
+    /// Validate the complete local endpoint/protocol configuration without inference.
+    ///
+    /// # Errors
+    /// Returns invalid configuration when the endpoint or protocol is unsupported.
+    fn validate_config(&self, config: &EmbeddingConfig) -> EmbeddingResult<()>;
+    /// Compute one attempt and validate every vector before returning it.
+    ///
+    /// # Errors
+    /// Reports invalid config/input, credentials, transport or malformed output.
+    fn embed(
+        &self,
+        config: &EmbeddingConfig,
+        texts: &[&str],
+        dimensions: Option<NonZeroUsize>,
+    ) -> EmbeddingResult<Vec<Vec<f32>>>;
+}

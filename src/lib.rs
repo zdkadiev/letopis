@@ -34,3 +34,17 @@ use crate::storage::SqliteStorage;
 pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage + use<>> {
     SqliteStorage::open(cache, vectors)
 }
+
+mod embedding;
+use crate::embedding::{HttpProviders, Ollama, Openai};
+use crate::service::{EmbeddingProvider, EmbeddingResult};
+
+/// Construct the synchronous provider pair, capturing compatible credentials once.
+/// Does not perform inference or require a key for native Ollama.
+///
+/// # Errors
+/// Reserved for failures constructing the provider boundary.
+pub fn open_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + use<>> {
+    let key = std::env::var("OPENAI_API_KEY").ok();
+    Ok(HttpProviders::new(Ollama::new(), Openai::new(key)))
+}

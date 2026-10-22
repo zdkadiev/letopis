@@ -18,3 +18,5 @@ pub fn assert_error(result: Result<Option<ParsedFile>, Vec<Diagnostic>>, want: D
         "expected {want:?}, got {errors:?}"
     );
 }
+
+pub mod embedding;
