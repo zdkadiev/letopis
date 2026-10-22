@@ -1,6 +1,6 @@
 use super::{
     connection::map_sqlite,
-    query::{Project, build_query},
+    query::{Meta, Project, Schemas, build_query},
 };
 use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256},
@@ -36,12 +36,14 @@ impl<'a> SqliteRead<'a> {
                 error,
             )
         })?;
+        let (sql, values) = build_query(
+            Query::select()
+                .column(Meta::ConfigIdentity)
+                .from((Schemas::Vec, Meta::Table))
+                .and_where(Expr::col(Meta::Id).eq(1)),
+        )?;
         let identity: Option<String> = transaction
-            .query_row(
-                "SELECT config_identity FROM vec.meta WHERE id=1",
-                [],
-                |row| row.get(0),
-            )
+            .query_row(&sql, params_from_iter(values), |row| row.get(0))
             .optional()
             .map_err(map_sqlite)?;
         let config_identity = identity

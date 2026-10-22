@@ -10,6 +10,84 @@ pub(super) enum Project {
     Revision,
 }
 
+#[derive(Clone, Copy, Iden)]
+pub(super) enum Nodes {
+    Table,
+    RowId,
+    Id,
+    Kind,
+    Uri,
+    Hash,
+    CreatedAt,
+    SourceSnapshot,
+    LineStart,
+    LineEnd,
+    SearchHash,
+}
+#[derive(Clone, Copy, Iden)]
+pub(super) enum Edges {
+    Table,
+    SourceId,
+    TargetId,
+    Type,
+}
+#[derive(Clone, Copy, Iden)]
+pub(super) enum Files {
+    Table,
+    Path,
+    Size,
+    MtimeNs,
+    Inode,
+    Hash,
+    CheckedAtNs,
+    Valid,
+    Error,
+}
+#[derive(Clone, Copy, Iden)]
+pub(super) enum TextIndex {
+    Table,
+    Rowid,
+    Text,
+}
+
+#[derive(Clone, Copy, Iden)]
+pub(super) enum Schemas {
+    Vec,
+}
+#[derive(Clone, Copy, Iden)]
+pub(super) enum Meta {
+    Table,
+    Id,
+    ConfigIdentity,
+}
+#[derive(Clone, Copy, Iden)]
+pub(super) enum VectorKeys {
+    Table,
+    RowId,
+    SearchHash,
+}
+#[derive(Clone, Copy, Iden)]
+pub(super) enum VectorIndex {
+    Table,
+    Rowid,
+    Vector,
+}
+#[derive(Clone, Copy, Iden)]
+pub(super) enum EmbedFailures {
+    Table,
+    SearchHash,
+    Attempts,
+    Error,
+}
+#[derive(Clone, Copy, Iden)]
+pub(super) enum QueryErrorRow {
+    #[iden = "query_error"]
+    Table,
+    Id,
+    At,
+    Error,
+}
+
 pub(super) fn build_query(
     statement: &impl QueryStatementBuilder,
 ) -> StorageResult<(String, Vec<SqliteValue>)> {

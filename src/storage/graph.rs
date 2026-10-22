@@ -1,4 +1,7 @@
-use super::connection::map_sqlite;
+use super::{
+    connection::map_sqlite,
+    query::{Edges, Nodes, TextIndex, build_query},
+};
 use crate::{
     domain::{
         Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, LineRange, Sha256, SourceUri, TreeOid,
@@ -8,7 +11,24 @@ use crate::{
         StorageResult, StoredNode,
     },
 };
-use rusqlite::{Connection, OptionalExtension, Row, params};
+use rusqlite::{Connection, OptionalExtension, Row, params_from_iter};
+use sea_query::{Expr, ExprTrait, OnConflict, Order, Query, Value};
+
+pub(super) const SOURCE_KIND: &str = "source";
+const VERTEX_KIND: &str = "vertex";
+const METAVERTEX_KIND: &str = "metavertex";
+const NODE_COLUMNS: [Nodes; 9] = [
+    Nodes::Id,
+    Nodes::Kind,
+    Nodes::Uri,
+    Nodes::Hash,
+    Nodes::CreatedAt,
+    Nodes::SourceSnapshot,
+    Nodes::LineStart,
+    Nodes::LineEnd,
+    Nodes::SearchHash,
+];
+const EDGE_COLUMNS: [Edges; 3] = [Edges::SourceId, Edges::TargetId, Edges::Type];
 
 pub(super) fn map_invalid_value(
     error: impl std::error::Error + Send + Sync + 'static,
@@ -44,12 +64,30 @@ pub(super) fn map_mutation(error: rusqlite::Error) -> StorageError {
     }
 }
 pub(super) fn upsert_node(db: &Connection, node: &NodeMetadata) -> StorageResult<i64> {
+    let query = Query::insert()
+        .into_table(Nodes::Table)
+        .columns(NODE_COLUMNS)
+        .values(build_node_values(node)?.map(Expr::val))
+        .map_err(map_invalid_value)?
+        .on_conflict(
+            OnConflict::column(Nodes::Id)
+                .update_columns(NODE_COLUMNS.into_iter().skip(1))
+                .to_owned(),
+        )
+        .returning_col(Nodes::RowId)
+        .to_owned();
+    let (sql, values) = build_query(&query)?;
+    db.query_row(&sql, params_from_iter(values), |row| row.get(0))
+        .map_err(map_mutation)
+}
+
+fn build_node_values(node: &NodeMetadata) -> StorageResult<[Value; 9]> {
     let (id, kind, uri, hash, created, snapshot, lines, search) = match node {
         NodeMetadata::Knowledge(n) => (
             n.id.as_str(),
             match n.kind {
-                ElementKind::Vertex => "vertex",
-                ElementKind::Metavertex => "metavertex",
+                ElementKind::Vertex => VERTEX_KIND,
+                ElementKind::Metavertex => METAVERTEX_KIND,
             },
             n.uri.as_str(),
             Some(n.hash.to_hex()),
@@ -60,7 +98,7 @@ pub(super) fn upsert_node(db: &Connection, node: &NodeMetadata) -> StorageResult
         ),
         NodeMetadata::Source(n) => (
             n.uri.as_str(),
-            "source",
+            SOURCE_KIND,
             n.uri.as_str(),
             n.hash.map(|h| h.to_hex()),
             n.created_at,
@@ -71,27 +109,30 @@ pub(super) fn upsert_node(db: &Connection, node: &NodeMetadata) -> StorageResult
     };
     let start = lines.map(|r| check_unsigned(r.get_start())).transpose()?;
     let end = lines.map(|r| check_unsigned(r.get_end())).transpose()?;
-    db.query_row(
-        "INSERT INTO nodes(id,kind,uri,hash,created_at,source_snapshot,line_start,line_end,search_hash)
-         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)
-         ON CONFLICT(id) DO UPDATE SET kind=excluded.kind,uri=excluded.uri,
-         hash=excluded.hash,created_at=excluded.created_at,source_snapshot=excluded.source_snapshot,
-         line_start=excluded.line_start,line_end=excluded.line_end,search_hash=excluded.search_hash
-         RETURNING row_id",
-        params![id,kind,uri,hash,check_unsigned(created)?,snapshot,start,end,search],
-        |row| row.get(0),
-    ).map_err(map_mutation)
+    Ok([
+        id.into(),
+        kind.into(),
+        uri.into(),
+        hash.into(),
+        check_unsigned(created)?.into(),
+        snapshot.into(),
+        start.into(),
+        end.into(),
+        search.into(),
+    ])
 }
 pub(super) fn read_node(db: &Connection, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
-    db.query_row(
-        "SELECT row_id,id,kind,uri,hash,created_at,source_snapshot,line_start,line_end,search_hash
-         FROM nodes WHERE id=?1",
-        [id.as_str()],
-        |row| Ok(decode_node(row)),
-    )
-    .optional()
-    .map_err(map_sqlite)?
-    .transpose()
+    let (sql, values) = build_query(
+        Query::select()
+            .column(Nodes::RowId)
+            .columns(NODE_COLUMNS)
+            .from(Nodes::Table)
+            .and_where(Expr::col(Nodes::Id).eq(id.as_str())),
+    )?;
+    db.query_row(&sql, params_from_iter(values), |row| Ok(decode_node(row)))
+        .optional()
+        .map_err(map_sqlite)?
+        .transpose()
 }
 fn decode_node(row: &Row<'_>) -> StorageResult<StoredNode> {
     let id: String = row.get(1).map_err(map_sqlite)?;
@@ -110,7 +151,7 @@ fn decode_node(row: &Row<'_>) -> StorageResult<StoredNode> {
         .map(Sha256::parse)
         .transpose()
         .map_err(map_invalid_value)?;
-    let metadata = if kind == "source" {
+    let metadata = if kind == SOURCE_KIND {
         if id != uri || snapshot.is_some() || search.is_some() {
             return Err(build_invalid_metadata_error());
         }
@@ -122,8 +163,8 @@ fn decode_node(row: &Row<'_>) -> StorageResult<StoredNode> {
         })
     } else {
         let kind = match kind.as_str() {
-            "vertex" => ElementKind::Vertex,
-            "metavertex" => ElementKind::Metavertex,
+            VERTEX_KIND => ElementKind::Vertex,
+            METAVERTEX_KIND => ElementKind::Metavertex,
             _ => return Err(build_invalid_metadata_error()),
         };
         NodeMetadata::Knowledge(KnowledgeMetadata {
@@ -163,30 +204,39 @@ fn decode_lines(start: Option<i64>, end: Option<i64>) -> StorageResult<Option<Li
     }
 }
 pub(super) fn insert_edge(db: &Connection, edge: &Edge) -> StorageResult<()> {
-    db.execute(
-        "INSERT INTO edges(source_id,target_id,type) VALUES(?1,?2,?3)",
-        params![
-            edge.get_source().as_str(),
-            edge.get_target().as_str(),
-            edge.get_edge_type().as_str()
-        ],
-    )
-    .map_err(map_mutation)?;
+    let (sql, values) = build_query(
+        Query::insert()
+            .into_table(Edges::Table)
+            .columns(EDGE_COLUMNS)
+            .values(
+                [
+                    edge.get_source().as_str(),
+                    edge.get_target().as_str(),
+                    edge.get_edge_type().as_str(),
+                ]
+                .map(Expr::val),
+            )
+            .map_err(map_invalid_value)?,
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
     Ok(())
 }
 pub(super) fn list_edges(
     db: &Connection,
     source: Option<&KnowledgeId>,
 ) -> StorageResult<Vec<Edge>> {
-    let mut stmt = db
-        .prepare(
-            "SELECT source_id,target_id,type FROM edges
-         WHERE ?1 IS NULL OR source_id=?1 ORDER BY source_id,target_id,type",
-        )
-        .map_err(map_sqlite)?;
-    let mut rows = stmt
-        .query([source.map(KnowledgeId::as_str)])
-        .map_err(map_sqlite)?;
+    let mut query = Query::select();
+    query.columns(EDGE_COLUMNS).from(Edges::Table);
+    if let Some(source) = source {
+        query.and_where(Expr::col(Edges::SourceId).eq(source.as_str()));
+    }
+    for column in EDGE_COLUMNS {
+        query.order_by(column, Order::Asc);
+    }
+    let (sql, values) = build_query(&query)?;
+    let mut stmt = db.prepare(&sql).map_err(map_sqlite)?;
+    let mut rows = stmt.query(params_from_iter(values)).map_err(map_sqlite)?;
     let mut edges = Vec::new();
     while let Some(row) = rows.next().map_err(map_sqlite)? {
         let source: String = row.get(0).map_err(map_sqlite)?;
@@ -209,17 +259,34 @@ pub(super) fn list_edges(
     Ok(edges)
 }
 pub(super) fn delete_outgoing(db: &Connection, source: &KnowledgeId) -> StorageResult<()> {
-    db.execute("DELETE FROM edges WHERE source_id=?1", [source.as_str()])
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(Edges::Table)
+            .and_where(Expr::col(Edges::SourceId).eq(source.as_str())),
+    )?;
+    db.execute(&sql, params_from_iter(values))
         .map_err(map_mutation)?;
     Ok(())
 }
 pub(super) fn delete_node(db: &Connection, id: &EdgeTarget) -> StorageResult<()> {
-    db.execute(
-        "DELETE FROM text_index WHERE rowid IN (SELECT row_id FROM nodes WHERE id=?1)",
-        [id.as_str()],
-    )
-    .map_err(map_mutation)?;
-    db.execute("DELETE FROM nodes WHERE id=?1", [id.as_str()])
+    let node = Query::select()
+        .column(Nodes::RowId)
+        .from(Nodes::Table)
+        .and_where(Expr::col(Nodes::Id).eq(id.as_str()))
+        .to_owned();
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(TextIndex::Table)
+            .and_where(Expr::col(TextIndex::Rowid).in_subquery(node)),
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(Nodes::Table)
+            .and_where(Expr::col(Nodes::Id).eq(id.as_str())),
+    )?;
+    db.execute(&sql, params_from_iter(values))
         .map_err(map_mutation)?;
     Ok(())
 }
