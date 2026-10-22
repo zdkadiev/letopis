@@ -1,6 +1,6 @@
 # TK-11 — Реализовать CLI-процесс, блокировки и JSON
 
-> **Статус:** blocked
+> **Статус:** in_progress
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 4 / 6 / 10 (best / expected / worst)
@@ -71,6 +71,28 @@
 **Риск и действие:** Отсоединённый запуск drain на обеих ОС и интеграция готового TK-13; обработанная отмена остаётся TK-29. Зафиксировать воспроизводимый failing case и ограничить исправление указанной границей; если требуется смена принятого дизайна или работа выходит за worst — поставить blocked, вернуть решение на соответствующий gate и пересчитать план. Ожидание оборудования/весов не маскировать рабочими часами.
 
 ## 9. Отчёт о выполнении
+
+**Текущий checkpoint Task 5, 2026-10-22.** Пользователь разрешил интеграцию готового
+TK-13 `06dc8a18` в TK-11. Отдельный merge `f5611e2` сохраняет обе истории;
+реальный drain подключён в `521276a`. [Полный отчёт](../../../../checks/TK-11/report.md#task-5-combined-production-drain--2026-10-22)
+содержит разрешение конфликтов, принятые rulings, RED/GREEN, receipt hashes и границы.
+
+Оба новых host/Linux ARM64 runner выполняют полный `./scripts/check-rust.sh`:
+348 корневых тестов PASS, 0 FAIL, 4 ignored (3 запускаемых родителями helper entrypoints;
+исторический 60-секундный provider deadline не повторялся). Отдельно проходят
+12 сценариев настоящего product drain и runtime/lock observers. Все четыре итоговых
+receipt inventory совпадают по 124 входам; последующая документационная правка
+отражена отдельным overlay, исходные manifests не менялись.
+
+Критерий реального drain подтверждают `cli_drain` в `task5-host-final` и
+`task5-linux-final/container`: HTTP, вектор по hash, отсутствие работы, конкуренция,
+исчерпание попыток, config/text races и смерть процессов. Критерий идемпотентности
+подтверждает `direct_product_drain_accepts_eof_and_reuses_vectors_after_lost_response`
+и сохранность cache revision/корпуса/Git index/refs. Обе финальные галочки остаются
+открытыми до независимого Task 5 и итогового review ветки. Реальные inspect/check
+остаются TK-12/TK-19; их unavailable-маршруты не запускают embeddings.
+
+Следующие записи относятся к более ранним checkpoint и не меняют текущий статус.
 
 **2026-10-22 — подготовка по Superpowers, реализация ещё не начата.** Созданы отдельные ветка `TK-11` и native worktree `/Users/zdkadiev/.codex/worktrees/tk-11/letopis` от `main`/`origin/main` на `12c5ad0c9f25e9a13f41a072fcac9570ff42ae75`. Базовый `./scripts/check-rust.sh` завершился с exit 0: fmt/compiler/Clippy и 172 Rust tests PASS, 0 failures; outer ignored child запускается родительскими process tests. Это проверка исходной базы, не приёмка ещё не созданного CLI.
 

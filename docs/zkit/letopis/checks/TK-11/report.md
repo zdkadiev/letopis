@@ -1,6 +1,11 @@
-# TK-11 Task 4 runtime acceptance — 2026-10-22
+# TK-11 runtime acceptance — 2026-10-22
 
-**Status: Task 4 implemented and verified; TK-11 remains partial.** Real drain
+Current implementation checkpoint: [Task 5 combined production drain](#task-5-combined-production-drain--2026-10-22)
+is implemented and verified on macOS/Linux ARM64; independent Task 5 and whole-branch
+reviews remain pending. The Task 4 material below is historical and retains its
+original source revisions and meaning.
+
+**Historical Task 4 status: implemented and verified; TK-11 was partial.** Real drain
 acceptance stays open for Task 5 after authorized integration of completed TK-13.
 Real inspect/check semantics remain TK-12/TK-19. No task/issue completion, merge,
 push, or integration of the parallel worktree is claimed.
@@ -144,17 +149,219 @@ specification and code-quality review with no Critical/Important findings. Tasks
 1–3 also passed their scoped gates; the final whole-branch review remains pending
 with Task 5. Evidence totals and scope above are unchanged.
 
-One Minor finding is deferred to that final review: `tests/cli/negative_controls.py`
-currently assumes `target/debug/examples/cli_runtime_fixture`; an inherited
-`CARGO_BUILD_TARGET` changes Cargo's artifact directory. Resolve the control's
-executable through Cargo JSON. It fails closed and does not invalidate the captured
-runs, which used no explicit build target.
+Historical Task 4 review follow-up: one Minor finding was deferred to final review:
+`tests/cli/negative_controls.py` assumed `target/debug/examples/cli_runtime_fixture`;
+an inherited `CARGO_BUILD_TARGET` changes that directory. It failed closed and did
+not invalidate those no-explicit-target receipts. Task 5 below resolves M1.
 
-Task 5 was not started. The read-only dependency checkpoint found TK-13 at
-`00bb62a1e68b6b5e837b2775bdc307b7d8918d18`: its committed card/report still state
-`in_progress`, pending its independent Task 5 and final whole-branch reviews.
-TK-13 is absent from this integration tree. The approved plan additionally requires
-authorized integration and forbids an implicit merge/rebase. Resume after the
-completed TK-13 is available through that gate, reconcile the shared filesystem
-and service contracts, then execute real-drain and combined-tree acceptance. No
-final TK-11 completion or publication is claimed.
+At that historical checkpoint Task 5 had not started. TK-13 was
+`00bb62a1e68b6b5e837b2775bdc307b7d8918d18`, still pending its independent reviews,
+and absent from the integration tree. Authorized integration of its completed
+implementation was required. That dependency was subsequently satisfied below;
+the earlier evidence is not reclassified.
+
+## Task 5 combined production drain — 2026-10-22
+
+**Implementation verified; independent Task 5 and whole-branch acceptance pending.**
+The final TK-11 checkboxes remain open until those reviews. Product inspect/check
+are still unavailable and remain owned by TK-12/TK-19; the fixture foreground is
+an integration consumer of the real launcher, never the embedding executor.
+
+### Source and integration mapping
+
+- TK-11 pre-merge base: `382dad5f986bedc43247c8de512728752eb01bce`.
+- Completed, authorized TK-13 input: `06dc8a18b117759d15507dd49f9922387488768d`;
+  its reviewed runtime is `bcd405c`. TK-13's historical receipts are unchanged.
+- Separate merge: `f5611e253baa6a506b41f059f66dfcd6e597354d`, preserving both parents.
+  The merge baseline passed the full host gate: 333 root tests, zero failures,
+  four ignored entries; eight additional filtered nested passes are separate.
+- Product implementation: `521276a5bf1fb67c04d744413a0f7368ca2d5d2b`
+  (`feat(cli): connect production embedding drain`). Evidence names the merge
+  base plus the exact dirty source inventory; every tested technical input is
+  identical to this implementation commit. Documentation overlay is detailed below.
+
+The integrated public contracts remain `Embeddings::read_configuration() ->
+EmbeddingResult<ConfigState>`, `Embeddings::drain() -> EmbeddingResult<DrainOutcome>`
+and `StorageRead::read_next_embedding_work(identity, max_attempts, after) ->
+StorageResult<VectorOutcome<Option<EmbeddingWork>>>`. `EmbeddingTasks` is implemented
+on that same `EmbeddingService`: readiness synchronizes the existing configuration,
+reads one eligible durable row and releases its view; missing/invalid configuration
+and changed identity mean no work. Storage failure remains a safe typed error.
+The drain wrapper explicitly invokes `Embeddings::drain(self)` and maps Complete,
+AlreadyRunning, Unavailable and ConfigChanged to clean completion without acquiring
+another lock. No config/JCS, HTTP, retry, selection or vector-publication algorithm
+was copied into the CLI runtime.
+
+`open_embedding_tasks` discovers the Git root and uses the pinned service directory
+with `SqliteStorage::open_confined`. `run_cli` binds only the real drain; unavailable
+read commands never refresh or launch. The foreground test consumer refreshes via
+`Documents::refresh`, then invokes real readiness and `open_background` with the
+Cargo-resolved product executable. Product executable discovery remains exclusively
+`current_exe`; the fixture override is test-only. The direct drain consumes the
+already published projection and owns no index lock. HTTP executes outside SQL
+transactions, demonstrated by publishing text and resetting identity while the
+provider response is blocked.
+
+### Conflict resolutions and accepted rulings
+
+All eleven conflicts were reconciled by responsibility, not by choosing one branch
+wholesale: both dependency/runner input sets; both application model/trait sets;
+one Markdown codec with TK-13's public parser type; both constructors in `lib.rs`;
+TK-10's confined SQLite initialization with TK-13's read-only cache attachment and
+work/pruning operations; one concrete filesystem and one persistent guard.
+
+The filesystem retains TK-11 std lock/try_lock, EINTR handling, PID-after-ownership,
+no unlink, one-shot macOS creation fallback, no-follow/nonblocking/CLOEXEC flags,
+inode checks and hardlink protection. TK-13 confined config/document reads,
+replacement/deletion checks and restrictive service modes remain. Its
+`EmbeddingFiles::try_lock_embed` delegates to `EmbedLocks`, preserving one guard.
+
+Two controller rulings are carried into this persistent record:
+
+1. Reject lock descriptors with link count other than one before PID mutation,
+   including revalidation under acquired ownership. Ordinary hardlinked corpus
+   reads remain valid. A deliberately hardlinked lock setup fails safely and needs
+   separate private lock files.
+2. Ordinary/unavailable CLI composition retains lazy service-directory creation;
+   the embedding constructor explicitly establishes its pinned directory before
+   returning. One `OnceCell<File>` retains the directory because the existing
+   filesystem operations initialize through `&self`; this is descriptor lifetime
+   state, not a second filesystem/cache subsystem. No-directory and replaced-directory
+   regressions both pass.
+
+The merged explicit storage fixture initially left cache WAL sidecars because its
+read-only cache attachment outlived the last writable cache connection. Field drop
+order now closes that attachment first. New regressions verify confined vector
+pruning, read-only cache access, final sidecar cleanup and a symlink introduced
+immediately before cache ATTACH. The symlink safety oracle was retained unchanged.
+
+The first concurrent-creation test hung because an error before its second barrier
+stranded the peer. Assertions now occur after the barrier while retaining the guard.
+A later host gate exposed the exact error: the config-read helper required two
+stable absence observations, so legitimate first-lock creation between them failed.
+Lock opening now uses one no-follow stat, followed by CREATE|EXCL and opened-inode
+checks. Observed existing deletion/replacement still fails; config/document stable
+reads are unchanged. A deterministic peer-creation schedule and both original
+mutation/deletion suites pass. This correction belongs to the implementation commit,
+not the earlier merge baseline.
+
+Auto-review rejected the initial broad scripted rewrite and two larger filesystem
+resolution patches because preservation was not sufficiently visible. No rejected
+write executed. Small field/method patches first preserved both contracts, then
+removed exact superseded definitions. A module patch was also rejected for apparently
+removing `mod local`; showing the complete retained declaration resolved it. No
+human permission workaround or out-of-worktree writes were used.
+
+### Product behavior and validation
+
+The twelve `cli_drain` scenarios use the actual product executable and real Documents,
+SQLite, provider/parser/filesystem and background composition:
+
+- Detached HTTP arrival, matching-hash stored vector, empty eligible backlog and
+  process completion; competing product exits while the first HTTP call is blocked.
+- Foreground response/EOF before HTTP completion; killed foreground does not cancel
+  detached work. Direct EOF drain exits 0, and repeating after discarded stdout
+  preserves corpus bytes, Git index/refs, cache revision and vectors.
+- Missing/invalid configuration or no eligible rows suppresses the lock probe/spawn;
+  exhausted attempts do not restart. Formatting preserves existing JCS identity.
+- Provider failure consumes the checked durable budget, persists only a safe error
+  and does not leak fixture secrets into headers/output. Config reset during HTTP
+  discards stale results through the actual TK-13 publication guard.
+- New text can publish during HTTP and requires its own hash/vector; old unreferenced
+  vectors are pruned. Stale live text is skipped before HTTP/reservation. SIGKILL
+  releases the persistent lock and retains the reserved attempt.
+- Unsafe automatic database paths fail without modifying external files; unavailable
+  check/inspect never trigger otherwise-ready embeddings.
+
+Two additional unit regressions verify readiness performs no provider/document work,
+releases its read before another storage unit, and preserves a durable-read error.
+The separate `cli_drain`/`support/drain` files keep these scenarios cohesive instead
+of enlarging transport-only tests. Prior local filesystem tests were extracted
+unchanged into `filesystem/document_tests.rs` under the same module paths; incoming
+TK-13 tests remain in `local_tests.rs`. Production filesystem code is about 500 lines.
+
+All commands ran in the TK-11 worktree; `python` below is the isolated
+`.artifacts/tk11/python-env/bin/python` (3.12.0, jsonschema 4.26.0).
+
+| Command / receipt | Result |
+|---|---|
+| `cargo test --locked --offline --test cli_drain -- --nocapture`, before binding | RED 101: actual detached product never reaches provider barrier |
+| Same executable oracle after binding and conforming fixture response | GREEN, 1 passed; later expanded to 12 real-product scenarios |
+| `python -B -m unittest discover -s tests/cli -p test_runner.py` | 8 passed |
+| `python -B tests/cli/run.py --platform host --evidence .artifacts/tk11/task5-host-final` | PASS, exit 0 |
+| `python -B tests/cli/run.py --platform linux --evidence .artifacts/tk11/task5-linux-final` | PASS, exit 0; container removed |
+| `CARGO_BUILD_TARGET=aarch64-apple-darwin python -B tests/cli/negative_controls.py --evidence .artifacts/tk11/task5-controls-final` | Both compile; intended RED 101; exact restoration; GREEN 0 |
+| `RUSTDOCFLAGS='-D warnings' cargo doc --locked --offline --no-deps` | PASS, exit 0 |
+
+Both platform runners execute the complete `./scripts/check-rust.sh` on the actual
+combined product: **348 root tests passed, zero failed, four ignored** on each.
+Three ignores are explicitly parent-driven child entrypoints (filesystem lock,
+document publication, embedding process). The fourth is
+`attempt_obeys_real_sixty_second_deadline`: the unchanged TK-13 real 60-second proof
+is deliberately not rerun or claimed for this combined revision. Host logs also
+contain six successful filtered nested runs; Linux contains eight. They are not
+added to the 348 root total. Dedicated observers additionally pass 31 CLI unit,
+25 lock, five process, three executable and twelve actual-drain tests per platform.
+Successful injected check/inspect output is labelled separately. Actual drain
+success envelopes are validated against the exact X-1 command schema.
+
+Host: macOS 26.6.2 ARM64. Linux: glibc 2.36, kernel 7.0.0-22-generic, ARM64,
+Python 3.11.2, Git 2.39.5. Both use Rust 1.95.0; Linux image dependencies are prepared
+before `docker run --network none`. Each receipt contains exact argv/stdin/exit,
+stdout/stderr, versions and executable copies/hashes. The final host, Linux outer,
+Linux inner and controls manifests have **124 identical input hashes**.
+
+Product SHA-256: host `5ba9167f76ce61d34decaf6f001bf0a90366185c4dfeb323f2c9a1b1d13cd494`;
+Linux `11f666606cea435ed756119b28f525b587ba9407931c9dabaf133f2377aaec87`.
+Controls retain their Task 4 behavioral oracles: inherited pipes fail foreground EOF;
+removed kernel exclusion admits a second owner. Deferred Minor M1 is addressed:
+both normal/negative-control runners resolve fixture paths from Cargo JSON, proven
+with an explicit build target and a Python artifact-path regression.
+
+### Receipts, development failures and limits
+
+Paths below are relative to ignored `.artifacts/tk11/`; all raw receipts remain
+separate from historical Task 4/TK-13 evidence.
+
+| Receipt | SHA-256 |
+|---|---|
+| `task5-merge/check-rust-3.log` | `7bd1fc35dc2aff5ef49dcddfc6ff33968f20c6b1a329dc907fb2ba2f087f6409` |
+| `task5/real-drain-red.log` | `8851659c7787d5d8ee396fa84514af0ab04a927f96cb8faa0597f6358345e5af` |
+| `task5/real-drain-green-2.log` | `29e2965457dc3ec187fa945535faa10e9f3014df8a994f50308b8962bd577bd7` |
+| `task5-host-final/manifest.json` | `a3b4acc1f9e2a9f5c4e7d91a6a061e8de4be16ba555987c1c850ef07f1dc7440` |
+| `task5-host-final/root-check.log` | `80016d5bb74ddc563c98b881e14dfa900cfec9db3a5aec55574ef8695ab2b498` |
+| `task5-linux-final/manifest.json` | `e98f1a7561311a8540fa47cf283587dd5543091e32e2d99bf12f6b103ae7b41c` |
+| `task5-linux-final/container/manifest.json` | `d5b7050920d0f0860f503f334e885484aea1a2a03dd2add54637f0bd1fdc0029` |
+| `task5-linux-final/container/root-check.log` | `3c8e746f082af49ee3fa4516cbc7c5fed6d465f625f73c4987ce036d9cc08357` |
+| `task5-controls-final/manifest.json` | `01182204854fb36852686dab992781286fea94942c7fa278a9af5a1c091bc785` |
+| `task5/python-runner.log` | `71a537aef125596c506fc198fe2106030138a73970195a66e4f780d99cfe0e4f` |
+
+Development failures are preserved, not acceptance: merge `check-rust.log` caught
+WAL lifetime; `check-rust-2.log` was terminated when the old barrier assertion hung;
+`task5-host` caught the actual lock-observation race. Pre-fix `task5-linux` and
+`task5-controls` passed but are superseded by final receipts. The initial HTTP
+fixture omitted required Ollama `model`; the existing provider correctly persisted
+`invalid embedding response` (`real-drain-observation.log`). Correcting that fixture,
+not provider behavior, produced `real-drain-green-2.log`. Development Clippy findings
+(unused shared test helpers/import and needless owned Output) were corrected before
+the final platform gates. No failing/partial receipt is counted as acceptance.
+
+After all four final snapshots completed, documentation alone was updated.
+`task5/documentation-overlay.json` records old/new hashes for this report, spec,
+plan, card and `tests/cli/README.md`; only that README differs among the 124 captured
+inputs. All remaining 123 inputs, including every product/test/build/runner input,
+remain identical. Original manifests/hashes were not rewritten. Documentation
+consistency/link checks and the overlay verification cover this prose-only delta.
+
+Self-review checked actual modules, visibility, imports, one parser/filesystem/guard,
+confined storage and `lib.rs` constructor wiring, thin CLI handlers/main, error/privacy
+mapping and synchronous execution. No known scoped correctness issue remains.
+Independent Task 5 and whole-branch review are still required. Engram/progress are
+controller-owned; no graph mutation, main merge, push or GitHub operation was done
+by this implementer. The primary checkout and exact TK-13 worktree were untouched.
+
+Limits: product provider tests use controlled loopback Ollama, not real model quality;
+no x86_64/Windows/NFS, target RAM/latency, physical power loss or handled TK-29 SIGINT
+claim. Detached completion allows a terminated Linux zombie pending PID 1 reaping;
+direct product calls verify exit 0. Unchanged historical harnesses with separate
+manifests and the historical 60-second provider deadline were not rerun.

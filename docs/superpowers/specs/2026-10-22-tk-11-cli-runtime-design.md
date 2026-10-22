@@ -143,3 +143,25 @@ non-blocking control-runner artifact-path finding is retained in the
 Tasks 1–4 are accepted as scoped increments. Task 5 and the whole-branch gate remain
 open: the latest read-only TK-13 checkpoint is not finally reviewed/completed and
 is absent from this tree. The accepted integration gate remains unchanged.
+
+## Task 5 implementation checkpoint — 2026-10-22
+
+The historical gate above was satisfied by the user's authorized integration of
+completed TK-13 `06dc8a18`; merge `f5611e2` preserves both histories. Implementation
+`521276a` binds the existing EmbeddingService to the real drain and uses confined
+automatic storage. The [combined report](../../zkit/letopis/checks/TK-11/report.md#task-5-combined-production-drain--2026-10-22)
+records the exact API mapping, conflict resolutions and source/evidence hashes.
+
+Both macOS/Linux ARM64 full root gates pass (348 root tests; nested helper counts
+separate), plus twelve real-product drain scenarios and compiling controls. No
+second configuration/provider/executor or lock implementation was introduced.
+Hardlinked coordination files still fail before PID mutation; ordinary hardlinked
+documents remain readable. Ordinary composition remains lazy, while embedding
+construction explicitly pins its service directory; one OnceCell retains that
+descriptor for existing &self operations. These controller rulings preserve both
+accepted source contracts. Deferred Task 4 Minor M1 is addressed by Cargo artifact
+JSON resolution and an explicit-target control run.
+
+Final Task 5 and whole-branch review remain pending; this is implementation evidence,
+not final task acceptance. Real inspect/check remain TK-12/TK-19. The unchanged
+historical 60-second deadline proof and separate-manifest harnesses were not rerun.
