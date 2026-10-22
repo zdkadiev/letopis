@@ -1,0 +1,120 @@
+# TK-11 — CLI process, locks and JSON
+
+Status: written design for user review. The user approved the new worktree/branch, TK-11/TK-13 ownership split, and check/inspect task-card corrections on 2026-10-22. The independent builder check identified only the now-resolved ownership question. Approval of this complete written design is the next Superpowers gate; no product code or dependency changes have been made.
+
+## Intent and starting state
+
+Expose the existing synchronous Letopis application through a short-lived CLI process, preserving the hexagonal boundaries and the X-1 JSON contract. A command refreshes published document metadata where required, calls an application service, emits one JSON envelope and exits. A detached invocation of the same executable drains embeddings without making the foreground command wait for inference. There is no server, persistent worker, process registry or async runtime.
+
+- Branch: `TK-11`.
+- Native managed worktree: `/Users/zdkadiev/.codex/worktrees/tk-11/letopis`.
+- Base: `12c5ad0c9f25e9a13f41a072fcac9570ff42ae75`, equal to fetched `origin/main` at start.
+- Existing product: Markdown/domain, immutable Git snapshots, SQLite storage and document refresh/publication. No product CLI or inspect/check service implementation exists at this base.
+- Baseline: `./scripts/check-rust.sh`, exit 0; formatting, compiler, Clippy and 172 passing Rust tests, zero failures. One outer process-test child is ignored by the default harness and explicitly invoked by its parent tests.
+- Baseline receipt: `.artifacts/tk11/start/check-rust.log`, SHA-256 `d1d0af4382ddd010ed95bb401cbb502b0f7496774cd4163f494551b58ef1c909`.
+- The primary checkout's existing `.gitignore` edit (`skills-lock.json`) and the active TK-13 worktree remain untouched.
+
+## Design authority
+
+Read with:
+
+- [TK-11 task](../../zkit/letopis/roadmap/epics/EP-1-thin-slice/tasks/TK-11-cli-runtime.md).
+- [Program structure](../../zkit/letopis/architecture.md#program-structure) and [structural review](../../zkit/letopis/architecture.md#program-structure-review).
+- [Decisions](../../zkit/letopis/decisions.md), especially D-93 through D-96 and D-98 through D-101.
+- [Mechanics](../../zkit/letopis/mechanics.md), especially MC-2 publication and MC-5 process/drain ownership.
+- [X-1 CLI](../../zkit/letopis/contracts/X-1-cli.md), its [JSON schema](../../zkit/letopis/contracts/schemas/X-1-cli.yaml), and [I-11 diagnostics](../../zkit/letopis/contracts/I-11-diagnostics.md).
+- [I-12 snapshot](../../zkit/letopis/contracts/I-12-snapshot.md), [X-3 Git](../../zkit/letopis/contracts/X-3-git.md), and [X-4 Markdown](../../zkit/letopis/contracts/X-4-markdown.md).
+- [TK-4 findings](../../zkit/letopis/checks/TK-4/findings.md), [TK-6 review](../../zkit/letopis/checks/TK-6/review.md), and [TK-10 specification](2026-10-22-tk-10-change-detection-design.md).
+- [TK-12](../../zkit/letopis/roadmap/epics/EP-1-thin-slice/tasks/TK-12-search.md), [TK-13](../../zkit/letopis/roadmap/epics/EP-1-thin-slice/tasks/TK-13-embeddings.md), [TK-14](../../zkit/letopis/roadmap/epics/EP-1-thin-slice/tasks/TK-14-thin-slice.md), [TK-19](../../zkit/letopis/roadmap/epics/EP-2-knowledge/tasks/TK-19-check-renames.md), and [TK-24](../../zkit/letopis/roadmap/epics/EP-2-knowledge/tasks/TK-24-inspect.md) for ownership boundaries.
+- [Agent rules](../../../AGENTS.md) and [development checks](../../development.md).
+
+The canonical design wins over implementation convenience. Keep historical evidence pinned to its original source; baseline tests are not evidence for a new CLI.
+
+## Accepted ownership split
+
+The user accepted: TK-11 builds CLI, JSON and detached process launching; TK-13 owns configuration and the real embedding executor. Connect the completed TK-13 service for actual drain acceptance. Do not duplicate its configuration validation/JCS implementation, HTTP clients, work selection, attempts, vector publication or provider logic in TK-11.
+
+The corrected TK-11 card explicitly reuses config identity from TK-13. Treat this as reuse/integration, with one implementation and one exact dependency version. Do not cherry-pick, merge, rebase or edit the other worktree without corresponding authorization. Main may receive its completed work independently; any combined tree needs its own verification.
+
+A process-fixture test can establish detachment, descriptor isolation and lock exclusion before the real executor is available. It cannot establish that production embedding work drains. Preserve the latter acceptance item as pending until real integration succeeds.
+
+## CLI boundary
+
+`src/main.rs` is a thin entry point into the assembly in `src/lib.rs`. Parse argv with `std`, not clap: command names and their documented flags are argv, the command-specific object is JSON on stdin. Unknown commands, flags, surplus positional arguments, malformed input, extra JSON values, wrong types and unknown object fields fail as `invalid_request` with exit 1. Strict DTOs use serde `deny_unknown_fields`; do not deserialize a general command wrapper absent from X-1.
+
+Implement the current CLI boundary for check/inspect and the internal drain command. Their consumer-driven interfaces and typed transport tests are a TK-11 deliverable; no dummy business service is introduced. Search/traverse, full reindex/status and future lifecycle commands retain their roadmap owners. Do not return empty fake inspection/check results or claim a command is operational merely because its parser accepts it.
+
+Builder call for review: until a concrete read/check service is wired by its owning task, a recognized and valid check/inspect request fails closed with the existing `internal_error` envelope and a fixed safe message that the operation is unavailable in this build. It never returns `ok:true`, runs a fake business service or creates a new error code. Parsing failures still return `invalid_request` before service dispatch. This is an incremental-build limitation, not a change to the final X-1 contract or acceptance of the missing command. Remove the unavailable route when TK-12/TK-19 supplies the real service. The real embedding route must similarly remain unavailable until TK-13 is connected; a fixture child is test-only.
+
+For public commands, require the documented JSON object; `{}` is the empty request. Do not invent numerical payload limits, a global execution deadline, environment config loading or a help/version protocol as part of TK-11.
+
+Builder call for review: the internal `embed --drain` invocation accepts empty stdin as the empty internal request because its fd 0 is `/dev/null` by the accepted runtime design. If an explicit JSON body is supplied, validate it as the strict empty object. This exception does not extend to public command payloads.
+
+## Responses and diagnostics
+
+Normal completion emits one complete X-1 JSON value plus newline, with no progress or subprocess output on stdout. `ok:true` has `result` and exits 0; `ok:false` has one `error` with `code`, `message`, `details` and exits 1. Optional nonempty `warnings` contains safe per-call diagnostics; a drain spawn failure is a warning, does not undo the foreground result and is not persisted.
+
+Use the existing error catalogue: `invalid_request`, `not_found`, `validation_failed`, `embedding_failed`, `internal_error`, `cancelled`. Do not add unsupported-command or conflict error codes. Map typed service errors at the CLI boundary; retain useful internal causes without serializing raw knowledge, subprocess/provider payloads, environment keys or authorization headers. No catch-all mapping may turn a real storage/Git failure into a successful empty result.
+
+The response writer owns normal stdout emission. It should be usable by the later TK-29 once-guard/cancellation implementation without introducing a second writer or success-exit path after cancellation. Handled SIGINT and its signal-hook thread remain TK-29; this task does not claim `cancelled` behavior from default signal death. The X-1 guarantee after forced termination remains explicitly limited.
+
+## Refresh, locks and detached execution
+
+Commands whose accepted semantics require refresh call `Documents::refresh` before serving. Keep its locked redetection and atomic publication intact. CLI handlers do not acquire index.lock around a service that already owns it; double locking is not extra safety. Check/inspect output must be produced by services, never by direct CLI access to SQLite, filesystem adapters or Git subprocesses.
+
+Extend the concrete filesystem capability only as required for the two persistent lock files. Use the chosen `std::fs::File::lock`/`try_lock` semantics; retain descriptor-relative safe opening, no-follow/nonregular checks, persistent inode identity, restrictive creation modes and the macOS create-race regression from TK-10. Write the owner's PID only after acquiring the kernel lock. File existence or PID text is not ownership. Release through RAII and never unlink the lock file. Do not change unrelated current file-read safety behavior while replacing the flock call.
+
+For a command eligible to trigger embedding work:
+
+1. Obtain configuration readiness and whether eligible current work exists through the application service boundary, reusing TK-13.
+2. If work is absent or configuration is unavailable, do not create useless detached processes or make inference requests.
+3. Probe embed.lock with try-lock. If busy, a drain is already running. If free, release the probe before spawn.
+4. Launch the current executable with exact argv `embed --drain`, repository-root cwd and inherited environment. Use process APIs, never shell interpolation or a PID registry.
+5. In the child, create the detached session using `libc::setsid` and redirect fd 0/1/2 to `/dev/null`. Any pre-exec operation must obey Rust's post-fork safety requirements; report setup/spawn failure safely to the parent.
+6. The foreground command does not wait for HTTP or draining. The child independently reopens service dependencies, tries embed.lock, exits successfully if another drain won, otherwise processes work and exits when eligible work is exhausted.
+
+Two successful probes may race; child lock acquisition resolves that race. Do not inherit the parent's SQLite connections or a live lock guard into a drain. Close-on-exec handling and detached process tests must prove the foreground can exit independently and its output pipes reach EOF.
+
+TK-13 owns the drain's lock for its entire execution. Agree the shared capability during integration; do not acquire the same lock again in the CLI handler. No queue/seq table, process daemon, retry scheduler or async runtime is introduced.
+
+## Physical responsibility boundaries
+
+- `domain/` remains pure; do not put JSON/process/I/O state there.
+- `service/mod.rs` owns small consumer-driven interfaces and necessary typed requests/results. Concrete orchestration belongs beside its own struct/impl in a responsibility-named file.
+- `cli/` owns argv/JSON DTOs, dispatch, handlers and rendering. Handlers call service interfaces. Split files by actual responsibility, avoiding a file for every trivial helper.
+- `filesystem/` owns confined paths and persistent lock implementations.
+- A process implementation file, placed by its actual runtime responsibility during planning, owns spawn/setsid/null-fd behavior and implements the application interface. It does not invoke storage or provider adapters directly.
+- `lib.rs` constructs the concrete adapters, services and handlers; declarations/reexports alone do not count as assembly.
+- `main.rs` forwards process I/O/argv into that assembly and returns the selected exit status.
+
+Use the pinned Rust toolchain and project Rust conventions: explicit imports, verb-form methods, meaningful local constants, focused functions aiming at 40 lines and no more than 60, typed failures, minimal visibility and Arrange/Act/Assert tests. Add no speculative future interfaces or generic plugin/framework abstraction. The exact signatures and smallest useful physical file set are builder choices to freeze in the implementation plan in the implementation plan; the task ownership below is settled.
+
+## Accepted delivery boundaries
+
+The independent builder check identified a circular ownership statement: TK-11 demanded real inspect acceptance while assigning its algorithm to TK-12, which depends on TK-11. On 2026-10-22 the user explicitly approved correcting the cards and continuing Superpowers with this resolution:
+
+- TK-11 owns CLI/JSON/processes/locks and contract tests that call the service interfaces with clearly labelled test doubles. This does not establish real read/check business behavior.
+- TK-12 owns the real basic inspect service and product-binary acceptance: refresh, common Git snapshot, metadata-only output and failures. Full batch/source inspect remains TK-24.
+- TK-19 owns full check and its real product-binary acceptance after refresh. Earlier parsing/publication remains TK-7/TK-10 and graph rules remain TK-18. Do not silently move the full checker into TK-11 or claim it complete here.
+- TK-13 owns config/JCS/providers/executor. TK-11's real drain acceptance remains pending until the completed service is connected and the combined path is verified. It is not waived or replaced by process fixtures.
+
+All three task cards carry the matching work, acceptance and handoff text. TK-19 explicitly consumes TK-11. No TK-11 dependency on unfinished read algorithms is introduced. The final X-1 wire/behavior contract is unchanged; subsequent owners satisfy the missing production routes rather than inheriting fabricated successful behavior.
+
+## Verification and acceptance
+
+| Area | Required evidence |
+|---|---|
+| Input/output | Actual executable, one parsed JSON value, correct exit 0/1, malformed/unknown/type/trailing input and argv rejection; output validated against X-1 |
+| Service dispatch | Typed requests reach service interfaces; no CLI direct-adapter calls; distinguish injected interface checks from real service execution |
+| Real check/inspect | Not a TK-11 success claim: TK-12 performs real basic inspect acceptance; TK-19 performs full check acceptance. TK-11 proves strict parsing, service dispatch, safe envelope and explicit unavailable-route failure before integration |
+| Idempotence | Repeat after losing a response preserves corpus bytes and Git user refs/index; unchanged refresh does not republish |
+| Locks | Real multi-process index/embed exclusion, occupied probe, owner death, stable lock inode and stale PID, std File lock interoperability on macOS/Linux |
+| Spawn | Same executable, setsid/session isolation, null fds 0/1/2, parent output EOF/exit independent of child, spawn failure warning, no shell |
+| Real drain | Pending TK-13 integration: missing vectors trigger a real drain; a competing drain exits; queue empties and process exits; no success inferred from a fixture-only child |
+| Composition | Actual lib.rs constructor calls, thin main/handlers, inward imports, minimal API, one concrete implementation per responsibility |
+
+Run `./scripts/check-rust.sh` on the changed product tree and focused executable/process checks. Exercise the changed path on macOS and Linux glibc ARM64 using isolated repositories/databases and controlled provider fixtures after TK-13 integration. Prepare dependencies before an offline Linux run. Pin inputs, lockfile, commands, output/exit results and platform limits in `docs/zkit/letopis/checks/TK-11/report.md` and a separate ignored evidence directory. Existing TK-4/TK-6/TK-10 evidence informs the design but is not rerun or relabelled automatically.
+
+Meaningful negative controls should compile and fail at the intended behavioral oracle, then restore exact original source and pass. Prioritize an inherited-output-fd/detachment control and loss of kernel exclusion. No x86, target RAM/latency, actual model quality, physical power loss or full TK-29 cancellation evidence is promised here.
+
+No task is marked done with fake or pending acceptance. Record the actual dependency and remaining work explicitly. The user-approved card correction resolves the builder check's only question. Present this complete written design, including the two labelled builder calls (internal drain EOF and unavailable incremental routes), for user review before Superpowers writing-plans. The next plan fixes concrete interfaces/files, RED/GREEN checks and integration evidence, then receives its own review/execution-method selection before implementation. No product code, dependency installation, merge, push or issue publication happens at this brainstorming stage.
