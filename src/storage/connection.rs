@@ -1,6 +1,6 @@
 use super::native::register_vec1;
 use crate::service::{StorageError, StorageErrorKind, StorageResult};
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::{Connection, ErrorCode, OpenFlags};
 use rustix::{
     fd::{AsFd, BorrowedFd},
     fs::{AtFlags, FileType, Mode, OFlags, Stat, fstat, open, statat},
@@ -9,11 +9,20 @@ use rustix::{
 #[cfg(test)]
 use std::cell::RefCell;
 use std::{
+    error::Error,
     fs,
     path::{Path, PathBuf},
-    time::Duration,
+    thread,
+    time::{Duration, Instant},
 };
 
+#[cfg(test)]
+thread_local! {
+    pub(super) static ON_INITIALIZATION_CONTENTION: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
+}
+
+const INITIALIZATION_WAIT: Duration = Duration::from_secs(5);
+const INITIALIZATION_RETRY: Duration = Duration::from_millis(1);
 const MIN_SQLITE_VERSION: i32 = 3_051_003;
 const VEC1_VERSION_PREFIX: &str = "version 0.8";
 pub(super) const CACHE_DATABASE: &str = "cache.db";
@@ -123,6 +132,41 @@ pub(super) fn map_sqlite(error: rusqlite::Error) -> StorageError {
         StorageErrorKind::InternalError,
         "storage database operation failed",
         error,
+    )
+}
+
+// Only schema creation and WAL initialization/readiness use this bounded lock wait.
+// The five-second budget applies to each call, not the entire open or command.
+// Ordinary cache/vector writes retain the connection's zero busy timeout.
+pub(super) fn wait_for_initialization<T>(
+    mut operation: impl FnMut() -> StorageResult<T>,
+) -> StorageResult<T> {
+    let started = Instant::now();
+    loop {
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(error)
+                if is_initialization_contention(&error)
+                    && started.elapsed() < INITIALIZATION_WAIT =>
+            {
+                #[cfg(test)]
+                if let Some(hook) = ON_INITIALIZATION_CONTENTION.take() {
+                    hook();
+                }
+                thread::sleep(INITIALIZATION_RETRY);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn is_initialization_contention(error: &StorageError) -> bool {
+    let cause = error
+        .source()
+        .and_then(|cause| cause.downcast_ref::<rusqlite::Error>());
+    matches!(
+        cause.and_then(rusqlite::Error::sqlite_error_code),
+        Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
     )
 }
 
@@ -245,11 +289,7 @@ fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()
     connection
         .pragma_update(None, "foreign_keys", "ON")
         .map_err(map_sqlite)?;
-    let journal: String = connection
-        .query_row(&format!("PRAGMA {schema}.journal_mode=WAL"), [], |row| {
-            row.get(0)
-        })
-        .map_err(map_sqlite)?;
+    let journal = initialize_journal(connection, schema)?;
     connection
         .execute_batch(&format!("PRAGMA {schema}.synchronous=FULL;"))
         .map_err(map_sqlite)?;
@@ -284,6 +324,28 @@ fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()
         ));
     }
     Ok(())
+}
+
+fn initialize_journal(connection: &Connection, schema: &str) -> StorageResult<String> {
+    // The first read can encounter BUSY_RECOVERY during concurrent WAL startup.
+    // Already-ready databases only read their mode; no writer lock is requested.
+    wait_for_initialization(|| {
+        let journal = read_journal(connection, schema).map_err(map_sqlite)?;
+        if journal == "wal" {
+            return Ok(journal);
+        }
+        connection
+            .query_row(&format!("PRAGMA {schema}.journal_mode=WAL"), [], |row| {
+                row.get(0)
+            })
+            .map_err(map_sqlite)
+    })
+}
+
+fn read_journal(connection: &Connection, schema: &str) -> rusqlite::Result<String> {
+    connection.query_row(&format!("PRAGMA {schema}.journal_mode"), [], |row| {
+        row.get(0)
+    })
 }
 
 fn verify_capabilities(connection: &Connection) -> StorageResult<()> {

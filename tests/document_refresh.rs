@@ -4,7 +4,7 @@ use letopis::{
     open_documents,
     service::{DocumentErrorKind, Documents, NodeMetadata},
 };
-use std::{fs, os::unix::fs::symlink};
+use std::{fs, os::unix::fs::symlink, sync::Barrier, thread};
 use support::documents::{DocumentRepo, build_external, build_whole, get_target};
 
 #[test]
@@ -395,4 +395,33 @@ fn assert_database_symlink_rejected(name: &str) {
         assert!(!outside.path().join(format!("{name}-wal")).exists());
         assert!(!outside.path().join(format!("{name}-shm")).exists());
     }
+}
+
+#[test]
+fn simultaneous_document_openers_initialize_and_publish_once() {
+    // Arrange a virgin repository and coordinate both normal composition calls.
+    let repo = DocumentRepo::new();
+    let barrier = Barrier::new(2);
+    // Act: both callers open independently and refresh the same empty corpus.
+    let outcomes = thread::scope(|scope| {
+        let workers: Vec<_> = (0..2)
+            .map(|_| {
+                scope.spawn(|| {
+                    barrier.wait();
+                    open_documents(repo.get_root()).unwrap().refresh().unwrap()
+                })
+            })
+            .collect();
+        workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    // Assert: initialization succeeds for both; publication happens exactly once.
+    assert_eq!(
+        outcomes.iter().filter(|outcome| outcome.published).count(),
+        1
+    );
+    assert!(outcomes.iter().all(|outcome| outcome.revision == 1));
+    assert_eq!(repo.read_state().revision, 1);
 }

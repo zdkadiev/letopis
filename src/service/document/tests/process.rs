@@ -104,6 +104,11 @@ fn run_child() {
     stream.set_write_timeout(Some(WAIT)).unwrap();
     CONTROL.with_borrow_mut(|control| *control = Some(stream));
     checkpoint("connected");
+    if let Some(mode) = mode.strip_prefix("normal-") {
+        run_normal_service(&root, mode);
+        checkpoint("finished");
+        return;
+    }
     let mut service = build_service(&root);
     if mode == "hold" {
         let _guard = service.filesystem.lock_index().unwrap();
@@ -127,6 +132,77 @@ fn run_child() {
     }
     drop(service);
     checkpoint("finished");
+}
+
+fn run_normal_service(root: &Path, mode: &str) {
+    LocalFileSystem::configure_next_process_test(TIME, Box::new(|| checkpoint("contended")));
+    let mut service = crate::open_documents(root).unwrap();
+    checkpoint("opened");
+    let outcome = service.refresh().unwrap();
+    assert_eq!(outcome.published, mode != "noop");
+}
+
+#[test]
+fn normal_open_waits_at_index_lock_during_cache_write_then_redetects() {
+    // Arrange: the owner holds a real cache transaction, not just index.lock.
+    let fixture = Fixture::new();
+    fixture.edit(NEW);
+    let expected = fixture.build_expected(NEW, "BravoToken");
+    let mut owner = Worker::spawn(fixture.root.path(), "publish");
+    owner.reach("begun");
+    // Act: normal composition must open before the owner releases its SQLite writer.
+    let mut waiter = Worker::spawn(fixture.root.path(), "normal-noop");
+    waiter.reach("opened");
+    waiter.resume();
+    waiter.reach("contended");
+    owner.resume();
+    owner.finish();
+    waiter.resume();
+    waiter.finish();
+    // Assert: the waiter redetects the committed publication and does not republish.
+    assert_eq!(read_state(fixture.root.path()), expected);
+    fixture.assert_preserved(NEW);
+}
+
+#[test]
+fn normal_open_redetects_after_active_cache_writer_is_killed() {
+    // Arrange a real transaction with an old publication still visible.
+    let fixture = Fixture::new();
+    fixture.edit(NEW);
+    let mut owner = Worker::spawn(fixture.root.path(), "publish");
+    owner.reach("begun");
+    let mut waiter = Worker::spawn(fixture.root.path(), "normal-publish");
+    waiter.reach("contended");
+    // Act: change the file while waiting, then release the writer through SIGKILL.
+    fs::write(fixture.root.path().join("a.md"), LATEST).unwrap();
+    let expected = fixture.build_expected(LATEST, "CharlieToken");
+    owner.kill();
+    waiter.resume();
+    waiter.finish();
+    // Assert: only the newest complete publication becomes visible.
+    assert_eq!(read_state(fixture.root.path()), expected);
+    fixture.assert_preserved(LATEST);
+}
+
+#[test]
+fn normal_open_and_noop_finish_during_vector_write_and_held_index_lock() {
+    // Arrange independent live vector and kernel-lock owners.
+    let fixture = Fixture::new();
+    let mut owner = Worker::spawn(fixture.root.path(), "hold");
+    owner.reach("holding");
+    let mut storage = build_service(fixture.root.path()).storage;
+    let identity = Sha256::digest(b"model identity");
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+        panic!("identity changed");
+    };
+    unit.set_query_error(99, "uncommitted").unwrap();
+    // Act: normal composition and a no-op must finish with both owners still active.
+    Worker::spawn(fixture.root.path(), "normal-noop").finish();
+    // Assert: neither the cache nor the committed vector state was changed.
+    assert_eq!(read_state(fixture.root.path()), fixture.old);
+    assert_eq!(read_vectors(fixture.root.path()), fixture.vector_state);
+    drop(unit);
+    owner.kill();
 }
 
 struct Worker {

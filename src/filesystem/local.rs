@@ -24,10 +24,21 @@ const DIRECTORY_FLAGS: OFlags = OFlags::RDONLY
     .union(OFlags::DIRECTORY)
     .union(OFlags::NOFOLLOW)
     .union(OFlags::CLOEXEC);
+const LOCK_FILE_FLAGS: OFlags = OFlags::RDWR
+    .union(OFlags::NOFOLLOW)
+    .union(OFlags::NONBLOCK)
+    .union(OFlags::CLOEXEC);
 const FILE_FLAGS: OFlags = OFlags::RDONLY
     .union(OFlags::NOFOLLOW)
     .union(OFlags::NONBLOCK)
     .union(OFlags::CLOEXEC);
+
+#[cfg(test)]
+type ProcessTest = (i64, Box<dyn FnOnce() + Send>);
+#[cfg(test)]
+thread_local! {
+    static NEXT_PROCESS_TEST: RefCell<Option<ProcessTest>> = const { RefCell::new(None) };
+}
 
 pub(crate) struct LocalFileSystem {
     root: OwnedFd,
@@ -55,7 +66,7 @@ impl LocalFileSystem {
     pub(crate) fn open(root: &Path) -> DocumentResult<Self> {
         let root = open(root, DIRECTORY_FLAGS, Mode::empty())
             .map_err(|cause| fail_io("cannot open document root", cause))?;
-        Ok(Self {
+        let filesystem = Self {
             root,
             #[cfg(test)]
             test_time: None,
@@ -65,7 +76,21 @@ impl LocalFileSystem {
             before_open: RefCell::new(None),
             #[cfg(test)]
             on_contention: RefCell::new(None),
-        })
+        };
+        #[cfg(test)]
+        let filesystem = {
+            let mut filesystem = filesystem;
+            if let Some((time, hook)) = NEXT_PROCESS_TEST.take() {
+                filesystem.configure_process_test(time, hook);
+            }
+            filesystem
+        };
+        Ok(filesystem)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn configure_next_process_test(time: i64, hook: Box<dyn FnOnce() + Send>) {
+        NEXT_PROCESS_TEST.set(Some((time, hook)));
     }
 
     #[cfg(test)]
@@ -139,13 +164,14 @@ impl LocalFileSystem {
 
     fn open_lock_file(&self) -> DocumentResult<OwnedFd> {
         let directory = self.open_service_directory()?;
-        openat(
-            directory,
+        let created = openat(
+            &directory,
             INDEX_LOCK,
-            OFlags::RDWR | OFlags::CREATE | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            LOCK_FILE_FLAGS | OFlags::CREATE,
             Mode::RUSR | Mode::WUSR,
-        )
-        .map_err(|cause| fail_io("cannot open index lock", cause))
+        );
+        reopen_concurrently_created_lock(&directory, created)
+            .map_err(|cause| fail_io("cannot open index lock", cause))
     }
 
     fn acquire_lock(&self, file: &OwnedFd) -> DocumentResult<()> {
@@ -229,6 +255,18 @@ impl FileSystem for LocalFileSystem {
     }
 }
 
+fn reopen_concurrently_created_lock(
+    directory: &impl AsFd,
+    created: Result<OwnedFd, Errno>,
+) -> Result<OwnedFd, Errno> {
+    match created {
+        // macOS can report ENOENT when another caller wins O_CREAT|O_NOFOLLOW.
+        // Reopen once without creation; absent or unsafe names still fail closed.
+        Err(Errno::NOENT) => openat(directory, INDEX_LOCK, LOCK_FILE_FLAGS, Mode::empty()),
+        result => result,
+    }
+}
+
 fn observe_descriptor(file: &impl AsFd) -> DocumentResult<FileStat> {
     let stat = fstat(file).map_err(|cause| fail_io("cannot observe open document file", cause))?;
     build_file_stat(&stat)
@@ -286,15 +324,18 @@ fn fail_changed() -> DocumentError {
 
 #[cfg(test)]
 mod tests {
-    use super::LocalFileSystem;
+    use super::{LocalFileSystem, observe_descriptor, reopen_concurrently_created_lock};
     use crate::{domain::RepoPath, service::FileSystem};
-    use rustix::fs::{FlockOperation, flock};
+    use rustix::{
+        fs::{FlockOperation, flock, fstat},
+        io::Errno,
+    };
     use std::{
         fs,
         os::unix::fs::{MetadataExt, symlink},
         path::Path,
         process::Command,
-        sync::mpsc,
+        sync::{Barrier, mpsc},
         thread,
         time::Duration,
     };
@@ -428,6 +469,89 @@ mod tests {
         // Assert
         assert!(result.is_err());
         worker.join().unwrap();
+    }
+
+    #[test]
+    fn concurrent_first_lock_creation_preserves_one_regular_file() {
+        for _ in 0..20 {
+            // Arrange both callers before the persistent lock file exists.
+            let root = tempdir().unwrap();
+            let barrier = Barrier::new(2);
+            let inodes = thread::scope(|scope| {
+                let workers: Vec<_> = (0..2)
+                    .map(|_| {
+                        let filesystem = LocalFileSystem::open(root.path()).unwrap();
+                        let barrier = &barrier;
+                        scope.spawn(move || {
+                            barrier.wait();
+                            // Act: create/open and acquire the same persistent lock.
+                            let guard = filesystem.lock_index().unwrap();
+                            fstat(&guard.file).unwrap().st_ino
+                        })
+                    })
+                    .collect();
+                workers
+                    .into_iter()
+                    .map(|worker| worker.join().unwrap())
+                    .collect::<Vec<_>>()
+            });
+            // Assert: both calls succeed against exactly the same regular inode.
+            assert_eq!(inodes[0], inodes[1]);
+            assert_eq!(
+                fs::metadata(root.path().join(".letopis/index.lock"))
+                    .unwrap()
+                    .ino(),
+                inodes[0]
+            );
+        }
+    }
+
+    #[test]
+    fn missing_creation_reopens_existing_lock_without_replacing_it() {
+        // Arrange the observed race outcome: a competitor created the file.
+        let root = tempdir().unwrap();
+        let path = root.path().join("index.lock");
+        fs::write(&path, b"persistent owner state").unwrap();
+        let directory = fs::File::open(root.path()).unwrap();
+        let before = fs::metadata(&path).unwrap().ino();
+        // Act: select exactly the ENOENT creation-error path.
+        let reopened = reopen_concurrently_created_lock(&directory, Err(Errno::NOENT)).unwrap();
+        // Assert identity/bytes and no fallback for an unrelated creation error.
+        assert_eq!(observe_descriptor(&reopened).unwrap().inode, before);
+        assert_eq!(fs::read(&path).unwrap(), b"persistent owner state");
+        assert_eq!(
+            reopen_concurrently_created_lock(&directory, Err(Errno::ACCESS)).unwrap_err(),
+            Errno::ACCESS
+        );
+    }
+
+    #[test]
+    fn missing_creation_reopen_rejects_absent_and_unsafe_lock_names() {
+        for kind in ["absent", "symlink", "fifo", "directory"] {
+            // Arrange an absent or unsafe name under the same live directory fd.
+            let root = tempdir().unwrap();
+            let path = root.path().join("index.lock");
+            let directory = fs::File::open(root.path()).unwrap();
+            let outside = tempdir().unwrap();
+            let target = outside.path().join("untouched");
+            fs::write(&target, b"outside").unwrap();
+            match kind {
+                "symlink" => symlink(&target, &path).unwrap(),
+                "fifo" => create_fifo(&path),
+                "directory" => fs::create_dir(&path).unwrap(),
+                _ => {}
+            }
+            // Act: the fallback may open a FIFO, but the next regular-file check rejects it.
+            let result = reopen_concurrently_created_lock(&directory, Err(Errno::NOENT));
+            // Assert no creation, no following symlinks, no acceptance of nonregular files.
+            if let Ok(file) = result {
+                assert!(observe_descriptor(&file).is_err());
+            }
+            if kind == "absent" {
+                assert!(!path.exists());
+            }
+            assert_eq!(fs::read(&target).unwrap(), b"outside");
+        }
     }
 
     #[test]
