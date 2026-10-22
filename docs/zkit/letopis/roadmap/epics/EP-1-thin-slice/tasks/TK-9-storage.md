@@ -1,6 +1,6 @@
 # TK-9 — Реализовать служебную SQLite и storage ports
 
-> **Статус:** planned
+> **Статус:** done
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 6 / 10 / 16 (best / expected / worst)
@@ -17,6 +17,7 @@
 - **Структура программы и границы модулей:** [обязательные архитектурные правила](../../../../architecture.md#program-structure), включая [порядок проверки](../../../../architecture.md#program-structure-review).
 
 - План и расписание: [roadmap](../../../../roadmap.md).
+- [Спецификация TK-9](../../../../../../superpowers/specs/2026-10-22-tk-9-storage-design.md) одобрена пользователем; [план реализации](../../../../../../superpowers/plans/2026-10-22-tk-9-storage.md) одобрен 2026-10-22 с выбором Subagent-driven. Реализация началась в отдельном worktree TK-9.
 - Основание: E-1…E-7, E-9…E-11, B-2/B-3, MC-2/MC-3, D-96.
 - Покрывает: [FR-4, FR-13, FR-17, FR-29, FR-32, C-3, C-4, C-5](../../../../requirements.md).
 - [Требования и критерии системы](../../../../requirements.md).
@@ -39,12 +40,12 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Согласованные таблицы/ключи/CHECK, nodes/edges/source projection, FTS, files и vectors.db с embed_failures работают через порты; таблиц заданий и ошибок нет (D-95).
-- [ ] WAL/FULL/fullfsync/FK настроены.
-- [ ] vec1 работает из одного бинарника без файла расширения и без `load_extension`; версия и SHA-256 исходника vec1 совпадают с TK-1 (D-96).
-- [ ] raw документы/источники не копируются в БД.
+- [x] Согласованные таблицы/ключи/CHECK, nodes/edges/source projection, FTS, files и vectors.db с embed_failures работают через порты; таблиц заданий и ошибок нет (D-95).
+- [x] WAL/FULL/fullfsync/FK настроены.
+- [x] vec1 работает из одного бинарника без файла расширения и без `load_extension`; версия и SHA-256 исходника vec1 совпадают с TK-1 (D-96).
+- [x] raw документы/источники не копируются в БД.
 
-- [ ] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
+- [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
 ## 6. Как проверить
 
@@ -69,6 +70,6 @@
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
+Реализация и проверки завершены на source commit `60fc1f0cd9f4be62c62d486632cd52446a9c46a0`: 106 Rust tests, семь Python checks, strict Rustdoc, canonical-DDL parity, copied executable и negative controls прошли на macOS ARM64 и source-built Linux glibc ARM64 без сети. Критерии подтверждены [отчётом и evidence](../../../../checks/TK-9/report.md).
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+Все шесть независимых task reviews, whole-branch review и финальный scoped re-review завершены; четыре замечания исправлены, новых проблем нет. [Результат review и принятые решения](../../../../checks/TK-9/review.md). Итог записан в Engram, revision 77. Physical power loss, x86_64, resource/quality и полный CLI/publication/ranking/drain не заявлены. Merge/push/issue closure ожидают отдельного указания по доставке.

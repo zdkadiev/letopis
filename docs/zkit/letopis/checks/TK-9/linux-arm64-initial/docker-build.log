@@ -1,0 +1,67 @@
+#0 building with "avito" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 790B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#2 DONE 0.6s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 427B done
+#3 DONE 0.0s
+
+#4 [ 1/14] FROM docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#4 resolve docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1 0.0s done
+#4 CACHED
+
+#5 [ 2/14] RUN apt-get update && apt-get install -y --no-install-recommends git python3 && rm -rf /var/lib/apt/lists/*
+#5 CANCELED
+
+#6 [internal] load build context
+#6 transferring context: 299.37kB 0.3s done
+#6 DONE 0.3s
+
+#7 [ 4/14] WORKDIR /repo
+#7 CACHED
+
+#8 [ 3/14] RUN rustup component add rustfmt clippy
+#8 CACHED
+
+#9 [ 5/14] COPY Cargo.toml Cargo.lock rust-toolchain.toml clippy.toml build.rs ./
+#9 ERROR: failed to calculate checksum of ref ea0671a2-a683-4cae-82c3-d05c327838ff::hgzr6i7hrsq17qgebhvw3bnyy: "/build.rs": not found
+
+#10 [ 7/14] COPY src ./src
+#10 CACHED
+
+#11 [ 8/14] COPY examples ./examples
+#11 ERROR: failed to calculate checksum of ref ea0671a2-a683-4cae-82c3-d05c327838ff::hgzr6i7hrsq17qgebhvw3bnyy: "/examples": not found
+
+#12 [ 6/14] COPY vendor ./vendor
+#12 ERROR: failed to calculate checksum of ref ea0671a2-a683-4cae-82c3-d05c327838ff::hgzr6i7hrsq17qgebhvw3bnyy: "/vendor": not found
+
+#13 [ 9/14] COPY scripts ./scripts
+#13 ERROR: failed to calculate checksum of ref ea0671a2-a683-4cae-82c3-d05c327838ff::hgzr6i7hrsq17qgebhvw3bnyy: "/scripts": not found
+------
+ > [ 5/14] COPY Cargo.toml Cargo.lock rust-toolchain.toml clippy.toml build.rs ./:
+------
+------
+ > [ 6/14] COPY vendor ./vendor:
+------
+------
+ > [ 8/14] COPY examples ./examples:
+------
+------
+ > [ 9/14] COPY scripts ./scripts:
+------
+Dockerfile:9
+--------------------
+   7 |     COPY src ./src
+   8 |     COPY examples ./examples
+   9 | >>> COPY scripts ./scripts
+  10 |     COPY tests/*.rs ./tests/
+  11 |     COPY tests/support ./tests/support
+--------------------
+ERROR: failed to build: failed to solve: failed to compute cache key: failed to calculate checksum of ref ea0671a2-a683-4cae-82c3-d05c327838ff::hgzr6i7hrsq17qgebhvw3bnyy: "/scripts": not found
+
+View build details: docker-desktop://dashboard/build/avito/avito/odhgr6y68nntmqnw547bsjwvo

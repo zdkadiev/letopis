@@ -1,0 +1,73 @@
+[
+    {
+        "Id": "sha256:fc24635a1a3c77dc2104f3217f37d3ad562cadc743f7df86d4c9b653ce8f385e",
+        "RepoTags": [
+            "letopis-tk9-886493bde9a34eb7a1d3692572f658e2:latest"
+        ],
+        "RepoDigests": [],
+        "Comment": "buildkit.dockerfile.v0",
+        "Created": "2026-10-22T14:04:57.388452925+03:00",
+        "Config": {
+            "Env": [
+                "PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "RUSTUP_HOME=/usr/local/rustup",
+                "CARGO_HOME=/usr/local/cargo",
+                "RUST_VERSION=1.95.0"
+            ],
+            "Cmd": [
+                "python3",
+                "-B",
+                "tests/storage/run.py",
+                "--platform",
+                "host",
+                "--evidence",
+                "/receipt"
+            ],
+            "WorkingDir": "/repo",
+            "Labels": {
+                "org.opencontainers.image.source": "https://github.com/rust-lang/docker-rust"
+            },
+            "ArgsEscaped": true
+        },
+        "Architecture": "arm64",
+        "Os": "linux",
+        "Size": 1606465006,
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/mnt/lima-avito-disk/docker/overlay2/lpy1qviix5i2kcpqvi4g44me0/diff:/mnt/lima-avito-disk/docker/overlay2/oww4i92f6u2a2ms841yojmoec/diff:/mnt/lima-avito-disk/docker/overlay2/gt3ror0m3las4ql3d4la1q4rx/diff:/mnt/lima-avito-disk/docker/overlay2/bcsl9e50ibwm0khfwckbindv0/diff:/mnt/lima-avito-disk/docker/overlay2/54yih7pvol906j5je4k5jd3id/diff:/mnt/lima-avito-disk/docker/overlay2/jkhepl0gp1g5ozuuywg8rxxv5/diff:/mnt/lima-avito-disk/docker/overlay2/co103voj3rz6xie2o0hvmmgcj/diff:/mnt/lima-avito-disk/docker/overlay2/oizxnwzi95ulyhf3cjirneyy3/diff:/mnt/lima-avito-disk/docker/overlay2/pnc84tp719ho5v4jgu154slsb/diff:/mnt/lima-avito-disk/docker/overlay2/l8ow3n8bu9xsh216r03io12b4/diff:/mnt/lima-avito-disk/docker/overlay2/3eucm23ak4smpiu1wx7n4v0bg/diff:/mnt/lima-avito-disk/docker/overlay2/exfoaq9obxk37y9n7bo26m1ln/diff:/mnt/lima-avito-disk/docker/overlay2/isx9qazfr5v1q8r6xlfl4rs44/diff:/mnt/lima-avito-disk/docker/overlay2/hezaebhmi98wc8ou8q1nqdkkd/diff:/mnt/lima-avito-disk/docker/overlay2/509233891c951d4ac55f0da10eef33777c88f4a2d8f3e111314f143fe5b62e0a/diff:/mnt/lima-avito-disk/docker/overlay2/40988bffd3a446787d1ddc9bca7feaa1fb15314020e3513b2b93897856430cf5/diff:/mnt/lima-avito-disk/docker/overlay2/e3f997666d1e8dd1d386e6f72393eae342e3c4f2accee556cd0abea31b91b36e/diff:/mnt/lima-avito-disk/docker/overlay2/2bdea58bd82666fca1647bcec9299e47971ec5eeeda5b1fc0f1bd4608877fb81/diff:/mnt/lima-avito-disk/docker/overlay2/b72d71975fe8ca2ddc8433040c1be3e3a7785879578591b7756fc784be5e68ae/diff",
+                "MergedDir": "/mnt/lima-avito-disk/docker/overlay2/tayekdzsqqnlwk816t7f7ubsl/merged",
+                "UpperDir": "/mnt/lima-avito-disk/docker/overlay2/tayekdzsqqnlwk816t7f7ubsl/diff",
+                "WorkDir": "/mnt/lima-avito-disk/docker/overlay2/tayekdzsqqnlwk816t7f7ubsl/work"
+            },
+            "Name": "overlay2"
+        },
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:a1ea3521f7b82c7449178568397141f88a60345d3a93eeede3213346b4957488",
+                "sha256:f949a780fa7d2c3e6c1c5730764472c7343e36c5d8ab89d3b77b1117a5670095",
+                "sha256:76180d018a70275eac1e4e11e4bc62480b09cca9e0ccf87187c6db34e7c84790",
+                "sha256:d5fbff28e790d028fe61d655f2766359d2de4f30f984d1872a7038ec415a5625",
+                "sha256:7e45dbfbfc80b6a7ccc8250264b2854aa3e469dbbf0c0303b5b0286fc986342c",
+                "sha256:6940566616ef241223a3809db118abaa5da02a25d2df5613d957cf3653f3f860",
+                "sha256:981efa117a0f36093fc253b3ab6158236471fbe979f3cb3234fcf6cd56b1653c",
+                "sha256:333b7bea2f7e1d6ab622810e56b70bd9a56948769575e2d96605de81c04c2636",
+                "sha256:499e3cd2e2062bc567c31158e38616fa9282c8c79dd15e79d8f721c6c20e5a69",
+                "sha256:fd7de6b1e25f4bf85759e69218c68ab8780a8a4b616f3471bde288b68825d567",
+                "sha256:6faa2c103ec32b99dd0c018b8d9f725ad902db7cf40cfbb5a4280a6911a40cd7",
+                "sha256:dc3f088117aae11899f7c49e014d7b974ed6f51bfc7b3bc6c4d2db28f66e737d",
+                "sha256:6e086464261fa725a5ef33eb29274be8a5effccd58df5d6df9b6d535733f2aec",
+                "sha256:9f62a6a638c33faaa7f1f7ab74fa4a527430e0f40278e8752264bd5a3cb4b527",
+                "sha256:a74e8be2fabc306ecc507d81734f7ab87b5986193c4cdf8028be35c03c394dd4",
+                "sha256:1c2c758f44fee17c1bc3292382c7c3ed32ccd2176f0d0ae56cfacd98c6329ae5",
+                "sha256:c385db74b0c36084c21fc788fa45b12c1d232de715d095105e3050541160b282",
+                "sha256:41eae6a5ff36b160df7c3353b36bd2c1d6c749b377d74c2cac8881508e671716",
+                "sha256:9f810f3fe3e395c0fbf128bc53229c5d00f540476cf3b5eb8debb51873cebf5b",
+                "sha256:3521eca8414a26e1d53cc236379843abb1cc029d6249c9d3686879b6dea10e14"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2026-10-22T14:04:57.716761068+03:00"
+        }
+    }
+]

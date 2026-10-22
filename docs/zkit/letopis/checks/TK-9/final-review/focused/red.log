@@ -1,0 +1,89 @@
+test_git_preparation_failure_retains_command_exit_and_fail_receipt (test_runner.PreparationTests.test_git_preparation_failure_retains_command_exit_and_fail_receipt) ... FAIL
+test_hash_preparation_failure_retains_fail_receipt (test_runner.PreparationTests.test_hash_preparation_failure_retains_fail_receipt) ... FAIL
+test_successful_git_preparation_records_both_commands (test_runner.PreparationTests.test_successful_git_preparation_records_both_commands) ... FAIL
+test_existing_evidence_directory_is_rejected (test_runner.RunnerTests.test_existing_evidence_directory_is_rejected) ... ok
+test_nonzero_command_prevents_pass_manifest (test_runner.RunnerTests.test_nonzero_command_prevents_pass_manifest) ... ok
+test_timeout_reaps_owned_process (test_runner.RunnerTests.test_timeout_reaps_owned_process) ... ok
+test_parity_accepts_current_schema_and_rejects_deliberate_drift (test_runner.SchemaParityTests.test_parity_accepts_current_schema_and_rejects_deliberate_drift) ... FAIL
+
+======================================================================
+FAIL: test_git_preparation_failure_retains_command_exit_and_fail_receipt (test_runner.PreparationTests.test_git_preparation_failure_retains_command_exit_and_fail_receipt)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-9/letopis/tests/storage/test_runner.py", line 74, in test_git_preparation_failure_retains_command_exit_and_fail_receipt
+    self.assertTrue((evidence / 'manifest.json').is_file(), result.stderr)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : fatal: not a git repository (or any of the parent directories): .git
+Traceback (most recent call last):
+  File "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmp5vn4nvjt/tests/storage/negative_controls.py", line 64, in <module>
+    main()
+    ~~~~^^
+  File "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmp5vn4nvjt/tests/storage/negative_controls.py", line 22, in main
+    commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+             ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['git', 'rev-parse', 'HEAD']' returned non-zero exit status 128.
+
+
+======================================================================
+FAIL: test_hash_preparation_failure_retains_fail_receipt (test_runner.PreparationTests.test_hash_preparation_failure_retains_fail_receipt)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-9/letopis/tests/storage/test_runner.py", line 63, in test_hash_preparation_failure_retains_fail_receipt
+    self.assertTrue((evidence / 'manifest.json').is_file(), result.stderr)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : Traceback (most recent call last):
+  File "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmpu9tbicwi/tests/storage/run.py", line 146, in <module>
+    main()
+    ~~~~^^
+  File "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmpu9tbicwi/tests/storage/run.py", line 121, in main
+    'inputs': hash_inputs(root), 'commands': COMMANDS}
+              ~~~~~~~~~~~^^^^^^
+  File "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmpu9tbicwi/tests/storage/run.py", line 50, in hash_inputs
+    return {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
+                                                     ~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py", line 777, in read_bytes
+    with self.open(mode='rb', buffering=0) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/private/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tmpu9tbicwi/Cargo.lock'
+
+
+======================================================================
+FAIL: test_successful_git_preparation_records_both_commands (test_runner.PreparationTests.test_successful_git_preparation_records_both_commands)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-9/letopis/tests/storage/test_runner.py", line 93, in test_successful_git_preparation_records_both_commands
+    self.assertEqual([c['exit_code'] for c in manifest['commands'][:2]], [0, 0])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [] != [0, 0]
+
+Second list contains 2 additional elements.
+First extra element 0:
+0
+
+- []
++ [0, 0]
+
+======================================================================
+FAIL: test_parity_accepts_current_schema_and_rejects_deliberate_drift (test_runner.SchemaParityTests.test_parity_accepts_current_schema_and_rejects_deliberate_drift)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zdkadiev/.codex/worktrees/tk-9/letopis/tests/storage/test_runner.py", line 112, in test_parity_accepts_current_schema_and_rejects_deliberate_drift
+    self.assertEqual(good.returncode, 0, good.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 2 != 0 : b"/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python: can't open file '/Users/zdkadiev/.codex/worktrees/tk-9/letopis/tests/storage/check_schema.py': [Errno 2] No such file or directory\n"
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.315s
+
+FAILED (failures=4)

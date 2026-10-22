@@ -1,0 +1,1 @@
+PASS: all eight Git/Markdown helper files preserve normalized token content except agreed module/type names.

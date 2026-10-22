@@ -1,0 +1,72 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/deps/letopis-fe8019bbed00dd43)
+
+running 1 test
+SQLite=3.53.2 vec1=version 0.8 (NEON, multi-threaded)
+journal_mode=wal
+synchronous=2
+foreign_keys=1
+test storage::native::tests::native_capabilities_match_pinned_stack ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.01s
+
+     Running tests/domain_values.rs (target/debug/deps/domain_values-2a4c12994e437823)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/git_retention.rs (target/debug/deps/git_retention-36c1c11f4b1419a1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+     Running tests/git_snapshots.rs (target/debug/deps/git_snapshots-53a6f8516fc84eb8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/markdown_elements.rs (target/debug/deps/markdown_elements-318347c1b54dce1b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/markdown_links.rs (target/debug/deps/markdown_links-ec869c9cc3e4099c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/markdown_search.rs (target/debug/deps/markdown_search-de3532881c825e7c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/storage_bootstrap.rs (target/debug/deps/storage_bootstrap-cfee7bb886e20f66)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+     Running tests/storage_cache.rs (target/debug/deps/storage_cache-b2f3f9a85eefdb6e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.00s
+
+     Running tests/storage_failures.rs (target/debug/deps/storage_failures-490716d2671b8ac6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/storage_vectors.rs (target/debug/deps/storage_vectors-e57cefcaa9b05345)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+

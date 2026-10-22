@@ -1,0 +1,26 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-9/letopis)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.89s
+     Running tests/storage_cache.rs (target/debug/deps/storage_cache-0ffadcf304b5dfa5)
+
+running 18 tests
+test late_fts_error_rolls_back_all_changes ... ok
+test dropped_unit_rolls_back ... ok
+test duplicate_edges_and_invalid_checks_are_rejected ... ok
+test caught_mutation_error_poisoned_unit_cannot_commit ... ok
+test fts_matches_use_native_score_then_id_without_candidate_limit ... ok
+test revision_overflow_rolls_back ... ok
+test source_missing_bytes_and_declared_targets_round_trip ... ok
+test cache_commit_preserves_node_row_id ... ok
+test contentless_fts_does_not_return_original_text ... ok
+test incoming_edges_survive_target_delete_and_reappear ... ok
+test empty_cache_publications_preserve_vector_identity_and_state ... ok
+test deleting_node_removes_fts_and_refuses_remaining_outgoing_edges ... ok
+test malformed_persisted_values_return_internal_errors ... ok
+test knowledge_and_source_optional_fields_survive_reopen ... ok
+test source_time_and_line_overflow_poison_the_unit ... ok
+test unsigned_values_do_not_wrap ... ok
+test valid_invalid_and_unmarked_file_rows_round_trip ... ok
+test source_projection_can_be_recomputed_and_removed ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+

@@ -1,0 +1,133 @@
+#0 building with "avito" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 790B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#2 DONE 0.5s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 557B done
+#3 DONE 0.0s
+
+#4 [ 1/14] FROM docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#4 resolve docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1 done
+#4 CACHED
+
+#5 [internal] load build context
+#5 transferring context: 683.62kB 0.2s done
+#5 DONE 0.2s
+
+#6 [ 2/14] RUN apt-get update && apt-get install -y --no-install-recommends git python3 && rm -rf /var/lib/apt/lists/*
+#6 0.275 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#6 0.499 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#6 0.579 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [34.8 kB]
+#6 0.653 Get:4 http://deb.debian.org/debian bookworm/main arm64 Packages [8689 kB]
+#6 1.442 Get:5 http://deb.debian.org/debian bookworm-updates/main arm64 Packages [6936 B]
+#6 1.513 Get:6 http://deb.debian.org/debian-security bookworm-security/main arm64 Packages [353 kB]
+#6 2.008 Fetched 9291 kB in 2s (4826 kB/s)
+#6 2.008 Reading package lists...
+#6 2.292 Reading package lists...
+#6 2.540 Building dependency tree...
+#6 2.613 Reading state information...
+#6 2.698 git is already the newest version (1:2.39.5-0+deb12u3).
+#6 2.698 python3 is already the newest version (3.11.2-1+b1).
+#6 2.698 python3 set to manually installed.
+#6 2.698 0 upgraded, 0 newly installed, 0 to remove and 76 not upgraded.
+#6 DONE 2.7s
+
+#7 [ 3/14] RUN rustup component add rustfmt clippy
+#7 0.173 info: downloading component rustfmt
+#7 1.148 info: downloading component clippy
+#7 DONE 2.3s
+
+#8 [ 4/14] WORKDIR /repo
+#8 DONE 0.0s
+
+#9 [ 5/14] COPY Cargo.toml Cargo.lock rust-toolchain.toml clippy.toml build.rs ./
+#9 DONE 0.0s
+
+#10 [ 6/14] COPY vendor ./vendor
+#10 DONE 0.0s
+
+#11 [ 7/14] COPY src ./src
+#11 DONE 0.0s
+
+#12 [ 8/14] COPY examples ./examples
+#12 DONE 0.0s
+
+#13 [ 9/14] COPY scripts ./scripts
+#13 DONE 0.0s
+
+#14 [10/14] COPY tests/*.rs ./tests/
+#14 DONE 0.0s
+
+#15 [11/14] COPY tests/support ./tests/support
+#15 DONE 0.0s
+
+#16 [12/14] COPY tests/fixtures/markdown ./tests/fixtures/markdown
+#16 DONE 0.0s
+
+#17 [13/14] COPY tests/storage ./tests/storage
+#17 DONE 0.0s
+
+#18 [14/14] RUN echo "b0a5aeaa0cd5c51bfbdb008cf1f3870b28c49b16" > SOURCE_COMMIT && cargo fetch --locked
+#18 0.132     Updating crates.io index
+#18 1.624  Downloading crates ...
+#18 1.911   Downloaded windows-link v0.2.1
+#18 1.967   Downloaded cfg-if v1.0.5
+#18 2.089   Downloaded cpufeatures v0.2.17
+#18 2.126   Downloaded fallible-streaming-iterator v0.1.9
+#18 2.129   Downloaded version_check v0.9.5
+#18 2.138   Downloaded block-buffer v0.10.4
+#18 2.142   Downloaded crypto-common v0.1.7
+#18 2.196   Downloaded errno v0.3.14
+#18 2.201   Downloaded itoa v1.0.18
+#18 2.204   Downloaded tempfile v3.23.0
+#18 2.210   Downloaded unicase v2.10.0
+#18 2.212   Downloaded generic-array v0.14.7
+#18 2.215   Downloaded fastrand v2.5.0
+#18 2.216   Downloaded pkg-config v0.3.34
+#18 2.223   Downloaded digest v0.10.7
+#18 2.224   Downloaded fallible-iterator v0.3.0
+#18 2.238   Downloaded find-msvc-tools v0.1.15
+#18 2.248   Downloaded shlex v2.0.1
+#18 2.249   Downloaded sha2 v0.10.9
+#18 2.251   Downloaded quote v1.0.47
+#18 2.266   Downloaded once_cell v1.21.4
+#18 2.271   Downloaded unicode-ident v1.0.27
+#18 2.281   Downloaded getrandom v0.3.4
+#18 2.285   Downloaded r-efi v5.3.0
+#18 2.289   Downloaded proc-macro2 v1.0.107
+#18 2.291   Downloaded ryu v1.0.23
+#18 2.293   Downloaded smallvec v1.16.3
+#18 2.294   Downloaded serde_core v1.0.228
+#18 2.296   Downloaded wit-bindgen v0.57.1
+#18 2.299   Downloaded serde_derive v1.0.228
+#18 2.300   Downloaded bitflags v2.13.2
+#18 2.313   Downloaded serde v1.0.228
+#18 2.326   Downloaded memchr v2.8.3
+#18 2.345   Downloaded typenum v1.20.1
+#18 2.352   Downloaded wasip2 v1.0.4+wasi-0.2.12
+#18 2.356   Downloaded pulldown-cmark v0.13.4
+#18 2.360   Downloaded cc v1.9.0
+#18 2.363   Downloaded rusqlite v0.40.2
+#18 2.368   Downloaded serde_json v1.0.145
+#18 2.382   Downloaded vcpkg v0.2.15
+#18 2.472   Downloaded syn v2.0.119
+#18 2.588   Downloaded rustix v1.1.5
+#18 2.607   Downloaded libc v0.2.191
+#18 2.882   Downloaded windows-sys v0.61.2
+#18 2.935   Downloaded linux-raw-sys v0.12.1
+#18 3.114   Downloaded libsqlite3-sys v0.38.2
+#18 DONE 3.3s
+
+#19 exporting to image
+#19 exporting layers
+#19 exporting layers 0.3s done
+#19 writing image sha256:48afb0f6f32b72bf39ff155b53563c843cc880fd6673fbc66c7c72ada8e5fd55 done
+#19 naming to docker.io/library/letopis-tk9-809f77896bdf40a5ac80849810111512 done
+#19 DONE 0.3s
+
+View build details: docker-desktop://dashboard/build/avito/avito/lrpz2rcgdwrohuvet1k7yiiqr

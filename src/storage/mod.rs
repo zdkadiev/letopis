@@ -1,0 +1,15 @@
+//! `SQLite` storage implementation; SQL and native handles remain private.
+mod connection;
+mod native;
+mod read;
+mod schema;
+mod sqlite;
+pub use sqlite::SqliteStorage;
+
+mod cache_write;
+mod files;
+mod fts;
+mod graph;
+
+mod vector_write;
+mod vectors;

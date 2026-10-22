@@ -1,0 +1,18 @@
+   Compiling letopis v0.0.0 (/Users/zdkadiev/.codex/worktrees/tk-9/letopis)
+error[E0432]: unresolved import `letopis::open_storage`
+ --> tests/storage_bootstrap.rs:1:5
+  |
+1 | use letopis::open_storage;
+  |     ^^^^^^^^^^^^^^^^^^^^^ no `open_storage` in the root
+
+error[E0432]: unresolved imports `letopis::service::Storage`, `letopis::service::StorageErrorKind`, `letopis::service::StorageRead`
+ --> tests/storage_bootstrap.rs:2:24
+  |
+2 | use letopis::service::{Storage, StorageErrorKind, StorageRead};
+  |                        ^^^^^^^  ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^ no `StorageRead` in `service`
+  |                        |        |
+  |                        |        no `StorageErrorKind` in `service`
+  |                        no `Storage` in `service`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `letopis` (test "storage_bootstrap") due to 2 previous errors

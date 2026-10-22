@@ -14,13 +14,13 @@ Work as a senior software engineer: understand the affected code and contracts, 
 The directory structure must reflect responsibilities and dependency boundaries:
 
 - `src/domain/`: pure entities, values, and rules; no filesystem, process, Git, SQL, HTTP, or CLI orchestration.
-- `src/service/`: concrete application services and their inbound interfaces; `src/service/ports/`: application-owned outbound traits. Services depend on domain types and contracts, not concrete adapters.
-- `src/adapters/`: separate technology modules for Git, storage, embedding, Markdown, and filesystem as their tasks implement them. Concrete adapter structs implement the relevant ports. Adapters do not orchestrate one another.
+- `src/service/`: application-owned traits and concrete application services. Define small interfaces in `service/mod.rs`; keep each concrete service struct and its implementations in a separate responsibility-named file. Services depend on domain types and their interfaces, not concrete technology implementations.
+- `src/git/`, `src/storage/`, `src/embedding/`, `src/markdown/`, and `src/filesystem/`: separate responsibility-named modules, introduced when their tasks implement them. Concrete structs implement the application-owned traits. These modules do not orchestrate one another.
 - `src/cli/`: argument parsing, dispatch, command handlers, and output formatting. Handlers convert input into typed requests and invoke service interfaces; business rules belong to services/domain. Handlers do not call storage/Git/embedding adapters directly.
 - `src/lib.rs`: composition root with actual constructor calls wiring adapters into services and services into handlers through interfaces. Module declarations and reexports alone are not composition.
 - `src/main.rs`, when introduced: thin CLI entry point using the assembly from `lib.rs`.
 
-Use `trait` for component contracts and concrete `struct`/`impl` for services and adapters. Keep implementation details private and expose only the necessary API. Add modules with real functionality; do not scaffold future subsystems or trivial forwarding services.
+Use `trait` for component interfaces and concrete `struct`/`impl` for implementations. Name types by responsibility or technology (`Storage`, `SqliteStorage`, `GitSnapshots`, `GitCli`), without `Port`/`Adapter` suffixes. Do not introduce `ports/`, `adapters/`, or `contracts/` directory layers. A module's `mod.rs` defines its interface, declares children, and explicitly reexports the necessary types. Put each concrete implementation's struct, inherent methods, and trait implementations together in its own file, for example `git/cli.rs` or `storage/sqlite.rs`; keep implementation bodies out of `mod.rs`. If interfaces grow, split them by responsibility into private files and reexport them from `mod.rs`. Keep implementation details private and expose only the necessary API. Add modules with real functionality; do not scaffold future subsystems or trivial forwarding services. These rules describe the target layout; the TK-9 plan must include moving the existing Git/Markdown modules and updating their imports.
 
 Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful helpers. Keep domain rules and technology-specific behavior in their owners; utilities must not bypass module boundaries.
 
