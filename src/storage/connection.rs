@@ -2,6 +2,7 @@ use super::native::register_vec1;
 use crate::service::{StorageError, StorageErrorKind, StorageResult};
 use rusqlite::{Connection, OpenFlags};
 use std::{
+    fmt::Write,
     fs,
     path::{Path, PathBuf},
     time::Duration,
@@ -99,7 +100,8 @@ pub(super) fn open_database(path: &Path) -> StorageResult<Connection> {
     register_vec1()?;
     let flags = OpenFlags::SQLITE_OPEN_READ_WRITE
         | OpenFlags::SQLITE_OPEN_CREATE
-        | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+        | OpenFlags::SQLITE_OPEN_NO_MUTEX
+        | OpenFlags::SQLITE_OPEN_URI;
     let connection = Connection::open_with_flags(path, flags).map_err(map_sqlite)?;
     connection
         .busy_timeout(Duration::ZERO)
@@ -120,6 +122,35 @@ pub(super) fn attach_vectors(connection: &Connection, path: &Path) -> StorageRes
         .execute("ATTACH DATABASE ?1 AS vec", [filename])
         .map_err(map_sqlite)?;
     configure_database(connection, "vec")
+}
+
+pub(super) fn attach_cache(connection: &Connection, path: &Path) -> StorageResult<()> {
+    let filename = path.to_str().ok_or_else(|| {
+        StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "invalid cache database path",
+        )
+    })?;
+    // Encode URI delimiters and UTF-8 bytes; only the absolute path's separators survive.
+    let mut uri = String::from("file:");
+    for byte in filename.bytes() {
+        if byte.is_ascii_alphanumeric() || b"/-._~".contains(&byte) {
+            uri.push(char::from(byte));
+        } else {
+            write!(&mut uri, "%{byte:02X}").map_err(|cause| {
+                StorageError::new_with_cause(
+                    StorageErrorKind::InternalError,
+                    "cache URI encoding failed",
+                    cause,
+                )
+            })?;
+        }
+    }
+    uri.push_str("?mode=ro");
+    connection
+        .execute("ATTACH DATABASE ?1 AS cache", [uri])
+        .map_err(map_sqlite)?;
+    Ok(())
 }
 
 fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()> {
@@ -189,7 +220,8 @@ fn verify_capabilities(connection: &Connection) -> StorageResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{attach_vectors, open_database};
+    use super::{attach_cache, attach_vectors, open_database};
+    use rusqlite::ErrorCode;
     use tempfile::TempDir;
 
     #[test]
@@ -214,6 +246,33 @@ mod tests {
         let connection = open_database(&cache).unwrap();
         attach_vectors(&connection, &vectors).unwrap();
         assert_policy(&connection, "vec");
+    }
+
+    #[test]
+    fn attached_cache_is_read_only_with_encoded_path_delimiters() {
+        // Arrange: delimiters, quotes and UTF-8 must name the literal file.
+        let root = TempDir::new().unwrap();
+        let cache = root.path().join("cache ?#%é' name.db");
+        let writer = open_database(&cache).unwrap();
+        writer.pragma_update(None, "user_version", 7).unwrap();
+        let vectors = open_database(&root.path().join("vectors")).unwrap();
+        // Act
+        attach_cache(&vectors, &cache).unwrap();
+        let version: i64 = vectors
+            .query_row("PRAGMA cache.user_version", [], |r| r.get(0))
+            .unwrap();
+        let error = vectors
+            .execute_batch("PRAGMA cache.user_version=8;")
+            .unwrap_err();
+        // Assert: the attached URI uses the intended database and rejects writes.
+        assert_eq!(version, 7);
+        assert_eq!(error.sqlite_error_code(), Some(ErrorCode::ReadOnly));
+        assert_eq!(
+            writer
+                .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+                .unwrap(),
+            7
+        );
     }
 
     fn assert_policy(connection: &rusqlite::Connection, schema: &str) {

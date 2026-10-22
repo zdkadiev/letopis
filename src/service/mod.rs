@@ -45,8 +45,8 @@ use crate::domain::{Edge, EdgeTarget, KnowledgeId, Sha256};
 mod model;
 pub use error::{StorageError, StorageErrorKind, StorageResult};
 pub use model::{
-    EmbeddingFailure, FileRow, KnowledgeMetadata, NodeMetadata, QueryError, SourceMetadata,
-    StoredNode, StoredVectorKey, TextMatch, VectorMatch, VectorOutcome,
+    EmbeddingFailure, EmbeddingWork, FileRow, KnowledgeMetadata, NodeMetadata, QueryError,
+    SourceMetadata, StoredNode, StoredVectorKey, TextMatch, VectorMatch, VectorOutcome,
 };
 
 /// Synchronous storage with exclusive scoped capabilities.
@@ -89,6 +89,24 @@ pub trait Storage {
 }
 /// Observations pinned within one read transaction.
 pub trait StorageRead {
+    /// Read the first eligible knowledge ID strictly after the optional cursor.
+    ///
+    /// # Errors
+    /// Rejects zero or unrepresentable attempt budgets; reports I/O or invalid data.
+    fn read_next_embedding_work(
+        &mut self,
+        expected: &Sha256,
+        max_attempts: u64,
+        after: Option<&KnowledgeId>,
+    ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>>;
+    /// Observe the native vector dimension under the pinned configuration identity.
+    ///
+    /// # Errors
+    /// Reports malformed native metadata or database failures.
+    fn read_vector_dimensions(
+        &mut self,
+        expected: &Sha256,
+    ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>>;
     /// Read typed metadata by normalized identity.
     ///
     /// # Errors
@@ -194,6 +212,12 @@ pub trait CacheWrite: Sized {
 
 /// Caller-owned atomic vector write; any failed mutation prevents commit.
 pub trait VectorWrite: Sized {
+    /// Remove vectors and failures absent from this transaction's cache observation.
+    /// Concurrent publication can leave recomputable missing vectors until next drain.
+    ///
+    /// # Errors
+    /// Reports database failures and prevents commit of a failed unit.
+    fn prune_unreferenced(&mut self) -> StorageResult<()>;
     /// Reserve one durable attempt within the caller's total budget.
     /// Commit before calling the provider; an unsent reservation still counts.
     ///

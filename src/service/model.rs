@@ -86,3 +86,10 @@ pub struct QueryError {
     pub at: u64,
     pub error: String,
 }
+
+/// One eligible knowledge row; equal search hashes can have several representatives.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmbeddingWork {
+    pub id: KnowledgeId,
+    pub search_hash: Sha256,
+}

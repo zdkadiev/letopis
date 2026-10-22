@@ -1,6 +1,6 @@
 use super::{
     cache_write::SqliteCacheWrite,
-    connection::{attach_vectors, open_database, prepare_paths},
+    connection::{attach_cache, attach_vectors, open_database, prepare_paths},
     read::SqliteRead,
     schema::{bootstrap_cache, bootstrap_vectors},
     vector_write::SqliteVectorWrite,
@@ -31,6 +31,7 @@ impl SqliteStorage {
         bootstrap_cache(&mut cache_writer)?;
         let mut vector_writer = open_database(&vectors)?;
         bootstrap_vectors(&mut vector_writer)?;
+        attach_cache(&vector_writer, &cache)?;
 
         let read = open_database(&cache)?;
         attach_vectors(&read, &vectors)?;
