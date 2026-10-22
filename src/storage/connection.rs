@@ -1,20 +1,172 @@
 use super::native::register_vec1;
 use crate::service::{StorageError, StorageErrorKind, StorageResult};
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::{Connection, ErrorCode, OpenFlags};
+use rustix::{
+    fd::{AsFd, BorrowedFd},
+    fs::{AtFlags, FileType, Mode, OFlags, Stat, fstat, open, statat},
+    io::Errno,
+};
+#[cfg(test)]
+use std::cell::RefCell;
 use std::{
+    error::Error,
     fs,
     path::{Path, PathBuf},
-    time::Duration,
+    thread,
+    time::{Duration, Instant},
 };
 
+#[cfg(test)]
+thread_local! {
+    pub(super) static ON_INITIALIZATION_CONTENTION: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
+}
+
+const INITIALIZATION_WAIT: Duration = Duration::from_secs(5);
+const INITIALIZATION_RETRY: Duration = Duration::from_millis(1);
 const MIN_SQLITE_VERSION: i32 = 3_051_003;
 const VEC1_VERSION_PREFIX: &str = "version 0.8";
+pub(super) const CACHE_DATABASE: &str = "cache.db";
+pub(super) const VECTOR_DATABASE: &str = "vectors.db";
+const DATABASE_OPEN_FLAGS: OpenFlags = OpenFlags::SQLITE_OPEN_READ_WRITE
+    .union(OpenFlags::SQLITE_OPEN_CREATE)
+    .union(OpenFlags::SQLITE_OPEN_NO_MUTEX);
+
+pub(super) struct ConfinedDirectory<'a> {
+    path: &'a Path,
+    pinned: BorrowedFd<'a>,
+    #[cfg(test)]
+    before_open: RefCell<Option<Box<dyn FnOnce()>>>,
+}
+impl<'a> ConfinedDirectory<'a> {
+    pub(super) fn new(path: &'a Path, pinned: &'a impl AsFd) -> Self {
+        Self {
+            path,
+            pinned: pinned.as_fd(),
+            #[cfg(test)]
+            before_open: RefCell::new(None),
+        }
+    }
+    pub(super) fn verify(&self) -> StorageResult<()> {
+        let directory = open(
+            self.path,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(map_path_error)?;
+        let current = fstat(&directory).map_err(map_path_error)?;
+        let pinned = fstat(self.pinned).map_err(map_path_error)?;
+        if !has_same_identity(&current, &pinned) {
+            return Err(fail_unsafe_path());
+        }
+        let cache = self.read_regular_stat(CACHE_DATABASE)?;
+        let vectors = self.read_regular_stat(VECTOR_DATABASE)?;
+        if let (Some(cache), Some(vectors)) = (cache, vectors)
+            && has_same_identity(&cache, &vectors)
+        {
+            return Err(fail_unsafe_path());
+        }
+        Ok(())
+    }
+
+    fn read_regular_stat(&self, name: &str) -> StorageResult<Option<Stat>> {
+        match statat(self.pinned, name, AtFlags::SYMLINK_NOFOLLOW) {
+            Ok(stat) if FileType::from_raw_mode(stat.st_mode) == FileType::RegularFile => {
+                Ok(Some(stat))
+            }
+            Ok(_) => Err(fail_unsafe_path()),
+            Err(Errno::NOENT) => Ok(None),
+            Err(error) => Err(map_path_error(error)),
+        }
+    }
+
+    pub(super) fn open_database(&self, name: &str) -> StorageResult<Connection> {
+        self.verify()?;
+        #[cfg(test)]
+        if let Some(hook) = self.before_open.take() {
+            hook();
+        }
+        // Keep the supplied path: canonicalization would hide the symlink from SQLite.
+        let connection = open_raw_database(
+            &self.path.join(name),
+            DATABASE_OPEN_FLAGS | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )?;
+        self.verify()?;
+        configure_connection(&connection)?;
+        Ok(connection)
+    }
+
+    pub(super) fn attach_vectors(&self, connection: &Connection) -> StorageResult<()> {
+        self.verify()?;
+        #[cfg(test)]
+        if let Some(hook) = self.before_open.take() {
+            hook();
+        }
+        // ATTACH inherits SQLITE_OPEN_NOFOLLOW from this directory's main connection.
+        attach_unconfigured_vectors(connection, &self.path.join(VECTOR_DATABASE))?;
+        self.verify()?;
+        configure_database(connection, "vec")
+    }
+}
+
+fn has_same_identity(left: &Stat, right: &Stat) -> bool {
+    left.st_dev == right.st_dev && left.st_ino == right.st_ino
+}
+
+fn fail_unsafe_path() -> StorageError {
+    StorageError::new(
+        StorageErrorKind::InvalidRequest,
+        "unsafe document storage path",
+    )
+}
+
+fn map_path_error(error: Errno) -> StorageError {
+    StorageError::new_with_cause(
+        StorageErrorKind::InvalidRequest,
+        "cannot validate document storage path",
+        error,
+    )
+}
 
 pub(super) fn map_sqlite(error: rusqlite::Error) -> StorageError {
     StorageError::new_with_cause(
         StorageErrorKind::InternalError,
         "storage database operation failed",
         error,
+    )
+}
+
+// Only schema creation and WAL initialization/readiness use this bounded lock wait.
+// The five-second budget applies to each call, not the entire open or command.
+// Ordinary cache/vector writes retain the connection's zero busy timeout.
+pub(super) fn wait_for_initialization<T>(
+    mut operation: impl FnMut() -> StorageResult<T>,
+) -> StorageResult<T> {
+    let started = Instant::now();
+    loop {
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(error)
+                if is_initialization_contention(&error)
+                    && started.elapsed() < INITIALIZATION_WAIT =>
+            {
+                #[cfg(test)]
+                if let Some(hook) = ON_INITIALIZATION_CONTENTION.take() {
+                    hook();
+                }
+                thread::sleep(INITIALIZATION_RETRY);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn is_initialization_contention(error: &StorageError) -> bool {
+    let cause = error
+        .source()
+        .and_then(|cause| cause.downcast_ref::<rusqlite::Error>());
+    matches!(
+        cause.and_then(rusqlite::Error::sqlite_error_code),
+        Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
     )
 }
 
@@ -96,20 +248,30 @@ fn has_same_file(cache: &Path, vectors: &Path) -> StorageResult<bool> {
 }
 
 pub(super) fn open_database(path: &Path) -> StorageResult<Connection> {
-    register_vec1()?;
-    let flags = OpenFlags::SQLITE_OPEN_READ_WRITE
-        | OpenFlags::SQLITE_OPEN_CREATE
-        | OpenFlags::SQLITE_OPEN_NO_MUTEX;
-    let connection = Connection::open_with_flags(path, flags).map_err(map_sqlite)?;
-    connection
-        .busy_timeout(Duration::ZERO)
-        .map_err(map_sqlite)?;
-    configure_database(&connection, "main")?;
-    verify_capabilities(&connection)?;
+    let connection = open_raw_database(path, DATABASE_OPEN_FLAGS)?;
+    configure_connection(&connection)?;
     Ok(connection)
 }
 
+fn open_raw_database(path: &Path, flags: OpenFlags) -> StorageResult<Connection> {
+    register_vec1()?;
+    Connection::open_with_flags(path, flags).map_err(map_sqlite)
+}
+
+fn configure_connection(connection: &Connection) -> StorageResult<()> {
+    connection
+        .busy_timeout(Duration::ZERO)
+        .map_err(map_sqlite)?;
+    configure_database(connection, "main")?;
+    verify_capabilities(connection)
+}
+
 pub(super) fn attach_vectors(connection: &Connection, path: &Path) -> StorageResult<()> {
+    attach_unconfigured_vectors(connection, path)?;
+    configure_database(connection, "vec")
+}
+
+fn attach_unconfigured_vectors(connection: &Connection, path: &Path) -> StorageResult<()> {
     let filename = path.to_str().ok_or_else(|| {
         StorageError::new(
             StorageErrorKind::InvalidRequest,
@@ -119,7 +281,7 @@ pub(super) fn attach_vectors(connection: &Connection, path: &Path) -> StorageRes
     connection
         .execute("ATTACH DATABASE ?1 AS vec", [filename])
         .map_err(map_sqlite)?;
-    configure_database(connection, "vec")
+    Ok(())
 }
 
 fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()> {
@@ -127,11 +289,7 @@ fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()
     connection
         .pragma_update(None, "foreign_keys", "ON")
         .map_err(map_sqlite)?;
-    let journal: String = connection
-        .query_row(&format!("PRAGMA {schema}.journal_mode=WAL"), [], |row| {
-            row.get(0)
-        })
-        .map_err(map_sqlite)?;
+    let journal = initialize_journal(connection, schema)?;
     connection
         .execute_batch(&format!("PRAGMA {schema}.synchronous=FULL;"))
         .map_err(map_sqlite)?;
@@ -168,6 +326,28 @@ fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()
     Ok(())
 }
 
+fn initialize_journal(connection: &Connection, schema: &str) -> StorageResult<String> {
+    // The first read can encounter BUSY_RECOVERY during concurrent WAL startup.
+    // Already-ready databases only read their mode; no writer lock is requested.
+    wait_for_initialization(|| {
+        let journal = read_journal(connection, schema).map_err(map_sqlite)?;
+        if journal == "wal" {
+            return Ok(journal);
+        }
+        connection
+            .query_row(&format!("PRAGMA {schema}.journal_mode=WAL"), [], |row| {
+                row.get(0)
+            })
+            .map_err(map_sqlite)
+    })
+}
+
+fn read_journal(connection: &Connection, schema: &str) -> rusqlite::Result<String> {
+    connection.query_row(&format!("PRAGMA {schema}.journal_mode"), [], |row| {
+        row.get(0)
+    })
+}
+
 fn verify_capabilities(connection: &Connection) -> StorageResult<()> {
     if rusqlite::version_number() < MIN_SQLITE_VERSION {
         return Err(StorageError::new(
@@ -189,8 +369,73 @@ fn verify_capabilities(connection: &Connection) -> StorageResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{attach_vectors, open_database};
+    use super::{ConfinedDirectory, attach_vectors, open_database};
+    use std::{
+        fs::{self, File},
+        os::unix::fs::symlink,
+    };
     use tempfile::TempDir;
+
+    #[test]
+    fn reject_database_leaf_symlink_installed_after_directory_validation() {
+        for name in ["cache.db", "vectors.db"] {
+            let root = TempDir::new().unwrap();
+            let path = fs::canonicalize(root.path()).unwrap();
+            let outside = TempDir::new().unwrap();
+            let target = outside.path().join("outside.db");
+            fs::write(&target, []).unwrap();
+            let pinned = File::open(&path).unwrap();
+            let directory = ConfinedDirectory::new(&path, &pinned);
+            let link = path.join(name);
+            let destination = target.clone();
+            directory.before_open.replace(Some(Box::new(move || {
+                symlink(destination, link).unwrap();
+            })));
+            assert!(directory.open_database(name).is_err());
+            assert_eq!(fs::read(&target).unwrap(), b"");
+        }
+    }
+
+    #[test]
+    fn reject_vector_attachment_symlink_installed_after_validation() {
+        let root = TempDir::new().unwrap();
+        let path = fs::canonicalize(root.path()).unwrap();
+        let outside = TempDir::new().unwrap();
+        let target = outside.path().join("outside.db");
+        fs::write(&target, []).unwrap();
+        let pinned = File::open(&path).unwrap();
+        let directory = ConfinedDirectory::new(&path, &pinned);
+        let connection = directory.open_database("cache.db").unwrap();
+        let link = path.join("vectors.db");
+        let destination = target.clone();
+        directory.before_open.replace(Some(Box::new(move || {
+            symlink(destination, link).unwrap();
+        })));
+        assert!(directory.attach_vectors(&connection).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"");
+    }
+
+    #[test]
+    fn reject_replaced_service_directory_before_initialization() {
+        for use_symlink in [false, true] {
+            let root = TempDir::new().unwrap();
+            let root_path = fs::canonicalize(root.path()).unwrap();
+            let path = root_path.join(".letopis");
+            fs::create_dir(&path).unwrap();
+            let pinned = File::open(&path).unwrap();
+            let directory = ConfinedDirectory::new(&path, &pinned);
+            fs::rename(&path, root_path.join("original")).unwrap();
+            let outside = TempDir::new().unwrap();
+            if use_symlink {
+                symlink(outside.path(), &path).unwrap();
+            } else {
+                fs::create_dir(&path).unwrap();
+            }
+            assert!(directory.open_database("cache.db").is_err());
+            assert!(!path.join("cache.db").exists());
+            assert!(!outside.path().join("cache.db").exists());
+        }
+    }
 
     #[test]
     fn both_database_connections_enforce_policy() {

@@ -60,3 +60,78 @@ impl Error for StorageError {
 }
 /// A storage operation's typed outcome.
 pub type StorageResult<T> = Result<T, StorageError>;
+
+/// Stable application classification for document refresh failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocumentErrorKind {
+    /// A path or request cannot be represented safely.
+    InvalidRequest,
+    /// Filesystem, Git, storage, clock or integrity checks failed.
+    InternalError,
+}
+/// Fixed safe context with a separately accessible internal cause.
+pub struct DocumentError {
+    kind: DocumentErrorKind,
+    message: &'static str,
+    cause: Option<Box<dyn Error + Send + Sync>>,
+}
+impl DocumentError {
+    pub(crate) fn new(kind: DocumentErrorKind, message: &'static str) -> Self {
+        Self {
+            kind,
+            message,
+            cause: None,
+        }
+    }
+    pub(crate) fn new_with_cause(
+        kind: DocumentErrorKind,
+        message: &'static str,
+        cause: impl Error + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            kind,
+            message,
+            cause: Some(Box::new(cause)),
+        }
+    }
+    /// Classification for application error mapping.
+    pub fn get_kind(&self) -> DocumentErrorKind {
+        self.kind
+    }
+    /// Fixed context without paths, document bytes or subprocess output.
+    pub fn get_message(&self) -> &str {
+        self.message
+    }
+}
+impl fmt::Display for DocumentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.message)
+    }
+}
+impl fmt::Debug for DocumentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DocumentError")
+            .field("kind", &self.kind)
+            .field("message", &self.message)
+            .finish_non_exhaustive()
+    }
+}
+impl Error for DocumentError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.cause
+            .as_deref()
+            .map(|cause| cause as &(dyn Error + 'static))
+    }
+}
+/// A document operation's typed outcome.
+pub type DocumentResult<T> = Result<T, DocumentError>;
+
+impl From<StorageError> for DocumentError {
+    fn from(cause: StorageError) -> Self {
+        Self::new_with_cause(
+            DocumentErrorKind::InternalError,
+            "document storage operation failed",
+            cause,
+        )
+    }
+}

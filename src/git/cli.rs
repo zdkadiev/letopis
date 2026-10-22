@@ -4,9 +4,13 @@ use super::process::{GitProcess, check_version};
 use super::{objects, refs};
 use crate::{
     domain::{RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN, TreeOid},
-    service::{GitSnapshots, RetainedTree, SnapshotError, SnapshotErrorKind, SnapshotFile},
+    service::{
+        CorpusFiles, DocumentError, DocumentErrorKind, DocumentResult, GitSnapshots, RetainedTree,
+        SnapshotError, SnapshotErrorKind, SnapshotFile,
+    },
 };
 use std::{
+    collections::BTreeSet,
     ffi::OsString,
     fs,
     io::ErrorKind,
@@ -19,6 +23,9 @@ pub(crate) struct GitCli {
     pub(super) oid_len: usize,
 }
 impl GitCli {
+    pub(crate) fn get_root(&self) -> &Path {
+        &self.root
+    }
     pub(crate) fn open(start: &Path) -> Result<Self, SnapshotError> {
         Self::open_with_process(start, GitProcess::new())
     }
@@ -129,4 +136,69 @@ impl GitSnapshots for GitCli {
         self.require_self_contained_objects()?;
         refs::Retainer { git: self }.pin(tree)
     }
+}
+
+impl CorpusFiles for GitCli {
+    fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+        let raw = self
+            .process
+            .run(
+                self.get_root(),
+                &[
+                    "ls-files".into(),
+                    "-z".into(),
+                    "--cached".into(),
+                    "--others".into(),
+                    "--exclude-standard".into(),
+                ],
+                None,
+            )
+            .map_err(|cause| {
+                DocumentError::new_with_cause(
+                    DocumentErrorKind::InternalError,
+                    "cannot list document candidates",
+                    cause,
+                )
+            })?;
+        parse_candidates(&raw)
+    }
+}
+fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
+    if !raw.is_empty() && !raw.ends_with(&[0]) {
+        return Err(DocumentError::new(
+            DocumentErrorKind::InternalError,
+            "invalid Git candidate response",
+        ));
+    }
+    let mut candidates = BTreeSet::new();
+    for entry in raw
+        .split(|byte| *byte == 0)
+        .filter(|entry| !entry.is_empty())
+    {
+        if !entry.ends_with(b".md") && !entry.ends_with(b".markdown") {
+            continue;
+        }
+        if entry
+            .split(|byte| *byte == b'/')
+            .any(|part| part == b".git" || part == b".letopis")
+        {
+            continue;
+        }
+        let text = std::str::from_utf8(entry).map_err(|cause| {
+            DocumentError::new_with_cause(
+                DocumentErrorKind::InvalidRequest,
+                "unsupported document path",
+                cause,
+            )
+        })?;
+        let path = RepoPath::parse(text).map_err(|cause| {
+            DocumentError::new_with_cause(
+                DocumentErrorKind::InvalidRequest,
+                "unsupported document path",
+                cause,
+            )
+        })?;
+        candidates.insert(path);
+    }
+    Ok(candidates.into_iter().collect())
 }

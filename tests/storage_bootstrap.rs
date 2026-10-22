@@ -191,7 +191,7 @@ fn parallel_initializers_leave_a_complete_schema() {
             .map(|handle| usize::from(handle.join().unwrap()))
             .sum::<usize>()
     });
-    assert!(successes >= 1, "neither initializer succeeded");
+    assert_eq!(successes, 2, "both initializers must open successfully");
     let mut storage = open_storage(&cache, &vectors).unwrap();
     assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
 }
@@ -312,14 +312,18 @@ fn malformed_stored_observations_return_safe_typed_errors() {
 }
 
 #[test]
-fn busy_bootstrap_returns_typed_error_without_retry() {
+fn initialized_open_succeeds_but_cache_write_still_returns_busy() {
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
     drop(open_storage(&cache, &vectors).unwrap());
     let connection = Connection::open(&cache).unwrap();
     connection.execute_batch("BEGIN IMMEDIATE").unwrap();
-    let error = assert_error(&cache, &vectors, StorageErrorKind::InternalError);
+    let mut storage = open_storage(&cache, &vectors).unwrap();
+    assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
+    let Err(error) = storage.begin_cache_write() else {
+        panic!("competing cache writer was accepted");
+    };
     let cause = std::error::Error::source(&error)
         .unwrap()
         .downcast_ref::<rusqlite::Error>()

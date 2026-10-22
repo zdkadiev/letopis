@@ -1,26 +1,9 @@
-use crate::domain::ByteSpan;
+use crate::{
+    domain::ByteSpan,
+    service::{Diagnostic, DiagnosticKind},
+};
 use std::ops::Range;
 
-/// Local diagnostic reasons; the CLI maps these into its existing error envelope.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum DiagnosticKind {
-    InvalidUtf8,
-    InvalidMetadata,
-    InvalidAnchor,
-    DuplicateAnchor,
-    OrphanMetadata,
-    NestedElement,
-    InvalidLinkTitle,
-    InvalidTarget,
-    SelfLoop,
-}
-/// A file error with source coordinates where available and a fixed local message.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Diagnostic {
-    pub kind: DiagnosticKind,
-    pub bytes: Option<ByteSpan>,
-    pub message: String,
-}
 impl Diagnostic {
     pub(super) fn new_at(kind: DiagnosticKind, range: Range<usize>) -> Self {
         Self {

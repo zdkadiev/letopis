@@ -42,8 +42,8 @@ fn cache_commit_preserves_node_row_id() {
     );
 }
 
-use letopis::domain::{Edge, EdgeType, RepoPath, Sha256};
-use letopis::service::{NodeMetadata, StorageErrorKind};
+use letopis::domain::{Edge, EdgeType, ElementKind, LineRange, RepoPath, Sha256, TreeOid};
+use letopis::service::{NodeMetadata, StorageErrorKind, StoredNode};
 use rusqlite::Connection;
 use std::error::Error;
 fn build_target(id: &str) -> EdgeTarget {
@@ -638,4 +638,108 @@ fn file_text_values_remain_literal() {
     let mut read = db.begin_read().unwrap();
     assert!(read.read_file(&file.path).unwrap().is_none());
     assert_eq!(read.read_file(&untouched.path).unwrap(), Some(untouched));
+}
+
+#[test]
+fn list_files_preserves_exact_paths_and_state() {
+    // Arrange: marked, invalid and unmarked files with literal SQL wildcards.
+    let root = TempDir::new().unwrap();
+    let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
+    let marked = build_file("a_b.md", "alpha");
+    let mut invalid = build_file("a%b.md", "broken");
+    invalid.mtime_ns = -23;
+    invalid.inode = 29;
+    invalid.checked_at_ns = 31;
+    invalid.valid = false;
+    invalid.error = Some("invalid metadata".into());
+    let unmarked = build_file("nested/a.markdown", "plain text");
+    let mut write = db.begin_cache_write().unwrap();
+    for row in [&unmarked, &marked, &invalid] {
+        write.upsert_file(row).unwrap();
+    }
+    write
+        .upsert_node(&build_knowledge("a_b.md", "alpha"))
+        .unwrap();
+    write.commit().unwrap();
+    let expected_file_rows = vec![invalid, marked, unmarked];
+
+    // Act.
+    let rows = db.begin_read().unwrap().list_files().unwrap();
+
+    // Assert: every persisted field and exact deterministic path ordering.
+    assert_eq!(
+        rows.iter().map(|row| row.path.as_str()).collect::<Vec<_>>(),
+        ["a%b.md", "a_b.md", "nested/a.markdown"]
+    );
+    assert_eq!(rows, expected_file_rows);
+}
+
+#[test]
+fn list_nodes_preserves_metadata_and_row_ids() {
+    // Arrange: knowledge and sources are inserted out of identity order.
+    let root = TempDir::new().unwrap();
+    let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
+    let source = build_source("code.rs#L2-L4", Some(Sha256::digest(b"source")), 3);
+    let missing = build_source("missing.rs", None, 11);
+    let anchored = build_knowledge("a_b.md#part", "anchored");
+    let mut write = db.begin_cache_write().unwrap();
+    let mut expected = Vec::new();
+    for metadata in [&missing, &source, &anchored] {
+        expected.push(StoredNode {
+            row_id: write.upsert_node(metadata).unwrap(),
+            metadata: metadata.clone(),
+        });
+    }
+    write
+        .upsert_node(&build_knowledge("a%b.md", "old"))
+        .unwrap();
+    write.commit().unwrap();
+    let original = db
+        .begin_read()
+        .unwrap()
+        .read_node(&build_target("a%b.md"))
+        .unwrap()
+        .unwrap();
+    let mut changed = build_knowledge("a%b.md", "updated");
+    if let NodeMetadata::Knowledge(ref mut node) = changed {
+        node.kind = ElementKind::Metavertex;
+        node.created_at = 41;
+        node.source_snapshot = Some(TreeOid::parse(&"a".repeat(40)).unwrap());
+        node.lines = LineRange::new(2, 9).unwrap();
+    }
+    let mut write = db.begin_cache_write().unwrap();
+    write.upsert_node(&changed).unwrap();
+    write.commit().unwrap();
+    expected.reverse();
+    expected.insert(
+        0,
+        StoredNode {
+            row_id: original.row_id,
+            metadata: changed,
+        },
+    );
+
+    // Act.
+    let rows = db.begin_read().unwrap().list_nodes().unwrap();
+
+    // Assert: complete metadata, identity order, and stable upsert row ID.
+    let updated = &rows[0];
+    assert_eq!(updated.row_id, original.row_id);
+    assert_eq!(rows, expected);
+}
+
+#[test]
+fn list_empty_published_state_returns_no_rows() {
+    // Arrange.
+    let root = TempDir::new().unwrap();
+    let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
+    let mut read = db.begin_read().unwrap();
+
+    // Act.
+    let files = read.list_files().unwrap();
+    let nodes = read.list_nodes().unwrap();
+
+    // Assert.
+    assert!(files.is_empty());
+    assert!(nodes.is_empty());
 }

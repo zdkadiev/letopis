@@ -1,6 +1,9 @@
 use super::{
     cache_write::SqliteCacheWrite,
-    connection::{attach_vectors, open_database, prepare_paths},
+    connection::{
+        CACHE_DATABASE, ConfinedDirectory, VECTOR_DATABASE, attach_vectors, open_database,
+        prepare_paths,
+    },
     read::SqliteRead,
     schema::{bootstrap_cache, bootstrap_vectors},
     vector_write::SqliteVectorWrite,
@@ -11,6 +14,7 @@ use crate::{
     service::{Storage, StorageResult, VectorOutcome},
 };
 use rusqlite::Connection;
+use rustix::fd::AsFd;
 use std::path::Path;
 
 /// `SQLite` implementation of the application storage contract.
@@ -34,6 +38,22 @@ impl SqliteStorage {
 
         let read = open_database(&cache)?;
         attach_vectors(&read, &vectors)?;
+        Ok(Self {
+            read,
+            cache_writer,
+            vector_writer,
+        })
+    }
+    pub(crate) fn open_confined(directory: &Path, pinned: &impl AsFd) -> StorageResult<Self> {
+        let paths = ConfinedDirectory::new(directory, pinned);
+        let mut cache_writer = paths.open_database(CACHE_DATABASE)?;
+        paths.verify()?;
+        bootstrap_cache(&mut cache_writer)?;
+        let mut vector_writer = paths.open_database(VECTOR_DATABASE)?;
+        paths.verify()?;
+        bootstrap_vectors(&mut vector_writer)?;
+        let read = paths.open_database(CACHE_DATABASE)?;
+        paths.attach_vectors(&read)?;
         Ok(Self {
             read,
             cache_writer,
