@@ -1,6 +1,6 @@
 # TK-10 — Change detection and atomic per-file publication
 
-Status: approved by the user on 2026-10-22; product implementation has not started.
+Status: approved by the user on 2026-10-22; implementation and platform checks complete, independent review in progress.
 Base: main@bf9b6b9c46ddc9af0864a3a3924e8d0826da5abb.
 Workspace: separate native worktree on branch TK-10.
 
@@ -224,4 +224,25 @@ Clippy and 112 Rust tests; log: /tmp/letopis-tk10-baseline.log. Linux has not be
 rerun for the documentation stage. See the [implementation plan](../plans/2026-10-22-tk-10-change-detection.md)
 for concrete interfaces, file ownership and verification. Plan review/execution
 method selection precede implementation under the requested Superpowers workflow.
-No product source is changed in this stage.
+Storage enumeration and filesystem/Git/Markdown interfaces are now implemented and independently reviewed; the publication service and final acceptance remain in progress.
+
+
+## Implementation and Verification
+
+The approved service is implemented through Tasks 1–4 of the plan. Production
+source checkpoint: `23787312a8b7e714280158d04bc9ea19f1d72006`. The
+[acceptance report](../../zkit/letopis/checks/TK-10/report.md) maps each criterion
+to real integration/process tests and separate macOS ARM64/source-built Linux
+ARM64 receipts: 161 Rust tests and nine Python runner tests pass per platform.
+Both compiling negative controls fail at their intended assertions and pass
+after byte-exact restoration. All 86 common platform input hashes match.
+
+Tasks 1–4 have independent approval, including scoped fixes for raw metadata
+exclusion ordering and automatic service-database symlink protection. The final whole-branch review is pending; these results do not yet claim
+that final gate is complete. Execution rulings and their costs are preserved in the
+[plan](../plans/2026-10-22-tk-10-change-detection.md#execution-rulings).
+
+CLI command integration remains TK-11/TK-14. The report retains the one-second
+timestamp/live-read limits, hostile ancestor-rename residual, and the limits
+of process-death checks versus physical power loss. No merge, push or GitHub
+issue update has occurred for TK-10.

@@ -1,6 +1,6 @@
 # TK-10 — Production refresh acceptance
 
-Date: 2026-10-22. Production implementation and process acceptance pass on macOS ARM64 and source-built Linux ARM64. Task 4 is ready for independent review; the controller owns the task/spec/plan acceptance marks and Engram record.
+Date: 2026-10-22. Production implementation and process acceptance pass on macOS ARM64 and source-built Linux ARM64. Tasks 1–4 have independent approval; final whole-branch review and the final Engram record remain pending.
 
 Source checkpoint: `23787312a8b7e714280158d04bc9ea19f1d72006` (`test(documents): prove process death and concurrent publication`). Tasks 1–3 end at `ac30e180c6efa4922c306dc0231c89606d996dc5`. Only the controller's three documentation edits were dirty during platform runs. All 191 host input hashes still match the restored current source tree after negative controls.
 
@@ -100,3 +100,18 @@ Task 4 source changes: private `service/document/tests/process.rs`, its declarat
 The source-built Linux run includes the prior confinement regressions: static candidate/parent/database symlinks, nonregular/FIFO replacements, late database-leaf/ATTACH substitutions and observed service-directory identity changes. Document-owned storage uses SQLite NOFOLLOW, inherited by vector ATTACH. Residual limit: there is no atomic descriptor-relative guarantee against an actively hostile actor concurrently renaming ancestors during SQLite's internal pathname/open sequence. No custom VFS or process-global directory change was added.
 
 These are acknowledged process-death cuts **between** SQLite operations, not cuts inside COMMIT and not physical power-loss proof. Live concurrent edits are not an atomic corpus snapshot. The one-second racy policy does not cover coarser timestamp granularity or deliberately restored old non-racy timestamps. Unrelated external-source freshness and source_snapshot validation/pinning remain later tasks. No x86_64, resource/capacity/performance, model quality, full CLI/drain/cancellation JSON, physical power loss, or unrelated historical proof-harness execution is claimed. Historical TK-2 receipts were untouched.
+
+
+## Independent Task Reviews
+
+All four stages are approved. Task 1: metadata enumeration, no findings. Task 2:
+raw excluded service metadata now filters before filename validation; two RED
+regressions and the scoped re-review confirm the fix. Task 3: automatic database
+opening retains directory identity and rejects cache/vector symlinks; public and
+late-boundary regressions and scoped re-review confirm the fix. Task 4: no findings;
+reviewer independently checked full process assertions, mutation failures,
+receipt counts and source equality without repeating the suites.
+
+Final whole-branch review is pending. The controller's three implementation
+rulings and their costs are preserved in the
+[plan](../../../../superpowers/plans/2026-10-22-tk-10-change-detection.md#execution-rulings).
