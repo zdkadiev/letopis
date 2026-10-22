@@ -4,7 +4,7 @@ mod input;
 mod output;
 
 pub(crate) use handlers::Handlers;
-pub(crate) use input::parse_request;
+pub(crate) use input::{Request, parse_request};
 pub(crate) use output::write_response;
 
 #[cfg(test)]

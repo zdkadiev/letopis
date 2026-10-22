@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TK-11 transport/process receipts; Python 3.11+, prepared jsonschema, offline runtime."""
+"""TK-11 transport/process/real-drain receipts with controlled local HTTP."""
 import argparse
 import hashlib
 from importlib.metadata import version
@@ -32,7 +32,7 @@ def hash_inputs(root):
     for name in ('src', 'vendor', 'examples', 'scripts', 'tests/support', 'tests/cli', 'tests/fixtures/markdown'):
         paths.extend(p for p in (root / name).rglob('*') if p.is_file()
                      and '__pycache__' not in p.parts)
-    paths.extend((root / 'tests').glob('cli_*.rs'))
+    paths.extend((root / 'tests').glob('*.rs'))
     return {str(p.relative_to(root)): hash_file(p) for p in sorted(paths)}
 
 
@@ -92,7 +92,6 @@ def capture_transport(root, evidence, execute, binary, catalogue):
         for i, (args, body, error) in enumerate([
             (['check'], b'{}', 'internal_error'),
             (['inspect'], b'{"element_ids":["knowledge.md"]}', 'internal_error'),
-            (['embed', '--drain'], b'', 'internal_error'),
             (['check'], b'{"extra":1}', 'invalid_request'),
             (['inspect'], b'{}', 'invalid_request'),
             (['embed', '--drain'], b'{"extra":1}', 'invalid_request'),
@@ -108,6 +107,12 @@ def capture_transport(root, evidence, execute, binary, catalogue):
             if error == 'internal_error':
                 assert response['error']['message'] == 'operation unavailable in this build'
         assert not (repo / '.letopis').exists()
+        execute([str(binary), 'embed', '--drain'], 'product-drain.json', cwd=repo,
+                expected=0, stdin=b'')
+        raw = (evidence / 'product-drain.json').read_bytes()
+        assert raw.endswith(b'\n') and raw.count(b'\n') == 1
+        assert not Path(str(evidence / 'product-drain.json') + '.stderr').read_bytes()
+        validate_response(catalogue, 'embed --drain', json.loads(raw), 0)
 
 
 def capture_handler_responses(evidence, catalogue):
@@ -137,13 +142,10 @@ def run_host(root, evidence, execute, manifest):
     for tool in (['rustc', '-vV'], ['cargo', '--version'], ['git', '--version'],
                  [sys.executable, '--version'], ['uname', '-a']):
         execute(tool, 'version-' + Path(tool[0]).name + '.log')
+    execute(['./scripts/check-rust.sh'], 'root-check.log')
     execute(['cargo', 'build', '--locked', '--offline', '--bin', 'letopis',
              '--example', 'cli_runtime_fixture', '--message-format=json'], 'build.log')
-    artifacts = {}
-    for line in (evidence / 'build.log').read_text().splitlines():
-        message = json.loads(line)
-        if message.get('reason') == 'compiler-artifact' and message.get('executable'):
-            artifacts[message['target']['name']] = Path(message['executable'])
+    artifacts = read_artifacts(evidence / 'build.log')
     assert set(artifacts) == {'letopis', 'cli_runtime_fixture'}
     manifest['executables'] = {}
     for name, artifact in artifacts.items():
@@ -163,7 +165,30 @@ def run_host(root, evidence, execute, manifest):
     assert any(o.get('null_fds') == [True, True, True] for o in observations)
     assert any(o.get('owned') is False for o in observations)
     (evidence / 'observers.json').write_text(json.dumps(observations, indent=2) + '\n')
+    execute(['cargo', 'test', '--locked', '--offline', '--test', 'cli_drain',
+             '--', '--nocapture', '--test-threads=1'], 'product-drain.log',
+            extra={'LETOPIS_CLI_FIXTURE': str(artifacts['cli_runtime_fixture'])})
+    captures = []
+    for line in (evidence / 'product-drain.log').read_text().splitlines():
+        for marker in ('PRODUCT_RESPONSE ', 'PRODUCT_FOREGROUND ', 'PRODUCT_DRAIN '):
+            if marker not in line:
+                continue
+            value = json.loads(line.split(marker, 1)[1])
+            if marker == 'PRODUCT_RESPONSE ':
+                validate_response(catalogue, 'embed --drain', value, 0)
+            captures.append({'kind': marker.strip(), 'observation': value})
+    assert any(item['kind'] == 'PRODUCT_DRAIN' for item in captures)
+    (evidence / 'product-observations.json').write_text(json.dumps(captures, indent=2) + '\n')
     capture_transport(root, evidence, execute, artifacts['letopis'], catalogue)
+
+
+def read_artifacts(log):
+    artifacts = {}
+    for line in log.read_text().splitlines():
+        message = json.loads(line)
+        if message.get('reason') == 'compiler-artifact' and message.get('executable'):
+            artifacts[message['target']['name']] = Path(message['executable'])
+    return artifacts
 
 
 def run_linux(root, evidence, execute, manifest):
@@ -204,7 +229,7 @@ def main():
                 'python': sys.version, 'commands': COMMANDS,
                 'environment': {k: os.environ[k] for k in ('PATH', 'CARGO_HOME', 'RUSTUP_HOME',
                    'CARGO_TARGET_DIR', 'RUSTFLAGS') if k in os.environ},
-                'limits': 'Transport and fixture runtime only; real drain requires Task 5.'}
+                'limits': 'Real product drain with controlled local HTTP; check/inspect unavailable; no real model quality or x86 evidence.'}
 
     def execute(argv, name, *, cwd=root, extra=None, **kwargs):
         run_command(argv, cwd=cwd, env=child_environment(evidence, extra),

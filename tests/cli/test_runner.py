@@ -83,6 +83,16 @@ class RunnerTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         inputs = run.hash_inputs(root)
         for name in ['tests/support/cli.rs', 'src/main.rs', 'tests/cli/run.py',
-                     'tests/cli/Dockerfile', '.dockerignore', run.SCHEMA]:
+                     'tests/cli/Dockerfile', '.dockerignore', run.SCHEMA,
+                     'tests/cli_drain.rs', 'tests/support/drain.rs',
+                     'tests/document_refresh.rs', 'tests/embedding_service.rs']:
             self.assertIn(name, inputs)
         self.assertFalse(any('__pycache__' in name for name in inputs))
+
+    def test_artifact_resolution_respects_target_specific_cargo_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / 'build.log'
+            artifact = '/target/aarch64-apple-darwin/debug/examples/cli_runtime_fixture'
+            log.write_text(json.dumps({'reason':'compiler-artifact',
+                'target':{'name':'cli_runtime_fixture'}, 'executable':artifact}) + '\n')
+            self.assertEqual(run.read_artifacts(log)['cli_runtime_fixture'], Path(artifact))

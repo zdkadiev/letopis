@@ -1,3 +1,5 @@
+// Shared process helpers are also consumed by the real-drain integration target.
+#[allow(dead_code)]
 #[path = "support/cli.rs"]
 mod cli;
 use cli::{Fixture, finish_foreground, wait_for_embed_lock};

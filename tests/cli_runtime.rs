@@ -95,7 +95,6 @@ fn unavailable_routes_preserve_corpus_index_and_refs_after_lost_response() {
     for (args, input) in [
         (vec!["check"], "{}"),
         (vec!["inspect"], "{\"element_ids\":[\"knowledge.md\"]}"),
-        (vec!["embed", "--drain"], ""),
     ] {
         let lost = invoke(root.path(), &args, input.as_bytes(), true);
         assert_eq!(lost.status.code(), Some(1));

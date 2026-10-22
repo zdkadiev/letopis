@@ -1,7 +1,8 @@
 use super::{
-    ConfigState, DrainOutcome, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingFiles,
-    EmbeddingProvider, EmbeddingResult, EmbeddingWork, Embeddings, Markdown, QueryEmbedding,
-    Storage, StorageError, StorageErrorKind, StorageRead, VectorOutcome, VectorWrite,
+    CommandError, CommandErrorKind, CommandResult, ConfigState, DrainOutcome, EmbeddingConfig,
+    EmbeddingError, EmbeddingErrorKind, EmbeddingFiles, EmbeddingProvider, EmbeddingResult,
+    EmbeddingTasks, EmbeddingWork, Embeddings, Markdown, QueryEmbedding, Storage, StorageError,
+    StorageErrorKind, StorageRead, VectorOutcome, VectorWrite,
 };
 use crate::domain::{KnowledgeId, RepoPath, Sha256};
 use std::{collections::BTreeSet, num::NonZeroUsize, time::Duration};
@@ -313,6 +314,34 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
     }
 }
 
+impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> EmbeddingTasks
+    for EmbeddingService<S, F, M, P>
+{
+    fn has_work(&mut self) -> CommandResult<bool> {
+        let ConfigState::Ready(config) = self.read_configuration().map_err(map_command)? else {
+            return Ok(false);
+        };
+        let next = self
+            .storage
+            .begin_read()
+            .map_err(map_storage)
+            .map_err(map_command)?
+            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None)
+            .map_err(map_storage)
+            .map_err(map_command)?;
+        Ok(matches!(next, VectorOutcome::Current(Some(_))))
+    }
+
+    fn drain(&mut self) -> CommandResult<()> {
+        match Embeddings::drain(self).map_err(map_command)? {
+            DrainOutcome::Complete
+            | DrainOutcome::AlreadyRunning
+            | DrainOutcome::Unavailable
+            | DrainOutcome::ConfigChanged => Ok(()),
+        }
+    }
+}
+
 impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> Embeddings
     for EmbeddingService<S, F, M, P>
 {
@@ -355,6 +384,15 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> Embedding
         }
         self.publish_query(&config, result)
     }
+}
+
+fn map_command(error: EmbeddingError) -> CommandError {
+    let kind = if error.get_kind() == EmbeddingErrorKind::InternalError {
+        CommandErrorKind::InternalError
+    } else {
+        CommandErrorKind::EmbeddingFailed
+    };
+    CommandError::new_with_cause(kind, "embedding operation failed", error)
 }
 
 fn map_storage(error: StorageError) -> EmbeddingError {

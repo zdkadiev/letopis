@@ -17,6 +17,52 @@ use std::{
 };
 use tempfile::TempDir;
 
+mod tasks {
+    use super::{Files, Provider, open_storage, publish};
+    use crate::{
+        markdown::MarkdownParser,
+        service::{CommandErrorKind, EmbeddingService, EmbeddingTasks, Storage},
+    };
+    use rusqlite::Connection;
+    use tempfile::TempDir;
+
+    #[test]
+    fn readiness_uses_durable_work_without_http_lock_or_retained_read() {
+        let root = TempDir::new().unwrap();
+        let mut storage = open_storage(&root);
+        let mut files = Files::new(0);
+        publish(&mut storage, &mut files, "a.md", "ready token");
+        let mut service = EmbeddingService::new(storage, files, MarkdownParser, Provider::new());
+        // Act
+        assert!(service.has_work().unwrap());
+        // Assert: no document/provider work; the read is gone before another unit starts.
+        assert_eq!(service.provider.calls.get(), 0);
+        assert!(service.files.reads.borrow().is_empty());
+        drop(service.storage.begin_cache_write().unwrap());
+    }
+
+    #[test]
+    fn readiness_preserves_storage_failure_as_a_safe_typed_error() {
+        let root = TempDir::new().unwrap();
+        let mut service = EmbeddingService::new(
+            open_storage(&root),
+            Files::new(0),
+            MarkdownParser,
+            Provider::new(),
+        );
+        assert!(!service.has_work().unwrap());
+        Connection::open(root.path().join("cache"))
+            .unwrap()
+            .execute_batch("ALTER TABLE nodes RENAME TO private_missing_nodes")
+            .unwrap();
+        // Act / Assert: durable-read failure must not look like successful no-work.
+        let error = service.has_work().unwrap_err();
+        assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+        assert_eq!(error.get_message(), "embedding operation failed");
+        assert!(!format!("{error:?}").contains("private_missing_nodes"));
+    }
+}
+
 struct Files {
     config: RefCell<Option<Vec<u8>>>,
     documents: BTreeMap<String, Vec<u8>>,

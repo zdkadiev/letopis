@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-from run import COMMANDS, child_environment, create_evidence, hash_file, hash_inputs, run_command
+from run import COMMANDS, child_environment, create_evidence, hash_file, hash_inputs, read_artifacts, run_command
 
 CONTROLS = [
     ('null-output', 'src/process/detached.rs',
@@ -28,11 +28,16 @@ def run_control(copy, evidence, control, manifest):
     original = path.read_bytes()
     assert original.decode().count(needle) == 1
     env = child_environment(evidence, {'CARGO_TARGET_DIR': str(copy / 'target')})
-    fixture = copy / 'target/debug/examples/cli_runtime_fixture'
-    env['LETOPIS_CLI_FIXTURE'] = str(fixture)
 
     def execute(argv, suffix):
         run_command(argv, cwd=copy, env=env, log=evidence / f'{name}-{suffix}.log')
+
+    def build_fixture(suffix):
+        execute(['cargo', 'build', '--locked', '--offline', '--example',
+                 'cli_runtime_fixture', '--message-format=json'], suffix)
+        fixture = read_artifacts(evidence / f'{name}-{suffix}.log')['cli_runtime_fixture']
+        env['LETOPIS_CLI_FIXTURE'] = str(fixture)
+        return fixture
 
     command = ['cargo', 'test', '--locked', '--offline', '--test', 'cli_process', test,
                '--', '--exact', '--nocapture']
@@ -41,7 +46,7 @@ def run_control(copy, evidence, control, manifest):
     try:
         path.write_text(original.decode().replace(needle, replacement))
         record['mutated_sha256'] = hash_file(path)
-        execute(['cargo', 'build', '--locked', '--offline', '--example', 'cli_runtime_fixture'], 'fixture')
+        fixture = build_fixture('fixture')
         record['mutated_fixture_sha256'] = hash_file(fixture)
         execute(['cargo', 'test', '--locked', '--offline', '--test', 'cli_process', '--no-run'], 'compile')
         try:
@@ -57,7 +62,7 @@ def run_control(copy, evidence, control, manifest):
         path.write_bytes(original)
         assert path.read_bytes() == original
         record['restored_sha256'] = hash_file(path)
-    execute(['cargo', 'build', '--locked', '--offline', '--example', 'cli_runtime_fixture'], 'restore-fixture')
+    fixture = build_fixture('restore-fixture')
     record['restored_fixture_sha256'] = hash_file(fixture)
     execute(command, 'green')
     record['status'] = 'PASS'

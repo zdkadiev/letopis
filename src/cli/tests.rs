@@ -494,7 +494,6 @@ mod transport_tests {
                 r#"{"element_ids":["x.md"]}"#,
                 "internal_error",
             ),
-            (vec!["embed".into(), "--drain".into()], "", "internal_error"),
             (vec!["check".into()], "null", "invalid_request"),
             (vec!["inspect".into()], "{}", "invalid_request"),
         ] {

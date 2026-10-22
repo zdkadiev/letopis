@@ -1,13 +1,14 @@
 FROM rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
 RUN apt-get update && apt-get install -y --no-install-recommends git python3 python3-venv && rm -rf /var/lib/apt/lists/*
 RUN python3 -m venv /opt/cli-python && /opt/cli-python/bin/pip install --no-cache-dir jsonschema==4.26.0
+RUN rustup component add rustfmt clippy
 WORKDIR /repo
 COPY Cargo.toml Cargo.lock rust-toolchain.toml clippy.toml build.rs .dockerignore ./
 COPY vendor ./vendor
 COPY src ./src
 COPY examples ./examples
 COPY scripts ./scripts
-COPY tests/cli_*.rs ./tests/
+COPY tests/*.rs ./tests/
 COPY tests/support ./tests/support
 COPY tests/fixtures/markdown ./tests/fixtures/markdown
 COPY tests/cli ./tests/cli

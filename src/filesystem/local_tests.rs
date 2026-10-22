@@ -5,6 +5,32 @@ use std::fs;
 use std::os::unix::fs::MetadataExt;
 
 #[test]
+fn concurrent_creation_after_absent_observation_reopens_the_same_inode() {
+    for name in ["embed.lock", "index.lock"] {
+        // Arrange a second opener exactly after the first observed absence.
+        let fixture = Fixture::new();
+        let files = LocalFileSystem::open(&fixture.0).unwrap();
+        let peer = LocalFileSystem::open(&fixture.0).unwrap();
+        let mut peer_file = None;
+        // Act: CREATE|EXCL must accept the peer's safe persistent file.
+        let file = files
+            .open_lock_with(name, || {
+                peer_file = Some(peer.open_lock_file(name).unwrap());
+            })
+            .unwrap();
+        // Assert ownership identity is shared; neither opener unlinks/replaces it.
+        let inode = file.metadata().unwrap().ino();
+        assert_eq!(peer_file.unwrap().metadata().unwrap().ino(), inode);
+        assert_eq!(
+            fs::metadata(fixture.0.join(".letopis").join(name))
+                .unwrap()
+                .ino(),
+            inode
+        );
+    }
+}
+
+#[test]
 fn owner_drop_unlocks_while_duplicate_descriptor_remains_open() {
     if run_bounded(
         "filesystem::local::embedding_tests::owner_drop_unlocks_while_duplicate_descriptor_remains_open",

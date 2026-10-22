@@ -1,9 +1,9 @@
 //! Test-only executor fixture. It proves process mechanics, never product embedding.
 use letopis::{
-    open_background, open_filesystem, open_storage,
+    open_background, open_documents, open_embedding_tasks, open_filesystem, open_storage,
     service::{
-        Background, CommandError, CommandErrorKind, CommandResult, EmbedLocks, EmbeddingTasks,
-        FileSystem,
+        Background, CommandError, CommandErrorKind, CommandResult, Documents, EmbedLocks,
+        EmbeddingTasks, FileSystem,
     },
 };
 use serde_json::{Value, json};
@@ -188,7 +188,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     let root = env::current_dir()?;
     match args.as_slice() {
         [command] if command == "foreground" => run_foreground(&root),
+        [command] if command == "product-foreground" => run_product_foreground(&root),
         [command, flag] if command == "embed" && flag == "--drain" => run_drain(&root),
         _ => Err("invalid fixture invocation".into()),
     }
+}
+
+fn run_product_foreground(root: &Path) -> Result<(), Box<dyn Error>> {
+    // This consumer refreshes through Documents; only the product can execute drain.
+    let executable = PathBuf::from(
+        env::var_os("LETOPIS_FIXTURE_EXECUTABLE").ok_or("missing product executable")?,
+    );
+    if executable == env::current_exe()? {
+        return Err("product drain must not execute the fixture".into());
+    }
+    open_documents(root)?.refresh()?;
+    let mut tasks = open_embedding_tasks(root)?;
+    let warning = open_background(root, &executable, Some(&mut tasks))?.start_if_needed()?;
+    println!(
+        "{}",
+        json!({"event":"product-foreground", "warning":warning.map(|w| w.message)})
+    );
+    let mut line = String::new();
+    std::io::stdin().lock().read_line(&mut line)?;
+    if line.trim() != "exit" {
+        return Err("missing foreground exit barrier".into());
+    }
+    Ok(())
 }

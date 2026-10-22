@@ -76,10 +76,27 @@ fn verify_artifact(path: &Path) -> PathBuf {
 }
 pub struct OwnedChild(Child);
 impl OwnedChild {
+    pub fn spawn(command: &mut Command) -> Self {
+        Self(command.spawn().unwrap())
+    }
+
+    pub fn send_input(&mut self, input: &[u8]) {
+        self.0.stdin.take().unwrap().write_all(input).unwrap();
+    }
+
+    pub fn get_id(&self) -> u32 {
+        self.0.id()
+    }
+
+    pub fn kill(&mut self) {
+        self.0.kill().unwrap();
+        self.0.wait().unwrap();
+    }
+
     pub fn collect_output(&mut self, timeout: Duration) -> Output {
-        let stdout = self.0.stdout.take().unwrap();
+        let stdout = self.0.stdout.take();
         let stderr = self.0.stderr.take().unwrap();
-        let out = start_reader(stdout);
+        let out = stdout.map(start_reader);
         let err = start_reader(stderr);
         let deadline = Instant::now() + timeout;
         let status = loop {
@@ -92,8 +109,11 @@ impl OwnedChild {
         Output {
             status,
             stdout: out
-                .recv_timeout(deadline.saturating_duration_since(Instant::now()))
-                .expect("stdout EOF before child release"),
+                .map(|out| {
+                    out.recv_timeout(deadline.saturating_duration_since(Instant::now()))
+                        .expect("stdout EOF before child release")
+                })
+                .unwrap_or_default(),
             stderr: err
                 .recv_timeout(deadline.saturating_duration_since(Instant::now()))
                 .expect("stderr EOF before child release"),

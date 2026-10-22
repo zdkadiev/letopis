@@ -92,7 +92,7 @@ pub fn open_documents(start: &Path) -> DocumentResult<impl Documents + use<>> {
 
 /// Parse and run one CLI request, emitting one complete JSON envelope.
 /// Returns 0 only for successfully written success output, otherwise 1.
-/// Current check, inspect and drain services are unavailable in this build.
+/// Check and inspect remain unavailable; drain uses the real embedding executor.
 pub fn run_cli(
     args: impl IntoIterator<Item = OsString>,
     input: &mut impl Read,
@@ -114,10 +114,38 @@ pub fn run_cli(
                 cause,
             )
         })?;
-        let mut background = open_background(&root, &executable, None)?;
+        if !matches!(request, cli::Request::Drain) {
+            return cli::Handlers::new(None, None, None).execute(request);
+        }
+        let mut tasks = open_embedding_tasks(&root)?;
+        let mut background = open_background(&root, &executable, Some(&mut tasks))?;
         cli::Handlers::new(None, None, Some(&mut background)).execute(request)
     });
     cli::write_response(output, response)
+}
+
+/// Open the existing embedding executor with confined automatic repository storage.
+/// Callers that serve freshly indexed data refresh through `Documents` before
+/// checking work. Direct drains consume the already published durable projection.
+///
+/// # Errors
+/// Reports unsupported repositories, unsafe service/database paths or setup failures.
+pub fn open_embedding_tasks(
+    start: &Path,
+) -> CommandResult<impl EmbeddingTasks + Embeddings + use<>> {
+    let git = GitCli::open(start).map_err(map_embedding_setup)?;
+    let files = LocalFileSystem::open(git.get_root()).map_err(map_embedding_setup)?;
+    let directory = files
+        .open_service_directory()
+        .map_err(map_embedding_setup)?;
+    let storage = SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory)
+        .map_err(map_embedding_setup)?;
+    Ok(EmbeddingService::new(
+        storage,
+        files,
+        MarkdownParser::new(),
+        open_embedding_provider().map_err(map_embedding_setup)?,
+    ))
 }
 
 /// Open background orchestration with an optional embedding executor.
@@ -173,7 +201,7 @@ pub fn open_embedding_files(root: &Path) -> EmbeddingResult<impl EmbeddingFiles 
 pub fn open_embeddings<S: Storage>(
     root: &Path,
     storage: S,
-) -> EmbeddingResult<impl Embeddings + use<S>> {
+) -> EmbeddingResult<impl Embeddings + EmbeddingTasks + use<S>> {
     Ok(EmbeddingService::new(
         storage,
         open_embedding_files(root)?,
@@ -184,4 +212,12 @@ pub fn open_embeddings<S: Storage>(
 
 fn map_embedding_files(error: DocumentError) -> EmbeddingError {
     EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
+}
+
+fn map_embedding_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot open embedding service",
+        error,
+    )
 }

@@ -6,6 +6,7 @@
 !src/
 !src/**
 !tests/
+!tests/*.rs
 !tests/domain_values.rs
 !tests/markdown_elements.rs
 !tests/markdown_links.rs
