@@ -60,18 +60,15 @@ pub fn open_documents(start: &Path) -> DocumentResult<impl Documents + use<>> {
         )
     })?;
     let filesystem = LocalFileSystem::open(git.get_root())?;
-    filesystem.open_service_directory()?;
-    let storage = SqliteStorage::open(
-        &git.get_root().join(".letopis/cache.db"),
-        &git.get_root().join(".letopis/vectors.db"),
-    )
-    .map_err(|cause| {
-        DocumentError::new_with_cause(
-            DocumentErrorKind::InternalError,
-            "cannot open document storage",
-            cause,
-        )
-    })?;
+    let directory = filesystem.open_service_directory()?;
+    let storage = SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory)
+        .map_err(|cause| {
+            DocumentError::new_with_cause(
+                DocumentErrorKind::InternalError,
+                "cannot open document storage",
+                cause,
+            )
+        })?;
     Ok(DocumentService::new(
         git,
         filesystem,
