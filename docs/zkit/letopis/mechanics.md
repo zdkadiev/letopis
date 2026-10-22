@@ -7,6 +7,8 @@
 
 ## Правка 2026-10-20
 
+2026-10-22 ([D-98](decisions.md#D-98)): §4 — диаграмма типов разделена на слои DomainCore / Services / Ports / Adapters; порты сведены к четырём интерфейсам FileSystem, Storage, VersionControl, EmbeddingProvider. Поведение и контракты I-n не меняются.
+
 2026-10-21 (D-97): MC-2 — кандидаты корпуса из `git ls-files` с учётом `.gitignore`; строка files у каждого Markdown-файла, в том числе без разметки.
 
 2026-10-21 ([D-96](decisions.md#D-96)): назван стек зависимостей. MC-5 — обработанная отмена (поток signal-hook печатает один ответ cancelled и завершает процесс; InterruptHandle не используется); в §5 — синхронный стек без async runtime, `std::fs::File::lock`, `libc::setsid`; версии крейтов и поставка vec1 закреплены в [D-96](decisions.md#D-96).
@@ -203,41 +205,86 @@ B-6: только проекция текущего состояния чере�
 
 ```mermaid
 classDiagram
-class DocumentService {
-  check(paths) Diagnostics
-  detectChanges() Delta
-  capture(SnapshotRequest)
+namespace DomainCore {
+  class KnowledgeId
+  class NodeMetadata
+  class EdgeMetadata
+  class SourceAddress
+  class Metagraph {
+    kindOf(KnowledgeId) Kind
+    problems() Problems
+  }
+  class DomainError
 }
-class IndexLock
-class WriteUnit
-class GitSnapshotPort {
-  pin(CanonicalSnapshot) RetainedTree
+namespace Services {
+  class DocumentService {
+    check(paths) Diagnostics
+    detectChanges() Delta
+    capture(SnapshotRequest)
+  }
+  class EmbeddingDrain {
+    nextWork() search_hash
+    reserveAttempt(search_hash)
+    publishVector(search_hash, vector)
+  }
+  class StatusQuery {
+    problems() Problems
+  }
 }
-class ProjectionPort {
-  prepare(ProjectionInput) PreparedProjection
-  publish(WriteUnit, PreparedProjection)
+namespace Ports {
+  class FileSystem {
+    lockIndex() IndexLock
+    lockEmbed() EmbedLock
+    list(candidates) FileStats
+    read(path) ByteStream
+  }
+  class Storage {
+    readView() IndexReadView
+    beginWrite(IndexLock) WriteUnit
+    publish(WriteUnit, PreparedProjection)
+    vectors: lookup, store, nearest
+    embedFailures, queryError, resetVectors
+  }
+  class VersionControl {
+    capture(SnapshotRequest) CanonicalSnapshot
+    read(snapshot, path) ByteStream
+    pin(CanonicalSnapshot) RetainedTree
+  }
+  class EmbeddingProvider {
+    embed(texts) vectors
+  }
 }
-class EmbeddingDrain {
-  nextWork() search_hash
-  reserveAttempt(search_hash)
-  publishVector(search_hash, vector)
+namespace Adapters {
+  class MarkdownCodec
+  class StdFileSystem
+  class SqliteStorage
+  class GitCli
+  class OllamaProvider
+  class OpenAiProvider
 }
-class EmbeddingPort {
-  embed(texts) vectors
-}
-class IndexReadView
-class StatusQuery {
-  problems() Problems
-}
-DocumentService --> IndexLock
-DocumentService --> GitSnapshotPort
-DocumentService --> WriteUnit
-DocumentService --> ProjectionPort
-ProjectionPort --> WriteUnit
-EmbeddingDrain --> EmbeddingPort
-StatusQuery ..> IndexReadView
-IndexReadView ..> ProjectionPort : pinned published data
+Metagraph o-- NodeMetadata
+Metagraph o-- EdgeMetadata
+NodeMetadata --> KnowledgeId
+EdgeMetadata --> KnowledgeId
+NodeMetadata --> SourceAddress
+DocumentService --> Metagraph
+StatusQuery --> Metagraph
+DocumentService --> FileSystem
+DocumentService --> Storage
+DocumentService --> VersionControl
+EmbeddingDrain --> Storage
+EmbeddingDrain --> EmbeddingProvider
+EmbeddingDrain --> FileSystem
+StatusQuery --> Storage
+MarkdownCodec ..> NodeMetadata : parses into
+StdFileSystem ..|> FileSystem
+SqliteStorage ..|> Storage
+GitCli ..|> VersionControl
+OllamaProvider ..|> EmbeddingProvider
+OpenAiProvider ..|> EmbeddingProvider
 ```
+
+Слои ([D-98](decisions.md#D-98), hexagonal [D-24](decisions.md#D-24)): DomainCore — чистые типы и правила метаграфа (ID, метаданные узлов и рёбер, адрес источника, вывод kind, висячие ссылки и includes-циклы), без I/O и без зависимостей от других слоёв; Services — сценарии CLI и drain, зависят только от DomainCore и четырёх портов; Ports — FileSystem, Storage, VersionControl, EmbeddingProvider, объявленные из потребностей Services; Adapters реализуют порты (std fs и `File::lock`; SQLite с FTS5 и vec1; git CLI; провайдеры Ollama и OpenAI) или переводят внешний формат в доменные типы (кодек Markdown, pulldown-cmark). HTTP-клиент `ureq` — деталь адаптеров провайдеров, отдельного порта у него нет. Зависимости направлены только внутрь. Контрактные порты I-2, I-8, I-11, I-12 — операции этих интерфейсов: IndexLock — FileSystem; IndexReadView, ProjectionPort, WriteUnit — Storage; GitSnapshotPort — VersionControl; EmbeddingPort — EmbeddingProvider.
 
 Спецификации общих in-process портов используют Rust-подобные типы и явно определяют транзакционное владение; wire-schema только у процессной границы. [C4 level 4](diagrams/mechanics-types.mmd) показывает важные типы/порты, не производственные классы с выдуманными методами.
 

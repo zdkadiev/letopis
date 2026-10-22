@@ -105,6 +105,7 @@
 | [D-95](#D-95) | Состояние выводится из данных: рёбра, очередь embeddings и диагностика без отдельного жизненного цикла | принято пользователем |
 | [D-96](#D-96) | Стек зависимостей v1: синхронный Rust без async runtime | принято пользователем |
 | [D-97](#D-97) | Состав корпуса по Git и строка files для каждого Markdown-файла | принято пользователем |
+| [D-98](#D-98) | Services зависят от четырёх портов: FileSystem, Storage, VersionControl, EmbeddingProvider | принято пользователем |
 
 ## Решения
 
@@ -517,7 +518,7 @@ Rust + rusqlite, единая SQLite 3.51.3+, WAL/FULL/fullfsync macOS. FTS5 con
 **Подробности:** [документ](architecture.md).
 
 <!-- links -->
-**Связи:** [concept.md](concept.md): 9. System concept; [requirements.md](requirements.md): C-7; [data.md](data.md): Sources; [architecture.md](architecture.md): 3. Key decisions, 9. Traceability; [D-94](#D-94): упоминает
+**Связи:** [concept.md](concept.md): 9. System concept; [requirements.md](requirements.md): C-7; [data.md](data.md): Sources; [architecture.md](architecture.md): 3. Key decisions, 9. Traceability; [mechanics.md](mechanics.md): 4. Internal contracts; [D-94](#D-94): упоминает; [D-98](#D-98): упоминает
 <!-- /links -->
 
 <a id="D-25"></a>
@@ -1917,7 +1918,7 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 **Заменяет:** D-17, D-75. **Уточняет:** D-4 (kind выводится), D-18 (errors входит в status), D-69 (замена целиком — правкой файла), D-71 (только полный reindex), D-79 (seq и attempts заменены embed_failures), D-93 (уточнение после сверки об активности рёбер и tree публикации снято), D-94 (п. 4–5: нет reindex --cancel и прогресса reindex в кэше).
 
 <!-- links -->
-**Связи:** [concept.md](concept.md): Changes since previous version; [requirements.md](requirements.md): Changes since previous version, FR-5, FR-6, FR-22, FR-27, FR-29, FR-30, FR-31, FR-32, FR-33, 12. Consistency check; [resource-math.md](resource-math.md): Changes since previous version, 2. Workload, A-10, Диагностика: размер без изменения хранения, 7. Consequences for the design; [contracts.md](contracts.md): Changes since previous version, Работа по завершению этапа без расширения интервью, Рабочие инженерные допущения для формализации, Проверка итерации contracts после R1; [data.md](data.md): Changes since previous version, 1. Summary, E-3, E-6, E-7, E-10, Что восстанавливается и что требует сохранности, 6. Storage classes and totals; [architecture.md](architecture.md): Changes since previous version, 2. Drivers, 3. Key decisions, Technology and constraints, 4. Parts, I-5, I-6, 6. Interfaces, 8. Cross-cutting concerns, 9. Traceability, 10. Reconciliation with earlier steps, 11. Risks, assumptions and open questions; [mechanics.md](mechanics.md): Правка 2026-10-20, 1. Summary, Фиксированный раунд mechanics R1, MC-1 — элементы и граф, MC-2 — состояния reindex, MC-3 — embeddings: работа из данных и попытки, MC-4 — источники и актуальность, MC-5 — процесс drain, MC-6 — чтение, поиск и обход, MC-7 — текущие проблемы и status, 7. Reconciliation with earlier steps, 10. Consistency check; [resilience.md](resilience.md): Правка 2026-10-21, 1. Summary, T-2, Практические границы без новых сервисов, Внешняя согласованная copy/restore-процедура, O-2; [roadmap.md](roadmap.md): Правка 2026-10-21, 1. Summary; [D-4](#D-4): упоминает; [D-7](#D-7): упоминает; [D-16](#D-16): упоминает; [D-17](#D-17): упоминает; [D-18](#D-18): упоминает; [D-19](#D-19): упоминает; [D-69](#D-69): упоминает; [D-71](#D-71): упоминает; [D-75](#D-75): упоминает; [D-77](#D-77): упоминает; [D-79](#D-79): упоминает; [D-83](#D-83): упоминает; [D-91](#D-91): упоминает; [D-92](#D-92): упоминает; [D-93](#D-93): упоминает; [D-94](#D-94): упоминает; [D-97](#D-97): упоминает
+**Связи:** [concept.md](concept.md): Changes since previous version; [requirements.md](requirements.md): Changes since previous version, FR-5, FR-6, FR-22, FR-27, FR-29, FR-30, FR-31, FR-32, FR-33, 12. Consistency check; [resource-math.md](resource-math.md): Changes since previous version, 2. Workload, A-10, Диагностика: размер без изменения хранения, 7. Consequences for the design; [contracts.md](contracts.md): Changes since previous version, Работа по завершению этапа без расширения интервью, Рабочие инженерные допущения для формализации, Проверка итерации contracts после R1; [data.md](data.md): Changes since previous version, 1. Summary, E-3, E-6, E-7, E-10, Что восстанавливается и что требует сохранности, 6. Storage classes and totals; [architecture.md](architecture.md): Changes since previous version, 2. Drivers, 3. Key decisions, Technology and constraints, 4. Parts, I-5, I-6, 6. Interfaces, 8. Cross-cutting concerns, 9. Traceability, 10. Reconciliation with earlier steps, 11. Risks, assumptions and open questions; [mechanics.md](mechanics.md): Правка 2026-10-20, 1. Summary, Фиксированный раунд mechanics R1, MC-1 — элементы и граф, MC-2 — состояния reindex, MC-3 — embeddings: работа из данных и попытки, MC-4 — источники и актуальность, MC-5 — процесс drain, MC-6 — чтение, поиск и обход, MC-7 — текущие проблемы и status, 7. Reconciliation with earlier steps, 10. Consistency check; [resilience.md](resilience.md): Правка 2026-10-21, 1. Summary, T-2, Практические границы без новых сервисов, Внешняя согласованная copy/restore-процедура, O-2; [roadmap.md](roadmap.md): Правка 2026-10-21, 1. Summary; [D-4](#D-4): упоминает; [D-7](#D-7): упоминает; [D-16](#D-16): упоминает; [D-17](#D-17): упоминает; [D-18](#D-18): упоминает; [D-19](#D-19): упоминает; [D-69](#D-69): упоминает; [D-71](#D-71): упоминает; [D-75](#D-75): упоминает; [D-77](#D-77): упоминает; [D-79](#D-79): упоминает; [D-83](#D-83): упоминает; [D-91](#D-91): упоминает; [D-92](#D-92): упоминает; [D-93](#D-93): упоминает; [D-94](#D-94): упоминает; [D-97](#D-97): упоминает; [D-98](#D-98): упоминает
 <!-- /links -->
 
 <a id="D-96"></a>
@@ -1952,7 +1953,7 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 **Уточняет:** D-22 (точный стек и поставка vec1), D-83 (настройки клиента), D-94 (механизм отмены).
 
 <!-- links -->
-**Связи:** [requirements.md](requirements.md): Changes since previous version, C-4, C-5, C-10; [contracts.md](contracts.md): Changes since previous version; [architecture.md](architecture.md): Changes since previous version, 3. Key decisions, Technology and constraints, S-6, NFR-5, 9. Traceability, 11. Risks, assumptions and open questions; [mechanics.md](mechanics.md): Правка 2026-10-20, MC-5 — процесс drain, MC-5 — результаты TK-4 и передача реализации, 5. Timing, memory and concurrency rules, 9. Deferred; [resilience.md](resilience.md): Правка 2026-10-21, T-2, DR-5; [roadmap.md](roadmap.md): Правка 2026-10-21, 1. Summary, TK-9, 9. Риски плана; [D-18](#D-18): упоминает; [D-22](#D-22): упоминает; [D-83](#D-83): упоминает; [D-94](#D-94): упоминает; [D-97](#D-97): упоминает
+**Связи:** [requirements.md](requirements.md): Changes since previous version, C-4, C-5, C-10; [contracts.md](contracts.md): Changes since previous version; [architecture.md](architecture.md): Changes since previous version, 3. Key decisions, Technology and constraints, S-6, NFR-5, 9. Traceability, 11. Risks, assumptions and open questions; [mechanics.md](mechanics.md): Правка 2026-10-20, MC-5 — процесс drain, MC-5 — результаты TK-4 и передача реализации, 5. Timing, memory and concurrency rules, 9. Deferred; [resilience.md](resilience.md): Правка 2026-10-21, T-2, DR-5; [roadmap.md](roadmap.md): Правка 2026-10-21, 1. Summary, TK-9, 9. Риски плана; [D-18](#D-18): упоминает; [D-22](#D-22): упоминает; [D-83](#D-83): упоминает; [D-94](#D-94): упоминает; [D-97](#D-97): упоминает; [D-98](#D-98): упоминает
 <!-- /links -->
 
 <a id="D-97"></a>
@@ -1973,4 +1974,26 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 
 <!-- links -->
 **Связи:** [mechanics.md](mechanics.md): Правка 2026-10-20, MC-2 — обнаружение, публикация по файлу и reindex
+<!-- /links -->
+
+<a id="D-98"></a>
+### D-98: Services зависят от четырёх портов: FileSystem, Storage, VersionControl, EmbeddingProvider
+> **Статус:** принято пользователем · **Дата:** 2026-10-22
+
+**Основание:** предложение пользователя разделить внутренний слой hexagonal и внешние зависимости; ответы: «Fine», «fine we can use single storage interface».
+
+1. Слои: DomainCore (чистые типы и правила метаграфа, без I/O) → Services (сценарии CLI и drain) → Ports → Adapters. Зависимости направлены только внутрь.
+2. Services видят четыре порта: FileSystem (блокировки index/embed, чтение и stat файлов корпуса), Storage (кэш и vectors.db как один интерфейс: согласованный read view, write unit публикации, операции с векторами, embed_failures, query_error, сброс векторов), VersionControl (снимки, чтение объектов, закрепление refs), EmbeddingProvider (texts → vectors).
+3. HTTP-клиент `ureq` — деталь адаптеров провайдеров Ollama и OpenAI, отдельного порта и знания об HTTP в Services нет.
+4. Один Storage сохраняет ограничения: чтение видит кэш и vectors.db одним снимком (MC-6), публикация — write unit кэша, сброс конфигурации — одна write-транзакция vectors.db с проверкой отпечатка (D-95); общей транзакции публикации и сброса нет.
+5. Контрактные порты I-2, I-8, I-11, I-12 остаются операциями этих интерфейсов, имена и сигнатуры контрактов не меняются.
+
+**Альтернативы:** раздельные порты cachedb и vectorsdb (ломают единый снимок чтения); порт httpServer (протечка протокола провайдеров в Services); порты по числу контрактов I-n.
+
+**Почему:** Services не должны знать SQLite, git, HTTP и файловую систему; четыре порта покрывают все внешние зависимости D-96 без дублирования контрактов.
+
+**Уточняет:** D-24 (какие порты), D-96 (где живёт ureq).
+
+<!-- links -->
+**Связи:** [architecture.md](architecture.md): 4. Parts; [mechanics.md](mechanics.md): Правка 2026-10-20, 4. Internal contracts
 <!-- /links -->
