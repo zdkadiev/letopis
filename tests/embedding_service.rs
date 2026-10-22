@@ -178,7 +178,7 @@ fn unwrap_current<T>(value: VectorOutcome<T>) -> T {
 fn start_success() -> HttpFixture {
     HttpFixture::start(FixtureReply::Status {
         status: 200,
-        body: r#"{"embeddings":[[1,2,3]]}"#.into(),
+        body: r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#.into(),
     })
 }
 fn start_failure() -> HttpFixture {
@@ -472,7 +472,7 @@ fn persistent_lock_prevents_another_drain() {
 #[test]
 fn reservation_precedes_http_and_new_work_is_found_after_compute() {
     let fixture = Fixture::new();
-    let (server, barrier) = start_paused(r#"{"embeddings":[[1,2,3]]}"#);
+    let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
     let old = fixture.publish("z.md", "old knowledge");
     let mut service = fixture.open_service();
@@ -493,7 +493,7 @@ fn reservation_precedes_http_and_new_work_is_found_after_compute() {
 #[test]
 fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
     let fixture = Fixture::new();
-    let (server, barrier) = start_paused(r#"{"embeddings":[[1,2,3]]}"#);
+    let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
     let old = fixture.publish("a.md", "old knowledge");
     let mut service = fixture.open_service();
@@ -528,7 +528,7 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
 #[test]
 fn reset_during_http_discards_old_result_without_old_cleanup() {
     let fixture = Fixture::new();
-    let (server, barrier) = start_paused(r#"{"embeddings":[[1,2,3]]}"#);
+    let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     fixture.write_config(&server.get_base_url(), 0);
     let hash = fixture.publish("a.md", "knowledge");
     let mut service = fixture.open_service();
@@ -552,7 +552,7 @@ fn reset_during_http_discards_old_result_without_old_cleanup() {
 #[test]
 fn late_old_query_success_or_error_cannot_replace_new_query_state() {
     for (body, new_success) in [
-        (r#"{"embeddings":[[1,2,3]]}"#, false),
+        (r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#, false),
         ("malformed response", false),
         ("malformed response", true),
     ] {
@@ -588,7 +588,7 @@ fn late_old_query_success_or_error_cannot_replace_new_query_state() {
 #[test]
 fn query_rechecks_dimension_established_during_http() {
     let fixture = Fixture::new();
-    let (server, barrier) = start_paused(r#"{"embeddings":[[1,2,3]]}"#);
+    let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
     let hash = fixture.publish("a.md", "knowledge");
     let mut service = fixture.open_service();

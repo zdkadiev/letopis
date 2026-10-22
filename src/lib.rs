@@ -23,6 +23,7 @@ pub fn open_git_snapshots(start: &Path) -> Result<impl GitSnapshots, SnapshotErr
 }
 
 mod storage;
+mod utils;
 use crate::service::{Storage, StorageResult};
 use crate::storage::SqliteStorage;
 

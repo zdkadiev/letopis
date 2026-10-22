@@ -1,4 +1,4 @@
-use super::http::{Http, build_endpoint, decode_vectors, invalid_response, prepare_body};
+use super::http::{Http, build_endpoint, decode_vectors, prepare_body, reject_response};
 use crate::service::{EmbeddingConfig, EmbeddingProvider, EmbeddingResult, ProviderKind};
 use serde_json::Value;
 use std::num::NonZeroUsize;
@@ -30,10 +30,15 @@ impl EmbeddingProvider for Ollama {
             }
         }
         let response = self.http.post(&endpoint, &body, None)?;
+        response
+            .get("model")
+            .and_then(Value::as_str)
+            .filter(|model| !model.is_empty())
+            .ok_or_else(reject_response)?;
         let items = response
             .get("embeddings")
             .and_then(Value::as_array)
-            .ok_or_else(invalid_response)?;
+            .ok_or_else(reject_response)?;
         decode_vectors(
             items,
             texts.len(),

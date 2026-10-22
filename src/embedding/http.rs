@@ -1,6 +1,7 @@
 use crate::service::{
     EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingResult, ProviderKind,
 };
+use crate::utils::JsonValue;
 use serde_json::{Value, json};
 use std::{num::NonZeroUsize, time::Duration};
 use ureq::{
@@ -10,6 +11,8 @@ use ureq::{
 };
 
 const ATTEMPT_DEADLINE: Duration = Duration::from_secs(60);
+// Match ureq's ordinary read_to_vec cap explicitly for the configured reader.
+const MAX_RESPONSE_BYTES: u64 = 10 * 1024 * 1024;
 const MIN_DIMENSIONS: usize = 2;
 const MAX_DIMENSIONS: usize = 4096;
 
@@ -54,13 +57,15 @@ impl Http {
         let bytes = response
             .body_mut()
             .with_config()
+            .limit(MAX_RESPONSE_BYTES)
             .read_to_vec()
             .map_err(classify)?;
-        let value: Value = serde_json::from_slice(&bytes).map_err(|cause| {
-            EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidResponse, cause)
-        })?;
+        let JsonValue(value) =
+            serde_json::from_slice::<JsonValue<false>>(&bytes).map_err(|cause| {
+                EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidResponse, cause)
+            })?;
         if value.get("error").is_some() {
-            return Err(invalid_response());
+            return Err(reject_response());
         }
         Ok(value)
     }
@@ -126,7 +131,7 @@ pub(super) fn decode_vectors(
     provider: ProviderKind,
 ) -> EmbeddingResult<Vec<Vec<f32>>> {
     if items.len() != count {
-        return Err(invalid_response());
+        return Err(reject_response());
     }
     let mut result = vec![None; count];
     let mut expected = dimensions;
@@ -135,12 +140,12 @@ pub(super) fn decode_vectors(
         let vector = read_vector(vector, expected)?;
         expected = NonZeroUsize::new(vector.len());
         if result[index].replace(vector).is_some() {
-            return Err(invalid_response());
+            return Err(reject_response());
         }
     }
     result
         .into_iter()
-        .map(|vector| vector.ok_or_else(invalid_response))
+        .map(|vector| vector.ok_or_else(reject_response))
         .collect()
 }
 fn read_index_vector(
@@ -157,17 +162,17 @@ fn read_index_vector(
                 .and_then(Value::as_u64)
                 .and_then(|index| usize::try_from(index).ok())
                 .filter(|index| *index < count)
-                .ok_or_else(invalid_response)?;
-            Ok((index, item.get("embedding").ok_or_else(invalid_response)?))
+                .ok_or_else(reject_response)?;
+            Ok((index, item.get("embedding").ok_or_else(reject_response)?))
         }
     }
 }
 fn read_vector(value: &Value, expected: Option<NonZeroUsize>) -> EmbeddingResult<Vec<f32>> {
-    let values = value.as_array().ok_or_else(invalid_response)?;
+    let values = value.as_array().ok_or_else(reject_response)?;
     if !(MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(&values.len())
         || expected.is_some_and(|size| values.len() != size.get())
     {
-        return Err(invalid_response());
+        return Err(reject_response());
     }
     values.iter().map(read_component).collect()
 }
@@ -175,17 +180,18 @@ fn read_component(value: &Value) -> EmbeddingResult<f32> {
     let number = value
         .as_f64()
         .filter(|number| number.is_finite() && number.abs() <= f64::from(f32::MAX))
-        .ok_or_else(invalid_response)?;
+        .ok_or_else(reject_response)?;
     // Conversion is deliberately rounded to float32 after checking its finite range.
     #[allow(clippy::cast_possible_truncation)]
     let component = number as f32;
     Ok(component)
 }
-pub(super) fn invalid_response() -> EmbeddingError {
+pub(super) fn reject_response() -> EmbeddingError {
     EmbeddingError::new(EmbeddingErrorKind::InvalidResponse)
 }
 fn classify(error: ureq::Error) -> EmbeddingError {
     let kind = match &error {
+        ureq::Error::BodyExceedsLimit(_) => EmbeddingErrorKind::InvalidResponse,
         ureq::Error::Timeout(_) => EmbeddingErrorKind::Timeout,
         ureq::Error::Io(error) if error.kind() == std::io::ErrorKind::TimedOut => {
             EmbeddingErrorKind::Timeout

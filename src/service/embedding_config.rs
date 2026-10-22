@@ -1,14 +1,9 @@
 use super::{EmbeddingError, EmbeddingErrorKind, EmbeddingResult};
 use crate::domain::Sha256;
-use serde::{
-    Deserialize, Deserializer,
-    de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor},
-};
-use serde_json::{Map, Value, value::RawValue};
+use crate::utils::JsonValue;
+use serde_json::{Map, Value};
 use std::{fmt, num::NonZeroUsize};
 
-// Preserve serde_json's default nesting budget across borrowed-token parsers.
-const MAX_JSON_DEPTH: usize = 128;
 const MIN_DIMENSIONS: usize = 2;
 const MAX_DIMENSIONS: usize = 4096;
 const ROOT_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retries"];
@@ -39,38 +34,39 @@ impl EmbeddingConfig {
     /// Rejects malformed shapes, forbidden keys, invalid parameters, unsupported
     /// dimensions and budgets not exactly preserved by JCS or storage integers.
     pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
-        let UniqueValue(value) = serde_json::from_slice(bytes).map_err(invalid_cause)?;
-        let root = value.as_object().ok_or_else(invalid)?;
+        let JsonValue(value) =
+            serde_json::from_slice::<JsonValue<true>>(bytes).map_err(map_config_error)?;
+        let root = value.as_object().ok_or_else(reject_config)?;
         if root.len() != ROOT_FIELDS.len()
             || root.keys().any(|key| !ROOT_FIELDS.contains(&key.as_str()))
         {
-            return Err(invalid());
+            return Err(reject_config());
         }
         let provider = match root.get("provider").and_then(Value::as_str) {
             Some("ollama") => ProviderKind::Ollama,
             Some("openai") => ProviderKind::Openai,
-            _ => return Err(invalid()),
+            _ => return Err(reject_config()),
         };
         let model = root
             .get("model")
             .and_then(Value::as_str)
             .filter(|model| !model.is_empty())
-            .ok_or_else(invalid)?;
+            .ok_or_else(reject_config)?;
         let parameters = root
             .get("parameters")
             .and_then(Value::as_object)
-            .ok_or_else(invalid)?;
+            .ok_or_else(reject_config)?;
         validate_parameters(parameters)?;
         let dimensions = read_dimensions(parameters)?;
         let retries = root
             .get("max_retries")
             .and_then(Value::as_u64)
-            .ok_or_else(invalid)?;
+            .ok_or_else(reject_config)?;
         let max_attempts = retries
             .checked_add(1)
             .filter(|count| i64::try_from(*count).is_ok())
-            .ok_or_else(invalid)?;
-        let canonical = serde_json_canonicalizer::to_vec(&value).map_err(invalid_cause)?;
+            .ok_or_else(reject_config)?;
+        let canonical = serde_json_canonicalizer::to_vec(&value).map_err(map_config_error)?;
         verify_execution_identity(&value, &canonical)?;
         Ok(Self {
             provider,
@@ -114,10 +110,10 @@ impl fmt::Debug for EmbeddingConfig {
             .finish_non_exhaustive()
     }
 }
-fn invalid() -> EmbeddingError {
+fn reject_config() -> EmbeddingError {
     EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)
 }
-fn invalid_cause(cause: impl std::error::Error + Send + Sync + 'static) -> EmbeddingError {
+fn map_config_error(cause: impl std::error::Error + Send + Sync + 'static) -> EmbeddingError {
     EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
 }
 fn validate_parameters(parameters: &Map<String, Value>) -> EmbeddingResult<()> {
@@ -138,7 +134,7 @@ fn validate_parameters(parameters: &Map<String, Value>) -> EmbeddingResult<()> {
             .get("encoding_format")
             .is_some_and(|v| v.as_str() != Some("float"))
     {
-        return Err(invalid());
+        return Err(reject_config());
     }
     Ok(())
 }
@@ -150,15 +146,16 @@ fn read_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<No
                 .as_u64()
                 .and_then(|size| usize::try_from(size).ok())
                 .filter(|size| (MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(size))
-                .ok_or_else(invalid)?;
-            NonZeroUsize::new(size).ok_or_else(invalid)
+                .ok_or_else(reject_config)?;
+            NonZeroUsize::new(size).ok_or_else(reject_config)
         })
         .transpose()
 }
 fn verify_execution_identity(original: &Value, bytes: &[u8]) -> EmbeddingResult<()> {
-    let canonical: Value = serde_json::from_slice(bytes).map_err(invalid_cause)?;
+    let JsonValue(canonical) =
+        serde_json::from_slice::<JsonValue<false>>(bytes).map_err(map_config_error)?;
     if !has_exact_integers(original, &canonical) {
-        return Err(invalid());
+        return Err(reject_config());
     }
     Ok(())
 }
@@ -184,110 +181,25 @@ fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
     }
 }
 
-// Deserialize recursively before constructing any Value object, so duplicates
-// cannot disappear into serde_json's last-key-wins representation.
-struct UniqueValue(Value);
-impl<'de> Deserialize<'de> for UniqueValue {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        UniqueValueSeed { depth: 0 }.deserialize(deserializer)
-    }
-}
-struct UniqueValueSeed {
-    depth: usize,
-}
-impl<'de> DeserializeSeed<'de> for UniqueValueSeed {
-    type Value = UniqueValue;
-    fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
-        if self.depth >= MAX_JSON_DEPTH {
-            return Err(de::Error::custom("JSON nesting exceeds supported limit"));
-        }
-        let raw = <&RawValue>::deserialize(deserializer)?;
-        if !has_supported_integer_token(raw.get()) {
-            return Err(de::Error::custom("integer outside supported range"));
-        }
-        let mut parser = serde_json::Deserializer::from_str(raw.get());
-        parser
-            .deserialize_any(UniqueVisitor { depth: self.depth })
-            .map_err(de::Error::custom)
-    }
-}
-// RawValue borrows the original token; serde_json would otherwise turn an
-// overflowing integer into f64 before the visitor can check its exact value.
-fn has_supported_integer_token(raw: &str) -> bool {
-    let is_number = raw
-        .as_bytes()
-        .first()
-        .is_some_and(|first| first.is_ascii_digit() || *first == b'-');
-    if !is_number || raw.contains(['.', 'e', 'E']) {
-        return true;
-    }
-    if raw.starts_with('-') {
-        raw.parse::<i64>().is_ok()
-    } else {
-        raw.parse::<u64>().is_ok()
-    }
-}
-struct UniqueVisitor {
-    depth: usize,
-}
-impl<'de> Visitor<'de> for UniqueVisitor {
-    type Value = UniqueValue;
-    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("unique-key JSON")
-    }
-    fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
-        Ok(UniqueValue(v.into()))
-    }
-    fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
-        Ok(UniqueValue(v.into()))
-    }
-    fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
-        Ok(UniqueValue(v.into()))
-    }
-    fn visit_f64<E: de::Error>(self, v: f64) -> Result<Self::Value, E> {
-        serde_json::Number::from_f64(v)
-            .map(|n| UniqueValue(Value::Number(n)))
-            .ok_or_else(|| E::custom("invalid number"))
-    }
-    fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
-        Ok(UniqueValue(v.into()))
-    }
-    fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
-        Ok(UniqueValue(Value::Null))
-    }
-    fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Self::Value, A::Error> {
-        let mut values = Vec::new();
-        while let Some(UniqueValue(value)) = sequence.next_element_seed(UniqueValueSeed {
-            depth: self.depth + 1,
-        })? {
-            values.push(value);
-        }
-        Ok(UniqueValue(Value::Array(values)))
-    }
-    fn visit_map<A: MapAccess<'de>>(self, mut object: A) -> Result<Self::Value, A::Error> {
-        let mut values = Map::new();
-        while let Some(key) = object.next_key::<String>()? {
-            let UniqueValue(value) = object.next_value_seed(UniqueValueSeed {
-                depth: self.depth + 1,
-            })?;
-            if values.insert(key, value).is_some() {
-                return Err(de::Error::custom("duplicate key"));
-            }
-        }
-        Ok(UniqueValue(Value::Object(values)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::UniqueValue;
+    use crate::utils::JsonValue;
 
     #[test]
     fn bounds_raw_token_traversal_before_canonicalization() {
         // Arrange
         let nested = format!("{}0{}", "[".repeat(130), "]".repeat(130));
         // Act
-        let result = serde_json::from_str::<UniqueValue>(&nested);
+        let result = serde_json::from_str::<JsonValue<true>>(&nested);
+        // Assert
+        assert!(result.is_err());
+    }
+    #[test]
+    fn rejects_trailing_json_after_configuration() {
+        // Arrange
+        let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":0} null"#;
+        // Act
+        let result = super::EmbeddingConfig::parse(bytes);
         // Assert
         assert!(result.is_err());
     }

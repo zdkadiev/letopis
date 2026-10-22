@@ -26,7 +26,7 @@ use tempfile::TempDir;
 
 const LIMIT: Duration = Duration::from_secs(15);
 const CHILD: &str = "service::embedding::tests::process::run_child";
-const SUCCESS: &str = r#"{"embeddings":[[1,2,3]]}"#;
+const SUCCESS: &str = r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#;
 
 pub(super) fn checkpoint(stage: &str) {
     if env::var("LETOPIS_PROCESS_STAGE").as_deref() != Ok(stage) {
@@ -343,17 +343,24 @@ fn edit_before_send_skips_stale_hash_without_reservation() {
     .unwrap();
     barrier.write_all(b"C").unwrap();
     // In a guard mutation an HTTP request must complete so the state oracle fails.
+    let mut requests = 0;
     let start = Instant::now();
     while child.child.try_wait().unwrap().is_none() && start.elapsed() < LIMIT {
         if let Ok((stream, _)) = fixture.listener.accept() {
+            requests += 1;
             reply(stream, SUCCESS);
         }
         thread::sleep(Duration::from_millis(5));
     }
     child.finish();
-    // Assert
+    while let Ok((stream, _)) = fixture.listener.accept() {
+        requests += 1;
+        reply(stream, SUCCESS);
+    }
+    // Assert stored state first to retain the compiling mutation oracle.
     fixture.assert_state(&fixture.config, None, None);
     assert_eq!(fixture.capture_cache(), before);
+    assert_eq!(requests, 0, "stale text must never reach HTTP");
 }
 
 #[test]

@@ -153,3 +153,12 @@ After user review of this written specification, use Superpowers writing-plans t
 Execution update 2026-10-22: Tasks 1–4 passed their per-task reviews. Task 5 process acceptance and compiling/restored negative controls passed; macOS/Linux receipts passed at `8d39c11ca5ad`; independent Task 5/final review remains pending. Accepted query observation ruling is retained in the implementation plan; TK-12 must validate against its pinned index read.
 
 [Production acceptance report](../../zkit/letopis/checks/TK-13/report.md) maps every acceptance row to executed assertions and records source hashes, real60s execution, process/mutation counts, architecture self-review and deferred findings. Acceptance rows requiring independent review remain open until the controller gate.
+
+
+## Final review clarifications (execution rulings 4 and 5)
+
+Each HTTP response is limited to 10 MiB (10 * 1024 * 1024 bytes), explicitly retaining ureq's ordinary convenience-reader default. Overflow returns safe typed InvalidResponse under the same single attempt deadline. This is shared transport policy, not a new config field or implicit input chunking. Responses are checked as literal wire JSON types; an object containing serde_json's private RawValue key remains an object. Such objects are also legal unknown configuration values and participate in JCS identity normally. Original integer-token overflow, recursive duplicate-key/depth and integer execution-fidelity guards remain in force. Decimal/exponent inputs keep their existing binary64/JCS semantics even when their canonical spelling is an integer beyond i64/u64.
+
+The canonical X-2 native response subset requires `model` to be present, a string and nonempty. Its value need not equal the requested model: aliases are accepted. This schema requirement overrides omitted metadata in earlier implementation fixtures. Current native success and vector-validation fixtures include model metadata; historical TK-3/TK-6 inputs and evidence remain unchanged.
+
+The final combined fix wave includes inherited child-output isolation, forced-watchdog descendant cleanup, helper verb names and an independent zero-HTTP stale-hash assertion. Fresh checks and evidence are required for the changed tree; independent scoped re-review and controller approval remain pending.

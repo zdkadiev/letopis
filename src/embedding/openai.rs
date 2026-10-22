@@ -1,4 +1,4 @@
-use super::http::{Http, build_endpoint, decode_vectors, invalid_response, prepare_body};
+use super::http::{Http, build_endpoint, decode_vectors, prepare_body, reject_response};
 use crate::service::{
     EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult,
     ProviderKind,
@@ -49,7 +49,7 @@ impl EmbeddingProvider for Openai {
         let items = response
             .get("data")
             .and_then(Value::as_array)
-            .ok_or_else(invalid_response)?;
+            .ok_or_else(reject_response)?;
         decode_vectors(
             items,
             texts.len(),

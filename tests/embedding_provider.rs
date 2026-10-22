@@ -63,7 +63,7 @@ fn start_fixture(body: &Value) -> HttpFixture {
 #[test]
 fn sends_native_request_without_silent_truncation_or_unknown_parameters() {
     // Arrange
-    let server = start_fixture(&json!({"embeddings":[[1,2,3],[4,5,6]]}));
+    let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3],[4,5,6]]}));
     let config = build_config(
         "ollama",
         &server.get_base_url(),
@@ -129,14 +129,14 @@ fn reorders_compatible_response_and_sends_only_supported_parameters() {
 fn rejects_malformed_native_vectors() {
     // Arrange
     let bodies = [
-        json!({"embeddings":[]}),
-        json!({"embeddings":[[]]}),
-        json!({"embeddings":[[1]]}),
-        json!({"embeddings":[[1,2],[1,2,3]]}),
-        json!({"embeddings":[[1,2,3e99]]}),
-        json!({"embeddings":[[1,"secret",3]]}),
+        json!({"model":"fixture-alias","embeddings":[]}),
+        json!({"model":"fixture-alias","embeddings":[[]]}),
+        json!({"model":"fixture-alias","embeddings":[[1]]}),
+        json!({"model":"fixture-alias","embeddings":[[1,2],[1,2,3]]}),
+        json!({"model":"fixture-alias","embeddings":[[1,2,3e99]]}),
+        json!({"model":"fixture-alias","embeddings":[[1,"secret",3]]}),
         json!({"error":"provider-secret"}),
-        json!({"embeddings":[[1,2,3],[4,5,6]]}),
+        json!({"model":"fixture-alias","embeddings":[[1,2,3],[4,5,6]]}),
     ];
     for body in bodies {
         let server = start_fixture(&body);
@@ -183,7 +183,7 @@ fn rejects_non_json_and_non_success_without_retrying() {
 #[test]
 fn refuses_redirects() {
     // Arrange
-    let destination = start_fixture(&json!({"embeddings":[[1,2,3]]}));
+    let destination = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let source = HttpFixture::start(FixtureReply::Redirect {
         location: destination.get_base_url(),
     });
@@ -400,7 +400,7 @@ fn keeps_ollama_available_without_compatible_credentials() {
         return;
     }
     // Arrange
-    let server = start_fixture(&json!({"embeddings":[[1,2,3]]}));
+    let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let compatible = build_config("openai", &server.get_base_url(), &json!({}));
     let native = build_config("ollama", &server.get_base_url(), &json!({}));
     let provider = open_embedding_provider().unwrap();
@@ -453,7 +453,7 @@ fn disables_environment_proxies_and_native_authorization() {
         return;
     }
     // Arrange
-    let server = start_fixture(&json!({"embeddings":[[1,2,3]]}));
+    let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
     // Act
     let vectors = open_embedding_provider()
@@ -493,7 +493,7 @@ fn redacts_cause_bearing_errors_and_config_debug() {
 #[test]
 fn rejects_empty_inputs_and_incompatible_requested_dimensions_without_io() {
     // Arrange
-    let server = start_fixture(&json!({"embeddings":[[1,2,3]]}));
+    let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let config = build_config("ollama", &server.get_base_url(), &json!({"dimensions":3}));
     let provider = open_embedding_provider().unwrap();
     // Act / Assert
@@ -531,7 +531,7 @@ fn attempt_obeys_real_sixty_second_deadline() {
     // Arrange
     let server = HttpFixture::start(FixtureReply::DelayedBody {
         delay: Duration::from_secs(65),
-        body: json!({"embeddings":[[1,2,3]]}).to_string(),
+        body: json!({"model":"fixture-alias","embeddings":[[1,2,3]]}).to_string(),
     });
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
     let start = Instant::now();
@@ -591,7 +591,7 @@ fn validates_unconfigured_dimensions_without_sending_an_implicit_request_dimensi
     for size in [2, 4096] {
         // Arrange
         let vector = vec![0.5; size];
-        let server = start_fixture(&json!({"embeddings":[vector]}));
+        let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[vector]}));
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
         // Act
         let vectors = open_embedding_provider()
@@ -610,7 +610,7 @@ fn rejects_inconsistent_unconfigured_and_unsupported_response_dimensions() {
         json!([vec![0.0; 4097], vec![0.0; 4097]]),
     ] {
         // Arrange
-        let server = start_fixture(&json!({"embeddings":embeddings}));
+        let server = start_fixture(&json!({"model":"fixture-alias","embeddings":embeddings}));
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
         // Act
         let error = open_embedding_provider()
@@ -624,7 +624,7 @@ fn rejects_inconsistent_unconfigured_and_unsupported_response_dimensions() {
 #[test]
 fn appends_endpoint_before_query_and_ignores_fragment() {
     // Arrange
-    let server = start_fixture(&json!({"embeddings":[[1,2,3]]}));
+    let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let endpoint = format!("{}/?fixture=1#ignored", server.get_base_url());
     let config = build_config("ollama", &endpoint, &json!({}));
     // Act
@@ -642,7 +642,7 @@ fn controlled_barrier_releases_an_owned_request() {
     let barrier = ResponseBarrier::default();
     let server = HttpFixture::start(FixtureReply::Barrier {
         barrier: barrier.clone(),
-        body: json!({"embeddings":[[1,2,3]]}).to_string(),
+        body: json!({"model":"fixture-alias","embeddings":[[1,2,3]]}).to_string(),
     });
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
     let provider = open_embedding_provider().unwrap();
@@ -756,4 +756,171 @@ fn retains_bounded_json_nesting_while_preserving_raw_integer_tokens() {
     let result = EmbeddingConfig::parse(bytes.as_bytes());
     // Assert
     assert!(result.is_err());
+}
+
+#[test]
+fn preserves_reserved_key_objects_in_unknown_config_parameters() {
+    // Arrange
+    let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","future":{"$serde_json::private::RawValue":"null"}},"max_retries":0}"#;
+    let reordered = br#"{"max_retries":0,"parameters":{"future":{"$serde_json::private::RawValue":"null"},"base_url":"http://localhost/api"},"model":"fixture","provider":"ollama"}"#;
+    // Act
+    let first = parse_config(bytes);
+    let second = parse_config(reordered);
+    // Assert
+    assert_eq!(
+        first.get_parameters()["future"],
+        json!({"$serde_json::private::RawValue":"null"})
+    );
+    assert_eq!(first.get_identity(), second.get_identity());
+    let changed = parse_config(br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","future":null},"max_retries":0}"#);
+    assert_ne!(first.get_identity(), changed.get_identity());
+}
+
+#[test]
+fn preserves_decimal_and_exponent_values_with_large_integer_jcs_spelling() {
+    for number in ["18446744073709551616.0", "1e20", "-1e20"] {
+        // Arrange
+        let bytes = format!(
+            r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","future":{number}}},"max_retries":0}}"#
+        );
+        // Act
+        let config = parse_config(bytes.as_bytes());
+        // Assert
+        assert_eq!(
+            config.get_parameters()["future"].as_f64(),
+            number.parse::<f64>().ok()
+        );
+    }
+}
+
+#[test]
+fn rejects_object_wire_components_indices_and_wrapped_responses() {
+    if run_isolated(
+        "rejects_object_wire_components_indices_and_wrapped_responses",
+        Some("fixture-secret"),
+        &[],
+    ) {
+        return;
+    }
+    let object = json!({"$serde_json::private::RawValue":"1"});
+    for protocol in ["ollama", "openai"] {
+        let valid = build_response(protocol);
+        let mut component = valid.clone();
+        if protocol == "ollama" {
+            component["embeddings"][0][0] = object.clone();
+        } else {
+            component["data"][0]["embedding"][0] = object.clone();
+        }
+        let wrapped = json!({"$serde_json::private::RawValue":valid.to_string()});
+        let mut invalid = vec![component, wrapped];
+        if protocol == "openai" {
+            let mut index = valid;
+            index["data"][0]["index"] = json!({"$serde_json::private::RawValue":"0"});
+            invalid.push(index);
+        }
+        for body in invalid {
+            assert_rejected_response(
+                protocol,
+                FixtureReply::Status {
+                    status: 200,
+                    body: body.to_string(),
+                },
+            );
+        }
+    }
+}
+
+fn build_response(protocol: &str) -> Value {
+    if protocol == "ollama" {
+        json!({"model":"fixture-alias","embeddings":[[1,2,3]]})
+    } else {
+        json!({"data":[{"index":0,"embedding":[1,2,3]}]})
+    }
+}
+
+fn assert_rejected_response(protocol: &str, reply: FixtureReply) {
+    // Arrange
+    let server = HttpFixture::start(reply);
+    let config = build_config(protocol, &server.get_base_url(), &json!({}));
+    // Act
+    let error = open_embedding_provider()
+        .unwrap()
+        .embed(&config, &["knowledge-secret"], None)
+        .unwrap_err();
+    // Assert
+    assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
+    assert!(!format!("{error} {error:?}").contains("secret"));
+    assert_eq!(server.take_requests().len(), 1);
+}
+
+#[test]
+fn bounds_both_protocol_bodies_with_and_without_content_length() {
+    if run_isolated(
+        "bounds_both_protocol_bodies_with_and_without_content_length",
+        Some("fixture-secret"),
+        &[],
+    ) {
+        return;
+    }
+    for protocol in ["ollama", "openai"] {
+        // Arrange: valid protocol payload with a large unknown field.
+        let mut body = build_response(protocol);
+        body["extra"] = format!("provider-secret{}", "x".repeat(10 * 1024 * 1024)).into();
+        let body = body.to_string();
+        for reply in [
+            FixtureReply::Status {
+                status: 200,
+                body: body.clone(),
+            },
+            FixtureReply::CloseDelimited { body: body.clone() },
+        ] {
+            assert_rejected_response(protocol, reply);
+        }
+        // Act: a normal bounded response still succeeds, including model aliases.
+        let server = start_fixture(&build_response(protocol));
+        let config = build_config(protocol, &server.get_base_url(), &json!({}));
+        let vectors = open_embedding_provider()
+            .unwrap()
+            .embed(&config, &["input"], None)
+            .unwrap();
+        // Assert
+        assert_eq!(vectors, vec![vec![1., 2., 3.]]);
+        assert_eq!(server.take_requests().len(), 1);
+    }
+}
+
+#[test]
+fn rejects_missing_empty_and_wrong_type_native_model() {
+    for model in [
+        None,
+        Some(json!("")),
+        Some(json!(1)),
+        Some(json!(null)),
+        Some(json!({"$serde_json::private::RawValue":"\"fixture\""})),
+    ] {
+        let mut body = build_response("ollama");
+        body.as_object_mut().unwrap().remove("model");
+        if let Some(model) = model {
+            body["model"] = model;
+        }
+        assert_rejected_response(
+            "ollama",
+            FixtureReply::Status {
+                status: 200,
+                body: body.to_string(),
+            },
+        );
+    }
+}
+
+#[test]
+fn rejects_trailing_response_tokens_and_excessive_depth() {
+    let valid = build_response("ollama").to_string();
+    let deep = format!("{}0{}", "[".repeat(130), "]".repeat(130));
+    for body in [
+        format!("{valid} null"),
+        format!(r#"{{"model":"fixture","embeddings":[[1,2,3]],"extra":{deep}}}"#),
+    ] {
+        assert_rejected_response("ollama", FixtureReply::Status { status: 200, body });
+    }
 }

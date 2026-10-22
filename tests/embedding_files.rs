@@ -3,6 +3,7 @@ use letopis::markdown::{MarkdownParser, parse};
 use letopis::open_embedding_files;
 use letopis::service::{EmbeddingFiles, Markdown, ParsedFile};
 use std::fs;
+use std::io::{Read, Seek, SeekFrom};
 use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -31,24 +32,37 @@ impl Drop for Fixture {
         fs::remove_dir_all(&self.0).unwrap();
     }
 }
-struct OwnedChild(Child);
+struct OwnedChild(Child, fs::File);
 impl OwnedChild {
     fn spawn(root: &Path, case: &str) -> Self {
+        let output = tempfile::tempfile().unwrap();
         Self(
             Command::new(std::env::current_exe().unwrap())
                 .args(["--exact", "embedding_files_child", "--nocapture"])
                 .env(CHILD_ROOT, root)
                 .env(CHILD_CASE, case)
+                .stdout(Stdio::from(output.try_clone().unwrap()))
+                .stderr(Stdio::from(output.try_clone().unwrap()))
                 .stdin(Stdio::null())
                 .spawn()
                 .unwrap(),
+            output,
         )
+    }
+    fn read_capture(&mut self) -> String {
+        self.1.seek(SeekFrom::Start(0)).unwrap();
+        let mut bytes = Vec::new();
+        (&mut self.1)
+            .take(64 * 1024)
+            .read_to_end(&mut bytes)
+            .unwrap();
+        String::from_utf8_lossy(&bytes).into_owned()
     }
     fn wait_success(&mut self) {
         let start = Instant::now();
         loop {
             if let Some(status) = self.0.try_wait().unwrap() {
-                assert!(status.success());
+                assert!(status.success(), "child failed: {}", self.read_capture());
                 return;
             }
             assert!(start.elapsed() < DEADLINE, "child exceeded deadline");

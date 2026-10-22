@@ -16,6 +16,9 @@ pub enum FixtureReply {
         status: u16,
         body: String,
     },
+    CloseDelimited {
+        body: String,
+    },
     Redirect {
         location: String,
     },
@@ -171,7 +174,9 @@ fn write_reply(stream: &mut TcpStream, reply: &FixtureReply, stop: &AtomicBool) 
             pause(*delay, stop);
             (200, body.as_str(), String::new())
         }
-        FixtureReply::DelayedBody { body, .. } => (200, body.as_str(), String::new()),
+        FixtureReply::CloseDelimited { body } | FixtureReply::DelayedBody { body, .. } => {
+            (200, body.as_str(), String::new())
+        }
         FixtureReply::Barrier { barrier, body } => {
             barrier.wait(stop);
             (200, body.as_str(), String::new())
@@ -180,9 +185,13 @@ fn write_reply(stream: &mut TcpStream, reply: &FixtureReply, stop: &AtomicBool) 
     if stop.load(Ordering::Relaxed) {
         return;
     }
+    let length = if matches!(reply, FixtureReply::CloseDelimited { .. }) {
+        String::new()
+    } else {
+        format!("Content-Length: {}\r\n", body.len())
+    };
     let header = format!(
-        "HTTP/1.1 {status} Fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n",
-        body.len()
+        "HTTP/1.1 {status} Fixture\r\nContent-Type: application/json\r\n{length}Connection: close\r\n{extra}\r\n"
     );
     if stream.write_all(header.as_bytes()).is_err() {
         return;
