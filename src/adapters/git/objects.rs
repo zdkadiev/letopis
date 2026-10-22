@@ -1,11 +1,13 @@
-use super::GitCliAdapter;
+use super::{
+    GitCliAdapter,
+    constants::{
+        BLOB_KIND, COMMIT_KIND, EXECUTABLE_FILE_MODE, GITLINK_KIND, GITLINK_MODE,
+        REGULAR_FILE_MODE, SYMLINK_MODE, TREE_KIND, TREE_MODE,
+    },
+};
 use crate::{
     domain::{RepoPath, TreeOid},
-    service::ports::git::{
-        SnapshotError,
-        SnapshotErrorKind::{self, *},
-        SnapshotFile,
-    },
+    service::ports::git::{SnapshotError, SnapshotErrorKind, SnapshotFile},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -20,8 +22,11 @@ pub(super) struct Entry {
     pub(super) oid: String,
     pub(super) name: Vec<u8>,
 }
-fn integrity() -> SnapshotError {
-    SnapshotError::new(InternalError, "Git object integrity failed")
+fn make_integrity_error() -> SnapshotError {
+    SnapshotError::new(
+        SnapshotErrorKind::InternalError,
+        "Git object integrity failed",
+    )
 }
 impl ObjectDb<'_> {
     pub(super) fn run(
@@ -37,26 +42,31 @@ impl ObjectDb<'_> {
     }
     fn parse_oid(&self, raw: &[u8]) -> Result<TreeOid, SnapshotError> {
         let text = std::str::from_utf8(raw)
-            .map_err(|_| integrity())?
+            .map_err(|_| make_integrity_error())?
             .trim_end_matches('\n');
         if text.len() != self.git.oid_len {
-            return Err(integrity());
+            return Err(make_integrity_error());
         }
-        TreeOid::parse(text).map_err(|_| integrity())
+        TreeOid::parse(text).map_err(|_| make_integrity_error())
     }
     pub(super) fn validate_tree(&self, oid: &TreeOid) -> Result<(), SnapshotError> {
         if oid.as_str().len() != self.git.oid_len {
             return Err(SnapshotError::new(
-                InvalidRequest,
+                SnapshotErrorKind::InvalidRequest,
                 "OID does not match repository object format",
             ));
         }
-        self.verified(oid.as_str(), "tree", NotFound, InvalidRequest)
-            .map(|_| ())
+        self.verify_object(
+            oid.as_str(),
+            TREE_KIND,
+            SnapshotErrorKind::NotFound,
+            SnapshotErrorKind::InvalidRequest,
+        )
+        .map(|_| ())
     }
     // Check type without peeling, read raw bytes and independently rehash without
     // writing. A decodable loose object under the wrong OID must never be trusted.
-    pub(super) fn verified(
+    pub(super) fn verify_object(
         &self,
         oid: &str,
         kind: &str,
@@ -70,47 +80,52 @@ impl ObjectDb<'_> {
         if info == format!("{oid} missing\n").as_bytes() {
             return Err(SnapshotError::new(missing, "Git object is missing"));
         }
-        let info = std::str::from_utf8(&info).map_err(|_| integrity())?;
+        let info = std::str::from_utf8(&info).map_err(|_| make_integrity_error())?;
         let fields: Vec<_> = info.split_whitespace().collect();
         if fields.len() != 3 || fields[0] != oid || fields[2].parse::<usize>().is_err() {
-            return Err(integrity());
+            return Err(make_integrity_error());
         }
         if fields[1] != kind {
             return Err(SnapshotError::new(wrong_type, "unexpected Git object type"));
         }
         let bytes = self.run(&["cat-file", kind, oid], None)?;
         if fields[2].parse::<usize>().ok() != Some(bytes.len()) {
-            return Err(integrity());
+            return Err(make_integrity_error());
         }
         let actual = self.parse_oid(&self.run(
             &["hash-object", "-t", kind, "--no-filters", "--stdin"],
             Some(&bytes),
         )?)?;
         if actual.as_str() != oid {
-            return Err(integrity());
+            return Err(make_integrity_error());
         }
         Ok(bytes)
     }
-    pub(super) fn entries(&self, oid: &str) -> Result<Vec<Entry>, SnapshotError> {
-        self.verified(oid, "tree", InternalError, InternalError)?;
+    pub(super) fn read_entries(&self, oid: &str) -> Result<Vec<Entry>, SnapshotError> {
+        self.verify_object(
+            oid,
+            TREE_KIND,
+            SnapshotErrorKind::InternalError,
+            SnapshotErrorKind::InternalError,
+        )?;
         let raw = self.run(&["ls-tree", "-z", oid], None)?;
         let mut entries = Vec::new();
         for record in raw.split(|b| *b == 0).filter(|r| !r.is_empty()) {
             let tab = record
                 .iter()
                 .position(|b| *b == b'\t')
-                .ok_or_else(integrity)?;
-            let head = std::str::from_utf8(&record[..tab]).map_err(|_| integrity())?;
+                .ok_or_else(make_integrity_error)?;
+            let head = std::str::from_utf8(&record[..tab]).map_err(|_| make_integrity_error())?;
             let parts: Vec<_> = head.split(' ').collect();
             if parts.len() != 3 {
-                return Err(integrity());
+                return Err(make_integrity_error());
             }
             self.parse_oid(parts[2].as_bytes())?;
             let kind = match (parts[0], parts[1]) {
-                ("040000", "tree") => "tree",
-                ("100644" | "100755" | "120000", "blob") => "blob",
-                ("160000", "commit") => "gitlink",
-                _ => return Err(integrity()),
+                (TREE_MODE, TREE_KIND) => TREE_KIND,
+                (REGULAR_FILE_MODE | EXECUTABLE_FILE_MODE | SYMLINK_MODE, BLOB_KIND) => BLOB_KIND,
+                (GITLINK_MODE, COMMIT_KIND) => GITLINK_KIND,
+                _ => return Err(make_integrity_error()),
             };
             entries.push(Entry {
                 kind: kind.into(),
@@ -130,25 +145,38 @@ impl ObjectDb<'_> {
         let mut parts = path.as_str().split('/').peekable();
         while let Some(part) = parts.next() {
             let entry = self
-                .entries(&current)?
+                .read_entries(&current)?
                 .into_iter()
                 .find(|e| e.name == part.as_bytes())
-                .ok_or_else(|| SnapshotError::new(NotFound, "snapshot path is missing"))?;
+                .ok_or_else(|| {
+                    SnapshotError::new(SnapshotErrorKind::NotFound, "snapshot path is missing")
+                })?;
             if parts.peek().is_none() {
-                if entry.kind != "blob" {
+                if entry.kind != BLOB_KIND {
                     return Err(SnapshotError::new(
-                        InvalidRequest,
+                        SnapshotErrorKind::InvalidRequest,
                         "snapshot path is not a blob",
                     ));
                 }
-                return self.verified(&entry.oid, "blob", InternalError, InternalError);
+                return self.verify_object(
+                    &entry.oid,
+                    BLOB_KIND,
+                    SnapshotErrorKind::InternalError,
+                    SnapshotErrorKind::InternalError,
+                );
             }
-            if entry.kind != "tree" {
-                return Err(SnapshotError::new(NotFound, "snapshot path is missing"));
+            if entry.kind != TREE_KIND {
+                return Err(SnapshotError::new(
+                    SnapshotErrorKind::NotFound,
+                    "snapshot path is missing",
+                ));
             }
             current = entry.oid;
         }
-        Err(SnapshotError::new(NotFound, "snapshot path is missing"))
+        Err(SnapshotError::new(
+            SnapshotErrorKind::NotFound,
+            "snapshot path is missing",
+        ))
     }
     pub(super) fn create_tree(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
         let mut paths = BTreeSet::new();
@@ -160,14 +188,17 @@ impl ObjectDb<'_> {
                 || parts.next() == Some(".letopis")
                 || !paths.insert(path)
             {
-                return Err(SnapshotError::new(InvalidRequest, "invalid snapshot paths"));
+                return Err(SnapshotError::new(
+                    SnapshotErrorKind::InvalidRequest,
+                    "invalid snapshot paths",
+                ));
             }
         }
         for path in &paths {
             for (i, c) in path.char_indices() {
                 if c == '/' && paths.contains(&path[..i]) {
                     return Err(SnapshotError::new(
-                        InvalidRequest,
+                        SnapshotErrorKind::InvalidRequest,
                         "snapshot file and directory collide",
                     ));
                 }
@@ -201,11 +232,15 @@ impl<'a> Directory<'a> {
     fn write(&self, db: &ObjectDb<'_>) -> Result<TreeOid, SnapshotError> {
         let mut input = Vec::new();
         for (name, oid) in &self.files {
-            input.extend_from_slice(format!("100644 blob {}\t{name}\0", oid.as_str()).as_bytes());
+            input.extend_from_slice(
+                format!("{REGULAR_FILE_MODE} {BLOB_KIND} {}\t{name}\0", oid.as_str()).as_bytes(),
+            );
         }
         for (name, dir) in &self.dirs {
             let oid = dir.write(db)?;
-            input.extend_from_slice(format!("040000 tree {}\t{name}\0", oid.as_str()).as_bytes());
+            input.extend_from_slice(
+                format!("{TREE_MODE} {TREE_KIND} {}\t{name}\0", oid.as_str()).as_bytes(),
+            );
         }
         db.parse_oid(&db.run(&["mktree", "-z"], Some(&input))?)
     }

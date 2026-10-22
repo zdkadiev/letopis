@@ -1,0 +1,283 @@
+--- before/Cargo.toml
++++ after/Cargo.toml
+@@ -22,3 +22,28 @@
+ todo = "deny"
+ unimplemented = "deny"
+ too_many_lines = "warn"
++
++# Selected pedantic checks: catch lossy casts before they silently change values.
++cast_possible_truncation = "warn"
++cast_possible_wrap = "warn"
++cast_precision_loss = "warn"
++cast_sign_loss = "warn"
++checked_conversions = "warn"
++
++# Make cloning and ownership choices explicit; avoid unnecessary allocations.
++implicit_clone = "warn"
++inefficient_to_string = "warn"
++needless_pass_by_value = "warn"
++
++# Prefer direct method references and clear, consistent control flow.
++manual_let_else = "warn"
++match_same_arms = "warn"
++redundant_closure_for_method_calls = "warn"
++semicolon_if_nothing_returned = "warn"
++unnested_or_patterns = "warn"
++
++# Explain public failure/panic contracts and flag ignored Self-returning results.
++doc_markdown = "warn"
++missing_errors_doc = "warn"
++missing_panics_doc = "warn"
++return_self_not_must_use = "warn"
+--- before/AGENTS.md
++++ after/AGENTS.md
+@@ -34,7 +34,7 @@
+ - Use ownership and borrowing deliberately; add cloning, shared ownership, locks, or dynamic dispatch only for an actual need.
+ - Model finite alternatives with enums and expected failures with typed `Result`. Document public APIs. Preserve useful internal error causes while keeping public diagnostics free of secrets and raw knowledge/provider/subprocess payloads.
+ - Keep I/O synchronous according to the design; do not add an async runtime without an agreed requirement. Product Git commands belong in the Git process adapter and use argv/stdin, never shell interpolation.
+-- Standard Clippy checks are enabled. `dbg!`, `todo!`, and `unimplemented!` are denied. Do not enable all of `restriction`, `pedantic`, or `nursery` indiscriminately. Any lint exception must be narrow and explain its reason.
++- Standard Clippy checks and the explicitly selected pedantic checks in `Cargo.toml` are enabled; see the development guide for each rule and its purpose. `dbg!`, `todo!`, and `unimplemented!` are denied. Do not enable all of `restriction`, `pedantic`, or `nursery` indiscriminately. Fix the underlying finding rather than adding a blanket allowance; any exception must be narrow and explain its reason. Public fallible APIs document `# Errors`, and public APIs that can panic document `# Panics`.
+ 
+ ## Verification
+ 
+--- before/docs/development.md
++++ after/docs/development.md
+@@ -30,6 +30,48 @@
+ 
+ Источники: [группы правил Clippy](https://doc.rust-lang.org/clippy/lints.html), [настройка Clippy](https://doc.rust-lang.org/clippy/configuration.html), [Cargo lints](https://doc.rust-lang.org/cargo/reference/manifest.html#the-lints-section).
+ 
++## Выбранные pedantic-проверки
++
++В `Cargo.toml` явно включены 17 дополнительных правил из `pedantic`. Это выбор для текущего проекта и обучения Rust; весь набор `pedantic` не включается. Все имена и принадлежность к группе сверены с закреплённым Clippy 1.95.0. Уровень каждого правила — `warn`; текущая проверка качества не допускает предупреждений.
++
++| Правило | Чему учит |
++|---|---|
++| `cast_possible_truncation` | Проверять сужающие числовые преобразования. |
++| `cast_possible_wrap` | Учитывать переполнение знакового результата. |
++| `cast_precision_loss` | Учитывать потерю точности числа. |
++| `cast_sign_loss` | Проверять знак перед преобразованием в unsigned. |
++| `checked_conversions` | Использовать `TryFrom` вместо ручной проверки границ. |
++| `implicit_clone` | Явно обозначать клонирование. |
++| `inefficient_to_string` | Избегать неэффективного строкового преобразования. |
++| `needless_pass_by_value` | Заимствовать аргумент, когда владение не требуется. |
++| `manual_let_else` | Использовать `let … else` для раннего выхода. |
++| `match_same_arms` | Объединять одинаковые ветки `match`. |
++| `redundant_closure_for_method_calls` | Передавать метод напрямую вместо лишнего замыкания. |
++| `semicolon_if_nothing_returned` | Явно завершать действие, возвращающее `()`. |
++| `unnested_or_patterns` | Объединять альтернативы внутри общего шаблона. |
++| `doc_markdown` | Оформлять идентификаторы в документации как код. |
++| `missing_errors_doc` | Описывать ошибки публичного fallible API в `# Errors`. |
++| `missing_panics_doc` | Описывать возможные паники публичного API в `# Panics`. |
++| `return_self_not_must_use` | Помечать подходящие методы, возвращающие `Self`, атрибутом `#[must_use]`. |
++
++Ранее включённый `too_many_lines` также относится к `pedantic` и сохраняет лимит 60 строк кода. Итого выбрано 18 правил этой группы.
++
++Практический пример безопасного сужения:
++
++```rust
++use std::num::TryFromIntError;
++
++fn convert_count(value: u64) -> Result<u8, TryFromIntError> {
++    u8::try_from(value)
++}
++```
++
++Вместо подавления `missing_errors_doc` описывать конкретные ошибки: например, `ByteSpan::new` возвращает `ValueError::InvalidRange`, если начало больше конца. `# Panics` добавляется при реальной возможности паники; пустые разделы не нужны. Подсказку о заимствовании или преобразовании проверять по смыслу: lint помогает ревью, но не заменяет понимание контракта.
++
++Выборочные исключения допускаются с объяснением через `reason`; общее отключение группы или правила ради зелёной проверки недопустимо. Проектные соглашения об именах методов, константах, границах модулей и Arrange / Act / Assert проверяются на ревью; эти 17 правил сами по себе их не обеспечивают.
++
++Официальные источники: [каталог правил Clippy 1.95.0](https://clippy.rust-lang.org/rust-1.95.0/index.html), [рекомендация выбирать отдельные pedantic lints](https://doc.rust-lang.org/clippy/lints.html#pedantic).
++
+ ## Импорты Rust
+ 
+ Импортировать используемые типы через `use`, а не повторять полный `crate::...` путь в выражениях и сигнатурах. Варианты enum писать через импортированный тип: `SnapshotErrorKind::InternalError`. В реализации предпочитать явные импорты вместо wildcard, если нет конкретной причины для исключения.
+--- before/src/lib.rs
++++ after/src/lib.rs
+@@ -10,6 +10,10 @@
+ /// Requires Git 2.29 or newer, a UTF-8 checkout root, and a SHA-1 or SHA-256
+ /// working repository without an object alternates path (even empty/inactive).
+ /// Alternates are checked again before each operation; use a self-contained clone.
++///
++/// # Errors
++/// Returns a snapshot error when Git or the working repository is unsupported,
++/// the checkout root cannot be decoded, an alternates path exists, or Git I/O fails.
+ pub fn open_git_snapshots(
+     start: &std::path::Path,
+ ) -> Result<impl service::ports::git::GitSnapshotPort, service::ports::git::SnapshotError> {
+--- before/src/domain/graph.rs
++++ after/src/domain/graph.rs
+@@ -6,6 +6,10 @@
+ pub struct EdgeType(String);
+ impl EdgeType {
+     /// Validate the X-4 lowercase ASCII type grammar.
++    ///
++    /// # Errors
++    /// Returns [`ValueError::InvalidType`] unless the name starts with a lowercase
++    /// ASCII letter and contains only lowercase ASCII letters, digits or `_`.
+     pub fn parse(raw: &str) -> Result<Self, ValueError> {
+         if !raw.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
+             || !raw
+@@ -47,6 +51,11 @@
+ }
+ impl Edge {
+     /// Reject self-loops and source/knowledge target mismatches; dangling targets are allowed.
++    ///
++    /// # Errors
++    /// Returns [`ValueError::SelfLoop`] when source and target identities match,
++    /// or [`ValueError::InvalidTarget`] when `external` targets knowledge or
++    /// another edge type targets a source address.
+     pub fn new(
+         source: KnowledgeId,
+         target: EdgeTarget,
+--- before/src/domain/identity.rs
++++ after/src/domain/identity.rs
+@@ -4,7 +4,11 @@
+ #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+ pub struct RepoPath(String);
+ impl RepoPath {
+-    /// Resolve dot components and reject absolute paths, controls and root escapes.
++    /// Resolve dot components and reject absolute paths, C0 controls and root escapes.
++    ///
++    /// # Errors
++    /// Returns [`ValueError::InvalidPath`] for absolute paths, C0 control characters,
++    /// `#`, root escapes, or a path that normalizes to an empty string.
+     pub fn parse(raw: &str) -> Result<Self, ValueError> {
+         if raw.starts_with('/') || raw.chars().any(|c| c <= '\u{1f}' || c == '#') {
+             return Err(ValueError::InvalidPath);
+@@ -35,6 +39,11 @@
+ pub struct Anchor(String);
+ impl Anchor {
+     /// Validate ASCII anchor grammar and its reserved line-range form.
++    ///
++    /// # Errors
++    /// Returns [`ValueError::InvalidAnchor`] unless the anchor starts with an
++    /// ASCII letter and contains only ASCII letters, digits, `_` or `-`.
++    /// The source line-range form `L<digits>-L<digits>` is also rejected.
+     pub fn parse(raw: &str) -> Result<Self, ValueError> {
+         let reserved = raw
+             .strip_prefix('L')
+@@ -64,6 +73,11 @@
+ pub struct KnowledgeId(String);
+ impl KnowledgeId {
+     /// Parse a root-relative Markdown path and optional explicit anchor.
++    ///
++    /// # Errors
++    /// Returns [`ValueError::InvalidPath`] for an invalid path or a path without
++    /// a `.md` or `.markdown` suffix, and [`ValueError::InvalidAnchor`] for an
++    /// invalid explicit anchor.
+     pub fn parse(raw: &str) -> Result<Self, ValueError> {
+         let (path, anchor) = match raw.split_once('#') {
+             Some((p, a)) => (p, Some(Anchor::parse(a)?)),
+@@ -72,6 +86,10 @@
+         Self::new(RepoPath::parse(path)?, anchor)
+     }
+     /// Build a knowledge identity from validated components.
++    ///
++    /// # Errors
++    /// Returns [`ValueError::InvalidPath`] when the path does not end in `.md`
++    /// or `.markdown`.
+     pub fn new(path: RepoPath, anchor: Option<Anchor>) -> Result<Self, ValueError> {
+         if !path.as_str().ends_with(".md") && !path.as_str().ends_with(".markdown") {
+             return Err(ValueError::InvalidPath);
+@@ -94,6 +112,11 @@
+ pub struct SourceUri(String);
+ impl SourceUri {
+     /// Normalize dot components and line numbers without reading source bytes.
++    ///
++    /// # Errors
++    /// Returns [`ValueError::InvalidPath`] for an invalid source path, or
++    /// [`ValueError::InvalidRange`] for a malformed, overflowing, zero-based or
++    /// reversed `L<start>-L<end>` fragment.
+     pub fn parse(raw: &str) -> Result<Self, ValueError> {
+         let (path, fragment) = raw
+             .split_once('#')
+--- before/src/domain/value.rs
++++ after/src/domain/value.rs
+@@ -35,6 +35,9 @@
+ }
+ impl ByteSpan {
+     /// Reject reversed ranges; empty ranges are allowed.
++    ///
++    /// # Errors
++    /// Returns [`ValueError::InvalidRange`] when `start > end`.
+     pub fn new(start: usize, end: usize) -> Result<Self, ValueError> {
+         if start > end {
+             return Err(ValueError::InvalidRange);
+@@ -59,6 +62,10 @@
+ }
+ impl LineRange {
+     /// Reject line zero and reversed ranges.
++    ///
++    /// # Errors
++    /// Returns [`ValueError::InvalidRange`] when `start` is zero or greater
++    /// than `end`.
+     pub fn new(start: u64, end: u64) -> Result<Self, ValueError> {
+         if start == 0 || start > end {
+             return Err(ValueError::InvalidRange);
+@@ -83,6 +90,10 @@
+ pub struct TreeOid(String);
+ impl TreeOid {
+     /// Accept exactly 40 or 64 lowercase hexadecimal characters.
++    ///
++    /// # Errors
++    /// Returns [`ValueError::InvalidOid`] for any other length or for a
++    /// non-lowercase-hexadecimal character. Repository existence is not checked.
+     pub fn parse(raw: &str) -> Result<Self, ValueError> {
+         if ![SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN].contains(&raw.len())
+             || !raw
+--- before/src/adapters/markdown/mod.rs
++++ after/src/adapters/markdown/mod.rs
+@@ -68,6 +68,10 @@
+ 
+ /// Parse one root-relative Markdown file without accessing disk, Git, SQL or a model.
+ /// `Ok(None)` is unmarked Markdown; errors never carry a partial valid projection.
++///
++/// # Errors
++/// Returns local diagnostics for invalid UTF-8 or invalid knowledge metadata,
++/// anchors, element layout or declared graph links.
+ pub fn parse(path: &RepoPath, bytes: &[u8]) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
+     let text = std::str::from_utf8(bytes).map_err(|e| {
+         vec![Diagnostic::new_at(
+--- before/src/adapters/markdown/search.rs
++++ after/src/adapters/markdown/search.rs
+@@ -20,8 +20,9 @@
+             continue;
+         }
+         match event {
+-            Event::Text(s) | Event::Code(s) => text.push_str(s),
+-            Event::Html(s) | Event::InlineHtml(s) => text.push_str(s),
++            Event::Text(s) | Event::Code(s) | Event::Html(s) | Event::InlineHtml(s) => {
++                text.push_str(s);
++            }
+             Event::SoftBreak
+             | Event::HardBreak
+             | Event::Rule
+--- before/src/service/ports/git.rs
++++ after/src/service/ports/git.rs
+@@ -91,9 +91,26 @@
+ /// Synchronous immutable snapshot operations. Creation alone does not retain.
+ pub trait GitSnapshotPort {
+     /// Create a tree from exactly these files, preserving captured bytes.
++    ///
++    /// # Errors
++    /// Returns [`SnapshotErrorKind::InvalidRequest`] for invalid, duplicate or
++    /// colliding paths, and [`SnapshotErrorKind::InternalError`] when repository
++    /// policy, Git I/O or object integrity checks fail.
+     fn create_tree(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError>;
+     /// Read a complete blob from an exact tree, without live-file fallback.
++    ///
++    /// # Errors
++    /// Returns [`SnapshotErrorKind::NotFound`] for a missing root or path,
++    /// [`SnapshotErrorKind::InvalidRequest`] for an incompatible OID format,
++    /// non-tree root or non-blob path, and [`SnapshotErrorKind::InternalError`]
++    /// for repository policy, Git I/O or integrity failures.
+     fn read_blob(&self, tree: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError>;
+     /// Validate the complete local closure and retain it through Git GC.
++    ///
++    /// # Errors
++    /// Returns [`SnapshotErrorKind::NotFound`] for a missing root,
++    /// [`SnapshotErrorKind::InvalidRequest`] for an incompatible OID format or
++    /// non-tree root, and [`SnapshotErrorKind::InternalError`] for an incomplete
++    /// or corrupt closure, repository policy, Git I/O or ref publication failure.
+     fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError>;
+ }

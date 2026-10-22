@@ -1,93 +1,131 @@
 #[path = "support/git.rs"]
 mod git;
-use git::{FORMATS, ObjectFormat, TempRepo};
+use git::{
+    BLOB_KIND, COMMIT_KIND, FORMATS, GITLINK_MODE, REGULAR_FILE_MODE, TAG_KIND, TREE_KIND,
+    TREE_MODE, TempRepo,
+};
 use letopis::{
     domain::{RepoPath, TreeOid},
     open_git_snapshots,
-    service::ports::git::{GitSnapshotPort, SnapshotErrorKind::*, SnapshotFile},
+    service::ports::git::{GitSnapshotPort, SnapshotErrorKind, SnapshotFile},
 };
 use std::fs;
-fn path(s: &str) -> RepoPath {
+
+fn parse_path(s: &str) -> RepoPath {
     RepoPath::parse(s).unwrap()
 }
-fn oid(s: &str) -> TreeOid {
+fn parse_tree_oid(s: &str) -> TreeOid {
     TreeOid::parse(s).unwrap()
 }
-fn external_tree(repo: &TempRepo, mode: &str, kind: &str, child: &str, name: &str) -> TreeOid {
-    oid(&repo.oid(
+fn create_external_tree(
+    repo: &TempRepo,
+    mode: &str,
+    kind: &str,
+    child: &str,
+    name: &str,
+) -> TreeOid {
+    parse_tree_oid(&repo.read_oid(
         &["mktree", "-z", "--missing"],
         Some(format!("{mode} {kind} {child}\t{name}\0").as_bytes()),
     ))
 }
-#[test]
-fn exact_bytes_without_index_or_commit() {
-    for format in FORMATS {
-        let repo = TempRepo::new(format);
-        let filter = repo.script("filter", "#!/bin/sh\ntouch FILTER_RAN\ncat\n");
-        repo.ok(
-            &["config", "filter.canary.clean", filter.to_str().unwrap()],
-            None,
-        );
-        repo.ok(&["config", "filter.canary.required", "true"], None);
-        repo.ok(&["config", "core.autocrlf", "true"], None);
-        fs::write(
-            repo.root().join(".gitattributes"),
-            b"* filter=canary text eol=crlf\n",
-        )
-        .unwrap();
-        let before = repo.head_index_config_and_live_snapshot();
-        let git = open_git_snapshots(repo.subdir()).unwrap();
-        let paths = [
-            path("live.md"),
-            path("nested/empty"),
-            path("nested/binary"),
-            path("文档/й.md"),
-            path("lf"),
-            path("crlf"),
-        ];
-        let bytes: [&[u8]; 6] = [
+fn configure_filter_trap(repo: &TempRepo) {
+    let filter = repo.write_script("filter", "#!/bin/sh\ntouch FILTER_RAN\ncat\n");
+    repo.run_git_successfully(
+        &["config", "filter.canary.clean", filter.to_str().unwrap()],
+        None,
+    );
+    repo.run_git_successfully(&["config", "filter.canary.required", "true"], None);
+    repo.run_git_successfully(&["config", "core.autocrlf", "true"], None);
+    fs::write(
+        repo.get_root().join(".gitattributes"),
+        b"* filter=canary text eol=crlf\n",
+    )
+    .unwrap();
+}
+fn build_captured_inputs() -> ([RepoPath; 6], [&'static [u8]; 6]) {
+    (
+        [
+            "live.md",
+            "nested/empty",
+            "nested/binary",
+            "文档/й.md",
+            "lf",
+            "crlf",
+        ]
+        .map(parse_path),
+        [
             b"no final newline",
             b"",
             b"\0\xff\x01\r\n",
             "Привет 🌳\n".as_bytes(),
             b"a\nb\n",
             b"a\r\nb\r\n",
-        ];
+        ],
+    )
+}
+
+#[test]
+fn exact_bytes_without_index_or_commit() {
+    // Arrange
+    for format in FORMATS {
+        let repo = TempRepo::new(format);
+        configure_filter_trap(&repo);
+        let before = repo.capture_fixture_state();
+        let git = open_git_snapshots(repo.get_subdir()).unwrap();
+        let (paths, bytes) = build_captured_inputs();
         let mut files: Vec<_> = paths
             .iter()
             .zip(bytes)
             .map(|(path, bytes)| SnapshotFile { path, bytes })
             .collect();
-        let s1 = git.create_tree(&files).unwrap();
-        for (p, b) in paths.iter().zip(bytes) {
-            assert_eq!(git.read_blob(&s1, p).unwrap(), b);
-        }
+        // Act
+        let first = git.create_tree(&files).unwrap();
+        let captured: Vec<_> = paths
+            .iter()
+            .map(|p| git.read_blob(&first, p).unwrap())
+            .collect();
         files.reverse();
-        assert_eq!(git.create_tree(&files).unwrap(), s1);
-        assert_eq!(repo.head_index_config_and_live_snapshot(), before);
-        assert!(!repo.root().join("FILTER_RAN").exists());
+        let reordered = git.create_tree(&files).unwrap();
+        let after = repo.capture_fixture_state();
+        // Assert
+        for (actual, expected) in captured.iter().zip(bytes) {
+            assert_eq!(actual, expected);
+        }
+        assert_eq!(reordered, first);
+        assert_eq!(after, before);
+        assert!(!repo.get_root().join("FILTER_RAN").exists());
+
+        // Arrange: mutate and remove live files after capturing their bytes.
         repo.change_and_delete_live_files("live.md");
-        assert_eq!(git.read_blob(&s1, &paths[0]).unwrap(), bytes[0]);
-        let s2 = git
+        // Act
+        let after_live_change = git.read_blob(&first, &paths[0]).unwrap();
+        let second = git
             .create_tree(&[SnapshotFile {
                 path: &paths[0],
                 bytes: b"new",
             }])
             .unwrap();
-        assert_ne!(s1, s2);
-        assert_eq!(git.read_blob(&s1, &paths[0]).unwrap(), bytes[0]);
-        let listing = repo.ok(&["ls-tree", "-rz", "--name-only", s1.as_str()], None);
+        let after_new_tree = git.read_blob(&first, &paths[0]).unwrap();
+        let listing =
+            repo.run_git_successfully(&["ls-tree", "-rz", "--name-only", first.as_str()], None);
+        // Assert
+        assert_eq!(after_live_change, bytes[0]);
+        assert_ne!(first, second);
+        assert_eq!(after_new_tree, bytes[0]);
         assert_eq!(
             listing.split(|b| *b == 0).filter(|s| !s.is_empty()).count(),
             6
         );
     }
 }
+
 #[test]
 fn paths_are_literal_and_never_shell_input() {
+    // Arrange
     for format in FORMATS {
         let repo = TempRepo::new(format);
-        let git = open_git_snapshots(repo.subdir()).unwrap();
+        let git = open_git_snapshots(repo.get_subdir()).unwrap();
         let paths = [
             "dir/a:b",
             "-name",
@@ -95,7 +133,7 @@ fn paths_are_literal_and_never_shell_input() {
             "$(touch SENTINEL).md",
             "space dir/a b",
         ]
-        .map(path);
+        .map(parse_path);
         let files: Vec<_> = paths
             .iter()
             .map(|p| SnapshotFile {
@@ -103,21 +141,34 @@ fn paths_are_literal_and_never_shell_input() {
                 bytes: b"literal",
             })
             .collect();
+        // Act
         let tree = git.create_tree(&files).unwrap();
-        for p in &paths {
-            assert_eq!(git.read_blob(&tree, p).unwrap(), b"literal");
+        let captured: Vec<_> = paths
+            .iter()
+            .map(|p| git.read_blob(&tree, p).unwrap())
+            .collect();
+        // Assert
+        for bytes in captured {
+            assert_eq!(bytes, b"literal");
         }
-        assert!(!repo.root().join("SENTINEL").exists());
-        assert!(!repo.subdir().join("SENTINEL").exists());
+        assert!(!repo.get_root().join("SENTINEL").exists());
+        assert!(!repo.get_subdir().join("SENTINEL").exists());
     }
 }
+
 #[test]
 fn empty_tree_and_invalid_paths() {
+    // Arrange
     for format in FORMATS {
         let repo = TempRepo::new(format);
-        let git = open_git_snapshots(repo.root()).unwrap();
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        // Act
         let empty = git.create_tree(&[]).unwrap();
-        assert!(repo.ok(&["ls-tree", empty.as_str()], None).is_empty());
+        let listing = repo.run_git_successfully(&["ls-tree", empty.as_str()], None);
+        // Assert
+        assert!(listing.is_empty());
+
+        // Arrange
         for names in [
             vec!["a", "a"],
             vec!["a", "a/b"],
@@ -125,7 +176,7 @@ fn empty_tree_and_invalid_paths() {
             vec!["dir/.git/x"],
             vec![".letopis/x"],
         ] {
-            let paths: Vec<_> = names.into_iter().map(path).collect();
+            let paths: Vec<_> = names.into_iter().map(parse_path).collect();
             let files: Vec<_> = paths
                 .iter()
                 .map(|p| SnapshotFile {
@@ -133,112 +184,114 @@ fn empty_tree_and_invalid_paths() {
                     bytes: b"UNIQUE_INVALID_CANARY",
                 })
                 .collect();
-            let before = repo.ok(&["count-objects", "-v"], None);
-            let err = git.create_tree(&files).unwrap_err();
-            assert_eq!(err.kind(), InvalidRequest);
-            assert!(!format!("{err:?} {err}").contains("CANARY"));
-            assert_eq!(
-                before,
-                repo.ok(&["count-objects", "-v"], None),
-                "invalid input must not write objects"
-            );
+            let before = repo.run_git_successfully(&["count-objects", "-v"], None);
+            // Act
+            let error = git.create_tree(&files).unwrap_err();
+            let after = repo.run_git_successfully(&["count-objects", "-v"], None);
+            // Assert
+            assert_eq!(error.get_kind(), SnapshotErrorKind::InvalidRequest);
+            assert!(!format!("{error:?} {error}").contains("CANARY"));
+            assert_eq!(before, after, "invalid input must not write objects");
         }
     }
 }
+
+fn build_tree_error_cases(repo: &TempRepo, empty: &TreeOid) -> Vec<(TreeOid, SnapshotErrorKind)> {
+    let commit = repo.read_oid(&["rev-parse", "HEAD"], None);
+    let wrong_length = match commit.len() {
+        40 => 64,
+        64 => 40,
+        _ => panic!("fixture Git uses an unsupported OID length"),
+    };
+    let tag_body = format!(
+        "object {commit}\ntype commit\ntag fixture\ntagger Fixture <fixture@example.invalid> 1 +0000\n\nfixture\n"
+    );
+    let tag = repo.read_oid(
+        &["hash-object", "-w", "-t", TAG_KIND, "--stdin"],
+        Some(tag_body.as_bytes()),
+    );
+    let missing = "1".repeat(commit.len());
+    vec![
+        (
+            parse_tree_oid(&"0".repeat(wrong_length)),
+            SnapshotErrorKind::InvalidRequest,
+        ),
+        (parse_tree_oid(&commit), SnapshotErrorKind::InvalidRequest),
+        (parse_tree_oid(&tag), SnapshotErrorKind::InvalidRequest),
+        (parse_tree_oid(&missing), SnapshotErrorKind::NotFound),
+        (empty.clone(), SnapshotErrorKind::NotFound),
+        (
+            create_external_tree(repo, REGULAR_FILE_MODE, BLOB_KIND, &missing, "leaf"),
+            SnapshotErrorKind::InternalError,
+        ),
+        (
+            create_external_tree(repo, TREE_MODE, TREE_KIND, empty.as_str(), "leaf"),
+            SnapshotErrorKind::InvalidRequest,
+        ),
+        (
+            create_external_tree(repo, GITLINK_MODE, COMMIT_KIND, &commit, "leaf"),
+            SnapshotErrorKind::InvalidRequest,
+        ),
+    ]
+}
+fn create_corrupted_blob_tree(repo: &TempRepo) -> TreeOid {
+    let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"valid expected"));
+    let other = repo.read_oid(
+        &["hash-object", "-w", "--stdin"],
+        Some(b"different CORRUPT_CANARY bytes"),
+    );
+    let tree = create_external_tree(repo, REGULAR_FILE_MODE, BLOB_KIND, &blob, "leaf");
+    repo.replace_loose_object(&blob, &other);
+    tree
+}
+
 #[test]
 fn tree_types_and_missing_objects_are_distinct() {
+    // Arrange
     for format in FORMATS {
         let repo = TempRepo::new(format);
-        let git = open_git_snapshots(repo.root()).unwrap();
-        let p = path("leaf");
-        let wrong = match format {
-            ObjectFormat::Sha1 => "0".repeat(64),
-            ObjectFormat::Sha256 => "0".repeat(40),
-        };
-        assert_eq!(
-            git.read_blob(&oid(&wrong), &p).unwrap_err().kind(),
-            InvalidRequest
-        );
-        let commit = repo.oid(&["rev-parse", "HEAD"], None);
-        assert_eq!(
-            git.read_blob(&oid(&commit), &p).unwrap_err().kind(),
-            InvalidRequest
-        );
-        let tag_body = format!(
-            "object {commit}\ntype commit\ntag fixture\ntagger Fixture <fixture@example.invalid> 1 +0000\n\nfixture\n"
-        );
-        let tag = repo.oid(
-            &["hash-object", "-w", "-t", "tag", "--stdin"],
-            Some(tag_body.as_bytes()),
-        );
-        assert_eq!(
-            git.read_blob(&oid(&tag), &p).unwrap_err().kind(),
-            InvalidRequest
-        );
-        let missing = "1".repeat(commit.len());
-        assert_eq!(
-            git.read_blob(&oid(&missing), &p).unwrap_err().kind(),
-            NotFound
-        );
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        let leaf = parse_path("leaf");
         let empty = git.create_tree(&[]).unwrap();
-        assert_eq!(git.read_blob(&empty, &p).unwrap_err().kind(), NotFound);
-        let dangling = external_tree(&repo, "100644", "blob", &missing, "leaf");
-        assert_eq!(
-            git.read_blob(&dangling, &p).unwrap_err().kind(),
-            InternalError
-        );
-        let tree_leaf = external_tree(&repo, "040000", "tree", empty.as_str(), "leaf");
-        assert_eq!(
-            git.read_blob(&tree_leaf, &p).unwrap_err().kind(),
-            InvalidRequest
-        );
-        let gitlink = external_tree(&repo, "160000", "commit", &commit, "leaf");
-        assert_eq!(
-            git.read_blob(&gitlink, &p).unwrap_err().kind(),
-            InvalidRequest
-        );
-        let blob = repo.oid(&["hash-object", "-w", "--stdin"], Some(b"valid expected"));
-        let other = repo.oid(
-            &["hash-object", "-w", "--stdin"],
-            Some(b"different CORRUPT_CANARY bytes"),
-        );
-        let tree = external_tree(&repo, "100644", "blob", &blob, "leaf");
-        fs::remove_file(
-            repo.root()
-                .join(format!(".git/objects/{}/{}", &blob[..2], &blob[2..])),
-        )
-        .unwrap();
-        fs::copy(
-            repo.root()
-                .join(format!(".git/objects/{}/{}", &other[..2], &other[2..])),
-            repo.root()
-                .join(format!(".git/objects/{}/{}", &blob[..2], &blob[2..])),
-        )
-        .unwrap();
-        let error = git.read_blob(&tree, &p).unwrap_err();
-        assert_eq!(error.kind(), InternalError);
+        for (tree, expected) in build_tree_error_cases(&repo, &empty) {
+            // Act
+            let error = git.read_blob(&tree, &leaf).unwrap_err();
+            // Assert
+            assert_eq!(error.get_kind(), expected);
+        }
+        // Arrange
+        let tree = create_corrupted_blob_tree(&repo);
+        // Act
+        let error = git.read_blob(&tree, &leaf).unwrap_err();
+        // Assert
+        assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
         assert!(!format!("{error} {error:?}").contains("CORRUPT_CANARY"));
     }
 }
+
 #[test]
 fn replacement_refs_do_not_change_bytes() {
+    // Arrange
     for format in FORMATS {
         let repo = TempRepo::new(format);
-        let git = open_git_snapshots(repo.root()).unwrap();
-        let p = path("x");
-        let s1 = git
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        let p = parse_path("x");
+        let original = git
             .create_tree(&[SnapshotFile {
                 path: &p,
                 bytes: b"original",
             }])
             .unwrap();
-        let s2 = git
+        let replacement = git
             .create_tree(&[SnapshotFile {
                 path: &p,
                 bytes: b"replacement",
             }])
             .unwrap();
-        repo.ok(&["replace", s1.as_str(), s2.as_str()], None);
-        assert_eq!(git.read_blob(&s1, &p).unwrap(), b"original");
+        repo.run_git_successfully(&["replace", original.as_str(), replacement.as_str()], None);
+        // Act
+        let bytes = git.read_blob(&original, &p).unwrap();
+        // Assert
+        assert_eq!(bytes, b"original");
     }
 }

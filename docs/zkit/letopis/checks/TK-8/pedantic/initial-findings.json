@@ -1,0 +1,194 @@
+[
+  {
+    "code": "clippy::match_same_arms",
+    "path": "src/adapters/markdown/search.rs",
+    "line": 23,
+    "message": "these match arms have identical bodies"
+  },
+  {
+    "code": "clippy::match_same_arms",
+    "path": "src/adapters/markdown/search.rs",
+    "line": 23,
+    "message": "these match arms have identical bodies"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/adapters/markdown/mod.rs",
+    "line": 71,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/adapters/markdown/mod.rs",
+    "line": 71,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/graph.rs",
+    "line": 9,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/graph.rs",
+    "line": 50,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/identity.rs",
+    "line": 8,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/identity.rs",
+    "line": 38,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/identity.rs",
+    "line": 67,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/identity.rs",
+    "line": 75,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/identity.rs",
+    "line": 97,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/value.rs",
+    "line": 38,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/value.rs",
+    "line": 62,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/value.rs",
+    "line": 86,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/graph.rs",
+    "line": 9,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/graph.rs",
+    "line": 50,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/service/ports/git.rs",
+    "line": 94,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/service/ports/git.rs",
+    "line": 96,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/service/ports/git.rs",
+    "line": 98,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/lib.rs",
+    "line": 13,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/identity.rs",
+    "line": 8,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/identity.rs",
+    "line": 38,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/identity.rs",
+    "line": 67,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/identity.rs",
+    "line": 75,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/identity.rs",
+    "line": 97,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/value.rs",
+    "line": 38,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/value.rs",
+    "line": 62,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/domain/value.rs",
+    "line": 86,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/service/ports/git.rs",
+    "line": 94,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/service/ports/git.rs",
+    "line": 96,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/service/ports/git.rs",
+    "line": 98,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  },
+  {
+    "code": "clippy::missing_errors_doc",
+    "path": "src/lib.rs",
+    "line": 13,
+    "message": "docs for function returning `Result` missing `# Errors` section"
+  }
+]

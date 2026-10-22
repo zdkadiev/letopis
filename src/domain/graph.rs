@@ -6,6 +6,10 @@ use std::collections::BTreeSet;
 pub struct EdgeType(String);
 impl EdgeType {
     /// Validate the X-4 lowercase ASCII type grammar.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::InvalidType`] unless the name starts with a lowercase
+    /// ASCII letter and contains only lowercase ASCII letters, digits or `_`.
     pub fn parse(raw: &str) -> Result<Self, ValueError> {
         if !raw.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
             || !raw
@@ -47,6 +51,11 @@ pub struct Edge {
 }
 impl Edge {
     /// Reject self-loops and source/knowledge target mismatches; dangling targets are allowed.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::SelfLoop`] when source and target identities match,
+    /// or [`ValueError::InvalidTarget`] when `external` targets knowledge or
+    /// another edge type targets a source address.
     pub fn new(
         source: KnowledgeId,
         target: EdgeTarget,
@@ -65,15 +74,15 @@ impl Edge {
         })
     }
     /// The containing knowledge element.
-    pub fn source(&self) -> &KnowledgeId {
+    pub fn get_source(&self) -> &KnowledgeId {
         &self.source
     }
     /// The declared target, whether or not it currently exists.
-    pub fn target(&self) -> &EdgeTarget {
+    pub fn get_target(&self) -> &EdgeTarget {
         &self.target
     }
     /// The declared relation type.
-    pub fn edge_type(&self) -> &EdgeType {
+    pub fn get_edge_type(&self) -> &EdgeType {
         &self.edge_type
     }
 }
@@ -85,10 +94,10 @@ pub enum ElementKind {
     Metavertex,
 }
 /// An element is a metavertex exactly when it has an outgoing includes edge.
-pub fn kind_for(id: &KnowledgeId, edges: &BTreeSet<Edge>) -> ElementKind {
+pub fn derive_element_kind(id: &KnowledgeId, edges: &BTreeSet<Edge>) -> ElementKind {
     if edges
         .iter()
-        .any(|e| e.source() == id && e.edge_type().as_str() == "includes")
+        .any(|e| e.get_source() == id && e.get_edge_type().as_str() == "includes")
     {
         ElementKind::Metavertex
     } else {

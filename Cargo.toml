@@ -10,3 +10,40 @@ sha2 = "=0.10.9"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.145"
 pulldown-cmark = { version = "=0.13.4", default-features = false }
+
+# Keep compiler diagnostics strict for every root-crate target.
+[lints.rust]
+warnings = "deny"
+
+# Standard Clippy checks, with explicit bans on debug output and unfinished code.
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+too_many_lines = "warn"
+
+# Selected pedantic checks: catch lossy casts before they silently change values.
+cast_possible_truncation = "warn"
+cast_possible_wrap = "warn"
+cast_precision_loss = "warn"
+cast_sign_loss = "warn"
+checked_conversions = "warn"
+
+# Make cloning and ownership choices explicit; avoid unnecessary allocations.
+implicit_clone = "warn"
+inefficient_to_string = "warn"
+needless_pass_by_value = "warn"
+
+# Prefer direct method references and clear, consistent control flow.
+manual_let_else = "warn"
+match_same_arms = "warn"
+redundant_closure_for_method_calls = "warn"
+semicolon_if_nothing_returned = "warn"
+unnested_or_patterns = "warn"
+
+# Explain public failure/panic contracts and flag ignored Self-returning results.
+doc_markdown = "warn"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+return_self_not_must_use = "warn"

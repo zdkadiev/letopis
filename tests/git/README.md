@@ -12,7 +12,8 @@ docker run --rm --network none letopis-tk8-check
 
 Build installs Git, rustfmt and Clippy and fetches locked Rust dependencies.
 Runtime recompiles the copied source and executes the complete root suite,
-format and lint checks offline. It does not mount host binaries. The Rust base
+format and lint checks offline. The build copies `clippy.toml` so Linux enforces
+the same 60-code-line function limit as the host. It does not mount host binaries. The Rust base
 image is digest-pinned; the actual Debian Git version and resulting image ID
 are recorded with each verification receipt.
 

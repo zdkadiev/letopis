@@ -14,6 +14,22 @@ pub enum ObjectFormat {
     Sha1,
     Sha256,
 }
+impl ObjectFormat {
+    pub fn to_init_arg(self) -> &'static str {
+        match self {
+            Self::Sha1 => "--object-format=sha1",
+            Self::Sha256 => "--object-format=sha256",
+        }
+    }
+}
+pub const SNAPSHOT_REF_PREFIX: &str = "refs/letopis/snapshots/";
+pub const BLOB_KIND: &str = "blob";
+pub const TREE_KIND: &str = "tree";
+pub const COMMIT_KIND: &str = "commit";
+pub const TAG_KIND: &str = "tag";
+pub const TREE_MODE: &str = "040000";
+pub const REGULAR_FILE_MODE: &str = "100644";
+pub const GITLINK_MODE: &str = "160000";
 pub const FORMATS: [ObjectFormat; 2] = [ObjectFormat::Sha1, ObjectFormat::Sha256];
 pub struct TempRepo {
     root: PathBuf,
@@ -27,7 +43,7 @@ pub struct FixtureState {
     refs: Vec<u8>,
     live: Vec<(String, Vec<u8>)>,
 }
-pub fn isolated(command: &mut Command) {
+pub fn isolate_command(command: &mut Command) {
     for (k, _) in env::vars_os() {
         if k.to_string_lossy().starts_with("GIT_") {
             command.env_remove(k);
@@ -50,31 +66,21 @@ impl TempRepo {
         let root = fs::canonicalize(root).unwrap();
         let subdir = root.join("subdir");
         let repo = Self { root, subdir };
-        repo.ok(
-            &[
-                "init",
-                "-q",
-                match format {
-                    ObjectFormat::Sha1 => "--object-format=sha1",
-                    ObjectFormat::Sha256 => "--object-format=sha256",
-                },
-            ],
-            None,
-        );
-        repo.ok(&["config", "user.name", "Fixture"], None);
-        repo.ok(&["config", "user.email", "fixture@example.invalid"], None);
-        fs::create_dir(repo.subdir()).unwrap();
+        repo.run_git_successfully(&["init", "-q", format.to_init_arg()], None);
+        repo.run_git_successfully(&["config", "user.name", "Fixture"], None);
+        repo.run_git_successfully(&["config", "user.email", "fixture@example.invalid"], None);
+        fs::create_dir(repo.get_subdir()).unwrap();
         fs::write(repo.root.join("live.md"), b"original live\n").unwrap();
-        repo.ok(&["add", "live.md"], None);
-        repo.ok(&["commit", "-qm", "fixture"], None);
+        repo.run_git_successfully(&["add", "live.md"], None);
+        repo.run_git_successfully(&["commit", "-qm", "fixture"], None);
         fs::write(repo.root.join("live.md"), b"staged live\n").unwrap();
-        repo.ok(&["add", "live.md"], None);
+        repo.run_git_successfully(&["add", "live.md"], None);
         fs::write(repo.root.join("live.md"), b"unstaged live\n").unwrap();
         repo
     }
-    pub fn shared_clone(&self) -> Self {
+    pub fn create_shared_clone(&self) -> Self {
         let root = self.root.join("BORROWER_PATH_CANARY");
-        self.ok(
+        self.run_git_successfully(
             &[
                 "clone",
                 "-q",
@@ -88,15 +94,15 @@ impl TempRepo {
         fs::create_dir(&subdir).unwrap();
         Self { root, subdir }
     }
-    pub fn root(&self) -> &Path {
+    pub fn get_root(&self) -> &Path {
         &self.root
     }
-    pub fn subdir(&self) -> &Path {
+    pub fn get_subdir(&self) -> &Path {
         &self.subdir
     }
-    pub fn git(&self, args: &[&str], input: Option<&[u8]>) -> Output {
+    pub fn run_git(&self, args: &[&str], input: Option<&[u8]>) -> Output {
         let mut c = Command::new("git");
-        isolated(&mut c);
+        isolate_command(&mut c);
         c.current_dir(&self.root)
             .args(args)
             .stdin(Stdio::piped())
@@ -115,8 +121,8 @@ impl TempRepo {
             output
         })
     }
-    pub fn ok(&self, args: &[&str], input: Option<&[u8]>) -> Vec<u8> {
-        let out = self.git(args, input);
+    pub fn run_git_successfully(&self, args: &[&str], input: Option<&[u8]>) -> Vec<u8> {
+        let out = self.run_git(args, input);
         assert!(
             out.status.success(),
             "fixture Git {args:?}: {}",
@@ -124,21 +130,21 @@ impl TempRepo {
         );
         out.stdout
     }
-    pub fn oid(&self, args: &[&str], input: Option<&[u8]>) -> String {
-        String::from_utf8(self.ok(args, input))
+    pub fn read_oid(&self, args: &[&str], input: Option<&[u8]>) -> String {
+        String::from_utf8(self.run_git_successfully(args, input))
             .unwrap()
             .trim()
             .to_owned()
     }
-    pub fn head_index_config_and_live_snapshot(&self) -> FixtureState {
+    pub fn capture_fixture_state(&self) -> FixtureState {
         FixtureState {
             head: fs::read(self.root.join(".git/HEAD")).unwrap(),
             index: fs::read(self.root.join(".git/index")).unwrap(),
             config: fs::read(self.root.join(".git/config")).unwrap(),
             refs: self
-                .ok(&["for-each-ref", "--format=%(refname) %(objectname)"], None)
+                .run_git_successfully(&["for-each-ref", "--format=%(refname) %(objectname)"], None)
                 .split_inclusive(|b| *b == b'\n')
-                .filter(|line| !line.starts_with(b"refs/letopis/snapshots/"))
+                .filter(|line| !line.starts_with(SNAPSHOT_REF_PREFIX.as_bytes()))
                 .flatten()
                 .copied()
                 .collect(),
@@ -154,22 +160,29 @@ impl TempRepo {
             fs::remove_file(self.root.join(path)).unwrap();
         }
     }
-    pub fn direct_ref(&self, oid: &str) -> String {
-        self.oid(
-            &["rev-parse", &format!("refs/letopis/snapshots/{oid}")],
-            None,
-        )
+    pub fn read_direct_ref(&self, oid: &str) -> String {
+        self.read_oid(&["rev-parse", &format!("{SNAPSHOT_REF_PREFIX}{oid}")], None)
+    }
+    pub fn build_object_path(&self, oid: &str) -> PathBuf {
+        self.root
+            .join(format!(".git/objects/{}/{}", &oid[..2], &oid[2..]))
+    }
+    pub fn replace_loose_object(&self, expected: &str, replacement: &str) {
+        let destination = self.build_object_path(expected);
+        fs::remove_file(&destination).unwrap();
+        fs::copy(self.build_object_path(replacement), destination).unwrap();
     }
     pub fn expire_reflogs_gc_prune_now_and_pack_refs(&self) {
-        self.ok(&["reflog", "expire", "--expire=now", "--all"], None);
-        self.ok(&["gc", "--prune=now"], None);
-        self.ok(&["prune", "--expire=now"], None);
-        self.ok(&["pack-refs", "--all"], None);
+        self.run_git_successfully(&["reflog", "expire", "--expire=now", "--all"], None);
+        self.run_git_successfully(&["gc", "--prune=now"], None);
+        self.run_git_successfully(&["prune", "--expire=now"], None);
+        self.run_git_successfully(&["pack-refs", "--all"], None);
     }
-    pub fn fsck_strict_no_reflogs(&self) -> ExitStatus {
-        self.git(&["fsck", "--strict", "--no-reflogs"], None).status
+    pub fn run_fsck_strict_no_reflogs(&self) -> ExitStatus {
+        self.run_git(&["fsck", "--strict", "--no-reflogs"], None)
+            .status
     }
-    pub fn script(&self, name: &str, text: &str) -> PathBuf {
+    pub fn write_script(&self, name: &str, text: &str) -> PathBuf {
         use std::os::unix::fs::PermissionsExt;
         let path = self.root.join(name);
         fs::write(&path, text).unwrap();
@@ -208,7 +221,7 @@ impl Drop for OwnedChild {
         }
     }
 }
-pub fn supervised_test(name: &str, envs: &[(&str, &str)]) {
+pub fn supervise_test(name: &str, envs: &[(&str, &str)]) {
     let mut c = Command::new(env::current_exe().unwrap());
     c.args(["--exact", name, "--nocapture"])
         .envs(envs.iter().copied())

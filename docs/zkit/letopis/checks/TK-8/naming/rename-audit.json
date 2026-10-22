@@ -1,0 +1,274 @@
+{
+  "scope": "src and root integration tests/support; excludes historical proof harnesses",
+  "rust_files_changed": 22,
+  "token_check": "PASS: only explicitly allowed identifier renames and serde callback string; whitespace/comments/commas ignored",
+  "test_names_unchanged": true,
+  "tests_in_changed_files": 53,
+  "replacements": [
+    {
+      "before": "\"optional_oid\"",
+      "after": "\"deserialize_optional_oid\"",
+      "count": 1
+    },
+    {
+      "before": "at",
+      "after": "new_at",
+      "count": 14
+    },
+    {
+      "before": "captured_inputs",
+      "after": "build_captured_inputs",
+      "count": 2
+    },
+    {
+      "before": "command",
+      "after": "build_command",
+      "count": 2
+    },
+    {
+      "before": "corrupted_blob_tree",
+      "after": "create_corrupted_blob_tree",
+      "count": 2
+    },
+    {
+      "before": "digits",
+      "after": "contains_only_ascii_digits",
+      "count": 5
+    },
+    {
+      "before": "direct_ref",
+      "after": "read_direct_ref",
+      "count": 4
+    },
+    {
+      "before": "edge_type",
+      "after": "get_edge_type",
+      "count": 3
+    },
+    {
+      "before": "element_bounds",
+      "after": "find_element_bounds",
+      "count": 2
+    },
+    {
+      "before": "end",
+      "after": "get_end",
+      "count": 10
+    },
+    {
+      "before": "entries",
+      "after": "read_entries",
+      "count": 3
+    },
+    {
+      "before": "exact_ref",
+      "after": "has_exact_ref",
+      "count": 4
+    },
+    {
+      "before": "external",
+      "after": "create_external_tree",
+      "count": 6
+    },
+    {
+      "before": "external_tree",
+      "after": "create_external_tree",
+      "count": 5
+    },
+    {
+      "before": "fsck_strict_no_reflogs",
+      "after": "run_fsck_strict_no_reflogs",
+      "count": 3
+    },
+    {
+      "before": "git",
+      "after": "run_git",
+      "count": 9
+    },
+    {
+      "before": "head_index_config_and_live_snapshot",
+      "after": "capture_fixture_state",
+      "count": 15
+    },
+    {
+      "before": "init_arg",
+      "after": "to_init_arg",
+      "count": 3
+    },
+    {
+      "before": "integrity",
+      "after": "make_integrity_error",
+      "count": 12
+    },
+    {
+      "before": "io_error",
+      "after": "make_io_error",
+      "count": 6
+    },
+    {
+      "before": "isolated",
+      "after": "isolate_command",
+      "count": 3
+    },
+    {
+      "before": "kind",
+      "after": "get_kind",
+      "count": 16
+    },
+    {
+      "before": "kind_for",
+      "after": "derive_element_kind",
+      "count": 5
+    },
+    {
+      "before": "line_after",
+      "after": "find_line_end",
+      "count": 3
+    },
+    {
+      "before": "line_number",
+      "after": "calculate_line_number",
+      "count": 3
+    },
+    {
+      "before": "line_start",
+      "after": "find_line_start",
+      "count": 3
+    },
+    {
+      "before": "message",
+      "after": "get_message",
+      "count": 3
+    },
+    {
+      "before": "metadata_comments",
+      "after": "collect_metadata_comments",
+      "count": 2
+    },
+    {
+      "before": "newline_repository_pair",
+      "after": "create_newline_repository_pair",
+      "count": 2
+    },
+    {
+      "before": "note",
+      "after": "build_note",
+      "count": 7
+    },
+    {
+      "before": "object_path",
+      "after": "build_object_path",
+      "count": 3
+    },
+    {
+      "before": "oid",
+      "after": "get_oid",
+      "count": 6
+    },
+    {
+      "before": "oid",
+      "after": "parse_tree_oid",
+      "count": 11
+    },
+    {
+      "before": "oid",
+      "after": "read_oid",
+      "count": 20
+    },
+    {
+      "before": "ok",
+      "after": "run_git_successfully",
+      "count": 41
+    },
+    {
+      "before": "optional_oid",
+      "after": "deserialize_optional_oid",
+      "count": 1
+    },
+    {
+      "before": "parsed",
+      "after": "parse_file",
+      "count": 21
+    },
+    {
+      "before": "path",
+      "after": "parse_path",
+      "count": 15
+    },
+    {
+      "before": "reference",
+      "after": "build_snapshot_ref",
+      "count": 4
+    },
+    {
+      "before": "root",
+      "after": "get_root",
+      "count": 42
+    },
+    {
+      "before": "script",
+      "after": "write_script",
+      "count": 6
+    },
+    {
+      "before": "shared_clone",
+      "after": "create_shared_clone",
+      "count": 2
+    },
+    {
+      "before": "source",
+      "after": "get_source",
+      "count": 4
+    },
+    {
+      "before": "start",
+      "after": "get_start",
+      "count": 9
+    },
+    {
+      "before": "subdir",
+      "after": "get_subdir",
+      "count": 7
+    },
+    {
+      "before": "supervised_test",
+      "after": "supervise_test",
+      "count": 4
+    },
+    {
+      "before": "system",
+      "after": "new",
+      "count": 2
+    },
+    {
+      "before": "target",
+      "after": "get_target",
+      "count": 5
+    },
+    {
+      "before": "tree_error_cases",
+      "after": "build_tree_error_cases",
+      "count": 2
+    },
+    {
+      "before": "verified",
+      "after": "verify_object",
+      "count": 5
+    },
+    {
+      "before": "whole",
+      "after": "build_whole_file",
+      "count": 12
+    },
+    {
+      "before": "with_cause",
+      "after": "new_with_cause",
+      "count": 3
+    },
+    {
+      "before": "with_executable",
+      "after": "new_with_executable",
+      "count": 5
+    }
+  ]
+}

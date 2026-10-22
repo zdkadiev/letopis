@@ -5,3 +5,4 @@ mod value;
 pub use graph::*;
 pub use identity::*;
 pub use value::*;
+pub(crate) use value::{SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN};

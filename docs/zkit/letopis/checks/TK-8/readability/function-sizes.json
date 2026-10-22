@@ -1,0 +1,1245 @@
+{
+  "method": "rustfmt-formatted function start through closing brace at matching indentation; physical lines include blank and comments; trait declarations excluded",
+  "input_aggregate_sha256": "2ae6c8c7f0de7739cebe62f1da69a45091eb80d4bc48ac6411bf09f93381321b",
+  "functions": [
+    {
+      "file": "src/adapters/markdown/links.rs",
+      "name": "collect",
+      "start": 6,
+      "end": 69,
+      "physical_lines": 64
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "linked_worktree_checks_common_object_store_and_refuses_inactive_alternates",
+      "start": 561,
+      "end": 620,
+      "physical_lines": 60
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "promisor_miss_never_fetches",
+      "start": 279,
+      "end": 336,
+      "physical_lines": 58
+    },
+    {
+      "file": "src/adapters/git/mod.rs",
+      "name": "open_with_process",
+      "start": 30,
+      "end": 85,
+      "physical_lines": 56
+    },
+    {
+      "file": "src/adapters/git/tests.rs",
+      "name": "discovers_trailing_newline_repository_without_touching_sibling",
+      "start": 188,
+      "end": 242,
+      "physical_lines": 55
+    },
+    {
+      "file": "src/adapters/git/refs.rs",
+      "name": "pin",
+      "start": 16,
+      "end": 69,
+      "physical_lines": 54
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "exact_bytes_without_index_or_commit",
+      "start": 63,
+      "end": 114,
+      "physical_lines": 52
+    },
+    {
+      "file": "src/adapters/git/process.rs",
+      "name": "exchange_pipes",
+      "start": 123,
+      "end": 172,
+      "physical_lines": 50
+    },
+    {
+      "file": "tests/domain_values.rs",
+      "name": "anchors_and_ranges_reject_invalid_values",
+      "start": 34,
+      "end": 83,
+      "physical_lines": 50
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "shared_clone_is_refused_before_donor_gc_can_break_retention",
+      "start": 471,
+      "end": 518,
+      "physical_lines": 48
+    },
+    {
+      "file": "src/adapters/git/refs.rs",
+      "name": "exact_ref",
+      "start": 71,
+      "end": 116,
+      "physical_lines": 46
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "retained_snapshots_survive_gc",
+      "start": 54,
+      "end": 97,
+      "physical_lines": 44
+    },
+    {
+      "file": "src/adapters/git/objects.rs",
+      "name": "read_blob",
+      "start": 138,
+      "end": 180,
+      "physical_lines": 43
+    },
+    {
+      "file": "src/adapters/markdown/scan.rs",
+      "name": "build_layout",
+      "start": 94,
+      "end": 136,
+      "physical_lines": 43
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "incomplete_tree_and_ref_failure_do_not_pin",
+      "start": 126,
+      "end": 167,
+      "physical_lines": 42
+    },
+    {
+      "file": "src/adapters/markdown/scan.rs",
+      "name": "collect_headings",
+      "start": 53,
+      "end": 92,
+      "physical_lines": 40
+    },
+    {
+      "file": "tests/domain_values.rs",
+      "name": "edge_identity_and_kind_are_derived",
+      "start": 138,
+      "end": 176,
+      "physical_lines": 39
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "concurrent_pin_is_idempotent",
+      "start": 240,
+      "end": 277,
+      "physical_lines": 38
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "alternates_added_after_open_refuse_operations_without_writes",
+      "start": 521,
+      "end": 558,
+      "physical_lines": 38
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "empty_tree_and_invalid_paths",
+      "start": 153,
+      "end": 190,
+      "physical_lines": 38
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "tree_error_cases",
+      "start": 192,
+      "end": 229,
+      "physical_lines": 38
+    },
+    {
+      "file": "tests/domain_values.rs",
+      "name": "edge_targets_and_self_loops_are_checked",
+      "start": 179,
+      "end": 215,
+      "physical_lines": 37
+    },
+    {
+      "file": "tests/markdown_links.rs",
+      "name": "invalid_graph_titles_and_targets_fail_file",
+      "start": 61,
+      "end": 97,
+      "physical_lines": 37
+    },
+    {
+      "file": "src/adapters/git/objects.rs",
+      "name": "create_tree",
+      "start": 181,
+      "end": 216,
+      "physical_lines": 36
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "symbolic_and_conflicting_refs_are_rejected",
+      "start": 169,
+      "end": 204,
+      "physical_lines": 36
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "conflicting_descendant_types_do_not_pin",
+      "start": 339,
+      "end": 374,
+      "physical_lines": 36
+    },
+    {
+      "file": "src/adapters/git/objects.rs",
+      "name": "verified",
+      "start": 69,
+      "end": 103,
+      "physical_lines": 35
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "assert_shared_clone_gc_outcome",
+      "start": 434,
+      "end": 468,
+      "physical_lines": 35
+    },
+    {
+      "file": "src/adapters/git/objects.rs",
+      "name": "entries",
+      "start": 104,
+      "end": 137,
+      "physical_lines": 34
+    },
+    {
+      "file": "src/adapters/git/tests.rs",
+      "name": "process_removes_inherited_overrides_and_hardens_writes",
+      "start": 140,
+      "end": 173,
+      "physical_lines": 34
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "paths_are_literal_and_never_shell_input",
+      "start": 117,
+      "end": 150,
+      "physical_lines": 34
+    },
+    {
+      "file": "src/adapters/git/mod.rs",
+      "name": "require_self_contained_objects",
+      "start": 89,
+      "end": 121,
+      "physical_lines": 33
+    },
+    {
+      "file": "src/adapters/markdown/mod.rs",
+      "name": "parse",
+      "start": 71,
+      "end": 101,
+      "physical_lines": 31
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "nested_elements_and_orphan_metadata_are_rejected",
+      "start": 157,
+      "end": 187,
+      "physical_lines": 31
+    },
+    {
+      "file": "src/adapters/git/process.rs",
+      "name": "command",
+      "start": 91,
+      "end": 120,
+      "physical_lines": 30
+    },
+    {
+      "file": "src/adapters/git/tests.rs",
+      "name": "subprocess_drains_and_reaps_on_io_failure",
+      "start": 91,
+      "end": 120,
+      "physical_lines": 30
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "assert_golden_element",
+      "start": 8,
+      "end": 37,
+      "physical_lines": 30
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "file_errors_never_return_partial_elements",
+      "start": 125,
+      "end": 154,
+      "physical_lines": 30
+    },
+    {
+      "file": "src/adapters/markdown/search.rs",
+      "name": "render",
+      "start": 7,
+      "end": 35,
+      "physical_lines": 29
+    },
+    {
+      "file": "tests/markdown_links.rs",
+      "name": "only_inline_links_declare_edges",
+      "start": 9,
+      "end": 37,
+      "physical_lines": 29
+    },
+    {
+      "file": "src/adapters/git/process.rs",
+      "name": "check_version",
+      "start": 40,
+      "end": 67,
+      "physical_lines": 28
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "try_borrowed_snapshot",
+      "start": 405,
+      "end": 432,
+      "physical_lines": 28
+    },
+    {
+      "file": "tests/markdown_search.rs",
+      "name": "golden_search_representations",
+      "start": 6,
+      "end": 33,
+      "physical_lines": 28
+    },
+    {
+      "file": "tests/markdown_search.rs",
+      "name": "metadata_and_link_changes_keep_search_hash",
+      "start": 41,
+      "end": 67,
+      "physical_lines": 27
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "unretained_unique_tree_is_collectable",
+      "start": 99,
+      "end": 124,
+      "physical_lines": 26
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "raw_html_content_does_not_declare_metadata",
+      "start": 250,
+      "end": 275,
+      "physical_lines": 26
+    },
+    {
+      "file": "tests/domain_values.rs",
+      "name": "sha256_uses_exact_bytes",
+      "start": 111,
+      "end": 135,
+      "physical_lines": 25
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "replacement_refs_do_not_change_bytes",
+      "start": 266,
+      "end": 290,
+      "physical_lines": 25
+    },
+    {
+      "file": "tests/domain_values.rs",
+      "name": "ids_and_sources_normalize_from_git_root",
+      "start": 8,
+      "end": 31,
+      "physical_lines": 24
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "golden_elements_have_exact_bytes_and_metadata",
+      "start": 40,
+      "end": 63,
+      "physical_lines": 24
+    },
+    {
+      "file": "tests/domain_values.rs",
+      "name": "tree_oids_are_full_lowercase_hex",
+      "start": 86,
+      "end": 108,
+      "physical_lines": 23
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "tree_types_and_missing_objects_are_distinct",
+      "start": 242,
+      "end": 263,
+      "physical_lines": 22
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "code_examples_do_not_declare_elements",
+      "start": 101,
+      "end": 122,
+      "physical_lines": 22
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "snapshot_metadata_preserves_full_oid_and_zero_created_at",
+      "start": 210,
+      "end": 231,
+      "physical_lines": 22
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "new",
+      "start": 59,
+      "end": 80,
+      "physical_lines": 22
+    },
+    {
+      "file": "src/domain/identity.rs",
+      "name": "parse",
+      "start": 97,
+      "end": 117,
+      "physical_lines": 21
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "unicode_crlf_and_eof_have_exact_spans",
+      "start": 66,
+      "end": 86,
+      "physical_lines": 21
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "git",
+      "start": 103,
+      "end": 123,
+      "physical_lines": 21
+    },
+    {
+      "file": "src/adapters/markdown/mod.rs",
+      "name": "at",
+      "start": 33,
+      "end": 52,
+      "physical_lines": 20
+    },
+    {
+      "file": "src/adapters/markdown/scan.rs",
+      "name": "metadata_comments",
+      "start": 32,
+      "end": 51,
+      "physical_lines": 20
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "gitlinks_are_retained_without_dereferencing",
+      "start": 376,
+      "end": 395,
+      "physical_lines": 20
+    },
+    {
+      "file": "src/adapters/git/tests.rs",
+      "name": "version_gate",
+      "start": 17,
+      "end": 35,
+      "physical_lines": 19
+    },
+    {
+      "file": "src/adapters/markdown/scan.rs",
+      "name": "element_bounds",
+      "start": 137,
+      "end": 155,
+      "physical_lines": 19
+    },
+    {
+      "file": "src/domain/identity.rs",
+      "name": "parse",
+      "start": 8,
+      "end": 26,
+      "physical_lines": 19
+    },
+    {
+      "file": "tests/markdown_links.rs",
+      "name": "sources_are_normalized_without_loading_destinations",
+      "start": 40,
+      "end": 58,
+      "physical_lines": 19
+    },
+    {
+      "file": "tests/markdown_search.rs",
+      "name": "search_text_preserves_word_and_block_boundaries",
+      "start": 128,
+      "end": 146,
+      "physical_lines": 19
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "anchors_are_unique_across_real_headings",
+      "start": 190,
+      "end": 207,
+      "physical_lines": 18
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "head_index_config_and_live_snapshot",
+      "start": 139,
+      "end": 156,
+      "physical_lines": 18
+    },
+    {
+      "file": "src/adapters/git/tests.rs",
+      "name": "open_rejects_old_git_before_object_calls",
+      "start": 38,
+      "end": 54,
+      "physical_lines": 17
+    },
+    {
+      "file": "src/domain/graph.rs",
+      "name": "new",
+      "start": 50,
+      "end": 66,
+      "physical_lines": 17
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "pin_worker",
+      "start": 205,
+      "end": 221,
+      "physical_lines": 17
+    },
+    {
+      "file": "tests/markdown_links.rs",
+      "name": "image_alt_links_do_not_declare_edges",
+      "start": 111,
+      "end": 127,
+      "physical_lines": 17
+    },
+    {
+      "file": "tests/markdown_search.rs",
+      "name": "own_text_label_and_code_change_search_hash",
+      "start": 70,
+      "end": 86,
+      "physical_lines": 17
+    },
+    {
+      "file": "src/adapters/git/tests.rs",
+      "name": "supervise_policy_worker",
+      "start": 122,
+      "end": 137,
+      "physical_lines": 16
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "external",
+      "start": 26,
+      "end": 41,
+      "physical_lines": 16
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "shared_clone",
+      "start": 81,
+      "end": 96,
+      "physical_lines": 16
+    },
+    {
+      "file": "src/adapters/git/objects.rs",
+      "name": "validate_tree",
+      "start": 52,
+      "end": 66,
+      "physical_lines": 15
+    },
+    {
+      "file": "src/adapters/git/objects.rs",
+      "name": "write",
+      "start": 232,
+      "end": 246,
+      "physical_lines": 15
+    },
+    {
+      "file": "src/adapters/git/tests.rs",
+      "name": "discovers_root_from_subdirectory",
+      "start": 57,
+      "end": 71,
+      "physical_lines": 15
+    },
+    {
+      "file": "src/adapters/git/tests.rs",
+      "name": "open_rejects_non_repository_and_bare",
+      "start": 74,
+      "end": 88,
+      "physical_lines": 15
+    },
+    {
+      "file": "src/domain/identity.rs",
+      "name": "parse",
+      "start": 38,
+      "end": 52,
+      "physical_lines": 15
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "spawn_pin_workers",
+      "start": 223,
+      "end": 237,
+      "physical_lines": 15
+    },
+    {
+      "file": "src/adapters/markdown/scan.rs",
+      "name": "scan",
+      "start": 17,
+      "end": 30,
+      "physical_lines": 14
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "configure_filter_trap",
+      "start": 26,
+      "end": 39,
+      "physical_lines": 14
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "metadata_must_fit_exactly_one_standalone_line",
+      "start": 234,
+      "end": 247,
+      "physical_lines": 14
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "supervised_test",
+      "start": 223,
+      "end": 236,
+      "physical_lines": 14
+    },
+    {
+      "file": "src/adapters/git/process.rs",
+      "name": "run",
+      "start": 78,
+      "end": 89,
+      "physical_lines": 12
+    },
+    {
+      "file": "src/adapters/markdown/metadata.rs",
+      "name": "parse",
+      "start": 18,
+      "end": 29,
+      "physical_lines": 12
+    },
+    {
+      "file": "tests/markdown_search.rs",
+      "name": "moving_path_preserves_text_hashes",
+      "start": 89,
+      "end": 100,
+      "physical_lines": 12
+    },
+    {
+      "file": "tests/markdown_search.rs",
+      "name": "code_examples_remain_searchable",
+      "start": 103,
+      "end": 114,
+      "physical_lines": 12
+    },
+    {
+      "file": "tests/markdown_search.rs",
+      "name": "crlf_metadata_line_does_not_add_search_whitespace",
+      "start": 149,
+      "end": 160,
+      "physical_lines": 12
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "isolated",
+      "start": 46,
+      "end": 57,
+      "physical_lines": 12
+    },
+    {
+      "file": "src/adapters/git/objects.rs",
+      "name": "run",
+      "start": 32,
+      "end": 42,
+      "physical_lines": 11
+    },
+    {
+      "file": "src/adapters/git/tests.rs",
+      "name": "newline_repository_pair",
+      "start": 175,
+      "end": 185,
+      "physical_lines": 11
+    },
+    {
+      "file": "src/domain/identity.rs",
+      "name": "new",
+      "start": 75,
+      "end": 85,
+      "physical_lines": 11
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "fmt",
+      "start": 16,
+      "end": 26,
+      "physical_lines": 11
+    },
+    {
+      "file": "src/domain/graph.rs",
+      "name": "parse",
+      "start": 9,
+      "end": 18,
+      "physical_lines": 10
+    },
+    {
+      "file": "src/domain/graph.rs",
+      "name": "kind_for",
+      "start": 88,
+      "end": 97,
+      "physical_lines": 10
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "parse",
+      "start": 86,
+      "end": 95,
+      "physical_lines": 10
+    },
+    {
+      "file": "src/service/ports/git.rs",
+      "name": "with_cause",
+      "start": 39,
+      "end": 48,
+      "physical_lines": 10
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "corrupted_blob_tree",
+      "start": 230,
+      "end": 239,
+      "physical_lines": 10
+    },
+    {
+      "file": "tests/markdown_elements.rs",
+      "name": "unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected",
+      "start": 89,
+      "end": 98,
+      "physical_lines": 10
+    },
+    {
+      "file": "tests/markdown_links.rs",
+      "name": "links_wrapping_images_still_declare_edges",
+      "start": 130,
+      "end": 139,
+      "physical_lines": 10
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "wait",
+      "start": 204,
+      "end": 213,
+      "physical_lines": 10
+    },
+    {
+      "file": "src/adapters/git/objects.rs",
+      "name": "parse_oid",
+      "start": 43,
+      "end": 51,
+      "physical_lines": 9
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "to_hex",
+      "start": 111,
+      "end": 119,
+      "physical_lines": 9
+    },
+    {
+      "file": "tests/markdown_links.rs",
+      "name": "links_outside_elements_are_only_navigation",
+      "start": 100,
+      "end": 108,
+      "physical_lines": 9
+    },
+    {
+      "file": "tests/markdown_search.rs",
+      "name": "reference_labels_use_whole_file_context",
+      "start": 117,
+      "end": 125,
+      "physical_lines": 9
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "ok",
+      "start": 124,
+      "end": 132,
+      "physical_lines": 9
+    },
+    {
+      "file": "src/adapters/git/objects.rs",
+      "name": "insert",
+      "start": 224,
+      "end": 231,
+      "physical_lines": 8
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "assert_no_ref",
+      "start": 45,
+      "end": 52,
+      "physical_lines": 8
+    },
+    {
+      "file": "src/adapters/markdown/scan.rs",
+      "name": "line_number",
+      "start": 169,
+      "end": 175,
+      "physical_lines": 7
+    },
+    {
+      "file": "src/domain/identity.rs",
+      "name": "parse",
+      "start": 67,
+      "end": 73,
+      "physical_lines": 7
+    },
+    {
+      "file": "src/service/ports/git.rs",
+      "name": "new",
+      "start": 32,
+      "end": 38,
+      "physical_lines": 7
+    },
+    {
+      "file": "src/service/ports/git.rs",
+      "name": "fmt",
+      "start": 60,
+      "end": 66,
+      "physical_lines": 7
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "assert_alternates_error",
+      "start": 397,
+      "end": 403,
+      "physical_lines": 7
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "script",
+      "start": 184,
+      "end": 190,
+      "physical_lines": 7
+    },
+    {
+      "file": "tests/support/mod.rs",
+      "name": "assert_error",
+      "start": 14,
+      "end": 20,
+      "physical_lines": 7
+    },
+    {
+      "file": "src/adapters/git/objects.rs",
+      "name": "integrity",
+      "start": 25,
+      "end": 30,
+      "physical_lines": 6
+    },
+    {
+      "file": "src/adapters/git/process.rs",
+      "name": "fmt",
+      "start": 25,
+      "end": 30,
+      "physical_lines": 6
+    },
+    {
+      "file": "src/adapters/markdown/scan.rs",
+      "name": "line_start",
+      "start": 157,
+      "end": 162,
+      "physical_lines": 6
+    },
+    {
+      "file": "src/adapters/markdown/scan.rs",
+      "name": "line_after",
+      "start": 163,
+      "end": 168,
+      "physical_lines": 6
+    },
+    {
+      "file": "src/domain/graph.rs",
+      "name": "as_str",
+      "start": 33,
+      "end": 38,
+      "physical_lines": 6
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "new",
+      "start": 38,
+      "end": 43,
+      "physical_lines": 6
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "new",
+      "start": 62,
+      "end": 67,
+      "physical_lines": 6
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "external_tree",
+      "start": 20,
+      "end": 25,
+      "physical_lines": 6
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "init_arg",
+      "start": 18,
+      "end": 23,
+      "physical_lines": 6
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "oid",
+      "start": 133,
+      "end": 138,
+      "physical_lines": 6
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "change_and_delete_live_files",
+      "start": 157,
+      "end": 162,
+      "physical_lines": 6
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "expire_reflogs_gc_prune_now_and_pack_refs",
+      "start": 175,
+      "end": 180,
+      "physical_lines": 6
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "drop",
+      "start": 216,
+      "end": 221,
+      "physical_lines": 6
+    },
+    {
+      "file": "src/lib.rs",
+      "name": "open_git_snapshots",
+      "start": 13,
+      "end": 17,
+      "physical_lines": 5
+    },
+    {
+      "file": "tests/markdown_search.rs",
+      "name": "note",
+      "start": 35,
+      "end": 39,
+      "physical_lines": 5
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "replace_loose_object",
+      "start": 170,
+      "end": 174,
+      "physical_lines": 5
+    },
+    {
+      "file": "tests/support/mod.rs",
+      "name": "parsed",
+      "start": 6,
+      "end": 10,
+      "physical_lines": 5
+    },
+    {
+      "file": "src/adapters/git/mod.rs",
+      "name": "create_tree",
+      "start": 125,
+      "end": 128,
+      "physical_lines": 4
+    },
+    {
+      "file": "src/adapters/git/mod.rs",
+      "name": "read_blob",
+      "start": 129,
+      "end": 132,
+      "physical_lines": 4
+    },
+    {
+      "file": "src/adapters/git/mod.rs",
+      "name": "pin",
+      "start": 133,
+      "end": 136,
+      "physical_lines": 4
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "object_path",
+      "start": 166,
+      "end": 169,
+      "physical_lines": 4
+    },
+    {
+      "file": "src/adapters/git/mod.rs",
+      "name": "open",
+      "start": 27,
+      "end": 29,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/adapters/git/process.rs",
+      "name": "fmt",
+      "start": 20,
+      "end": 22,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/adapters/git/process.rs",
+      "name": "io_error",
+      "start": 33,
+      "end": 35,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/adapters/git/process.rs",
+      "name": "is_exit_code",
+      "start": 36,
+      "end": 38,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/adapters/git/process.rs",
+      "name": "system",
+      "start": 72,
+      "end": 74,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/adapters/git/process.rs",
+      "name": "with_executable",
+      "start": 75,
+      "end": 77,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/graph.rs",
+      "name": "as_str",
+      "start": 20,
+      "end": 22,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/graph.rs",
+      "name": "source",
+      "start": 68,
+      "end": 70,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/graph.rs",
+      "name": "target",
+      "start": 72,
+      "end": 74,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/graph.rs",
+      "name": "edge_type",
+      "start": 76,
+      "end": 78,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/identity.rs",
+      "name": "as_str",
+      "start": 28,
+      "end": 30,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/identity.rs",
+      "name": "as_str",
+      "start": 54,
+      "end": 56,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/identity.rs",
+      "name": "digits",
+      "start": 58,
+      "end": 60,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/identity.rs",
+      "name": "as_str",
+      "start": 87,
+      "end": 89,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/identity.rs",
+      "name": "as_str",
+      "start": 119,
+      "end": 121,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "start",
+      "start": 45,
+      "end": 47,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "end",
+      "start": 49,
+      "end": 51,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "start",
+      "start": 69,
+      "end": 71,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "end",
+      "start": 73,
+      "end": 75,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "as_str",
+      "start": 97,
+      "end": 99,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/domain/value.rs",
+      "name": "digest",
+      "start": 107,
+      "end": 109,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/service/ports/git.rs",
+      "name": "kind",
+      "start": 50,
+      "end": 52,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/service/ports/git.rs",
+      "name": "message",
+      "start": 54,
+      "end": 56,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/service/ports/git.rs",
+      "name": "source",
+      "start": 70,
+      "end": 72,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/service/ports/git.rs",
+      "name": "new",
+      "start": 82,
+      "end": 84,
+      "physical_lines": 3
+    },
+    {
+      "file": "src/service/ports/git.rs",
+      "name": "oid",
+      "start": 86,
+      "end": 88,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "path",
+      "start": 20,
+      "end": 22,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "oid",
+      "start": 23,
+      "end": 25,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/git_retention.rs",
+      "name": "reference",
+      "start": 42,
+      "end": 44,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "path",
+      "start": 14,
+      "end": 16,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/git_snapshots.rs",
+      "name": "oid",
+      "start": 17,
+      "end": 19,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "root",
+      "start": 97,
+      "end": 99,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "subdir",
+      "start": 100,
+      "end": 102,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "direct_ref",
+      "start": 163,
+      "end": 165,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "fsck_strict_no_reflogs",
+      "start": 181,
+      "end": 183,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "drop",
+      "start": 193,
+      "end": 195,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/support/git.rs",
+      "name": "spawn",
+      "start": 201,
+      "end": 203,
+      "physical_lines": 3
+    },
+    {
+      "file": "tests/support/mod.rs",
+      "name": "whole",
+      "start": 11,
+      "end": 13,
+      "physical_lines": 3
+    }
+  ]
+}

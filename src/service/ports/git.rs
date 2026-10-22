@@ -19,6 +19,7 @@ pub enum SnapshotErrorKind {
     /// Git, repository integrity or retention failed.
     InternalError,
 }
+
 /// A safe diagnostic, retaining I/O or exit causes without subprocess payloads.
 #[derive(Debug)]
 pub struct SnapshotError {
@@ -26,6 +27,7 @@ pub struct SnapshotError {
     message: &'static str,
     cause: Option<Box<dyn Error + Send + Sync>>,
 }
+
 impl SnapshotError {
     pub(crate) fn new(kind: SnapshotErrorKind, message: &'static str) -> Self {
         Self {
@@ -34,7 +36,7 @@ impl SnapshotError {
             cause: None,
         }
     }
-    pub(crate) fn with_cause(
+    pub(crate) fn new_with_cause(
         message: &'static str,
         cause: impl Error + Send + Sync + 'static,
     ) -> Self {
@@ -45,14 +47,15 @@ impl SnapshotError {
         }
     }
     /// Classification suitable for application error mapping.
-    pub fn kind(&self) -> SnapshotErrorKind {
+    pub fn get_kind(&self) -> SnapshotErrorKind {
         self.kind
     }
     /// Static operation context, without repository paths or file bytes.
-    pub fn message(&self) -> &str {
+    pub fn get_message(&self) -> &str {
         self.message
     }
 }
+
 impl fmt::Display for SnapshotError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.message)?;
@@ -62,31 +65,52 @@ impl fmt::Display for SnapshotError {
         Ok(())
     }
 }
+
 impl Error for SnapshotError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.cause.as_ref().map(|c| c.as_ref() as &dyn Error)
     }
 }
+
 /// A tree whose complete local closure has a confirmed permanent service ref.
 #[derive(Debug)]
 pub struct RetainedTree {
     oid: TreeOid,
 }
+
 impl RetainedTree {
     pub(crate) fn new(oid: TreeOid) -> Self {
         Self { oid }
     }
     /// The exact retained tree OID.
-    pub fn oid(&self) -> &TreeOid {
+    pub fn get_oid(&self) -> &TreeOid {
         &self.oid
     }
 }
+
 /// Synchronous immutable snapshot operations. Creation alone does not retain.
 pub trait GitSnapshotPort {
     /// Create a tree from exactly these files, preserving captured bytes.
+    ///
+    /// # Errors
+    /// Returns [`SnapshotErrorKind::InvalidRequest`] for invalid, duplicate or
+    /// colliding paths, and [`SnapshotErrorKind::InternalError`] when repository
+    /// policy, Git I/O or object integrity checks fail.
     fn create_tree(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError>;
     /// Read a complete blob from an exact tree, without live-file fallback.
+    ///
+    /// # Errors
+    /// Returns [`SnapshotErrorKind::NotFound`] for a missing root or path,
+    /// [`SnapshotErrorKind::InvalidRequest`] for an incompatible OID format,
+    /// non-tree root or non-blob path, and [`SnapshotErrorKind::InternalError`]
+    /// for repository policy, Git I/O or integrity failures.
     fn read_blob(&self, tree: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError>;
     /// Validate the complete local closure and retain it through Git GC.
+    ///
+    /// # Errors
+    /// Returns [`SnapshotErrorKind::NotFound`] for a missing root,
+    /// [`SnapshotErrorKind::InvalidRequest`] for an incompatible OID format or
+    /// non-tree root, and [`SnapshotErrorKind::InternalError`] for an incomplete
+    /// or corrupt closure, repository policy, Git I/O or ref publication failure.
     fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError>;
 }

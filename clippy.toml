@@ -1,0 +1,2 @@
+# Aim for about 40 lines; enforce 60 code lines per function/method.
+too-many-lines-threshold = 60

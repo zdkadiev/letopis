@@ -11,8 +11,8 @@ pub(super) fn render(
 ) -> String {
     let mut text = String::new();
     for (event, range) in events {
-        if range.start < span.start()
-            || range.end > span.end()
+        if range.start < span.get_start()
+            || range.end > span.get_end()
             || metadata_ranges
                 .iter()
                 .any(|m| range.start >= m.start && range.end <= m.end)
@@ -20,8 +20,9 @@ pub(super) fn render(
             continue;
         }
         match event {
-            Event::Text(s) | Event::Code(s) => text.push_str(s),
-            Event::Html(s) | Event::InlineHtml(s) => text.push_str(s),
+            Event::Text(s) | Event::Code(s) | Event::Html(s) | Event::InlineHtml(s) => {
+                text.push_str(s);
+            }
             Event::SoftBreak
             | Event::HardBreak
             | Event::Rule
