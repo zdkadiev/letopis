@@ -210,6 +210,7 @@ impl LocalFileSystem {
         if current.inode != before.inode || current.device != before.device {
             return Err(fail_changed());
         }
+        observe_lock_descriptor(&guard.file)?;
         guard
             .file
             .set_len(0)
@@ -273,7 +274,7 @@ impl FileSystem for LocalFileSystem {
 
     fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
         let file = self.open_lock_file(INDEX_LOCK)?;
-        let before = observe_descriptor(&file)?;
+        let before = observe_lock_descriptor(&file)?;
         if !self.try_acquire_lock(&file)? {
             retry_io(|| file.lock())
                 .map_err(|cause| fail_io("cannot acquire coordination lock", cause))?;
@@ -287,7 +288,7 @@ impl EmbedLocks for LocalFileSystem {
 
     fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>> {
         let file = self.open_lock_file(EMBED_LOCK)?;
-        let before = observe_descriptor(&file)?;
+        let before = observe_lock_descriptor(&file)?;
         if !self.try_acquire_lock(&file)? {
             return Ok(None);
         }
@@ -306,6 +307,17 @@ fn reopen_concurrently_created_lock(
         Err(Errno::NOENT) => openat(directory, name, LOCK_FILE_FLAGS, Mode::empty()),
         result => result,
     }
+}
+
+fn observe_lock_descriptor(file: &File) -> DocumentResult<FileStat> {
+    let stat = fstat(file).map_err(|cause| fail_io("cannot observe coordination lock", cause))?;
+    if stat.st_nlink != 1 {
+        return Err(DocumentError::new(
+            DocumentErrorKind::InvalidRequest,
+            "private coordination lock required",
+        ));
+    }
+    build_file_stat(&stat)
 }
 
 fn observe_descriptor(file: &impl AsFd) -> DocumentResult<FileStat> {
@@ -369,7 +381,7 @@ mod tests {
     use super::{LocalFileSystem, observe_descriptor, reopen_concurrently_created_lock};
     use crate::{
         domain::RepoPath,
-        service::{EmbedLocks, FileSystem},
+        service::{DocumentErrorKind, EmbedLocks, FileSystem},
     };
     use rustix::{
         fs::{FlockOperation, flock, fstat},
@@ -554,6 +566,159 @@ mod tests {
         drop(guard);
         let _next = filesystem.try_lock_embed().unwrap().unwrap();
         assert_eq!(fs::metadata(path).unwrap().ino(), inode);
+    }
+
+    #[test]
+    fn hardlinked_lock_targets_are_rejected_without_modifying_corpus_or_external_bytes() {
+        for name in ["index.lock", "embed.lock"] {
+            for external in [false, true] {
+                // Arrange each target on the same filesystem as its lock hard link.
+                let root = tempdir().unwrap();
+                let outside = tempdir().unwrap();
+                let target_root = if external {
+                    outside.path()
+                } else {
+                    root.path()
+                };
+                let target = target_root.join("private-note.md");
+                let bytes = b"private corpus or external contents\0\xff";
+                fs::write(&target, bytes).unwrap();
+                fs::create_dir(root.path().join(".letopis")).unwrap();
+                let path = root.path().join(".letopis").join(name);
+                fs::hard_link(&target, &path).unwrap();
+                let inode = fs::metadata(&target).unwrap().ino();
+                let filesystem = LocalFileSystem::open(root.path()).unwrap();
+                // Act
+                let result = if name == "index.lock" {
+                    filesystem.lock_index().map(Some)
+                } else {
+                    filesystem.try_lock_embed()
+                };
+                // Assert the error neither mutates the inode nor exposes private data.
+                assert_eq!(
+                    fs::read(&target).unwrap(),
+                    bytes,
+                    "{name} external={external}"
+                );
+                assert_eq!(fs::read(&path).unwrap(), bytes);
+                assert_eq!(fs::metadata(&target).unwrap().ino(), inode);
+                assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
+                let error = result.err().expect("hard-linked lock must fail");
+                assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+                let diagnostic = format!("{error} {error:?}");
+                assert!(!diagnostic.contains("private corpus"));
+                assert!(!diagnostic.contains(target.to_str().unwrap()));
+            }
+        }
+    }
+
+    #[test]
+    fn aliased_index_and_embed_names_are_rejected_without_mutation() {
+        // Arrange
+        let root = tempdir().unwrap();
+        fs::create_dir(root.path().join(".letopis")).unwrap();
+        let index = root.path().join(".letopis/index.lock");
+        let embed = root.path().join(".letopis/embed.lock");
+        fs::write(&index, b"shared lock inode bytes").unwrap();
+        fs::hard_link(&index, &embed).unwrap();
+        let inode = fs::metadata(&index).unwrap().ino();
+        let filesystem = LocalFileSystem::open(root.path()).unwrap();
+        for name in ["index.lock", "embed.lock"] {
+            // Act
+            let result = if name == "index.lock" {
+                filesystem.lock_index().map(Some)
+            } else {
+                filesystem.try_lock_embed()
+            };
+            // Assert
+            assert_eq!(fs::read(&index).unwrap(), b"shared lock inode bytes");
+            assert_eq!(fs::read(&embed).unwrap(), b"shared lock inode bytes");
+            assert_eq!(fs::metadata(&index).unwrap().ino(), inode);
+            assert_eq!(fs::metadata(&embed).unwrap().ino(), inode);
+            let error = result.err().expect("aliased lock names must fail");
+            assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+        }
+    }
+
+    #[test]
+    fn hardlink_added_during_index_contention_is_rejected_after_acquiring_ownership() {
+        // Arrange an initially private lock descriptor and observe actual contention.
+        let root = tempdir().unwrap();
+        let filesystem = LocalFileSystem::open(root.path()).unwrap();
+        let guard = filesystem.lock_index().unwrap();
+        let path = root.path().join(".letopis/index.lock");
+        fs::write(&path, b"holder bytes must survive").unwrap();
+        let inode = fs::metadata(&path).unwrap().ino();
+        let waiting = LocalFileSystem::open(root.path()).unwrap();
+        let (sender, receiver) = mpsc::channel();
+        waiting
+            .on_contention
+            .replace(Some(Box::new(move || sender.send(()).unwrap())));
+        let worker = thread::spawn(move || waiting.lock_index());
+        receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        let alias = root.path().join("note.md");
+        fs::hard_link(&path, &alias).unwrap();
+        // Act
+        drop(guard);
+        let result = worker.join().unwrap();
+        // Assert the pre-acquisition check cannot hide a subsequently added link.
+        assert_eq!(fs::read(&path).unwrap(), b"holder bytes must survive");
+        assert_eq!(fs::read(&alias).unwrap(), b"holder bytes must survive");
+        assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
+        assert_eq!(fs::metadata(&alias).unwrap().ino(), inode);
+        let error = result
+            .err()
+            .expect("new hard link must fail after contention");
+        assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+        // Removing the alias permits reacquisition; failure released its kernel lock.
+        fs::remove_file(alias).unwrap();
+        drop(filesystem.lock_index().unwrap());
+    }
+
+    #[test]
+    fn busy_embed_probe_rejects_new_hardlink_without_touching_owner_bytes() {
+        // Arrange
+        let root = tempdir().unwrap();
+        let filesystem = LocalFileSystem::open(root.path()).unwrap();
+        let _guard = filesystem.try_lock_embed().unwrap().unwrap();
+        let path = root.path().join(".letopis/embed.lock");
+        let alias = root.path().join("note.md");
+        let bytes = fs::read(&path).unwrap();
+        let inode = fs::metadata(&path).unwrap().ino();
+        fs::hard_link(&path, &alias).unwrap();
+        // Act
+        let result = filesystem.try_lock_embed();
+        // Assert an unsafe descriptor is an error even when another owner is busy.
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(fs::read(&alias).unwrap(), bytes);
+        assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
+        assert_eq!(fs::metadata(&alias).unwrap().ino(), inode);
+        let error = result.err().expect("hard-linked busy lock must fail");
+        assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+    }
+
+    #[test]
+    fn ordinary_hardlinked_document_reads_remain_supported() {
+        // Arrange
+        let root = tempdir().unwrap();
+        fs::write(root.path().join("note.md"), b"unchanged document bytes").unwrap();
+        fs::hard_link(root.path().join("note.md"), root.path().join("alias.md")).unwrap();
+        let filesystem = LocalFileSystem::open(root.path()).unwrap();
+        let inode = fs::metadata(root.path().join("note.md")).unwrap().ino();
+        for name in ["note.md", "alias.md"] {
+            // Act
+            let captured = filesystem
+                .read_file(&RepoPath::parse(name).unwrap())
+                .unwrap()
+                .unwrap();
+            // Assert lock-specific validation must not reject ordinary document hard links.
+            assert_eq!(captured.bytes, b"unchanged document bytes");
+            assert_eq!(captured.stat.inode, inode);
+            assert_eq!(
+                fs::read(root.path().join(name)).unwrap(),
+                b"unchanged document bytes"
+            );
+        }
     }
 
     #[test]
