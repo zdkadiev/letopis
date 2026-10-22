@@ -1,0 +1,2 @@
+# Whole-crate mutation testing is the default. Do not add broad file/function skips.
+# Any exact equivalent mutation exclusion must have an individual evidence record.

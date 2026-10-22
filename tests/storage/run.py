@@ -43,7 +43,7 @@ def run_command(argv: list[str], *, cwd: Path, env: dict[str, str],
 
 
 def hash_inputs(root):
-    paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs',
+    paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs', 'Makefile', '.cargo/mutants.toml',
               'rust-toolchain.toml', 'clippy.toml', '.dockerignore',
               'docs/zkit/letopis/mechanics/storage-schema.sql')]
     for name in ('src', 'vendor', 'examples', 'tests', 'scripts'):
@@ -65,7 +65,7 @@ def run_host(root, evidence, execute):
                  [sys.executable, '--version'], ['uname', '-a']):
         execute(tool, 'version-' + Path(tool[0]).name + '.log')
     process_env = {'LETOPIS_TEST_EVIDENCE': str(evidence / 'process')}
-    execute(['./scripts/check-rust.sh'], 'rust-check.log', extra=process_env)
+    execute(['make', 'verify'], 'rust-check.log', extra=process_env)
     execute(['cargo', 'test', '--locked', '--offline', '--test',
              'embedding_provider', 'attempt_obeys_real_sixty_second_deadline',
              '--', '--ignored', '--exact', '--nocapture'],

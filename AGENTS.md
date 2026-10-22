@@ -22,7 +22,7 @@ The directory structure must reflect responsibilities and dependency boundaries:
 
 Use `trait` for component interfaces and concrete `struct`/`impl` for implementations. Name types by responsibility or technology (`Storage`, `SqliteStorage`, `GitSnapshots`, `GitCli`), without `Port`/`Adapter` suffixes. Do not introduce `ports/`, `adapters/`, or `contracts/` directory layers. A module's `mod.rs` defines its interface, declares children, and explicitly reexports the necessary types. Put each concrete implementation's struct, inherent methods, and trait implementations together in its own file, for example `git/cli.rs` or `storage/sqlite.rs`; keep implementation bodies out of `mod.rs`. If interfaces grow, split them by responsibility into private files and reexport them from `mod.rs`. Keep implementation details private and expose only the necessary API. Add modules with real functionality; do not scaffold future subsystems or trivial forwarding services. These rules describe the target layout; the TK-9 plan must include moving the existing Git/Markdown modules and updating their imports.
 
-Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful helpers. Keep domain rules and technology-specific behavior in their owners; utilities must not bypass module boundaries.
+Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful helpers; see [code reading order](#code-reading-order) for when to extract them. Keep domain rules and technology-specific behavior in their owners; utilities must not bypass module boundaries.
 
 ## Rust conventions
 
@@ -32,20 +32,59 @@ Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful
 - Replace meaningful repeated domain/protocol literals with clearly named constants near their owning module; use SCREAMING_SNAKE_CASE. Do not replace literals mechanically or collect unrelated constants in a global bag.
 - Keep functions and methods focused: aim for about 40 lines, with 60 lines as the upper limit. Split longer implementations into cohesive named helpers, not arbitrary wrappers or compressed formatting. Apply the same rule to tests and test helpers.
 - Use ownership and borrowing deliberately; add cloning, shared ownership, locks, or dynamic dispatch only for an actual need.
-- Model finite alternatives with enums and expected failures with typed `Result`. Document public APIs. Preserve useful internal error causes while keeping public diagnostics free of secrets and raw knowledge/provider/subprocess payloads.
+- Model finite alternatives with enums and expected failures with typed `Result`. Document public APIs as described in [readability and documentation](#readability-and-documentation). Preserve useful internal error causes while keeping public diagnostics free of secrets and raw knowledge/provider/subprocess payloads.
 - Compose ordinary storage queries with SeaQuery and typed table/column identifiers; execute through rusqlite using bound values from the private storage/query.rs helper. Keep builder types inside storage. Raw SQL is reserved for schemas, SQLite introspection/PRAGMAs/native probes, and specialized FTS5/vec1 search or native commands; format substantial SQL across readable lines. Never interpolate user values or render them into SQL with to_string.
 - Keep I/O synchronous according to the design; do not add an async runtime without an agreed requirement. Product Git commands belong in the Git process adapter and use argv/stdin, never shell interpolation.
 - Standard Clippy checks and the explicitly selected pedantic checks in `Cargo.toml` are enabled; see the development guide for each rule and its purpose. `dbg!`, `todo!`, and `unimplemented!` are denied. Do not enable all of `restriction`, `pedantic`, or `nursery` indiscriminately. Fix the underlying finding rather than adding a blanket allowance; any exception must be narrow and explain its reason. Public fallible APIs document `# Errors`, and public APIs that can panic document `# Panics`.
 
+## Code reading order
+
+Code reads top to bottom, from abstract to concrete. Apply these rules to new and touched code only; do not reorder untouched code just to conform.
+
+- A caller is defined above everything it calls. A function or method must not call one defined above it. Type and constant definitions are not calls and may be referenced from above.
+- Group by level of abstraction: orchestration and abstract calls first, then intermediate steps, then low-level details. Keep methods of the same level adjacent.
+- Within an `impl`, public methods come first and private helpers last, in the order they are first called. A public method that calls another public method stays above it.
+- Within a file, order items as constants, types, `impl` blocks with the public API, trait implementations, then private free functions. Trait implementations such as `Display` stay next to their type. `#[cfg(test)]` modules go last, with test helpers after the tests.
+- Place a helper by its consumers: one file keeps it as a private function at the bottom of that file; several files of one module share the module-local `utils.rs`; several modules share `src/utils.rs`. Extract only when there are at least two consumers. `utils.rs` files follow the same top-to-bottom order.
+
+## Readability and documentation
+
+Apply these rules to new and touched code only.
+
+- Prefer early exits: `let Some(x) = value else { return ... };` and `?` over nested `match` and `if let`. Keep nesting to two levels.
+- Use newtypes and enums instead of bare primitives: `SnapshotId(String)` rather than `String`, an enum rather than `bool` flags.
+- Group more than three or four parameters into a request struct.
+- Use iterator chains while they read well (three or four steps); split longer chains into named steps instead of a manual loop or one long expression.
+- Write explicit types in signatures; do not use `impl Trait` where it hides meaning.
+- Keep files focused on one responsibility, roughly 300-500 lines; split a file that grows far beyond that.
+- Comments explain why, not what: required for `unsafe`, platform workarounds, and non-obvious invariants. Do not narrate the body line by line or repeat the method name.
+- Document every `pub` and interface method (traits in `service/mod.rs`, `mod.rs` re-exports) and every private method whose purpose is not clear from its name and signature. Trivial accessors and obvious one-liners need no comment.
+- A method comment starts with one sentence saying what it does, then states the contract: preconditions, what is returned, side effects, and guarantees such as atomicity or idempotence, plus `# Errors` and `# Panics` where they apply.
+- Document a trait's contract on the trait itself: what every implementation must guarantee, not only the current one. An `impl` comment covers only what is specific to that implementation, such as SQLite or Git behavior.
+- Update a comment in the same commit that changes the behavior it describes.
+
 ## Verification
 
-For product Rust changes run:
+Run commands from the repository root; from elsewhere use `make -C <path> <target>`. Dependencies are locked and offline: if they have not been prepared, run `cargo fetch --locked` first. Checks never download dependencies or rewrite files; apply formatting with `make fmt`.
 
-```sh
-./scripts/check-rust.sh
-```
+| Command | Runs | Use |
+| --- | --- | --- |
+| `make check` | `cargo fmt --check`, `cargo check` (all targets), Clippy with `-D warnings`, root tests | Required for every product Rust change. |
+| `make verify` | `make check`, strict Rustdoc (`RUSTDOCFLAGS='-D warnings'`), root tests in the release profile | Before claiming completion of a task that changes `src/`, public documentation, or dependencies. |
+| `make mutants` | `cargo mutants` over the root crate with locked, offline cargo | Mutation testing, see below. |
+| `python3 -B tests/storage/run.py --platform host\|linux --evidence <new directory>` | Schema parity, runner tests, native SQLite/vec1 capabilities, copied standalone executable and its linkage | When storage, native stack, build, or vendored inputs change. Evidence goes to a new directory, never over existing evidence. |
 
-It checks formatting, compiler diagnostics, Clippy, and root tests with locked offline dependencies. If dependencies have not been prepared, use `cargo fetch --locked` first. Formatting can be applied with `cargo fmt --all`.
+### Mutation testing
+
+Passing tests prove that the checked behavior works, not that the tests would notice a break. Mutation testing changes the code (flips a condition, replaces a return value, removes a call) and requires at least one test to fail for every change.
+
+- Requires `cargo-mutants` (`cargo install --locked cargo-mutants`); it is a developer tool and is not part of `Cargo.lock`. Its output directory `mutants.out*` is git-ignored.
+- For behavioral changes in `src/`, run it over the changed code only: `git diff main > mutants.diff` and `make mutants ARGS='--in-diff mutants.diff'`. Run it over the whole crate before merging a task into `main` and after changes to domain rules, storage, or change detection.
+- Every surviving mutant is either killed by a new or stronger test (assert the observable result, not just that the call did not fail) or recorded as equivalent: list the mutant and the reason in the task card, spec, or plan, and exclude it narrowly in `.cargo/mutants.toml` with a comment. Do not exclude a whole file or function to make the run pass.
+- Timeouts and unviable mutants are not survivors, but report their counts. Do not shorten the run by lowering the timeout without saying so.
+- Report the mutation result as caught / missed / timeout / unviable counts for the scope that was actually run. Mutation testing complements `make check`; it does not replace it, and it does not apply to documentation-only edits.
+
+### Review and reporting
 
 - Structure tests as Arrange, Act, Assert: prepare inputs/fixtures, execute the behavior, then check results. Use explicit phase comments where they clarify boundaries; repeat phases for genuinely sequential scenarios. Keep helpers private and keep scenario assertions visible.
 - Test meaningful behavior and failure paths for behavioral changes. Import-only or documentation-only edits do not need new behavioral tests.

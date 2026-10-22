@@ -27,7 +27,7 @@ def hash_file(path):
 
 
 def hash_inputs(root):
-    paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs',
+    paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs', 'Makefile', '.cargo/mutants.toml',
              'rust-toolchain.toml', 'clippy.toml', '.dockerignore', SCHEMA)]
     for name in ('src', 'vendor', 'examples', 'scripts', 'tests/support', 'tests/cli', 'tests/fixtures/markdown'):
         paths.extend(p for p in (root / name).rglob('*') if p.is_file()
@@ -142,7 +142,7 @@ def run_host(root, evidence, execute, manifest):
     for tool in (['rustc', '-vV'], ['cargo', '--version'], ['git', '--version'],
                  [sys.executable, '--version'], ['uname', '-a']):
         execute(tool, 'version-' + Path(tool[0]).name + '.log')
-    execute(['./scripts/check-rust.sh'], 'root-check.log')
+    execute(['make', 'verify'], 'root-check.log')
     execute(['cargo', 'build', '--locked', '--offline', '--bin', 'letopis',
              '--example', 'cli_runtime_fixture', '--message-format=json'], 'build.log')
     artifacts = read_artifacts(evidence / 'build.log')

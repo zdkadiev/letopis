@@ -76,10 +76,18 @@ fn verify_artifact(path: &Path) -> PathBuf {
 }
 pub struct OwnedChild(Child);
 impl OwnedChild {
+    /// Spawn a fixture process whose lifetime is owned by this guard.
+    ///
+    /// # Panics
+    /// Panics when process setup or spawn fails.
     pub fn spawn(command: &mut Command) -> Self {
         Self(command.spawn().unwrap())
     }
 
+    /// Write the complete fixture input and close stdin to deliver EOF.
+    ///
+    /// # Panics
+    /// Panics if stdin was not piped, was already consumed, or writing fails.
     pub fn send_input(&mut self, input: &[u8]) {
         self.0.stdin.take().unwrap().write_all(input).unwrap();
     }
@@ -88,11 +96,20 @@ impl OwnedChild {
         self.0.id()
     }
 
+    /// Kill and reap this still-running owned process without consulting PID files.
+    ///
+    /// # Panics
+    /// Panics if the process already exited or termination/wait fails.
     pub fn kill(&mut self) {
         self.0.kill().unwrap();
         self.0.wait().unwrap();
     }
 
+    /// Await owned process termination and captured pipe EOF within one watchdog.
+    ///
+    /// Null stdout is represented by empty bytes; captured stderr must be piped.
+    /// # Panics
+    /// Panics on process/I/O errors, missing stderr, timeout or inherited pipes.
     pub fn collect_output(&mut self, timeout: Duration) -> Output {
         let stdout = self.0.stdout.take();
         let stderr = self.0.stderr.take().unwrap();

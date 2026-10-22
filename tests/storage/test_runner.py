@@ -143,7 +143,7 @@ class InputInventoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             sources = (
-                'Cargo.toml', 'Cargo.lock', 'build.rs', 'rust-toolchain.toml',
+                'Cargo.toml', 'Cargo.lock', 'build.rs', 'rust-toolchain.toml', 'Makefile', '.cargo/mutants.toml',
                 'clippy.toml', '.dockerignore',
                 'docs/zkit/letopis/mechanics/storage-schema.sql',
                 'src/lib.rs', 'tests/storage/test_runner.py',

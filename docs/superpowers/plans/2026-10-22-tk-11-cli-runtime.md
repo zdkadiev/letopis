@@ -158,6 +158,23 @@ Composition in `lib.rs`: public `open_background<'a>(root: &Path, executable: &P
 
 ### Task 5 execution evidence and integration rulings — 2026-10-22
 
+### Accepted verification policy update — 2026-10-23
+
+The user replaced AGENTS after review of `4030714`. Fix round 1 applies the new
+mandatory `make verify` (debug check, strict Rustdoc, release tests), whole-crate
+cargo-mutants after storage integration, and host/Linux storage/native acceptance.
+The two historical compiling controls remain useful but do not replace mutation
+testing. No waiver is granted. Exact survivors must be killed by meaningful tests
+or individually justified and narrowly excluded with comments; defaults determine
+timeouts, and caught/missed/timeout/unviable are recorded for the actual scope.
+
+Before mutation execution, bounded caller ordering and helper contracts were fixed,
+the historical host nested count corrected to eight, and a minimal worktree-owned
+Makefile became the single command source. The old script delegates to `make check`.
+The primary checkout's other-writer workflow/Makefile was not imported. First
+`make verify` passes on the policy tree; final mutation/platform acceptance remains
+pending and receives new receipts. Both accepted integration rulings below remain.
+
 Authorized completed TK-13 `06dc8a18` was merged separately as `f5611e2`; product
 integration is `521276a`. Steps 1–4 are implemented and verified. Step 5 remains
 open only for independent Task 5/whole-branch review and controller acceptance;

@@ -410,6 +410,8 @@ pub trait Inspections {
     fn inspect(&mut self, ids: &[ElementAddress]) -> CommandResult<Inspection>;
 }
 /// Narrow readiness and execution capability of the embedding executor.
+/// Implementations reuse the executor's configuration, durable attempts and publication
+/// guards. Readiness never performs inference or retains a read transaction for launch.
 pub trait EmbeddingTasks {
     /// Determine whether configuration is ready and eligible durable work exists.
     ///
@@ -417,9 +419,10 @@ pub trait EmbeddingTasks {
     /// Reports failures inspecting durable work.
     fn has_work(&mut self) -> CommandResult<bool>;
     /// Drain eligible work under the executor-owned lock.
+    /// Missing/invalid configuration, changed identity and an occupied lock finish cleanly.
     ///
     /// # Errors
-    /// Reports configuration, storage or embedding failures.
+    /// Reports unexpected storage, coordination or embedding infrastructure failures.
     fn drain(&mut self) -> CommandResult<()>;
 }
 /// Nonblocking persistent embedding exclusion.

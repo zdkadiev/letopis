@@ -20,14 +20,23 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Watchdog for owned fixture completion; not a product deadline.
 pub const WAIT: Duration = Duration::from_secs(10);
+/// Valid native Ollama response with an exactly assertable vector.
 pub const SUCCESS: &str = r#"{"model":"fixture","embeddings":[[1,2,3]]}"#;
+/// Synthetic privacy sentinel; never a real credential.
 pub const SECRET: &str = "private-provider-body-and-key-sentinel";
 
+/// An isolated repository whose projection is published by the real Documents service.
 pub struct Fixture {
+    /// Repository and corpus used by this one test.
     pub repo: DocumentRepo,
 }
 impl Fixture {
+    /// Create an isolated committed Git corpus with a real document projection.
+    ///
+    /// # Panics
+    /// Panics when temporary files, Git setup or initial publication fail.
     pub fn new() -> Self {
         let fixture = Self {
             repo: DocumentRepo::new(),
@@ -47,6 +56,11 @@ impl Fixture {
         fixture
     }
 
+    /// Replace the fixture knowledge file and atomically refresh its projection.
+    ///
+    /// Returns the published search hash; the real Documents service owns locking.
+    /// # Panics
+    /// Panics if writing, parsing or publication fails.
     pub fn publish(&self, body: &str) -> Sha256 {
         let bytes = build_whole(1, body);
         self.repo.write("knowledge.md", &bytes);
@@ -61,6 +75,11 @@ impl Fixture {
             .search_hash
     }
 
+    /// Write a complete local Ollama configuration and return its validated identity.
+    ///
+    /// The URL must be a supported HTTP endpoint; this does not perform inference.
+    /// # Panics
+    /// Panics if the file cannot be written or the supplied configuration is invalid.
     pub fn write_config(&self, url: &str, retries: u64) -> EmbeddingConfig {
         let bytes = serde_json::to_vec(&json!({
             "provider":"ollama", "model":"fixture", "parameters":{"base_url":url},
@@ -71,6 +90,11 @@ impl Fixture {
         EmbeddingConfig::parse(&bytes).unwrap()
     }
 
+    /// Start the actual product drain with EOF stdin and captured output.
+    ///
+    /// The returned guard owns termination/reaping if a test fails.
+    /// # Panics
+    /// Panics if the product executable cannot be spawned.
     pub fn spawn_drain(&self) -> cli::OwnedChild {
         cli::OwnedChild::spawn(
             Command::new(env!("CARGO_BIN_EXE_letopis"))
@@ -83,6 +107,11 @@ impl Fixture {
         )
     }
 
+    /// Start the fixture consumer using real readiness and the product executable.
+    ///
+    /// It waits for explicit test input after reporting the foreground result.
+    /// # Panics
+    /// Panics if the fixture cannot be built or its process cannot be spawned.
     pub fn spawn_foreground(&self) -> cli::OwnedChild {
         cli::OwnedChild::spawn(
             Command::new(cli::get_fixture())
@@ -96,6 +125,11 @@ impl Fixture {
         )
     }
 
+    /// Start the product drain while discarding its stdout response.
+    ///
+    /// The owned child still captures stderr and can be awaited for completion.
+    /// # Panics
+    /// Panics if the product process cannot be spawned.
     pub fn spawn_lost_drain(&self) -> cli::OwnedChild {
         cli::OwnedChild::spawn(
             Command::new(env!("CARGO_BIN_EXE_letopis"))
@@ -107,6 +141,11 @@ impl Fixture {
         )
     }
 
+    /// Release the foreground input barrier and assert successful output and EOF.
+    ///
+    /// Does not release any HTTP barrier, so EOF demonstrates parent independence.
+    /// # Panics
+    /// Panics on timeout, failed process/I/O or an unexpected response.
     pub fn finish_foreground(&self, child: &mut cli::OwnedChild) {
         child.send_input(b"exit\n");
         let output = child.collect_output(WAIT);
@@ -118,14 +157,10 @@ impl Fixture {
         println!("PRODUCT_FOREGROUND {response}");
     }
 
-    pub fn open_storage(&self) -> impl Storage + use<> {
-        open_storage(
-            &self.repo.get_root().join(".letopis/cache.db"),
-            &self.repo.get_root().join(".letopis/vectors.db"),
-        )
-        .unwrap()
-    }
-
+    /// Read the vector stored for the expected configuration and exact search hash.
+    ///
+    /// # Panics
+    /// Panics on storage failure or an unexpected configuration identity.
     pub fn read_vector(&self, config: &EmbeddingConfig, hash: &Sha256) -> Option<Vec<f32>> {
         unwrap_current(
             self.open_storage()
@@ -136,6 +171,10 @@ impl Fixture {
         )
     }
 
+    /// Read durable attempts and the safe diagnostic for one expected identity/hash.
+    ///
+    /// # Panics
+    /// Panics on storage failure or an unexpected configuration identity.
     pub fn read_failure(
         &self,
         config: &EmbeddingConfig,
@@ -150,6 +189,10 @@ impl Fixture {
         )
     }
 
+    /// Assert that no eligible durable row remains under this configuration budget.
+    ///
+    /// # Panics
+    /// Panics on storage failure, changed identity or remaining eligible work.
     pub fn assert_no_work(&self, config: &EmbeddingConfig) {
         let work = self
             .open_storage()
@@ -160,6 +203,11 @@ impl Fixture {
         assert_eq!(work, VectorOutcome::Current(None));
     }
 
+    /// Capture published state, knowledge/index bytes and user refs for equality checks.
+    ///
+    /// The byte-vector entries are knowledge.md followed by the Git index.
+    /// # Panics
+    /// Panics if storage, files or Git refs cannot be read.
     pub fn capture_corpus(&self) -> (State, Vec<Vec<u8>>, Vec<u8>) {
         let files = ["knowledge.md", ".git/index"]
             .iter()
@@ -173,6 +221,14 @@ impl Fixture {
         assert!(refs.status.success());
         (self.repo.read_state(), files, refs.stdout)
     }
+
+    fn open_storage(&self) -> impl Storage + use<> {
+        open_storage(
+            &self.repo.get_root().join(".letopis/cache.db"),
+            &self.repo.get_root().join(".letopis/vectors.db"),
+        )
+        .unwrap()
+    }
 }
 
 /// Owns cleanup of only this fixture's spawned detached product PID.
@@ -182,6 +238,11 @@ pub struct DetachedOwner {
     finished: bool,
 }
 impl DetachedOwner {
+    /// Track only the product launched by this isolated fixture foreground.
+    ///
+    /// No signal is sent until cleanup; the supplied PID must identify its foreground.
+    /// # Panics
+    /// Panics if the foreground PID cannot be represented by the native process API.
     pub fn new(root: &Path, foreground: u32) -> Self {
         Self {
             path: root.join(".letopis/embed.lock"),
@@ -190,6 +251,27 @@ impl DetachedOwner {
         }
     }
 
+    /// Wait for the known detached product to terminate, then disarm cleanup.
+    ///
+    /// An exited Linux zombie counts as terminated; direct calls separately test exit code.
+    /// # Panics
+    /// Panics if the ownership PID is invalid or the process exceeds the watchdog.
+    pub fn wait_for_exit(&mut self) {
+        let pid = self.read_pid();
+        let deadline = Instant::now() + WAIT;
+        while !has_exited(pid) {
+            assert!(Instant::now() < deadline, "detached product did not exit");
+            thread::sleep(Duration::from_millis(5));
+        }
+        self.finished = true;
+        println!("PRODUCT_DRAIN {{\"pid\":{pid},\"exited\":true}}");
+    }
+
+    /// Read this isolated fixture's drain PID and reject foreground/test identities.
+    ///
+    /// The caller must have observed actual HTTP arrival before trusting this record.
+    /// # Panics
+    /// Panics for absent/malformed PID text or an excluded process identity.
     pub fn read_pid(&self) -> i32 {
         let pid = fs::read_to_string(&self.path)
             .unwrap()
@@ -200,17 +282,6 @@ impl DetachedOwner {
         assert_ne!(pid, self.foreground);
         assert_ne!(u32::try_from(pid).unwrap(), std::process::id());
         pid
-    }
-
-    pub fn wait_for_exit(&mut self) {
-        let pid = self.read_pid();
-        let deadline = Instant::now() + WAIT;
-        while !has_exited(pid) {
-            assert!(Instant::now() < deadline, "detached product did not exit");
-            thread::sleep(Duration::from_millis(5));
-        }
-        self.finished = true;
-        println!("PRODUCT_DRAIN {{\"pid\":{pid},\"exited\":true}}");
     }
 }
 impl Drop for DetachedOwner {
@@ -243,6 +314,10 @@ impl Drop for DetachedOwner {
     }
 }
 
+/// Assert one successful X-1 drain response and exit zero.
+///
+/// # Panics
+/// Panics on a failed process, stderr, malformed JSON or an unexpected envelope.
 pub fn assert_success(output: &Output) {
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     assert!(output.stderr.is_empty());
@@ -252,6 +327,10 @@ pub fn assert_success(output: &Output) {
     println!("PRODUCT_RESPONSE {response}");
 }
 
+/// Prove lock release by actually acquiring a fresh embedding lease.
+///
+/// # Panics
+/// Panics if the lock path is unsafe or another process retains ownership.
 pub fn assert_released(root: &Path) {
     let files = open_filesystem(root).unwrap();
     assert!(files.try_lock_embed().unwrap().is_some());

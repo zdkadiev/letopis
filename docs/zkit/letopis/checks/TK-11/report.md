@@ -299,7 +299,8 @@ Three ignores are explicitly parent-driven child entrypoints (filesystem lock,
 document publication, embedding process). The fourth is
 `attempt_obeys_real_sixty_second_deadline`: the unchanged TK-13 real 60-second proof
 is deliberately not rerun or claimed for this combined revision. Host logs also
-contain six successful filtered nested runs; Linux contains eight. They are not
+contain eight successful filtered nested runs; Linux contains eight. Two host
+prefixes were interleaved; the raw records, not only intact prefixes, determine this count. They are not
 added to the 348 root total. Dedicated observers additionally pass 31 CLI unit,
 25 lock, five process, three executable and twelve actual-drain tests per platform.
 Successful injected check/inspect output is labelled separately. Actual drain

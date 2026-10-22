@@ -48,6 +48,62 @@ impl<'a> ConfinedDirectory<'a> {
             before_open: RefCell::new(None),
         }
     }
+
+    /// Open a named database only while its path matches the pinned service directory.
+    ///
+    /// # Errors
+    /// Rejects unsafe aliases, replacement/symlinks, native capability or `SQLite` failures.
+    pub(super) fn open_database(&self, name: &str) -> StorageResult<Connection> {
+        self.verify()?;
+        #[cfg(test)]
+        if let Some(hook) = self.before_open.take() {
+            hook();
+        }
+        // Keep the supplied path: canonicalization would hide the symlink from SQLite.
+        let connection = open_raw_database(
+            &self.path.join(name),
+            DATABASE_OPEN_FLAGS | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )?;
+        self.verify()?;
+        configure_connection(&connection)?;
+        Ok(connection)
+    }
+
+    /// Attach the confined vectors database under the connection's no-follow policy.
+    ///
+    /// # Errors
+    /// Rejects replaced/unsafe paths or `SQLite` attachment/configuration failures.
+    pub(super) fn attach_vectors(&self, connection: &Connection) -> StorageResult<()> {
+        self.verify()?;
+        #[cfg(test)]
+        if let Some(hook) = self.before_open.take() {
+            hook();
+        }
+        // ATTACH inherits SQLITE_OPEN_NOFOLLOW from this directory's main connection.
+        attach_unconfigured_vectors(connection, &self.path.join(VECTOR_DATABASE))?;
+        self.verify()?;
+        configure_database(connection, "vec")
+    }
+
+    /// Attach the confined cache read-only for hash-reference checks during vector writes.
+    ///
+    /// # Errors
+    /// Rejects changed directory/leaf paths and failures attaching the read-only database.
+    pub(super) fn attach_cache(&self, connection: &Connection) -> StorageResult<()> {
+        self.verify()?;
+        #[cfg(test)]
+        if let Some(hook) = self.before_open.take() {
+            hook();
+        }
+        attach_cache(connection, &self.path.join(CACHE_DATABASE))?;
+        self.verify()
+    }
+
+    /// Verify the retained directory and require distinct regular database leaves.
+    ///
+    /// Missing leaves are allowed for initial creation; existing aliases are rejected.
+    /// # Errors
+    /// Reports unsafe paths, replacement or failed descriptor/path observations.
     pub(super) fn verify(&self) -> StorageResult<()> {
         let directory = open(
             self.path,
@@ -79,44 +135,6 @@ impl<'a> ConfinedDirectory<'a> {
             Err(Errno::NOENT) => Ok(None),
             Err(error) => Err(map_path_error(error)),
         }
-    }
-
-    pub(super) fn open_database(&self, name: &str) -> StorageResult<Connection> {
-        self.verify()?;
-        #[cfg(test)]
-        if let Some(hook) = self.before_open.take() {
-            hook();
-        }
-        // Keep the supplied path: canonicalization would hide the symlink from SQLite.
-        let connection = open_raw_database(
-            &self.path.join(name),
-            DATABASE_OPEN_FLAGS | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        )?;
-        self.verify()?;
-        configure_connection(&connection)?;
-        Ok(connection)
-    }
-
-    pub(super) fn attach_vectors(&self, connection: &Connection) -> StorageResult<()> {
-        self.verify()?;
-        #[cfg(test)]
-        if let Some(hook) = self.before_open.take() {
-            hook();
-        }
-        // ATTACH inherits SQLITE_OPEN_NOFOLLOW from this directory's main connection.
-        attach_unconfigured_vectors(connection, &self.path.join(VECTOR_DATABASE))?;
-        self.verify()?;
-        configure_database(connection, "vec")
-    }
-
-    pub(super) fn attach_cache(&self, connection: &Connection) -> StorageResult<()> {
-        self.verify()?;
-        #[cfg(test)]
-        if let Some(hook) = self.before_open.take() {
-            hook();
-        }
-        attach_cache(connection, &self.path.join(CACHE_DATABASE))?;
-        self.verify()
     }
 }
 

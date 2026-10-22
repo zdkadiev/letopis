@@ -1,6 +1,9 @@
 **
 !Cargo.toml
 !Cargo.lock
+!Makefile
+!.cargo/
+!.cargo/mutants.toml
 !clippy.toml
 !rust-toolchain.toml
 !src/

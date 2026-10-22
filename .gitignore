@@ -3,3 +3,5 @@
 .agents
 .vscode/
 /.artifacts/
+/mutants.out*/
+/mutants.diff

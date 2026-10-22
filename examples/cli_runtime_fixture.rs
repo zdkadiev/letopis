@@ -70,6 +70,17 @@ impl FixtureTasks {
         Ok(())
     }
 }
+fn main() -> Result<(), Box<dyn Error>> {
+    let args = env::args().skip(1).collect::<Vec<_>>();
+    let root = env::current_dir()?;
+    match args.as_slice() {
+        [command] if command == "foreground" => run_foreground(&root),
+        [command] if command == "product-foreground" => run_product_foreground(&root),
+        [command, flag] if command == "embed" && flag == "--drain" => run_drain(&root),
+        _ => Err("invalid fixture invocation".into()),
+    }
+}
+
 fn read_command(control: &mut BufReader<UnixStream>) -> Result<String, Box<dyn Error>> {
     let mut line = String::new();
     if control.read_line(&mut line)? == 0 {
@@ -182,16 +193,6 @@ fn run_foreground(root: &Path) -> Result<(), Box<dyn Error>> {
         return Err("missing foreground exit barrier".into());
     }
     Ok(())
-}
-fn main() -> Result<(), Box<dyn Error>> {
-    let args = env::args().skip(1).collect::<Vec<_>>();
-    let root = env::current_dir()?;
-    match args.as_slice() {
-        [command] if command == "foreground" => run_foreground(&root),
-        [command] if command == "product-foreground" => run_product_foreground(&root),
-        [command, flag] if command == "embed" && flag == "--drain" => run_drain(&root),
-        _ => Err("invalid fixture invocation".into()),
-    }
 }
 
 fn run_product_foreground(root: &Path) -> Result<(), Box<dyn Error>> {

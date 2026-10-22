@@ -32,7 +32,8 @@ union. Handler responses are labelled separately from actual product outputs.
 schedules; `locks.log` runs the Task 2 filesystem tests, including native flock
 exclusion and hardlink rejection. `product-drain.log` and `product-observations.json`
 retain actual product output, detached completion and foreground EOF observations.
-Both platforms first run `./scripts/check-rust.sh`, including the merged document,
+Both platforms first run `make verify` (debug checks, strict Rustdoc and release
+tests), including the merged document,
 filesystem, storage and provider regressions. Three ignored child entry helpers
 are explicitly driven by parent tests. The fourth ignore is TK-13's separate real
 60-second provider deadline acceptance: it is deliberately not rerun here; its

@@ -49,6 +49,7 @@ thread_local! {
     static NEXT_PROCESS_TEST: RefCell<Option<ProcessTest>> = const { RefCell::new(None) };
 }
 
+/// Pins the checkout and lazily retains one private service directory identity.
 pub(crate) struct LocalFileSystem {
     root: File,
     service: OnceCell<File>,
@@ -73,6 +74,11 @@ impl Drop for PersistentLock {
     }
 }
 impl LocalFileSystem {
+    /// Pin a regular checkout directory without creating service state.
+    ///
+    /// Service operations initialize their directory lazily and retain its identity.
+    /// # Errors
+    /// Rejects symlink/non-directory roots and failures opening the directory.
     pub(crate) fn open(root: &Path) -> DocumentResult<Self> {
         let root = open(root, DIRECTORY_FLAGS, Mode::empty())
             .map_err(|cause| fail_io("cannot open document root", cause))?;
@@ -100,65 +106,24 @@ impl LocalFileSystem {
     }
 
     #[cfg(test)]
+    /// Install a one-use clock/contention hook for the next opener on this test thread.
     pub(crate) fn configure_next_process_test(time: i64, hook: Box<dyn FnOnce() + Send>) {
         NEXT_PROCESS_TEST.set(Some((time, hook)));
     }
 
     #[cfg(test)]
+    /// Override this fixture's clock and consume its hook on first actual contention.
     pub(crate) fn configure_process_test(&mut self, time: i64, hook: Box<dyn FnOnce() + Send>) {
         self.test_time = Some(time);
         self.on_contention.replace(Some(hook));
     }
 
-    fn open_parent(&self, path: &str) -> Result<(OwnedFd, String), Errno> {
-        let mut parts = path.split('/').peekable();
-        let mut parent = openat(&self.root, ".", DIRECTORY_FLAGS, Mode::empty())?;
-        while let Some(part) = parts.next() {
-            if parts.peek().is_none() {
-                return Ok((parent, part.to_owned()));
-            }
-            parent = openat(&parent, part, DIRECTORY_FLAGS, Mode::empty())?;
-        }
-        Err(Errno::INVAL)
-    }
-
-    fn observe_file(&self, path: &str) -> DocumentResult<Option<FileStat>> {
-        let observation = self
-            .open_parent(path)
-            .and_then(|(parent, name)| statat(parent, name, AtFlags::SYMLINK_NOFOLLOW));
-        match observation {
-            Ok(stat) => build_file_stat(&stat).map(Some),
-            Err(Errno::NOENT) => Ok(None),
-            Err(cause) => Err(fail_io("cannot observe document file", cause)),
-        }
-    }
-
-    fn open_file(&self, path: &RepoPath) -> DocumentResult<File> {
-        let (parent, name) = self
-            .open_parent(path.as_str())
-            .map_err(|cause| fail_io("cannot open document parent", cause))?;
-        openat(parent, name, FILE_FLAGS, Mode::empty())
-            .map(File::from)
-            .map_err(|cause| fail_io("cannot open document file", cause))
-    }
-
-    fn verify_read(
-        &self,
-        path: &RepoPath,
-        file: &File,
-        before: FileStat,
-        size: usize,
-    ) -> DocumentResult<()> {
-        let after = observe_descriptor(file)?;
-        if after != before
-            || self.observe_file(path.as_str())? != Some(before)
-            || u64::try_from(size).ok() != Some(before.size)
-        {
-            return Err(fail_changed());
-        }
-        Ok(())
-    }
-
+    /// Create or validate the private service directory and return an owned descriptor.
+    ///
+    /// The first successful call pins its identity; subsequent calls reject replacement.
+    /// The returned duplicate does not transfer the filesystem's retained ownership.
+    /// # Errors
+    /// Reports unsafe/replaced paths, creation/permission failures or failed duplication.
     pub(crate) fn open_service_directory(&self) -> DocumentResult<OwnedFd> {
         let directory = self.get_service_directory()?;
         directory
@@ -166,54 +131,125 @@ impl LocalFileSystem {
             .map(OwnedFd::from)
             .map_err(|cause| fail_io("cannot duplicate service directory", cause))
     }
+}
 
-    fn get_service_directory(&self) -> DocumentResult<&File> {
-        if self.service.get().is_none() {
-            let directory = self.create_service_directory()?;
-            let _ = self.service.set(directory);
-        }
-        let directory = self.service.get().ok_or_else(fail_changed)?;
-        let pinned =
-            fstat(directory).map_err(|cause| fail_io("cannot observe service directory", cause))?;
-        verify_entry(&self.root, SERVICE_DIRECTORY, &pinned)
-            .map_err(|cause| fail_io("service directory changed", cause))?;
-        Ok(directory)
+impl EmbeddingFiles for LocalFileSystem {
+    type EmbedLock = PersistentLock;
+
+    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+        let directory = self.get_service_directory().map_err(map_io)?;
+        let bytes = read_regular(directory, "config.json", |_| {})?;
+        self.get_service_directory().map_err(map_io)?;
+        Ok(bytes)
     }
 
-    fn create_service_directory(&self) -> DocumentResult<File> {
-        match mkdirat(&self.root, SERVICE_DIRECTORY, Mode::RWXU) {
-            Ok(()) | Err(Errno::EXIST) => {}
-            Err(cause) => return Err(fail_io("cannot create service directory", cause)),
-        }
-        let before = statat(&self.root, SERVICE_DIRECTORY, AtFlags::SYMLINK_NOFOLLOW)
-            .map_err(|cause| fail_io("cannot observe service directory", cause))?;
-        let file = File::from(
-            openat(
-                &self.root,
-                SERVICE_DIRECTORY,
-                DIRECTORY_FLAGS,
-                Mode::empty(),
-            )
-            .map_err(|cause| fail_io("cannot open service directory", cause))?,
-        );
-        let opened =
-            fstat(&file).map_err(|cause| fail_io("cannot observe service directory", cause))?;
-        require_identity(&before, &opened)
-            .map_err(|cause| fail_io("service directory changed", cause))?;
-        fchmod(&file, Mode::RWXU)
-            .map_err(|cause| fail_io("cannot protect service directory", cause))?;
-        Ok(file)
+    fn read_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>> {
+        read_regular(&self.root, path.as_str(), |_| {})
     }
 
+    fn try_lock_embed(&self) -> EmbeddingResult<Option<Self::EmbedLock>> {
+        EmbedLocks::try_lock_embed(self).map_err(map_io)
+    }
+
+    fn get_time_secs(&self) -> EmbeddingResult<u64> {
+        Ok(SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_err(map_io)?
+            .as_secs())
+    }
+
+    fn wait(&self, delay: Duration) -> EmbeddingResult<()> {
+        std::thread::sleep(delay);
+        Ok(())
+    }
+}
+
+impl EmbedLocks for LocalFileSystem {
+    type EmbedLock = PersistentLock;
+
+    fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>> {
+        let file = self.open_lock_file(EMBED_LOCK)?;
+        let before = observe_lock_descriptor(&file)?;
+        if !self.try_acquire_lock(&file)? {
+            self.verify_lock(&file, EMBED_LOCK)?;
+            return Ok(None);
+        }
+        self.finish_lock(file, EMBED_LOCK, before).map(Some)
+    }
+}
+
+impl FileSystem for LocalFileSystem {
+    type IndexLock = PersistentLock;
+
+    fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+        let Some(stat) = self.stat_file(path)? else {
+            return Ok(None);
+        };
+        #[cfg(test)]
+        if let Some(hook) = self.before_open.take() {
+            hook();
+        }
+        let mut file = self.open_file(path)?;
+        if observe_descriptor(&file)? != stat {
+            return Err(fail_changed());
+        }
+        let checked_at_ns = self.get_time_ns()?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)
+            .map_err(|cause| fail_io("cannot read document file", cause))?;
+        #[cfg(test)]
+        if let Some(hook) = self.after_read.take() {
+            hook();
+        }
+        self.verify_read(path, &file, stat, bytes.len())?;
+        Ok(Some(CapturedFile {
+            bytes,
+            stat,
+            checked_at_ns,
+        }))
+    }
+
+    fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
+        let before = self.observe_file(path.as_str())?;
+        if self.observe_file(path.as_str())? != before {
+            return Err(fail_changed());
+        }
+        Ok(before)
+    }
+
+    fn get_time_ns(&self) -> DocumentResult<i64> {
+        #[cfg(test)]
+        if let Some(time) = self.test_time {
+            return Ok(time);
+        }
+        let duration = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_err(|cause| fail_io("unsupported document clock", cause))?;
+        i64::try_from(duration.as_nanos())
+            .map_err(|cause| fail_io("unsupported document clock", cause))
+    }
+
+    fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
+        let file = self.open_lock_file(INDEX_LOCK)?;
+        let before = observe_lock_descriptor(&file)?;
+        if !self.try_acquire_lock(&file)? {
+            retry_io(|| file.lock())
+                .map_err(|cause| fail_io("cannot acquire coordination lock", cause))?;
+        }
+        self.finish_lock(file, INDEX_LOCK, before)
+    }
+}
+
+impl LocalFileSystem {
     fn open_lock_file(&self, name: &str) -> DocumentResult<File> {
         self.open_lock_with(name, || {})
     }
 
     fn open_lock_with(&self, name: &str, observe: impl FnOnce()) -> DocumentResult<File> {
-        let directory = self.open_service_directory()?;
+        let directory = self.get_service_directory()?;
         // Absence is allowed to change: another owner may create this persistent
         // lock next. CREATE|EXCL and the opened-inode checks resolve that race.
-        let before = match statat(&directory, name, AtFlags::SYMLINK_NOFOLLOW) {
+        let before = match statat(directory, name, AtFlags::SYMLINK_NOFOLLOW) {
             Ok(stat) => Some(stat),
             Err(Errno::NOENT) => None,
             Err(cause) => return Err(fail_io("cannot observe coordination lock", cause)),
@@ -223,7 +259,7 @@ impl LocalFileSystem {
         }
         observe();
         let opened = match before {
-            Some(_) => openat(&directory, name, LOCK_FILE_FLAGS, Mode::empty()),
+            Some(_) => openat(directory, name, LOCK_FILE_FLAGS, Mode::empty()),
             None => create_lock_file(&directory, name),
         };
         let file = opened
@@ -238,15 +274,6 @@ impl LocalFileSystem {
         observe_lock_descriptor(&file)?;
         self.verify_lock(&file, name)?;
         Ok(file)
-    }
-
-    fn verify_lock(&self, file: &File, name: &str) -> DocumentResult<()> {
-        let directory = self.get_service_directory()?;
-        let pinned =
-            fstat(file).map_err(|cause| fail_io("cannot observe coordination lock", cause))?;
-        verify_entry(directory, name, &pinned)
-            .map(|_| ())
-            .map_err(|cause| fail_io("coordination lock changed", cause))
     }
 
     fn try_acquire_lock(&self, file: &File) -> DocumentResult<bool> {
@@ -293,112 +320,101 @@ impl LocalFileSystem {
         self.verify_lock(&guard.file, name)?;
         Ok(guard)
     }
-}
 
-impl FileSystem for LocalFileSystem {
-    type IndexLock = PersistentLock;
+    fn verify_lock(&self, file: &File, name: &str) -> DocumentResult<()> {
+        let directory = self.get_service_directory()?;
+        let pinned =
+            fstat(file).map_err(|cause| fail_io("cannot observe coordination lock", cause))?;
+        verify_entry(directory, name, &pinned)
+            .map(|_| ())
+            .map_err(|cause| fail_io("coordination lock changed", cause))
+    }
 
-    fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
-        let before = self.observe_file(path.as_str())?;
-        if self.observe_file(path.as_str())? != before {
+    fn get_service_directory(&self) -> DocumentResult<&File> {
+        if self.service.get().is_none() {
+            let directory = self.create_service_directory()?;
+            let _ = self.service.set(directory);
+        }
+        let directory = self.service.get().ok_or_else(fail_changed)?;
+        let pinned =
+            fstat(directory).map_err(|cause| fail_io("cannot observe service directory", cause))?;
+        verify_entry(&self.root, SERVICE_DIRECTORY, &pinned)
+            .map_err(|cause| fail_io("service directory changed", cause))?;
+        Ok(directory)
+    }
+
+    fn create_service_directory(&self) -> DocumentResult<File> {
+        match mkdirat(&self.root, SERVICE_DIRECTORY, Mode::RWXU) {
+            Ok(()) | Err(Errno::EXIST) => {}
+            Err(cause) => return Err(fail_io("cannot create service directory", cause)),
+        }
+        let before = statat(&self.root, SERVICE_DIRECTORY, AtFlags::SYMLINK_NOFOLLOW)
+            .map_err(|cause| fail_io("cannot observe service directory", cause))?;
+        let file = File::from(
+            openat(
+                &self.root,
+                SERVICE_DIRECTORY,
+                DIRECTORY_FLAGS,
+                Mode::empty(),
+            )
+            .map_err(|cause| fail_io("cannot open service directory", cause))?,
+        );
+        let opened =
+            fstat(&file).map_err(|cause| fail_io("cannot observe service directory", cause))?;
+        require_identity(&before, &opened)
+            .map_err(|cause| fail_io("service directory changed", cause))?;
+        fchmod(&file, Mode::RWXU)
+            .map_err(|cause| fail_io("cannot protect service directory", cause))?;
+        Ok(file)
+    }
+
+    fn open_file(&self, path: &RepoPath) -> DocumentResult<File> {
+        let (parent, name) = self
+            .open_parent(path.as_str())
+            .map_err(|cause| fail_io("cannot open document parent", cause))?;
+        openat(parent, name, FILE_FLAGS, Mode::empty())
+            .map(File::from)
+            .map_err(|cause| fail_io("cannot open document file", cause))
+    }
+
+    fn verify_read(
+        &self,
+        path: &RepoPath,
+        file: &File,
+        before: FileStat,
+        size: usize,
+    ) -> DocumentResult<()> {
+        let after = observe_descriptor(file)?;
+        if after != before
+            || self.observe_file(path.as_str())? != Some(before)
+            || u64::try_from(size).ok() != Some(before.size)
+        {
             return Err(fail_changed());
         }
-        Ok(before)
-    }
-
-    fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
-        let Some(stat) = self.stat_file(path)? else {
-            return Ok(None);
-        };
-        #[cfg(test)]
-        if let Some(hook) = self.before_open.take() {
-            hook();
-        }
-        let mut file = self.open_file(path)?;
-        if observe_descriptor(&file)? != stat {
-            return Err(fail_changed());
-        }
-        let checked_at_ns = self.get_time_ns()?;
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)
-            .map_err(|cause| fail_io("cannot read document file", cause))?;
-        #[cfg(test)]
-        if let Some(hook) = self.after_read.take() {
-            hook();
-        }
-        self.verify_read(path, &file, stat, bytes.len())?;
-        Ok(Some(CapturedFile {
-            bytes,
-            stat,
-            checked_at_ns,
-        }))
-    }
-
-    fn get_time_ns(&self) -> DocumentResult<i64> {
-        #[cfg(test)]
-        if let Some(time) = self.test_time {
-            return Ok(time);
-        }
-        let duration = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map_err(|cause| fail_io("unsupported document clock", cause))?;
-        i64::try_from(duration.as_nanos())
-            .map_err(|cause| fail_io("unsupported document clock", cause))
-    }
-
-    fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
-        let file = self.open_lock_file(INDEX_LOCK)?;
-        let before = observe_lock_descriptor(&file)?;
-        if !self.try_acquire_lock(&file)? {
-            retry_io(|| file.lock())
-                .map_err(|cause| fail_io("cannot acquire coordination lock", cause))?;
-        }
-        self.finish_lock(file, INDEX_LOCK, before)
-    }
-}
-
-impl EmbedLocks for LocalFileSystem {
-    type EmbedLock = PersistentLock;
-
-    fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>> {
-        let file = self.open_lock_file(EMBED_LOCK)?;
-        let before = observe_lock_descriptor(&file)?;
-        if !self.try_acquire_lock(&file)? {
-            self.verify_lock(&file, EMBED_LOCK)?;
-            return Ok(None);
-        }
-        self.finish_lock(file, EMBED_LOCK, before).map(Some)
-    }
-}
-
-impl EmbeddingFiles for LocalFileSystem {
-    type EmbedLock = PersistentLock;
-
-    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
-        let directory = self.get_service_directory().map_err(map_io)?;
-        let bytes = read_regular(directory, "config.json", |_| {})?;
-        self.get_service_directory().map_err(map_io)?;
-        Ok(bytes)
-    }
-
-    fn read_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>> {
-        read_regular(&self.root, path.as_str(), |_| {})
-    }
-
-    fn try_lock_embed(&self) -> EmbeddingResult<Option<Self::EmbedLock>> {
-        EmbedLocks::try_lock_embed(self).map_err(map_io)
-    }
-
-    fn get_time_secs(&self) -> EmbeddingResult<u64> {
-        Ok(SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map_err(map_io)?
-            .as_secs())
-    }
-
-    fn wait(&self, delay: Duration) -> EmbeddingResult<()> {
-        std::thread::sleep(delay);
         Ok(())
+    }
+
+    fn observe_file(&self, path: &str) -> DocumentResult<Option<FileStat>> {
+        let observation = self
+            .open_parent(path)
+            .and_then(|(parent, name)| statat(parent, name, AtFlags::SYMLINK_NOFOLLOW));
+        match observation {
+            Ok(stat) => build_file_stat(&stat).map(Some),
+            Err(Errno::NOENT) => Ok(None),
+            Err(cause) => Err(fail_io("cannot observe document file", cause)),
+        }
+    }
+
+    fn open_parent(&self, path: &str) -> Result<(OwnedFd, String), Errno> {
+        let mut parts = path.split('/').peekable();
+        let mut parent = openat(&self.root, ".", DIRECTORY_FLAGS, Mode::empty())?;
+        while let Some(part) = parts.next() {
+            if parts.peek().is_none() {
+                return Ok((parent, part.to_owned()));
+            }
+            parent = openat(&parent, part, DIRECTORY_FLAGS, Mode::empty())?;
+        }
+        Err(Errno::INVAL)
     }
 }
 

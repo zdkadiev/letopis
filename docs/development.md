@@ -2,7 +2,9 @@
 
 Для продуктового crate и root tests обязательны rustfmt, диагностика rustc и Clippy. Rust 1.95.0, rustfmt и Clippy закреплены в `rust-toolchain.toml`; стандартный формат rustfmt сохраняется без отдельного файла настроек.
 
-Из любого каталога запустить `scripts/check-rust.sh` по пути к checkout. Скрипт выбирает корень проекта и последовательно выполняет:
+Из корня запустить `make check`, из другого каталога — `make -C <checkout> check`.
+Makefile — единственный источник команд; исторический `scripts/check-rust.sh`
+сохранён и делегирует этому target:
 
 ```sh
 cargo fmt --all --check
@@ -11,7 +13,39 @@ cargo clippy --locked --offline --all-targets -- -D warnings
 cargo test --locked --offline
 ```
 
-Для offline-проверок зависимости должны быть заранее доступны: при первом запуске подготовить их через `cargo fetch --locked`. Скрипт не загружает зависимости и не исправляет форматирование автоматически. Форматирование вручную: `cargo fmt --all`.
+Для offline-проверок зависимости должны быть заранее доступны: при первом запуске
+подготовить их через `cargo fetch --locked`. Проверки не загружают зависимости и не
+исправляют файлы. Форматирование вручную: `make fmt`.
+
+Перед завершением задачи, меняющей `src/`, публичную документацию или зависимости,
+обязателен `make verify`: `make check`, строгий Rustdoc с `RUSTDOCFLAGS='-D warnings'`
+и `cargo test --locked --offline --release`. Debug и release totals записываются
+раздельно; nested helper invocations не прибавляются к корневым тестам.
+
+## Mutation testing и native stack
+
+`make mutants` запускает developer tool `cargo-mutants` над корневым crate и передаёт
+каждому Cargo вызову `--locked --offline`. Сам инструмент не входит в Cargo.lock.
+Для локальной установки в отдельный каталог можно использовать `cargo install
+--locked cargo-mutants --root <tools>` и добавить `<tools>/bin` в PATH текущего вызова.
+В этой задаче подготовлен `.artifacts/tk11/tools/bin` (27.1.0); глобальная установка
+не менялась. `mutants.out*` и временный `mutants.diff` исключены из Git.
+
+Для поведения в изменённом коде: `git diff main > mutants.diff`, затем
+`make mutants ARGS='--in-diff mutants.diff'`. После изменений domain/storage/change
+detection и перед merge в main требуется whole-crate запуск без фильтра diff.
+Мутации исполняются в копиях, а исходные raw logs сохраняются. Для каждого survivor
+нужен тест, который проверяет нарушенный результат и убивает мутацию, либо отдельное
+обоснование эквивалентности в задаче/spec/plan и точное комментированное исключение
+в `.cargo/mutants.toml`. Не исключать файл или функцию целиком. Отдельно указывать
+caught/missed/timeout/unviable и реальные параметры; default timeout не сокращать
+скрыто. Mutation testing не заменяет `make check` и не требуется для prose-only правок.
+
+После изменений storage/native/build/vendor дополнительно выполнить
+`python3 -B tests/storage/run.py --platform host|linux --evidence <new-directory>`.
+Runner проверяет schema parity, свой lifecycle, bundled SQLite/vec1 и копию
+самостоятельного executable с проверкой linkage; каждый evidence path новый.
+Исторические harnesses с отдельными manifest не входят в корневой gate автоматически.
 
 ## Правила
 

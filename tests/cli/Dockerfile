@@ -4,6 +4,8 @@ RUN python3 -m venv /opt/cli-python && /opt/cli-python/bin/pip install --no-cach
 RUN rustup component add rustfmt clippy
 WORKDIR /repo
 COPY Cargo.toml Cargo.lock rust-toolchain.toml clippy.toml build.rs .dockerignore ./
+COPY Makefile ./
+COPY .cargo/mutants.toml ./.cargo/mutants.toml
 COPY vendor ./vendor
 COPY src ./src
 COPY examples ./examples
