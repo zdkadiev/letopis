@@ -1,4 +1,8 @@
-use super::connection::map_sqlite;
+use super::{
+    connection::map_sqlite,
+    graph::map_invalid_value,
+    query::{EmbedFailures, Meta, QueryErrorRow, Schemas, VectorIndex, VectorKeys, build_query},
+};
 use crate::{
     domain::{KnowledgeId, Sha256},
     service::{
@@ -6,15 +10,24 @@ use crate::{
         StoredVectorKey, VectorMatch,
     },
 };
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params, params_from_iter};
+use sea_query::{Asterisk, Expr, ExprTrait, JoinType, OnConflict, Query};
 
-const RESET_INDEX: &str = "DROP TABLE vector_index; CREATE VIRTUAL TABLE vector_index USING vec1(vector); INSERT INTO vector_index(cmd,arg) VALUES('rebuild','{index:\"none\",distance:\"cos\"}'); DELETE FROM vector_keys; DELETE FROM embed_failures;";
+const RESET_INDEX: &str = r#"
+    DROP TABLE vector_index;
+    CREATE VIRTUAL TABLE vector_index USING vec1(vector);
+    INSERT INTO vector_index(cmd,arg) VALUES('rebuild','{index:"none",distance:"cos"}');
+"#;
 
 pub(super) fn matches_identity(connection: &Connection, expected: &Sha256) -> StorageResult<bool> {
+    let (sql, values) = build_query(
+        Query::select()
+            .column(Meta::ConfigIdentity)
+            .from(Meta::Table)
+            .and_where(Expr::col(Meta::Id).eq(1)),
+    )?;
     let identity: Option<String> = connection
-        .query_row("SELECT config_identity FROM meta WHERE id=1", [], |r| {
-            r.get(0)
-        })
+        .query_row(&sql, params_from_iter(values), |r| r.get(0))
         .optional()
         .map_err(map_sqlite)?;
     Ok(identity.as_deref() == Some(expected.to_hex().as_str()))
@@ -27,7 +40,26 @@ pub(super) fn reset_vectors(connection: &mut Connection, identity: &Sha256) -> S
         return Ok(false);
     }
     tx.execute_batch(RESET_INDEX).map_err(map_sqlite)?;
-    tx.execute("INSERT INTO meta(id,config_identity) VALUES(1,?1) ON CONFLICT(id) DO UPDATE SET config_identity=excluded.config_identity", [identity.to_hex()]).map_err(map_sqlite)?;
+    let (sql, values) = build_query(Query::delete().from_table(VectorKeys::Table))?;
+    tx.execute(&sql, params_from_iter(values))
+        .map_err(map_sqlite)?;
+    let (sql, values) = build_query(Query::delete().from_table(EmbedFailures::Table))?;
+    tx.execute(&sql, params_from_iter(values))
+        .map_err(map_sqlite)?;
+    let (sql, values) = build_query(
+        Query::insert()
+            .into_table(Meta::Table)
+            .columns([Meta::Id, Meta::ConfigIdentity])
+            .values([Expr::val(1), Expr::val(identity.to_hex())])
+            .map_err(map_invalid_value)?
+            .on_conflict(
+                OnConflict::column(Meta::Id)
+                    .update_column(Meta::ConfigIdentity)
+                    .to_owned(),
+            ),
+    )?;
+    tx.execute(&sql, params_from_iter(values))
+        .map_err(map_sqlite)?;
     tx.commit().map_err(map_sqlite)?;
     Ok(true)
 }
@@ -47,53 +79,98 @@ pub(super) fn store_vector(
     dimensions: usize,
 ) -> StorageResult<StoredVectorKey> {
     let bytes = encode_vector(vector, dimensions)?;
-    let inserted = connection
-        .execute(
-            "INSERT OR IGNORE INTO vector_keys(search_hash) VALUES(?1)",
-            [hash.to_hex()],
-        )
-        .map_err(map_sqlite)?
-        == 1;
-    let row_id = connection
-        .query_row(
-            "SELECT row_id FROM vector_keys WHERE search_hash=?1",
-            [hash.to_hex()],
-            |r| r.get::<_, i64>(0),
-        )
-        .map_err(map_sqlite)?;
-    if inserted {
+    let key = get_or_insert_vector_key(connection, hash)?;
+    if key.inserted {
+        let (sql, values) = build_query(
+            Query::insert()
+                .into_table(VectorIndex::Table)
+                .columns([VectorIndex::Rowid, VectorIndex::Vector])
+                .values([Expr::val(key.row_id), Expr::val(bytes)])
+                .map_err(map_invalid_value)?,
+        )?;
         connection
-            .execute(
-                "INSERT INTO vector_index(rowid,vector) VALUES(?1,?2)",
-                params![row_id, bytes],
-            )
+            .execute(&sql, params_from_iter(values))
             .map_err(map_sqlite)?;
     } else {
+        let (sql, values) = build_query(
+            Query::select()
+                .expr(Expr::val(1))
+                .from(VectorIndex::Table)
+                .and_where(Expr::col(VectorIndex::Rowid).eq(key.row_id)),
+        )?;
         let exists = connection
-            .query_row(
-                "SELECT 1 FROM vector_index WHERE rowid=?1",
-                [row_id],
-                |_| Ok(()),
-            )
+            .query_row(&sql, params_from_iter(values), |_| Ok(()))
             .optional()
             .map_err(map_sqlite)?;
         if exists.is_none() {
             return Err(invalid_stored_vector());
         }
     }
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(EmbedFailures::Table)
+            .and_where(Expr::col(EmbedFailures::SearchHash).eq(hash.to_hex())),
+    )?;
     connection
-        .execute(
-            "DELETE FROM embed_failures WHERE search_hash=?1",
-            [hash.to_hex()],
-        )
+        .execute(&sql, params_from_iter(values))
+        .map_err(map_sqlite)?;
+    Ok(key)
+}
+
+fn get_or_insert_vector_key(
+    connection: &Connection,
+    hash: &Sha256,
+) -> StorageResult<StoredVectorKey> {
+    let (sql, values) = build_query(
+        Query::insert()
+            .into_table(VectorKeys::Table)
+            .columns([VectorKeys::SearchHash])
+            .values([Expr::val(hash.to_hex())])
+            .map_err(map_invalid_value)?
+            .on_conflict(
+                OnConflict::column(VectorKeys::SearchHash)
+                    .do_nothing()
+                    .to_owned(),
+            ),
+    )?;
+    let inserted = connection
+        .execute(&sql, params_from_iter(values))
+        .map_err(map_sqlite)?
+        == 1;
+    let (sql, values) = build_query(
+        Query::select()
+            .column(VectorKeys::RowId)
+            .from(VectorKeys::Table)
+            .and_where(Expr::col(VectorKeys::SearchHash).eq(hash.to_hex())),
+    )?;
+    let row_id = connection
+        .query_row(&sql, params_from_iter(values), |r| r.get(0))
         .map_err(map_sqlite)?;
     Ok(StoredVectorKey { row_id, inserted })
 }
+
 pub(super) fn read_vector(
     connection: &Connection,
     hash: &Sha256,
 ) -> StorageResult<Option<Vec<f32>>> {
-    let value = connection.query_row("SELECT v.vector FROM vec.vector_keys k LEFT JOIN vec.vector_index v ON v.rowid=k.row_id WHERE k.search_hash=?1", [hash.to_hex()], |r| r.get::<_,Option<Vec<u8>>>(0)).optional().map_err(map_sqlite)?;
+    let (sql, values) = build_query(
+        Query::select()
+            .column((VectorIndex::Table, VectorIndex::Vector))
+            .from((Schemas::Vec, VectorKeys::Table))
+            .join(
+                JoinType::LeftJoin,
+                (Schemas::Vec, VectorIndex::Table),
+                Expr::col((VectorIndex::Table, VectorIndex::Rowid))
+                    .equals((VectorKeys::Table, VectorKeys::RowId)),
+            )
+            .and_where(Expr::col((VectorKeys::Table, VectorKeys::SearchHash)).eq(hash.to_hex())),
+    )?;
+    let value = connection
+        .query_row(&sql, params_from_iter(values), |r| {
+            r.get::<_, Option<Vec<u8>>>(0)
+        })
+        .optional()
+        .map_err(map_sqlite)?;
     value
         .map(|bytes| decode_vector(&bytes.ok_or_else(invalid_stored_vector)?))
         .transpose()
@@ -123,13 +200,27 @@ pub(super) fn find_nearest_vectors(
     dimensions: usize,
 ) -> StorageResult<Vec<VectorMatch>> {
     let bytes = encode_vector(query, dimensions)?;
+    let (sql, values) = build_query(
+        Query::select()
+            .expr(Expr::col(Asterisk).count())
+            .from((Schemas::Vec, VectorKeys::Table)),
+    )?;
     let count: i64 = connection
-        .query_row("SELECT count(*) FROM vec.vector_keys", [], |r| r.get(0))
+        .query_row(&sql, params_from_iter(values), |r| r.get(0))
         .map_err(map_sqlite)?;
     if count == 0 {
         return Ok(Vec::new());
     }
-    let mut statement = connection.prepare("SELECT n.id,k.search_hash,v.distance FROM vec.vector_index(?1,?2) v JOIN vec.vector_keys k ON k.row_id=v.rowid JOIN nodes n ON n.search_hash=k.search_hash WHERE n.kind<>'source' ORDER BY v.distance,n.id").map_err(map_sqlite)?;
+    let mut statement = connection
+        .prepare(
+            "SELECT n.id, k.search_hash, v.distance
+         FROM vec.vector_index(?1, ?2) v
+         JOIN vec.vector_keys k ON k.row_id = v.rowid
+         JOIN nodes n ON n.search_hash = k.search_hash
+         WHERE n.kind <> 'source'
+         ORDER BY v.distance, n.id",
+        )
+        .map_err(map_sqlite)?;
     let rows = statement
         .query_map(params![bytes, format!("{{K:{count}}}")], |r| {
             Ok((
@@ -162,21 +253,40 @@ pub(super) fn reserve_attempt(
             "attempt budget must be positive",
         ));
     }
-    connection.execute(
-        "INSERT INTO embed_failures(search_hash,attempts) VALUES(?1,1) ON CONFLICT(search_hash) DO UPDATE SET attempts=attempts+1 WHERE attempts<?2",
-        params![hash.to_hex(), budget],
-    ).map(|changed| changed == 1).map_err(map_sqlite)
+    let (sql, values) = build_query(
+        Query::insert()
+            .into_table(EmbedFailures::Table)
+            .columns([EmbedFailures::SearchHash, EmbedFailures::Attempts])
+            .values([Expr::val(hash.to_hex()), Expr::val(1)])
+            .map_err(map_invalid_value)?
+            .on_conflict(
+                OnConflict::column(EmbedFailures::SearchHash)
+                    .value(
+                        EmbedFailures::Attempts,
+                        Expr::col(EmbedFailures::Attempts).add(1),
+                    )
+                    .action_and_where(Expr::col(EmbedFailures::Attempts).lt(budget))
+                    .to_owned(),
+            ),
+    )?;
+    connection
+        .execute(&sql, params_from_iter(values))
+        .map(|changed| changed == 1)
+        .map_err(map_sqlite)
 }
 pub(super) fn record_failure(
     connection: &Connection,
     hash: &Sha256,
     safe_error: &str,
 ) -> StorageResult<bool> {
+    let (sql, values) = build_query(
+        Query::update()
+            .table(EmbedFailures::Table)
+            .value(EmbedFailures::Error, safe_error)
+            .and_where(Expr::col(EmbedFailures::SearchHash).eq(hash.to_hex())),
+    )?;
     connection
-        .execute(
-            "UPDATE embed_failures SET error=?2 WHERE search_hash=?1",
-            params![hash.to_hex(), safe_error],
-        )
+        .execute(&sql, params_from_iter(values))
         .map(|changed| changed == 1)
         .map_err(map_sqlite)
 }
@@ -186,12 +296,31 @@ pub(super) fn set_query_error(
     safe_error: &str,
 ) -> StorageResult<()> {
     let at = encode_unsigned(at)?;
-    connection.execute("INSERT INTO query_error(id,at,error) VALUES(1,?1,?2) ON CONFLICT(id) DO UPDATE SET at=excluded.at,error=excluded.error", params![at, safe_error]).map_err(map_sqlite)?;
+    let (sql, values) = build_query(
+        Query::insert()
+            .into_table(QueryErrorRow::Table)
+            .columns([QueryErrorRow::Id, QueryErrorRow::At, QueryErrorRow::Error])
+            .values([Expr::val(1), Expr::val(at), Expr::val(safe_error)])
+            .map_err(map_invalid_value)?
+            .on_conflict(
+                OnConflict::column(QueryErrorRow::Id)
+                    .update_columns([QueryErrorRow::At, QueryErrorRow::Error])
+                    .to_owned(),
+            ),
+    )?;
+    connection
+        .execute(&sql, params_from_iter(values))
+        .map_err(map_sqlite)?;
     Ok(())
 }
 pub(super) fn clear_query_error(connection: &Connection) -> StorageResult<()> {
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(QueryErrorRow::Table)
+            .and_where(Expr::col(QueryErrorRow::Id).eq(1)),
+    )?;
     connection
-        .execute("DELETE FROM query_error WHERE id=1", [])
+        .execute(&sql, params_from_iter(values))
         .map_err(map_sqlite)?;
     Ok(())
 }
@@ -199,12 +328,16 @@ pub(super) fn read_failure(
     connection: &Connection,
     hash: &Sha256,
 ) -> StorageResult<Option<EmbeddingFailure>> {
+    let (sql, values) = build_query(
+        Query::select()
+            .columns([EmbedFailures::Attempts, EmbedFailures::Error])
+            .from((Schemas::Vec, EmbedFailures::Table))
+            .and_where(Expr::col(EmbedFailures::SearchHash).eq(hash.to_hex())),
+    )?;
     let value = connection
-        .query_row(
-            "SELECT attempts,error FROM vec.embed_failures WHERE search_hash=?1",
-            [hash.to_hex()],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
-        )
+        .query_row(&sql, params_from_iter(values), |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?))
+        })
         .optional()
         .map_err(map_sqlite)?;
     value
@@ -222,12 +355,16 @@ pub(super) fn read_failure(
         .transpose()
 }
 pub(super) fn read_query_error(connection: &Connection) -> StorageResult<Option<QueryError>> {
+    let (sql, values) = build_query(
+        Query::select()
+            .columns([QueryErrorRow::At, QueryErrorRow::Error])
+            .from((Schemas::Vec, QueryErrorRow::Table))
+            .and_where(Expr::col(QueryErrorRow::Id).eq(1)),
+    )?;
     let value = connection
-        .query_row(
-            "SELECT at,error FROM vec.query_error WHERE id=1",
-            [],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-        )
+        .query_row(&sql, params_from_iter(values), |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })
         .optional()
         .map_err(map_sqlite)?;
     value

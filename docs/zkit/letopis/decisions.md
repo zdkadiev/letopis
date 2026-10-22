@@ -2021,3 +2021,41 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 <!-- links -->
 **Связи:** [architecture.md](architecture.md#program-structure); [development.md](../../development.md); [TK-9 specification](../../superpowers/specs/2026-10-22-tk-9-storage-design.md)
 <!-- /links -->
+
+
+<a id="D-100"></a>
+### D-100: Fluent SQL builder внутри storage, синхронное исполнение через rusqlite
+> **Статус:** принято пользователем · **Дата:** 2026-10-22
+
+**Основание:** после TK-9 пользователь указал, что SQL как текст внутри Rust
+нечитаем, попросил SQL builder и одобрил fluent SeaQuery с именованными
+идентификаторами таблиц/колонок; затем утвердил конкретный план командой go on.
+
+1. Обычные SELECT/INSERT/UPDATE/DELETE, joins, subqueries, upserts, conflict guards
+   и RETURNING собираются через SeaQuery =1.0.2, только backend-sqlite/derive.
+2. Существующий rusqlite =0.40.2 исполняет запросы на прежних соединениях и
+   транзакциях; libsqlite3-sys =0.38.2 и статическая vec1 не меняются.
+3. Все значения передаются как параметры; имена задаются private enum в storage.
+   Код построения остаётся в файле владельца операции; приватный query.rs строит
+   SQL с параметрами и выполняет проверяемое преобразование значений для драйвера.
+   u64 вне SQLite i64 отвергается, а NULL/text/BLOB/bool сохраняют свой смысл.
+4. Публичный binder sea-query-rusqlite 0.8.0 требует rusqlite ^0.38. Сохранение
+   драйвера с маленьким private преобразованием — выбор реализации плана,
+   не основание понижать SQLite-стек или подключать второй драйвер.
+5. DDL, introspection, PRAGMA/ATTACH/native probes, FTS MATCH/bm25 и vec1 native
+   search/reset-команды остаются SQL, отформатированным в читаемые строки.
+   Обычные CRUD метаданных этих индексов используют builder.
+6. SeaQuery не выходит из storage; domain/service, trait-контракты, lib.rs wiring,
+   схема, snapshot/atomicity/identity/attempt-budget/error-инварианты сохраняются.
+   Нет ORM, пула, async runtime и заявления о compile-time проверке схемы БД.
+
+**Альтернативы:** SQL-строки для всех операций (отклонены пользователем по
+читаемости); Diesel/ORM (более широкая замена драйвера и модели); понижение
+rusqlite ради опубликованного binder (не требуется для цели).
+
+**Уточняет:** D-96 (дополнительная библиотека построения запросов без изменения
+runtime/движка), D-99 (внутренняя организация storage).
+
+<!-- links -->
+**Связи:** [architecture.md](architecture.md#program-structure); [development.md](../../development.md); [спецификация](../../superpowers/specs/2026-10-22-storage-query-builder-design.md); [план](../../superpowers/plans/2026-10-22-storage-query-builder.md)
+<!-- /links -->

@@ -59,7 +59,7 @@ letopis — локальное CLI-приложение без постоянн�
 |---|---|---|---|
 | Runtime и процессы | Rust; процесс на каждый вызов CLI и отсоединённый drain embeddings; синхронный std I/O без async runtime | [D-22](decisions.md#D-22), [D-94](decisions.md#D-94), [D-96](decisions.md#D-96) | Нет постоянного процесса; RAM/CPU вызовов и provider учитываются совместно |
 | Toolchain и платформы | Rust 1.95.0, edition 2024 (MSRV = закреплённая версия); macOS и Linux (glibc), arm64 и x86_64; Windows и NFS не поддерживаются | [D-96](decisions.md#D-96) | Проверено на macOS/Linux ARM64 (TK-1…TK-4); x86_64 — assumed до TK-43 |
-| Служебное хранение/поиск | SQLite через rusqlite `=0.40.2` с bundled SQLite; WAL/FULL, macOS fullfsync; FTS5; vec1 в `.letopis/vectors.db` (ATTACH) | [D-22](decisions.md#D-22), [D-92](decisions.md#D-92), [D-96](decisions.md#D-96) | R-1/R-2/R-6 — ограниченные пробы; vec1 в подключённом файле проверен TK-3 |
+| Служебное хранение/поиск | SQLite через rusqlite `=0.40.2` с bundled SQLite; SeaQuery `=1.0.2` для обычных запросов ([D-100](decisions.md#D-100)); WAL/FULL, macOS fullfsync; FTS5; vec1 в `.letopis/vectors.db` (ATTACH) | [D-22](decisions.md#D-22), [D-92](decisions.md#D-92), [D-96](decisions.md#D-96) | R-1/R-2/R-6 — ограниченные пробы; vec1 в подключённом файле проверен TK-3 |
 | Поставка vec1 | `ext/vec1` закреплённого коммита компилируется build.rs (`cc`) в бинарник и регистрируется `sqlite3_auto_extension`; `load_extension` выключен | [D-96](decisions.md#D-96) | Один файл поставки; статическая сборка проверяется TK-9/TK-43 (TK-1 проверил отдельный файл vec1) |
 | Очередь/история | Очередь — запрос по кэшу и vectors.db; Git для bytes и refs только выданных inspect-снимков и source_snapshot (`refs/letopis/snapshots/*`) | [D-95](decisions.md#D-95), [D-19](decisions.md#D-19) | Без брокера, таблицы заданий и SQL-копии текста; tree на публикацию нет |
 | Embeddings | Общий порт с адаптерами Ollama и совместимого API | [D-13](decisions.md#D-13), [D-65](decisions.md#D-65)…[D-68](decisions.md#D-68) | Локальная модель входит в бюджет; цены/квоты произвольного remote не оценены |
@@ -89,6 +89,8 @@ letopis — локальное CLI-приложение без постоянн�
 
 <a id="program-structure"></a>
 ### Разделение реализации сервисов и адаптеров
+
+Обычные SQL-запросы внутри storage строятся через SeaQuery с типизированными именами таблиц/колонок и связанными параметрами, затем исполняются существующим rusqlite ([D-100](decisions.md#D-100)). Приватный query.rs преобразует значения с проверкой диапазонов; builder не выходит в domain/service. DDL и специализированные SQLite/FTS5/vec1 операции остаются явным SQL. Владение соединениями, snapshot/transaction-границы, engine/native build и композиция lib.rs не меняются.
 
 Пользователь разрешил общий `src/utils.rs` и локальные `utils.rs` внутри отдельных модулей. Общий файл содержит действительно переиспользуемые вспомогательные функции, локальный — детали своего модуля; бизнес-правила сохраняются в domain/service, технологические реализации — в адаптерах. Вспомогательные модули имеют минимальную видимость: приватный `mod utils` локально, `pub(crate)` для элементов с реальными внутренними потребителями. Общие utilities не зависят от конкретных адаптеров, сервисов или точки сборки и не становятся способом обойти hexagonal-границы. Файлы появляются при наличии нужного кода, а не создаются пустыми заранее.
 

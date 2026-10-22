@@ -1,31 +1,45 @@
 use super::{
     connection::map_sqlite,
-    graph::{map_invalid_value, map_mutation},
+    graph::{SOURCE_KIND, map_invalid_value, map_mutation},
+    query::{Nodes, TextIndex, build_query},
 };
 use crate::{
     domain::KnowledgeId,
     service::{StorageError, StorageErrorKind, StorageResult, TextMatch},
 };
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, params_from_iter};
+use sea_query::{Expr, ExprTrait, Query};
 pub(super) fn replace_text(db: &Connection, id: &KnowledgeId, text: &str) -> StorageResult<()> {
+    let (sql, values) = build_query(
+        Query::select()
+            .column(Nodes::RowId)
+            .from(Nodes::Table)
+            .and_where(Expr::col(Nodes::Id).eq(id.as_str()))
+            .and_where(Expr::col(Nodes::Kind).ne(SOURCE_KIND)),
+    )?;
     let row: Option<i64> = db
-        .query_row(
-            "SELECT row_id FROM nodes WHERE id=?1 AND kind<>'source'",
-            [id.as_str()],
-            |r| r.get(0),
-        )
+        .query_row(&sql, params_from_iter(values), |row| row.get(0))
         .optional()
         .map_err(map_sqlite)?;
     let row = row.ok_or_else(|| {
         StorageError::new(StorageErrorKind::NotFound, "knowledge metadata is absent")
     })?;
-    db.execute("DELETE FROM text_index WHERE rowid=?1", [row])
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(TextIndex::Table)
+            .and_where(Expr::col(TextIndex::Rowid).eq(row)),
+    )?;
+    db.execute(&sql, params_from_iter(values))
         .map_err(map_mutation)?;
-    db.execute(
-        "INSERT INTO text_index(rowid,text) VALUES(?1,?2)",
-        params![row, text],
-    )
-    .map_err(map_mutation)?;
+    let (sql, values) = build_query(
+        Query::insert()
+            .into_table(TextIndex::Table)
+            .columns([TextIndex::Rowid, TextIndex::Text])
+            .values([Expr::val(row), Expr::val(text)])
+            .map_err(map_invalid_value)?,
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
     Ok(())
 }
 fn map_match(error: rusqlite::Error) -> StorageError {
@@ -43,9 +57,11 @@ fn map_match(error: rusqlite::Error) -> StorageError {
 pub(super) fn match_text(db: &Connection, expression: &str) -> StorageResult<Vec<TextMatch>> {
     let mut stmt = db
         .prepare(
-            "SELECT nodes.id,nodes.row_id,bm25(text_index) AS score
-         FROM text_index JOIN nodes ON nodes.row_id=text_index.rowid
-         WHERE text_index MATCH ?1 AND nodes.kind<>'source' ORDER BY score,nodes.id",
+            "SELECT nodes.id, nodes.row_id, bm25(text_index) AS score
+             FROM text_index
+             JOIN nodes ON nodes.row_id = text_index.rowid
+             WHERE text_index MATCH ?1 AND nodes.kind <> 'source'
+             ORDER BY score, nodes.id",
         )
         .map_err(map_sqlite)?;
     let mut rows = stmt.query([expression]).map_err(map_match)?;

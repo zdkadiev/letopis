@@ -575,3 +575,67 @@ fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
     assert!(read.list_edges(None).unwrap().is_empty());
     assert!(read.read_node(&build_target("a.md")).unwrap().is_none());
 }
+
+#[test]
+fn list_edges_keeps_optional_filter_and_order() {
+    // Arrange
+    let root = TempDir::new().unwrap();
+    let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
+    let first = build_edge("a.md", build_target("x.md"), "refutes");
+    let second = build_edge("a.md", build_target("z.md"), "supports");
+    let third = build_edge("b.md", build_target("a.md"), "supports");
+    let mut write = db.begin_cache_write().unwrap();
+    for id in ["a.md", "b.md"] {
+        write.upsert_node(&build_knowledge(id, "alpha")).unwrap();
+    }
+    for edge in [&third, &second, &first] {
+        write.insert_edge(edge).unwrap();
+    }
+    write.commit().unwrap();
+    // Act
+    let mut read = db.begin_read().unwrap();
+    let all = read.list_edges(None).unwrap();
+    let selected = read
+        .list_edges(Some(&KnowledgeId::parse("a.md").unwrap()))
+        .unwrap();
+    let absent = read
+        .list_edges(Some(&KnowledgeId::parse("absent.md").unwrap()))
+        .unwrap();
+    // Assert
+    assert_eq!(all, vec![first.clone(), second.clone(), third]);
+    assert_eq!(selected, vec![first, second]);
+    assert!(absent.is_empty());
+}
+
+#[test]
+fn file_text_values_remain_literal() {
+    // Arrange
+    let root = TempDir::new().unwrap();
+    let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
+    let mut file = build_file("notes/é'--.md", "alpha");
+    file.valid = false;
+    file.error = Some("safe 'quoted' ?1 -- mémoire".into());
+    let untouched = build_file("other.md", "beta");
+    let mut write = db.begin_cache_write().unwrap();
+    write.upsert_file(&file).unwrap();
+    write.upsert_file(&untouched).unwrap();
+    write.commit().unwrap();
+    // Act / Assert: read literal text, then replace and delete that row only.
+    let mut read = db.begin_read().unwrap();
+    assert_eq!(read.read_file(&file.path).unwrap(), Some(file.clone()));
+    drop(read);
+    file.error = None;
+    file.valid = true;
+    let mut write = db.begin_cache_write().unwrap();
+    write.upsert_file(&file).unwrap();
+    write.commit().unwrap();
+    let mut read = db.begin_read().unwrap();
+    assert_eq!(read.read_file(&file.path).unwrap(), Some(file.clone()));
+    drop(read);
+    let mut write = db.begin_cache_write().unwrap();
+    write.delete_file(&file.path).unwrap();
+    write.commit().unwrap();
+    let mut read = db.begin_read().unwrap();
+    assert!(read.read_file(&file.path).unwrap().is_none());
+    assert_eq!(read.read_file(&untouched.path).unwrap(), Some(untouched));
+}

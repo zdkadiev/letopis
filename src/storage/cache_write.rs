@@ -1,9 +1,14 @@
-use super::{connection::map_sqlite, files, fts, graph};
+use super::{
+    connection::map_sqlite,
+    files, fts, graph,
+    query::{Project, build_query},
+};
 use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath},
     service::{CacheWrite, FileRow, NodeMetadata, StorageError, StorageErrorKind, StorageResult},
 };
-use rusqlite::{Connection, Transaction, TransactionBehavior};
+use rusqlite::{Connection, Transaction, TransactionBehavior, params_from_iter};
+use sea_query::{Expr, ExprTrait, Query};
 
 pub struct SqliteCacheWrite<'a> {
     transaction: Transaction<'a>,
@@ -61,9 +66,15 @@ impl CacheWrite for SqliteCacheWrite<'_> {
                 "cache unit has failed",
             ));
         }
+        let (sql, values) = build_query(
+            Query::select()
+                .column(Project::Revision)
+                .from(Project::Table)
+                .and_where(Expr::col(Project::Id).eq(1)),
+        )?;
         let revision: i64 = self
             .transaction
-            .query_row("SELECT revision FROM project WHERE id=1", [], |r| r.get(0))
+            .query_row(&sql, params_from_iter(values), |r| r.get(0))
             .map_err(map_sqlite)?;
         let next = revision
             .checked_add(1)
@@ -71,8 +82,14 @@ impl CacheWrite for SqliteCacheWrite<'_> {
             .ok_or_else(|| {
                 StorageError::new(StorageErrorKind::InternalError, "storage revision overflow")
             })?;
+        let (sql, values) = build_query(
+            Query::update()
+                .table(Project::Table)
+                .value(Project::Revision, next)
+                .and_where(Expr::col(Project::Id).eq(1)),
+        )?;
         self.transaction
-            .execute("UPDATE project SET revision=?1 WHERE id=1", [next])
+            .execute(&sql, params_from_iter(values))
             .map_err(map_sqlite)?;
         self.transaction.commit().map_err(map_sqlite)?;
         graph::read_unsigned(next)
