@@ -41,6 +41,16 @@ impl PreparedProjection {
         outcome
     }
 }
+/// Inputs for projecting one observed file against the previously published graph.
+pub(super) struct FileProjection<'a, F, M> {
+    pub(super) filesystem: &'a F,
+    pub(super) markdown: &'a M,
+    pub(super) base_revision: u64,
+    pub(super) path: &'a RepoPath,
+    pub(super) observed: &'a Observation,
+    pub(super) previous: Option<&'a FileRow>,
+    pub(super) graph: &'a EffectiveGraph,
+}
 pub(super) struct EffectiveGraph {
     knowledge: BTreeMap<KnowledgeId, KnowledgeMetadata>,
     edges: BTreeSet<Edge>,
@@ -178,14 +188,17 @@ pub(super) fn prepare_removal(
 }
 
 pub(super) fn prepare_file<F: FileSystem, M: Markdown>(
-    filesystem: &F,
-    markdown: &M,
-    base_revision: u64,
-    path: &RepoPath,
-    observed: &Observation,
-    previous: Option<&FileRow>,
-    graph: &EffectiveGraph,
+    request: &FileProjection<'_, F, M>,
 ) -> DocumentResult<PreparedProjection> {
+    let FileProjection {
+        filesystem,
+        markdown,
+        base_revision,
+        path,
+        observed,
+        previous,
+        graph,
+    } = *request;
     let captured = filesystem.read_file(path)?.ok_or_else(fail_changed)?;
     if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
         return Err(fail_changed());

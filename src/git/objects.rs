@@ -90,18 +90,7 @@ impl ObjectDb<'_> {
                     SnapshotError::new(SnapshotErrorKind::NotFound, MISSING_SNAPSHOT_PATH)
                 })?;
             if parts.peek().is_none() {
-                if entry.kind != BLOB_KIND {
-                    return Err(SnapshotError::new(
-                        SnapshotErrorKind::InvalidRequest,
-                        "snapshot path is not a blob",
-                    ));
-                }
-                return self.verify_object(
-                    &entry.oid,
-                    BLOB_KIND,
-                    SnapshotErrorKind::InternalError,
-                    SnapshotErrorKind::InternalError,
-                );
+                return self.read_leaf_blob(&entry);
             }
             if entry.kind != TREE_KIND {
                 return Err(SnapshotError::new(
@@ -216,6 +205,20 @@ impl ObjectDb<'_> {
     }
     fn parse_tree_oid(&self, raw: &[u8]) -> Result<TreeOid, SnapshotError> {
         TreeOid::parse(self.parse_oid_text(raw)?).map_err(|_| make_integrity_error())
+    }
+    fn read_leaf_blob(&self, entry: &Entry) -> Result<Vec<u8>, SnapshotError> {
+        if entry.kind != BLOB_KIND {
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InvalidRequest,
+                "snapshot path is not a blob",
+            ));
+        }
+        self.verify_object(
+            &entry.oid,
+            BLOB_KIND,
+            SnapshotErrorKind::InternalError,
+            SnapshotErrorKind::InternalError,
+        )
     }
     fn parse_oid_text<'a>(&self, raw: &'a [u8]) -> Result<&'a str, SnapshotError> {
         let text = std::str::from_utf8(raw)

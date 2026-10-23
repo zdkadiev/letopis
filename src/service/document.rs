@@ -1,7 +1,9 @@
 use super::{
     CacheWrite, CorpusFiles, DocumentError, DocumentErrorKind, DocumentResult, Documents, FileRow,
     FileStat, FileSystem, Markdown, RefreshOutcome, Storage, StorageRead,
-    projection::{EffectiveGraph, PreparedProjection, prepare_file, prepare_removal, publish},
+    projection::{
+        EffectiveGraph, FileProjection, PreparedProjection, prepare_file, prepare_removal, publish,
+    },
 };
 use crate::domain::{RepoPath, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -109,15 +111,15 @@ impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> DocumentService<G, 
             outcome = apply_projection(&mut unit, prepared, outcome)?;
         }
         for (path, observation) in delta.updated {
-            let prepared = prepare_file(
-                &self.filesystem,
-                &self.markdown,
-                state.revision,
-                &path,
-                &observation,
-                state.files.get(&path),
-                &graph,
-            )?;
+            let prepared = prepare_file(&FileProjection {
+                filesystem: &self.filesystem,
+                markdown: &self.markdown,
+                base_revision: state.revision,
+                path: &path,
+                observed: &observation,
+                previous: state.files.get(&path),
+                graph: &graph,
+            })?;
             graph.apply(&prepared);
             outcome = apply_projection(&mut unit, prepared, outcome)?;
         }
