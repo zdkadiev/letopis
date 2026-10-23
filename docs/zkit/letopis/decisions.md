@@ -106,6 +106,7 @@
 | [D-96](#D-96) | Стек зависимостей v1: синхронный Rust без async runtime | принято пользователем |
 | [D-97](#D-97) | Состав корпуса по Git и строка files для каждого Markdown-файла | принято пользователем |
 | [D-98](#D-98) | Services зависят от четырёх портов: FileSystem, Storage, VersionControl, EmbeddingProvider | принято пользователем |
+| [D-102](#D-102) | TK-12: pinned query config и базовые search/inspect | принято пользователем |
 
 ## Решения
 
@@ -2072,3 +2073,19 @@ runtime/движка), D-99 (внутренняя организация storage
 4. Команда Git из D-97 сохраняется точно: ignore-правила исключают untracked-файлы, но не уже tracked-файлы. Удалённый с диска tracked-файл может остаться в выводе ls-files; подтверждённый stat NotFound учитывается как удаление.
 
 **Уточняет:** [D-97](#D-97), [MC-2](mechanics.md), [I-2](contracts/I-2-projections.md). Остальные границы D-95/D-98/D-99/D-100 сохраняются. CLI, embedding/drain, проверка оснований source_snapshot, полная corruption recovery и физическое power-loss доказательство этой задачей не вводятся.
+
+<a id="D-102"></a>
+### D-102: TK-12 — закреплённая query config и базовые search/inspect
+> **Статус:** принято пользователем · **Дата:** 2026-10-23
+
+**Основание:** пользователь выбрал подключение готовой TK-13 сейчас, затем утвердил полную [спецификацию TK-12](../../superpowers/specs/2026-10-23-tk-12-search-design.md): «Да, утверждаю спецификацию. Продолжай к плану реализации TK-12 по Superpowers».
+
+1. TK-12 использует существующие query embedding/providers TK-13 в реальном CLI. Новые runtime, provider, зависимость, schema/config field или public score не вводятся. TK-14 сохраняет сквозной сценарий новой сессии и навык агента.
+2. Readiness/reset выполняется до search read view. После pin используются захваченные config/identity/dimensions; позднее расхождение даёт FTS в том же view, без reset/repin. Query_error пишется короткой guarded-транзакцией отдельного соединения. Контракт TK-13 Invalid/FTS для нечитаемой config сохраняется; HTTP не держит write unit/lock; query warning в search не добавляется (D-62).
+3. FTS получает литеральные Unicode alphanumeric токены с AND; нетокенизируемая строка даёт пустой успех без MATCH/HTTP. Каналы полностью ранжируются BM25/cosine, затем sum(1/rank), ID tie-break и итоговый limit.
+4. TK-12 реализует knowledge stale и metadata-only выдачу. Полные source freshness/provenance и filters остаются TK-20/TK-21/TK-22. Пустые filters/source-списки равны отсутствию; валидные неподдержанные ограничения дают safe internal_error вместо игнорирования фильтра.
+5. Inspect знаний поддерживает несколько файлов и дубли в одном закреплённом Git tree, с актуальными hash/lines из captured bytes и отказом всей группы при неизвестном знании. Полные source/mixed-batch и I-12 capture остаются TK-24. Для bounded capture Git получает один файл за раз, затем path/blob identities; тексты корпуса не накапливаются.
+
+**Граница:** одобрены спецификация и подготовка плана. Продуктовая реализация и приёмка ещё не выполнены. Конечные v1-контракты не сокращены: перечислены явные ограничения промежуточной версии. Merge/push/GitHub этим решением не выполняются.
+
+**Связи:** [I-8](contracts/I-8-read-view.md), [MC-6](mechanics.md), [TK-12](roadmap/epics/EP-1-thin-slice/tasks/TK-12-search.md).

@@ -1,8 +1,8 @@
 use super::{
     CommandError, CommandErrorKind, CommandResult, ConfigState, DrainOutcome, EmbeddingConfig,
     EmbeddingError, EmbeddingErrorKind, EmbeddingFiles, EmbeddingProvider, EmbeddingResult,
-    EmbeddingTasks, EmbeddingWork, Embeddings, Markdown, QueryEmbedding, Storage, StorageError,
-    StorageErrorKind, StorageRead, VectorOutcome, VectorWrite,
+    EmbeddingTasks, EmbeddingWork, Embeddings, Markdown, QueryEmbedding, QueryEmbeddingRequest,
+    Storage, StorageError, StorageErrorKind, StorageRead, VectorOutcome, VectorWrite,
 };
 use crate::domain::{KnowledgeId, RepoPath, Sha256};
 use std::{collections::BTreeSet, num::NonZeroUsize, time::Duration};
@@ -29,7 +29,102 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
             provider,
         }
     }
+}
 
+impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> EmbeddingTasks
+    for EmbeddingService<S, F, M, P>
+{
+    fn has_work(&mut self) -> CommandResult<bool> {
+        let ConfigState::Ready(config) = self.read_configuration().map_err(map_command)? else {
+            return Ok(false);
+        };
+        let next = self
+            .storage
+            .begin_read()
+            .map_err(map_storage)
+            .map_err(map_command)?
+            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None)
+            .map_err(map_storage)
+            .map_err(map_command)?;
+        Ok(matches!(next, VectorOutcome::Current(Some(_))))
+    }
+
+    fn drain(&mut self) -> CommandResult<()> {
+        match Embeddings::drain(self).map_err(map_command)? {
+            DrainOutcome::Complete
+            | DrainOutcome::AlreadyRunning
+            | DrainOutcome::Unavailable
+            | DrainOutcome::ConfigChanged => Ok(()),
+        }
+    }
+}
+
+impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> Embeddings
+    for EmbeddingService<S, F, M, P>
+{
+    fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding> {
+        let ConfigState::Ready(config) = self.read_configuration()? else {
+            return Ok(QueryEmbedding::Unavailable);
+        };
+        let VectorOutcome::Current(dimensions) = self.read_dimensions(&config)? else {
+            return Ok(QueryEmbedding::Unavailable);
+        };
+        self.embed_query_with_config(QueryEmbeddingRequest {
+            text,
+            config: &config,
+            dimensions,
+        })
+    }
+
+    fn embed_query_with_config(
+        &mut self,
+        request: QueryEmbeddingRequest<'_>,
+    ) -> EmbeddingResult<QueryEmbedding> {
+        if self.provider.validate_config(request.config).is_err() {
+            return Ok(QueryEmbedding::Unavailable);
+        }
+        let VectorOutcome::Current(_) = self.read_dimensions(request.config)? else {
+            return Ok(QueryEmbedding::Unavailable);
+        };
+        let mut result = self.compute_vector(request.config, request.text, request.dimensions);
+        let VectorOutcome::Current(current) = self.read_dimensions(request.config)? else {
+            return Ok(QueryEmbedding::Unavailable);
+        };
+        if let Ok(vector) = &result
+            && current.is_some_and(|size| vector.len() != size.get())
+        {
+            result = Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
+        }
+        self.publish_query(request.config, result)
+    }
+
+    fn drain(&mut self) -> EmbeddingResult<DrainOutcome> {
+        let ConfigState::Ready(config) = self.read_configuration()? else {
+            return Ok(DrainOutcome::Unavailable);
+        };
+        let Some(_guard) = self.files.try_lock_embed()? else {
+            return Ok(DrainOutcome::AlreadyRunning);
+        };
+        self.drain_ready(&config)
+    }
+
+    fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
+        match self.read_ready_config() {
+            Ok(None) => Ok(ConfigState::Missing),
+            Err(error) => Ok(ConfigState::Invalid(error.get_kind())),
+            Ok(Some(config)) => {
+                self.storage
+                    .reset_vectors(&config.get_identity())
+                    .map_err(map_storage)?;
+                Ok(ConfigState::Ready(config))
+            }
+        }
+    }
+}
+
+impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
+    EmbeddingService<S, F, M, P>
+{
     fn read_ready_config(&self) -> EmbeddingResult<Option<EmbeddingConfig>> {
         self.files
             .read_config()?
@@ -312,78 +407,6 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
         };
         unit.commit().map_err(map_storage)?;
         Ok(outcome)
-    }
-}
-
-impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> EmbeddingTasks
-    for EmbeddingService<S, F, M, P>
-{
-    fn has_work(&mut self) -> CommandResult<bool> {
-        let ConfigState::Ready(config) = self.read_configuration().map_err(map_command)? else {
-            return Ok(false);
-        };
-        let next = self
-            .storage
-            .begin_read()
-            .map_err(map_storage)
-            .map_err(map_command)?
-            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None)
-            .map_err(map_storage)
-            .map_err(map_command)?;
-        Ok(matches!(next, VectorOutcome::Current(Some(_))))
-    }
-
-    fn drain(&mut self) -> CommandResult<()> {
-        match Embeddings::drain(self).map_err(map_command)? {
-            DrainOutcome::Complete
-            | DrainOutcome::AlreadyRunning
-            | DrainOutcome::Unavailable
-            | DrainOutcome::ConfigChanged => Ok(()),
-        }
-    }
-}
-
-impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> Embeddings
-    for EmbeddingService<S, F, M, P>
-{
-    fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
-        match self.read_ready_config() {
-            Ok(None) => Ok(ConfigState::Missing),
-            Err(error) => Ok(ConfigState::Invalid(error.get_kind())),
-            Ok(Some(config)) => {
-                self.storage
-                    .reset_vectors(&config.get_identity())
-                    .map_err(map_storage)?;
-                Ok(ConfigState::Ready(config))
-            }
-        }
-    }
-    fn drain(&mut self) -> EmbeddingResult<DrainOutcome> {
-        let ConfigState::Ready(config) = self.read_configuration()? else {
-            return Ok(DrainOutcome::Unavailable);
-        };
-        let Some(_guard) = self.files.try_lock_embed()? else {
-            return Ok(DrainOutcome::AlreadyRunning);
-        };
-        self.drain_ready(&config)
-    }
-    fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding> {
-        let ConfigState::Ready(config) = self.read_configuration()? else {
-            return Ok(QueryEmbedding::Unavailable);
-        };
-        let VectorOutcome::Current(dimensions) = self.read_dimensions(&config)? else {
-            return Ok(QueryEmbedding::Unavailable);
-        };
-        let mut result = self.compute_vector(&config, text, dimensions);
-        if let Ok(vector) = &result {
-            let VectorOutcome::Current(current) = self.read_dimensions(&config)? else {
-                return Ok(QueryEmbedding::Unavailable);
-            };
-            if current.is_some_and(|size| vector.len() != size.get()) {
-                result = Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
-            }
-        }
-        self.publish_query(&config, result)
     }
 }
 

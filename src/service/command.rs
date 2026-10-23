@@ -1,6 +1,11 @@
 use crate::domain::{KnowledgeId, LineRange, RepoPath, Sha256, SourceUri, TreeOid};
 use serde_json::Value;
-use std::{collections::BTreeMap, error::Error, fmt};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    error::Error,
+    fmt,
+    num::NonZeroUsize,
+};
 
 /// Stable X-1 classification for command failures and safe findings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -141,6 +146,35 @@ pub struct InspectedElement {
     pub lines: Option<LineRange>,
     /// Exact element hash, or absent for an unavailable source.
     pub hash: Option<Sha256>,
+}
+
+/// Literal search text and final result bound.
+#[derive(Debug)]
+pub struct SearchRequest {
+    /// Uninterpreted user query, tokenized by the search service.
+    pub query: String,
+    /// Maximum links after combining complete candidate channels.
+    pub limit: NonZeroUsize,
+}
+/// Baseline knowledge freshness observations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SearchFlag {
+    /// Current knowledge is missing, invalid, or differs from pinned metadata.
+    Stale,
+}
+/// Metadata-only knowledge link from one pinned cache revision.
+#[derive(Debug, PartialEq, Eq)]
+pub struct SearchLink {
+    /// Normalized knowledge identity, including an anchor when present.
+    pub element_id: KnowledgeId,
+    /// Repository-relative containing file.
+    pub path: RepoPath,
+    /// Inclusive coordinates in the pinned revision.
+    pub lines: LineRange,
+    /// Cache publication revision shared by every link in the response.
+    pub revision: u64,
+    /// Unique observed freshness reasons; empty does not certify source provenance.
+    pub flags: BTreeSet<SearchFlag>,
 }
 
 #[cfg(test)]

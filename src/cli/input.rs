@@ -1,12 +1,20 @@
-use crate::domain::RepoPath;
-use crate::service::{CommandError, CommandErrorKind, CommandResult, ElementAddress};
-use serde::{Deserialize, de::DeserializeOwned};
-use std::{collections::BTreeSet, ffi::OsString, io::Read};
+use crate::domain::{RepoPath, TreeOid};
+use crate::service::{
+    CommandError, CommandErrorKind, CommandResult, ElementAddress, SearchRequest,
+};
+use serde::{
+    Deserialize, Deserializer,
+    de::{DeserializeOwned, Error},
+};
+use serde_json::value::RawValue;
+use std::{collections::BTreeSet, ffi::OsString, io::Read, num::NonZeroUsize};
 
+/// Typed command input after transport validation and unsupported-filter checks.
 #[derive(Debug)]
 pub(crate) enum Request {
     Check(Vec<RepoPath>),
     Inspect(Vec<ElementAddress>),
+    Search(SearchRequest),
     Drain,
 }
 #[derive(Deserialize)]
@@ -19,6 +27,24 @@ struct CheckInput {
 #[serde(deny_unknown_fields)]
 struct InspectInput {
     element_ids: Vec<String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SearchInput {
+    query: String,
+    limit: u64,
+    #[serde(default, deserialize_with = "read_non_null_option")]
+    filters: Option<SearchFiltersInput>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SearchFiltersInput {
+    #[serde(default, deserialize_with = "read_non_null_option")]
+    needs_recheck: Option<bool>,
+    #[serde(default)]
+    sources: Vec<String>,
+    #[serde(default)]
+    source_revisions: Vec<String>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -52,25 +78,68 @@ pub(crate) fn parse_request(args: &[OsString], input: &mut impl Read) -> Command
                 .collect::<CommandResult<BTreeSet<_>>>()?;
             Ok(Request::Inspect(ids.into_iter().collect()))
         }
-        ["embed", "--drain"] => {
-            let mut bytes = Vec::new();
-            input.read_to_end(&mut bytes).map_err(|cause| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InvalidRequest,
-                    "cannot read command input",
-                    cause,
-                )
-            })?;
-            if !bytes
-                .iter()
-                .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
-            {
-                let _: EmptyInput = read_object(&mut bytes.as_slice())?;
-            }
-            Ok(Request::Drain)
-        }
+        ["search"] => read_search(input).map(Request::Search),
+        ["embed", "--drain"] => read_drain(input),
         _ => Err(invalid_request()),
     }
+}
+fn read_search(input: &mut impl Read) -> CommandResult<SearchRequest> {
+    let dto: SearchInput = read_object(input)?;
+    let limit = usize::try_from(dto.limit)
+        .ok()
+        .and_then(NonZeroUsize::new)
+        .ok_or_else(invalid_request)?;
+    if let Some(filters) = dto.filters {
+        for revision in &filters.source_revisions {
+            TreeOid::parse(revision).map_err(|_| invalid_request())?;
+        }
+        if filters.needs_recheck.is_some()
+            || !filters.sources.is_empty()
+            || !filters.source_revisions.is_empty()
+        {
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "operation unavailable in this build",
+            ));
+        }
+    }
+    Ok(SearchRequest {
+        query: dto.query,
+        limit,
+    })
+}
+fn read_non_null_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    // Derived structs accept JSON sequences, including [] for all-default fields.
+    // These optional fields permit only an object or boolean, never a sequence.
+    let raw = <&RawValue>::deserialize(deserializer)?;
+    if raw.get().starts_with('[') {
+        return Err(D::Error::custom("invalid optional field shape"));
+    }
+    let mut parser = serde_json::Deserializer::from_str(raw.get());
+    T::deserialize(&mut parser)
+        .map(Some)
+        .map_err(D::Error::custom)
+}
+fn read_drain(input: &mut impl Read) -> CommandResult<Request> {
+    let mut bytes = Vec::new();
+    input.read_to_end(&mut bytes).map_err(|cause| {
+        CommandError::new_with_cause(
+            CommandErrorKind::InvalidRequest,
+            "cannot read command input",
+            cause,
+        )
+    })?;
+    if !bytes
+        .iter()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+    {
+        let _: EmptyInput = read_object(&mut bytes.as_slice())?;
+    }
+    Ok(Request::Drain)
 }
 fn read_object<T: DeserializeOwned>(input: &mut impl Read) -> CommandResult<T> {
     let mut bytes = Vec::new();

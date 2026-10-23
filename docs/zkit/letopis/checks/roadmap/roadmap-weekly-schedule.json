@@ -173,13 +173,19 @@
           "cumulative": 6
         },
         {
+          "task": "TK-13",
+          "hours": 6,
+          "cumulative": 6
+        },
+        {
           "task": "TK-12",
-          "hours": 7,
-          "cumulative": 7
+          "hours": 1,
+          "cumulative": 1
         }
       ],
       "finishes": [
-        "TK-11"
+        "TK-11",
+        "TK-13"
       ]
     },
     {
@@ -188,13 +194,8 @@
       "allocations": [
         {
           "task": "TK-12",
-          "hours": 1,
+          "hours": 7,
           "cumulative": 8
-        },
-        {
-          "task": "TK-13",
-          "hours": 6,
-          "cumulative": 6
         },
         {
           "task": "TK-14",
@@ -203,8 +204,7 @@
         }
       ],
       "finishes": [
-        "TK-12",
-        "TK-13"
+        "TK-12"
       ]
     },
     {

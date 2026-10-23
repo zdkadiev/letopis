@@ -3,10 +3,10 @@ mod tests;
 use super::process::{GitProcess, check_version};
 use super::{objects, refs};
 use crate::{
-    domain::{RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN, TreeOid},
+    domain::{BlobOid, RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN, TreeOid},
     service::{
         CorpusFiles, DocumentError, DocumentErrorKind, DocumentResult, GitSnapshots, RetainedTree,
-        SnapshotError, SnapshotErrorKind, SnapshotFile,
+        SnapshotEntry, SnapshotError, SnapshotErrorKind, SnapshotFile,
     },
 };
 use std::{
@@ -127,6 +127,14 @@ impl GitSnapshots for GitCli {
     fn create_tree(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
         self.require_self_contained_objects()?;
         objects::ObjectDb { git: self }.create_tree(files)
+    }
+    fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
+        self.require_self_contained_objects()?;
+        objects::ObjectDb { git: self }.write_blob(bytes)
+    }
+    fn create_tree_from_blobs(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
+        self.require_self_contained_objects()?;
+        objects::ObjectDb { git: self }.create_tree_from_blobs(entries)
     }
     fn read_blob(&self, tree: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
         self.require_self_contained_objects()?;

@@ -2,7 +2,7 @@
 
 > **Фаза:** PH-2
 > **Оценка, ч:** 28 / 50 / 90 (best / expected / worst)
-> **Зависимости:** [TK-7](../EP-1-thin-slice/tasks/TK-7-markdown.md), [TK-8](../EP-1-thin-slice/tasks/TK-8-git-snapshots.md), [TK-9](../EP-1-thin-slice/tasks/TK-9-storage.md), [TK-10](../EP-1-thin-slice/tasks/TK-10-change-detection.md), [TK-12](../EP-1-thin-slice/tasks/TK-12-search.md), [TK-17](../EP-7-early-validation/tasks/TK-17-early-pilot.md)
+> **Зависимости:** [TK-7](../EP-1-thin-slice/tasks/TK-7-markdown.md), [TK-8](../EP-1-thin-slice/tasks/TK-8-git-snapshots.md), [TK-9](../EP-1-thin-slice/tasks/TK-9-storage.md), [TK-10](../EP-1-thin-slice/tasks/TK-10-change-detection.md), [TK-11](../EP-1-thin-slice/tasks/TK-11-cli-runtime.md), [TK-12](../EP-1-thin-slice/tasks/TK-12-search.md), [TK-17](../EP-7-early-validation/tasks/TK-17-early-pilot.md)
 
 ## Цель
 

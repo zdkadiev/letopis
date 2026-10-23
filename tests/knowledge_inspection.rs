@@ -1,0 +1,190 @@
+mod support;
+use letopis::{
+    domain::{LineRange, RepoPath, Sha256},
+    open_documents, open_git_snapshots, open_inspections,
+    service::{CommandErrorKind, Documents, ElementAddress, GitSnapshots, Inspections},
+};
+use support::reading::ReadingRepo;
+
+#[test]
+fn inspect_reads_current_knowledge_from_one_retained_tree() {
+    // Arrange: fixed codec goldens exercise exact bytes and section boundaries.
+    let repo = ReadingRepo::new();
+    let fixtures = build_fixtures();
+    for (path, bytes, ..) in fixtures {
+        repo.write(path, bytes);
+    }
+    let mut service = open_inspections(repo.get_root()).unwrap();
+    let addresses = fixtures
+        .iter()
+        .map(|(_, _, id, ..)| ElementAddress::parse(id).unwrap())
+        .collect::<Vec<_>>();
+    // Act
+    let result = service.inspect(&addresses).unwrap();
+    let git = open_git_snapshots(repo.get_root()).unwrap();
+    // Assert
+    assert_eq!(result.elements.len(), 4);
+    for (path, bytes, id, start, end, hash) in fixtures {
+        assert_eq!(result.elements[id].path, RepoPath::parse(path).unwrap());
+        assert_eq!(
+            result.elements[id].lines,
+            Some(LineRange::new(start, end).unwrap())
+        );
+        assert_eq!(result.elements[id].hash, Some(Sha256::parse(hash).unwrap()));
+        repo.write(path, b"live edit");
+        assert_eq!(
+            git.read_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
+                .unwrap(),
+            bytes
+        );
+    }
+    let status = std::process::Command::new("git")
+        .current_dir(repo.get_root())
+        .args(["gc", "--prune=now"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    assert_eq!(
+        git.read_blob(&result.snapshot, &RepoPath::parse("crlf.md").unwrap())
+            .unwrap(),
+        fixtures[0].1
+    );
+}
+
+#[test]
+fn inspect_deduplicates_cross_file_ids_and_rejects_unknown_batch() {
+    let repo = ReadingRepo::new();
+    repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\nalpha\n");
+    repo.write("b.md", include_bytes!("fixtures/markdown/sections.md"));
+    let mut service = open_inspections(repo.get_root()).unwrap();
+    let result = service
+        .inspect(&["a.md", "./a.md", "b.md#a"].map(|id| ElementAddress::parse(id).unwrap()))
+        .unwrap();
+    assert_eq!(result.elements.len(), 2);
+    let error = service
+        .inspect(&["a.md", "missing.md"].map(|id| ElementAddress::parse(id).unwrap()))
+        .unwrap_err();
+    assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
+}
+
+#[test]
+fn inspect_rejects_invalid_current_file_instead_of_using_old_sql() {
+    let repo = ReadingRepo::new();
+    repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\nold\n");
+    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    repo.write("a.md", b"<!-- letopis: {invalid} -->\ncurrent\n");
+    let error = open_inspections(repo.get_root())
+        .unwrap()
+        .inspect(&[ElementAddress::parse("a.md").unwrap()])
+        .unwrap_err();
+    assert_eq!(error.get_kind(), CommandErrorKind::ValidationFailed);
+}
+
+#[test]
+fn inspect_distinguishes_referenced_sources_from_unknown_ids() {
+    let repo = ReadingRepo::new();
+    repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\n[source](src/data.rs \"letopis:type=external\") [other](plain.md \"letopis:type=external\")\n");
+    repo.write("plain.md", b"unmarked Markdown");
+    let mut service = open_inspections(repo.get_root()).unwrap();
+    for (id, kind) in [
+        ("src/data.rs", CommandErrorKind::InternalError),
+        ("plain.md", CommandErrorKind::InternalError),
+        ("missing.rs", CommandErrorKind::NotFound),
+        ("missing.md", CommandErrorKind::NotFound),
+    ] {
+        assert_eq!(
+            service
+                .inspect(&[ElementAddress::parse(id).unwrap()])
+                .unwrap_err()
+                .get_kind(),
+            kind
+        );
+    }
+    // Removing canonical declarations removes source membership despite old SQL.
+    repo.write("a.md", b"unmarked");
+    assert_eq!(
+        service
+            .inspect(&[ElementAddress::parse("src/data.rs").unwrap()])
+            .unwrap_err()
+            .get_kind(),
+        CommandErrorKind::NotFound
+    );
+}
+
+#[test]
+fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
+    // Arrange: refresh an indexed file which subsequently disappears.
+    let repo = ReadingRepo::new();
+    repo.write("gone.md", b"<!-- letopis: {\"created_at\":1} -->\ngone");
+    repo.write("kept.md", b"<!-- letopis: {\"created_at\":1} -->\nkept");
+    let status = std::process::Command::new("git")
+        .current_dir(repo.get_root())
+        .args(["add", "gone.md"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    std::fs::remove_file(repo.get_root().join("gone.md")).unwrap();
+    let mut service = open_inspections(repo.get_root()).unwrap();
+    // Act
+    let current = service
+        .inspect(&[ElementAddress::parse("kept.md").unwrap()])
+        .unwrap();
+    let removed = service
+        .inspect(&[ElementAddress::parse("gone.md").unwrap()])
+        .unwrap_err();
+    // Assert
+    assert_eq!(current.elements.len(), 1);
+    assert_eq!(removed.get_kind(), CommandErrorKind::NotFound);
+    assert!(
+        open_git_snapshots(repo.get_root())
+            .unwrap()
+            .read_blob(&current.snapshot, &RepoPath::parse("gone.md").unwrap())
+            .is_err()
+    );
+}
+
+type InspectionFixture = (
+    &'static str,
+    &'static [u8],
+    &'static str,
+    u64,
+    u64,
+    &'static str,
+);
+fn build_fixtures() -> [InspectionFixture; 4] {
+    [
+        (
+            "crlf.md",
+            include_bytes!("fixtures/markdown/crlf.md").as_slice(),
+            "crlf.md#a",
+            1,
+            3,
+            "eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864",
+        ),
+        (
+            "unicode.md",
+            include_bytes!("fixtures/markdown/unicode.md").as_slice(),
+            "unicode.md#memory",
+            3,
+            5,
+            "99f2ad88e68feb8a1341ea4aec0bf046d236ef8c25953a45c1ee33dad5113a11",
+        ),
+        (
+            "sections.md",
+            include_bytes!("fixtures/markdown/sections.md").as_slice(),
+            "sections.md#a",
+            3,
+            8,
+            "4ca8f91e2e8b4e7af4edf635b9ffa41afb9c8a0d58f3d08fa940a8df9b093bf1",
+        ),
+        (
+            "no-final-newline.md",
+            include_bytes!("fixtures/markdown/no-final-newline.md").as_slice(),
+            "no-final-newline.md#e",
+            1,
+            3,
+            "8ae8dc48443c3b9132365da3e83a1862fe8c1be55da7ee6a9bbf478703fe58d2",
+        ),
+    ]
+}

@@ -80,6 +80,125 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             run.validate_response(catalogue, 'check', {**valid, 'extra': 1}, 0)
 
+    def test_handler_capture_classifies_lists_without_loosening_validation(self):
+        from jsonschema import ValidationError
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        records = [
+            {'exit': 0, 'response': {'ok': True, 'result': {'errors': []}}},
+            {'exit': 0, 'response': {'ok': True, 'result': {'snapshot': 'a' * 40, 'elements': {}}}},
+            {'exit': 1, 'response': {'ok': False, 'error': {'code': 'internal_error', 'message': 'safe', 'details': {}}}},
+            {'exit': 0, 'response': {'ok': True, 'result': []}},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            def capture(items):
+                (evidence / 'handlers.log').write_text(''.join('CLI_RESPONSE ' + json.dumps(item) + '\n' for item in items))
+                run.capture_handler_responses(evidence, catalogue)
+            capture(records)
+            results = json.loads((evidence / 'handler-responses.json').read_text())
+            self.assertEqual(results[-1]['command'], 'search')
+            self.assertEqual(results[-1]['source'], 'injected handler unit test')
+            with self.assertRaises(AssertionError):
+                capture(records[:-1])
+            with self.assertRaises(AssertionError):
+                capture([*records[:-1], {**records[-1], 'exit': 1}])
+            malformed = {'ok': True, 'result': [{'element_id': 'x.md', 'path': 'x.md', 'lines': [1, 2], 'revision': 1, 'flags': [], 'text': 'private'}]}
+            with self.assertRaises(ValidationError):
+                capture([*records[:-1], {'exit': 0, 'response': malformed}])
+
+    def test_product_reading_capture_requires_all_real_classifications(self):
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        records = self.make_reading_records()
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            self.capture_reading(evidence, catalogue, records)
+            observed = json.loads((evidence / 'product-reading-responses.json').read_text())
+            self.assertEqual([r['case'] for r in observed],
+                             ['search_success', 'search_fallback', 'inspect_success',
+                              'not_found', 'malformed_input'])
+            self.assertTrue(all(r['source'] == 'actual product executable' for r in observed))
+            for index in range(len(records)):
+                with self.subTest(missing=records[index]['case']):
+                    with self.assertRaises(AssertionError):
+                        self.capture_reading(evidence, catalogue, records[:index] + records[index+1:])
+
+    def test_product_reading_rejects_wrong_shape_exit_and_classification(self):
+        from jsonschema import ValidationError
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        records = self.make_reading_records()
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            for field, value, error in [('exit', 1, AssertionError),
+                    ('response', {'ok': True, 'result': {'errors': []}}, ValidationError),
+                    ('command', 'inspect', ValidationError),
+                    ('case', 'not_found', AssertionError)]:
+                with self.subTest(field=field), self.assertRaises(error):
+                    self.capture_reading(evidence, catalogue, [{**records[0], field: value}, *records[1:]])
+
+    def test_injected_receipt_cannot_replace_product_reading(self):
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        records = self.make_reading_records()
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            injected = 'CLI_RESPONSE ' + json.dumps(records[0]) + '\n'
+            self.capture_reading(evidence, catalogue, records, injected)
+            observed = json.loads((evidence / 'product-reading-responses.json').read_text())
+            self.assertEqual(len(observed), 5)
+            with self.assertRaises(AssertionError):
+                self.capture_reading(evidence, catalogue, records[1:], injected)
+
+    def make_reading_records(self):
+        success = {'ok': True, 'result': []}
+        return [
+            {'command': 'search', 'case': 'search_success', 'exit': 0, 'response': success},
+            {'command': 'search', 'case': 'search_fallback', 'exit': 0, 'response': success},
+            {'command': 'inspect', 'case': 'inspect_success', 'exit': 0,
+             'response': {'ok': True, 'result': {'snapshot': 'a' * 40, 'elements': {}}}},
+            {'command': 'inspect', 'case': 'not_found', 'exit': 1,
+             'response': {'ok': False, 'error': {'code': 'not_found', 'message': 'safe', 'details': {}}}},
+            {'command': 'search', 'case': 'malformed_input', 'exit': 1,
+             'response': {'ok': False, 'error': {'code': 'invalid_request', 'message': 'safe', 'details': {}}}},
+        ]
+
+    def capture_reading(self, evidence, catalogue, records, prefix=''):
+        (evidence / 'runtime.log').write_text(prefix + ''.join(
+            'PRODUCT_READING ' + json.dumps(record) + '\n' for record in records))
+        run.capture_reading_responses(evidence, catalogue)
+
+    def test_actual_transport_isolates_noninitializing_and_inspection_cases(self):
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        repositories = []
+        terminator = "\n"
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            def execute(argv, name, *, cwd, expected=0, stdin=None):
+                if argv[0] == 'git':
+                    return
+                repositories.append(str(cwd))
+                if argv[1] == 'inspect' and stdin != b'{}':
+                    (cwd / '.letopis').mkdir(exist_ok=True)
+                    response = {'ok': False, 'error': {'code': 'not_found', 'message': 'unknown', 'details': {}}}
+                elif argv[1] == 'search':
+                    (cwd / '.letopis').mkdir(exist_ok=True)
+                    response = {'ok': True, 'result': []}
+                elif argv[1:] == ['embed', '--drain'] and not stdin:
+                    response = {'ok': True, 'result': {}}
+                else:
+                    code = 'internal_error' if argv[1] == 'check' and stdin == b'{}' else 'invalid_request'
+                    response = {'ok': False, 'error': {'code': code, 'message': 'operation unavailable in this build' if code == 'internal_error' else 'invalid command input', 'details': {}}}
+                (evidence / name).write_text(json.dumps(response) + terminator)
+                Path(str(evidence / name) + '.stderr').write_bytes(b'')
+            run.capture_transport(root, evidence, execute, Path('/product'), catalogue)
+            self.assertEqual(len(repositories), len(set(repositories)))
+            terminator = "\n{}\n"
+            with self.assertRaises(AssertionError):
+                run.capture_transport(root, evidence, execute, Path('/product'), catalogue)
+
     def test_inventory_covers_support_schema_and_ignores_bytecode(self):
         root = Path(__file__).resolve().parents[2]
         inputs = run.hash_inputs(root)
@@ -96,6 +215,12 @@ class RunnerTests(unittest.TestCase):
             with self.subTest(control=name):
                 occurrences = (root / relative).read_text().count(needle)
                 self.assertEqual(occurrences, 1, f'{name}: stale or ambiguous source anchor')
+
+    def test_reading_controls_match_current_source_exactly_once(self):
+        root = Path(__file__).resolve().parents[2]
+        for name, relative, needle, *_rest in negative_controls.READING_CONTROLS:
+            with self.subTest(control=name):
+                self.assertEqual((root / relative).read_text().count(needle), 1)
 
     def test_artifact_resolution_respects_target_specific_cargo_path(self):
         with tempfile.TemporaryDirectory() as directory:

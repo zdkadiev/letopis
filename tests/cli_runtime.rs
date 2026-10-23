@@ -79,6 +79,17 @@ fn malformed_requests_fail_before_service_directory_creation() {
         (vec!["check"], "{\"paths\":null}"),
         (vec!["check"], "{\"extra\":1}"),
         (vec!["inspect"], "{}"),
+        (vec!["search", "extra"], "{}"),
+        (vec!["search"], r#"["x",1]"#),
+        (vec!["search"], r#"{"query":"x","limit":1,"filters":[]}"#),
+        (vec!["search"], r#"{"query":"x","limit":1,"query":"y"}"#),
+        (vec!["search"], r#"{"query":"x","limit":1.0}"#),
+        (vec!["search"], r#"{"query":"x","limit":1e0}"#),
+        (
+            vec!["search"],
+            r#"{"query":"x","limit":18446744073709551616}"#,
+        ),
+        (vec!["search"], r#"{"query":"x","limit":1} {}"#),
         (vec!["embed", "--drain"], "{\"extra\":1}"),
     ] {
         let output = invoke(root.path(), &args, input.as_bytes(), false);
@@ -87,24 +98,49 @@ fn malformed_requests_fail_before_service_directory_creation() {
     }
 }
 #[test]
-fn unavailable_routes_preserve_corpus_index_and_refs_after_lost_response() {
+fn nested_invalid_and_unsupported_requests_do_not_initialize_repository_or_child() {
+    let root = make_repository();
+    let nested = root.path().join("nested");
+    fs::create_dir(&nested).unwrap();
+    for (args, input, code) in [
+        (vec!["check"], "{}", "internal_error"),
+        (
+            vec!["search"],
+            r#"{"query":"x","limit":1,"filters":{"needs_recheck":false}}"#,
+            "internal_error",
+        ),
+        (
+            vec!["search"],
+            r#"{"query":"x","limit":0}"#,
+            "invalid_request",
+        ),
+        (vec!["inspect"], "{}", "invalid_request"),
+        (
+            vec!["embed", "--drain"],
+            r#"{"extra":1}"#,
+            "invalid_request",
+        ),
+    ] {
+        assert_error(&invoke(&nested, &args, input.as_bytes(), false), code);
+        assert!(!root.path().join(".letopis").exists());
+        assert!(!nested.join(".letopis").exists());
+    }
+}
+
+#[test]
+fn unavailable_check_preserves_corpus_index_and_refs_after_lost_response() {
     let root = make_repository();
     let corpus = fs::read(root.path().join("knowledge.md")).unwrap();
     let index = fs::read(root.path().join(".git/index")).unwrap();
     let refs = run_git(root.path(), &["show-ref"]);
-    for (args, input) in [
-        (vec!["check"], "{}"),
-        (vec!["inspect"], "{\"element_ids\":[\"knowledge.md\"]}"),
-    ] {
-        let lost = invoke(root.path(), &args, input.as_bytes(), true);
-        assert_eq!(lost.status.code(), Some(1));
-        assert!(lost.stderr.is_empty());
-        for _ in 0..2 {
-            assert_error(
-                &invoke(root.path(), &args, input.as_bytes(), false),
-                "internal_error",
-            );
-        }
+    let lost = invoke(root.path(), &["check"], b"{}", true);
+    assert_eq!(lost.status.code(), Some(1));
+    assert!(lost.stderr.is_empty());
+    for _ in 0..2 {
+        assert_error(
+            &invoke(root.path(), &["check"], b"{}", false),
+            "internal_error",
+        );
     }
     assert_eq!(fs::read(root.path().join("knowledge.md")).unwrap(), corpus);
     assert_eq!(fs::read(root.path().join(".git/index")).unwrap(), index);

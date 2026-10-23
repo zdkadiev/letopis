@@ -1,6 +1,6 @@
 use letopis::domain::{
-    Anchor, ByteSpan, Edge, EdgeTarget, EdgeType, ElementKind, ElementMetadata, KnowledgeId,
-    LineRange, Sha256, SourceUri, TreeOid, ValueError, derive_element_kind,
+    Anchor, BlobOid, ByteSpan, Edge, EdgeTarget, EdgeType, ElementKind, ElementMetadata,
+    KnowledgeId, LineRange, Sha256, SourceUri, TreeOid, ValueError, derive_element_kind,
 };
 use std::collections::BTreeSet;
 
@@ -266,5 +266,24 @@ fn value_errors_describe_the_validation_failure() {
     ] {
         // Act / Assert
         assert_eq!(error.to_string(), expected);
+    }
+}
+
+#[test]
+fn blob_oids_preserve_both_formats_and_reject_noncanonical_input() {
+    for raw in ["0123456789abcdef".repeat(4), "f".repeat(40)] {
+        assert_eq!(BlobOid::parse(&raw).unwrap().as_str(), raw);
+    }
+    for raw in [
+        "".into(),
+        "a".repeat(39),
+        "a".repeat(41),
+        "a".repeat(63),
+        "a".repeat(65),
+        "A".repeat(40),
+        "g".repeat(64),
+        format!("{}\n", "a".repeat(40)),
+    ] {
+        assert_eq!(BlobOid::parse(&raw), Err(ValueError::InvalidOid));
     }
 }

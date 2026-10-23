@@ -1,4 +1,4 @@
-# TK-11 CLI runtime receipts
+# CLI runtime, search and inspection receipts
 
 The runner verifies the combined root crate, product CLI transport, real filesystem
 and process adapters, and the actual embedding drain against controlled loopback
@@ -7,17 +7,21 @@ durable attempts, config/text races, lost responses, process death and no-work
 launch suppression. Its foreground fixture calls the production service/launcher;
 the embedding executor is always the actual product executable.
 
-Successful check/inspect envelopes still come only from injected handler tests.
-Those product routes return `internal_error` / `operation unavailable in this build`
-and cannot trigger embeddings. Real inspect/check semantics belong to TK-12/TK-19.
+Search and knowledge inspection use the actual product executable. `cli_reading`
+asserts one JSON line, empty stderr and exact exit before emitting `PRODUCT_READING`
+observations for search success, provider-failure FTS fallback, retained-tree inspect,
+not-found and malformed-input errors. The runner validates each against its matching
+X-1 command schema and records `product-reading-responses.json`. Injected
+`CLI_RESPONSE` receipts remain separately labelled and cannot satisfy this coverage.
+Full source inspection and check semantics remain TK-24/TK-19 work.
 
 Use Python 3.11+ with the development dependency `jsonschema==4.26.0` prepared in
 an isolated environment; it is not a product dependency. For this worktree:
 
 ```sh
 .artifacts/tk11/python-env/bin/python -B -m unittest discover -s tests/cli -p test_runner.py -v
-.artifacts/tk11/python-env/bin/python -B tests/cli/run.py --platform host --evidence .artifacts/tk11/host-NEW
-.artifacts/tk11/python-env/bin/python -B tests/cli/run.py --platform linux --evidence .artifacts/tk11/linux-NEW
+.artifacts/tk11/python-env/bin/python -B tests/cli/run.py --platform host --evidence .artifacts/tk12/host-NEW
+.artifacts/tk11/python-env/bin/python -B tests/cli/run.py --platform linux --evidence .artifacts/tk12/linux-NEW
 .artifacts/tk11/python-env/bin/python -B tests/cli/negative_controls.py --evidence .artifacts/tk11/controls-NEW
 RUSTDOCFLAGS='-D warnings' cargo doc --locked --offline --no-deps
 ```
@@ -58,6 +62,11 @@ completion accepts an exited Linux zombie when minimal container PID 1 has not
 yet reaped it; direct product invocations additionally assert exit 0.
 Caller-supplied fixture overrides are removed;
 the tests receive the fixture just built from the measured source.
+
+For TK-12 use `negative_controls.py --suite reading --evidence <new-directory>`
+for captured configuration, candidate hash validation, cache reopening after inference,
+and live inspection rereads. The default `runtime` suite retains the historical
+null-output/kernel-exclusion controls; selecting reading does not rerun those.
 
 Negative controls copy the current source into a disposable directory. They remove
 null stdout/stderr redirection and kernel exclusion independently. Each altered

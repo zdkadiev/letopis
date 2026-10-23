@@ -21,7 +21,8 @@ use crate::service::{
     Background, BackgroundService, CommandError, CommandErrorKind, CommandResult, DocumentError,
     DocumentErrorKind, DocumentResult, DocumentService, Documents, EmbedLocks, EmbeddingError,
     EmbeddingErrorKind, EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService,
-    EmbeddingTasks, Embeddings, FileSystem, GitSnapshots, SnapshotError, Storage, StorageResult,
+    EmbeddingTasks, Embeddings, FileSystem, GitSnapshots, InspectionService, Inspections,
+    SearchDependencies, SearchService, Searches, SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use std::{
@@ -45,7 +46,8 @@ pub mod service;
 
 /// Parse and run one CLI request, emitting one complete JSON envelope.
 /// Returns 0 only for successfully written success output, otherwise 1.
-/// Check and inspect remain unavailable; drain uses the real embedding executor.
+/// Search and inspect refresh through their application services; check remains unavailable.
+/// Successful foreground operations may launch the existing detached embedding drain.
 pub fn run_cli(
     args: impl IntoIterator<Item = OsString>,
     input: &mut impl Read,
@@ -67,14 +69,73 @@ pub fn run_cli(
                 cause,
             )
         })?;
-        if !matches!(request, cli::Request::Drain) {
-            return cli::Handlers::new(None, None, None).execute(request);
+        if matches!(request, cli::Request::Check(_)) {
+            return cli::Handlers::new(None, None, None, None).execute(request);
         }
+        // Foreground services and background exclusion must share the discovered root.
+        let root = match &request {
+            cli::Request::Search(_) | cli::Request::Inspect(_) => GitCli::open(&root)
+                .map_err(map_embedding_setup)?
+                .get_root()
+                .to_path_buf(),
+            cli::Request::Check(_) | cli::Request::Drain => root,
+        };
         let mut tasks = open_embedding_tasks(&root)?;
         let mut background = open_background(&root, &executable, Some(&mut tasks))?;
-        cli::Handlers::new(None, None, Some(&mut background)).execute(request)
+        match request {
+            cli::Request::Search(request) => {
+                let mut searches = open_searches(&root)?;
+                cli::Handlers::new(None, None, Some(&mut searches), Some(&mut background))
+                    .execute(cli::Request::Search(request))
+            }
+            cli::Request::Inspect(ids) => {
+                let mut inspections = open_inspections(&root)?;
+                cli::Handlers::new(None, Some(&mut inspections), None, Some(&mut background))
+                    .execute(cli::Request::Inspect(ids))
+            }
+            request => cli::Handlers::new(None, None, None, Some(&mut background)).execute(request),
+        }
     });
     cli::write_response(output, response)
+}
+
+/// Open hybrid knowledge search with independently owned read and embedding connections.
+///
+/// # Errors
+/// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
+pub fn open_searches(start: &Path) -> CommandResult<impl Searches + use<>> {
+    let documents = open_documents(start).map_err(map_search_setup)?;
+    let git = GitCli::open(start).map_err(map_search_setup)?;
+    let filesystem = LocalFileSystem::open(git.get_root()).map_err(map_search_setup)?;
+    let directory = filesystem
+        .open_service_directory()
+        .map_err(map_search_setup)?;
+    let storage = SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory)
+        .map_err(map_search_setup)?;
+    let embeddings = open_embedding_tasks(start)?;
+    Ok(SearchService::new(SearchDependencies {
+        documents,
+        storage,
+        embeddings,
+        filesystem,
+        markdown: MarkdownParser::new(),
+    }))
+}
+
+/// Open canonical current-knowledge inspection for the repository containing `start`.
+///
+/// # Errors
+/// Reports unsupported repositories, unsafe service paths or setup failures.
+pub fn open_inspections(start: &Path) -> CommandResult<impl Inspections + use<>> {
+    let documents = open_documents(start).map_err(map_inspection_setup)?;
+    let git = GitCli::open(start).map_err(map_inspection_setup)?;
+    let files = LocalFileSystem::open(git.get_root()).map_err(map_inspection_setup)?;
+    Ok(InspectionService::new(
+        documents,
+        git,
+        files,
+        MarkdownParser::new(),
+    ))
 }
 
 /// Open document refresh operations for the working copy containing `start`.
@@ -220,6 +281,22 @@ pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage 
 /// Reports an inaccessible or non-directory root, including a symlink root.
 pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLocks + use<>> {
     LocalFileSystem::open(root)
+}
+
+fn map_search_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot open search service",
+        error,
+    )
+}
+
+fn map_inspection_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot open inspection service",
+        error,
+    )
 }
 
 fn map_embedding_files(error: DocumentError) -> EmbeddingError {

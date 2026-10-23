@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TK-11 transport/process/real-drain receipts with controlled local HTTP."""
+"""CLI transport, search, inspection and real-drain receipts with local HTTP."""
 import argparse
 import hashlib
 from importlib.metadata import version
@@ -82,37 +82,42 @@ def validate_response(catalogue, command, response, code):
 
 
 def capture_transport(root, evidence, execute, binary, catalogue):
-    with tempfile.TemporaryDirectory(prefix='tk11-product-') as temporary:
-        repo = Path(temporary)
-        execute(['git', 'init', '-q'], 'product-git-init.log', cwd=repo)
-        (repo / 'knowledge.md').write_text('private corpus sentinel\n')
-        execute(['git', 'add', 'knowledge.md'], 'product-git-add.log', cwd=repo)
-        execute(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.org',
-                 'commit', '-qm', 'fixture'], 'product-git-commit.log', cwd=repo)
-        for i, (args, body, error) in enumerate([
-            (['check'], b'{}', 'internal_error'),
-            (['inspect'], b'{"element_ids":["knowledge.md"]}', 'internal_error'),
-            (['check'], b'{"extra":1}', 'invalid_request'),
-            (['inspect'], b'{}', 'invalid_request'),
-            (['embed', '--drain'], b'{"extra":1}', 'invalid_request'),
-        ]):
+    observations = []
+    cases = [
+        (['check'], b'{}', 'internal_error', True),
+        (['inspect'], b'{"element_ids":["knowledge.md"]}', 'not_found', False),
+        (['check'], b'{"extra":1}', 'invalid_request', True),
+        (['inspect'], b'{}', 'invalid_request', True),
+        (['embed', '--drain'], b'{"extra":1}', 'invalid_request', True),
+        (['search'], b'{"query":"absent","limit":1}', None, False),
+        (['embed', '--drain'], b'', None, False),
+    ]
+    for i, (args, body, error, pre_io) in enumerate(cases):
+        # Each case owns a fresh repository: a real inspect can initialize storage.
+        with tempfile.TemporaryDirectory(prefix='letopis-product-') as temporary:
+            repo = Path(temporary)
+            execute(['git', 'init', '-q'], f'product-{i}-git-init.log', cwd=repo)
+            (repo / 'knowledge.md').write_text('private corpus sentinel\n')
+            execute(['git', 'add', 'knowledge.md'], f'product-{i}-git-add.log', cwd=repo)
+            execute(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.org',
+                     'commit', '-qm', 'fixture'], f'product-{i}-git-commit.log', cwd=repo)
             name = f'product-{i}.json'
-            execute([str(binary), *args], name, cwd=repo, expected=1, stdin=body)
+            expected = 1 if error else 0
+            execute([str(binary), *args], name, cwd=repo, expected=expected, stdin=body)
             raw = (evidence / name).read_bytes()
             assert raw.endswith(b'\n') and raw.count(b'\n') == 1
             assert not Path(str(evidence / name) + '.stderr').read_bytes()
             response = json.loads(raw)
-            validate_response(catalogue, ' '.join(args), response, 1)
-            assert response['error']['code'] == error
+            validate_response(catalogue, ' '.join(args), response, expected)
+            if error:
+                assert response['error']['code'] == error
             if error == 'internal_error':
                 assert response['error']['message'] == 'operation unavailable in this build'
-        assert not (repo / '.letopis').exists()
-        execute([str(binary), 'embed', '--drain'], 'product-drain.json', cwd=repo,
-                expected=0, stdin=b'')
-        raw = (evidence / 'product-drain.json').read_bytes()
-        assert raw.endswith(b'\n') and raw.count(b'\n') == 1
-        assert not Path(str(evidence / 'product-drain.json') + '.stderr').read_bytes()
-        validate_response(catalogue, 'embed --drain', json.loads(raw), 0)
+            if pre_io:
+                assert not (repo / '.letopis').exists()
+            observations.append({'source': 'actual product executable', 'command': ' '.join(args),
+                                 'exit': expected, 'response': response})
+    (evidence / 'product-transport-responses.json').write_text(json.dumps(observations, indent=2) + '\n')
 
 
 def capture_handler_responses(evidence, catalogue):
@@ -123,15 +128,41 @@ def capture_handler_responses(evidence, catalogue):
         record = json.loads(line.split('CLI_RESPONSE ', 1)[1])
         response = record['response']
         result = response.get('result', {})
-        command = 'inspect' if 'elements' in result else 'check'
-        if response.get('ok') and not result:
-            command = 'embed --drain'
+        if isinstance(result, list):
+            command = 'search'
+        else:
+            command = 'inspect' if 'elements' in result else 'check'
+            if response.get('ok') and not result:
+                command = 'embed --drain'
         validate_response(catalogue, command, response, record['exit'])
         responses.append({'source': 'injected handler unit test', 'command': command, **record})
     assert any(r['command'] == 'check' and r['exit'] == 0 for r in responses)
     assert any(r['command'] == 'inspect' and r['exit'] == 0 for r in responses)
+    assert any(r['command'] == 'search' and r['exit'] == 0 for r in responses)
     assert any(r['exit'] == 1 for r in responses)
     (evidence / 'handler-responses.json').write_text(json.dumps(responses, indent=2) + '\n')
+
+
+def capture_reading_responses(evidence, catalogue):
+    responses = []
+    expected = {'search_success': ('search', 0, None),
+                'search_fallback': ('search', 0, None),
+                'inspect_success': ('inspect', 0, None),
+                'not_found': ('inspect', 1, 'not_found'),
+                'malformed_input': ('search', 1, 'invalid_request')}
+    for line in (evidence / 'runtime.log').read_text().splitlines():
+        if 'PRODUCT_READING ' not in line:
+            continue
+        record = json.loads(line.split('PRODUCT_READING ', 1)[1])
+        validate_response(catalogue, record['command'], record['response'], record['exit'])
+        assert record['case'] in expected
+        command, code, error = expected[record['case']]
+        assert (record['command'], record['exit']) == (command, code)
+        if error:
+            assert record['response']['error']['code'] == error
+        responses.append({**record, 'source': 'actual product executable'})
+    assert {record['case'] for record in responses} == set(expected)
+    (evidence / 'product-reading-responses.json').write_text(json.dumps(responses, indent=2) + '\n')
 
 
 def run_host(root, evidence, execute, manifest):
@@ -151,14 +182,15 @@ def run_host(root, evidence, execute, manifest):
     for name, artifact in artifacts.items():
         shutil.copy2(artifact, evidence / name)
         manifest['executables'][name] = {'cargo_path': str(artifact), 'sha256': hash_file(artifact)}
-    execute(['cargo', 'test', '--locked', '--offline', '--lib', 'cli::tests::',
+    execute(['cargo', 'test', '--locked', '--offline', '--lib', 'cli::',
              '--', '--nocapture', '--test-threads=1'], 'handlers.log')
     capture_handler_responses(evidence, catalogue)
     execute(['cargo', 'test', '--locked', '--offline', '--lib', 'filesystem::local::tests::',
              '--', '--nocapture', '--test-threads=1'], 'locks.log')
     execute(['cargo', 'test', '--locked', '--offline', '--test', 'cli_process',
-             '--test', 'cli_runtime', '--', '--nocapture', '--test-threads=1'],
+             '--test', 'cli_runtime', '--test', 'cli_reading', '--', '--nocapture', '--test-threads=1'],
             'runtime.log', extra={'LETOPIS_CLI_FIXTURE': str(artifacts['cli_runtime_fixture'])})
+    capture_reading_responses(evidence, catalogue)
     observations = [json.loads(line.split('CLI_OBSERVER ', 1)[1])
                     for line in (evidence / 'runtime.log').read_text().splitlines()
                     if 'CLI_OBSERVER ' in line]
@@ -179,7 +211,7 @@ def run_host(root, evidence, execute, manifest):
             captures.append({'kind': marker.strip(), 'observation': value})
     assert any(item['kind'] == 'PRODUCT_DRAIN' for item in captures)
     (evidence / 'product-observations.json').write_text(json.dumps(captures, indent=2) + '\n')
-    capture_transport(root, evidence, execute, artifacts['letopis'], catalogue)
+    capture_transport(root, evidence, execute, evidence / 'letopis', catalogue)
 
 
 def read_artifacts(log):
@@ -229,7 +261,7 @@ def main():
                 'python': sys.version, 'commands': COMMANDS,
                 'environment': {k: os.environ[k] for k in ('PATH', 'CARGO_HOME', 'RUSTUP_HOME',
                    'CARGO_TARGET_DIR', 'RUSTFLAGS') if k in os.environ},
-                'limits': 'Real product drain with controlled local HTTP; check/inspect unavailable; no real model quality or x86 evidence.'}
+                'limits': 'Real product search/knowledge inspect/drain with controlled local HTTP; check and full source inspection unavailable; no real model quality or x86 evidence.'}
 
     def execute(argv, name, *, cwd=root, extra=None, **kwargs):
         run_command(argv, cwd=cwd, env=child_environment(evidence, extra),

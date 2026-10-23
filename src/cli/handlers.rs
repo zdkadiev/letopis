@@ -1,13 +1,15 @@
 use super::input::Request;
 use crate::service::{
     Background, CheckReport, Checks, CommandError, CommandErrorKind, CommandProblem, CommandResult,
-    Inspection, Inspections,
+    Inspection, Inspections, SearchLink, Searches,
 };
 
+/// Typed application results before X-1 transport rendering.
 #[derive(Debug)]
 pub(crate) enum ResponseResult {
     Check(CheckReport),
     Inspect(Inspection),
+    Search(Vec<SearchLink>),
     Drained,
 }
 #[derive(Debug)]
@@ -15,23 +17,30 @@ pub(crate) struct CommandResponse {
     pub result: ResponseResult,
     pub warnings: Vec<CommandProblem>,
 }
+/// Dispatches commands through optional application services, then triggers background work.
 pub(crate) struct Handlers<'a> {
     checks: Option<&'a mut dyn Checks>,
     inspections: Option<&'a mut dyn Inspections>,
+    searches: Option<&'a mut dyn Searches>,
     background: Option<&'a mut dyn Background>,
 }
 impl<'a> Handlers<'a> {
+    /// Borrow the services available for this command without performing I/O.
     pub(crate) fn new(
         checks: Option<&'a mut dyn Checks>,
         inspections: Option<&'a mut dyn Inspections>,
+        searches: Option<&'a mut dyn Searches>,
         background: Option<&'a mut dyn Background>,
     ) -> Self {
         Self {
             checks,
             inspections,
+            searches,
             background,
         }
     }
+    /// Run one service operation and start background work only after foreground success.
+    /// Service and background failures propagate without exposing partial results.
     pub(crate) fn execute(&mut self, request: Request) -> CommandResult<CommandResponse> {
         let result = match request {
             Request::Check(paths) => ResponseResult::Check(
@@ -45,6 +54,12 @@ impl<'a> Handlers<'a> {
                     .as_deref_mut()
                     .ok_or_else(unavailable)?
                     .inspect(&ids)?,
+            ),
+            Request::Search(request) => ResponseResult::Search(
+                self.searches
+                    .as_deref_mut()
+                    .ok_or_else(unavailable)?
+                    .search(&request)?,
             ),
             Request::Drain => {
                 self.background
