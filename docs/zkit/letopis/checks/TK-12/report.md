@@ -1,6 +1,6 @@
 # TK-12 combined acceptance
 
-Status: in progress. Task 5 and whole-branch reviews have reported approval; the final ordering fix awaits scoped re-review and controller-owned acceptance-document finalization. This report does not authorize integration or mark TK-12 complete.
+Status: accepted on branch `TK-12`. Task 5, whole-branch review and the single scoped final re-review are complete. Product source is `facad76bddf3f02b7c206cd152070e8a447929b7`; the final test-ordering commit is `a38f3f764d9fe5a61622faa9c496489ce256fafd`. Embedding-test organization remains explicitly deferred maintenance.
 
 ## Scope and source
 

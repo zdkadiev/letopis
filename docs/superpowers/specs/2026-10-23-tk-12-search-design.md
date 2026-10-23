@@ -1,6 +1,8 @@
 # TK-12 — Search and consistent reads
 
-Status: approved by the user on 2026-10-23: «Да, утверждаю спецификацию. Продолжай к плану реализации TK-12 по Superpowers». The independent builder check and its resolved configuration-readiness question are complete. Preparation of the implementation plan is authorized; product implementation awaits plan review and execution-method selection.
+Status: implementation accepted for the approved TK-12 baseline after Task 5, whole-branch and final scoped reviews. Results and limits are recorded in the implementation-acceptance section and linked report.
+
+Historical approval and planning context (before implementation): approved by the user on 2026-10-23: «Да, утверждаю спецификацию. Продолжай к плану реализации TK-12 по Superpowers». The independent builder check and its resolved configuration-readiness question are complete. Preparation of the implementation plan is authorized; product implementation awaits plan review and execution-method selection.
 
 ## Intent and verified starting point
 
