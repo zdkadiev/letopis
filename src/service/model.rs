@@ -7,52 +7,79 @@ use std::{collections::BTreeSet, fmt, num::NonZeroUsize};
 /// Searchable knowledge metadata; document text is never retained here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeMetadata {
+    /// Identity of the knowledge element.
     pub id: KnowledgeId,
+    /// Address of the element; equal to its identity for knowledge nodes.
     pub uri: KnowledgeId,
+    /// Vertex or metavertex classification derived from outgoing edges.
     pub kind: ElementKind,
+    /// SHA-256 fingerprint of the element as parsed.
     pub hash: Sha256,
+    /// Author-supplied creation timestamp.
     pub created_at: u64,
+    /// Git tree of the source snapshot declared by the author, if any.
     pub source_snapshot: Option<TreeOid>,
+    /// Line range the element occupies in its file.
     pub lines: LineRange,
+    /// SHA-256 of the search text, used as the shared vector key.
     pub search_hash: Sha256,
 }
 /// Caller-computed source projection, including sources with missing bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceMetadata {
+    /// Normalized source address, with an optional line fragment.
     pub uri: SourceUri,
+    /// SHA-256 of the addressed bytes; `None` when they are missing.
     pub hash: Option<Sha256>,
+    /// Earliest creation timestamp among the elements referencing this source.
     pub created_at: u64,
+    /// Addressed line range, if the address names one.
     pub lines: Option<LineRange>,
 }
 /// Persistable graph metadata, with distinct knowledge and source identities.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NodeMetadata {
+    /// A knowledge element declared in Markdown.
     Knowledge(KnowledgeMetadata),
+    /// An external source address referenced by an edge.
     Source(SourceMetadata),
 }
 /// A node and its stable FTS join key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoredNode {
+    /// Stable row identifier used to join the full-text index.
     pub row_id: i64,
+    /// Persisted node metadata.
     pub metadata: NodeMetadata,
 }
 /// Change-detection state for a Markdown candidate, marked or unmarked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileRow {
+    /// Root-relative path of the candidate file.
     pub path: RepoPath,
+    /// Size in bytes at the last observation.
     pub size: u64,
+    /// Modification time in nanoseconds since the Unix epoch.
     pub mtime_ns: i64,
+    /// Inode number at the last observation.
     pub inode: u64,
+    /// SHA-256 of the file bytes.
     pub hash: Sha256,
+    /// Clock sample, in nanoseconds since the Unix epoch, taken before the file was read.
     pub checked_at_ns: i64,
+    /// Whether the file parsed into a valid projection.
     pub valid: bool,
+    /// Safe local message when the file is invalid.
     pub error: Option<String>,
 }
 /// A contentless FTS match, ordered by native BM25 then identity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextMatch {
+    /// Identity of the matching knowledge element.
     pub id: KnowledgeId,
+    /// Row identifier of the matching node.
     pub row_id: i64,
+    /// Native BM25 score; lower values rank first.
     pub bm25: f64,
 }
 
@@ -67,86 +94,122 @@ pub enum VectorOutcome<T> {
 /// Stable text-addressed vector key and whether this unit inserted it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoredVectorKey {
+    /// Row identifier of the vector key.
     pub row_id: i64,
+    /// Whether this unit created the key rather than finding an existing one.
     pub inserted: bool,
 }
 /// A native cosine match joined to a currently published knowledge element.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VectorMatch {
+    /// Identity of the matching knowledge element.
     pub id: KnowledgeId,
+    /// Search hash whose vector matched.
     pub search_hash: Sha256,
+    /// Native cosine distance; lower values are closer.
     pub distance: f64,
 }
 
 /// Durable reservation count and the latest safe failure for one search hash.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmbeddingFailure {
+    /// Search hash the attempts were reserved for.
     pub search_hash: Sha256,
+    /// Number of durably reserved attempts.
     pub attempts: u64,
+    /// Latest safe failure message, if any.
     pub error: Option<String>,
 }
 /// Latest safe query embedding failure, retained until explicit successful clear.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueryError {
+    /// Unix seconds at which the failure was recorded.
     pub at: u64,
+    /// Safe failure message.
     pub error: String,
 }
 
 /// One eligible knowledge row; equal search hashes can have several representatives.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmbeddingWork {
+    /// Identity of one knowledge element carrying this search hash.
     pub id: KnowledgeId,
+    /// Search hash that still needs a vector.
     pub search_hash: Sha256,
 }
 
 /// A whole valid file's projection; raw Markdown is not retained.
 #[derive(Debug)]
 pub struct ParsedFile {
+    /// Knowledge elements in document order.
     pub elements: Vec<ParsedElement>,
+    /// Graph edges declared by the file.
     pub edges: BTreeSet<Edge>,
 }
 
 /// One parsed element with transient shared search text and its fingerprint.
 #[derive(Debug)]
 pub struct ParsedElement {
+    /// Parsed element metadata and source coordinates.
     pub element: Element,
+    /// Transient text shared by search and embedding.
     pub search_text: String,
+    /// SHA-256 of `search_text`.
     pub search_hash: Sha256,
 }
 
 /// Local diagnostic reasons; the CLI maps these into its existing error envelope.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum DiagnosticKind {
+    /// The file is not valid UTF-8.
     InvalidUtf8,
+    /// A metadata comment is malformed or not alone on its line.
     InvalidMetadata,
+    /// An explicit heading anchor is not allowed.
     InvalidAnchor,
+    /// Two headings declare the same explicit anchor.
     DuplicateAnchor,
+    /// Metadata does not immediately follow an anchored heading.
     OrphanMetadata,
+    /// One knowledge element lies inside another.
     NestedElement,
+    /// A `letopis:` link title is malformed.
     InvalidLinkTitle,
+    /// A link target is not a valid graph address.
     InvalidTarget,
+    /// An element links to itself.
     SelfLoop,
 }
 /// A file error with source coordinates where available and a fixed local message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
+    /// Machine-readable reason.
     pub kind: DiagnosticKind,
+    /// Byte range of the offending text, where it can be located.
     pub bytes: Option<ByteSpan>,
+    /// Fixed local message, free of file contents.
     pub message: String,
 }
 /// Root-relative regular-file observation used by change detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FileStat {
+    /// Size in bytes.
     pub size: u64,
+    /// Modification time in nanoseconds since the Unix epoch.
     pub mtime_ns: i64,
+    /// Inode number.
     pub inode: u64,
+    /// Device number.
     pub device: u64,
 }
 /// Exact file bytes with a verified observation and pre-read clock sample.
 #[derive(Debug)]
 pub struct CapturedFile {
+    /// Exact file bytes.
     pub bytes: Vec<u8>,
+    /// Observation verified around the read.
     pub stat: FileStat,
+    /// Clock sample, in nanoseconds since the Unix epoch, taken before the read.
     pub checked_at_ns: i64,
 }
 /// Counts for one refresh publication; all counts are zero for a no-op.

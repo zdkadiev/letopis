@@ -106,7 +106,7 @@ mod tests {
         let mut storage = SqliteStorage::open_confined(&path, &pinned).unwrap();
         let identity = Sha256::digest(b"confined");
         seed_vector(&mut storage, &identity);
-        // Act: pruning requires the cache attachment added by TK-13.
+        // Act: pruning requires the read-only cache attachment used for hash-reference checks.
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         unit.prune_unreferenced().unwrap();
         unit.commit().unwrap();

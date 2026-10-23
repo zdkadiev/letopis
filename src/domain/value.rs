@@ -3,13 +3,21 @@ use std::fmt;
 /// A violation of an identity or graph value's local invariants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueError {
+    /// Not a SHA-256 hash.
     InvalidHash,
+    /// Not a valid root-relative path.
     InvalidPath,
+    /// Not a valid anchor.
     InvalidAnchor,
+    /// Not a valid byte or line range.
     InvalidRange,
+    /// Not a valid tree or blob OID.
     InvalidOid,
+    /// Not a valid edge type.
     InvalidType,
+    /// Not a valid edge target.
     InvalidTarget,
+    /// An edge from an element to itself.
     SelfLoop,
 }
 impl fmt::Display for ValueError {

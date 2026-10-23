@@ -6,6 +6,9 @@ use crate::domain::RepoPath;
 use std::{num::NonZeroUsize, time::Duration};
 
 /// Synchronous texts-to-vectors boundary shared by documents and queries.
+///
+/// Every implementation validates what it returns and exposes no credentials or response
+/// bodies in its errors.
 pub trait EmbeddingProvider {
     /// Validate the complete local endpoint/protocol configuration without inference.
     ///
@@ -25,6 +28,9 @@ pub trait EmbeddingProvider {
 }
 
 /// Confined synchronous file, clock and drain-lock operations.
+///
+/// Every implementation stays beneath one pinned root and fails rather than returning bytes
+/// it observed changing; at most one drain lock is held at a time.
 pub trait EmbeddingFiles {
     /// Exclusive drain ownership, released when dropped.
     type EmbedLock;
@@ -51,11 +57,14 @@ pub trait EmbeddingFiles {
     /// Wait synchronously for a caller-selected retry delay.
     ///
     /// # Errors
-    /// Reserved for environment failures while waiting.
+    /// Reports an environment failure that prevents the wait; none is currently produced.
     fn wait(&self, delay: Duration) -> EmbeddingResult<()>;
 }
 
 /// Synchronous embedding application operations.
+///
+/// Every implementation keeps document vectors consistent with the committed configuration
+/// identity and persists only safe diagnostics.
 pub trait Embeddings {
     /// Reread, validate and synchronize ready configuration.
     ///

@@ -2,6 +2,9 @@ use super::{CapturedFile, Diagnostic, DocumentResult, FileStat, ParsedFile, Refr
 use crate::domain::RepoPath;
 
 /// Synchronous document publication operations.
+///
+/// Every implementation publishes a refresh atomically: readers see either the previous
+/// projection or the complete new one, never a partial update.
 pub trait Documents {
     /// Detect and atomically publish changed file projections.
     ///
@@ -10,6 +13,8 @@ pub trait Documents {
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome>;
 }
 /// Repository-owned discovery of Markdown candidate paths.
+///
+/// Every implementation reports only normalized root-relative paths and never reads file bodies.
 pub trait CorpusFiles {
     /// List normalized, deduplicated candidates including deleted tracked files.
     ///
@@ -18,6 +23,9 @@ pub trait CorpusFiles {
     fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>>;
 }
 /// Confined synchronous file observations and publication exclusion.
+///
+/// Every implementation stays beneath one pinned root, never follows symlinks out of it, and
+/// fails rather than returning bytes it observed changing.
 pub trait FileSystem {
     /// Exclusive kernel lock released when its guard is dropped.
     type IndexLock;
@@ -44,6 +52,8 @@ pub trait FileSystem {
 }
 
 /// Pure shared Markdown projection and search-text codec.
+///
+/// Every implementation is deterministic and performs no I/O: equal bytes give equal results.
 pub trait Markdown {
     /// Parse a whole file atomically; unmarked Markdown produces `None`.
     ///

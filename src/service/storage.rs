@@ -6,6 +6,10 @@ use crate::domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256};
 use std::num::NonZeroUsize;
 
 /// Synchronous storage with exclusive scoped capabilities.
+///
+/// Every implementation hands out at most one scoped capability at a time (hence
+/// `&mut self`). A write capability commits atomically or not at all, and a dropped
+/// or failed capability leaves the stored data unchanged.
 pub trait Storage {
     /// An owned read transaction borrowing this storage exclusively.
     type Read<'a>: StorageRead
@@ -44,6 +48,9 @@ pub trait Storage {
     fn begin_read(&mut self) -> StorageResult<Self::Read<'_>>;
 }
 /// Observations pinned within one read transaction.
+///
+/// Every implementation answers all methods from one consistent view, so results
+/// never mix revisions, and never modifies stored data.
 pub trait StorageRead {
     /// Read the first eligible knowledge ID strictly after the optional cursor.
     ///
@@ -186,6 +193,7 @@ pub trait VectorWrite: Sized {
     fn prune_unreferenced(&mut self) -> StorageResult<()>;
     /// Reserve one durable attempt within the caller's total budget.
     /// Commit before calling the provider; an unsent reservation still counts.
+    /// Returns `true` when an attempt was reserved and `false` when the budget is exhausted.
     ///
     /// # Errors
     /// Rejects zero or budgets above `i64::MAX` and reports database failures.

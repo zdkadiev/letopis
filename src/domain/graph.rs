@@ -29,7 +29,9 @@ impl EdgeType {
 /// Graph targets distinguish knowledge references from source addresses.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EdgeTarget {
+    /// Another knowledge element.
     Knowledge(KnowledgeId),
+    /// An external source address.
     Source(SourceUri),
 }
 impl EdgeTarget {
@@ -90,7 +92,9 @@ impl Edge {
 /// Derived classification, never stored in the canonical metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ElementKind {
+    /// An element with no outgoing `includes` edge.
     Vertex,
+    /// An element with an outgoing `includes` edge.
     Metavertex,
 }
 /// An element is a metavertex exactly when it has an outgoing includes edge.
@@ -108,15 +112,22 @@ pub fn derive_element_kind(id: &KnowledgeId, edges: &BTreeSet<Edge>) -> ElementK
 /// Canonical metadata supplied by the author; no clock is consulted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ElementMetadata {
+    /// Author-supplied creation timestamp.
     pub created_at: u64,
+    /// Git tree of the source snapshot declared by the author, if any.
     pub source_snapshot: Option<TreeOid>,
 }
 /// One knowledge element's metadata and exact source coordinates; no stored text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
+    /// Identity of the element.
     pub id: KnowledgeId,
+    /// Author-supplied metadata.
     pub metadata: ElementMetadata,
+    /// Byte range the element occupies in its file.
     pub bytes: ByteSpan,
+    /// Line range the element occupies in its file.
     pub lines: LineRange,
+    /// SHA-256 fingerprint of the element.
     pub hash: Sha256,
 }

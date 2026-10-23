@@ -45,6 +45,9 @@ pub trait EmbeddingTasks {
     fn drain(&mut self) -> CommandResult<()>;
 }
 /// Nonblocking persistent embedding exclusion.
+///
+/// Every implementation grants ownership to at most one holder at a time across processes
+/// and releases it when the returned lock is dropped.
 pub trait EmbedLocks {
     /// Owned kernel lock released through RAII.
     type EmbedLock;
@@ -55,6 +58,8 @@ pub trait EmbedLocks {
     fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>>;
 }
 /// Detached drain process launch capability.
+///
+/// Every implementation returns without waiting for the launched process to finish.
 pub trait DrainProcess {
     /// Start the internal drain command without waiting for inference.
     ///
@@ -63,6 +68,9 @@ pub trait DrainProcess {
     fn spawn_drain(&self) -> CommandResult<()>;
 }
 /// Foreground triggering and direct execution of background work.
+///
+/// Every implementation reports launch problems as safe, nonfatal diagnostics where the
+/// foreground result is already complete.
 pub trait Background {
     /// Start eligible work, returning a safe nonfatal launch warning if needed.
     ///
