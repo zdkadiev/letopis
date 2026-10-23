@@ -9,7 +9,8 @@ use crate::service::{
     Background, BackgroundService, CommandError, CommandErrorKind, CommandResult, DocumentError,
     DocumentErrorKind, DocumentResult, DocumentService, Documents, EmbedLocks, EmbeddingError,
     EmbeddingErrorKind, EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService,
-    EmbeddingTasks, Embeddings, FileSystem, GitSnapshots, SnapshotError, Storage, StorageResult,
+    EmbeddingTasks, Embeddings, FileSystem, GitSnapshots, InspectionService, Inspections,
+    SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use std::{
@@ -63,6 +64,22 @@ pub fn run_cli(
         cli::Handlers::new(None, None, Some(&mut background)).execute(request)
     });
     cli::write_response(output, response)
+}
+
+/// Open canonical current-knowledge inspection for the repository containing `start`.
+///
+/// # Errors
+/// Reports unsupported repositories, unsafe service paths or setup failures.
+pub fn open_inspections(start: &Path) -> CommandResult<impl Inspections + use<>> {
+    let documents = open_documents(start).map_err(map_inspection_setup)?;
+    let git = GitCli::open(start).map_err(map_inspection_setup)?;
+    let files = LocalFileSystem::open(git.get_root()).map_err(map_inspection_setup)?;
+    Ok(InspectionService::new(
+        documents,
+        git,
+        files,
+        MarkdownParser::new(),
+    ))
 }
 
 /// Open document refresh operations for the working copy containing `start`.
@@ -208,6 +225,14 @@ pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage 
 /// Reports an inaccessible or non-directory root, including a symlink root.
 pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLocks + use<>> {
     LocalFileSystem::open(root)
+}
+
+fn map_inspection_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot open inspection service",
+        error,
+    )
 }
 
 fn map_embedding_files(error: DocumentError) -> EmbeddingError {

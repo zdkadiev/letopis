@@ -5,11 +5,137 @@ use git::{
     TREE_MODE, TempRepo,
 };
 use letopis::{
-    domain::{RepoPath, TreeOid},
+    domain::{BlobOid, RepoPath, TreeOid},
     open_git_snapshots,
-    service::{GitSnapshots, SnapshotErrorKind, SnapshotFile},
+    service::{GitSnapshots, SnapshotEntry, SnapshotErrorKind, SnapshotFile},
 };
 use std::fs;
+
+#[test]
+fn incremental_blobs_reproduce_tree_without_touching_user_state() {
+    for format in FORMATS {
+        // Arrange
+        let repo = TempRepo::new(format);
+        configure_filter_trap(&repo);
+        let before = repo.capture_fixture_state();
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        let paths = [parse_path("a.md"), parse_path("nested/文档.md")];
+        let bytes = [b"a\r\n".as_slice(), "Привет 🌳".as_bytes()];
+        // Act
+        let entries: Vec<_> = paths
+            .iter()
+            .zip(bytes)
+            .map(|(path, bytes)| SnapshotEntry {
+                path: path.clone(),
+                oid: git.write_blob(bytes).unwrap(),
+            })
+            .collect();
+        let tree = git.create_tree_from_blobs(&entries).unwrap();
+        let expected = git
+            .create_tree(
+                &paths
+                    .iter()
+                    .zip(bytes)
+                    .map(|(path, bytes)| SnapshotFile { path, bytes })
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap();
+        // Assert
+        assert_eq!(tree, expected);
+        for (path, bytes) in paths.iter().zip(bytes) {
+            assert_eq!(git.read_blob(&tree, path).unwrap(), bytes);
+        }
+        assert_eq!(repo.capture_fixture_state(), before);
+        assert!(!repo.get_root().join("FILTER_RAN").exists());
+    }
+}
+
+#[test]
+fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format() {
+    for format in FORMATS {
+        // Arrange
+        let repo = TempRepo::new(format);
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        let blob = git.write_blob(b"expected").unwrap();
+        let tree = git.create_tree(&[]).unwrap();
+        let missing = BlobOid::parse(&"1".repeat(blob.as_str().len())).unwrap();
+        let foreign =
+            BlobOid::parse(&"0".repeat(if blob.as_str().len() == 40 { 64 } else { 40 })).unwrap();
+        for names in [
+            vec!["a", "a"],
+            vec!["a", "a/b"],
+            vec![".git/x"],
+            vec!["dir/.GIT/x"],
+            vec![".letopis/x"],
+        ] {
+            let entries: Vec<_> = names
+                .into_iter()
+                .map(|p| SnapshotEntry {
+                    path: parse_path(p),
+                    oid: blob.clone(),
+                })
+                .collect();
+            let before = repo.run_git_successfully(&["count-objects", "-v"], None);
+            assert_eq!(
+                git.create_tree_from_blobs(&entries).unwrap_err().get_kind(),
+                SnapshotErrorKind::InvalidRequest
+            );
+            assert_eq!(
+                repo.run_git_successfully(&["count-objects", "-v"], None),
+                before
+            );
+        }
+        for oid in [missing, foreign, BlobOid::parse(tree.as_str()).unwrap()] {
+            let entries = [SnapshotEntry {
+                path: parse_path("a"),
+                oid,
+            }];
+            assert_eq!(
+                git.create_tree_from_blobs(&entries).unwrap_err().get_kind(),
+                SnapshotErrorKind::InvalidRequest
+            );
+        }
+        let replacement = git.write_blob(b"corrupt replacement").unwrap();
+        repo.replace_loose_object(blob.as_str(), replacement.as_str());
+        let entries = [SnapshotEntry {
+            path: parse_path("a"),
+            oid: blob,
+        }];
+        assert_eq!(
+            git.create_tree_from_blobs(&entries).unwrap_err().get_kind(),
+            SnapshotErrorKind::InternalError
+        );
+        assert!(
+            repo.run_git_successfully(&["for-each-ref", "refs/letopis"], None)
+                .is_empty()
+        );
+    }
+}
+
+#[test]
+fn incremental_operations_recheck_self_contained_object_policy() {
+    // Arrange: alternates appear after opening the repository.
+    for format in FORMATS {
+        let repo = TempRepo::new(format);
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        let oid = git.write_blob(b"captured").unwrap();
+        fs::create_dir_all(repo.get_root().join(".git/objects/info")).unwrap();
+        fs::write(repo.get_root().join(".git/objects/info/alternates"), b"").unwrap();
+        // Act / Assert
+        assert_eq!(
+            git.write_blob(b"later").unwrap_err().get_kind(),
+            SnapshotErrorKind::InternalError
+        );
+        let entries = [SnapshotEntry {
+            path: parse_path("x"),
+            oid,
+        }];
+        assert_eq!(
+            git.create_tree_from_blobs(&entries).unwrap_err().get_kind(),
+            SnapshotErrorKind::InternalError
+        );
+    }
+}
 
 fn parse_path(s: &str) -> RepoPath {
     RepoPath::parse(s).unwrap()

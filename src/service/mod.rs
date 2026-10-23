@@ -4,7 +4,7 @@ pub(crate) use background::BackgroundService;
 mod retained_tree;
 mod snapshot_error;
 
-use crate::domain::{RepoPath, TreeOid};
+use crate::domain::{BlobOid, RepoPath, TreeOid};
 pub use retained_tree::RetainedTree;
 pub use snapshot_error::{SnapshotError, SnapshotErrorKind};
 
@@ -15,6 +15,13 @@ pub struct SnapshotFile<'a> {
     /// Exact captured bytes, without Git filters or normalization.
     pub bytes: &'a [u8],
 }
+/// One validated path and previously written blob in a snapshot request.
+pub struct SnapshotEntry {
+    /// Root-relative path in the resulting tree.
+    pub path: RepoPath,
+    /// Exact captured bytes' blob identity.
+    pub oid: BlobOid,
+}
 /// Synchronous immutable snapshot operations. Creation alone does not retain.
 pub trait GitSnapshots {
     /// Create a tree from exactly these files, preserving captured bytes.
@@ -24,6 +31,17 @@ pub trait GitSnapshots {
     /// colliding paths, and [`SnapshotErrorKind::InternalError`] when repository
     /// policy, Git I/O or object integrity checks fail.
     fn create_tree(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError>;
+    /// Write exact captured bytes without filters or normalization; does not retain.
+    ///
+    /// # Errors
+    /// Reports repository policy, Git I/O or object integrity failures.
+    fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError>;
+    /// Assemble exactly these paths after validating all blobs; does not retain.
+    ///
+    /// # Errors
+    /// Invalid paths, collisions, missing/wrong-type blobs or foreign formats are
+    /// invalid requests; policy, I/O and corruption failures are internal errors.
+    fn create_tree_from_blobs(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError>;
     /// Read a complete blob from an exact tree, without live-file fallback.
     ///
     /// # Errors
@@ -45,7 +63,6 @@ pub trait GitSnapshots {
 mod document;
 mod error;
 mod projection;
-use crate::domain::{Edge, EdgeTarget, KnowledgeId, Sha256};
 pub(crate) use document::DocumentService;
 mod model;
 pub use error::{StorageError, StorageErrorKind, StorageResult};
@@ -55,223 +72,11 @@ pub use model::{
     StoredVectorKey, TextMatch, VectorMatch, VectorOutcome,
 };
 
-/// Synchronous storage with exclusive scoped capabilities.
-pub trait Storage {
-    /// An owned read transaction borrowing this storage exclusively.
-    type Read<'a>: StorageRead
-    where
-        Self: 'a;
-    /// An atomic cache publication capability.
-    type CacheWrite<'a>: CacheWrite
-    where
-        Self: 'a;
-    /// An atomic vector-file write capability.
-    type VectorWrite<'a>: VectorWrite
-    where
-        Self: 'a;
-    /// Begin a write only when the pinned vector identity matches.
-    ///
-    /// # Errors
-    /// Reports contention or database failures.
-    fn begin_vector_write(
-        &mut self,
-        expected: &Sha256,
-    ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>>;
-    /// Atomically clear vectors for a changed identity; return whether changed.
-    ///
-    /// # Errors
-    /// Reports contention, schema or database failures, rolling back all changes.
-    fn reset_vectors(&mut self, identity: &Sha256) -> StorageResult<bool>;
-    /// Begin an exclusive cache publication transaction.
-    ///
-    /// # Errors
-    /// Returns an internal error on contention or database failure.
-    fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>>;
-    /// Begin and pin a read of cache revision and vector identity.
-    ///
-    /// # Errors
-    /// Returns an internal error if the snapshot cannot be opened or decoded.
-    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>>;
-}
-/// Observations pinned within one read transaction.
-pub trait StorageRead {
-    /// Read the first eligible knowledge ID strictly after the optional cursor.
-    ///
-    /// # Errors
-    /// Rejects zero or unrepresentable attempt budgets; reports I/O or invalid data.
-    fn read_next_embedding_work(
-        &mut self,
-        expected: &Sha256,
-        max_attempts: u64,
-        after: Option<&KnowledgeId>,
-    ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>>;
-    /// Observe the native vector dimension under the pinned configuration identity.
-    ///
-    /// # Errors
-    /// Reports malformed native metadata or database failures.
-    fn read_vector_dimensions(
-        &mut self,
-        expected: &Sha256,
-    ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>>;
-    /// Read typed metadata by normalized identity.
-    ///
-    /// # Errors
-    /// Returns an internal error for I/O or malformed persisted values.
-    fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>>;
-    /// List all published node metadata in ascending normalized identity order.
-    ///
-    /// # Errors
-    /// Returns an internal error for I/O or malformed persisted values.
-    fn list_nodes(&mut self) -> StorageResult<Vec<StoredNode>>;
-    /// List all declared edges, optionally restricted to their source.
-    ///
-    /// # Errors
-    /// Returns an internal error for I/O or malformed persisted edges.
-    fn list_edges(&mut self, source: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>>;
-    /// Read a candidate file's change-detection state.
-    ///
-    /// # Errors
-    /// Returns an internal error for I/O or malformed persisted values.
-    fn read_file(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>>;
-    /// List all candidate file states in ascending exact path order.
-    ///
-    /// # Errors
-    /// Returns an internal error for I/O or malformed persisted values.
-    fn list_files(&mut self) -> StorageResult<Vec<FileRow>>;
-    /// Execute an already-prepared FTS expression without a candidate limit.
-    ///
-    /// # Errors
-    /// Returns an invalid request for malformed expressions, or an internal error for I/O.
-    fn match_text(&mut self, expression: &str) -> StorageResult<Vec<TextMatch>>;
-    /// Read a text-addressed vector under the expected pinned identity.
-    ///
-    /// # Errors
-    /// Reports malformed stored vectors or database failures.
-    fn read_vector(
-        &mut self,
-        expected: &Sha256,
-        hash: &Sha256,
-    ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>>;
-    /// Find native cosine matches joined to current node search hashes.
-    ///
-    /// # Errors
-    /// Rejects invalid query vectors or reports database/integrity failures.
-    fn find_nearest_vectors(
-        &mut self,
-        expected: &Sha256,
-        query: &[f32],
-        dimensions: usize,
-    ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>>;
-    /// Read durable attempts and the latest failure under the pinned identity.
-    ///
-    /// # Errors
-    /// Reports malformed persisted values or database failures.
-    fn read_failure(
-        &mut self,
-        expected: &Sha256,
-        hash: &Sha256,
-    ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>>;
-    /// Read the last query embedding failure, independent of model resets.
-    ///
-    /// # Errors
-    /// Reports malformed persisted values or database failures.
-    fn read_query_error(&mut self) -> StorageResult<Option<QueryError>>;
-    /// Publication revision observed by this read.
-    fn get_revision(&self) -> u64;
-    /// Vector configuration identity observed by this read.
-    fn get_config_identity(&self) -> Option<Sha256>;
-}
-
-/// Caller-owned atomic cache publication; any failed mutation prevents commit.
-pub trait CacheWrite: Sized {
-    /// Insert or replace metadata while preserving its row ID.
-    ///
-    /// # Errors
-    /// Rejects unsupported numeric values or database failures.
-    fn upsert_node(&mut self, node: &NodeMetadata) -> StorageResult<i64>;
-    /// Insert a declared edge, including a dangling target.
-    ///
-    /// # Errors
-    /// Rejects duplicate edges and missing sources; reports database failures.
-    fn insert_edge(&mut self, edge: &Edge) -> StorageResult<()>;
-    /// Remove all declarations owned by a knowledge element.
-    ///
-    /// # Errors
-    /// Reports database failures.
-    fn delete_outgoing(&mut self, source: &KnowledgeId) -> StorageResult<()>;
-    /// Delete a node and its FTS entry, preserving incoming edges.
-    ///
-    /// # Errors
-    /// Rejects deletion while outgoing edges remain; reports database failures.
-    fn delete_node(&mut self, id: &EdgeTarget) -> StorageResult<()>;
-    /// Replace a knowledge element's contentless FTS entry.
-    ///
-    /// # Errors
-    /// Returns not found for absent knowledge, or a database failure.
-    fn replace_text(&mut self, id: &KnowledgeId, text: &str) -> StorageResult<()>;
-    /// Replace a Markdown candidate's state.
-    ///
-    /// # Errors
-    /// Rejects unsupported numbers and inconsistent validity; reports database failures.
-    fn upsert_file(&mut self, file: &FileRow) -> StorageResult<()>;
-    /// Remove a candidate's state.
-    ///
-    /// # Errors
-    /// Reports database failures.
-    fn delete_file(&mut self, path: &RepoPath) -> StorageResult<()>;
-    /// Publish all mutations and increment the revision once, including empty units.
-    ///
-    /// # Errors
-    /// Rejects failed units, revision overflow, and database failures, rolling back.
-    fn commit(self) -> StorageResult<u64>;
-}
-
-/// Caller-owned atomic vector write; any failed mutation prevents commit.
-pub trait VectorWrite: Sized {
-    /// Remove vectors and failures absent from this transaction's cache observation.
-    /// Concurrent publication can leave recomputable missing vectors until next drain.
-    ///
-    /// # Errors
-    /// Reports database failures and prevents commit of a failed unit.
-    fn prune_unreferenced(&mut self) -> StorageResult<()>;
-    /// Reserve one durable attempt within the caller's total budget.
-    /// Commit before calling the provider; an unsent reservation still counts.
-    ///
-    /// # Errors
-    /// Rejects zero or budgets above `i64::MAX` and reports database failures.
-    fn reserve_attempt(&mut self, hash: &Sha256, max_attempts: u64) -> StorageResult<bool>;
-    /// Replace an existing reservation's error with the caller's safe message.
-    /// Returns false when no reservation exists; never creates an attempt.
-    ///
-    /// # Errors
-    /// Reports database failures.
-    fn record_failure(&mut self, hash: &Sha256, safe_error: &str) -> StorageResult<bool>;
-    /// Replace the singleton query failure with an already-safe message.
-    ///
-    /// # Errors
-    /// Rejects timestamps above `i64::MAX` and reports database failures.
-    fn set_query_error(&mut self, at: u64, safe_error: &str) -> StorageResult<()>;
-    /// Clear the singleton error after a successful query embedding.
-    ///
-    /// # Errors
-    /// Reports database failures.
-    fn clear_query_error(&mut self) -> StorageResult<()>;
-    /// Store one text vector, preserving an existing key and vector.
-    ///
-    /// # Errors
-    /// Rejects empty, nonfinite or mismatched vectors and reports database corruption/I/O.
-    fn store_vector(
-        &mut self,
-        hash: &Sha256,
-        vector: &[f32],
-        dimensions: usize,
-    ) -> StorageResult<StoredVectorKey>;
-    /// Commit all writes atomically.
-    ///
-    /// # Errors
-    /// Rejects poisoned units or reports database failures, rolling back.
-    fn commit(self) -> StorageResult<()>;
-}
+mod storage;
+/// Scoped storage capabilities for cache, vector and pinned read operations.
+pub use storage::{CacheWrite, Storage, StorageRead, VectorWrite};
+mod inspection;
+pub(crate) use inspection::InspectionService;
 
 pub use error::{DocumentError, DocumentErrorKind, DocumentResult};
 pub use model::{CapturedFile, FileStat, RefreshOutcome};

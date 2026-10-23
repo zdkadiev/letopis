@@ -21,3 +21,6 @@ pub fn assert_error(result: Result<Option<ParsedFile>, Vec<Diagnostic>>, want: D
 }
 
 pub mod embedding;
+
+pub mod git;
+pub mod reading;

@@ -96,17 +96,39 @@ impl TreeOid {
     /// Returns [`ValueError::InvalidOid`] for any other length or for a
     /// non-lowercase-hexadecimal character. Repository existence is not checked.
     pub fn parse(raw: &str) -> Result<Self, ValueError> {
-        if ![SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN].contains(&raw.len())
-            || !raw
-                .bytes()
-                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
-        {
-            return Err(ValueError::InvalidOid);
-        }
+        validate_oid(raw)?;
         Ok(Self(raw.into()))
     }
     /// The unmodified full OID.
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
+
+/// A full SHA-1 or SHA-256 Git blob OID; adapters verify existence and type.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BlobOid(String);
+impl BlobOid {
+    /// Accept exactly 40 or 64 lowercase hexadecimal characters.
+    ///
+    /// # Errors
+    /// Returns [`ValueError::InvalidOid`] for noncanonical input. Existence is not checked.
+    pub fn parse(raw: &str) -> Result<Self, ValueError> {
+        validate_oid(raw)?;
+        Ok(Self(raw.into()))
+    }
+    /// The unmodified full object identity.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+fn validate_oid(raw: &str) -> Result<(), ValueError> {
+    if ![SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN].contains(&raw.len())
+        || !raw
+            .bytes()
+            .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+    {
+        return Err(ValueError::InvalidOid);
+    }
+    Ok(())
 }
