@@ -4,7 +4,7 @@
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 4 / 6 / 12 (best / expected / worst)
-> **План:** неделя 10 — 6 ч
+> **План:** неделя 9 — 6 ч
 > **Зависимости:** [TK-3](../../EP-8-proofs/tasks/TK-3-vector-harness.md), [TK-6](../../EP-8-proofs/tasks/TK-6-provider-harness.md), [TK-9](TK-9-storage.md)
 
 
