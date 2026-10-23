@@ -1,4 +1,5 @@
 use crate::service::{EmbeddingError, EmbeddingErrorKind, EmbeddingResult};
+use crate::utils::has_same_identity;
 use rustix::fs::{AtFlags, FileType, Mode, OFlags, Stat, fstat, openat, statat};
 use rustix::io::Errno;
 use std::fs::File;
@@ -71,10 +72,7 @@ pub(super) fn verify_entry(parent: &File, name: &str, identity: &Stat) -> Embedd
     Ok(current)
 }
 pub(super) fn require_identity(before: &Stat, after: &Stat) -> EmbeddingResult<()> {
-    if before.st_dev != after.st_dev
-        || before.st_ino != after.st_ino
-        || before.st_mode != after.st_mode
-    {
+    if !has_same_identity(before, after) || before.st_mode != after.st_mode {
         return Err(reject_input());
     }
     Ok(())

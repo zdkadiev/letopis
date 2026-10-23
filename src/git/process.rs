@@ -1,4 +1,4 @@
-use super::constants::MIN_GIT_VERSION;
+use super::constants::{HASH_OBJECT_COMMAND, MIN_GIT_VERSION, MKTREE_COMMAND, UPDATE_REF_COMMAND};
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use std::{
     env,
@@ -104,9 +104,9 @@ impl GitProcess {
             .env("LC_ALL", "C");
         command.args(["-c", "core.hooksPath=/dev/null"]);
         let writes = args.first().is_some_and(|a| {
-            a == "mktree"
-                || a == "update-ref"
-                || (a == "hash-object" && args.iter().any(|a| a == "-w"))
+            a == MKTREE_COMMAND
+                || a == UPDATE_REF_COMMAND
+                || (a == HASH_OBJECT_COMMAND && args.iter().any(|a| a == "-w"))
         });
         if writes {
             command.args(["-c", "core.fsync=all", "-c", "core.fsyncMethod=fsync"]);

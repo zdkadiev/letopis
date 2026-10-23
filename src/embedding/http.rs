@@ -1,5 +1,6 @@
 use crate::service::{
-    EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingResult, ProviderKind,
+    EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingResult, MAX_DIMENSIONS,
+    MIN_DIMENSIONS, ProviderKind,
 };
 use crate::utils::JsonValue;
 use serde_json::{Value, json};
@@ -13,8 +14,6 @@ use ureq::{
 const ATTEMPT_DEADLINE: Duration = Duration::from_secs(60);
 // Match ureq's ordinary read_to_vec cap explicitly for the configured reader.
 const MAX_RESPONSE_BYTES: u64 = 10 * 1024 * 1024;
-const MIN_DIMENSIONS: usize = 2;
-const MAX_DIMENSIONS: usize = 4096;
 
 pub(super) struct Http {
     agent: Agent,

@@ -6,6 +6,7 @@ use crate::service::{StorageError, StorageErrorKind, StorageResult};
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 
 const SCHEMA_VERSION: i64 = 1;
+const USER_VERSION_PRAGMA: &str = "user_version";
 const CACHE_SCHEMA: &str = include_str!("cache.sql");
 const VECTOR_SCHEMA: &str = include_str!("vectors.sql");
 
@@ -40,7 +41,7 @@ fn initialize_schema(connection: &Connection, sql: &str) -> StorageResult<()> {
     if !has_schema(&transaction, sql)? {
         transaction.execute_batch(sql).map_err(map_sqlite)?;
         transaction
-            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .pragma_update(None, USER_VERSION_PRAGMA, SCHEMA_VERSION)
             .map_err(map_sqlite)?;
     }
     transaction.commit().map_err(map_sqlite)
@@ -48,7 +49,7 @@ fn initialize_schema(connection: &Connection, sql: &str) -> StorageResult<()> {
 
 fn has_schema(connection: &Connection, sql: &str) -> StorageResult<bool> {
     let version: i64 = connection
-        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .pragma_query_value(None, USER_VERSION_PRAGMA, |row| row.get(0))
         .map_err(map_sqlite)?;
     let definitions = read_definitions(connection)?;
     match version {

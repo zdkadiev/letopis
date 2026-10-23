@@ -1,3 +1,4 @@
+use rustix::fs::Stat;
 use serde::{
     Deserialize, Deserializer,
     de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor},
@@ -7,6 +8,11 @@ use std::fmt;
 
 /// Directory under the repository root that holds Letopis state; Git, filesystem and storage all agree on it.
 pub(crate) const SERVICE_DIRECTORY: &str = ".letopis";
+
+/// Whether two observations describe the same file: equal device and inode.
+pub(crate) fn has_same_identity(left: &Stat, right: &Stat) -> bool {
+    left.st_dev == right.st_dev && left.st_ino == right.st_ino
+}
 
 // Preserve serde_json's default nesting budget across borrowed-token parsers.
 const MAX_JSON_DEPTH: usize = 128;

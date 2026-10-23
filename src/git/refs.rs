@@ -1,6 +1,6 @@
 use super::{
     GitCli,
-    constants::{BLOB_KIND, GITLINK_KIND, SNAPSHOT_REF_PREFIX, TREE_KIND},
+    constants::{BLOB_KIND, GITLINK_KIND, SNAPSHOT_REF_PREFIX, TREE_KIND, UPDATE_REF_COMMAND},
     objects::ObjectDb,
     process::is_exit_code,
 };
@@ -49,7 +49,7 @@ impl Retainer<'_> {
         }
         let zero = "0".repeat(self.git.oid_len);
         match db.run(
-            &["update-ref", "--no-deref", &name, oid.as_str(), &zero],
+            &[UPDATE_REF_COMMAND, "--no-deref", &name, oid.as_str(), &zero],
             None,
         ) {
             Ok(_) => {}

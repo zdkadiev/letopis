@@ -33,6 +33,7 @@ pub use command_traits::{
 };
 pub use document_traits::{CorpusFiles, Documents, FileSystem, Markdown};
 pub use embedding_config::{EmbeddingConfig, ProviderKind};
+pub(crate) use embedding_config::{MAX_DIMENSIONS, MIN_DIMENSIONS};
 pub use embedding_error::{EmbeddingError, EmbeddingErrorKind, EmbeddingResult};
 pub use embedding_traits::{EmbeddingFiles, EmbeddingProvider, Embeddings};
 pub use error::{

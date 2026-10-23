@@ -1,5 +1,4 @@
-#[cfg(test)]
-mod tests;
+use super::constants::REV_PARSE_COMMAND;
 use super::process::{GitProcess, check_version};
 use super::{objects, refs};
 use crate::{
@@ -12,7 +11,6 @@ use crate::{
 };
 use std::{
     collections::BTreeSet,
-    ffi::OsString,
     fs,
     io::ErrorKind,
     path::{Path, PathBuf},
@@ -32,52 +30,9 @@ impl GitCli {
     }
     fn open_with_process(start: &Path, process: GitProcess) -> Result<Self, SnapshotError> {
         check_version(&process.run(start, &["--version".into()], None)?)?;
-        let raw = process.run(start, &["rev-parse".into(), "--show-toplevel".into()], None)?;
-        let root = PathBuf::from(
-            String::from_utf8(raw)
-                .map_err(|_| {
-                    SnapshotError::new(SnapshotErrorKind::InternalError, "invalid Git root")
-                })?
-                .strip_suffix('\n')
-                .ok_or_else(|| {
-                    SnapshotError::new(
-                        SnapshotErrorKind::InternalError,
-                        "invalid Git root response",
-                    )
-                })?,
-        );
-        if !root.is_absolute() {
-            return Err(SnapshotError::new(
-                SnapshotErrorKind::InternalError,
-                "invalid Git root",
-            ));
-        }
-        let inside = process.run(
-            &root,
-            &["rev-parse".into(), "--is-inside-work-tree".into()],
-            None,
-        )?;
-        if inside != b"true\n" {
-            return Err(SnapshotError::new(
-                SnapshotErrorKind::InternalError,
-                "Git working copy required",
-            ));
-        }
-        let format = process.run(
-            &root,
-            &[OsString::from("rev-parse"), "--show-object-format".into()],
-            None,
-        )?;
-        let oid_len = match format.as_slice() {
-            b"sha1\n" => SHA1_OID_HEX_LEN,
-            b"sha256\n" => SHA256_OID_HEX_LEN,
-            _ => {
-                return Err(SnapshotError::new(
-                    SnapshotErrorKind::InternalError,
-                    "unsupported Git object format",
-                ));
-            }
-        };
+        let root = read_root(&process, start)?;
+        require_work_tree(&process, &root)?;
+        let oid_len = read_oid_len(&process, &root)?;
         let git = Self {
             root,
             process,
@@ -93,7 +48,7 @@ impl GitCli {
         let raw = self.process.run(
             &self.root,
             &[
-                "rev-parse".into(),
+                REV_PARSE_COMMAND.into(),
                 "--git-path".into(),
                 "objects/info/alternates".into(),
             ],
@@ -172,6 +127,61 @@ impl CorpusFiles for GitCli {
         parse_candidates(&raw)
     }
 }
+fn read_root(process: &GitProcess, start: &Path) -> Result<PathBuf, SnapshotError> {
+    let raw = process.run(
+        start,
+        &[REV_PARSE_COMMAND.into(), "--show-toplevel".into()],
+        None,
+    )?;
+    let text = String::from_utf8(raw)
+        .map_err(|_| SnapshotError::new(SnapshotErrorKind::InternalError, "invalid Git root"))?;
+    let line = text.strip_suffix('\n').ok_or_else(|| {
+        SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            "invalid Git root response",
+        )
+    })?;
+    let root = PathBuf::from(line);
+    if !root.is_absolute() {
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            "invalid Git root",
+        ));
+    }
+    Ok(root)
+}
+
+fn require_work_tree(process: &GitProcess, root: &Path) -> Result<(), SnapshotError> {
+    let inside = process.run(
+        root,
+        &[REV_PARSE_COMMAND.into(), "--is-inside-work-tree".into()],
+        None,
+    )?;
+    if inside != b"true\n" {
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            "Git working copy required",
+        ));
+    }
+    Ok(())
+}
+
+fn read_oid_len(process: &GitProcess, root: &Path) -> Result<usize, SnapshotError> {
+    let format = process.run(
+        root,
+        &[REV_PARSE_COMMAND.into(), "--show-object-format".into()],
+        None,
+    )?;
+    match format.as_slice() {
+        b"sha1\n" => Ok(SHA1_OID_HEX_LEN),
+        b"sha256\n" => Ok(SHA256_OID_HEX_LEN),
+        _ => Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            "unsupported Git object format",
+        )),
+    }
+}
+
 fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
     if !raw.is_empty() && !raw.ends_with(&[0]) {
         return Err(DocumentError::new(
@@ -211,3 +221,6 @@ fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
     }
     Ok(candidates.into_iter().collect())
 }
+
+#[cfg(test)]
+mod tests;

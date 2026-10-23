@@ -1,6 +1,6 @@
 use super::{
     connection::map_sqlite,
-    graph::map_invalid_value,
+    graph::{SOURCE_KIND, map_invalid_value},
     query::{EmbedFailures, Nodes, Schemas, VectorIndex, VectorKeys, build_query},
 };
 use crate::{
@@ -9,8 +9,6 @@ use crate::{
 };
 use rusqlite::{Connection, OptionalExtension, params_from_iter};
 use sea_query::{Expr, ExprTrait, Order, Query, SelectStatement};
-
-const SOURCE_KIND: &str = "source";
 
 pub(super) fn read_next_embedding_work(
     connection: &Connection,

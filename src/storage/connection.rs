@@ -1,5 +1,6 @@
 use super::native::register_vec1;
 use crate::service::{StorageError, StorageErrorKind, StorageResult};
+use crate::utils::has_same_identity;
 use rusqlite::{Connection, ErrorCode, OpenFlags};
 use rustix::{
     fd::{AsFd, BorrowedFd},
@@ -26,6 +27,10 @@ const INITIALIZATION_WAIT: Duration = Duration::from_secs(5);
 const INITIALIZATION_RETRY: Duration = Duration::from_millis(1);
 const MIN_SQLITE_VERSION: i32 = 3_051_003;
 const VEC1_VERSION_PREFIX: &str = "version 0.8";
+const MAIN_SCHEMA: &str = "main";
+const VECTOR_SCHEMA: &str = "vec";
+const FOREIGN_KEYS_PRAGMA: &str = "foreign_keys";
+const WAL_MODE: &str = "wal";
 pub(super) const CACHE_DATABASE: &str = "cache.db";
 pub(super) const VECTOR_DATABASE: &str = "vectors.db";
 const DATABASE_OPEN_FLAGS: OpenFlags = OpenFlags::SQLITE_OPEN_READ_WRITE
@@ -82,7 +87,7 @@ impl<'a> ConfinedDirectory<'a> {
         // ATTACH inherits SQLITE_OPEN_NOFOLLOW from this directory's main connection.
         attach_unconfigured_vectors(connection, &self.path.join(VECTOR_DATABASE))?;
         self.verify()?;
-        configure_database(connection, "vec")
+        configure_database(connection, VECTOR_SCHEMA)
     }
 
     /// Attach the confined cache read-only for hash-reference checks during vector writes.
@@ -136,10 +141,6 @@ impl<'a> ConfinedDirectory<'a> {
             Err(error) => Err(map_path_error(error)),
         }
     }
-}
-
-fn has_same_identity(left: &Stat, right: &Stat) -> bool {
-    left.st_dev == right.st_dev && left.st_ino == right.st_ino
 }
 
 fn fail_unsafe_path() -> StorageError {
@@ -292,13 +293,13 @@ fn configure_connection(connection: &Connection) -> StorageResult<()> {
     connection
         .busy_timeout(Duration::ZERO)
         .map_err(map_sqlite)?;
-    configure_database(connection, "main")?;
+    configure_database(connection, MAIN_SCHEMA)?;
     verify_capabilities(connection)
 }
 
 pub(super) fn attach_vectors(connection: &Connection, path: &Path) -> StorageResult<()> {
     attach_unconfigured_vectors(connection, path)?;
-    configure_database(connection, "vec")
+    configure_database(connection, VECTOR_SCHEMA)
 }
 
 fn attach_unconfigured_vectors(connection: &Connection, path: &Path) -> StorageResult<()> {
@@ -346,7 +347,7 @@ pub(super) fn attach_cache(connection: &Connection, path: &Path) -> StorageResul
 fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()> {
     // `schema` is private and only the literal main/vec names reach this helper.
     connection
-        .pragma_update(None, "foreign_keys", "ON")
+        .pragma_update(None, FOREIGN_KEYS_PRAGMA, "ON")
         .map_err(map_sqlite)?;
     let journal = initialize_journal(connection, schema)?;
     connection
@@ -362,7 +363,7 @@ fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()
         })
         .map_err(map_sqlite)?;
     let foreign: i64 = connection
-        .pragma_query_value(None, "foreign_keys", |row| row.get(0))
+        .pragma_query_value(None, FOREIGN_KEYS_PRAGMA, |row| row.get(0))
         .map_err(map_sqlite)?;
     #[cfg(target_os = "macos")]
     {
@@ -376,7 +377,7 @@ fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()
             ));
         }
     }
-    if journal != "wal" || sync != 2 || foreign != 1 {
+    if journal != WAL_MODE || sync != 2 || foreign != 1 {
         return Err(StorageError::new(
             StorageErrorKind::InternalError,
             "storage connection policy unavailable",
@@ -390,7 +391,7 @@ fn initialize_journal(connection: &Connection, schema: &str) -> StorageResult<St
     // Already-ready databases only read their mode; no writer lock is requested.
     wait_for_initialization(|| {
         let journal = read_journal(connection, schema).map_err(map_sqlite)?;
-        if journal == "wal" {
+        if journal == WAL_MODE {
             return Ok(journal);
         }
         connection

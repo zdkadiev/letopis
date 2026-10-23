@@ -1,6 +1,6 @@
 use super::{
     connection::map_sqlite,
-    graph::map_invalid_value,
+    graph::{SOURCE_KIND, map_invalid_value},
     query::{EmbedFailures, Meta, QueryErrorRow, Schemas, VectorIndex, VectorKeys, build_query},
 };
 use crate::{
@@ -262,12 +262,12 @@ pub(super) fn find_nearest_vectors(
          FROM vec.vector_index(?1, ?2) v
          JOIN vec.vector_keys k ON k.row_id = v.rowid
          JOIN nodes n ON n.search_hash = k.search_hash
-         WHERE n.kind <> 'source'
+         WHERE n.kind <> ?3
          ORDER BY v.distance, n.id",
         )
         .map_err(map_sqlite)?;
     let rows = statement
-        .query_map(params![bytes, format!("{{K:{count}}}")], |r| {
+        .query_map(params![bytes, format!("{{K:{count}}}"), SOURCE_KIND], |r| {
             Ok((
                 r.get::<_, String>(0)?,
                 r.get::<_, String>(1)?,

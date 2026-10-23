@@ -4,8 +4,10 @@ use crate::utils::JsonValue;
 use serde_json::{Map, Value};
 use std::{fmt, num::NonZeroUsize};
 
-const MIN_DIMENSIONS: usize = 2;
-const MAX_DIMENSIONS: usize = 4096;
+/// Smallest embedding vector length a provider may return.
+pub(crate) const MIN_DIMENSIONS: usize = 2;
+/// Largest embedding vector length a provider may return.
+pub(crate) const MAX_DIMENSIONS: usize = 4096;
 const ROOT_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retries"];
 
 /// Supported finite protocol selection.
