@@ -9,3 +9,6 @@ pub(crate) use output::write_response;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod search_tests;

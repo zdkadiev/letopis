@@ -80,6 +80,63 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             run.validate_response(catalogue, 'check', {**valid, 'extra': 1}, 0)
 
+    def test_handler_capture_classifies_lists_without_loosening_validation(self):
+        from jsonschema import ValidationError
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        records = [
+            {'exit': 0, 'response': {'ok': True, 'result': {'errors': []}}},
+            {'exit': 0, 'response': {'ok': True, 'result': {'snapshot': 'a' * 40, 'elements': {}}}},
+            {'exit': 1, 'response': {'ok': False, 'error': {'code': 'internal_error', 'message': 'safe', 'details': {}}}},
+            {'exit': 0, 'response': {'ok': True, 'result': []}},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            def capture(items):
+                (evidence / 'handlers.log').write_text(''.join('CLI_RESPONSE ' + json.dumps(item) + '\n' for item in items))
+                run.capture_handler_responses(evidence, catalogue)
+            capture(records)
+            results = json.loads((evidence / 'handler-responses.json').read_text())
+            self.assertEqual(results[-1]['command'], 'search')
+            self.assertEqual(results[-1]['source'], 'injected handler unit test')
+            with self.assertRaises(AssertionError):
+                capture(records[:-1])
+            with self.assertRaises(AssertionError):
+                capture([*records[:-1], {**records[-1], 'exit': 1}])
+            malformed = {'ok': True, 'result': [{'element_id': 'x.md', 'path': 'x.md', 'lines': [1, 2], 'revision': 1, 'flags': [], 'text': 'private'}]}
+            with self.assertRaises(ValidationError):
+                capture([*records[:-1], {'exit': 0, 'response': malformed}])
+
+    def test_actual_transport_isolates_noninitializing_and_inspection_cases(self):
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        repositories = []
+        terminator = "\n"
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            def execute(argv, name, *, cwd, expected=0, stdin=None):
+                if argv[0] == 'git':
+                    return
+                repositories.append(str(cwd))
+                if argv[1] == 'inspect' and stdin != b'{}':
+                    (cwd / '.letopis').mkdir(exist_ok=True)
+                    response = {'ok': False, 'error': {'code': 'not_found', 'message': 'unknown', 'details': {}}}
+                elif argv[1] == 'search':
+                    (cwd / '.letopis').mkdir(exist_ok=True)
+                    response = {'ok': True, 'result': []}
+                elif argv[1:] == ['embed', '--drain'] and not stdin:
+                    response = {'ok': True, 'result': {}}
+                else:
+                    code = 'internal_error' if argv[1] == 'check' and stdin == b'{}' else 'invalid_request'
+                    response = {'ok': False, 'error': {'code': code, 'message': 'operation unavailable in this build' if code == 'internal_error' else 'invalid command input', 'details': {}}}
+                (evidence / name).write_text(json.dumps(response) + terminator)
+                Path(str(evidence / name) + '.stderr').write_bytes(b'')
+            run.capture_transport(root, evidence, execute, Path('/product'), catalogue)
+            self.assertEqual(len(repositories), len(set(repositories)))
+            terminator = "\n{}\n"
+            with self.assertRaises(AssertionError):
+                run.capture_transport(root, evidence, execute, Path('/product'), catalogue)
+
     def test_inventory_covers_support_schema_and_ignores_bytecode(self):
         root = Path(__file__).resolve().parents[2]
         inputs = run.hash_inputs(root)

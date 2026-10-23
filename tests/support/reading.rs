@@ -16,19 +16,19 @@ impl ReadingRepo {
     pub fn new() -> Self {
         Self(TempRepo::new(ObjectFormat::Sha1))
     }
+    /// Run the actual binary with isolated Git settings and synthetic child credentials.
+    ///
+    /// # Panics
+    /// Panics if process setup fails or the owned child exceeds the watchdog.
     pub fn invoke(&self, args: &[&str], input: &[u8]) -> Output {
-        let mut stdin = tempfile::tempfile().unwrap();
-        stdin.write_all(input).unwrap();
-        stdin.rewind().unwrap();
-        let mut command = Command::new(env!("CARGO_BIN_EXE_letopis"));
-        isolate_command(&mut command);
-        command
-            .current_dir(self.get_root())
-            .args(args)
-            .stdin(Stdio::from(stdin))
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        OwnedChild::spawn(&mut command).wait(Instant::now() + Duration::from_secs(30))
+        self.invoke_output(args, input, Stdio::piped())
+    }
+    /// Run the binary with discarded stdout to test retries after a lost response.
+    ///
+    /// # Panics
+    /// Panics if process setup fails or the owned child exceeds the watchdog.
+    pub fn invoke_lost(&self, args: &[&str], input: &[u8]) -> Output {
+        self.invoke_output(args, input, Stdio::null())
     }
 
     pub fn write_knowledge(&self, path: &str, body: &str) {
@@ -78,6 +78,21 @@ impl ReadingRepo {
     }
     pub fn get_root(&self) -> &Path {
         self.0.get_root()
+    }
+    fn invoke_output(&self, args: &[&str], input: &[u8], stdout: Stdio) -> Output {
+        let mut stdin = tempfile::tempfile().unwrap();
+        stdin.write_all(input).unwrap();
+        stdin.rewind().unwrap();
+        let mut command = Command::new(env!("CARGO_BIN_EXE_letopis"));
+        isolate_command(&mut command);
+        command
+            .current_dir(self.get_root())
+            .args(args)
+            .stdin(Stdio::from(stdin))
+            .stdout(stdout)
+            .env("OPENAI_API_KEY", "fixture-secret")
+            .stderr(Stdio::piped());
+        OwnedChild::spawn(&mut command).wait(Instant::now() + Duration::from_secs(30))
     }
 }
 

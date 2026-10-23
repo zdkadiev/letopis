@@ -1,6 +1,8 @@
 use super::handlers::{CommandResponse, ResponseResult};
 use crate::domain::Sha256;
-use crate::service::{CommandError, CommandErrorKind, CommandProblem, InspectedElement};
+use crate::service::{
+    CommandError, CommandErrorKind, CommandProblem, InspectedElement, SearchFlag, SearchLink,
+};
 use serde::Serialize;
 use serde_json::Value;
 use std::{collections::BTreeMap, io::Write};
@@ -33,6 +35,7 @@ enum ResultBody<'a> {
         snapshot: &'a str,
         elements: BTreeMap<&'a str, Element<'a>>,
     },
+    Search(Vec<Link<'a>>),
     Drained {},
 }
 #[derive(Serialize)]
@@ -41,6 +44,15 @@ struct Element<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     lines: Option<[u64; 2]>,
     hash: Option<String>,
+}
+
+#[derive(Serialize)]
+struct Link<'a> {
+    element_id: &'a str,
+    path: &'a str,
+    lines: [u64; 2],
+    revision: u64,
+    flags: Vec<&'static str>,
 }
 
 pub(crate) fn write_response(
@@ -94,7 +106,23 @@ fn build_result(result: &ResponseResult) -> ResultBody<'_> {
                 .map(|(key, value)| (key.as_str(), build_element(value)))
                 .collect(),
         },
+        ResponseResult::Search(links) => ResultBody::Search(links.iter().map(build_link).collect()),
         ResponseResult::Drained => ResultBody::Drained {},
+    }
+}
+fn build_link(link: &SearchLink) -> Link<'_> {
+    Link {
+        element_id: link.element_id.as_str(),
+        path: link.path.as_str(),
+        lines: [link.lines.get_start(), link.lines.get_end()],
+        revision: link.revision,
+        flags: link
+            .flags
+            .iter()
+            .map(|flag| match flag {
+                SearchFlag::Stale => "stale",
+            })
+            .collect(),
     }
 }
 fn build_element(element: &InspectedElement) -> Element<'_> {

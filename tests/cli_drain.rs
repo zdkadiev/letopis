@@ -327,34 +327,29 @@ fn stale_live_text_is_skipped_before_any_product_http_or_reservation() {
 }
 
 #[test]
-fn unavailable_read_commands_do_not_trigger_ready_embeddings() {
+fn unavailable_check_does_not_trigger_ready_embeddings() {
     let fixture = Fixture::new();
     let http = HttpFixture::start(FixtureReply::Status {
         status: 200,
         body: SUCCESS.into(),
     });
     fixture.write_config(&http.get_base_url(), 0);
-    for (command, body) in [
-        ("check", "{}"),
-        ("inspect", r#"{"element_ids":["knowledge.md"]}"#),
-    ] {
-        let mut child = cli::OwnedChild::spawn(
-            Command::new(env!("CARGO_BIN_EXE_letopis"))
-                .arg(command)
-                .current_dir(fixture.repo.get_root())
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped()),
-        );
-        child.send_input(body.as_bytes());
-        let output = child.collect_output(WAIT);
-        assert_eq!(output.status.code(), Some(1));
-        let response: Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(
-            response["error"]["message"],
-            "operation unavailable in this build"
-        );
-    }
+    let mut child = cli::OwnedChild::spawn(
+        Command::new(env!("CARGO_BIN_EXE_letopis"))
+            .arg("check")
+            .current_dir(fixture.repo.get_root())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    );
+    child.send_input(b"{}");
+    let output = child.collect_output(WAIT);
+    assert_eq!(output.status.code(), Some(1));
+    let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        response["error"]["message"],
+        "operation unavailable in this build"
+    );
     assert!(!fixture.repo.get_root().join(".letopis/embed.lock").exists());
     assert!(http.take_requests().is_empty());
 }

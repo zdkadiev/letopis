@@ -34,7 +34,8 @@ pub mod service;
 
 /// Parse and run one CLI request, emitting one complete JSON envelope.
 /// Returns 0 only for successfully written success output, otherwise 1.
-/// Check and inspect remain unavailable; drain uses the real embedding executor.
+/// Search and inspect refresh through their application services; check remains unavailable.
+/// Successful foreground operations may launch the existing detached embedding drain.
 pub fn run_cli(
     args: impl IntoIterator<Item = OsString>,
     input: &mut impl Read,
@@ -56,12 +57,24 @@ pub fn run_cli(
                 cause,
             )
         })?;
-        if !matches!(request, cli::Request::Drain) {
-            return cli::Handlers::new(None, None, None).execute(request);
+        if matches!(request, cli::Request::Check(_)) {
+            return cli::Handlers::new(None, None, None, None).execute(request);
         }
         let mut tasks = open_embedding_tasks(&root)?;
         let mut background = open_background(&root, &executable, Some(&mut tasks))?;
-        cli::Handlers::new(None, None, Some(&mut background)).execute(request)
+        match request {
+            cli::Request::Search(request) => {
+                let mut searches = open_searches(&root)?;
+                cli::Handlers::new(None, None, Some(&mut searches), Some(&mut background))
+                    .execute(cli::Request::Search(request))
+            }
+            cli::Request::Inspect(ids) => {
+                let mut inspections = open_inspections(&root)?;
+                cli::Handlers::new(None, Some(&mut inspections), None, Some(&mut background))
+                    .execute(cli::Request::Inspect(ids))
+            }
+            request => cli::Handlers::new(None, None, None, Some(&mut background)).execute(request),
+        }
     });
     cli::write_response(output, response)
 }
