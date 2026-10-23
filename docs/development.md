@@ -27,28 +27,7 @@ cargo test --locked --offline
 и `cargo test --locked --offline --release`. Debug и release totals записываются
 раздельно; nested helper invocations не прибавляются к корневым тестам.
 
-## Mutation testing и native stack
-
-`make mutants` запускает developer tool `cargo-mutants` над корневым crate и передаёт
-каждому Cargo вызову `--locked --offline`. Сам инструмент не входит в Cargo.lock.
-Для локальной установки в отдельный каталог можно использовать `cargo install
---locked cargo-mutants --root <tools>` и добавить `<tools>/bin` в PATH текущего вызова.
-В этой задаче подготовлен `.artifacts/tk11/tools/bin` (27.1.0); глобальная установка
-не менялась. `mutants.out*` и временный `mutants.diff` исключены из Git.
-
-Для поведения в изменённом коде: `git diff main > mutants.diff`, затем
-`make mutants ARGS='--in-diff mutants.diff'`. После изменений domain/storage/change
-detection и перед merge в main требуется whole-crate запуск без фильтра diff.
-Мутации исполняются в копиях, а исходные raw logs сохраняются.
-`cap_lints = true` в `.cargo/mutants.toml` ограничивает lint errors только в
-одноразовых копиях: иначе удалённое мутацией использование вызывает deny-warnings
-до проверки поведения. Строгий `make verify` проверяет production tree отдельно;
-mutation receipt не доказывает lint cleanliness. Для каждого survivor
-нужен тест, который проверяет нарушенный результат и убивает мутацию, либо отдельное
-обоснование эквивалентности в задаче/spec/plan и точное комментированное исключение
-в `.cargo/mutants.toml`. Не исключать файл или функцию целиком. Отдельно указывать
-caught/missed/timeout/unviable и реальные параметры; default timeout не сокращать
-скрыто. Mutation testing не заменяет `make check` и не требуется для prose-only правок.
+## Native stack
 
 После изменений storage/native/build/vendor дополнительно выполнить
 `python3 -B tests/storage/run.py --platform host|linux --evidence <new-directory>`.

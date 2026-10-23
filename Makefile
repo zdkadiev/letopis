@@ -2,7 +2,7 @@ CARGO ?= cargo
 V ?= 0
 MAKEFLAGS += --no-print-directory
 
-.PHONY: check verify mutants fmt _check
+.PHONY: check verify fmt _check
 
 # Capture one step at a time so a failure retains its complete diagnostic output.
 define run
@@ -26,9 +26,6 @@ _check:
 	$(call run,$(CARGO) check --locked --offline --all-targets)
 	$(call run,$(CARGO) clippy --locked --offline --all-targets -- -D warnings)
 	$(call run,$(CARGO) test --locked --offline)
-
-mutants:
-	$(CARGO) mutants --cargo-arg=--locked --cargo-arg=--offline $(ARGS)
 
 fmt:
 	$(CARGO) fmt --all

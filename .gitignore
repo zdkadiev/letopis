@@ -4,5 +4,3 @@
 .vscode/
 /.artifacts/
 skills-lock.json
-/mutants.out*
-/mutants.diff
