@@ -10,7 +10,7 @@ use crate::service::{
     DocumentErrorKind, DocumentResult, DocumentService, Documents, EmbedLocks, EmbeddingError,
     EmbeddingErrorKind, EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService,
     EmbeddingTasks, Embeddings, FileSystem, GitSnapshots, InspectionService, Inspections,
-    SnapshotError, Storage, StorageResult,
+    SearchDependencies, SearchService, Searches, SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use std::{
@@ -64,6 +64,29 @@ pub fn run_cli(
         cli::Handlers::new(None, None, Some(&mut background)).execute(request)
     });
     cli::write_response(output, response)
+}
+
+/// Open hybrid knowledge search with independently owned read and embedding connections.
+///
+/// # Errors
+/// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
+pub fn open_searches(start: &Path) -> CommandResult<impl Searches + use<>> {
+    let documents = open_documents(start).map_err(map_search_setup)?;
+    let git = GitCli::open(start).map_err(map_search_setup)?;
+    let filesystem = LocalFileSystem::open(git.get_root()).map_err(map_search_setup)?;
+    let directory = filesystem
+        .open_service_directory()
+        .map_err(map_search_setup)?;
+    let storage = SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory)
+        .map_err(map_search_setup)?;
+    let embeddings = open_embedding_tasks(start)?;
+    Ok(SearchService::new(SearchDependencies {
+        documents,
+        storage,
+        embeddings,
+        filesystem,
+        markdown: MarkdownParser::new(),
+    }))
 }
 
 /// Open canonical current-knowledge inspection for the repository containing `start`.
@@ -225,6 +248,14 @@ pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage 
 /// Reports an inaccessible or non-directory root, including a symlink root.
 pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLocks + use<>> {
     LocalFileSystem::open(root)
+}
+
+fn map_search_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot open search service",
+        error,
+    )
 }
 
 fn map_inspection_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {

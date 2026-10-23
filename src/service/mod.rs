@@ -75,6 +75,9 @@ pub use model::{
 mod storage;
 /// Scoped storage capabilities for cache, vector and pinned read operations.
 pub use storage::{CacheWrite, Storage, StorageRead, VectorWrite};
+mod search;
+/// Consistent search assembly used only by the composition root.
+pub(crate) use search::{SearchDependencies, SearchService};
 mod inspection;
 pub(crate) use inspection::InspectionService;
 
@@ -193,9 +196,10 @@ pub trait Markdown {
 
 mod command;
 
+/// Command requests, safe results and public error classifications.
 pub use command::{
     CheckReport, CommandError, CommandErrorKind, CommandProblem, CommandResult, ElementAddress,
-    InspectedElement, Inspection,
+    InspectedElement, Inspection, SearchFlag, SearchLink, SearchRequest,
 };
 
 /// Application-owned corpus validation capability.
@@ -205,6 +209,14 @@ pub trait Checks {
     /// # Errors
     /// Reports command, refresh or infrastructure failures.
     fn check(&mut self, paths: &[RepoPath]) -> CommandResult<CheckReport>;
+}
+/// Consistent metadata-only hybrid knowledge search.
+pub trait Searches {
+    /// Refresh and search one pinned revision, observing baseline live knowledge freshness.
+    ///
+    /// # Errors
+    /// Reports refresh, storage, integrity, or non-configuration filesystem failures.
+    fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>>;
 }
 /// Application-owned metadata inspection capability.
 pub trait Inspections {
