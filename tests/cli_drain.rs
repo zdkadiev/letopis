@@ -327,17 +327,19 @@ fn stale_live_text_is_skipped_before_any_product_http_or_reservation() {
 }
 
 #[test]
-fn unavailable_check_does_not_trigger_ready_embeddings() {
+fn nested_unavailable_check_does_not_trigger_ready_embeddings() {
     let fixture = Fixture::new();
     let http = HttpFixture::start(FixtureReply::Status {
         status: 200,
         body: SUCCESS.into(),
     });
     fixture.write_config(&http.get_base_url(), 0);
+    let nested = fixture.repo.get_root().join("nested");
+    fs::create_dir(&nested).unwrap();
     let mut child = cli::OwnedChild::spawn(
         Command::new(env!("CARGO_BIN_EXE_letopis"))
             .arg("check")
-            .current_dir(fixture.repo.get_root())
+            .current_dir(&nested)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
@@ -352,4 +354,5 @@ fn unavailable_check_does_not_trigger_ready_embeddings() {
     );
     assert!(!fixture.repo.get_root().join(".letopis/embed.lock").exists());
     assert!(http.take_requests().is_empty());
+    assert!(!nested.join(".letopis").exists());
 }

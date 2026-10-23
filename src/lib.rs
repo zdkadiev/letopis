@@ -60,6 +60,14 @@ pub fn run_cli(
         if matches!(request, cli::Request::Check(_)) {
             return cli::Handlers::new(None, None, None, None).execute(request);
         }
+        // Foreground services and background exclusion must share the discovered root.
+        let root = match &request {
+            cli::Request::Search(_) | cli::Request::Inspect(_) => GitCli::open(&root)
+                .map_err(map_embedding_setup)?
+                .get_root()
+                .to_path_buf(),
+            cli::Request::Check(_) | cli::Request::Drain => root,
+        };
         let mut tasks = open_embedding_tasks(&root)?;
         let mut background = open_background(&root, &executable, Some(&mut tasks))?;
         match request {

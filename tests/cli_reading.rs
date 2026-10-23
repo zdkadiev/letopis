@@ -13,8 +13,11 @@ mod drain;
 mod support;
 use letopis::{
     domain::{RepoPath, TreeOid},
-    open_documents, open_git_snapshots,
-    service::{Documents, GitSnapshots, NodeMetadata, Storage, StorageRead, VectorOutcome},
+    open_documents, open_embedding_tasks, open_filesystem, open_git_snapshots,
+    service::{
+        Documents, EmbedLocks, EmbeddingTasks, GitSnapshots, NodeMetadata, Storage, StorageRead,
+        VectorOutcome,
+    },
 };
 use serde_json::{Value, json};
 use std::{
@@ -237,6 +240,107 @@ fn lost_output_then_retry_preserves_corpus_user_state_and_revision() {
         assert_eq!(repo.open_storage().begin_read().unwrap().get_revision(), 1);
         assert_eq!(capture_user_state(&repo), before);
     }
+}
+
+#[test]
+fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path() {
+    let mut warnings = Vec::new();
+    for (command, input) in [
+        ("search", br#"{"query":"sqlite","limit":1}"#.as_slice()),
+        ("inspect", br#"{"element_ids":["knowledge.md"]}"#.as_slice()),
+    ] {
+        // Arrange: actual eligible work and an existing root drain lease.
+        let repo = ReadingRepo::new();
+        repo.write_knowledge("knowledge.md", "sqlite");
+        let http = HttpFixture::start(FixtureReply::Status {
+            status: 200,
+            body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
+        });
+        repo.write_config("ollama", &http.get_base_url(), "fixture");
+        open_documents(repo.get_root()).unwrap().refresh().unwrap();
+        assert!(
+            open_embedding_tasks(repo.get_root())
+                .unwrap()
+                .has_work()
+                .unwrap()
+        );
+        let files = open_filesystem(repo.get_root()).unwrap();
+        let _lease = files.try_lock_embed().unwrap().unwrap();
+        let child_service = repo.get_root().join("subdir/.letopis");
+        fs::write(&child_service, b"keep unsafe child service path").unwrap();
+        // Act: the nested cwd must not change the lock or service directory owner.
+        let mut child = spawn_nested_reading(&repo, command);
+        child.send_input(input);
+        let response = read_response(&child.collect_output(Duration::from_secs(10)), 0);
+        // Assert: root exclusion avoids both provider calls and launch warnings.
+        assert_eq!(response["ok"], true);
+        warnings.push((command, response.get("warnings").cloned()));
+        assert_eq!(
+            fs::read(&child_service).unwrap(),
+            b"keep unsafe child service path"
+        );
+        assert!(http.take_requests().is_empty());
+        assert!(
+            open_embedding_tasks(repo.get_root())
+                .unwrap()
+                .has_work()
+                .unwrap()
+        );
+    }
+    assert_eq!(warnings, [("search", None), ("inspect", None)]);
+}
+
+#[test]
+fn nested_search_and_inspect_launch_the_existing_drain_only_at_repository_root() {
+    let mut child_service_paths = Vec::new();
+    for (command, input) in [
+        ("search", br#"{"query":"sqlite","limit":1}"#.as_slice()),
+        ("inspect", br#"{"element_ids":["knowledge.md"]}"#.as_slice()),
+    ] {
+        let repo = ReadingRepo::new();
+        repo.write_knowledge("knowledge.md", "sqlite");
+        let barrier = ResponseBarrier::default();
+        let http = HttpFixture::start(FixtureReply::Barrier {
+            barrier: barrier.clone(),
+            body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
+        });
+        repo.write_config("ollama", &http.get_base_url(), "fixture");
+        let mut child = spawn_nested_reading(&repo, command);
+        let mut owner = drain::DetachedOwner::new(repo.get_root(), child.get_id());
+        child.send_input(input);
+        let response = read_response(&child.collect_output(Duration::from_secs(10)), 0);
+        // HTTP arrival establishes ownership before inspecting the root PID receipt.
+        barrier.wait_until_entered();
+        assert!(owner.read_pid() > 0);
+        barrier.release();
+        owner.wait_for_exit();
+        assert_eq!(response["ok"], true);
+        assert!(response.get("warnings").is_none(), "{response}");
+        child_service_paths.push((command, repo.get_root().join("subdir/.letopis").exists()));
+        assert_eq!(
+            http.take_requests(),
+            vec![json!({"model":"fixture","input":["sqlite"],"truncate":false})]
+        );
+        assert!(
+            !open_embedding_tasks(repo.get_root())
+                .unwrap()
+                .has_work()
+                .unwrap()
+        );
+    }
+    assert_eq!(child_service_paths, [("search", false), ("inspect", false)]);
+}
+
+fn spawn_nested_reading(repo: &ReadingRepo, command: &str) -> cli::OwnedChild {
+    let mut process = Command::new(env!("CARGO_BIN_EXE_letopis"));
+    isolate_command(&mut process);
+    process
+        .current_dir(repo.get_root().join("subdir"))
+        .arg(command)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    cli::OwnedChild::spawn(&mut process)
 }
 
 fn read_response(output: &Output, exit: i32) -> Value {
