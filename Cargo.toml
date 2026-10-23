@@ -21,6 +21,7 @@ pulldown-cmark = { version = "=0.13.4", default-features = false }
 # Keep compiler diagnostics strict for every root-crate target.
 [lints.rust]
 warnings = "deny"
+missing_debug_implementations = "warn"
 
 # Standard Clippy checks, with explicit bans on debug output and unfinished code.
 [lints.clippy]

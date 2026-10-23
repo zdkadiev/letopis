@@ -1,5 +1,17 @@
 //! Read-only knowledge graph foundations for Letopis.
 
+// Production code returns errors and documents exceptions with `#[expect]`.
+// Tests and integration-test helpers are exempt: `cfg(test)` is off for the lib build only.
+#![cfg_attr(
+    not(test),
+    warn(
+        clippy::allow_attributes,
+        clippy::allow_attributes_without_reason,
+        clippy::expect_used,
+        clippy::unwrap_used
+    )
+)]
+
 use crate::embedding::{HttpProviders, Ollama, Openai};
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;

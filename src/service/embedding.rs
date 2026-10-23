@@ -10,6 +10,7 @@ use std::{collections::BTreeSet, num::NonZeroUsize, time::Duration};
 const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 /// Coordinates ready configuration, durable document work and transient queries.
+#[derive(Debug)]
 pub struct EmbeddingService<S, F, M, P> {
     storage: S,
     files: F,

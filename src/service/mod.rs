@@ -9,6 +9,7 @@ pub use retained_tree::RetainedTree;
 pub use snapshot_error::{SnapshotError, SnapshotErrorKind};
 
 /// One captured regular file. The adapter never reads its live path.
+#[derive(Debug)]
 pub struct SnapshotFile<'a> {
     /// Root-relative path in the resulting tree.
     pub path: &'a RepoPath,

@@ -182,7 +182,10 @@ fn read_component(value: &Value) -> EmbeddingResult<f32> {
         .filter(|number| number.is_finite() && number.abs() <= f64::from(f32::MAX))
         .ok_or_else(reject_response)?;
     // Conversion is deliberately rounded to float32 after checking its finite range.
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "range was checked and float32 rounding is intended"
+    )]
     let component = number as f32;
     Ok(component)
 }

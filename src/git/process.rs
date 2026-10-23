@@ -120,6 +120,10 @@ impl GitProcess {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "build_command pipes stdin, stdout and stderr before spawning"
+)]
 fn exchange_pipes(child: &mut Child, input: Option<&[u8]>) -> Result<Vec<u8>, SnapshotError> {
     let mut stdin = child.stdin.take().expect("piped stdin");
     let mut stdout = child.stdout.take().expect("piped stdout");
