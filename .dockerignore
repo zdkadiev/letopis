@@ -48,3 +48,7 @@
 !tests/embedding_provider.rs
 !tests/embedding_service.rs
 !tests/embedding_files.rs
+
+!skills/
+!skills/letopis/
+!skills/letopis/SKILL.md

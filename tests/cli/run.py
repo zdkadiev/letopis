@@ -28,7 +28,7 @@ def hash_file(path):
 
 def hash_inputs(root):
     paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs', 'Makefile',
-             'rust-toolchain.toml', 'clippy.toml', '.dockerignore', SCHEMA)]
+             'rust-toolchain.toml', 'clippy.toml', '.dockerignore', 'skills/letopis/SKILL.md', SCHEMA)]
     for name in ('src', 'vendor', 'examples', 'scripts', 'tests/support', 'tests/cli', 'tests/fixtures/markdown'):
         paths.extend(p for p in (root / name).rglob('*') if p.is_file()
                      and '__pycache__' not in p.parts)

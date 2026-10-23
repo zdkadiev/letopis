@@ -13,6 +13,7 @@ COPY tests/*.rs ./tests/
 COPY tests/support ./tests/support
 COPY tests/fixtures/markdown ./tests/fixtures/markdown
 COPY tests/cli ./tests/cli
+COPY skills/letopis/SKILL.md ./skills/letopis/SKILL.md
 COPY docs/zkit/letopis/contracts/schemas/X-1-cli.yaml ./docs/zkit/letopis/contracts/schemas/
 ARG SOURCE_COMMIT=unknown
 RUN echo "$SOURCE_COMMIT" > SOURCE_COMMIT && cargo fetch --locked

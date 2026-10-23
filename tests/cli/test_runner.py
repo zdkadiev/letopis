@@ -258,7 +258,7 @@ class RunnerTests(unittest.TestCase):
                      'tests/cli/Dockerfile', '.dockerignore', run.SCHEMA,
                      'tests/cli_drain.rs', 'tests/support/drain.rs',
                      'tests/document_refresh.rs', 'tests/embedding_service.rs',
-                     'tests/thin_slice.rs', 'tests/support/thin_slice.rs',
+                     'tests/thin_slice.rs', 'tests/support/thin_slice.rs', 'skills/letopis/SKILL.md',
                      'tests/fixtures/markdown/thin_slice/cache.rs', 'tests/fixtures/markdown/thin_slice/cache.md.in',
                      'tests/fixtures/markdown/thin_slice/flow.md.in']:
             self.assertIn(name, inputs)

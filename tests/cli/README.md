@@ -138,3 +138,18 @@ wrong error classifications. The tests additionally observe source metadata and
 persisted vectors through read-only APIs, never by seeding the projection.
 Crash/rollback coverage comes separately from the current private document-service
 process driver; this is not an actual-CLI crash checkpoint or a power-loss test.
+
+TK-14's initial portable agent reference is [skills/letopis/SKILL.md](../../skills/letopis/SKILL.md).
+It is supplied explicitly for the fresh-session smoke; installation/automatic
+discovery in every agent runtime is not claimed. Baseline without the skill and
+separate writer/reader sessions are retained alongside the acceptance evidence.
+
+```sh
+.artifacts/tk14/python-env/bin/python -B -m unittest discover -s tests/cli -p test_runner.py
+.artifacts/tk14/python-env/bin/python -B tests/cli/run.py --platform host --evidence .artifacts/tk14/host-NEW
+.artifacts/tk14/python-env/bin/python -B tests/cli/run.py --platform linux --evidence .artifacts/tk14/linux-NEW
+```
+
+Prepare Python 3.11+ and `jsonschema==4.26.0` before running these checks. Use
+new evidence directories. The runner includes `make verify`; do not repeat it
+on an unchanged accepted tree just to obtain a second identical log.
