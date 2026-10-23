@@ -76,3 +76,56 @@ Fixture paths come from Cargo JSON artifacts, including when `CARGO_BUILD_TARGET
 selects a target-specific output directory.
 No claim is made about historical proof harnesses, real providers, handled SIGINT,
 Windows/NFS, power loss, or untested architectures.
+
+## TK-14: load the small source-linked corpus
+
+The fixed corpus has three knowledge elements, two normalized source addresses
+(whole file and line 2), and five edges. It is loaded by real CLI change detection;
+no SQL seed, library refresher or precomputed vectors are used. Templates become
+Markdown only in the disposable repository. The source tree is committed first;
+`inspect` later returns a different tree containing knowledge files.
+
+From this project root, build `cargo build --locked --offline --bin letopis`,
+then run this example. Keep the temporary repository path printed in the output.
+
+```sh
+python3 - "$PWD" "$(mktemp -d)" "$PWD/target/debug/letopis" <<'PY'
+import json, os, shutil, subprocess, sys
+from pathlib import Path
+project, repo, binary = map(Path, sys.argv[1:])
+fixture = project / 'tests/fixtures/markdown/thin_slice'
+env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+env.update(GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL='/dev/null')
+def git(*args):
+    return subprocess.check_output(['git', '-C', str(repo), *args], env=env).decode().strip()
+git('init', '-q')
+git('config', 'user.name', 'Fixture')
+git('config', 'user.email', 'fixture@example.invalid')
+(repo / 'src').mkdir()
+shutil.copyfile(fixture / 'cache.rs', repo / 'src/cache.rs')
+(repo / '.gitignore').write_text('.letopis/\n')
+git('add', '.gitignore', 'src/cache.rs')
+git('commit', '-qm', 'source basis')
+tree = git('rev-parse', 'HEAD^{tree}')
+(repo / 'knowledge').mkdir()
+for stem in ('cache', 'flow'):
+    text = (fixture / (stem + '.md.in')).read_text().replace('__SOURCE_TREE__', tree)
+    (repo / 'knowledge' / (stem + '.md')).write_text(text)
+response = subprocess.check_output([str(binary.resolve()), 'search'], cwd=repo, env=env,
+    input=b'{"query":"CacheScope","limit":10}')
+print(json.dumps({'repository': str(repo), 'source_tree': tree,
+                  'search': json.loads(response)}))
+PY
+```
+
+From the printed repository, pass `{"element_ids":["knowledge/cache.md",
+"knowledge/flow.md#reuse"]}` to the same binary's `inspect` stdin. Read its
+returned snapshot with `git show <snapshot>:knowledge/cache.md`; the source
+basis is read separately with `git show <source_tree>:src/cache.rs`.
+No model configuration is required for this FTS route. With a supported config,
+the existing `embed --drain` computes missing vectors through the real provider.
+TK-14 automatic tests use a controlled loopback Ollama HTTP fixture.
+
+TK-15 should replace the fixed input set with its seeded target-scale corpus and
+use this same foreground CLI loading route. This example does not establish
+100k-item loading speed, RAM use or a real model's quality.

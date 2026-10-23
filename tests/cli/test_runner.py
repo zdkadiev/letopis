@@ -205,7 +205,10 @@ class RunnerTests(unittest.TestCase):
         for name in ['tests/support/cli.rs', 'src/main.rs', 'tests/cli/run.py',
                      'tests/cli/Dockerfile', '.dockerignore', run.SCHEMA,
                      'tests/cli_drain.rs', 'tests/support/drain.rs',
-                     'tests/document_refresh.rs', 'tests/embedding_service.rs']:
+                     'tests/document_refresh.rs', 'tests/embedding_service.rs',
+                     'tests/thin_slice.rs', 'tests/support/thin_slice.rs',
+                     'tests/fixtures/markdown/thin_slice/cache.rs', 'tests/fixtures/markdown/thin_slice/cache.md.in',
+                     'tests/fixtures/markdown/thin_slice/flow.md.in']:
             self.assertIn(name, inputs)
         self.assertFalse(any('__pycache__' in name for name in inputs))
 

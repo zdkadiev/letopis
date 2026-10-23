@@ -1,6 +1,6 @@
 # TK-14 End-to-End CLI and Agent Skill Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Проверить реальный путь «решение со ссылкой на код → Markdown → CLI → graph/FTS → inspect snapshot → current vector», передать TK-15 минимальный воспроизводимый loader и начальный навык агента.
 
@@ -10,7 +10,7 @@
 
 **Spec:** [Утверждённая спецификация](../specs/2026-10-24-tk-14-thin-slice-design.md), approved пользователем «Go» 2026-10-24.
 
-**State:** Author-reviewed plan; выполнение ожидает review пользователя и выбора метода. Worktree `/Users/zdkadiev/.codex/worktrees/tk-14/letopis`, branch `codex/TK-14`, production base `ae7d2eb`.
+**State:** Утверждён пользователем «Хорошо.» 2026-10-24; выполняется Native. Worktree `/Users/zdkadiev/.codex/worktrees/tk-14/letopis`, branch `codex/TK-14`, production base `ae7d2eb`.
 
 ## Global Constraints
 
@@ -36,9 +36,9 @@
 
 | Файл | Ответственность / владелец |
 |---|---|
-| `tests/fixtures/thin_slice/cache.rs`, `cache.md.in`, `flow.md.in` (новые) | Только фиксированные source/Markdown inputs; Task 1 |
+| `tests/fixtures/markdown/thin_slice/cache.rs`, `cache.md.in`, `flow.md.in` (новые) | Только фиксированные source/Markdown inputs; Task 1 |
 | `tests/support/thin_slice.rs` (новый) | Частный helper загрузки и чтения metadata; Tasks 1–2 |
-| `tests/support/mod.rs` (изменение) | Объявить test-only helper; Task 1 |
+| `tests/thin_slice.rs` local path module | Объявить helper только для этого test target; Task 1 |
 | `tests/thin_slice.rs` (новый) | CLI loading/inspect/source/vector и failure/race scenarios; Tasks 1–2, helpers после тестов |
 | `tests/cli/run.py`, `test_runner.py`, `Dockerfile`, `.dockerignore` (изменения) | Hash inventory, Linux copy, schema-validated actual product receipts; Tasks 1–2 |
 | `tests/cli/README.md` (изменение) | Воспроизведение TK-14 и передача loader в TK-15; Task 1, итог Task 3 |
@@ -63,7 +63,7 @@
 - `read_projection(&self) -> ProjectionSnapshot`; snapshot содержит `revision: u64`, `knowledge: BTreeMap<String, KnowledgeMetadata>`, `sources: BTreeMap<String, SourceMetadata>`, `edges: BTreeSet<(String,String,String)>`; handles отпускаются до следующего CLI/HTTP.
 - `emit_slice(case: &str, command: &str, exit: i32, response: &Value)` печатает одну строку `THIN_SLICE_RESPONSE <json>` только после assertions; Task 2 runner читает этот формат.
 
-- [ ] **Step 1: Зафиксировать входы и независимые ожидания.**
+- [x] **Step 1: Зафиксировать входы и независимые ожидания.**
 
 `cache.rs` содержит ровно LF bytes:
 ```rust
@@ -90,16 +90,16 @@ assert_eq!(state.knowledge["knowledge/cache.md"].search_hash.to_hex(),
     "b3209c440805716a35f247dbecf963207fd2e7b102964a72bd6198251be5951d");
 ```
 
-- [ ] **Step 2: Добавить тесты `binary_load_projects_sources_and_is_idempotent` и `binary_inspect_retains_knowledge_bytes_separately_from_source_basis`.** Первый вызывает load без config, проверяет полный набор ID/edges и literals выше; повторный load сохраняет revision и проекции. Второй делает inspect `knowledge/cache.md` + `knowledge/flow.md#reuse`, проверяет корректные строки/хеши и `git show <snapshot>:<path>`, затем меняет live Markdown и ещё раз читает старый snapshot. Source basis равен fixture source tree и содержит `src/cache.rs`; tree из knowledge inspect не считается source basis. Capture user HEAD/index/config и corpus bytes до операций, сравнить после, исключая разрешённые `refs/letopis/snapshots/*`.
-- [ ] **Step 3: Реализовать только test helpers и inputs; выполнить тесты.**
+- [x] **Step 2: Добавить тесты `binary_load_projects_sources_and_is_idempotent` и `binary_inspect_retains_knowledge_bytes_separately_from_source_basis`.** Первый вызывает load без config, проверяет полный набор ID/edges и literals выше; повторный load сохраняет revision и проекции. Второй делает inspect `knowledge/cache.md` + `knowledge/flow.md#reuse`, проверяет корректные строки/хеши и `git show <snapshot>:<path>`, затем меняет live Markdown и ещё раз читает старый snapshot. Source basis равен fixture source tree и содержит `src/cache.rs`; tree из knowledge inspect не считается source basis. Capture user HEAD/index/config и corpus bytes до операций, сравнить после, исключая разрешённые `refs/letopis/snapshots/*`.
+- [x] **Step 3: Реализовать только test helpers и inputs; выполнить тесты.**
 
 Run: `cargo test --locked --offline --test thin_slice binary_ -- --nocapture --test-threads=1`.
 Expected: 2 scenario tests PASS. На существующем исправном продукте первый запуск может сразу пройти: честно отметить characterization GREEN. Ошибка отсутствующего helper/компиляции не считается behavioral RED. Если обнаружен production defect, сначала сохранить воспроизводимый runtime failure, затем отдельный минимальный fix под TDD; согласованный контракт не менять.
 
-- [ ] **Step 4: Проверить чувствительность новых assertions.** В disposable copy изменить `SourceMetadata { ... created_at, ... }` в `src/service/projection.rs` на `created_at: created_at.saturating_add(1)`; тест source counts/metadata обязан скомпилироваться и упасть по timestamp. Для snapshot test независимо заставить записываемый blob содержать изменённые bytes, сохранив metadata исходного capture: observable comparison с Git bytes обязан упасть. Восстановить точные bytes, повторить те же тесты до GREEN. Не коммитить controls и не запускать cargo-mutants.
-- [ ] **Step 5: Передать loader пользователю TK-15.** В `tests/cli/README.md` добавить воспроизводимую последовательность: новый disposable Git repo → source commit/tree → materialize templates → вызов бинаря search/inspect. Команды только с argv/quoted paths; loader не пишет SQL и не требует модели. Объяснить, как будущий TK-15 генератор заменит только набор входных файлов. Через такой же production refresh допускается масштабная загрузка; её скорость здесь не обещается.
-- [ ] **Step 6: Включить новые inputs в runner inventory и Linux context.** `hash_inputs` в `tests/cli/run.py` добавляет `tests/fixtures/thin_slice`; Dockerfile копирует этот каталог, `.dockerignore` разрешает его. `test_inventory_covers_support_schema_and_ignores_bytecode` проверяет все три fixture-файла и test/helper. `cargo test --test thin_slice` в Linux должен видеть те же bytes. Публикация skill будет отдельно включена в inventory/copy Task 3.
-- [ ] **Step 7: Проверить focused suite и commit только paths Task 1.**
+- [x] **Step 4: Проверить чувствительность новых assertions.** В disposable copy изменить `SourceMetadata { ... created_at, ... }` в `src/service/projection.rs` на `created_at: created_at.saturating_add(1)`; тест source counts/metadata обязан скомпилироваться и упасть по timestamp. Для snapshot test независимо заставить записываемый blob содержать изменённые bytes, сохранив metadata исходного capture: observable comparison с Git bytes обязан упасть. Восстановить точные bytes, повторить те же тесты до GREEN. Не коммитить controls и не запускать cargo-mutants.
+- [x] **Step 5: Передать loader пользователю TK-15.** В `tests/cli/README.md` добавить воспроизводимую последовательность: новый disposable Git repo → source commit/tree → materialize templates → вызов бинаря search/inspect. Команды только с argv/quoted paths; loader не пишет SQL и не требует модели. Объяснить, как будущий TK-15 генератор заменит только набор входных файлов. Через такой же production refresh допускается масштабная загрузка; её скорость здесь не обещается.
+- [x] **Step 6: Включить новые inputs в runner inventory и Linux context.** Существующие recursive inventory и Docker COPY `tests/fixtures/markdown` уже включают подкаталог `thin_slice`; менять эти правила не требуется. `test_inventory_covers_support_schema_and_ignores_bytecode` проверяет все три fixture-файла и test/helper. `cargo test --test thin_slice` в Linux должен видеть те же bytes. Публикация skill будет отдельно включена в inventory/copy Task 3.
+- [x] **Step 7: Проверить focused suite и commit только paths Task 1.**
 
 Run: `cargo test --locked --offline --test thin_slice -- --test-threads=1` и `python3 -B -m unittest discover -s tests/cli -p test_runner.py` в подготовленном Python env.
 Expected: PASS. Commit: `test: add reproducible CLI thin-slice loading and source projection`.
@@ -167,4 +167,4 @@ Runner включает `make verify V=1` (fmt/all-target check/Clippy/root debu
 - План не заявляет будущие commands/полный source lifecycle/RAM/real-model quality. Межзадачные dependencies линейны, общие helper/test/runner files пересекаются.
 - Рекомендация автора для этого плана: **Native**, затем один независимый итоговый review. Это уменьшает повторную передачу контекста для трёх тесно связанных задач; выбор остаётся пользователю.
 
-Пользователь утвердил спецификацию, но ещё не review этого плана и не execution method TK-14. Реализация не начата. Merge/push/issue closure не входят в текущее утверждение плана и выполняются по пользовательской команде после приёмки.
+Пользователь утвердил спецификацию и этот план; Native выбран ответом «Хорошо.» на предложение плана и этого метода. Реализация выполняется. Merge/push/issue closure не входят в текущее утверждение плана и выполняются по пользовательской команде после приёмки.
