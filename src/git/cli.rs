@@ -8,6 +8,7 @@ use crate::{
         CorpusFiles, DocumentError, DocumentErrorKind, DocumentResult, GitSnapshots, RetainedTree,
         SnapshotEntry, SnapshotError, SnapshotErrorKind, SnapshotFile,
     },
+    utils::SERVICE_DIRECTORY,
 };
 use std::{
     collections::BTreeSet,
@@ -188,7 +189,7 @@ fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
         }
         if entry
             .split(|byte| *byte == b'/')
-            .any(|part| part == b".git" || part == b".letopis")
+            .any(|part| part == b".git" || part == SERVICE_DIRECTORY.as_bytes())
         {
             continue;
         }

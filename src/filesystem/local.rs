@@ -8,6 +8,7 @@ use crate::{
         CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, EmbedLocks, EmbeddingFiles,
         EmbeddingResult, FileStat, FileSystem,
     },
+    utils::SERVICE_DIRECTORY,
 };
 use rustix::{
     fd::{AsFd, OwnedFd},
@@ -25,7 +26,6 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-const SERVICE_DIRECTORY: &str = ".letopis";
 const INDEX_LOCK: &str = "index.lock";
 const EMBED_LOCK: &str = "embed.lock";
 const NANOS_PER_SECOND: i64 = 1_000_000_000;

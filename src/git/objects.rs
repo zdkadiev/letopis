@@ -8,6 +8,7 @@ use super::{
 use crate::{
     domain::{BlobOid, RepoPath, TreeOid},
     service::{SnapshotEntry, SnapshotError, SnapshotErrorKind, SnapshotFile},
+    utils::SERVICE_DIRECTORY,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -260,7 +261,7 @@ fn validate_paths(paths: &[&RepoPath]) -> Result<(), SnapshotError> {
         let path = path.as_str();
         let mut parts = path.split('/');
         if parts.clone().any(|part| part.eq_ignore_ascii_case(".git"))
-            || parts.next() == Some(".letopis")
+            || parts.next() == Some(SERVICE_DIRECTORY)
             || !unique.insert(path)
         {
             return Err(SnapshotError::new(

@@ -5,6 +5,9 @@ use serde::{
 use serde_json::{Map, Value, value::RawValue};
 use std::fmt;
 
+/// Directory under the repository root that holds Letopis state; Git, filesystem and storage all agree on it.
+pub(crate) const SERVICE_DIRECTORY: &str = ".letopis";
+
 // Preserve serde_json's default nesting budget across borrowed-token parsers.
 const MAX_JSON_DEPTH: usize = 128;
 

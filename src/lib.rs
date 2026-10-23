@@ -25,11 +25,12 @@ use crate::service::{
     SearchDependencies, SearchService, Searches, SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
+use crate::utils::SERVICE_DIRECTORY;
 use std::{
     env,
     ffi::OsString,
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 mod cli;
@@ -54,48 +55,7 @@ pub fn run_cli(
     output: &mut impl Write,
 ) -> u8 {
     let args = args.into_iter().collect::<Vec<_>>();
-    let response = cli::parse_request(&args, input).and_then(|request| {
-        let root = env::current_dir().map_err(|cause| {
-            CommandError::new_with_cause(
-                CommandErrorKind::InternalError,
-                "cannot locate command directory",
-                cause,
-            )
-        })?;
-        let executable = env::current_exe().map_err(|cause| {
-            CommandError::new_with_cause(
-                CommandErrorKind::InternalError,
-                "cannot locate command executable",
-                cause,
-            )
-        })?;
-        if matches!(request, cli::Request::Check(_)) {
-            return cli::Handlers::new(None, None, None, None).execute(request);
-        }
-        // Foreground services and background exclusion must share the discovered root.
-        let root = match &request {
-            cli::Request::Search(_) | cli::Request::Inspect(_) => GitCli::open(&root)
-                .map_err(map_embedding_setup)?
-                .get_root()
-                .to_path_buf(),
-            cli::Request::Check(_) | cli::Request::Drain => root,
-        };
-        let mut tasks = open_embedding_tasks(&root)?;
-        let mut background = open_background(&root, &executable, Some(&mut tasks))?;
-        match request {
-            cli::Request::Search(request) => {
-                let mut searches = open_searches(&root)?;
-                cli::Handlers::new(None, None, Some(&mut searches), Some(&mut background))
-                    .execute(cli::Request::Search(request))
-            }
-            cli::Request::Inspect(ids) => {
-                let mut inspections = open_inspections(&root)?;
-                cli::Handlers::new(None, Some(&mut inspections), None, Some(&mut background))
-                    .execute(cli::Request::Inspect(ids))
-            }
-            request => cli::Handlers::new(None, None, None, Some(&mut background)).execute(request),
-        }
-    });
+    let response = cli::parse_request(&args, input).and_then(run_request);
     cli::write_response(output, response)
 }
 
@@ -110,7 +70,7 @@ pub fn open_searches(start: &Path) -> CommandResult<impl Searches + use<>> {
     let directory = filesystem
         .open_service_directory()
         .map_err(map_search_setup)?;
-    let storage = SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory)
+    let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
         .map_err(map_search_setup)?;
     let embeddings = open_embedding_tasks(start)?;
     Ok(SearchService::new(SearchDependencies {
@@ -152,7 +112,7 @@ pub fn open_documents(start: &Path) -> DocumentResult<impl Documents + use<>> {
     })?;
     let filesystem = LocalFileSystem::open(git.get_root())?;
     let directory = filesystem.open_service_directory()?;
-    let storage = SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory)
+    let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
         .map_err(|cause| {
             DocumentError::new_with_cause(
                 DocumentErrorKind::InternalError,
@@ -182,7 +142,7 @@ pub fn open_embedding_tasks(
     let directory = files
         .open_service_directory()
         .map_err(map_embedding_setup)?;
-    let storage = SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory)
+    let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
         .map_err(map_embedding_setup)?;
     Ok(EmbeddingService::new(
         storage,
@@ -250,7 +210,7 @@ pub fn open_embedding_files(root: &Path) -> EmbeddingResult<impl EmbeddingFiles 
 /// # Errors
 /// Reserved for failures constructing the provider boundary.
 pub fn open_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + use<>> {
-    let key = std::env::var("OPENAI_API_KEY").ok();
+    let key = env::var("OPENAI_API_KEY").ok();
     Ok(HttpProviders::new(Ollama::new(), Openai::new(key)))
 }
 
@@ -281,6 +241,74 @@ pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage 
 /// Reports an inaccessible or non-directory root, including a symlink root.
 pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLocks + use<>> {
     LocalFileSystem::open(root)
+}
+
+fn run_request(request: cli::Request) -> CommandResult<cli::CommandResponse> {
+    let (directory, executable) = locate_environment()?;
+    match request {
+        cli::Request::Check(_) => cli::Handlers::new(None, None, None, None).execute(request),
+        cli::Request::Drain => run_drain(request, &directory, &executable),
+        cli::Request::Search(_) => run_search(request, &directory, &executable),
+        cli::Request::Inspect(_) => run_inspect(request, &directory, &executable),
+    }
+}
+
+fn locate_environment() -> CommandResult<(PathBuf, PathBuf)> {
+    let directory = env::current_dir().map_err(|cause| {
+        CommandError::new_with_cause(
+            CommandErrorKind::InternalError,
+            "cannot locate command directory",
+            cause,
+        )
+    })?;
+    let executable = env::current_exe().map_err(|cause| {
+        CommandError::new_with_cause(
+            CommandErrorKind::InternalError,
+            "cannot locate command executable",
+            cause,
+        )
+    })?;
+    Ok((directory, executable))
+}
+
+fn run_drain(
+    request: cli::Request,
+    root: &Path,
+    executable: &Path,
+) -> CommandResult<cli::CommandResponse> {
+    let mut tasks = open_embedding_tasks(root)?;
+    let mut background = open_background(root, executable, Some(&mut tasks))?;
+    cli::Handlers::new(None, None, None, Some(&mut background)).execute(request)
+}
+
+fn run_search(
+    request: cli::Request,
+    directory: &Path,
+    executable: &Path,
+) -> CommandResult<cli::CommandResponse> {
+    let root = open_repository_root(directory)?;
+    let mut tasks = open_embedding_tasks(&root)?;
+    let mut background = open_background(&root, executable, Some(&mut tasks))?;
+    let mut searches = open_searches(&root)?;
+    cli::Handlers::new(None, None, Some(&mut searches), Some(&mut background)).execute(request)
+}
+
+fn run_inspect(
+    request: cli::Request,
+    directory: &Path,
+    executable: &Path,
+) -> CommandResult<cli::CommandResponse> {
+    let root = open_repository_root(directory)?;
+    let mut tasks = open_embedding_tasks(&root)?;
+    let mut background = open_background(&root, executable, Some(&mut tasks))?;
+    let mut inspections = open_inspections(&root)?;
+    cli::Handlers::new(None, Some(&mut inspections), None, Some(&mut background)).execute(request)
+}
+
+/// Foreground services and background exclusion must share the discovered repository root.
+fn open_repository_root(directory: &Path) -> CommandResult<PathBuf> {
+    let git = GitCli::open(directory).map_err(map_embedding_setup)?;
+    Ok(git.get_root().to_path_buf())
 }
 
 fn map_search_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
