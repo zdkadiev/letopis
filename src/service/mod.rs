@@ -264,7 +264,7 @@ pub trait Background {
 
 mod embedding;
 pub use embedding::EmbeddingService;
-pub use model::{ConfigState, DrainOutcome, QueryEmbedding};
+pub use model::{ConfigState, DrainOutcome, QueryEmbedding, QueryEmbeddingRequest};
 
 /// Synchronous embedding application operations.
 pub trait Embeddings {
@@ -283,4 +283,16 @@ pub trait Embeddings {
     /// # Errors
     /// Reports storage or clock failures; ordinary provider errors are unavailable.
     fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding>;
+    /// Compute one transient query using immutable captured inputs without rereading or resetting configuration.
+    ///
+    /// Rejects a changed committed identity and incompatible captured or current dimensions.
+    /// No write unit or embedding lock spans inference; document attempts are untouched.
+    /// Only the captured identity's guarded safe diagnostic may be persisted or cleared.
+    ///
+    /// # Errors
+    /// Reports storage or clock failures; invalid provider policy and provider failures are unavailable.
+    fn embed_query_with_config(
+        &mut self,
+        request: QueryEmbeddingRequest<'_>,
+    ) -> EmbeddingResult<QueryEmbedding>;
 }

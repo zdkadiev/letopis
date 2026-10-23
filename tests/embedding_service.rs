@@ -6,11 +6,12 @@ use letopis::{
     service::{
         CacheWrite, ConfigState, DrainOutcome, EmbeddingConfig, EmbeddingErrorKind,
         EmbeddingFailure, EmbeddingFiles, Embeddings, FileRow, KnowledgeMetadata, NodeMetadata,
-        QueryEmbedding, QueryError, Storage, StorageRead, VectorOutcome, VectorWrite,
+        QueryEmbedding, QueryEmbeddingRequest, QueryError, Storage, StorageRead, VectorOutcome,
+        VectorWrite,
     },
 };
 use rusqlite::{Connection, types::Value};
-use std::{fs, thread};
+use std::{fs, num::NonZeroUsize, thread};
 use support::embedding::{FixtureReply, HttpFixture, ResponseBarrier};
 use tempfile::TempDir;
 
@@ -703,4 +704,174 @@ fn valid_shape_with_invalid_endpoint_does_not_reset_or_compute() {
     assert!(fixture.read_vector(&prior, &hash).is_some());
     assert!(server.take_requests().is_empty());
     assert_eq!(fixture.capture_corpus(), before);
+}
+
+#[test]
+fn captured_query_checks_identity_before_http_and_before_diagnostic_commit() {
+    // Missing identity and replacement before invocation both forbid HTTP.
+    for replacement in [false, true] {
+        let fixture = Fixture::new();
+        let server = start_success();
+        let captured = fixture.write_config(&server.get_base_url(), 0);
+        if replacement {
+            let next = fixture.write_config(&server.get_base_url(), 1);
+            seed_query_error(&fixture, &next);
+        }
+        let error = fixture.read_query_error();
+        let result = fixture
+            .open_service()
+            .embed_query_with_config(QueryEmbeddingRequest {
+                text: "query",
+                config: &captured,
+                dimensions: None,
+            })
+            .unwrap();
+        assert_eq!(result, QueryEmbedding::Unavailable);
+        assert!(server.take_requests().is_empty());
+        assert_eq!(fixture.read_query_error(), error);
+    }
+}
+
+#[test]
+fn captured_query_preserves_replacement_diagnostics_after_http() {
+    // Replacement during success or failure must retain its own diagnostic.
+    for body in [
+        r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#,
+        "malformed",
+    ] {
+        let fixture = Fixture::new();
+        let (server, barrier) = start_paused(body);
+        let captured = fixture.write_config(&server.get_base_url(), 0);
+        fixture.open_service().read_configuration().unwrap();
+        let mut service = fixture.open_service();
+        let worker = Operation::spawn(barrier.clone(), move || {
+            service
+                .embed_query_with_config(QueryEmbeddingRequest {
+                    text: "query",
+                    config: &captured,
+                    dimensions: None,
+                })
+                .unwrap()
+        });
+        barrier.wait_until_entered();
+        let next = fixture.write_config(&server.get_base_url(), 1);
+        seed_query_error(&fixture, &next);
+        let error = fixture.read_query_error();
+        barrier.release();
+        assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
+        assert_eq!(server.take_requests().len(), 1);
+        assert_eq!(fixture.read_query_error(), error);
+    }
+}
+
+#[test]
+fn captured_query_validates_pinned_and_newly_established_dimensions() {
+    // Pinned size must be checked before a document establishes the index size.
+    let fixture = Fixture::new();
+    let server = HttpFixture::start(FixtureReply::Status {
+        status: 200,
+        body: r#"{"model":"fixture-alias","embeddings":[[1,2]]}"#.into(),
+    });
+    let captured = fixture.write_config(&server.get_base_url(), 0);
+    fixture.open_service().read_configuration().unwrap();
+    let result = fixture
+        .open_service()
+        .embed_query_with_config(QueryEmbeddingRequest {
+            text: "query",
+            config: &captured,
+            dimensions: NonZeroUsize::new(3),
+        })
+        .unwrap();
+    assert_eq!(result, QueryEmbedding::Unavailable);
+    assert_eq!(server.take_requests().len(), 1);
+    assert_eq!(
+        fixture.read_query_error().unwrap().error,
+        "invalid embedding response"
+    );
+}
+
+#[test]
+fn captured_query_rejects_dimensions_established_during_http() {
+    // First document vector can establish another size while inference is paused.
+    let fixture = Fixture::new();
+    let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
+    let captured = fixture.write_config(&server.get_base_url(), 0);
+    let hash = fixture.publish("a.md", "knowledge");
+    fixture.open_service().read_configuration().unwrap();
+    let config = captured.clone();
+    let mut service = fixture.open_service();
+    let worker = Operation::spawn(barrier.clone(), move || {
+        service
+            .embed_query_with_config(QueryEmbeddingRequest {
+                text: "query",
+                config: &captured,
+                dimensions: None,
+            })
+            .unwrap()
+    });
+    barrier.wait_until_entered();
+    let mut storage = fixture.open_storage();
+    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
+    unit.commit().unwrap();
+    barrier.release();
+    assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
+    assert_eq!(server.take_requests().len(), 1);
+    assert_eq!(
+        fixture.read_vector(&config, &hash),
+        Some(vec![1., 2., 3., 4.])
+    );
+    assert_eq!(
+        fixture.read_query_error().unwrap().error,
+        "invalid embedding response"
+    );
+}
+
+#[test]
+fn captured_query_diagnostic_write_failure_remains_an_error() {
+    for succeeds in [false, true] {
+        let fixture = Fixture::new();
+        let server = if succeeds {
+            start_success()
+        } else {
+            start_failure()
+        };
+        let config = fixture.write_config(&server.get_base_url(), 0);
+        seed_query_error(&fixture, &config);
+        let mut service = fixture.open_service();
+        let db = Connection::open(fixture.root.path().join("vectors")).unwrap();
+        db.execute_batch(
+            "CREATE TRIGGER reject_query_insert BEFORE INSERT ON query_error
+             BEGIN SELECT RAISE(ABORT, 'private diagnostic'); END;
+             CREATE TRIGGER reject_query_delete BEFORE DELETE ON query_error
+             BEGIN SELECT RAISE(ABORT, 'private diagnostic'); END;",
+        )
+        .unwrap();
+        // Act
+        let error = service
+            .embed_query_with_config(QueryEmbeddingRequest {
+                text: "query",
+                config: &config,
+                dimensions: None,
+            })
+            .unwrap_err();
+        db.execute_batch("DROP TRIGGER reject_query_insert; DROP TRIGGER reject_query_delete;")
+            .unwrap();
+        // Assert
+        assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
+        assert!(!format!("{error:?}").contains("private"));
+        assert_eq!(
+            fixture.read_query_error().unwrap().error,
+            "replacement diagnostic"
+        );
+        assert_eq!(server.take_requests().len(), 1);
+    }
+}
+
+fn seed_query_error(fixture: &Fixture, config: &EmbeddingConfig) {
+    let mut storage = fixture.open_storage();
+    storage.reset_vectors(&config.get_identity()).unwrap();
+    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    unit.set_query_error(7, "replacement diagnostic").unwrap();
+    unit.commit().unwrap();
 }

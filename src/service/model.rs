@@ -3,7 +3,7 @@ use crate::domain::{
     ByteSpan, Edge, Element, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, SourceUri,
     TreeOid,
 };
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, num::NonZeroUsize};
 /// Searchable knowledge metadata; document text is never retained here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeMetadata {
@@ -195,4 +195,14 @@ pub enum QueryEmbedding {
     Available { identity: Sha256, vector: Vec<f32> },
     /// Search can continue without vector ranking.
     Unavailable,
+}
+
+/// Immutable configuration and vector dimensions captured for query execution.
+pub struct QueryEmbeddingRequest<'a> {
+    /// Query text sent once to the configured provider; never persisted.
+    pub text: &'a str,
+    /// Validated caller-captured configuration; execution never rereads or resets it.
+    pub config: &'a EmbeddingConfig,
+    /// Native vector dimensions observed by the caller's read view, if established.
+    pub dimensions: Option<NonZeroUsize>,
 }
