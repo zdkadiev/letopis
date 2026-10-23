@@ -15,7 +15,7 @@ The directory structure must reflect responsibilities and dependency boundaries:
 
 - `src/domain/`: pure entities, values, and rules; no filesystem, process, Git, SQL, HTTP, or CLI orchestration.
 - `src/service/`: application-owned traits and concrete application services. Define small interfaces in `service/mod.rs`; keep each concrete service struct and its implementations in a separate responsibility-named file. Services depend on domain types and their interfaces, not concrete technology implementations.
-- `src/git/`, `src/storage/`, `src/embedding/`, `src/markdown/`, and `src/filesystem/`: separate responsibility-named modules, introduced when their tasks implement them. Concrete structs implement the application-owned traits. These modules do not orchestrate one another.
+- `src/git/`, `src/storage/`, `src/embedding/`, `src/markdown/`, `src/filesystem/`, and `src/process/`: separate responsibility-named modules, introduced when their tasks implement them. Concrete structs implement the application-owned traits. These modules do not orchestrate one another.
 - `src/cli/`: argument parsing, dispatch, command handlers, and output formatting. Handlers convert input into typed requests and invoke service interfaces; business rules belong to services/domain. Handlers do not call storage/Git/embedding adapters directly.
 - `src/lib.rs`: composition root with actual constructor calls wiring adapters into services and services into handlers through interfaces. Module declarations and reexports alone are not composition.
 - `src/main.rs`, when introduced: thin CLI entry point using the assembly from `lib.rs`.

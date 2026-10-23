@@ -11,7 +11,7 @@ const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 /// Coordinates ready configuration, durable document work and transient queries.
 #[derive(Debug)]
-pub struct EmbeddingService<S, F, M, P> {
+pub(crate) struct EmbeddingService<S, F, M, P> {
     storage: S,
     files: F,
     markdown: M,
@@ -21,7 +21,7 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
     EmbeddingService<S, F, M, P>
 {
     /// Construct the application service from its owned boundary implementations.
-    pub fn new(storage: S, files: F, markdown: M, provider: P) -> Self {
+    pub(crate) fn new(storage: S, files: F, markdown: M, provider: P) -> Self {
         Self {
             storage,
             files,

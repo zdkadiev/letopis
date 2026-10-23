@@ -18,7 +18,8 @@ use rustix::fd::AsFd;
 use std::path::Path;
 
 /// `SQLite` implementation of the application storage contract.
-pub struct SqliteStorage {
+#[derive(Debug)]
+pub(crate) struct SqliteStorage {
     // Drop the read-only cache attachment before its last writable connection,
     // so normal SQLite closure can checkpoint and remove cache WAL sidecars.
     vector_writer: Connection,
@@ -31,7 +32,7 @@ impl SqliteStorage {
     /// # Errors
     /// Returns an invalid request for invalid/aliased paths and an internal error
     /// for incompatible schemas, native capabilities, contention or database I/O.
-    pub fn open(cache: &Path, vectors: &Path) -> StorageResult<Self> {
+    pub(crate) fn open(cache: &Path, vectors: &Path) -> StorageResult<Self> {
         let (cache, vectors) = prepare_paths(cache, vectors)?;
         let mut cache_writer = open_database(&cache)?;
         bootstrap_cache(&mut cache_writer)?;

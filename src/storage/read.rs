@@ -13,7 +13,8 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params_from_iter};
 use sea_query::{Expr, ExprTrait, Query};
 use std::num::NonZeroUsize;
 
-pub struct SqliteRead<'a> {
+#[derive(Debug)]
+pub(crate) struct SqliteRead<'a> {
     transaction: Transaction<'a>,
     revision: u64,
     config_identity: Option<Sha256>,

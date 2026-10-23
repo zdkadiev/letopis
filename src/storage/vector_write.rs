@@ -7,7 +7,8 @@ use crate::{
 };
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 
-pub struct SqliteVectorWrite<'a> {
+#[derive(Debug)]
+pub(crate) struct SqliteVectorWrite<'a> {
     transaction: Transaction<'a>,
     failed: bool,
 }
