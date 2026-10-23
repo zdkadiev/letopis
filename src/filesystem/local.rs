@@ -21,7 +21,7 @@ use std::{
     cell::OnceCell,
     error::Error,
     fs::{File, TryLockError},
-    io::{self, Read, Seek, SeekFrom, Write},
+    io::{self, ErrorKind, Read, Seek, SeekFrom, Write},
     path::Path,
     time::{Duration, SystemTime},
 };
@@ -492,7 +492,7 @@ where
         match operation() {
             Ok(()) => return Ok(true),
             Err(TryLockError::WouldBlock) => return Ok(false),
-            Err(TryLockError::Error(cause)) if cause.kind() == io::ErrorKind::Interrupted => {}
+            Err(TryLockError::Error(cause)) if cause.kind() == ErrorKind::Interrupted => {}
             Err(cause) => return Err(cause),
         }
     }
@@ -501,7 +501,7 @@ where
 fn retry_io(mut operation: impl FnMut() -> io::Result<()>) -> io::Result<()> {
     loop {
         match operation() {
-            Err(cause) if cause.kind() == io::ErrorKind::Interrupted => {}
+            Err(cause) if cause.kind() == ErrorKind::Interrupted => {}
             result => return result,
         }
     }

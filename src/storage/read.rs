@@ -1,6 +1,13 @@
 use super::{
     connection::map_sqlite,
+    files::{list_files, read_file},
+    fts::match_text,
+    graph::{list_edges, list_nodes, read_node},
     query::{Meta, Project, Schemas, build_query},
+    vectors::{
+        find_nearest_vectors, read_failure, read_query_error, read_vector, read_vector_dimensions,
+    },
+    work::read_next_embedding_work,
 };
 use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256},
@@ -75,8 +82,7 @@ impl StorageRead for SqliteRead<'_> {
         if self.config_identity != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        super::work::read_next_embedding_work(&self.transaction, max_attempts, after)
-            .map(VectorOutcome::Current)
+        read_next_embedding_work(&self.transaction, max_attempts, after).map(VectorOutcome::Current)
     }
     fn read_vector_dimensions(
         &mut self,
@@ -85,7 +91,7 @@ impl StorageRead for SqliteRead<'_> {
         if self.config_identity != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        super::vectors::read_vector_dimensions(&self.transaction, true).map(VectorOutcome::Current)
+        read_vector_dimensions(&self.transaction, true).map(VectorOutcome::Current)
     }
     fn read_failure(
         &mut self,
@@ -95,10 +101,10 @@ impl StorageRead for SqliteRead<'_> {
         if self.config_identity != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        super::vectors::read_failure(&self.transaction, hash).map(VectorOutcome::Current)
+        read_failure(&self.transaction, hash).map(VectorOutcome::Current)
     }
     fn read_query_error(&mut self) -> StorageResult<Option<QueryError>> {
-        super::vectors::read_query_error(&self.transaction)
+        read_query_error(&self.transaction)
     }
     fn read_vector(
         &mut self,
@@ -108,7 +114,7 @@ impl StorageRead for SqliteRead<'_> {
         if self.config_identity != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        super::vectors::read_vector(&self.transaction, hash).map(VectorOutcome::Current)
+        read_vector(&self.transaction, hash).map(VectorOutcome::Current)
     }
     fn find_nearest_vectors(
         &mut self,
@@ -119,26 +125,25 @@ impl StorageRead for SqliteRead<'_> {
         if self.config_identity != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        super::vectors::find_nearest_vectors(&self.transaction, query, dimensions)
-            .map(VectorOutcome::Current)
+        find_nearest_vectors(&self.transaction, query, dimensions).map(VectorOutcome::Current)
     }
     fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
-        super::graph::read_node(&self.transaction, id)
+        read_node(&self.transaction, id)
     }
     fn list_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
-        super::graph::list_nodes(&self.transaction)
+        list_nodes(&self.transaction)
     }
     fn list_edges(&mut self, source: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>> {
-        super::graph::list_edges(&self.transaction, source)
+        list_edges(&self.transaction, source)
     }
     fn read_file(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
-        super::files::read_file(&self.transaction, path)
+        read_file(&self.transaction, path)
     }
     fn list_files(&mut self) -> StorageResult<Vec<FileRow>> {
-        super::files::list_files(&self.transaction)
+        list_files(&self.transaction)
     }
     fn match_text(&mut self, expression: &str) -> StorageResult<Vec<TextMatch>> {
-        super::fts::match_text(&self.transaction, expression)
+        match_text(&self.transaction, expression)
     }
     fn get_revision(&self) -> u64 {
         self.revision

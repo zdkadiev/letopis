@@ -13,6 +13,7 @@ use std::{
     error::Error,
     fmt::Write,
     fs,
+    io::ErrorKind,
     path::{Path, PathBuf},
     thread,
     time::{Duration, Instant},
@@ -264,7 +265,7 @@ fn has_same_file(cache: &Path, vectors: &Path) -> StorageResult<bool> {
         use std::os::unix::fs::MetadataExt;
         let read = |path| match fs::metadata(path) {
             Ok(metadata) => Ok(Some(metadata)),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
             Err(error) => Err(StorageError::new_with_cause(
                 StorageErrorKind::InvalidRequest,
                 "storage file identity unavailable",

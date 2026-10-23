@@ -1,4 +1,4 @@
-use super::GitCli;
+use super::{GitCli, parse_candidates};
 use crate::git::{
     constants::SNAPSHOT_REF_PREFIX,
     process::{GitProcess, check_version},
@@ -368,7 +368,7 @@ fn candidates_exclude_raw_git_metadata_components() {
     // Arrange: Git itself forbids adding .git paths to its real index.
     let raw = b".git/bad#anchor.md\0nested/.git/bad\xff.markdown\0.git-notes.md\0";
     // Act
-    let candidates = super::parse_candidates(raw).unwrap();
+    let candidates = parse_candidates(raw).unwrap();
     // Assert
     assert_eq!(
         candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -395,8 +395,8 @@ fn rejects_non_absence_errors_when_inspecting_object_alternates() {
 #[test]
 fn rejects_unterminated_candidates_and_accepts_empty_output() {
     // Arrange / Act
-    let malformed = super::parse_candidates(b"note.md").unwrap_err();
-    let empty = super::parse_candidates(b"").unwrap();
+    let malformed = parse_candidates(b"note.md").unwrap_err();
+    let empty = parse_candidates(b"").unwrap();
     // Assert
     assert_eq!(malformed.get_kind(), DocumentErrorKind::InternalError);
     assert!(empty.is_empty());

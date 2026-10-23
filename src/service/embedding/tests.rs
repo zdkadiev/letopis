@@ -360,8 +360,8 @@ fn rejected_vector_input_drops_poisoned_unit_before_recording_failure() {
 
 mod process;
 
-pub(super) fn checkpoint(stage: &str) {
-    process::checkpoint(stage);
+pub(super) fn reach_checkpoint(stage: &str) {
+    process::reach_checkpoint(stage);
 }
 
 #[test]

@@ -185,6 +185,7 @@ fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::EmbeddingConfig;
     use crate::utils::JsonValue;
 
     #[test]
@@ -201,7 +202,7 @@ mod tests {
         // Arrange
         let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":0} null"#;
         // Act
-        let result = super::EmbeddingConfig::parse(bytes);
+        let result = EmbeddingConfig::parse(bytes);
         // Assert
         assert!(result.is_err());
     }

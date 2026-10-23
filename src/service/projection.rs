@@ -1,3 +1,5 @@
+#[cfg(test)]
+use super::document::reach_checkpoint;
 use super::{
     CacheWrite, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileRow,
     FileSystem, KnowledgeMetadata, Markdown, NodeMetadata, ParsedFile, RefreshOutcome,
@@ -276,7 +278,7 @@ pub(super) fn publish<W: CacheWrite>(
         unit.delete_node(&EdgeTarget::Knowledge(id))?;
     }
     #[cfg(test)]
-    super::document::checkpoint("cleared");
+    reach_checkpoint("cleared");
     for text in &prepared.search {
         unit.upsert_node(&NodeMetadata::Knowledge(text.metadata.clone()))?;
     }
@@ -284,18 +286,18 @@ pub(super) fn publish<W: CacheWrite>(
         unit.insert_edge(edge)?;
     }
     #[cfg(test)]
-    super::document::checkpoint("projections");
+    reach_checkpoint("projections");
     for text in prepared.search {
         unit.replace_text(&text.metadata.id, &text.search_text)?;
     }
     #[cfg(test)]
-    super::document::checkpoint("fts");
+    reach_checkpoint("fts");
     match prepared.file {
         FileChange::Upsert(row) => unit.upsert_file(&row)?,
         FileChange::Remove(path) => unit.delete_file(&path)?,
     }
     #[cfg(test)]
-    super::document::checkpoint("fingerprints");
+    reach_checkpoint("fingerprints");
     Ok(())
 }
 

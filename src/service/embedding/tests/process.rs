@@ -11,7 +11,7 @@ use crate::{
 use rusqlite::{Connection, types::Value};
 use std::{
     env, fs,
-    io::{Read, Write},
+    io::{ErrorKind, Read, Write},
     net::{TcpListener, TcpStream},
     os::unix::{
         fs::MetadataExt,
@@ -28,7 +28,7 @@ const LIMIT: Duration = Duration::from_secs(15);
 const CHILD: &str = "service::embedding::tests::process::run_child";
 const SUCCESS: &str = r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#;
 
-pub(super) fn checkpoint(stage: &str) {
+pub(super) fn reach_checkpoint(stage: &str) {
     if env::var("LETOPIS_PROCESS_STAGE").as_deref() != Ok(stage) {
         return;
     }
@@ -44,7 +44,7 @@ pub(super) fn checkpoint(stage: &str) {
 #[test]
 #[ignore = "private child entrypoint explicitly invoked by process parents"]
 fn run_child() {
-    checkpoint("child");
+    reach_checkpoint("child");
     let root = PathBuf::from(env::var_os("LETOPIS_PROCESS_ROOT").unwrap());
     let storage = crate::open_storage(&root.join("cache"), &root.join("vectors")).unwrap();
     let mut service = open_embeddings(&root, storage).unwrap();
@@ -105,7 +105,7 @@ impl Fixture {
         let stream = loop {
             match self.listener.accept() {
                 Ok((stream, _)) => break stream,
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                Err(error) if error.kind() == ErrorKind::WouldBlock => {
                     assert!(start.elapsed() < LIMIT, "HTTP readiness timeout");
                     thread::sleep(Duration::from_millis(5));
                 }

@@ -35,11 +35,11 @@ pub(super) fn read_vector_dimensions(
         .map_err(map_sqlite)?;
     value
         .map(|value| {
-            let size = usize::try_from(value).map_err(|_| invalid_stored_vector())?;
+            let size = usize::try_from(value).map_err(|_| fail_invalid_stored_vector())?;
             if !(NATIVE_DIMENSION_MIN..=NATIVE_DIMENSION_MAX).contains(&size) {
-                return Err(invalid_stored_vector());
+                return Err(fail_invalid_stored_vector());
             }
-            NonZeroUsize::new(size).ok_or_else(invalid_stored_vector)
+            NonZeroUsize::new(size).ok_or_else(fail_invalid_stored_vector)
         })
         .transpose()
 }
@@ -135,7 +135,7 @@ pub(super) fn store_vector(
             .optional()
             .map_err(map_sqlite)?;
         if exists.is_none() {
-            return Err(invalid_stored_vector());
+            return Err(fail_invalid_stored_vector());
         }
     }
     let (sql, values) = build_query(
@@ -217,23 +217,23 @@ pub(super) fn read_vector(
         .optional()
         .map_err(map_sqlite)?;
     value
-        .map(|bytes| decode_vector(&bytes.ok_or_else(invalid_stored_vector)?))
+        .map(|bytes| decode_vector(&bytes.ok_or_else(fail_invalid_stored_vector)?))
         .transpose()
 }
 fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
     if bytes.is_empty() || !bytes.len().is_multiple_of(4) {
-        return Err(invalid_stored_vector());
+        return Err(fail_invalid_stored_vector());
     }
     let values: Vec<_> = bytes
         .chunks_exact(4)
         .map(|c| f32::from_ne_bytes([c[0], c[1], c[2], c[3]]))
         .collect();
     if values.iter().any(|v| !v.is_finite()) {
-        return Err(invalid_stored_vector());
+        return Err(fail_invalid_stored_vector());
     }
     Ok(values)
 }
-fn invalid_stored_vector() -> StorageError {
+fn fail_invalid_stored_vector() -> StorageError {
     StorageError::new(
         StorageErrorKind::InternalError,
         "invalid stored vector data",
@@ -278,8 +278,8 @@ pub(super) fn find_nearest_vectors(
     rows.map(|row| {
         let (id, hash, distance) = row.map_err(map_sqlite)?;
         Ok(VectorMatch {
-            id: KnowledgeId::parse(&id).map_err(|_| invalid_stored_vector())?,
-            search_hash: Sha256::parse(&hash).map_err(|_| invalid_stored_vector())?,
+            id: KnowledgeId::parse(&id).map_err(|_| fail_invalid_stored_vector())?,
+            search_hash: Sha256::parse(&hash).map_err(|_| fail_invalid_stored_vector())?,
             distance,
         })
     })
@@ -389,7 +389,7 @@ pub(super) fn read_failure(
         .map(|(attempts, error)| {
             let attempts = decode_unsigned(attempts)?;
             if attempts == 0 {
-                return Err(invalid_diagnostic());
+                return Err(fail_invalid_diagnostic());
             }
             Ok(EmbeddingFailure {
                 search_hash: *hash,
@@ -431,9 +431,9 @@ fn encode_unsigned(value: u64) -> StorageResult<i64> {
     })
 }
 fn decode_unsigned(value: i64) -> StorageResult<u64> {
-    u64::try_from(value).map_err(|_| invalid_diagnostic())
+    u64::try_from(value).map_err(|_| fail_invalid_diagnostic())
 }
-fn invalid_diagnostic() -> StorageError {
+fn fail_invalid_diagnostic() -> StorageError {
     StorageError::new(StorageErrorKind::InternalError, "invalid stored diagnostic")
 }
 

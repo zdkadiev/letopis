@@ -5,6 +5,7 @@ use crate::{
     filesystem::LocalFileSystem,
     git::GitCli,
     markdown::MarkdownParser,
+    open_documents,
     service::{
         CacheWrite, Documents, EmbeddingFailure, FileRow, FileSystem, NodeMetadata, QueryError,
         Storage, StorageError, StorageRead, StorageResult, StoredNode, VectorOutcome, VectorWrite,
@@ -55,7 +56,7 @@ thread_local! {
     static FAIL_LATE: RefCell<bool> = const { RefCell::new(false) };
 }
 
-pub(in crate::service) fn checkpoint(name: &str) {
+pub(in crate::service) fn reach_checkpoint(name: &str) {
     CONTROL.with_borrow_mut(|control| {
         if let Some(stream) = control {
             writeln!(stream, "{name}").unwrap();
@@ -86,7 +87,7 @@ pub(in crate::service) fn fail_late<W: CacheWrite>(unit: &mut W) -> StorageResul
 fn build_service(root: &Path) -> Service {
     let git = GitCli::open(root).unwrap();
     let mut filesystem = LocalFileSystem::open(git.get_root()).unwrap();
-    filesystem.configure_process_test(TIME, Box::new(|| checkpoint("contended")));
+    filesystem.configure_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
     let directory = filesystem.open_service_directory().unwrap();
     let storage =
         SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory).unwrap();
@@ -103,16 +104,16 @@ fn run_child() {
     stream.set_read_timeout(Some(WAIT)).unwrap();
     stream.set_write_timeout(Some(WAIT)).unwrap();
     CONTROL.with_borrow_mut(|control| *control = Some(stream));
-    checkpoint("connected");
+    reach_checkpoint("connected");
     if let Some(mode) = mode.strip_prefix("normal-") {
         run_normal_service(&root, mode);
-        checkpoint("finished");
+        reach_checkpoint("finished");
         return;
     }
     let mut service = build_service(&root);
     if mode == "hold" {
         let _guard = service.filesystem.lock_index().unwrap();
-        checkpoint("holding");
+        reach_checkpoint("holding");
     } else {
         FAIL_LATE.with_borrow_mut(|enabled| *enabled = mode == "fail");
         let result = service.refresh();
@@ -131,13 +132,13 @@ fn run_child() {
         }
     }
     drop(service);
-    checkpoint("finished");
+    reach_checkpoint("finished");
 }
 
 fn run_normal_service(root: &Path, mode: &str) {
-    LocalFileSystem::configure_next_process_test(TIME, Box::new(|| checkpoint("contended")));
-    let mut service = crate::open_documents(root).unwrap();
-    checkpoint("opened");
+    LocalFileSystem::configure_next_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
+    let mut service = open_documents(root).unwrap();
+    reach_checkpoint("opened");
     let outcome = service.refresh().unwrap();
     assert_eq!(outcome.published, mode != "noop");
 }

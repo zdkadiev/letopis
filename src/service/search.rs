@@ -66,7 +66,7 @@ impl<D: Documents, S: Storage, E: Embeddings, F: FileSystem, M: Markdown> Search
         ranked
             .into_iter()
             .map(|id| {
-                let node = metadata.get(&id).ok_or_else(invalid_search_data)?;
+                let node = metadata.get(&id).ok_or_else(fail_invalid_search_data)?;
                 build_link(node, read.get_revision(), &self.filesystem, &self.markdown)
             })
             .collect()
@@ -134,7 +134,7 @@ fn find_vector_candidates<R: StorageRead, E: Embeddings>(
         || vector.len() != dimensions.get()
         || vector.iter().any(|value| !value.is_finite())
     {
-        return Err(invalid_search_data());
+        return Err(fail_invalid_search_data());
     }
     match read
         .find_nearest_vectors(&identity, &vector, dimensions.get())
@@ -154,14 +154,14 @@ fn read_candidate_metadata<R: StorageRead>(
     for hit in fts {
         let (row_id, node) = read_knowledge(read, &hit.id)?;
         if row_id != hit.row_id {
-            return Err(invalid_search_data());
+            return Err(fail_invalid_search_data());
         }
         metadata.insert(hit.id.clone(), node);
     }
     for hit in vectors {
         let (_, node) = read_knowledge(read, &hit.id)?;
         if node.search_hash != hit.search_hash {
-            return Err(invalid_search_data());
+            return Err(fail_invalid_search_data());
         }
         metadata.insert(hit.id.clone(), node);
     }
@@ -175,12 +175,12 @@ fn read_knowledge<R: StorageRead>(
     let stored = read
         .read_node(&EdgeTarget::Knowledge(id.clone()))
         .map_err(map_search_error)?
-        .ok_or_else(invalid_search_data)?;
+        .ok_or_else(fail_invalid_search_data)?;
     let NodeMetadata::Knowledge(node) = stored.metadata else {
-        return Err(invalid_search_data());
+        return Err(fail_invalid_search_data());
     };
     if node.id != *id || node.uri != *id {
-        return Err(invalid_search_data());
+        return Err(fail_invalid_search_data());
     }
     Ok((stored.row_id, node))
 }
@@ -197,7 +197,7 @@ fn rank_candidates(
         let score = scores.entry(id.clone()).or_insert(0.0);
         *score += weight;
         if !score.is_finite() {
-            return Err(invalid_search_data());
+            return Err(fail_invalid_search_data());
         }
     }
     let mut ranked: Vec<_> = scores.into_iter().collect();
@@ -213,7 +213,7 @@ fn rank_candidates(
 
 fn rank_channel(mut channel: Vec<(&KnowledgeId, f64)>) -> CommandResult<Vec<(&KnowledgeId, f64)>> {
     if channel.iter().any(|(_, metric)| !metric.is_finite()) {
-        return Err(invalid_search_data());
+        return Err(fail_invalid_search_data());
     }
     channel.sort_by(|(left_id, left), (right_id, right)| {
         // Signed zeros are equal metrics and therefore use the same identity tie-break.
@@ -229,7 +229,7 @@ fn rank_channel(mut channel: Vec<(&KnowledgeId, f64)>) -> CommandResult<Vec<(&Kn
         let rank = index
             .checked_add(1)
             .and_then(NonZeroUsize::new)
-            .ok_or_else(invalid_search_data)?;
+            .ok_or_else(fail_invalid_search_data)?;
         *weight = calculate_rank_weight(rank)?;
     }
     Ok(channel)
@@ -282,7 +282,7 @@ fn is_current_knowledge<F: FileSystem, M: Markdown>(
     }))
 }
 
-fn invalid_search_data() -> CommandError {
+fn fail_invalid_search_data() -> CommandError {
     CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
 }
 fn map_search_error(cause: impl Error + Send + Sync + 'static) -> CommandError {

@@ -12,6 +12,7 @@
     )
 )]
 
+use crate::cli::{CommandResponse, Handlers, Request, parse_request, write_response};
 use crate::embedding::{HttpProviders, Ollama, Openai};
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
@@ -55,8 +56,8 @@ pub fn run_cli(
     output: &mut impl Write,
 ) -> u8 {
     let args = args.into_iter().collect::<Vec<_>>();
-    let response = cli::parse_request(&args, input).and_then(run_request);
-    cli::write_response(output, response)
+    let response = parse_request(&args, input).and_then(run_request);
+    write_response(output, response)
 }
 
 /// Open hybrid knowledge search with independently owned read and embedding connections.
@@ -243,13 +244,13 @@ pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLoc
     LocalFileSystem::open(root)
 }
 
-fn run_request(request: cli::Request) -> CommandResult<cli::CommandResponse> {
+fn run_request(request: Request) -> CommandResult<CommandResponse> {
     let (directory, executable) = locate_environment()?;
     match request {
-        cli::Request::Check(_) => cli::Handlers::new(None, None, None, None).execute(request),
-        cli::Request::Drain => run_drain(request, &directory, &executable),
-        cli::Request::Search(_) => run_search(request, &directory, &executable),
-        cli::Request::Inspect(_) => run_inspect(request, &directory, &executable),
+        Request::Check(_) => Handlers::new(None, None, None, None).execute(request),
+        Request::Drain => run_drain(request, &directory, &executable),
+        Request::Search(_) => run_search(request, &directory, &executable),
+        Request::Inspect(_) => run_inspect(request, &directory, &executable),
     }
 }
 
@@ -271,38 +272,34 @@ fn locate_environment() -> CommandResult<(PathBuf, PathBuf)> {
     Ok((directory, executable))
 }
 
-fn run_drain(
-    request: cli::Request,
-    root: &Path,
-    executable: &Path,
-) -> CommandResult<cli::CommandResponse> {
+fn run_drain(request: Request, root: &Path, executable: &Path) -> CommandResult<CommandResponse> {
     let mut tasks = open_embedding_tasks(root)?;
     let mut background = open_background(root, executable, Some(&mut tasks))?;
-    cli::Handlers::new(None, None, None, Some(&mut background)).execute(request)
+    Handlers::new(None, None, None, Some(&mut background)).execute(request)
 }
 
 fn run_search(
-    request: cli::Request,
+    request: Request,
     directory: &Path,
     executable: &Path,
-) -> CommandResult<cli::CommandResponse> {
+) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
     let mut tasks = open_embedding_tasks(&root)?;
     let mut background = open_background(&root, executable, Some(&mut tasks))?;
     let mut searches = open_searches(&root)?;
-    cli::Handlers::new(None, None, Some(&mut searches), Some(&mut background)).execute(request)
+    Handlers::new(None, None, Some(&mut searches), Some(&mut background)).execute(request)
 }
 
 fn run_inspect(
-    request: cli::Request,
+    request: Request,
     directory: &Path,
     executable: &Path,
-) -> CommandResult<cli::CommandResponse> {
+) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
     let mut tasks = open_embedding_tasks(&root)?;
     let mut background = open_background(&root, executable, Some(&mut tasks))?;
     let mut inspections = open_inspections(&root)?;
-    cli::Handlers::new(None, Some(&mut inspections), None, Some(&mut background)).execute(request)
+    Handlers::new(None, Some(&mut inspections), None, Some(&mut background)).execute(request)
 }
 
 /// Foreground services and background exclusion must share the discovered repository root.

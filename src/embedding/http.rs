@@ -4,7 +4,7 @@ use crate::service::{
 };
 use crate::utils::JsonValue;
 use serde_json::{Value, json};
-use std::{num::NonZeroUsize, time::Duration};
+use std::{io::ErrorKind, num::NonZeroUsize, time::Duration};
 use ureq::{
     Agent,
     http::Uri,
@@ -20,9 +20,9 @@ pub(super) struct Http {
 }
 impl Http {
     pub(super) fn new() -> Self {
-        Self::with_deadline(ATTEMPT_DEADLINE)
+        Self::new_with_deadline(ATTEMPT_DEADLINE)
     }
-    fn with_deadline(deadline: Duration) -> Self {
+    fn new_with_deadline(deadline: Duration) -> Self {
         let agent = Agent::config_builder()
             .proxy(None)
             .max_redirects(0)
@@ -195,7 +195,7 @@ fn classify(error: ureq::Error) -> EmbeddingError {
     let kind = match &error {
         ureq::Error::BodyExceedsLimit(_) => EmbeddingErrorKind::InvalidResponse,
         ureq::Error::Timeout(_) => EmbeddingErrorKind::Timeout,
-        ureq::Error::Io(error) if error.kind() == std::io::ErrorKind::TimedOut => {
+        ureq::Error::Io(error) if error.kind() == ErrorKind::TimedOut => {
             EmbeddingErrorKind::Timeout
         }
         _ => EmbeddingErrorKind::Connection,
@@ -239,7 +239,7 @@ mod tests {
             thread::sleep(body_delay);
             let _ = socket.write_all(b"{}");
         });
-        let http = Http::with_deadline(Duration::from_millis(120));
+        let http = Http::new_with_deadline(Duration::from_millis(120));
         let start = Instant::now();
         // Act
         let result = http.post(&endpoint, &json!({"input":["fixture"]}), None);

@@ -59,11 +59,11 @@ fn has_schema(connection: &Connection, sql: &str) -> StorageResult<bool> {
             let reference = Connection::open_in_memory().map_err(map_sqlite)?;
             reference.execute_batch(sql).map_err(map_sqlite)?;
             if definitions != read_definitions(&reference)? {
-                return Err(incompatible_schema());
+                return Err(fail_incompatible_schema());
             }
             Ok(true)
         }
-        _ => Err(incompatible_schema()),
+        _ => Err(fail_incompatible_schema()),
     }
 }
 
@@ -76,7 +76,7 @@ fn read_definitions(connection: &Connection) -> StorageResult<Vec<Definition>> {
         .map_err(map_sqlite)
 }
 
-fn incompatible_schema() -> StorageError {
+fn fail_incompatible_schema() -> StorageError {
     StorageError::new(
         StorageErrorKind::InternalError,
         "incompatible storage database schema",
@@ -88,6 +88,7 @@ mod tests {
     use super::{
         CACHE_SCHEMA, VECTOR_SCHEMA, bootstrap_cache, bootstrap_schema, bootstrap_vectors,
     };
+    use crate::process_test_support::supervise_test;
     use crate::storage::connection::{ON_INITIALIZATION_CONTENTION, open_database};
     use rusqlite::TransactionBehavior;
     use std::{
@@ -195,7 +196,7 @@ mod tests {
     fn initialization_contention_expires_and_can_be_retried_safely() {
         const CHILD: &str = "LETOPIS_INITIALIZATION_EXPIRATION_CHILD";
         if std::env::var_os(CHILD).is_none() {
-            crate::process_test_support::supervise_test(
+            supervise_test(
                 "storage::schema::tests::initialization_contention_expires_and_can_be_retried_safely",
                 &[(CHILD, "1")],
             );
