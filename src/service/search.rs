@@ -190,15 +190,16 @@ fn rank_candidates(
     vectors: &[VectorMatch],
     limit: NonZeroUsize,
 ) -> CommandResult<Vec<KnowledgeId>> {
+    let text_ranks = rank_channel(fts.iter().map(|hit| (&hit.id, hit.bm25)).collect())?;
+    let vector_ranks = rank_channel(vectors.iter().map(|hit| (&hit.id, hit.distance)).collect())?;
     let mut scores = BTreeMap::new();
-    add_channel_ranks(
-        fts.iter().map(|hit| (&hit.id, hit.bm25)).collect(),
-        &mut scores,
-    )?;
-    add_channel_ranks(
-        vectors.iter().map(|hit| (&hit.id, hit.distance)).collect(),
-        &mut scores,
-    )?;
+    for (id, weight) in text_ranks.into_iter().chain(vector_ranks) {
+        let score = scores.entry(id.clone()).or_insert(0.0);
+        *score += weight;
+        if !score.is_finite() {
+            return Err(invalid_search_data());
+        }
+    }
     let mut ranked: Vec<_> = scores.into_iter().collect();
     ranked.sort_by(|(left_id, left), (right_id, right)| {
         right.total_cmp(left).then_with(|| left_id.cmp(right_id))
@@ -210,10 +211,7 @@ fn rank_candidates(
         .collect())
 }
 
-fn add_channel_ranks(
-    mut channel: Vec<(&KnowledgeId, f64)>,
-    scores: &mut BTreeMap<KnowledgeId, f64>,
-) -> CommandResult<()> {
+fn rank_channel(mut channel: Vec<(&KnowledgeId, f64)>) -> CommandResult<Vec<(&KnowledgeId, f64)>> {
     if channel.iter().any(|(_, metric)| !metric.is_finite()) {
         return Err(invalid_search_data());
     }
@@ -226,18 +224,15 @@ fn add_channel_ranks(
         }
     });
     let mut seen = BTreeSet::new();
-    for (id, _) in channel {
-        if !seen.insert(id) {
-            continue;
-        }
-        let rank = NonZeroUsize::new(seen.len()).ok_or_else(invalid_search_data)?;
-        let score = scores.entry(id.clone()).or_insert(0.0);
-        *score += calculate_rank_weight(rank)?;
-        if !score.is_finite() {
-            return Err(invalid_search_data());
-        }
+    channel.retain(|(id, _)| seen.insert(*id));
+    for (index, (_, weight)) in channel.iter_mut().enumerate() {
+        let rank = index
+            .checked_add(1)
+            .and_then(NonZeroUsize::new)
+            .ok_or_else(invalid_search_data)?;
+        *weight = calculate_rank_weight(rank)?;
     }
-    Ok(())
+    Ok(channel)
 }
 
 /// Restrict ranks to an exactly representable integer before computing their reciprocal.
