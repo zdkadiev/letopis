@@ -425,3 +425,27 @@ fn simultaneous_document_openers_initialize_and_publish_once() {
     assert!(outcomes.iter().all(|outcome| outcome.revision == 1));
     assert_eq!(repo.read_state().revision, 1);
 }
+
+#[test]
+fn removes_an_orphan_source_while_preserving_unrelated_knowledge() {
+    // Arrange: one independent knowledge element survives the last source reference.
+    let repo = DocumentRepo::new();
+    repo.write("source.txt", "source bytes");
+    repo.write("reference.md", build_external(2, "source.txt", "Reference"));
+    repo.write("unrelated.md", build_whole(3, "SurvivingKnowledge"));
+    let mut documents = open_documents(repo.get_root()).unwrap();
+    documents.refresh().unwrap();
+    let before = repo.read_state();
+    // Act
+    repo.remove("reference.md");
+    documents.refresh().unwrap();
+    // Assert: an unrelated ID must not prevent orphan cleanup.
+    let after = repo.read_state();
+    assert_eq!(after.nodes.len(), 1);
+    assert_eq!(
+        after.get_node("unrelated.md"),
+        before.get_node("unrelated.md")
+    );
+    assert!(after.edges.is_empty());
+    assert_eq!(repo.search("SurvivingKnowledge"), ["unrelated.md"]);
+}

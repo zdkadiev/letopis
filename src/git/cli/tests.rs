@@ -3,13 +3,12 @@ use crate::git::{
     constants::SNAPSHOT_REF_PREFIX,
     process::{GitProcess, check_version},
 };
+use crate::process_test_support as fixture;
 use crate::{
     domain::{RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN},
     open_git_snapshots,
-    service::{GitSnapshots, SnapshotErrorKind, SnapshotFile},
+    service::{DocumentErrorKind, GitSnapshots, SnapshotErrorKind, SnapshotFile},
 };
-#[path = "../../../tests/support/git.rs"]
-mod fixture;
 use fixture::{ObjectFormat, TempRepo};
 use std::{fs, path::PathBuf, process::Command};
 
@@ -104,7 +103,6 @@ fn subprocess_drains_and_reaps_on_io_failure() {
     let input = b"STDIN_CANARY".repeat(100000);
     // Act
     let error = process.run(repo.get_root(), &[], Some(&input)).unwrap_err();
-    let safe = format!("{error} {error:?}");
     let pid = fs::read_to_string(repo.get_root().join("child-pid")).unwrap();
     let child_exists = Command::new("kill")
         .args(["-0", pid.trim()])
@@ -113,8 +111,14 @@ fn subprocess_drains_and_reaps_on_io_failure() {
         .status
         .success();
     // Assert
-    assert!(!safe.contains("STDIN_CANARY"));
-    assert!(!safe.contains("STDERR_CANARY"));
+    for diagnostic in [error.to_string(), format!("{error:?}")] {
+        assert!(
+            diagnostic.contains('7'),
+            "the safe exit cause must remain visible"
+        );
+        assert!(!diagnostic.contains("STDIN_CANARY"));
+        assert!(!diagnostic.contains("STDERR_CANARY"));
+    }
     assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
     assert!(!child_exists, "Git child must be reaped");
 }
@@ -370,4 +374,88 @@ fn candidates_exclude_raw_git_metadata_components() {
         candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
         [".git-notes.md"]
     );
+}
+
+#[test]
+fn rejects_non_absence_errors_when_inspecting_object_alternates() {
+    // Arrange: ENOTDIR is deterministic even when tests run with elevated privileges.
+    let repo = TempRepo::new(ObjectFormat::Sha1);
+    let info = repo.get_root().join(".git/objects/info");
+    fs::remove_dir(&info).unwrap();
+    fs::write(&info, b"not a directory").unwrap();
+    // Act
+    let error = GitCli::open(repo.get_root())
+        .err()
+        .expect("unsafe object store was accepted");
+    // Assert
+    assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+    assert_eq!(fs::read(info).unwrap(), b"not a directory");
+}
+
+#[test]
+fn rejects_unterminated_candidates_and_accepts_empty_output() {
+    // Arrange / Act
+    let malformed = super::parse_candidates(b"note.md").unwrap_err();
+    let empty = super::parse_candidates(b"").unwrap();
+    // Assert
+    assert_eq!(malformed.get_kind(), DocumentErrorKind::InternalError);
+    assert!(empty.is_empty());
+}
+
+#[test]
+fn rejects_object_header_with_a_different_advertised_oid() {
+    // Arrange: all subprocess work stays real except one malformed protocol header.
+    let repo = TempRepo::new(ObjectFormat::Sha1);
+    let program = repo.write_script(
+        "wrong-object-header",
+        "#!/bin/sh\nfor arg do\n if [ \"$arg\" = --batch-check ]; then\n  read -r requested\n  printf '0000000000000000000000000000000000000000 tree 0\\n'\n  exit 0\n fi\ndone\nexec git \"$@\"\n",
+    );
+    let process = GitProcess::new_with_executable(program);
+    let git = GitCli::open_with_process(repo.get_root(), process).unwrap();
+    let tree = git.create_tree(&[]).unwrap();
+    let path = RepoPath::parse("missing.md").unwrap();
+    // Act
+    let error = git.read_blob(&tree, &path).unwrap_err();
+    // Assert: accepting the wrong OID would instead reach an ordinary missing path.
+    assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+}
+
+#[test]
+fn preserves_unexpected_symbolic_ref_failure_before_writing_a_ref() {
+    // Arrange
+    let repo = TempRepo::new(ObjectFormat::Sha1);
+    let program = repo.write_script(
+        "failed-ref-inspection",
+        "#!/bin/sh\nfor arg do\n if [ \"$arg\" = symbolic-ref ]; then exit 7; fi\ndone\nexec git \"$@\"\n",
+    );
+    let process = GitProcess::new_with_executable(program);
+    let git = GitCli::open_with_process(repo.get_root(), process).unwrap();
+    let tree = git.create_tree(&[]).unwrap();
+    // Act
+    let error = git.pin(&tree).unwrap_err();
+    // Assert: exit 1 alone means a nonsymbolic ref; other exits remain failures.
+    assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+    assert!(error.to_string().contains('7'));
+    assert!(
+        repo.run_git_successfully(&["for-each-ref", SNAPSHOT_REF_PREFIX], None)
+            .is_empty()
+    );
+}
+
+#[test]
+fn hardens_tree_and_ref_writes_with_git_fsync_settings() {
+    // Arrange
+    let repo = TempRepo::new(ObjectFormat::Sha1);
+    let program = repo.write_script("write-arguments", "#!/bin/sh\nprintf '%s\\n' \"$@\"\n");
+    let process = GitProcess::new_with_executable(program);
+    for command in ["mktree", "update-ref"] {
+        // Act
+        let output = process
+            .run(repo.get_root(), &[command.into()], None)
+            .unwrap();
+        let arguments = String::from_utf8(output).unwrap();
+        // Assert
+        assert!(arguments.lines().any(|arg| arg == "core.fsync=all"));
+        assert!(arguments.lines().any(|arg| arg == "core.fsyncMethod=fsync"));
+    }
 }

@@ -53,6 +53,7 @@ pub(super) enum TextIndex {
 #[derive(Clone, Copy, Iden)]
 pub(super) enum Schemas {
     Vec,
+    Cache,
 }
 #[derive(Clone, Copy, Iden)]
 pub(super) enum Meta {

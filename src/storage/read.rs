@@ -5,12 +5,13 @@ use super::{
 use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256},
     service::{
-        EmbeddingFailure, FileRow, QueryError, StorageError, StorageErrorKind, StorageRead,
-        StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
+        EmbeddingFailure, EmbeddingWork, FileRow, QueryError, StorageError, StorageErrorKind,
+        StorageRead, StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
     },
 };
 use rusqlite::{Connection, OptionalExtension, Transaction, params_from_iter};
 use sea_query::{Expr, ExprTrait, Query};
+use std::num::NonZeroUsize;
 
 pub struct SqliteRead<'a> {
     transaction: Transaction<'a>,
@@ -64,6 +65,27 @@ impl<'a> SqliteRead<'a> {
     }
 }
 impl StorageRead for SqliteRead<'_> {
+    fn read_next_embedding_work(
+        &mut self,
+        expected: &Sha256,
+        max_attempts: u64,
+        after: Option<&KnowledgeId>,
+    ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>> {
+        if self.config_identity != Some(*expected) {
+            return Ok(VectorOutcome::ConfigChanged);
+        }
+        super::work::read_next_embedding_work(&self.transaction, max_attempts, after)
+            .map(VectorOutcome::Current)
+    }
+    fn read_vector_dimensions(
+        &mut self,
+        expected: &Sha256,
+    ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>> {
+        if self.config_identity != Some(*expected) {
+            return Ok(VectorOutcome::ConfigChanged);
+        }
+        super::vectors::read_vector_dimensions(&self.transaction, true).map(VectorOutcome::Current)
+    }
     fn read_failure(
         &mut self,
         expected: &Sha256,

@@ -43,7 +43,7 @@ def run_command(argv: list[str], *, cwd: Path, env: dict[str, str],
 
 
 def hash_inputs(root):
-    paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs',
+    paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs', 'Makefile', '.cargo/mutants.toml',
               'rust-toolchain.toml', 'clippy.toml', '.dockerignore',
               'docs/zkit/letopis/mechanics/storage-schema.sql')]
     for name in ('src', 'vendor', 'examples', 'tests', 'scripts'):
@@ -64,7 +64,12 @@ def run_host(root, evidence, execute):
     for tool in (['rustc', '-vV'], ['cargo', '--version'], ['git', '--version'],
                  [sys.executable, '--version'], ['uname', '-a']):
         execute(tool, 'version-' + Path(tool[0]).name + '.log')
-    execute(['make', 'check'], 'rust-check.log')
+    process_env = {'LETOPIS_TEST_EVIDENCE': str(evidence / 'process')}
+    execute(['make', 'verify', 'V=1'], 'rust-check.log', extra=process_env)
+    execute(['cargo', 'test', '--locked', '--offline', '--test',
+             'embedding_provider', 'attempt_obeys_real_sixty_second_deadline',
+             '--', '--ignored', '--exact', '--nocapture'],
+            'provider-real-deadline.log', extra=process_env)
     execute(['cargo', 'doc', '--locked', '--offline', '--no-deps'],
             'rustdoc.log', extra={'RUSTDOCFLAGS': '-D warnings'})
     execute(['cargo', 'test', '--locked', '--offline',

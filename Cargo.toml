@@ -6,13 +6,16 @@ rust-version = "1.95.0"
 publish = false
 
 [dependencies]
+libc = "=0.2.191"
 rustix = { version = "=1.1.5", default-features = false, features = ["fs", "std"] }
 sea-query = { version = "=1.0.2", default-features = false, features = ["backend-sqlite", "derive"] }
 rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
 libsqlite3-sys = { version = "=0.38.2", default-features = false, features = ["bundled"] }
 sha2 = "=0.10.9"
 serde = { version = "=1.0.228", features = ["derive"] }
-serde_json = "=1.0.145"
+serde_json = { version = "=1.0.145", features = ["raw_value"] }
+ureq = { version = "=3.4.2", default-features = false, features = ["rustls", "platform-verifier", "json"] }
+serde_json_canonicalizer = "=0.3.2"
 pulldown-cmark = { version = "=0.13.4", default-features = false }
 
 # Keep compiler diagnostics strict for every root-crate target.
@@ -57,4 +60,6 @@ cc = "=1.9.0"
 sha2 = "=0.10.9"
 
 [dev-dependencies]
+# Private filesystem watchdogs terminate their owned process groups.
+rustix = { version = "=1.1.5", default-features = false, features = ["process", "std"] }
 tempfile = "=3.23.0"

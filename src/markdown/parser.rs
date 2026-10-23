@@ -13,7 +13,8 @@ pub fn parse(path: &RepoPath, bytes: &[u8]) -> Result<Option<ParsedFile>, Vec<Di
     MarkdownParser::new().parse_file(path, bytes)
 }
 
-pub(crate) struct MarkdownParser;
+/// The shared pure X-4 Markdown codec used by application services.
+pub struct MarkdownParser;
 impl MarkdownParser {
     pub(crate) fn new() -> Self {
         Self

@@ -12,6 +12,37 @@ use crate::{
 };
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params, params_from_iter};
 use sea_query::{Asterisk, Expr, ExprTrait, JoinType, OnConflict, Query};
+use std::num::NonZeroUsize;
+
+// Pinned vec1 0.8: VEC1_CONFIG_NELEM and VEC1_VECSIZE_MIN/MAX in vendor/vec1/vec1.c.
+const NATIVE_DIMENSION_FIELD: i64 = 2;
+const NATIVE_DIMENSION_MIN: usize = 2;
+const NATIVE_DIMENSION_MAX: usize = 4096;
+
+pub(super) fn read_vector_dimensions(
+    connection: &Connection,
+    attached: bool,
+) -> StorageResult<Option<NonZeroUsize>> {
+    // Native shadow introspection is read-only, with private fixed schema names.
+    let sql = if attached {
+        "SELECT val FROM vec.vector_index_config WHERE id = ?1"
+    } else {
+        "SELECT val FROM main.vector_index_config WHERE id = ?1"
+    };
+    let value: Option<i64> = connection
+        .query_row(sql, [NATIVE_DIMENSION_FIELD], |row| row.get(0))
+        .optional()
+        .map_err(map_sqlite)?;
+    value
+        .map(|value| {
+            let size = usize::try_from(value).map_err(|_| invalid_stored_vector())?;
+            if !(NATIVE_DIMENSION_MIN..=NATIVE_DIMENSION_MAX).contains(&size) {
+                return Err(invalid_stored_vector());
+            }
+            NonZeroUsize::new(size).ok_or_else(invalid_stored_vector)
+        })
+        .transpose()
+}
 
 const RESET_INDEX: &str = r#"
     DROP TABLE vector_index;
@@ -79,6 +110,7 @@ pub(super) fn store_vector(
     dimensions: usize,
 ) -> StorageResult<StoredVectorKey> {
     let bytes = encode_vector(vector, dimensions)?;
+    validate_dimensions(connection, dimensions)?;
     let key = get_or_insert_vector_key(connection, hash)?;
     if key.inserted {
         let (sql, values) = build_query(
@@ -115,6 +147,19 @@ pub(super) fn store_vector(
         .execute(&sql, params_from_iter(values))
         .map_err(map_sqlite)?;
     Ok(key)
+}
+
+fn validate_dimensions(connection: &Connection, dimensions: usize) -> StorageResult<()> {
+    let current = read_vector_dimensions(connection, false)?;
+    if !(NATIVE_DIMENSION_MIN..=NATIVE_DIMENSION_MAX).contains(&dimensions)
+        || current.is_some_and(|size| size.get() != dimensions)
+    {
+        return Err(StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "unsupported or mismatched vector dimensions",
+        ));
+    }
+    Ok(())
 }
 
 fn get_or_insert_vector_key(
@@ -390,4 +435,25 @@ fn decode_unsigned(value: i64) -> StorageResult<u64> {
 }
 fn invalid_diagnostic() -> StorageError {
     StorageError::new(StorageErrorKind::InternalError, "invalid stored diagnostic")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_vector;
+    use crate::service::StorageErrorKind;
+
+    #[test]
+    fn rejects_empty_or_partially_encoded_stored_vectors() {
+        // Arrange: retain a valid component before a truncated trailing component.
+        let mut truncated = 1.0_f32.to_ne_bytes().to_vec();
+        truncated.push(0);
+        for bytes in [Vec::new(), vec![0], truncated] {
+            // Act
+            let error = decode_vector(&bytes).unwrap_err();
+            // Assert: incomplete bytes cannot silently become a shorter vector.
+            assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
+        }
+        // Act / Assert: complete finite components still decode without loss.
+        assert_eq!(decode_vector(&1.0_f32.to_ne_bytes()).unwrap(), vec![1.0]);
+    }
 }

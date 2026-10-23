@@ -1,3 +1,4 @@
+use super::{EmbeddingConfig, EmbeddingErrorKind};
 use crate::domain::{
     ByteSpan, Edge, Element, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, SourceUri,
     TreeOid,
@@ -91,6 +92,13 @@ pub struct QueryError {
     pub error: String,
 }
 
+/// One eligible knowledge row; equal search hashes can have several representatives.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmbeddingWork {
+    pub id: KnowledgeId,
+    pub search_hash: Sha256,
+}
+
 /// A whole valid file's projection; raw Markdown is not retained.
 #[derive(Debug)]
 pub struct ParsedFile {
@@ -154,4 +162,37 @@ pub struct RefreshOutcome {
     pub files_removed: usize,
     /// Invalid observations among `files_updated`.
     pub invalid_files_updated: usize,
+}
+
+/// Current readiness after validating and synchronizing configuration.
+#[derive(Debug)]
+pub enum ConfigState {
+    /// No configuration file exists.
+    Missing,
+    /// Configuration cannot currently be used; existing vectors remain intact.
+    Invalid(EmbeddingErrorKind),
+    /// Validated configuration synchronized with vector storage.
+    Ready(EmbeddingConfig),
+}
+
+/// Result of one synchronous document drain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DrainOutcome {
+    /// All eligible work is stored, skipped, or exhausted.
+    Complete,
+    /// Configuration is absent or invalid.
+    Unavailable,
+    /// Another process owns the drain lock.
+    AlreadyRunning,
+    /// Committed vector identity changed during this invocation.
+    ConfigChanged,
+}
+
+/// Query vectors remain transient and never consume document reservations.
+#[derive(Debug, PartialEq)]
+pub enum QueryEmbedding {
+    /// A validated vector under its captured configuration identity.
+    Available { identity: Sha256, vector: Vec<f32> },
+    /// Search can continue without vector ranking.
+    Unavailable,
 }

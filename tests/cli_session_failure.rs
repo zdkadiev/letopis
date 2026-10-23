@@ -1,0 +1,56 @@
+//! Isolated syscall-failure proof; the interposed symbol exists only in this test executable.
+#![cfg(any(target_os = "macos", target_os = "linux"))]
+use letopis::{
+    open_background,
+    service::{Background, CommandErrorKind, CommandResult, EmbeddingTasks},
+};
+use std::path::Path;
+
+struct ReadyWork;
+impl EmbeddingTasks for ReadyWork {
+    fn has_work(&mut self) -> CommandResult<bool> {
+        Ok(true)
+    }
+    fn drain(&mut self) -> CommandResult<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn reports_a_safe_warning_when_the_child_cannot_create_its_session() {
+    // Arrange: the executable exists, so failed exec cannot mask a lost setsid error.
+    let root = tempfile::tempdir().unwrap();
+    let executable = Path::new("/usr/bin/true");
+    assert!(executable.is_file());
+    let mut tasks = ReadyWork;
+    let mut background = open_background(root.path(), executable, Some(&mut tasks)).unwrap();
+    // Act
+    let warning = background
+        .start_if_needed()
+        .unwrap()
+        .expect("session setup must fail");
+    // Assert
+    assert_eq!(warning.code, CommandErrorKind::InternalError);
+    assert!(warning.details.is_empty());
+    let root_text = root.path().display().to_string();
+    assert!(!warning.message.contains(root_text.as_str()));
+}
+
+// The executable-local definition intercepts the real libc boundary called by
+// DetachedProcess's pre_exec closure. It must remain async-signal-safe after fork.
+#[unsafe(export_name = "setsid")]
+extern "C" fn fail_session_creation() -> libc::pid_t {
+    // SAFETY: each supported platform returns the calling thread's valid errno
+    // pointer. Writing EPERM neither allocates nor acquires a userspace lock.
+    unsafe {
+        #[cfg(target_os = "macos")]
+        {
+            *libc::__error() = libc::EPERM;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            *libc::__errno_location() = libc::EPERM;
+        }
+    }
+    -1
+}

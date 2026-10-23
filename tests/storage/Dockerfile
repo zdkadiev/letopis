@@ -3,6 +3,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git python3 && 
 RUN rustup component add rustfmt clippy
 WORKDIR /repo
 COPY Cargo.toml Cargo.lock rust-toolchain.toml clippy.toml build.rs ./
+COPY Makefile ./
+COPY .cargo/mutants.toml ./.cargo/mutants.toml
 COPY .dockerignore ./
 COPY docs/zkit/letopis/mechanics/storage-schema.sql ./docs/zkit/letopis/mechanics/
 COPY vendor ./vendor

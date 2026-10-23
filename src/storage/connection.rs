@@ -10,6 +10,7 @@ use rustix::{
 use std::cell::RefCell;
 use std::{
     error::Error,
+    fmt::Write,
     fs,
     path::{Path, PathBuf},
     thread,
@@ -29,7 +30,8 @@ pub(super) const CACHE_DATABASE: &str = "cache.db";
 pub(super) const VECTOR_DATABASE: &str = "vectors.db";
 const DATABASE_OPEN_FLAGS: OpenFlags = OpenFlags::SQLITE_OPEN_READ_WRITE
     .union(OpenFlags::SQLITE_OPEN_CREATE)
-    .union(OpenFlags::SQLITE_OPEN_NO_MUTEX);
+    .union(OpenFlags::SQLITE_OPEN_NO_MUTEX)
+    .union(OpenFlags::SQLITE_OPEN_URI);
 
 pub(super) struct ConfinedDirectory<'a> {
     path: &'a Path,
@@ -46,6 +48,62 @@ impl<'a> ConfinedDirectory<'a> {
             before_open: RefCell::new(None),
         }
     }
+
+    /// Open a named database only while its path matches the pinned service directory.
+    ///
+    /// # Errors
+    /// Rejects unsafe aliases, replacement/symlinks, native capability or `SQLite` failures.
+    pub(super) fn open_database(&self, name: &str) -> StorageResult<Connection> {
+        self.verify()?;
+        #[cfg(test)]
+        if let Some(hook) = self.before_open.take() {
+            hook();
+        }
+        // Keep the supplied path: canonicalization would hide the symlink from SQLite.
+        let connection = open_raw_database(
+            &self.path.join(name),
+            DATABASE_OPEN_FLAGS | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )?;
+        self.verify()?;
+        configure_connection(&connection)?;
+        Ok(connection)
+    }
+
+    /// Attach the confined vectors database under the connection's no-follow policy.
+    ///
+    /// # Errors
+    /// Rejects replaced/unsafe paths or `SQLite` attachment/configuration failures.
+    pub(super) fn attach_vectors(&self, connection: &Connection) -> StorageResult<()> {
+        self.verify()?;
+        #[cfg(test)]
+        if let Some(hook) = self.before_open.take() {
+            hook();
+        }
+        // ATTACH inherits SQLITE_OPEN_NOFOLLOW from this directory's main connection.
+        attach_unconfigured_vectors(connection, &self.path.join(VECTOR_DATABASE))?;
+        self.verify()?;
+        configure_database(connection, "vec")
+    }
+
+    /// Attach the confined cache read-only for hash-reference checks during vector writes.
+    ///
+    /// # Errors
+    /// Rejects changed directory/leaf paths and failures attaching the read-only database.
+    pub(super) fn attach_cache(&self, connection: &Connection) -> StorageResult<()> {
+        self.verify()?;
+        #[cfg(test)]
+        if let Some(hook) = self.before_open.take() {
+            hook();
+        }
+        attach_cache(connection, &self.path.join(CACHE_DATABASE))?;
+        self.verify()
+    }
+
+    /// Verify the retained directory and require distinct regular database leaves.
+    ///
+    /// Missing leaves are allowed for initial creation; existing aliases are rejected.
+    /// # Errors
+    /// Reports unsafe paths, replacement or failed descriptor/path observations.
     pub(super) fn verify(&self) -> StorageResult<()> {
         let directory = open(
             self.path,
@@ -77,34 +135,6 @@ impl<'a> ConfinedDirectory<'a> {
             Err(Errno::NOENT) => Ok(None),
             Err(error) => Err(map_path_error(error)),
         }
-    }
-
-    pub(super) fn open_database(&self, name: &str) -> StorageResult<Connection> {
-        self.verify()?;
-        #[cfg(test)]
-        if let Some(hook) = self.before_open.take() {
-            hook();
-        }
-        // Keep the supplied path: canonicalization would hide the symlink from SQLite.
-        let connection = open_raw_database(
-            &self.path.join(name),
-            DATABASE_OPEN_FLAGS | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        )?;
-        self.verify()?;
-        configure_connection(&connection)?;
-        Ok(connection)
-    }
-
-    pub(super) fn attach_vectors(&self, connection: &Connection) -> StorageResult<()> {
-        self.verify()?;
-        #[cfg(test)]
-        if let Some(hook) = self.before_open.take() {
-            hook();
-        }
-        // ATTACH inherits SQLITE_OPEN_NOFOLLOW from this directory's main connection.
-        attach_unconfigured_vectors(connection, &self.path.join(VECTOR_DATABASE))?;
-        self.verify()?;
-        configure_database(connection, "vec")
     }
 }
 
@@ -284,6 +314,35 @@ fn attach_unconfigured_vectors(connection: &Connection, path: &Path) -> StorageR
     Ok(())
 }
 
+pub(super) fn attach_cache(connection: &Connection, path: &Path) -> StorageResult<()> {
+    let filename = path.to_str().ok_or_else(|| {
+        StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "invalid cache database path",
+        )
+    })?;
+    // Encode URI delimiters and UTF-8 bytes; only the absolute path's separators survive.
+    let mut uri = String::from("file:");
+    for byte in filename.bytes() {
+        if byte.is_ascii_alphanumeric() || b"/-._~".contains(&byte) {
+            uri.push(char::from(byte));
+        } else {
+            write!(&mut uri, "%{byte:02X}").map_err(|cause| {
+                StorageError::new_with_cause(
+                    StorageErrorKind::InternalError,
+                    "cache URI encoding failed",
+                    cause,
+                )
+            })?;
+        }
+    }
+    uri.push_str("?mode=ro");
+    connection
+        .execute("ATTACH DATABASE ?1 AS cache", [uri])
+        .map_err(map_sqlite)?;
+    Ok(())
+}
+
 fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()> {
     // `schema` is private and only the literal main/vec names reach this helper.
     connection
@@ -368,13 +427,40 @@ fn verify_capabilities(connection: &Connection) -> StorageResult<()> {
 }
 
 #[cfg(test)]
+#[path = "connection_policy_tests.rs"]
+mod policy_tests;
+
+#[cfg(test)]
 mod tests {
-    use super::{ConfinedDirectory, attach_vectors, open_database};
+    use super::{ConfinedDirectory, attach_cache, attach_vectors, open_database};
+    use rusqlite::ErrorCode;
     use std::{
         fs::{self, File},
         os::unix::fs::symlink,
     };
     use tempfile::TempDir;
+
+    #[test]
+    fn reject_cache_attachment_symlink_installed_after_validation() {
+        // Arrange: pin the service directory and open the vector connection.
+        let root = TempDir::new().unwrap();
+        let path = fs::canonicalize(root.path()).unwrap();
+        let outside = TempDir::new().unwrap();
+        let target = outside.path().join("outside.db");
+        fs::write(&target, []).unwrap();
+        let pinned = File::open(&path).unwrap();
+        let directory = ConfinedDirectory::new(&path, &pinned);
+        let connection = directory.open_database("vectors.db").unwrap();
+        let link = path.join("cache.db");
+        let destination = target.clone();
+        directory.before_open.replace(Some(Box::new(move || {
+            symlink(destination, link).unwrap();
+        })));
+        // Act / Assert: the read-only ATTACH inherits NOFOLLOW, including a URI.
+        assert!(directory.attach_cache(&connection).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"");
+        assert!(!outside.path().join("outside.db-wal").exists());
+    }
 
     #[test]
     fn reject_database_leaf_symlink_installed_after_directory_validation() {
@@ -459,6 +545,33 @@ mod tests {
         let connection = open_database(&cache).unwrap();
         attach_vectors(&connection, &vectors).unwrap();
         assert_policy(&connection, "vec");
+    }
+
+    #[test]
+    fn attached_cache_is_read_only_with_encoded_path_delimiters() {
+        // Arrange: delimiters, quotes and UTF-8 must name the literal file.
+        let root = TempDir::new().unwrap();
+        let cache = root.path().join("cache ?#%é' name.db");
+        let writer = open_database(&cache).unwrap();
+        writer.pragma_update(None, "user_version", 7).unwrap();
+        let vectors = open_database(&root.path().join("vectors")).unwrap();
+        // Act
+        attach_cache(&vectors, &cache).unwrap();
+        let version: i64 = vectors
+            .query_row("PRAGMA cache.user_version", [], |r| r.get(0))
+            .unwrap();
+        let error = vectors
+            .execute_batch("PRAGMA cache.user_version=8;")
+            .unwrap_err();
+        // Assert: the attached URI uses the intended database and rejects writes.
+        assert_eq!(version, 7);
+        assert_eq!(error.sqlite_error_code(), Some(ErrorCode::ReadOnly));
+        assert_eq!(
+            writer
+                .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+                .unwrap(),
+            7
+        );
     }
 
     fn assert_policy(connection: &rusqlite::Connection, schema: &str) {
