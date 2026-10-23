@@ -1,15 +1,15 @@
 use super::{
-    Background, CommandError, CommandErrorKind, CommandProblem, CommandResult, DrainProcess,
-    EmbedLocks, EmbeddingTasks,
+    BackgroundRunner, CommandError, CommandErrorKind, CommandProblem, CommandResult, DrainLauncher,
+    EmbedLocker, EmbeddingExecutor,
 };
 
 pub(crate) struct BackgroundService<'a, F, P> {
-    tasks: Option<&'a mut dyn EmbeddingTasks>,
+    tasks: Option<&'a mut dyn EmbeddingExecutor>,
     files: F,
     process: P,
 }
-impl<'a, F: EmbedLocks, P: DrainProcess> BackgroundService<'a, F, P> {
-    pub(crate) fn new(tasks: Option<&'a mut dyn EmbeddingTasks>, files: F, process: P) -> Self {
+impl<'a, F: EmbedLocker, P: DrainLauncher> BackgroundService<'a, F, P> {
+    pub(crate) fn new(tasks: Option<&'a mut dyn EmbeddingExecutor>, files: F, process: P) -> Self {
         Self {
             tasks,
             files,
@@ -17,7 +17,7 @@ impl<'a, F: EmbedLocks, P: DrainProcess> BackgroundService<'a, F, P> {
         }
     }
 }
-impl<F: EmbedLocks, P: DrainProcess> Background for BackgroundService<'_, F, P> {
+impl<F: EmbedLocker, P: DrainLauncher> BackgroundRunner for BackgroundService<'_, F, P> {
     fn start_if_needed(&mut self) -> CommandResult<Option<CommandProblem>> {
         let Some(tasks) = self.tasks.as_deref_mut() else {
             return Ok(None);
@@ -56,8 +56,8 @@ fn build_warning() -> CommandProblem {
 mod tests {
     use super::BackgroundService;
     use crate::service::{
-        Background, CommandError, CommandErrorKind, CommandResult, DocumentError,
-        DocumentErrorKind, DocumentResult, DrainProcess, EmbedLocks, EmbeddingTasks,
+        BackgroundRunner, CommandError, CommandErrorKind, CommandResult, DocumentError,
+        DocumentErrorKind, DocumentResult, DrainLauncher, EmbedLocker, EmbeddingExecutor,
     };
     use std::{cell::RefCell, io};
 
@@ -68,7 +68,7 @@ mod tests {
         ready: CommandResult<bool>,
         result: CommandResult<()>,
     }
-    impl EmbeddingTasks for Tasks<'_> {
+    impl EmbeddingExecutor for Tasks<'_> {
         fn has_work(&mut self) -> CommandResult<bool> {
             self.calls.0.borrow_mut().push("ready");
             std::mem::replace(&mut self.ready, Ok(false))
@@ -89,7 +89,7 @@ mod tests {
         busy: bool,
         fails: bool,
     }
-    impl<'a> EmbedLocks for Locks<'a> {
+    impl<'a> EmbedLocker for Locks<'a> {
         type EmbedLock = Lease<'a>;
         fn try_lock_embed(&self) -> DocumentResult<Option<Lease<'a>>> {
             self.calls.0.borrow_mut().push("probe");
@@ -107,7 +107,7 @@ mod tests {
         calls: &'a Calls,
         fails: bool,
     }
-    impl DrainProcess for Process<'_> {
+    impl DrainLauncher for Process<'_> {
         fn spawn_drain(&self) -> CommandResult<()> {
             self.calls.0.borrow_mut().push("spawn");
             if self.fails {

@@ -1,6 +1,6 @@
 use super::{
-    CacheWrite, CorpusFiles, DocumentError, DocumentErrorKind, DocumentResult, Documents, FileRow,
-    FileStat, FileSystem, Markdown, RefreshOutcome, Storage, StorageRead,
+    CacheWrite, CorpusLister, DocumentError, DocumentErrorKind, DocumentResult, FileRow, FileStat,
+    FileSystem, MarkdownCodec, RefreshOutcome, Refresher, Storage, StorageRead,
     projection::{
         EffectiveGraph, FileProjection, PreparedProjection, prepare_file, prepare_removal, publish,
     },
@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const RACY_WINDOW_NS: i64 = 1_000_000_000;
 
-pub(crate) struct DocumentService<G, F, M, S> {
+pub(crate) struct DocumentRefresher<G, F, M, S> {
     git: G,
     filesystem: F,
     markdown: M,
@@ -34,7 +34,7 @@ impl Delta {
         self.updated.is_empty() && self.removed.is_empty()
     }
 }
-impl<G, F, M, S> DocumentService<G, F, M, S> {
+impl<G, F, M, S> DocumentRefresher<G, F, M, S> {
     pub(crate) fn new(git: G, filesystem: F, markdown: M, storage: S) -> Self {
         Self {
             git,
@@ -44,7 +44,7 @@ impl<G, F, M, S> DocumentService<G, F, M, S> {
         }
     }
 }
-impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> DocumentService<G, F, M, S> {
+impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, S: Storage> DocumentRefresher<G, F, M, S> {
     fn read_file_state(&mut self) -> DocumentResult<FileState> {
         let mut read = self.storage.begin_read()?;
         Ok(FileState {
@@ -134,8 +134,8 @@ impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> DocumentService<G, 
         Ok(outcome)
     }
 }
-impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> Documents
-    for DocumentService<G, F, M, S>
+impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, S: Storage> Refresher
+    for DocumentRefresher<G, F, M, S>
 {
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
         let preliminary = self.read_file_state()?;

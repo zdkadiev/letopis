@@ -2,7 +2,7 @@
 use super::{Handlers, Request, parse_request, write_response};
 use crate::{
     domain::{KnowledgeId, LineRange, RepoPath},
-    service::{CommandErrorKind, CommandResult, SearchFlag, SearchLink, SearchRequest, Searches},
+    service::{CommandErrorKind, CommandResult, SearchFlag, SearchLink, SearchRequest, Searcher},
 };
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, ffi::OsString, num::NonZeroUsize};
@@ -122,7 +122,7 @@ fn search_handler_dispatches_typed_request_and_renders_links() {
 }
 
 struct SearchDouble;
-impl Searches for SearchDouble {
+impl Searcher for SearchDouble {
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
         assert_eq!(request.query, "private query");
         assert_eq!(request.limit.get(), 3);

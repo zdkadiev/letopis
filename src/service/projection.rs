@@ -1,10 +1,10 @@
 #[cfg(test)]
-use super::document::reach_checkpoint;
+use super::document_refresher::reach_checkpoint;
 use super::{
     CacheWrite, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileRow,
-    FileSystem, KnowledgeMetadata, Markdown, NodeMetadata, ParsedFile, RefreshOutcome,
+    FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile, RefreshOutcome,
     SourceMetadata, StorageRead,
-    document::{Observation, fail_changed},
+    document_refresher::{Observation, fail_changed},
 };
 use crate::domain::{
     Edge, EdgeTarget, KnowledgeId, LineRange, RepoPath, Sha256, SourceUri, derive_element_kind,
@@ -187,7 +187,7 @@ pub(super) fn prepare_removal(
     }
 }
 
-pub(super) fn prepare_file<F: FileSystem, M: Markdown>(
+pub(super) fn prepare_file<F: FileSystem, M: MarkdownCodec>(
     request: &FileProjection<'_, F, M>,
 ) -> DocumentResult<PreparedProjection> {
     let FileProjection {

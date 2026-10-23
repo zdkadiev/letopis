@@ -1,7 +1,7 @@
 use letopis::domain::RepoPath;
 use letopis::markdown::{MarkdownParser, parse};
 use letopis::open_embedding_files;
-use letopis::service::{EmbeddingFiles, Markdown, ParsedFile};
+use letopis::service::{EmbeddingFiles, MarkdownCodec, ParsedFile};
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};

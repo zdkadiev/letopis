@@ -1,10 +1,11 @@
 //! Test-only executor fixture. It proves process mechanics, never product embedding.
 use letopis::{
-    open_background, open_documents, open_embedding_tasks, open_filesystem, open_storage,
+    open_filesystem, open_storage,
     service::{
-        Background, CommandError, CommandErrorKind, CommandResult, Documents, EmbedLocks,
-        EmbeddingTasks, FileSystem,
+        BackgroundRunner, CommandError, CommandErrorKind, CommandResult, EmbedLocker,
+        EmbeddingExecutor, FileSystem, Refresher,
     },
+    wire_background_runner, wire_document_refresher, wire_embedding_executor,
 };
 use serde_json::{Value, json};
 use std::{
@@ -25,7 +26,7 @@ struct FixtureTasks {
     control: Option<BufReader<UnixStream>>,
     root: PathBuf,
 }
-impl EmbeddingTasks for FixtureTasks {
+impl EmbeddingExecutor for FixtureTasks {
     fn has_work(&mut self) -> CommandResult<bool> {
         Ok(true)
     }
@@ -160,7 +161,7 @@ fn run_drain(root: &Path) -> Result<(), Box<dyn Error>> {
         control: Some(control),
         root: root.to_path_buf(),
     };
-    open_background(root, &env::current_exe()?, Some(&mut tasks))?.drain()?;
+    wire_background_runner(root, &env::current_exe()?, Some(&mut tasks))?.drain()?;
     Ok(())
 }
 fn run_foreground(root: &Path) -> Result<(), Box<dyn Error>> {
@@ -177,7 +178,7 @@ fn run_foreground(root: &Path) -> Result<(), Box<dyn Error>> {
         control: None,
         root: root.to_path_buf(),
     };
-    let warning = open_background(root, &executable, Some(&mut tasks))?.start_if_needed()?;
+    let warning = wire_background_runner(root, &executable, Some(&mut tasks))?.start_if_needed()?;
     // SAFETY: getsid(0) queries this process and has no pointer arguments.
     let sid = unsafe { libc::getsid(0) };
     println!(
@@ -203,9 +204,9 @@ fn run_product_foreground(root: &Path) -> Result<(), Box<dyn Error>> {
     if executable == env::current_exe()? {
         return Err("product drain must not execute the fixture".into());
     }
-    open_documents(root)?.refresh()?;
-    let mut tasks = open_embedding_tasks(root)?;
-    let warning = open_background(root, &executable, Some(&mut tasks))?.start_if_needed()?;
+    wire_document_refresher(root)?.refresh()?;
+    let mut tasks = wire_embedding_executor(root)?;
+    let warning = wire_background_runner(root, &executable, Some(&mut tasks))?.start_if_needed()?;
     println!(
         "{}",
         json!({"event":"product-foreground", "warning":warning.map(|w| w.message)})

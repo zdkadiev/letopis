@@ -1,7 +1,7 @@
 mod support;
 use letopis::{
+    build_embedding_provider,
     domain::Sha256,
-    open_embedding_provider,
     service::{EmbeddingConfig, EmbeddingErrorKind, EmbeddingProvider},
 };
 use serde_json::json;
@@ -34,7 +34,7 @@ fn accepts_valid_responses_between_one_and_ten_mebibytes() {
     .unwrap();
     let config = EmbeddingConfig::parse(&bytes).unwrap();
     // Act
-    let vectors = open_embedding_provider()
+    let vectors = build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap();

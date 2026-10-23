@@ -5,7 +5,7 @@ use crate::domain::RepoPath;
 ///
 /// Every implementation publishes a refresh atomically: readers see either the previous
 /// projection or the complete new one, never a partial update.
-pub trait Documents {
+pub trait Refresher {
     /// Detect and atomically publish changed file projections.
     ///
     /// # Errors
@@ -15,7 +15,7 @@ pub trait Documents {
 /// Repository-owned discovery of Markdown candidate paths.
 ///
 /// Every implementation reports only normalized root-relative paths and never reads file bodies.
-pub trait CorpusFiles {
+pub trait CorpusLister {
     /// List normalized, deduplicated candidates including deleted tracked files.
     ///
     /// # Errors
@@ -54,7 +54,7 @@ pub trait FileSystem {
 /// Pure shared Markdown projection and search-text codec.
 ///
 /// Every implementation is deterministic and performs no I/O: equal bytes give equal results.
-pub trait Markdown {
+pub trait MarkdownCodec {
     /// Parse a whole file atomically; unmarked Markdown produces `None`.
     ///
     /// # Errors

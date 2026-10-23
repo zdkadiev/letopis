@@ -1,7 +1,7 @@
 use super::{LocalFileSystem, observe_descriptor, reopen_concurrently_created_lock};
 use crate::{
     domain::RepoPath,
-    service::{DocumentErrorKind, EmbedLocks, FileSystem},
+    service::{DocumentErrorKind, EmbedLocker, FileSystem},
 };
 use rustix::{
     fs::{FlockOperation, flock, fstat},

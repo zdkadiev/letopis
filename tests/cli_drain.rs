@@ -8,8 +8,9 @@ mod support;
 
 use drain::{DetachedOwner, Fixture, SECRET, SUCCESS, WAIT, assert_released, assert_success};
 use letopis::{
-    open_documents, open_embedding_tasks, open_filesystem,
-    service::{ConfigState, Documents, EmbedLocks, EmbeddingTasks, Embeddings},
+    open_filesystem,
+    service::{ConfigState, EmbedLocker, Embedder, EmbeddingExecutor, Refresher},
+    wire_document_refresher, wire_embedding_executor,
 };
 use serde_json::Value;
 use std::{
@@ -94,7 +95,7 @@ fn missing_invalid_or_empty_work_never_launches_a_product() {
             "empty" => {
                 fixture.write_config(&http.get_base_url(), 0);
                 fixture.repo.remove("knowledge.md");
-                open_documents(fixture.repo.get_root())
+                wire_document_refresher(fixture.repo.get_root())
                     .unwrap()
                     .refresh()
                     .unwrap();
@@ -184,12 +185,12 @@ fn identity_reset_during_product_http_discards_the_late_result() {
     barrier.wait_until_entered();
     // Act: another real invocation synchronizes a changed identity during HTTP.
     let current = fixture.write_config(&http.get_base_url(), 1);
-    let mut next = open_embedding_tasks(fixture.repo.get_root()).unwrap();
+    let mut next = wire_embedding_executor(fixture.repo.get_root()).unwrap();
     assert!(matches!(
         next.read_configuration().unwrap(),
         ConfigState::Ready(_)
     ));
-    assert!(EmbeddingTasks::has_work(&mut next).unwrap());
+    assert!(EmbeddingExecutor::has_work(&mut next).unwrap());
     barrier.release();
     assert_success(&child.collect_output(WAIT));
     // Assert old work did not publish into the new identity; a fresh drain can finish.

@@ -1,16 +1,16 @@
 //! Production-process schedules. Only this private test driver reads control variables.
-use super::super::DocumentService;
+use super::super::DocumentRefresher;
 use crate::{
     domain::{Edge, RepoPath, Sha256},
     filesystem::LocalFileSystem,
     git::GitCli,
     markdown::MarkdownParser,
-    open_documents,
     service::{
-        CacheWrite, Documents, EmbeddingFailure, FileRow, FileSystem, NodeMetadata, QueryError,
+        CacheWrite, EmbeddingFailure, FileRow, FileSystem, NodeMetadata, QueryError, Refresher,
         Storage, StorageError, StorageRead, StorageResult, StoredNode, VectorOutcome, VectorWrite,
     },
     storage::SqliteStorage,
+    wire_document_refresher,
 };
 use rusqlite::Connection;
 use std::{
@@ -32,7 +32,7 @@ use tempfile::TempDir;
 
 const TIME: i64 = 42;
 const WAIT: Duration = Duration::from_secs(20);
-const CHILD: &str = "service::document::tests::process::run_child";
+const CHILD: &str = "service::document_refresher::tests::process::run_child";
 const SOURCE: &[u8] = b"external source\r\nexact bytes\n";
 const OLD: &str = "<!-- letopis: {\"created_at\":1} -->\nAlphaToken [source](source.txt \"letopis:type=external\")\n";
 const NEW: &str = "<!-- letopis: {\"created_at\":3} -->\nBravoToken [source](source.txt \"letopis:type=external\")\n";
@@ -50,7 +50,7 @@ const CUTS: [&str; 10] = [
     "before_commit",
     "after_commit",
 ];
-type Service = DocumentService<GitCli, LocalFileSystem, MarkdownParser, SqliteStorage>;
+type Service = DocumentRefresher<GitCli, LocalFileSystem, MarkdownParser, SqliteStorage>;
 type Tokens = Vec<(String, i64, String, i64)>;
 thread_local! {
     static CONTROL: RefCell<Option<UnixStream>> = const { RefCell::new(None) };
@@ -584,7 +584,7 @@ fn late_storage_error_rolls_back_every_cache_mutation() {
 
 fn run_normal_service(root: &Path, mode: &str) {
     LocalFileSystem::configure_next_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
-    let mut service = open_documents(root).unwrap();
+    let mut service = wire_document_refresher(root).unwrap();
     reach_checkpoint("opened");
     let outcome = service.refresh().unwrap();
     assert_eq!(outcome.published, mode != "noop");
@@ -639,7 +639,7 @@ fn build_service(root: &Path) -> Service {
     let directory = filesystem.open_service_directory().unwrap();
     let storage =
         SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory).unwrap();
-    DocumentService::new(git, filesystem, MarkdownParser::new(), storage)
+    DocumentRefresher::new(git, filesystem, MarkdownParser::new(), storage)
 }
 
 fn read_git_objects(root: &Path) -> Vec<u8> {

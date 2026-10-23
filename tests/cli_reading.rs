@@ -13,11 +13,12 @@ mod drain;
 mod support;
 use letopis::{
     domain::{RepoPath, TreeOid},
-    open_documents, open_embedding_tasks, open_filesystem, open_git_snapshots,
+    open_filesystem, open_git_snapshots,
     service::{
-        Documents, EmbedLocks, EmbeddingTasks, GitSnapshots, NodeMetadata, Storage, StorageRead,
-        VectorOutcome,
+        EmbedLocker, EmbeddingExecutor, GitSnapshots, NodeMetadata, Refresher, Storage,
+        StorageRead, VectorOutcome,
     },
+    wire_document_refresher, wire_embedding_executor,
 };
 use serde_json::{Value, json};
 use std::{
@@ -164,7 +165,10 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
             body: "PRIVATE_PROVIDER_BODY".into(),
         });
         let config = repo.write_config(provider, &server.get_base_url(), "fixture");
-        open_documents(repo.get_root()).unwrap().refresh().unwrap();
+        wire_document_refresher(repo.get_root())
+            .unwrap()
+            .refresh()
+            .unwrap();
         repo.seed_vectors(&config, &[("knowledge.md", &[1.0, 0.0])]);
         let response = read_response(
             &repo.invoke(&["search"], br#"{"query":"sqlite","limit":1}"#),
@@ -262,9 +266,12 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
             body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
         });
         repo.write_config("ollama", &http.get_base_url(), "fixture");
-        open_documents(repo.get_root()).unwrap().refresh().unwrap();
+        wire_document_refresher(repo.get_root())
+            .unwrap()
+            .refresh()
+            .unwrap();
         assert!(
-            open_embedding_tasks(repo.get_root())
+            wire_embedding_executor(repo.get_root())
                 .unwrap()
                 .has_work()
                 .unwrap()
@@ -286,7 +293,7 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
         );
         assert!(http.take_requests().is_empty());
         assert!(
-            open_embedding_tasks(repo.get_root())
+            wire_embedding_executor(repo.get_root())
                 .unwrap()
                 .has_work()
                 .unwrap()
@@ -327,7 +334,7 @@ fn nested_search_and_inspect_launch_the_existing_drain_only_at_repository_root()
             vec![json!({"model":"fixture","input":["sqlite"],"truncate":false})]
         );
         assert!(
-            !open_embedding_tasks(repo.get_root())
+            !wire_embedding_executor(repo.get_root())
                 .unwrap()
                 .has_work()
                 .unwrap()

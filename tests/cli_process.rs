@@ -5,7 +5,7 @@ mod cli;
 use cli::{Fixture, finish_foreground, wait_for_embed_lock};
 use letopis::{
     open_filesystem,
-    service::{DocumentResult, EmbedLocks},
+    service::{DocumentResult, EmbedLocker},
 };
 use std::{cell::RefCell, fs, os::unix::fs::MetadataExt};
 
@@ -104,11 +104,11 @@ fn exec_failure_returns_safe_warning() {
     assert!(!response.to_string().contains("secret"));
 }
 
-struct ReleaseAfterBusyProbe<F: EmbedLocks> {
+struct ReleaseAfterBusyProbe<F: EmbedLocker> {
     files: F,
     owner: RefCell<Option<F::EmbedLock>>,
 }
-impl<F: EmbedLocks> EmbedLocks for ReleaseAfterBusyProbe<F> {
+impl<F: EmbedLocker> EmbedLocker for ReleaseAfterBusyProbe<F> {
     type EmbedLock = F::EmbedLock;
 
     fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>> {

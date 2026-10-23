@@ -1,11 +1,11 @@
 mod support;
 use letopis::{
     domain::LineRange,
-    open_documents, open_searches,
     service::{
-        CommandErrorKind, Documents, NodeMetadata, SearchFlag, SearchRequest, Searches, Storage,
+        CommandErrorKind, NodeMetadata, Refresher, SearchFlag, SearchRequest, Searcher, Storage,
         StorageRead, VectorOutcome,
     },
+    wire_document_refresher, wire_searcher,
 };
 use std::num::NonZeroUsize;
 use support::{
@@ -21,7 +21,7 @@ fn search_refreshes_and_returns_only_knowledge_links() {
         "sqlite\n[source](src/sqlite.rs \"letopis:type=external\")",
     );
     repo.write("plain.md", b"sqlite");
-    let links = open_searches(repo.get_root())
+    let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 10))
         .unwrap();
@@ -37,7 +37,7 @@ fn fts_literals_work_on_native_tokenizer() {
     let repo = ReadingRepo::new();
     repo.write_knowledge("all.md", "SQLite OR блокировки NEAR x title café 42");
     repo.write_knowledge("partial.md", "SQLite");
-    let mut search = open_searches(repo.get_root()).unwrap();
+    let mut search = wire_searcher(repo.get_root()).unwrap();
     for query in [
         "SQLite OR блокировки",
         "\"NEAR(x*)\" title:café 42",
@@ -62,12 +62,15 @@ fn empty_query_never_calls_match_or_provider() {
         body: "must not call".into(),
     });
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     repo.write_knowledge("b.md", "new");
     for query in ["", " * : () \" "] {
         assert!(
-            open_searches(repo.get_root())
+            wire_searcher(repo.get_root())
                 .unwrap()
                 .search(&make_request(query, 2))
                 .unwrap()
@@ -88,7 +91,7 @@ fn search_uses_prepared_vectors_and_actual_query_client() {
         body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
     });
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
-    let revision = open_documents(repo.get_root())
+    let revision = wire_document_refresher(repo.get_root())
         .unwrap()
         .refresh()
         .unwrap()
@@ -101,7 +104,7 @@ fn search_uses_prepared_vectors_and_actual_query_client() {
             ("c.md", &[1.0, 0.0]),
         ],
     );
-    let links = open_searches(repo.get_root())
+    let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap();
@@ -135,9 +138,12 @@ fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
         body: "SECRET".into(),
     });
     let config = repo.write_config("openai", &server.get_base_url(), "fixture");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
-    let links = open_searches(repo.get_root())
+    let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap();
@@ -162,9 +168,12 @@ fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
 fn invalid_live_knowledge_retains_pinned_link_as_stale() {
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     repo.write("a.md", b"<!-- letopis: {invalid} -->\ncurrent");
-    let links = open_searches(repo.get_root())
+    let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap();
@@ -179,10 +188,13 @@ fn invalid_live_knowledge_retains_pinned_link_as_stale() {
 fn search_propagates_non_config_io_failures() {
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     std::fs::remove_file(repo.get_root().join("a.md")).unwrap();
     std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("a.md")).unwrap();
-    let error = open_searches(repo.get_root())
+    let error = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap_err();
@@ -201,7 +213,7 @@ fn unreadable_invalid_and_missing_configuration_permit_fts_without_provider() {
             }
             _ => {}
         }
-        let links = open_searches(repo.get_root())
+        let links = wire_searcher(repo.get_root())
             .unwrap()
             .search(&make_request("sqlite", 2))
             .unwrap();
@@ -224,7 +236,7 @@ fn missing_vector_dimensions_skip_inference_and_shared_hashes_keep_distinct_ids(
         body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
     });
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
-    let mut search = open_searches(repo.get_root()).unwrap();
+    let mut search = wire_searcher(repo.get_root()).unwrap();
     let first = search.search(&make_request("sqlite", 10)).unwrap();
     assert_eq!(first.len(), 2);
     assert!(server.take_requests().is_empty());
@@ -244,7 +256,10 @@ fn mismatched_persisted_knowledge_uri_fails_even_beyond_final_limit() {
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite sqlite sqlite");
     repo.write_knowledge("b.md", "sqlite plus extra words");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
         .execute(
@@ -252,7 +267,7 @@ fn mismatched_persisted_knowledge_uri_fails_even_beyond_final_limit() {
             ["wrong.md", "b.md"],
         )
         .unwrap();
-    let error = open_searches(repo.get_root())
+    let error = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 1))
         .unwrap_err();
@@ -262,12 +277,15 @@ fn mismatched_persisted_knowledge_uri_fails_even_beyond_final_limit() {
 fn stale_coordinates_are_observed_without_replacing_pinned_lines() {
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
         .execute("UPDATE nodes SET line_start = 2 WHERE id = ?1", ["a.md"])
         .unwrap();
-    let links = open_searches(repo.get_root())
+    let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap();
@@ -287,11 +305,14 @@ fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
         body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
     });
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[0.0, 1.0]), ("b.md", &[1.0, 0.0])]);
     repo.write_knowledge("a.md", "current sqlite");
     repo.write_knowledge("b.md", "current unrelated");
-    let links = open_searches(repo.get_root())
+    let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 10))
         .unwrap();

@@ -1,13 +1,13 @@
 //! Isolated syscall-failure proof; the interposed symbol exists only in this test executable.
 #![cfg(any(target_os = "macos", target_os = "linux"))]
 use letopis::{
-    open_background,
-    service::{Background, CommandErrorKind, CommandResult, EmbeddingTasks},
+    service::{BackgroundRunner, CommandErrorKind, CommandResult, EmbeddingExecutor},
+    wire_background_runner,
 };
 use std::path::Path;
 
 struct ReadyWork;
-impl EmbeddingTasks for ReadyWork {
+impl EmbeddingExecutor for ReadyWork {
     fn has_work(&mut self) -> CommandResult<bool> {
         Ok(true)
     }
@@ -23,7 +23,7 @@ fn reports_a_safe_warning_when_the_child_cannot_create_its_session() {
     let executable = Path::new("/usr/bin/true");
     assert!(executable.is_file());
     let mut tasks = ReadyWork;
-    let mut background = open_background(root.path(), executable, Some(&mut tasks)).unwrap();
+    let mut background = wire_background_runner(root.path(), executable, Some(&mut tasks)).unwrap();
     // Act
     let warning = background
         .start_if_needed()

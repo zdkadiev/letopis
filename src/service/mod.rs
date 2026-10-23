@@ -2,7 +2,7 @@
 mod background;
 mod command;
 mod command_traits;
-mod document;
+mod document_refresher;
 mod document_traits;
 mod embedding;
 mod embedding_config;
@@ -19,7 +19,7 @@ mod snapshot_traits;
 mod storage;
 
 pub(crate) use background::BackgroundService;
-pub(crate) use document::DocumentService;
+pub(crate) use document_refresher::DocumentRefresher;
 pub(crate) use embedding::EmbeddingService;
 pub(crate) use inspection::InspectionService;
 pub(crate) use search::{SearchDependencies, SearchService};
@@ -29,13 +29,13 @@ pub use command::{
     InspectedElement, Inspection, SearchFlag, SearchLink, SearchRequest,
 };
 pub use command_traits::{
-    Background, Checks, DrainProcess, EmbedLocks, EmbeddingTasks, Inspections, Searches,
+    BackgroundRunner, Checker, DrainLauncher, EmbedLocker, EmbeddingExecutor, Inspector, Searcher,
 };
-pub use document_traits::{CorpusFiles, Documents, FileSystem, Markdown};
+pub use document_traits::{CorpusLister, FileSystem, MarkdownCodec, Refresher};
 pub use embedding_config::{EmbeddingConfig, ProviderKind};
 pub(crate) use embedding_config::{MAX_DIMENSIONS, MIN_DIMENSIONS};
 pub use embedding_error::{EmbeddingError, EmbeddingErrorKind, EmbeddingResult};
-pub use embedding_traits::{EmbeddingFiles, EmbeddingProvider, Embeddings};
+pub use embedding_traits::{Embedder, EmbeddingFiles, EmbeddingProvider};
 pub use error::{
     DocumentError, DocumentErrorKind, DocumentResult, StorageError, StorageErrorKind, StorageResult,
 };

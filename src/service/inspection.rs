@@ -1,13 +1,13 @@
 use super::{
-    CommandError, CommandErrorKind, CommandResult, CorpusFiles, DocumentError, DocumentErrorKind,
-    Documents, ElementAddress, FileSystem, GitSnapshots, InspectedElement, Inspection, Inspections,
-    Markdown, ParsedFile, SnapshotEntry, SnapshotError, SnapshotErrorKind,
+    CommandError, CommandErrorKind, CommandResult, CorpusLister, DocumentError, DocumentErrorKind,
+    ElementAddress, FileSystem, GitSnapshots, InspectedElement, Inspection, Inspector,
+    MarkdownCodec, ParsedFile, Refresher, SnapshotEntry, SnapshotError, SnapshotErrorKind,
 };
 use crate::domain::{EdgeTarget, RepoPath};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) struct InspectionService<D, G, F, M> {
-    documents: D,
+    refresher: D,
     git: G,
     filesystem: F,
     markdown: M,
@@ -19,20 +19,20 @@ struct CapturedKnowledge {
     sources: BTreeSet<String>,
 }
 impl<D, G, F, M> InspectionService<D, G, F, M> {
-    pub(crate) fn new(documents: D, git: G, filesystem: F, markdown: M) -> Self {
+    pub(crate) fn new(refresher: D, git: G, filesystem: F, markdown: M) -> Self {
         Self {
-            documents,
+            refresher,
             git,
             filesystem,
             markdown,
         }
     }
 }
-impl<D: Documents, G: CorpusFiles + GitSnapshots, F: FileSystem, M: Markdown> Inspections
+impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileSystem, M: MarkdownCodec> Inspector
     for InspectionService<D, G, F, M>
 {
     fn inspect(&mut self, ids: &[ElementAddress]) -> CommandResult<Inspection> {
-        self.documents.refresh().map_err(map_document_error)?;
+        self.refresher.refresh().map_err(map_document_error)?;
         let requested = ids
             .iter()
             .map(ElementAddress::as_str)
@@ -57,7 +57,7 @@ impl<D: Documents, G: CorpusFiles + GitSnapshots, F: FileSystem, M: Markdown> In
         })
     }
 }
-impl<D, G: GitSnapshots, F: FileSystem, M: Markdown> InspectionService<D, G, F, M> {
+impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G, F, M> {
     // Each call owns and drops one file's bytes and parsed search text before the next read.
     fn capture_file(
         &self,
@@ -154,8 +154,8 @@ mod tests {
         domain::{BlobOid, RepoPath, TreeOid},
         markdown::MarkdownParser,
         service::{
-            CapturedFile, CorpusFiles, DocumentResult, Documents, ElementAddress, FileStat,
-            FileSystem, GitSnapshots, Inspections, RefreshOutcome, RetainedTree, SnapshotEntry,
+            CapturedFile, CorpusLister, DocumentResult, ElementAddress, FileStat, FileSystem,
+            GitSnapshots, Inspector, RefreshOutcome, Refresher, RetainedTree, SnapshotEntry,
             SnapshotError, SnapshotFile,
         },
     };
@@ -197,7 +197,7 @@ mod tests {
         );
     }
 
-    impl Documents for RecordingDocuments {
+    impl Refresher for RecordingDocuments {
         fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
             self.0.borrow_mut().push("refresh".into());
             Ok(RefreshOutcome {
@@ -209,7 +209,7 @@ mod tests {
             })
         }
     }
-    impl CorpusFiles for RecordingGit {
+    impl CorpusLister for RecordingGit {
         fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
             self.0.borrow_mut().push("list".into());
             Ok(["a.md", "b.md"]

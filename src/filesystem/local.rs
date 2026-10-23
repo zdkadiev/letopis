@@ -5,8 +5,8 @@ use super::{
 use crate::{
     domain::RepoPath,
     service::{
-        CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, EmbedLocks, EmbeddingFiles,
-        EmbeddingResult, FileStat, FileSystem,
+        CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, EmbedLocker,
+        EmbeddingFiles, EmbeddingResult, FileStat, FileSystem,
     },
     utils::SERVICE_DIRECTORY,
 };
@@ -151,7 +151,7 @@ impl EmbeddingFiles for LocalFileSystem {
     }
 
     fn try_lock_embed(&self) -> EmbeddingResult<Option<Self::EmbedLock>> {
-        EmbedLocks::try_lock_embed(self).map_err(map_io)
+        EmbedLocker::try_lock_embed(self).map_err(map_io)
     }
 
     fn get_time_secs(&self) -> EmbeddingResult<u64> {
@@ -167,7 +167,7 @@ impl EmbeddingFiles for LocalFileSystem {
     }
 }
 
-impl EmbedLocks for LocalFileSystem {
+impl EmbedLocker for LocalFileSystem {
     type EmbedLock = PersistentLock;
 
     fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>> {

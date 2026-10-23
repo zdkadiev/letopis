@@ -159,8 +159,8 @@ mod transport_tests {
     use crate::domain::{LineRange, RepoPath, Sha256, TreeOid};
     use crate::run_cli;
     use crate::service::{
-        Background, CheckReport, Checks, CommandError, CommandErrorKind, CommandProblem,
-        CommandResult, ElementAddress, InspectedElement, Inspection, Inspections,
+        BackgroundRunner, CheckReport, Checker, CommandError, CommandErrorKind, CommandProblem,
+        CommandResult, ElementAddress, InspectedElement, Inspection, Inspector,
     };
     use serde_json::{Value, json};
     use std::collections::BTreeMap;
@@ -171,7 +171,7 @@ mod transport_tests {
         calls: Vec<Vec<RepoPath>>,
         fail: bool,
     }
-    impl Checks for CheckDouble {
+    impl Checker for CheckDouble {
         fn check(&mut self, paths: &[RepoPath]) -> CommandResult<CheckReport> {
             self.calls.push(paths.to_vec());
             if self.fail {
@@ -193,7 +193,7 @@ mod transport_tests {
         warn: bool,
         fail: bool,
     }
-    impl Background for BackgroundDouble {
+    impl BackgroundRunner for BackgroundDouble {
         fn start_if_needed(&mut self) -> CommandResult<Option<CommandProblem>> {
             self.starts += 1;
             if self.fail {
@@ -213,7 +213,7 @@ mod transport_tests {
     struct InspectDouble {
         calls: Vec<Vec<ElementAddress>>,
     }
-    impl Inspections for InspectDouble {
+    impl Inspector for InspectDouble {
         fn inspect(&mut self, ids: &[ElementAddress]) -> CommandResult<Inspection> {
             self.calls.push(ids.to_vec());
             Ok(Inspection {

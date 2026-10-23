@@ -1,6 +1,6 @@
 use super::{Diagnostic, DiagnosticKind, Events, links, scan, search};
 use crate::domain::{RepoPath, Sha256};
-use crate::service::{Markdown, ParsedElement, ParsedFile};
+use crate::service::{MarkdownCodec, ParsedElement, ParsedFile};
 use pulldown_cmark::{Options, Parser};
 
 /// Parse one root-relative Markdown file without accessing disk, Git, SQL or a model.
@@ -21,7 +21,7 @@ impl MarkdownParser {
         Self
     }
 }
-impl Markdown for MarkdownParser {
+impl MarkdownCodec for MarkdownParser {
     fn parse_file(
         &self,
         path: &RepoPath,
@@ -63,7 +63,7 @@ impl Markdown for MarkdownParser {
 #[cfg(test)]
 mod tests {
     use super::{MarkdownParser, parse};
-    use crate::{domain::RepoPath, service::Markdown};
+    use crate::{domain::RepoPath, service::MarkdownCodec};
 
     #[test]
     fn parser_interface_preserves_all_free_function_outcomes() {

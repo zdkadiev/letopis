@@ -5,11 +5,12 @@ use crate::{
 use letopis::{
     domain::{RepoPath, Sha256},
     markdown::parse,
-    open_documents, open_filesystem, open_storage,
+    open_filesystem, open_storage,
     service::{
-        Documents, EmbedLocks, EmbeddingConfig, EmbeddingFailure, Storage, StorageRead,
+        EmbedLocker, EmbeddingConfig, EmbeddingFailure, Refresher, Storage, StorageRead,
         VectorOutcome,
     },
+    wire_document_refresher,
 };
 use serde_json::{Value, json};
 use std::{
@@ -64,7 +65,7 @@ impl Fixture {
     pub fn publish(&self, body: &str) -> Sha256 {
         let bytes = build_whole(1, body);
         self.repo.write("knowledge.md", &bytes);
-        open_documents(self.repo.get_root())
+        wire_document_refresher(self.repo.get_root())
             .unwrap()
             .refresh()
             .unwrap();

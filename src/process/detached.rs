@@ -1,4 +1,4 @@
-use crate::service::{CommandError, CommandErrorKind, CommandResult, DrainProcess};
+use crate::service::{CommandError, CommandErrorKind, CommandResult, DrainLauncher};
 use std::{
     io,
     os::unix::process::CommandExt,
@@ -15,7 +15,7 @@ impl DetachedProcess {
         Self { executable, root }
     }
 }
-impl DrainProcess for DetachedProcess {
+impl DrainLauncher for DetachedProcess {
     fn spawn_drain(&self) -> CommandResult<()> {
         let mut command = Command::new(&self.executable);
         command
@@ -52,7 +52,7 @@ impl DrainProcess for DetachedProcess {
 #[cfg(test)]
 mod tests {
     use super::DetachedProcess;
-    use crate::service::{CommandErrorKind, DrainProcess};
+    use crate::service::{CommandErrorKind, DrainLauncher};
     use std::{error::Error, fs};
 
     #[test]

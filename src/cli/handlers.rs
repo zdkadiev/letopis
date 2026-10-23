@@ -1,7 +1,7 @@
 use super::input::Request;
 use crate::service::{
-    Background, CheckReport, Checks, CommandError, CommandErrorKind, CommandProblem, CommandResult,
-    Inspection, Inspections, SearchLink, Searches,
+    BackgroundRunner, CheckReport, Checker, CommandError, CommandErrorKind, CommandProblem,
+    CommandResult, Inspection, Inspector, SearchLink, Searcher,
 };
 
 /// Typed application results before X-1 transport rendering.
@@ -19,18 +19,18 @@ pub(crate) struct CommandResponse {
 }
 /// Dispatches commands through optional application services, then triggers background work.
 pub(crate) struct Handlers<'a> {
-    checks: Option<&'a mut dyn Checks>,
-    inspections: Option<&'a mut dyn Inspections>,
-    searches: Option<&'a mut dyn Searches>,
-    background: Option<&'a mut dyn Background>,
+    checks: Option<&'a mut dyn Checker>,
+    inspections: Option<&'a mut dyn Inspector>,
+    searches: Option<&'a mut dyn Searcher>,
+    background: Option<&'a mut dyn BackgroundRunner>,
 }
 impl<'a> Handlers<'a> {
     /// Borrow the services available for this command without performing I/O.
     pub(crate) fn new(
-        checks: Option<&'a mut dyn Checks>,
-        inspections: Option<&'a mut dyn Inspections>,
-        searches: Option<&'a mut dyn Searches>,
-        background: Option<&'a mut dyn Background>,
+        checks: Option<&'a mut dyn Checker>,
+        inspections: Option<&'a mut dyn Inspector>,
+        searches: Option<&'a mut dyn Searcher>,
+        background: Option<&'a mut dyn BackgroundRunner>,
     ) -> Self {
         Self {
             checks,

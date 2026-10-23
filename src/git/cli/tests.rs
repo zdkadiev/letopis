@@ -220,7 +220,7 @@ fn discovers_trailing_newline_repository_without_touching_sibling() {
 
 #[test]
 fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
-    use crate::service::CorpusFiles;
+    use crate::service::CorpusLister;
     // Arrange
     let repo = TempRepo::new(ObjectFormat::Sha1);
     for path in [
@@ -263,7 +263,7 @@ fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
 
 #[test]
 fn candidates_reject_unsupported_raw_paths() {
-    use crate::service::{CorpusFiles, DocumentErrorKind};
+    use crate::service::{CorpusLister, DocumentErrorKind};
     for raw in [
         b"bad\xff.md".to_vec(),
         b"bad#anchor.md".to_vec(),
@@ -288,7 +288,7 @@ fn candidates_reject_unsupported_raw_paths() {
 
 #[test]
 fn candidates_deduplicate_unmerged_index_stages() {
-    use crate::service::CorpusFiles;
+    use crate::service::CorpusLister;
     // Arrange
     let repo = TempRepo::new(ObjectFormat::Sha1);
     let oid = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"conflict"));
@@ -309,7 +309,7 @@ fn candidates_deduplicate_unmerged_index_stages() {
 
 #[test]
 fn candidates_exclude_metadata_before_validating_paths() {
-    use crate::service::CorpusFiles;
+    use crate::service::CorpusLister;
     for raw in [
         b".letopis/bad#anchor.md".as_slice(),
         b".letopis/bad\xff.md",

@@ -1,8 +1,9 @@
 use super::{
-    CommandError, CommandErrorKind, CommandResult, ConfigState, DrainOutcome, EmbeddingConfig,
-    EmbeddingError, EmbeddingErrorKind, EmbeddingFiles, EmbeddingProvider, EmbeddingResult,
-    EmbeddingTasks, EmbeddingWork, Embeddings, Markdown, QueryEmbedding, QueryEmbeddingRequest,
-    Storage, StorageError, StorageErrorKind, StorageRead, VectorOutcome, VectorWrite,
+    CommandError, CommandErrorKind, CommandResult, ConfigState, DrainOutcome, Embedder,
+    EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles,
+    EmbeddingProvider, EmbeddingResult, EmbeddingWork, MarkdownCodec, QueryEmbedding,
+    QueryEmbeddingRequest, Storage, StorageError, StorageErrorKind, StorageRead, VectorOutcome,
+    VectorWrite,
 };
 use crate::domain::{KnowledgeId, RepoPath, Sha256};
 use std::{collections::BTreeSet, num::NonZeroUsize, time::Duration};
@@ -17,7 +18,7 @@ pub(crate) struct EmbeddingService<S, F, M, P> {
     markdown: M,
     provider: P,
 }
-impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
+impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     EmbeddingService<S, F, M, P>
 {
     /// Construct the application service from its owned boundary implementations.
@@ -31,7 +32,7 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
     }
 }
 
-impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> EmbeddingTasks
+impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> EmbeddingExecutor
     for EmbeddingService<S, F, M, P>
 {
     fn has_work(&mut self) -> CommandResult<bool> {
@@ -50,7 +51,7 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> Embedding
     }
 
     fn drain(&mut self) -> CommandResult<()> {
-        match Embeddings::drain(self).map_err(map_command)? {
+        match Embedder::drain(self).map_err(map_command)? {
             DrainOutcome::Complete
             | DrainOutcome::AlreadyRunning
             | DrainOutcome::Unavailable
@@ -59,7 +60,7 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> Embedding
     }
 }
 
-impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> Embeddings
+impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embedder
     for EmbeddingService<S, F, M, P>
 {
     fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding> {
@@ -122,7 +123,7 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider> Embedding
     }
 }
 
-impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
+impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     EmbeddingService<S, F, M, P>
 {
     fn read_ready_config(&self) -> EmbeddingResult<Option<EmbeddingConfig>> {

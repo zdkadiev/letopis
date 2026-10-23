@@ -1,10 +1,10 @@
-use super::DocumentService;
+use super::DocumentRefresher;
 use crate::{
     domain::RepoPath,
     markdown::MarkdownParser,
     service::{
-        CapturedFile, CorpusFiles, Diagnostic, DocumentError, DocumentErrorKind, DocumentResult,
-        Documents, FileStat, FileSystem, Markdown, ParsedFile, Storage, StorageRead,
+        CapturedFile, CorpusLister, Diagnostic, DocumentError, DocumentErrorKind, DocumentResult,
+        FileStat, FileSystem, MarkdownCodec, ParsedFile, Refresher, Storage, StorageRead,
     },
     storage::SqliteStorage,
 };
@@ -19,7 +19,7 @@ const INITIAL: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nAlphaToken\n";
 const EDITED: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nBravoToken\n";
 const NOW: i64 = 5_000_000_000;
 struct Candidates;
-impl CorpusFiles for Candidates {
+impl CorpusLister for Candidates {
     fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
         Ok(vec![RepoPath::parse("note.md").unwrap()])
     }
@@ -89,7 +89,7 @@ impl FileSystem for TestFiles {
     }
 }
 struct CountingMarkdown(Cell<usize>);
-impl Markdown for CountingMarkdown {
+impl MarkdownCodec for CountingMarkdown {
     fn parse_file(
         &self,
         path: &RepoPath,
@@ -99,7 +99,7 @@ impl Markdown for CountingMarkdown {
         MarkdownParser::new().parse_file(path, bytes)
     }
 }
-type TestService = DocumentService<Candidates, TestFiles, CountingMarkdown, SqliteStorage>;
+type TestService = DocumentRefresher<Candidates, TestFiles, CountingMarkdown, SqliteStorage>;
 #[test]
 fn skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files() {
     for bytes in [
@@ -305,7 +305,7 @@ fn build_service() -> (TempDir, TestService) {
         SqliteStorage::open(&dir.path().join("cache.db"), &dir.path().join("vectors.db")).unwrap();
     (
         dir,
-        DocumentService::new(
+        DocumentRefresher::new(
             Candidates,
             TestFiles::new(),
             CountingMarkdown(Cell::new(0)),

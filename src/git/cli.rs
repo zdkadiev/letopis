@@ -4,7 +4,7 @@ use super::{objects, refs};
 use crate::{
     domain::{BlobOid, RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN, TreeOid},
     service::{
-        CorpusFiles, DocumentError, DocumentErrorKind, DocumentResult, GitSnapshots, RetainedTree,
+        CorpusLister, DocumentError, DocumentErrorKind, DocumentResult, GitSnapshots, RetainedTree,
         SnapshotEntry, SnapshotError, SnapshotErrorKind, SnapshotFile,
     },
     utils::SERVICE_DIRECTORY,
@@ -102,7 +102,7 @@ impl GitSnapshots for GitCli {
     }
 }
 
-impl CorpusFiles for GitCli {
+impl CorpusLister for GitCli {
     fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
         let raw = self
             .process

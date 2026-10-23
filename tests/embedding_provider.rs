@@ -1,4 +1,4 @@
-use letopis::open_embedding_provider;
+use letopis::build_embedding_provider;
 use letopis::service::{EmbeddingConfig, EmbeddingProvider};
 
 #[test]
@@ -28,7 +28,7 @@ fn rejects_duplicate_nested_keys() {
 fn validates_endpoint_without_inference() {
     // Arrange
     let config = parse_config(br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"file:///tmp/fixture"},"max_retries":3}"#);
-    let provider = open_embedding_provider().unwrap();
+    let provider = build_embedding_provider().unwrap();
     // Act
     let result = provider.validate_config(&config);
     // Assert
@@ -50,7 +50,7 @@ fn sends_native_request_without_silent_truncation_or_unknown_parameters() {
         &server.get_base_url(),
         &json!({"dimensions":3,"keep_alive":"5m","options":{"seed":7},"unknown":42,"input":"override","model":"override"}),
     );
-    let provider = open_embedding_provider().unwrap();
+    let provider = build_embedding_provider().unwrap();
     // Act
     let vectors = provider
         .embed(&config, &["first", "second"], NonZeroUsize::new(3))
@@ -91,7 +91,7 @@ fn reorders_compatible_response_and_sends_only_supported_parameters() {
         &server.get_base_url(),
         &json!({"dimensions":3,"options":{},"unknown":99}),
     );
-    let provider = open_embedding_provider().unwrap();
+    let provider = build_embedding_provider().unwrap();
     // Act
     let vectors = provider.embed(&config, &["first", "second"], None).unwrap();
     // Assert
@@ -123,7 +123,7 @@ fn rejects_malformed_native_vectors() {
         let server = start_fixture(&body);
         let config = build_config("ollama", &server.get_base_url(), &json!({"dimensions":3}));
         // Act
-        let error = open_embedding_provider()
+        let error = build_embedding_provider()
             .unwrap()
             .embed(&config, &["input-secret"], None)
             .unwrap_err();
@@ -152,7 +152,7 @@ fn rejects_non_json_and_non_success_without_retrying() {
         });
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
         // Act
-        let error = open_embedding_provider()
+        let error = build_embedding_provider()
             .unwrap()
             .embed(&config, &["input"], None)
             .unwrap_err();
@@ -170,7 +170,7 @@ fn refuses_redirects() {
     });
     let config = build_config("ollama", &source.get_base_url(), &json!({}));
     // Act
-    let error = open_embedding_provider()
+    let error = build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap_err();
@@ -295,7 +295,7 @@ fn rejects_overflow_and_canonicalization_budget_collisions() {
 }
 #[test]
 fn rejects_invalid_endpoint_schemes_userinfo_and_incomplete_hosts() {
-    let provider = open_embedding_provider().unwrap();
+    let provider = build_embedding_provider().unwrap();
     for endpoint in [
         "ftp://localhost/api",
         "http://user:secret@localhost/api",
@@ -345,7 +345,7 @@ fn rejects_compatible_index_and_vector_failures() {
         let server = start_fixture(&json!({"data":data}));
         let config = build_config("openai", &server.get_base_url(), &json!({"dimensions":3}));
         // Act
-        let error = open_embedding_provider()
+        let error = build_embedding_provider()
             .unwrap()
             .embed(&config, &["first", "second"], None)
             .unwrap_err();
@@ -366,7 +366,7 @@ fn keeps_ollama_available_without_compatible_credentials() {
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let compatible = build_config("openai", &server.get_base_url(), &json!({}));
     let native = build_config("ollama", &server.get_base_url(), &json!({}));
-    let provider = open_embedding_provider().unwrap();
+    let provider = build_embedding_provider().unwrap();
     // Act
     provider.validate_config(&compatible).unwrap();
     let error = provider.embed(&compatible, &["input"], None).unwrap_err();
@@ -389,7 +389,7 @@ fn rejects_invalid_compatible_credentials_before_network_io() {
     let server = start_fixture(&json!({"data":[{"index":0,"embedding":[1,2,3]}]}));
     let config = build_config("openai", &server.get_base_url(), &json!({}));
     // Act
-    let error = open_embedding_provider()
+    let error = build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap_err();
@@ -419,7 +419,7 @@ fn disables_environment_proxies_and_native_authorization() {
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
     // Act
-    let vectors = open_embedding_provider()
+    let vectors = build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap();
@@ -462,7 +462,7 @@ fn rejects_empty_inputs_and_incompatible_requested_dimensions_without_io() {
     // Arrange
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let config = build_config("ollama", &server.get_base_url(), &json!({"dimensions":3}));
-    let provider = open_embedding_provider().unwrap();
+    let provider = build_embedding_provider().unwrap();
     // Act / Assert
     for (texts, dimensions) in [
         (vec![], None),
@@ -483,7 +483,7 @@ fn rejects_connection_failures_without_exposing_endpoint_or_input() {
     drop(listener);
     let config = build_config("ollama", &url, &json!({}));
     // Act
-    let error = open_embedding_provider()
+    let error = build_embedding_provider()
         .unwrap()
         .embed(&config, &["knowledge-secret"], None)
         .unwrap_err();
@@ -503,7 +503,7 @@ fn attempt_obeys_real_sixty_second_deadline() {
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
     let start = Instant::now();
     // Act
-    let error = open_embedding_provider()
+    let error = build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap_err();
@@ -543,7 +543,7 @@ fn rejects_compatible_error_payload_status_and_non_json() {
         });
         let config = build_config("openai", &server.get_base_url(), &json!({}));
         // Act
-        let error = open_embedding_provider()
+        let error = build_embedding_provider()
             .unwrap()
             .embed(&config, &["knowledge-secret"], None)
             .unwrap_err();
@@ -561,7 +561,7 @@ fn validates_unconfigured_dimensions_without_sending_an_implicit_request_dimensi
         let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[vector]}));
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
         // Act
-        let vectors = open_embedding_provider()
+        let vectors = build_embedding_provider()
             .unwrap()
             .embed(&config, &["input"], NonZeroUsize::new(size))
             .unwrap();
@@ -580,7 +580,7 @@ fn rejects_inconsistent_unconfigured_and_unsupported_response_dimensions() {
         let server = start_fixture(&json!({"model":"fixture-alias","embeddings":embeddings}));
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
         // Act
-        let error = open_embedding_provider()
+        let error = build_embedding_provider()
             .unwrap()
             .embed(&config, &["first", "second"], None)
             .unwrap_err();
@@ -595,7 +595,7 @@ fn appends_endpoint_before_query_and_ignores_fragment() {
     let endpoint = format!("{}/?fixture=1#ignored", server.get_base_url());
     let config = build_config("ollama", &endpoint, &json!({}));
     // Act
-    open_embedding_provider()
+    build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap();
@@ -612,7 +612,7 @@ fn controlled_barrier_releases_an_owned_request() {
         body: json!({"model":"fixture-alias","embeddings":[[1,2,3]]}).to_string(),
     });
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
-    let provider = open_embedding_provider().unwrap();
+    let provider = build_embedding_provider().unwrap();
     // Act
     let worker = std::thread::spawn(move || provider.embed(&config, &["input"], None));
     barrier.wait_until_entered();
@@ -823,7 +823,7 @@ fn bounds_both_protocol_bodies_with_and_without_content_length() {
         // Act: a normal bounded response still succeeds, including model aliases.
         let server = start_fixture(&build_response(protocol));
         let config = build_config(protocol, &server.get_base_url(), &json!({}));
-        let vectors = open_embedding_provider()
+        let vectors = build_embedding_provider()
             .unwrap()
             .embed(&config, &["input"], None)
             .unwrap();
@@ -908,7 +908,7 @@ fn assert_rejected_response(protocol: &str, reply: FixtureReply) {
     let server = HttpFixture::start(reply);
     let config = build_config(protocol, &server.get_base_url(), &json!({}));
     // Act
-    let error = open_embedding_provider()
+    let error = build_embedding_provider()
         .unwrap()
         .embed(&config, &["knowledge-secret"], None)
         .unwrap_err();

@@ -2,13 +2,13 @@ mod support;
 use letopis::{
     domain::{Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, RepoPath, Sha256},
     markdown::parse,
-    open_embedding_files, open_embeddings, open_storage,
+    open_embedding_files, open_storage,
     service::{
-        CacheWrite, ConfigState, DrainOutcome, EmbeddingConfig, EmbeddingErrorKind,
-        EmbeddingFailure, EmbeddingFiles, Embeddings, FileRow, KnowledgeMetadata, NodeMetadata,
-        QueryEmbedding, QueryEmbeddingRequest, QueryError, Storage, StorageRead, VectorOutcome,
-        VectorWrite,
+        CacheWrite, ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind,
+        EmbeddingFailure, EmbeddingFiles, FileRow, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
+        QueryEmbeddingRequest, QueryError, Storage, StorageRead, VectorOutcome, VectorWrite,
     },
+    wire_embedder,
 };
 use rusqlite::{Connection, types::Value};
 use std::{fs, num::NonZeroUsize, thread};
@@ -31,8 +31,8 @@ impl Fixture {
         )
         .unwrap()
     }
-    fn open_service(&self) -> impl Embeddings + use<> {
-        open_embeddings(self.root.path(), self.open_storage()).unwrap()
+    fn open_service(&self) -> impl Embedder + use<> {
+        wire_embedder(self.root.path(), self.open_storage()).unwrap()
     }
     fn write_config(&self, url: &str, retries: u64) -> EmbeddingConfig {
         self.write_raw_config(

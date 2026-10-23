@@ -19,11 +19,11 @@ use crate::git::GitCli;
 use crate::markdown::MarkdownParser;
 use crate::process::DetachedProcess;
 use crate::service::{
-    Background, BackgroundService, CommandError, CommandErrorKind, CommandResult, DocumentError,
-    DocumentErrorKind, DocumentResult, DocumentService, Documents, EmbedLocks, EmbeddingError,
-    EmbeddingErrorKind, EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService,
-    EmbeddingTasks, Embeddings, FileSystem, GitSnapshots, InspectionService, Inspections,
-    SearchDependencies, SearchService, Searches, SnapshotError, Storage, StorageResult,
+    BackgroundRunner, BackgroundService, CommandError, CommandErrorKind, CommandResult,
+    DocumentError, DocumentErrorKind, DocumentRefresher, DocumentResult, EmbedLocker, Embedder,
+    EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles, EmbeddingProvider,
+    EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots, InspectionService, Inspector,
+    Refresher, SearchDependencies, SearchService, Searcher, SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -60,12 +60,12 @@ pub fn run_cli(
     write_response(output, response)
 }
 
-/// Open hybrid knowledge search with independently owned read and embedding connections.
+/// Wire hybrid knowledge search with independently owned read and embedding connections.
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
-pub fn open_searches(start: &Path) -> CommandResult<impl Searches + use<>> {
-    let documents = open_documents(start).map_err(map_search_setup)?;
+pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
+    let refresher = wire_document_refresher(start).map_err(map_search_setup)?;
     let git = GitCli::open(start).map_err(map_search_setup)?;
     let filesystem = LocalFileSystem::open(git.get_root()).map_err(map_search_setup)?;
     let directory = filesystem
@@ -73,9 +73,9 @@ pub fn open_searches(start: &Path) -> CommandResult<impl Searches + use<>> {
         .map_err(map_search_setup)?;
     let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
         .map_err(map_search_setup)?;
-    let embeddings = open_embedding_tasks(start)?;
+    let embeddings = wire_embedding_executor(start)?;
     Ok(SearchService::new(SearchDependencies {
-        documents,
+        refresher,
         storage,
         embeddings,
         filesystem,
@@ -83,27 +83,27 @@ pub fn open_searches(start: &Path) -> CommandResult<impl Searches + use<>> {
     }))
 }
 
-/// Open canonical current-knowledge inspection for the repository containing `start`.
+/// Wire canonical current-knowledge inspection for the repository containing `start`.
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or setup failures.
-pub fn open_inspections(start: &Path) -> CommandResult<impl Inspections + use<>> {
-    let documents = open_documents(start).map_err(map_inspection_setup)?;
+pub fn wire_inspector(start: &Path) -> CommandResult<impl Inspector + use<>> {
+    let refresher = wire_document_refresher(start).map_err(map_inspection_setup)?;
     let git = GitCli::open(start).map_err(map_inspection_setup)?;
     let files = LocalFileSystem::open(git.get_root()).map_err(map_inspection_setup)?;
     Ok(InspectionService::new(
-        documents,
+        refresher,
         git,
         files,
         MarkdownParser::new(),
     ))
 }
 
-/// Open document refresh operations for the working copy containing `start`.
+/// Wire document refresh operations for the working copy containing `start`.
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths, or storage/I/O failures.
-pub fn open_documents(start: &Path) -> DocumentResult<impl Documents + use<>> {
+pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + use<>> {
     let git = GitCli::open(start).map_err(|cause| {
         DocumentError::new_with_cause(
             DocumentErrorKind::InternalError,
@@ -121,7 +121,7 @@ pub fn open_documents(start: &Path) -> DocumentResult<impl Documents + use<>> {
                 cause,
             )
         })?;
-    Ok(DocumentService::new(
+    Ok(DocumentRefresher::new(
         git,
         filesystem,
         MarkdownParser::new(),
@@ -129,15 +129,15 @@ pub fn open_documents(start: &Path) -> DocumentResult<impl Documents + use<>> {
     ))
 }
 
-/// Open the existing embedding executor with confined automatic repository storage.
-/// Callers that serve freshly indexed data refresh through `Documents` before
+/// Wire the existing embedding executor with confined automatic repository storage.
+/// Callers that serve freshly indexed data refresh through `Refresher` before
 /// checking work. Direct drains consume the already published durable projection.
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe service/database paths or setup failures.
-pub fn open_embedding_tasks(
+pub fn wire_embedding_executor(
     start: &Path,
-) -> CommandResult<impl EmbeddingTasks + Embeddings + use<>> {
+) -> CommandResult<impl EmbeddingExecutor + Embedder + use<>> {
     let git = GitCli::open(start).map_err(map_embedding_setup)?;
     let files = LocalFileSystem::open(git.get_root()).map_err(map_embedding_setup)?;
     let directory = files
@@ -149,19 +149,19 @@ pub fn open_embedding_tasks(
         storage,
         files,
         MarkdownParser::new(),
-        open_embedding_provider().map_err(map_embedding_setup)?,
+        build_embedding_provider().map_err(map_embedding_setup)?,
     ))
 }
 
-/// Open background orchestration with an optional embedding executor.
+/// Wire background orchestration with an optional embedding executor.
 ///
 /// # Errors
 /// Reports an inaccessible or unsafe root directory.
-pub fn open_background<'a>(
+pub fn wire_background_runner<'a>(
     root: &Path,
     executable: &Path,
-    tasks: Option<&'a mut dyn EmbeddingTasks>,
-) -> CommandResult<impl Background + use<'a>> {
+    tasks: Option<&'a mut dyn EmbeddingExecutor>,
+) -> CommandResult<impl BackgroundRunner + use<'a>> {
     let files = LocalFileSystem::open(root).map_err(|cause| {
         CommandError::new_with_cause(
             CommandErrorKind::InternalError,
@@ -176,19 +176,19 @@ pub fn open_background<'a>(
     ))
 }
 
-/// Assemble synchronous embeddings with explicit caller-owned storage.
+/// Wire synchronous embeddings with explicit caller-owned storage.
 ///
 /// # Errors
 /// Reports confined filesystem or provider construction failures.
-pub fn open_embeddings<S: Storage>(
+pub fn wire_embedder<S: Storage>(
     root: &Path,
     storage: S,
-) -> EmbeddingResult<impl Embeddings + EmbeddingTasks + use<S>> {
+) -> EmbeddingResult<impl Embedder + EmbeddingExecutor + use<S>> {
     Ok(EmbeddingService::new(
         storage,
         open_embedding_files(root)?,
         MarkdownParser::new(),
-        open_embedding_provider()?,
+        build_embedding_provider()?,
     ))
 }
 
@@ -210,7 +210,7 @@ pub fn open_embedding_files(root: &Path) -> EmbeddingResult<impl EmbeddingFiles 
 ///
 /// # Errors
 /// Reserved for failures constructing the provider boundary.
-pub fn open_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + use<>> {
+pub fn build_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + use<>> {
     let key = env::var("OPENAI_API_KEY").ok();
     Ok(HttpProviders::new(Ollama::new(), Openai::new(key)))
 }
@@ -240,7 +240,7 @@ pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage 
 ///
 /// # Errors
 /// Reports an inaccessible or non-directory root, including a symlink root.
-pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLocks + use<>> {
+pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLocker + use<>> {
     LocalFileSystem::open(root)
 }
 
@@ -273,8 +273,8 @@ fn locate_environment() -> CommandResult<(PathBuf, PathBuf)> {
 }
 
 fn run_drain(request: Request, root: &Path, executable: &Path) -> CommandResult<CommandResponse> {
-    let mut tasks = open_embedding_tasks(root)?;
-    let mut background = open_background(root, executable, Some(&mut tasks))?;
+    let mut tasks = wire_embedding_executor(root)?;
+    let mut background = wire_background_runner(root, executable, Some(&mut tasks))?;
     Handlers::new(None, None, None, Some(&mut background)).execute(request)
 }
 
@@ -284,9 +284,9 @@ fn run_search(
     executable: &Path,
 ) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
-    let mut tasks = open_embedding_tasks(&root)?;
-    let mut background = open_background(&root, executable, Some(&mut tasks))?;
-    let mut searches = open_searches(&root)?;
+    let mut tasks = wire_embedding_executor(&root)?;
+    let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
+    let mut searches = wire_searcher(&root)?;
     Handlers::new(None, None, Some(&mut searches), Some(&mut background)).execute(request)
 }
 
@@ -296,9 +296,9 @@ fn run_inspect(
     executable: &Path,
 ) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
-    let mut tasks = open_embedding_tasks(&root)?;
-    let mut background = open_background(&root, executable, Some(&mut tasks))?;
-    let mut inspections = open_inspections(&root)?;
+    let mut tasks = wire_embedding_executor(&root)?;
+    let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
+    let mut inspections = wire_inspector(&root)?;
     Handlers::new(None, Some(&mut inspections), None, Some(&mut background)).execute(request)
 }
 

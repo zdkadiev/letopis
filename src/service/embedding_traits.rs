@@ -65,7 +65,7 @@ pub trait EmbeddingFiles {
 ///
 /// Every implementation keeps document vectors consistent with the committed configuration
 /// identity and persists only safe diagnostics.
-pub trait Embeddings {
+pub trait Embedder {
     /// Reread, validate and synchronize ready configuration.
     ///
     /// # Errors

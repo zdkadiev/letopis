@@ -2,11 +2,11 @@ use super::{Files, open_storage, publish};
 use crate::{
     domain::{RepoPath, Sha256},
     markdown::parse,
-    open_embeddings,
     service::{
-        DrainOutcome, EmbeddingConfig, Embeddings, QueryEmbedding, Storage, StorageRead,
+        DrainOutcome, Embedder, EmbeddingConfig, QueryEmbedding, Storage, StorageRead,
         VectorOutcome, VectorWrite,
     },
+    wire_embedder,
 };
 use rusqlite::{Connection, types::Value};
 use std::{
@@ -34,7 +34,7 @@ fn run_child() {
     reach_checkpoint("child");
     let root = PathBuf::from(env::var_os("LETOPIS_PROCESS_ROOT").unwrap());
     let storage = crate::open_storage(&root.join("cache"), &root.join("vectors")).unwrap();
-    let mut service = open_embeddings(&root, storage).unwrap();
+    let mut service = wire_embedder(&root, storage).unwrap();
     if env::var("LETOPIS_PROCESS_ACTION").as_deref() == Ok("query") {
         assert_eq!(
             service.embed_query("canary query").unwrap(),
@@ -432,7 +432,7 @@ fn reply(mut stream: TcpStream, body: &str) {
 
 fn reset_with_current_state(fixture: &Fixture) -> EmbeddingConfig {
     let next = Fixture::write_config(&fixture.root, &fixture.listener, 1);
-    let mut service = open_embeddings(fixture.root.path(), open_storage(&fixture.root)).unwrap();
+    let mut service = wire_embedder(fixture.root.path(), open_storage(&fixture.root)).unwrap();
     service.read_configuration().unwrap();
     let mut storage = open_storage(&fixture.root);
     let mut files = Files::new(0);

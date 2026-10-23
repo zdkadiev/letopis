@@ -5,7 +5,7 @@ use super::{
 use crate::domain::RepoPath;
 
 /// Application-owned corpus validation capability.
-pub trait Checks {
+pub trait Checker {
     /// Validate the given paths, or the whole corpus when empty.
     ///
     /// # Errors
@@ -13,7 +13,7 @@ pub trait Checks {
     fn check(&mut self, paths: &[RepoPath]) -> CommandResult<CheckReport>;
 }
 /// Consistent metadata-only hybrid knowledge search.
-pub trait Searches {
+pub trait Searcher {
     /// Refresh and search one pinned revision, observing baseline live knowledge freshness.
     ///
     /// # Errors
@@ -21,7 +21,7 @@ pub trait Searches {
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>>;
 }
 /// Application-owned metadata inspection capability.
-pub trait Inspections {
+pub trait Inspector {
     /// Inspect normalized addresses in one snapshot.
     ///
     /// # Errors
@@ -31,7 +31,7 @@ pub trait Inspections {
 /// Narrow readiness and execution capability of the embedding executor.
 /// Implementations reuse the executor's configuration, durable attempts and publication
 /// guards. Readiness never performs inference or retains a read transaction for launch.
-pub trait EmbeddingTasks {
+pub trait EmbeddingExecutor {
     /// Determine whether configuration is ready and eligible durable work exists.
     ///
     /// # Errors
@@ -48,7 +48,7 @@ pub trait EmbeddingTasks {
 ///
 /// Every implementation grants ownership to at most one holder at a time across processes
 /// and releases it when the returned lock is dropped.
-pub trait EmbedLocks {
+pub trait EmbedLocker {
     /// Owned kernel lock released through RAII.
     type EmbedLock;
     /// Probe exclusive embedding ownership without waiting.
@@ -60,7 +60,7 @@ pub trait EmbedLocks {
 /// Detached drain process launch capability.
 ///
 /// Every implementation returns without waiting for the launched process to finish.
-pub trait DrainProcess {
+pub trait DrainLauncher {
     /// Start the internal drain command without waiting for inference.
     ///
     /// # Errors
@@ -71,7 +71,7 @@ pub trait DrainProcess {
 ///
 /// Every implementation reports launch problems as safe, nonfatal diagnostics where the
 /// foreground result is already complete.
-pub trait Background {
+pub trait BackgroundRunner {
     /// Start eligible work, returning a safe nonfatal launch warning if needed.
     ///
     /// # Errors

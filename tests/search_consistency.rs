@@ -1,11 +1,11 @@
 mod support;
 use letopis::{
     domain::LineRange,
-    open_documents, open_searches,
     service::{
-        CommandErrorKind, CommandResult, Documents, SearchFlag, SearchLink, SearchRequest,
-        Searches, Storage, StorageRead, VectorOutcome, VectorWrite,
+        CommandErrorKind, CommandResult, Refresher, SearchFlag, SearchLink, SearchRequest,
+        Searcher, Storage, StorageRead, VectorOutcome, VectorWrite,
     },
+    wire_document_refresher, wire_searcher,
 };
 use std::{num::NonZeroUsize, thread};
 use support::{
@@ -30,7 +30,7 @@ fn concurrent_publication_preserves_old_membership_coordinates_and_revision() {
         body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
     });
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
-    let revision = open_documents(repo.get_root())
+    let revision = wire_document_refresher(repo.get_root())
         .unwrap()
         .refresh()
         .unwrap()
@@ -44,7 +44,7 @@ fn concurrent_publication_preserves_old_membership_coordinates_and_revision() {
     repo.write("c.md", b"<!-- letopis: {invalid} -->\ninvalid");
     repo.write_knowledge("new.md", "sqlite");
     assert!(
-        open_documents(repo.get_root())
+        wire_document_refresher(repo.get_root())
             .unwrap()
             .refresh()
             .unwrap()
@@ -73,7 +73,10 @@ fn concurrent_publication_preserves_old_membership_coordinates_and_revision() {
 fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates() {
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     let config = repo.write_config("ollama", "http://localhost/api", "fixture");
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let mut old_storage = repo.open_storage();
@@ -115,7 +118,7 @@ fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
         repo.write_knowledge("b.md", "semantic");
         let (server, barrier) = start_paused(protocol);
         let config = repo.write_config(protocol, &server.get_base_url(), "fixture");
-        let revision = open_documents(repo.get_root())
+        let revision = wire_document_refresher(repo.get_root())
             .unwrap()
             .refresh()
             .unwrap()
@@ -162,7 +165,7 @@ fn concurrent_vector_insert_cannot_add_membership_to_pinned_channel() {
     repo.write_knowledge("b.md", "semantic");
     let (server, barrier) = start_paused("openai");
     let config = repo.write_config("openai", &server.get_base_url(), "fixture");
-    let revision = open_documents(repo.get_root())
+    let revision = wire_document_refresher(repo.get_root())
         .unwrap()
         .refresh()
         .unwrap()
@@ -193,7 +196,10 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
         body: "malformed".into(),
     });
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let worker = PausedSearch::spawn(repo.get_root(), barrier.clone());
     barrier.wait_until_entered();
@@ -216,7 +222,7 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
     );
     repo.write_knowledge("b.md", "sqlite");
     assert!(
-        open_documents(repo.get_root())
+        wire_document_refresher(repo.get_root())
             .unwrap()
             .refresh()
             .unwrap()
@@ -230,7 +236,10 @@ fn live_confinement_error_releases_read_before_subsequent_reset() {
     repo.write_knowledge("a.md", "sqlite");
     let (server, barrier) = start_paused("ollama");
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let worker = PausedSearch::spawn(repo.get_root(), barrier.clone());
     barrier.wait_until_entered();
@@ -254,7 +263,10 @@ fn metadata_storage_error_releases_search_read_and_allows_new_publication() {
     repo.write_knowledge("a.md", "sqlite");
     let (server, barrier) = start_paused("ollama");
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
@@ -279,7 +291,7 @@ fn metadata_storage_error_releases_search_read_and_allows_new_publication() {
         .unwrap();
     repo.write_knowledge("a.md", "repaired sqlite");
     assert!(
-        open_documents(repo.get_root())
+        wire_document_refresher(repo.get_root())
             .unwrap()
             .refresh()
             .unwrap()
@@ -292,7 +304,7 @@ impl PausedSearch {
     fn spawn(root: &std::path::Path, barrier: ResponseBarrier) -> Self {
         let root = root.to_owned();
         let worker = thread::spawn(move || {
-            open_searches(&root).unwrap().search(&SearchRequest {
+            wire_searcher(&root).unwrap().search(&SearchRequest {
                 query: "sqlite".into(),
                 limit: NonZeroUsize::new(10).unwrap(),
             })

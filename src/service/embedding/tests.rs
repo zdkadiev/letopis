@@ -3,8 +3,8 @@ use crate::{
     domain::{ElementKind, KnowledgeId, RepoPath, Sha256},
     markdown::{MarkdownParser, parse},
     service::{
-        CacheWrite, ConfigState, DrainOutcome, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind,
-        EmbeddingFailure, EmbeddingFiles, EmbeddingProvider, EmbeddingResult, Embeddings,
+        CacheWrite, ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingError,
+        EmbeddingErrorKind, EmbeddingFailure, EmbeddingFiles, EmbeddingProvider, EmbeddingResult,
         KnowledgeMetadata, NodeMetadata, QueryEmbedding, QueryEmbeddingRequest, Storage,
         StorageRead, VectorOutcome, VectorWrite,
     },
@@ -22,7 +22,7 @@ mod tasks {
     use super::{Files, Provider, open_storage, publish};
     use crate::{
         markdown::MarkdownParser,
-        service::{CommandErrorKind, EmbeddingService, EmbeddingTasks, Storage},
+        service::{CommandErrorKind, EmbeddingExecutor, EmbeddingService, Storage},
     };
     use rusqlite::Connection;
     use tempfile::TempDir;

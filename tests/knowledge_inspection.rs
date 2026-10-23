@@ -1,8 +1,9 @@
 mod support;
 use letopis::{
     domain::{LineRange, RepoPath, Sha256},
-    open_documents, open_git_snapshots, open_inspections,
-    service::{CommandErrorKind, Documents, ElementAddress, GitSnapshots, Inspections},
+    open_git_snapshots,
+    service::{CommandErrorKind, ElementAddress, GitSnapshots, Inspector, Refresher},
+    wire_document_refresher, wire_inspector,
 };
 use support::reading::ReadingRepo;
 
@@ -14,7 +15,7 @@ fn inspect_reads_current_knowledge_from_one_retained_tree() {
     for (path, bytes, ..) in fixtures {
         repo.write(path, bytes);
     }
-    let mut service = open_inspections(repo.get_root()).unwrap();
+    let mut service = wire_inspector(repo.get_root()).unwrap();
     let addresses = fixtures
         .iter()
         .map(|(_, _, id, ..)| ElementAddress::parse(id).unwrap())
@@ -56,7 +57,7 @@ fn inspect_deduplicates_cross_file_ids_and_rejects_unknown_batch() {
     let repo = ReadingRepo::new();
     repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\nalpha\n");
     repo.write("b.md", include_bytes!("fixtures/markdown/sections.md"));
-    let mut service = open_inspections(repo.get_root()).unwrap();
+    let mut service = wire_inspector(repo.get_root()).unwrap();
     let result = service
         .inspect(&["a.md", "./a.md", "b.md#a"].map(|id| ElementAddress::parse(id).unwrap()))
         .unwrap();
@@ -71,9 +72,12 @@ fn inspect_deduplicates_cross_file_ids_and_rejects_unknown_batch() {
 fn inspect_rejects_invalid_current_file_instead_of_using_old_sql() {
     let repo = ReadingRepo::new();
     repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\nold\n");
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     repo.write("a.md", b"<!-- letopis: {invalid} -->\ncurrent\n");
-    let error = open_inspections(repo.get_root())
+    let error = wire_inspector(repo.get_root())
         .unwrap()
         .inspect(&[ElementAddress::parse("a.md").unwrap()])
         .unwrap_err();
@@ -85,7 +89,7 @@ fn inspect_distinguishes_referenced_sources_from_unknown_ids() {
     let repo = ReadingRepo::new();
     repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\n[source](src/data.rs \"letopis:type=external\") [other](plain.md \"letopis:type=external\")\n");
     repo.write("plain.md", b"unmarked Markdown");
-    let mut service = open_inspections(repo.get_root()).unwrap();
+    let mut service = wire_inspector(repo.get_root()).unwrap();
     for (id, kind) in [
         ("src/data.rs", CommandErrorKind::InternalError),
         ("plain.md", CommandErrorKind::InternalError),
@@ -123,9 +127,12 @@ fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
         .status()
         .unwrap();
     assert!(status.success());
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
     std::fs::remove_file(repo.get_root().join("gone.md")).unwrap();
-    let mut service = open_inspections(repo.get_root()).unwrap();
+    let mut service = wire_inspector(repo.get_root()).unwrap();
     // Act
     let current = service
         .inspect(&[ElementAddress::parse("kept.md").unwrap()])

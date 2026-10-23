@@ -1,8 +1,8 @@
 use super::{
-    CommandError, CommandErrorKind, CommandResult, ConfigState, Documents, EmbeddingConfig,
-    Embeddings, FileSystem, KnowledgeMetadata, Markdown, NodeMetadata, QueryEmbedding,
-    QueryEmbeddingRequest, SearchFlag, SearchLink, SearchRequest, Searches, Storage, StorageRead,
-    TextMatch, VectorMatch, VectorOutcome,
+    CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder, EmbeddingConfig,
+    FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, QueryEmbedding,
+    QueryEmbeddingRequest, Refresher, SearchFlag, SearchLink, SearchRequest, Searcher, Storage,
+    StorageRead, TextMatch, VectorMatch, VectorOutcome,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath};
 use std::{
@@ -14,7 +14,7 @@ use std::{
 /// Independently owned boundaries; inference cannot upgrade the search read into a write.
 pub(crate) struct SearchDependencies<D, S, E, F, M> {
     /// Canonical document publication before pinning.
-    pub(crate) documents: D,
+    pub(crate) refresher: D,
     /// Exclusive scoped search read connection.
     pub(crate) storage: S,
     /// Query executor owning independent configuration and diagnostic connections.
@@ -26,7 +26,7 @@ pub(crate) struct SearchDependencies<D, S, E, F, M> {
 }
 /// Refreshes and ranks complete candidate channels from one scoped read.
 pub(crate) struct SearchService<D, S, E, F, M> {
-    documents: D,
+    refresher: D,
     storage: S,
     embeddings: E,
     filesystem: F,
@@ -36,7 +36,7 @@ impl<D, S, E, F, M> SearchService<D, S, E, F, M> {
     /// Assemble search from owned boundaries without performing I/O.
     pub(crate) fn new(dependencies: SearchDependencies<D, S, E, F, M>) -> Self {
         Self {
-            documents: dependencies.documents,
+            refresher: dependencies.refresher,
             storage: dependencies.storage,
             embeddings: dependencies.embeddings,
             filesystem: dependencies.filesystem,
@@ -44,11 +44,11 @@ impl<D, S, E, F, M> SearchService<D, S, E, F, M> {
         }
     }
 }
-impl<D: Documents, S: Storage, E: Embeddings, F: FileSystem, M: Markdown> Searches
+impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec> Searcher
     for SearchService<D, S, E, F, M>
 {
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
-        self.documents.refresh().map_err(map_search_error)?;
+        self.refresher.refresh().map_err(map_search_error)?;
         let config = self
             .embeddings
             .read_configuration()
@@ -111,7 +111,7 @@ fn build_fts_expression(query: &str) -> Option<String> {
     Some(tokens.join(" AND "))
 }
 
-fn find_vector_candidates<R: StorageRead, E: Embeddings>(
+fn find_vector_candidates<R: StorageRead, E: Embedder>(
     read: &mut R,
     embeddings: &mut E,
     captured: Option<(&EmbeddingConfig, NonZeroUsize)>,
@@ -241,7 +241,7 @@ fn calculate_rank_weight(rank: NonZeroUsize) -> CommandResult<f64> {
     Ok(1.0 / f64::from(rank))
 }
 
-fn build_link<F: FileSystem, M: Markdown>(
+fn build_link<F: FileSystem, M: MarkdownCodec>(
     node: &KnowledgeMetadata,
     revision: u64,
     filesystem: &F,
@@ -263,7 +263,7 @@ fn build_link<F: FileSystem, M: Markdown>(
     })
 }
 
-fn is_current_knowledge<F: FileSystem, M: Markdown>(
+fn is_current_knowledge<F: FileSystem, M: MarkdownCodec>(
     node: &KnowledgeMetadata,
     path: &RepoPath,
     filesystem: &F,

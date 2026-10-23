@@ -6,8 +6,8 @@ use crate::{
     domain::{ElementKind, KnowledgeId, LineRange, Sha256},
     open_storage,
     service::{
-        CacheWrite, CommandErrorKind, ConfigState, DrainOutcome, EmbeddingConfig, EmbeddingError,
-        EmbeddingErrorKind, EmbeddingResult, Embeddings, KnowledgeMetadata, NodeMetadata,
+        CacheWrite, CommandErrorKind, ConfigState, DrainOutcome, Embedder, EmbeddingConfig,
+        EmbeddingError, EmbeddingErrorKind, EmbeddingResult, KnowledgeMetadata, NodeMetadata,
         QueryEmbedding, QueryEmbeddingRequest, Storage, StorageRead, TextMatch, VectorMatch,
         VectorOutcome, VectorWrite,
     },
@@ -330,7 +330,7 @@ fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
     );
 }
 
-impl Embeddings for FixedQuery {
+impl Embedder for FixedQuery {
     fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
         panic!("must use captured configuration")
     }
