@@ -2,7 +2,7 @@
 
 Для продуктового crate и root tests обязательны rustfmt, диагностика rustc и Clippy. Rust 1.95.0, rustfmt и Clippy закреплены в `rust-toolchain.toml`; стандартный формат rustfmt сохраняется без отдельного файла настроек.
 
-Из любого каталога запустить `scripts/check-rust.sh` по пути к checkout. Скрипт выбирает корень проекта и последовательно выполняет:
+Запустить `make check` в корне checkout (из другого каталога: `make -C <путь> check`). Цель последовательно выполняет:
 
 ```sh
 cargo fmt --all --check
@@ -11,7 +11,15 @@ cargo clippy --locked --offline --all-targets -- -D warnings
 cargo test --locked --offline
 ```
 
-Для offline-проверок зависимости должны быть заранее доступны: при первом запуске подготовить их через `cargo fetch --locked`. Скрипт не загружает зависимости и не исправляет форматирование автоматически. Форматирование вручную: `cargo fmt --all`.
+Для offline-проверок зависимости должны быть заранее доступны: при первом запуске подготовить их через `cargo fetch --locked`. Цель не загружает зависимости и не исправляет форматирование автоматически. Форматирование вручную: `make fmt` (`cargo fmt --all`).
+
+При успехе `make check` и `make verify` печатают одну строку `ok`, при ошибке — полный вывод упавшего шага (так лог остаётся коротким, в том числе для агента). Полный вывод всех команд: `make check V=1`.
+
+## Расширенная проверка
+
+- `make verify`: `make check`, строгий Rustdoc (`RUSTDOCFLAGS='-D warnings'`) и root tests в release-профиле.
+- `make mutants`: мутационное тестирование через `cargo mutants` (`cargo install --locked cargo-mutants`, в `Cargo.lock` не входит). Для изменения поведения в `src/` запускать по diff: `git diff main > mutants.diff`, `make mutants ARGS='--in-diff mutants.diff'`; полный прогон — перед слиянием задачи в `main`. Каждый выживший мутант либо убивается тестом, либо фиксируется как эквивалентный с причиной и узким исключением в `.cargo/mutants.toml`.
+- `tests/storage/run.py --platform host|linux --evidence <новый каталог>`: схема, нативный стек SQLite/vec1, автономный исполняемый файл; нужен при изменении storage, нативных зависимостей или сборки.
 
 ## Правила
 

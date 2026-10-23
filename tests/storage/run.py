@@ -64,7 +64,7 @@ def run_host(root, evidence, execute):
     for tool in (['rustc', '-vV'], ['cargo', '--version'], ['git', '--version'],
                  [sys.executable, '--version'], ['uname', '-a']):
         execute(tool, 'version-' + Path(tool[0]).name + '.log')
-    execute(['./scripts/check-rust.sh'], 'rust-check.log')
+    execute(['make', 'check'], 'rust-check.log')
     execute(['cargo', 'doc', '--locked', '--offline', '--no-deps'],
             'rustdoc.log', extra={'RUSTDOCFLAGS': '-D warnings'})
     execute(['cargo', 'test', '--locked', '--offline',

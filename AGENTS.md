@@ -65,13 +65,26 @@ Apply these rules to new and touched code only.
 
 ## Verification
 
-For product Rust changes run:
+Run commands from the repository root; from elsewhere use `make -C <path> <target>`. Dependencies are locked and offline: if they have not been prepared, run `cargo fetch --locked` first. Checks never download dependencies or rewrite files; apply formatting with `make fmt`. `make check` and `make verify` print one `ok` line on success and the full output of the failed step on failure, which keeps logs small; `V=1` (for example `make check V=1`) shows every command's output.
 
-```sh
-./scripts/check-rust.sh
-```
+| Command | Runs | Use |
+| --- | --- | --- |
+| `make check` | `cargo fmt --check`, `cargo check` (all targets), Clippy with `-D warnings`, root tests | Required for every product Rust change. |
+| `make verify` | `make check`, strict Rustdoc (`RUSTDOCFLAGS='-D warnings'`), root tests in the release profile | Before claiming completion of a task that changes `src/`, public documentation, or dependencies. |
+| `make mutants` | `cargo mutants` over the root crate with locked, offline cargo | Mutation testing, see below. |
+| `python3 -B tests/storage/run.py --platform host\|linux --evidence <new directory>` | Schema parity, runner tests, native SQLite/vec1 capabilities, copied standalone executable and its linkage | When storage, native stack, build, or vendored inputs change. Evidence goes to a new directory, never over existing evidence. |
 
-It checks formatting, compiler diagnostics, Clippy, and root tests with locked offline dependencies. If dependencies have not been prepared, use `cargo fetch --locked` first. Formatting can be applied with `cargo fmt --all`.
+### Mutation testing
+
+Passing tests prove that the checked behavior works, not that the tests would notice a break. Mutation testing changes the code (flips a condition, replaces a return value, removes a call) and requires at least one test to fail for every change.
+
+- Requires `cargo-mutants` (`cargo install --locked cargo-mutants`); it is a developer tool and is not part of `Cargo.lock`. Its output directory `mutants.out*` is git-ignored.
+- For behavioral changes in `src/`, run it over the changed code only: `git diff main > mutants.diff` and `make mutants ARGS='--in-diff mutants.diff'`. Run it over the whole crate before merging a task into `main` and after changes to domain rules, storage, or change detection.
+- Every surviving mutant is either killed by a new or stronger test (assert the observable result, not just that the call did not fail) or recorded as equivalent: list the mutant and the reason in the task card, spec, or plan, and exclude it narrowly in `.cargo/mutants.toml` with a comment. Do not exclude a whole file or function to make the run pass.
+- Timeouts and unviable mutants are not survivors, but report their counts. Do not shorten the run by lowering the timeout without saying so.
+- Report the mutation result as caught / missed / timeout / unviable counts for the scope that was actually run. Mutation testing complements `make check`; it does not replace it, and it does not apply to documentation-only edits.
+
+### Review and reporting
 
 - Structure tests as Arrange, Act, Assert: prepare inputs/fixtures, execute the behavior, then check results. Use explicit phase comments where they clarify boundaries; repeat phases for genuinely sequential scenarios. Keep helpers private and keep scenario assertions visible.
 - Test meaningful behavior and failure paths for behavioral changes. Import-only or documentation-only edits do not need new behavioral tests.
