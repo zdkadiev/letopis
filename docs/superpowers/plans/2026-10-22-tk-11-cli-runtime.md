@@ -261,3 +261,251 @@ authorized integration and forbids an implicit merge/rebase. Resume after the
 completed TK-13 is available through that gate, reconcile the shared filesystem
 and service contracts, then execute real-drain and combined-tree acceptance. No
 final TK-11 completion or publication is claimed.
+
+
+## Task 5 fix round 1 — 2026-10-23
+
+Fix review base is4030714; policy/source checkpoint1034d016 retained the completed
+TK-13 integration and actual production drain. The immutable original2061-candidate
+baseline is complete:550 tool-caught/81 missed/6 timeout/1424 unviable. Its exact
+705+1356 disjoint union, metadata, every raw diff and72 unchanged source hashes
+are sealed in `.artifacts/tk11/task5-fix1/immutable-baseline-final/`.
+
+All550 tool catches were causally audited.23 have timing-only failure blocks;
+four are directly mutation-sensitive (two removed-NONBLOCK FIFO schedules, inverted
+setsid success handling, forced unsupported dimension1).19 observer-only cases
+(first-stage3+continuation16) retain their original tool classification with causal
+credit withheld until final affected validation. The first audit found18; its raw
+receipt is preserved and v2 adds the multi-observer-only array-length case.
+Four ambiguous tool timeouts each pass every test in isolated single-worker replay
+and are MISSED there (0caught/4missed/0timeout/0unviable;270s actual budget).
+The original six timeouts remain six; two are causal unbounded initialization loops.
+
+### Accepted fix-round rulings and costs
+
+| Ruling | Accepted decision | Cost / future obligation |
+| --- | --- | --- |
+| 1 | Require coordination-lock nlink=1 before PID mutation and revalidate under ownership; ordinary corpus hardlinks remain valid. | Intentionally hardlinked locks require private files. |
+| 2 | Ordinary/unavailable CLI composition initializes its one service directory lazily; embedding construction explicitly pins it. | Constructor readiness differs; no-directory and replacement regressions remain required. |
+| 3 | Cap lints only in disposable mutation copies; production make verify remains strict and whole-scope/time budgets remain explicit. | Mutation copies establish behavioral sensitivity, not production lint cleanliness. |
+| 4 | One private generic typed retry helper accepts the operation; production passes File::try_lock and retains WouldBlock hook, PID ordering and RAII. Rerun all final local.rs candidates plus survivor scopes. | One helper and changed inventory require explicit before/after mapping; no byte-identical final-inventory claim. |
+| 5 | Checkpoint/interrupt only the owned coordinator, benchmark bounded six-suite modes, and resume the exact unfinished identity partition. Defaults require all12 passes and clear improvement; they were rejected. | Benchmark time and multi-receipt accounting; shared-target timings omit per-copy rebuild cost. |
+| 6 | Preserve public Diagnostic spans around the complete offending service comment, without unrelated prefix or multiline truncation. | A future equally useful location change requires intentional contract/test updates. |
+| 7 | Isolated integration executable interposes only its own C setsid boundary with async-signal-safe errno failure; prove real warning propagation on both platforms/debug/release. | Platform/linker-specific test coupling; report concrete interception failure rather than excluding the mutation. |
+| 8 | Only initialization elapsed<5s to <=5s is contract-equivalent under the per-step retry budget; exact equality may permit one extra retry, and existing1ms sleep can finish beyond5s. | Future strict-cutoff/retry-count requirements need deterministic clock tests and removal of this exact exclusion. |
+| 9 | Keep the real five-second SQLite expiration body in an owned30s supervised child, kill/reap only that child on failure, and prove the exact test ran. | Extra child invocation and watchdog maintenance; no clock seam or product behavior change. |
+| 10 | Use two mutation workers/two test threads for final affected receipts after actual observer-only noise; preserve exact scope and non-shortening timeouts (actual274s final), isolate ambiguous failures without catch credit. | Longer wall time and replay accounting; no new benchmark or baseline restart. |
+| 11 | Use the existing SQLite ffi authorizer on a test-owned connection to ignore one seeded-bad policy setter; validate actual policy, safe failure, non-panicking callback/lifetime and scoped unregister. | Test-only native unsafe/runtime coupling and final strict/platform gates; no new production seam/dependency. |
+
+The interrupted705 terminal outcomes are256caught/39missed/0timeout/410unviable;
+continuation1356 is294caught/42missed/6timeout/1014unviable. The benchmark's six
+2-thread suites pass348root/0failed/4ignored. Five default suites pass the same;
+one default suite fails148passed/1failed/3ignored at the real two-probe observer.
+Default mode was only3.2% faster and is rejected. Preserve its original parser
+report and use corrected-counts-v2.json; the failed measurement is no mutant catch.
+The first non-capped exploratory receipt (6caught/26unviable/6unfinished) remains
+separate and provides no union credit. All final unviables are real Rust type or
+syntax failures; no resource/link/disk error was silently classified unviable.
+
+### Exact equivalent mutations
+
+The23 decisions below are final current-consumer/source audits, not pending
+proposals. Historical proposals remain in survivor-triage.json and the initial
+map; final-equivalence-decisions-v3.json records all23 accepted mappings. Only exact
+anchored names are excluded in `.cargo/mutants.toml`; no file/function is skipped.
+Each disjoint-bit proof applies to the fixed macOS/Linux permission/open constants.
+Private diagnostic redaction, URI spelling, read-only extra Git flags and retry
+eligibility are contract-equivalent; they are not claimed byte/trace-identical.
+Native dependency/build-mode or consumer/contract changes require re-auditing the
+relevant exclusion. SQLite3.53.2 comes from libsqlite3-sys0.38.2; the accepted bundled
+build excludes system SQLite. Arbitrary build-script/pkg-config overrides are
+outside this supported build choice. Pinned source hashes and URI/readonly Git
+probes are retained in the fix evidence; canonical Git-root proof includes a
+supplied double-leading-separator/PWD alias resolving to the ordinary physical root.
+
+| ID | Exact final mutation | Current-contract equivalence proof |
+| --- | --- | --- |
+| E01 | `src/utils.rs:65:9: replace <impl Visitor<'de> for JsonVisitor<CHECK_INTEGER_TOKENS>>::expecting -> fmt::Result with Ok(Default::default())` | JsonVisitor is crate-private and consumed only by serde_json deserialize_any; it implements every JSON value kind. expecting is a required visitor formatting hook for unsupported deserializer value kinds, not an application diagnostic. Parsing errors are wrapped by EmbeddingError with fixed public Display/Debug and private causes. No public JSON acceptance, identity, vector, or error category changes. |
+| E02 | `src/domain/sha256.rs:23:46: replace \| with ^ in Sha256::parse` | The unchanged precondition accepts exactly lowercase hexadecimal bytes. Each decode result is 0..15, so the shifted first nibble occupies bits4..7 and the second occupies bits0..3. Their intersection is zero for every accepted pair; bitwise OR and XOR produce identical bytes. Rejected inputs return before this expression. |
+| E03 | `src/embedding/openai.rs:31:9: replace <impl fmt::Debug for Openai>::fmt -> fmt::Result with Ok(Default::default())` | Openai is crate-private and its custom Debug implementation has no runtime consumer, generic Debug bound, or outward Debug composition (HttpProviders has no Debug implementation). Empty output and the fixed redacted text both satisfy credential nondisclosure; prescribing component-name formatting solely to kill this mutation would invent an incidental contract. |
+| E04 | `src/filesystem/local.rs:309:40: replace \| with ^ in LocalFileSystem::finish_lock` | Mode::RUSR and Mode::WUSR are independent POSIX permission bits (0400 and0200). Their bit sets do not overlap, so OR and XOR both produce owner read/write mode0600 on both supported hosts. |
+| E05 | `src/filesystem/local.rs:422:42: replace \| with ^ in create_lock_file` | LOCK_FILE_FLAGS contains RDWR/CLOEXEC/NOFOLLOW/NONBLOCK. CREATE and EXCL are distinct nonoverlapping flag bits absent from those base flags; each changed OR therefore has disjoint operands and XOR preserves the exact open flags on supported macOS/Linux. |
+| E06 | `src/filesystem/local.rs:422:25: replace \| with ^ in create_lock_file` | LOCK_FILE_FLAGS contains RDWR/CLOEXEC/NOFOLLOW/NONBLOCK. CREATE and EXCL are distinct nonoverlapping flag bits absent from those base flags; each changed OR therefore has disjoint operands and XOR preserves the exact open flags on supported macOS/Linux. |
+| E07 | `src/filesystem/local.rs:423:20: replace \| with ^ in create_lock_file` | Mode::RUSR and Mode::WUSR are disjoint owner permission bits; OR and XOR both produce0600. |
+| E08 | `src/filesystem/read.rs:31:70: replace \| with ^ in read_regular` | The read flags RDONLY/NOFOLLOW/NONBLOCK have no CLOEXEC bit set. CLOEXEC is a separate open flag, so XOR and OR produce the same descriptor flags on supported macOS/Linux. |
+| E09 | `src/filesystem/read.rs:31:51: replace \| with ^ in read_regular` | RDONLY is zero; NOFOLLOW/NONBLOCK/CLOEXEC are separate nonoverlapping open flags. The exact OR expression has disjoint operands, so XOR produces the same flags on supported macOS/Linux. |
+| E10 | `src/filesystem/read.rs:31:32: replace \| with ^ in read_regular` | RDONLY is zero; NOFOLLOW/NONBLOCK/CLOEXEC are separate nonoverlapping open flags. The exact OR expression has disjoint operands, so XOR produces the same flags on supported macOS/Linux. |
+| E11 | `src/git/process.rs:109:65: replace == with != in GitProcess::build_command` | The first argument for hash-object is itself different from -w, so any != -w is always true. Existing writable hash-object calls still receive exactly the same fsync settings; the only changed call is read-only independent rehash without -w, which receives extra core.fsync settings but never writes an object. The private process adapter has no externally supplied argv or argument observer. |
+| E12 | `src/storage/connection.rs:65:33: replace \| with ^ in ConfinedDirectory<'a>::open_database` | The base database flags do not contain SQLITE_OPEN_NOFOLLOW, a distinct bit. The directory RDONLY(0), DIRECTORY, NOFOLLOW and CLOEXEC operands are distinct bits on supported macOS/Linux; OR and XOR produce identical effective flags at each exact expression. |
+| E13 | `src/storage/connection.rs:110:67: replace \| with ^ in ConfinedDirectory<'a>::verify` | The base database flags do not contain SQLITE_OPEN_NOFOLLOW, a distinct bit. The directory RDONLY(0), DIRECTORY, NOFOLLOW and CLOEXEC operands are distinct bits on supported macOS/Linux; OR and XOR produce identical effective flags at each exact expression. |
+| E14 | `src/storage/connection.rs:110:48: replace \| with ^ in ConfinedDirectory<'a>::verify` | The base database flags do not contain SQLITE_OPEN_NOFOLLOW, a distinct bit. The directory RDONLY(0), DIRECTORY, NOFOLLOW and CLOEXEC operands are distinct bits on supported macOS/Linux; OR and XOR produce identical effective flags at each exact expression. |
+| E15 | `src/storage/connection.rs:110:28: replace \| with ^ in ConfinedDirectory<'a>::verify` | The base database flags do not contain SQLITE_OPEN_NOFOLLOW, a distinct bit. The directory RDONLY(0), DIRECTORY, NOFOLLOW and CLOEXEC operands are distinct bits on supported macOS/Linux; OR and XOR produce identical effective flags at each exact expression. |
+| E16 | `src/storage/connection.rs:180:42: replace < with <= in wait_for_initialization` | Only exact elapsed==5s differs, permitting one extra retry. Existing per-step budget already sleeps1ms after eligibility and may finish an operation after5s; accepted TK10 contract is not a hard nanosecond cutoff. |
+| E17 | `src/storage/connection.rs:327:41: replace \|\| with && in attach_cache` | alphanumeric and unreserved/slash sets are disjoint, so AND percent-encodes all bytes. The only consumer is SQLite URI parsing: locked sqlite3.c decodes %HH before VFS use, mode=ro remains separate, canonical absolute callers prevent authority differences. Same pinned SQLite3.53.2 probe confirms identical filename/value and rejected writes for both encodings, including delimiters/UTF-8. No formatting contract for private URI. |
+| E18 | `src/storage/connection.rs:411:35: replace < with == in verify_capabilities` | Cargo pins bundled libsqlite3-sys0.38.2, whose SQLite3.53.2 is strictly above required3.51.3. Both comparisons remain false for the supported runtime. No external/unbundled version consumer; revisit exact exclusion on native dependency/requirement changes. |
+| E19 | `src/storage/connection.rs:411:35: replace < with <= in verify_capabilities` | Cargo pins bundled libsqlite3-sys0.38.2, whose SQLite3.53.2 is strictly above required3.51.3. Both comparisons remain false for the supported runtime. No external/unbundled version consumer; revisit exact exclusion on native dependency/requirement changes. |
+
+| E20 | `src/git/process.rs:109:40: replace && with \|\| in GitProcess::build_command` | For current private argv callers, mktree and update-ref retain fsync settings, hash-object -w retains fsync settings, and no other command carries -w. The changed conjunction therefore only adds core.fsync/core.fsyncMethod to the independent read-only hash-object call without -w. That command performs no object write and returns the same independently recomputed OID; SHA1/SHA256 repository state/argv-consumer proof is preserved in hash-object-readonly-equivalence.json. GitProcess has no public arbitrary-argv or argument observer. Reaudit if any future caller passes -w to another command or exposes command formatting. Cost: Read-only command invocation differs; future argv consumers or flags require re-auditing this exact exclusion. |
+| E21 | `src/service/embedding_error.rs:77:9: replace <impl fmt::Display for PrivateCause>::fmt -> fmt::Result with Ok(Default::default())` | PrivateCause owns the original error but exposes no payload or source chain. Its only outward path is EmbeddingError::source as dyn Error; current production consumers use the public EmbeddingError kind/Display/Debug, with no PrivateCause formatting consumer. The public type promises a private non-formatable cause, not a marker string; both the fixed redacted marker and empty formatting preserve nondisclosure and source presence. The redaction integration test formats the wrapper only to assert no secret and no nested source. Public EmbeddingError Display and useful Debug classification are unchanged and separately tested. Cost: Wrapper text is contract-equivalent, not byte-identical; a future public marker-text requirement requires removing this exact exclusion. |
+| E22 | `src/service/embedding_error.rs:82:9: replace <impl fmt::Debug for PrivateCause>::fmt -> fmt::Result with Ok(Default::default())` | PrivateCause is an opaque cause wrapper with no useful-classification formatting contract. No production Debug composition consumes this private implementation; EmbeddingError Debug independently prints its stable kind and is strengthened by a public positive assertion. Empty PrivateCause Debug preserves the documented non-formatable/private payload contract, the retained source wrapper, and nondisclosure. The sole formatting consumer is the integration redaction assertion; requiring incidental wrapper marker text solely to kill this mutation would add a new contract. Cost: Wrapper debug text changes; future diagnostic-format guarantees or consumers require re-auditing this exact exclusion. |
+| E23 | `src/service/embedding_config.rs:41:13: replace \|\| with && in EmbeddingConfig::parse` | JsonValue rejects duplicate keys and ROOT_FIELDS lists exactly the four mandatory provider/model/parameters/max_retries keys. With all four present and no extras both predicates accept; any extra with all mandatory keys has length>4 and unknown=true, so both predicates reject. At length4 an unknown key necessarily replaces a mandatory key; at length<4 or only mandatory-key subsets a mandatory key is missing. The mutated early check may let these inputs reach an individual required-field lookup, but each missing field rejects with the same fixed InvalidConfig and no cause. Before any missing max_retries lookup, parameter validation/read_dimensions also only use the same cause-free rejection. No canonicalization, I/O, result identity, retained cause, or accepted configuration changes. The only difference is private rejection control flow; error text is fixed. Reaudit if fields become optional or a later validation gains side effects or distinct public error classification/cause. Cost: Early rejection path differs; future optional fields or diagnostic/side-effect requirements require removing this exact exclusion. |
+
+### Historical changed-tree verification checkpoint before the259 run
+
+Strict `make verify V=1` passes388root/0failed/4ignored in both debug and release,
+with8 emitted nested passes per profile and two additional supervisor-owned child
+invocations whose stdout is captured. The interposed setsid failure test passes in
+both profiles on macOS; Linux execution remains a final platform gate. One failed
+first strict attempt found duplicate test-module loading; the corrected shared
+cfg(test) supervisor avoids production coupling. The negative unmatched-filter
+regression is RED then GREEN; the approved retry helper API is RED then GREEN.
+A stale copied timestamp on the first supervisor GREEN attempt is preserved;
+refreshing timestamps proves actual recompilation in supervisor-green2.log.
+Python runner checks pass11CLI/10storage, including quiet/V1/failed-step output.
+
+Final unfiltered inventory is2063; all1880 nonlocal mutation metadata, expression
+bytes and enclosing-function bytes equal1034d01.44 serialized diff contexts change
+only because adjacent cfg(test) content changed. Whole-file hashes are unchanged
+for57 source files;15 existing source files differ (14test-only, one production
+retry refactor), plus one new test-only module. Final local.rs has183 candidates
+versus181 originally. Its full universe is retained, with four exact equivalents;
+all179 eligible local candidates are in the259-record affected selection, together
+with all meaningful original nonlocal misses, all19 withheld cases and all6timeouts.
+The tool's list exactly equals those259 complete final candidate records. Actual
+baseline auto-timeout is274s (floor270); two workers/two test threads are running.
+Technical hashes are frozen in affected-inputs-before.json. Final mutations,
+host/Linux native/CLI evidence, source commits and independent reviews remain open.
+No final acceptance, merge, push or GitHub operation is claimed.
+
+
+Ruling11 accepts narrow real SQLite authorizer fault injection in a test-owned
+connection through existing ffi, with no new feature/dependency or production seam.
+Seed one bad foreign_keys/synchronous value, ignore only that PRAGMA setter, keep
+WAL and the other policy valid, and assert safe failure plus actual observations.
+The callback must validate action/non-null arguments, never panic/unwind, retain a
+static context with documented unsafe lifetime, and unregister through scoped
+cleanup. Cost: native unsafe/runtime coupling plus strict final changed-tree gates.
+This addresses the affected-run miss at connection.rs:379:38. The initial triage
+incorrectly attributed both OR mutations to the WAL-only scenario; the actual last
+OR mutation preserves journal rejection and weakens only sync/foreign rejection.
+The active259 run stays unchanged; apply the regression afterward and replay this
+exact candidate with minimum timeout274s, retaining the original miss classification.
+
+### Final mutation resolution — 2026-10-23
+
+The sealed259-record affected receipt is102caught/6missed/0timeout/151unviable,
+with exact selected metadata/raw diffs and unchanged242storage/131CLI input hashes.
+Every unviable has a real Rust type/syntax error. All102 catches have mutation-
+sensitive failures: the sole timing-only catch removes O_DIRECTORY and blocks the
+controlled FIFO open, so its verified30s owned-child watchdog is directly causal.
+Two resource-keyword hits are expected native WouldBlock assertions after removing
+unlock/forcing successful lock acquisition; they are not resource exhaustion.
+No unrelated observer-only catch or unresolved infrastructure case remains here.
+
+The six actual misses are retained. E20–E23 above resolve four as exact equivalents.
+Two meaningful gaps receive tests: a real SQLite authorizer ignores only one
+seeded-bad policy setter, then configuration must reject while WAL/other policy
+remain valid; a public parse accepts valid nested/empty arrays, preserves execution
+parameters and matches independently specified canonical JSON bytes/hash. Each
+focused unmutated test passes; an exact two-candidate replay catches both mutations
+(2caught/0missed/0timeout/0unviable), with12s build+54s baseline and actual274s timeout.
+Its failures are the new policy unwrap_err on Ok and allowed array rejected as
+InvalidConfig, not unrelated timing failures. No production seam/dependency changed.
+
+The final tree has2063 unfiltered candidate records byte-identical to the259-run
+inventory,23 exact equivalents and2040 default-eligible candidates. Only the two
+test-only files and mutation-policy exclusions changed after259. All183 final
+local.rs candidates are accounted for:179 executed plus4 narrow equivalents.
+The1880 nonlocal production-expression/enclosing-function correspondence to1034d01
+remains valid; changed whole-file test bytes are not called identical. Raw259 plus
+focused2 receipts cover259 distinct affected identities, resolving104caught/
+4equivalent/151unviable; this is not another full-crate execution. The full original
+2061 baseline remains550tool-caught/81missed/6timeout/1424unviable.
+
+`final-original-gap-resolution-map.json` preserves each original identity and its
+resolution:81 misses→62caught+19equivalent;19 withheld observer-only catches→17caught+
+2equivalent;6 timeouts→4caught+2equivalent. The two real init loops remain historical
+270s timeouts even though the finite nonretryable test now catches them. Four late
+ambiguous timeouts first replayed0caught/4missed/0timeout/0unviable on unchanged1034;
+subsequent regressions/equivalence audits resolve them without laundering baseline
+classifications. The earlier18-case audit and failed default-harness benchmark are
+preserved; corrected receipts say19 withheld and148passed/1failed/3ignored for that
+partial benchmark. Later timeout floors preserve actual253→270→274s progression.
+
+Technical commit `c81f5285344fe67b31eb2f17c932fc4f69974a91` contains34 intended paths.
+The host native runner captured dirty1034d01; every one of its242 technical hashes
+matches the committed blobs exactly (`technical-commit-correspondence.json`). This
+content mapping does not relabel the original source-capture log. Its explicit
+make verify V=1 exits0 with390root/0failed/4ignored per debug/release profile,
+8emitted nested passes each and2additional captured supervisor children. Root
+normal ignores remain3parent-driven child entries plus the real provider deadline.
+The host runner separately selects the current root-manifest production provider
+deadline:1pass/0fail/0ignored,39filtered,60.01s libtest elapsed; production elapsed
+is asserted59s<=elapsed<64s against a delayed65s response. Historical standalone
+manifests are not substituted or claimed rerun. Final Linux/native and CLI gates
+are recorded separately below. Independent fix/whole-branch review
+and controller acceptance remain required; no main merge/push/GitHub/Engram write.
+
+### Final platform gates and limits
+
+All four commands below exit0 with PASS manifests. Each explicitly executes
+`make verify V=1` (exit0): formatting, all-target compiler/Clippy with -D warnings,
+390 root passes/0 failures/4 ignores in each debug/release profile, and strict
+Rustdoc. Each profile emits8 nested one-pass summaries; two additional supervised
+children (FIFO and real initialization expiration) capture their output and are
+reported separately. The child supervisor verifies the exact case ran, not merely
+exit0. The executable-local setsid failure interposition passes macOS/Linux in both
+profiles. CLI runners additionally pass12 dedicated real-drain scenarios each,
+validate handler/product envelopes and preserve real process/null-fd/lock evidence.
+Each CLI platform includes five expected product-error exits1; successful driver
+exit0 means every command matched its expected exit, not that all child exits were0.
+Python workflow checks pass11CLI/10storage; exact quiet/V1/failure receipts prove
+one ok line by default and complete failing-step output without full-suite repeats.
+
+```sh
+.artifacts/tk11/python-env/bin/python3 -B tests/storage/run.py --platform host --evidence .artifacts/tk11/task5-fix1/storage-host-final
+.artifacts/tk11/python-env/bin/python3 -B tests/storage/run.py --platform linux --evidence .artifacts/tk11/task5-fix1/storage-linux-final
+.artifacts/tk11/python-env/bin/python3 -B tests/cli/run.py --platform host --evidence .artifacts/tk11/task5-fix1/cli-host-final
+.artifacts/tk11/python-env/bin/python3 -B tests/cli/run.py --platform linux --evidence .artifacts/tk11/task5-fix1/cli-linux-final
+```
+
+| Runner | Result | Outer manifest SHA-256 |
+| --- | --- | --- |
+| storage host | PASS; 390/0/4 debug and release; 8 emitted nested each | `b1275861497ae4a9fd4a5fe764c72aa28b3b8fcf72d630ad1619d0ee761c5fcf` |
+| storage linux | PASS; 390/0/4 debug and release; 8 emitted nested each | `25bfd108659509ccbbb00d40291664a8b7d7a0f26432d0d3b89138c34e58bd88` |
+| cli host | PASS; 390/0/4 debug and release; 8 emitted nested each | `1a2da675410b0e205dfa8511d60df91cdbb9a5595759edb57d1d5ffe6de9f11e` |
+| cli linux | PASS; 390/0/4 debug and release; 8 emitted nested each | `9be75ef2481adba787da1c53c4982427480ee5ecac9b78627157ea61ab3b8447` |
+
+Evidence lives under `.artifacts/tk11/task5-fix1/`; Linux checked manifests are
+`storage-linux-final/container/manifest.json` SHA-256
+`8f468669301f937b5d85fcf87a2a4748a8700d8d8f6b44e75ba720161a111c1a`
+and `cli-linux-final/container/manifest.json` SHA-256
+`80bbc9fec039c911e03f68bfb5b733a845e882054c9f3824f4eca55ae06d503f`.
+Storage host/outer inventories contain242 entries; the container's132 entries are
+an exact shared subset, with110 host-only historical/runner inputs. Every common
+hash matches, including all new root tests, cfg(test) support/git.rs, production,
+Makefile and mutation policy. This is not a claim of242==132 equality. CLI host,
+outer and container inventories are exactly equal at131 entries. All technical
+bytes still match c81f528; the later four task-document edits are outside those
+inventories and do not change source/test/build inputs. Docker image preparation
+uses apt/rustup/pip and cargo fetch --locked as applicable; only actual checks are
+locked/offline and runtime containers use --network none. Image builds are not
+labelled offline.
+
+The storage runners separately execute the current root-manifest command:
+`cargo test --locked --offline --test embedding_provider attempt_obeys_real_sixty_second_deadline -- --ignored --exact --nocapture`.
+Both pass1/0/0 with39 filtered; libtest elapsed is60.01s host and63.55s Linux.
+The test calls the actual open_embedding_provider and asserts product elapsed
+59s<=elapsed<64s against a65s delayed body; the printed suite duration is recorded
+separately from that assertion. The captured test source SHA-256 is
+`690dea276ae596c25d16f2f551b281543e00071378a1b3c1d0c471c92baaaa16`.
+This is a new current-product proof, not reuse of a matching historical test name
+or separate manifest. CLI runners and normal root tests retain its ignore.
+Unchanged historical standalone harnesses were not rerun; no duplicate deadline
+execution was added outside the required storage runners.
+
+Limits remain controlled loopback providers (not model quality), macOS/Linux
+ARM64 only, no Windows/NFS/x86_64/power-loss/target-resource or handled TK-29 SIGINT
+claim. Real inspect/check semantics remain TK-12/TK-19. Independent fix review and
+whole-branch review, final acceptance/ledger and Engram are controller-owned and
+pending. No main merge, push, GitHub action or other-worktree write was performed.

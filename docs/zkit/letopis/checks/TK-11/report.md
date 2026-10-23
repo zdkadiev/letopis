@@ -366,3 +366,113 @@ no x86_64/Windows/NFS, target RAM/latency, physical power loss or handled TK-29 
 claim. Detached completion allows a terminated Linux zombie pending PID 1 reaping;
 direct product calls verify exit 0. Unchanged historical harnesses with separate
 manifests and the historical 60-second provider deadline were not rerun.
+
+
+## Task5 fix round1 — implementation verified, review pending, 2026-10-23
+
+Technical commit: `c81f5285344fe67b31eb2f17c932fc4f69974a91`; fix base4030714,
+pre-existing policy/order/contracts correction1034d01. All eleven accepted decisions
+and costs,23 exact equivalent proofs and the complete scope/receipt mapping are in
+[the implementation plan](../../../../superpowers/plans/2026-10-22-tk-11-cli-runtime.md#task-5-fix-round-1--2026-10-23).
+The host native runner truthfully captured dirty1034d01; all242 tested technical
+hashes match c81f528 committed blobs exactly. Later source captures name c81f528.
+The documentation overlay changes no tested technical input.
+
+The complete immutable2061 baseline remains550tool-caught/81missed/6timeout/
+1424unviable, exact705+1356 disjoint union with metadata/raw diffs/72source hashes.
+Of550 tool catches,19 observer-only cases initially withheld causal credit; final
+mapping resolves17caught+2equivalent. Original81 misses resolve62caught+
+19equivalent; original6 timeouts resolve4caught+2equivalent, without rewriting
+historical classifications. Four ambiguous timeouts first replayed as4missed on
+unchanged source. All unviable logs contain real Rust errors, not infrastructure.
+
+The final unfiltered inventory has2063 candidates, with1880 unchanged nonlocal
+production-expression/function mappings. All183 local.rs candidates are accounted
+for:179 executed+4exact equivalents. The259-record affected run actually reports
+102caught/6missed/0timeout/151unviable at274s. Two new public/native regressions
+catch the remaining meaningful policy/array misses in an exact focused replay:
+2caught/0missed/0timeout/0unviable at274s. Four affected misses are narrowly proved
+E20–E23 equivalents. Distinct affected identities therefore resolve104caught/
+4equivalent/151unviable; this is not a new whole-crate execution. Default config
+excludes23 exact names and lists2040 eligible candidates, with no broad exclusion.
+All102 catches are causally sensitive; the one timing-only case removes O_DIRECTORY
+and blocks the tested FIFO. Expected WouldBlock lock diagnostics are not resource
+failures. Every original miss/withheld/timeout identity has an explicit final map.
+
+The only additional production refactor is one typed private Interrupted-only lock
+retry helper; finite success/contention/nonretryable tests preserve RAII/PID/hook
+behavior. Tests cover positive nested-array JCS identity, public safe diagnostics,
+complete invalid-comment spans, stat/lock identity, NOFOLLOW/nonregular reads,
+provider size/error boundaries, persisted corruption and transaction poisoning.
+The real five-second SQLite expiration body now runs under a30s owned supervisor;
+its helper rejects a successful child that matched zero tests. Dedicated setsid
+interposition exercises actual pre_exec failure on macOS/Linux/debug/release.
+Make check/verify print one ok line by default, full failed-step output on failure,
+and all output under V=1; fake-Cargo workflow checks verify this without duplicating
+full product suites. Mutation lint capping applies only to disposable copies;
+production strict checks remain unchanged. No dependency/lockfile change.
+
+
+### Final verification commands, evidence and limits
+
+All four commands below exit0 with PASS manifests. Each explicitly executes
+`make verify V=1` (exit0): formatting, all-target compiler/Clippy with -D warnings,
+390 root passes/0 failures/4 ignores in each debug/release profile, and strict
+Rustdoc. Each profile emits8 nested one-pass summaries; two additional supervised
+children (FIFO and real initialization expiration) capture their output and are
+reported separately. The child supervisor verifies the exact case ran, not merely
+exit0. The executable-local setsid failure interposition passes macOS/Linux in both
+profiles. CLI runners additionally pass12 dedicated real-drain scenarios each,
+validate handler/product envelopes and preserve real process/null-fd/lock evidence.
+Each CLI platform includes five expected product-error exits1; successful driver
+exit0 means every command matched its expected exit, not that all child exits were0.
+Python workflow checks pass11CLI/10storage; exact quiet/V1/failure receipts prove
+one ok line by default and complete failing-step output without full-suite repeats.
+
+```sh
+.artifacts/tk11/python-env/bin/python3 -B tests/storage/run.py --platform host --evidence .artifacts/tk11/task5-fix1/storage-host-final
+.artifacts/tk11/python-env/bin/python3 -B tests/storage/run.py --platform linux --evidence .artifacts/tk11/task5-fix1/storage-linux-final
+.artifacts/tk11/python-env/bin/python3 -B tests/cli/run.py --platform host --evidence .artifacts/tk11/task5-fix1/cli-host-final
+.artifacts/tk11/python-env/bin/python3 -B tests/cli/run.py --platform linux --evidence .artifacts/tk11/task5-fix1/cli-linux-final
+```
+
+| Runner | Result | Outer manifest SHA-256 |
+| --- | --- | --- |
+| storage host | PASS; 390/0/4 debug and release; 8 emitted nested each | `b1275861497ae4a9fd4a5fe764c72aa28b3b8fcf72d630ad1619d0ee761c5fcf` |
+| storage linux | PASS; 390/0/4 debug and release; 8 emitted nested each | `25bfd108659509ccbbb00d40291664a8b7d7a0f26432d0d3b89138c34e58bd88` |
+| cli host | PASS; 390/0/4 debug and release; 8 emitted nested each | `1a2da675410b0e205dfa8511d60df91cdbb9a5595759edb57d1d5ffe6de9f11e` |
+| cli linux | PASS; 390/0/4 debug and release; 8 emitted nested each | `9be75ef2481adba787da1c53c4982427480ee5ecac9b78627157ea61ab3b8447` |
+
+Evidence lives under `.artifacts/tk11/task5-fix1/`; Linux checked manifests are
+`storage-linux-final/container/manifest.json` SHA-256
+`8f468669301f937b5d85fcf87a2a4748a8700d8d8f6b44e75ba720161a111c1a`
+and `cli-linux-final/container/manifest.json` SHA-256
+`80bbc9fec039c911e03f68bfb5b733a845e882054c9f3824f4eca55ae06d503f`.
+Storage host/outer inventories contain242 entries; the container's132 entries are
+an exact shared subset, with110 host-only historical/runner inputs. Every common
+hash matches, including all new root tests, cfg(test) support/git.rs, production,
+Makefile and mutation policy. This is not a claim of242==132 equality. CLI host,
+outer and container inventories are exactly equal at131 entries. All technical
+bytes still match c81f528; the later four task-document edits are outside those
+inventories and do not change source/test/build inputs. Docker image preparation
+uses apt/rustup/pip and cargo fetch --locked as applicable; only actual checks are
+locked/offline and runtime containers use --network none. Image builds are not
+labelled offline.
+
+The storage runners separately execute the current root-manifest command:
+`cargo test --locked --offline --test embedding_provider attempt_obeys_real_sixty_second_deadline -- --ignored --exact --nocapture`.
+Both pass1/0/0 with39 filtered; libtest elapsed is60.01s host and63.55s Linux.
+The test calls the actual open_embedding_provider and asserts product elapsed
+59s<=elapsed<64s against a65s delayed body; the printed suite duration is recorded
+separately from that assertion. The captured test source SHA-256 is
+`690dea276ae596c25d16f2f551b281543e00071378a1b3c1d0c471c92baaaa16`.
+This is a new current-product proof, not reuse of a matching historical test name
+or separate manifest. CLI runners and normal root tests retain its ignore.
+Unchanged historical standalone harnesses were not rerun; no duplicate deadline
+execution was added outside the required storage runners.
+
+Limits remain controlled loopback providers (not model quality), macOS/Linux
+ARM64 only, no Windows/NFS/x86_64/power-loss/target-resource or handled TK-29 SIGINT
+claim. Real inspect/check semantics remain TK-12/TK-19. Independent fix review and
+whole-branch review, final acceptance/ledger and Engram are controller-owned and
+pending. No main merge, push, GitHub action or other-worktree write was performed.

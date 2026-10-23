@@ -165,3 +165,37 @@ JSON resolution and an explicit-target control run.
 Final Task 5 and whole-branch review remain pending; this is implementation evidence,
 not final task acceptance. Real inspect/check remain TK-12/TK-19. The unchanged
 historical 60-second deadline proof and separate-manifest harnesses were not rerun.
+
+
+## Task 5 fix-round verified contract checkpoint — 2026-10-23
+
+The private-lock/lazy-construction contracts above remain unchanged. One private
+typed helper preserves Interrupted-only retry, WouldBlock contention, private
+causes, PID-after-ownership and RAII unlock. Public invalid-comment coordinates
+retain the complete offending comment and omit unrelated prefix text. Public
+errors keep useful safe classification/context; opaque private cause wrappers
+remain non-formatable. Valid nested-array parameters retain their execution values
+and independently specified JCS identity. SQLite policy tests use a scoped native
+authorizer, with no production seam, to prove each ineffective setting fails closed.
+The real five-second initialization-expiration body is supervised in an owned30s
+child; the helper verifies exactly the requested test ran. The retry budget remains
+per-step, allowing the documented exact-equality equivalent rather than a strict
+nanosecond cutoff. All eleven rulings/costs and23 exact equivalent proofs are in
+[the implementation plan](../plans/2026-10-22-tk-11-cli-runtime.md#task-5-fix-round-1--2026-10-23).
+
+Technical commit c81f528 is verified by host/Linux storage/native and CLI runners:
+strict make verify V=1 passes390 root tests/0failures/4ignores per debug/release
+profile,8emitted nested passes each plus2additional captured supervisor children.
+Real setsid failure interposition passes both platforms/profiles; dedicated CLI
+real-drain tests pass12 each. Storage runners separately pass the current root
+production provider's real deadline test (60.01s host/63.55s Linux libtest elapsed,
+product assertion59<=elapsed<64s); normal roots retain its ignore. Separate-manifest
+historical harnesses were not rerun. Full original mutation baseline2061 remains
+550tool-caught/81missed/6timeout/1424unviable; final259 affected plus focused2 receipts
+resolve every meaningful miss/withheld case, with23 narrow equivalents and2063
+unfiltered/2040eligible final candidates. These scopes are not conflated.
+
+Independent fix review, whole-branch review and controller acceptance remain
+required. Earlier evidence retains its captured revisions/commands, including the
+host native dirty1034 capture explicitly content-mapped to c81. No task acceptance,
+main merge, push, GitHub action or Engram update is claimed by this implementer.

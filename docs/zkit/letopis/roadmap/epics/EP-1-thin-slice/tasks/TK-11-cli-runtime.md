@@ -130,3 +130,27 @@ TK-13 на `00bb62a1` ещё имеет открытые независимые 
 TK-13 через разрешённое объединение, подключить существующий executor и выполнить
 реальную drain-приёмку и финальное ревью ветки. До этого статус `blocked`,
 критерии реального drain/сервиса открыты; результаты Tasks 1–4 сохранены.
+
+
+**2026-10-23 — Task5 fix round1 проверена; независимая приёмка открыта.**
+Технический коммит `c81f5285344fe67b31eb2f17c932fc4f69974a91`. Полный immutable
+baseline1034d01:2061 исходная мутация,550tool-caught/81missed/6timeout/1424unviable;
+классификации сохранены. Все81misses разрешены62caught+19equivalent;19withheld
+observer-only cases→17caught+2equivalent;6timeouts→4caught+2equivalent. Финальный
+scope259:102caught/6missed/0timeout/151unviable; два meaningful miss затем пойманы
+точным replay2/0/0/0. Финальный inventory2063,2040eligible,23узких equivalent
+exclusions; все183local.rs accounted:179executed+4equivalent. Это отдельные scopes,
+не новый полный прогон. Все11решений с ценой, точные proofs и source correspondence
+сохранены в [плане](../../../../../../superpowers/plans/2026-10-22-tk-11-cli-runtime.md#task-5-fix-round-1--2026-10-23).
+
+Host/Linux storage/native и CLI PASS: make verify V=1,390root/0failed/4ignored на
+каждый debug/release profile,8emitted nested+2additional captured supervisor children
+отдельно;12real-drain
+scenarios на платформу. Setsid failure interposition подтверждён обеими платформами
+и профилями. Storage runners отдельно выполнили root production deadline test:
+1PASS,60.01s host/63.55s Linux; historical standalone manifests не запускались.
+Storage242host/132container — точное общее подмножество; CLI131 равны полностью.
+Dirty1034 host capture точно сопоставлен с committed242input hashes c81f528.
+Исходные receipts сохранены; новые находятся в task5-fix1. Независимые fix/whole-
+branch reviews и итоговый ledger/Engram остаются controller-owned. Inspect/check —
+TK-12/TK-19. Merge/push/GitHub и изменения других worktrees не выполнялись.
