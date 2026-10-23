@@ -105,7 +105,8 @@ impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> DocumentService<G, 
                 return Err(fail_changed());
             }
             let prepared = prepare_removal(state.revision, path, &graph);
-            apply_projection(&mut unit, &mut graph, prepared, &mut outcome)?;
+            graph.apply(&prepared);
+            outcome = apply_projection(&mut unit, prepared, outcome)?;
         }
         for (path, observation) in delta.updated {
             let prepared = prepare_file(
@@ -117,7 +118,8 @@ impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> DocumentService<G, 
                 state.files.get(&path),
                 &graph,
             )?;
-            apply_projection(&mut unit, &mut graph, prepared, &mut outcome)?;
+            graph.apply(&prepared);
+            outcome = apply_projection(&mut unit, prepared, outcome)?;
         }
         graph.reconcile_sources(&self.filesystem, &mut unit)?;
         #[cfg(test)]
@@ -195,16 +197,15 @@ fn is_racy(previous: &FileRow, now: Option<i64>) -> bool {
 
 fn apply_projection<W: CacheWrite>(
     unit: &mut W,
-    graph: &mut EffectiveGraph,
     prepared: PreparedProjection,
-    outcome: &mut RefreshOutcome,
-) -> DocumentResult<()> {
+    outcome: RefreshOutcome,
+) -> DocumentResult<RefreshOutcome> {
     if prepared.base_revision != outcome.revision {
         return Err(fail_changed());
     }
-    prepared.add_counts(outcome);
-    graph.apply(&prepared);
-    publish(unit, prepared)
+    let outcome = prepared.add_counts(outcome);
+    publish(unit, prepared)?;
+    Ok(outcome)
 }
 
 fn build_outcome(revision: u64, published: bool) -> RefreshOutcome {

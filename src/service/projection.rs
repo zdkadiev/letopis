@@ -27,7 +27,8 @@ enum FileChange {
     Remove(RepoPath),
 }
 impl PreparedProjection {
-    pub(super) fn add_counts(&self, outcome: &mut RefreshOutcome) {
+    /// Returns `outcome` with this projection's file change counted.
+    pub(super) fn add_counts(&self, mut outcome: RefreshOutcome) -> RefreshOutcome {
         match &self.file {
             FileChange::Upsert(row) => {
                 outcome.files_updated += 1;
@@ -35,6 +36,7 @@ impl PreparedProjection {
             }
             FileChange::Remove(_) => outcome.files_removed += 1,
         }
+        outcome
     }
 }
 pub(super) struct EffectiveGraph {
@@ -200,7 +202,7 @@ pub(super) fn prepare_file<F: FileSystem, M: Markdown>(
         file.error.clone_from(&previous.error);
     } else {
         match markdown.parse_file(path, &captured.bytes) {
-            Ok(parsed) => prepare_valid(&mut prepared, parsed, graph.list_file_ids(path)),
+            Ok(parsed) => prepared = prepare_valid(prepared, parsed, graph.list_file_ids(path)),
             Err(errors) => {
                 file.valid = false;
                 file.error = Some(
@@ -230,10 +232,10 @@ fn build_file_row(path: &RepoPath, captured: &CapturedFile, hash: Sha256) -> Fil
 }
 
 fn prepare_valid(
-    prepared: &mut PreparedProjection,
+    mut prepared: PreparedProjection,
     parsed: Option<ParsedFile>,
     old_ids: Vec<KnowledgeId>,
-) {
+) -> PreparedProjection {
     prepared.cleared = old_ids;
     if let Some(parsed) = parsed {
         prepared.edges = parsed.edges;
@@ -260,6 +262,7 @@ fn prepare_valid(
         .filter(|id| !prepared.search.iter().any(|text| &text.metadata.id == *id))
         .cloned()
         .collect();
+    prepared
 }
 
 pub(super) fn publish<W: CacheWrite>(
