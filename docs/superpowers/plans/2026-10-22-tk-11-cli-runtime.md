@@ -509,3 +509,50 @@ ARM64 only, no Windows/NFS/x86_64/power-loss/target-resource or handled TK-29 SI
 claim. Real inspect/check semantics remain TK-12/TK-19. Independent fix review and
 whole-branch review, final acceptance/ledger and Engram are controller-owned and
 pending. No main merge, push, GitHub action or other-worktree write was performed.
+
+
+## Final review M1 — compiling-control anchor correction, 2026-10-23
+
+The single final review wave repairs developer tooling only. The kernel-exclusion
+control now matches `retry_lock(|| file.try_lock())` and replaces only the kernel
+operation with a typed successful closure, preserving helper usage under compiler
+warnings=deny. The new lightweight Python regression checks every declared control
+anchor occurs exactly once in its current owner file, with no Rust execution.
+It first fails on the stale kernel anchor (12tests/1failure), then all12 pass.
+
+Actual scoped commands:
+
+```sh
+.artifacts/tk11/python-env/bin/python3 -B -m unittest discover -s tests/cli -p test_runner.py -v
+.artifacts/tk11/python-env/bin/python3 -B tests/cli/negative_controls.py --evidence .artifacts/tk11/final-fix/controls
+```
+
+Both controls in the disposable copy compile the actual fixture and cli_process
+harness, fail the intended exact oracle (REDexit101;0passed/1failed), restore source
+bytes exactly, rebuild and pass the same case (GREENexit0;1passed/0failed). Null-output
+fails at stdout EOF before child release; kernel-exclusion reports second ownership
+Bool(true) instead of false. The runner exits0 with PASS; expected RED exceptions
+are deliberately checked, not counted as an ordinary successful test command.
+Manifest SHA-256: `516814ae558fc0c4def6fa5086bc018950db4d7e51b497d2e70e77f243f08b50`.
+Raw evidence and stage hashes remain under `.artifacts/tk11/final-fix/`.
+
+Exactly two Python tooling inputs change from the previous32c9914 checkpoint:
+
+| Tooling input | Previous SHA-256 | Current SHA-256 |
+| --- | --- | --- |
+| `tests/cli/negative_controls.py` | `f30f78b2d7840eb9a32f2deac4c6e2c92947d7ae1ad3c58df3844043ed7d126b` | `2a44e03c0c717ce0ba5d4193ca2f2078f7936c32beb8cb96b4472367eba39373` |
+| `tests/cli/test_runner.py` | `c019335bc2aad10d4868fba55aba160d18751c14e604258d4b8d2504432dc08b` | `795a7e8e0e60c15d2d28e84a1d1babff0d89490996ca3ab192d03da663bb3f91` |
+
+All241 other entries in the prior243-input union, including every product Rust,
+Rust test/build/native/schema input, remain byte-identical. Prior runtime receipts
+and their complete maps remain historical and unchanged: current maps differ at
+these two tooling paths, so no all243-equal-to-old-map claim is made. The new focused
+receipt covers the changed tooling; `focused-validation-and-correspondence.json`
+records exact source restoration, stage hashes and current131CLI input map.
+No390-test/platform/native/deadline/mutation suite was repeated for this Python-only
+fix. Actual control execution is macOSARM64; prior runtime platform limits remain.
+
+All eleven accepted rulings/costs and23 exact equivalent decisions above remain
+unchanged. The final-fix report records the subsequent commit/content mapping.
+One scoped final re-review and controller-owned task acceptance remain pending;
+no main merge, push, GitHub, Engram or other-worktree action is performed here.

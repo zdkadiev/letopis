@@ -15,8 +15,8 @@ CONTROLS = [
      '.stdout(Stdio::inherit())\n            .stderr(Stdio::inherit())',
      'detached_child_has_exact_context_null_fds_and_no_service_descriptors',
      'stdout EOF before child release'),
-    ('kernel-exclusion', 'src/filesystem/local.rs', 'match file.try_lock() {',
-     'match { let _ = file; Ok::<(), TryLockError>(()) } {',
+    ('kernel-exclusion', 'src/filesystem/local.rs', 'retry_lock(|| file.try_lock())',
+     'retry_lock(|| { let _ = file; Ok::<(), TryLockError>(()) })',
      'two_released_probes_yield_exactly_one_active_drain',
      'left: Bool(true)\n right: false'),
 ]

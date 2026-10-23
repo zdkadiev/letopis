@@ -199,3 +199,17 @@ Independent fix review, whole-branch review and controller acceptance remain
 required. Earlier evidence retains its captured revisions/commands, including the
 host native dirty1034 capture explicitly content-mapped to c81. No task acceptance,
 main merge, push, GitHub action or Engram update is claimed by this implementer.
+
+
+## Final review tooling checkpoint — 2026-10-23
+
+M1 retargets the compiling kernel-exclusion control to the current real lock
+closure while retaining retry_lock usage; every declared source anchor now has a
+lightweight exact-match regression. Python12/12 and both isolated compile→intended
+RED→byte-exact restore→same-oracle GREEN cycles pass on macOSARM64. No product Rust,
+build/native/schema input or accepted runtime contract changed. Two Python tooling
+hashes differ from32c9914;241 other prior runtime input hashes remain identical.
+The prior runtime receipts are preserved and combined with the new focused receipt,
+not relabelled as byte-equal complete current maps. The plan/report retain exact
+old/new hashes and scope. All11rulings/costs and23equivalents remain; one scoped
+final re-review and controller acceptance are pending, with no broad suite rerun.

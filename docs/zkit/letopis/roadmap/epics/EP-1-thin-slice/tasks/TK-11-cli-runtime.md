@@ -154,3 +154,17 @@ Dirty1034 host capture точно сопоставлен с committed242input ha
 Исходные receipts сохранены; новые находятся в task5-fix1. Независимые fix/whole-
 branch reviews и итоговый ledger/Engram остаются controller-owned. Inspect/check —
 TK-12/TK-19. Merge/push/GitHub и изменения других worktrees не выполнялись.
+
+
+**2026-10-23 — единая финальная правка M1 проверена; scoped re-review открыт.**
+Negative control kernel-exclusion привязан к текущему retry_lock closure и обходит
+только реальный kernel call, сохраняя использование helper при warnings=deny.
+Новый лёгкий preflight проверяет точное единственное совпадение каждого anchor.
+Python12/12 и оба реальных isolated compile→RED→exact restore→GREEN controls PASS
+(macOSARM64), receipt `.artifacts/tk11/final-fix/controls/manifest.json`.
+Из prior243 inputs изменены только2Python tooling paths; остальные241, включая все
+Rust/build/native/schema inputs, совпадают побайтно. Старые runtime receipts/maps
+сохранены; новые hashes и focused proof записаны в plan/report/final-fix-report.
+390-test/native/deadline/mutation suites повторно не запускались. Все11решений и
+23equivalents сохранены. Итоговая приёмка и ledger/Engram остаются root-owned;
+main merge/push/GitHub и изменения других worktrees не выполнялись.

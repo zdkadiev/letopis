@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import run
+import negative_controls
 
 
 class RunnerTests(unittest.TestCase):
@@ -88,6 +89,13 @@ class RunnerTests(unittest.TestCase):
                      'tests/document_refresh.rs', 'tests/embedding_service.rs']:
             self.assertIn(name, inputs)
         self.assertFalse(any('__pycache__' in name for name in inputs))
+
+    def test_every_negative_control_matches_current_source_exactly_once(self):
+        root = Path(__file__).resolve().parents[2]
+        for name, relative, needle, _replacement, _test, _oracle in negative_controls.CONTROLS:
+            with self.subTest(control=name):
+                occurrences = (root / relative).read_text().count(needle)
+                self.assertEqual(occurrences, 1, f'{name}: stale or ambiguous source anchor')
 
     def test_artifact_resolution_respects_target_specific_cargo_path(self):
         with tempfile.TemporaryDirectory() as directory:
