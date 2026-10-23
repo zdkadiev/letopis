@@ -52,8 +52,8 @@ pub mod service;
 /// Successful foreground operations may launch the existing detached embedding drain.
 pub fn run_cli(
     args: impl IntoIterator<Item = OsString>,
-    input: &mut impl Read,
-    output: &mut impl Write,
+    input: impl Read,
+    output: impl Write,
 ) -> u8 {
     let args = args.into_iter().collect::<Vec<_>>();
     let response = parse_request(&args, input).and_then(run_request);

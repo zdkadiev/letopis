@@ -50,7 +50,7 @@ struct SearchFiltersInput {
 #[serde(deny_unknown_fields)]
 struct EmptyInput {}
 
-pub(crate) fn parse_request(args: &[OsString], input: &mut impl Read) -> CommandResult<Request> {
+pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResult<Request> {
     let args = args
         .iter()
         .map(|arg| arg.to_str().ok_or_else(fail_invalid_request))
@@ -83,7 +83,7 @@ pub(crate) fn parse_request(args: &[OsString], input: &mut impl Read) -> Command
         _ => Err(fail_invalid_request()),
     }
 }
-fn read_search(input: &mut impl Read) -> CommandResult<SearchRequest> {
+fn read_search(input: impl Read) -> CommandResult<SearchRequest> {
     let dto: SearchInput = read_object(input)?;
     let limit = usize::try_from(dto.limit)
         .ok()
@@ -124,7 +124,7 @@ where
         .map(Some)
         .map_err(D::Error::custom)
 }
-fn read_drain(input: &mut impl Read) -> CommandResult<Request> {
+fn read_drain(mut input: impl Read) -> CommandResult<Request> {
     let mut bytes = Vec::new();
     input.read_to_end(&mut bytes).map_err(|cause| {
         CommandError::new_with_cause(
@@ -141,7 +141,7 @@ fn read_drain(input: &mut impl Read) -> CommandResult<Request> {
     }
     Ok(Request::Drain)
 }
-fn read_object<T: DeserializeOwned>(input: &mut impl Read) -> CommandResult<T> {
+fn read_object<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
     let mut bytes = Vec::new();
     input.read_to_end(&mut bytes).map_err(|cause| {
         CommandError::new_with_cause(

@@ -56,7 +56,7 @@ struct Link<'a> {
 }
 
 pub(crate) fn write_response(
-    output: &mut impl Write,
+    mut output: impl Write,
     response: Result<CommandResponse, CommandError>,
 ) -> u8 {
     let (encoded, exit) = match response {
