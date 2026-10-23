@@ -9,11 +9,6 @@ use std::fmt;
 /// Directory under the repository root that holds Letopis state; Git, filesystem and storage all agree on it.
 pub(crate) const SERVICE_DIRECTORY: &str = ".letopis";
 
-/// Whether two observations describe the same file: equal device and inode.
-pub(crate) fn has_same_identity(left: &Stat, right: &Stat) -> bool {
-    left.st_dev == right.st_dev && left.st_ino == right.st_ino
-}
-
 // Preserve serde_json's default nesting budget across borrowed-token parsers.
 const MAX_JSON_DEPTH: usize = 128;
 
@@ -47,22 +42,6 @@ impl<'de, const CHECK_INTEGER_TOKENS: bool> DeserializeSeed<'de>
         parser
             .deserialize_any(JsonVisitor::<CHECK_INTEGER_TOKENS> { depth: self.depth })
             .map_err(de::Error::custom)
-    }
-}
-// RawValue borrows the original token; serde_json would otherwise turn an
-// overflowing integer into f64 before the visitor can check its exact value.
-fn has_supported_integer_token(raw: &str) -> bool {
-    let is_number = raw
-        .as_bytes()
-        .first()
-        .is_some_and(|first| first.is_ascii_digit() || *first == b'-');
-    if !is_number || raw.contains(['.', 'e', 'E']) {
-        return true;
-    }
-    if raw.starts_with('-') {
-        raw.parse::<i64>().is_ok()
-    } else {
-        raw.parse::<u64>().is_ok()
     }
 }
 struct JsonVisitor<const CHECK_INTEGER_TOKENS: bool> {
@@ -115,5 +94,27 @@ impl<'de, const CHECK_INTEGER_TOKENS: bool> Visitor<'de> for JsonVisitor<CHECK_I
             }
         }
         Ok(JsonValue(Value::Object(values)))
+    }
+}
+
+/// Whether two observations describe the same file: equal device and inode.
+pub(crate) fn has_same_identity(left: &Stat, right: &Stat) -> bool {
+    left.st_dev == right.st_dev && left.st_ino == right.st_ino
+}
+
+// RawValue borrows the original token; serde_json would otherwise turn an
+// overflowing integer into f64 before the visitor can check its exact value.
+fn has_supported_integer_token(raw: &str) -> bool {
+    let is_number = raw
+        .as_bytes()
+        .first()
+        .is_some_and(|first| first.is_ascii_digit() || *first == b'-');
+    if !is_number || raw.contains(['.', 'e', 'E']) {
+        return true;
+    }
+    if raw.starts_with('-') {
+        raw.parse::<i64>().is_ok()
+    } else {
+        raw.parse::<u64>().is_ok()
     }
 }
