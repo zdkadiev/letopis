@@ -39,7 +39,11 @@ impl<D: Documents, G: CorpusFiles + GitSnapshots, F: FileSystem, M: Markdown> In
             .collect::<BTreeSet<_>>();
         let mut captured = CapturedKnowledge::default();
         for path in self.git.list_candidates().map_err(map_document_error)? {
-            self.capture_file(path, &requested, &mut captured)?;
+            if let Some(file) = self.capture_file(path, &requested)? {
+                captured.entries.extend(file.entries);
+                captured.elements.extend(file.elements);
+                captured.sources.extend(file.sources);
+            }
         }
         captured.validate_membership(&requested)?;
         let tree = self
@@ -59,14 +63,13 @@ impl<D, G: GitSnapshots, F: FileSystem, M: Markdown> InspectionService<D, G, F, 
         &self,
         path: RepoPath,
         requested: &BTreeSet<&str>,
-        captured: &mut CapturedKnowledge,
-    ) -> CommandResult<()> {
+    ) -> CommandResult<Option<CapturedKnowledge>> {
         let Some(file) = self
             .filesystem
             .read_file(&path)
             .map_err(map_document_error)?
         else {
-            return Ok(());
+            return Ok(None);
         };
         let parsed = self.markdown.parse_file(&path, &file.bytes).map_err(|_| {
             CommandError::new(
@@ -75,15 +78,16 @@ impl<D, G: GitSnapshots, F: FileSystem, M: Markdown> InspectionService<D, G, F, 
             )
         })?;
         let Some(parsed) = parsed else {
-            return Ok(());
+            return Ok(None);
         };
         let oid = self
             .git
             .write_blob(&file.bytes)
             .map_err(map_snapshot_error)?;
+        let mut captured = CapturedKnowledge::default();
         captured.collect_metadata(&path, parsed, requested);
         captured.entries.push(SnapshotEntry { path, oid });
-        Ok(())
+        Ok(Some(captured))
     }
 }
 impl CapturedKnowledge {

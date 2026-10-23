@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TK-11 transport/process/real-drain receipts with controlled local HTTP."""
+"""CLI transport, search, inspection and real-drain receipts with local HTTP."""
 import argparse
 import hashlib
 from importlib.metadata import version
@@ -143,6 +143,28 @@ def capture_handler_responses(evidence, catalogue):
     (evidence / 'handler-responses.json').write_text(json.dumps(responses, indent=2) + '\n')
 
 
+def capture_reading_responses(evidence, catalogue):
+    responses = []
+    expected = {'search_success': ('search', 0, None),
+                'search_fallback': ('search', 0, None),
+                'inspect_success': ('inspect', 0, None),
+                'not_found': ('inspect', 1, 'not_found'),
+                'malformed_input': ('search', 1, 'invalid_request')}
+    for line in (evidence / 'runtime.log').read_text().splitlines():
+        if 'PRODUCT_READING ' not in line:
+            continue
+        record = json.loads(line.split('PRODUCT_READING ', 1)[1])
+        validate_response(catalogue, record['command'], record['response'], record['exit'])
+        assert record['case'] in expected
+        command, code, error = expected[record['case']]
+        assert (record['command'], record['exit']) == (command, code)
+        if error:
+            assert record['response']['error']['code'] == error
+        responses.append({**record, 'source': 'actual product executable'})
+    assert {record['case'] for record in responses} == set(expected)
+    (evidence / 'product-reading-responses.json').write_text(json.dumps(responses, indent=2) + '\n')
+
+
 def run_host(root, evidence, execute, manifest):
     from jsonschema import Draft202012Validator
     manifest['jsonschema'] = version('jsonschema')
@@ -168,6 +190,7 @@ def run_host(root, evidence, execute, manifest):
     execute(['cargo', 'test', '--locked', '--offline', '--test', 'cli_process',
              '--test', 'cli_runtime', '--test', 'cli_reading', '--', '--nocapture', '--test-threads=1'],
             'runtime.log', extra={'LETOPIS_CLI_FIXTURE': str(artifacts['cli_runtime_fixture'])})
+    capture_reading_responses(evidence, catalogue)
     observations = [json.loads(line.split('CLI_OBSERVER ', 1)[1])
                     for line in (evidence / 'runtime.log').read_text().splitlines()
                     if 'CLI_OBSERVER ' in line]
@@ -188,7 +211,7 @@ def run_host(root, evidence, execute, manifest):
             captures.append({'kind': marker.strip(), 'observation': value})
     assert any(item['kind'] == 'PRODUCT_DRAIN' for item in captures)
     (evidence / 'product-observations.json').write_text(json.dumps(captures, indent=2) + '\n')
-    capture_transport(root, evidence, execute, artifacts['letopis'], catalogue)
+    capture_transport(root, evidence, execute, evidence / 'letopis', catalogue)
 
 
 def read_artifacts(log):

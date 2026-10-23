@@ -42,6 +42,7 @@ fn incremental_blobs_reproduce_tree_without_touching_user_state() {
             .unwrap();
         // Assert
         assert_eq!(tree, expected);
+        assert!(format!("{:?}", entries[0]).starts_with("SnapshotEntry {"));
         for (path, bytes) in paths.iter().zip(bytes) {
             assert_eq!(git.read_blob(&tree, path).unwrap(), bytes);
         }

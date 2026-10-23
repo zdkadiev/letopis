@@ -57,10 +57,9 @@ fn unsupported_filters_fail_before_repository_initialization() {
     ] {
         let repo = ReadingRepo::new();
         let body = json!({"query":"x","limit":1,"filters":filters}).to_string();
-        assert_eq!(
-            read_response(&repo.invoke(&["search"], body.as_bytes()), 1)["error"]["code"],
-            "invalid_request"
-        );
+        let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 1);
+        emit_reading("malformed_input", "search", 1, &response);
+        assert_eq!(response["error"]["code"], "invalid_request");
         assert!(!repo.get_root().join(".letopis").exists());
     }
 }
@@ -76,6 +75,7 @@ fn binary_search_refreshes_and_returns_links_with_empty_filter_equivalence() {
     ] {
         let body = format!(r#"{{"query":"SQLite OR блокировки café 42","limit":1{suffix}}}"#);
         let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 0);
+        emit_reading("search_success", "search", 0, &response);
         assert_eq!(
             response,
             json!({"ok":true,"result":[{"element_id":"knowledge.md","path":"knowledge.md","lines":[1,2],"revision":1,"flags":[]}]})
@@ -139,6 +139,7 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
         ),
         0,
     );
+    emit_reading("inspect_success", "inspect", 0, &response);
     assert_eq!(
         response["result"]["elements"],
         json!({"knowledge.md#a":{"path":"knowledge.md","lines":[1,3],"hash":"eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864"}})
@@ -173,6 +174,7 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
             response,
             json!({"ok":true,"result":[{"element_id":"knowledge.md","path":"knowledge.md","lines":[1,2],"revision":1,"flags":[]}]})
         );
+        emit_reading("search_fallback", "search", 0, &response);
         let requests = server.take_requests();
         assert_eq!(requests.len(), 1);
         assert_eq!(requests[0]["input"], json!(["sqlite"]));
@@ -208,6 +210,9 @@ fn binary_inspect_unknown_and_source_errors_are_all_or_nothing() {
     ] {
         let body = json!({"element_ids":ids}).to_string();
         let response = read_response(&repo.invoke(&["inspect"], body.as_bytes()), 1);
+        if code == "not_found" {
+            emit_reading("not_found", "inspect", 1, &response);
+        }
         assert_eq!(response["error"]["code"], code);
         assert!(response.get("result").is_none());
     }
@@ -351,6 +356,12 @@ fn read_response(output: &Output, exit: i32) -> Value {
         1
     );
     serde_json::from_slice(&output.stdout).unwrap()
+}
+fn emit_reading(case: &str, command: &str, exit: i32, response: &Value) {
+    println!(
+        "PRODUCT_READING {}",
+        json!({"case":case,"command":command,"exit":exit,"response":response})
+    );
 }
 fn capture_user_state(repo: &ReadingRepo) -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) {
     let refs = run_git(repo, &["for-each-ref"]);

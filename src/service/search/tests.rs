@@ -36,21 +36,32 @@ fn literal_query_quotes_unicode_tokens_without_fts_operators() {
 #[test]
 fn signed_zero_metrics_tie_by_identity_in_both_channels() {
     assert_eq!(
-        rank_ids(&[text("b.md", -0.0), text("a.md", 0.0)], &[], 2),
+        rank_ids(
+            &[make_text_match("b.md", -0.0), make_text_match("a.md", 0.0)],
+            &[],
+            2
+        ),
         ["a.md", "b.md"]
     );
     assert_eq!(
-        rank_ids(&[], &[vector("b.md", -0.0), vector("a.md", 0.0)], 2),
+        rank_ids(
+            &[],
+            &[
+                make_vector_match("b.md", -0.0),
+                make_vector_match("a.md", 0.0)
+            ],
+            2
+        ),
         ["a.md", "b.md"]
     );
 }
 #[test]
 fn reciprocal_rank_unions_channels_before_limit() {
-    let fts = [text("a.md", -2.0), text("b.md", -1.0)];
+    let fts = [make_text_match("a.md", -2.0), make_text_match("b.md", -1.0)];
     let vectors = [
-        vector("c.md", 0.0),
-        vector("b.md", 0.5),
-        vector("a.md", 1.0),
+        make_vector_match("c.md", 0.0),
+        make_vector_match("b.md", 0.5),
+        make_vector_match("a.md", 1.0),
     ];
     for (limit, expected) in [(3, vec!["a.md", "b.md", "c.md"]), (2, vec!["a.md", "b.md"])] {
         assert_eq!(rank_ids(&fts, &vectors, limit), expected);
@@ -59,20 +70,46 @@ fn reciprocal_rank_unions_channels_before_limit() {
 #[test]
 fn ranking_orders_ties_deduplicates_and_keeps_disjoint_channels() {
     assert_eq!(
-        rank_ids(&[text("b.md", 0.0), text("a.md", 0.0)], &[], 9),
+        rank_ids(
+            &[make_text_match("b.md", 0.0), make_text_match("a.md", 0.0)],
+            &[],
+            9
+        ),
         ["a.md", "b.md"]
     );
     assert_eq!(
-        rank_ids(&[], &[vector("b.md", 0.0), vector("a.md", 0.0)], 9),
+        rank_ids(
+            &[],
+            &[
+                make_vector_match("b.md", 0.0),
+                make_vector_match("a.md", 0.0)
+            ],
+            9
+        ),
         ["a.md", "b.md"]
     );
     assert_eq!(
-        rank_ids(&[text("b.md", 0.0)], &[vector("a.md", 0.0)], 9),
+        rank_ids(
+            &[make_text_match("b.md", 0.0)],
+            &[make_vector_match("a.md", 0.0)],
+            9
+        ),
         ["a.md", "b.md"]
     );
-    let fts = [text("a.md", -3.0), text("a.md", -2.0), text("b.md", -1.0)];
+    let fts = [
+        make_text_match("a.md", -3.0),
+        make_text_match("a.md", -2.0),
+        make_text_match("b.md", -1.0),
+    ];
     assert_eq!(
-        rank_ids(&fts, &[vector("c.md", 0.0), vector("b.md", 0.1)], 9),
+        rank_ids(
+            &fts,
+            &[
+                make_vector_match("c.md", 0.0),
+                make_vector_match("b.md", 0.1)
+            ],
+            9
+        ),
         ["a.md", "b.md", "c.md"]
     );
     assert!(rank_ids(&[], &[], 9).is_empty());
@@ -81,8 +118,8 @@ fn ranking_orders_ties_deduplicates_and_keeps_disjoint_channels() {
 fn ranking_rejects_nonfinite_native_metrics() {
     for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         for (fts, vectors) in [
-            (vec![text("a.md", value)], vec![]),
-            (vec![], vec![vector("a.md", value)]),
+            (vec![make_text_match("a.md", value)], vec![]),
+            (vec![], vec![make_vector_match("a.md", value)]),
         ] {
             assert_eq!(
                 rank_candidates(&fts, &vectors, NonZeroUsize::MIN)
@@ -95,14 +132,21 @@ fn ranking_rejects_nonfinite_native_metrics() {
 }
 #[test]
 fn reciprocal_ranks_reward_overlap_before_applying_small_limit() {
-    let fts = [text("z.md", -2.0), text("a.md", -1.0)];
-    let vectors = [vector("y.md", 0.0), vector("a.md", 1.0)];
-    assert_eq!(rank_ids(&fts, &vectors, 1), ["a.md"]);
-    let fts = [text("a.md", -3.0), text("b.md", -2.0), text("c.md", -1.0)];
+    let fts = [make_text_match("z.md", -2.0), make_text_match("a.md", -1.0)];
     let vectors = [
-        vector("d.md", 0.0),
-        vector("b.md", 0.5),
-        vector("c.md", 1.0),
+        make_vector_match("y.md", 0.0),
+        make_vector_match("a.md", 1.0),
+    ];
+    assert_eq!(rank_ids(&fts, &vectors, 1), ["a.md"]);
+    let fts = [
+        make_text_match("a.md", -3.0),
+        make_text_match("b.md", -2.0),
+        make_text_match("c.md", -1.0),
+    ];
+    let vectors = [
+        make_vector_match("d.md", 0.0),
+        make_vector_match("b.md", 0.5),
+        make_vector_match("c.md", 1.0),
     ];
     assert_eq!(
         rank_ids(&fts, &vectors, 4),
@@ -112,9 +156,9 @@ fn reciprocal_ranks_reward_overlap_before_applying_small_limit() {
         rank_ids(
             &[],
             &[
-                vector("b.md", 0.0),
-                vector("b.md", 0.1),
-                vector("a.md", 0.2)
+                make_vector_match("b.md", 0.0),
+                make_vector_match("b.md", 0.1),
+                make_vector_match("a.md", 0.2)
             ],
             9
         ),
@@ -141,11 +185,13 @@ fn candidate_metadata_rejects_wrong_rows_and_search_hashes() {
     let row = unit.upsert_node(&node).unwrap();
     unit.commit().unwrap();
     let mut read = storage.begin_read().unwrap();
-    let mut bad_row = text("a.md", 0.0);
+    let mut bad_row = make_text_match("a.md", 0.0);
     bad_row.row_id = row + 1;
     assert!(read_candidate_metadata(&mut read, &[bad_row], &[]).is_err());
-    assert!(read_candidate_metadata(&mut read, &[], &[vector("a.md", 0.0)]).is_err());
-    assert!(read_candidate_metadata(&mut read, &[text("missing.md", 0.0)], &[]).is_err());
+    assert!(read_candidate_metadata(&mut read, &[], &[make_vector_match("a.md", 0.0)]).is_err());
+    assert!(
+        read_candidate_metadata(&mut read, &[make_text_match("missing.md", 0.0)], &[]).is_err()
+    );
     assert_eq!(read.get_revision(), 1);
 }
 #[test]
@@ -325,14 +371,14 @@ fn rank_ids(fts: &[TextMatch], vectors: &[VectorMatch], limit: usize) -> Vec<Str
         .map(|id| id.as_str().to_owned())
         .collect()
 }
-fn text(id: &str, bm25: f64) -> TextMatch {
+fn make_text_match(id: &str, bm25: f64) -> TextMatch {
     TextMatch {
         id: KnowledgeId::parse(id).unwrap(),
         row_id: 1,
         bm25,
     }
 }
-fn vector(id: &str, distance: f64) -> VectorMatch {
+fn make_vector_match(id: &str, distance: f64) -> VectorMatch {
     VectorMatch {
         id: KnowledgeId::parse(id).unwrap(),
         search_hash: Sha256::digest(b"shared"),

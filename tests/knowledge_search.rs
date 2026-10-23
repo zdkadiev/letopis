@@ -23,7 +23,7 @@ fn search_refreshes_and_returns_only_knowledge_links() {
     repo.write("plain.md", b"sqlite");
     let links = open_searches(repo.get_root())
         .unwrap()
-        .search(&request("sqlite", 10))
+        .search(&make_request("sqlite", 10))
         .unwrap();
     assert_eq!(links.len(), 1);
     assert_eq!(links[0].element_id.as_str(), "a.md");
@@ -43,7 +43,7 @@ fn fts_literals_work_on_native_tokenizer() {
         "\"NEAR(x*)\" title:café 42",
         "CAFÉ блокировки 42",
     ] {
-        let links = search.search(&request(query, 10)).unwrap();
+        let links = search.search(&make_request(query, 10)).unwrap();
         assert_eq!(
             links
                 .iter()
@@ -69,7 +69,7 @@ fn empty_query_never_calls_match_or_provider() {
         assert!(
             open_searches(repo.get_root())
                 .unwrap()
-                .search(&request(query, 2))
+                .search(&make_request(query, 2))
                 .unwrap()
                 .is_empty()
         );
@@ -103,7 +103,7 @@ fn search_uses_prepared_vectors_and_actual_query_client() {
     );
     let links = open_searches(repo.get_root())
         .unwrap()
-        .search(&request("sqlite", 2))
+        .search(&make_request("sqlite", 2))
         .unwrap();
     assert_eq!(
         links
@@ -139,7 +139,7 @@ fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let links = open_searches(repo.get_root())
         .unwrap()
-        .search(&request("sqlite", 2))
+        .search(&make_request("sqlite", 2))
         .unwrap();
     assert_eq!(links.len(), 1);
     assert!(links[0].flags.is_empty());
@@ -166,7 +166,7 @@ fn invalid_live_knowledge_retains_pinned_link_as_stale() {
     repo.write("a.md", b"<!-- letopis: {invalid} -->\ncurrent");
     let links = open_searches(repo.get_root())
         .unwrap()
-        .search(&request("sqlite", 2))
+        .search(&make_request("sqlite", 2))
         .unwrap();
     assert_eq!(links.len(), 1);
     assert_eq!(
@@ -184,7 +184,7 @@ fn search_propagates_non_config_io_failures() {
     std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("a.md")).unwrap();
     let error = open_searches(repo.get_root())
         .unwrap()
-        .search(&request("sqlite", 2))
+        .search(&make_request("sqlite", 2))
         .unwrap_err();
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
 }
@@ -203,7 +203,7 @@ fn unreadable_invalid_and_missing_configuration_permit_fts_without_provider() {
         }
         let links = open_searches(repo.get_root())
             .unwrap()
-            .search(&request("sqlite", 2))
+            .search(&make_request("sqlite", 2))
             .unwrap();
         assert_eq!(
             links
@@ -225,11 +225,11 @@ fn missing_vector_dimensions_skip_inference_and_shared_hashes_keep_distinct_ids(
     });
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     let mut search = open_searches(repo.get_root()).unwrap();
-    let first = search.search(&request("sqlite", 10)).unwrap();
+    let first = search.search(&make_request("sqlite", 10)).unwrap();
     assert_eq!(first.len(), 2);
     assert!(server.take_requests().is_empty());
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
-    let vector_only = search.search(&request("notlexical", 10)).unwrap();
+    let vector_only = search.search(&make_request("notlexical", 10)).unwrap();
     assert_eq!(
         vector_only
             .iter()
@@ -254,7 +254,7 @@ fn mismatched_persisted_knowledge_uri_fails_even_beyond_final_limit() {
         .unwrap();
     let error = open_searches(repo.get_root())
         .unwrap()
-        .search(&request("sqlite", 1))
+        .search(&make_request("sqlite", 1))
         .unwrap_err();
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
 }
@@ -269,7 +269,7 @@ fn stale_coordinates_are_observed_without_replacing_pinned_lines() {
         .unwrap();
     let links = open_searches(repo.get_root())
         .unwrap()
-        .search(&request("sqlite", 2))
+        .search(&make_request("sqlite", 2))
         .unwrap();
     assert_eq!(links[0].lines, LineRange::new(2, 2).unwrap());
     assert_eq!(
@@ -293,7 +293,7 @@ fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
     repo.write_knowledge("b.md", "current unrelated");
     let links = open_searches(repo.get_root())
         .unwrap()
-        .search(&request("sqlite", 10))
+        .search(&make_request("sqlite", 10))
         .unwrap();
     assert_eq!(
         links
@@ -314,7 +314,7 @@ fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
         VectorOutcome::Current(vec![])
     );
 }
-fn request(query: &str, limit: usize) -> SearchRequest {
+fn make_request(query: &str, limit: usize) -> SearchRequest {
     SearchRequest {
         query: query.into(),
         limit: NonZeroUsize::new(limit).unwrap(),

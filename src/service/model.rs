@@ -3,7 +3,7 @@ use crate::domain::{
     ByteSpan, Edge, Element, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, SourceUri,
     TreeOid,
 };
-use std::{collections::BTreeSet, num::NonZeroUsize};
+use std::{collections::BTreeSet, fmt, num::NonZeroUsize};
 /// Searchable knowledge metadata; document text is never retained here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeMetadata {
@@ -205,4 +205,41 @@ pub struct QueryEmbeddingRequest<'a> {
     pub config: &'a EmbeddingConfig,
     /// Native vector dimensions observed by the caller's read view, if established.
     pub dimensions: Option<NonZeroUsize>,
+}
+
+impl fmt::Debug for QueryEmbeddingRequest<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("QueryEmbeddingRequest")
+            .field("config", &self.config)
+            .field("dimensions", &self.dimensions)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EmbeddingConfig, QueryEmbeddingRequest};
+    use std::num::NonZeroUsize;
+
+    #[test]
+    fn query_request_debug_omits_text_and_provider_parameters() {
+        // Arrange: each private field has an independent recognizable sentinel.
+        let config = EmbeddingConfig::parse(
+            br#"{"provider":"ollama","model":"PRIVATE_MODEL","parameters":{"base_url":"http://PRIVATE_ENDPOINT"},"max_retries":0}"#,
+        )
+        .unwrap();
+        let request = QueryEmbeddingRequest {
+            text: "PRIVATE_QUERY",
+            config: &config,
+            dimensions: NonZeroUsize::new(2),
+        };
+        // Act
+        let diagnostic = format!("{request:?}");
+        // Assert
+        for private in ["PRIVATE_QUERY", "PRIVATE_MODEL", "PRIVATE_ENDPOINT"] {
+            assert!(!diagnostic.contains(private));
+        }
+        assert!(diagnostic.starts_with("QueryEmbeddingRequest {"));
+        assert!(diagnostic.contains("dimensions: Some(2)"));
+    }
 }

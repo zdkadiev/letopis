@@ -16,6 +16,7 @@ pub struct SnapshotFile<'a> {
     pub bytes: &'a [u8],
 }
 /// One validated path and previously written blob in a snapshot request.
+#[derive(Debug)]
 pub struct SnapshotEntry {
     /// Root-relative path in the resulting tree.
     pub path: RepoPath,
