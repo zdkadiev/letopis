@@ -5,37 +5,6 @@ use letopis::{
 };
 use support::{assert_error, build_whole_file, parse_file};
 
-fn assert_golden_element(parsed: &ParsedElement, want: &serde_json::Value, name: &str) {
-    let got = &parsed.element;
-    assert_eq!(got.id.as_str(), want["id"].as_str().unwrap(), "{name}");
-    assert_eq!(
-        got.bytes.get_start() as u64,
-        want["start"].as_u64().unwrap(),
-        "{name}"
-    );
-    assert_eq!(
-        got.bytes.get_end() as u64,
-        want["end"].as_u64().unwrap(),
-        "{name}"
-    );
-    assert_eq!(
-        got.lines.get_start(),
-        want["line_start"].as_u64().unwrap(),
-        "{name}"
-    );
-    assert_eq!(
-        got.lines.get_end(),
-        want["line_end"].as_u64().unwrap(),
-        "{name}"
-    );
-    assert_eq!(got.hash.to_hex(), want["hash"].as_str().unwrap(), "{name}");
-    assert_eq!(
-        got.metadata.created_at,
-        want["created_at"].as_u64().unwrap(),
-        "{name}"
-    );
-}
-
 #[test]
 fn golden_elements_have_exact_bytes_and_metadata() {
     // Arrange
@@ -296,4 +265,35 @@ fn locates_the_complete_invalid_comment_without_unrelated_prefix_text() {
         let highlighted = &text[span.get_start()..span.get_end()];
         assert_eq!(highlighted.trim_end_matches(['\r', '\n']), comment);
     }
+}
+
+fn assert_golden_element(parsed: &ParsedElement, want: &serde_json::Value, name: &str) {
+    let got = &parsed.element;
+    assert_eq!(got.id.as_str(), want["id"].as_str().unwrap(), "{name}");
+    assert_eq!(
+        got.bytes.get_start() as u64,
+        want["start"].as_u64().unwrap(),
+        "{name}"
+    );
+    assert_eq!(
+        got.bytes.get_end() as u64,
+        want["end"].as_u64().unwrap(),
+        "{name}"
+    );
+    assert_eq!(
+        got.lines.get_start(),
+        want["line_start"].as_u64().unwrap(),
+        "{name}"
+    );
+    assert_eq!(
+        got.lines.get_end(),
+        want["line_end"].as_u64().unwrap(),
+        "{name}"
+    );
+    assert_eq!(got.hash.to_hex(), want["hash"].as_str().unwrap(), "{name}");
+    assert_eq!(
+        got.metadata.created_at,
+        want["created_at"].as_u64().unwrap(),
+        "{name}"
+    );
 }

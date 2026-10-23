@@ -7,68 +7,6 @@ use std::{
 };
 use tempfile::TempDir;
 
-fn make_repository() -> TempDir {
-    let root = tempfile::tempdir().unwrap();
-    run_git(root.path(), &["init", "-q"]);
-    fs::write(
-        root.path().join("knowledge.md"),
-        "private corpus sentinel\n",
-    )
-    .unwrap();
-    run_git(root.path(), &["add", "knowledge.md"]);
-    run_git(
-        root.path(),
-        &[
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.org",
-            "commit",
-            "-qm",
-            "fixture",
-        ],
-    );
-    root
-}
-fn run_git(root: &Path, args: &[&str]) -> Vec<u8> {
-    let result = Command::new("git")
-        .args(args)
-        .current_dir(root)
-        .output()
-        .unwrap();
-    assert!(result.status.success());
-    result.stdout
-}
-fn invoke(root: &Path, args: &[&str], input: &[u8], lost: bool) -> Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_letopis"))
-        .args(args)
-        .current_dir(root)
-        .stdin(Stdio::piped())
-        .stdout(if lost { Stdio::null() } else { Stdio::piped() })
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    child.stdin.take().unwrap().write_all(input).unwrap();
-    child.wait_with_output().unwrap()
-}
-fn assert_error(output: &Output, code: &str) {
-    assert_eq!(output.status.code(), Some(1));
-    assert!(output.stderr.is_empty());
-    assert_eq!(
-        output.stdout.iter().filter(|byte| **byte == b'\n').count(),
-        1
-    );
-    let response: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(response["ok"], false);
-    assert_eq!(response["error"]["code"], code);
-    assert_eq!(response["error"]["details"], serde_json::json!({}));
-    if code == "internal_error" {
-        assert_eq!(
-            response["error"]["message"],
-            "operation unavailable in this build"
-        );
-    }
-}
 #[test]
 fn malformed_requests_fail_before_service_directory_creation() {
     let root = make_repository();
@@ -183,5 +121,71 @@ fn missing_current_directory_uses_one_safe_envelope_after_input_validation() {
         let response: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(response["error"]["code"], code);
         assert_eq!(response["error"]["message"], message);
+    }
+}
+
+fn make_repository() -> TempDir {
+    let root = tempfile::tempdir().unwrap();
+    run_git(root.path(), &["init", "-q"]);
+    fs::write(
+        root.path().join("knowledge.md"),
+        "private corpus sentinel\n",
+    )
+    .unwrap();
+    run_git(root.path(), &["add", "knowledge.md"]);
+    run_git(
+        root.path(),
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.org",
+            "commit",
+            "-qm",
+            "fixture",
+        ],
+    );
+    root
+}
+
+fn run_git(root: &Path, args: &[&str]) -> Vec<u8> {
+    let result = Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(result.status.success());
+    result.stdout
+}
+
+fn invoke(root: &Path, args: &[&str], input: &[u8], lost: bool) -> Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_letopis"))
+        .args(args)
+        .current_dir(root)
+        .stdin(Stdio::piped())
+        .stdout(if lost { Stdio::null() } else { Stdio::piped() })
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(input).unwrap();
+    child.wait_with_output().unwrap()
+}
+
+fn assert_error(output: &Output, code: &str) {
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stderr.is_empty());
+    assert_eq!(
+        output.stdout.iter().filter(|byte| **byte == b'\n').count(),
+        1
+    );
+    let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], code);
+    assert_eq!(response["error"]["details"], serde_json::json!({}));
+    if code == "internal_error" {
+        assert_eq!(
+            response["error"]["message"],
+            "operation unavailable in this build"
+        );
     }
 }

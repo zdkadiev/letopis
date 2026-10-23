@@ -84,16 +84,6 @@ pub(in crate::service) fn fail_late<W: CacheWrite>(unit: &mut W) -> StorageResul
     Ok(())
 }
 
-fn build_service(root: &Path) -> Service {
-    let git = GitCli::open(root).unwrap();
-    let mut filesystem = LocalFileSystem::open(git.get_root()).unwrap();
-    filesystem.configure_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
-    let directory = filesystem.open_service_directory().unwrap();
-    let storage =
-        SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory).unwrap();
-    DocumentService::new(git, filesystem, MarkdownParser::new(), storage)
-}
-
 #[test]
 #[ignore = "subprocess entry; invoked only by the production schedule tests"]
 fn run_child() {
@@ -133,14 +123,6 @@ fn run_child() {
     }
     drop(service);
     reach_checkpoint("finished");
-}
-
-fn run_normal_service(root: &Path, mode: &str) {
-    LocalFileSystem::configure_next_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
-    let mut service = open_documents(root).unwrap();
-    reach_checkpoint("opened");
-    let outcome = service.refresh().unwrap();
-    assert_eq!(outcome.published, mode != "noop");
 }
 
 #[test]
@@ -326,61 +308,12 @@ struct State {
     files: Vec<FileRow>,
     tokens: Tokens,
 }
-fn read_tokens(connection: &Connection) -> Tokens {
-    connection.execute_batch("CREATE VIRTUAL TABLE IF NOT EXISTS temp.tokens USING fts5vocab(main, text_index, instance);").unwrap();
-    connection
-        .prepare("SELECT term, doc, col, offset FROM temp.tokens ORDER BY term, doc, col, offset")
-        .unwrap()
-        .query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
-        })
-        .unwrap()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap()
-}
-fn read_state(root: &Path) -> State {
-    let mut storage = build_service(root).storage;
-    let mut read = storage.begin_read().unwrap();
-    let connection = Connection::open(root.join(".letopis/cache.db")).unwrap();
-    State {
-        revision: read.get_revision(),
-        nodes: read.list_nodes().unwrap(),
-        edges: read.list_edges(None).unwrap(),
-        files: read.list_files().unwrap(),
-        tokens: read_tokens(&connection),
-    }
-}
 #[derive(Debug, PartialEq)]
 struct VectorState {
     identity: Option<Sha256>,
     vector: VectorOutcome<Option<Vec<f32>>>,
     failure: VectorOutcome<Option<EmbeddingFailure>>,
     query_error: Option<QueryError>,
-}
-fn read_vectors(root: &Path) -> VectorState {
-    let mut storage = build_service(root).storage;
-    let mut read = storage.begin_read().unwrap();
-    let identity = Sha256::digest(b"model identity");
-    VectorState {
-        identity: read.get_config_identity(),
-        vector: read
-            .read_vector(&identity, &Sha256::digest(b"retained vector"))
-            .unwrap(),
-        failure: read
-            .read_failure(&identity, &Sha256::digest(b"failed vector"))
-            .unwrap(),
-        query_error: read.read_query_error().unwrap(),
-    }
-}
-fn read_git_objects(root: &Path) -> Vec<u8> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["count-objects", "-v"])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    output.stdout
 }
 struct Fixture {
     root: TempDir,
@@ -516,21 +449,6 @@ impl Fixture {
         expected
     }
 }
-fn seed_vectors(storage: &mut SqliteStorage) {
-    let identity = Sha256::digest(b"model identity");
-    storage.reset_vectors(&identity).unwrap();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
-        panic!("identity changed");
-    };
-    unit.store_vector(&Sha256::digest(b"retained vector"), &[1.0, 0.0], 2)
-        .unwrap();
-    let failure = Sha256::digest(b"failed vector");
-    assert!(unit.reserve_attempt(&failure, 3).unwrap());
-    unit.record_failure(&failure, "safe failure").unwrap();
-    unit.set_query_error(7, "safe query error").unwrap();
-    unit.commit().unwrap();
-}
-
 #[test]
 fn sigkill_keeps_exact_old_or_complete_new_publication() {
     for cut in CUTS {
@@ -665,4 +583,90 @@ fn late_storage_error_rolls_back_every_cache_mutation() {
         read_state(fixture.root.path()),
         fixture.build_expected(NEW, "BravoToken")
     );
+}
+
+fn run_normal_service(root: &Path, mode: &str) {
+    LocalFileSystem::configure_next_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
+    let mut service = open_documents(root).unwrap();
+    reach_checkpoint("opened");
+    let outcome = service.refresh().unwrap();
+    assert_eq!(outcome.published, mode != "noop");
+}
+
+fn read_state(root: &Path) -> State {
+    let mut storage = build_service(root).storage;
+    let mut read = storage.begin_read().unwrap();
+    let connection = Connection::open(root.join(".letopis/cache.db")).unwrap();
+    State {
+        revision: read.get_revision(),
+        nodes: read.list_nodes().unwrap(),
+        edges: read.list_edges(None).unwrap(),
+        files: read.list_files().unwrap(),
+        tokens: read_tokens(&connection),
+    }
+}
+
+fn read_tokens(connection: &Connection) -> Tokens {
+    connection.execute_batch("CREATE VIRTUAL TABLE IF NOT EXISTS temp.tokens USING fts5vocab(main, text_index, instance);").unwrap();
+    connection
+        .prepare("SELECT term, doc, col, offset FROM temp.tokens ORDER BY term, doc, col, offset")
+        .unwrap()
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
+}
+
+fn read_vectors(root: &Path) -> VectorState {
+    let mut storage = build_service(root).storage;
+    let mut read = storage.begin_read().unwrap();
+    let identity = Sha256::digest(b"model identity");
+    VectorState {
+        identity: read.get_config_identity(),
+        vector: read
+            .read_vector(&identity, &Sha256::digest(b"retained vector"))
+            .unwrap(),
+        failure: read
+            .read_failure(&identity, &Sha256::digest(b"failed vector"))
+            .unwrap(),
+        query_error: read.read_query_error().unwrap(),
+    }
+}
+
+fn build_service(root: &Path) -> Service {
+    let git = GitCli::open(root).unwrap();
+    let mut filesystem = LocalFileSystem::open(git.get_root()).unwrap();
+    filesystem.configure_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
+    let directory = filesystem.open_service_directory().unwrap();
+    let storage =
+        SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory).unwrap();
+    DocumentService::new(git, filesystem, MarkdownParser::new(), storage)
+}
+
+fn read_git_objects(root: &Path) -> Vec<u8> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["count-objects", "-v"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    output.stdout
+}
+
+fn seed_vectors(storage: &mut SqliteStorage) {
+    let identity = Sha256::digest(b"model identity");
+    storage.reset_vectors(&identity).unwrap();
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+        panic!("identity changed");
+    };
+    unit.store_vector(&Sha256::digest(b"retained vector"), &[1.0, 0.0], 2)
+        .unwrap();
+    let failure = Sha256::digest(b"failed vector");
+    assert!(unit.reserve_attempt(&failure, 3).unwrap());
+    unit.record_failure(&failure, "safe failure").unwrap();
+    unit.set_query_error(7, "safe query error").unwrap();
+    unit.commit().unwrap();
 }

@@ -120,27 +120,6 @@ mod tests {
             Ok(())
         }
     }
-    fn build_tasks(calls: &Calls, ready: CommandResult<bool>) -> Tasks<'_> {
-        Tasks {
-            calls,
-            ready,
-            result: Ok(()),
-        }
-    }
-    fn build_locks(calls: &Calls) -> Locks<'_> {
-        Locks {
-            calls,
-            busy: false,
-            fails: false,
-        }
-    }
-    fn build_process(calls: &Calls) -> Process<'_> {
-        Process {
-            calls,
-            fails: false,
-        }
-    }
-
     #[test]
     fn absent_capability_does_not_probe_or_spawn() {
         let calls = Calls::default();
@@ -246,5 +225,28 @@ mod tests {
             CommandErrorKind::EmbeddingFailed
         );
         assert_eq!(*calls.0.borrow(), ["drain"]);
+    }
+
+    fn build_tasks(calls: &Calls, ready: CommandResult<bool>) -> Tasks<'_> {
+        Tasks {
+            calls,
+            ready,
+            result: Ok(()),
+        }
+    }
+
+    fn build_locks(calls: &Calls) -> Locks<'_> {
+        Locks {
+            calls,
+            busy: false,
+            fails: false,
+        }
+    }
+
+    fn build_process(calls: &Calls) -> Process<'_> {
+        Process {
+            calls,
+            fails: false,
+        }
     }
 }

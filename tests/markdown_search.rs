@@ -32,11 +32,6 @@ fn golden_search_representations() {
     }
 }
 
-fn build_note(anchor: &str, created: u64, snapshot: &str, target: &str, kind: &str) -> String {
-    format!(
-        "## WAL {{#{anchor}}}\n<!-- letopis: {{\"created_at\":{created},\"source_snapshot\":\"{snapshot}\"}} -->\nUse **safe** [SQLite]({target} \"letopis:type={kind}\").\n"
-    )
-}
 #[test]
 fn metadata_and_link_changes_keep_search_hash() {
     // Arrange
@@ -158,4 +153,10 @@ fn crlf_metadata_line_does_not_add_search_whitespace() {
     assert_eq!(b.elements[0].search_text, "A\nHi");
     assert_eq!(a.elements[0].search_hash, b.elements[0].search_hash);
     assert_ne!(a.elements[0].element.hash, b.elements[0].element.hash);
+}
+
+fn build_note(anchor: &str, created: u64, snapshot: &str, target: &str, kind: &str) -> String {
+    format!(
+        "## WAL {{#{anchor}}}\n<!-- letopis: {{\"created_at\":{created},\"source_snapshot\":\"{snapshot}\"}} -->\nUse **safe** [SQLite]({target} \"letopis:type={kind}\").\n"
+    )
 }

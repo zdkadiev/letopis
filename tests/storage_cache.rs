@@ -46,18 +46,6 @@ use letopis::domain::{Edge, EdgeType, ElementKind, LineRange, RepoPath, Sha256, 
 use letopis::service::{NodeMetadata, StorageErrorKind, StoredNode};
 use rusqlite::Connection;
 use std::error::Error;
-fn build_target(id: &str) -> EdgeTarget {
-    EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap())
-}
-fn build_edge(source: &str, target: EdgeTarget, kind: &str) -> Edge {
-    Edge::new(
-        KnowledgeId::parse(source).unwrap(),
-        target,
-        EdgeType::parse(kind).unwrap(),
-    )
-    .unwrap()
-}
-
 #[test]
 fn source_missing_bytes_and_declared_targets_round_trip() {
     let root = TempDir::new().unwrap();
@@ -218,17 +206,6 @@ fn caught_mutation_error_poisoned_unit_cannot_commit() {
     );
     assert!(write.commit().is_err());
     assert_empty(&mut db);
-}
-fn assert_empty(db: &mut impl Storage) {
-    let mut read = db.begin_read().unwrap();
-    assert_eq!(read.get_revision(), 0);
-    assert!(read.read_node(&build_target("a.md")).unwrap().is_none());
-    assert!(
-        read.read_file(&RepoPath::parse("a.md").unwrap())
-            .unwrap()
-            .is_none()
-    );
-    assert!(read.match_text("alpha").unwrap().is_empty());
 }
 #[test]
 fn dropped_unit_rolls_back() {
@@ -742,4 +719,29 @@ fn list_empty_published_state_returns_no_rows() {
     // Assert.
     assert!(files.is_empty());
     assert!(nodes.is_empty());
+}
+
+fn build_edge(source: &str, target: EdgeTarget, kind: &str) -> Edge {
+    Edge::new(
+        KnowledgeId::parse(source).unwrap(),
+        target,
+        EdgeType::parse(kind).unwrap(),
+    )
+    .unwrap()
+}
+
+fn assert_empty(db: &mut impl Storage) {
+    let mut read = db.begin_read().unwrap();
+    assert_eq!(read.get_revision(), 0);
+    assert!(read.read_node(&build_target("a.md")).unwrap().is_none());
+    assert!(
+        read.read_file(&RepoPath::parse("a.md").unwrap())
+            .unwrap()
+            .is_none()
+    );
+    assert!(read.match_text("alpha").unwrap().is_empty());
+}
+
+fn build_target(id: &str) -> EdgeTarget {
+    EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap())
 }

@@ -76,14 +76,6 @@ impl Drop for OwnedChild {
         self.0.wait().unwrap();
     }
 }
-fn wait_for(path: &Path) {
-    let start = Instant::now();
-    while !path.exists() {
-        assert!(start.elapsed() < DEADLINE, "barrier exceeded deadline");
-        std::thread::sleep(Duration::from_millis(5));
-    }
-}
-
 #[test]
 fn reads_exact_bytes_and_stable_absence_without_decoding_config() {
     // Arrange
@@ -243,22 +235,6 @@ fn embedding_files_child() {
     }
 }
 
-fn assert_parsed_equal(old: Option<ParsedFile>, new: Option<ParsedFile>) {
-    match (old, new) {
-        (None, None) => {}
-        (Some(old), Some(new)) => {
-            assert_eq!(old.edges, new.edges);
-            assert_eq!(old.elements.len(), new.elements.len());
-            for (old, new) in old.elements.iter().zip(new.elements.iter()) {
-                assert_eq!(old.element, new.element);
-                assert_eq!(old.search_text, new.search_text);
-                assert_eq!(old.search_hash, new.search_hash);
-            }
-        }
-        _ => panic!("parser marking differs"),
-    }
-}
-
 #[test]
 fn protects_existing_service_paths_and_rejects_lock_symlinks() {
     // Arrange
@@ -294,4 +270,28 @@ fn protects_existing_service_paths_and_rejects_lock_symlinks() {
     fs::remove_file(fixture.0.join(".letopis/embed.lock")).unwrap();
     symlink("/dev/null", fixture.0.join(".letopis/embed.lock")).unwrap();
     assert!(files.try_lock_embed().is_err());
+}
+
+fn wait_for(path: &Path) {
+    let start = Instant::now();
+    while !path.exists() {
+        assert!(start.elapsed() < DEADLINE, "barrier exceeded deadline");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+fn assert_parsed_equal(old: Option<ParsedFile>, new: Option<ParsedFile>) {
+    match (old, new) {
+        (None, None) => {}
+        (Some(old), Some(new)) => {
+            assert_eq!(old.edges, new.edges);
+            assert_eq!(old.elements.len(), new.elements.len());
+            for (old, new) in old.elements.iter().zip(new.elements.iter()) {
+                assert_eq!(old.element, new.element);
+                assert_eq!(old.search_text, new.search_text);
+                assert_eq!(old.search_hash, new.search_hash);
+            }
+        }
+        _ => panic!("parser marking differs"),
+    }
 }

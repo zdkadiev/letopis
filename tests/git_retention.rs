@@ -17,41 +17,6 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-fn parse_path(s: &str) -> RepoPath {
-    RepoPath::parse(s).unwrap()
-}
-fn parse_tree_oid(s: &str) -> TreeOid {
-    TreeOid::parse(s).unwrap()
-}
-fn create_external_tree(repo: &TempRepo, child: &str, name: &str, kind: &str) -> TreeOid {
-    parse_tree_oid(
-        &repo.read_oid(
-            &["mktree", "-z", "--missing"],
-            Some(
-                format!(
-                    "{} {kind} {child}\t{name}\0",
-                    if kind == TREE_KIND {
-                        TREE_MODE
-                    } else {
-                        REGULAR_FILE_MODE
-                    }
-                )
-                .as_bytes(),
-            ),
-        ),
-    )
-}
-fn build_snapshot_ref(tree: &TreeOid) -> String {
-    format!("{SNAPSHOT_REF_PREFIX}{}", tree.as_str())
-}
-fn assert_no_ref(repo: &TempRepo, tree: &TreeOid) {
-    assert!(
-        !repo
-            .run_git(&["show-ref", "--verify", &build_snapshot_ref(tree)], None)
-            .status
-            .success()
-    );
-}
 #[test]
 fn retained_snapshots_survive_gc() {
     // Arrange
@@ -206,40 +171,6 @@ fn symbolic_and_conflicting_refs_are_rejected() {
         }
     }
 }
-fn pin_worker(root: OsString) {
-    // Arrange: announce readiness, then wait for the parent barrier.
-    let root = PathBuf::from(root);
-    let tree = parse_tree_oid(&std::env::var("LETOPIS_PIN_OID").unwrap());
-    let id = std::env::var("LETOPIS_PIN_WORKER").unwrap();
-    fs::write(root.join(format!("ready-{id}")), b"ready").unwrap();
-    let deadline = Instant::now() + Duration::from_secs(20);
-    while !root.join("start").exists() {
-        assert!(Instant::now() < deadline);
-        thread::sleep(Duration::from_millis(5));
-    }
-    // Act
-    let git = open_git_snapshots(&root).unwrap();
-    let retained = git.pin(&tree).unwrap();
-    // Assert
-    assert_eq!(retained.get_oid(), &tree);
-}
-
-fn spawn_pin_workers(root: &Path, tree: &TreeOid) -> Vec<git::OwnedChild> {
-    let mut children = Vec::new();
-    for id in ["a", "b"] {
-        let mut c = Command::new(std::env::current_exe().unwrap());
-        git::isolate_command(&mut c);
-        c.args(["--exact", "concurrent_pin_is_idempotent", "--nocapture"])
-            .env("LETOPIS_PIN_ROOT", root)
-            .env("LETOPIS_PIN_OID", tree.as_str())
-            .env("LETOPIS_PIN_WORKER", id)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        children.push(git::OwnedChild::spawn(&mut c));
-    }
-    children
-}
-
 #[test]
 fn concurrent_pin_is_idempotent() {
     if let Some(root) = std::env::var_os("LETOPIS_PIN_ROOT") {
@@ -400,82 +331,6 @@ fn gitlinks_are_retained_without_dereferencing() {
     }
 }
 
-fn assert_alternates_error(error: &SnapshotError, donor: &TempRepo) {
-    assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
-    assert!(error.get_message().contains("alternates"));
-    let diagnostic = format!("{error} {error:?}");
-    assert!(!diagnostic.contains(donor.get_root().to_str().unwrap()));
-    assert!(!diagnostic.contains("CANARY"));
-}
-
-fn try_borrowed_snapshot(
-    donor: &TempRepo,
-    borrower: &TempRepo,
-    p: &RepoPath,
-    bytes: &[u8],
-    local_blob: &Path,
-) -> Option<(impl GitSnapshots, TreeOid)> {
-    // Act
-    let opened = open_git_snapshots(borrower.get_root());
-    match opened {
-        Ok(git) => {
-            // On the unfixed adapter this recreates the public-API failure:
-            // hash-object -w reuses the donor blob and pin appears successful.
-            let tree = git.create_tree(&[SnapshotFile { path: p, bytes }]).unwrap();
-            git.pin(&tree).unwrap();
-            assert_eq!(git.read_blob(&tree, p).unwrap(), bytes);
-            assert!(
-                !local_blob.exists(),
-                "hash-object -w must not be mistaken for materialization"
-            );
-            Some((git, tree))
-        }
-        Err(error) => {
-            assert_alternates_error(&error, donor);
-            None
-        }
-    }
-}
-
-fn assert_shared_clone_gc_outcome(
-    donor: &TempRepo,
-    borrower: &TempRepo,
-    blob: &str,
-    p: &RepoPath,
-    accepted: &Option<(impl GitSnapshots, TreeOid)>,
-    format: ObjectFormat,
-) {
-    assert!(
-        !donor
-            .run_git(&["cat-file", "-e", blob], None)
-            .status
-            .success(),
-        "donor GC really removed the unreferenced blob"
-    );
-    assert!(
-        !borrower
-            .run_git(&["cat-file", "-e", blob], None)
-            .status
-            .success()
-    );
-    if let Some((git, tree)) = accepted {
-        assert_eq!(
-            git.read_blob(tree, p).unwrap_err().get_kind(),
-            SnapshotErrorKind::InternalError
-        );
-        assert_eq!(borrower.read_direct_ref(tree.as_str()), tree.as_str());
-        eprintln!(
-            "{format:?}: accepted shared snapshot lost its donor blob after GC while its service ref remained exact"
-        );
-    } else {
-        assert!(
-            borrower
-                .run_git_successfully(&["for-each-ref", SNAPSHOT_REF_PREFIX], None)
-                .is_empty()
-        );
-    }
-}
-
 #[test]
 fn shared_clone_is_refused_before_donor_gc_can_break_retention() {
     let mut refused = Vec::new();
@@ -628,5 +483,155 @@ fn linked_worktree_checks_common_object_store_and_refuses_inactive_alternates() 
             objects
         );
         assert_eq!(bytes, b"linked bytes");
+    }
+}
+
+fn parse_path(s: &str) -> RepoPath {
+    RepoPath::parse(s).unwrap()
+}
+
+fn create_external_tree(repo: &TempRepo, child: &str, name: &str, kind: &str) -> TreeOid {
+    parse_tree_oid(
+        &repo.read_oid(
+            &["mktree", "-z", "--missing"],
+            Some(
+                format!(
+                    "{} {kind} {child}\t{name}\0",
+                    if kind == TREE_KIND {
+                        TREE_MODE
+                    } else {
+                        REGULAR_FILE_MODE
+                    }
+                )
+                .as_bytes(),
+            ),
+        ),
+    )
+}
+
+fn assert_no_ref(repo: &TempRepo, tree: &TreeOid) {
+    assert!(
+        !repo
+            .run_git(&["show-ref", "--verify", &build_snapshot_ref(tree)], None)
+            .status
+            .success()
+    );
+}
+
+fn build_snapshot_ref(tree: &TreeOid) -> String {
+    format!("{SNAPSHOT_REF_PREFIX}{}", tree.as_str())
+}
+
+fn pin_worker(root: OsString) {
+    // Arrange: announce readiness, then wait for the parent barrier.
+    let root = PathBuf::from(root);
+    let tree = parse_tree_oid(&std::env::var("LETOPIS_PIN_OID").unwrap());
+    let id = std::env::var("LETOPIS_PIN_WORKER").unwrap();
+    fs::write(root.join(format!("ready-{id}")), b"ready").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !root.join("start").exists() {
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(5));
+    }
+    // Act
+    let git = open_git_snapshots(&root).unwrap();
+    let retained = git.pin(&tree).unwrap();
+    // Assert
+    assert_eq!(retained.get_oid(), &tree);
+}
+
+fn parse_tree_oid(s: &str) -> TreeOid {
+    TreeOid::parse(s).unwrap()
+}
+
+fn spawn_pin_workers(root: &Path, tree: &TreeOid) -> Vec<git::OwnedChild> {
+    let mut children = Vec::new();
+    for id in ["a", "b"] {
+        let mut c = Command::new(std::env::current_exe().unwrap());
+        git::isolate_command(&mut c);
+        c.args(["--exact", "concurrent_pin_is_idempotent", "--nocapture"])
+            .env("LETOPIS_PIN_ROOT", root)
+            .env("LETOPIS_PIN_OID", tree.as_str())
+            .env("LETOPIS_PIN_WORKER", id)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        children.push(git::OwnedChild::spawn(&mut c));
+    }
+    children
+}
+
+fn try_borrowed_snapshot(
+    donor: &TempRepo,
+    borrower: &TempRepo,
+    p: &RepoPath,
+    bytes: &[u8],
+    local_blob: &Path,
+) -> Option<(impl GitSnapshots, TreeOid)> {
+    // Act
+    let opened = open_git_snapshots(borrower.get_root());
+    match opened {
+        Ok(git) => {
+            // On the unfixed adapter this recreates the public-API failure:
+            // hash-object -w reuses the donor blob and pin appears successful.
+            let tree = git.create_tree(&[SnapshotFile { path: p, bytes }]).unwrap();
+            git.pin(&tree).unwrap();
+            assert_eq!(git.read_blob(&tree, p).unwrap(), bytes);
+            assert!(
+                !local_blob.exists(),
+                "hash-object -w must not be mistaken for materialization"
+            );
+            Some((git, tree))
+        }
+        Err(error) => {
+            assert_alternates_error(&error, donor);
+            None
+        }
+    }
+}
+
+fn assert_alternates_error(error: &SnapshotError, donor: &TempRepo) {
+    assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+    assert!(error.get_message().contains("alternates"));
+    let diagnostic = format!("{error} {error:?}");
+    assert!(!diagnostic.contains(donor.get_root().to_str().unwrap()));
+    assert!(!diagnostic.contains("CANARY"));
+}
+
+fn assert_shared_clone_gc_outcome(
+    donor: &TempRepo,
+    borrower: &TempRepo,
+    blob: &str,
+    p: &RepoPath,
+    accepted: &Option<(impl GitSnapshots, TreeOid)>,
+    format: ObjectFormat,
+) {
+    assert!(
+        !donor
+            .run_git(&["cat-file", "-e", blob], None)
+            .status
+            .success(),
+        "donor GC really removed the unreferenced blob"
+    );
+    assert!(
+        !borrower
+            .run_git(&["cat-file", "-e", blob], None)
+            .status
+            .success()
+    );
+    if let Some((git, tree)) = accepted {
+        assert_eq!(
+            git.read_blob(tree, p).unwrap_err().get_kind(),
+            SnapshotErrorKind::InternalError
+        );
+        assert_eq!(borrower.read_direct_ref(tree.as_str()), tree.as_str());
+        eprintln!(
+            "{format:?}: accepted shared snapshot lost its donor blob after GC while its service ref remained exact"
+        );
+    } else {
+        assert!(
+            borrower
+                .run_git_successfully(&["for-each-ref", SNAPSHOT_REF_PREFIX], None)
+                .is_empty()
+        );
     }
 }

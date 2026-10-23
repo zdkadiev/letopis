@@ -22,10 +22,6 @@ use std::{
 };
 use tempfile::tempdir;
 
-fn create_fifo(path: &Path) {
-    assert!(Command::new("mkfifo").arg(path).status().unwrap().success());
-}
-
 #[test]
 fn read_regular_file_preserves_bytes_and_stat() {
     // Arrange
@@ -856,4 +852,8 @@ fn reject_service_directory_and_lock_symlinks() {
             b"untouched"
         );
     }
+}
+
+fn create_fifo(path: &Path) {
+    assert!(Command::new("mkfifo").arg(path).status().unwrap().success());
 }

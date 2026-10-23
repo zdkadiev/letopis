@@ -364,39 +364,6 @@ fn reject_vector_database_symlink_without_touching_external_file() {
     assert_database_symlink_rejected("vectors.db");
 }
 
-fn assert_database_symlink_rejected(name: &str) {
-    for initialize in [false, true] {
-        // Arrange an empty or already compatible outside database.
-        let repo = DocumentRepo::new();
-        let outside = tempfile::tempdir().unwrap();
-        let target = outside.path().join(name);
-        if initialize {
-            drop(
-                letopis::open_storage(
-                    &outside.path().join("cache.db"),
-                    &outside.path().join("vectors.db"),
-                )
-                .unwrap(),
-            );
-        } else {
-            fs::write(&target, []).unwrap();
-        }
-        let before = fs::read(&target).unwrap();
-        fs::create_dir(repo.get_root().join(".letopis")).unwrap();
-        symlink(&target, repo.get_root().join(".letopis").join(name)).unwrap();
-        // Act.
-        let result = open_documents(repo.get_root());
-        // Assert rejection and exact outside bytes, including initialized databases.
-        let Err(error) = result else {
-            panic!("accepted database symlink: {name}");
-        };
-        assert!(!format!("{error} {error:?}").contains(target.to_str().unwrap()));
-        assert_eq!(fs::read(&target).unwrap(), before);
-        assert!(!outside.path().join(format!("{name}-wal")).exists());
-        assert!(!outside.path().join(format!("{name}-shm")).exists());
-    }
-}
-
 #[test]
 fn simultaneous_document_openers_initialize_and_publish_once() {
     // Arrange a virgin repository and coordinate both normal composition calls.
@@ -448,4 +415,37 @@ fn removes_an_orphan_source_while_preserving_unrelated_knowledge() {
     );
     assert!(after.edges.is_empty());
     assert_eq!(repo.search("SurvivingKnowledge"), ["unrelated.md"]);
+}
+
+fn assert_database_symlink_rejected(name: &str) {
+    for initialize in [false, true] {
+        // Arrange an empty or already compatible outside database.
+        let repo = DocumentRepo::new();
+        let outside = tempfile::tempdir().unwrap();
+        let target = outside.path().join(name);
+        if initialize {
+            drop(
+                letopis::open_storage(
+                    &outside.path().join("cache.db"),
+                    &outside.path().join("vectors.db"),
+                )
+                .unwrap(),
+            );
+        } else {
+            fs::write(&target, []).unwrap();
+        }
+        let before = fs::read(&target).unwrap();
+        fs::create_dir(repo.get_root().join(".letopis")).unwrap();
+        symlink(&target, repo.get_root().join(".letopis").join(name)).unwrap();
+        // Act.
+        let result = open_documents(repo.get_root());
+        // Assert rejection and exact outside bytes, including initialized databases.
+        let Err(error) = result else {
+            panic!("accepted database symlink: {name}");
+        };
+        assert!(!format!("{error} {error:?}").contains(target.to_str().unwrap()));
+        assert_eq!(fs::read(&target).unwrap(), before);
+        assert!(!outside.path().join(format!("{name}-wal")).exists());
+        assert!(!outside.path().join(format!("{name}-shm")).exists());
+    }
 }

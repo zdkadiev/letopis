@@ -139,23 +139,6 @@ mod tests {
     use rusqlite::{Connection, params_from_iter, types::Value as SqliteValue};
     use sea_query::{Enum, Expr, OptionEnum, Query, Value};
 
-    fn read_values(values: Vec<Value>) -> (String, Vec<SqliteValue>) {
-        let db = Connection::open_in_memory().unwrap();
-        let mut query = Query::select();
-        for value in values {
-            query.expr(Expr::val(value));
-        }
-        let (sql, parameters) = build_query(&query).unwrap();
-        let mut statement = db.prepare(&sql).unwrap();
-        let count = statement.column_count();
-        let result = statement
-            .query_row(params_from_iter(parameters), |row| {
-                (0..count).map(|index| row.get(index)).collect()
-            })
-            .unwrap();
-        (sql, result)
-    }
-
     #[test]
     fn quoted_unicode_text_remains_bound() {
         // Arrange
@@ -268,5 +251,22 @@ mod tests {
         let (_, result) = read_values(values);
         // Assert
         assert_eq!(result, vec![SqliteValue::Null; count]);
+    }
+
+    fn read_values(values: Vec<Value>) -> (String, Vec<SqliteValue>) {
+        let db = Connection::open_in_memory().unwrap();
+        let mut query = Query::select();
+        for value in values {
+            query.expr(Expr::val(value));
+        }
+        let (sql, parameters) = build_query(&query).unwrap();
+        let mut statement = db.prepare(&sql).unwrap();
+        let count = statement.column_count();
+        let result = statement
+            .query_row(params_from_iter(parameters), |row| {
+                (0..count).map(|index| row.get(index)).collect()
+            })
+            .unwrap();
+        (sql, result)
     }
 }

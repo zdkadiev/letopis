@@ -11,89 +11,6 @@ use letopis::{
 use rusqlite::{Connection, types::Value};
 use tempfile::TempDir;
 
-fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
-    match outcome {
-        VectorOutcome::Current(value) => value,
-        VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
-    }
-}
-fn open(root: &TempDir) -> impl Storage + use<> {
-    open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap()
-}
-fn publish(storage: &mut impl Storage, rows: &[(&str, &str)]) -> u64 {
-    let mut unit = storage.begin_cache_write().unwrap();
-    for (id, text) in rows {
-        unit.upsert_node(&support::build_knowledge(id, text))
-            .unwrap();
-    }
-    unit.commit().unwrap()
-}
-fn store(storage: &mut impl Storage, identity: &Sha256, text: &str, size: usize) -> i64 {
-    let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
-    let key = unit
-        .store_vector(&Sha256::digest(text.as_bytes()), &vec![1.0; size], size)
-        .unwrap();
-    unit.commit().unwrap();
-    key.row_id
-}
-fn read_next_work(
-    storage: &mut impl Storage,
-    identity: &Sha256,
-    budget: u64,
-    after: Option<&KnowledgeId>,
-) -> Option<EmbeddingWork> {
-    unwrap_current(
-        storage
-            .begin_read()
-            .unwrap()
-            .read_next_embedding_work(identity, budget, after)
-            .unwrap(),
-    )
-}
-fn read_size(storage: &mut impl Storage, identity: &Sha256) -> Option<usize> {
-    unwrap_current(
-        storage
-            .begin_read()
-            .unwrap()
-            .read_vector_dimensions(identity)
-            .unwrap(),
-    )
-    .map(Into::into)
-}
-fn prune(storage: &mut impl Storage, identity: &Sha256) {
-    let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
-    unit.prune_unreferenced().unwrap();
-    unit.commit().unwrap();
-}
-fn count_keys(root: &TempDir) -> i64 {
-    Connection::open(root.path().join("vectors"))
-        .unwrap()
-        .query_row("SELECT count(*) FROM vector_keys", [], |row| row.get(0))
-        .unwrap()
-}
-
-fn read_native_state(root: &TempDir) -> Vec<Vec<Vec<Value>>> {
-    let db = Connection::open(root.path().join("vectors")).unwrap();
-    [
-        "SELECT row_id, search_hash FROM vector_keys ORDER BY row_id",
-        "SELECT id, vector FROM vector_index_base ORDER BY id",
-        "SELECT id, val FROM vector_index_config ORDER BY id",
-        "SELECT id, val FROM vector_index_model ORDER BY id",
-        "SELECT type, name, sql FROM sqlite_schema ORDER BY name",
-    ]
-    .into_iter()
-    .map(|sql| {
-        let mut statement = db.prepare(sql).unwrap();
-        let count = statement.column_count();
-        statement
-            .query_map([], |row| (0..count).map(|i| row.get(i)).collect())
-            .unwrap()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap()
-    })
-    .collect()
-}
-
 #[test]
 fn cursor_orders_shared_hashes_and_excludes_sources_and_stored_hashes() {
     // Arrange: reverse insertion order and shared text with two representatives.
@@ -527,4 +444,94 @@ fn abandoned_cleanup_restores_vectors_failures_and_dimensions() {
             .attempts,
         1
     );
+}
+
+fn open(root: &TempDir) -> impl Storage + use<> {
+    open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap()
+}
+
+fn publish(storage: &mut impl Storage, rows: &[(&str, &str)]) -> u64 {
+    let mut unit = storage.begin_cache_write().unwrap();
+    for (id, text) in rows {
+        unit.upsert_node(&support::build_knowledge(id, text))
+            .unwrap();
+    }
+    unit.commit().unwrap()
+}
+
+fn store(storage: &mut impl Storage, identity: &Sha256, text: &str, size: usize) -> i64 {
+    let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
+    let key = unit
+        .store_vector(&Sha256::digest(text.as_bytes()), &vec![1.0; size], size)
+        .unwrap();
+    unit.commit().unwrap();
+    key.row_id
+}
+
+fn read_next_work(
+    storage: &mut impl Storage,
+    identity: &Sha256,
+    budget: u64,
+    after: Option<&KnowledgeId>,
+) -> Option<EmbeddingWork> {
+    unwrap_current(
+        storage
+            .begin_read()
+            .unwrap()
+            .read_next_embedding_work(identity, budget, after)
+            .unwrap(),
+    )
+}
+
+fn read_size(storage: &mut impl Storage, identity: &Sha256) -> Option<usize> {
+    unwrap_current(
+        storage
+            .begin_read()
+            .unwrap()
+            .read_vector_dimensions(identity)
+            .unwrap(),
+    )
+    .map(Into::into)
+}
+
+fn prune(storage: &mut impl Storage, identity: &Sha256) {
+    let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
+    unit.prune_unreferenced().unwrap();
+    unit.commit().unwrap();
+}
+
+fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
+    match outcome {
+        VectorOutcome::Current(value) => value,
+        VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
+    }
+}
+
+fn count_keys(root: &TempDir) -> i64 {
+    Connection::open(root.path().join("vectors"))
+        .unwrap()
+        .query_row("SELECT count(*) FROM vector_keys", [], |row| row.get(0))
+        .unwrap()
+}
+
+fn read_native_state(root: &TempDir) -> Vec<Vec<Vec<Value>>> {
+    let db = Connection::open(root.path().join("vectors")).unwrap();
+    [
+        "SELECT row_id, search_hash FROM vector_keys ORDER BY row_id",
+        "SELECT id, vector FROM vector_index_base ORDER BY id",
+        "SELECT id, val FROM vector_index_config ORDER BY id",
+        "SELECT id, val FROM vector_index_model ORDER BY id",
+        "SELECT type, name, sql FROM sqlite_schema ORDER BY name",
+    ]
+    .into_iter()
+    .map(|sql| {
+        let mut statement = db.prepare(sql).unwrap();
+        let count = statement.column_count();
+        statement
+            .query_map([], |row| (0..count).map(|i| row.get(i)).collect())
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+    })
+    .collect()
 }

@@ -28,19 +28,6 @@ const LIMIT: Duration = Duration::from_secs(15);
 const CHILD: &str = "service::embedding::tests::process::run_child";
 const SUCCESS: &str = r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#;
 
-pub(super) fn reach_checkpoint(stage: &str) {
-    if env::var("LETOPIS_PROCESS_STAGE").as_deref() != Ok(stage) {
-        return;
-    }
-    let mut socket = UnixStream::connect(env::var_os("LETOPIS_PROCESS_SOCKET").unwrap()).unwrap();
-    socket.set_read_timeout(Some(LIMIT)).unwrap();
-    socket.set_write_timeout(Some(LIMIT)).unwrap();
-    socket.write_all(b"R").unwrap();
-    let mut signal = [0];
-    socket.read_exact(&mut signal).unwrap();
-    assert_eq!(signal, *b"C");
-}
-
 #[test]
 #[ignore = "private child entrypoint explicitly invoked by process parents"]
 fn run_child() {
@@ -256,40 +243,6 @@ impl Drop for Process {
         let _ = self.child.wait();
     }
 }
-fn read_http_request(mut stream: TcpStream) -> TcpStream {
-    stream.set_nonblocking(false).unwrap();
-    stream.set_read_timeout(Some(LIMIT)).unwrap();
-    stream.set_write_timeout(Some(LIMIT)).unwrap();
-    let mut bytes = Vec::new();
-    while !bytes.ends_with(b"\r\n\r\n") {
-        let mut byte = [0];
-        stream.read_exact(&mut byte).unwrap();
-        bytes.push(byte[0]);
-        assert!(bytes.len() < 16384);
-    }
-    let headers = String::from_utf8(bytes).unwrap();
-    let length: usize = headers
-        .lines()
-        .find_map(|line| {
-            let (key, value) = line.split_once(':')?;
-            key.eq_ignore_ascii_case("content-length")
-                .then(|| value.trim().parse().unwrap())
-        })
-        .unwrap();
-    assert!(length < 16384);
-    stream.read_exact(&mut vec![0; length]).unwrap();
-    stream
-}
-
-fn reply(mut stream: TcpStream, body: &str) {
-    write!(
-        stream,
-        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
-    )
-    .unwrap();
-}
-
 #[test]
 fn two_drains_have_one_owner_and_one_stored_vector() {
     // Arrange
@@ -392,43 +345,6 @@ fn reset_during_http_discards_late_document_success_and_error() {
     }
 }
 
-fn reset_with_current_state(fixture: &Fixture) -> EmbeddingConfig {
-    let next = Fixture::write_config(&fixture.root, &fixture.listener, 1);
-    let mut service = open_embeddings(fixture.root.path(), open_storage(&fixture.root)).unwrap();
-    service.read_configuration().unwrap();
-    let mut storage = open_storage(&fixture.root);
-    let mut files = Files::new(0);
-    let current = publish(&mut storage, &mut files, "b.md", "current knowledge");
-    fs::write(fixture.root.path().join("b.md"), &files.documents["b.md"]).unwrap();
-    let VectorOutcome::Current(mut unit) =
-        storage.begin_vector_write(&next.get_identity()).unwrap()
-    else {
-        panic!()
-    };
-    unit.store_vector(&current, &[4., 5., 6.], 3).unwrap();
-    unit.set_query_error(7, "current safe error").unwrap();
-    unit.commit().unwrap();
-    next
-}
-fn wait_for_exit(child: &mut Process) {
-    let start = Instant::now();
-    while child.child.try_wait().unwrap().is_none() {
-        assert!(start.elapsed() < LIMIT, "child watchdog timeout");
-        thread::sleep(Duration::from_millis(5));
-    }
-}
-fn assert_current_error(fixture: &Fixture) {
-    let mut storage = open_storage(&fixture.root);
-    let error = storage
-        .begin_read()
-        .unwrap()
-        .read_query_error()
-        .unwrap()
-        .unwrap();
-    assert_eq!(error.at, 7);
-    assert_eq!(error.error, "current safe error");
-}
-
 #[test]
 fn reset_during_http_preserves_current_query_error() {
     for (label, body) in [
@@ -465,4 +381,90 @@ fn assert_current_vector(fixture: &Fixture, config: &EmbeddingConfig) {
         read.read_vector(&config.get_identity(), &hash).unwrap(),
         VectorOutcome::Current(Some(vec![4., 5., 6.]))
     );
+}
+
+pub(super) fn reach_checkpoint(stage: &str) {
+    if env::var("LETOPIS_PROCESS_STAGE").as_deref() != Ok(stage) {
+        return;
+    }
+    let mut socket = UnixStream::connect(env::var_os("LETOPIS_PROCESS_SOCKET").unwrap()).unwrap();
+    socket.set_read_timeout(Some(LIMIT)).unwrap();
+    socket.set_write_timeout(Some(LIMIT)).unwrap();
+    socket.write_all(b"R").unwrap();
+    let mut signal = [0];
+    socket.read_exact(&mut signal).unwrap();
+    assert_eq!(signal, *b"C");
+}
+
+fn read_http_request(mut stream: TcpStream) -> TcpStream {
+    stream.set_nonblocking(false).unwrap();
+    stream.set_read_timeout(Some(LIMIT)).unwrap();
+    stream.set_write_timeout(Some(LIMIT)).unwrap();
+    let mut bytes = Vec::new();
+    while !bytes.ends_with(b"\r\n\r\n") {
+        let mut byte = [0];
+        stream.read_exact(&mut byte).unwrap();
+        bytes.push(byte[0]);
+        assert!(bytes.len() < 16384);
+    }
+    let headers = String::from_utf8(bytes).unwrap();
+    let length: usize = headers
+        .lines()
+        .find_map(|line| {
+            let (key, value) = line.split_once(':')?;
+            key.eq_ignore_ascii_case("content-length")
+                .then(|| value.trim().parse().unwrap())
+        })
+        .unwrap();
+    assert!(length < 16384);
+    stream.read_exact(&mut vec![0; length]).unwrap();
+    stream
+}
+
+fn reply(mut stream: TcpStream, body: &str) {
+    write!(
+        stream,
+        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    )
+    .unwrap();
+}
+
+fn reset_with_current_state(fixture: &Fixture) -> EmbeddingConfig {
+    let next = Fixture::write_config(&fixture.root, &fixture.listener, 1);
+    let mut service = open_embeddings(fixture.root.path(), open_storage(&fixture.root)).unwrap();
+    service.read_configuration().unwrap();
+    let mut storage = open_storage(&fixture.root);
+    let mut files = Files::new(0);
+    let current = publish(&mut storage, &mut files, "b.md", "current knowledge");
+    fs::write(fixture.root.path().join("b.md"), &files.documents["b.md"]).unwrap();
+    let VectorOutcome::Current(mut unit) =
+        storage.begin_vector_write(&next.get_identity()).unwrap()
+    else {
+        panic!()
+    };
+    unit.store_vector(&current, &[4., 5., 6.], 3).unwrap();
+    unit.set_query_error(7, "current safe error").unwrap();
+    unit.commit().unwrap();
+    next
+}
+
+fn wait_for_exit(child: &mut Process) {
+    let start = Instant::now();
+    while child.child.try_wait().unwrap().is_none() {
+        assert!(start.elapsed() < LIMIT, "child watchdog timeout");
+        thread::sleep(Duration::from_millis(5));
+    }
+}
+
+fn assert_current_error(fixture: &Fixture) {
+    let mut storage = open_storage(&fixture.root);
+    let error = storage
+        .begin_read()
+        .unwrap()
+        .read_query_error()
+        .unwrap()
+        .unwrap();
+    assert_eq!(error.at, 7);
+    assert_eq!(error.error, "current safe error");
 }

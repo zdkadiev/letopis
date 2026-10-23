@@ -100,32 +100,6 @@ impl Markdown for CountingMarkdown {
     }
 }
 type TestService = DocumentService<Candidates, TestFiles, CountingMarkdown, SqliteStorage>;
-fn build_service() -> (TempDir, TestService) {
-    let dir = tempfile::tempdir().unwrap();
-    let storage =
-        SqliteStorage::open(&dir.path().join("cache.db"), &dir.path().join("vectors.db")).unwrap();
-    (
-        dir,
-        DocumentService::new(
-            Candidates,
-            TestFiles::new(),
-            CountingMarkdown(Cell::new(0)),
-            storage,
-        ),
-    )
-}
-fn read_matches(service: &mut TestService, text: &str) -> Vec<String> {
-    service
-        .storage
-        .begin_read()
-        .unwrap()
-        .match_text(text)
-        .unwrap()
-        .into_iter()
-        .map(|row| row.id.as_str().to_owned())
-        .collect()
-}
-
 #[test]
 fn skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files() {
     for bytes in [
@@ -323,6 +297,33 @@ fn read_fts_blocks(root: &Path) -> Vec<(i64, Vec<u8>)> {
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap()
+}
+
+fn build_service() -> (TempDir, TestService) {
+    let dir = tempfile::tempdir().unwrap();
+    let storage =
+        SqliteStorage::open(&dir.path().join("cache.db"), &dir.path().join("vectors.db")).unwrap();
+    (
+        dir,
+        DocumentService::new(
+            Candidates,
+            TestFiles::new(),
+            CountingMarkdown(Cell::new(0)),
+            storage,
+        ),
+    )
+}
+
+fn read_matches(service: &mut TestService, text: &str) -> Vec<String> {
+    service
+        .storage
+        .begin_read()
+        .unwrap()
+        .match_text(text)
+        .unwrap()
+        .into_iter()
+        .map(|row| row.id.as_str().to_owned())
+        .collect()
 }
 
 pub(super) mod process;

@@ -132,28 +132,6 @@ mod tests {
         assert!(!path.join("cache.db-shm").exists());
     }
 
-    fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
-        match outcome {
-            VectorOutcome::Current(value) => value,
-            VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
-        }
-    }
-    fn seed_vector(storage: &mut SqliteStorage, identity: &Sha256) -> i64 {
-        storage.reset_vectors(identity).unwrap();
-        let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
-        let row = unit
-            .store_vector(identity, &[1.0, 0.0, 0.0], 3)
-            .unwrap()
-            .row_id;
-        unit.commit().unwrap();
-        row
-    }
-    fn count_failures(storage: &SqliteStorage) -> i64 {
-        storage
-            .vector_writer
-            .query_row("SELECT count(*) FROM embed_failures", [], |r| r.get(0))
-            .unwrap()
-    }
     #[test]
     fn reset_late_meta_failure_preserves_identity_key_vector_and_query_error() {
         // Arrange a populated native table, then fail after DROP/recreation/deletion.
@@ -255,5 +233,30 @@ mod tests {
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         assert!(unit.store_vector(&identity, &[1.0, 0.0, 0.0], 3).is_err());
         assert!(unit.commit().is_err());
+    }
+
+    fn seed_vector(storage: &mut SqliteStorage, identity: &Sha256) -> i64 {
+        storage.reset_vectors(identity).unwrap();
+        let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
+        let row = unit
+            .store_vector(identity, &[1.0, 0.0, 0.0], 3)
+            .unwrap()
+            .row_id;
+        unit.commit().unwrap();
+        row
+    }
+
+    fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
+        match outcome {
+            VectorOutcome::Current(value) => value,
+            VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
+        }
+    }
+
+    fn count_failures(storage: &SqliteStorage) -> i64 {
+        storage
+            .vector_writer
+            .query_row("SELECT count(*) FROM embed_failures", [], |r| r.get(0))
+            .unwrap()
     }
 }

@@ -215,6 +215,34 @@ mod tests {
         time::{Duration, Instant},
     };
 
+    #[test]
+    fn bounds_waiting_for_response_headers() {
+        run_deadline_case(Duration::from_millis(240), Duration::ZERO);
+    }
+    #[test]
+    fn bounds_waiting_for_response_body() {
+        run_deadline_case(Duration::ZERO, Duration::from_millis(240));
+    }
+    #[test]
+    fn shares_one_deadline_across_headers_and_body() {
+        run_deadline_case(Duration::from_millis(80), Duration::from_millis(80));
+    }
+    #[test]
+    fn classifies_io_timeouts_without_exposing_transport_payloads() {
+        // Arrange
+        for (io_kind, expected) in [
+            (ErrorKind::TimedOut, EmbeddingErrorKind::Timeout),
+            (ErrorKind::ConnectionReset, EmbeddingErrorKind::Connection),
+        ] {
+            let cause = ureq::Error::Io(io::Error::new(io_kind, "transport-secret"));
+            // Act
+            let error = classify(cause);
+            // Assert
+            assert_eq!(error.get_kind(), expected);
+            assert!(!format!("{error} {error:?}").contains("transport-secret"));
+        }
+    }
+
     fn run_deadline_case(header_delay: Duration, body_delay: Duration) {
         // Arrange
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -248,32 +276,5 @@ mod tests {
         // Assert
         assert_eq!(result.unwrap_err().get_kind(), EmbeddingErrorKind::Timeout);
         assert!(elapsed < Duration::from_secs(2));
-    }
-    #[test]
-    fn bounds_waiting_for_response_headers() {
-        run_deadline_case(Duration::from_millis(240), Duration::ZERO);
-    }
-    #[test]
-    fn bounds_waiting_for_response_body() {
-        run_deadline_case(Duration::ZERO, Duration::from_millis(240));
-    }
-    #[test]
-    fn shares_one_deadline_across_headers_and_body() {
-        run_deadline_case(Duration::from_millis(80), Duration::from_millis(80));
-    }
-    #[test]
-    fn classifies_io_timeouts_without_exposing_transport_payloads() {
-        // Arrange
-        for (io_kind, expected) in [
-            (ErrorKind::TimedOut, EmbeddingErrorKind::Timeout),
-            (ErrorKind::ConnectionReset, EmbeddingErrorKind::Connection),
-        ] {
-            let cause = ureq::Error::Io(io::Error::new(io_kind, "transport-secret"));
-            // Act
-            let error = classify(cause);
-            // Assert
-            assert_eq!(error.get_kind(), expected);
-            assert!(!format!("{error} {error:?}").contains("transport-secret"));
-        }
     }
 }

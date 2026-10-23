@@ -7,38 +7,6 @@ use letopis::{
 };
 use tempfile::TempDir;
 
-fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
-    match outcome {
-        VectorOutcome::Current(value) => value,
-        VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
-    }
-}
-fn store(storage: &mut impl Storage, identity: &Sha256, hash: &Sha256, vector: &[f32]) -> i64 {
-    let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
-    let key = unit.store_vector(hash, vector, vector.len()).unwrap();
-    unit.commit().unwrap();
-    key.row_id
-}
-fn publish_hash(storage: &mut impl Storage, hash: Sha256) {
-    let mut node = support::build_knowledge("a.md", "fixture");
-    let letopis::service::NodeMetadata::Knowledge(ref mut knowledge) = node else {
-        panic!("knowledge fixture");
-    };
-    knowledge.search_hash = hash;
-    let mut unit = storage.begin_cache_write().unwrap();
-    unit.upsert_node(&node).unwrap();
-    unit.commit().unwrap();
-}
-fn assert_nearest(read: &mut impl StorageRead, identity: &Sha256, query: &[f32]) {
-    let matches = unwrap_current(
-        read.find_nearest_vectors(identity, query, query.len())
-            .unwrap(),
-    );
-    assert_eq!(matches.len(), 1);
-    assert_eq!(matches[0].id.as_str(), "a.md");
-    assert_eq!(matches[0].search_hash, *identity);
-    assert_eq!(matches[0].distance, 0.0);
-}
 #[test]
 fn text_hash_shares_one_vector() {
     // Catches duplicate keys, lost bytes, and one-to-one rather than text joins.
@@ -298,4 +266,40 @@ fn nearest_validates_query_and_orders_all_candidates_by_distance_then_id() {
             .collect::<Vec<_>>(),
         [("z.md", 0.0), ("a.md", 1.0), ("b.md", 1.0)]
     );
+}
+
+fn store(storage: &mut impl Storage, identity: &Sha256, hash: &Sha256, vector: &[f32]) -> i64 {
+    let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
+    let key = unit.store_vector(hash, vector, vector.len()).unwrap();
+    unit.commit().unwrap();
+    key.row_id
+}
+
+fn publish_hash(storage: &mut impl Storage, hash: Sha256) {
+    let mut node = support::build_knowledge("a.md", "fixture");
+    let letopis::service::NodeMetadata::Knowledge(ref mut knowledge) = node else {
+        panic!("knowledge fixture");
+    };
+    knowledge.search_hash = hash;
+    let mut unit = storage.begin_cache_write().unwrap();
+    unit.upsert_node(&node).unwrap();
+    unit.commit().unwrap();
+}
+
+fn assert_nearest(read: &mut impl StorageRead, identity: &Sha256, query: &[f32]) {
+    let matches = unwrap_current(
+        read.find_nearest_vectors(identity, query, query.len())
+            .unwrap(),
+    );
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].id.as_str(), "a.md");
+    assert_eq!(matches[0].search_hash, *identity);
+    assert_eq!(matches[0].distance, 0.0);
+}
+
+fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
+    match outcome {
+        VectorOutcome::Current(value) => value,
+        VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
+    }
 }

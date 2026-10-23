@@ -123,23 +123,6 @@ fn subprocess_drains_and_reaps_on_io_failure() {
     assert!(!child_exists, "Git child must be reaped");
 }
 
-fn supervise_policy_worker() {
-    fixture::supervise_test(
-        "git::cli::tests::process_removes_inherited_overrides_and_hardens_writes",
-        &[
-            ("LETOPIS_POLICY_WORKER", "1"),
-            ("GIT_DIR", "CANARY_DIR"),
-            ("GIT_WORK_TREE", "CANARY_WORKTREE"),
-            ("GIT_INDEX_FILE", "CANARY_INDEX"),
-            ("GIT_OBJECT_DIRECTORY", "CANARY_OBJECTS"),
-            ("GIT_CONFIG_COUNT", "1"),
-            ("GIT_CONFIG_KEY_0", "core.bare"),
-            ("GIT_CONFIG_VALUE_0", "true"),
-            ("GIT_CONFIG_PARAMETERS", "CANARY_CONFIG"),
-        ],
-    );
-}
-
 #[test]
 fn process_removes_inherited_overrides_and_hardens_writes() {
     if std::env::var_os("LETOPIS_POLICY_WORKER").is_none() {
@@ -174,18 +157,6 @@ fn process_removes_inherited_overrides_and_hardens_writes() {
     ] {
         assert!(text.contains(flag), "missing {flag}");
     }
-}
-
-fn create_newline_repository_pair(parent: &TempRepo, format: ObjectFormat) -> (PathBuf, PathBuf) {
-    let sibling = parent.get_root().join("repo");
-    let target = parent.get_root().join("repo\n");
-    for root in [&sibling, &target] {
-        parent.run_git_successfully(
-            &["init", "-q", format.to_init_arg(), root.to_str().unwrap()],
-            None,
-        );
-    }
-    (sibling, target)
 }
 
 #[test]
@@ -458,4 +429,33 @@ fn hardens_tree_and_ref_writes_with_git_fsync_settings() {
         assert!(arguments.lines().any(|arg| arg == "core.fsync=all"));
         assert!(arguments.lines().any(|arg| arg == "core.fsyncMethod=fsync"));
     }
+}
+
+fn supervise_policy_worker() {
+    fixture::supervise_test(
+        "git::cli::tests::process_removes_inherited_overrides_and_hardens_writes",
+        &[
+            ("LETOPIS_POLICY_WORKER", "1"),
+            ("GIT_DIR", "CANARY_DIR"),
+            ("GIT_WORK_TREE", "CANARY_WORKTREE"),
+            ("GIT_INDEX_FILE", "CANARY_INDEX"),
+            ("GIT_OBJECT_DIRECTORY", "CANARY_OBJECTS"),
+            ("GIT_CONFIG_COUNT", "1"),
+            ("GIT_CONFIG_KEY_0", "core.bare"),
+            ("GIT_CONFIG_VALUE_0", "true"),
+            ("GIT_CONFIG_PARAMETERS", "CANARY_CONFIG"),
+        ],
+    );
+}
+
+fn create_newline_repository_pair(parent: &TempRepo, format: ObjectFormat) -> (PathBuf, PathBuf) {
+    let sibling = parent.get_root().join("repo");
+    let target = parent.get_root().join("repo\n");
+    for root in [&sibling, &target] {
+        parent.run_git_successfully(
+            &["init", "-q", format.to_init_arg(), root.to_str().unwrap()],
+            None,
+        );
+    }
+    (sibling, target)
 }
