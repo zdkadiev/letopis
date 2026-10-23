@@ -41,6 +41,13 @@ impl ObjectDb<'_> {
         }
         root.write(self)
     }
+    pub(super) fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
+        let raw = self.run(
+            &[HASH_OBJECT_COMMAND, "-w", "--no-filters", "--stdin"],
+            Some(bytes),
+        )?;
+        BlobOid::parse(self.parse_oid_text(&raw)?).map_err(|_| make_integrity_error())
+    }
     pub(super) fn create_tree_from_blobs(
         &self,
         entries: &[SnapshotEntry],
@@ -195,13 +202,6 @@ impl ObjectDb<'_> {
             return Err(make_integrity_error());
         }
         Ok(bytes)
-    }
-    pub(super) fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
-        let raw = self.run(
-            &[HASH_OBJECT_COMMAND, "-w", "--no-filters", "--stdin"],
-            Some(bytes),
-        )?;
-        BlobOid::parse(self.parse_oid_text(&raw)?).map_err(|_| make_integrity_error())
     }
     pub(super) fn run(
         &self,

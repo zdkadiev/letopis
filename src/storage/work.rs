@@ -72,15 +72,6 @@ fn select_exhausted_hash(max_attempts: u64) -> SelectStatement {
         .to_owned()
 }
 
-fn select_live_hash(hash: Expr) -> SelectStatement {
-    Query::select()
-        .expr(Expr::val(1))
-        .from((Schemas::Cache, Nodes::Table))
-        .and_where(Expr::col((Nodes::Table, Nodes::Kind)).ne(SOURCE_KIND))
-        .and_where(Expr::col((Nodes::Table, Nodes::SearchHash)).eq(hash))
-        .to_owned()
-}
-
 pub(super) fn prune_unreferenced(connection: &Connection) -> StorageResult<()> {
     let orphan_keys = Query::select()
         .column(VectorKeys::RowId)
@@ -126,4 +117,13 @@ pub(super) fn prune_unreferenced(connection: &Connection) -> StorageResult<()> {
         .execute(&sql, params_from_iter(values))
         .map_err(map_sqlite)?;
     Ok(())
+}
+
+fn select_live_hash(hash: Expr) -> SelectStatement {
+    Query::select()
+        .expr(Expr::val(1))
+        .from((Schemas::Cache, Nodes::Table))
+        .and_where(Expr::col((Nodes::Table, Nodes::Kind)).ne(SOURCE_KIND))
+        .and_where(Expr::col((Nodes::Table, Nodes::SearchHash)).eq(hash))
+        .to_owned()
 }

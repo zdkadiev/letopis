@@ -112,12 +112,7 @@ impl fmt::Debug for EmbeddingConfig {
             .finish_non_exhaustive()
     }
 }
-fn reject_config() -> EmbeddingError {
-    EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)
-}
-fn map_config_error(cause: impl std::error::Error + Send + Sync + 'static) -> EmbeddingError {
-    EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
-}
+
 fn validate_parameters(parameters: &Map<String, Value>) -> EmbeddingResult<()> {
     if parameters
         .get("base_url")
@@ -140,6 +135,7 @@ fn validate_parameters(parameters: &Map<String, Value>) -> EmbeddingResult<()> {
     }
     Ok(())
 }
+
 fn read_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<NonZeroUsize>> {
     parameters
         .get("dimensions")
@@ -153,6 +149,7 @@ fn read_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<No
         })
         .transpose()
 }
+
 fn verify_execution_identity(original: &Value, bytes: &[u8]) -> EmbeddingResult<()> {
     let JsonValue(canonical) =
         serde_json::from_slice::<JsonValue<false>>(bytes).map_err(map_config_error)?;
@@ -161,6 +158,11 @@ fn verify_execution_identity(original: &Value, bytes: &[u8]) -> EmbeddingResult<
     }
     Ok(())
 }
+
+fn map_config_error(cause: impl std::error::Error + Send + Sync + 'static) -> EmbeddingError {
+    EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
+}
+
 fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
     match original {
         Value::Number(number) if number.is_u64() => number.as_u64() == canonical.as_u64(),
@@ -181,6 +183,10 @@ fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
         }),
         _ => true,
     }
+}
+
+fn reject_config() -> EmbeddingError {
+    EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)
 }
 
 #[cfg(test)]

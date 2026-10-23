@@ -19,50 +19,12 @@ const NATIVE_DIMENSION_FIELD: i64 = 2;
 const NATIVE_DIMENSION_MIN: usize = 2;
 const NATIVE_DIMENSION_MAX: usize = 4096;
 
-pub(super) fn read_vector_dimensions(
-    connection: &Connection,
-    attached: bool,
-) -> StorageResult<Option<NonZeroUsize>> {
-    // Native shadow introspection is read-only, with private fixed schema names.
-    let sql = if attached {
-        "SELECT val FROM vec.vector_index_config WHERE id = ?1"
-    } else {
-        "SELECT val FROM main.vector_index_config WHERE id = ?1"
-    };
-    let value: Option<i64> = connection
-        .query_row(sql, [NATIVE_DIMENSION_FIELD], |row| row.get(0))
-        .optional()
-        .map_err(map_sqlite)?;
-    value
-        .map(|value| {
-            let size = usize::try_from(value).map_err(|_| fail_invalid_stored_vector())?;
-            if !(NATIVE_DIMENSION_MIN..=NATIVE_DIMENSION_MAX).contains(&size) {
-                return Err(fail_invalid_stored_vector());
-            }
-            NonZeroUsize::new(size).ok_or_else(fail_invalid_stored_vector)
-        })
-        .transpose()
-}
-
 const RESET_INDEX: &str = r#"
     DROP TABLE vector_index;
     CREATE VIRTUAL TABLE vector_index USING vec1(vector);
     INSERT INTO vector_index(cmd,arg) VALUES('rebuild','{index:"none",distance:"cos"}');
 "#;
 
-pub(super) fn matches_identity(connection: &Connection, expected: &Sha256) -> StorageResult<bool> {
-    let (sql, values) = build_query(
-        Query::select()
-            .column(Meta::ConfigIdentity)
-            .from(Meta::Table)
-            .and_where(Expr::col(Meta::Id).eq(1)),
-    )?;
-    let identity: Option<String> = connection
-        .query_row(&sql, params_from_iter(values), |r| r.get(0))
-        .optional()
-        .map_err(map_sqlite)?;
-    Ok(identity.as_deref() == Some(expected.to_hex().as_str()))
-}
 pub(super) fn reset_vectors(connection: &mut Connection, identity: &Sha256) -> StorageResult<bool> {
     let tx = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -94,15 +56,21 @@ pub(super) fn reset_vectors(connection: &mut Connection, identity: &Sha256) -> S
     tx.commit().map_err(map_sqlite)?;
     Ok(true)
 }
-pub(super) fn encode_vector(vector: &[f32], dimensions: usize) -> StorageResult<Vec<u8>> {
-    if vector.is_empty() || vector.len() != dimensions || vector.iter().any(|v| !v.is_finite()) {
-        return Err(StorageError::new(
-            StorageErrorKind::InvalidRequest,
-            "invalid vector values or dimensions",
-        ));
-    }
-    Ok(vector.iter().flat_map(|v| v.to_ne_bytes()).collect())
+
+pub(super) fn matches_identity(connection: &Connection, expected: &Sha256) -> StorageResult<bool> {
+    let (sql, values) = build_query(
+        Query::select()
+            .column(Meta::ConfigIdentity)
+            .from(Meta::Table)
+            .and_where(Expr::col(Meta::Id).eq(1)),
+    )?;
+    let identity: Option<String> = connection
+        .query_row(&sql, params_from_iter(values), |r| r.get(0))
+        .optional()
+        .map_err(map_sqlite)?;
+    Ok(identity.as_deref() == Some(expected.to_hex().as_str()))
 }
+
 pub(super) fn store_vector(
     connection: &Connection,
     hash: &Sha256,
@@ -160,6 +128,31 @@ fn validate_dimensions(connection: &Connection, dimensions: usize) -> StorageRes
         ));
     }
     Ok(())
+}
+
+pub(super) fn read_vector_dimensions(
+    connection: &Connection,
+    attached: bool,
+) -> StorageResult<Option<NonZeroUsize>> {
+    // Native shadow introspection is read-only, with private fixed schema names.
+    let sql = if attached {
+        "SELECT val FROM vec.vector_index_config WHERE id = ?1"
+    } else {
+        "SELECT val FROM main.vector_index_config WHERE id = ?1"
+    };
+    let value: Option<i64> = connection
+        .query_row(sql, [NATIVE_DIMENSION_FIELD], |row| row.get(0))
+        .optional()
+        .map_err(map_sqlite)?;
+    value
+        .map(|value| {
+            let size = usize::try_from(value).map_err(|_| fail_invalid_stored_vector())?;
+            if !(NATIVE_DIMENSION_MIN..=NATIVE_DIMENSION_MAX).contains(&size) {
+                return Err(fail_invalid_stored_vector());
+            }
+            NonZeroUsize::new(size).ok_or_else(fail_invalid_stored_vector)
+        })
+        .transpose()
 }
 
 fn get_or_insert_vector_key(
@@ -220,6 +213,7 @@ pub(super) fn read_vector(
         .map(|bytes| decode_vector(&bytes.ok_or_else(fail_invalid_stored_vector)?))
         .transpose()
 }
+
 fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
     if bytes.is_empty() || !bytes.len().is_multiple_of(4) {
         return Err(fail_invalid_stored_vector());
@@ -233,12 +227,7 @@ fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
     }
     Ok(values)
 }
-fn fail_invalid_stored_vector() -> StorageError {
-    StorageError::new(
-        StorageErrorKind::InternalError,
-        "invalid stored vector data",
-    )
-}
+
 pub(super) fn find_nearest_vectors(
     connection: &Connection,
     query: &[f32],
@@ -286,6 +275,23 @@ pub(super) fn find_nearest_vectors(
     .collect()
 }
 
+pub(super) fn encode_vector(vector: &[f32], dimensions: usize) -> StorageResult<Vec<u8>> {
+    if vector.is_empty() || vector.len() != dimensions || vector.iter().any(|v| !v.is_finite()) {
+        return Err(StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "invalid vector values or dimensions",
+        ));
+    }
+    Ok(vector.iter().flat_map(|v| v.to_ne_bytes()).collect())
+}
+
+fn fail_invalid_stored_vector() -> StorageError {
+    StorageError::new(
+        StorageErrorKind::InternalError,
+        "invalid stored vector data",
+    )
+}
+
 pub(super) fn reserve_attempt(
     connection: &Connection,
     hash: &Sha256,
@@ -319,6 +325,7 @@ pub(super) fn reserve_attempt(
         .map(|changed| changed == 1)
         .map_err(map_sqlite)
 }
+
 pub(super) fn record_failure(
     connection: &Connection,
     hash: &Sha256,
@@ -335,6 +342,7 @@ pub(super) fn record_failure(
         .map(|changed| changed == 1)
         .map_err(map_sqlite)
 }
+
 pub(super) fn set_query_error(
     connection: &Connection,
     at: u64,
@@ -358,6 +366,17 @@ pub(super) fn set_query_error(
         .map_err(map_sqlite)?;
     Ok(())
 }
+
+fn encode_unsigned(value: u64) -> StorageResult<i64> {
+    i64::try_from(value).map_err(|cause| {
+        StorageError::new_with_cause(
+            StorageErrorKind::InvalidRequest,
+            "unsupported diagnostic number",
+            cause,
+        )
+    })
+}
+
 pub(super) fn clear_query_error(connection: &Connection) -> StorageResult<()> {
     let (sql, values) = build_query(
         Query::delete()
@@ -369,6 +388,7 @@ pub(super) fn clear_query_error(connection: &Connection) -> StorageResult<()> {
         .map_err(map_sqlite)?;
     Ok(())
 }
+
 pub(super) fn read_failure(
     connection: &Connection,
     hash: &Sha256,
@@ -399,6 +419,7 @@ pub(super) fn read_failure(
         })
         .transpose()
 }
+
 pub(super) fn read_query_error(connection: &Connection) -> StorageResult<Option<QueryError>> {
     let (sql, values) = build_query(
         Query::select()
@@ -421,18 +442,11 @@ pub(super) fn read_query_error(connection: &Connection) -> StorageResult<Option<
         })
         .transpose()
 }
-fn encode_unsigned(value: u64) -> StorageResult<i64> {
-    i64::try_from(value).map_err(|cause| {
-        StorageError::new_with_cause(
-            StorageErrorKind::InvalidRequest,
-            "unsupported diagnostic number",
-            cause,
-        )
-    })
-}
+
 fn decode_unsigned(value: i64) -> StorageResult<u64> {
     u64::try_from(value).map_err(|_| fail_invalid_diagnostic())
 }
+
 fn fail_invalid_diagnostic() -> StorageError {
     StorageError::new(StorageErrorKind::InternalError, "invalid stored diagnostic")
 }

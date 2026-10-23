@@ -30,39 +30,6 @@ const NODE_COLUMNS: [Nodes; 9] = [
 ];
 const EDGE_COLUMNS: [Edges; 3] = [Edges::SourceId, Edges::TargetId, Edges::Type];
 
-pub(super) fn map_invalid_value(
-    error: impl std::error::Error + Send + Sync + 'static,
-) -> StorageError {
-    StorageError::new_with_cause(
-        StorageErrorKind::InternalError,
-        "invalid persisted storage value",
-        error,
-    )
-}
-pub(super) fn check_unsigned(value: u64) -> StorageResult<i64> {
-    i64::try_from(value).map_err(|e| {
-        StorageError::new_with_cause(
-            StorageErrorKind::InvalidRequest,
-            "storage integer out of range",
-            e,
-        )
-    })
-}
-pub(super) fn read_unsigned(value: i64) -> StorageResult<u64> {
-    u64::try_from(value).map_err(map_invalid_value)
-}
-pub(super) fn map_mutation(error: rusqlite::Error) -> StorageError {
-    if matches!(&error, rusqlite::Error::SqliteFailure(e, _) if e.code == rusqlite::ErrorCode::ConstraintViolation)
-    {
-        StorageError::new_with_cause(
-            StorageErrorKind::InvalidRequest,
-            "invalid storage mutation",
-            error,
-        )
-    } else {
-        map_sqlite(error)
-    }
-}
 pub(super) fn upsert_node(db: &Connection, node: &NodeMetadata) -> StorageResult<i64> {
     let query = Query::insert()
         .into_table(Nodes::Table)
@@ -121,6 +88,17 @@ fn build_node_values(node: &NodeMetadata) -> StorageResult<[Value; 9]> {
         search.into(),
     ])
 }
+
+pub(super) fn check_unsigned(value: u64) -> StorageResult<i64> {
+    i64::try_from(value).map_err(|e| {
+        StorageError::new_with_cause(
+            StorageErrorKind::InvalidRequest,
+            "storage integer out of range",
+            e,
+        )
+    })
+}
+
 pub(super) fn read_node(db: &Connection, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
     let (sql, values) = build_query(
         Query::select()
@@ -134,6 +112,7 @@ pub(super) fn read_node(db: &Connection, id: &EdgeTarget) -> StorageResult<Optio
         .map_err(map_sqlite)?
         .transpose()
 }
+
 pub(super) fn list_nodes(db: &Connection) -> StorageResult<Vec<StoredNode>> {
     let (sql, values) = build_query(
         Query::select()
@@ -152,6 +131,7 @@ pub(super) fn list_nodes(db: &Connection) -> StorageResult<Vec<StoredNode>> {
     }
     Ok(nodes)
 }
+
 fn decode_node(row: &Row<'_>) -> StorageResult<StoredNode> {
     let id: String = row.get(1).map_err(map_sqlite)?;
     let kind: String = row.get(2).map_err(map_sqlite)?;
@@ -206,12 +186,7 @@ fn decode_node(row: &Row<'_>) -> StorageResult<StoredNode> {
         metadata,
     })
 }
-fn build_invalid_metadata_error() -> StorageError {
-    StorageError::new(
-        StorageErrorKind::InternalError,
-        "invalid persisted metadata",
-    )
-}
+
 fn decode_lines(start: Option<i64>, end: Option<i64>) -> StorageResult<Option<LineRange>> {
     match (start, end) {
         (None, None) => Ok(None),
@@ -221,6 +196,18 @@ fn decode_lines(start: Option<i64>, end: Option<i64>) -> StorageResult<Option<Li
         _ => Err(build_invalid_metadata_error()),
     }
 }
+
+pub(super) fn read_unsigned(value: i64) -> StorageResult<u64> {
+    u64::try_from(value).map_err(map_invalid_value)
+}
+
+fn build_invalid_metadata_error() -> StorageError {
+    StorageError::new(
+        StorageErrorKind::InternalError,
+        "invalid persisted metadata",
+    )
+}
+
 pub(super) fn insert_edge(db: &Connection, edge: &Edge) -> StorageResult<()> {
     let (sql, values) = build_query(
         Query::insert()
@@ -240,6 +227,7 @@ pub(super) fn insert_edge(db: &Connection, edge: &Edge) -> StorageResult<()> {
         .map_err(map_mutation)?;
     Ok(())
 }
+
 pub(super) fn list_edges(
     db: &Connection,
     source: Option<&KnowledgeId>,
@@ -276,6 +264,17 @@ pub(super) fn list_edges(
     }
     Ok(edges)
 }
+
+pub(super) fn map_invalid_value(
+    error: impl std::error::Error + Send + Sync + 'static,
+) -> StorageError {
+    StorageError::new_with_cause(
+        StorageErrorKind::InternalError,
+        "invalid persisted storage value",
+        error,
+    )
+}
+
 pub(super) fn delete_outgoing(db: &Connection, source: &KnowledgeId) -> StorageResult<()> {
     let (sql, values) = build_query(
         Query::delete()
@@ -286,6 +285,7 @@ pub(super) fn delete_outgoing(db: &Connection, source: &KnowledgeId) -> StorageR
         .map_err(map_mutation)?;
     Ok(())
 }
+
 pub(super) fn delete_node(db: &Connection, id: &EdgeTarget) -> StorageResult<()> {
     let node = Query::select()
         .column(Nodes::RowId)
@@ -307,6 +307,19 @@ pub(super) fn delete_node(db: &Connection, id: &EdgeTarget) -> StorageResult<()>
     db.execute(&sql, params_from_iter(values))
         .map_err(map_mutation)?;
     Ok(())
+}
+
+pub(super) fn map_mutation(error: rusqlite::Error) -> StorageError {
+    if matches!(&error, rusqlite::Error::SqliteFailure(e, _) if e.code == rusqlite::ErrorCode::ConstraintViolation)
+    {
+        StorageError::new_with_cause(
+            StorageErrorKind::InvalidRequest,
+            "invalid storage mutation",
+            error,
+        )
+    } else {
+        map_sqlite(error)
+    }
 }
 
 #[cfg(test)]

@@ -9,6 +9,7 @@ use crate::{
 };
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use sea_query::{Expr, ExprTrait, Query};
+
 pub(super) fn replace_text(db: &Connection, id: &KnowledgeId, text: &str) -> StorageResult<()> {
     let (sql, values) = build_query(
         Query::select()
@@ -42,18 +43,7 @@ pub(super) fn replace_text(db: &Connection, id: &KnowledgeId, text: &str) -> Sto
         .map_err(map_mutation)?;
     Ok(())
 }
-fn map_match(error: rusqlite::Error) -> StorageError {
-    if matches!(&error,rusqlite::Error::SqliteFailure(e,_) if e.code==rusqlite::ErrorCode::Unknown)
-    {
-        StorageError::new_with_cause(
-            StorageErrorKind::InvalidRequest,
-            "invalid full-text expression",
-            error,
-        )
-    } else {
-        map_sqlite(error)
-    }
-}
+
 pub(super) fn match_text(db: &Connection, expression: &str) -> StorageResult<Vec<TextMatch>> {
     let mut stmt = db
         .prepare(
@@ -77,4 +67,17 @@ pub(super) fn match_text(db: &Connection, expression: &str) -> StorageResult<Vec
         });
     }
     Ok(found)
+}
+
+fn map_match(error: rusqlite::Error) -> StorageError {
+    if matches!(&error,rusqlite::Error::SqliteFailure(e,_) if e.code==rusqlite::ErrorCode::Unknown)
+    {
+        StorageError::new_with_cause(
+            StorageErrorKind::InvalidRequest,
+            "invalid full-text expression",
+            error,
+        )
+    } else {
+        map_sqlite(error)
+    }
 }
