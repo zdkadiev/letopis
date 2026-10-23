@@ -199,6 +199,58 @@ class RunnerTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 run.capture_transport(root, evidence, execute, Path('/product'), catalogue)
 
+    def test_thin_slice_requires_all_actual_cases(self):
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        records = self.make_thin_slice_records()
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            self.capture_thin_slice(evidence, catalogue, records)
+            observed = json.loads((evidence / 'thin-slice-responses.json').read_text())
+            self.assertEqual(len(observed), 7)
+            self.assertTrue(all(r['source'] == 'actual product executable' for r in observed))
+            for index in range(len(records)):
+                with self.subTest(missing=records[index]['case']):
+                    with self.assertRaises(AssertionError):
+                        self.capture_thin_slice(evidence, catalogue, records[:index] + records[index+1:])
+
+    def test_thin_slice_rejects_invalid_envelope_or_exit(self):
+        from jsonschema import ValidationError
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        records = self.make_thin_slice_records()
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            for change, error in [({'exit': 1}, AssertionError),
+                                  ({'response': {'ok': True, 'result': {'errors': []}}}, ValidationError),
+                                  ({'case': 'invented'}, AssertionError)]:
+                with self.subTest(change=change):
+                    with self.assertRaises(error):
+                        self.capture_thin_slice(evidence, catalogue, [{**records[0], **change}, *records[1:]])
+            bad = {**records[-1], 'response': {'ok': False, 'error':
+                {'code': 'internal_error', 'message': 'wrong classification', 'details': {}}}}
+            with self.assertRaises(AssertionError):
+                self.capture_thin_slice(evidence, catalogue, [*records[:-1], bad])
+
+    def make_thin_slice_records(self):
+        search = {'ok': True, 'result': [{'element_id': 'knowledge/cache.md',
+            'path': 'knowledge/cache.md', 'lines': [1, 3], 'revision': 1, 'flags': []}]}
+        records = [{'case': case, 'command': 'search', 'exit': 0, 'response': search}
+                   for case in ['load', 'background', 'provider_failure', 'invalid_neighbor', 'text_race']]
+        records.append({'case': 'inspect', 'command': 'inspect', 'exit': 0,
+                        'response': {'ok': True, 'result': {'snapshot': 'a' * 40,
+                            'elements': {'knowledge/cache.md': {'path': 'knowledge/cache.md',
+                                'lines': [1, 3], 'hash': 'b' * 64}}}}})
+        records.append({'case': 'invalid_inspect', 'command': 'inspect', 'exit': 1,
+                        'response': {'ok': False, 'error': {'code': 'validation_failed',
+                            'message': 'invalid current file', 'details': {}}}})
+        return records
+
+    def capture_thin_slice(self, evidence, catalogue, records):
+        (evidence / 'thin-slice.log').write_text(''.join(
+            'THIN_SLICE_RESPONSE ' + json.dumps(record) + '\n' for record in records))
+        run.capture_thin_slice_responses(evidence, catalogue)
+
     def test_inventory_covers_support_schema_and_ignores_bytecode(self):
         root = Path(__file__).resolve().parents[2]
         inputs = run.hash_inputs(root)

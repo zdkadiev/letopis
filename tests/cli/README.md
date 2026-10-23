@@ -129,3 +129,12 @@ TK-14 automatic tests use a controlled loopback Ollama HTTP fixture.
 TK-15 should replace the fixed input set with its seeded target-scale corpus and
 use this same foreground CLI loading route. This example does not establish
 100k-item loading speed, RAM use or a real model's quality.
+
+The runner records `thin-slice.log` and `thin-slice-responses.json`: seven required
+actual-product cases cover loading, inspection, detached completion, provider
+failure, invalid-file isolation/current rejection, and a text edit during HTTP.
+The collector rejects missing cases, invalid command schemas, wrong exits and
+wrong error classifications. The tests additionally observe source metadata and
+persisted vectors through read-only APIs, never by seeding the projection.
+Crash/rollback coverage comes separately from the current private document-service
+process driver; this is not an actual-CLI crash checkpoint or a power-loss test.

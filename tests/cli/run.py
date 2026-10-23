@@ -191,6 +191,9 @@ def run_host(root, evidence, execute, manifest):
              '--test', 'cli_runtime', '--test', 'cli_reading', '--', '--nocapture', '--test-threads=1'],
             'runtime.log', extra={'LETOPIS_CLI_FIXTURE': str(artifacts['cli_runtime_fixture'])})
     capture_reading_responses(evidence, catalogue)
+    execute(['cargo', 'test', '--locked', '--offline', '--test', 'thin_slice',
+             '--', '--nocapture', '--test-threads=1'], 'thin-slice.log')
+    capture_thin_slice_responses(evidence, catalogue)
     observations = [json.loads(line.split('CLI_OBSERVER ', 1)[1])
                     for line in (evidence / 'runtime.log').read_text().splitlines()
                     if 'CLI_OBSERVER ' in line]
@@ -212,6 +215,27 @@ def run_host(root, evidence, execute, manifest):
     assert any(item['kind'] == 'PRODUCT_DRAIN' for item in captures)
     (evidence / 'product-observations.json').write_text(json.dumps(captures, indent=2) + '\n')
     capture_transport(root, evidence, execute, evidence / 'letopis', catalogue)
+
+
+def capture_thin_slice_responses(evidence, catalogue):
+    expected = {case: ('search', 0, None) for case in
+                ('load', 'background', 'provider_failure', 'invalid_neighbor', 'text_race')}
+    expected.update(inspect=('inspect', 0, None),
+                    invalid_inspect=('inspect', 1, 'validation_failed'))
+    responses = []
+    for line in (evidence / 'thin-slice.log').read_text().splitlines():
+        if 'THIN_SLICE_RESPONSE ' not in line:
+            continue
+        record = json.loads(line.split('THIN_SLICE_RESPONSE ', 1)[1])
+        assert record['case'] in expected, 'unknown thin-slice scenario'
+        command, code, error = expected[record['case']]
+        assert (record['command'], record['exit']) == (command, code)
+        validate_response(catalogue, command, record['response'], code)
+        if error:
+            assert record['response']['error']['code'] == error
+        responses.append({**record, 'source': 'actual product executable'})
+    assert {record['case'] for record in responses} == set(expected)
+    (evidence / 'thin-slice-responses.json').write_text(json.dumps(responses, indent=2) + '\n')
 
 
 def read_artifacts(log):
