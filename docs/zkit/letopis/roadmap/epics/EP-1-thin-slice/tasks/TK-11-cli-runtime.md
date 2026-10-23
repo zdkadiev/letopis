@@ -1,6 +1,6 @@
 # TK-11 — Реализовать CLI-процесс, блокировки и JSON
 
-> **Статус:** in_progress
+> **Статус:** done
 > **Эпик:** [EP-1](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 4 / 6 / 10 (best / expected / worst)
@@ -40,9 +40,9 @@
 
 - [x] Граница check/inspect отклоняет невалидные запросы, вызывает интерфейс сервиса и передаёт результат/ошибку в X-1 без прямого вызова адаптеров; evidence с test doubles обозначено как контрактная проверка, а не реальный inspect/check.
 - [x] Отсоединённый процесс проходит реальные проверки setsid, fd 0/1/2 → /dev/null, освобождённой probe-блокировки, конкурентного запуска и завершения foreground без ожидания drain.
-- [ ] После подключения готового [TK-13](TK-13-embeddings.md) настоящий drain запускается, когда есть подходящие тексты без вектора, и завершается, когда работы не осталось; competing drain завершается без второго владельца (D-95). Fixture-процесс не заменяет этот критерий.
+- [x] После подключения готового [TK-13](TK-13-embeddings.md) настоящий drain запускается, когда есть подходящие тексты без вектора, и завершается, когда работы не осталось; competing drain завершается без второго владельца (D-95). Fixture-процесс не заменяет этот критерий.
 - [x] Один JSON stdout, exit 0/1, unknown fields reject.
-- [ ] Повтор вызова после потери ответа идемпотентен; letopis не меняет корпус.
+- [x] Повтор вызова после потери ответа идемпотентен; letopis не меняет корпус.
 
 - [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
@@ -168,3 +168,54 @@ Rust/build/native/schema inputs, совпадают побайтно. Стары
 390-test/native/deadline/mutation suites повторно не запускались. Все11решений и
 23equivalents сохранены. Итоговая приёмка и ledger/Engram остаются root-owned;
 main merge/push/GitHub и изменения других worktrees не выполнялись.
+
+## Final acceptance — 2026-10-23
+
+TK-11 is complete and accepted on branch `TK-11` at reviewed implementation
+`62f2356143a485852ecb392f35d51c901e7f7536`; runtime Rust/build source is
+`c81f5285344fe67b31eb2f17c932fc4f69974a91`. Completed TK-13 was integrated by
+authorized merge `f5611e253baa6a506b41f059f66dfcd6e597354d`; no TK-11 merge into
+main, push, or GitHub issue update is claimed.
+
+All five plan tasks passed their task reviews. The full branch review
+`12c5ad0..32c9914` found no Critical/Important issue and one Minor stale control
+anchor. Its single fix wave `32c9914..62f2356` passed the independent scoped
+re-review: M1 addressed, no new breakage or out-of-scope observations. All eleven
+recorded rulings and their costs remain accepted; no new waiver was introduced.
+The twelve explicitly declined broad-review subjects retain their previously
+approved roadmap/contract boundaries, including actual check/inspect semantics
+in TK-12/TK-19 and handled cancellation in TK-29.
+
+Accepted verification combines the unchanged runtime inputs with the focused
+Python correction; it does not relabel historical raw manifests as fresh runs:
+
+- Host and Linux ARM64 storage/native and CLI drivers ran `make verify V=1`: each
+  debug and release profile reports 390 passed, zero failed, four ignored entries.
+  Eight emitted nested results per profile and two captured supervisor children
+  remain separate. Dedicated real-product drain coverage passes 12 cases per platform.
+- Native SQLite/vec1, standalone linkage and actual provider-deadline cases passed
+  in their retained platform receipts. Evidence covers macOS/Linux glibc ARM64,
+  controlled providers and process death; other platforms, live-model quality and
+  physical power loss are not claimed.
+- The original complete 2061-candidate mutation union remains
+  **550 caught / 81 missed / 6 timeout / 1424 unviable**. Final affected 259-candidate
+  execution remains **102 / 6 / 0 / 151**, followed by exact two-target replay
+  **2 / 0 / 0 / 0**. Distinct affected resolution is 104 caught, four equivalent,
+  151 unviable; all original gaps resolve through catches or the 23 individually
+  justified narrow equivalents. This is composite evidence, not one final 2063 run.
+- Only two Python tooling files changed after the full runtime receipts; all other
+  241 of the prior 243 inputs are identical, including every Rust/build/native/schema
+  input. New focused evidence has 12/12 Python passes and both actual compiling
+  controls: intended RED 101, exact restoration, same-case GREEN 0. This focused
+  execution is macOS ARM64 only. Old input maps and source captures remain intact.
+
+The final-fix correspondence remains at
+`.artifacts/tk11/final-fix/focused-validation-and-correspondence.json`
+(SHA-256 `7e30f54c8d29a13739488d0172ad39648927b74fab05cb10ef69215a3d54585a`).
+Final review/ledger/package records are retained in the verified plan-only archive
+`.artifacts/tk11/sdd-final-2026-10-23/`; persistent task documents preserve decisions,
+verification, equivalences and limits. Review report SHA-256 values:
+
+- `task-5-rereview-1.md`: `0f269739a5d0e3a906c2d7f4f124efcae1420cb85f837be15552c092f91e6435`.
+- `final-review.md`: `93d762d85808681fc267a4774f23a4470d0c264359ebef3a660f7abbcb166624`.
+- `final-rereview.md`: `542a06aff71df52fbf098c104629b9dd4ab3ee74320ba7e99fa71f816f7e0547`.

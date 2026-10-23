@@ -152,7 +152,7 @@ Composition in `lib.rs`: public `open_background<'a>(root: &Path, executable: &P
 - [x] **Step 2: Implement EmbeddingTasks on the existing service.** `has_work` synchronizes readiness through its existing read_configuration; Missing/Invalid yields false, Ready reads one eligible work row for its identity and checked attempt budget, releases the view and returns presence. Identity change returns false; genuine storage/I/O errors remain typed failures. `drain` calls the existing trait method explicitly as `Embeddings::drain(self)` (not a recursive `self.drain()`), mapping Complete/AlreadyRunning/Unavailable/ConfigChanged to clean no-work termination and unexpected failures safely. Do not acquire embed.lock in this wrapper. In EmbeddingFiles::try_lock_embed, delegate to the shared EmbedLocks capability and translate the error, preserving one concrete guard/PID implementation.
 - [x] **Step 3: Wire real confined dependencies in lib.rs.** Reuse Git root discovery and TK-10 open_service_directory/open_confined path validation; construct real SQLite storage, existing provider/parser/filesystem and EmbeddingService. Prepare refreshed graph/FTS before ready work checks using Documents::refresh where the triggering service requires it. Connect real task capability into BackgroundService, keep real check/inspect services absent until their own tasks. Product `embed --drain` now uses that same configured service. Avoid implicit unsafe explicit-path openers that bypass confined automatic storage. No SQLite transaction/connection is inherited across exec or held over HTTP by the foreground. Do not use unavailable read commands as secretly successful embedding triggers; direct drain and a test-only foreground consumer can prove the launch/real executor path, with actual public read-command trigger acceptance added by their owners.
 - [x] **Step 4: Run real-drain GREEN and race/error cases.** Build/publish a fixture through the real Documents service in test preparation, invoke the actual product drain with empty stdin, and separately trigger it via production BackgroundService/open_background with the resolved product executable path, not the fixture executable path. Controlled provider barriers prove one active embed owner, no request without config or eligible work, exhaustion not respawned, foreground response/EOF independent of HTTP, final eligible backlog empty, parent loss/death lock release, preserved corpus/cache revision and correctly hash-addressed vectors. Check identity change/late result using TK-13's actual publication guard, invalid config and provider errors without secret leakage; configuration formatting reuses existing JCS. Use a fixture foreground consumer only to trigger the production launcher, never as the embedding executor. Rerun the changed combined root gate and dedicated host/Linux runner at new evidence paths; keep Task 4 receipts historical.
-- [ ] **Step 5: Complete acceptance and commit.** Map each corrected TK-11 checkbox to an actual command/receipt and the reviewed combined revision. Do not mark real inspect/check complete here; name the owning tasks. Run final architecture/API/privacy review of changed files and the selected execution workflow's whole-branch review. `git commit -m "feat(cli): connect production embedding drain"` for intended paths. Update Engram with decisions/limits/current artifacts; merge/push/issue closure only on user authorization.
+- [x] **Step 5: Complete acceptance and commit.** Map each corrected TK-11 checkbox to an actual command/receipt and the reviewed combined revision. Do not mark real inspect/check complete here; name the owning tasks. Run final architecture/API/privacy review of changed files and the selected execution workflow's whole-branch review. `git commit -m "feat(cli): connect production embedding drain"` for intended paths. Update Engram with decisions/limits/current artifacts; merge/push/issue closure only on user authorization.
 
 ## Coverage and completion ledger
 
@@ -556,3 +556,54 @@ All eleven accepted rulings/costs and23 exact equivalent decisions above remain
 unchanged. The final-fix report records the subsequent commit/content mapping.
 One scoped final re-review and controller-owned task acceptance remain pending;
 no main merge, push, GitHub, Engram or other-worktree action is performed here.
+
+## Final acceptance — 2026-10-23
+
+TK-11 is complete and accepted on branch `TK-11` at reviewed implementation
+`62f2356143a485852ecb392f35d51c901e7f7536`; runtime Rust/build source is
+`c81f5285344fe67b31eb2f17c932fc4f69974a91`. Completed TK-13 was integrated by
+authorized merge `f5611e253baa6a506b41f059f66dfcd6e597354d`; no TK-11 merge into
+main, push, or GitHub issue update is claimed.
+
+All five plan tasks passed their task reviews. The full branch review
+`12c5ad0..32c9914` found no Critical/Important issue and one Minor stale control
+anchor. Its single fix wave `32c9914..62f2356` passed the independent scoped
+re-review: M1 addressed, no new breakage or out-of-scope observations. All eleven
+recorded rulings and their costs remain accepted; no new waiver was introduced.
+The twelve explicitly declined broad-review subjects retain their previously
+approved roadmap/contract boundaries, including actual check/inspect semantics
+in TK-12/TK-19 and handled cancellation in TK-29.
+
+Accepted verification combines the unchanged runtime inputs with the focused
+Python correction; it does not relabel historical raw manifests as fresh runs:
+
+- Host and Linux ARM64 storage/native and CLI drivers ran `make verify V=1`: each
+  debug and release profile reports 390 passed, zero failed, four ignored entries.
+  Eight emitted nested results per profile and two captured supervisor children
+  remain separate. Dedicated real-product drain coverage passes 12 cases per platform.
+- Native SQLite/vec1, standalone linkage and actual provider-deadline cases passed
+  in their retained platform receipts. Evidence covers macOS/Linux glibc ARM64,
+  controlled providers and process death; other platforms, live-model quality and
+  physical power loss are not claimed.
+- The original complete 2061-candidate mutation union remains
+  **550 caught / 81 missed / 6 timeout / 1424 unviable**. Final affected 259-candidate
+  execution remains **102 / 6 / 0 / 151**, followed by exact two-target replay
+  **2 / 0 / 0 / 0**. Distinct affected resolution is 104 caught, four equivalent,
+  151 unviable; all original gaps resolve through catches or the 23 individually
+  justified narrow equivalents. This is composite evidence, not one final 2063 run.
+- Only two Python tooling files changed after the full runtime receipts; all other
+  241 of the prior 243 inputs are identical, including every Rust/build/native/schema
+  input. New focused evidence has 12/12 Python passes and both actual compiling
+  controls: intended RED 101, exact restoration, same-case GREEN 0. This focused
+  execution is macOS ARM64 only. Old input maps and source captures remain intact.
+
+The final-fix correspondence remains at
+`.artifacts/tk11/final-fix/focused-validation-and-correspondence.json`
+(SHA-256 `7e30f54c8d29a13739488d0172ad39648927b74fab05cb10ef69215a3d54585a`).
+Final review/ledger/package records are retained in the verified plan-only archive
+`.artifacts/tk11/sdd-final-2026-10-23/`; persistent task documents preserve decisions,
+verification, equivalences and limits. Review report SHA-256 values:
+
+- `task-5-rereview-1.md`: `0f269739a5d0e3a906c2d7f4f124efcae1420cb85f837be15552c092f91e6435`.
+- `final-review.md`: `93d762d85808681fc267a4774f23a4470d0c264359ebef3a660f7abbcb166624`.
+- `final-rereview.md`: `542a06aff71df52fbf098c104629b9dd4ab3ee74320ba7e99fa71f816f7e0547`.
