@@ -111,6 +111,39 @@ fn inspect_distinguishes_referenced_sources_from_unknown_ids() {
     );
 }
 
+#[test]
+fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
+    // Arrange: refresh an indexed file which subsequently disappears.
+    let repo = ReadingRepo::new();
+    repo.write("gone.md", b"<!-- letopis: {\"created_at\":1} -->\ngone");
+    repo.write("kept.md", b"<!-- letopis: {\"created_at\":1} -->\nkept");
+    let status = std::process::Command::new("git")
+        .current_dir(repo.get_root())
+        .args(["add", "gone.md"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    open_documents(repo.get_root()).unwrap().refresh().unwrap();
+    std::fs::remove_file(repo.get_root().join("gone.md")).unwrap();
+    let mut service = open_inspections(repo.get_root()).unwrap();
+    // Act
+    let current = service
+        .inspect(&[ElementAddress::parse("kept.md").unwrap()])
+        .unwrap();
+    let removed = service
+        .inspect(&[ElementAddress::parse("gone.md").unwrap()])
+        .unwrap_err();
+    // Assert
+    assert_eq!(current.elements.len(), 1);
+    assert_eq!(removed.get_kind(), CommandErrorKind::NotFound);
+    assert!(
+        open_git_snapshots(repo.get_root())
+            .unwrap()
+            .read_blob(&current.snapshot, &RepoPath::parse("gone.md").unwrap())
+            .is_err()
+    );
+}
+
 type InspectionFixture = (
     &'static str,
     &'static [u8],
@@ -154,37 +187,4 @@ fn build_fixtures() -> [InspectionFixture; 4] {
             "8ae8dc48443c3b9132365da3e83a1862fe8c1be55da7ee6a9bbf478703fe58d2",
         ),
     ]
-}
-
-#[test]
-fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
-    // Arrange: refresh an indexed file which subsequently disappears.
-    let repo = ReadingRepo::new();
-    repo.write("gone.md", b"<!-- letopis: {\"created_at\":1} -->\ngone");
-    repo.write("kept.md", b"<!-- letopis: {\"created_at\":1} -->\nkept");
-    let status = std::process::Command::new("git")
-        .current_dir(repo.get_root())
-        .args(["add", "gone.md"])
-        .status()
-        .unwrap();
-    assert!(status.success());
-    open_documents(repo.get_root()).unwrap().refresh().unwrap();
-    std::fs::remove_file(repo.get_root().join("gone.md")).unwrap();
-    let mut service = open_inspections(repo.get_root()).unwrap();
-    // Act
-    let current = service
-        .inspect(&[ElementAddress::parse("kept.md").unwrap()])
-        .unwrap();
-    let removed = service
-        .inspect(&[ElementAddress::parse("gone.md").unwrap()])
-        .unwrap_err();
-    // Assert
-    assert_eq!(current.elements.len(), 1);
-    assert_eq!(removed.get_kind(), CommandErrorKind::NotFound);
-    assert!(
-        open_git_snapshots(repo.get_root())
-            .unwrap()
-            .read_blob(&current.snapshot, &RepoPath::parse("gone.md").unwrap())
-            .is_err()
-    );
 }
