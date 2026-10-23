@@ -193,6 +193,8 @@ mod tests {
                 .contains("SECRET_SENTINEL")
         );
         assert_eq!(error.to_string(), "safe failure");
-        assert!(!format!("{error:?}").contains("SECRET_SENTINEL"));
+        let debug = format!("{error:?}");
+        assert!(debug.contains(error.get_message()));
+        assert!(!debug.contains("SECRET_SENTINEL"));
     }
 }

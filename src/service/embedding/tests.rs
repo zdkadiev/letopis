@@ -349,3 +349,32 @@ mod process;
 pub(super) fn checkpoint(stage: &str) {
     process::checkpoint(stage);
 }
+
+#[test]
+fn rejects_a_provider_vector_that_violates_the_first_requested_dimension() {
+    // Arrange: no stored dimension can mask the configuration's requested size.
+    let root = TempDir::new().unwrap();
+    let files = Files::new(0);
+    let config = serde_json::json!({
+        "provider":"ollama", "model":"m", "max_retries":0,
+        "parameters":{"base_url":"http://localhost/api", "dimensions":2},
+    });
+    files
+        .config
+        .replace(Some(serde_json::to_vec(&config).unwrap()));
+    let mut service =
+        EmbeddingService::new(open_storage(&root), files, MarkdownParser, Provider::new());
+    // Act: this provider double returns three components despite the request.
+    let result = service.embed_query("query").unwrap();
+    // Assert: a malformed result cannot become an available query vector.
+    assert_eq!(result, QueryEmbedding::Unavailable);
+    let error = service
+        .storage
+        .begin_read()
+        .unwrap()
+        .read_query_error()
+        .unwrap()
+        .unwrap();
+    assert_eq!(error.error, "invalid embedding response");
+    assert_eq!(service.provider.calls.get(), 1);
+}

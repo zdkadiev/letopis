@@ -308,3 +308,31 @@ pub(super) fn delete_node(db: &Connection, id: &EdgeTarget) -> StorageResult<()>
         .map_err(map_mutation)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::decode_node;
+    use crate::service::StorageErrorKind;
+    use rusqlite::{Connection, params};
+
+    #[test]
+    fn rejects_each_inconsistent_persisted_source_field() {
+        let connection = Connection::open_in_memory().unwrap();
+        for (id, snapshot, search) in [
+            ("different.rs", None, None),
+            ("code.rs", Some("unexpected snapshot"), None),
+            ("code.rs", None, Some("unexpected search hash")),
+        ] {
+            // Arrange: each row violates exactly one source-specific invariant.
+            let mut statement = connection
+                .prepare("SELECT 1, ?1, 'source', 'code.rs', NULL, 0, ?2, NULL, NULL, ?3")
+                .unwrap();
+            let mut rows = statement.query(params![id, snapshot, search]).unwrap();
+            let row = rows.next().unwrap().unwrap();
+            // Act
+            let error = decode_node(row).unwrap_err();
+            // Assert
+            assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
+        }
+    }
+}

@@ -96,3 +96,53 @@ class RunnerTests(unittest.TestCase):
             log.write_text(json.dumps({'reason':'compiler-artifact',
                 'target':{'name':'cli_runtime_fixture'}, 'executable':artifact}) + '\n')
             self.assertEqual(run.read_artifacts(log)['cli_runtime_fixture'], Path(artifact))
+
+
+class MakeWorkflowTests(unittest.TestCase):
+    def test_success_is_one_ok_line_for_check_and_verify(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for target in ('check', 'verify'):
+                result = self.run_make(directory, target)
+                self.assertEqual(result.returncode, 0, result.stdout)
+                self.assertEqual(result.stdout, 'ok\n')
+
+    def test_verbose_verify_retains_every_steps_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.run_make(directory, 'verify', verbose=True)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            for step in ('fmt', 'check', 'clippy', 'test', 'doc'):
+                self.assertIn('stdout ' + step + '\n', result.stdout)
+                self.assertIn('stderr ' + step + '\n', result.stdout)
+            self.assertEqual(result.stdout.count('stdout test\n'), 2)
+            self.assertTrue(result.stdout.endswith('ok\n'))
+
+    def test_failure_prints_complete_failed_step_and_stops(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for failed in ('clippy', 'doc'):
+                result = self.run_make(directory, 'verify', fail_step=failed)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stdout.startswith(
+                    f'stdout {failed}\nstderr {failed}\n'), result.stdout)
+                self.assertNotIn('stdout test\n', result.stdout)
+                self.assertNotIn('ok\n', result.stdout)
+
+    def run_make(self, directory, target, *, verbose=False, fail_step=None):
+        root = Path(__file__).resolve().parents[2]
+        fake = Path(directory) / 'cargo.py'
+        fake.write_text(
+            "import os,sys\n"
+            "step=sys.argv[1]\n"
+            "print('stdout '+step, flush=True)\n"
+            "print('stderr '+step, file=sys.stderr, flush=True)\n"
+            "raise SystemExit(23 if os.environ.get('FAIL_STEP') == step else 0)\n"
+        )
+        env = {key: value for key, value in os.environ.items()
+               if key not in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'FAIL_STEP')}
+        if fail_step:
+            env['FAIL_STEP'] = fail_step
+        return subprocess.run(
+            ['make', '-C', directory, '-f', str(root / 'Makefile'), target,
+             f'CARGO={sys.executable} {fake}', f'V={int(verbose)}'],
+            cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=10,
+        )

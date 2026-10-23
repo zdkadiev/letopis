@@ -55,3 +55,30 @@ fn require_unchanged(before: &Stat, after: &Stat) -> EmbeddingResult<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::require_unchanged;
+    use crate::service::EmbeddingErrorKind;
+    use rustix::fs::fstat;
+    use std::fs::File;
+
+    #[test]
+    fn rejects_each_independent_stat_change() {
+        // Arrange: initialize platform-specific fields through a real descriptor.
+        let file = File::open(".").unwrap();
+        let before = fstat(&file).unwrap();
+        let mut changes = [before; 5];
+        changes[0].st_size += 1;
+        changes[1].st_mtime += 1;
+        changes[2].st_mtime_nsec += 1;
+        changes[3].st_ctime += 1;
+        changes[4].st_ctime_nsec += 1;
+        // Act / Assert
+        assert!(require_unchanged(&before, &before).is_ok());
+        for after in changes {
+            let error = require_unchanged(&before, &after).unwrap_err();
+            assert_eq!(error.get_kind(), EmbeddingErrorKind::Input);
+        }
+    }
+}

@@ -135,3 +135,36 @@ impl From<StorageError> for DocumentError {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{DocumentError, DocumentErrorKind};
+    use std::{error::Error, io};
+
+    #[test]
+    fn preserves_document_context_without_exposing_its_private_cause() {
+        // Arrange: callers supply safe operation context and a separate raw cause.
+        let context = "safe document operation context";
+        let error = DocumentError::new_with_cause(
+            DocumentErrorKind::InternalError,
+            context,
+            io::Error::other("PRIVATE_DOCUMENT_CAUSE"),
+        );
+        // Act
+        let message = error.get_message();
+        let display = error.to_string();
+        let debug = format!("{error:?}");
+        // Assert: public context remains useful while the cause stays internal.
+        assert_eq!(message, context);
+        assert_eq!(display, context);
+        assert!(debug.contains(context));
+        assert!(!debug.contains("PRIVATE_DOCUMENT_CAUSE"));
+        assert!(
+            error
+                .source()
+                .unwrap()
+                .to_string()
+                .contains("PRIVATE_DOCUMENT_CAUSE")
+        );
+    }
+}

@@ -192,6 +192,14 @@ mod tests {
     }
     #[test]
     fn initialization_contention_expires_and_can_be_retried_safely() {
+        const CHILD: &str = "LETOPIS_INITIALIZATION_EXPIRATION_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            crate::process_test_support::supervise_test(
+                "storage::schema::tests::initialization_contention_expires_and_can_be_retried_safely",
+                &[(CHILD, "1")],
+            );
+            return;
+        }
         // Arrange a missing schema whose write ownership cannot be acquired yet.
         let root = TempDir::new().unwrap();
         let path = root.path().join("database");

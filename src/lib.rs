@@ -221,3 +221,7 @@ fn map_embedding_setup(error: impl std::error::Error + Send + Sync + 'static) ->
         error,
     )
 }
+
+#[cfg(test)]
+#[path = "../tests/support/git.rs"]
+mod process_test_support;

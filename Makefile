@@ -1,16 +1,31 @@
 CARGO ?= cargo
+V ?= 0
+MAKEFLAGS += --no-print-directory
 
-.PHONY: check verify mutants fmt
+.PHONY: check verify mutants fmt _check
 
-check:
-	$(CARGO) fmt --all --check
-	$(CARGO) check --locked --offline --all-targets
-	$(CARGO) clippy --locked --offline --all-targets -- -D warnings
-	$(CARGO) test --locked --offline
+# Capture one step at a time so a failure retains its complete diagnostic output.
+define run
+	@if [ "$(V)" = "1" ]; then $(1); else \
+		log=$$(mktemp) || exit $$?; \
+		if $(1) >"$$log" 2>&1; then status=0; else status=$$?; cat "$$log"; fi; \
+		rm -f "$$log"; exit $$status; \
+	fi
+endef
 
-verify: check
-	RUSTDOCFLAGS='-D warnings' $(CARGO) doc --locked --offline --no-deps
-	$(CARGO) test --locked --offline --release
+check: _check
+	@printf 'ok\n'
+
+verify: _check
+	$(call run,RUSTDOCFLAGS='-D warnings' $(CARGO) doc --locked --offline --no-deps)
+	$(call run,$(CARGO) test --locked --offline --release)
+	@printf 'ok\n'
+
+_check:
+	$(call run,$(CARGO) fmt --all --check)
+	$(call run,$(CARGO) check --locked --offline --all-targets)
+	$(call run,$(CARGO) clippy --locked --offline --all-targets -- -D warnings)
+	$(call run,$(CARGO) test --locked --offline)
 
 mutants:
 	$(CARGO) mutants --cargo-arg=--locked --cargo-arg=--offline $(ARGS)

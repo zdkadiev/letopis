@@ -1,2 +1,53 @@
-# Whole-crate mutation testing is the default. Do not add broad file/function skips.
-# Any exact equivalent mutation exclusion must have an individual evidence record.
+# Full crate is the default; only individually proved equivalents are excluded.
+# Cap lints only in disposable mutated copies; production make verify stays strict.
+cap_lints = true
+
+# Evidence and costs: TK-11 implementation plan, Fix round1 equivalence table.
+exclude_re = [
+  # E01: Required JSON visitor hook is unreachable with current serde_json-only consumers.
+  "^src/utils\\.rs:65:9:\\ replace\\ <impl\\ Visitor<'de>\\ for\\ JsonVisitor<CHECK_INTEGER_TOKENS>>::expecting\\ \\->\\ fmt::Result\\ with\\ Ok\\(Default::default\\(\\)\\)$",
+  # E02: Shifted high nibble and low nibble have disjoint bits after validated hex parsing.
+  "^src/domain/sha256\\.rs:23:46:\\ replace\\ \\|\\ with\\ \\^\\ in\\ Sha256::parse$",
+  # E03: Private unconsumed Debug may stay empty while preserving redaction.
+  "^src/embedding/openai\\.rs:31:9:\\ replace\\ <impl\\ fmt::Debug\\ for\\ Openai>::fmt\\ \\->\\ fmt::Result\\ with\\ Ok\\(Default::default\\(\\)\\)$",
+  # E04: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/filesystem/local\\.rs:309:40:\\ replace\\ \\|\\ with\\ \\^\\ in\\ LocalFileSystem::finish_lock$",
+  # E05: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/filesystem/local\\.rs:422:42:\\ replace\\ \\|\\ with\\ \\^\\ in\\ create_lock_file$",
+  # E06: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/filesystem/local\\.rs:422:25:\\ replace\\ \\|\\ with\\ \\^\\ in\\ create_lock_file$",
+  # E07: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/filesystem/local\\.rs:423:20:\\ replace\\ \\|\\ with\\ \\^\\ in\\ create_lock_file$",
+  # E08: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/filesystem/read\\.rs:31:70:\\ replace\\ \\|\\ with\\ \\^\\ in\\ read_regular$",
+  # E09: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/filesystem/read\\.rs:31:51:\\ replace\\ \\|\\ with\\ \\^\\ in\\ read_regular$",
+  # E10: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/filesystem/read\\.rs:31:32:\\ replace\\ \\|\\ with\\ \\^\\ in\\ read_regular$",
+  # E11: Read-only hash-object hardening flags do not write objects or alter output.
+  "^src/git/process\\.rs:109:65:\\ replace\\ ==\\ with\\ !=\\ in\\ GitProcess::build_command$",
+  # E12: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/storage/connection\\.rs:65:33:\\ replace\\ \\|\\ with\\ \\^\\ in\\ ConfinedDirectory<'a>::open_database$",
+  # E13: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/storage/connection\\.rs:110:67:\\ replace\\ \\|\\ with\\ \\^\\ in\\ ConfinedDirectory<'a>::verify$",
+  # E14: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/storage/connection\\.rs:110:48:\\ replace\\ \\|\\ with\\ \\^\\ in\\ ConfinedDirectory<'a>::verify$",
+  # E15: OR and XOR are identical for these disjoint fixed permission/open bits.
+  "^src/storage/connection\\.rs:110:28:\\ replace\\ \\|\\ with\\ \\^\\ in\\ ConfinedDirectory<'a>::verify$",
+  # E16: Per-step retry budget permits an extra retry at exact equality; no strict cutoff.
+  "^src/storage/connection\\.rs:180:42:\\ replace\\ <\\ with\\ <=\\ in\\ wait_for_initialization$",
+  # E17: SQLite decodes all %HH path bytes; canonical path and mode=ro are unchanged.
+  "^src/storage/connection\\.rs:327:41:\\ replace\\ \\|\\|\\ with\\ \\&\\&\\ in\\ attach_cache$",
+  # E18: Locked bundled SQLite3.53.2 is above required3.51.3; reaudit native/build changes.
+  "^src/storage/connection\\.rs:411:35:\\ replace\\ <\\ with\\ ==\\ in\\ verify_capabilities$",
+  # E19: Locked bundled SQLite3.53.2 is above required3.51.3; reaudit native/build changes.
+  "^src/storage/connection\\.rs:411:35:\\ replace\\ <\\ with\\ <=\\ in\\ verify_capabilities$",
+  # E20: Current write argv stays hardened; only read-only hash-object gains inert fsync settings.
+  "^src/git/process\\.rs:109:40:\\ replace\\ \\&\\&\\ with\\ \\|\\|\\ in\\ GitProcess::build_command$",
+  # E21: Opaque private cause Display has no marker-text contract; empty remains non-formatable.
+  "^src/service/embedding_error\\.rs:77:9:\\ replace\\ <impl\\ fmt::Display\\ for\\ PrivateCause>::fmt\\ \\->\\ fmt::Result\\ with\\ Ok\\(Default::default\\(\\)\\)$",
+  # E22: Opaque private cause Debug has no marker-text contract; public classification stays useful.
+  "^src/service/embedding_error\\.rs:82:9:\\ replace\\ <impl\\ fmt::Debug\\ for\\ PrivateCause>::fmt\\ \\->\\ fmt::Result\\ with\\ Ok\\(Default::default\\(\\)\\)$",
+  # E23: All four unique fields are required; missing/unknown roots still reject with the same safe error.
+  "^src/service/embedding_config\\.rs:41:13:\\ replace\\ \\|\\|\\ with\\ \\&\\&\\ in\\ EmbeddingConfig::parse$",
+]

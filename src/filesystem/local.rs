@@ -277,13 +277,10 @@ impl LocalFileSystem {
     }
 
     fn try_acquire_lock(&self, file: &File) -> DocumentResult<bool> {
-        loop {
-            match file.try_lock() {
-                Ok(()) => return Ok(true),
-                Err(TryLockError::WouldBlock) => break,
-                Err(TryLockError::Error(cause)) if cause.kind() == io::ErrorKind::Interrupted => {}
-                Err(cause) => return Err(fail_io("cannot acquire coordination lock", cause)),
-            }
+        let acquired = retry_lock(|| file.try_lock())
+            .map_err(|cause| fail_io("cannot acquire coordination lock", cause))?;
+        if acquired {
+            return Ok(true);
         }
         #[cfg(test)]
         if let Some(hook) = self.on_contention.take() {
@@ -490,6 +487,21 @@ fn build_file_stat(stat: &Stat) -> DocumentResult<FileStat> {
         inode: stat.st_ino,
         device,
     })
+}
+
+/// Retry only interrupted lock attempts, returning false for ordinary contention.
+fn retry_lock<F>(mut operation: F) -> Result<bool, TryLockError>
+where
+    F: FnMut() -> Result<(), TryLockError>,
+{
+    loop {
+        match operation() {
+            Ok(()) => return Ok(true),
+            Err(TryLockError::WouldBlock) => return Ok(false),
+            Err(TryLockError::Error(cause)) if cause.kind() == io::ErrorKind::Interrupted => {}
+            Err(cause) => return Err(cause),
+        }
+    }
 }
 
 fn retry_io(mut operation: impl FnMut() -> io::Result<()>) -> io::Result<()> {

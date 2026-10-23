@@ -1,8 +1,11 @@
-use super::LocalFileSystem;
+use super::{LocalFileSystem, observe_lock_descriptor, retry_io, retry_lock};
 use crate::filesystem::test_support::{Fixture, run_bounded};
-use crate::service::EmbeddingFiles;
-use std::fs;
+use crate::service::{DocumentErrorKind, EmbeddingFiles};
 use std::os::unix::fs::MetadataExt;
+use std::{
+    fs::{self, TryLockError},
+    io::ErrorKind,
+};
 
 #[test]
 fn concurrent_creation_after_absent_observation_reopens_the_same_inode() {
@@ -80,4 +83,97 @@ fn lock_open_rejects_replacement_and_never_recreates_observed_deletion() {
             assert!(!fixture.0.join(".letopis/embed.lock").exists());
         }
     }
+}
+
+#[test]
+fn retries_interrupted_io_until_the_operation_succeeds() {
+    // Arrange
+    let mut results = [Err(ErrorKind::Interrupted.into()), Ok(())].into_iter();
+    // Act
+    let result = retry_io(|| results.next().expect("unexpected extra retry"));
+    // Assert
+    assert!(result.is_ok());
+    assert!(results.next().is_none());
+}
+
+#[test]
+fn preserves_nonretryable_io_errors() {
+    // Arrange
+    let mut results = [Err(ErrorKind::PermissionDenied.into())].into_iter();
+    // Act
+    let error = retry_io(|| results.next().expect("nonretryable error was retried")).unwrap_err();
+    // Assert
+    assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+    assert!(results.next().is_none());
+}
+
+#[test]
+fn rejects_each_prior_lock_identity_mismatch_before_writing_pid() {
+    for change_inode in [true, false] {
+        // Arrange: hold a real lock, then change exactly one prior observation field.
+        let fixture = Fixture::new();
+        let files = LocalFileSystem::open(&fixture.0).unwrap();
+        let file = files.open_lock_file("embed.lock").unwrap();
+        let mut before = observe_lock_descriptor(&file).unwrap();
+        if change_inode {
+            let other = files.open_lock_file("index.lock").unwrap();
+            before.inode = observe_lock_descriptor(&other).unwrap().inode;
+        } else {
+            before.device ^= 1;
+        }
+        let path = fixture.0.join(".letopis/embed.lock");
+        fs::write(&path, b"previous owner").unwrap();
+        file.try_lock().unwrap();
+        let duplicate = file.try_clone().unwrap();
+        // Act
+        let result = files.finish_lock(file, "embed.lock", before);
+        // Assert: failed completion releases ownership even with another fd open.
+        let error = result.err().expect("identity mismatch was accepted");
+        assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
+        assert_eq!(fs::read(&path).unwrap(), b"previous owner");
+        let contender = LocalFileSystem::open(&fixture.0).unwrap();
+        assert!(contender.try_lock_embed().unwrap().is_some());
+        drop(duplicate);
+    }
+}
+
+#[test]
+fn retries_interrupted_lock_acquisition_until_success() {
+    // Arrange
+    let mut results = [
+        Err(TryLockError::Error(ErrorKind::Interrupted.into())),
+        Ok(()),
+    ]
+    .into_iter();
+    // Act
+    let acquired = retry_lock(|| results.next().expect("unexpected extra retry")).unwrap();
+    // Assert
+    assert!(acquired);
+    assert!(results.next().is_none());
+}
+
+#[test]
+fn returns_contention_without_retrying() {
+    // Arrange
+    let mut results = [Err(TryLockError::WouldBlock)].into_iter();
+    // Act
+    let acquired = retry_lock(|| results.next().expect("contention was retried")).unwrap();
+    // Assert
+    assert!(!acquired);
+    assert!(results.next().is_none());
+}
+
+#[test]
+fn preserves_nonretryable_lock_errors() {
+    // Arrange
+    let mut results = [Err(TryLockError::Error(ErrorKind::PermissionDenied.into()))].into_iter();
+    // Act
+    let error =
+        retry_lock(|| results.next().expect("nonretryable lock error was retried")).unwrap_err();
+    // Assert
+    let TryLockError::Error(cause) = error else {
+        panic!("expected the original nonretryable I/O error");
+    };
+    assert_eq!(cause.kind(), ErrorKind::PermissionDenied);
+    assert!(results.next().is_none());
 }

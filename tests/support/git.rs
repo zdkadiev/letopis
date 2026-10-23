@@ -221,6 +221,11 @@ impl Drop for OwnedChild {
         }
     }
 }
+/// Run exactly one test case in an owned child under a thirty-second watchdog.
+///
+/// # Panics
+/// Panics if the child fails, does not execute the requested case, or exceeds the
+/// bound; the owned child is killed and reaped when necessary.
 pub fn supervise_test(name: &str, envs: &[(&str, &str)]) {
     let mut c = Command::new(env::current_exe().unwrap());
     c.args(["--exact", name, "--nocapture"])
@@ -232,6 +237,17 @@ pub fn supervise_test(name: &str, envs: &[(&str, &str)]) {
         out.status.success(),
         "supervised test failed: {} {}",
         String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    // Libtest also exits successfully when an --exact filter matches zero tests.
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let named_test = format!("test {name} ...");
+    assert!(
+        stdout.contains(&named_test)
+            && stdout.lines().any(|line| {
+                line.starts_with("test result: ok. 1 passed; 0 failed; 0 ignored;")
+            }),
+        "supervised test did not run exactly the requested case: {stdout} {}",
         String::from_utf8_lossy(&out.stderr)
     );
 }

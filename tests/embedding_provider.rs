@@ -483,9 +483,13 @@ fn redacts_cause_bearing_errors_and_config_debug() {
         &json!({"future":"knowledge-secret"}),
     );
     // Act
-    let formatted = format!("{error} {error:?} {config:?}");
+    let debug = format!("{error:?}");
+    let config_debug = format!("{config:?}");
+    let formatted = format!("{error} {debug} {config_debug}");
     let source = error.source().unwrap();
     // Assert
+    assert!(debug.contains(&format!("{:?}", EmbeddingErrorKind::InvalidResponse)));
+    assert!(config_debug.contains(&format!("{:?}", config.get_provider())));
     assert!(!formatted.contains("secret"));
     assert!(!format!("{source} {source:?}").contains("secret"));
     assert!(source.source().is_none());

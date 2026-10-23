@@ -65,7 +65,7 @@ Apply these rules to new and touched code only.
 
 ## Verification
 
-Run commands from the repository root; from elsewhere use `make -C <path> <target>`. Dependencies are locked and offline: if they have not been prepared, run `cargo fetch --locked` first. Checks never download dependencies or rewrite files; apply formatting with `make fmt`.
+Run commands from the repository root; from elsewhere use `make -C <path> <target>`. Dependencies are locked and offline: if they have not been prepared, run `cargo fetch --locked` first. Checks never download dependencies or rewrite files; apply formatting with `make fmt`. `make check` and `make verify` print one `ok` line on success and the full output of the failed step on failure, which keeps logs small; `V=1` (for example `make check V=1`) shows every command's output.
 
 | Command | Runs | Use |
 | --- | --- | --- |

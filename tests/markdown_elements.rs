@@ -273,3 +273,27 @@ fn raw_html_content_does_not_declare_metadata() {
         assert!(unmarked.unwrap().is_none(), "{open}");
     }
 }
+
+#[test]
+fn locates_the_complete_invalid_comment_without_unrelated_prefix_text() {
+    // Arrange: coordinates must retain a multiline comment and omit ordinary prose.
+    let path = RepoPath::parse("a.md").unwrap();
+    for (prefix, comment) in [
+        ("intro ", "<!-- letopis: {\"created_at\":1} -->"),
+        ("", "<!-- letopis: {\n\"created_at\":1} -->"),
+    ] {
+        let text = format!("{prefix}{comment}\n");
+        // Act
+        let diagnostics = parse(&path, text.as_bytes()).unwrap_err();
+        // Assert
+        let diagnostic = diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.kind == DiagnosticKind::InvalidMetadata)
+            .expect("invalid service comment must be reported");
+        let span = diagnostic
+            .bytes
+            .expect("comment location must be available");
+        let highlighted = &text[span.get_start()..span.get_end()];
+        assert_eq!(highlighted.trim_end_matches(['\r', '\n']), comment);
+    }
+}

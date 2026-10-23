@@ -142,7 +142,7 @@ def run_host(root, evidence, execute, manifest):
     for tool in (['rustc', '-vV'], ['cargo', '--version'], ['git', '--version'],
                  [sys.executable, '--version'], ['uname', '-a']):
         execute(tool, 'version-' + Path(tool[0]).name + '.log')
-    execute(['make', 'verify'], 'root-check.log')
+    execute(['make', 'verify', 'V=1'], 'root-check.log')
     execute(['cargo', 'build', '--locked', '--offline', '--bin', 'letopis',
              '--example', 'cli_runtime_fixture', '--message-format=json'], 'build.log')
     artifacts = read_artifacts(evidence / 'build.log')

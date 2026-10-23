@@ -1,6 +1,10 @@
 use super::read::{ReadStage, read_regular};
 use super::test_support::{Fixture, run_bounded};
-use std::fs::{self, File};
+use crate::service::EmbeddingErrorKind;
+use std::{
+    error::Error,
+    fs::{self, File},
+};
 
 #[test]
 fn rejects_observed_replacement_between_stat_and_open() {
@@ -21,7 +25,14 @@ fn rejects_observed_replacement_between_stat_and_open() {
         });
         mutator.finish();
         // Assert
-        assert!(result.is_err(), "{action}");
+        let error = result.unwrap_err();
+        if action == "symlink" {
+            assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
+            assert!(
+                error.source().is_some(),
+                "NOFOLLOW must reject the open syscall"
+            );
+        }
     }
 }
 

@@ -203,11 +203,11 @@ fn classify(error: ureq::Error) -> EmbeddingError {
 
 #[cfg(test)]
 mod tests {
-    use super::Http;
+    use super::{Http, classify};
     use crate::service::EmbeddingErrorKind;
     use serde_json::json;
     use std::{
-        io::{Read, Write},
+        io::{self, ErrorKind, Read, Write},
         net::TcpListener,
         thread,
         time::{Duration, Instant},
@@ -258,5 +258,20 @@ mod tests {
     #[test]
     fn shares_one_deadline_across_headers_and_body() {
         run_deadline_case(Duration::from_millis(80), Duration::from_millis(80));
+    }
+    #[test]
+    fn classifies_io_timeouts_without_exposing_transport_payloads() {
+        // Arrange
+        for (io_kind, expected) in [
+            (ErrorKind::TimedOut, EmbeddingErrorKind::Timeout),
+            (ErrorKind::ConnectionReset, EmbeddingErrorKind::Connection),
+        ] {
+            let cause = ureq::Error::Io(io::Error::new(io_kind, "transport-secret"));
+            // Act
+            let error = classify(cause);
+            // Assert
+            assert_eq!(error.get_kind(), expected);
+            assert!(!format!("{error} {error:?}").contains("transport-secret"));
+        }
     }
 }

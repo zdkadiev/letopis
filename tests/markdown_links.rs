@@ -137,3 +137,19 @@ fn links_wrapping_images_still_declare_edges() {
     assert_eq!(got.edges.first().unwrap().get_target().as_str(), "b.md");
     assert_eq!(got.elements[0].search_text, "alt");
 }
+
+#[test]
+fn inline_links_after_image_alt_text_still_declare_edges() {
+    // Arrange: closing the image must end the suppression of alt-text links.
+    let text = build_whole_file(
+        "![see [hidden](hidden.md \"letopis:type=includes\")](img.png)\n\n[after](b.md \"letopis:type=includes\")",
+    );
+    // Act
+    let got = parse_file("a.md", &text);
+    // Assert
+    assert_eq!(got.edges.len(), 1);
+    let edge = got.edges.first().unwrap();
+    assert_eq!(edge.get_source().as_str(), "a.md");
+    assert_eq!(edge.get_target().as_str(), "b.md");
+    assert_eq!(edge.get_edge_type().as_str(), "includes");
+}

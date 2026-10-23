@@ -40,7 +40,7 @@ fn anchors_and_ranges_reject_invalid_values() {
         assert!(anchor.is_err(), "{raw}");
     }
     // Arrange
-    for raw in ["a", "WAL", "a_b-12", "L1", "Lx-Ly"] {
+    for raw in ["a", "WAL", "a_b-12", "L1", "Lx-Ly", "L1-Lx", "Lx-L2"] {
         // Act
         let anchor = Anchor::parse(raw);
         // Assert
@@ -54,6 +54,8 @@ fn anchors_and_ranges_reject_invalid_values() {
         "a.rs#L0-L2",
         "a.rs#L3-L2",
         "a.rs#L1-Lx",
+        "a.rs#L+1-L2",
+        "a.rs#L1-L+2",
         "a.rs#L9999999999999999999999999999-L2",
         "",
         ".",
@@ -220,5 +222,49 @@ fn sha256_hex_round_trip_and_invalid_inputs() {
     assert_eq!(Sha256::parse(&hash.to_hex()), Ok(hash));
     for raw in ["A".repeat(64), "a".repeat(63), "g".repeat(64)] {
         assert_eq!(Sha256::parse(&raw), Err(ValueError::InvalidHash));
+    }
+}
+
+#[test]
+fn only_outgoing_includes_edges_make_an_element_a_metavertex() {
+    // Arrange
+    let source = KnowledgeId::parse("source.md").unwrap();
+    let target = KnowledgeId::parse("target.md").unwrap();
+    for (kind, expected) in [
+        ("includes", ElementKind::Metavertex),
+        ("depends_on", ElementKind::Vertex),
+    ] {
+        let edge = Edge::new(
+            source.clone(),
+            EdgeTarget::Knowledge(target.clone()),
+            EdgeType::parse(kind).unwrap(),
+        )
+        .unwrap();
+        let edges = BTreeSet::from([edge]);
+        // Act / Assert
+        assert_eq!(derive_element_kind(&source, &edges), expected);
+        assert_eq!(derive_element_kind(&target, &edges), ElementKind::Vertex);
+    }
+    assert_eq!(
+        derive_element_kind(&source, &BTreeSet::new()),
+        ElementKind::Vertex
+    );
+}
+
+#[test]
+fn value_errors_describe_the_validation_failure() {
+    // Arrange
+    for (error, expected) in [
+        (ValueError::InvalidHash, "invalid SHA-256 hash"),
+        (ValueError::InvalidPath, "invalid root-relative path"),
+        (ValueError::InvalidAnchor, "invalid anchor"),
+        (ValueError::InvalidRange, "invalid range"),
+        (ValueError::InvalidOid, "invalid tree OID"),
+        (ValueError::InvalidType, "invalid edge type"),
+        (ValueError::InvalidTarget, "invalid edge target"),
+        (ValueError::SelfLoop, "self-loop"),
+    ] {
+        // Act / Assert
+        assert_eq!(error.to_string(), expected);
     }
 }

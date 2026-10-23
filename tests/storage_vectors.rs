@@ -3,7 +3,7 @@ mod support;
 use letopis::{
     domain::Sha256,
     open_storage,
-    service::{CacheWrite, Storage, StorageRead, VectorOutcome, VectorWrite},
+    service::{CacheWrite, Storage, StorageErrorKind, StorageRead, VectorOutcome, VectorWrite},
 };
 use tempfile::TempDir;
 
@@ -182,7 +182,8 @@ fn caught_vector_error_cannot_commit_key_or_prior_write() {
         storage.reset_vectors(&m1).unwrap();
         let mut unit = unwrap_current(storage.begin_vector_write(&m1).unwrap());
         unit.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
-        assert!(unit.store_vector(&m1, &invalid, 3).is_err());
+        let error = unit.store_vector(&m1, &invalid, 3).unwrap_err();
+        assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
         assert!(unit.commit().is_err());
         let mut read = storage.begin_read().unwrap();
         assert_eq!(unwrap_current(read.read_vector(&m1, &hash).unwrap()), None);

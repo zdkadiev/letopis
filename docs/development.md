@@ -4,7 +4,12 @@
 
 Из корня запустить `make check`, из другого каталога — `make -C <checkout> check`.
 Makefile — единственный источник команд; исторический `scripts/check-rust.sh`
-сохранён и делегирует этому target:
+сохранён и делегирует этому target. `make check` и `make verify` печатают одну
+строку `ok` при успехе и полный вывод упавшего шага при ошибке. Для полного
+лога каждого шага используйте `V=1`, например `make verify V=1`; platform runners
+передают этот флаг явно, чтобы evidence сохраняло summaries тестов.
+
+`make check` выполняет:
 
 ```sh
 cargo fmt --all --check
@@ -34,7 +39,11 @@ cargo test --locked --offline
 Для поведения в изменённом коде: `git diff main > mutants.diff`, затем
 `make mutants ARGS='--in-diff mutants.diff'`. После изменений domain/storage/change
 detection и перед merge в main требуется whole-crate запуск без фильтра diff.
-Мутации исполняются в копиях, а исходные raw logs сохраняются. Для каждого survivor
+Мутации исполняются в копиях, а исходные raw logs сохраняются.
+`cap_lints = true` в `.cargo/mutants.toml` ограничивает lint errors только в
+одноразовых копиях: иначе удалённое мутацией использование вызывает deny-warnings
+до проверки поведения. Строгий `make verify` проверяет production tree отдельно;
+mutation receipt не доказывает lint cleanliness. Для каждого survivor
 нужен тест, который проверяет нарушенный результат и убивает мутацию, либо отдельное
 обоснование эквивалентности в задаче/spec/plan и точное комментированное исключение
 в `.cargo/mutants.toml`. Не исключать файл или функцию целиком. Отдельно указывать

@@ -427,6 +427,10 @@ fn verify_capabilities(connection: &Connection) -> StorageResult<()> {
 }
 
 #[cfg(test)]
+#[path = "connection_policy_tests.rs"]
+mod policy_tests;
+
+#[cfg(test)]
 mod tests {
     use super::{ConfinedDirectory, attach_cache, attach_vectors, open_database};
     use rusqlite::ErrorCode;
