@@ -1,6 +1,6 @@
 # TK-12 — Search and consistent reads
 
-Status: proposed written design; independent builder check completed; awaiting user approval. No product implementation or implementation plan is authorized yet.
+Status: approved by the user on 2026-10-23: «Да, утверждаю спецификацию. Продолжай к плану реализации TK-12 по Superpowers». The independent builder check and its resolved configuration-readiness question are complete. Preparation of the implementation plan is authorized; product implementation awaits plan review and execution-method selection.
 
 ## Intent and verified starting point
 
@@ -14,7 +14,7 @@ Storage already provides a scoped read transaction pinning cache revision and ve
 
 On 2026-10-23 the user selected: “Подключить готовую TK-13 сейчас (рекомендую)”. TK-12 therefore depends on completed TK-13 and owns real query-embedding integration into CLI search now. Controlled HTTP fixtures exercise the actual existing provider implementations. Do not reimplement providers or claim actual model quality from fixtures. TK-14 still owns the new-agent end-to-end workflow, initial agent skill and target-corpus preparation.
 
-The full description below remains proposed until approved. Implementation choices explicitly labelled builder calls are recommendations, not prior user decisions.
+The user approved this complete description, including the choices labelled builder calls. Those labels preserve their origin as engineering recommendations, now accepted through full-specification approval.
 
 ## Design sources and precedence
 
@@ -46,7 +46,7 @@ Builder call: extend the existing embedding service boundary only enough to exec
 
 The two database files need not share one cross-file instant. Cache metadata/FTS must share one cache snapshot; vectors join only the pinned node search hashes and configuration. Concurrent vector publication/reset must produce a valid compatible channel or explicit FTS fallback, never another model's result. Native reset/schema-change behavior with an older reader is a required executable acceptance case, not assumed from WAL.
 
-I-8 currently says a mismatch “otherwise ... resets MC-3”, while MC-6 says mismatch gives FTS-only. Proposed clarification: normal synchronization occurs before the view; a mismatch discovered after pinning gives FTS-only for that request, with no reset or repin from the read view. A later call can synchronize again. Align I-8 with that sequencing as a clarification in the approved design, not a write-on-read capability.
+I-8 currently says a mismatch “otherwise ... resets MC-3”, while MC-6 says mismatch gives FTS-only. Approved clarification: normal synchronization occurs before the view; a mismatch discovered after pinning gives FTS-only for that request, with no reset or repin from the read view. A later call can synchronize again. Align I-8 with that sequencing as a clarification in the approved design, not a write-on-read capability.
 
 ## Literal FTS and ranking
 
@@ -106,10 +106,10 @@ Plan exact files/signatures only after this description is approved. Prefer a fe
 
 Store the approved spec in this directory and the subsequent implementation plan in `docs/superpowers/plans/`. Record final results in the TK-12 task card and `docs/zkit/letopis/checks/TK-12/report.md`, with new ignored receipts under `.artifacts/tk12/`. Do not overwrite prior evidence or mark pending platform cases done. Preserve test-helper nested counts separately from root test counts.
 
-No claims of live model usefulness, minimal-hardware RAM/latency, x86/other platforms, physical power loss, full source provenance/filters/traverse, full check or handled SIGINT are made here. Those retain their existing roadmap owners. This scope does not merge, push, close issues or begin implementation automatically.
+No claims of live model usefulness, minimal-hardware RAM/latency, x86/other platforms, physical power loss, full source provenance/filters/traverse, full check or handled SIGINT are made here. Those retain their existing roadmap owners. This scope does not merge, push or close issues automatically; implementation starts after plan review and execution-method selection.
 
 ## Open status
 
-The user-approved scope question is resolved: reuse TK-13 now. The independent builder check raised one question about configuration-readiness errors. The existing TK-13 interface and implementation answer it: preserve their Invalid/FTS outcome, without widening this task into a shared error-policy change. The text above is corrected accordingly; no user-only question remains from that check. The proposed builder calls (incremental unsupported requests, baseline freshness/source coverage, literal tokenization, pinned config sequencing and bounded inspect capture) await approval of this complete description. No product code or dependencies have changed.
+The user-approved scope question is resolved: reuse TK-13 now. The independent builder check raised one question about configuration-readiness errors. The existing TK-13 interface and implementation answer it: preserve their Invalid/FTS outcome, without widening this task into a shared error-policy change. The text above is corrected accordingly; no user-only question remains from that check. The user approved the full description, including the labelled builder calls, on 2026-10-23. The [implementation plan](../plans/2026-10-23-tk-12-search.md) is being prepared for its separate review. No product code or dependencies have changed.
 
 Independent check and controller resolution: [design review](../../zkit/letopis/checks/TK-12/design-review-2026-10-23.md).
