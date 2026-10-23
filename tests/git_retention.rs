@@ -426,17 +426,7 @@ fn linked_worktree_checks_common_object_store_and_refuses_inactive_alternates() 
     // Arrange
     for format in FORMATS {
         let repo = TempRepo::new(format);
-        let linked = repo.get_root().join("linked");
-        repo.run_git_successfully(
-            &[
-                "worktree",
-                "add",
-                "-q",
-                "--detach",
-                linked.to_str().unwrap(),
-            ],
-            None,
-        );
+        let linked = add_linked_worktree(&repo);
         let git = open_git_snapshots(&linked).unwrap();
         let p = parse_path("linked");
         let tree = git
@@ -634,4 +624,19 @@ fn assert_shared_clone_gc_outcome(
                 .is_empty()
         );
     }
+}
+
+fn add_linked_worktree(repo: &TempRepo) -> PathBuf {
+    let linked = repo.get_root().join("linked");
+    repo.run_git_successfully(
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            linked.to_str().unwrap(),
+        ],
+        None,
+    );
+    linked
 }

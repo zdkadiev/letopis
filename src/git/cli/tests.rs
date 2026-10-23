@@ -5,7 +5,7 @@ use crate::git::{
 };
 use crate::process_test_support as fixture;
 use crate::{
-    domain::{RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN},
+    domain::RepoPath,
     open_git_snapshots,
     service::{DocumentErrorKind, GitSnapshots, SnapshotErrorKind, SnapshotFile},
 };
@@ -58,8 +58,8 @@ fn discovers_root_from_subdirectory() {
     for format in fixture::FORMATS {
         let repo = TempRepo::new(format);
         let expected_length = match format {
-            ObjectFormat::Sha1 => SHA1_OID_HEX_LEN,
-            ObjectFormat::Sha256 => SHA256_OID_HEX_LEN,
+            ObjectFormat::Sha1 => 40,
+            ObjectFormat::Sha256 => 64,
         };
         // Act
         let git = GitCli::open(repo.get_subdir()).unwrap();

@@ -18,6 +18,7 @@ use std::{
     fs::{self, File},
     io::{BufRead, BufReader, Read, Write},
     os::unix::{
+        fs::MetadataExt,
         net::{UnixListener, UnixStream},
         process::ExitStatusExt,
     },
@@ -422,14 +423,11 @@ impl Fixture {
                 "i.md" => INVALID,
                 _ => continue,
             };
-            let stat = LocalFileSystem::open(self.root.path())
-                .unwrap()
-                .stat_file(&file.path)
-                .unwrap()
-                .unwrap();
-            file.size = stat.size;
-            file.mtime_ns = stat.mtime_ns;
-            file.inode = stat.inode;
+            // Independent oracle: observe the file with std, not the adapter under test.
+            let metadata = fs::metadata(self.root.path().join(file.path.as_str())).unwrap();
+            file.size = metadata.len();
+            file.mtime_ns = metadata.mtime() * 1_000_000_000 + metadata.mtime_nsec();
+            file.inode = metadata.ino();
             file.hash = Sha256::digest(contents.as_bytes());
             file.checked_at_ns = TIME;
             if file.path.as_str() == "i.md" {
@@ -530,7 +528,6 @@ fn waiting_publisher_redetects_newer_edit_after_owner_is_killed() {
     owner.kill();
     waiter.resume();
     waiter.finish();
-    use std::os::unix::fs::MetadataExt;
     assert_eq!(
         fs::metadata(fixture.root.path().join(".letopis/index.lock"))
             .unwrap()
