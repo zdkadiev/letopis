@@ -46,25 +46,25 @@ impl<'a> Handlers<'a> {
             Request::Check(paths) => ResponseResult::Check(
                 self.checks
                     .as_deref_mut()
-                    .ok_or_else(unavailable)?
+                    .ok_or_else(fail_unavailable)?
                     .check(&paths)?,
             ),
             Request::Inspect(ids) => ResponseResult::Inspect(
                 self.inspections
                     .as_deref_mut()
-                    .ok_or_else(unavailable)?
+                    .ok_or_else(fail_unavailable)?
                     .inspect(&ids)?,
             ),
             Request::Search(request) => ResponseResult::Search(
                 self.searches
                     .as_deref_mut()
-                    .ok_or_else(unavailable)?
+                    .ok_or_else(fail_unavailable)?
                     .search(&request)?,
             ),
             Request::Drain => {
                 self.background
                     .as_deref_mut()
-                    .ok_or_else(unavailable)?
+                    .ok_or_else(fail_unavailable)?
                     .drain()?;
                 return Ok(CommandResponse {
                     result: ResponseResult::Drained,
@@ -82,7 +82,7 @@ impl<'a> Handlers<'a> {
         })
     }
 }
-fn unavailable() -> CommandError {
+fn fail_unavailable() -> CommandError {
     CommandError::new(
         CommandErrorKind::InternalError,
         "operation unavailable in this build",

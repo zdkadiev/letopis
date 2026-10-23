@@ -1,9 +1,10 @@
 use crate::service::{
-    EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingResult, ProviderKind,
+    EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingResult, MAX_DIMENSIONS,
+    MIN_DIMENSIONS, ProviderKind,
 };
 use crate::utils::JsonValue;
 use serde_json::{Value, json};
-use std::{num::NonZeroUsize, time::Duration};
+use std::{io::ErrorKind, num::NonZeroUsize, time::Duration};
 use ureq::{
     Agent,
     http::Uri,
@@ -13,17 +14,15 @@ use ureq::{
 const ATTEMPT_DEADLINE: Duration = Duration::from_secs(60);
 // Match ureq's ordinary read_to_vec cap explicitly for the configured reader.
 const MAX_RESPONSE_BYTES: u64 = 10 * 1024 * 1024;
-const MIN_DIMENSIONS: usize = 2;
-const MAX_DIMENSIONS: usize = 4096;
 
 pub(super) struct Http {
     agent: Agent,
 }
 impl Http {
     pub(super) fn new() -> Self {
-        Self::with_deadline(ATTEMPT_DEADLINE)
+        Self::new_with_deadline(ATTEMPT_DEADLINE)
     }
-    fn with_deadline(deadline: Duration) -> Self {
+    fn new_with_deadline(deadline: Duration) -> Self {
         let agent = Agent::config_builder()
             .proxy(None)
             .max_redirects(0)
@@ -182,7 +181,10 @@ fn read_component(value: &Value) -> EmbeddingResult<f32> {
         .filter(|number| number.is_finite() && number.abs() <= f64::from(f32::MAX))
         .ok_or_else(reject_response)?;
     // Conversion is deliberately rounded to float32 after checking its finite range.
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "range was checked and float32 rounding is intended"
+    )]
     let component = number as f32;
     Ok(component)
 }
@@ -193,7 +195,7 @@ fn classify(error: ureq::Error) -> EmbeddingError {
     let kind = match &error {
         ureq::Error::BodyExceedsLimit(_) => EmbeddingErrorKind::InvalidResponse,
         ureq::Error::Timeout(_) => EmbeddingErrorKind::Timeout,
-        ureq::Error::Io(error) if error.kind() == std::io::ErrorKind::TimedOut => {
+        ureq::Error::Io(error) if error.kind() == ErrorKind::TimedOut => {
             EmbeddingErrorKind::Timeout
         }
         _ => EmbeddingErrorKind::Connection,
@@ -213,40 +215,6 @@ mod tests {
         time::{Duration, Instant},
     };
 
-    fn run_deadline_case(header_delay: Duration, body_delay: Duration) {
-        // Arrange
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let endpoint = format!("http://{}/embed", listener.local_addr().unwrap());
-        let worker = thread::spawn(move || {
-            let (mut socket, _) = listener.accept().unwrap();
-            socket
-                .set_read_timeout(Some(Duration::from_secs(2)))
-                .unwrap();
-            let mut received = Vec::new();
-            loop {
-                let mut byte = [0];
-                socket.read_exact(&mut byte).unwrap();
-                received.push(byte[0]);
-                if received.ends_with(b"\r\n\r\n") {
-                    break;
-                }
-            }
-            thread::sleep(header_delay);
-            let _ = socket
-                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n");
-            thread::sleep(body_delay);
-            let _ = socket.write_all(b"{}");
-        });
-        let http = Http::with_deadline(Duration::from_millis(120));
-        let start = Instant::now();
-        // Act
-        let result = http.post(&endpoint, &json!({"input":["fixture"]}), None);
-        let elapsed = start.elapsed();
-        worker.join().unwrap();
-        // Assert
-        assert_eq!(result.unwrap_err().get_kind(), EmbeddingErrorKind::Timeout);
-        assert!(elapsed < Duration::from_secs(2));
-    }
     #[test]
     fn bounds_waiting_for_response_headers() {
         run_deadline_case(Duration::from_millis(240), Duration::ZERO);
@@ -273,5 +241,40 @@ mod tests {
             assert_eq!(error.get_kind(), expected);
             assert!(!format!("{error} {error:?}").contains("transport-secret"));
         }
+    }
+
+    fn run_deadline_case(header_delay: Duration, body_delay: Duration) {
+        // Arrange
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}/embed", listener.local_addr().unwrap());
+        let worker = thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut received = Vec::new();
+            loop {
+                let mut byte = [0];
+                socket.read_exact(&mut byte).unwrap();
+                received.push(byte[0]);
+                if received.ends_with(b"\r\n\r\n") {
+                    break;
+                }
+            }
+            thread::sleep(header_delay);
+            let _ = socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n");
+            thread::sleep(body_delay);
+            let _ = socket.write_all(b"{}");
+        });
+        let http = Http::new_with_deadline(Duration::from_millis(120));
+        let start = Instant::now();
+        // Act
+        let result = http.post(&endpoint, &json!({"input":["fixture"]}), None);
+        let elapsed = start.elapsed();
+        worker.join().unwrap();
+        // Assert
+        assert_eq!(result.unwrap_err().get_kind(), EmbeddingErrorKind::Timeout);
+        assert!(elapsed < Duration::from_secs(2));
     }
 }

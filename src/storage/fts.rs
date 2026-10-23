@@ -7,8 +7,9 @@ use crate::{
     domain::KnowledgeId,
     service::{StorageError, StorageErrorKind, StorageResult, TextMatch},
 };
-use rusqlite::{Connection, OptionalExtension, params_from_iter};
+use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use sea_query::{Expr, ExprTrait, Query};
+
 pub(super) fn replace_text(db: &Connection, id: &KnowledgeId, text: &str) -> StorageResult<()> {
     let (sql, values) = build_query(
         Query::select()
@@ -42,6 +43,32 @@ pub(super) fn replace_text(db: &Connection, id: &KnowledgeId, text: &str) -> Sto
         .map_err(map_mutation)?;
     Ok(())
 }
+
+pub(super) fn match_text(db: &Connection, expression: &str) -> StorageResult<Vec<TextMatch>> {
+    let mut stmt = db
+        .prepare(
+            "SELECT nodes.id, nodes.row_id, bm25(text_index) AS score
+             FROM text_index
+             JOIN nodes ON nodes.row_id = text_index.rowid
+             WHERE text_index MATCH ?1 AND nodes.kind <> ?2
+             ORDER BY score, nodes.id",
+        )
+        .map_err(map_sqlite)?;
+    let mut rows = stmt
+        .query(params![expression, SOURCE_KIND])
+        .map_err(map_match)?;
+    let mut found = Vec::new();
+    while let Some(row) = rows.next().map_err(map_match)? {
+        let id: String = row.get(0).map_err(map_sqlite)?;
+        found.push(TextMatch {
+            id: KnowledgeId::parse(&id).map_err(map_invalid_value)?,
+            row_id: row.get(1).map_err(map_sqlite)?,
+            bm25: row.get(2).map_err(map_sqlite)?,
+        });
+    }
+    Ok(found)
+}
+
 fn map_match(error: rusqlite::Error) -> StorageError {
     if matches!(&error,rusqlite::Error::SqliteFailure(e,_) if e.code==rusqlite::ErrorCode::Unknown)
     {
@@ -53,26 +80,4 @@ fn map_match(error: rusqlite::Error) -> StorageError {
     } else {
         map_sqlite(error)
     }
-}
-pub(super) fn match_text(db: &Connection, expression: &str) -> StorageResult<Vec<TextMatch>> {
-    let mut stmt = db
-        .prepare(
-            "SELECT nodes.id, nodes.row_id, bm25(text_index) AS score
-             FROM text_index
-             JOIN nodes ON nodes.row_id = text_index.rowid
-             WHERE text_index MATCH ?1 AND nodes.kind <> 'source'
-             ORDER BY score, nodes.id",
-        )
-        .map_err(map_sqlite)?;
-    let mut rows = stmt.query([expression]).map_err(map_match)?;
-    let mut found = Vec::new();
-    while let Some(row) = rows.next().map_err(map_match)? {
-        let id: String = row.get(0).map_err(map_sqlite)?;
-        found.push(TextMatch {
-            id: KnowledgeId::parse(&id).map_err(map_invalid_value)?,
-            row_id: row.get(1).map_err(map_sqlite)?,
-            bm25: row.get(2).map_err(map_sqlite)?,
-        });
-    }
-    Ok(found)
 }

@@ -1,6 +1,6 @@
 use super::{
     connection::map_sqlite,
-    graph::map_invalid_value,
+    graph::{SOURCE_KIND, map_invalid_value},
     query::{EmbedFailures, Nodes, Schemas, VectorIndex, VectorKeys, build_query},
 };
 use crate::{
@@ -9,8 +9,6 @@ use crate::{
 };
 use rusqlite::{Connection, OptionalExtension, params_from_iter};
 use sea_query::{Expr, ExprTrait, Order, Query, SelectStatement};
-
-const SOURCE_KIND: &str = "source";
 
 pub(super) fn read_next_embedding_work(
     connection: &Connection,
@@ -74,15 +72,6 @@ fn select_exhausted_hash(max_attempts: u64) -> SelectStatement {
         .to_owned()
 }
 
-fn select_live_hash(hash: Expr) -> SelectStatement {
-    Query::select()
-        .expr(Expr::val(1))
-        .from((Schemas::Cache, Nodes::Table))
-        .and_where(Expr::col((Nodes::Table, Nodes::Kind)).ne(SOURCE_KIND))
-        .and_where(Expr::col((Nodes::Table, Nodes::SearchHash)).eq(hash))
-        .to_owned()
-}
-
 pub(super) fn prune_unreferenced(connection: &Connection) -> StorageResult<()> {
     let orphan_keys = Query::select()
         .column(VectorKeys::RowId)
@@ -128,4 +117,13 @@ pub(super) fn prune_unreferenced(connection: &Connection) -> StorageResult<()> {
         .execute(&sql, params_from_iter(values))
         .map_err(map_sqlite)?;
     Ok(())
+}
+
+fn select_live_hash(hash: Expr) -> SelectStatement {
+    Query::select()
+        .expr(Expr::val(1))
+        .from((Schemas::Cache, Nodes::Table))
+        .and_where(Expr::col((Nodes::Table, Nodes::Kind)).ne(SOURCE_KIND))
+        .and_where(Expr::col((Nodes::Table, Nodes::SearchHash)).eq(hash))
+        .to_owned()
 }

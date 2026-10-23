@@ -64,10 +64,6 @@ impl Anchor {
         &self.0
     }
 }
-fn contains_only_ascii_digits(s: &str) -> bool {
-    !s.is_empty() && s.bytes().all(|c| c.is_ascii_digit())
-}
-
 /// Identity of a whole Markdown file or an anchored knowledge section.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct KnowledgeId(String);
@@ -142,4 +138,8 @@ impl SourceUri {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
+
+fn contains_only_ascii_digits(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|c| c.is_ascii_digit())
 }

@@ -1,4 +1,4 @@
-use super::constants::MIN_GIT_VERSION;
+use super::constants::{HASH_OBJECT_COMMAND, MIN_GIT_VERSION, MKTREE_COMMAND, UPDATE_REF_COMMAND};
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use std::{
     env,
@@ -30,41 +30,6 @@ impl fmt::Display for SafeCause {
     }
 }
 impl Error for SafeCause {}
-fn make_io_error(message: &'static str, error: io::Error) -> SnapshotError {
-    SnapshotError::new_with_cause(message, SafeCause::Io(error))
-}
-pub(super) fn is_exit_code(error: &SnapshotError, code: i32) -> bool {
-    matches!(error.source().and_then(|cause|cause.downcast_ref::<SafeCause>()),Some(SafeCause::Exit(status)) if status.code()==Some(code))
-}
-
-pub(super) fn check_version(output: &[u8]) -> Result<(), SnapshotError> {
-    let unsupported = || {
-        SnapshotError::new(
-            SnapshotErrorKind::InternalError,
-            "Git 2.29 or newer is required",
-        )
-    };
-    let text = std::str::from_utf8(output).map_err(|_| unsupported())?;
-    let version = text
-        .strip_prefix("git version ")
-        .ok_or_else(unsupported)?
-        .split_whitespace()
-        .next()
-        .ok_or_else(unsupported)?;
-    let mut parts = version.split('.');
-    let major = parts
-        .next()
-        .and_then(|s| s.parse::<u32>().ok())
-        .ok_or_else(unsupported)?;
-    let minor = parts
-        .next()
-        .and_then(|s| s.parse::<u32>().ok())
-        .ok_or_else(unsupported)?;
-    if (major, minor) < MIN_GIT_VERSION {
-        return Err(unsupported());
-    }
-    Ok(())
-}
 pub(super) struct GitProcess {
     program: PathBuf,
 }
@@ -104,9 +69,9 @@ impl GitProcess {
             .env("LC_ALL", "C");
         command.args(["-c", "core.hooksPath=/dev/null"]);
         let writes = args.first().is_some_and(|a| {
-            a == "mktree"
-                || a == "update-ref"
-                || (a == "hash-object" && args.iter().any(|a| a == "-w"))
+            a == MKTREE_COMMAND
+                || a == UPDATE_REF_COMMAND
+                || (a == HASH_OBJECT_COMMAND && args.iter().any(|a| a == "-w"))
         });
         if writes {
             command.args(["-c", "core.fsync=all", "-c", "core.fsyncMethod=fsync"]);
@@ -120,6 +85,43 @@ impl GitProcess {
     }
 }
 
+pub(super) fn is_exit_code(error: &SnapshotError, code: i32) -> bool {
+    matches!(error.source().and_then(|cause|cause.downcast_ref::<SafeCause>()),Some(SafeCause::Exit(status)) if status.code()==Some(code))
+}
+
+pub(super) fn check_version(output: &[u8]) -> Result<(), SnapshotError> {
+    let unsupported = || {
+        SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            "Git 2.29 or newer is required",
+        )
+    };
+    let text = std::str::from_utf8(output).map_err(|_| unsupported())?;
+    let version = text
+        .strip_prefix("git version ")
+        .ok_or_else(unsupported)?
+        .split_whitespace()
+        .next()
+        .ok_or_else(unsupported)?;
+    let mut parts = version.split('.');
+    let major = parts
+        .next()
+        .and_then(|s| s.parse::<u32>().ok())
+        .ok_or_else(unsupported)?;
+    let minor = parts
+        .next()
+        .and_then(|s| s.parse::<u32>().ok())
+        .ok_or_else(unsupported)?;
+    if (major, minor) < MIN_GIT_VERSION {
+        return Err(unsupported());
+    }
+    Ok(())
+}
+
+#[expect(
+    clippy::expect_used,
+    reason = "build_command pipes stdin, stdout and stderr before spawning"
+)]
 fn exchange_pipes(child: &mut Child, input: Option<&[u8]>) -> Result<Vec<u8>, SnapshotError> {
     let mut stdin = child.stdin.take().expect("piped stdin");
     let mut stdout = child.stdout.take().expect("piped stdout");
@@ -169,4 +171,8 @@ fn exchange_pipes(child: &mut Child, input: Option<&[u8]>) -> Result<Vec<u8>, Sn
         })?
         .map_err(|e| make_io_error("Git stdout failed", e))
     })
+}
+
+fn make_io_error(message: &'static str, error: io::Error) -> SnapshotError {
+    SnapshotError::new_with_cause(message, SafeCause::Io(error))
 }

@@ -1,7 +1,7 @@
 use super::{Diagnostic, DiagnosticKind, Events};
 use crate::domain::{Edge, EdgeTarget, EdgeType, Element, KnowledgeId, SourceUri, ValueError};
 use pulldown_cmark::{Event, LinkType, Tag, TagEnd};
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, ops::Range};
 
 pub(super) fn collect(
     events: &Events<'_>,
@@ -43,27 +43,36 @@ pub(super) fn collect(
         if !title.starts_with("letopis:") {
             continue;
         }
-        let edge_type = title
-            .strip_prefix("letopis:type=")
-            .and_then(|s| EdgeType::parse(s).ok())
-            .ok_or_else(|| Diagnostic::new_at(DiagnosticKind::InvalidLinkTitle, range.clone()))?;
-        let target = if edge_type.as_str() == "external" {
-            SourceUri::parse(dest_url).map(EdgeTarget::Source)
-        } else {
-            KnowledgeId::parse(dest_url).map(EdgeTarget::Knowledge)
-        }
-        .map_err(|_| Diagnostic::new_at(DiagnosticKind::InvalidTarget, range.clone()))?;
-        let edge = Edge::new(element.id.clone(), target, edge_type).map_err(|e| {
-            Diagnostic::new_at(
-                if e == ValueError::SelfLoop {
-                    DiagnosticKind::SelfLoop
-                } else {
-                    DiagnosticKind::InvalidTarget
-                },
-                range.clone(),
-            )
-        })?;
-        edges.insert(edge);
+        edges.insert(build_edge(element, dest_url, title, range)?);
     }
     Ok(edges)
+}
+
+/// Build one graph edge from a `letopis:` link title, rejecting malformed declarations.
+fn build_edge(
+    element: &Element,
+    dest_url: &str,
+    title: &str,
+    range: &Range<usize>,
+) -> Result<Edge, Diagnostic> {
+    let edge_type = title
+        .strip_prefix("letopis:type=")
+        .and_then(|s| EdgeType::parse(s).ok())
+        .ok_or_else(|| Diagnostic::new_at(DiagnosticKind::InvalidLinkTitle, range.clone()))?;
+    let target = if edge_type.as_str() == "external" {
+        SourceUri::parse(dest_url).map(EdgeTarget::Source)
+    } else {
+        KnowledgeId::parse(dest_url).map(EdgeTarget::Knowledge)
+    }
+    .map_err(|_| Diagnostic::new_at(DiagnosticKind::InvalidTarget, range.clone()))?;
+    Edge::new(element.id.clone(), target, edge_type).map_err(|e| {
+        Diagnostic::new_at(
+            if e == ValueError::SelfLoop {
+                DiagnosticKind::SelfLoop
+            } else {
+                DiagnosticKind::InvalidTarget
+            },
+            range.clone(),
+        )
+    })
 }

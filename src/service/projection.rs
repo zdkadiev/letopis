@@ -1,3 +1,5 @@
+#[cfg(test)]
+use super::document::reach_checkpoint;
 use super::{
     CacheWrite, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileRow,
     FileSystem, KnowledgeMetadata, Markdown, NodeMetadata, ParsedFile, RefreshOutcome,
@@ -27,7 +29,8 @@ enum FileChange {
     Remove(RepoPath),
 }
 impl PreparedProjection {
-    pub(super) fn add_counts(&self, outcome: &mut RefreshOutcome) {
+    /// Returns `outcome` with this projection's file change counted.
+    pub(super) fn add_counts(&self, mut outcome: RefreshOutcome) -> RefreshOutcome {
         match &self.file {
             FileChange::Upsert(row) => {
                 outcome.files_updated += 1;
@@ -35,7 +38,18 @@ impl PreparedProjection {
             }
             FileChange::Remove(_) => outcome.files_removed += 1,
         }
+        outcome
     }
+}
+/// Inputs for projecting one observed file against the previously published graph.
+pub(super) struct FileProjection<'a, F, M> {
+    pub(super) filesystem: &'a F,
+    pub(super) markdown: &'a M,
+    pub(super) base_revision: u64,
+    pub(super) path: &'a RepoPath,
+    pub(super) observed: &'a Observation,
+    pub(super) previous: Option<&'a FileRow>,
+    pub(super) graph: &'a EffectiveGraph,
 }
 pub(super) struct EffectiveGraph {
     knowledge: BTreeMap<KnowledgeId, KnowledgeMetadata>,
@@ -174,14 +188,17 @@ pub(super) fn prepare_removal(
 }
 
 pub(super) fn prepare_file<F: FileSystem, M: Markdown>(
-    filesystem: &F,
-    markdown: &M,
-    base_revision: u64,
-    path: &RepoPath,
-    observed: &Observation,
-    previous: Option<&FileRow>,
-    graph: &EffectiveGraph,
+    request: &FileProjection<'_, F, M>,
 ) -> DocumentResult<PreparedProjection> {
+    let FileProjection {
+        filesystem,
+        markdown,
+        base_revision,
+        path,
+        observed,
+        previous,
+        graph,
+    } = *request;
     let captured = filesystem.read_file(path)?.ok_or_else(fail_changed)?;
     if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
         return Err(fail_changed());
@@ -200,7 +217,7 @@ pub(super) fn prepare_file<F: FileSystem, M: Markdown>(
         file.error.clone_from(&previous.error);
     } else {
         match markdown.parse_file(path, &captured.bytes) {
-            Ok(parsed) => prepare_valid(&mut prepared, parsed, graph.list_file_ids(path)),
+            Ok(parsed) => prepared = prepare_valid(prepared, parsed, graph.list_file_ids(path)),
             Err(errors) => {
                 file.valid = false;
                 file.error = Some(
@@ -230,10 +247,10 @@ fn build_file_row(path: &RepoPath, captured: &CapturedFile, hash: Sha256) -> Fil
 }
 
 fn prepare_valid(
-    prepared: &mut PreparedProjection,
+    mut prepared: PreparedProjection,
     parsed: Option<ParsedFile>,
     old_ids: Vec<KnowledgeId>,
-) {
+) -> PreparedProjection {
     prepared.cleared = old_ids;
     if let Some(parsed) = parsed {
         prepared.edges = parsed.edges;
@@ -260,6 +277,7 @@ fn prepare_valid(
         .filter(|id| !prepared.search.iter().any(|text| &text.metadata.id == *id))
         .cloned()
         .collect();
+    prepared
 }
 
 pub(super) fn publish<W: CacheWrite>(
@@ -273,7 +291,7 @@ pub(super) fn publish<W: CacheWrite>(
         unit.delete_node(&EdgeTarget::Knowledge(id))?;
     }
     #[cfg(test)]
-    super::document::checkpoint("cleared");
+    reach_checkpoint("cleared");
     for text in &prepared.search {
         unit.upsert_node(&NodeMetadata::Knowledge(text.metadata.clone()))?;
     }
@@ -281,18 +299,18 @@ pub(super) fn publish<W: CacheWrite>(
         unit.insert_edge(edge)?;
     }
     #[cfg(test)]
-    super::document::checkpoint("projections");
+    reach_checkpoint("projections");
     for text in prepared.search {
         unit.replace_text(&text.metadata.id, &text.search_text)?;
     }
     #[cfg(test)]
-    super::document::checkpoint("fts");
+    reach_checkpoint("fts");
     match prepared.file {
         FileChange::Upsert(row) => unit.upsert_file(&row)?,
         FileChange::Remove(path) => unit.delete_file(&path)?,
     }
     #[cfg(test)]
-    super::document::checkpoint("fingerprints");
+    reach_checkpoint("fingerprints");
     Ok(())
 }
 

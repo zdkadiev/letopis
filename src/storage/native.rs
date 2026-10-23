@@ -5,6 +5,8 @@ use std::{
     sync::OnceLock,
 };
 
+// SAFETY: this matches the C definition compiled by build.rs, which implements
+// SQLite's extension entry-point ABI against the same bundled headers.
 unsafe extern "C" {
     fn letopis_vec1_init(
         database: *mut sqlite3,
@@ -33,13 +35,13 @@ pub(super) fn register_vec1() -> StorageResult<()> {
 #[cfg(test)]
 mod tests {
     use super::register_vec1;
+    use crate::storage::connection::open_database;
 
     #[test]
     fn native_capabilities_match_pinned_stack() {
         register_vec1().unwrap();
         let root = tempfile::TempDir::new().unwrap();
-        let connection =
-            super::super::connection::open_database(&root.path().join("native.db")).unwrap();
+        let connection = open_database(&root.path().join("native.db")).unwrap();
         assert!(rusqlite::version_number() >= 3_051_003);
         let info: String = connection
             .query_row("SELECT vec1_info()", [], |row| row.get(0))

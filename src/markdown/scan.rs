@@ -120,7 +120,12 @@ fn build_layout(
         }
         let id = KnowledgeId::new(path.clone(), anchor)
             .map_err(|_| Diagnostic::new_at(DiagnosticKind::InvalidTarget, begin..end))?;
+        #[expect(
+            clippy::expect_used,
+            reason = "find_element_bounds returns ordered ranges"
+        )]
         let bytes = ByteSpan::new(begin, end).expect("heading ranges are ordered");
+        #[expect(clippy::expect_used, reason = "a nonempty element spans ordered lines")]
         let lines = LineRange::new(
             calculate_line_number(text, begin),
             calculate_line_number(text, end.saturating_sub(1)),

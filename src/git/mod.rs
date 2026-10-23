@@ -1,3 +1,4 @@
+//! Git process implementation of the application snapshot contract.
 mod cli;
 mod constants;
 mod objects;

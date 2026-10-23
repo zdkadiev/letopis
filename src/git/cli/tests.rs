@@ -1,11 +1,11 @@
-use super::GitCli;
+use super::{GitCli, parse_candidates};
 use crate::git::{
     constants::SNAPSHOT_REF_PREFIX,
     process::{GitProcess, check_version},
 };
 use crate::process_test_support as fixture;
 use crate::{
-    domain::{RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN},
+    domain::RepoPath,
     open_git_snapshots,
     service::{DocumentErrorKind, GitSnapshots, SnapshotErrorKind, SnapshotFile},
 };
@@ -58,8 +58,8 @@ fn discovers_root_from_subdirectory() {
     for format in fixture::FORMATS {
         let repo = TempRepo::new(format);
         let expected_length = match format {
-            ObjectFormat::Sha1 => SHA1_OID_HEX_LEN,
-            ObjectFormat::Sha256 => SHA256_OID_HEX_LEN,
+            ObjectFormat::Sha1 => 40,
+            ObjectFormat::Sha256 => 64,
         };
         // Act
         let git = GitCli::open(repo.get_subdir()).unwrap();
@@ -123,23 +123,6 @@ fn subprocess_drains_and_reaps_on_io_failure() {
     assert!(!child_exists, "Git child must be reaped");
 }
 
-fn supervise_policy_worker() {
-    fixture::supervise_test(
-        "git::cli::tests::process_removes_inherited_overrides_and_hardens_writes",
-        &[
-            ("LETOPIS_POLICY_WORKER", "1"),
-            ("GIT_DIR", "CANARY_DIR"),
-            ("GIT_WORK_TREE", "CANARY_WORKTREE"),
-            ("GIT_INDEX_FILE", "CANARY_INDEX"),
-            ("GIT_OBJECT_DIRECTORY", "CANARY_OBJECTS"),
-            ("GIT_CONFIG_COUNT", "1"),
-            ("GIT_CONFIG_KEY_0", "core.bare"),
-            ("GIT_CONFIG_VALUE_0", "true"),
-            ("GIT_CONFIG_PARAMETERS", "CANARY_CONFIG"),
-        ],
-    );
-}
-
 #[test]
 fn process_removes_inherited_overrides_and_hardens_writes() {
     if std::env::var_os("LETOPIS_POLICY_WORKER").is_none() {
@@ -174,18 +157,6 @@ fn process_removes_inherited_overrides_and_hardens_writes() {
     ] {
         assert!(text.contains(flag), "missing {flag}");
     }
-}
-
-fn create_newline_repository_pair(parent: &TempRepo, format: ObjectFormat) -> (PathBuf, PathBuf) {
-    let sibling = parent.get_root().join("repo");
-    let target = parent.get_root().join("repo\n");
-    for root in [&sibling, &target] {
-        parent.run_git_successfully(
-            &["init", "-q", format.to_init_arg(), root.to_str().unwrap()],
-            None,
-        );
-    }
-    (sibling, target)
 }
 
 #[test]
@@ -368,7 +339,7 @@ fn candidates_exclude_raw_git_metadata_components() {
     // Arrange: Git itself forbids adding .git paths to its real index.
     let raw = b".git/bad#anchor.md\0nested/.git/bad\xff.markdown\0.git-notes.md\0";
     // Act
-    let candidates = super::parse_candidates(raw).unwrap();
+    let candidates = parse_candidates(raw).unwrap();
     // Assert
     assert_eq!(
         candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -395,8 +366,8 @@ fn rejects_non_absence_errors_when_inspecting_object_alternates() {
 #[test]
 fn rejects_unterminated_candidates_and_accepts_empty_output() {
     // Arrange / Act
-    let malformed = super::parse_candidates(b"note.md").unwrap_err();
-    let empty = super::parse_candidates(b"").unwrap();
+    let malformed = parse_candidates(b"note.md").unwrap_err();
+    let empty = parse_candidates(b"").unwrap();
     // Assert
     assert_eq!(malformed.get_kind(), DocumentErrorKind::InternalError);
     assert!(empty.is_empty());
@@ -458,4 +429,33 @@ fn hardens_tree_and_ref_writes_with_git_fsync_settings() {
         assert!(arguments.lines().any(|arg| arg == "core.fsync=all"));
         assert!(arguments.lines().any(|arg| arg == "core.fsyncMethod=fsync"));
     }
+}
+
+fn supervise_policy_worker() {
+    fixture::supervise_test(
+        "git::cli::tests::process_removes_inherited_overrides_and_hardens_writes",
+        &[
+            ("LETOPIS_POLICY_WORKER", "1"),
+            ("GIT_DIR", "CANARY_DIR"),
+            ("GIT_WORK_TREE", "CANARY_WORKTREE"),
+            ("GIT_INDEX_FILE", "CANARY_INDEX"),
+            ("GIT_OBJECT_DIRECTORY", "CANARY_OBJECTS"),
+            ("GIT_CONFIG_COUNT", "1"),
+            ("GIT_CONFIG_KEY_0", "core.bare"),
+            ("GIT_CONFIG_VALUE_0", "true"),
+            ("GIT_CONFIG_PARAMETERS", "CANARY_CONFIG"),
+        ],
+    );
+}
+
+fn create_newline_repository_pair(parent: &TempRepo, format: ObjectFormat) -> (PathBuf, PathBuf) {
+    let sibling = parent.get_root().join("repo");
+    let target = parent.get_root().join("repo\n");
+    for root in [&sibling, &target] {
+        parent.run_git_successfully(
+            &["init", "-q", format.to_init_arg(), root.to_str().unwrap()],
+            None,
+        );
+    }
+    (sibling, target)
 }

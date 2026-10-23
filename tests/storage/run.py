@@ -43,7 +43,7 @@ def run_command(argv: list[str], *, cwd: Path, env: dict[str, str],
 
 
 def hash_inputs(root):
-    paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs', 'Makefile', '.cargo/mutants.toml',
+    paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs', 'Makefile',
               'rust-toolchain.toml', 'clippy.toml', '.dockerignore',
               'docs/zkit/letopis/mechanics/storage-schema.sql')]
     for name in ('src', 'vendor', 'examples', 'tests', 'scripts'):

@@ -1,7 +1,9 @@
 use super::{
     CacheWrite, CorpusFiles, DocumentError, DocumentErrorKind, DocumentResult, Documents, FileRow,
     FileStat, FileSystem, Markdown, RefreshOutcome, Storage, StorageRead,
-    projection::{EffectiveGraph, PreparedProjection, prepare_file, prepare_removal, publish},
+    projection::{
+        EffectiveGraph, FileProjection, PreparedProjection, prepare_file, prepare_removal, publish,
+    },
 };
 use crate::domain::{RepoPath, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -98,35 +100,37 @@ impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> DocumentService<G, 
         };
         let mut unit = self.storage.begin_cache_write()?;
         #[cfg(test)]
-        checkpoint("begun");
+        reach_checkpoint("begun");
         let mut outcome = build_outcome(state.revision, true);
         for (path, check_missing) in delta.removed {
             if check_missing && self.filesystem.stat_file(&path)?.is_some() {
                 return Err(fail_changed());
             }
             let prepared = prepare_removal(state.revision, path, &graph);
-            apply_projection(&mut unit, &mut graph, prepared, &mut outcome)?;
+            graph.apply(&prepared);
+            outcome = apply_projection(&mut unit, prepared, outcome)?;
         }
         for (path, observation) in delta.updated {
-            let prepared = prepare_file(
-                &self.filesystem,
-                &self.markdown,
-                state.revision,
-                &path,
-                &observation,
-                state.files.get(&path),
-                &graph,
-            )?;
-            apply_projection(&mut unit, &mut graph, prepared, &mut outcome)?;
+            let prepared = prepare_file(&FileProjection {
+                filesystem: &self.filesystem,
+                markdown: &self.markdown,
+                base_revision: state.revision,
+                path: &path,
+                observed: &observation,
+                previous: state.files.get(&path),
+                graph: &graph,
+            })?;
+            graph.apply(&prepared);
+            outcome = apply_projection(&mut unit, prepared, outcome)?;
         }
         graph.reconcile_sources(&self.filesystem, &mut unit)?;
         #[cfg(test)]
-        checkpoint("before_commit");
+        reach_checkpoint("before_commit");
         #[cfg(test)]
         tests::process::fail_late(&mut unit)?;
         outcome.revision = unit.commit()?;
         #[cfg(test)]
-        checkpoint("after_commit");
+        reach_checkpoint("after_commit");
         Ok(outcome)
     }
 }
@@ -139,15 +143,15 @@ impl<G: CorpusFiles, F: FileSystem, M: Markdown, S: Storage> Documents
             return Ok(build_outcome(preliminary.revision, false));
         }
         #[cfg(test)]
-        checkpoint("detected");
+        reach_checkpoint("detected");
         drop(preliminary);
         let _lock = self.filesystem.lock_index()?;
         #[cfg(test)]
-        checkpoint("locked");
+        reach_checkpoint("locked");
         let state = self.read_file_state()?;
         let delta = self.detect_changes(&state)?;
         #[cfg(test)]
-        checkpoint("redetected");
+        reach_checkpoint("redetected");
         if delta.is_empty() && state.revision != 0 {
             return Ok(build_outcome(state.revision, false));
         }
@@ -195,16 +199,15 @@ fn is_racy(previous: &FileRow, now: Option<i64>) -> bool {
 
 fn apply_projection<W: CacheWrite>(
     unit: &mut W,
-    graph: &mut EffectiveGraph,
     prepared: PreparedProjection,
-    outcome: &mut RefreshOutcome,
-) -> DocumentResult<()> {
+    outcome: RefreshOutcome,
+) -> DocumentResult<RefreshOutcome> {
     if prepared.base_revision != outcome.revision {
         return Err(fail_changed());
     }
-    prepared.add_counts(outcome);
-    graph.apply(&prepared);
-    publish(unit, prepared)
+    let outcome = prepared.add_counts(outcome);
+    publish(unit, prepared)?;
+    Ok(outcome)
 }
 
 fn build_outcome(revision: u64, published: bool) -> RefreshOutcome {
@@ -228,4 +231,4 @@ pub(super) fn fail_changed() -> DocumentError {
 mod tests;
 
 #[cfg(test)]
-pub(super) use tests::process::checkpoint;
+pub(super) use tests::process::reach_checkpoint;

@@ -1,18 +1,22 @@
 use super::{
     GitCli,
     constants::{
-        BLOB_KIND, COMMIT_KIND, EXECUTABLE_FILE_MODE, GITLINK_KIND, GITLINK_MODE,
-        REGULAR_FILE_MODE, SYMLINK_MODE, TREE_KIND, TREE_MODE,
+        BLOB_KIND, CAT_FILE_COMMAND, COMMIT_KIND, EXECUTABLE_FILE_MODE, GITLINK_KIND, GITLINK_MODE,
+        HASH_OBJECT_COMMAND, MKTREE_COMMAND, REGULAR_FILE_MODE, SYMLINK_MODE, TREE_KIND, TREE_MODE,
     },
 };
 use crate::{
     domain::{BlobOid, RepoPath, TreeOid},
     service::{SnapshotEntry, SnapshotError, SnapshotErrorKind, SnapshotFile},
+    utils::SERVICE_DIRECTORY,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
     ffi::OsString,
 };
+
+const FOREIGN_OID_FORMAT: &str = "OID does not match repository object format";
+const MISSING_SNAPSHOT_PATH: &str = "snapshot path is missing";
 
 pub(super) struct ObjectDb<'a> {
     pub(super) git: &'a GitCli,
@@ -37,6 +41,13 @@ impl ObjectDb<'_> {
         }
         root.write(self)
     }
+    pub(super) fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
+        let raw = self.run(
+            &[HASH_OBJECT_COMMAND, "-w", "--no-filters", "--stdin"],
+            Some(bytes),
+        )?;
+        BlobOid::parse(self.parse_oid_text(&raw)?).map_err(|_| make_integrity_error())
+    }
     pub(super) fn create_tree_from_blobs(
         &self,
         entries: &[SnapshotEntry],
@@ -46,7 +57,7 @@ impl ObjectDb<'_> {
             if entry.oid.as_str().len() != self.git.oid_len {
                 return Err(SnapshotError::new(
                     SnapshotErrorKind::InvalidRequest,
-                    "OID does not match repository object format",
+                    FOREIGN_OID_FORMAT,
                 ));
             }
             self.verify_object(
@@ -76,40 +87,29 @@ impl ObjectDb<'_> {
                 .into_iter()
                 .find(|e| e.name == part.as_bytes())
                 .ok_or_else(|| {
-                    SnapshotError::new(SnapshotErrorKind::NotFound, "snapshot path is missing")
+                    SnapshotError::new(SnapshotErrorKind::NotFound, MISSING_SNAPSHOT_PATH)
                 })?;
             if parts.peek().is_none() {
-                if entry.kind != BLOB_KIND {
-                    return Err(SnapshotError::new(
-                        SnapshotErrorKind::InvalidRequest,
-                        "snapshot path is not a blob",
-                    ));
-                }
-                return self.verify_object(
-                    &entry.oid,
-                    BLOB_KIND,
-                    SnapshotErrorKind::InternalError,
-                    SnapshotErrorKind::InternalError,
-                );
+                return self.read_leaf_blob(&entry);
             }
             if entry.kind != TREE_KIND {
                 return Err(SnapshotError::new(
                     SnapshotErrorKind::NotFound,
-                    "snapshot path is missing",
+                    MISSING_SNAPSHOT_PATH,
                 ));
             }
             current = entry.oid;
         }
         Err(SnapshotError::new(
             SnapshotErrorKind::NotFound,
-            "snapshot path is missing",
+            MISSING_SNAPSHOT_PATH,
         ))
     }
     pub(super) fn validate_tree(&self, oid: &TreeOid) -> Result<(), SnapshotError> {
         if oid.as_str().len() != self.git.oid_len {
             return Err(SnapshotError::new(
                 SnapshotErrorKind::InvalidRequest,
-                "OID does not match repository object format",
+                FOREIGN_OID_FORMAT,
             ));
         }
         self.verify_object(
@@ -164,7 +164,7 @@ impl ObjectDb<'_> {
         wrong_type: SnapshotErrorKind,
     ) -> Result<Vec<u8>, SnapshotError> {
         let info = self.run(
-            &["cat-file", "--batch-check"],
+            &[CAT_FILE_COMMAND, "--batch-check"],
             Some(format!("{oid}\n").as_bytes()),
         )?;
         if info == format!("{oid} missing\n").as_bytes() {
@@ -178,12 +178,12 @@ impl ObjectDb<'_> {
         if fields[1] != kind {
             return Err(SnapshotError::new(wrong_type, "unexpected Git object type"));
         }
-        let bytes = self.run(&["cat-file", kind, oid], None)?;
+        let bytes = self.run(&[CAT_FILE_COMMAND, kind, oid], None)?;
         if fields[2].parse::<usize>().ok() != Some(bytes.len()) {
             return Err(make_integrity_error());
         }
         let actual_raw = self.run(
-            &["hash-object", "-t", kind, "--no-filters", "--stdin"],
+            &[HASH_OBJECT_COMMAND, "-t", kind, "--no-filters", "--stdin"],
             Some(&bytes),
         )?;
         let actual = self.parse_oid_text(&actual_raw)?;
@@ -191,13 +191,6 @@ impl ObjectDb<'_> {
             return Err(make_integrity_error());
         }
         Ok(bytes)
-    }
-    pub(super) fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
-        let raw = self.run(
-            &["hash-object", "-w", "--no-filters", "--stdin"],
-            Some(bytes),
-        )?;
-        BlobOid::parse(self.parse_oid_text(&raw)?).map_err(|_| make_integrity_error())
     }
     pub(super) fn run(
         &self,
@@ -212,6 +205,20 @@ impl ObjectDb<'_> {
     }
     fn parse_tree_oid(&self, raw: &[u8]) -> Result<TreeOid, SnapshotError> {
         TreeOid::parse(self.parse_oid_text(raw)?).map_err(|_| make_integrity_error())
+    }
+    fn read_leaf_blob(&self, entry: &Entry) -> Result<Vec<u8>, SnapshotError> {
+        if entry.kind != BLOB_KIND {
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InvalidRequest,
+                "snapshot path is not a blob",
+            ));
+        }
+        self.verify_object(
+            &entry.oid,
+            BLOB_KIND,
+            SnapshotErrorKind::InternalError,
+            SnapshotErrorKind::InternalError,
+        )
     }
     fn parse_oid_text<'a>(&self, raw: &'a [u8]) -> Result<&'a str, SnapshotError> {
         let text = std::str::from_utf8(raw)
@@ -250,7 +257,7 @@ impl<'a> Directory<'a> {
                 format!("{TREE_MODE} {TREE_KIND} {}\t{name}\0", oid.as_str()).as_bytes(),
             );
         }
-        db.parse_tree_oid(&db.run(&["mktree", "-z"], Some(&input))?)
+        db.parse_tree_oid(&db.run(&[MKTREE_COMMAND, "-z"], Some(&input))?)
     }
 }
 
@@ -260,7 +267,7 @@ fn validate_paths(paths: &[&RepoPath]) -> Result<(), SnapshotError> {
         let path = path.as_str();
         let mut parts = path.split('/');
         if parts.clone().any(|part| part.eq_ignore_ascii_case(".git"))
-            || parts.next() == Some(".letopis")
+            || parts.next() == Some(SERVICE_DIRECTORY)
             || !unique.insert(path)
         {
             return Err(SnapshotError::new(

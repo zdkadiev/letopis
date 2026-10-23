@@ -1,4 +1,4 @@
-use super::{connection::map_sqlite, vectors};
+use super::{connection::map_sqlite, vectors, work::prune_unreferenced};
 use crate::{
     domain::Sha256,
     service::{
@@ -7,7 +7,8 @@ use crate::{
 };
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 
-pub struct SqliteVectorWrite<'a> {
+#[derive(Debug)]
+pub(crate) struct SqliteVectorWrite<'a> {
     transaction: Transaction<'a>,
     failed: bool,
 }
@@ -30,7 +31,7 @@ impl<'a> SqliteVectorWrite<'a> {
 }
 impl VectorWrite for SqliteVectorWrite<'_> {
     fn prune_unreferenced(&mut self) -> StorageResult<()> {
-        let result = super::work::prune_unreferenced(&self.transaction);
+        let result = prune_unreferenced(&self.transaction);
         self.failed |= result.is_err();
         result
     }

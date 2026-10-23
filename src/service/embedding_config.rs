@@ -4,8 +4,10 @@ use crate::utils::JsonValue;
 use serde_json::{Map, Value};
 use std::{fmt, num::NonZeroUsize};
 
-const MIN_DIMENSIONS: usize = 2;
-const MAX_DIMENSIONS: usize = 4096;
+/// Smallest embedding vector length a provider may return.
+pub(crate) const MIN_DIMENSIONS: usize = 2;
+/// Largest embedding vector length a provider may return.
+pub(crate) const MAX_DIMENSIONS: usize = 4096;
 const ROOT_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retries"];
 
 /// Supported finite protocol selection.
@@ -110,12 +112,7 @@ impl fmt::Debug for EmbeddingConfig {
             .finish_non_exhaustive()
     }
 }
-fn reject_config() -> EmbeddingError {
-    EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)
-}
-fn map_config_error(cause: impl std::error::Error + Send + Sync + 'static) -> EmbeddingError {
-    EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
-}
+
 fn validate_parameters(parameters: &Map<String, Value>) -> EmbeddingResult<()> {
     if parameters
         .get("base_url")
@@ -138,6 +135,7 @@ fn validate_parameters(parameters: &Map<String, Value>) -> EmbeddingResult<()> {
     }
     Ok(())
 }
+
 fn read_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<NonZeroUsize>> {
     parameters
         .get("dimensions")
@@ -151,6 +149,7 @@ fn read_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<No
         })
         .transpose()
 }
+
 fn verify_execution_identity(original: &Value, bytes: &[u8]) -> EmbeddingResult<()> {
     let JsonValue(canonical) =
         serde_json::from_slice::<JsonValue<false>>(bytes).map_err(map_config_error)?;
@@ -159,6 +158,11 @@ fn verify_execution_identity(original: &Value, bytes: &[u8]) -> EmbeddingResult<
     }
     Ok(())
 }
+
+fn map_config_error(cause: impl std::error::Error + Send + Sync + 'static) -> EmbeddingError {
+    EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
+}
+
 fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
     match original {
         Value::Number(number) if number.is_u64() => number.as_u64() == canonical.as_u64(),
@@ -181,8 +185,13 @@ fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
     }
 }
 
+fn reject_config() -> EmbeddingError {
+    EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)
+}
+
 #[cfg(test)]
 mod tests {
+    use super::EmbeddingConfig;
     use crate::utils::JsonValue;
 
     #[test]
@@ -199,7 +208,7 @@ mod tests {
         // Arrange
         let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":0} null"#;
         // Act
-        let result = super::EmbeddingConfig::parse(bytes);
+        let result = EmbeddingConfig::parse(bytes);
         // Assert
         assert!(result.is_err());
     }

@@ -5,21 +5,6 @@ use letopis::{
 };
 use tempfile::TempDir;
 
-fn unwrap_current<T>(value: VectorOutcome<T>) -> T {
-    match value {
-        VectorOutcome::Current(value) => value,
-        VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
-    }
-}
-fn read_failure(
-    storage: &mut impl Storage,
-    identity: &Sha256,
-    hash: &Sha256,
-) -> Option<EmbeddingFailure> {
-    let mut read = storage.begin_read().unwrap();
-    assert_eq!(read.get_revision(), 0);
-    unwrap_current(read.read_failure(identity, hash).unwrap())
-}
 #[test]
 fn reservation_is_durable_only_after_commit_and_survives_reopen() {
     // Catches implicit commit, forgotten persisted counters, and off-by-one budgets.
@@ -291,5 +276,22 @@ fn reject_stale_actions(storage: &mut impl Storage, m1: &Sha256, m2: &Sha256) {
                 panic!("stale writer accepted");
             }
         }
+    }
+}
+
+fn read_failure(
+    storage: &mut impl Storage,
+    identity: &Sha256,
+    hash: &Sha256,
+) -> Option<EmbeddingFailure> {
+    let mut read = storage.begin_read().unwrap();
+    assert_eq!(read.get_revision(), 0);
+    unwrap_current(read.read_failure(identity, hash).unwrap())
+}
+
+fn unwrap_current<T>(value: VectorOutcome<T>) -> T {
+    match value {
+        VectorOutcome::Current(value) => value,
+        VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
     }
 }

@@ -1,10 +1,6 @@
 use letopis::open_embedding_provider;
 use letopis::service::{EmbeddingConfig, EmbeddingProvider};
 
-fn parse_config(bytes: &[u8]) -> EmbeddingConfig {
-    EmbeddingConfig::parse(bytes).unwrap()
-}
-
 #[test]
 fn ignores_object_order_for_identity() {
     // Arrange
@@ -45,21 +41,6 @@ use serde_json::{Value, json};
 use std::{num::NonZeroUsize, process::Command};
 use support::embedding::{FixtureReply, HttpFixture};
 
-fn build_config(provider: &str, url: &str, extras: &Value) -> EmbeddingConfig {
-    let mut parameters = extras.as_object().unwrap().clone();
-    parameters.insert("base_url".to_owned(), url.into());
-    parse_config(
-        &serde_json::to_vec(&json!({"provider": provider, "model":"fixture",
-        "parameters": parameters, "max_retries":3}))
-        .unwrap(),
-    )
-}
-fn start_fixture(body: &Value) -> HttpFixture {
-    HttpFixture::start(FixtureReply::Status {
-        status: 200,
-        body: body.to_string(),
-    })
-}
 #[test]
 fn sends_native_request_without_silent_truncation_or_unknown_parameters() {
     // Arrange
@@ -330,24 +311,6 @@ fn rejects_invalid_endpoint_schemes_userinfo_and_incomplete_hosts() {
         // Assert
         assert!(result.is_err(), "{endpoint}");
     }
-}
-fn run_isolated(name: &str, key: Option<&str>, extras: &[(&str, &str)]) -> bool {
-    if std::env::var_os("LETOPIS_PROVIDER_CHILD").is_some() {
-        return false;
-    }
-    let mut command = Command::new(std::env::current_exe().unwrap());
-    command
-        .args(["--exact", name])
-        .env("LETOPIS_PROVIDER_CHILD", "1")
-        .env_remove("OPENAI_API_KEY");
-    if let Some(key) = key {
-        command.env("OPENAI_API_KEY", key);
-    }
-    for (name, value) in extras {
-        command.env(name, value);
-    }
-    assert!(command.status().unwrap().success());
-    true
 }
 #[test]
 fn rejects_compatible_index_and_vector_failures() {
@@ -834,29 +797,6 @@ fn rejects_object_wire_components_indices_and_wrapped_responses() {
     }
 }
 
-fn build_response(protocol: &str) -> Value {
-    if protocol == "ollama" {
-        json!({"model":"fixture-alias","embeddings":[[1,2,3]]})
-    } else {
-        json!({"data":[{"index":0,"embedding":[1,2,3]}]})
-    }
-}
-
-fn assert_rejected_response(protocol: &str, reply: FixtureReply) {
-    // Arrange
-    let server = HttpFixture::start(reply);
-    let config = build_config(protocol, &server.get_base_url(), &json!({}));
-    // Act
-    let error = open_embedding_provider()
-        .unwrap()
-        .embed(&config, &["knowledge-secret"], None)
-        .unwrap_err();
-    // Assert
-    assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
-    assert!(!format!("{error} {error:?}").contains("secret"));
-    assert_eq!(server.take_requests().len(), 1);
-}
-
 #[test]
 fn bounds_both_protocol_bodies_with_and_without_content_length() {
     if run_isolated(
@@ -927,4 +867,67 @@ fn rejects_trailing_response_tokens_and_excessive_depth() {
     ] {
         assert_rejected_response("ollama", FixtureReply::Status { status: 200, body });
     }
+}
+
+fn start_fixture(body: &Value) -> HttpFixture {
+    HttpFixture::start(FixtureReply::Status {
+        status: 200,
+        body: body.to_string(),
+    })
+}
+
+fn run_isolated(name: &str, key: Option<&str>, extras: &[(&str, &str)]) -> bool {
+    if std::env::var_os("LETOPIS_PROVIDER_CHILD").is_some() {
+        return false;
+    }
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command
+        .args(["--exact", name])
+        .env("LETOPIS_PROVIDER_CHILD", "1")
+        .env_remove("OPENAI_API_KEY");
+    if let Some(key) = key {
+        command.env("OPENAI_API_KEY", key);
+    }
+    for (name, value) in extras {
+        command.env(name, value);
+    }
+    assert!(command.status().unwrap().success());
+    true
+}
+
+fn build_response(protocol: &str) -> Value {
+    if protocol == "ollama" {
+        json!({"model":"fixture-alias","embeddings":[[1,2,3]]})
+    } else {
+        json!({"data":[{"index":0,"embedding":[1,2,3]}]})
+    }
+}
+
+fn assert_rejected_response(protocol: &str, reply: FixtureReply) {
+    // Arrange
+    let server = HttpFixture::start(reply);
+    let config = build_config(protocol, &server.get_base_url(), &json!({}));
+    // Act
+    let error = open_embedding_provider()
+        .unwrap()
+        .embed(&config, &["knowledge-secret"], None)
+        .unwrap_err();
+    // Assert
+    assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
+    assert!(!format!("{error} {error:?}").contains("secret"));
+    assert_eq!(server.take_requests().len(), 1);
+}
+
+fn build_config(provider: &str, url: &str, extras: &Value) -> EmbeddingConfig {
+    let mut parameters = extras.as_object().unwrap().clone();
+    parameters.insert("base_url".to_owned(), url.into());
+    parse_config(
+        &serde_json::to_vec(&json!({"provider": provider, "model":"fixture",
+        "parameters": parameters, "max_retries":3}))
+        .unwrap(),
+    )
+}
+
+fn parse_config(bytes: &[u8]) -> EmbeddingConfig {
+    EmbeddingConfig::parse(bytes).unwrap()
 }

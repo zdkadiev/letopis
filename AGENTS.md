@@ -15,7 +15,7 @@ The directory structure must reflect responsibilities and dependency boundaries:
 
 - `src/domain/`: pure entities, values, and rules; no filesystem, process, Git, SQL, HTTP, or CLI orchestration.
 - `src/service/`: application-owned traits and concrete application services. Define small interfaces in `service/mod.rs`; keep each concrete service struct and its implementations in a separate responsibility-named file. Services depend on domain types and their interfaces, not concrete technology implementations.
-- `src/git/`, `src/storage/`, `src/embedding/`, `src/markdown/`, and `src/filesystem/`: separate responsibility-named modules, introduced when their tasks implement them. Concrete structs implement the application-owned traits. These modules do not orchestrate one another.
+- `src/git/`, `src/storage/`, `src/embedding/`, `src/markdown/`, `src/filesystem/`, and `src/process/`: separate responsibility-named modules, introduced when their tasks implement them. Concrete structs implement the application-owned traits. These modules do not orchestrate one another.
 - `src/cli/`: argument parsing, dispatch, command handlers, and output formatting. Handlers convert input into typed requests and invoke service interfaces; business rules belong to services/domain. Handlers do not call storage/Git/embedding adapters directly.
 - `src/lib.rs`: composition root with actual constructor calls wiring adapters into services and services into handlers through interfaces. Module declarations and reexports alone are not composition.
 - `src/main.rs`, when introduced: thin CLI entry point using the assembly from `lib.rs`.
@@ -32,10 +32,13 @@ Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful
 - Replace meaningful repeated domain/protocol literals with clearly named constants near their owning module; use SCREAMING_SNAKE_CASE. Do not replace literals mechanically or collect unrelated constants in a global bag.
 - Keep functions and methods focused: aim for about 40 lines, with 60 lines as the upper limit. Split longer implementations into cohesive named helpers, not arbitrary wrappers or compressed formatting. Apply the same rule to tests and test helpers.
 - Use ownership and borrowing deliberately; add cloning, shared ownership, locks, or dynamic dispatch only for an actual need.
+- Choose dispatch in this order: a concrete type, then a generic bound, then `dyn Trait`. Use `dyn` only where a generic cannot work, such as an optional collaborator (`Option<&mut dyn Trait>`, where `None` has no concrete type), a type-erased error cause (`Box<dyn Error + Send + Sync>`), a stored test hook (`Box<dyn FnOnce()>`), or a generic parameter list that would spread through public signatures.
+- Do not use `unwrap`/`expect` in production code; return a typed `Result`. `expect` is allowed only for an invariant guaranteed by construction; mark it `#[expect(clippy::expect_used, reason = "...")]` and state the invariant in the reason. Tests may use both. A detected programming bug is a panic, an expected failure is an error.
+- Every public type implements `Debug`.
 - Model finite alternatives with enums and expected failures with typed `Result`. Document public APIs as described in [readability and documentation](#readability-and-documentation). Preserve useful internal error causes while keeping public diagnostics free of secrets and raw knowledge/provider/subprocess payloads.
 - Compose ordinary storage queries with SeaQuery and typed table/column identifiers; execute through rusqlite using bound values from the private storage/query.rs helper. Keep builder types inside storage. Raw SQL is reserved for schemas, SQLite introspection/PRAGMAs/native probes, and specialized FTS5/vec1 search or native commands; format substantial SQL across readable lines. Never interpolate user values or render them into SQL with to_string.
 - Keep I/O synchronous according to the design; do not add an async runtime without an agreed requirement. Product Git commands belong in the Git process adapter and use argv/stdin, never shell interpolation.
-- Standard Clippy checks and the explicitly selected pedantic checks in `Cargo.toml` are enabled; see the development guide for each rule and its purpose. `dbg!`, `todo!`, and `unimplemented!` are denied. Do not enable all of `restriction`, `pedantic`, or `nursery` indiscriminately. Fix the underlying finding rather than adding a blanket allowance; any exception must be narrow and explain its reason. Public fallible APIs document `# Errors`, and public APIs that can panic document `# Panics`.
+- Standard Clippy checks and the explicitly selected pedantic checks in `Cargo.toml` are enabled; see the development guide for each rule and its purpose. `dbg!`, `todo!`, and `unimplemented!` are denied. Do not enable all of `restriction`, `pedantic`, or `nursery` indiscriminately. Fix the underlying finding rather than adding a blanket allowance; any exception must be narrow and explain its reason, written as `#[expect(lint, reason = "...")]` rather than `#[allow]`, so the exception fails the build when it is no longer needed. Public fallible APIs document `# Errors`, and public APIs that can panic document `# Panics`.
 
 ## Code reading order
 
@@ -54,6 +57,7 @@ Apply these rules to new and touched code only.
 - Prefer early exits: `let Some(x) = value else { return ... };` and `?` over nested `match` and `if let`. Keep nesting to two levels.
 - Use newtypes and enums instead of bare primitives: `SnapshotId(String)` rather than `String`, an enum rather than `bool` flags.
 - Group more than three or four parameters into a request struct.
+- Do not use `&mut` parameters as output: a function returns its result instead of filling an argument (`fn count(..) -> Counts`, then merge at the caller). `&mut self` for state the type owns is fine. Allowed exceptions: signatures fixed by a trait or external API (`fmt`, `Read`/`Write` streams, `rusqlite::Connection` transactions) and handles that are the resource itself, not a result container. Apply to new and touched code only.
 - Use iterator chains while they read well (three or four steps); split longer chains into named steps instead of a manual loop or one long expression.
 - Write explicit types in signatures; do not use `impl Trait` where it hides meaning.
 - Keep files focused on one responsibility, roughly 300-500 lines; split a file that grows far beyond that.
@@ -71,21 +75,13 @@ Run commands from the repository root; from elsewhere use `make -C <path> <targe
 | --- | --- | --- |
 | `make check` | `cargo fmt --check`, `cargo check` (all targets), Clippy with `-D warnings`, root tests | Required for every product Rust change. |
 | `make verify` | `make check`, strict Rustdoc (`RUSTDOCFLAGS='-D warnings'`), root tests in the release profile | Before claiming completion of a task that changes `src/`, public documentation, or dependencies. |
-| `make mutants` | `cargo mutants` over the root crate with locked, offline cargo | Mutation testing, see below. |
 | `python3 -B tests/storage/run.py --platform host\|linux --evidence <new directory>` | Schema parity, runner tests, native SQLite/vec1 capabilities, copied standalone executable and its linkage | When storage, native stack, build, or vendored inputs change. Evidence goes to a new directory, never over existing evidence. |
-
-### Mutation testing
-
-Passing tests prove that the checked behavior works, not that the tests would notice a break. Mutation testing changes the code (flips a condition, replaces a return value, removes a call) and requires at least one test to fail for every change.
-
-- Requires `cargo-mutants` (`cargo install --locked cargo-mutants`); it is a developer tool and is not part of `Cargo.lock`. Its output directory `mutants.out*` is git-ignored.
-- For behavioral changes in `src/`, run it over the changed code only: `git diff main > mutants.diff` and `make mutants ARGS='--in-diff mutants.diff'`. Run it over the whole crate before merging a task into `main` and after changes to domain rules, storage, or change detection.
-- Every surviving mutant is either killed by a new or stronger test (assert the observable result, not just that the call did not fail) or recorded as equivalent: list the mutant and the reason in the task card, spec, or plan, and exclude it narrowly in `.cargo/mutants.toml` with a comment. Do not exclude a whole file or function to make the run pass.
-- Timeouts and unviable mutants are not survivors, but report their counts. Do not shorten the run by lowering the timeout without saying so.
-- Report the mutation result as caught / missed / timeout / unviable counts for the scope that was actually run. Mutation testing complements `make check`; it does not replace it, and it does not apply to documentation-only edits.
 
 ### Review and reporting
 
+- A test must not assert its own ground truth: do not compute the expected value with the code under test or repeat the implementation in the assertion. Use independent literals or an independent oracle.
+- A `TODO` names an issue (`// TODO(#123): ...`); otherwise fix it now or record it in the task card.
+- Mutation-check the tests you write: after a test passes, temporarily break the code it covers by hand (flip a condition, change a returned value, remove a call) and confirm the test fails, then restore the code. A test that still passes does not verify that behavior; strengthen it. No tooling is required; do not leave mutations in the tree.
 - Structure tests as Arrange, Act, Assert: prepare inputs/fixtures, execute the behavior, then check results. Use explicit phase comments where they clarify boundaries; repeat phases for genuinely sequential scenarios. Keep helpers private and keep scenario assertions visible.
 - Test meaningful behavior and failure paths for behavioral changes. Import-only or documentation-only edits do not need new behavioral tests.
 - Before claiming completion, verify the actual changed tree. Report exact commands/results and any unrun checks or platform limits.

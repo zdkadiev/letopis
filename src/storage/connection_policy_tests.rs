@@ -211,7 +211,7 @@ impl<'a> IgnoredPolicy<'a> {
         let result = unsafe {
             ffi::sqlite3_set_authorizer(
                 connection.handle(),
-                Some(ignore_policy_setter),
+                Some(accept_policy_setting),
                 policy.as_ptr().cast_mut().cast(),
             )
         };
@@ -230,7 +230,7 @@ impl Drop for IgnoredPolicy<'_> {
     }
 }
 
-unsafe extern "C" fn ignore_policy_setter(
+unsafe extern "C" fn accept_policy_setting(
     context: *mut c_void,
     action: c_int,
     name: *const c_char,

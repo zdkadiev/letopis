@@ -160,34 +160,6 @@ impl EmbeddingProvider for Provider {
         }
     }
 }
-fn open_storage(root: &TempDir) -> SqliteStorage {
-    SqliteStorage::open(&root.path().join("cache"), &root.path().join("vectors")).unwrap()
-}
-fn publish(storage: &mut SqliteStorage, files: &mut Files, path: &str, body: &str) -> Sha256 {
-    let bytes = format!("<!-- letopis: {{\"created_at\":1}} -->\n{body}").into_bytes();
-    let mut parsed = parse(&RepoPath::parse(path).unwrap(), &bytes)
-        .unwrap()
-        .unwrap();
-    let element = parsed.elements.remove(0);
-    let mut unit = storage.begin_cache_write().unwrap();
-    unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
-        id: element.element.id.clone(),
-        uri: element.element.id,
-        kind: ElementKind::Vertex,
-        hash: element.element.hash,
-        created_at: 1,
-        source_snapshot: None,
-        lines: element.element.lines,
-        search_hash: element.search_hash,
-    }))
-    .unwrap();
-    unit.replace_text(&KnowledgeId::parse(path).unwrap(), &element.search_text)
-        .unwrap();
-    unit.commit().unwrap();
-    files.documents.insert(path.into(), bytes);
-    element.search_hash
-}
-
 #[test]
 fn configuration_is_reread_and_provider_validation_precedes_identity_reset() {
     // Arrange
@@ -360,10 +332,6 @@ fn rejected_vector_input_drops_poisoned_unit_before_recording_failure() {
 
 mod process;
 
-pub(super) fn checkpoint(stage: &str) {
-    process::checkpoint(stage);
-}
-
 #[test]
 fn rejects_a_provider_vector_that_violates_the_first_requested_dimension() {
     // Arrange: no stored dimension can mask the configuration's requested size.
@@ -519,4 +487,37 @@ fn captured_query_rejects_invalid_provider_policy_without_reset_or_http() {
         service.storage.begin_read().unwrap().get_config_identity(),
         Some(captured.get_identity())
     );
+}
+
+fn open_storage(root: &TempDir) -> SqliteStorage {
+    SqliteStorage::open(&root.path().join("cache"), &root.path().join("vectors")).unwrap()
+}
+
+fn publish(storage: &mut SqliteStorage, files: &mut Files, path: &str, body: &str) -> Sha256 {
+    let bytes = format!("<!-- letopis: {{\"created_at\":1}} -->\n{body}").into_bytes();
+    let mut parsed = parse(&RepoPath::parse(path).unwrap(), &bytes)
+        .unwrap()
+        .unwrap();
+    let element = parsed.elements.remove(0);
+    let mut unit = storage.begin_cache_write().unwrap();
+    unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
+        id: element.element.id.clone(),
+        uri: element.element.id,
+        kind: ElementKind::Vertex,
+        hash: element.element.hash,
+        created_at: 1,
+        source_snapshot: None,
+        lines: element.element.lines,
+        search_hash: element.search_hash,
+    }))
+    .unwrap();
+    unit.replace_text(&KnowledgeId::parse(path).unwrap(), &element.search_text)
+        .unwrap();
+    unit.commit().unwrap();
+    files.documents.insert(path.into(), bytes);
+    element.search_hash
+}
+
+pub(super) fn reach_checkpoint(stage: &str) {
+    process::reach_checkpoint(stage);
 }

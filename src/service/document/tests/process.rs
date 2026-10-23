@@ -5,6 +5,7 @@ use crate::{
     filesystem::LocalFileSystem,
     git::GitCli,
     markdown::MarkdownParser,
+    open_documents,
     service::{
         CacheWrite, Documents, EmbeddingFailure, FileRow, FileSystem, NodeMetadata, QueryError,
         Storage, StorageError, StorageRead, StorageResult, StoredNode, VectorOutcome, VectorWrite,
@@ -17,6 +18,7 @@ use std::{
     fs::{self, File},
     io::{BufRead, BufReader, Read, Write},
     os::unix::{
+        fs::MetadataExt,
         net::{UnixListener, UnixStream},
         process::ExitStatusExt,
     },
@@ -55,7 +57,7 @@ thread_local! {
     static FAIL_LATE: RefCell<bool> = const { RefCell::new(false) };
 }
 
-pub(in crate::service) fn checkpoint(name: &str) {
+pub(in crate::service) fn reach_checkpoint(name: &str) {
     CONTROL.with_borrow_mut(|control| {
         if let Some(stream) = control {
             writeln!(stream, "{name}").unwrap();
@@ -83,16 +85,6 @@ pub(in crate::service) fn fail_late<W: CacheWrite>(unit: &mut W) -> StorageResul
     Ok(())
 }
 
-fn build_service(root: &Path) -> Service {
-    let git = GitCli::open(root).unwrap();
-    let mut filesystem = LocalFileSystem::open(git.get_root()).unwrap();
-    filesystem.configure_process_test(TIME, Box::new(|| checkpoint("contended")));
-    let directory = filesystem.open_service_directory().unwrap();
-    let storage =
-        SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory).unwrap();
-    DocumentService::new(git, filesystem, MarkdownParser::new(), storage)
-}
-
 #[test]
 #[ignore = "subprocess entry; invoked only by the production schedule tests"]
 fn run_child() {
@@ -103,16 +95,16 @@ fn run_child() {
     stream.set_read_timeout(Some(WAIT)).unwrap();
     stream.set_write_timeout(Some(WAIT)).unwrap();
     CONTROL.with_borrow_mut(|control| *control = Some(stream));
-    checkpoint("connected");
+    reach_checkpoint("connected");
     if let Some(mode) = mode.strip_prefix("normal-") {
         run_normal_service(&root, mode);
-        checkpoint("finished");
+        reach_checkpoint("finished");
         return;
     }
     let mut service = build_service(&root);
     if mode == "hold" {
         let _guard = service.filesystem.lock_index().unwrap();
-        checkpoint("holding");
+        reach_checkpoint("holding");
     } else {
         FAIL_LATE.with_borrow_mut(|enabled| *enabled = mode == "fail");
         let result = service.refresh();
@@ -131,15 +123,7 @@ fn run_child() {
         }
     }
     drop(service);
-    checkpoint("finished");
-}
-
-fn run_normal_service(root: &Path, mode: &str) {
-    LocalFileSystem::configure_next_process_test(TIME, Box::new(|| checkpoint("contended")));
-    let mut service = crate::open_documents(root).unwrap();
-    checkpoint("opened");
-    let outcome = service.refresh().unwrap();
-    assert_eq!(outcome.published, mode != "noop");
+    reach_checkpoint("finished");
 }
 
 #[test]
@@ -325,61 +309,12 @@ struct State {
     files: Vec<FileRow>,
     tokens: Tokens,
 }
-fn read_tokens(connection: &Connection) -> Tokens {
-    connection.execute_batch("CREATE VIRTUAL TABLE IF NOT EXISTS temp.tokens USING fts5vocab(main, text_index, instance);").unwrap();
-    connection
-        .prepare("SELECT term, doc, col, offset FROM temp.tokens ORDER BY term, doc, col, offset")
-        .unwrap()
-        .query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
-        })
-        .unwrap()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap()
-}
-fn read_state(root: &Path) -> State {
-    let mut storage = build_service(root).storage;
-    let mut read = storage.begin_read().unwrap();
-    let connection = Connection::open(root.join(".letopis/cache.db")).unwrap();
-    State {
-        revision: read.get_revision(),
-        nodes: read.list_nodes().unwrap(),
-        edges: read.list_edges(None).unwrap(),
-        files: read.list_files().unwrap(),
-        tokens: read_tokens(&connection),
-    }
-}
 #[derive(Debug, PartialEq)]
 struct VectorState {
     identity: Option<Sha256>,
     vector: VectorOutcome<Option<Vec<f32>>>,
     failure: VectorOutcome<Option<EmbeddingFailure>>,
     query_error: Option<QueryError>,
-}
-fn read_vectors(root: &Path) -> VectorState {
-    let mut storage = build_service(root).storage;
-    let mut read = storage.begin_read().unwrap();
-    let identity = Sha256::digest(b"model identity");
-    VectorState {
-        identity: read.get_config_identity(),
-        vector: read
-            .read_vector(&identity, &Sha256::digest(b"retained vector"))
-            .unwrap(),
-        failure: read
-            .read_failure(&identity, &Sha256::digest(b"failed vector"))
-            .unwrap(),
-        query_error: read.read_query_error().unwrap(),
-    }
-}
-fn read_git_objects(root: &Path) -> Vec<u8> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["count-objects", "-v"])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    output.stdout
 }
 struct Fixture {
     root: TempDir,
@@ -488,14 +423,11 @@ impl Fixture {
                 "i.md" => INVALID,
                 _ => continue,
             };
-            let stat = LocalFileSystem::open(self.root.path())
-                .unwrap()
-                .stat_file(&file.path)
-                .unwrap()
-                .unwrap();
-            file.size = stat.size;
-            file.mtime_ns = stat.mtime_ns;
-            file.inode = stat.inode;
+            // Independent oracle: observe the file with std, not the adapter under test.
+            let metadata = fs::metadata(self.root.path().join(file.path.as_str())).unwrap();
+            file.size = metadata.len();
+            file.mtime_ns = metadata.mtime() * 1_000_000_000 + metadata.mtime_nsec();
+            file.inode = metadata.ino();
             file.hash = Sha256::digest(contents.as_bytes());
             file.checked_at_ns = TIME;
             if file.path.as_str() == "i.md" {
@@ -515,21 +447,6 @@ impl Fixture {
         expected
     }
 }
-fn seed_vectors(storage: &mut SqliteStorage) {
-    let identity = Sha256::digest(b"model identity");
-    storage.reset_vectors(&identity).unwrap();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
-        panic!("identity changed");
-    };
-    unit.store_vector(&Sha256::digest(b"retained vector"), &[1.0, 0.0], 2)
-        .unwrap();
-    let failure = Sha256::digest(b"failed vector");
-    assert!(unit.reserve_attempt(&failure, 3).unwrap());
-    unit.record_failure(&failure, "safe failure").unwrap();
-    unit.set_query_error(7, "safe query error").unwrap();
-    unit.commit().unwrap();
-}
-
 #[test]
 fn sigkill_keeps_exact_old_or_complete_new_publication() {
     for cut in CUTS {
@@ -611,7 +528,6 @@ fn waiting_publisher_redetects_newer_edit_after_owner_is_killed() {
     owner.kill();
     waiter.resume();
     waiter.finish();
-    use std::os::unix::fs::MetadataExt;
     assert_eq!(
         fs::metadata(fixture.root.path().join(".letopis/index.lock"))
             .unwrap()
@@ -664,4 +580,90 @@ fn late_storage_error_rolls_back_every_cache_mutation() {
         read_state(fixture.root.path()),
         fixture.build_expected(NEW, "BravoToken")
     );
+}
+
+fn run_normal_service(root: &Path, mode: &str) {
+    LocalFileSystem::configure_next_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
+    let mut service = open_documents(root).unwrap();
+    reach_checkpoint("opened");
+    let outcome = service.refresh().unwrap();
+    assert_eq!(outcome.published, mode != "noop");
+}
+
+fn read_state(root: &Path) -> State {
+    let mut storage = build_service(root).storage;
+    let mut read = storage.begin_read().unwrap();
+    let connection = Connection::open(root.join(".letopis/cache.db")).unwrap();
+    State {
+        revision: read.get_revision(),
+        nodes: read.list_nodes().unwrap(),
+        edges: read.list_edges(None).unwrap(),
+        files: read.list_files().unwrap(),
+        tokens: read_tokens(&connection),
+    }
+}
+
+fn read_tokens(connection: &Connection) -> Tokens {
+    connection.execute_batch("CREATE VIRTUAL TABLE IF NOT EXISTS temp.tokens USING fts5vocab(main, text_index, instance);").unwrap();
+    connection
+        .prepare("SELECT term, doc, col, offset FROM temp.tokens ORDER BY term, doc, col, offset")
+        .unwrap()
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
+}
+
+fn read_vectors(root: &Path) -> VectorState {
+    let mut storage = build_service(root).storage;
+    let mut read = storage.begin_read().unwrap();
+    let identity = Sha256::digest(b"model identity");
+    VectorState {
+        identity: read.get_config_identity(),
+        vector: read
+            .read_vector(&identity, &Sha256::digest(b"retained vector"))
+            .unwrap(),
+        failure: read
+            .read_failure(&identity, &Sha256::digest(b"failed vector"))
+            .unwrap(),
+        query_error: read.read_query_error().unwrap(),
+    }
+}
+
+fn build_service(root: &Path) -> Service {
+    let git = GitCli::open(root).unwrap();
+    let mut filesystem = LocalFileSystem::open(git.get_root()).unwrap();
+    filesystem.configure_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
+    let directory = filesystem.open_service_directory().unwrap();
+    let storage =
+        SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory).unwrap();
+    DocumentService::new(git, filesystem, MarkdownParser::new(), storage)
+}
+
+fn read_git_objects(root: &Path) -> Vec<u8> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["count-objects", "-v"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    output.stdout
+}
+
+fn seed_vectors(storage: &mut SqliteStorage) {
+    let identity = Sha256::digest(b"model identity");
+    storage.reset_vectors(&identity).unwrap();
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+        panic!("identity changed");
+    };
+    unit.store_vector(&Sha256::digest(b"retained vector"), &[1.0, 0.0], 2)
+        .unwrap();
+    let failure = Sha256::digest(b"failed vector");
+    assert!(unit.reserve_attempt(&failure, 3).unwrap());
+    unit.record_failure(&failure, "safe failure").unwrap();
+    unit.set_query_error(7, "safe query error").unwrap();
+    unit.commit().unwrap();
 }

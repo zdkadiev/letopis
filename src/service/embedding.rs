@@ -10,7 +10,8 @@ use std::{collections::BTreeSet, num::NonZeroUsize, time::Duration};
 const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 /// Coordinates ready configuration, durable document work and transient queries.
-pub struct EmbeddingService<S, F, M, P> {
+#[derive(Debug)]
+pub(crate) struct EmbeddingService<S, F, M, P> {
     storage: S,
     files: F,
     markdown: M,
@@ -20,7 +21,7 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
     EmbeddingService<S, F, M, P>
 {
     /// Construct the application service from its owned boundary implementations.
-    pub fn new(storage: S, files: F, markdown: M, provider: P) -> Self {
+    pub(crate) fn new(storage: S, files: F, markdown: M, provider: P) -> Self {
         Self {
             storage,
             files,
@@ -135,20 +136,61 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
             .transpose()
     }
 
-    fn read_dimensions(
-        &mut self,
-        config: &EmbeddingConfig,
-    ) -> EmbeddingResult<VectorOutcome<Option<NonZeroUsize>>> {
-        self.storage
-            .begin_read()
+    fn drain_ready(&mut self, config: &EmbeddingConfig) -> EmbeddingResult<DrainOutcome> {
+        let mut skipped = BTreeSet::<KnowledgeId>::new();
+        let mut after = None;
+        loop {
+            let next = self
+                .storage
+                .begin_read()
+                .map_err(map_storage)?
+                .read_next_embedding_work(
+                    &config.get_identity(),
+                    config.get_max_attempts(),
+                    after.as_ref(),
+                )
+                .map_err(map_storage)?;
+            let work = match next {
+                VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
+                VectorOutcome::Current(None) => return self.prune(config),
+                VectorOutcome::Current(Some(work)) => work,
+            };
+            if skipped.contains(&work.id) {
+                after = Some(work.id);
+                continue;
+            }
+            let prepared = match self.prepare_text(&work) {
+                Ok(None) => {
+                    after = Some(work.id.clone());
+                    skipped.insert(work.id);
+                    continue;
+                }
+                Ok(Some(text)) => Ok(text),
+                Err(error) => Err(error),
+            };
+            if self.process_work(config, &work, prepared)? == DrainOutcome::ConfigChanged {
+                return Ok(DrainOutcome::ConfigChanged);
+            }
+            after = None;
+        }
+    }
+
+    fn prune(&mut self, config: &EmbeddingConfig) -> EmbeddingResult<DrainOutcome> {
+        let VectorOutcome::Current(mut unit) = self
+            .storage
+            .begin_vector_write(&config.get_identity())
             .map_err(map_storage)?
-            .read_vector_dimensions(&config.get_identity())
-            .map_err(map_storage)
+        else {
+            return Ok(DrainOutcome::ConfigChanged);
+        };
+        unit.prune_unreferenced().map_err(map_storage)?;
+        unit.commit().map_err(map_storage)?;
+        Ok(DrainOutcome::Complete)
     }
 
     fn prepare_text(&self, work: &EmbeddingWork) -> EmbeddingResult<Option<String>> {
         #[cfg(test)]
-        tests::checkpoint("prepare");
+        tests::reach_checkpoint("prepare");
         let path = RepoPath::parse(work.id.as_str().split('#').next().unwrap_or_default())
             .map_err(|cause| {
                 EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, cause)
@@ -169,6 +211,51 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
             .map(|element| element.search_text))
     }
 
+    fn process_work(
+        &mut self,
+        config: &EmbeddingConfig,
+        work: &EmbeddingWork,
+        text: EmbeddingResult<String>,
+    ) -> EmbeddingResult<DrainOutcome> {
+        let VectorOutcome::Current(dimensions) = self.read_dimensions(config)? else {
+            return Ok(DrainOutcome::ConfigChanged);
+        };
+        match self.reserve(config, &work.search_hash)? {
+            VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
+            VectorOutcome::Current(false) => return Ok(DrainOutcome::Complete),
+            VectorOutcome::Current(true) => {}
+        }
+        #[cfg(test)]
+        tests::reach_checkpoint("reserved");
+        let text = match text {
+            Ok(text) => text,
+            Err(error) => return self.finish_failure(config, &work.search_hash, &error),
+        };
+        let vector = match self.compute_vector(config, &text, dimensions) {
+            Ok(vector) => vector,
+            Err(error) => return self.finish_failure(config, &work.search_hash, &error),
+        };
+        match self.publish_vector(config, &work.search_hash, &vector) {
+            Ok(VectorOutcome::ConfigChanged) => Ok(DrainOutcome::ConfigChanged),
+            Ok(VectorOutcome::Current(())) => Ok(DrainOutcome::Complete),
+            Err(error) if error.get_kind() == EmbeddingErrorKind::InvalidResponse => {
+                self.finish_failure(config, &work.search_hash, &error)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn read_dimensions(
+        &mut self,
+        config: &EmbeddingConfig,
+    ) -> EmbeddingResult<VectorOutcome<Option<NonZeroUsize>>> {
+        self.storage
+            .begin_read()
+            .map_err(map_storage)?
+            .read_vector_dimensions(&config.get_identity())
+            .map_err(map_storage)
+    }
+
     fn reserve(
         &mut self,
         config: &EmbeddingConfig,
@@ -186,6 +273,36 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
             .map_err(map_storage)?;
         unit.commit().map_err(map_storage)?;
         Ok(VectorOutcome::Current(reserved))
+    }
+
+    fn finish_failure(
+        &mut self,
+        config: &EmbeddingConfig,
+        hash: &Sha256,
+        error: &EmbeddingError,
+    ) -> EmbeddingResult<DrainOutcome> {
+        if matches!(
+            self.record_failure(config, hash, error)?,
+            VectorOutcome::ConfigChanged
+        ) {
+            return Ok(DrainOutcome::ConfigChanged);
+        }
+        let failure = self
+            .storage
+            .begin_read()
+            .map_err(map_storage)?
+            .read_failure(&config.get_identity(), hash)
+            .map_err(map_storage)?;
+        match failure {
+            VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
+            VectorOutcome::Current(Some(failure))
+                if failure.attempts < config.get_max_attempts() =>
+            {
+                self.files.wait(RETRY_DELAY)?;
+            }
+            VectorOutcome::Current(_) => {}
+        }
+        Ok(DrainOutcome::Complete)
     }
 
     fn record_failure(
@@ -256,122 +373,6 @@ impl<S: Storage, F: EmbeddingFiles, M: Markdown, P: EmbeddingProvider>
             }
             Err(error) => Err(map_storage(error)),
         }
-    }
-
-    fn process_work(
-        &mut self,
-        config: &EmbeddingConfig,
-        work: &EmbeddingWork,
-        text: EmbeddingResult<String>,
-    ) -> EmbeddingResult<DrainOutcome> {
-        let VectorOutcome::Current(dimensions) = self.read_dimensions(config)? else {
-            return Ok(DrainOutcome::ConfigChanged);
-        };
-        match self.reserve(config, &work.search_hash)? {
-            VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
-            VectorOutcome::Current(false) => return Ok(DrainOutcome::Complete),
-            VectorOutcome::Current(true) => {}
-        }
-        #[cfg(test)]
-        tests::checkpoint("reserved");
-        let text = match text {
-            Ok(text) => text,
-            Err(error) => return self.finish_failure(config, &work.search_hash, &error),
-        };
-        let vector = match self.compute_vector(config, &text, dimensions) {
-            Ok(vector) => vector,
-            Err(error) => return self.finish_failure(config, &work.search_hash, &error),
-        };
-        match self.publish_vector(config, &work.search_hash, &vector) {
-            Ok(VectorOutcome::ConfigChanged) => Ok(DrainOutcome::ConfigChanged),
-            Ok(VectorOutcome::Current(())) => Ok(DrainOutcome::Complete),
-            Err(error) if error.get_kind() == EmbeddingErrorKind::InvalidResponse => {
-                self.finish_failure(config, &work.search_hash, &error)
-            }
-            Err(error) => Err(error),
-        }
-    }
-
-    fn finish_failure(
-        &mut self,
-        config: &EmbeddingConfig,
-        hash: &Sha256,
-        error: &EmbeddingError,
-    ) -> EmbeddingResult<DrainOutcome> {
-        if matches!(
-            self.record_failure(config, hash, error)?,
-            VectorOutcome::ConfigChanged
-        ) {
-            return Ok(DrainOutcome::ConfigChanged);
-        }
-        let failure = self
-            .storage
-            .begin_read()
-            .map_err(map_storage)?
-            .read_failure(&config.get_identity(), hash)
-            .map_err(map_storage)?;
-        match failure {
-            VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
-            VectorOutcome::Current(Some(failure))
-                if failure.attempts < config.get_max_attempts() =>
-            {
-                self.files.wait(RETRY_DELAY)?;
-            }
-            VectorOutcome::Current(_) => {}
-        }
-        Ok(DrainOutcome::Complete)
-    }
-
-    fn drain_ready(&mut self, config: &EmbeddingConfig) -> EmbeddingResult<DrainOutcome> {
-        let mut skipped = BTreeSet::<KnowledgeId>::new();
-        let mut after = None;
-        loop {
-            let next = self
-                .storage
-                .begin_read()
-                .map_err(map_storage)?
-                .read_next_embedding_work(
-                    &config.get_identity(),
-                    config.get_max_attempts(),
-                    after.as_ref(),
-                )
-                .map_err(map_storage)?;
-            let work = match next {
-                VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
-                VectorOutcome::Current(None) => return self.prune(config),
-                VectorOutcome::Current(Some(work)) => work,
-            };
-            if skipped.contains(&work.id) {
-                after = Some(work.id);
-                continue;
-            }
-            let prepared = match self.prepare_text(&work) {
-                Ok(None) => {
-                    after = Some(work.id.clone());
-                    skipped.insert(work.id);
-                    continue;
-                }
-                Ok(Some(text)) => Ok(text),
-                Err(error) => Err(error),
-            };
-            if self.process_work(config, &work, prepared)? == DrainOutcome::ConfigChanged {
-                return Ok(DrainOutcome::ConfigChanged);
-            }
-            after = None;
-        }
-    }
-
-    fn prune(&mut self, config: &EmbeddingConfig) -> EmbeddingResult<DrainOutcome> {
-        let VectorOutcome::Current(mut unit) = self
-            .storage
-            .begin_vector_write(&config.get_identity())
-            .map_err(map_storage)?
-        else {
-            return Ok(DrainOutcome::ConfigChanged);
-        };
-        unit.prune_unreferenced().map_err(map_storage)?;
-        unit.commit().map_err(map_storage)?;
-        Ok(DrainOutcome::Complete)
     }
 
     fn publish_query(

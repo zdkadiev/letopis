@@ -10,7 +10,8 @@ use crate::{
 use rusqlite::{Connection, Transaction, TransactionBehavior, params_from_iter};
 use sea_query::{Expr, ExprTrait, Query};
 
-pub struct SqliteCacheWrite<'a> {
+#[derive(Debug)]
+pub(crate) struct SqliteCacheWrite<'a> {
     transaction: Transaction<'a>,
     failed: bool,
 }

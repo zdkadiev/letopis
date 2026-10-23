@@ -33,7 +33,7 @@ impl Fixture {
         command
             .args([
                 "--exact",
-                "filesystem::test_support::mutation_child",
+                "filesystem::test_support::run_mutation_child",
                 "--nocapture",
             ])
             .env(CHILD_ROOT, &self.0)
@@ -74,7 +74,7 @@ fn wait_for(path: &Path) {
 }
 
 #[test]
-fn mutation_child() {
+fn run_mutation_child() {
     let Some(root) = std::env::var_os(CHILD_ROOT) else {
         return;
     };

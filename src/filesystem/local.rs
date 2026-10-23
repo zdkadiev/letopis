@@ -8,6 +8,7 @@ use crate::{
         CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, EmbedLocks, EmbeddingFiles,
         EmbeddingResult, FileStat, FileSystem,
     },
+    utils::SERVICE_DIRECTORY,
 };
 use rustix::{
     fd::{AsFd, OwnedFd},
@@ -20,12 +21,14 @@ use std::{
     cell::OnceCell,
     error::Error,
     fs::{File, TryLockError},
-    io::{self, Read, Seek, SeekFrom, Write},
+    io::{self, ErrorKind, Read, Seek, SeekFrom, Write},
     path::Path,
     time::{Duration, SystemTime},
 };
 
-const SERVICE_DIRECTORY: &str = ".letopis";
+const COORDINATION_LOCK_ERROR: &str = "cannot observe coordination lock";
+const SERVICE_DIRECTORY_ERROR: &str = "cannot observe service directory";
+const TIMESTAMP_ERROR: &str = "unsupported file timestamp";
 const INDEX_LOCK: &str = "index.lock";
 const EMBED_LOCK: &str = "embed.lock";
 const NANOS_PER_SECOND: i64 = 1_000_000_000;
@@ -252,7 +255,7 @@ impl LocalFileSystem {
         let before = match statat(directory, name, AtFlags::SYMLINK_NOFOLLOW) {
             Ok(stat) => Some(stat),
             Err(Errno::NOENT) => None,
-            Err(cause) => return Err(fail_io("cannot observe coordination lock", cause)),
+            Err(cause) => return Err(fail_io(COORDINATION_LOCK_ERROR, cause)),
         };
         if let Some(stat) = &before {
             build_file_stat(stat)?;
@@ -265,8 +268,7 @@ impl LocalFileSystem {
         let file = opened
             .map(File::from)
             .map_err(|cause| fail_io("cannot open coordination lock", cause))?;
-        let current =
-            fstat(&file).map_err(|cause| fail_io("cannot observe coordination lock", cause))?;
+        let current = fstat(&file).map_err(|cause| fail_io(COORDINATION_LOCK_ERROR, cause))?;
         if let Some(before) = before {
             require_identity(&before, &current)
                 .map_err(|cause| fail_io("coordination lock changed", cause))?;
@@ -320,8 +322,7 @@ impl LocalFileSystem {
 
     fn verify_lock(&self, file: &File, name: &str) -> DocumentResult<()> {
         let directory = self.get_service_directory()?;
-        let pinned =
-            fstat(file).map_err(|cause| fail_io("cannot observe coordination lock", cause))?;
+        let pinned = fstat(file).map_err(|cause| fail_io(COORDINATION_LOCK_ERROR, cause))?;
         verify_entry(directory, name, &pinned)
             .map(|_| ())
             .map_err(|cause| fail_io("coordination lock changed", cause))
@@ -333,8 +334,7 @@ impl LocalFileSystem {
             let _ = self.service.set(directory);
         }
         let directory = self.service.get().ok_or_else(fail_changed)?;
-        let pinned =
-            fstat(directory).map_err(|cause| fail_io("cannot observe service directory", cause))?;
+        let pinned = fstat(directory).map_err(|cause| fail_io(SERVICE_DIRECTORY_ERROR, cause))?;
         verify_entry(&self.root, SERVICE_DIRECTORY, &pinned)
             .map_err(|cause| fail_io("service directory changed", cause))?;
         Ok(directory)
@@ -346,7 +346,7 @@ impl LocalFileSystem {
             Err(cause) => return Err(fail_io("cannot create service directory", cause)),
         }
         let before = statat(&self.root, SERVICE_DIRECTORY, AtFlags::SYMLINK_NOFOLLOW)
-            .map_err(|cause| fail_io("cannot observe service directory", cause))?;
+            .map_err(|cause| fail_io(SERVICE_DIRECTORY_ERROR, cause))?;
         let file = File::from(
             openat(
                 &self.root,
@@ -356,8 +356,7 @@ impl LocalFileSystem {
             )
             .map_err(|cause| fail_io("cannot open service directory", cause))?,
         );
-        let opened =
-            fstat(&file).map_err(|cause| fail_io("cannot observe service directory", cause))?;
+        let opened = fstat(&file).map_err(|cause| fail_io(SERVICE_DIRECTORY_ERROR, cause))?;
         require_identity(&before, &opened)
             .map_err(|cause| fail_io("service directory changed", cause))?;
         fchmod(&file, Mode::RWXU)
@@ -442,7 +441,7 @@ fn reopen_concurrently_created_lock(
 }
 
 fn observe_lock_descriptor(file: &File) -> DocumentResult<FileStat> {
-    let stat = fstat(file).map_err(|cause| fail_io("cannot observe coordination lock", cause))?;
+    let stat = fstat(file).map_err(|cause| fail_io(COORDINATION_LOCK_ERROR, cause))?;
     if stat.st_nlink != 1 {
         return Err(DocumentError::new(
             DocumentErrorKind::InvalidRequest,
@@ -467,18 +466,13 @@ fn build_file_stat(stat: &Stat) -> DocumentResult<FileStat> {
     let size =
         u64::try_from(stat.st_size).map_err(|cause| fail_io("unsupported file size", cause))?;
     let seconds = i64::try_from(i128::from(stat.st_mtime))
-        .map_err(|cause| fail_io("unsupported file timestamp", cause))?;
+        .map_err(|cause| fail_io(TIMESTAMP_ERROR, cause))?;
     let nanos = i64::try_from(i128::from(stat.st_mtime_nsec))
-        .map_err(|cause| fail_io("unsupported file timestamp", cause))?;
+        .map_err(|cause| fail_io(TIMESTAMP_ERROR, cause))?;
     let mtime_ns = seconds
         .checked_mul(NANOS_PER_SECOND)
         .and_then(|value| value.checked_add(nanos))
-        .ok_or_else(|| {
-            DocumentError::new(
-                DocumentErrorKind::InternalError,
-                "unsupported file timestamp",
-            )
-        })?;
+        .ok_or_else(|| DocumentError::new(DocumentErrorKind::InternalError, TIMESTAMP_ERROR))?;
     let device = u64::try_from(i128::from(stat.st_dev))
         .map_err(|cause| fail_io("unsupported file device", cause))?;
     Ok(FileStat {
@@ -498,7 +492,7 @@ where
         match operation() {
             Ok(()) => return Ok(true),
             Err(TryLockError::WouldBlock) => return Ok(false),
-            Err(TryLockError::Error(cause)) if cause.kind() == io::ErrorKind::Interrupted => {}
+            Err(TryLockError::Error(cause)) if cause.kind() == ErrorKind::Interrupted => {}
             Err(cause) => return Err(cause),
         }
     }
@@ -507,7 +501,7 @@ where
 fn retry_io(mut operation: impl FnMut() -> io::Result<()>) -> io::Result<()> {
     loop {
         match operation() {
-            Err(cause) if cause.kind() == io::ErrorKind::Interrupted => {}
+            Err(cause) if cause.kind() == ErrorKind::Interrupted => {}
             result => return result,
         }
     }

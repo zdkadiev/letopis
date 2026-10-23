@@ -157,6 +157,7 @@ mod transport_tests {
     use crate::cli::input::{Request, parse_request};
     use crate::cli::output::write_response;
     use crate::domain::{LineRange, RepoPath, Sha256, TreeOid};
+    use crate::run_cli;
     use crate::service::{
         Background, CheckReport, Checks, CommandError, CommandErrorKind, CommandProblem,
         CommandResult, ElementAddress, InspectedElement, Inspection, Inspections,
@@ -456,7 +457,7 @@ mod transport_tests {
     #[test]
     fn run_cli_uses_real_unavailable_route_and_one_error_envelope() {
         let mut output = vec![];
-        let exit = crate::run_cli(["check".into()], &mut b"{}".as_slice(), &mut output);
+        let exit = run_cli(["check".into()], &mut b"{}".as_slice(), &mut output);
         assert_eq!(exit, 1);
         assert_eq!(
             serde_json::from_slice::<Value>(&output).unwrap(),
@@ -497,7 +498,7 @@ mod transport_tests {
             (vec!["inspect".into()], "{}", "invalid_request"),
         ] {
             let mut output = vec![];
-            assert_eq!(crate::run_cli(args, &mut body.as_bytes(), &mut output), 1);
+            assert_eq!(run_cli(args, &mut body.as_bytes(), &mut output), 1);
             assert_eq!(
                 serde_json::from_slice::<Value>(&output).unwrap()["error"]["code"],
                 code

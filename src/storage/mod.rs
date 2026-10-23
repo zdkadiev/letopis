@@ -5,7 +5,7 @@ mod query;
 mod read;
 mod schema;
 mod sqlite;
-pub use sqlite::SqliteStorage;
+pub(crate) use sqlite::SqliteStorage;
 
 mod cache_write;
 mod files;

@@ -50,10 +50,10 @@ struct SearchFiltersInput {
 #[serde(deny_unknown_fields)]
 struct EmptyInput {}
 
-pub(crate) fn parse_request(args: &[OsString], input: &mut impl Read) -> CommandResult<Request> {
+pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResult<Request> {
     let args = args
         .iter()
-        .map(|arg| arg.to_str().ok_or_else(invalid_request))
+        .map(|arg| arg.to_str().ok_or_else(fail_invalid_request))
         .collect::<CommandResult<Vec<_>>>()?;
     // Validate all argv before reading stdin or constructing any service.
     match args.as_slice() {
@@ -62,14 +62,14 @@ pub(crate) fn parse_request(args: &[OsString], input: &mut impl Read) -> Command
             let paths = dto
                 .paths
                 .iter()
-                .map(|raw| RepoPath::parse(raw).map_err(|_| invalid_request()))
+                .map(|raw| RepoPath::parse(raw).map_err(|_| fail_invalid_request()))
                 .collect::<CommandResult<BTreeSet<_>>>()?;
             Ok(Request::Check(paths.into_iter().collect()))
         }
         ["inspect"] => {
             let dto: InspectInput = read_object(input)?;
             if dto.element_ids.is_empty() {
-                return Err(invalid_request());
+                return Err(fail_invalid_request());
             }
             let ids = dto
                 .element_ids
@@ -80,18 +80,18 @@ pub(crate) fn parse_request(args: &[OsString], input: &mut impl Read) -> Command
         }
         ["search"] => read_search(input).map(Request::Search),
         ["embed", "--drain"] => read_drain(input),
-        _ => Err(invalid_request()),
+        _ => Err(fail_invalid_request()),
     }
 }
-fn read_search(input: &mut impl Read) -> CommandResult<SearchRequest> {
+fn read_search(input: impl Read) -> CommandResult<SearchRequest> {
     let dto: SearchInput = read_object(input)?;
     let limit = usize::try_from(dto.limit)
         .ok()
         .and_then(NonZeroUsize::new)
-        .ok_or_else(invalid_request)?;
+        .ok_or_else(fail_invalid_request)?;
     if let Some(filters) = dto.filters {
         for revision in &filters.source_revisions {
-            TreeOid::parse(revision).map_err(|_| invalid_request())?;
+            TreeOid::parse(revision).map_err(|_| fail_invalid_request())?;
         }
         if filters.needs_recheck.is_some()
             || !filters.sources.is_empty()
@@ -124,7 +124,7 @@ where
         .map(Some)
         .map_err(D::Error::custom)
 }
-fn read_drain(input: &mut impl Read) -> CommandResult<Request> {
+fn read_drain(mut input: impl Read) -> CommandResult<Request> {
     let mut bytes = Vec::new();
     input.read_to_end(&mut bytes).map_err(|cause| {
         CommandError::new_with_cause(
@@ -141,7 +141,7 @@ fn read_drain(input: &mut impl Read) -> CommandResult<Request> {
     }
     Ok(Request::Drain)
 }
-fn read_object<T: DeserializeOwned>(input: &mut impl Read) -> CommandResult<T> {
+fn read_object<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
     let mut bytes = Vec::new();
     input.read_to_end(&mut bytes).map_err(|cause| {
         CommandError::new_with_cause(
@@ -151,7 +151,7 @@ fn read_object<T: DeserializeOwned>(input: &mut impl Read) -> CommandResult<T> {
         )
     })?;
     if bytes.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'{') {
-        return Err(invalid_request());
+        return Err(fail_invalid_request());
     }
     serde_json::from_slice(&bytes).map_err(|cause| {
         CommandError::new_with_cause(
@@ -162,6 +162,6 @@ fn read_object<T: DeserializeOwned>(input: &mut impl Read) -> CommandResult<T> {
     })
 }
 
-fn invalid_request() -> CommandError {
+fn fail_invalid_request() -> CommandError {
     CommandError::new(CommandErrorKind::InvalidRequest, "invalid command input")
 }

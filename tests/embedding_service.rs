@@ -170,35 +170,6 @@ struct Corpus {
     matches: Vec<KnowledgeId>,
     revision: u64,
 }
-fn unwrap_current<T>(value: VectorOutcome<T>) -> T {
-    match value {
-        VectorOutcome::Current(value) => value,
-        VectorOutcome::ConfigChanged => panic!("unexpected configuration change"),
-    }
-}
-fn start_success() -> HttpFixture {
-    HttpFixture::start(FixtureReply::Status {
-        status: 200,
-        body: r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#.into(),
-    })
-}
-fn start_failure() -> HttpFixture {
-    HttpFixture::start(FixtureReply::Status {
-        status: 500,
-        body: "private provider payload".into(),
-    })
-}
-fn start_paused(body: &str) -> (HttpFixture, ResponseBarrier) {
-    let barrier = ResponseBarrier::default();
-    (
-        HttpFixture::start(FixtureReply::Barrier {
-            barrier: barrier.clone(),
-            body: body.into(),
-        }),
-        barrier,
-    )
-}
-
 struct Operation<T> {
     barrier: ResponseBarrier,
     worker: Option<thread::JoinHandle<T>>,
@@ -874,4 +845,36 @@ fn seed_query_error(fixture: &Fixture, config: &EmbeddingConfig) {
     let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
     unit.set_query_error(7, "replacement diagnostic").unwrap();
     unit.commit().unwrap();
+}
+
+fn start_success() -> HttpFixture {
+    HttpFixture::start(FixtureReply::Status {
+        status: 200,
+        body: r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#.into(),
+    })
+}
+
+fn start_failure() -> HttpFixture {
+    HttpFixture::start(FixtureReply::Status {
+        status: 500,
+        body: "private provider payload".into(),
+    })
+}
+
+fn start_paused(body: &str) -> (HttpFixture, ResponseBarrier) {
+    let barrier = ResponseBarrier::default();
+    (
+        HttpFixture::start(FixtureReply::Barrier {
+            barrier: barrier.clone(),
+            body: body.into(),
+        }),
+        barrier,
+    )
+}
+
+fn unwrap_current<T>(value: VectorOutcome<T>) -> T {
+    match value {
+        VectorOutcome::Current(value) => value,
+        VectorOutcome::ConfigChanged => panic!("unexpected configuration change"),
+    }
 }

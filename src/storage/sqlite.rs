@@ -18,7 +18,8 @@ use rustix::fd::AsFd;
 use std::path::Path;
 
 /// `SQLite` implementation of the application storage contract.
-pub struct SqliteStorage {
+#[derive(Debug)]
+pub(crate) struct SqliteStorage {
     // Drop the read-only cache attachment before its last writable connection,
     // so normal SQLite closure can checkpoint and remove cache WAL sidecars.
     vector_writer: Connection,
@@ -31,7 +32,7 @@ impl SqliteStorage {
     /// # Errors
     /// Returns an invalid request for invalid/aliased paths and an internal error
     /// for incompatible schemas, native capabilities, contention or database I/O.
-    pub fn open(cache: &Path, vectors: &Path) -> StorageResult<Self> {
+    pub(crate) fn open(cache: &Path, vectors: &Path) -> StorageResult<Self> {
         let (cache, vectors) = prepare_paths(cache, vectors)?;
         let mut cache_writer = open_database(&cache)?;
         bootstrap_cache(&mut cache_writer)?;
@@ -105,7 +106,7 @@ mod tests {
         let mut storage = SqliteStorage::open_confined(&path, &pinned).unwrap();
         let identity = Sha256::digest(b"confined");
         seed_vector(&mut storage, &identity);
-        // Act: pruning requires the cache attachment added by TK-13.
+        // Act: pruning requires the read-only cache attachment used for hash-reference checks.
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         unit.prune_unreferenced().unwrap();
         unit.commit().unwrap();
@@ -131,28 +132,6 @@ mod tests {
         assert!(!path.join("cache.db-shm").exists());
     }
 
-    fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
-        match outcome {
-            VectorOutcome::Current(value) => value,
-            VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
-        }
-    }
-    fn seed_vector(storage: &mut SqliteStorage, identity: &Sha256) -> i64 {
-        storage.reset_vectors(identity).unwrap();
-        let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
-        let row = unit
-            .store_vector(identity, &[1.0, 0.0, 0.0], 3)
-            .unwrap()
-            .row_id;
-        unit.commit().unwrap();
-        row
-    }
-    fn count_failures(storage: &SqliteStorage) -> i64 {
-        storage
-            .vector_writer
-            .query_row("SELECT count(*) FROM embed_failures", [], |r| r.get(0))
-            .unwrap()
-    }
     #[test]
     fn reset_late_meta_failure_preserves_identity_key_vector_and_query_error() {
         // Arrange a populated native table, then fail after DROP/recreation/deletion.
@@ -254,5 +233,30 @@ mod tests {
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         assert!(unit.store_vector(&identity, &[1.0, 0.0, 0.0], 3).is_err());
         assert!(unit.commit().is_err());
+    }
+
+    fn seed_vector(storage: &mut SqliteStorage, identity: &Sha256) -> i64 {
+        storage.reset_vectors(identity).unwrap();
+        let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
+        let row = unit
+            .store_vector(identity, &[1.0, 0.0, 0.0], 3)
+            .unwrap()
+            .row_id;
+        unit.commit().unwrap();
+        row
+    }
+
+    fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
+        match outcome {
+            VectorOutcome::Current(value) => value,
+            VectorOutcome::ConfigChanged => panic!("unexpected identity change"),
+        }
+    }
+
+    fn count_failures(storage: &SqliteStorage) -> i64 {
+        storage
+            .vector_writer
+            .query_row("SELECT count(*) FROM embed_failures", [], |r| r.get(0))
+            .unwrap()
     }
 }
