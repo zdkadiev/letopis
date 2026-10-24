@@ -85,4 +85,7 @@ writer/reader агентами. Настоящий CLI загружает/ище
 
 Передача TK-15: фиксированный source-linked corpus и production CLI loader в
 `tests/cli/README.md`; генератор/масштаб/RAM/usefulness не выполнены этой задачей.
-Merge/push и закрытие GitHub issue ожидают отдельной команды пользователя.
+По команде пользователя выполнен fast-forward в локальный `main` до `397d3d1`.
+После merge `make verify V=1` PASS: 460/0/4 отдельно в debug и release.
+[GitHub issue #14](https://github.com/zaurkadiev/letopis/issues/14) обновлена
+и закрыта как completed. Push не выполнялся; worktree с raw evidence сохранён.

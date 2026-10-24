@@ -1,6 +1,6 @@
 # TK-14 — Сквозной CLI и начальный навык агента
 
-> Статус: done на ветке codex/TK-14; host/Linux PASS и независимое ревью пройдены. Merge/push ожидают отдельной команды.
+> Статус: done; fast-forward в локальный main, GitHub issue #14 закрыта. Push не выполнялся.
 > Дата: 2026-10-24. Production base: `ae7d2ebf377af9efa46d53ab157cde7d8526be87`.
 > Frozen code/skill checkpoint: `b7d3b44`; Native, новая ветка `codex/TK-14`.
 
@@ -174,8 +174,14 @@ embedding, x86/Windows/NFS/power loss или полном source lifecycle. Chec
 source inspect/filters/traverse/status остаются соответствующим следующим задачам;
 в навыке они явно помечены недоступными. G-1 не закрывается TK-14.
 
-Merge, shared-branch push и закрытие GitHub issue не выполняются этим планом без
-отдельной команды пользователя. Engram task: `entity_77b1f3b8be2c439397f96494020ee809`.
+По команде пользователя 2026-10-24 выполнен fast-forward `main` с `ae7d2eb`
+до `397d3d15475e3a2ff6eb538555aac70b78c03027`. На результате merge свежий
+`make verify V=1` завершился с exit 0: 460 passed / 0 failed / 4 ignored отдельно
+в debug и release; fmt/check/Clippy/strict Rustdoc PASS. Filtered subprocess
+summaries не прибавляются к root counts. Лог: `.artifacts/tk14/integration-2026-10-24/main-verify.log`
+в основном checkout. [GitHub issue #14](https://github.com/zaurkadiev/letopis/issues/14)
+обновлена и закрыта как completed. Push не выполнялся; origin/main остаётся
+на `ae7d2eb`. Worktree сохранён вместе с ignored raw evidence. Engram task: `entity_77b1f3b8be2c439397f96494020ee809`.
 
 Execution ledger, task briefs и review package сохраняются отдельно в
 `.artifacts/tk14/native-complete-b7d3b44/`; исходный plan workspace удаляется
