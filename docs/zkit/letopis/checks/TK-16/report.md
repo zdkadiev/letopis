@@ -1,6 +1,6 @@
 # TK-16 — Local RAM assessment
 
-> Status: local measurements complete; independently reviewed, reporting corrections applied.
+> Status: original local measurements complete; follow-up contention fix passes macOS/Linux gates, mutation sweep pending.
 > Formal 4 GB hardware/budget acceptance: **not assessed**; G-1 remains blocked.
 > Date: 2026-10-24. Base main@ccb15f0; branch tk-16 (renamed from codex/tk-16 at user request).
 > Worktree: /Users/zdkadiev/.codex/worktrees/tk-16/letopis.
@@ -100,7 +100,7 @@ The shared provider was never killed or explicitly unloaded.
 | After first 45-second drain | 1,251 / 98,749 | 98,749 / 0 / 0 | 768 |
 | After repeated 45-second drain | 2,458 / 97,542 | 97,542 / 0 / 0 | 768 |
 
-All observations retain 100k/100k/500k counts and zero invalid files. Populated
+All original measurement observations retain 100k/100k/500k counts and zero invalid files. Populated
 revision changes from 1 before search to 2 after search; all backlog observations
 retain revision 1.
 Populated nonempty searches returned five results and left zero query_error rows.
@@ -118,13 +118,14 @@ continued until its planned interruption and produced 1,251 current vectors.
 Two idle triage searches, one nonempty and one empty, then succeeded under an
 embedding barrier; the repeated overlap also succeeded and returned five results.
 
-This is an intermittent observed failure, not a diagnosed root cause or a fixed
-product bug. The failed window remains included in all-window RAM maxima. Raw
+At the original measurement revision this was an undiagnosed intermittent
+failure. The follow-up correction below separately reproduces and fixes ordinary
+vector-writer contention; it does not rewrite this failed capture. The failed window remains included in all-window RAM maxima. Raw
 error response, timing, process samples and coverage are retained. Its original
 probe asserted before summary emission; that phase's exact exit code was not
 retained and is not invented. The repeat stores explicit scenario outcome and
-signal-PID evidence. No product repair or redesign was attempted under this RAM-
-only request. This failure needs investigation before treating concurrent drain
+signal-PID evidence. No product repair or redesign was attempted during the original RAM-only
+assessment; the later explicit correction is reported separately below. This failure needs investigation before treating concurrent drain
 and search as reliably validated.
 
 ## Meter validation and limits
@@ -150,11 +151,12 @@ the helper exited and was checked gone before the corrected run.
 Three captured-native-fixture checks pass for one-shot/series formats, strict byte
 units and unavailable values. Three disposable semantic controls were caught:
 **3 caught / 0 missed / 0 timeout / 0 unviable**, each restored GREEN. No product
-mutation sweep or unchanged root suite was rerun. Original 146 product/build/test
-hashes still equal the previously verified main snapshot (make verify: 481 passed,
+mutation sweep or unchanged root suite was rerun. At the original measurement revision, all 146 product/build/test
+hashes matched the previously verified main snapshot (make verify: 481 passed,
 0 failed, 5 ignored per profile; 49 Python 3.12 tests). These are reused historical
-gates, not fresh tests in TK-16. No src/dependency/schema/interface/composition
-changes exist; hexagonal module boundaries remain unchanged.
+gates, not fresh tests in TK-16. The original assessment changed no src/dependency/schema/interface/composition.
+The later correction changes only the storage writer policy and tests; no
+interfaces, module dependencies or composition-root wiring change.
 
 ## Reproduction and evidence
 
@@ -171,6 +173,46 @@ Evidence snapshot: 1286 files in `.artifacts/tk16/evidence-manifest.json`,
 SHA-256 `bf6e4f884a7282db3e21621a197b8030942b66f85a57a4be2c6d86028fe54e25`. Corpus databases are excluded from
 that raw-tool snapshot and verified separately. All raw evidence stays in this
 worktree; no merge, push or GitHub issue update is part of this assessment.
+
+## Follow-up: concurrent search/drain correction
+
+After the RAM-only scope was completed, the user requested correction of the
+search failure. [Correction plan](../../../../superpowers/plans/2026-10-24-tk-16-search-contention-fix.md)
+records the separate software change. The original RAM figures above remain
+historical to the pinned TK-15 product binary; they are not new-build measurements.
+
+A competing vector writer reproducibly made search fail before configuration
+read and when clearing or setting query diagnostics after inference. Both paths
+use BEGIN IMMEDIATE on an independent vectors.db writer whose busy timeout was0.
+`SqliteStorage` now sets a5-second SQLite busy timeout only on vector_writer in
+both normal and confined open paths. Cache/read connections keep timeout0. There
+is no application retry loop, new runtime, public interface, schema or lock file.
+Identity is still rechecked after acquiring the writer. Sustained contention
+beyond the bound can still fail; fairness or universal success is not promised.
+The original safe error did not retain its private cause, so its raw capture is
+not presented as a recovered SQLite stack trace.
+
+`cargo test --locked --offline --test search_contention`:3failed before the fix,
+3passed after it. Tests assert exact search results and diagnostic clear/set,
+including successful FTS fallback on a bad provider response. A native policy test
+covers both open paths and unchanged zero cache/read timeout. Three selected
+manual semantic controls are caught:3caught/0missed/0timeout/0unviable; sources were
+restored byte-for-byte and tests pass again. Regressions use a held native writer
+and a100ms observation window, not a fairness proof or formal scheduler model.
+
+Fresh macOS/Linux ARM64 storage acceptance PASS in `contention-host-03` and
+`contention-linux-02/container`: make verify (485passed/0failed/5ignored per debug
+and release profile), strict Rustdoc, schema parity/runner checks, copied native
+executable/linkage and a real60-second provider deadline. Earlier lint-only
+failures remain in fresh separate directories; no lint suppression was added.
+A fresh independent code review found no actionable findings, contingent on gates;
+see `.artifacts/tk16/contention-code-review-01.md`. Full-crate mutation sweep is
+still running; its counts and remaining limits will be recorded separately.
+
+These tests validate search waiting for a competing short vector transaction;
+they do not by themselves certify every reverse drain-under-query interleaving.
+The shared writer policy applies in both directions. No actual4GB run or new
+whole-stack RAM maxima have been claimed.
 
 ## Controller ruling
 
@@ -190,7 +232,7 @@ the frozen evidence manifest in `completion-verification.json`.
 Local RAM observations are available. **TK-16 acceptance is blocked/not assessed**:
 no 4 GB hardware run, no complete OS-cache/shared-buffer attribution, sampled
 rather than absolute concurrent maxima, both overlap query processes missed, and
-one unresolved overlap failure.
+software follow-up mutation verification pending (the original failed capture remains).
 No conclusion that the full stack fits 1 GB or that G-1 passes follows from these
 numbers. The narrowed local assessment is complete; canonical acceptance remains
 blocked. Findings and verification are recorded in the existing Engram store.

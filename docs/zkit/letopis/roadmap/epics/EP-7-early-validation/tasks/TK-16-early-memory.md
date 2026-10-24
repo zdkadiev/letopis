@@ -106,3 +106,17 @@ warm143.704MB, загрузка sampled240.271MB, drain peak15.696–16.351MB.
 Ollama/инструменты в эти значения не входят; пики не складываются. Данные
 выведены из сохранённых395samples/5time logs без нового прогона. Ветка переименована
 пользователем в `tk-16`; исторические receipts сохраняют исходное имя.
+
+### Дополнение: исправление конкуренции search/drain
+
+После локальной RAM-оценки пользователь потребовал устранить сбой. Три сценария
+в `tests/search_contention.rs` воспроизвели internal_error на старом коде и проходят
+после настройки busy_timeout=5s только для vector_writer в обоих open-путях
+`src/storage/sqlite.rs`; `src/storage/connection.rs` уточняет область политики.
+Cache/read сохраняют timeout0, интерфейсы/схема/runtime/lib.rs не менялись.
+Проверены точный результат поиска, очистка/запись query_error и FTS fallback.
+Полные macOS/Linux ARM64 acceptance PASS: make verify485/0/5 в каждом профиле,
+строгий Rustdoc, native/schema/linkage и реальный60-секундный provider deadline.
+Три ручных semantic controls caught; независимое ревью без замечаний. Общий
+mutation-прогон ещё выполняется. Исторические RAM receipts сохраняют прежнюю
+сборку; новая4ГБ приёмка и полный concurrent RAM учёт не заявляются.

@@ -2,7 +2,7 @@ use super::{
     cache_write::SqliteCacheWrite,
     connection::{
         CACHE_DATABASE, ConfinedDirectory, VECTOR_DATABASE, attach_cache, attach_vectors,
-        open_database, prepare_paths,
+        map_sqlite, open_database, prepare_paths,
     },
     read::SqliteRead,
     schema::{bootstrap_cache, bootstrap_vectors},
@@ -15,7 +15,10 @@ use crate::{
 };
 use rusqlite::Connection;
 use rustix::fd::AsFd;
-use std::path::Path;
+use std::{path::Path, time::Duration};
+
+// Drain and query diagnostics share this writer; cache/read connections stay fail-fast.
+const VECTOR_WRITE_WAIT: Duration = Duration::from_secs(5);
 
 /// `SQLite` implementation of the application storage contract.
 #[derive(Debug)]
@@ -32,12 +35,17 @@ impl SqliteStorage {
     /// # Errors
     /// Returns an invalid request for invalid/aliased paths and an internal error
     /// for incompatible schemas, native capabilities, contention or database I/O.
+    /// Vector writes wait up to five seconds for a competing `SQLite` writer; cache
+    /// writes and read connections retain their zero busy timeout.
     pub(crate) fn open(cache: &Path, vectors: &Path) -> StorageResult<Self> {
         let (cache, vectors) = prepare_paths(cache, vectors)?;
         let mut cache_writer = open_database(&cache)?;
         bootstrap_cache(&mut cache_writer)?;
         let mut vector_writer = open_database(&vectors)?;
         bootstrap_vectors(&mut vector_writer)?;
+        vector_writer
+            .busy_timeout(VECTOR_WRITE_WAIT)
+            .map_err(map_sqlite)?;
         attach_cache(&vector_writer, &cache)?;
 
         let read = open_database(&cache)?;
@@ -56,6 +64,9 @@ impl SqliteStorage {
         let mut vector_writer = paths.open_database(VECTOR_DATABASE)?;
         paths.verify()?;
         bootstrap_vectors(&mut vector_writer)?;
+        vector_writer
+            .busy_timeout(VECTOR_WRITE_WAIT)
+            .map_err(map_sqlite)?;
         paths.attach_cache(&vector_writer)?;
         let read = paths.open_database(CACHE_DATABASE)?;
         paths.attach_vectors(&read)?;
@@ -96,6 +107,32 @@ mod tests {
     };
     use std::fs::File;
     use tempfile::TempDir;
+
+    #[test]
+    fn vector_writer_wait_is_bounded_without_changing_cache_or_read_policy() {
+        for confined in [false, true] {
+            // Arrange: exercise both supported open paths against independent databases.
+            let root = TempDir::new().unwrap();
+            let path = root.path().canonicalize().unwrap();
+            let pinned = File::open(&path).unwrap();
+            let storage = if confined {
+                SqliteStorage::open_confined(&path, &pinned).unwrap()
+            } else {
+                SqliteStorage::open(&path.join("cache.db"), &path.join("vectors.db")).unwrap()
+            };
+            // Act / Assert: only vectors writers have the five-second contention budget.
+            for (connection, expected) in [
+                (&storage.vector_writer, 5000),
+                (&storage.cache_writer, 0),
+                (&storage.read, 0),
+            ] {
+                let timeout: i64 = connection
+                    .pragma_query_value(None, "busy_timeout", |r| r.get(0))
+                    .unwrap();
+                assert_eq!(timeout, expected);
+            }
+        }
+    }
 
     #[test]
     fn confined_vector_pruning_uses_read_only_cache_and_closes_cleanly() {

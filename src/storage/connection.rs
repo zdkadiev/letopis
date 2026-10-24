@@ -169,7 +169,8 @@ pub(super) fn map_sqlite(error: rusqlite::Error) -> StorageError {
 
 // Only schema creation and WAL initialization/readiness use this bounded lock wait.
 // The five-second budget applies to each call, not the entire open or command.
-// Ordinary cache/vector writes retain the connection's zero busy timeout.
+// Cache/read connections retain zero busy timeout; SqliteStorage separately
+// configures a bounded wait on its independent vectors writer.
 pub(super) fn wait_for_initialization<T>(
     mut operation: impl FnMut() -> StorageResult<T>,
 ) -> StorageResult<T> {
