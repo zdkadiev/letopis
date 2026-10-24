@@ -1,6 +1,6 @@
 # TK-15 — Reproducible target-scale corpus
 
-> Status: approved by user “Go on with implementation”, 2026-10-24; implementation plan review pending.
+> Status: approved by user “Go on with implementation”, 2026-10-24; implementation plan approved with “Go”; execution started.
 > Base: main@c8ede9efa4a298d12651c2f5a206ab71fc60bed6.
 > Worktree: /Users/zdkadiev/.codex/worktrees/tk-15/letopis; branch tk-15.
 

@@ -110,5 +110,5 @@ Spec coverage: generation/bytes/DAG Task1; current hash/config/failure coverage 
 production route/backlog/model/resume Task3; reproducible handoff Task4; real full
 acceptance/report/final review primary. All five Review Focus entries have named
 checks in owning tasks. File/interface/signature names match across tasks. Four
-reviewable tasks, no product restructuring or #49 implementation. Plan approval
-is the next gate; the user already selected subagent-driven execution.
+reviewable tasks, no product restructuring or #49 implementation. User approved this plan with “Go” on 2026-10-24; subagent-driven execution
+is selected, with stronger implementation models and Luna on light tasks.
