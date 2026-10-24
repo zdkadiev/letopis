@@ -1,6 +1,6 @@
 # TK-15 — Reproducible target-scale corpus
 
-> Status: draft; specification approval pending. Date: 2026-10-24.
+> Status: approved by user “Go on with implementation”, 2026-10-24; implementation plan review pending.
 > Base: main@c8ede9efa4a298d12651c2f5a206ab71fc60bed6.
 > Worktree: /Users/zdkadiev/.codex/worktrees/tk-15/letopis; branch tk-15.
 
@@ -30,15 +30,18 @@ Markdown file; valid targets and acyclic includes. Full loading and all embeddin
 writes must pass through the existing product CLI/executor. Source nodes have no
 embedding work. Metadata, source trees and hashes obey current contracts.
 
-Author proposals for approval, not previously accepted user decisions:
+Author proposals accepted by the instruction to proceed, with the user’s later
+model-routing correction preserved:
 - Python standard-library tooling under tests/target_corpus, plus a small root
   Rust integration-test observer using existing public storage interfaces.
 - A-2 expected profile, approximately 2,000 UTF-8 bytes per marked knowledge
   fragment, and A-5 30 elements/file (last file 10): 3,334 Markdown files.
   Record exact actual sizes; 2,000 is a fixture target, never a product limit.
 - Existing local Ollama model embeddinggemma:300m-qat-q4_0 at explicit loopback
-  base URL http://127.0.0.1:11434; no remote paid provider or model download.
-  The model is already installed locally. Freeze and record the actual model
+  API base URL http://127.0.0.1:11434/api; no remote paid provider or model download.
+  Endpoint prefix clarified from the existing build_endpoint implementation: it
+  appends /embed to the configured prefix. The model is already installed locally.
+  Freeze and record the actual model
   digest, provider/config identity and observed dimension, not a guessed identity.
 - User-selected model split: stronger models own generator design/implementation,
   the Rust observer, difficult fixes and final review. Use gpt-6-luna with medium
@@ -157,8 +160,8 @@ Fresh Luna/medium reviewer: nothing important left. No implementation changes.
 Unchanged branch baseline `make check` exit 0; receipt under
 `.artifacts/tk15/preparation/baseline.log`.
 
-## Open approval
+## Approval and follow-up
 
-Approve the scope and author proposals above, including local real-model full
-population. Then prepare the implementation plan and dispatch tasks according to
-the user-selected model split above.
+User approved proceeding with implementation on 2026-10-24. Next: review the
+implementation plan, then execute with the selected model split. GitHub #49
+tracks parallel drain separately; TK-15 uses the current sequential executor.
