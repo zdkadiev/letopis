@@ -100,9 +100,9 @@ No future-subsystem scaffolding. If a file would exceed 500 lines, split one coh
 - [x] Run all focused Python tests, `make verify` (logs to new evidence), and build/discover release observer/product artifacts. Record actual results once; inspect architecture/no product delta and compare frozen inputs before long run.
 - [x] Generate full target under ignored `.artifacts/tk15/target-01`, validate actual source/input counts/bytes and reproducibility receipts. Capture configured backlog with the production release CLI. No SQL seed or model fixture counts as acceptance.
 - [x] Run real local-model drain, with concise durable progress and bounded observation intervals. Observe current-vector coverage through the release observer. If interrupted/incomplete, retain artifacts and resume; do not mark TK15 done until all criteria are supported. Report measured small/full duration, failures and platform scope.
-- [ ] Fill `docs/zkit/letopis/checks/TK-15/report.md`, task card and this plan with actual evidence/limits. Preserve full-scale inputs/receipts separately from Git. Record Engram using the existing shared store and unchanged provenance.
-- [ ] Dispatch one whole-branch review on the most capable available model with spec/plan/diff/evidence; resolve findings and record any declined scopes. Do not rerun accepted suites unless code changes warrant it.
-- [ ] Archive byte-verified plan ledger/briefs/review artifacts before deleting only owned scratch workspace. Commit task completion docs, retain worktree/evidence, and report ready for the user's later merge/push instruction.
+- [x] Fill `docs/zkit/letopis/checks/TK-15/report.md`, task card and this plan with actual evidence/limits. Preserve full-scale inputs/receipts separately from Git. Record Engram using the existing shared store and unchanged provenance.
+- [x] Dispatch one whole-branch review on the most capable available model with spec/plan/diff/evidence; resolve findings and record any declined scopes. Do not rerun accepted suites unless code changes warrant it.
+- [x] Archive byte-verified plan ledger/briefs/review artifacts before deleting only owned scratch workspace. Commit task completion docs, retain worktree/evidence, and report ready for the user's later merge/push instruction.
 
 ## Self-review
 
@@ -113,4 +113,4 @@ checks in owning tasks. File/interface/signature names match across tasks. Four
 reviewable tasks, no product restructuring or #49 implementation. User approved this plan with “Go” on 2026-10-24; subagent-driven execution
 is selected, with stronger implementation models and Luna on light tasks.
 
-Full acceptance: [report](../../zkit/letopis/checks/TK-15/report.md); actual drain phase7831.240799s,100000/100000current vectors,768dims,missing/eligible/failed/exhausted/invalid0. Final-source observation and unchanged-input checksPASS. Scoped finalfix/evidence review and completion bookkeeping pending.
+Full acceptance: [report](../../zkit/letopis/checks/TK-15/report.md); actual drain phase7831.240799s,100000/100000current vectors,768dims,missing/eligible/failed/exhausted/invalid0. Final-source observation and unchanged-input checksPASS. Scoped finalfix/evidence review approved, no Critical/Important; documented pipeMinor nonblocking. All13rulings retained. Engram completionrevision221;28executionfiles byteverified beforeownedSDDscratchcleanup;rawfulltarget/receipts/worktreepreserved. No mergepushissueclosure.

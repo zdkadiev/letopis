@@ -1,6 +1,6 @@
 # TK-15 — Target corpus and production population
 
-> Status: full acceptance passed; scoped final review and completion bookkeeping pending.
+> Status: completed; full acceptance and scoped final review passed.
 > Date: 2026-10-24. Branch: `tk-15`, base `main@c8ede9e`.
 > Worktree: `/Users/zdkadiev/.codex/worktrees/tk-15/letopis`.
 
@@ -140,7 +140,8 @@ Each recorded control has an intended behavioral RED result and exact-restored
 GREEN; observer controls compile before failing. No full-crate mutation sweep
 was run or implied. Controlled changes: **19 caught / 0 missed / 0 timeout / 0 unviable**,
 across those separate scopes, not a statistical whole-tree mutation result. These
-are historical controls at their captured revisions.
+are historical controls at their captured revisions. An earlier observer control
+that failed to compile was discarded and is outside this selected viable scope.
 
 All four task reviews passed after scoped fixes. The strongest-model whole-branch
 code review at `bbdb447` found no Critical or Important issues. Its Minor lexical
@@ -150,14 +151,18 @@ The other Minor finding is explicitly deferred: `--max-seconds` bounds the direc
 child wait, but a descendant retaining an inherited pipe could delay readers and
 receipts. The current product redirects detached streams; no workload failure was
 established. README documents the limit; no generic process framework was added.
-One scoped final fix/evidence review remains pending; full acceptance and its
-documents are ready for that review.
+Scoped final fix/evidence review approved: `.artifacts/tk15/final-review-acceptance.md`,
+SHA-256 `6f49183774c0131eb71836ec4f1955258e4524782a729c2ba3e8462a4326a9be`. It independently verified
+13 raw receipt hashes, 146 root hashes, nine final tool/binary hashes and both
+4,334-file corpora. All 13 rulings match the ledger; the two omitted inline
+entries were corrected during review. No Critical or Important findings remain;
+the documented pipe-reader Minor is accepted as nonblocking.
 
 ## Controller rulings
 
 The following is the exhaustive chronological ruling record from this plan’s
-execution ledger. Each retains its stated cost if wrong; the reviewed code and
-receipts resolve the concrete acceptance claims separately.
+execution ledger, including inline rulings. Each retains its stated cost if wrong;
+the reviewed code and receipts resolve the concrete acceptance claims separately.
 
 - use base_url http://127.0.0.1:11434/api — current provider appends /embed to prefix — cost if wrong: real-model smoke fails, no populated claim.
 
@@ -167,9 +172,13 @@ receipts resolve the concrete acceptance claims separately.
 
 - optional Rust observer helper belongs in tests/support/target_corpus.rs — current CLI Docker COPY/inventory includes support recursively but not new Python harness directory — cost if wrong: helper ownership lives outside the Python tooling directory, no behavior/scope changes. Observer root tests must not require generated Python files to compile/run. Actual TK15 runner records its own Python inputs.
 
+- deterministic sorting is acceptable at current scope pending measured bottleneck — avoids premature optimization — cost if wrong: validation overhead for4334inputfiles.
+
 - observer requires existing WAL journal mode in addition to recognized version — product open_storage configures journal mode before rejecting full-schema mismatch — avoids header changes to unsupported input — cost if wrong: a legitimate DELETE-mode database needs product initialization before observer; acceptance uses already-created CLI WAL stores. Covered by nonmutation tests.
 
 - Task3 may use actual CLI empty search query for initial refresh — Task2 sample demonstrated configured storage identity without provider inference; avoids unnecessary query/model work — cost if wrong: product smoke fails before fullrun. Counts/real drain independently verified.
+
+- reuse this gate only if fingerprint unchanged at final acceptance — runs independent Rust checks during Python work without repetition — cost if wrong: any later Rust/input change requires a fresh gate.
 
 - generate full immutable inputs while Task3 review runs — only accepted Task1 generator used, no product loading/inference or mutable runner code — cost if wrong: generator artifacts require a new directory after any actual input-generator fix. Full load/drain still waits Task3 review.
 
@@ -198,9 +207,20 @@ No RAM budget, minimum 4 GB machine fit, search latency, model quality, memory
 usefulness, physical power-loss, full source lifecycle or G-1 success is proven.
 TK-16 measures RAM; TK-17 evaluates usefulness on different real-agent inputs.
 
-## Completion pending
+## Completion and retained handoff
 
-All task acceptance criteria are now supported by full-scale receipts. Finish the
-single scoped final fix/evidence review, Engram completion record and byte-verified
-Superpowers execution archive. Preserve worktree and inputs for later integration;
-no merge, push or GitHub issue closure is implied.
+All TK-15 acceptance criteria and review gates passed. The existing shared Engram
+task `entity_22509d20e7184480a77f891f62d7b3e3` is resolved at completion revision
+**221**, commit `e27f125277f5e9f10bcd3bf1b48fa23448e22f53`. Useful findings, limits,
+touched artifacts, source/acceptance commits and evidence references are linked
+and contained; existing task attributes were preserved.
+
+The owned Superpowers scratch workspace was copied and all **28 files** verified
+byte for byte before removing only that workspace. It retained **13 rulings**.
+Archive: `.artifacts/tk15/sdd-complete-84cbdad/`; manifest `archive.json` SHA-256
+`48e53598c99a659b010eb72cd0ca589b1bb53189a92e5fd00b39e905d74242c5`. Raw review reports, corpus, populated
+stores, model/config/binary pins and receipt directories remain in the task
+worktree for TK-16. No unrelated workspace was cleaned.
+
+Branch `tk-15` is ready for the user's later integration instruction. This task
+has not merged, pushed or closed its GitHub issue automatically.

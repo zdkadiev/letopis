@@ -1,6 +1,6 @@
 # TK-15 — Reproducible target-scale corpus
 
-> Status: approved by user “Go on with implementation”, 2026-10-24; implementation plan approved with “Go”; execution started.
+> Status: approved by user “Go on with implementation”, 2026-10-24; implementation plan approved with “Go”; implementation, full acceptance and final review completed.
 > Base: main@c8ede9efa4a298d12651c2f5a206ab71fc60bed6.
 > Worktree: /Users/zdkadiev/.codex/worktrees/tk-15/letopis; branch tk-15.
 
@@ -163,6 +163,6 @@ Unchanged branch baseline `make check` exit 0; receipt under
 ## Approval and follow-up
 
 User approved specification and plan on 2026-10-24. All four tasks and full-scale
-acceptance have passed with the selected model split; scoped final review and
-completion bookkeeping remain. See the [actual report](../../zkit/letopis/checks/TK-15/report.md).
+acceptance and final review have passed with the selected model split. The
+execution record was byte-verified and archived; completion is recorded in Engram. See the [actual report](../../zkit/letopis/checks/TK-15/report.md).
 GitHub #49 tracks parallel drain separately; TK-15 used the current sequential executor.

@@ -1,6 +1,6 @@
 # TK-15 — Подготовить изолированный целевой корпус
 
-> **Статус:** in progress
+> **Статус:** done
 > **Эпик:** [EP-7](../epic.md)
 > **Фаза:** PH-1
 > **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
@@ -70,8 +70,8 @@
 
 ## 9. Отчёт о выполнении
 
-Реализация, четыре проверки задач и полная приёмка завершены; финальный scoped
-review и оформление результата ещё выполняются.
+Реализация, четыре проверки задач, полная приёмка и финальный scoped review
+завершены. No Critical/Important; описанное ограничение pipe-reader — nonblocking Minor.
 Спецификация: [Superpowers](../../../../../../superpowers/specs/2026-10-24-tk-15-target-corpus-design.md),
 [план](../../../../../../superpowers/plans/2026-10-24-tk-15-target-corpus.md),
 [отчёт и evidence](../../../../checks/TK-15/report.md).
@@ -91,3 +91,9 @@ missing/eligible/failed/exhausted/invalid 0. Pin модели/config/binaries с
 25 focused tests passed; 19 ручных semantic controls пойманы в отдельных
 исторических областях, без полного mutation sweep. Отчёт содержит точные команды,
 границы и все решения контроллера. RAM и usefulness относятся к TK-16/TK-17.
+
+Все 13 решений контроллера сохранены в отчёте. Архив Superpowers: 28 файлов
+сверены побайтно; удалён только owned scratch workspace. Корпус, populated stores,
+пины и raw receipts остаются в task worktree для TK-16; есть отдельная незагруженная
+идентичная реплика для воспроизведения backlog. Engram task resolved, revision 221.
+Ветка `tk-15`; merge/push/закрытие GitHub issue этим выполнением не производились.
