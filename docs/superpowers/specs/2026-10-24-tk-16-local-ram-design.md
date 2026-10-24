@@ -2,7 +2,7 @@
 
 Status: user directed “ok just assess ram usage” on 2026-10-24, opting out of
 further design questions. This is a local assessment, not 4 GB hardware acceptance.
-Base main@ccb15f0; branch codex/tk-16; isolated managed worktree tk-16/letopis.
+Base main@ccb15f0; branch tk-16 (renamed from codex/tk-16); isolated managed worktree tk-16/letopis.
 
 ## Intent and constraints
 

@@ -2,7 +2,7 @@
 
 > Status: local measurements complete; independently reviewed, reporting corrections applied.
 > Formal 4 GB hardware/budget acceptance: **not assessed**; G-1 remains blocked.
-> Date: 2026-10-24. Base main@ccb15f0; branch codex/tk-16.
+> Date: 2026-10-24. Base main@ccb15f0; branch tk-16 (renamed from codex/tk-16 at user request).
 > Worktree: /Users/zdkadiev/.codex/worktrees/tk-16/letopis.
 
 ## Scope and result
@@ -47,6 +47,31 @@ used for physical-charge/group maxima; missing/exited-PID samples never become z
 Completeness means the already-selected PID set was captured, not that discovery
 found every workload process. In particular, it does not include the two missed
 query processes.
+
+## CLI-only RSS breakdown
+
+The following separates the `letopis` process from Ollama, Git and measurement
+tools. Values are decimal MB; independent peaks must not be summed.
+
+| Operation | Sampled CLI RSS maximum MB | Native time maximum RSS MB |
+|---|---:|---:|
+| First search with relocated-file revalidation | 265.322 | 266.420 |
+| Warm search | 121.995 | 143.704 |
+| Initial corpus load | 240.271 | not CLI-specific* |
+| First drain | 15.663 | 15.696 |
+| Repeated drain | 16.318 | 16.351 |
+
+*The load command wraps the Python harness, so its time maximum is not attributed
+to the CLI. The 240.271 MB value is the largest CLI sample, not a proven absolute
+peak. Other time rows directly wrap the CLI. Short queries during drain have
+separate time maxima of 14.336 MB (failed) and 28.803072 MB (successful); their
+processes escaped snapshots, as disclosed above. These figures describe this
+100k-node workload, not a general CLI memory guarantee.
+
+Derived without rerunning commands: `.artifacts/tk16/cli-analysis-01.json` records
+per-phase maxima, source sample/PID and SHA-256 hashes of all 395 sample files and
+five time logs. It supplements the frozen raw evidence manifest; prior receipts
+and the independent review remain unchanged.
 
 ## Inputs, coverage and preservation
 
