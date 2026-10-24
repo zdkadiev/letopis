@@ -40,7 +40,7 @@
 | `tests/target_corpus/validate.py` | Independent generated-input structural/byte validation, Task 1 |
 | `tests/target_corpus/test_generate.py` | Literal fixture/count/reference/UTF-8 tests, Task 1 |
 | `tests/target_corpus.rs` | Root integration-test observer entry, behavioral checks, Task 2 stronger worker |
-| `tests/target_corpus/observer.rs` | Test-local storage observation implementation if needed to keep entry focused, Task 2 |
+| `tests/support/target_corpus.rs` | Test-local storage observation implementation if needed to keep entry focused, Task 2 |
 | `tests/target_corpus/run.py` | Product CLI orchestration, lock ownership, receipts/resumption, Task 3 stronger worker |
 | `tests/target_corpus/test_run.py` | Runner/control and failure-path tests, Task 3 |
 | `tests/target_corpus/README.md` | Reproducible commands, state/limits/handoff, Task 4 Luna |
@@ -62,7 +62,7 @@ No future-subsystem scaffolding. If a file would exceed 500 lines, split one coh
 
 ### Task 2: Existing-store observer with hash/config-aware coverage
 
-**Files:** create `tests/target_corpus.rs`, optionally private `tests/target_corpus/observer.rs`.
+**Files:** create `tests/target_corpus.rs`, optionally private `tests/support/target_corpus.rs`.
 
 **Interfaces:** consumes Task 1 manifest/repository. Exposes ignored test entry `observe_existing_corpus`, invoked from the compiled integration-test executable using `--ignored --exact observe_existing_corpus --nocapture`. Environment `LETOPIS_CORPUS_REQUEST` points to JSON `{root, output, expected_knowledge, expected_sources, expected_edges}`. Read config from that root. Output is exclusive-created JSON receipt with schema_version=1, project_revision, config_identity, dimensions, knowledge/source/edge counts, unique_search_hashes, covered_nodes, missing_nodes, eligible_hashes, failed_hashes, exhausted_hashes, invalid_files and verdict (`populated` or `not_assessed`). No vector payload is emitted.
 
