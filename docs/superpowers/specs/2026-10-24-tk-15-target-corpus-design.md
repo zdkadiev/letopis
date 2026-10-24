@@ -2,7 +2,7 @@
 
 > Status: draft; specification approval pending. Date: 2026-10-24.
 > Base: main@c8ede9efa4a298d12651c2f5a206ab71fc60bed6.
-> Worktree: /Users/zdkadiev/.codex/worktrees/tk-15/letopis; branch codex/TK-15.
+> Worktree: /Users/zdkadiev/.codex/worktrees/tk-15/letopis; branch tk-15.
 
 ## Intent and sources
 
@@ -40,8 +40,11 @@ Author proposals for approval, not previously accepted user decisions:
   base URL http://127.0.0.1:11434; no remote paid provider or model download.
   The model is already installed locally. Freeze and record the actual model
   digest, provider/config identity and observed dimension, not a guessed identity.
-- User-selected implementation model: gpt-6-luna, medium reasoning, clean-context
-  bounded subagents. Primary agent owns specification, integration and final review.
+- User-selected model split: stronger models own generator design/implementation,
+  the Rust observer, difficult fixes and final review. Use gpt-6-luna with medium
+  reasoning only for bounded light tasks such as documentation and routine checks.
+  Give subagents clean contexts and return concise summaries; keep logs in files.
+  This replaces the initial proposal to assign main implementation to Luna.
 
 ## Corpus generation
 
@@ -157,4 +160,5 @@ Unchanged branch baseline `make check` exit 0; receipt under
 ## Open approval
 
 Approve the scope and author proposals above, including local real-model full
-population. Then prepare the implementation plan and dispatch bounded Luna tasks.
+population. Then prepare the implementation plan and dispatch tasks according to
+the user-selected model split above.
