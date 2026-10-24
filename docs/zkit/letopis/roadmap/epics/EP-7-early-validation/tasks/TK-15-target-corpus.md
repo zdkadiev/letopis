@@ -43,7 +43,7 @@
 - [x] Полная загрузка проходит через slice, а не обход production путей.
 
 - [x] Payload соответствует выбранному A-2 сценарию; записаны точные UTF-8 byte sum/mean/min/max и seed, короткие заглушки не подменяют размер при том же node count.
-- [ ] Для populated доступны 100 000 current vectors знаний выбранной конфигурации/search_hash; source исключены. Backlog описан отдельно. Неполное покрытие фиксируется как not assessed populated, queued=0 само по себе не критерий.
+- [x] Для populated доступны 100 000 current vectors знаний выбранной конфигурации/search_hash; source исключены. Backlog описан отдельно. Неполное покрытие фиксируется как not assessed populated, queued=0 само по себе не критерий.
 
 - [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
@@ -70,20 +70,24 @@
 
 ## 9. Отчёт о выполнении
 
-Реализация и четыре независимые проверки завершены; full production load пройден.
+Реализация, четыре проверки задач и полная приёмка завершены; финальный scoped
+review и оформление результата ещё выполняются.
 Спецификация: [Superpowers](../../../../../../superpowers/specs/2026-10-24-tk-15-target-corpus-design.md),
 [план](../../../../../../superpowers/plans/2026-10-24-tk-15-target-corpus.md),
 [отчёт и evidence](../../../../checks/TK-15/report.md).
 
 Seed 15: 100k knowledge, 100k source addresses, 500k рёбер; 100k фрагментов
 ровно по 2000 UTF-8 bytes, sum 200000000; 3334 Markdown-файла и 1000 source shards.
-Production загрузка 95.556470 s; backlog 0 covered / 100000 eligible,
-failed/exhausted/invalid 0. Full real-model drain ещё выполняется; populated
-не подтверждён, последний критерий остаётся открытым.
+Production загрузка 95.556470 s; backlog 0 covered / 100000 eligible.
+Последовательный реальный drain с локальной Ollama занял 7831.240799 s целиком;
+CLI-процесс — 7825.869103 s. Итог и новая финальная read-only observation:
+100000 current vectors / 100000 уникальных knowledge search_hash, 768 dimensions;
+missing/eligible/failed/exhausted/invalid 0. Pin модели/config/binaries сохранён.
+`final-acceptance-01/summary.json` перечисляет и хэширует исходные receipts.
 
 Изменены только test harness и документация: product src/schema/dependencies/build
 без изменений. `make verify V=1`: 481 passed / 0 failed / 5 ignored отдельно
-в debug/release; 146 входных хэшей всё ещё совпадают. Полный отчёт различает
-исторические тесты, финальный path-only fix, ручные semantic controls и ограничения.
-Финальный scoped review и закрытие задачи ждут полного покрытия 100000 current
-vectors; RAM и usefulness относятся к TK-16/TK-17.
+в debug/release; 146 входных хэшей всё ещё совпадают. Финальный path-only fix:
+25 focused tests passed; 19 ручных semantic controls пойманы в отдельных
+исторических областях, без полного mutation sweep. Отчёт содержит точные команды,
+границы и все решения контроллера. RAM и usefulness относятся к TK-16/TK-17.

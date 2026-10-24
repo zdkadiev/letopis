@@ -1,6 +1,6 @@
 # TK-15 — Target corpus and production population
 
-> Status: in progress; full production loading passed; full real-model population pending.
+> Status: full acceptance passed; scoped final review and completion bookkeeping pending.
 > Date: 2026-10-24. Branch: `tk-15`, base `main@c8ede9e`.
 > Worktree: `/Users/zdkadiev/.codex/worktrees/tk-15/letopis`.
 
@@ -77,18 +77,31 @@ that would reject a documentation-only commit.
 
 | Pinned observation | Configured backlog | Final populated state |
 |---|---:|---:|
-| Knowledge / sources / edges | 100,000 / 100,000 / 500,000 | Pending |
-| Unique current knowledge hashes | 100,000 | Pending |
-| Covered / missing knowledge | 0 / 100,000 | Pending |
-| Eligible / failed / exhausted hashes | 100,000 / 0 / 0 | Pending |
-| Invalid files | 0 | Pending |
-| Revision / dimensions | 1 / null before first vector | Pending |
-| Verdict | `not_assessed` | Pending |
+| Knowledge / sources / edges | 100,000 / 100,000 / 500,000 | 100,000 / 100,000 / 500,000 |
+| Unique current knowledge hashes | 100,000 | 100,000 |
+| Covered / missing knowledge | 0 / 100,000 | 100,000 / 0 |
+| Eligible / failed / exhausted hashes | 100,000 / 0 / 0 | 0 / 0 / 0 |
+| Invalid files | 0 | 0 |
+| Revision / dimensions | 1 / null before first vector | 1 / 768 |
+| Verdict | `not_assessed` | `populated` |
 
-Full real-model drain started **08:37:18 UTC**. Monitor-04 at **08:55:45 UTC**
-observed **23,369 covered**, 76,631 missing, 768 dimensions, zero failed/exhausted;
-this is a historical progress snapshot, not population acceptance. Full coverage
-must be observed after the real process finishes; zero queued work alone cannot pass.
+Full real-model drain started **08:37:18 UTC** and finished successfully at about
+**10:47:49 UTC**, without a watchdog, reset or second drain. Actual CLI process:
+**7825.869103 s**; complete drain phase:
+**7831.240799 s** (2 h 10 min 31 s); wrapper:
+**7831.305460 s**. These are observed host elapsed times with
+periodic read-only coverage snapshots, not an isolated throughput benchmark or SLA.
+
+The completed phase and a fresh final-source `observe` phase both read the same
+100,000 current knowledge vectors under the same config/model/binary pin, with
+768 dimensions and all missing/eligible/failed/exhausted/invalid counts zero.
+The final read-only observation took **5.115246 s**.
+The wrapper/process/observation receipts have exit/success results; no vector
+payload was emitted. `check-final.py` independently asserts literal target counts,
+backlog equality before drain, full observation equality afterward, durable pins,
+config bytes, 146 root hashes, nine final tool/binary hashes and all 4,334 input
+hashes. Summary: `.artifacts/tk15/final-acceptance-01/summary.json`, SHA-256
+`e1cd3d5c893cf576588ce91dd4407d623920052de24f53d9dd9ff537b33dca69`. Raw receipts are hashed in that summary.
 
 ## Verification and review
 
@@ -104,7 +117,7 @@ receipts remain against their captured sources; they are not rewritten by later 
 | Root Rust gate | `make verify V=1`, exit 0; 481 passed / 0 failed / 5 ignored separately in debug and release | `root-01/` |
 | Real-model small smoke | 60 / 60 current vectors, 768 dimensions; actual drain 2.450110 s | `task3-real-load-20261024-02/`, `task3-real-drain-20261024-02/` |
 | Full input / configured backlog | Passed; exact counts and bytes above | `full-prep-01/`, `target-01/`, `full-load-01/` |
-| Full real-model population | Running; not assessed | `full-drain-01/`, `full-drain-launch-01/` |
+| Full real-model population | Passed: 100,000 / 100,000 current vectors; missing/eligible/failed/exhausted/invalid zero | `full-drain-01/`, `full-drain-launch-01/` |
 
 Root verification includes format, compiler/all targets, Clippy with denied
 warnings and strict Rustdoc. Sixteen nested filtered test summaries are separate
@@ -125,7 +138,9 @@ Focused manual semantic controls: initial generator 2, generator fixes 2,
 observer 2, original runner 7, resumed-load fixes 3, final path guards 3.
 Each recorded control has an intended behavioral RED result and exact-restored
 GREEN; observer controls compile before failing. No full-crate mutation sweep
-was run or implied. These are historical controls at their captured revisions.
+was run or implied. Controlled changes: **19 caught / 0 missed / 0 timeout / 0 unviable**,
+across those separate scopes, not a statistical whole-tree mutation result. These
+are historical controls at their captured revisions.
 
 All four task reviews passed after scoped fixes. The strongest-model whole-branch
 code review at `bbdb447` found no Critical or Important issues. Its Minor lexical
@@ -135,7 +150,36 @@ The other Minor finding is explicitly deferred: `--max-seconds` bounds the direc
 child wait, but a descendant retaining an inherited pipe could delay readers and
 receipts. The current product redirects detached streams; no workload failure was
 established. README documents the limit; no generic process framework was added.
-One scoped final fix/evidence review remains pending population and final documents.
+One scoped final fix/evidence review remains pending; full acceptance and its
+documents are ready for that review.
+
+## Controller rulings
+
+The following is the exhaustive chronological ruling record from this plan’s
+execution ledger. Each retains its stated cost if wrong; the reviewed code and
+receipts resolve the concrete acceptance claims separately.
+
+- use base_url http://127.0.0.1:11434/api — current provider appends /embed to prefix — cost if wrong: real-model smoke fails, no populated claim.
+
+- trim generated Task4 brief at Primary integration heading — extractor otherwise carries non-task tail into Task4 — cost if wrong: primary acceptance could be omitted; retained in plan and ledger instead.
+
+- no full-model generation during early task checks — deterministic tests first, one final acceptance run — cost if wrong: late scale defects require scoped fixes.
+
+- optional Rust observer helper belongs in tests/support/target_corpus.rs — current CLI Docker COPY/inventory includes support recursively but not new Python harness directory — cost if wrong: helper ownership lives outside the Python tooling directory, no behavior/scope changes. Observer root tests must not require generated Python files to compile/run. Actual TK15 runner records its own Python inputs.
+
+- observer requires existing WAL journal mode in addition to recognized version — product open_storage configures journal mode before rejecting full-schema mismatch — avoids header changes to unsupported input — cost if wrong: a legitimate DELETE-mode database needs product initialization before observer; acceptance uses already-created CLI WAL stores. Covered by nonmutation tests.
+
+- Task3 may use actual CLI empty search query for initial refresh — Task2 sample demonstrated configured storage identity without provider inference; avoids unnecessary query/model work — cost if wrong: product smoke fails before fullrun. Counts/real drain independently verified.
+
+- generate full immutable inputs while Task3 review runs — only accepted Task1 generator used, no product loading/inference or mutable runner code — cost if wrong: generator artifacts require a new directory after any actual input-generator fix. Full load/drain still waits Task3 review.
+
+- Task3 may add a narrow sqlite3 stdlib read-only metadata precondition for genuinely incomplete first initialization, alongside existing Rust observer gate for initialized states — distinguishes safe empty owned store from stale configured data without adding product API — cost if wrong: extra test-tool metadata coupling; public Rust observer remains authoritative for acceptance and coverage, with no direct SQL/vector writes. Product/generator/observer unchanged.
+
+- start accepted full load/drain concurrently with Task4 documentation-only work — no second implementer or runtime input changes; frozen hashes record exact code/binaries — cost if wrong: any code change invalidates affected receipts and requires new appropriate acceptance. No docs-only rerun.
+
+- whole-branch code review begins after all4taskgates while fullpopulation runs — codeinputs are frozen and review can catch issues early — cost if wrong: final completion verdict remains pending, require one scoped evidence followup afterfullrun rather than pretend prepopulation review proves100kcoverage.
+
+- defer inherited-pipe reader-future behavior — actualfrozenletopisdetached processredirectsallstreams and no workloadfailure observed; arbitrary descendant-retained pipes outside current supportedroute — cost ifwrong: watchdog can be exceeded; documentlimitation clearly, no new processframework. Final scopedreview seesruling and mayreject.
 
 ## Handoff and limits
 
@@ -144,6 +188,8 @@ cover isolated generation, build artifact discovery, load, drain and observation
 Keep `target-01/`, its `.letopis` stores/config, parent pin and all receipt directories
 for TK-16. New evidence directories are exclusive-created; never overwrite old
 receipts or reset this populated state to manufacture a fresh backlog.
+`target-final-repro-01/` is an unloaded, byte-identical input-only replica available
+for a separate fresh backlog reproduction in TK-16; it has no model vectors.
 
 This run is macOS 26.6.2 ARM64, Python 3.12 and the pinned Rust toolchain. No new
 Linux run or historical native/proof harness run is claimed. Normal SQLite sidecar
@@ -154,7 +200,7 @@ TK-16 measures RAM; TK-17 evaluates usefulness on different real-agent inputs.
 
 ## Completion pending
 
-Finish the existing full drain, obtain final current-hash/config coverage, fill
-final counts/durations and task criteria, and complete scoped review, Engram record
-and byte-verified Superpowers execution archive. Incomplete coverage remains
-`not_assessed`; the small smoke and green root suite do not replace full acceptance.
+All task acceptance criteria are now supported by full-scale receipts. Finish the
+single scoped final fix/evidence review, Engram completion record and byte-verified
+Superpowers execution archive. Preserve worktree and inputs for later integration;
+no merge, push or GitHub issue closure is implied.

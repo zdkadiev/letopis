@@ -162,6 +162,7 @@ Unchanged branch baseline `make check` exit 0; receipt under
 
 ## Approval and follow-up
 
-User approved proceeding with implementation on 2026-10-24. Next: review the
-implementation plan, then execute with the selected model split. GitHub #49
-tracks parallel drain separately; TK-15 uses the current sequential executor.
+User approved specification and plan on 2026-10-24. All four tasks and full-scale
+acceptance have passed with the selected model split; scoped final review and
+completion bookkeeping remain. See the [actual report](../../zkit/letopis/checks/TK-15/report.md).
+GitHub #49 tracks parallel drain separately; TK-15 used the current sequential executor.
