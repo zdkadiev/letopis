@@ -13,6 +13,7 @@ from pathlib import Path
 import platform
 import re
 import signal
+import sqlite3
 import stat
 import subprocess
 import sys
@@ -54,7 +55,7 @@ def main(arguments: list[str] | None = None) -> int:
     previous = signal.signal(signal.SIGTERM, _interrupt)
     try:
         _execute_phase(options, receipt)
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError, KeyboardInterrupt) as error:
+    except (OSError, ValueError, KeyError, TypeError, sqlite3.Error, subprocess.SubprocessError, KeyboardInterrupt) as error:
         # Exception text may include provider bodies or input: retain only its type.
         receipt["error"] = type(error).__name__
     finally:
@@ -105,6 +106,8 @@ def _execute_phase(options: argparse.Namespace, receipt: dict) -> None:
             with _own_lock(service / "embed.lock"):
                 process = None
                 if options.phase == "load":
+                    if _has_initialized_identity(service / "vectors.db", pin["config_identity"]):
+                        receipt["before_observation"] = _observe(options, manifest, pin, "before-")
                     process = _run_product(options, repository, ["search"],
                                            b'{"query":"","limit":1}')
                 observation = _observe(options, manifest, pin)
@@ -146,6 +149,48 @@ def _prepare_pin(options: argparse.Namespace, service: Path) -> dict:
     if _hash_file(config_path) != pin["config_sha256"]:
         raise ValueError("config bytes differ from durable pin")
     return pin
+
+
+def _has_initialized_identity(path: Path, expected: str) -> bool:
+    """Reject stale identity; permit only provably empty first-initialization metadata.
+
+    This read-only guard never reads vector payloads or validates product coverage;
+    matching initialized stores still require the Rust observer before refresh.
+    """
+    if not path.exists() and not path.is_symlink():
+        return False
+    _verify_path(path)
+    before = path.stat(follow_symlinks=False)
+    if not stat.S_ISREG(before.st_mode):
+        raise ValueError("vectors database must be a regular file")
+    database = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+    try:
+        database.execute("BEGIN")
+        version = database.execute("PRAGMA user_version").fetchone()[0]
+        definitions = database.execute("SELECT name FROM sqlite_schema WHERE sql IS NOT NULL").fetchall()
+        if version == 0 and not definitions:
+            return False
+        if version != 1:
+            raise ValueError("unsupported existing vectors database")
+        identities = database.execute("SELECT id, config_identity FROM meta").fetchall()
+        if identities == [(1, expected)]:
+            return True
+        if identities:
+            raise ValueError("stored config identity differs from durable pin")
+        occupied = database.execute("""
+            SELECT EXISTS(SELECT 1 FROM vector_keys)
+                OR EXISTS(SELECT 1 FROM embed_failures)
+                OR EXISTS(SELECT 1 FROM query_error)
+        """).fetchone()[0]
+        if occupied:
+            raise ValueError("unconfigured database contains embedding state")
+    finally:
+        database.close()
+        _verify_path(path)
+        after = path.stat(follow_symlinks=False)
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            raise ValueError("vectors database identity changed")
+    return False
 
 
 def _get_provenance() -> dict:

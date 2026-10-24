@@ -6,6 +6,7 @@ import io
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
+import sqlite3
 from pathlib import Path
 import sys
 import tempfile
@@ -118,6 +119,7 @@ class RunnerTests(unittest.TestCase):
         config = self.repository / ".letopis/config.json"
         before = config.stat().st_mtime_ns
         self.assertEqual(self._run("load", "retry-load"), 0)
+        self.assertTrue((self.root / "retry-load/before-observation.json").exists())
         self.assertEqual(config.stat().st_mtime_ns, before)
         self.assertEqual((self.corpus.parent / "runner-pin.json").read_bytes(), pin)
 
@@ -227,6 +229,44 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runner._verify_response(b'{"ok":false,"error":{"code":"internal_error"}}\n', "search", 1)
 
+    def test_resumed_load_rejects_stored_identity_before_refresh_preserving_state(self) -> None:
+        self.assertEqual(self._run("load", "load"), 0)
+        old_receipt = (self.root / "load/runner-receipt.json").read_bytes()
+        vectors = self.repository / ".letopis/vectors.db"
+        with sqlite3.connect(vectors) as database:
+            database.execute("UPDATE meta SET config_identity = ?", ("b" * 64,))
+        (self.repository / ".letopis/coverage").write_text("3")
+        (self.repository / ".letopis/preserved").write_text("three-vectors")
+        before = vectors.read_bytes()
+        self.assertEqual(self._run("load", "stale-load"), 1)
+        self.assertFalse((self.root / "stale-load/refresh-process.json").exists())
+        self.assertEqual(vectors.read_bytes(), before)
+        self.assertEqual((self.repository / ".letopis/coverage").read_text(), "3")
+        self.assertEqual((self.repository / ".letopis/preserved").read_text(), "three-vectors")
+        self.assertEqual((self.root / "load/runner-receipt.json").read_bytes(), old_receipt)
+
+    def test_first_initialization_resumes_missing_empty_and_unconfigured_vectors(self) -> None:
+        self.assertEqual(self._run("load", "load"), 0)
+        vectors = self.repository / ".letopis/vectors.db"
+        vectors.unlink()
+        self.assertEqual(self._run("load", "missing-vectors"), 0)
+        vectors.write_bytes(b"")
+        self.assertEqual(self._run("load", "empty-vectors"), 0)
+        vectors.unlink()
+        with sqlite3.connect(vectors) as database:
+            database.execute("PRAGMA user_version=0")
+        self.assertEqual(self._run("load", "empty-version-zero"), 0)
+        with sqlite3.connect(vectors) as database:
+            database.execute("DELETE FROM meta")
+        self.assertEqual(self._run("load", "unconfigured-vectors"), 0)
+        with sqlite3.connect(vectors) as database:
+            database.execute("DELETE FROM meta")
+            database.execute("INSERT INTO vector_keys VALUES(1, 'existing-key')")
+        before = vectors.read_bytes()
+        self.assertEqual(self._run("load", "unconfigured-with-keys"), 1)
+        self.assertEqual(vectors.read_bytes(), before)
+        self.assertFalse((self.root / "unconfigured-with-keys/refresh-process.json").exists())
+
     def _run(self, phase: str, evidence: str, *extra: str) -> int:
         arguments = ["--corpus", str(self.corpus), "--binary", str(self.binary),
                      "--observer", str(self.observer), "--evidence", str(self.root / evidence),
@@ -265,6 +305,11 @@ class LocalHttpTests(unittest.TestCase):
                                                "--config", str(config)]), 0)
                 self.assertEqual(server.paths, ["/api/tags"])
                 before = (root / "corpus/repository/.letopis/config.json").read_bytes()
+                vectors = root / "corpus/repository/.letopis/vectors.db"
+                with sqlite3.connect(vectors) as database:
+                    database.execute("DELETE FROM meta")
+                self.assertEqual(runner.main([*common, "--phase", "load", "--evidence", str(root / "first-init")]), 0)
+
                 self.assertEqual(runner.main([*common, "--phase", "drain", "--evidence", str(root / "bounded"),
                                                "--max-seconds", "0.15"]), 1)
                 self.assertEqual(runner.main([*common, "--phase", "drain", "--evidence", str(root / "complete"),
@@ -274,6 +319,21 @@ class LocalHttpTests(unittest.TestCase):
             self.assertEqual((receipt["covered_nodes"], receipt["dimensions"], receipt["verdict"]), (60, 2, "populated"))
             self.assertEqual((root / "corpus/repository/.letopis/config.json").read_bytes(), before)
             self.assertIn("/api/embed", server.paths)
+            vectors = root / "corpus/repository/.letopis/vectors.db"
+            with sqlite3.connect(vectors) as database:
+                database.execute("UPDATE meta SET config_identity = ?", ("d" * 64,))
+            saved = vectors.read_bytes()
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(runner.main([*common, "--phase", "load", "--evidence", str(root / "stale")]), 1)
+            self.assertFalse((root / "stale/refresh-process.json").exists())
+            self.assertEqual(vectors.read_bytes(), saved)
+            identity = json.loads((root / "complete/observation.json").read_text())["config_identity"]
+            with sqlite3.connect(vectors) as database:
+                database.execute("UPDATE meta SET config_identity = ?", (identity,))
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(runner.main([*common, "--phase", "observe", "--evidence", str(root / "preserved")]), 0)
+            self.assertEqual(json.loads((root / "preserved/observation.json").read_text())["covered_nodes"], 60)
+
 
 
 @contextlib.contextmanager
@@ -323,7 +383,7 @@ class _ProviderHandler(BaseHTTPRequestHandler):
 
 def _get_product_script() -> str:
     return f'''#!{sys.executable}
-import fcntl, json, os, pathlib, sys, time
+import fcntl, hashlib, json, os, pathlib, sqlite3, sys, time
 root = pathlib.Path('.letopis')
 control = os.environ.get('CONTROL', '')
 assert 'GIT_DIR' not in os.environ and 'OPENAI_API_KEY' not in os.environ
@@ -337,8 +397,21 @@ if sys.argv[1:] == ['search']:
         pass
     else:
         raise RuntimeError('missing backlog barrier')
-    for leaf in ('cache.db', 'vectors.db'):
-        (root / leaf).touch()
+    (root / 'cache.db').touch()
+    config = json.loads((root / 'config.json').read_text())
+    identity = hashlib.sha256(json.dumps(config, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    with sqlite3.connect(root / 'vectors.db') as database:
+        for definition in ('meta(id INTEGER PRIMARY KEY, config_identity TEXT)',
+                           'vector_keys(row_id INTEGER PRIMARY KEY, search_hash TEXT)',
+                           'embed_failures(search_hash TEXT, attempts INTEGER)', 'query_error(id INTEGER)'):
+            database.execute('CREATE TABLE IF NOT EXISTS ' + definition)
+        stored = database.execute('SELECT config_identity FROM meta WHERE id=1').fetchone()
+        if stored != (identity,):
+            for name in ('coverage', 'preserved'):
+                (root / name).unlink(missing_ok=True)
+            database.execute('DELETE FROM vector_keys')
+            database.execute('INSERT OR REPLACE INTO meta VALUES(1, ?)', (identity,))
+        database.execute('PRAGMA user_version=1')
     print('not-json' if control == 'bad-json' else (json.dumps(dict(ok=False, error=dict(code='internal_error',message='safe',details={{}}))) if control == 'load-failure' else json.dumps(dict(ok=True, result=[]))))
     sys.exit(1 if control == 'load-failure' else 0)
 assert sys.argv[1:] == ['embed', '--drain'] and sys.stdin.buffer.read() == b''
@@ -363,7 +436,7 @@ print(json.dumps(dict(ok=True, result={{}})))
 
 def _get_observer_script() -> str:
     return f'''#!{sys.executable}
-import fcntl, hashlib, json, os, pathlib, sys
+import fcntl, hashlib, json, os, pathlib, sqlite3, sys
 assert sys.argv[1:] == ['--ignored', '--exact', 'observe_existing_corpus', '--nocapture']
 request = json.loads(pathlib.Path(os.environ['LETOPIS_CORPUS_REQUEST']).read_text())
 root = pathlib.Path(request['root']) / '.letopis'
@@ -382,6 +455,8 @@ if control == 'observer-failure':
     sys.exit(7)
 config = json.loads((root / 'config.json').read_text())
 identity = hashlib.sha256(json.dumps(config, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+with sqlite3.connect(root / 'vectors.db') as database:
+    assert database.execute('SELECT config_identity FROM meta WHERE id=1').fetchone() == (identity,)
 covered = int((root / 'coverage').read_text()) if (root / 'coverage').exists() else 0
 receipt = dict(schema_version=1, project_revision=1, config_identity=identity,
                dimensions=2 if covered else None, knowledge_nodes=10, source_nodes=10, edges=50,
