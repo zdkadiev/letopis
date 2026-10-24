@@ -94,6 +94,15 @@ class GeneratorTests(unittest.TestCase):
             self.assertEqual(manifest["packing"]["distribution"], [21, 10])
             self.assertEqual(validate_corpus(output / "corpus.json")["counts"]["edges"], 155)
 
+    def test_short_remainder_can_borrow_from_multiple_earlier_files(self):
+        self.assertEqual(plan_packing(40, 11), [10, 10, 10, 10])
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary).resolve() / "multi-donor"
+            manifest = generate_corpus(
+                output, CorpusOptions(seed=15, knowledge_count=40, elements_per_file=11))
+            self.assertEqual(manifest["packing"]["distribution"], [10, 10, 10, 10])
+            self.assertEqual(validate_corpus(output / "corpus.json")["counts"]["edges"], 200)
+
     def test_invalid_options_do_not_create_output(self):
         invalid = [CorpusOptions(seed=1, knowledge_count=0),
                    CorpusOptions(seed=1, knowledge_count=9),
@@ -177,6 +186,11 @@ class ValidatorTests(unittest.TestCase):
         self._assert_rejected(lambda text: text.replace("Evidence remains stable", "<!-- letopis: {} -->   ", 1),
                               "metadata")
 
+    def test_rejects_code_context_graph_links_with_same_bytes_and_updated_hashes(self):
+        for context in ("backtick fence", "tilde fence", "inline code", "spaces", "tab"):
+            with self.subTest(context=context):
+                self._assert_rejected(lambda text: self._put_links_in_code(text, context), "code")
+
     def test_rejects_modified_fragment_hash(self):
         self._assert_rejected(lambda text: text.replace("Synthetic", "Different", 1),
                               "hash", update_hash=False)
@@ -224,6 +238,25 @@ class ValidatorTests(unittest.TestCase):
                 self._update_hash(output, "knowledge/part-0000.md")
             with self.assertRaisesRegex(ValueError, error):
                 validate_corpus(output / "corpus.json")
+
+    def _put_links_in_code(self, text, context):
+        start = text.index("[source]")
+        end = text.index("\n\nSynthetic case", start)
+        block = text[start:end]
+        if context in ("backtick fence", "tilde fence"):
+            fence = "```" if context == "backtick fence" else "~~~"
+            replacement = f"{fence}\n{block}\n{fence}"
+        elif context == "inline code":
+            replacement = "\n".join(f"`{line}`" for line in block.splitlines())
+        else:
+            indentation = "    " if context == "spaces" else "\t"
+            replacement = "\n" + "\n".join(indentation + line for line in block.splitlines())
+        added = len(replacement) - len(block)
+        changed = text[:start] + replacement + text[end:]
+        filler = "Evidence remains stable while the dependent knowledge is revised. "
+        changed = changed.replace(filler[:added], "", 1)
+        self.assertEqual(len(changed.encode("utf-8")), len(text.encode("utf-8")))
+        return changed
 
     def _update_hash(self, output, relative):
         path = output / "corpus.json"

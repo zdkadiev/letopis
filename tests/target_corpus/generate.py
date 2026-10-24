@@ -111,10 +111,15 @@ def plan_packing(knowledge_count: int, elements_per_file: int) -> list[int]:
     if packing[-1] >= MIN_ELEMENTS:
         return packing
     needed = MIN_ELEMENTS - packing[-1]
-    if len(packing) < 2 or packing[-2] - needed < MIN_ELEMENTS:
+    if len(packing) * MIN_ELEMENTS > knowledge_count:
         raise ValueError("impossible packing for selected elements_per_file")
-    packing[-2] -= needed
-    packing[-1] += needed
+    for donor in range(len(packing) - 2, -1, -1):
+        transferred = min(needed, packing[donor] - MIN_ELEMENTS)
+        packing[donor] -= transferred
+        packing[-1] += transferred
+        needed -= transferred
+        if needed == 0:
+            break
     return packing
 
 

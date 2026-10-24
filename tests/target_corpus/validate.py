@@ -180,6 +180,8 @@ def _read_fragment(inspection: Inspection, fragment: _Fragment, tree: str) -> No
         raise ValueError("unexpected heading changes marked fragment boundary")
     if text.count("<!-- letopis:") != 1:
         raise ValueError("extra fragment metadata")
+    if "`" in text or "\t" in text or re.search(r"^(?: {4}| {0,3}~{3})", text, re.MULTILINE):
+        raise ValueError("code constructs are outside the generated fixture grammar")
     links = LINK.findall(text)
     if text.count('"letopis:type=') != len(links):
         raise ValueError("invalid graph link")
