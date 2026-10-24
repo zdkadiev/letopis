@@ -90,15 +90,15 @@ No future-subsystem scaffolding. If a file would exceed 500 lines, split one coh
 
 **Interfaces:** consumes finished CLI options and receipt schema from Tasks 1–3. Produces copyable build/smoke/target/backlog/drain/observe/resume commands and clear expected verdicts. Luna/medium owns this task; primary retains actual acceptance/report ownership.
 
-- [ ] **Step 1: Read implemented --help and task reports.** List actual build artifact discovery and phase prerequisites. Do not invent unsupported switches or claim pending measurements.
-- [ ] **Step 2: Write commands and safety/limits documentation.** Explain source addresses vs files, exact A2 bytes/seed, input/model/config hashes, source-vs-knowledge snapshots, read-only observer preconditions, backlog/populated receipts, local-model-only policy, timeout/resume/owned cleanup, generated-output location and TK16 handoff. Full corpus is excluded from usefulness pilots. #49 remains a separate sequential-to-parallel proposal.
-- [ ] **Step 3: Validate documentation.** Run documented --help and a disposable small smoke command where existing receipts do not already cover it; verify local links and diff whitespace. No rerun of unchanged root suites, no behavioral tests for prose alone.
-- [ ] **Step 4: Commit owned documentation.** Return concise status/commit/check summary. Primary independent task review checks commands against implemented interfaces.
+- [x] **Step 1: Read implemented --help and task reports.** List actual build artifact discovery and phase prerequisites. Do not invent unsupported switches or claim pending measurements.
+- [x] **Step 2: Write commands and safety/limits documentation.** Explain source addresses vs files, exact A2 bytes/seed, input/model/config hashes, source-vs-knowledge snapshots, read-only observer preconditions, backlog/populated receipts, local-model-only policy, timeout/resume/owned cleanup, generated-output location and TK16 handoff. Full corpus is excluded from usefulness pilots. #49 remains a separate sequential-to-parallel proposal.
+- [x] **Step 3: Validate documentation.** Run documented --help and a disposable small smoke command where existing receipts do not already cover it; verify local links and diff whitespace. No rerun of unchanged root suites, no behavioral tests for prose alone.
+- [x] **Step 4: Commit owned documentation.** Return concise status/commit/check summary. Primary independent task review checks commands against implemented interfaces.
 
 ## Primary integration and completion
 
-- [ ] Run all focused Python tests, `make verify` (logs to new evidence), and build/discover release observer/product artifacts. Record actual results once; inspect architecture/no product delta and compare frozen inputs before long run.
-- [ ] Generate full target under ignored `.artifacts/tk15/target-01`, validate actual source/input counts/bytes and reproducibility receipts. Capture configured backlog with the production release CLI. No SQL seed or model fixture counts as acceptance.
+- [x] Run all focused Python tests, `make verify` (logs to new evidence), and build/discover release observer/product artifacts. Record actual results once; inspect architecture/no product delta and compare frozen inputs before long run.
+- [x] Generate full target under ignored `.artifacts/tk15/target-01`, validate actual source/input counts/bytes and reproducibility receipts. Capture configured backlog with the production release CLI. No SQL seed or model fixture counts as acceptance.
 - [ ] Run real local-model drain, with concise durable progress and bounded observation intervals. Observe current-vector coverage through the release observer. If interrupted/incomplete, retain artifacts and resume; do not mark TK15 done until all criteria are supported. Report measured small/full duration, failures and platform scope.
 - [ ] Fill `docs/zkit/letopis/checks/TK-15/report.md`, task card and this plan with actual evidence/limits. Preserve full-scale inputs/receipts separately from Git. Record Engram using the existing shared store and unchanged provenance.
 - [ ] Dispatch one whole-branch review on the most capable available model with spec/plan/diff/evidence; resolve findings and record any declined scopes. Do not rerun accepted suites unless code changes warrant it.

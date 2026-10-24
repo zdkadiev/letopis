@@ -1,6 +1,6 @@
 # TK-15 — Target corpus and production population
 
-> Status: in progress; full product loading and population have not yet run.
+> Status: in progress; full product loading passed; real-model full population is running.
 > Date: 2026-10-24. Branch: tk-15, base main@c8ede9e.
 > Worktree: /Users/zdkadiev/.codex/worktrees/tk-15/letopis.
 
@@ -26,8 +26,8 @@ of committed reports. Historical receipts remain against their captured source.
 | Root gate | make verify V=1 exit0;481passed/0failed/5ignored each debug/release;16nestedfiltered summaries separate | .artifacts/tk15/root-01 |
 | Full generated input | Independent checkerPASS;100000knowledge/100000sources/500000edges | .artifacts/tk15/target-01 and full-prep-01 |
 | Real model small smoke |60/60current knowledge vectors,768dimensions;historical pre-review runner checkpoint | .artifacts/tk15/task3-real-load-20261024-02 and task3-real-drain-20261024-02 |
-| Full configured backlog | pending | not yet captured |
-| Full populated state | not assessed | not yet run |
+| Full configured backlog | PASS:100000eligible hashes/0covered,0invalid/failed/exhausted;revision1,configured identity | .artifacts/tk15/full-load-01 |
+| Full populated state | not assessed;drain running,firstmonitor2440covered/0failed/0exhausted | .artifacts/tk15/full-drain-01 and monitor-01 |
 
 ## Full input facts
 
@@ -58,7 +58,8 @@ physical power-loss, full source lifecycle or G-1 success is established here.
 
 ## Completion pending
 
-Resumed-load preservation fix1528d8c and scoped re-review are complete. Write
-actual command handoff, run full production load under owned lock, then real-model drain and
-current-hash/config coverage observation. Populate task criteria and final review
+Resumed-load preservation fix1528d8c and scoped re-review are complete.
+[Command handoff](../../../../../tests/target_corpus/README.md) passed Task4 review
+after safe temporary-output and limit clarifications. Full production load passed
+in95.556470seconds;real-model drain is running. Finish current-hash/config coverage observation. Populate task criteria and final review
 only from those results. Incomplete coverage must remain not assessed.
