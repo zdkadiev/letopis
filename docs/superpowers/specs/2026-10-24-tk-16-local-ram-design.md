@@ -55,3 +55,12 @@ Both short concurrent search CLIs finished between process snapshots; overlap RA
 rows therefore measure sampled drain/provider only. Independent query time maximum
 RSS is retained separately and cannot be added as a simultaneous peak. The local
 report discloses this omission; complete concurrent accounting remains unassessed.
+
+## Follow-up correction
+
+User subsequently required search to work during drain. The
+[correction plan](../plans/2026-10-24-tk-16-search-contention-fix.md) and
+[report](../../zkit/letopis/checks/TK-16/report.md#follow-up-concurrent-searchdrain-correction)
+record a verified5-second wait scoped to the independent vector writer. The
+original RAM captures stay pinned to their original binary; this software fix
+does not establish4GB acceptance or new full-memory maxima.

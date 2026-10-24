@@ -1,6 +1,6 @@
 # TK-16 — Local RAM assessment
 
-> Status: original local measurements complete; follow-up contention fix passes macOS/Linux gates, mutation sweep pending.
+> Status: original local measurements complete; follow-up contention correction and verification complete.
 > Formal 4 GB hardware/budget acceptance: **not assessed**; G-1 remains blocked.
 > Date: 2026-10-24. Base main@ccb15f0; branch tk-16 (renamed from codex/tk-16 at user request).
 > Worktree: /Users/zdkadiev/.codex/worktrees/tk-16/letopis.
@@ -125,8 +125,8 @@ error response, timing, process samples and coverage are retained. Its original
 probe asserted before summary emission; that phase's exact exit code was not
 retained and is not invented. The repeat stores explicit scenario outcome and
 signal-PID evidence. No product repair or redesign was attempted during the original RAM-only
-assessment; the later explicit correction is reported separately below. This failure needs investigation before treating concurrent drain
-and search as reliably validated.
+assessment; the later explicit correction is reported separately below. The follow-up below reproduces and corrects vector-writer contention; the historical
+failed capture remains intact and does not retain its private error cause.
 
 ## Meter validation and limits
 
@@ -172,7 +172,7 @@ receipts, source-copy proof, parser controls and live calibration.
 Evidence snapshot: 1286 files in `.artifacts/tk16/evidence-manifest.json`,
 SHA-256 `bf6e4f884a7282db3e21621a197b8030942b66f85a57a4be2c6d86028fe54e25`. Corpus databases are excluded from
 that raw-tool snapshot and verified separately. All raw evidence stays in this
-worktree; no merge, push or GitHub issue update is part of this assessment.
+worktree. The follow-up updates GitHub issue16; no merge/push has been performed.
 
 ## Follow-up: concurrent search/drain correction
 
@@ -200,14 +200,33 @@ manual semantic controls are caught:3caught/0missed/0timeout/0unviable; sources 
 restored byte-for-byte and tests pass again. Regressions use a held native writer
 and a100ms observation window, not a fairness proof or formal scheduler model.
 
-Fresh macOS/Linux ARM64 storage acceptance PASS in `contention-host-03` and
-`contention-linux-02/container`: make verify (485passed/0failed/5ignored per debug
-and release profile), strict Rustdoc, schema parity/runner checks, copied native
-executable/linkage and a real60-second provider deadline. Earlier lint-only
-failures remain in fresh separate directories; no lint suppression was added.
-A fresh independent code review found no actionable findings, contingent on gates;
-see `.artifacts/tk16/contention-code-review-01.md`. Full-crate mutation sweep is
-still running; its counts and remaining limits will be recorded separately.
+Final macOS/Linux ARM64 storage acceptance PASS in `contention-final-host-01`
+and `contention-final-linux-01/container`: make verify (**487passed/0failed/5ignored
+per debug and release profile**), strict Rustdoc, schema parity/runner checks,
+copied native executable/linkage and a separate real60-second provider deadline.
+Final source hashes match both captures. Earlier lint failures and a provider
+readiness-watchdog failure under simultaneous heavy builds remain retained;
+serial gates passed without changing timeouts or suppressing lints. Independent
+code review found no actionable findings; see `contention-code-review-01.md`.
+
+Release CLI functional check:6/6 queries returned5results during an alive owned
+drain on a copied100k corpus, current vectors2458→2553, final zero error/reservation
+rows. Independent checks pass in `contention-smoke-01/functional-verification.json`.
+The original smoke wrapper failed its final count assertion, counting all
+reservation rows; its exact earlier value was not retained and is not invented.
+This functional check is not a new RAM benchmark or a pass for the failed wrapper.
+
+Complete incremental whole-source mutation classification: **510caught/0missed/
+0timeout/1739unviable**, plus17reviewed equivalents and1previously excluded
+SHA equivalent. Of2266 current candidates,2254 reuse verified unchanged source
+mappings;12 changed/new cases were freshly checked (4caught/0missed/0timeout/
+8unviable). Unviable mutated programs do not compile and are not test kills.
+The exact deadline survivor now fails a deterministic boundary regression;
+invalid-path safe diagnostics also gained a public behavioral test. Twenty-six
+watchdog-contaminated apparent catches were discarded and quietly replayed.
+`contention-final-mutation-01.json` retains the complete operator mapping, counts
+and final input hashes. The correction plan records proofs/assumptions for18
+narrow equivalent exclusions, interrupted runs and full-suite survivor fallback.
 
 These tests validate search waiting for a competing short vector transaction;
 they do not by themselves certify every reverse drain-under-query interleaving.
@@ -219,7 +238,8 @@ whole-stack RAM maxima have been claimed.
 Retain failed scenario outcomes alongside valid memory samples rather than aborting
 receipt emission; failure must stay observable. Cost if wrong: RAM figures could
 be mistaken for proof that the workflow succeeds. Scenario success is recorded
-separately, the initial failure stays open, and G-1 remains not assessed.
+separately; the original failure stays in historical evidence, the reproduced
+contention defect is corrected, and G-1 remains not assessed.
 
 ## Formal verdict
 
@@ -232,7 +252,7 @@ the frozen evidence manifest in `completion-verification.json`.
 Local RAM observations are available. **TK-16 acceptance is blocked/not assessed**:
 no 4 GB hardware run, no complete OS-cache/shared-buffer attribution, sampled
 rather than absolute concurrent maxima, both overlap query processes missed, and
-software follow-up mutation verification pending (the original failed capture remains).
+no new full-memory measurement of the corrected build (the historical failed capture remains).
 No conclusion that the full stack fits 1 GB or that G-1 passes follows from these
 numbers. The narrowed local assessment is complete; canonical acceptance remains
 blocked. Findings and verification are recorded in the existing Engram store.

@@ -2,12 +2,32 @@ use letopis::open_storage;
 use letopis::service::{Storage, StorageErrorKind, StorageRead};
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
-use std::sync::{Arc, Barrier};
+use std::{
+    path::Path,
+    sync::{Arc, Barrier},
+};
 use tempfile::TempDir;
 
 #[path = "support/storage.rs"]
 mod storage_support;
 use storage_support::assert_error;
+
+#[test]
+fn invalid_database_paths_return_safe_readable_diagnostics_without_side_effects() {
+    for path in ["", "private-label\0cache.db"] {
+        // Arrange: invalid input must be rejected before the vector database is opened.
+        let root = TempDir::new().unwrap();
+        let vectors = root.path().join("vectors.db");
+        // Act
+        let error = open_storage(Path::new(path), &vectors).err().unwrap();
+        // Assert: verify the public diagnostic contract, not only an error category.
+        assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
+        assert_eq!(error.get_message(), "invalid storage database path");
+        assert_eq!(error.to_string(), "invalid storage database path");
+        assert!(!format!("{error:?}").contains("private-label"));
+        assert!(!vectors.exists());
+    }
+}
 
 #[test]
 fn fresh_storage_reopens_with_empty_identity() {

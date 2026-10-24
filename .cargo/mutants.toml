@@ -1,0 +1,27 @@
+# Exact equivalent operators only; proofs and assumptions: TK-16 contention plan.
+# Recheck on native-stack, platform, command-inventory, config-schema or path-policy changes.
+# Hex nibbles and constant permission/open flags have disjoint bits: OR == XOR.
+# Existing read-only hash-object calls gain only fsync config; writing calls stay hardened.
+# Canonical absolute Unix filenames decode identically after all-byte URI encoding.
+# Locked bundled SQLite 3.53.2 makes both mutated version comparisons false.
+# Duplicate-free config requires every one of its four allowed root keys.
+exclude_re = [
+    "^src/domain/sha256\\.rs:23:46: replace \\| with \\^ in Sha256::parse$",
+    "^src/filesystem/local\\.rs:311:40: replace \\| with \\^ in LocalFileSystem::finish_lock$",
+    "^src/filesystem/local\\.rs:421:42: replace \\| with \\^ in create_lock_file$",
+    "^src/filesystem/local\\.rs:421:25: replace \\| with \\^ in create_lock_file$",
+    "^src/filesystem/local\\.rs:422:20: replace \\| with \\^ in create_lock_file$",
+    "^src/filesystem/read\\.rs:31:70: replace \\| with \\^ in read_regular$",
+    "^src/filesystem/read\\.rs:31:51: replace \\| with \\^ in read_regular$",
+    "^src/filesystem/read\\.rs:31:32: replace \\| with \\^ in read_regular$",
+    "^src/storage/connection\\.rs:71:33: replace \\| with \\^ in ConfinedDirectory<'a>::open_database$",
+    "^src/storage/connection\\.rs:116:67: replace \\| with \\^ in ConfinedDirectory<'a>::verify$",
+    "^src/storage/connection\\.rs:116:48: replace \\| with \\^ in ConfinedDirectory<'a>::verify$",
+    "^src/storage/connection\\.rs:116:28: replace \\| with \\^ in ConfinedDirectory<'a>::verify$",
+    "^src/git/process\\.rs:74:46: replace && with \\|\\| in GitProcess::build_command$",
+    "^src/git/process\\.rs:74:71: replace == with != in GitProcess::build_command$",
+    "^src/storage/connection\\.rs:331:41: replace \\|\\| with && in attach_cache$",
+    "^src/storage/connection\\.rs:415:35: replace < with == in verify_capabilities$",
+    "^src/storage/connection\\.rs:415:35: replace < with <= in verify_capabilities$",
+    "^src/service/embedding_config\\.rs:43:13: replace \\|\\| with && in EmbeddingConfig::parse$",
+]

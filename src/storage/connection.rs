@@ -178,10 +178,7 @@ pub(super) fn wait_for_initialization<T>(
     loop {
         match operation() {
             Ok(value) => return Ok(value),
-            Err(error)
-                if is_initialization_contention(&error)
-                    && started.elapsed() < INITIALIZATION_WAIT =>
-            {
+            Err(error) if can_retry_initialization(&error, started.elapsed()) => {
                 #[cfg(test)]
                 if let Some(hook) = ON_INITIALIZATION_CONTENTION.take() {
                     hook();
@@ -191,6 +188,10 @@ pub(super) fn wait_for_initialization<T>(
             Err(error) => return Err(error),
         }
     }
+}
+
+fn can_retry_initialization(error: &StorageError, elapsed: Duration) -> bool {
+    is_initialization_contention(error) && elapsed < INITIALIZATION_WAIT
 }
 
 fn is_initialization_contention(error: &StorageError) -> bool {

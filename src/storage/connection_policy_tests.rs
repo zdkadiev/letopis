@@ -1,6 +1,6 @@
 use super::{
-    ConfinedDirectory, configure_database, prepare_paths, read_journal, resolve_path,
-    wait_for_initialization,
+    ConfinedDirectory, can_retry_initialization, configure_database, map_sqlite, prepare_paths,
+    read_journal, resolve_path, wait_for_initialization,
 };
 use crate::service::{StorageError, StorageErrorKind};
 use rusqlite::{Connection, ffi};
@@ -10,12 +10,29 @@ use std::{
     fs::{self, File},
     os::unix::fs::symlink,
     process::Command,
+    time::Duration,
 };
 use tempfile::TempDir;
 
 use crate::process_test_support as process_fixture;
 
 struct IgnoredPolicy<'a>(&'a Connection);
+
+#[test]
+fn initialization_retry_stops_at_the_exact_budget_without_retrying_other_errors() {
+    // Arrange: exercise the real SQLite contention classification without a clock race.
+    let busy = map_sqlite(rusqlite::Error::SqliteFailure(
+        ffi::Error::new(ffi::SQLITE_BUSY),
+        None,
+    ));
+    let ordinary = StorageError::new(StorageErrorKind::InternalError, "not contention");
+    for (seconds, expected) in [(0, true), (4, true), (5, false), (6, false)] {
+        // Act / Assert: the five-second deadline is exclusive for another retry.
+        let elapsed = Duration::from_secs(seconds);
+        assert_eq!(can_retry_initialization(&busy, elapsed), expected);
+        assert!(!can_retry_initialization(&ordinary, elapsed));
+    }
+}
 
 #[test]
 fn rejects_a_service_symlink_back_to_the_pinned_directory() {
