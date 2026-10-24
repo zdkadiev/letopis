@@ -66,6 +66,8 @@ def validate_corpus(manifest_path: Path) -> dict:
 
 
 def _reject_symlinks(path: Path) -> None:
+    if ".." in path.parts:
+        raise ValueError("input contains parent traversal")
     if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
         raise ValueError(f"symlink input: {path.name}")
 

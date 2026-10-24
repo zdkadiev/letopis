@@ -278,6 +278,19 @@ class RunnerTests(unittest.TestCase):
         return json.loads((self.root / path).read_text())
 
 
+class PathTests(unittest.TestCase):
+    def test_evidence_guard_rejects_lexical_parent_traversal_without_writes(self) -> None:
+        base = Path(tempfile.gettempdir()).resolve() / f"letopis-path-runner-{os.getpid()}"
+        intermediate, destination = base / "absent", base / "evidence"
+        self.assertFalse(base.exists())
+        with self.assertRaisesRegex(ValueError, "parent traversal"):
+            runner._verify_path(intermediate / ".." / "evidence", exists=False)
+        self.assertFalse(intermediate.exists())
+        self.assertFalse(destination.exists())
+        self.assertFalse(base.exists())
+        self.assertIsNone(runner._verify_path(base / "canonical", exists=False))
+
+
 class LocalHttpTests(unittest.TestCase):
     def test_installed_model_inspection_never_pulls_or_uses_remote_model(self) -> None:
         with _serve_provider() as server:

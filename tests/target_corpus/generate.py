@@ -124,6 +124,8 @@ def plan_packing(knowledge_count: int, elements_per_file: int) -> list[int]:
 
 
 def _validate_output(output: Path) -> None:
+    if ".." in output.parts:
+        raise ValueError("output contains parent traversal")
     if output.exists() or output.is_symlink():
         raise ValueError("output already exists")
     if any(parent.is_symlink() for parent in output.parents):

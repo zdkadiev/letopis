@@ -104,7 +104,10 @@ The observer requires the product to have initialized regular version-1 WAL
 stores; load performs the product initialization before its first observation.
 
 Run a bounded drain first if desired; `--max-seconds` is a watchdog, not a
-product SLA:
+product SLA.
+`--max-seconds` bounds the direct-child wait, but a descendant retaining inherited
+stdout/stderr can outlive that limit and delay observation/receipts; the current
+product redirects detached streams.
 
 ```sh
 EVIDENCE="$PWD/.artifacts/tk15/drain-100k-attempt-1"

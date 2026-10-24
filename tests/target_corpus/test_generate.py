@@ -10,8 +10,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from generate import CorpusOptions, generate_corpus, plan_packing
-from validate import validate_corpus
+from generate import CorpusOptions, _validate_output, generate_corpus, plan_packing
+from validate import _reject_symlinks, validate_corpus
 
 
 class GeneratorTests(unittest.TestCase):
@@ -132,6 +132,17 @@ class GeneratorTests(unittest.TestCase):
                     generate_corpus(output, CorpusOptions(seed=1, knowledge_count=10))
             self.assertEqual((existing / "keep").read_text(), "preserve")
 
+    def test_output_guard_rejects_lexical_parent_traversal_without_writes(self):
+        base = Path(tempfile.gettempdir()).resolve() / f"letopis-path-generator-{os.getpid()}"
+        intermediate, destination = base / "absent", base / "destination"
+        self.assertFalse(base.exists())
+        with self.assertRaisesRegex(ValueError, "parent traversal"):
+            _validate_output(intermediate / ".." / "destination")
+        self.assertFalse(intermediate.exists())
+        self.assertFalse(destination.exists())
+        self.assertFalse(base.exists())
+        self.assertIsNone(_validate_output(base / "canonical"))
+
     def test_cli_defaults_and_flags(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary).resolve() / "cli"
@@ -146,6 +157,17 @@ class GeneratorTests(unittest.TestCase):
 
 
 class ValidatorTests(unittest.TestCase):
+    def test_input_guard_rejects_lexical_parent_traversal_without_writes(self):
+        base = Path(tempfile.gettempdir()).resolve() / f"letopis-path-validator-{os.getpid()}"
+        intermediate, destination = base / "absent", base / "corpus.json"
+        self.assertFalse(base.exists())
+        with self.assertRaisesRegex(ValueError, "parent traversal"):
+            _reject_symlinks(intermediate / ".." / "corpus.json")
+        self.assertFalse(intermediate.exists())
+        self.assertFalse(destination.exists())
+        self.assertFalse(base.exists())
+        self.assertIsNone(_reject_symlinks(base / "canonical.json"))
+
     def test_rejects_cycle_even_with_updated_input_hashes(self):
         def mutate(text):
             return text.replace(

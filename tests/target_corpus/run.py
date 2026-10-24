@@ -447,6 +447,8 @@ def _verify_lock_identity(path: Path, before: os.stat_result, directory: os.stat
 
 
 def _verify_path(path: Path, *, exists: bool = True) -> None:
+    if ".." in path.parts:
+        raise ValueError("path contains parent traversal")
     if not path.is_absolute() or path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
         raise ValueError("absolute nonsymlink path required")
     if exists and not path.exists():
