@@ -1,6 +1,6 @@
 # TK-16 — Local RAM assessment
 
-> Status: local measurements complete; independent review pending.
+> Status: local measurements complete; independently reviewed, reporting corrections applied.
 > Formal 4 GB hardware/budget acceptance: **not assessed**; G-1 remains blocked.
 > Date: 2026-10-24. Base main@ccb15f0; branch codex/tk-16.
 > Worktree: /Users/zdkadiev/.codex/worktrees/tk-16/letopis.
@@ -20,14 +20,21 @@ Those maxima occur in different windows. Including the recorded measurement
 coordinator/observer RSS at the same instant reached **1,187.430 MB** during
 fresh backlog loading. These are observations, not a full unique-RAM bound.
 
-| Window | Physical-charge sum MB | Summed RSS MB | With recorded orchestration RSS MB | Complete/native samples |
+| Window | Physical-charge sum MB | Summed RSS MB | With recorded orchestration RSS MB | Complete selected-PID samples |
 |---|---:|---:|---:|---:|
 | Populated: first relocated-fixture search | 314.101 | 739.312 | 776.815 | 79/79 |
 | Populated: warm search | 273.518 | 613.810 | 651.575 | 6/6 |
 | Fresh backlog: initial load | 379.097 | 732.119 | 1187.430 | 165/165 |
-| Backlog: first overlap (query failed) | 248.467 | 514.998 | 743.096 | 72/73 |
-| Backlog: repeated overlap (query succeeded) | 249.303 | 520.110 | 555.057 | 71/72 |
+| Backlog: drain/provider during first overlap* | 248.467 | 514.998 | 743.096 | 72/73 |
+| Backlog: drain/provider during repeated overlap* | 249.303 | 520.110 | 555.057 | 71/72 |
 
+
+*Both short search CLI processes escaped every overlap snapshot: searches lasted
+0.38 / 0.43 s while snapshot gaps were 0.608–0.649 s, and discovery preceded query
+launch. These two rows measure sampled drain/provider RAM only. Query time logs
+separately retain maximum RSS of 14,336,000 / 28,803,072 bytes; these are independent
+peaks and cannot be added to the table as simultaneous totals. The first query
+failed; the repeated query succeeded.
 
 Each column is its own observed maximum; do not add column maxima together.
 The inclusive RSS column is computed from simultaneous app + recorded-tool rows,
@@ -35,8 +42,11 @@ not the sum of separate peaks. Persistent Ollama GUI/server/model runners and
 owned CLI/Git children are target processes. Python orchestration, the Rust
 coverage observer and time wrappers are separate measurement overhead. Transient
 ps/footprint utility processes are excluded. The largest recorded instrumentation
-RSS alone was 591.561 MB. All 395 native samples remain, with 393 complete samples
+RSS alone was 591.561 MB. All 395 native samples remain, with 393 complete selected-PID samples
 used for physical-charge/group maxima; missing/exited-PID samples never become zero.
+Completeness means the already-selected PID set was captured, not that discovery
+found every workload process. In particular, it does not include the two missed
+query processes.
 
 ## Inputs, coverage and preservation
 
@@ -65,7 +75,9 @@ The shared provider was never killed or explicitly unloaded.
 | After first 45-second drain | 1,251 / 98,749 | 98,749 / 0 / 0 | 768 |
 | After repeated 45-second drain | 2,458 / 97,542 | 97,542 / 0 / 0 | 768 |
 
-All observations retain 100k/100k/500k counts, revision 1 and zero invalid files.
+All observations retain 100k/100k/500k counts and zero invalid files. Populated
+revision changes from 1 before search to 2 after search; all backlog observations
+retain revision 1.
 Populated nonempty searches returned five results and left zero query_error rows.
 The first relocated-fixture search took 48.143 s and the warm search 3.667 s;
 the first includes revalidation of copied file inodes, not a pristine cold-cache
@@ -98,7 +110,8 @@ mappings and compressed/swapped memory differently from RSS and includes unified
 CPU/GPU objects on Apple silicon: [Apple explanation](https://developer.apple.com/videos/play/wwdc2022/10106/).
 RSS sums can double-count shared pages. Do not add size_vram to either counter.
 Neither the reported charged footprint nor the selected-process RSS sum measures
-all attributed OS file cache/shared buffers. Short-lived children may evade sampling.
+all attributed OS file cache/shared buffers. Both short overlap query processes
+escaped sampling as documented above; concurrent search RAM is therefore incomplete.
 The loop delays 0.5 s between captures; actual timestamps, not a guaranteed fixed
 sample rate, are retained. Sampling overhead means elapsed times are not latency
 benchmarks. MB here is decimal; the unchanged budget is 1,000,000,000 bytes.
@@ -143,8 +156,16 @@ separately, the initial failure stays open, and G-1 remains not assessed.
 
 ## Formal verdict
 
+Independent review verified all 395 frames, 1,286 evidence hashes, input/binary
+pins and reported maxima without rerunning workloads. Its Important sampling
+scope finding and Minor revision-provenance correction are applied above.
+Review: `.artifacts/tk16/final-review.md`; its SHA-256 is recorded separately from
+the frozen evidence manifest in `completion-verification.json`.
+
 Local RAM observations are available. **TK-16 acceptance is blocked/not assessed**:
 no 4 GB hardware run, no complete OS-cache/shared-buffer attribution, sampled
-rather than absolute concurrent maxima, and one unresolved overlap failure.
+rather than absolute concurrent maxima, both overlap query processes missed, and
+one unresolved overlap failure.
 No conclusion that the full stack fits 1 GB or that G-1 passes follows from these
-numbers. Independent local-evidence review and Engram final recording remain.
+numbers. The narrowed local assessment is complete; canonical acceptance remains
+blocked. Findings and verification are recorded in the existing Engram store.

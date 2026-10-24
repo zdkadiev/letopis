@@ -48,3 +48,10 @@ peak, complete OS-cache attribution or proof on a 4 GB laptop. The original
 1,000,000,000-byte budget remains unchanged. TK-16 hardware acceptance and G-1
 remain not assessed without the required equipment and complete accounting.
 No merge/push/GitHub closure is authorized by starting this assessment.
+
+## Observed method limitation
+
+Both short concurrent search CLIs finished between process snapshots; overlap RAM
+rows therefore measure sampled drain/provider only. Independent query time maximum
+RSS is retained separately and cannot be added as a simultaneous peak. The local
+report discloses this omission; complete concurrent accounting remains unassessed.
