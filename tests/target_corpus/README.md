@@ -14,21 +14,25 @@ available. Discover executable paths from Cargo's JSON messages instead of
 depending on Cargo's changing hashed test filename:
 
 ```sh
-set -o pipefail
+set -euo pipefail
+TASK_TMP=$(mktemp -d "${TMPDIR:-/tmp}/tk15-paths.XXXXXX")
+trap 'rm -rf "$TASK_TMP"' EXIT
 cargo build --release --locked --offline --message-format=json \
   | python3 -c 'import json,sys; [print(m["executable"]) for line in sys.stdin if (m:=json.loads(line)).get("reason")=="compiler-artifact" and m.get("target",{}).get("name")=="letopis" and m.get("executable")]' \
-  > /tmp/tk15-product-paths
+  > "$TASK_TMP/product-paths"
 cargo test --locked --offline --test target_corpus --no-run --message-format=json \
   | python3 -c 'import json,sys; [print(m["executable"]) for line in sys.stdin if (m:=json.loads(line)).get("reason")=="compiler-artifact" and m.get("target",{}).get("name")=="target_corpus" and m.get("executable")]' \
-  > /tmp/tk15-observer-paths
-PRODUCT=$(tail -n 1 /tmp/tk15-product-paths)
-OBSERVER=$(tail -n 1 /tmp/tk15-observer-paths)
+  > "$TASK_TMP/observer-paths"
+PRODUCT=$(tail -n 1 "$TASK_TMP/product-paths")
+OBSERVER=$(tail -n 1 "$TASK_TMP/observer-paths")
 test -x "$PRODUCT" && test -x "$OBSERVER"
 ```
 
 The product is the `letopis` binary; the observer is the executable generated
 for the `target_corpus` integration test. Keep the selected files unchanged
 through load, drain and observe: their SHA-256 digests are pinned on first load.
+The path files live in a newly created private temporary directory; the exit
+trap removes only that directory.
 
 ## Generate and validate
 
@@ -53,9 +57,13 @@ python3 -B tests/target_corpus/generate.py --output "$OUT" \
 python3 -B tests/target_corpus/validate.py "$OUT/corpus.json"
 ```
 
-The manifest records the source Git tree and input SHA-256 values, counts,
-packing and exact UTF-8 byte statistics for marked knowledge fragments and
-Markdown files. The target is 100,000 knowledge nodes, 100,000 distinct
+The manifest records the fixture's source Git tree and input SHA-256 values,
+counts, packing and exact UTF-8 byte statistics for marked knowledge fragments
+and Markdown files. The source tree is captured before the generated knowledge
+is committed into the fixture. The later product load creates its own knowledge
+snapshot; the observer's `project_revision` and graph counts describe that
+knowledge/inspect snapshot, not the earlier source-tree OID. The target is
+100,000 knowledge nodes, 100,000 distinct
 normalized source addresses and 500,000 distinct edges; each marked fragment
 must be exactly 2,000 UTF-8 bytes. The default 30 elements per file yields 3,334
 files and 10 elements in the last file. A node count alone does not prove the
@@ -92,6 +100,8 @@ narrow SQLite read-only metadata guard before search; only empty first-init
 metadata may proceed without identity. A mismatch or occupied identity-less
 state fails closed before product refresh. Matching initialized state must also
 pass the Rust observer under the embedding lock.
+The observer requires the product to have initialized regular version-1 WAL
+stores; load performs the product initialization before its first observation.
 
 Run a bounded drain first if desired; `--max-seconds` is a watchdog, not a
 product SLA:
@@ -106,6 +116,10 @@ python3 -B tests/target_corpus/run.py --corpus "$CORPUS" \
 Continue interrupted or incomplete work with the same corpus, executables,
 installed model and pinned config, and a new evidence directory. Never rerun
 generation over the existing corpus or overwrite earlier receipts.
+On timeout or handled interruption, the runner terminates and reaps only its
+owned drain process group. Do not use broad process-name cleanup. A forced
+`SIGKILL` of the runner or power loss may prevent the current phase from writing
+its final receipt; use a fresh evidence directory to record the next phase.
 
 ```sh
 EVIDENCE="$PWD/.artifacts/tk15/drain-100k-attempt-2"
@@ -140,6 +154,7 @@ The retained smoke evidence under `.artifacts/tk15/task3-real-model-20261024-02/
 used 60 knowledge nodes, 60 sources and 300 edges. Its load receipt reported a
 zero-covered backlog; its subsequent local-model drain receipt reported
 60/60 covered and dimension 768. These receipts validate the small workflow,
-not the 100,000-node acceptance run. Report full-target success only from the
-controller's primary evidence and hand that evidence off with the TK-16
-results.
+not the 100,000-node acceptance run. This retained execution evidence is from
+macOS only; it provides no Linux, full-target RAM, or machine-size result.
+Report full-target success only from the controller's primary evidence and hand
+that evidence off with the TK-16 results.
