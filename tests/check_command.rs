@@ -190,9 +190,13 @@ fn check_snapshot_findings_are_current_and_safe() {
             {"code":"validation_failed","message":"knowledge source snapshot is unavailable","details":{"path":"blob.md","reason":"source_snapshot_unavailable","element_id":"blob.md","target":blob.as_str()}},
             {"code":"validation_failed","message":"knowledge source snapshot is unavailable","details":{"path":"foreign.md","reason":"source_snapshot_unavailable","element_id":"foreign.md","target":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}},
             {"code":"validation_failed","message":"knowledge source snapshot is missing","details":{"path":"missing.md","reason":"missing_source_snapshot","element_id":"missing.md"}},
+            {"code":"validation_failed","message":"knowledge source is not found","details":{"path":"missing.md","reason":"source_not_found","element_id":"missing.md","target":"code.rs"}},
             {"code":"validation_failed","message":"knowledge source snapshot is unavailable","details":{"path":"repeat.md","reason":"source_snapshot_unavailable","element_id":"repeat.md","target":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
         ]}})
     );
+    // Repair both root metadata and addressed bytes; an empty tree has no code.rs.
+    let repaired = support::provenance::create_basis(repo.get_root(), &[("code.rs", b"source")]);
+    repo.write("code.rs", b"source");
     for path in [
         "absent.md",
         "blob.md",
@@ -200,7 +204,7 @@ fn check_snapshot_findings_are_current_and_safe() {
         "repeat.md",
         "missing.md",
     ] {
-        repo.write(path, format!("<!-- letopis: {{\"created_at\":42,\"source_snapshot\":\"{}\"}} -->\n[source](code.rs \"letopis:type=external\")\n", valid.as_str()).as_bytes());
+        repo.write(path, format!("<!-- letopis: {{\"created_at\":42,\"source_snapshot\":\"{}\"}} -->\n[source](code.rs \"letopis:type=external\")\n", repaired.as_str()).as_bytes());
     }
     assert_eq!(
         check(&repo, b"{}"),

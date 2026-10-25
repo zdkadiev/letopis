@@ -7,7 +7,7 @@ use letopis::{
     },
     wire_document_refresher, wire_searcher,
 };
-use std::num::NonZeroUsize;
+use std::{collections::BTreeSet, num::NonZeroUsize};
 use support::{
     embedding::{FixtureReply, HttpFixture},
     reading::{ReadingRepo, run_with_credentials},
@@ -30,7 +30,10 @@ fn search_refreshes_and_returns_only_knowledge_links() {
     assert_eq!(links[0].path.as_str(), "a.md");
     assert_eq!(links[0].lines, LineRange::new(1, 3).unwrap());
     assert_eq!(links[0].revision, 1);
-    assert!(links[0].flags.is_empty());
+    assert_eq!(
+        links[0].flags,
+        BTreeSet::from([SearchFlag::SourceChanged, SearchFlag::SourceNotFound,])
+    );
 }
 #[test]
 fn fts_literals_work_on_native_tokenizer() {

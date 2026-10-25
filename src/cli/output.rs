@@ -46,6 +46,7 @@ struct Element<'a> {
     hash: Option<String>,
 }
 
+/// Existing X-1 metadata envelope; freshness flags never add source text or fields.
 #[derive(Serialize)]
 struct Link<'a> {
     element_id: &'a str,

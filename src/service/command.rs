@@ -156,7 +156,7 @@ pub struct SearchRequest {
     /// Maximum links after combining complete candidate channels.
     pub limit: NonZeroUsize,
 }
-/// Baseline knowledge freshness observations.
+/// Observed knowledge and source freshness reasons from the existing X-1 contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SearchFlag {
     /// Current knowledge is missing, invalid, or differs from pinned metadata.

@@ -97,7 +97,7 @@ pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenan
     Ok(ProvenanceService::new(git, filesystem))
 }
 
-/// Wire current corpus validation with a separate pinned reader and read-only Git probe.
+/// Wire corpus validation with one pinned reader and independent live provenance observations.
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or storage setup failures.
@@ -114,11 +114,14 @@ pub fn wire_checker(start: &Path) -> CommandResult<impl Checker + use<>> {
         refresher,
         storage,
         CurrentGraphDiagnostics::new(),
-        git,
+        ProvenanceService::new(
+            GitCli::open(start).map_err(map_check_setup)?,
+            LocalFileSystem::open(git.get_root()).map_err(map_check_setup)?,
+        ),
     ))
 }
 
-/// Wire hybrid knowledge search with independently owned read and embedding connections.
+/// Wire hybrid search with independently owned read, embedding and provenance collaborators.
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
@@ -138,6 +141,10 @@ pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
         embeddings,
         filesystem,
         markdown: MarkdownParser::new(),
+        provenance: ProvenanceService::new(
+            GitCli::open(start).map_err(map_search_setup)?,
+            LocalFileSystem::open(git.get_root()).map_err(map_search_setup)?,
+        ),
     }))
 }
 

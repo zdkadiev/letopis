@@ -9,7 +9,8 @@ use crate::domain::RepoPath;
 /// Implementations refresh the entire corpus before opening one pinned cache read.
 /// All cache-derived findings share that view. Exact owner selectors filter findings
 /// after full graph validation; they never restrict refresh or graph membership.
-/// Snapshot probes are read-only and repeated OIDs are checked once per invocation.
+/// Source bases and bindings come from that view; live byte observations are read-only.
+/// Missing sources or bases produce findings without removing knowledge.
 pub trait Checker {
     /// Validate the given paths, or the whole corpus when empty.
     ///
@@ -20,7 +21,10 @@ pub trait Checker {
 }
 /// Consistent metadata-only hybrid knowledge search.
 pub trait Searcher {
-    /// Refresh and search one pinned revision, observing baseline live knowledge freshness.
+    /// Refresh and search one pinned revision, observing live knowledge and source freshness.
+    ///
+    /// Source bindings and metadata share the ranking view; live bytes are observed separately.
+    /// Flags are deduplicated X-1 values and links contain no source text or excerpts.
     ///
     /// # Errors
     /// Reports refresh, storage, integrity, or non-configuration filesystem failures.

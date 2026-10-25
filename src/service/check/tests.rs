@@ -1,17 +1,21 @@
 use super::CheckService;
 use crate::{
-    domain::{ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, TreeOid},
+    domain::{
+        Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256,
+        SourceUri, TreeOid,
+    },
     service::{
         CacheWrite, Checker, CommandError, CommandErrorKind, CommandProblem, CommandResult,
         CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentResult,
-        GraphDiagnostics, KnowledgeMetadata, NodeMetadata, RefreshOutcome, Refresher,
-        SnapshotError, SnapshotState, SnapshotVerifier, Storage, StorageError, StorageErrorKind,
-        StorageRead, StorageResult, VectorOutcome,
+        GraphDiagnostics, KnowledgeMetadata, NodeMetadata, ProvenanceIssue, ProvenanceObservation,
+        ProvenanceRequest, RefreshOutcome, Refresher, SearchFlag, SnapshotError, SnapshotState,
+        SnapshotVerifier, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
+        Storage, StorageError, StorageErrorKind, StorageRead, StorageResult, VectorOutcome,
     },
     storage::SqliteStorage,
 };
 use serde_json::{Value, json};
-use std::{cell::RefCell, error::Error, io, rc::Rc};
+use std::{cell::RefCell, collections::BTreeSet, error::Error, io, rc::Rc};
 use tempfile::TempDir;
 
 type Events = Rc<RefCell<Vec<&'static str>>>;
@@ -39,6 +43,41 @@ struct Verifier {
     probes: Probes,
     result: SnapshotState,
     fail: bool,
+}
+
+#[test]
+fn check_reports_missing_address_from_selected_knowledge() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut storage = open_storage(&directory);
+    publish_nodes(&mut storage, &[build_node("a.md#one", "a")]);
+    let mut unit = storage.begin_cache_write().unwrap();
+    unit.insert_edge(
+        &Edge::new(
+            KnowledgeId::parse("a.md#one").unwrap(),
+            EdgeTarget::Source(SourceUri::parse("gone.rs").unwrap()),
+            EdgeType::parse("external").unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    unit.commit().unwrap();
+    let mut service = CheckService::new(
+        Refresh(|| Ok(build_outcome())),
+        storage,
+        FindingDiagnostics,
+        Verifier {
+            probes: Probes::default(),
+            result: SnapshotState::Available,
+            fail: false,
+        },
+    );
+
+    let report = service.check(&[RepoPath::parse("a.md").unwrap()]).unwrap();
+
+    assert_eq!(report.errors.len(), 2);
+    assert_eq!(report.errors[1].details["reason"], "source_not_found");
+    assert_eq!(report.errors[1].details["path"], "a.md");
+    assert_eq!(report.errors[1].details["target"], "gone.rs");
 }
 
 #[test]
@@ -86,7 +125,7 @@ fn check_refreshes_before_opening_one_read() {
 }
 
 #[test]
-fn check_reuses_same_view_and_probes_each_oid_once() {
+fn check_reuses_same_view_for_each_knowledge_observation() {
     let directory = tempfile::tempdir().unwrap();
     let mut writer = open_storage(&directory);
     publish_nodes(
@@ -110,7 +149,7 @@ fn check_reuses_same_view_and_probes_each_oid_once() {
 
     let report = service.check(&[]).unwrap();
 
-    assert_eq!(*probes.borrow(), ["a".repeat(40)]);
+    assert_eq!(*probes.borrow(), ["a".repeat(40), "a".repeat(40)]);
     assert_eq!(
         get_findings(&report.errors),
         json!([
@@ -120,7 +159,15 @@ fn check_reuses_same_view_and_probes_each_oid_once() {
     );
     // A new invocation must observe the newly committed metadata and probe afresh.
     let report = service.check(&[]).unwrap();
-    assert_eq!(*probes.borrow(), ["a".repeat(40), "b".repeat(40)]);
+    assert_eq!(
+        *probes.borrow(),
+        [
+            "a".repeat(40),
+            "a".repeat(40),
+            "b".repeat(40),
+            "b".repeat(40)
+        ]
+    );
     assert_eq!(report.errors.len(), 2);
     assert_eq!(report.errors[0].details["target"], "b".repeat(40));
 }
@@ -292,6 +339,44 @@ impl GraphDiagnostics for FindingDiagnostics {
     }
 }
 
+impl SourceProvenance for Verifier {
+    fn observe_sources(
+        &self,
+        request: ProvenanceRequest<'_>,
+    ) -> DocumentResult<ProvenanceObservation> {
+        let mut issues = BTreeSet::new();
+        if let Some(snapshot) = request.source_snapshot {
+            let state = self.verify_snapshot(snapshot).map_err(|cause| {
+                DocumentError::new_with_cause(
+                    DocumentErrorKind::InternalError,
+                    "safe provenance",
+                    cause,
+                )
+            })?;
+            if state != SnapshotState::Available {
+                issues.insert(ProvenanceIssue::SnapshotUnavailable {
+                    snapshot: snapshot.clone(),
+                });
+            }
+        }
+        for source in request.sources {
+            issues.insert(ProvenanceIssue::SourceNotFound {
+                source: source.clone(),
+            });
+        }
+        Ok(ProvenanceObservation {
+            flags: BTreeSet::from([SearchFlag::SourceNotFound]),
+            issues,
+        })
+    }
+    fn compare_revision(
+        &self,
+        _: SourceRevisionRequest<'_>,
+    ) -> Result<SourceRevisionComparison, SnapshotError> {
+        panic!("check does not compare requested revisions")
+    }
+}
+
 impl SnapshotVerifier for Verifier {
     fn verify_snapshot(&self, oid: &TreeOid) -> Result<SnapshotState, SnapshotError> {
         self.probes.borrow_mut().push(oid.as_str().into());
@@ -405,3 +490,5 @@ fn assert_private_failure(error: &CommandError) {
     assert!(error.source().is_some());
     assert!(!format!("{error} {error:?}").contains("SECRET_"));
 }
+
+mod pinned;

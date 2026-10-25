@@ -1,8 +1,8 @@
 use super::{
     CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder, EmbeddingConfig,
-    FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, QueryEmbedding,
-    QueryEmbeddingRequest, Refresher, SearchFlag, SearchLink, SearchRequest, Searcher, Storage,
-    StorageRead, TextMatch, VectorMatch, VectorOutcome,
+    FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceRequest, QueryEmbedding,
+    QueryEmbeddingRequest, Refresher, SearchFlag, SearchLink, SearchRequest, Searcher,
+    SourceProvenance, Storage, StorageRead, TextMatch, VectorMatch, VectorOutcome,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath};
 use std::{
@@ -12,7 +12,8 @@ use std::{
 };
 
 /// Independently owned boundaries; inference cannot upgrade the search read into a write.
-pub(crate) struct SearchDependencies<D, S, E, F, M> {
+#[derive(Debug)]
+pub(crate) struct SearchDependencies<D, S, E, F, M, P> {
     /// Canonical document publication before pinning.
     pub(crate) refresher: D,
     /// Exclusive scoped search read connection.
@@ -23,29 +24,34 @@ pub(crate) struct SearchDependencies<D, S, E, F, M> {
     pub(crate) filesystem: F,
     /// Shared whole-file knowledge codec.
     pub(crate) markdown: M,
+    /// Read-only observations of the ranked knowledge source bindings.
+    pub(crate) provenance: P,
 }
 /// Refreshes and ranks complete candidate channels from one scoped read.
-pub(crate) struct SearchService<D, S, E, F, M> {
+#[derive(Debug)]
+pub(crate) struct SearchService<D, S, E, F, M, P> {
     refresher: D,
     storage: S,
     embeddings: E,
     filesystem: F,
     markdown: M,
+    provenance: P,
 }
-impl<D, S, E, F, M> SearchService<D, S, E, F, M> {
+impl<D, S, E, F, M, P> SearchService<D, S, E, F, M, P> {
     /// Assemble search from owned boundaries without performing I/O.
-    pub(crate) fn new(dependencies: SearchDependencies<D, S, E, F, M>) -> Self {
+    pub(crate) fn new(dependencies: SearchDependencies<D, S, E, F, M, P>) -> Self {
         Self {
             refresher: dependencies.refresher,
             storage: dependencies.storage,
             embeddings: dependencies.embeddings,
             filesystem: dependencies.filesystem,
             markdown: dependencies.markdown,
+            provenance: dependencies.provenance,
         }
     }
 }
-impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec> Searcher
-    for SearchService<D, S, E, F, M>
+impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec, P: SourceProvenance>
+    Searcher for SearchService<D, S, E, F, M, P>
 {
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
         self.refresher.refresh().map_err(map_search_error)?;
@@ -67,7 +73,26 @@ impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec> Sea
             .into_iter()
             .map(|id| {
                 let node = metadata.get(&id).ok_or_else(fail_invalid_search_data)?;
-                build_link(node, read.get_revision(), &self.filesystem, &self.markdown)
+                let sources = read
+                    .list_edges(Some(&id))
+                    .map_err(map_search_error)?
+                    .into_iter()
+                    .filter_map(|edge| match edge.get_target() {
+                        EdgeTarget::Source(source) => Some(source.clone()),
+                        EdgeTarget::Knowledge(_) => None,
+                    })
+                    .collect();
+                let observed = self
+                    .provenance
+                    .observe_sources(ProvenanceRequest {
+                        source_snapshot: node.source_snapshot.as_ref(),
+                        sources: &sources,
+                    })
+                    .map_err(map_search_error)?;
+                let mut link =
+                    build_link(node, read.get_revision(), &self.filesystem, &self.markdown)?;
+                link.flags.extend(observed.flags);
+                Ok(link)
             })
             .collect()
     }
