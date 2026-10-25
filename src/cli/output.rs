@@ -1,7 +1,8 @@
 use super::handlers::{CommandResponse, ResponseResult};
-use crate::domain::Sha256;
+use crate::domain::{Edge, Sha256};
 use crate::service::{
     CommandError, CommandErrorKind, CommandProblem, InspectedElement, SearchFlag, SearchLink,
+    TraversalLink,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -36,6 +37,11 @@ enum ResultBody<'a> {
         elements: BTreeMap<&'a str, Element<'a>>,
     },
     Search(Vec<Link<'a>>),
+    Traverse {
+        elements: Vec<Link<'a>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        edges: Option<Vec<TraversedEdge<'a>>>,
+    },
     Drained {},
 }
 #[derive(Serialize)]
@@ -51,9 +57,18 @@ struct Element<'a> {
 struct Link<'a> {
     element_id: &'a str,
     path: &'a str,
-    lines: [u64; 2],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lines: Option<[u64; 2]>,
     revision: u64,
     flags: Vec<&'static str>,
+}
+
+#[derive(Serialize)]
+struct TraversedEdge<'a> {
+    source: &'a str,
+    target: &'a str,
+    #[serde(rename = "type")]
+    edge_type: &'a str,
 }
 
 pub(crate) fn write_response(
@@ -108,6 +123,17 @@ fn build_result(result: &ResponseResult) -> ResultBody<'_> {
                 .collect(),
         },
         ResponseResult::Search(links) => ResultBody::Search(links.iter().map(build_link).collect()),
+        ResponseResult::Traverse(traversal) => ResultBody::Traverse {
+            elements: traversal
+                .elements
+                .iter()
+                .map(build_traversal_link)
+                .collect(),
+            edges: traversal
+                .edges
+                .as_ref()
+                .map(|edges| edges.iter().map(build_edge).collect()),
+        },
         ResponseResult::Drained => ResultBody::Drained {},
     }
 }
@@ -115,17 +141,32 @@ fn build_link(link: &SearchLink) -> Link<'_> {
     Link {
         element_id: link.element_id.as_str(),
         path: link.path.as_str(),
-        lines: [link.lines.get_start(), link.lines.get_end()],
+        lines: Some([link.lines.get_start(), link.lines.get_end()]),
         revision: link.revision,
-        flags: link
-            .flags
-            .iter()
-            .map(|flag| match flag {
-                SearchFlag::Stale => "stale",
-                SearchFlag::SourceChanged => "source_changed",
-                SearchFlag::SourceNotFound => "source_not_found",
-            })
-            .collect(),
+        flags: link.flags.iter().map(get_flag).collect(),
+    }
+}
+fn build_traversal_link(link: &TraversalLink) -> Link<'_> {
+    Link {
+        element_id: link.element_id.as_str(),
+        path: link.path.as_str(),
+        lines: link.lines.map(|lines| [lines.get_start(), lines.get_end()]),
+        revision: link.revision,
+        flags: link.flags.iter().map(get_flag).collect(),
+    }
+}
+fn build_edge(edge: &Edge) -> TraversedEdge<'_> {
+    TraversedEdge {
+        source: edge.get_source().as_str(),
+        target: edge.get_target().as_str(),
+        edge_type: edge.get_edge_type().as_str(),
+    }
+}
+fn get_flag(flag: &SearchFlag) -> &'static str {
+    match flag {
+        SearchFlag::Stale => "stale",
+        SearchFlag::SourceChanged => "source_changed",
+        SearchFlag::SourceNotFound => "source_not_found",
     }
 }
 fn build_element(element: &InspectedElement) -> Element<'_> {

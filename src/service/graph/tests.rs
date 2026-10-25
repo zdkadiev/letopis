@@ -59,7 +59,7 @@ fn traverses_each_mode_and_direction_in_bfs_order() {
         ),
     ];
     for (mode, direction, expected) in cases {
-        let mut read = GeneratedRead::fixed();
+        let mut read = GeneratedRead::build_fixed();
         let mut request = make_request();
         request.mode = mode;
         request.direction = direction;
@@ -70,7 +70,7 @@ fn traverses_each_mode_and_direction_in_bfs_order() {
 
 #[test]
 fn keeps_edge_budget_independent_from_node_budget() {
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.edge_limit = NonZeroUsize::new(1);
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
@@ -91,7 +91,7 @@ fn keeps_edge_budget_independent_from_node_budget() {
 
 #[test]
 fn includes_consumes_one_depth_step() {
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.mode = TraversalMode::Containment;
     request.depth = 1;
@@ -101,7 +101,7 @@ fn includes_consumes_one_depth_step() {
 
 #[test]
 fn validates_all_starts_even_at_depth_zero() {
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     read.expected_roots = 2;
     let mut request = make_request();
     request.element_ids.insert(parse_address("unknown.md"));
@@ -116,7 +116,7 @@ fn validates_all_starts_even_at_depth_zero() {
 
 #[test]
 fn returns_requested_empty_edges_after_validating_depth_zero() {
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.depth = 0;
     request.edge_limit = NonZeroUsize::new(5);
@@ -129,7 +129,7 @@ fn returns_requested_empty_edges_after_validating_depth_zero() {
 
 #[test]
 fn stops_buffered_transitions_and_queries_at_node_cap() {
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.limit = NonZeroUsize::new(2).unwrap();
     request.edge_limit = NonZeroUsize::new(20);
@@ -148,7 +148,7 @@ fn stops_buffered_transitions_and_queries_at_node_cap() {
 
 #[test]
 fn previsits_multiple_starts_and_deduplicates_cycles_at_max_depth() {
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     read.expected_roots = 2;
     let mut request = make_request();
     request.element_ids.insert(parse_address("c.md"));
@@ -161,7 +161,7 @@ fn previsits_multiple_starts_and_deduplicates_cycles_at_max_depth() {
 
 #[test]
 fn terminates_includes_cycle_without_returning_start_twice() {
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     read.includes_cycle = true;
     let mut request = make_request();
     request.mode = TraversalMode::Containment;
@@ -173,7 +173,7 @@ fn terminates_includes_cycle_without_returning_start_twice() {
 
 #[test]
 fn preserves_original_incoming_edges_and_considered_back_edges() {
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.direction = TraversalDirection::Incoming;
     request.edge_limit = NonZeroUsize::new(20);
@@ -186,7 +186,7 @@ fn preserves_original_incoming_edges_and_considered_back_edges() {
             ("c.md", "d.md", "z_custom_link")
         ]
     );
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     request.direction = TraversalDirection::Outgoing;
     request.depth = u64::MAX;
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
@@ -196,7 +196,7 @@ fn preserves_original_incoming_edges_and_considered_back_edges() {
 
 #[test]
 fn intersects_open_types_and_omits_edges_when_not_requested() {
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request
         .edge_types
@@ -208,7 +208,7 @@ fn intersects_open_types_and_omits_edges_when_not_requested() {
 
 #[test]
 fn merges_page_crossing_ties_without_skips_and_bounds_high_degree_reads() {
-    let mut read = GeneratedRead::star(100_000);
+    let mut read = GeneratedRead::build_star(100_000);
     let mut request = make_request();
     request.direction = TraversalDirection::Both;
     request.limit = NonZeroUsize::new(35).unwrap();
@@ -232,7 +232,7 @@ fn merges_page_crossing_ties_without_skips_and_bounds_high_degree_reads() {
 
 #[test]
 fn continues_short_nonempty_pages_until_the_node_cap() {
-    let mut read = GeneratedRead::star(100_000);
+    let mut read = GeneratedRead::build_star(100_000);
     read.page_size = 7;
     let mut request = make_request();
     request.limit = NonZeroUsize::new(35).unwrap();
@@ -244,7 +244,7 @@ fn continues_short_nonempty_pages_until_the_node_cap() {
 
 #[test]
 fn rejects_a_late_page_error_without_returning_partial_graph() {
-    let mut read = GeneratedRead::star(100_000);
+    let mut read = GeneratedRead::build_star(100_000);
     read.fail_on_page = Some(2);
     let mut request = make_request();
     request.limit = NonZeroUsize::new(35).unwrap();
@@ -257,7 +257,7 @@ fn rejects_a_late_page_error_without_returning_partial_graph() {
 
 #[test]
 fn rejects_empty_typed_starts_without_any_read() {
-    let mut read = GeneratedRead::fixed();
+    let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.element_ids.clear();
     let error = GraphService::new()
@@ -279,7 +279,7 @@ struct GeneratedRead {
     expanded: Vec<i64>,
 }
 impl GeneratedRead {
-    fn fixed() -> Self {
+    fn build_fixed() -> Self {
         Self {
             degree: None,
             page_size: 32,
@@ -291,10 +291,10 @@ impl GeneratedRead {
             expanded: Vec::new(),
         }
     }
-    fn star(degree: usize) -> Self {
+    fn build_star(degree: usize) -> Self {
         Self {
             degree: Some(degree),
-            ..Self::fixed()
+            ..Self::build_fixed()
         }
     }
     fn generate_edges(&self) -> Vec<Edge> {

@@ -12,7 +12,9 @@
     )
 )]
 
-use crate::cli::{CommandResponse, Handlers, Request, parse_request, write_response};
+use crate::cli::{
+    CommandResponse, HandlerServices, Handlers, Request, parse_request, write_response,
+};
 use crate::embedding::{HttpProviders, Ollama, Openai};
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
@@ -51,7 +53,7 @@ pub mod service;
 
 /// Parse and run one CLI request, emitting one complete JSON envelope.
 /// Returns 0 only for successfully written success output, otherwise 1.
-/// Check, search and inspect refresh through their application services.
+/// Check, search, traverse and inspect refresh through their application services.
 /// Successful foreground operations may launch the existing detached embedding drain.
 pub fn run_cli(
     args: impl IntoIterator<Item = OsString>,
@@ -67,6 +69,31 @@ pub fn run_cli(
 /// The caller supplies the consistent read view to each operation.
 pub fn wire_graph_diagnostics() -> impl GraphDiagnostics {
     CurrentGraphDiagnostics::new()
+}
+
+/// Wire bounded traversal with owned graph, source, provenance and readiness collaborators.
+///
+/// # Errors
+/// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
+pub fn wire_traverser(start: &Path) -> CommandResult<impl Traverser + use<>> {
+    let refresher = wire_document_refresher(start).map_err(map_traversal_setup)?;
+    let git = GitCli::open(start).map_err(map_traversal_setup)?;
+    let filesystem = LocalFileSystem::open(git.get_root()).map_err(map_traversal_setup)?;
+    let directory = filesystem
+        .open_service_directory()
+        .map_err(map_traversal_setup)?;
+    let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
+        .map_err(map_traversal_setup)?;
+    Ok(TraversalService::new(TraversalDependencies {
+        storage,
+        filesystem,
+        refresher: Box::new(refresher),
+        embeddings: Box::new(wire_embedding_executor(start)?),
+        markdown: Box::new(MarkdownParser::new()),
+        sources: Box::new(wire_source_reader(git.get_root()).map_err(map_traversal_setup)?),
+        provenance: Box::new(wire_source_provenance(start).map_err(map_traversal_setup)?),
+        graph: Box::new(GraphService::new()),
+    }))
 }
 
 /// Wire live source observations beneath the caller's already-selected Git root.
@@ -146,31 +173,6 @@ pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
             GitCli::open(start).map_err(map_search_setup)?,
             LocalFileSystem::open(git.get_root()).map_err(map_search_setup)?,
         ),
-    }))
-}
-
-/// Wire bounded traversal with owned graph, source, provenance and readiness collaborators.
-///
-/// # Errors
-/// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
-pub fn wire_traverser(start: &Path) -> CommandResult<impl Traverser + use<>> {
-    let refresher = wire_document_refresher(start).map_err(map_traversal_setup)?;
-    let git = GitCli::open(start).map_err(map_traversal_setup)?;
-    let filesystem = LocalFileSystem::open(git.get_root()).map_err(map_traversal_setup)?;
-    let directory = filesystem
-        .open_service_directory()
-        .map_err(map_traversal_setup)?;
-    let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
-        .map_err(map_traversal_setup)?;
-    Ok(TraversalService::new(TraversalDependencies {
-        storage,
-        filesystem,
-        refresher: Box::new(refresher),
-        embeddings: Box::new(wire_embedding_executor(start)?),
-        markdown: Box::new(MarkdownParser::new()),
-        sources: Box::new(wire_source_reader(git.get_root()).map_err(map_traversal_setup)?),
-        provenance: Box::new(wire_source_provenance(start).map_err(map_traversal_setup)?),
-        graph: Box::new(GraphService::new()),
     }))
 }
 
@@ -354,6 +356,7 @@ fn run_request(request: Request) -> CommandResult<CommandResponse> {
         Request::Check(_) => run_check(request, &directory, &executable),
         Request::Drain => run_drain(request, &directory, &executable),
         Request::Search(_) => run_search(request, &directory, &executable),
+        Request::Traverse(_) => run_traverse(request, &directory, &executable),
         Request::Inspect(_) => run_inspect(request, &directory, &executable),
     }
 }
@@ -379,7 +382,11 @@ fn locate_environment() -> CommandResult<(PathBuf, PathBuf)> {
 fn run_drain(request: Request, root: &Path, executable: &Path) -> CommandResult<CommandResponse> {
     let mut tasks = wire_embedding_executor(root)?;
     let mut background = wire_background_runner(root, executable, Some(&mut tasks))?;
-    Handlers::new(None, None, None, Some(&mut background)).execute(request)
+    Handlers::new(HandlerServices {
+        background: Some(&mut background),
+        ..HandlerServices::default()
+    })
+    .execute(request)
 }
 
 fn run_check(
@@ -391,7 +398,12 @@ fn run_check(
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut checks = wire_checker(&root)?;
-    Handlers::new(Some(&mut checks), None, None, Some(&mut background)).execute(request)
+    Handlers::new(HandlerServices {
+        checks: Some(&mut checks),
+        background: Some(&mut background),
+        ..HandlerServices::default()
+    })
+    .execute(request)
 }
 
 fn run_search(
@@ -403,7 +415,29 @@ fn run_search(
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut searches = wire_searcher(&root)?;
-    Handlers::new(None, None, Some(&mut searches), Some(&mut background)).execute(request)
+    Handlers::new(HandlerServices {
+        searches: Some(&mut searches),
+        background: Some(&mut background),
+        ..HandlerServices::default()
+    })
+    .execute(request)
+}
+
+fn run_traverse(
+    request: Request,
+    directory: &Path,
+    executable: &Path,
+) -> CommandResult<CommandResponse> {
+    let root = open_repository_root(directory)?;
+    let mut tasks = wire_embedding_executor(&root)?;
+    let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
+    let mut traversals = wire_traverser(&root)?;
+    Handlers::new(HandlerServices {
+        traversals: Some(&mut traversals),
+        background: Some(&mut background),
+        ..HandlerServices::default()
+    })
+    .execute(request)
 }
 
 fn run_inspect(
@@ -415,7 +449,12 @@ fn run_inspect(
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut inspections = wire_inspector(&root)?;
-    Handlers::new(None, Some(&mut inspections), None, Some(&mut background)).execute(request)
+    Handlers::new(HandlerServices {
+        inspections: Some(&mut inspections),
+        background: Some(&mut background),
+        ..HandlerServices::default()
+    })
+    .execute(request)
 }
 
 /// Foreground services and background exclusion must share the discovered repository root.

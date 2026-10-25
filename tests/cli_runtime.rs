@@ -1,9 +1,13 @@
+#[expect(dead_code, reason = "Only the shared owned-process watchdog is needed")]
+#[path = "support/cli.rs"]
+mod cli;
 use serde_json::Value;
 use std::{
     fs,
     io::Write,
     path::Path,
     process::{Command, Output, Stdio},
+    time::Duration,
 };
 use tempfile::TempDir;
 
@@ -28,6 +32,19 @@ fn malformed_requests_fail_before_service_directory_creation() {
             r#"{"query":"x","limit":18446744073709551616}"#,
         ),
         (vec!["search"], r#"{"query":"x","limit":1} {}"#),
+        (vec!["traverse", "extra"], "{}"),
+        (
+            vec!["traverse"],
+            r#"{"element_ids":["a.md"],"mode":"both","direction":"both","depth":1,"limit":0}"#,
+        ),
+        (
+            vec!["traverse"],
+            r#"{"element_ids":["a.md"],"mode":"both","direction":"both","depth":1e0,"limit":1}"#,
+        ),
+        (
+            vec!["traverse"],
+            r#"{"element_ids":["a.md"],"mode":"both","direction":"both","depth":1,"limit":1,"edge_limit":null}"#,
+        ),
         (vec!["embed", "--drain"], "{\"extra\":1}"),
     ] {
         let output = invoke(root.path(), &args, input.as_bytes(), false);
@@ -49,6 +66,16 @@ fn nested_invalid_requests_do_not_initialize_repository_or_child() {
         (
             vec!["search"],
             r#"{"query":"x","limit":0}"#,
+            "invalid_request",
+        ),
+        (
+            vec!["traverse"],
+            r#"{"element_ids":["a.md"],"mode":"both","direction":"both","depth":1,"limit":0}"#,
+            "invalid_request",
+        ),
+        (
+            vec!["traverse"],
+            r#"{"element_ids":[],"mode":"both","direction":"both","depth":0,"limit":1}"#,
             "invalid_request",
         ),
         (vec!["inspect"], "{}", "invalid_request"),
@@ -162,16 +189,16 @@ fn run_git(root: &Path, args: &[&str]) -> Vec<u8> {
 }
 
 fn invoke(root: &Path, args: &[&str], input: &[u8], lost: bool) -> Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_letopis"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_letopis"));
+    command
         .args(args)
         .current_dir(root)
         .stdin(Stdio::piped())
         .stdout(if lost { Stdio::null() } else { Stdio::piped() })
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    child.stdin.take().unwrap().write_all(input).unwrap();
-    child.wait_with_output().unwrap()
+        .stderr(Stdio::piped());
+    let mut child = cli::OwnedChild::spawn(&mut command);
+    child.send_input(input);
+    child.collect_output(Duration::from_secs(10))
 }
 
 fn assert_error(output: &Output, code: &str) {
