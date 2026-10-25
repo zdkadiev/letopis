@@ -161,6 +161,10 @@ pub struct SearchRequest {
 pub enum SearchFlag {
     /// Current knowledge is missing, invalid, or differs from pinned metadata.
     Stale,
+    /// Source bytes differ or the declared basis cannot be verified.
+    SourceChanged,
+    /// A complete local source address is unavailable.
+    SourceNotFound,
 }
 /// Metadata-only knowledge link from one pinned cache revision.
 #[derive(Debug, PartialEq, Eq)]

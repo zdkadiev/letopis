@@ -1,5 +1,6 @@
 //! Application contracts.
-use crate::domain::{RepoPath, SourceUri};
+use crate::domain::{RepoPath, SourceUri, TreeOid};
+use std::collections::BTreeSet;
 mod background;
 mod check;
 mod command;
@@ -15,6 +16,8 @@ mod graph_diagnostics;
 mod inspection;
 mod model;
 mod projection;
+mod provenance;
+mod provenance_types;
 mod retained_tree;
 mod search;
 mod snapshot_error;
@@ -28,6 +31,12 @@ pub(crate) use document_refresher::DocumentRefresher;
 pub(crate) use embedding::EmbeddingService;
 pub(crate) use graph_diagnostics::CurrentGraphDiagnostics;
 pub(crate) use inspection::InspectionService;
+pub(crate) use provenance::ProvenanceService;
+/// Source comparison requests and metadata-only outcomes.
+pub use provenance_types::{
+    ProvenanceIssue, ProvenanceObservation, ProvenanceRequest, SourceRevisionComparison,
+    SourceRevisionRequest,
+};
 pub(crate) use search::{SearchDependencies, SearchService};
 /// Concrete source observation assembly, kept inside the crate.
 pub(crate) use source::SourceService;
@@ -126,4 +135,47 @@ pub enum SourceAvailability {
     SourceNotFound,
     /// The source is remote and no fetch was performed; availability is unknown.
     Unfetched,
+}
+
+/// Read-only source comparison using caller-owned consistent metadata.
+///
+/// Implementations never refresh, open storage, retain refs, write or fetch URLs.
+/// Callers gather all request fields from the same pinned view or validated projection.
+/// Declared roots are checked even without sources. Missing/invalid bases require
+/// rechecking; missing local addresses are reported independently. Remote bytes
+/// remain unknown and are never classified as changed or missing by comparison.
+pub trait SourceProvenance {
+    /// Observe source flags and current diagnostics without returning source bytes.
+    ///
+    /// # Errors
+    /// Returns safe errors for filesystem, Git policy, I/O or corruption failures.
+    fn observe_sources(
+        &self,
+        request: ProvenanceRequest<'_>,
+    ) -> DocumentResult<ProvenanceObservation>;
+    /// Compare one address across a declared basis and an explicit requested tree.
+    ///
+    /// Validates the requested root before returning any unavailable/unknown state.
+    /// Both trees use the same local path and complete inclusive line range.
+    ///
+    /// # Errors
+    /// Requested missing trees are `NotFound`, wrong type/format `InvalidRequest`;
+    /// repository and object integrity failures remain `InternalError`.
+    fn compare_revision(
+        &self,
+        request: SourceRevisionRequest<'_>,
+    ) -> Result<SourceRevisionComparison, SnapshotError>;
+}
+/// Index publication's retention capability; the caller must hold index.lock.
+///
+/// Every implementation verifies each unique root once per call and pins every
+/// available root, including roots without external sources. A pin failure after
+/// successful verification is an error, even if the root disappeared meanwhile.
+pub trait BasisRetainer {
+    /// Verify unique declared roots and pin every available complete tree closure.
+    /// Missing/invalid roots are validation findings, not publication failures.
+    ///
+    /// # Errors
+    /// Returns safe errors for corruption, Git I/O or failed ref publication.
+    fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()>;
 }

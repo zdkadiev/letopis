@@ -121,6 +121,8 @@ fn build_link(link: &SearchLink) -> Link<'_> {
             .iter()
             .map(|flag| match flag {
                 SearchFlag::Stale => "stale",
+                SearchFlag::SourceChanged => "source_changed",
+                SearchFlag::SourceNotFound => "source_not_found",
             })
             .collect(),
     }

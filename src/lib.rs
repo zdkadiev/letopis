@@ -23,8 +23,9 @@ use crate::service::{
     CommandResult, CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentRefresher,
     DocumentResult, EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
-    GraphDiagnostics, InspectionService, Inspector, Refresher, SearchDependencies, SearchService,
-    Searcher, SnapshotError, SnapshotVerifier, SourceReader, SourceService, Storage, StorageResult,
+    GraphDiagnostics, InspectionService, Inspector, ProvenanceService, Refresher,
+    SearchDependencies, SearchService, Searcher, SnapshotError, SnapshotVerifier, SourceProvenance,
+    SourceReader, SourceService, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -77,6 +78,23 @@ pub fn wire_graph_diagnostics() -> impl GraphDiagnostics {
 /// Reports an inaccessible, symlink or non-directory root.
 pub fn wire_source_reader(root: &Path) -> DocumentResult<impl SourceReader + use<>> {
     Ok(SourceService::new(LocalFileSystem::open(root)?))
+}
+
+/// Wire read-only source provenance beneath the repository containing `root`.
+/// Does not open storage, create service state, retain refs or fetch sources.
+///
+/// # Errors
+/// Reports unsupported repositories or unsafe filesystem roots.
+pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenance + use<>> {
+    let git = GitCli::open(root).map_err(|cause| {
+        DocumentError::new_with_cause(
+            DocumentErrorKind::InternalError,
+            "cannot open provenance repository",
+            cause,
+        )
+    })?;
+    let filesystem = LocalFileSystem::open(git.get_root())?;
+    Ok(ProvenanceService::new(git, filesystem))
 }
 
 /// Wire current corpus validation with a separate pinned reader and read-only Git probe.
