@@ -2,7 +2,10 @@
 use super::{Handlers, Request, parse_request, write_response};
 use crate::{
     domain::{KnowledgeId, LineRange, RepoPath},
-    service::{CommandErrorKind, CommandResult, SearchFlag, SearchLink, SearchRequest, Searcher},
+    service::{
+        CommandErrorKind, CommandResult, RecheckFilter, SearchFlag, SearchLink, SearchRequest,
+        Searcher,
+    },
 };
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, ffi::OsString, num::NonZeroUsize};
@@ -59,7 +62,7 @@ fn parse_search_rejects_null_duplicate_unknown_numeric_and_trailing_inputs() {
 }
 
 #[test]
-fn malformed_source_revisions_are_rejected_before_unsupported_filters() {
+fn malformed_source_revisions_are_rejected() {
     for oid in ["A".repeat(40), "a".repeat(39), "g".repeat(64)] {
         let body =
             json!({"query":"x","limit":1,"filters":{"sources":["x"],"source_revisions":[oid]}});
@@ -71,7 +74,7 @@ fn malformed_source_revisions_are_rejected_before_unsupported_filters() {
 }
 
 #[test]
-fn empty_filters_equal_absence_and_valid_restrictions_fail_closed() {
+fn empty_filters_equal_absence() {
     for filters in [
         None,
         Some(json!({})),
@@ -87,17 +90,45 @@ fn empty_filters_equal_absence_and_valid_restrictions_fail_closed() {
         assert_eq!(request.query, "private query");
         assert_eq!(request.limit.get(), 3);
     }
-    for filters in [
-        json!({"needs_recheck":true}),
-        json!({"needs_recheck":false}),
-        json!({"sources":["source"]}),
-        json!({"source_revisions":["a".repeat(40)]}),
-        json!({"source_revisions":["a".repeat(64)]}),
+}
+
+#[test]
+fn effective_filters_are_typed_and_deduplicated() {
+    for (filters, recheck, sources, revisions) in [
+        (json!({"needs_recheck":true}), RecheckFilter::Required, 0, 0),
+        (
+            json!({"needs_recheck":false}),
+            RecheckFilter::NotRequired,
+            0,
+            0,
+        ),
+        (
+            json!({"sources":["./src/../code.rs","code.rs"]}),
+            RecheckFilter::Any,
+            1,
+            0,
+        ),
+        (
+            json!({"source_revisions":["a".repeat(40),"a".repeat(40)]}),
+            RecheckFilter::Any,
+            0,
+            1,
+        ),
+        (
+            json!({"source_revisions":["a".repeat(64)]}),
+            RecheckFilter::Any,
+            0,
+            1,
+        ),
     ] {
-        let error =
-            parse(&json!({"query":"x","limit":1,"filters":filters}).to_string()).unwrap_err();
-        assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
-        assert_eq!(error.get_message(), "operation unavailable in this build");
+        let Request::Search(request) =
+            parse(&json!({"query":"x","limit":1,"filters":filters}).to_string()).unwrap()
+        else {
+            panic!("search")
+        };
+        assert_eq!(request.filters.needs_recheck, recheck);
+        assert_eq!(request.filters.sources.len(), sources);
+        assert_eq!(request.filters.source_revisions.len(), revisions);
     }
 }
 
@@ -105,6 +136,7 @@ fn empty_filters_equal_absence_and_valid_restrictions_fail_closed() {
 fn search_handler_dispatches_typed_request_and_renders_links() {
     let mut searches = SearchDouble;
     let request = SearchRequest {
+        filters: Default::default(),
         query: "private query".into(),
         limit: NonZeroUsize::new(3).unwrap(),
     };

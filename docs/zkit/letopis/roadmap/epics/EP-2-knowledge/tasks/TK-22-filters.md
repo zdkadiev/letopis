@@ -1,6 +1,6 @@
 # TK-22 — Завершить поисковые filters и fallback
 
-> **Статус:** planned
+> **Статус:** done — implementation verified; Task 1–3 reviews passed; whole-branch review found no product/architecture defects. Its actual verdict was With fixes solely for the metadata inconsistency reconciled here; scoped metadata re-review of commit `7ce1753` is complete: the finding is addressed and no new breakage was found.
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
@@ -37,11 +37,11 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Filters сочетаются AND, списки OR, пустые/отсутствующие списки равны.
-- [ ] source/revision совпадают в одной привязке.
-- [ ] Фильтрация до итогового limit, неизвестная revision даёт not_found, query failure не превращает обычную FTS выдачу в ошибку; её показ совместно проверяет TK-28.
+- [x] Filters сочетаются AND, списки OR, пустые/отсутствующие списки равны.
+- [x] source/revision совпадают в одной привязке.
+- [x] Фильтрация до итогового limit, неизвестная revision даёт not_found, query failure не превращает обычную FTS выдачу в ошибку; storage/executor lifecycle проверен, показ status/problems остаётся TK-28.
 
-- [ ] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
+- [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
 ## 6. Как проверить
 
@@ -70,6 +70,13 @@
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
-
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+Реализация проверена 2026-10-25: [отчёт](../../../../checks/TK-22/report.md),
+[machine-readable receipt](../../../../checks/TK-22/verification.json), product `bee627e19956da317fa45961ab6d4321eb0741d4`.
+Typed filters/strict CLI, same-binding historical comparison, complete eligible ranking,
+filtered FTS fallback и same-identity query_error lifecycle реализованы без новой schema/runtime.
+Late error/read cleanup и concurrent publication подтверждены controlled fixtures и runtime
+mutations с точным восстановлением. `make verify V=1`: debug/release по
+620 passed, 0 failed, 5 ignored; strict Rustdoc/Clippy прошли.
+Архитектурная self-review и все 10 spec items/5 Review Focus cases перечислены в отчёте.
+Task 1 и Task 2 reviews прошли; Task 3 review и scoped evidence re-review прошли. Whole-branch review на `f099224` не нашёл product/architecture defects и вынес фактический verdict **With fixes** только из-за несогласованного metadata, исправленного здесь. Scoped re-review metadata commit `7ce1753` завершён: finding ADDRESSED, новых проблем нет. Task завершён. TK-28 UI,
+Linux/native harness rerun, реальные providers/deadlines, corpus/pilot/resource/gates не заявляются.

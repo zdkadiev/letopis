@@ -163,6 +163,9 @@ impl FileSystem for BoundaryFiles {
     }
 }
 impl SourceProvenance for BoundaryProvenance {
+    fn validate_revisions(&self, _: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
+        panic!("this scenario does not validate requested revisions")
+    }
     fn observe_sources(&self, _: ProvenanceRequest<'_>) -> DocumentResult<ProvenanceObservation> {
         self.events.borrow_mut().push("observe");
         if self.failure == Some("observe") {

@@ -201,6 +201,16 @@ TK-11 переносит эти примитивы в CLI без повторн�
 
 ### MC-6 — чтение, поиск и обход
 
+Уточнение реализованного search TK-22 (2026-10-25): [отчёт](checks/TK-22/report.md).
+Все requested source_revisions проходят preflight после refresh и до readiness,
+inference и пустых candidate exits. Source/revision predicates используют metadata,
+bindings и basis одного pinned view; каждый candidate наблюдает current flags один
+раз, сохраняет их в link, затем только eligible IDs получают channel ranks/fusion/limit.
+Filtered query failure и следующий фактический success под той же identity проверены
+через bounded HTTP fixture; query_error сохраняется/очищается отдельным guarded
+writer. Late provenance errors освобождают owned reader до drop сервиса.
+TK-28 UI, пилоты и gates этой проверкой не сертифицируются.
+
 Search/traverse после обнаружения изменений (MC-2) синхронизируют готовую конфигурацию через MC-3 до закрепления read view, затем открывают read-транзакцию ([D-102](decisions.md#D-102), порядок уточнён для TK-12 2026-10-23); BEGIN и первое чтение project.revision закрепляют один read snapshot кэша; vectors.db читается в той же транзакции. Конфигурация берётся из `.letopis/config.json` и принимается, только если её identity совпадает с meta.config_identity, иначе FTS-only. Query embedding вызывается напрямую с этой конфигурацией, без write lock; при ошибке выполняется один FTS-поиск с обычным успешным ответом без предупреждения, а ошибка записывается в единственную строку vec.query_error и видна только в status.problems; успешный query embedding её удаляет ([D-62](decisions.md#D-62)). Read view освобождается при результате/отмене/error.
 
 Фильтры разных полей объединяются И, внутри списков — хотя бы одно совпадение; пустой/отсутствующий список одинаковы. Source и source_revision проверяются на одной привязке. Полный eligible-набор формируется до итогового limit, включая динамическую проверку источников. Source не самостоятельный search text, но доступен inspect/traverse. FTS возвращает все подходящие совпадения, vec1 exact — все доступные подходящие vectors; преждевременный LIMIT перед фильтрами запрещён. Первый baseline допускает полный перебор метаданных и векторов, без необоснованного oversampling.

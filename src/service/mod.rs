@@ -20,6 +20,7 @@ mod provenance;
 mod provenance_types;
 mod retained_tree;
 mod search;
+mod search_filters;
 mod snapshot_error;
 mod snapshot_traits;
 mod source;
@@ -64,6 +65,8 @@ pub use model::{
     StoredVectorKey, TextMatch, VectorMatch, VectorOutcome,
 };
 pub use retained_tree::RetainedTree;
+/// Typed, normalized search restrictions and current-flag selection.
+pub use search_filters::{RecheckFilter, SearchFilters};
 pub use snapshot_error::{SnapshotError, SnapshotErrorKind};
 pub use snapshot_traits::{
     GitSnapshots, SnapshotEntry, SnapshotFile, SnapshotState, SnapshotVerifier,
@@ -146,6 +149,17 @@ pub enum SourceAvailability {
 /// rechecking; missing local addresses are reported independently. Remote bytes
 /// remain unknown and are never classified as changed or missing by comparison.
 pub trait SourceProvenance {
+    /// Validate every unique requested root independently of source bindings.
+    ///
+    /// Checks roots in their ordered set order; an empty set succeeds. This is
+    /// read-only and must run before candidate-dependent exits or query inference.
+    /// The first invalid root rejects the request without partial results.
+    ///
+    /// # Errors
+    /// Missing trees are `NotFound`, wrong type/format is `InvalidRequest`, and
+    /// repository or object integrity failures remain `InternalError`.
+    fn validate_revisions(&self, revisions: &BTreeSet<TreeOid>) -> Result<(), SnapshotError>;
+
     /// Observe source flags and current diagnostics without returning source bytes.
     ///
     /// # Errors

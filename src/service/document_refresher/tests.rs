@@ -104,6 +104,9 @@ impl MarkdownCodec for CountingMarkdown {
 }
 struct TestProvenance;
 impl SourceProvenance for TestProvenance {
+    fn validate_revisions(&self, _: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
+        panic!("this scenario does not validate requested revisions")
+    }
     fn observe_sources(&self, _: ProvenanceRequest<'_>) -> DocumentResult<ProvenanceObservation> {
         Ok(ProvenanceObservation {
             flags: BTreeSet::new(),

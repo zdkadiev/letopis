@@ -106,6 +106,7 @@ fn run_during_write<S: Searcher + Send + 'static>(
     let worker = thread::spawn(move || {
         sender
             .send(searcher.search(&SearchRequest {
+                filters: Default::default(),
                 query: "sqlite".into(),
                 limit: NonZeroUsize::new(5).unwrap(),
             }))

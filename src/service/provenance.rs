@@ -24,6 +24,13 @@ impl<G, F> ProvenanceService<G, F> {
 impl<G: GitSnapshots + SnapshotVerifier, F: FileSystem> SourceProvenance
     for ProvenanceService<G, F>
 {
+    fn validate_revisions(&self, revisions: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
+        for revision in revisions {
+            self.verify_requested_revision(revision)?;
+        }
+        Ok(())
+    }
+
     fn observe_sources(
         &self,
         request: ProvenanceRequest<'_>,
