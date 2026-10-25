@@ -130,13 +130,30 @@ external-ссылками. Невалидный referrer сохраняет по
 Текущий SourceReader использует переданный pinned StorageRead, проверяет членство
 до I/O и наблюдает live bytes локального файла; не обновляет кэш и не возвращает
 source text. Недоступный файл/полный диапазон — SourceNotFound, инфраструктурная
-ошибка — typed Result error. Исторические алгоритмы ниже остаются TK-21.
+ошибка — typed Result error. Исторические алгоритмы ниже уточнены реализованной границей TK-21.
 При upgrade старых URL нужна [явная пересборка производного кэша](../../development.md#tk-20-явная-пересборка-кэша-при-обновлении),
 с сохранением Markdown/Git/vectors/config/lock files; CLI reindex пока не реализован.
 
-source_snapshot знания пишет агент в метаданные ([D-93](decisions.md#D-93)). При публикации Git-порт проверяет существование и тип tree и закрепляет его ref; отсутствующий или неизвестный снимок — текущая проблема (status и check проверяют в Git различные значения source_snapshot) и признак перепроверки, не отказ. Адресованные bytes снимка сравниваются с текущими: неравенство — flag source_changed. Правка без изменения snapshot не обновляет основание; удалённые старые основания доступны по удерживаемым Git-деревьям, history-table нет.
+Реализованная граница TK-21 (2026-10-25): [I-4/I-7](contracts/I-4-sources.md#реализованная-граница-tk-21--2026-10-25),
+[spec](../../superpowers/specs/2026-10-25-tk-21-provenance-design.md),
+[проверка](checks/TK-21/report.md). `ProvenanceRequest` передаёт optional basis и
+set SourceUri одного знания; `observe_sources` возвращает flags/issues без
+Storage/pin/write. `SourceRevisionRequest` сравнивает одну пару с явно запрошенным
+tree; JSON filters остаются TK-22. `BasisRetainer` используется refresher под
+index.lock до SQL write transaction: доступные основания закрепляются, включая
+last-valid проекцию и появившийся позднее tree без новой SQL revision.
+Check/search читают metadata и source edges из своего единственного pinned view,
+а bytes — через независимые Git/FileSystem collaborators. Check сохраняет полную
+проверку графа перед owner selection; Search не меняет rank/limit/provider semantics.
+Отсутствие basis не делает файл invalid: `source_changed` + точная check reason.
+Отсутствие адреса — `source_not_found`; flags объединяются со stale без дублей.
+Правка с прежним полем snapshot сохраняет basis, удаление поля убирает каноническое
+основание; Letopis не пишет Markdown и не восстанавливает скрытую историю из БД.
+HTTP/HTTPS остаются unknown, source в CLI inspect отложен до TK-24.
 
-В поиске/обходе flags вычисляются по индексным метаданным, текущим файлам рабочей копии и Git-объектам по source_snapshot; CanonicalSnapshot используется только inspect ([D-95](decisions.md#D-95)). Несовпадение текущего Markdown/hash/координат с индексом даёт stale; отсутствие адресованного источника — source_not_found; отличие от source_snapshot — source_changed. Один источник/несколько причин не дублируют flags. Пустой flags означает только отсутствие обнаруженной причины. Filters.source_revisions сравнивает адресованные bytes пары source+revision, а не commit OID и не разные external-привязки. Неверный формат/тип Git OID отличается от отсутствующего корректного объекта по X-3. Файл, изменившийся после чтения, требует следующей перепроверки; абсолютная актуальность live bytes на весь срок запроса не обещается.
+source_snapshot знания пишет агент в метаданные ([D-93](decisions.md#D-93)). При публикации Git-порт проверяет существование и тип tree и закрепляет его ref; отсутствующий или неизвестный снимок — текущая проблема (check наблюдает объявленные source_snapshot через общий сервис) и признак перепроверки, не отказ. Адресованные bytes снимка сравниваются с текущими: неравенство — flag source_changed. Правка без изменения snapshot не обновляет основание; удалённые старые основания доступны по удерживаемым Git-деревьям, history-table нет.
+
+Целевой контракт поиска/обхода: flags вычисляются по индексным метаданным, текущим файлам рабочей копии и Git-объектам по source_snapshot; CanonicalSnapshot используется только inspect ([D-95](decisions.md#D-95)). Несовпадение текущего Markdown/hash/координат с индексом даёт stale; отсутствие адресованного источника — source_not_found; отличие от source_snapshot — source_changed. Один источник/несколько причин не дублируют flags. Пустой flags означает только отсутствие обнаруженной причины. Filters.source_revisions сравнивает адресованные bytes пары source+revision, а не commit OID и не разные external-привязки. Неверный формат/тип Git OID отличается от отсутствующего корректного объекта по X-3. Файл, изменившийся после чтения, требует следующей перепроверки; абсолютная актуальность live bytes на весь срок запроса не обещается.
 
 ### MC-5 — процессы, блокировки и отмена
 

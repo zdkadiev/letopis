@@ -32,8 +32,56 @@ HTTP/HTTPS — непрозрачный исходный адрес с query/fra
 обычной политике invalid-file: прежняя валидная проекция сохраняется, а в свежий
 кэш некорректный source/edge не попадает; исправление ссылки не требует пересборки.
 
-Следующий Layout задаёт целевой исторический контракт: `validate_basis`, `observe`,
-`source_changed` и сравнение Git bytes остаются TK-21; TK-20 их реализацию не заявляет.
+## Реализованная граница TK-21 — 2026-10-25
+
+[Утверждённая спецификация](../../../superpowers/specs/2026-10-25-tk-21-provenance-design.md)
+и [отчёт проверки](../checks/TK-21/report.md) уточняют исторический Layout ниже.
+В `service/mod.rs` объявлены `SourceProvenance` и `BasisRetainer`; конкретный
+`ProvenanceService<G,F>` находится в `service/provenance.rs`.
+
+```rust
+SourceProvenance::observe_sources(ProvenanceRequest {
+    source_snapshot: Option<&TreeOid>, sources: &BTreeSet<SourceUri>,
+}) -> DocumentResult<ProvenanceObservation>
+SourceProvenance::compare_revision(SourceRevisionRequest {
+    source_snapshot: Option<&TreeOid>, source: &SourceUri, revision: &TreeOid,
+}) -> Result<SourceRevisionComparison, SnapshotError>
+BasisRetainer::retain_snapshots(&BTreeSet<TreeOid>) -> DocumentResult<()>
+```
+
+`ProvenanceObservation` содержит только `BTreeSet<SearchFlag>` и
+`BTreeSet<ProvenanceIssue>`. Caller передаёт snapshot и source targets одного
+pinned view. Наблюдение не открывает Storage, не refresh/pin/write и не возвращает
+bytes. Check и Search используют тот же read view для metadata, bindings и
+ранжирования; live bytes читаются отдельно и не имеют межфайловой атомарности.
+
+Refresher под существующим index.lock проверяет/закрепляет каждый доступный
+эффективный basis до SQL write transaction, включая last-valid metadata и ранее
+отсутствовавший tree при неизменном Markdown. Git I/O/corruption/pin failure
+прерывают публикацию, отсутствующий/невалидный root остаётся диагностикой.
+Корректный ref может остаться после SQL rollback. Markdown не изменяется.
+Сохранённое поле snapshot удерживает прежнее основание при edit; удалённое поле
+означает отсутствие основания, которое пересборка кэша не восстанавливает из истории.
+
+Точные bytes всего файла или включительного диапазона сравниваются без
+UTF-8/EOL нормализации. Отличие — `source_changed`, отсутствующий полный адрес
+в current или basis — `source_not_found`. Неизвестный basis — `source_changed`
+как причина перепроверки, с `missing_source_snapshot` либо
+`source_snapshot_unavailable` в check; независимые причины не теряются.
+Check добавляет `source_not_found` по owner path/element_id/target, сортирует и
+дедуплицирует findings. Search объединяет эти flags с `stale`, сохраняя ровно
+`element_id/path/lines/revision/flags`; знание остаётся находимым при ошибке источника.
+HTTP/HTTPS остаются `Unfetched`, без ложного 404 и без локального/сетевого чтения.
+
+`compare_revision` сравнивает одну и ту же пару source+revision с basis данного
+знания: Equal/Different/SourceNotFound/BasisUnavailable/Unfetched. Явно запрошенный
+root проверяется первым: missing — NotFound, wrong type/format — InvalidRequest,
+corruption — InternalError. Разные trees с равными адресованными bytes равны.
+JSON search filters остаются TK-22, source в CLI inspect — TK-24; эти consumers
+не заявляются реализованными. Нет новой schema/history/cache/процесса/runtime.
+
+Следующий Layout сохраняет исторические имена и более широкий целевой контракт;
+это не дополнительные существующие Rust APIs и не доказательство готовности filters.
 
 ## Layout
 
@@ -50,7 +98,7 @@ observe(knowledge: NodeMetadata, indexed: IndexReadView,
 
 WorkingCopy — текущие файлы рабочей копии, прочитанные в этом вызове; основания читаются Git-объектами по source_snapshot. CanonicalSnapshot (I-12) используется только inspect ([D-95](../decisions.md#D-95)).
 
-InclusiveLines: start/end целые, 1≤start≤end, обе включительны. Без диапазона читаются bytes всего файла. Validate_basis не отказывает индексации [D-93](../decisions.md#D-93): он сравнивает bytes по всем связям знания в одном основании; несовпадение даёт флаг source_changed, недоступный tree или диапазон — диагностику file:<путь знания> и флаг перепроверки. Неверный тип OID — invalid_request, отсутствующий существующий по форме объект — not_found; повреждение Git — internal_error, не маскируется.
+InclusiveLines: start/end целые, 1≤start≤end, обе включительны. Без диапазона читаются bytes всего файла. Validate_basis не отказывает индексации [D-93](../decisions.md#D-93): он сравнивает bytes по всем связям знания в одном основании; несовпадение даёт флаг source_changed, недоступный tree или диапазон — диагностику file:<путь знания> и флаг перепроверки. Для явно запрошенной revision неверный тип OID — invalid_request, отсутствующий существующий по форме объект — not_found; повреждение Git — internal_error, не маскируется.
 
 Observe не подтверждает знание и не пишет новый source_snapshot. Flags из существующего X-1, совпадение source+revision проверяется на одной привязке; исторический hash вычисляется из Git, не берётся из текущего source hash. Без обнаруженной причины flags пуст; это не проверка истинности. Чтение одинакового path внутри вызова можно разделить временным владением, постоянного source cache нет. Веб-загрузчик в порт не входит.
 
