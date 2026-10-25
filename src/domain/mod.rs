@@ -2,11 +2,14 @@
 mod graph;
 mod identity;
 mod sha256;
+mod validation;
 mod value;
 pub use graph::{
     Edge, EdgeTarget, EdgeType, Element, ElementKind, ElementMetadata, derive_element_kind,
 };
 pub use identity::{Anchor, KnowledgeId, RepoPath, SourceUri};
 pub use sha256::Sha256;
+/// Deterministic findings derived from the current knowledge graph.
+pub use validation::{GraphProblem, find_graph_problems};
 pub use value::{BlobOid, ByteSpan, LineRange, TreeOid, ValueError};
 pub(crate) use value::{SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN};
