@@ -1,4 +1,4 @@
-use super::{LineRange, ValueError};
+use super::ValueError;
 
 /// A lexically normalized path relative to the Git root; no filesystem access.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -98,43 +98,6 @@ impl KnowledgeId {
         Ok(Self(result))
     }
     /// Canonical identity, including its optional anchor.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-/// A local source address: full file or inclusive line range.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SourceUri(String);
-impl SourceUri {
-    /// Normalize dot components and line numbers without reading source bytes.
-    ///
-    /// # Errors
-    /// Returns [`ValueError::InvalidPath`] for an invalid source path, or
-    /// [`ValueError::InvalidRange`] for a malformed, overflowing, zero-based or
-    /// reversed `L<start>-L<end>` fragment.
-    pub fn parse(raw: &str) -> Result<Self, ValueError> {
-        let (path, fragment) = raw
-            .split_once('#')
-            .map_or((raw, None), |(p, f)| (p, Some(f)));
-        let mut out = RepoPath::parse(path)?.0;
-        if let Some(f) = fragment {
-            let (a, b) = f
-                .strip_prefix('L')
-                .and_then(|f| f.split_once("-L"))
-                .ok_or(ValueError::InvalidRange)?;
-            if !contains_only_ascii_digits(a) || !contains_only_ascii_digits(b) {
-                return Err(ValueError::InvalidRange);
-            }
-            let range = LineRange::new(
-                a.parse().map_err(|_| ValueError::InvalidRange)?,
-                b.parse().map_err(|_| ValueError::InvalidRange)?,
-            )?;
-            out.push_str(&format!("#L{}-L{}", range.get_start(), range.get_end()));
-        }
-        Ok(Self(out))
-    }
-    /// Canonical address; it is also the source identity.
     pub fn as_str(&self) -> &str {
         &self.0
     }

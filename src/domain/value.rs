@@ -64,7 +64,7 @@ impl ByteSpan {
 }
 
 /// An inclusive, one-based source line range.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LineRange {
     start: u64,
     end: u64,

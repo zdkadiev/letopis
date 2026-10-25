@@ -2,13 +2,16 @@
 mod graph;
 mod identity;
 mod sha256;
+mod source;
 mod validation;
 mod value;
 pub use graph::{
     Edge, EdgeTarget, EdgeType, Element, ElementKind, ElementMetadata, derive_element_kind,
 };
-pub use identity::{Anchor, KnowledgeId, RepoPath, SourceUri};
+pub use identity::{Anchor, KnowledgeId, RepoPath};
 pub use sha256::Sha256;
+/// Validated local source components and opaque remote source identities.
+pub use source::{LocalSource, SourceUri};
 /// Deterministic findings derived from the current knowledge graph.
 pub use validation::{GraphProblem, find_graph_problems};
 pub use value::{BlobOid, ByteSpan, LineRange, TreeOid, ValueError};

@@ -7,7 +7,7 @@ use super::{
     document_refresher::{Observation, fail_changed},
 };
 use crate::domain::{
-    Edge, EdgeTarget, KnowledgeId, LineRange, RepoPath, Sha256, SourceUri, derive_element_kind,
+    Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, derive_element_kind,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -115,31 +115,30 @@ impl EffectiveGraph {
         let references = self.collect_source_references()?;
         let mut paths: BTreeMap<RepoPath, Vec<(SourceUri, u64)>> = BTreeMap::new();
         for uri in &self.touched_sources {
-            if let Some(&created_at) = references.get(uri) {
-                paths
-                    .entry(parse_source_path(uri)?)
-                    .or_default()
-                    .push((uri.clone(), created_at));
-            } else if !self.knowledge.keys().any(|id| id.as_str() == uri.as_str()) {
+            if !references.contains_key(uri)
+                && !self.knowledge.keys().any(|id| id.as_str() == uri.as_str())
+            {
                 unit.delete_node(&EdgeTarget::Source(uri.clone()))?;
             }
+            let Some(&created_at) = references.get(uri) else {
+                continue;
+            };
+            let Some(local) = uri.get_local() else {
+                unit.upsert_node(&NodeMetadata::Source(SourceMetadata {
+                    uri: uri.clone(),
+                    hash: None,
+                    created_at,
+                    lines: None,
+                }))?;
+                continue;
+            };
+            paths
+                .entry(local.get_path().clone())
+                .or_default()
+                .push((uri.clone(), created_at));
         }
         for (path, sources) in paths {
-            // One capture serves every affected address of this path and then is released.
-            let captured = filesystem.read_file(&path)?;
-            for (uri, created_at) in sources {
-                let lines = parse_source_lines(&uri)?;
-                let hash = captured
-                    .as_ref()
-                    .and_then(|file| select_source_bytes(&file.bytes, lines))
-                    .map(Sha256::digest);
-                unit.upsert_node(&NodeMetadata::Source(SourceMetadata {
-                    uri,
-                    hash,
-                    created_at,
-                    lines,
-                }))?;
-            }
+            publish_source_group(filesystem, unit, &path, sources)?;
         }
         Ok(())
     }
@@ -314,38 +313,27 @@ pub(super) fn publish<W: CacheWrite>(
     Ok(())
 }
 
-fn parse_source_path(uri: &SourceUri) -> DocumentResult<RepoPath> {
-    let path = uri.as_str().split('#').next().ok_or_else(fail_changed)?;
-    RepoPath::parse(path).map_err(|_| fail_changed())
-}
-
-fn parse_source_lines(uri: &SourceUri) -> DocumentResult<Option<LineRange>> {
-    let Some((_, fragment)) = uri.as_str().split_once("#L") else {
-        return Ok(None);
-    };
-    let (start, end) = fragment.split_once("-L").ok_or_else(fail_changed)?;
-    let start = start.parse().map_err(|_| fail_changed())?;
-    let end = end.parse().map_err(|_| fail_changed())?;
-    LineRange::new(start, end)
-        .map(Some)
-        .map_err(|_| fail_changed())
-}
-
-fn select_source_bytes(bytes: &[u8], lines: Option<LineRange>) -> Option<&[u8]> {
-    let Some(lines) = lines else {
-        return Some(bytes);
-    };
-    let mut offset = 0;
-    let mut start = None;
-    for (index, line) in bytes.split_inclusive(|byte| *byte == b'\n').enumerate() {
-        let number = u64::try_from(index).ok()?.checked_add(1)?;
-        if number == lines.get_start() {
-            start = Some(offset);
-        }
-        offset += line.len();
-        if number == lines.get_end() {
-            return Some(&bytes[start?..offset]);
-        }
+fn publish_source_group<F: FileSystem, W: CacheWrite>(
+    filesystem: &F,
+    unit: &mut W,
+    path: &RepoPath,
+    sources: Vec<(SourceUri, u64)>,
+) -> DocumentResult<()> {
+    // One capture serves every affected address of this path and then is released.
+    let captured = filesystem.read_file(path)?;
+    for (uri, created_at) in sources {
+        let local = uri.get_local().ok_or_else(fail_changed)?;
+        let lines = local.get_lines();
+        let hash = captured
+            .as_ref()
+            .and_then(|file| local.select_bytes(&file.bytes))
+            .map(Sha256::digest);
+        unit.upsert_node(&NodeMetadata::Source(SourceMetadata {
+            uri,
+            hash,
+            created_at,
+            lines,
+        }))?;
     }
-    None
+    Ok(())
 }

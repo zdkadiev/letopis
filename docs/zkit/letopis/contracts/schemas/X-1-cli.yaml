@@ -696,8 +696,15 @@
     },
     "SourceId": {
       "type": "string",
-      "pattern": "^(?!/)[^\\x00-\\x1f#]+(?:#L[1-9][0-9]*-L[1-9][0-9]*)?(?![\\s\\S])",
-      "description": "D-91: a source's ID is its normalized address: a whole file or path#Lstart-Lend. end >= start is checked by the application. A path is either a corpus element or a source; the application resolves which."
+      "anyOf": [
+        {
+          "pattern": "^(?!/)(?![Hh][Tt][Tt][Pp][Ss]?:)[^\\x00-\\x1f#]+(?:#L[1-9][0-9]*-L[1-9][0-9]*)?(?![\\s\\S])"
+        },
+        {
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^/\\x00-\\x20\\x7f-\\x9f\\s\\\\?#]+[^\\x00-\\x20\\x7f-\\x9f\\s\\\\]*(?![\\s\\S])"
+        }
+      ],
+      "description": "D-91: a source ID is a normalized local path with an optional inclusive #Lstart-Lend range, or an opaque absolute HTTP/HTTPS address preserving its original spelling, query and fragment. Reserved HTTP schemes cannot fall back to local paths. This schema checks lexical spelling only; root-relative normalization, numeric overflow, range ordering and complete authority validation belong to the application. A path is either a corpus element or a source; the application resolves which."
     },
     "ElementId": {
       "anyOf": [
