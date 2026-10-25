@@ -23,9 +23,10 @@ use crate::service::{
     CommandResult, CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentRefresher,
     DocumentResult, EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
-    GraphDiagnostics, InspectionService, Inspector, ProvenanceService, RefreshDependencies,
-    Refresher, SearchDependencies, SearchService, Searcher, SnapshotError, SnapshotVerifier,
-    SourceProvenance, SourceReader, SourceService, Storage, StorageResult,
+    GraphDiagnostics, GraphService, InspectionService, Inspector, ProvenanceService,
+    RefreshDependencies, Refresher, SearchDependencies, SearchService, Searcher, SnapshotError,
+    SnapshotVerifier, SourceProvenance, SourceReader, SourceService, Storage, StorageResult,
+    TraversalDependencies, TraversalService, Traverser,
 };
 use crate::storage::SqliteStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -145,6 +146,31 @@ pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
             GitCli::open(start).map_err(map_search_setup)?,
             LocalFileSystem::open(git.get_root()).map_err(map_search_setup)?,
         ),
+    }))
+}
+
+/// Wire bounded traversal with owned graph, source, provenance and readiness collaborators.
+///
+/// # Errors
+/// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
+pub fn wire_traverser(start: &Path) -> CommandResult<impl Traverser + use<>> {
+    let refresher = wire_document_refresher(start).map_err(map_traversal_setup)?;
+    let git = GitCli::open(start).map_err(map_traversal_setup)?;
+    let filesystem = LocalFileSystem::open(git.get_root()).map_err(map_traversal_setup)?;
+    let directory = filesystem
+        .open_service_directory()
+        .map_err(map_traversal_setup)?;
+    let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
+        .map_err(map_traversal_setup)?;
+    Ok(TraversalService::new(TraversalDependencies {
+        storage,
+        filesystem,
+        refresher: Box::new(refresher),
+        embeddings: Box::new(wire_embedding_executor(start)?),
+        markdown: Box::new(MarkdownParser::new()),
+        sources: Box::new(wire_source_reader(git.get_root()).map_err(map_traversal_setup)?),
+        provenance: Box::new(wire_source_provenance(start).map_err(map_traversal_setup)?),
+        graph: Box::new(GraphService::new()),
     }))
 }
 
@@ -410,6 +436,14 @@ fn map_search_setup(error: impl std::error::Error + Send + Sync + 'static) -> Co
     CommandError::new_with_cause(
         CommandErrorKind::InternalError,
         "cannot open search service",
+        error,
+    )
+}
+
+fn map_traversal_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot prepare traversal",
         error,
     )
 }

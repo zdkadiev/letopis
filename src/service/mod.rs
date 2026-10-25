@@ -1,5 +1,5 @@
 //! Application contracts.
-use crate::domain::{RepoPath, SourceUri, TreeOid};
+use crate::domain::{Graph, RepoPath, SourceUri, TreeOid};
 use std::collections::BTreeSet;
 mod background;
 mod check;
@@ -12,8 +12,10 @@ mod embedding_config;
 mod embedding_error;
 mod embedding_traits;
 mod error;
+mod graph;
 mod graph_diagnostics;
 mod inspection;
+mod knowledge_link;
 mod model;
 mod projection;
 mod provenance;
@@ -25,6 +27,7 @@ mod snapshot_error;
 mod snapshot_traits;
 mod source;
 mod storage;
+mod traversal;
 mod traversal_types;
 
 pub(crate) use background::BackgroundService;
@@ -32,6 +35,7 @@ pub(crate) use check::CheckService;
 /// Cache refresh implementation and its caller-owned collaborator bundle.
 pub(crate) use document_refresher::{DocumentRefresher, RefreshDependencies};
 pub(crate) use embedding::EmbeddingService;
+pub(crate) use graph::GraphService;
 pub(crate) use graph_diagnostics::CurrentGraphDiagnostics;
 pub(crate) use inspection::InspectionService;
 pub(crate) use provenance::ProvenanceService;
@@ -43,6 +47,7 @@ pub use provenance_types::{
 pub(crate) use search::{SearchDependencies, SearchService};
 /// Concrete source observation assembly, kept inside the crate.
 pub(crate) use source::SourceService;
+pub(crate) use traversal::{TraversalDependencies, TraversalService};
 
 pub use command::{
     CheckReport, CommandError, CommandErrorKind, CommandProblem, CommandResult, ElementAddress,
@@ -50,6 +55,7 @@ pub use command::{
 };
 pub use command_traits::{
     BackgroundRunner, Checker, DrainLauncher, EmbedLocker, EmbeddingExecutor, Inspector, Searcher,
+    Traverser,
 };
 pub use document_traits::{CorpusLister, FileSystem, MarkdownCodec, Refresher};
 pub use embedding_config::{EmbeddingConfig, ProviderKind};
@@ -115,9 +121,9 @@ pub trait SourceReader {
     /// # Errors
     /// Returns a safe document error with a private cause when storage or confined
     /// filesystem access fails; such failures never become `SourceNotFound`.
-    fn read_source<R: StorageRead>(
+    fn read_source(
         &self,
-        view: &mut R,
+        view: &mut dyn StorageRead,
         uri: &SourceUri,
     ) -> DocumentResult<Option<SourceObservation>>;
 }
@@ -198,8 +204,9 @@ pub trait BasisRetainer {
 
 /// Minimal pinned graph identities and bounded directional page requests.
 pub use traversal_types::{
-    GraphNeighbor, GraphNodeKey, GraphNodeRef, NeighborCursor, NeighborDirection,
-    NeighborPageRequest, TraversalDirection, TraversalMode,
+    ElementLocation, GraphNeighbor, GraphNodeKey, GraphNodeRef, NeighborCursor, NeighborDirection,
+    NeighborPageRequest, Traversal, TraversalDirection, TraversalLink, TraversalMode,
+    TraversalRequest,
 };
 
 /// Bounded graph reads from one consistent caller-owned view.
@@ -225,4 +232,25 @@ pub trait GraphRead {
         &mut self,
         request: &NeighborPageRequest<'_>,
     ) -> StorageResult<Vec<GraphNeighbor>>;
+}
+
+/// Shared internal page bound for storage producers and incremental consumers.
+pub(crate) use traversal_types::NEIGHBOR_PAGE_QUANTUM;
+
+/// Incremental graph traversal within the caller's existing pinned read view.
+///
+/// Implementations validate all starts, preserve MC-6 BFS ordering, bound neighbor
+/// buffers and selected data, and never read unrelated complete node metadata.
+/// Starts are excluded from selected elements; edges preserve declaration orientation.
+pub trait GraphTraversal {
+    /// Discover bounded graph data without refreshing or opening another view.
+    ///
+    /// # Errors
+    /// Rejects empty or absent starts and propagates safe storage/integrity failures.
+    /// No partial graph is returned on failure.
+    fn traverse(
+        &self,
+        read: &mut dyn GraphRead,
+        request: &TraversalRequest,
+    ) -> CommandResult<Graph>;
 }

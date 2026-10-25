@@ -4,17 +4,17 @@ use super::{
     query::{Edges, Nodes, build_query},
 };
 use crate::{
-    domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, SourceUri, TreeOid},
+    domain::{Edge, EdgeTarget, EdgeType, INCLUDES_EDGE_TYPE, KnowledgeId, SourceUri, TreeOid},
     service::{
-        ElementAddress, GraphNeighbor, GraphNodeKey, GraphNodeRef, NeighborDirection,
-        NeighborPageRequest, StorageError, StorageErrorKind, StorageResult, TraversalMode,
+        ElementAddress, GraphNeighbor, GraphNodeKey, GraphNodeRef, NEIGHBOR_PAGE_QUANTUM,
+        NeighborDirection, NeighborPageRequest, StorageError, StorageErrorKind, StorageResult,
+        TraversalMode,
     },
 };
 use rusqlite::{Connection, OptionalExtension, Row, params_from_iter};
 use sea_query::{Expr, ExprTrait, Iden, JoinType, Order, Query, SelectStatement};
 use std::collections::BTreeSet;
 
-const NEIGHBOR_PAGE_QUANTUM: usize = 32;
 #[derive(Clone, Copy, Iden)]
 enum Endpoint {
     Source,
@@ -111,10 +111,10 @@ fn apply_filters(query: &mut SelectStatement, request: &NeighborPageRequest<'_>,
     let kind = Expr::col((Edges::Table, Edges::Type));
     match request.mode {
         TraversalMode::Relations => {
-            query.and_where(kind.clone().ne("includes"));
+            query.and_where(kind.clone().ne(INCLUDES_EDGE_TYPE));
         }
         TraversalMode::Containment => {
-            query.and_where(kind.clone().eq("includes"));
+            query.and_where(kind.clone().eq(INCLUDES_EDGE_TYPE));
         }
         TraversalMode::Both => {}
     }

@@ -2,7 +2,7 @@ use super::{ByteSpan, KnowledgeId, LineRange, Sha256, SourceUri, TreeOid, ValueE
 use std::collections::BTreeSet;
 
 /// The system relation that defines knowledge containment.
-pub(super) const INCLUDES_EDGE_TYPE: &str = "includes";
+pub(crate) const INCLUDES_EDGE_TYPE: &str = "includes";
 
 /// A validated edge type, including the system types includes and external.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -133,4 +133,32 @@ pub struct Element {
     pub lines: LineRange,
     /// SHA-256 fingerprint of the element.
     pub hash: Sha256,
+}
+
+/// Ordered partial traversal data, independent of storage and traversal execution.
+///
+/// Selected elements are deduplicated and omit starts. Optional original edges
+/// can mention starts or other endpoints absent from the selected element list.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Graph {
+    elements: Vec<EdgeTarget>,
+    edges: Option<Vec<Edge>>,
+}
+impl Graph {
+    /// Package the service's already deduplicated traversal result without I/O.
+    pub(crate) fn new(elements: Vec<EdgeTarget>, edges: Option<Vec<Edge>>) -> Self {
+        Self { elements, edges }
+    }
+    /// Return selected identities in BFS discovery order.
+    pub fn get_elements(&self) -> &[EdgeTarget] {
+        &self.elements
+    }
+    /// Return requested edges in first-encounter order, or absent when unrequested.
+    pub fn get_edges(&self) -> Option<&[Edge]> {
+        self.edges.as_deref()
+    }
+    /// Transfer selected identities and optional original edges to their consumer.
+    pub fn into_parts(self) -> (Vec<EdgeTarget>, Option<Vec<Edge>>) {
+        (self.elements, self.edges)
+    }
 }

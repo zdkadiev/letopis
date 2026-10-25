@@ -1,0 +1,208 @@
+mod support;
+use letopis::{
+    domain::LineRange,
+    service::{
+        CommandErrorKind, ElementAddress, Refresher, SearchFlag, TraversalDirection, TraversalMode,
+        TraversalRequest, Traverser,
+    },
+    wire_document_refresher, wire_traverser,
+};
+use std::{collections::BTreeSet, num::NonZeroUsize};
+use support::reading::ReadingRepo;
+
+#[test]
+fn traverses_without_configuration_with_source_urls_and_ranges() {
+    let repo = ReadingRepo::new();
+    repo.write_knowledge("a.md", "[child](b.md \"letopis:type=includes\") [code](code.rs#L2-L2 \"letopis:type=external\") [url](https://Host/x?q=1#part \"letopis:type=external\")");
+    repo.write_knowledge("b.md", "child");
+    repo.write("code.rs", b"one\ntwo\n");
+    let output = wire_traverser(repo.get_root())
+        .unwrap()
+        .traverse(&make_request("a.md"))
+        .unwrap();
+    assert_eq!(
+        output
+            .elements
+            .iter()
+            .map(|link| link.element_id.as_str())
+            .collect::<Vec<_>>(),
+        ["code.rs#L2-L2", "https://Host/x?q=1#part", "b.md"]
+    );
+    assert_eq!(output.elements[0].path.as_str(), "code.rs");
+    assert_eq!(
+        output.elements[0].lines,
+        Some(LineRange::new(2, 2).unwrap())
+    );
+    assert_eq!(output.elements[1].path.as_str(), "https://Host/x?q=1#part");
+    assert_eq!(output.elements[1].lines, None);
+    assert_eq!(
+        output.elements[2].lines,
+        Some(LineRange::new(1, 2).unwrap())
+    );
+    assert!(
+        output
+            .elements
+            .iter()
+            .all(|link| link.revision == 1 && link.flags.is_empty())
+    );
+    assert!(output.edges.is_none());
+}
+
+#[test]
+fn distinguishes_missing_source_membership_from_removed_final_reference() {
+    let repo = ReadingRepo::new();
+    repo.write_knowledge("a.md", "[code](missing.rs \"letopis:type=external\")");
+    let mut service = wire_traverser(repo.get_root()).unwrap();
+    let mut request = make_request("missing.rs");
+    request.direction = TraversalDirection::Incoming;
+    let output = service.traverse(&request).unwrap();
+    assert_eq!(output.elements[0].element_id.as_str(), "a.md");
+    assert_eq!(
+        output.elements[0].flags,
+        BTreeSet::from([SearchFlag::SourceChanged, SearchFlag::SourceNotFound])
+    );
+    repo.write_knowledge("a.md", "reference removed");
+    let error = service.traverse(&request).unwrap_err();
+    assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
+}
+
+#[test]
+fn retains_last_valid_knowledge_as_stale_and_missing_source_flag() {
+    let repo = ReadingRepo::new();
+    repo.write_knowledge(
+        "a.md",
+        "[child](b.md \"letopis:type=includes\") [code](code.rs#L2-L3 \"letopis:type=external\")",
+    );
+    repo.write_knowledge("b.md", "valid child");
+    repo.write("code.rs", b"one\n");
+    let mut service = wire_traverser(repo.get_root()).unwrap();
+    service.traverse(&make_request("a.md")).unwrap();
+    repo.write("b.md", b"<!-- letopis: {broken} -->\nSECRET");
+    let output = service.traverse(&make_request("a.md")).unwrap();
+    assert_eq!(
+        output.elements[0].flags,
+        BTreeSet::from([SearchFlag::SourceNotFound])
+    );
+    assert_eq!(
+        output.elements[1].flags,
+        BTreeSet::from([SearchFlag::Stale])
+    );
+    assert_eq!(
+        output.elements[1].lines,
+        Some(LineRange::new(1, 2).unwrap())
+    );
+}
+
+#[test]
+fn propagates_unsafe_source_errors_without_private_paths_or_payloads() {
+    let repo = ReadingRepo::new();
+    repo.write_knowledge("a.md", "[code](code.rs \"letopis:type=external\")");
+    repo.write("code.rs", b"SECRET");
+    let mut service = wire_traverser(repo.get_root()).unwrap();
+    service.traverse(&make_request("a.md")).unwrap();
+    std::fs::remove_file(repo.get_root().join("code.rs")).unwrap();
+    std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("code.rs")).unwrap();
+    let error = service.traverse(&make_request("a.md")).unwrap_err();
+    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+    assert!(!format!("{error:?}").contains("SECRET"));
+    assert!(!error.to_string().contains("/private/tmp"));
+}
+
+#[test]
+fn observes_late_source_binding_even_when_traversing_only_containment() {
+    let repo = ReadingRepo::new();
+    repo.write_knowledge("a.md", "[child](b.md \"letopis:type=includes\")");
+    let mut body = String::new();
+    for index in 0..65 {
+        let source = format!("s{index:02}.rs");
+        body.push_str(&format!("[code]({source} \"letopis:type=external\")\n"));
+        if index < 64 {
+            repo.write(&source, b"live");
+        }
+    }
+    repo.write_knowledge("b.md", &body);
+    let mut request = make_request("a.md");
+    request.mode = TraversalMode::Containment;
+    request
+        .edge_types
+        .insert(letopis::domain::EdgeType::parse("includes").unwrap());
+    let output = wire_traverser(repo.get_root())
+        .unwrap()
+        .traverse(&request)
+        .unwrap();
+    assert_eq!(output.elements.len(), 1);
+    assert_eq!(output.elements[0].element_id.as_str(), "b.md");
+    assert_eq!(
+        output.elements[0].flags,
+        BTreeSet::from([SearchFlag::SourceChanged, SearchFlag::SourceNotFound])
+    );
+}
+
+#[test]
+fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
+    let repo = ReadingRepo::new();
+    repo.write_knowledge(
+        "a.md",
+        "[b](b.md \"letopis:type=includes\") [c](c.md \"letopis:type=includes\")",
+    );
+    repo.write_knowledge("b.md", "first");
+    repo.write_knowledge("c.md", "second");
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
+    let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
+    connection
+        .execute(
+            "UPDATE nodes SET created_at = 'PRIVATE_INVALID' WHERE id = ?1",
+            ["c.md"],
+        )
+        .unwrap();
+    let mut service = wire_traverser(repo.get_root()).unwrap();
+    let mut request = make_request("a.md");
+    request.limit = NonZeroUsize::new(1).unwrap();
+    let output = service.traverse(&request).unwrap();
+    assert_eq!(output.elements[0].element_id.as_str(), "b.md");
+    request.limit = NonZeroUsize::new(2).unwrap();
+    let error = service.traverse(&request).unwrap_err();
+    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+    assert!(!format!("{error:?}").contains("PRIVATE_INVALID"));
+    let busy: i64 = connection
+        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(
+        busy, 0,
+        "failed traversal must release its read view while the service lives"
+    );
+    connection
+        .execute("UPDATE nodes SET created_at = 3 WHERE id = ?1", ["c.md"])
+        .unwrap();
+    assert_eq!(service.traverse(&request).unwrap().elements.len(), 2);
+}
+
+#[test]
+fn resolves_markdown_shaped_source_by_stored_membership() {
+    let repo = ReadingRepo::new();
+    repo.write_knowledge("a.md", "[source](plain.md \"letopis:type=external\")");
+    repo.write("plain.md", b"unmarked Markdown source");
+    let output = wire_traverser(repo.get_root())
+        .unwrap()
+        .traverse(&make_request("a.md"))
+        .unwrap();
+    assert_eq!(output.elements[0].element_id.as_str(), "plain.md");
+    assert_eq!(output.elements[0].path.as_str(), "plain.md");
+    assert_eq!(output.elements[0].lines, None);
+    assert!(output.elements[0].flags.is_empty());
+}
+
+fn make_request(start: &str) -> TraversalRequest {
+    TraversalRequest {
+        element_ids: BTreeSet::from([ElementAddress::parse(start).unwrap()]),
+        mode: TraversalMode::Both,
+        direction: TraversalDirection::Outgoing,
+        depth: 2,
+        limit: NonZeroUsize::new(20).unwrap(),
+        edge_types: BTreeSet::new(),
+        edge_limit: None,
+    }
+}

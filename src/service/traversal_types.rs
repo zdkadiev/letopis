@@ -1,6 +1,67 @@
-use super::ElementAddress;
-use crate::domain::{Edge, EdgeTarget, EdgeType};
+use super::{ElementAddress, SearchFlag};
+use crate::domain::{Edge, EdgeTarget, EdgeType, LineRange, RepoPath, SourceUri};
 use std::{collections::BTreeSet, num::NonZeroUsize};
+
+/// Internal bound shared by neighbor producers and consumers.
+pub(crate) const NEIGHBOR_PAGE_QUANTUM: usize = 32;
+
+/// Normalized starts, traversal selection and independent output bounds.
+#[derive(Debug)]
+pub struct TraversalRequest {
+    /// Unique canonical start selectors, all validated before expansion.
+    pub element_ids: BTreeSet<ElementAddress>,
+    /// Relationship family to follow.
+    pub mode: TraversalMode,
+    /// Directions to follow, preserving original edge orientation.
+    pub direction: TraversalDirection,
+    /// Maximum number of transitions from any start, including containment.
+    pub depth: u64,
+    /// Maximum discovered elements, excluding starts.
+    pub limit: NonZeroUsize,
+    /// Optional intersection with the mode; empty means unrestricted.
+    pub edge_types: BTreeSet<EdgeType>,
+    /// Optional independent maximum of first-encounter edges.
+    pub edge_limit: Option<NonZeroUsize>,
+}
+/// Local containing path or opaque remote source location.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ElementLocation {
+    /// Canonical repository-relative file path without source coordinates.
+    Local(RepoPath),
+    /// Verbatim remote source URL, never fetched.
+    Remote(SourceUri),
+}
+/// One selected element's metadata and observed freshness in a pinned revision.
+#[derive(Debug, PartialEq, Eq)]
+pub struct TraversalLink {
+    /// Canonical selected element identity.
+    pub element_id: ElementAddress,
+    /// Containing file or verbatim URL.
+    pub path: ElementLocation,
+    /// Pinned knowledge coordinates or addressed local source range.
+    pub lines: Option<LineRange>,
+    /// Shared cache publication revision.
+    pub revision: u64,
+    /// Deduplicated existing X-1 freshness reasons.
+    pub flags: BTreeSet<SearchFlag>,
+}
+/// Metadata-only traversal output with optional original traversed edges.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Traversal {
+    /// Selected links in BFS discovery order, excluding starts.
+    pub elements: Vec<TraversalLink>,
+    /// Requested first-encounter edge triples, absent when unrequested.
+    pub edges: Option<Vec<Edge>>,
+}
+impl ElementLocation {
+    /// Return the normalized local path or verbatim remote URL.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Local(path) => path.as_str(),
+            Self::Remote(uri) => uri.as_str(),
+        }
+    }
+}
 
 /// Eligible graph relationships for a traversal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
