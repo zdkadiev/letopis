@@ -1,5 +1,5 @@
 //! Application contracts.
-use crate::domain::RepoPath;
+use crate::domain::{RepoPath, SourceUri};
 mod background;
 mod check;
 mod command;
@@ -19,6 +19,7 @@ mod retained_tree;
 mod search;
 mod snapshot_error;
 mod snapshot_traits;
+mod source;
 mod storage;
 
 pub(crate) use background::BackgroundService;
@@ -28,6 +29,8 @@ pub(crate) use embedding::EmbeddingService;
 pub(crate) use graph_diagnostics::CurrentGraphDiagnostics;
 pub(crate) use inspection::InspectionService;
 pub(crate) use search::{SearchDependencies, SearchService};
+/// Concrete source observation assembly, kept inside the crate.
+pub(crate) use source::SourceService;
 
 pub use command::{
     CheckReport, CommandError, CommandErrorKind, CommandProblem, CommandResult, ElementAddress,
@@ -79,4 +82,48 @@ pub trait GraphDiagnostics {
         view: &mut R,
         paths: &[RepoPath],
     ) -> CommandResult<Vec<CommandProblem>>;
+}
+
+/// Current source observations constrained by membership in a caller-pinned view.
+///
+/// Implementations read only the requested source, retaining its derived identity
+/// and creation time. Unknown addresses and knowledge nodes return `None` without
+/// filesystem I/O. Local bytes are captured live beneath the configured root;
+/// remote addresses are never fetched. Reads do not refresh, reopen storage,
+/// publish metadata, change vector state or create a Git snapshot.
+pub trait SourceReader {
+    /// Observe current bytes or typed availability for one referenced source.
+    ///
+    /// A local observation has no cross-file or historical snapshot guarantee.
+    /// Missing files and incomplete ranges return `SourceNotFound`; remote
+    /// availability remains `Unfetched`. Results never contain source bytes.
+    ///
+    /// # Errors
+    /// Returns a safe document error with a private cause when storage or confined
+    /// filesystem access fails; such failures never become `SourceNotFound`.
+    fn read_source<R: StorageRead>(
+        &self,
+        view: &mut R,
+        uri: &SourceUri,
+    ) -> DocumentResult<Option<SourceObservation>>;
+}
+
+/// Metadata and current availability of one referenced source; contains no bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceObservation {
+    /// Derived identity/creation time and freshly observed hash and line range.
+    pub metadata: SourceMetadata,
+    /// Availability of the addressed bytes during this explicit observation.
+    pub availability: SourceAvailability,
+}
+
+/// Current byte availability, separate from source membership in the graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceAvailability {
+    /// The complete addressed local bytes were captured successfully.
+    Available,
+    /// Referenced local bytes are absent, including an incomplete line range.
+    SourceNotFound,
+    /// The source is remote and no fetch was performed; availability is unknown.
+    Unfetched,
 }

@@ -24,7 +24,7 @@ use crate::service::{
     DocumentResult, EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
     GraphDiagnostics, InspectionService, Inspector, Refresher, SearchDependencies, SearchService,
-    Searcher, SnapshotError, SnapshotVerifier, Storage, StorageResult,
+    Searcher, SnapshotError, SnapshotVerifier, SourceReader, SourceService, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -65,6 +65,18 @@ pub fn run_cli(
 /// The caller supplies the consistent read view to each operation.
 pub fn wire_graph_diagnostics() -> impl GraphDiagnostics {
     CurrentGraphDiagnostics::new()
+}
+
+/// Wire live source observations beneath the caller's already-selected Git root.
+///
+/// Pins the root directory without discovering a repository, opening storage,
+/// creating service state, refreshing, pinning Git trees or launching a drain.
+/// Each read receives the caller's existing pinned storage view.
+///
+/// # Errors
+/// Reports an inaccessible, symlink or non-directory root.
+pub fn wire_source_reader(root: &Path) -> DocumentResult<impl SourceReader + use<>> {
+    Ok(SourceService::new(LocalFileSystem::open(root)?))
 }
 
 /// Wire current corpus validation with a separate pinned reader and read-only Git probe.

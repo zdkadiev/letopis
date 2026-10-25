@@ -24,16 +24,16 @@ pub struct KnowledgeMetadata {
     /// SHA-256 of the search text, used as the shared vector key.
     pub search_hash: Sha256,
 }
-/// Caller-computed source projection, including sources with missing bytes.
+/// Derived source projection, including missing local or unfetched remote bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceMetadata {
-    /// Normalized source address, with an optional line fragment.
+    /// Canonical local address or verbatim opaque HTTP/HTTPS address.
     pub uri: SourceUri,
-    /// SHA-256 of the addressed bytes; `None` when they are missing.
+    /// SHA-256 of addressed bytes; `None` for missing local or unknown remote bytes.
     pub hash: Option<Sha256>,
     /// Earliest creation timestamp among the elements referencing this source.
     pub created_at: u64,
-    /// Addressed line range, if the address names one.
+    /// Local addressed line range, including missing ranges; `None` for remote URLs.
     pub lines: Option<LineRange>,
 }
 /// Persistable graph metadata, with distinct knowledge and source identities.
