@@ -268,6 +268,29 @@ fn rejects_empty_typed_starts_without_any_read() {
     assert_eq!(read.page_calls, 0);
 }
 
+#[test]
+fn traversal_work_does_not_scale_with_unrelated_nodes_or_hub_degree() {
+    for degree in [64, 100_000_000] {
+        // Arrange a lazy source: neither degree nor unrelated identities are collected.
+        let mut read = GeneratedRead::build_star(degree);
+        let mut request = make_request();
+        request.limit = NonZeroUsize::new(3).unwrap();
+        request.edge_limit = NonZeroUsize::new(1);
+        request.depth = u64::MAX;
+        // Act.
+        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        // Assert identical literal output, independent edge cap and mid-page stop.
+        assert_eq!(get_ids(&graph), ["n00000.md", "n00001.md", "n00002.md"]);
+        assert_eq!(
+            get_triples(&graph),
+            [("a.md", "n00000.md", "z_custom_link")]
+        );
+        assert_eq!(read.page_calls, 1);
+        assert_eq!(read.expanded, [1]);
+        assert_eq!(read.resolved, ["a.md"]);
+    }
+}
+
 struct GeneratedRead {
     degree: Option<usize>,
     page_size: usize,

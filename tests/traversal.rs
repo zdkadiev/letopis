@@ -195,6 +195,34 @@ fn resolves_markdown_shaped_source_by_stored_membership() {
     assert!(output.elements[0].flags.is_empty());
 }
 
+#[test]
+fn distinguishes_nonregular_sources_from_missing_local_flags() {
+    let repo = ReadingRepo::new();
+    repo.write_knowledge("a.md", "[code](code.rs \"letopis:type=external\")");
+    let mut service = wire_traverser(repo.get_root()).unwrap();
+    let output = service.traverse(&make_request("a.md")).unwrap();
+    assert_eq!(
+        output.elements[0].flags,
+        BTreeSet::from([SearchFlag::SourceNotFound])
+    );
+    std::fs::create_dir(repo.get_root().join("code.rs")).unwrap();
+    let error = service.traverse(&make_request("a.md")).unwrap_err();
+    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+    let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
+    let busy: i64 = connection
+        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(busy, 0);
+    std::fs::remove_dir(repo.get_root().join("code.rs")).unwrap();
+    repo.write("code.rs", b"now available");
+    repo.write_knowledge("a.md", "[code](code.rs \"letopis:type=external\") changed");
+    assert!(
+        service.traverse(&make_request("a.md")).unwrap().elements[0]
+            .flags
+            .is_empty()
+    );
+}
+
 fn make_request(start: &str) -> TraversalRequest {
     TraversalRequest {
         element_ids: BTreeSet::from([ElementAddress::parse(start).unwrap()]),
