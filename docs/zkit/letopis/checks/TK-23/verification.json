@@ -522,7 +522,9 @@
   ],
   "review_gates": {
     "task4_independent": "approved_after_I1_rereview",
-    "whole_branch": "pending"
+    "whole_branch": "code_quality_approved_with_M1_M2_documentation_corrections",
+    "final_documentation_corrections": "M1/M2 documentation correction implemented, scoped re-review pending",
+    "linux_native_standalone": "open"
   },
   "limits": [
     "Required Linux native/standalone acceptance remains open",
@@ -969,7 +971,7 @@
       "evidence_directory": ".artifacts/tk23/task4-fix1-20261026"
     },
     "native_scope": "original host native and failed Linux remain at e9a9cd4; no native runner rerun for test-only assertion change",
-    "review_gates": "pending"
+    "review_gates": "I1 scoped rereview approved; final M1/M2 documentation correction implemented, scoped re-review pending; Linux native/standalone open"
   },
   "review_evidence": {
     "task-1-review.md": {
@@ -991,6 +993,20 @@
     "task-4-rereview.md": {
       "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-4-rereview.md",
       "sha256": "b2046ab52ec13588dc556bb3bc365a8421e69141bae34b34d15795096c08b94b"
+    },
+    "final-review.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/final-review.md",
+      "sha256": "9a0eec4bff28f2263dc813d0dc28f58b00a70afb4cd291452b9c89846c01276b"
     }
+  },
+  "final_review_disposition": {
+    "reviewed_head": "524b96d4e93a84d9ecbc65bc3d743841650c561e",
+    "critical_product_findings": 0,
+    "important_product_findings": 0,
+    "code_quality": "approved with M1/M2 documentation corrections",
+    "disposition": "M1/M2 documentation correction implemented, scoped re-review pending",
+    "linux_native_standalone_acceptance": "open",
+    "ready_to_merge": false,
+    "cancellation_scope": "TK-23 preserves normal JSON/exit behavior and ordinary OS signal termination; handled SIGINT, cancelled JSON and stdout once-guard implementation remain TK-29"
   }
 }
