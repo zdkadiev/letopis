@@ -15,8 +15,8 @@ use rusqlite::{Connection, OptionalExtension, Row, params_from_iter};
 use sea_query::{Expr, ExprTrait, OnConflict, Order, Query, Value};
 
 pub(super) const SOURCE_KIND: &str = "source";
-const VERTEX_KIND: &str = "vertex";
-const METAVERTEX_KIND: &str = "metavertex";
+pub(super) const VERTEX_KIND: &str = "vertex";
+pub(super) const METAVERTEX_KIND: &str = "metavertex";
 const NODE_COLUMNS: [Nodes; 9] = [
     Nodes::Id,
     Nodes::Kind,

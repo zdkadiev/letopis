@@ -3,6 +3,7 @@ use super::{
     files::{list_files, read_file},
     fts::match_text,
     graph::{list_edges, list_nodes, read_node},
+    neighbors::{list_source_snapshots, read_neighbor_page, resolve_node},
     query::{Meta, Project, Schemas, build_query},
     vectors::{
         find_nearest_vectors, read_failure, read_query_error, read_vector, read_vector_dimensions,
@@ -10,15 +11,16 @@ use super::{
     work::read_next_embedding_work,
 };
 use crate::{
-    domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256},
+    domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
     service::{
-        EmbeddingFailure, EmbeddingWork, FileRow, QueryError, StorageError, StorageErrorKind,
-        StorageRead, StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
+        ElementAddress, EmbeddingFailure, EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef,
+        GraphRead, NeighborPageRequest, QueryError, StorageError, StorageErrorKind, StorageRead,
+        StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
     },
 };
 use rusqlite::{Connection, OptionalExtension, Transaction, params_from_iter};
 use sea_query::{Expr, ExprTrait, Query};
-use std::num::NonZeroUsize;
+use std::{collections::BTreeSet, num::NonZeroUsize};
 
 #[derive(Debug)]
 pub(crate) struct SqliteRead<'a> {
@@ -72,7 +74,21 @@ impl<'a> SqliteRead<'a> {
         })
     }
 }
+impl GraphRead for SqliteRead<'_> {
+    fn resolve_node(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+        resolve_node(&self.transaction, id)
+    }
+    fn read_neighbor_page(
+        &mut self,
+        request: &NeighborPageRequest<'_>,
+    ) -> StorageResult<Vec<GraphNeighbor>> {
+        read_neighbor_page(&self.transaction, request)
+    }
+}
 impl StorageRead for SqliteRead<'_> {
+    fn list_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
+        list_source_snapshots(&self.transaction)
+    }
     fn read_next_embedding_work(
         &mut self,
         expected: &Sha256,

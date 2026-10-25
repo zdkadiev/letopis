@@ -25,6 +25,7 @@ mod snapshot_error;
 mod snapshot_traits;
 mod source;
 mod storage;
+mod traversal_types;
 
 pub(crate) use background::BackgroundService;
 pub(crate) use check::CheckService;
@@ -193,4 +194,35 @@ pub trait BasisRetainer {
     /// # Errors
     /// Returns safe errors for corruption, Git I/O or failed ref publication.
     fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()>;
+}
+
+/// Minimal pinned graph identities and bounded directional page requests.
+pub use traversal_types::{
+    GraphNeighbor, GraphNodeKey, GraphNodeRef, NeighborCursor, NeighborDirection,
+    NeighborPageRequest, TraversalDirection, TraversalMode,
+};
+
+/// Bounded graph reads from one consistent caller-owned view.
+///
+/// Handles belong to this view only. Pages sort by (edge type, reached identity),
+/// preserve original edge orientation and exclude missing endpoints before the
+/// limit. No complete node metadata is decoded for neighbor enumeration.
+/// A cursor sequence fixes node, direction, mode and types. Only an empty page
+/// ends a stream; a short nonempty page does not guarantee exhaustion.
+pub trait GraphRead {
+    /// Resolve a normalized identity using its actual stored classification.
+    ///
+    /// # Errors
+    /// Reports database failures or invalid persisted identities/kinds.
+    fn resolve_node(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>>;
+    /// Read at most the requested number of eligible neighbors strictly after a cursor.
+    ///
+    /// The handle must originate in this view; the positive limit may not exceed 32.
+    ///
+    /// # Errors
+    /// Rejects a limit above the internal quantum; reports database or decoding failures.
+    fn read_neighbor_page(
+        &mut self,
+        request: &NeighborPageRequest<'_>,
+    ) -> StorageResult<Vec<GraphNeighbor>>;
 }

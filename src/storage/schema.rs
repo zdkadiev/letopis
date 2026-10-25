@@ -5,7 +5,8 @@ use super::{
 use crate::service::{StorageError, StorageErrorKind, StorageResult};
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 
-const SCHEMA_VERSION: i64 = 1;
+const CACHE_SCHEMA_VERSION: i64 = 2;
+const VECTOR_SCHEMA_VERSION: i64 = 1;
 const USER_VERSION_PRAGMA: &str = "user_version";
 const CACHE_SCHEMA: &str = include_str!("cache.sql");
 const VECTOR_SCHEMA: &str = include_str!("vectors.sql");
@@ -13,48 +14,56 @@ const VECTOR_SCHEMA: &str = include_str!("vectors.sql");
 type Definition = (String, String, String);
 
 pub(super) fn bootstrap_cache(connection: &mut Connection) -> StorageResult<()> {
-    bootstrap_schema(connection, CACHE_SCHEMA)
+    bootstrap_schema(connection, CACHE_SCHEMA, CACHE_SCHEMA_VERSION)
 }
 pub(super) fn bootstrap_vectors(connection: &mut Connection) -> StorageResult<()> {
-    bootstrap_schema(connection, VECTOR_SCHEMA)
+    bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)
 }
 
-fn bootstrap_schema(connection: &mut Connection, sql: &str) -> StorageResult<()> {
+fn bootstrap_schema(
+    connection: &mut Connection,
+    sql: &str,
+    expected_version: i64,
+) -> StorageResult<()> {
     // Pin version and definitions to one read view without requesting a writer.
     let initialized = wait_for_initialization(|| {
         let read = connection.transaction().map_err(map_sqlite)?;
-        let initialized = has_schema(&read, sql)?;
+        let initialized = has_schema(&read, sql, expected_version)?;
         read.commit().map_err(map_sqlite)?;
         Ok(initialized)
     })?;
     if initialized {
         return Ok(());
     }
-    initialize_schema(connection, sql)
+    initialize_schema(connection, sql, expected_version)
 }
 
-fn initialize_schema(connection: &Connection, sql: &str) -> StorageResult<()> {
+fn initialize_schema(
+    connection: &Connection,
+    sql: &str,
+    expected_version: i64,
+) -> StorageResult<()> {
     let transaction = wait_for_initialization(|| {
         Transaction::new_unchecked(connection, TransactionBehavior::Immediate).map_err(map_sqlite)
     })?;
     // A competing initializer may have committed while this connection waited.
-    if !has_schema(&transaction, sql)? {
+    if !has_schema(&transaction, sql, expected_version)? {
         transaction.execute_batch(sql).map_err(map_sqlite)?;
         transaction
-            .pragma_update(None, USER_VERSION_PRAGMA, SCHEMA_VERSION)
+            .pragma_update(None, USER_VERSION_PRAGMA, expected_version)
             .map_err(map_sqlite)?;
     }
     transaction.commit().map_err(map_sqlite)
 }
 
-fn has_schema(connection: &Connection, sql: &str) -> StorageResult<bool> {
+fn has_schema(connection: &Connection, sql: &str, expected_version: i64) -> StorageResult<bool> {
     let version: i64 = connection
         .pragma_query_value(None, USER_VERSION_PRAGMA, |row| row.get(0))
         .map_err(map_sqlite)?;
     let definitions = read_definitions(connection)?;
     match version {
         0 if definitions.is_empty() => Ok(false),
-        SCHEMA_VERSION => {
+        version if version == expected_version => {
             register_vec1()?;
             let reference = Connection::open_in_memory().map_err(map_sqlite)?;
             reference.execute_batch(sql).map_err(map_sqlite)?;
@@ -86,17 +95,46 @@ fn fail_incompatible_schema() -> StorageError {
 #[cfg(test)]
 mod tests {
     use super::{
-        CACHE_SCHEMA, VECTOR_SCHEMA, bootstrap_cache, bootstrap_schema, bootstrap_vectors,
+        CACHE_SCHEMA, CACHE_SCHEMA_VERSION, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION, bootstrap_cache,
+        bootstrap_schema, bootstrap_vectors,
     };
-    use crate::process_test_support::supervise_test;
     use crate::storage::connection::{ON_INITIALIZATION_CONTENTION, open_database};
-    use rusqlite::TransactionBehavior;
+    use crate::{
+        domain::Sha256,
+        process_test_support::supervise_test,
+        service::{Storage, StorageResult, VectorOutcome, VectorWrite},
+        storage::SqliteStorage,
+    };
+    use rusqlite::{Connection, TransactionBehavior};
     use std::{
+        fs,
+        os::unix::fs::MetadataExt,
+        path::Path,
         sync::mpsc,
         thread,
         time::{Duration, Instant},
     };
     use tempfile::TempDir;
+
+    #[test]
+    fn cache_and_vector_versions_are_independent() {
+        for (bootstrap, version) in [
+            (
+                bootstrap_cache as fn(&mut Connection) -> StorageResult<()>,
+                2,
+            ),
+            (bootstrap_vectors, 1),
+        ] {
+            let mut connection = Connection::open_in_memory().unwrap();
+            bootstrap(&mut connection).unwrap();
+            assert_eq!(
+                connection
+                    .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                version
+            );
+        }
+    }
 
     #[test]
     fn existing_schemas_validate_on_query_only_connections() {
@@ -112,7 +150,10 @@ mod tests {
     }
     #[test]
     fn waiting_initializer_rechecks_committed_schema_for_both_databases() {
-        for sql in [CACHE_SCHEMA, VECTOR_SCHEMA] {
+        for (sql, version) in [
+            (CACHE_SCHEMA, CACHE_SCHEMA_VERSION),
+            (VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION),
+        ] {
             // Arrange a first initializer holding an uncommitted real schema.
             let root = TempDir::new().unwrap();
             let path = root.path().join("database");
@@ -122,7 +163,9 @@ mod tests {
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .unwrap();
             transaction.execute_batch(sql).unwrap();
-            transaction.pragma_update(None, "user_version", 1).unwrap();
+            transaction
+                .pragma_update(None, "user_version", version)
+                .unwrap();
             let (contended, observed) = mpsc::channel();
             let (release, released) = mpsc::channel();
             let worker = thread::spawn(move || {
@@ -130,7 +173,7 @@ mod tests {
                     contended.send(()).unwrap();
                     released.recv_timeout(Duration::from_secs(20)).unwrap();
                 })));
-                bootstrap_schema(&mut waiter, sql)
+                bootstrap_schema(&mut waiter, sql, version)
             });
             // Act: the waiter has observed no schema, then failed to take ownership.
             observed.recv_timeout(Duration::from_secs(20)).unwrap();
@@ -142,7 +185,7 @@ mod tests {
                 owner
                     .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
                     .unwrap(),
-                1
+                version
             );
         }
     }
@@ -237,5 +280,63 @@ mod tests {
                 .unwrap(),
             0
         );
+    }
+    #[test]
+    fn old_cache_rejection_preserves_populated_vectors_config_and_locks() {
+        // Arrange closed populated databases and independent configuration/lock identities.
+        let root = TempDir::new().unwrap();
+        let cache = root.path().join("cache.db");
+        let vectors = root.path().join("vectors.db");
+        let identity = Sha256::digest(b"model");
+        let hash = Sha256::digest(b"text");
+        {
+            let mut storage = SqliteStorage::open(&cache, &vectors).unwrap();
+            storage.reset_vectors(&identity).unwrap();
+            let VectorOutcome::Current(mut write) = storage.begin_vector_write(&identity).unwrap()
+            else {
+                panic!()
+            };
+            write.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
+            write.reserve_attempt(&hash, 3).unwrap();
+            write.record_failure(&hash, "failure sentinel").unwrap();
+            write.commit().unwrap();
+        }
+        {
+            let connection = Connection::open(&cache).unwrap();
+            connection
+                .execute_batch(
+                    "DROP INDEX edges_outgoing;
+                DROP INDEX edges_incoming;
+                DROP INDEX nodes_source_snapshot;
+                CREATE INDEX edges_target ON edges(target_id);
+                PRAGMA user_version=1;",
+                )
+                .unwrap();
+        }
+        let files = [
+            "cache.db",
+            "vectors.db",
+            "config.json",
+            "index.lock",
+            "embed.lock",
+        ];
+        for name in &files[2..] {
+            fs::write(root.path().join(name), name).unwrap();
+        }
+        let before: Vec<_> = files
+            .iter()
+            .map(|name| capture_file(&root.path().join(name)))
+            .collect();
+        // Act: cache incompatibility is detected before the vector database is opened.
+        let error = SqliteStorage::open(&cache, &vectors).unwrap_err();
+        // Assert exact content and inode identity, including populated native vector state.
+        assert_eq!(error.get_message(), "incompatible storage database schema");
+        for (name, expected) in files.iter().zip(before) {
+            assert_eq!(capture_file(&root.path().join(name)), expected, "{name}");
+        }
+    }
+
+    fn capture_file(path: &Path) -> (u64, Vec<u8>) {
+        (fs::metadata(path).unwrap().ino(), fs::read(path).unwrap())
     }
 }

@@ -1,9 +1,9 @@
 use super::{
-    EmbeddingFailure, EmbeddingWork, FileRow, NodeMetadata, QueryError, StorageResult, StoredNode,
-    StoredVectorKey, TextMatch, VectorMatch, VectorOutcome,
+    EmbeddingFailure, EmbeddingWork, FileRow, GraphRead, NodeMetadata, QueryError, StorageResult,
+    StoredNode, StoredVectorKey, TextMatch, VectorMatch, VectorOutcome,
 };
-use crate::domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256};
-use std::num::NonZeroUsize;
+use crate::domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid};
+use std::{collections::BTreeSet, num::NonZeroUsize};
 
 /// Synchronous storage with exclusive scoped capabilities.
 ///
@@ -12,7 +12,7 @@ use std::num::NonZeroUsize;
 /// or failed capability leaves the stored data unchanged.
 pub trait Storage {
     /// An owned read transaction borrowing this storage exclusively.
-    type Read<'a>: StorageRead
+    type Read<'a>: StorageRead + GraphRead
     where
         Self: 'a;
     /// An atomic cache publication capability.
@@ -75,6 +75,11 @@ pub trait StorageRead {
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
     fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>>;
+    /// List distinct non-null author-declared source roots without reading node metadata.
+    ///
+    /// # Errors
+    /// Reports database failures or malformed persisted tree identities.
+    fn list_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>>;
     /// List all published node metadata in ascending normalized identity order.
     ///
     /// # Errors

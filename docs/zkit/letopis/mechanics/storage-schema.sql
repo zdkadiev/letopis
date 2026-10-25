@@ -35,7 +35,9 @@ CREATE TABLE edges(
  CHECK(source_id<>target_id)
 ) WITHOUT ROWID;
 -- Plain indexes for required outgoing/incoming traversal, not speculative caches.
-CREATE INDEX edges_target ON edges(target_id);
+CREATE INDEX edges_outgoing ON edges(source_id,type,target_id);
+CREATE INDEX edges_incoming ON edges(target_id,type,source_id);
+CREATE INDEX nodes_source_snapshot ON nodes(source_snapshot) WHERE source_snapshot IS NOT NULL;
 -- Joins KNN results from vectors.db and finds texts without a vector.
 CREATE INDEX nodes_search_hash ON nodes(search_hash) WHERE search_hash IS NOT NULL;
 CREATE VIRTUAL TABLE text_index USING fts5(text, content='', contentless_delete=1);
