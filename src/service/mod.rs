@@ -50,7 +50,9 @@ pub use model::{
 };
 pub use retained_tree::RetainedTree;
 pub use snapshot_error::{SnapshotError, SnapshotErrorKind};
-pub use snapshot_traits::{GitSnapshots, SnapshotEntry, SnapshotFile};
+pub use snapshot_traits::{
+    GitSnapshots, SnapshotEntry, SnapshotFile, SnapshotState, SnapshotVerifier,
+};
 pub use storage::{CacheWrite, Storage, StorageRead, VectorWrite};
 
 /// Current graph diagnostics derived exclusively from the supplied consistent view.

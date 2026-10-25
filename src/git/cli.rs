@@ -5,7 +5,8 @@ use crate::{
     domain::{BlobOid, RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN, TreeOid},
     service::{
         CorpusLister, DocumentError, DocumentErrorKind, DocumentResult, GitSnapshots, RetainedTree,
-        SnapshotEntry, SnapshotError, SnapshotErrorKind, SnapshotFile,
+        SnapshotEntry, SnapshotError, SnapshotErrorKind, SnapshotFile, SnapshotState,
+        SnapshotVerifier,
     },
     utils::SERVICE_DIRECTORY,
 };
@@ -99,6 +100,20 @@ impl GitSnapshots for GitCli {
     fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
         self.require_self_contained_objects()?;
         refs::Retainer { git: self }.pin(tree)
+    }
+}
+
+impl SnapshotVerifier for GitCli {
+    fn verify_snapshot(&self, tree: &TreeOid) -> Result<SnapshotState, SnapshotError> {
+        self.require_self_contained_objects()?;
+        match (objects::ObjectDb { git: self }).validate_tree(tree) {
+            Ok(()) => Ok(SnapshotState::Available),
+            Err(error) => match error.get_kind() {
+                SnapshotErrorKind::NotFound => Ok(SnapshotState::Missing),
+                SnapshotErrorKind::InvalidRequest => Ok(SnapshotState::Invalid),
+                SnapshotErrorKind::InternalError => Err(error),
+            },
+        }
     }
 }
 

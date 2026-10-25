@@ -24,7 +24,7 @@ use crate::service::{
     EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles,
     EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
     GraphDiagnostics, InspectionService, Inspector, Refresher, SearchDependencies, SearchService,
-    Searcher, SnapshotError, Storage, StorageResult,
+    Searcher, SnapshotError, SnapshotVerifier, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -222,7 +222,7 @@ pub fn build_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + us
     Ok(HttpProviders::new(Ollama::new(), Openai::new(key)))
 }
 
-/// Open immutable Git snapshot operations at the working copy containing `start`.
+/// Open immutable Git snapshot operations and read-only root verification at `start`.
 /// Requires Git 2.29 or newer, a UTF-8 checkout root, and a SHA-1 or SHA-256
 /// working repository without an object alternates path (even empty/inactive).
 /// Alternates are checked again before each operation; use a self-contained clone.
@@ -230,7 +230,9 @@ pub fn build_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + us
 /// # Errors
 /// Returns a snapshot error when Git or the working repository is unsupported,
 /// the checkout root cannot be decoded, an alternates path exists, or Git I/O fails.
-pub fn open_git_snapshots(start: &Path) -> Result<impl GitSnapshots, SnapshotError> {
+pub fn open_git_snapshots(
+    start: &Path,
+) -> Result<impl GitSnapshots + SnapshotVerifier, SnapshotError> {
     GitCli::open(start)
 }
 
