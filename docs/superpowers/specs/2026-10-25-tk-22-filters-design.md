@@ -1,6 +1,6 @@
 # TK-22 — Search filters and embedding fallback
 
-Status: proposed; awaiting user approval. No product implementation or implementation plan is approved by this document yet.
+Status: approved by the user on 2026-10-25 ("go on" after the specification approval request). The complete contract and five displayed builder choices are accepted. Preparation of the separate implementation plan is authorized; product implementation awaits plan approval.
 
 ## Intent and scope
 
@@ -45,9 +45,9 @@ A source revision selector, when present, is a complete valid Git tree OID under
 - Validate every requested revision before query inference and candidate-dependent exits, including empty query, empty corpus or selectors matching no sources. A valid-shaped missing tree rejects the whole request with `not_found`; malformed OID or wrong Git object type is `invalid_request`; Git corruption and operational failures remain safe typed errors. No partial results are returned. For multiple invalid roots, deterministic normalized order determines the reported error; no new error aggregation field.
 - CLI keeps strict object/type validation: null filter fields, wrong field shapes, unknown fields and malformed source addresses are invalid requests. Valid empty arrays stay accepted.
 
-## Builder choices proposed for approval
+## Accepted builder choices
 
-The following details are engineering defaults proposed here, not previous user decisions:
+The following engineering defaults were proposed explicitly and accepted with this specification; they were not represented as earlier project decisions:
 
 1. Source selectors use the existing `SourceUri` parser and exact canonical identity. A whole-file address and a line-range address are different sources; there is no implicit path prefix, glob or range containment. Local paths normalize as TK-20; HTTP/HTTPS preserves its opaque spelling, query and fragment. A valid remote address can satisfy the source-address filter without fetching it.
 2. Reuse the existing SearchService rather than add a general filter engine. Add a typed filter value to SearchRequest and small cohesive private helpers. Deduplicate inputs into ordered collections; the implementation plan chooses concrete type/file details without a new public JSON shape.
@@ -100,4 +100,4 @@ Record actual changed revision, commands, counts, platform and limits in docs/zk
 
 ## Approval boundary
 
-This document proposes the complete TK-22 behavior and the five builder choices above. Independent builder check on 2026-10-25 returned “nothing important left”; no open builder questions. Product implementation waits for specification approval and then approval of the separate Superpowers implementation plan.
+The user approved the complete TK-22 behavior and the five builder choices above on 2026-10-25. Independent builder check returned “nothing important left”; no open builder questions. Product implementation waits for approval of the separate Superpowers implementation plan.
