@@ -1,6 +1,6 @@
 # TK-22 — verified search filters and fallback
 
-Implementation verified on 2026-10-25. Task 1–3 reviews passed, including Task 3 scoped evidence re-review. The final whole-branch review at `f099224` found no product or architecture defects and returned **With fixes** solely for the metadata inconsistency reconciled in this update; a scoped re-review of this metadata update remains pending. This is an implementation acceptance receipt, not completion of deferred TK-28 UI or system gates.
+Implementation verified on 2026-10-25. Task 1–3 reviews passed, including Task 3 scoped evidence re-review. The final whole-branch review at `f099224` found no product or architecture defects and returned **With fixes** solely for the metadata inconsistency reconciled in this update; scoped metadata re-review of commit `7ce1753` is complete: the finding is addressed and no new breakage was found. This is an implementation acceptance receipt, not completion of deferred TK-28 UI or system gates.
 
 ## Captured revision and commands
 
@@ -60,4 +60,4 @@ Reviewed the actual branch's `service/search_filters.rs`, `service/mod.rs`, `ser
 
 ## Limits and handoff
 
-TK-28 owns status/problems presentation; this task proves the existing storage/executor lifecycle directly. No native storage runner was required because schema/storage/build/vendored/native inputs were unchanged. No fresh Linux run, historical isolated proof harness, real deadline, paid model, large-corpus or pilot/resource/G-1/G-2 certification is claimed. Existing historical evidence stays attached to its captured revision. All implementation-task reviews passed. The whole-branch review had one P3 metadata finding and no product/architecture findings; the actual verdict was **With fixes**, addressed by this documentation update. Scoped re-review of the metadata update remains pending. Merge/push/issues were not performed.
+TK-28 owns status/problems presentation; this task proves the existing storage/executor lifecycle directly. No native storage runner was required because schema/storage/build/vendored/native inputs were unchanged. No fresh Linux run, historical isolated proof harness, real deadline, paid model, large-corpus or pilot/resource/G-1/G-2 certification is claimed. Existing historical evidence stays attached to its captured revision. All implementation-task reviews passed. The whole-branch review had one P3 metadata finding and no product/architecture findings; the actual verdict was **With fixes**, addressed by this documentation update. Scoped metadata re-review of commit `7ce1753` is complete: the finding is addressed and no new breakage was found. Merge/push/issues were not performed.

@@ -1,5 +1,5 @@
 {
-  "status": "implementation verified; Task 1-3 reviews passed; whole-branch review found no product/architecture defects and returned With fixes solely for metadata inconsistency; scoped metadata re-review pending",
+  "status": "implementation accepted; all task reviews completed; final metadata finding addressed by scoped re-review at7ce1753",
   "product_revision": "bee627e19956da317fa45961ab6d4321eb0741d4",
   "tested_worktree_parent": "1826241a18d17c2e63b0ec049a82e4e9a8133571",
   "upstream_reviewed_product": "6076fda1917b586642a1c8b72e9fa9b9beef7e38",
@@ -841,6 +841,11 @@
         "sha256": "aa3b6334d0a8db46a092d0138f092f9c8886fc5892a892b614a7a4302ee03b9b"
       }
     ],
-    "scoped_metadata_rereview": "pending after this documentation commit; no future result recorded"
+    "scoped_metadata_rereview": {
+      "reviewed_commit": "7ce1753f4e6c6e75e4c465d325091a13128319cc",
+      "path": ".superpowers/sdd/2026-10-25-tk-22-filters/final-rereview.md",
+      "sha256": "f3402f9ec305fc721d0eb787456d137263ca54971c18bef19170613d7b49dac8",
+      "verdict": "P3 ADDRESSED; no new breakage or out-of-scope observations"
+    }
   }
 }
