@@ -1,6 +1,6 @@
 # TK-22 — verified search filters and fallback
 
-Implementation verified on 2026-10-25; independent Task 3 review and the final whole-branch review are pending. This is an implementation acceptance receipt, not completion of the deferred TK-28 UI or system gates.
+Implementation verified on 2026-10-25. Task 1–3 reviews passed, including Task 3 scoped evidence re-review. The final whole-branch review at `f099224` found no product or architecture defects and returned **With fixes** solely for the metadata inconsistency reconciled in this update; a scoped re-review of this metadata update remains pending. This is an implementation acceptance receipt, not completion of deferred TK-28 UI or system gates.
 
 ## Captured revision and commands
 
@@ -36,6 +36,10 @@ Fresh evidence lives under `.artifacts/tk22/task3/`: `final-verify.log`, `final-
 
 All five approved Review Focus cases are covered: missing selector cannot be hidden by OR/empty-query/unmatched-source shortcuts (item 5); equal addresses use each note's basis (item 4); one retained observation drives filtering/rendering (item 7); same-config failure→actual success clears query_error (item 8); excluded corrupt/nonfinite metric remains an integrity error (`excluded_nonfinite_metrics_remain_integrity_errors`).
 
+## Accepted execution adjustments
+
+The plan-scoped ledger records six accepted adjustments, in order: (1) Task 1 used a temporary narrow `#[expect(dead_code)]` on `SearchFilters::matches_flags` until Task 2 consumed it, costing one temporary lint exception that was removed; (2) Task 2 used a private borrowed `SearchEligibility` context because the storage GAT guard conflicts with a whole-`&self` borrow, costing one private context/helper-signature deviation with no public or runtime change; (3) Task 2 updated an obsolete unavailable-filter scenario in `tests/cli_reading.rs`, costing one extra test file; (4) Task 2 replaced an obsolete valid-filter row in `tests/cli_runtime.rs` with malformed input, costing a second extra test file; (5) Task 3 added two production-path error-propagation controls after initial controls were classified as fixture sensitivity, costing two focused mutation/restoration cycles and receipt updates; (6) the plan-specific ignored review workspace was retained to preserve historical evidence, costing local disk space.
+
 ## Runtime controls and restoration
 
 - Omitting `clear_query_error` in `service/embedding.rs` failed the same-identity sequence at the successful-query cleared-row assertion (exit 101), after actual successful semantic inference. Exact source bytes restored; target passed.
@@ -56,4 +60,4 @@ Reviewed the actual branch's `service/search_filters.rs`, `service/mod.rs`, `ser
 
 ## Limits and handoff
 
-TK-28 owns status/problems presentation; this task proves the existing storage/executor lifecycle directly. No native storage runner was required because schema/storage/build/vendored/native inputs were unchanged. No fresh Linux run, historical isolated proof harness, real deadline, paid model, large-corpus or pilot/resource/G-1/G-2 certification is claimed. Existing historical evidence stays attached to its captured revision. Independent Task 3 and whole-branch reviews must still resolve any findings before final acceptance/integration; merge/push/issues were not performed.
+TK-28 owns status/problems presentation; this task proves the existing storage/executor lifecycle directly. No native storage runner was required because schema/storage/build/vendored/native inputs were unchanged. No fresh Linux run, historical isolated proof harness, real deadline, paid model, large-corpus or pilot/resource/G-1/G-2 certification is claimed. Existing historical evidence stays attached to its captured revision. All implementation-task reviews passed. The whole-branch review had one P3 metadata finding and no product/architecture findings; the actual verdict was **With fixes**, addressed by this documentation update. Scoped re-review of the metadata update remains pending. Merge/push/issues were not performed.

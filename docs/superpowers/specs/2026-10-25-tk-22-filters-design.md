@@ -1,6 +1,6 @@
 # TK-22 — Search filters and embedding fallback
 
-Status: approved by the user on 2026-10-25 ("go on" after the specification approval request); implementation and its approved plan have been executed. [Acceptance receipt](../../zkit/letopis/checks/TK-22/report.md): product verified, independent Task 3 and whole-branch reviews pending. The complete contract and five builder choices remain accepted. TK-28 presentation and deferred gates remain outside this acceptance.
+Status: approved by the user on 2026-10-25 ("go on" after the specification approval request); implementation and its approved plan have been executed. [Acceptance receipt](../../zkit/letopis/checks/TK-22/report.md): product verified; Task 3 review and scoped evidence re-review accepted; the whole-branch review found no product or architecture defects and returned With fixes solely for the metadata inconsistency now reconciled here. A scoped re-review of this metadata update remains pending. The complete contract and five builder choices remain accepted. TK-28 presentation and deferred gates remain outside this acceptance.
 
 ## Intent and scope
 
@@ -100,4 +100,4 @@ Record actual changed revision, commands, counts, platform and limits in docs/zk
 
 ## Approval boundary
 
-The user approved the complete TK-22 behavior and the five builder choices above on 2026-10-25. Independent builder check returned “nothing important left”; no open builder questions. The separate Superpowers implementation plan was subsequently approved and executed. Product verification is recorded in the acceptance receipt above; independent Task 3 and whole-branch reviews remain pending.
+The user approved the complete TK-22 behavior and the five builder choices above on 2026-10-25. Independent builder check returned “nothing important left”; no open builder questions. The separate Superpowers implementation plan was subsequently approved and executed. Product verification and review outcomes are recorded in the acceptance receipt above; all three implementation task reviews passed, and the whole-branch review found no product or architecture defects. Its actual verdict was With fixes for the metadata inconsistency reconciled here; scoped re-review of this metadata update remains pending.

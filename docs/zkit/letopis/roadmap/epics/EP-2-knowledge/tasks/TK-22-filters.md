@@ -1,6 +1,6 @@
 # TK-22 — Завершить поисковые filters и fallback
 
-> **Статус:** implementation verified; independent task/final reviews pending
+> **Статус:** done — implementation verified; Task 1–3 reviews passed; whole-branch review found no product/architecture defects. Its actual verdict was With fixes solely for the metadata inconsistency reconciled here; scoped re-review of this update remains pending.
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
@@ -78,5 +78,5 @@ Late error/read cleanup и concurrent publication подтверждены contr
 mutations с точным восстановлением. `make verify V=1`: debug/release по
 620 passed, 0 failed, 5 ignored; strict Rustdoc/Clippy прошли.
 Архитектурная self-review и все 10 spec items/5 Review Focus cases перечислены в отчёте.
-Независимые task/final reviews ожидаются, поэтому статус ещё не done. TK-28 UI,
+Task 1 и Task 2 reviews прошли; Task 3 review и scoped evidence re-review прошли. Whole-branch review на `f099224` не нашёл product/architecture defects и вынес фактический verdict **With fixes** только из-за несогласованного metadata, исправленного здесь. Scoped re-review этого metadata update ещё ожидается. Task завершён; это не закрывает scoped re-review. TK-28 UI,
 Linux/native harness rerun, реальные providers/deadlines, corpus/pilot/resource/gates не заявляются.
