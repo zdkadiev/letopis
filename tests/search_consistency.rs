@@ -258,10 +258,13 @@ fn live_confinement_error_releases_read_before_subsequent_reset() {
 }
 
 #[test]
-fn metadata_storage_error_releases_search_read_and_allows_new_publication() {
+fn corrupt_refresh_metadata_releases_read_before_inference_and_allows_new_publication() {
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
-    let (server, barrier) = start_paused("ollama");
+    let server = HttpFixture::start(FixtureReply::Status {
+        status: 200,
+        body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
+    });
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     wire_document_refresher(repo.get_root())
         .unwrap()
@@ -272,13 +275,16 @@ fn metadata_storage_error_releases_search_read_and_allows_new_publication() {
     connection
         .execute("UPDATE nodes SET created_at = -1 WHERE id = ?1", ["a.md"])
         .unwrap();
-    let worker = PausedSearch::spawn(repo.get_root(), barrier.clone());
-    barrier.wait_until_entered();
-    barrier.release();
-    assert_eq!(
-        worker.join().unwrap_err().get_kind(),
-        CommandErrorKind::InternalError
-    );
+    // Refresh reads declared bases from this pinned metadata before inference.
+    let error = wire_searcher(repo.get_root())
+        .unwrap()
+        .search(&SearchRequest {
+            query: "sqlite".into(),
+            limit: NonZeroUsize::new(10).unwrap(),
+        })
+        .unwrap_err();
+    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+    assert!(server.take_requests().is_empty());
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
     assert!(
         repo.open_storage()

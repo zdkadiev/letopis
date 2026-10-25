@@ -23,9 +23,9 @@ use crate::service::{
     CommandResult, CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentRefresher,
     DocumentResult, EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
-    GraphDiagnostics, InspectionService, Inspector, ProvenanceService, Refresher,
-    SearchDependencies, SearchService, Searcher, SnapshotError, SnapshotVerifier, SourceProvenance,
-    SourceReader, SourceService, Storage, StorageResult,
+    GraphDiagnostics, InspectionService, Inspector, ProvenanceService, RefreshDependencies,
+    Refresher, SearchDependencies, SearchService, Searcher, SnapshotError, SnapshotVerifier,
+    SourceProvenance, SourceReader, SourceService, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -179,12 +179,23 @@ pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + 
                 cause,
             )
         })?;
-    Ok(DocumentRefresher::new(
+    let provenance = ProvenanceService::new(
+        GitCli::open(start).map_err(|cause| {
+            DocumentError::new_with_cause(
+                DocumentErrorKind::InternalError,
+                "cannot open provenance repository",
+                cause,
+            )
+        })?,
+        LocalFileSystem::open(git.get_root())?,
+    );
+    Ok(DocumentRefresher::new(RefreshDependencies {
         git,
         filesystem,
-        MarkdownParser::new(),
+        markdown: MarkdownParser::new(),
         storage,
-    ))
+        provenance,
+    }))
 }
 
 /// Wire the existing embedding executor with confined automatic repository storage.

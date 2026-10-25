@@ -27,7 +27,8 @@ mod storage;
 
 pub(crate) use background::BackgroundService;
 pub(crate) use check::CheckService;
-pub(crate) use document_refresher::DocumentRefresher;
+/// Cache refresh implementation and its caller-owned collaborator bundle.
+pub(crate) use document_refresher::{DocumentRefresher, RefreshDependencies};
 pub(crate) use embedding::EmbeddingService;
 pub(crate) use graph_diagnostics::CurrentGraphDiagnostics;
 pub(crate) use inspection::InspectionService;

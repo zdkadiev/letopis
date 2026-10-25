@@ -1,6 +1,7 @@
 use super::super::{
     CapturedFile, DocumentError, DocumentErrorKind, DocumentRefresher, DocumentResult, FileStat,
-    FileSystem, Refresher, SourceAvailability, SourceReader, Storage,
+    FileSystem, ProvenanceService, RefreshDependencies, Refresher, SourceAvailability,
+    SourceReader, Storage,
 };
 use super::SourceService;
 use crate::{
@@ -20,12 +21,17 @@ fn publish_remote_without_file_capture_and_group_local_ranges() {
     let recorded_reads = Rc::new(RefCell::new(Vec::new()));
     let filesystem = RecordedFiles::new(repo.path(), recorded_reads.clone());
     let storage = open_storage(repo.path());
-    let mut refresher = DocumentRefresher::new(
+    let provenance = ProvenanceService::new(
         GitCli::open(repo.path()).unwrap(),
-        filesystem,
-        MarkdownParser::new(),
-        storage,
+        RecordedFiles::new(repo.path(), recorded_reads.clone()),
     );
+    let mut refresher = DocumentRefresher::new(RefreshDependencies {
+        git: GitCli::open(repo.path()).unwrap(),
+        filesystem,
+        markdown: MarkdownParser::new(),
+        storage,
+        provenance,
+    });
 
     refresher.refresh().unwrap();
 
@@ -35,7 +41,8 @@ fn publish_remote_without_file_capture_and_group_local_ranges() {
             .iter()
             .filter(|path| path.as_str() == "source.txt")
             .count(),
-        1
+        // Preflight observes both local bindings; projection groups their final capture.
+        3
     );
     assert!(
         reads

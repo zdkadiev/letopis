@@ -1,23 +1,46 @@
 use super::{
-    CacheWrite, CorpusLister, DocumentError, DocumentErrorKind, DocumentResult, FileRow, FileStat,
-    FileSystem, MarkdownCodec, RefreshOutcome, Refresher, Storage, StorageRead,
+    BasisRetainer, CacheWrite, CorpusLister, DocumentError, DocumentErrorKind, DocumentResult,
+    FileRow, FileStat, FileSystem, MarkdownCodec, NodeMetadata, RefreshOutcome, Refresher,
+    SourceProvenance, Storage, StorageRead,
     projection::{
         EffectiveGraph, FileProjection, PreparedProjection, prepare_file, prepare_removal, publish,
     },
 };
-use crate::domain::{RepoPath, Sha256};
+use crate::domain::{RepoPath, Sha256, TreeOid};
+use basis::{BasisPreparation, prepare_basis};
+
 use std::collections::{BTreeMap, BTreeSet};
+
+mod basis;
 
 const RACY_WINDOW_NS: i64 = 1_000_000_000;
 
-pub(crate) struct DocumentRefresher<G, F, M, S> {
+/// Collaborators used to refresh and retain the effective document projection.
+#[derive(Debug)]
+pub(crate) struct RefreshDependencies<G, F, M, S, P> {
+    /// Lists the current corpus candidates.
+    pub(crate) git: G,
+    /// Captures documents and owns the index exclusion lock.
+    pub(crate) filesystem: F,
+    /// Parses canonical document metadata and source bindings.
+    pub(crate) markdown: M,
+    /// Reads the current projection and publishes cache changes atomically.
+    pub(crate) storage: S,
+    /// Observes source bindings and retains author-declared roots.
+    pub(crate) provenance: P,
+}
+
+#[derive(Debug)]
+pub(crate) struct DocumentRefresher<G, F, M, S, P> {
     git: G,
     filesystem: F,
     markdown: M,
     storage: S,
+    provenance: P,
 }
 struct FileState {
     revision: u64,
+    source_snapshots: BTreeSet<TreeOid>,
     files: BTreeMap<RepoPath, FileRow>,
 }
 pub(super) struct Observation {
@@ -34,21 +57,78 @@ impl Delta {
         self.updated.is_empty() && self.removed.is_empty()
     }
 }
-impl<G, F, M, S> DocumentRefresher<G, F, M, S> {
-    pub(crate) fn new(git: G, filesystem: F, markdown: M, storage: S) -> Self {
+impl<G, F, M, S, P> DocumentRefresher<G, F, M, S, P> {
+    /// Assemble the refresh collaborators without reading or publishing state.
+    pub(crate) fn new(dependencies: RefreshDependencies<G, F, M, S, P>) -> Self {
+        let RefreshDependencies {
+            git,
+            filesystem,
+            markdown,
+            storage,
+            provenance,
+        } = dependencies;
         Self {
             git,
             filesystem,
             markdown,
             storage,
+            provenance,
         }
     }
 }
-impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, S: Storage> DocumentRefresher<G, F, M, S> {
+impl<
+    G: CorpusLister,
+    F: FileSystem,
+    M: MarkdownCodec,
+    S: Storage,
+    P: SourceProvenance + BasisRetainer,
+> Refresher for DocumentRefresher<G, F, M, S, P>
+{
+    fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
+        let preliminary = self.read_file_state()?;
+        if self.detect_changes(&preliminary)?.is_empty()
+            && preliminary.revision != 0
+            && preliminary.source_snapshots.is_empty()
+        {
+            return Ok(build_outcome(preliminary.revision, false));
+        }
+        #[cfg(test)]
+        reach_checkpoint("detected");
+        drop(preliminary);
+        let _lock = self.filesystem.lock_index()?;
+        #[cfg(test)]
+        reach_checkpoint("locked");
+        let state = self.read_file_state()?;
+        let delta = self.detect_changes(&state)?;
+        #[cfg(test)]
+        reach_checkpoint("redetected");
+        if delta.is_empty() && state.revision != 0 {
+            self.provenance.retain_snapshots(&state.source_snapshots)?;
+            return Ok(build_outcome(state.revision, false));
+        }
+        self.publish_changes(&state, delta)
+    }
+}
+impl<
+    G: CorpusLister,
+    F: FileSystem,
+    M: MarkdownCodec,
+    S: Storage,
+    P: SourceProvenance + BasisRetainer,
+> DocumentRefresher<G, F, M, S, P>
+{
     fn read_file_state(&mut self) -> DocumentResult<FileState> {
         let mut read = self.storage.begin_read()?;
         Ok(FileState {
             revision: read.get_revision(),
+            source_snapshots: read
+                .list_nodes()?
+                .into_iter()
+                .filter_map(|node| match node.metadata {
+                    NodeMetadata::Knowledge(knowledge) => knowledge.source_snapshot,
+                    NodeMetadata::Source(_) => None,
+                })
+                .collect(),
             files: read
                 .list_files()?
                 .into_iter()
@@ -90,14 +170,7 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, S: Storage> DocumentRefre
         state: &FileState,
         delta: Delta,
     ) -> DocumentResult<RefreshOutcome> {
-        // Keep only metadata after releasing this pinned read, before BEGIN IMMEDIATE.
-        let mut graph = {
-            let mut read = self.storage.begin_read()?;
-            if read.get_revision() != state.revision {
-                return Err(fail_changed());
-            }
-            EffectiveGraph::read(&mut read)?
-        };
+        let mut graph = self.prepare_publication(state, &delta)?;
         let mut unit = self.storage.begin_cache_write()?;
         #[cfg(test)]
         reach_checkpoint("begun");
@@ -133,29 +206,31 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, S: Storage> DocumentRefre
         reach_checkpoint("after_commit");
         Ok(outcome)
     }
-}
-impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, S: Storage> Refresher
-    for DocumentRefresher<G, F, M, S>
-{
-    fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
-        let preliminary = self.read_file_state()?;
-        if self.detect_changes(&preliminary)?.is_empty() && preliminary.revision != 0 {
-            return Ok(build_outcome(preliminary.revision, false));
-        }
-        #[cfg(test)]
-        reach_checkpoint("detected");
-        drop(preliminary);
-        let _lock = self.filesystem.lock_index()?;
-        #[cfg(test)]
-        reach_checkpoint("locked");
-        let state = self.read_file_state()?;
-        let delta = self.detect_changes(&state)?;
-        #[cfg(test)]
-        reach_checkpoint("redetected");
-        if delta.is_empty() && state.revision != 0 {
-            return Ok(build_outcome(state.revision, false));
-        }
-        self.publish_changes(&state, delta)
+
+    fn prepare_publication(
+        &mut self,
+        state: &FileState,
+        delta: &Delta,
+    ) -> DocumentResult<EffectiveGraph> {
+        // Keep only metadata after releasing this pinned read, before BEGIN IMMEDIATE.
+        let graph = {
+            let mut read = self.storage.begin_read()?;
+            if read.get_revision() != state.revision {
+                return Err(fail_changed());
+            }
+            EffectiveGraph::read(&mut read)?
+        };
+        let basis = prepare_basis(
+            &self.filesystem,
+            &self.markdown,
+            BasisPreparation {
+                graph: &graph,
+                updated: &delta.updated,
+                previous: &state.files,
+            },
+        )?;
+        basis.validate_basis(&self.provenance)?;
+        Ok(graph)
     }
 }
 
