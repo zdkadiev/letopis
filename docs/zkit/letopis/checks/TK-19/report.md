@@ -1,7 +1,7 @@
 # TK-19: production check and lifecycle acceptance
 
 Date: 2026-10-25. Implementation and macOS host acceptance PASS.
-Whole-branch review: **no implementation findings; M1 clarified; scoped re-review pending**.
+Whole-branch review: **Approved within accepted scope; M1 ADDRESSED; no open findings**.
 No Critical or Important findings were reported. The combined
 check/status task stays `in_progress`: status belongs to TK-28, traversal to TK-23.
 
@@ -130,8 +130,8 @@ single cancelled JSON/exit-1 guarantee remain TK-29. The current runtime install
 no SIGINT handler and uses the default process signal behavior: SIGINT terminates
 the foreground process, without a cancelled-JSON or exit-1 guarantee. Cancellation
 handling was not tested in this acceptance. Whole-branch review found no
-implementation findings; M1 clarified this scope, and its scoped re-review and
-Engram recording remain controller-owned and pending.
+implementation findings; M1 clarified this scope; scoped re-review confirmed it ADDRESSED with no new
+findings. Engram recording completed at revision 259.
 No merge, push, publication or GitHub update was performed.
 
 ## Whole-branch review and M1 documentation correction
@@ -144,12 +144,12 @@ documentation correction distinguishes delivered invalid-input/infrastructure
 responses from deferred handled SIGINT. The existing default signal behavior
 does not guarantee a cancelled JSON or exit 1; TK-29 owns that work.
 
-M1 clarified; scoped re-review pending. The 269 verified product/test/build input
+M1 clarified; scoped re-review Approved, M1 ADDRESSED. The 269 verified product/test/build input
 hashes and their canonical digest remain unchanged. Validation covers affected
 relative links, receipt JSON and `git diff --check`. Product suites were not rerun:
 this correction changes no product or test input, and the final reviewer explicitly
 requires only bounded review of the documentation. Historical execution evidence
-and the prior integrated verification remain unchanged. Engram is still pending.
+and the prior integrated verification remain unchanged. Engram recording completed at revision 259; main/GitHub integration is not performed.
 
 Documentation validation: `python3 -B .artifacts/tk19/task3/m1-docs/validate_docs.py`
 PASS (16 relative link targets, all 269 hashes equal to the accepted checkpoint,
@@ -157,3 +157,21 @@ unchanged canonical digest); `python3 -B -m json.tool
 docs/zkit/letopis/checks/TK-19/verification.json` PASS; `git diff --check` PASS.
 New private validation output: `.artifacts/tk19/task3/m1-docs/validation.log` and
 `validation.json`. These checks do not rerun or replace the historical product suites.
+
+
+## Final administrative closure
+
+2026-10-25: all three task reviews Approved. Final whole-branch review found no
+Critical/Important or implementation issue; its sole Minor M1 was clarified in
+cc95d1250433f6e2281c6481d5d3bf430ce360ff, and independent scoped re-review marked
+M1 ADDRESSED with no new findings. Private review records remain in the retained
+SDD workspace. Shared Engram revision 259 records the implementation and evidence.
+
+Executor decisions: retain private verification/SDD evidence (local disk cost);
+update the current CLI runner expectation for working check (small extra runner
+maintenance, historical evidence unchanged); retain handled SIGINT ownership in
+TK-29 (current CLI has no handled-cancellation JSON/exit-1 guarantee).
+
+Accepted TK-19 check implementation is complete. Combined check/status task
+criteria remain pending status TK-28; traversal TK-23, source provenance TK-21,
+handled cancellation TK-29 and platform/pilot gates are not accepted by this work.

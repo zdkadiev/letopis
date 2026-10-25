@@ -1,7 +1,7 @@
 {
   "task": "TK-19",
   "date": "2026-10-25",
-  "status": "implementation_and_host_acceptance_pass; whole_branch_review_no_implementation_findings; M1_clarified; scoped_re_review_pending",
+  "status": "accepted_TK19_check_scope_implementation_and_host_acceptance_pass; task_and_final_reviews_approved; combined_status_criterion_pending_TK28",
   "workspace": "/Users/zdkadiev/.codex/worktrees/tk-19/letopis",
   "branch": "tk-19",
   "source": {
@@ -600,7 +600,7 @@
     "cases": 7
   },
   "architectural_self_review": "pass; no Task3 product source changes; reviewed actual service/traits/Git/CLI/lib constructors and synchronous ownership",
-  "independent_final_review": "whole-branch review no implementation findings; M1 clarified; scoped re-review pending",
+  "independent_final_review": "whole-branch review no Critical/Important or implementation findings; sole Minor M1 addressed in cc95d1250433f6e2281c6481d5d3bf430ce360ff; scoped re-review Approved with no new findings",
   "scope_limits": [
     "macOS arm64 only",
     "Linux/native storage runner not rerun: no storage/build/vendor/dependency edits",
@@ -907,5 +907,26 @@
     "git_diff_check_exit": 0,
     "product_suites_rerun": false,
     "scoped_re_review": "pending controller"
-  }
+  },
+  "engram": {
+    "recorded_revision": 259,
+    "scope": "shared existing project store; implementation/evidence/commits/limits recorded; no new store"
+  },
+  "executor_decisions": [
+    {
+      "decision": "Retain ignored SDD workspace and evidence",
+      "reason": "Preserve verification evidence",
+      "cost_if_wrong": "Extra local disk use"
+    },
+    {
+      "decision": "Maintain current CLI runner valid-check expectation",
+      "reason": "Production check supersedes unavailable behavior",
+      "cost_if_wrong": "Small additional runner maintenance"
+    },
+    {
+      "decision": "Handled SIGINT remains TK29",
+      "reason": "Later-approved plan and task ownership defer implementation; current runtime has no handler",
+      "cost_if_wrong": "No cancelled JSON/exit1 guarantee until TK29"
+    }
+  ]
 }
