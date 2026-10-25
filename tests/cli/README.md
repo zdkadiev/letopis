@@ -155,3 +155,21 @@ separate writer/reader sessions are retained alongside the acceptance evidence.
 Prepare Python 3.11+ and `jsonschema==4.26.0` before running these checks. Use
 new evidence directories. The runner includes `make verify`; do not repeat it
 on an unchanged accepted tree just to obtain a second identical log.
+
+## TK-20 source-service handoff
+
+The 2026-10-25 [approved source contract](../../docs/superpowers/specs/2026-10-25-tk-20-source-identity-design.md)
+is implemented through `SourceReader` with the caller's pinned `StorageRead`.
+HTTP/HTTPS identities preserve original spelling/query/fragment and return unknown,
+unfetched bytes without network or local-file reads. Missing local bytes return
+`hash=None` and `SourceNotFound`; storage/unsafe-read failures remain typed errors.
+Source CLI inspect remains TK-24; historical comparisons remain TK-21. No new CLI
+fields or source flags are exposed here. Existing `check` refresh can reconstruct
+the cache; CLI `reindex` is still pending.
+
+Existing caches require the explicit, quiescent cache-only rebuild described in
+[development guidance](../../docs/development.md#tk-20-явная-пересборка-кэша-при-обновлении).
+This upgrade preserves canonical files, vectors, configuration and lock files.
+Focused proofs: `tests/source_addresses.rs`, `tests/source_projection.rs`,
+`tests/source_reading.rs`, `tests/source_lifecycle.rs`, and `tests/test_source_contract.py`.
+Their service acceptance does not establish later CLI consumer behavior or G-1/G-2.

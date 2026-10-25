@@ -122,4 +122,14 @@ The builder chooses exact trait/method/type names, whether to split the existing
 
 A fresh reviewer (`/root/tk20_builder_check`) found one material question: whether old cached URL identities require automatic repair or an explicit rebuild. The user answered on 2026-10-25: explicit cache rebuild on upgrade. The upgrade section records that answer. The reviewer found no other material planning questions; its service/CLI boundary and unfetched remote-state checks were clear.
 
-Private review receipt: `.artifacts/tk20/start/builder-check.md`. The user approved the full document on 2026-10-25 and requested the implementation plan. Product implementation awaits plan review and execution-method selection.
+Private review receipt: `.artifacts/tk20/start/builder-check.md`. The user approved the full document on 2026-10-25 and requested the implementation plan. The user subsequently approved the plan and explicitly selected subagent-driven implementation on 2026-10-25.
+
+## Delivery status — 2026-10-25
+
+Tasks 1/2 are implemented and independently reviewed (`71ff596`, `838c316`).
+Task 3 lifecycle/rebuild/legacy-upgrade proofs and upgrade guidance are prepared;
+its independent task review, whole-branch review and shared-memory handoff are
+pending. The [current task report](../../zkit/letopis/checks/TK-20/report.md) and
+[verification receipt](../../zkit/letopis/checks/TK-20/verification.json) distinguish
+service-level acceptance from later CLI consumers and unassessed G-1/G-2.
+Accepted behavior above is unchanged. The task card remains in_progress.

@@ -2,6 +2,28 @@
 > x-boundary: I-4 · x-direction: internal · x-status: draft
 > x-serves: FR-17, FR-18, FR-19, FR-20, FR-23, FR-24 · x-limits: []
 
+## Реализованная граница TK-20 — 2026-10-25
+
+[Утверждённая спецификация](../../../superpowers/specs/2026-10-25-tk-20-source-identity-design.md):
+`SourceReader::read_source(&mut StorageRead, &SourceUri)` возвращает
+`Result<Option<SourceObservation>, DocumentError>`. Caller владеет уже открытым
+pinned read view и refresh. Reader не открывает БД, не публикует и не обновляет граф.
+Отсутствующий source или knowledge по этому адресу даёт `None` до I/O.
+Локальный source наблюдается через confined FileSystem: точные bytes файла либо
+включительного диапазона, без UTF-8/EOL преобразования. Результат содержит только
+метаданные и `Available` либо `SourceNotFound`; недоступный файл/полный диапазон
+имеет `hash=None`, unsafe/I/O/storage failures остаются типизированной ошибкой.
+
+HTTP/HTTPS — непрозрачный исходный адрес с query/fragment: `hash=None`, `lines=None`,
+`Unfetched`, без filesystem/network I/O. Это неизвестные bytes, не утверждение 404.
+`SourceNotFound` — типизированная причина для будущих CLI consumers; новых публичных
+полей/flags TK-20 не добавляет. Live bytes наблюдаются заново при следующем чтении,
+а принадлежность и `created_at` берутся из pinned view. Source text не возвращается
+и не хранится. Старые кэши требуют [явной пересборки](../../../development.md#tk-20-явная-пересборка-кэша-при-обновлении).
+
+Следующий Layout задаёт целевой исторический контракт: `validate_basis`, `observe`,
+`source_changed` и сравнение Git bytes остаются TK-21; TK-20 их реализацию не заявляет.
+
 ## Layout
 
 ```text
