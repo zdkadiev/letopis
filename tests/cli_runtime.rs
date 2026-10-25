@@ -36,15 +36,15 @@ fn malformed_requests_fail_before_service_directory_creation() {
     }
 }
 #[test]
-fn nested_invalid_and_unsupported_requests_do_not_initialize_repository_or_child() {
+fn nested_invalid_requests_do_not_initialize_repository_or_child() {
     let root = make_repository();
     let nested = root.path().join("nested");
     fs::create_dir(&nested).unwrap();
     for (args, input, code) in [
         (
             vec!["search"],
-            r#"{"query":"x","limit":1,"filters":{"needs_recheck":false}}"#,
-            "internal_error",
+            r#"{"query":"x","limit":1,"filters":{"needs_recheck":null}}"#,
+            "invalid_request",
         ),
         (
             vec!["search"],

@@ -33,23 +33,36 @@ use support::{
 };
 
 #[test]
-fn unsupported_filters_fail_before_repository_initialization() {
+fn effective_filters_initialize_repository_for_search() {
     for filters in [
         json!({"needs_recheck":true}),
         json!({"needs_recheck":false}),
         json!({"sources":["src/x.rs"]}),
-        json!({"source_revisions":["a".repeat(40)]}),
     ] {
         let repo = ReadingRepo::new();
         let body = json!({"query":"x","limit":1,"filters":filters}).to_string();
-        let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 1);
-        assert_eq!(response["error"]["code"], "internal_error");
-        assert_eq!(
-            response["error"]["message"],
-            "operation unavailable in this build"
-        );
-        assert!(!repo.get_root().join(".letopis").exists());
+
+        let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 0);
+
+        assert_eq!(response, json!({"ok":true,"result":[]}));
+        assert!(repo.get_root().join(".letopis/cache.db").exists());
     }
+    let repo = ReadingRepo::new();
+    let tree = open_git_snapshots(repo.get_root())
+        .unwrap()
+        .create_tree(&[])
+        .unwrap();
+    let body =
+        json!({"query":"x","limit":1,"filters":{"source_revisions":[tree.as_str()]}}).to_string();
+
+    let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 0);
+
+    assert_eq!(response, json!({"ok":true,"result":[]}));
+    assert!(repo.get_root().join(".letopis/cache.db").exists());
+}
+
+#[test]
+fn malformed_filters_fail_before_repository_initialization() {
     for filters in [
         json!({"sources":null}),
         json!({"needs_recheck":null}),

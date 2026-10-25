@@ -1,6 +1,7 @@
-use crate::domain::{RepoPath, TreeOid};
+use crate::domain::{RepoPath, SourceUri, TreeOid};
 use crate::service::{
-    CommandError, CommandErrorKind, CommandResult, ElementAddress, SearchRequest,
+    CommandError, CommandErrorKind, CommandResult, ElementAddress, RecheckFilter, SearchFilters,
+    SearchRequest,
 };
 use serde::{
     Deserialize, Deserializer,
@@ -9,7 +10,7 @@ use serde::{
 use serde_json::value::RawValue;
 use std::{collections::BTreeSet, ffi::OsString, io::Read, num::NonZeroUsize};
 
-/// Typed command input after transport validation and unsupported-filter checks.
+/// Typed command input after transport validation.
 #[derive(Debug)]
 pub(crate) enum Request {
     Check(Vec<RepoPath>),
@@ -89,26 +90,41 @@ fn read_search(input: impl Read) -> CommandResult<SearchRequest> {
         .ok()
         .and_then(NonZeroUsize::new)
         .ok_or_else(fail_invalid_request)?;
-    if let Some(filters) = dto.filters {
-        for revision in &filters.source_revisions {
-            TreeOid::parse(revision).map_err(|_| fail_invalid_request())?;
-        }
-        if filters.needs_recheck.is_some()
-            || !filters.sources.is_empty()
-            || !filters.source_revisions.is_empty()
-        {
-            return Err(CommandError::new(
-                CommandErrorKind::InternalError,
-                "operation unavailable in this build",
-            ));
-        }
-    }
+    let filters = dto
+        .filters
+        .as_ref()
+        .map(parse_filters)
+        .transpose()?
+        .unwrap_or_default();
     Ok(SearchRequest {
-        filters: Default::default(),
+        filters,
         query: dto.query,
         limit,
     })
 }
+fn parse_filters(input: &SearchFiltersInput) -> CommandResult<SearchFilters> {
+    let needs_recheck = match input.needs_recheck {
+        None => RecheckFilter::Any,
+        Some(true) => RecheckFilter::Required,
+        Some(false) => RecheckFilter::NotRequired,
+    };
+    let sources = input
+        .sources
+        .iter()
+        .map(|source| SourceUri::parse(source).map_err(|_| fail_invalid_request()))
+        .collect::<CommandResult<BTreeSet<_>>>()?;
+    let source_revisions = input
+        .source_revisions
+        .iter()
+        .map(|revision| TreeOid::parse(revision).map_err(|_| fail_invalid_request()))
+        .collect::<CommandResult<BTreeSet<_>>>()?;
+    Ok(SearchFilters {
+        needs_recheck,
+        sources,
+        source_revisions,
+    })
+}
+
 fn read_non_null_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
     D: Deserializer<'de>,

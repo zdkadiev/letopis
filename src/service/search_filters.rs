@@ -29,13 +29,6 @@ pub struct SearchFilters {
 
 impl SearchFilters {
     /// Return whether the observed flags satisfy the recheck restriction.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "Search eligibility uses this predicate in TK-22 Task 2."
-        )
-    )]
     pub(crate) fn matches_flags(&self, flags: &BTreeSet<SearchFlag>) -> bool {
         match self.needs_recheck {
             RecheckFilter::Any => true,

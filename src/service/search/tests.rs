@@ -1,6 +1,7 @@
 use super::{
-    build_fts_expression, calculate_rank_weight, capture_vector_config, find_vector_candidates,
-    rank_candidates, read_candidate_metadata,
+    build_fts_expression, capture_vector_config, find_vector_candidates,
+    ranking::{calculate_rank_weight, rank_candidates},
+    read_candidate_metadata,
 };
 use crate::{
     domain::{ElementKind, KnowledgeId, LineRange, Sha256},
@@ -12,7 +13,7 @@ use crate::{
         VectorOutcome, VectorWrite,
     },
 };
-use std::num::NonZeroUsize;
+use std::{collections::BTreeSet, num::NonZeroUsize};
 struct FixedQuery(Option<EmbeddingResult<QueryEmbedding>>);
 
 #[test]
@@ -122,7 +123,7 @@ fn ranking_rejects_nonfinite_native_metrics() {
             (vec![], vec![make_vector_match("a.md", value)]),
         ] {
             assert_eq!(
-                rank_candidates(&fts, &vectors, NonZeroUsize::MIN)
+                rank_candidates(&fts, &vectors, &BTreeSet::new(), NonZeroUsize::MIN)
                     .unwrap_err()
                     .get_kind(),
                 CommandErrorKind::InternalError
@@ -365,11 +366,19 @@ fn seed_dimension<S: Storage>(storage: &mut S, config: &EmbeddingConfig, dimensi
     write.commit().unwrap();
 }
 fn rank_ids(fts: &[TextMatch], vectors: &[VectorMatch], limit: usize) -> Vec<String> {
-    rank_candidates(fts, vectors, NonZeroUsize::new(limit).unwrap())
-        .unwrap()
-        .iter()
-        .map(|id| id.as_str().to_owned())
-        .collect()
+    rank_candidates(
+        fts,
+        vectors,
+        &fts.iter()
+            .map(|hit| hit.id.clone())
+            .chain(vectors.iter().map(|hit| hit.id.clone()))
+            .collect(),
+        NonZeroUsize::new(limit).unwrap(),
+    )
+    .unwrap()
+    .iter()
+    .map(|id| id.as_str().to_owned())
+    .collect()
 }
 fn make_text_match(id: &str, bm25: f64) -> TextMatch {
     TextMatch {
@@ -387,3 +396,5 @@ fn make_vector_match(id: &str, distance: f64) -> VectorMatch {
 }
 
 mod scoped;
+
+mod filters;

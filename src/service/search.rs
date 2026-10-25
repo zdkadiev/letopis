@@ -1,15 +1,26 @@
 use super::{
     CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder, EmbeddingConfig,
     FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceRequest, QueryEmbedding,
-    QueryEmbeddingRequest, Refresher, SearchFlag, SearchLink, SearchRequest, Searcher,
-    SourceProvenance, Storage, StorageRead, TextMatch, VectorMatch, VectorOutcome,
+    QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag, SearchLink, SearchRequest,
+    Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance, SourceRevisionComparison,
+    SourceRevisionRequest, Storage, StorageRead, TextMatch, VectorMatch, VectorOutcome,
 };
-use crate::domain::{EdgeTarget, KnowledgeId, RepoPath};
+use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
     num::NonZeroUsize,
 };
+
+mod ranking;
+use ranking::{rank_candidates, validate_metrics};
+
+/// Borrow disjoint read-only boundaries while storage owns the pinned read view.
+struct SearchEligibility<'a, F, M, P> {
+    filesystem: &'a F,
+    markdown: &'a M,
+    provenance: &'a P,
+}
 
 /// Independently owned boundaries; inference cannot upgrade the search read into a write.
 #[derive(Debug)]
@@ -24,7 +35,7 @@ pub(crate) struct SearchDependencies<D, S, E, F, M, P> {
     pub(crate) filesystem: F,
     /// Shared whole-file knowledge codec.
     pub(crate) markdown: M,
-    /// Read-only observations of the ranked knowledge source bindings.
+    /// Read-only observations and comparisons of candidate source bindings.
     pub(crate) provenance: P,
 }
 /// Refreshes and ranks complete candidate channels from one scoped read.
@@ -55,6 +66,9 @@ impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec, P: 
 {
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
         self.refresher.refresh().map_err(map_search_error)?;
+        self.provenance
+            .validate_revisions(&request.filters.source_revisions)
+            .map_err(map_revision_error)?;
         let config = self
             .embeddings
             .read_configuration()
@@ -67,35 +81,111 @@ impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec, P: 
         let vectors =
             find_vector_candidates(&mut read, &mut self.embeddings, captured, &request.query)?;
         let fts = read.match_text(&expression).map_err(map_search_error)?;
+        validate_metrics(&fts, &vectors)?;
         let metadata = read_candidate_metadata(&mut read, &fts, &vectors)?;
-        let ranked = rank_candidates(&fts, &vectors, request.limit)?;
+        let eligibility = SearchEligibility {
+            filesystem: &self.filesystem,
+            markdown: &self.markdown,
+            provenance: &self.provenance,
+        };
+        let mut links = eligibility.read_eligible_links(&mut read, &metadata, &request.filters)?;
+        let eligible = links.keys().cloned().collect();
+        let ranked = rank_candidates(&fts, &vectors, &eligible, request.limit)?;
         ranked
             .into_iter()
-            .map(|id| {
-                let node = metadata.get(&id).ok_or_else(fail_invalid_search_data)?;
-                let sources = read
-                    .list_edges(Some(&id))
-                    .map_err(map_search_error)?
-                    .into_iter()
-                    .filter_map(|edge| match edge.get_target() {
-                        EdgeTarget::Source(source) => Some(source.clone()),
-                        EdgeTarget::Knowledge(_) => None,
-                    })
-                    .collect();
-                let observed = self
-                    .provenance
-                    .observe_sources(ProvenanceRequest {
-                        source_snapshot: node.source_snapshot.as_ref(),
-                        sources: &sources,
-                    })
-                    .map_err(map_search_error)?;
-                let mut link =
-                    build_link(node, read.get_revision(), &self.filesystem, &self.markdown)?;
-                link.flags.extend(observed.flags);
-                Ok(link)
-            })
+            .map(|id| links.remove(&id).ok_or_else(fail_invalid_search_data))
             .collect()
     }
+}
+
+impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_, F, M, P> {
+    fn read_eligible_links<R: StorageRead>(
+        &self,
+        read: &mut R,
+        metadata: &BTreeMap<KnowledgeId, KnowledgeMetadata>,
+        filters: &SearchFilters,
+    ) -> CommandResult<BTreeMap<KnowledgeId, SearchLink>> {
+        let mut links = BTreeMap::new();
+        for (id, node) in metadata {
+            let sources = read_source_bindings(read, id)?;
+            if !self.matches_sources(node, &sources, filters)? {
+                continue;
+            }
+            let mut link = build_link(node, read.get_revision(), self.filesystem, self.markdown)?;
+            let observed = self
+                .provenance
+                .observe_sources(ProvenanceRequest {
+                    source_snapshot: node.source_snapshot.as_ref(),
+                    sources: &sources,
+                })
+                .map_err(map_search_error)?;
+            link.flags.extend(observed.flags);
+            if filters.matches_flags(&link.flags) {
+                links.insert(id.clone(), link);
+            }
+        }
+        Ok(links)
+    }
+
+    fn matches_sources(
+        &self,
+        node: &KnowledgeMetadata,
+        sources: &BTreeSet<SourceUri>,
+        filters: &SearchFilters,
+    ) -> CommandResult<bool> {
+        if filters.sources.is_empty() && filters.source_revisions.is_empty() {
+            return Ok(true);
+        }
+        for source in sources {
+            if !filters.sources.is_empty() && !filters.sources.contains(source) {
+                continue;
+            }
+            if filters.source_revisions.is_empty() {
+                return Ok(true);
+            }
+            if self.matches_revision(node, source, filters)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn matches_revision(
+        &self,
+        node: &KnowledgeMetadata,
+        source: &SourceUri,
+        filters: &SearchFilters,
+    ) -> CommandResult<bool> {
+        for revision in &filters.source_revisions {
+            let comparison = self
+                .provenance
+                .compare_revision(SourceRevisionRequest {
+                    source_snapshot: node.source_snapshot.as_ref(),
+                    source,
+                    revision,
+                })
+                .map_err(map_revision_error)?;
+            if comparison == SourceRevisionComparison::Equal {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}
+
+fn read_source_bindings<R: StorageRead>(
+    read: &mut R,
+    id: &KnowledgeId,
+) -> CommandResult<BTreeSet<SourceUri>> {
+    Ok(read
+        .list_edges(Some(id))
+        .map_err(map_search_error)?
+        .into_iter()
+        .filter_map(|edge| match edge.get_target() {
+            EdgeTarget::Source(source) => Some(source.clone()),
+            EdgeTarget::Knowledge(_) => None,
+        })
+        .collect())
 }
 
 fn capture_vector_config<'a, R: StorageRead>(
@@ -210,62 +300,6 @@ fn read_knowledge<R: StorageRead>(
     Ok((stored.row_id, node))
 }
 
-fn rank_candidates(
-    fts: &[TextMatch],
-    vectors: &[VectorMatch],
-    limit: NonZeroUsize,
-) -> CommandResult<Vec<KnowledgeId>> {
-    let text_ranks = rank_channel(fts.iter().map(|hit| (&hit.id, hit.bm25)).collect())?;
-    let vector_ranks = rank_channel(vectors.iter().map(|hit| (&hit.id, hit.distance)).collect())?;
-    let mut scores = BTreeMap::new();
-    for (id, weight) in text_ranks.into_iter().chain(vector_ranks) {
-        let score = scores.entry(id.clone()).or_insert(0.0);
-        *score += weight;
-        if !score.is_finite() {
-            return Err(fail_invalid_search_data());
-        }
-    }
-    let mut ranked: Vec<_> = scores.into_iter().collect();
-    ranked.sort_by(|(left_id, left), (right_id, right)| {
-        right.total_cmp(left).then_with(|| left_id.cmp(right_id))
-    });
-    Ok(ranked
-        .into_iter()
-        .take(limit.get())
-        .map(|(id, _)| id)
-        .collect())
-}
-
-fn rank_channel(mut channel: Vec<(&KnowledgeId, f64)>) -> CommandResult<Vec<(&KnowledgeId, f64)>> {
-    if channel.iter().any(|(_, metric)| !metric.is_finite()) {
-        return Err(fail_invalid_search_data());
-    }
-    channel.sort_by(|(left_id, left), (right_id, right)| {
-        // Signed zeros are equal metrics and therefore use the same identity tie-break.
-        if left == right {
-            left_id.cmp(right_id)
-        } else {
-            left.total_cmp(right)
-        }
-    });
-    let mut seen = BTreeSet::new();
-    channel.retain(|(id, _)| seen.insert(*id));
-    for (index, (_, weight)) in channel.iter_mut().enumerate() {
-        let rank = index
-            .checked_add(1)
-            .and_then(NonZeroUsize::new)
-            .ok_or_else(fail_invalid_search_data)?;
-        *weight = calculate_rank_weight(rank)?;
-    }
-    Ok(channel)
-}
-
-/// Restrict ranks to an exactly representable integer before computing their reciprocal.
-fn calculate_rank_weight(rank: NonZeroUsize) -> CommandResult<f64> {
-    let rank = u32::try_from(rank.get()).map_err(map_search_error)?;
-    Ok(1.0 / f64::from(rank))
-}
-
 fn build_link<F: FileSystem, M: MarkdownCodec>(
     node: &KnowledgeMetadata,
     revision: u64,
@@ -309,6 +343,14 @@ fn is_current_knowledge<F: FileSystem, M: MarkdownCodec>(
 
 fn fail_invalid_search_data() -> CommandError {
     CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
+}
+fn map_revision_error(cause: SnapshotError) -> CommandError {
+    let kind = match cause.get_kind() {
+        SnapshotErrorKind::NotFound => CommandErrorKind::NotFound,
+        SnapshotErrorKind::InvalidRequest => CommandErrorKind::InvalidRequest,
+        SnapshotErrorKind::InternalError => CommandErrorKind::InternalError,
+    };
+    CommandError::new_with_cause(kind, "cannot search source revisions", cause)
 }
 fn map_search_error(cause: impl Error + Send + Sync + 'static) -> CommandError {
     CommandError::new_with_cause(
