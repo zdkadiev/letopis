@@ -1,0 +1,54 @@
+{
+  "status": "component_ready_cli_integration_pending",
+  "branch": "tk-18",
+  "base": "75be0deead9d1317b2fd0f833e2bbc83a526c9b5",
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64"
+  },
+  "focused_tests": {
+    "domain": 6,
+    "service": 6,
+    "public_integration": 5
+  },
+  "existing_markdown_tests": 28,
+  "make_check": "PASS",
+  "make_verify": "PASS incl strictRustdoc and release",
+  "final_gate_log": ".artifacts/tk18/task3-verify-fixed.log",
+  "task_reviews": 3,
+  "final_review": {
+    "verdict": "Approved",
+    "critical": 0,
+    "important": 0,
+    "minor_open": 0,
+    "minor_corrected": 1
+  },
+  "controls": {
+    "total": 8,
+    "temporary_product_mutations": 7,
+    "test_only_fresh_view": 1,
+    "caught": 8,
+    "restored": true
+  },
+  "reviewed_product_hashes_match": true,
+  "source_sha256": {
+    "src/domain/graph.rs": "0a5837814ded27db4ab5c524fceaa9f31e6d5910c3256ddfa54b2dd2e1337b11",
+    "src/domain/mod.rs": "f021bbe3e93fd0bd69f06b02cd3fa486bfed05c41908917098a15b9c1a05c066",
+    "src/domain/validation.rs": "890855106ef7cef291167a3b01451b484dd595c1c98a373e4421649cace53be5",
+    "src/lib.rs": "41853d05c1b79a78577b4e2c1aef2126dbe6aea43efcb09103f0843886897a9f",
+    "src/markdown/diagnostic.rs": "5683628acbfae1710d2c2582d8dcf8af4710ffb244e0528632ea183f5b54fb33",
+    "src/service/graph_diagnostics.rs": "6118ca3fe932a215554dd6275a6d7c522d4c7eab95f1504bbf8046df2729c7ef",
+    "src/service/mod.rs": "ed66518254ace09fe9d0836f320d550a3554055ec0e3c7c53f1c200542ae7ad8",
+    "src/service/model.rs": "2a2d7f1cb4b9ad28a8a9b0fde9172707c5a6fcd6c336171b8bb54db23c3dc4ee",
+    "tests/graph_diagnostics.rs": "28486df26dfa144552a1c5646e2e2e5e09af21865d308a414394c015b2e8b822"
+  },
+  "storage_native_schema_dependency_changes": false,
+  "paid_pilot_runs": 0,
+  "limits": [
+    "CLI check/status/traverse integration pending TK19/TK28/TK23",
+    "source/config/provider status aggregation outside graph subset",
+    "G1/TK17/resource/G2/release gates not accepted",
+    "host verification only; native/platform historical suites not rerun"
+  ],
+  "git_state": "captured before commit: uncommitted working-tree snapshot; subsequent integration is recorded in Git history and issue #18"
+}

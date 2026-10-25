@@ -180,6 +180,38 @@ pub enum DiagnosticKind {
     /// An element links to itself.
     SelfLoop,
 }
+impl DiagnosticKind {
+    /// Return the fixed parser message without document contents.
+    pub fn get_message(&self) -> &'static str {
+        match self {
+            Self::InvalidUtf8 => "Markdown is not UTF-8",
+            Self::InvalidMetadata => "invalid letopis metadata",
+            Self::InvalidAnchor => "invalid explicit anchor",
+            Self::DuplicateAnchor => "duplicate explicit anchor",
+            Self::OrphanMetadata => "metadata does not immediately follow an anchored heading",
+            Self::NestedElement => "knowledge elements cannot be nested",
+            Self::InvalidLinkTitle => "invalid letopis link title",
+            Self::InvalidTarget => "invalid graph target",
+            Self::SelfLoop => "knowledge cannot link to itself",
+        }
+    }
+
+    /// Return the stable machine-readable parser reason.
+    pub fn get_code(&self) -> &'static str {
+        match self {
+            Self::InvalidUtf8 => "invalid_utf8",
+            Self::InvalidMetadata => "invalid_metadata",
+            Self::InvalidAnchor => "invalid_anchor",
+            Self::DuplicateAnchor => "duplicate_anchor",
+            Self::OrphanMetadata => "orphan_metadata",
+            Self::NestedElement => "nested_element",
+            Self::InvalidLinkTitle => "invalid_link_title",
+            Self::InvalidTarget => "invalid_target",
+            Self::SelfLoop => "self_loop",
+        }
+    }
+}
+
 /// A file error with source coordinates where available and a fixed local message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {

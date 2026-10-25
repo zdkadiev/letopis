@@ -20,10 +20,11 @@ use crate::markdown::MarkdownParser;
 use crate::process::DetachedProcess;
 use crate::service::{
     BackgroundRunner, BackgroundService, CommandError, CommandErrorKind, CommandResult,
-    DocumentError, DocumentErrorKind, DocumentRefresher, DocumentResult, EmbedLocker, Embedder,
-    EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles, EmbeddingProvider,
-    EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots, InspectionService, Inspector,
-    Refresher, SearchDependencies, SearchService, Searcher, SnapshotError, Storage, StorageResult,
+    CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentRefresher, DocumentResult,
+    EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles,
+    EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
+    GraphDiagnostics, InspectionService, Inspector, Refresher, SearchDependencies, SearchService,
+    Searcher, SnapshotError, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -58,6 +59,12 @@ pub fn run_cli(
     let args = args.into_iter().collect::<Vec<_>>();
     let response = parse_request(&args, input).and_then(run_request);
     write_response(output, response)
+}
+
+/// Construct current diagnostics without opening storage or performing I/O.
+/// The caller supplies the consistent read view to each operation.
+pub fn wire_graph_diagnostics() -> impl GraphDiagnostics {
+    CurrentGraphDiagnostics::new()
 }
 
 /// Wire hybrid knowledge search with independently owned read and embedding connections.

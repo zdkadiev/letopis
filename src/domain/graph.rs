@@ -1,6 +1,9 @@
 use super::{ByteSpan, KnowledgeId, LineRange, Sha256, SourceUri, TreeOid, ValueError};
 use std::collections::BTreeSet;
 
+/// The system relation that defines knowledge containment.
+pub(super) const INCLUDES_EDGE_TYPE: &str = "includes";
+
 /// A validated edge type, including the system types includes and external.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EdgeType(String);
@@ -101,7 +104,7 @@ pub enum ElementKind {
 pub fn derive_element_kind(id: &KnowledgeId, edges: &BTreeSet<Edge>) -> ElementKind {
     if edges
         .iter()
-        .any(|e| e.get_source() == id && e.get_edge_type().as_str() == "includes")
+        .any(|e| e.get_source() == id && e.get_edge_type().as_str() == INCLUDES_EDGE_TYPE)
     {
         ElementKind::Metavertex
     } else {
