@@ -19,10 +19,10 @@ use crate::git::GitCli;
 use crate::markdown::MarkdownParser;
 use crate::process::DetachedProcess;
 use crate::service::{
-    BackgroundRunner, BackgroundService, CommandError, CommandErrorKind, CommandResult,
-    CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentRefresher, DocumentResult,
-    EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles,
-    EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
+    BackgroundRunner, BackgroundService, CheckService, Checker, CommandError, CommandErrorKind,
+    CommandResult, CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentRefresher,
+    DocumentResult, EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
+    EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
     GraphDiagnostics, InspectionService, Inspector, Refresher, SearchDependencies, SearchService,
     Searcher, SnapshotError, SnapshotVerifier, Storage, StorageResult,
 };
@@ -49,7 +49,7 @@ pub mod service;
 
 /// Parse and run one CLI request, emitting one complete JSON envelope.
 /// Returns 0 only for successfully written success output, otherwise 1.
-/// Search and inspect refresh through their application services; check remains unavailable.
+/// Check, search and inspect refresh through their application services.
 /// Successful foreground operations may launch the existing detached embedding drain.
 pub fn run_cli(
     args: impl IntoIterator<Item = OsString>,
@@ -65,6 +65,27 @@ pub fn run_cli(
 /// The caller supplies the consistent read view to each operation.
 pub fn wire_graph_diagnostics() -> impl GraphDiagnostics {
     CurrentGraphDiagnostics::new()
+}
+
+/// Wire current corpus validation with a separate pinned reader and read-only Git probe.
+///
+/// # Errors
+/// Reports unsupported repositories, unsafe service paths or storage setup failures.
+pub fn wire_checker(start: &Path) -> CommandResult<impl Checker + use<>> {
+    let refresher = wire_document_refresher(start).map_err(map_check_setup)?;
+    let git = GitCli::open(start).map_err(map_check_setup)?;
+    let filesystem = LocalFileSystem::open(git.get_root()).map_err(map_check_setup)?;
+    let directory = filesystem
+        .open_service_directory()
+        .map_err(map_check_setup)?;
+    let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
+        .map_err(map_check_setup)?;
+    Ok(CheckService::new(
+        refresher,
+        storage,
+        CurrentGraphDiagnostics::new(),
+        git,
+    ))
 }
 
 /// Wire hybrid knowledge search with independently owned read and embedding connections.
@@ -256,7 +277,7 @@ pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLoc
 fn run_request(request: Request) -> CommandResult<CommandResponse> {
     let (directory, executable) = locate_environment()?;
     match request {
-        Request::Check(_) => Handlers::new(None, None, None, None).execute(request),
+        Request::Check(_) => run_check(request, &directory, &executable),
         Request::Drain => run_drain(request, &directory, &executable),
         Request::Search(_) => run_search(request, &directory, &executable),
         Request::Inspect(_) => run_inspect(request, &directory, &executable),
@@ -287,6 +308,18 @@ fn run_drain(request: Request, root: &Path, executable: &Path) -> CommandResult<
     Handlers::new(None, None, None, Some(&mut background)).execute(request)
 }
 
+fn run_check(
+    request: Request,
+    directory: &Path,
+    executable: &Path,
+) -> CommandResult<CommandResponse> {
+    let root = open_repository_root(directory)?;
+    let mut tasks = wire_embedding_executor(&root)?;
+    let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
+    let mut checks = wire_checker(&root)?;
+    Handlers::new(Some(&mut checks), None, None, Some(&mut background)).execute(request)
+}
+
 fn run_search(
     request: Request,
     directory: &Path,
@@ -315,6 +348,14 @@ fn run_inspect(
 fn open_repository_root(directory: &Path) -> CommandResult<PathBuf> {
     let git = GitCli::open(directory).map_err(map_embedding_setup)?;
     Ok(git.get_root().to_path_buf())
+}
+
+fn map_check_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot open check service",
+        error,
+    )
 }
 
 fn map_search_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {

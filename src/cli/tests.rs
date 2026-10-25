@@ -455,9 +455,10 @@ mod transport_tests {
         assert!(serde_json::from_slice::<Value>(&writer.bytes).is_ok());
     }
     #[test]
-    fn run_cli_uses_real_unavailable_route_and_one_error_envelope() {
+    fn missing_checker_uses_one_safe_error_envelope() {
         let mut output = vec![];
-        let exit = run_cli(["check".into()], &mut b"{}".as_slice(), &mut output);
+        let response = Handlers::new(None, None, None, None).execute(Request::Check(vec![]));
+        let exit = write_response(&mut output, response);
         assert_eq!(exit, 1);
         assert_eq!(
             serde_json::from_slice::<Value>(&output).unwrap(),
@@ -491,9 +492,8 @@ mod transport_tests {
         assert!(value.get("warnings").is_none());
     }
     #[test]
-    fn run_cli_check_is_unavailable_and_invalid_input_is_rejected() {
+    fn run_cli_rejects_invalid_input() {
         for (args, body, code) in [
-            (vec!["check".into()], "{}", "internal_error"),
             (vec!["check".into()], "null", "invalid_request"),
             (vec!["inspect".into()], "{}", "invalid_request"),
         ] {

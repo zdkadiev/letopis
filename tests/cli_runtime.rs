@@ -41,7 +41,6 @@ fn nested_invalid_and_unsupported_requests_do_not_initialize_repository_or_child
     let nested = root.path().join("nested");
     fs::create_dir(&nested).unwrap();
     for (args, input, code) in [
-        (vec!["check"], "{}", "internal_error"),
         (
             vec!["search"],
             r#"{"query":"x","limit":1,"filters":{"needs_recheck":false}}"#,
@@ -66,24 +65,28 @@ fn nested_invalid_and_unsupported_requests_do_not_initialize_repository_or_child
 }
 
 #[test]
-fn unavailable_check_preserves_corpus_index_and_refs_after_lost_response() {
+fn check_preserves_corpus_index_and_refs_after_lost_response() {
     let root = make_repository();
     let corpus = fs::read(root.path().join("knowledge.md")).unwrap();
     let index = fs::read(root.path().join(".git/index")).unwrap();
     let refs = run_git(root.path(), &["show-ref"]);
     let lost = invoke(root.path(), &["check"], b"{}", true);
-    assert_eq!(lost.status.code(), Some(1));
+    assert_eq!(lost.status.code(), Some(0));
     assert!(lost.stderr.is_empty());
     for _ in 0..2 {
-        assert_error(
-            &invoke(root.path(), &["check"], b"{}", false),
-            "internal_error",
+        let output = invoke(root.path(), &["check"], b"{}", false);
+        assert_eq!(output.status.code(), Some(0));
+        assert!(output.stderr.is_empty());
+        let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(
+            response,
+            serde_json::json!({"ok":true,"result":{"errors":[]}})
         );
     }
     assert_eq!(fs::read(root.path().join("knowledge.md")).unwrap(), corpus);
     assert_eq!(fs::read(root.path().join(".git/index")).unwrap(), index);
     assert_eq!(run_git(root.path(), &["show-ref"]), refs);
-    assert!(!root.path().join(".letopis").exists());
+    assert!(root.path().join(".letopis/cache.db").is_file());
 }
 
 #[test]

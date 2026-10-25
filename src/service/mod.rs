@@ -1,6 +1,7 @@
 //! Application contracts.
 use crate::domain::RepoPath;
 mod background;
+mod check;
 mod command;
 mod command_traits;
 mod document_refresher;
@@ -21,6 +22,7 @@ mod snapshot_traits;
 mod storage;
 
 pub(crate) use background::BackgroundService;
+pub(crate) use check::CheckService;
 pub(crate) use document_refresher::DocumentRefresher;
 pub(crate) use embedding::EmbeddingService;
 pub(crate) use graph_diagnostics::CurrentGraphDiagnostics;
