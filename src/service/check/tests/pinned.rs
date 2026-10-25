@@ -72,6 +72,9 @@ impl GraphDiagnostics for PublishingBindings {
     }
 }
 impl SourceProvenance for Observations {
+    fn validate_revisions(&self, _: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
+        panic!("this scenario does not validate requested revisions")
+    }
     fn observe_sources(
         &self,
         request: ProvenanceRequest<'_>,

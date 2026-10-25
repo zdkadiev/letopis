@@ -340,6 +340,7 @@ fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
 }
 fn make_request(query: &str, limit: usize) -> SearchRequest {
     SearchRequest {
+        filters: Default::default(),
         query: query.into(),
         limit: NonZeroUsize::new(limit).unwrap(),
     }

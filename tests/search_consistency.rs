@@ -279,6 +279,7 @@ fn corrupt_refresh_metadata_releases_read_before_inference_and_allows_new_public
     let error = wire_searcher(repo.get_root())
         .unwrap()
         .search(&SearchRequest {
+            filters: Default::default(),
             query: "sqlite".into(),
             limit: NonZeroUsize::new(10).unwrap(),
         })
@@ -311,6 +312,7 @@ impl PausedSearch {
         let root = root.to_owned();
         let worker = thread::spawn(move || {
             wire_searcher(&root).unwrap().search(&SearchRequest {
+                filters: Default::default(),
                 query: "sqlite".into(),
                 limit: NonZeroUsize::new(10).unwrap(),
             })

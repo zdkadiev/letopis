@@ -6,8 +6,9 @@ use letopis::{
     },
     wire_source_provenance,
 };
+use std::collections::BTreeSet;
 use support::{
-    git::{FORMATS, TempRepo},
+    git::{FORMATS, ObjectFormat, TempRepo},
     provenance::create_basis,
 };
 
@@ -196,5 +197,57 @@ fn report_missing_or_invalid_basis_as_unavailable_for_valid_requested_revision()
             .unwrap();
         // Assert
         assert_eq!(actual, SourceRevisionComparison::BasisUnavailable);
+    }
+}
+
+#[test]
+fn validate_all_requested_trees_without_a_source() {
+    for format in FORMATS {
+        // Arrange
+        let repo = TempRepo::new(format);
+        let valid = create_basis(repo.get_root(), &[]);
+        let service = wire_source_provenance(repo.get_root()).unwrap();
+        let foreign_length = match format {
+            ObjectFormat::Sha1 => 64,
+            ObjectFormat::Sha256 => 40,
+        };
+        let missing = TreeOid::parse(&"a".repeat(valid.as_str().len())).unwrap();
+        let foreign = TreeOid::parse(&"a".repeat(foreign_length)).unwrap();
+        let commit = TreeOid::parse(&repo.read_oid(&["rev-parse", "HEAD"], None)).unwrap();
+        // Act / Assert: empty input and a complete empty tree need no source.
+        assert!(service.validate_revisions(&BTreeSet::new()).is_ok());
+        assert!(
+            service
+                .validate_revisions(&BTreeSet::from([valid.clone()]))
+                .is_ok()
+        );
+        let result = service.validate_revisions(&BTreeSet::from([valid, missing]));
+        assert_eq!(result.unwrap_err().get_kind(), SnapshotErrorKind::NotFound);
+        for revision in [commit, foreign] {
+            let result = service.validate_revisions(&BTreeSet::from([revision]));
+            assert_eq!(
+                result.unwrap_err().get_kind(),
+                SnapshotErrorKind::InvalidRequest
+            );
+        }
+    }
+}
+
+#[test]
+fn validate_revisions_preserves_corrupt_root_failure() {
+    for format in FORMATS {
+        // Arrange
+        let repo = TempRepo::new(format);
+        let revision = create_basis(repo.get_root(), &[("a", b"basis\n")]);
+        let replacement = create_basis(repo.get_root(), &[]);
+        let service = wire_source_provenance(repo.get_root()).unwrap();
+        repo.replace_loose_object(revision.as_str(), replacement.as_str());
+        // Act
+        let result = service.validate_revisions(&BTreeSet::from([revision]));
+        // Assert
+        assert_eq!(
+            result.unwrap_err().get_kind(),
+            SnapshotErrorKind::InternalError
+        );
     }
 }

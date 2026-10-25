@@ -1,3 +1,4 @@
+use super::SearchFilters;
 use crate::domain::{KnowledgeId, LineRange, RepoPath, Sha256, SourceUri, TreeOid};
 use serde_json::Value;
 use std::{
@@ -148,13 +149,15 @@ pub struct InspectedElement {
     pub hash: Option<Sha256>,
 }
 
-/// Literal search text and final result bound.
+/// Literal search text, normalized restrictions and final result bound.
 #[derive(Debug)]
 pub struct SearchRequest {
     /// Uninterpreted user query, tokenized by the search service.
     pub query: String,
     /// Maximum links after combining complete candidate channels.
     pub limit: NonZeroUsize,
+    /// Normalized source, revision and current-flag restrictions.
+    pub filters: SearchFilters,
 }
 /// Observed knowledge and source freshness reasons from the existing X-1 contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

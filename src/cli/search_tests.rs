@@ -105,6 +105,7 @@ fn empty_filters_equal_absence_and_valid_restrictions_fail_closed() {
 fn search_handler_dispatches_typed_request_and_renders_links() {
     let mut searches = SearchDouble;
     let request = SearchRequest {
+        filters: Default::default(),
         query: "private query".into(),
         limit: NonZeroUsize::new(3).unwrap(),
     };

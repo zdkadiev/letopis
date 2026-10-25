@@ -104,6 +104,7 @@ fn read_search(input: impl Read) -> CommandResult<SearchRequest> {
         }
     }
     Ok(SearchRequest {
+        filters: Default::default(),
         query: dto.query,
         limit,
     })

@@ -186,6 +186,13 @@ impl Embedder for Query {
     }
 }
 impl SourceProvenance for Observations {
+    fn validate_revisions(&self, revisions: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
+        assert!(
+            revisions.is_empty(),
+            "this scenario has no revision filters"
+        );
+        Ok(())
+    }
     fn observe_sources(
         &self,
         request: ProvenanceRequest<'_>,
@@ -268,6 +275,7 @@ fn publish_candidate(storage: &mut SqliteStorage, oid: &str, source: &str) {
 }
 fn build_request() -> SearchRequest {
     SearchRequest {
+        filters: Default::default(),
         query: "query".into(),
         limit: NonZeroUsize::new(10).unwrap(),
     }
