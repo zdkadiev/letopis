@@ -115,6 +115,10 @@ CLI вызывает интерфейсы сервисов; сервисы по�
 Интерфейсы задаются потребностями сценариев и владением данными. По [D-98](decisions.md#D-98) Storage — один прикладной интерфейс к кэшу и vectors.db; write unit/read view остаются явными типизированными возможностями с собственным временем жизни и границами транзакций, а не произвольным SQL API. Публичные интерфейсы сервисов добавляются вместе с реализацией сценариев; пустые каталоги, forwarding-сервисы и набор будущих traits заранее не создаются. Существующий чистый Markdown-parser подключается через адаптер, когда у сервиса появляется соответствующая потребность. Это конкретизация уже принятой hexagonal-архитектуры, без новых процессов, wire-протоколов или Cargo crates.
 
 
+#### TK-23 — данные Graph и алгоритм обхода
+
+`domain::Graph` — независимые упорядоченные данные результата, без I/O или injected storage. `service::GraphService` реализует GraphTraversal/BFS и читает object-safe GraphRead; TraversalService владеет refresh/readiness/pin/selected-link observations, сохраняя только S/F generics для scoped Storage и FileSystem lock. Storage исполняет bounded keyset pages; lib.rs создаёт реальные collaborators, CLI вызывает Traverser. Нового процесса, runtime, forwarding layer или граф-кэша нет. BFS bound не распространяется на существующие publication/file/root/JSON buffers. [Физическая проверка, host receipt, Linux native limit и pending review gates](checks/TK-23/report.md).
+
 <a id="program-structure-review"></a>
 #### Приёмка структуры в каждой задаче
 

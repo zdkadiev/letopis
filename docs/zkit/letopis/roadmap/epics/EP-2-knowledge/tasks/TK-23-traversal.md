@@ -1,6 +1,6 @@
 # TK-23 — Реализовать полный traverse
 
-> **Статус:** planned
+> **Статус:** implementation ready; Linux native acceptance blocked; reviews pending
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 6 / 8 / 16 (best / expected / worst)
@@ -65,6 +65,6 @@
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
+Реализация и отчёт готовы: [отчёт TK-23](../../../../checks/TK-23/report.md), [verification.json](../../../../checks/TK-23/verification.json). Code/test checkpoint `e9a9cd4a4c9d6807b0a75d79022dc8f838796e78`: host native runner прошёл, включая `make verify V=1`, debug/release отдельно 684/0/5 в 48 root executables, DDL parity, native SQLite/vec1, standalone/linkage и отдельный real-deadline probe. Новые scoped/memory/failure регрессии и десять runtime production controls восстановлены побайтно; граф, BFS, storage, CLI и lib.rs wiring проверены по физическим файлам. Task4 не потребовал product behavior fix.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+**Linux native/standalone acceptance открыт:** debug snapshot 684/0/5 сохранён, release log только частичный; Docker overlay2 стал read-only и не позволил записать/скопировать финальные receipts или удалить owned container. FAIL evidence сохранён, новый Linux run нужен после восстановления инфраструктуры. **Ожидаются Task4 independent review и final whole-branch review.** Критерии выше и финальный статус `done` оставлены контроллеру после обязательных проверок/gates. Memory bound относится к BFS, не к publication/file/root/JSON costs; cache-v2 rebuild — только явный quiescent cache-only путь с сохранением vectors/config/locks/Markdown/Git. TK-24/TK-28, paid/model/pilot/resource/G-1/G-2 и exhaustive cancellation drills не сертифицированы. Merge/push/GitHub publication не выполнялись.

@@ -1,0 +1,540 @@
+{
+  "status": "implementation_ready_linux_native_blocked",
+  "source_commit": "e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
+  "baseline_commit": "b8b89f6fe2d1a83d6f50041ceae5735b86264ec3",
+  "platforms": {
+    "host": {
+      "status": "PASS",
+      "runner_exit_code": 0,
+      "make_verify_exit_code": 0,
+      "manifest": ".artifacts/tk23/final-host-task4-20261026-01/manifest.json",
+      "commands": [
+        {
+          "argv": [
+            "git",
+            "rev-parse",
+            "HEAD"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-commit.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "git",
+            "status",
+            "--short"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-dirty.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "-B",
+            "tests/storage/check_schema.py",
+            "/Users/zdkadiev/.codex/worktrees/tk-23/letopis"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "schema-parity.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "-B",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests/storage",
+            "-p",
+            "test_runner.py",
+            "-v"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "runner-tests.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "version-rustc.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "--version"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "version-cargo.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--version"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "version-git.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "--version"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "version-python3.14.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "uname",
+            "-a"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "version-uname.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "make",
+            "verify",
+            "V=1"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "rust-check.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "--test",
+            "embedding_provider",
+            "attempt_obeys_real_sixty_second_deadline",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "provider-real-deadline.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "doc",
+            "--locked",
+            "--offline",
+            "--no-deps"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "rustdoc.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "storage::native::tests::native_capabilities_match_pinned_stack",
+            "--",
+            "--nocapture"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "native.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "build",
+            "--locked",
+            "--offline",
+            "--example",
+            "storage_check",
+            "--message-format=json"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "build.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "otool",
+            "-L",
+            "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-6tlokhvx/storage_check"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "dynamic.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-6tlokhvx/storage_check",
+            "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-6tlokhvx/scratch"
+          ],
+          "cwd": "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-6tlokhvx",
+          "log": "standalone.log",
+          "exit_code": 0
+        }
+      ],
+      "schema_parity": "PASS",
+      "native": "SQLite 3.53.2 / vec1 0.8 NEON",
+      "runner_python_tests": 10,
+      "explicit_deadline_probe_passed": 1,
+      "native_probe_passed": 1,
+      "standalone": "PASS: copied executable, FTS, shared native vector, exact bytes, reopen, revision=1",
+      "dynamic_linkage": "no SQLite/vec1 shared dependency",
+      "executable_sha256": "7456d31659873f7c5db47eeb7fc31cfb086c30c462773b64a7e1a3881e13e90e"
+    },
+    "linux": {
+      "status": "BLOCKED_INFRASTRUCTURE",
+      "runner_exit_code": 1,
+      "manifest": ".artifacts/tk23/final-linux-task4-20261026-01/manifest.json",
+      "commands": [
+        {
+          "argv": [
+            "git",
+            "rev-parse",
+            "HEAD"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-commit.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "git",
+            "status",
+            "--short"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-dirty.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "version"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-version.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "build",
+            "-f",
+            "tests/storage/Dockerfile",
+            "-t",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3",
+            "--build-arg",
+            "SOURCE_COMMIT=e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
+            "."
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-build.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "image",
+            "inspect",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "image.json",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "run",
+            "--name",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run",
+            "--network",
+            "none",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "linux.log",
+          "exit_code": 1
+        },
+        {
+          "argv": [
+            "docker",
+            "cp",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run:/receipt/.",
+            "/Users/zdkadiev/.codex/worktrees/tk-23/letopis/.artifacts/tk23/final-linux-task4-20261026-01/container"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-copy.log",
+          "exit_code": 1
+        },
+        {
+          "argv": [
+            "docker",
+            "rm",
+            "-f",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-cleanup.log",
+          "exit_code": 1
+        }
+      ],
+      "captured_counts_are_partial": true,
+      "full_make_verify_exit_code": "not certified from recovered final log",
+      "native_command_exit_code": 101,
+      "native_detailed_log": "not recovered",
+      "standalone": "unavailable",
+      "dynamic_linkage": "unavailable",
+      "inner_manifest": "unavailable: read-only filesystem prevented finalization/copy",
+      "failure": "Docker overlay2 read-only; dead owned container; receipt write/copy/cleanup failed",
+      "disk_pressure": "host Data 1.8Gi available / 100 percent displayed; plausible contributor, root cause unproven",
+      "read_only_export_exit_code": 1,
+      "fresh_native_run_required": true
+    }
+  },
+  "root_counts": {
+    "host": {
+      "debug": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      },
+      "release": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      }
+    },
+    "linux_preserved_partial_snapshot": {
+      "debug": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      },
+      "release": {
+        "root_executables": 39,
+        "passed": 578,
+        "failed": 0,
+        "ignored": 4
+      }
+    }
+  },
+  "focused": {
+    "root_executables": 17,
+    "passed": 380,
+    "failed": 0,
+    "ignored": 3,
+    "restored_final_scoped": {
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "controls": [
+    {
+      "name": "reopen-after-publication",
+      "target": "service::traversal::tests::scoped::retains_original_graph_bindings_and_revision_across_pages",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "readiness-after-pin",
+      "target": "service::traversal::tests::scoped::synchronizes_readiness_before_one_pinned_read_without_query_inference",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "swallow-late-page",
+      "target": "service::traversal::tests::scoped::releases_read_after_late_failure_while_service_lives",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "1b797a733161501e9e6d8ce68dbcf015f7e13ebdeb5f44f9f39948edf0ef32c3"
+    },
+    {
+      "name": "swallow-provenance",
+      "target": "service::traversal::tests::scoped::releases_read_after_late_failure_while_service_lives",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "swallow-source",
+      "target": "service::traversal::tests::scoped::releases_read_after_late_failure_while_service_lives",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "collect-before-observe",
+      "target": "service::traversal::tests::bindings::observes_large_source_bindings_pagewise",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "overrun-node-cap",
+      "target": "service::graph::tests::traversal_work_does_not_scale_with_unrelated_nodes_or_hub_degree",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "1b797a733161501e9e6d8ce68dbcf015f7e13ebdeb5f44f9f39948edf0ef32c3"
+    },
+    {
+      "name": "swallow-binding-page",
+      "target": "service::traversal::tests::bindings::reports_late_binding_page_failure_after_completed_observations",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "retain-success-reader",
+      "target": "service::traversal::tests::scoped::releases_read_after_normal_and_depth_zero_empty_results",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "hide-unsafe-source",
+      "target": "distinguishes_nonregular_sources_from_missing_local_flags",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "0746895da4243cedfda24289bda35df5e267dbad04708a8ebd473c2d14bf374e"
+    }
+  ],
+  "input_identity": {
+    "source_commit": "e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
+    "input_count": 319,
+    "aggregate_sha256": "143fd382892be2c3adfbd3f259b438d4364b22e2a03e987185903d0567e3ac6a",
+    "host_outer_equal": true,
+    "linux_outer_equal": true,
+    "container_input_map": "unavailable: filesystem read-only prevented receipt copy",
+    "current_files_equal": true
+  },
+  "preflight": [
+    "fmt --check",
+    "all-target Clippy -D warnings",
+    "strict Rustdoc",
+    "focused library and 16 integration targets",
+    "36 stream query plans and one source-root plan"
+  ],
+  "review_gates": {
+    "task4_independent": "pending",
+    "whole_branch": "pending"
+  },
+  "limits": [
+    "Required Linux native/standalone acceptance remains open",
+    "BFS bound is not whole-command fixed RSS",
+    "initial/changed publication, candidate/file/root sets, file parsing and JSON buffers remain separate",
+    "live files have no cross-file atomicity",
+    "opt-in existing corpus not run",
+    "TK-24/TK-28, paid/model/pilot/resource/G-1/G-2 and exhaustive new cancellation drills deferred"
+  ],
+  "engram": "delegated controller ownership; no writes by Task4 implementer",
+  "docker_wrapper": {
+    "path": ".artifacts/tk23/task4-20261026/docker-bin/docker",
+    "sha256": "18279ccfb7ffbc2ebfa403cd9d50655f97e7a590f42b98d60e434ddd74fdad94",
+    "actual_argv_log": ".artifacts/tk23/task4-20261026/docker-invocations.jsonl"
+  }
+}

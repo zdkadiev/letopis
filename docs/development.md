@@ -207,3 +207,9 @@ vector `[1.0, 0.0, 0.0]`, счётчик попыток и failure sentinel че
 зависит от размера корпуса. После неё неизменённый refresh читает только состояния
 файлов и отдельный набор объявленных корней, а соседей можно получать ограниченными
 страницами. Это не обещание постоянной памяти при первоначальной/изменённой публикации.
+
+### Проверка bounded traversal TK-23
+
+[Отчёт TK-23](zkit/letopis/checks/TK-23/report.md) и [machine-readable receipt](zkit/letopis/checks/TK-23/verification.json) фиксируют code checkpoint `e9a9cd4a4c9d6807b0a75d79022dc8f838796e78`: host native runner прошёл, включая `make verify V=1` с 684/0/5 в 48 root executables отдельно для debug и release. Explicit deadline/native probes и ignored corpus указаны отдельно. Linux image построен и debug snapshot содержит 684/0/5; полный native/standalone verdict не получен: Docker overlay2 стал read-only, manifest/copy/cleanup завершились ошибкой. После восстановления Docker нужен новый Linux evidence directory; не переименовывать FAIL receipt в PASS и не приписывать ему будущие результаты.
+
+Ограничение относится к BFS/results плюс двум страницам соседей, не ко всему RSS команды: первоначальная/изменённая публикация, candidate/file/root sets, чтение/разбор файлов и JSON имеют собственные расходы. Task4 independent review и final whole-branch review ожидаются; последующий docs commit не меняет captured revision. Описанный выше cache-only rebuild остаётся явной quiescent-процедурой; tests используют только временные fixtures.
