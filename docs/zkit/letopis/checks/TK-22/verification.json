@@ -572,5 +572,245 @@
     "missing_targets": 0,
     "log": ".artifacts/tk22/task3/doc-links.json",
     "sha256": "757a61e0dd86717b0f86ae9264e45ba5bd2fa5a8c5acd3893e65c3a2145bded2"
+  },
+  "mutation_classification": {
+    "production_path_controls": 13,
+    "by_task": {
+      "Task1": 5,
+      "Task2": 5,
+      "Task3": 3
+    },
+    "production_controls": [
+      {
+        "task": 1,
+        "name": "skip-requested-root",
+        "file": "src/service/provenance.rs",
+        "red_log": ".artifacts/tk22/task1/mutation-skip-requested-root.log",
+        "red_sha256": "b9d1f72b26ea16f9781813ab2ef6d849f47f69c2661de6122d186c65cd548c09",
+        "restored_log": ".artifacts/tk22/task1/restored-skip-requested-root.log",
+        "restored_sha256": "a4b4ad5b0bc2819f5be8e433565af04fb5eae4139755a512f493e5648a37efd3"
+      },
+      {
+        "task": 1,
+        "name": "restrict-any",
+        "file": "src/service/search_filters.rs",
+        "red_log": ".artifacts/tk22/task1/mutation-restrict-any.log",
+        "red_sha256": "d0bf5e0aa4602357a96aa24d1d1439ab894652dbc231bbbdf0745381943da195",
+        "restored_log": ".artifacts/tk22/task1/restored-restrict-any.log",
+        "restored_sha256": "c8aa021baaaf5dbb1b9d3aa9de41244898f1d943347603247217b656460b8361"
+      },
+      {
+        "task": 1,
+        "name": "allow-required-empty",
+        "file": "src/service/search_filters.rs",
+        "red_log": ".artifacts/tk22/task1/mutation-allow-required-empty.log",
+        "red_sha256": "09305f32751b57ae6a669ed1938fd9b4844c3c753c5e0a9f135aa009515c6cd7",
+        "restored_log": ".artifacts/tk22/task1/restored-allow-required-empty.log",
+        "restored_sha256": "0bae3ff6b64d2b382ab91054fe86e3efc398388bb60623abceeb022a2704ae4d"
+      },
+      {
+        "task": 1,
+        "name": "allow-not-required-flag",
+        "file": "src/service/search_filters.rs",
+        "red_log": ".artifacts/tk22/task1/mutation-allow-not-required-flag.log",
+        "red_sha256": "d8563607127c4e2e4c5dda489a542f73f10fdbb6e658b792a079bcd74ea11c67",
+        "restored_log": ".artifacts/tk22/task1/restored-allow-not-required-flag.log",
+        "restored_sha256": "afb80cbd7880815746ba2d89051378281edbdb0a974f1fb359fceee8d4655826"
+      },
+      {
+        "task": 1,
+        "name": "corrupt-root-after-green",
+        "file": "src/service/provenance.rs",
+        "red_log": ".artifacts/tk22/task1/mutation-corrupt-root-after-green.log",
+        "red_sha256": "acf839abf224e0fb4af0f3c7e582afeb60d57fd7bc3d9dae40f3d3e099ad7b49",
+        "restored_log": ".artifacts/tk22/task1/restored-corrupt-root-after-green.log",
+        "restored_sha256": "fa35083979b89c8c4939c86a6d66b9281347824440011dc95e8fa819322803de"
+      },
+      {
+        "task": 2,
+        "name": "or-fields",
+        "file": "src/service/search.rs",
+        "red_log": ".artifacts/tk22/task2/or-fields-red.log",
+        "red_sha256": "3bdbb5a2581efa0c04bb984dfc5a9bbec24767437a569ce299f53a067847e605",
+        "restored_log": ".artifacts/tk22/task2/or-fields-restored.log",
+        "restored_sha256": "37afb0b376a47b2582b261aa52fb8e6e287e6fa9a6f5a2268c3f82f3091eb4df"
+      },
+      {
+        "task": 2,
+        "name": "different-bindings",
+        "file": "src/service/search.rs",
+        "red_log": ".artifacts/tk22/task2/different-bindings-red.log",
+        "red_sha256": "ec5d187538b4a9523778f18d53df20b3b068aa9271e332a3cc558cdf61494f6a",
+        "restored_log": ".artifacts/tk22/task2/different-bindings-restored.log",
+        "restored_sha256": "66cddc8c3751002df3d0ade75b76ecebe00e18b4193f431bf10f9fd71a9a5425"
+      },
+      {
+        "task": 2,
+        "name": "rank-and-limit-before-eligibility",
+        "file": "src/service/search/ranking.rs",
+        "red_log": ".artifacts/tk22/task2/rank-and-limit-before-eligibility-red.log",
+        "red_sha256": "fa79994a471d76947c02a16b9502deb823b3e5d94b8c4e6b11c85a722480a2bc",
+        "restored_log": ".artifacts/tk22/task2/rank-and-limit-before-eligibility-restored.log",
+        "restored_sha256": "3baa4c2eeea972ab159ab4c1e5049258565d9b9fbc01279ff9a29d48b706dd93"
+      },
+      {
+        "task": 2,
+        "name": "skip-empty-preflight",
+        "file": "src/service/search.rs",
+        "red_log": ".artifacts/tk22/task2/skip-empty-preflight-red.log",
+        "red_sha256": "e825ace6f285cc2648000888919de964dd2f3f70dc5873db7b8be82927f3a4c8",
+        "restored_log": ".artifacts/tk22/task2/skip-empty-preflight-restored.log",
+        "restored_sha256": "c45785ece5284587c00e757ea5077a42398515e4c083bedb414de56f8e8b2840"
+      },
+      {
+        "task": 2,
+        "name": "required-only-stale",
+        "file": "src/service/search.rs",
+        "red_log": ".artifacts/tk22/task2/required-only-stale-red.log",
+        "red_sha256": "64476d7aa668d52cdc2b041f29a9ecf852f1a4e541a116e8b0a69bef720b651b",
+        "restored_log": ".artifacts/tk22/task2/required-only-stale-restored.log",
+        "restored_sha256": "3e88d8d7fa7371f77e06545f3d4875c8cc6bb9dc37760b48b3de2417f2218d1f"
+      },
+      {
+        "task": 3,
+        "name": "query-error-clear",
+        "file": "src/service/embedding.rs",
+        "red_log": ".artifacts/tk22/task3/mutation-query-error-clear.log",
+        "red_sha256": "452b5010bc40dcd3c7d9e4212108ebe2c7bf3376889cc26153e85730159fc05b",
+        "restored_log": ".artifacts/tk22/task3/restored-query-error-clear.log",
+        "restored_sha256": "d214d385d1ad896901e86e69ec1d05026f51c7bc05af7f1ccd9afbb29c04b1ac"
+      },
+      {
+        "task": 3,
+        "name": "production-observation-error",
+        "file": "src/service/search.rs",
+        "red_log": ".artifacts/tk22/task3/evidence-strengthening/production-observation-error-red.log",
+        "red_sha256": "dc0f5c15d01a5a6fa6aec10046ea647942d898e87c87acf167c4e4d7a20c9691",
+        "restored_log": ".artifacts/tk22/task3/evidence-strengthening/production-observation-error-restored.log",
+        "restored_sha256": "1e080a73c99711b9311d807b6543ae43edf101d1ef0d500b87676be847da58a8"
+      },
+      {
+        "task": 3,
+        "name": "production-comparison-error",
+        "file": "src/service/search.rs",
+        "red_log": ".artifacts/tk22/task3/evidence-strengthening/production-comparison-error-red.log",
+        "red_sha256": "b042dfbe00faed6129f9dd2ac22bb72b43785d3c1aec8f760c5547ff87f6ba69",
+        "restored_log": ".artifacts/tk22/task3/evidence-strengthening/production-comparison-error-restored.log",
+        "restored_sha256": "59149a2e729298d2a816d540e569fc3e682bf14bf05e576df23201ab92ece51a"
+      }
+    ],
+    "fixture_sensitivity_checks": [
+      {
+        "task": 3,
+        "name": "late-observation",
+        "file": "src/service/search/tests/scoped.rs",
+        "classification": "fixture/oracle-sensitivity only; not production error-handling mutation proof"
+      },
+      {
+        "task": 3,
+        "name": "late-comparison",
+        "file": "src/service/search/tests/scoped.rs",
+        "classification": "fixture/oracle-sensitivity only; not production error-handling mutation proof"
+      }
+    ],
+    "fixture_sensitivity_count": 2,
+    "task1_receipt_note": "Six historical mutant/stub receipts cover five distinct controls. The corrected-corrupt-fixture RED and later post-GREEN corrupt-root control exercise the same behavior and count once, not as a sixth distinct control. Raw receipts and logs are preserved."
+  },
+  "production_error_controls": [
+    {
+      "name": "production-observation-error",
+      "classification": "production error-handling mutation",
+      "file": "src/service/search.rs",
+      "command": "cargo test --locked --offline --lib service::search::tests::scoped::late_provenance_failure_releases_pinned_view_while_service_stays_alive",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/Repos/letopis/target",
+        "RUST_TEST_THREADS": "2"
+      },
+      "original_sha256": "853f2cb35bd67f5d0c91965faf41069b393578dbfd9824cf74249c00ddea1e26",
+      "mutated_sha256": "f7b6a2f38740869fdac49a2db509e36748b1e564e7fe5bdf40c0c2852699c849",
+      "restored_sha256": "853f2cb35bd67f5d0c91965faf41069b393578dbfd9824cf74249c00ddea1e26",
+      "fixture_sha256": "e5ffc91fe3fe0a1fc4fd66be0424d85144ce22a3dc2efcdc7b6f163601acd921",
+      "fixture_unchanged": true,
+      "mutation_exit": 101,
+      "restored_exit": 0,
+      "runtime_oracle": "unwrap_err rejected successful a.md SearchLink",
+      "replacement": {
+        "before": "                    sources: &sources,\n                })\n                .map_err(map_search_error)?;",
+        "after": "                    sources: &sources,\n                })\n                .unwrap_or_else(|_| super::ProvenanceObservation {\n                    flags: BTreeSet::new(),\n                    issues: BTreeSet::new(),\n                });"
+      }
+    },
+    {
+      "name": "production-comparison-error",
+      "classification": "production error-handling mutation",
+      "file": "src/service/search.rs",
+      "command": "cargo test --locked --offline --lib service::search::tests::scoped::late_provenance_failure_releases_pinned_view_while_service_stays_alive",
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/zdkadiev/Repos/letopis/target",
+        "RUST_TEST_THREADS": "2"
+      },
+      "original_sha256": "853f2cb35bd67f5d0c91965faf41069b393578dbfd9824cf74249c00ddea1e26",
+      "mutated_sha256": "c531a5bee3ad966a7faafcd012952a0fccdd0a92d6f789c93d3ea04f9de86cd3",
+      "restored_sha256": "853f2cb35bd67f5d0c91965faf41069b393578dbfd9824cf74249c00ddea1e26",
+      "fixture_sha256": "e5ffc91fe3fe0a1fc4fd66be0424d85144ce22a3dc2efcdc7b6f163601acd921",
+      "fixture_unchanged": true,
+      "mutation_exit": 101,
+      "restored_exit": 0,
+      "runtime_oracle": "unwrap_err rejected successful a.md SearchLink",
+      "replacement": {
+        "before": "                    revision,\n                })\n                .map_err(map_revision_error)?;",
+        "after": "                    revision,\n                })\n                .unwrap_or(SourceRevisionComparison::Equal);"
+      }
+    }
+  ],
+  "clippy_supplemental": {
+    "path": "clippy.toml",
+    "sha256": "b9df5373d8d4335f6354c51dbf2e704af609848241f2bedfdae4c4d2581d6d4c",
+    "base_revision": "cafd60b54032ca878bbca7fdda9a1839c4ffc658",
+    "base_sha256": "b9df5373d8d4335f6354c51dbf2e704af609848241f2bedfdae4c4d2581d6d4c",
+    "exact_base_bytes_match": true,
+    "in_original_299_manifest": false,
+    "provenance": "Supplemental check after original combined verification; not retroactively part of the earlier pre/post frozen299 map."
+  },
+  "evidence_strengthening": {
+    "historical_receipt_commit": "503813f9e1a4e39b4f873b7b836ea644620f4f71",
+    "directory": ".artifacts/tk22/task3/evidence-strengthening",
+    "inputs_and_restoration": {
+      "frozen_input_count": 299,
+      "all_original_input_hashes_match": true,
+      "original_manifest_sha256": "13566d7be1b87833fe8dc45a818907a40e4ceecb712a4ce10f7d88149e7bc760",
+      "product_revision": "bee627e19956da317fa45961ab6d4321eb0741d4",
+      "old_evidence_files_checked": 21,
+      "old_evidence_hashes_preserved": true,
+      "fixture_unchanged": true,
+      "source_exactly_restored": true,
+      "clippy_supplemental": {
+        "path": "clippy.toml",
+        "sha256": "b9df5373d8d4335f6354c51dbf2e704af609848241f2bedfdae4c4d2581d6d4c",
+        "base_revision": "cafd60b54032ca878bbca7fdda9a1839c4ffc658",
+        "base_sha256": "b9df5373d8d4335f6354c51dbf2e704af609848241f2bedfdae4c4d2581d6d4c",
+        "exact_base_bytes_match": true,
+        "in_original_299_manifest": false,
+        "provenance": "Supplemental check after original combined verification; not retroactively part of the earlier pre/post frozen299 map."
+      }
+    },
+    "full_suite_rerun": false,
+    "reason": "Evidence-only update; both targeted restored tests passed and all 299 original product input hashes still match bee627e. Supplemental clippy hash is explicitly outside the earlier299 map.",
+    "sha256": {
+      "clippy-supplemental.json": "d87c09710a520932d6192d62e348f5b03c82c6c307d497645ba3a4b85c97d82b",
+      "control-classification.json": "89dc8a0be6d2905d435e7480f79e8463c981b279aac647d086e4ec5cf55f39a9",
+      "doc-links.json": "757a61e0dd86717b0f86ae9264e45ba5bd2fa5a8c5acd3893e65c3a2145bded2",
+      "historical-report.md": "fa14cf6dd095be2ff64e05a024f3c86788d6ae54f1df7ca998cf33aadf3136c8",
+      "historical-verification.json": "3c2f1d413a5411133c3c48efdb924bbe401efca0e5c6e2cb347c1a52e1f72caa",
+      "metadata-validation.json": "dda7f42c302557b650384f67fb57d177c79777ed86cb4dfdbe62f64146c25752",
+      "production-comparison-error-red.log": "b042dfbe00faed6129f9dd2ac22bb72b43785d3c1aec8f760c5547ff87f6ba69",
+      "production-comparison-error-restored.log": "59149a2e729298d2a816d540e569fc3e682bf14bf05e576df23201ab92ece51a",
+      "production-comparison-error.diff": "3386b7d760bfa2c43a0720fd5b03c2773f4cf91a53e154131117a4c669489d7f",
+      "production-controls.json": "34301ef103b14105cdb1b40b2499380c29b48201fff487e28513b5ece3aadbc3",
+      "production-observation-error-red.log": "dc0f5c15d01a5a6fa6aec10046ea647942d898e87c87acf167c4e4d7a20c9691",
+      "production-observation-error-restored.log": "1e080a73c99711b9311d807b6543ae43edf101d1ef0d500b87676be847da58a8",
+      "production-observation-error.diff": "bf2535b23a59cca774dbe30a07000f87ddd6f17c785e726344323aa69802c5fa",
+      "restoration-and-inputs.json": "0b628a62f38c152840fb91455d8038e49751e232a6e42a8207667b479c908dd7",
+      "run-production-controls.py": "200d983fb06aec1b97c37924cde30035d08eff2b0302770826100173e78e3703"
+    }
   }
 }
