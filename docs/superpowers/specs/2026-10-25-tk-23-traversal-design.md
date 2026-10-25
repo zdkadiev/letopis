@@ -1,6 +1,6 @@
 # TK-23 — Complete graph traversal
 
-Status: proposed specification, awaiting user approval. The user requested Superpowers, a new worktree and exact branch `tk-23` from `main`, and chose “По карточке” for the example and remaining discovery questions. Engineering choices below are proposals made by the builder; implementation has not started.
+Status: approved by the user on 2026-10-25: “Да, спецификацию TK-23 утверждаю. Продолжай к плану реализации по Superpowers.” The user requested a new worktree and exact branch `tk-23` from `main`, and delegated discovery defaults with “По карточке”. The engineering choices below were accepted with this specification; product implementation has not started.
 
 ## Intent and boundaries
 
@@ -24,12 +24,12 @@ At this revision CLI input, handlers and composition do not implement traverse. 
 
 Fresh baseline `make check V=1` passed on the unchanged product tree: 620 root debug tests passed, 0 failed, 5 ignored, across 45 root executables; fmt, all-target check and Clippy passed. Full log and its SHA-256 are retained under `.artifacts/tk23/baseline.log` and `baseline.json`. Nested child/doc-test summaries are excluded. No fresh release, native/Linux, historical proof, paid-model, pilot or gate run is claimed.
 
-## Approaches and proposed choice
+## Approaches and accepted choice
 
 1. **One pinned graph, in-memory adjacency and service-owned BFS — recommended choice.** Use existing complete typed graph reads once, build request-local ordered neighbors, and walk them. No new SQL/storage interface or persisted graph representation. The cost is O(V + E) temporary graph memory, plus deterministic sorting and requested live observations; this is a simple baseline, not a performance acceptance claim.
 2. **Incremental neighbor queries.** Add incoming/outgoing filtered neighbor operations to the storage interface and SQL, querying each BFS frontier under the same view. This could lower memory for small traversals on large graphs, but adds interfaces/query round trips and implementation work without a measured requirement. Defer unless measurement justifies it.
 
-The user delegated remaining discovery choices with “По карточке”. The builder selects approach 1 for this proposed design; approval of the document remains required before product implementation.
+The user delegated remaining discovery choices with “По карточке” and subsequently approved this specification, including approach 1. Incremental SQL traversal remains deferred pending measurement.
 
 ## Input and address contract
 
@@ -104,4 +104,4 @@ Track final results/limits in the task card, a TK-23 report/receipt and the agre
 
 ## Approval and next step
 
-The user delegated discovery defaults; this full specification and its engineering choices are still proposed. Fresh independent builder check `/root/tk23_builder_check` returned “nothing important left”; no planning-blocking questions were identified. The review covered the proposed design and relevant current contracts/code, not implemented product behavior. After user approval, create the implementation plan with Superpowers writing-plans; product implementation awaits that plan's approval and execution choice.
+The full specification and its engineering choices are approved; preparation of the implementation plan is authorized. Fresh independent builder check `/root/tk23_builder_check` returned “nothing important left”; no planning-blocking questions were identified. The review covered the proposed design and relevant current contracts/code, not implemented product behavior. The implementation plan is [TK-23 traversal](../plans/2026-10-25-tk-23-traversal.md), prepared with Superpowers writing-plans. Product implementation awaits that plan's approval and execution choice.
