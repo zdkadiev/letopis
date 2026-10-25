@@ -1,6 +1,6 @@
 # TK-22 — Search filters and embedding fallback
 
-Status: approved by the user on 2026-10-25 ("go on" after the specification approval request). The complete contract and five displayed builder choices are accepted. Preparation of the separate implementation plan is authorized; product implementation awaits plan approval.
+Status: approved by the user on 2026-10-25 ("go on" after the specification approval request); implementation and its approved plan have been executed. [Acceptance receipt](../../zkit/letopis/checks/TK-22/report.md): product verified, independent Task 3 and whole-branch reviews pending. The complete contract and five builder choices remain accepted. TK-28 presentation and deferred gates remain outside this acceptance.
 
 ## Intent and scope
 
@@ -22,7 +22,7 @@ Excluded: new ranking algorithms, source text output, remote fetching, new persi
 
 Worktree `/Users/zdkadiev/.codex/worktrees/tk-22/letopis`, branch `tk-22`, starts from `main@cafd60b54032ca878bbca7fdda9a1839c4ffc658`. GitHub main matched that exact SHA during preparation. Existing TK-21 evidence and other worktrees are preserved.
 
-Current code: CLI recognizes filter fields but rejects effective filters as unavailable. Search reads complete FTS/vector candidates, ranks and limits, then observes only returned sources. TK-21 already provides `SourceProvenance::observe_sources` and `compare_revision`; the latter validates an explicitly requested tree before comparing a binding. These capabilities are inputs, not proof of the new filter path. No fresh baseline suite is claimed during documentation preparation; run it before product edits.
+Historical starting code before implementation: CLI recognizes filter fields but rejects effective filters as unavailable. Search reads complete FTS/vector candidates, ranks and limits, then observes only returned sources. TK-21 already provides `SourceProvenance::observe_sources` and `compare_revision`; the latter validates an explicitly requested tree before comparing a binding. These capabilities are inputs, not proof of the new filter path. No fresh baseline suite is claimed during documentation preparation; run it before product edits.
 
 ## Observable contract
 
@@ -100,4 +100,4 @@ Record actual changed revision, commands, counts, platform and limits in docs/zk
 
 ## Approval boundary
 
-The user approved the complete TK-22 behavior and the five builder choices above on 2026-10-25. Independent builder check returned “nothing important left”; no open builder questions. Product implementation waits for approval of the separate Superpowers implementation plan.
+The user approved the complete TK-22 behavior and the five builder choices above on 2026-10-25. Independent builder check returned “nothing important left”; no open builder questions. The separate Superpowers implementation plan was subsequently approved and executed. Product verification is recorded in the acceptance receipt above; independent Task 3 and whole-branch reviews remain pending.

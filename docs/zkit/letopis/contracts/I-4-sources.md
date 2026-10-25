@@ -77,13 +77,27 @@ HTTP/HTTPS остаются `Unfetched`, без ложного 404 и без л�
 знания: Equal/Different/SourceNotFound/BasisUnavailable/Unfetched. Явно запрошенный
 root проверяется первым: missing — NotFound, wrong type/format — InvalidRequest,
 corruption — InternalError. Разные trees с равными адресованными bytes равны.
-JSON search filters остаются TK-22, source в CLI inspect — TK-24; эти consumers
-не заявляются реализованными. Нет новой schema/history/cache/процесса/runtime.
+На момент TK-21 JSON search filters оставались TK-22, source в CLI inspect — TK-24;
+расширение search реализовано ниже в TK-22. Нет новой schema/history/cache/процесса/runtime.
+
+## Реализованная граница TK-22 — 2026-10-25
+
+[Проверка filters](../checks/TK-22/report.md) подтверждает новый read-only метод
+`SourceProvenance::validate_revisions(&BTreeSet<TreeOid>) -> Result<(), SnapshotError>`.
+Search проверяет все нормализованные requested trees после refresh и до configuration,
+inference и candidate-dependent exits, в том числе пустого query/корпуса.
+`SearchFilters` передаёт `RecheckFilter::{Any,Required,NotRequired}` и ordered sets
+точных SourceUri/TreeOid. Поля сочетаются AND, значения списка OR; пустой список
+не ограничивает. Source и revision совпадают в одной текущей pinned binding;
+каждое знание сравнивается со своим basis. Whole-file и range — разные identities.
+Remote URL не загружается и не доказывает равенство bytes. Наблюдение flags выполняется
+один раз и сохраняется в returned link; отсутствие flags не удостоверяет истинность.
+JSON filters реализованы; source в CLI inspect остаётся TK-24, status UI — TK-28.
+
+## Layout
 
 Следующий Layout сохраняет исторические имена и более широкий целевой контракт;
 это не дополнительные существующие Rust APIs и не доказательство готовности filters.
-
-## Layout
 
 ```text
 SourceAddress { uri: NormalizedUri, lines: Option<InclusiveLines> }

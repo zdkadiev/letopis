@@ -1,0 +1,54 @@
+# TK-22 — verified search filters and fallback
+
+Implementation verified on 2026-10-25; independent Task 3 review and the final whole-branch review are pending. This is an implementation acceptance receipt, not completion of the deferred TK-28 UI or system gates.
+
+## Captured revision and commands
+
+Product revision: `bee627e19956da317fa45961ab6d4321eb0741d4`. Task 3 started at `1826241a18d17c2e63b0ec049a82e4e9a8133571`; reviewed upstream product was `6076fda1917b586642a1c8b72e9fa9b9beef7e38`. Platform: `macOS-26.6.2-arm64-arm-64bit`, Rust/Cargo 1.95.0. [Machine-readable receipt](verification.json) contains every root executable count and evidence SHA-256.
+
+All commands ran at the task root with `CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target RUST_TEST_THREADS=2` and locked offline dependencies:
+
+| Command | Actual result |
+| --- | --- |
+| `cargo test --locked --offline --test search_filter_fallback` | 3 passed, 0 failed, 0 ignored |
+| `cargo test --locked --offline --lib service::search::tests::scoped` | 3 passed, 0 failed, 0 ignored |
+| `cargo test --locked --offline --test search_consistency` | 7 passed, 0 failed, 0 ignored |
+| `make verify V=1` | exit 0; fmt/check/Clippy, root debug tests, strict Rustdoc, root release tests; no warnings |
+
+Final root counts use the **last** summary after each Cargo `Running` header, excluding nested child summaries and Doc-tests. Debug: 620 passed / 0 failed / 5 ignored across 45 executables. Release: 620 passed / 0 failed / 5 ignored across 45 executables. Five ignored tests remain ignored in each profile; this receipt does not claim them run.
+
+Fresh evidence lives under `.artifacts/tk22/task3/`: `final-verify.log`, `final-counts.json`, `final-inputs.json`, focused logs and mutation/restoration logs. Frozen Rust/build/test input manifest SHA-256: `13566d7be1b87833fe8dc45a818907a40e4ceecb712a4ce10f7d88149e7bc760`. Final verify log SHA-256: `9c22eaa125571d4436b3cbdbda11edfb5d096c2529e62340ac55e0331a18a37f`. Private evidence remains untracked; historical receipts were not rewritten. Documentation validation checked 156 relative file links with no missing targets; changed contract prose was checked against the implemented filter and lifecycle rules.
+
+## Acceptance coverage
+
+| Spec item | Concrete evidence in the final root suite |
+| --- | --- |
+| 1. Strict transport, empty/duplicate selectors | `tests/search_filters.rs`: `empty_and_duplicate_selectors_preserve_literal_ids`, `invalid_filter_shapes_and_addresses_are_invalid_requests`; CLI unit tests |
+| 2. AND/OR, recheck modes, exact identities | `source_and_revision_require_one_binding_and_fields_combine_with_and`, `sources_use_exact_normalized_addresses_and_opaque_urls`, `current_changed_missing_and_invalid_notes_drive_all_recheck_modes` |
+| 3. Same-binding trap | `source_and_revision_require_one_binding_and_fields_combine_with_and` |
+| 4. Equal bytes/different trees, per-note basis, missing/range/remote nonmatches | `revision_equality_uses_per_note_basis_and_complete_selected_bytes` |
+| 5. Complete revision preflight and safe typed errors | `every_requested_root_is_validated_even_after_a_matching_tree`; service `revision_preflight_precedes_provider_and_candidate_dependent_exits`, `revision_comparison_errors_preserve_typed_codes` |
+| 6. Filter before eligible channel ranks/fusion/limit | service `eligible_channel_ranks_are_recomputed_before_fusion`, `excluded_channel_heads_do_not_consume_limit`, `eligible_ties_and_duplicates_keep_identity_order`; CLI `ineligible_fts_head_cannot_consume_the_final_limit` |
+| 7. Live flags, one observation, pinned metadata/bindings | service `changing_observer_is_called_once_and_retained_flags_drive_rendering`; scoped `search_observes_metadata_and_bindings_from_original_pinned_view`; seven `search_consistency` tests |
+| 8. Filtered fallback and singleton lifecycle | three `search_filter_fallback` tests: one endpoint returns HTTP 500 then valid 2D embedding under unchanged identity; literal FTS IDs a.md/b.md, then semantic.md appears; exactly two query payloads; no warnings/secrets/text; no pending embedding work or attempts |
+| 9. Late failure releases scoped reads | scoped `late_provenance_failure_releases_pinned_view_while_service_stays_alive` covers observation/comparison errors after successful query; no partial result, safe InternalError, WAL checkpoint and publication to revision 2 before explicit service drop. Existing post-query metadata error remains green |
+| 10. Physical architecture review | actual files and constructor review below |
+
+All five approved Review Focus cases are covered: missing selector cannot be hidden by OR/empty-query/unmatched-source shortcuts (item 5); equal addresses use each note's basis (item 4); one retained observation drives filtering/rendering (item 7); same-config failure→actual success clears query_error (item 8); excluded corrupt/nonfinite metric remains an integrity error (`excluded_nonfinite_metrics_remain_integrity_errors`).
+
+## Runtime controls and restoration
+
+- Omitting `clear_query_error` in `service/embedding.rs` failed the same-identity sequence at the successful-query cleared-row assertion (exit 101), after actual successful semantic inference. Exact source bytes restored; target passed.
+- Replacing the late observation error with empty flags/issues success failed `unwrap_err` on returned links (exit 101). Replacing the late comparison error with Equal success also failed that assertion. Exact source bytes restored after each; target passed.
+- `verification.json` records original/mutated/restored SHA-256 for all three controls and their exact commands. These hashes capture the mutation-time files; the final frozen manifest also includes the later helper-order/documentation cleanup, covered by final make verify. The initial observation control removed the sole error-constructor use and was rejected by unused-import lint; it was not counted as runtime proof. The valid control retained construction before returning empty success.
+- Initial fallback runs corrected test-only assumptions (safe diagnostic excludes HTTP status; dimensions belongs inside parameters; Ollama adds truncate:false). These were fixture mistakes, not production defects or invented RED evidence. No production fix was required.
+
+## Files, API and architecture
+
+Task 3 changes only `tests/search_filter_fallback.rs`, `tests/support/embedding.rs`, and `src/service/search/tests/scoped.rs`, plus acceptance/contract documentation. `HttpFixture::start_sequence(Vec<FixtureReply>) -> Self` is test-only, preserves `start`, consumes one reply per accepted HTTP request, rejects empty/exhausted sequences, and joins its owned worker on drop. No product trait/schema/runtime/dependency was added.
+
+Reviewed the actual branch's `service/search_filters.rs`, `service/mod.rs`, `service/search.rs`, `service/search/ranking.rs`, `service/provenance.rs`, `cli/input.rs`, CLI handler path and `lib.rs::wire_searcher`. Domain remains I/O-free; application traits remain service-owned; eligibility only borrows filesystem/codec/provenance while storage owns the pinned reader. Services import domain/traits rather than concrete technology; concrete SQLite/Git/filesystem/embedding implementations are constructed in lib.rs and passed through SearchDependencies. CLI converts strict JSON to typed filters and invokes Searcher. No adapter orchestration, new layer, broad fallback catch or production visibility change was introduced by Task 3. Query diagnostics use the executor's separate guarded connection; the scoped read itself stays read-only. Synchronous I/O and X-1 link/envelope/error names remain unchanged.
+
+## Limits and handoff
+
+TK-28 owns status/problems presentation; this task proves the existing storage/executor lifecycle directly. No native storage runner was required because schema/storage/build/vendored/native inputs were unchanged. No fresh Linux run, historical isolated proof harness, real deadline, paid model, large-corpus or pilot/resource/G-1/G-2 certification is claimed. Existing historical evidence stays attached to its captured revision. Independent Task 3 and whole-branch reviews must still resolve any findings before final acceptance/integration; merge/push/issues were not performed.

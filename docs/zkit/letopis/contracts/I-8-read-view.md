@@ -25,6 +25,16 @@ StateReadView — та же идея короткого read tx для одно�
 
 Порядок readiness/reset → pin → сравнение identity закреплён утверждённой [спецификацией TK-12](../../../superpowers/specs/2026-10-23-tk-12-search-design.md) и [D-102](../decisions.md#D-102). Query embedding использует захваченные config/dimensions; HTTP не удерживает write unit. Короткая guarded-запись query_error использует отдельное соединение, не обновление read view. Это согласование I-8 с MC-6, не утверждение уже реализованного пути.
 
+## Проверка search TK-22 — 2026-10-25
+
+[Отчёт](../checks/TK-22/report.md) проверяет effective filters при concurrent
+publication: metadata, source bindings и basis берутся из исходного owned read view,
+а eligibility считается до channel ranks/fusion/limit. Поздняя provenance/comparison
+ошибка после успешного query возвращает safe error без partial links и освобождает
+reader до drop живого SearchService; последующие WAL checkpoint и publication проходят.
+Query_error очищается фактическим следующим успешным query под той же config identity,
+без config reset; отдельная guarded diagnostic-запись не делает read view writable.
+
 ## Timing and limits
 
 Synchronous in-process call; no independent deadline or quota. The caller owns the existing read view or write unit. Computing embeddings never runs inside the write unit. Resource limits remain those of mechanics and resource-math.

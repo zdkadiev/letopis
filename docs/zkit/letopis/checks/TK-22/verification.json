@@ -1,0 +1,576 @@
+{
+  "status": "implementation verified; independent Task 3 and whole-branch reviews pending",
+  "product_revision": "bee627e19956da317fa45961ab6d4321eb0741d4",
+  "tested_worktree_parent": "1826241a18d17c2e63b0ec049a82e4e9a8133571",
+  "upstream_reviewed_product": "6076fda1917b586642a1c8b72e9fa9b9beef7e38",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "versions": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "git": "git version 2.50.1 (Apple Git-155)"
+  },
+  "environment": {
+    "CARGO_TARGET_DIR": "/Users/zdkadiev/Repos/letopis/target",
+    "RUST_TEST_THREADS": "2"
+  },
+  "verification": {
+    "command": "CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target RUST_TEST_THREADS=2 make verify V=1",
+    "exit_code": 0,
+    "log": ".artifacts/tk22/task3/final-verify.log",
+    "summary": {
+      "log": ".artifacts/tk22/task3/final-verify.log",
+      "profiles": {
+        "debug": {
+          "root_executables": 45,
+          "passed": 620,
+          "failed": 0,
+          "ignored": 5
+        },
+        "release": {
+          "root_executables": 45,
+          "passed": 620,
+          "failed": 0,
+          "ignored": 5
+        }
+      },
+      "targets": {
+        "unittests src/lib.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/letopis-ab7ce5d1b85a9e86)": {
+          "passed": 234,
+          "failed": 0,
+          "ignored": 3
+        },
+        "unittests src/main.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/letopis-1002f0a8fd380ec0)": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/check_command.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/check_command-d46f2c11ea803a36)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/check_lifecycle.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/check_lifecycle-7eb2a1aa83dee8de)": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/cli_drain.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/cli_drain-bfbb775dfe940d94)": {
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/cli_process.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/cli_process-f496364b901364e2)": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/cli_reading.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/cli_reading-7a74136e38b79878)": {
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/cli_runtime.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/cli_runtime-72bab304f5bb051c)": {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/cli_session_failure.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/cli_session_failure-3e516d751bd26de7)": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/document_refresh.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/document_refresh-64ca908a06acb76f)": {
+          "passed": 16,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/domain_values.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/domain_values-4fa293be91c6d114)": {
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/embedding_boundaries.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/embedding_boundaries-488e25953e3dc7ee)": {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/embedding_files.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/embedding_files-0b35410176f1e305)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/embedding_provider.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/embedding_provider-26447f48daf7a647)": {
+          "passed": 39,
+          "failed": 0,
+          "ignored": 1
+        },
+        "tests/embedding_service.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/embedding_service-a3818151f5ba6562)": {
+          "passed": 25,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/git_retention.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/git_retention-3245d3636b43871b)": {
+          "passed": 11,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/git_snapshots.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/git_snapshots-ae9d8a5b2d55d194)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/graph_diagnostics.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/graph_diagnostics-9ccf7b0da1914843)": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/knowledge_inspection.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/knowledge_inspection-1d6bfda6807a6d3f)": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/knowledge_search.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/knowledge_search-df826680a963cf46)": {
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/markdown_elements.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/markdown_elements-a5ce7b1b40ebdff4)": {
+          "passed": 11,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/markdown_links.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/markdown_links-842d269659efda97)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/markdown_search.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/markdown_search-468f0649b97505a9)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/process_supervision.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/process_supervision-0ab7194aa8b21e93)": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/provenance_commands.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/provenance_commands-02e7f30a6b6f8df4)": {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/provenance_indexing.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/provenance_indexing-d3d89addc2282a0b)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/provenance_observation.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/provenance_observation-d95676d527355897)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/provenance_revisions.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/provenance_revisions-f901942fe12f39c6)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/search_consistency.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/search_consistency-dc2cebddbfd82723)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/search_contention.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/search_contention-175e0ed791bbeabd)": {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/search_filter_fallback.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/search_filter_fallback-13dce6c7e0af3453)": {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/search_filters.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/search_filters-33252581bcc7301f)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/snapshot_verification.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/snapshot_verification-f5899bef6ce2c2b7)": {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/source_addresses.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/source_addresses-fcc624097086468d)": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/source_lifecycle.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/source_lifecycle-cc998235ce465508)": {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/source_projection.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/source_projection-5de878bd5f00ec2b)": {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/source_reading.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/source_reading-3dedf990c7b6913a)": {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_bootstrap.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/storage_bootstrap-750ae7fd0a38c7d8)": {
+          "passed": 15,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_cache.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/storage_cache-7559622e48d07b1d)": {
+          "passed": 23,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_embedding_work.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/storage_embedding_work-5816f037d3995fb1)": {
+          "passed": 15,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_failure_atomicity.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/storage_failure_atomicity-1d86be2fa221c7a7)": {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_failures.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/storage_failures-f967a1c67376b47f)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_vectors.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/storage_vectors-91f1670fcc24063b)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/target_corpus.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/target_corpus-c864bf094c884c1e)": {
+          "passed": 21,
+          "failed": 0,
+          "ignored": 1
+        },
+        "tests/thin_slice.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/thin_slice-0715c972eabf3dbb)": {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        "unittests src/lib.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/letopis-61cf5c99dacce15a)": {
+          "passed": 234,
+          "failed": 0,
+          "ignored": 3
+        },
+        "unittests src/main.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/letopis-58b67883ed57f54b)": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/check_command.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/check_command-13740195244d8524)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/check_lifecycle.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/check_lifecycle-f44455d4b5222c72)": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/cli_drain.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/cli_drain-2416d87cc856396e)": {
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/cli_process.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/cli_process-09ec2df6e0f847d5)": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/cli_reading.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/cli_reading-a830f73012388272)": {
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/cli_runtime.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/cli_runtime-4ce442fd3d6cedd2)": {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/cli_session_failure.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/cli_session_failure-26620447cddbcfc7)": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/document_refresh.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/document_refresh-db6dbb27929ae69e)": {
+          "passed": 16,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/domain_values.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/domain_values-79cc6c4c3b3ab0e3)": {
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/embedding_boundaries.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/embedding_boundaries-4ebf4e0a0f019dd7)": {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/embedding_files.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/embedding_files-5a57aeac9047f482)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/embedding_provider.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/embedding_provider-11097571a245b869)": {
+          "passed": 39,
+          "failed": 0,
+          "ignored": 1
+        },
+        "tests/embedding_service.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/embedding_service-59cad14e9dc19588)": {
+          "passed": 25,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/git_retention.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/git_retention-c5af34fa0a96c718)": {
+          "passed": 11,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/git_snapshots.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/git_snapshots-7a19dda44c0942e8)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/graph_diagnostics.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/graph_diagnostics-6c6dfb62ff45b0e5)": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/knowledge_inspection.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/knowledge_inspection-9e4338160daf6707)": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/knowledge_search.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/knowledge_search-c8ff0c16b313d314)": {
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/markdown_elements.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/markdown_elements-00f9f3b32c4aaac3)": {
+          "passed": 11,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/markdown_links.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/markdown_links-15b10b2879792339)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/markdown_search.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/markdown_search-826599d2465f75c9)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/process_supervision.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/process_supervision-f4968f0aef73c54d)": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/provenance_commands.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/provenance_commands-48d1eeffef55b9be)": {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/provenance_indexing.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/provenance_indexing-1ad107c62cd18ee2)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/provenance_observation.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/provenance_observation-dab7a6618036d009)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/provenance_revisions.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/provenance_revisions-e233788da3ccdf82)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/search_consistency.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/search_consistency-a475624f2165b7b6)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/search_contention.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/search_contention-5f4384a656b8e23e)": {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/search_filter_fallback.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/search_filter_fallback-a1710dc70c641d8b)": {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/search_filters.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/search_filters-4cac60a669cf6276)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/snapshot_verification.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/snapshot_verification-dbfaa0ca2eaf7f9d)": {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/source_addresses.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/source_addresses-d08b44d7968ba743)": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/source_lifecycle.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/source_lifecycle-a4dbb84530184fb0)": {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/source_projection.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/source_projection-875bbb7a60dcdbee)": {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/source_reading.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/source_reading-0538a25c1891aa1c)": {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_bootstrap.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/storage_bootstrap-96ee9ef5b71bd114)": {
+          "passed": 15,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_cache.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/storage_cache-b3f31bc9b439e01e)": {
+          "passed": 23,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_embedding_work.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/storage_embedding_work-f8a5b103fc5eff4c)": {
+          "passed": 15,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_failure_atomicity.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/storage_failure_atomicity-432af50abf59daab)": {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_failures.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/storage_failures-b06aa2692322cb4c)": {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/storage_vectors.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/storage_vectors-d747c1aecd30c2ae)": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "tests/target_corpus.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/target_corpus-1e0c1f2e0b9cdaf2)": {
+          "passed": 21,
+          "failed": 0,
+          "ignored": 1
+        },
+        "tests/thin_slice.rs (/Users/zdkadiev/Repos/letopis/target/release/deps/thin_slice-8cd3c4d84fd37050)": {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        }
+      }
+    },
+    "warnings": 0
+  },
+  "focused": [
+    {
+      "command": "cargo test --locked --offline --test search_filter_fallback",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "log": "fallback-green.log"
+    },
+    {
+      "command": "cargo test --locked --offline --lib service::search::tests::scoped",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "log": "scoped-green.log"
+    },
+    {
+      "command": "cargo test --locked --offline --test search_consistency",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "log": "consistency-green.log"
+    }
+  ],
+  "mutations": [
+    {
+      "name": "query-error-clear",
+      "file": "src/service/embedding.rs",
+      "command": "cargo test --locked --offline --test search_filter_fallback filtered_failure_then_success_clears_query_error_without_identity_reset",
+      "mutation_exit": 101,
+      "restored_exit": 0,
+      "original_sha256": "603e4deef364d8a666a4b763753e6a01a1d2a5bbf6cd73f761b4a5202766a2f7",
+      "mutated_sha256": "0909306555f1e678f42935c69bf0b393ea567b8b9db7ee527e882a0b06b7eed8",
+      "restored_sha256": "603e4deef364d8a666a4b763753e6a01a1d2a5bbf6cd73f761b4a5202766a2f7"
+    },
+    {
+      "name": "late-observation",
+      "file": "src/service/search/tests/scoped.rs",
+      "command": "cargo test --locked --offline --lib service::search::tests::scoped::late_provenance_failure_releases_pinned_view_while_service_stays_alive",
+      "mutation_exit": 101,
+      "restored_exit": 0,
+      "original_sha256": "4c3acebe27c2a2a99c0b65fc360376c369ca368726aa324d11b1702f5c12e730",
+      "mutated_sha256": "64908b0e28f9487a367632831d877362a1b7f0cc626028cbce763fc124b6d5bb",
+      "restored_sha256": "4c3acebe27c2a2a99c0b65fc360376c369ca368726aa324d11b1702f5c12e730"
+    },
+    {
+      "name": "late-comparison",
+      "file": "src/service/search/tests/scoped.rs",
+      "command": "cargo test --locked --offline --lib service::search::tests::scoped::late_provenance_failure_releases_pinned_view_while_service_stays_alive",
+      "mutation_exit": 101,
+      "restored_exit": 0,
+      "original_sha256": "4c3acebe27c2a2a99c0b65fc360376c369ca368726aa324d11b1702f5c12e730",
+      "mutated_sha256": "24e56d57557e35898aeb07f91e48207d90d81c0203510e4060fb9d6589613c63",
+      "restored_sha256": "4c3acebe27c2a2a99c0b65fc360376c369ca368726aa324d11b1702f5c12e730"
+    }
+  ],
+  "input_manifest": ".artifacts/tk22/task3/final-inputs.json",
+  "input_manifest_sha256": "13566d7be1b87833fe8dc45a818907a40e4ceecb712a4ce10f7d88149e7bc760",
+  "evidence_sha256": {
+    "consistency-green.log": "dead65b21c06bf5e8cbe13f261b9e7a3ba9b84117bc58e0ebb396605748473bb",
+    "fallback-focused.log": "b8428e39fd27881636afeef7fbd3ffbfbb57c30d4eed54a7215e9f33a3210692",
+    "fallback-green.log": "6c5b076ea20757ed0a43fe175f08b48870739fce7708efa5bf5ee622dbfe03f4",
+    "fallback-initial.log": "1da05257dcdf9fe329775d83aa289fb4b929ec93344c64eb2d96484661a01e5f",
+    "final-counts.json": "3386a968362c95f9acc4920fa5db59313f23f32ff2d06d9b7baf13f768eb421c",
+    "final-inputs.json": "13566d7be1b87833fe8dc45a818907a40e4ceecb712a4ce10f7d88149e7bc760",
+    "final-verify.log": "9c22eaa125571d4436b3cbdbda11edfb5d096c2529e62340ac55e0331a18a37f",
+    "mutation-late-comparison.log": "438c3b7e1b8b3ca915687c963c4d7a2c15af595bb0c6f75ac0df96135016eaf5",
+    "mutation-late-observation.log": "3fcda4cfacc7131eb5add12e4a2177e529c605a623c40887193c40b764f9af31",
+    "mutation-query-error-clear.log": "452b5010bc40dcd3c7d9e4212108ebe2c7bf3376889cc26153e85730159fc05b",
+    "mutations.json": "cf5201a875d221fa3cbe043e3fa3593622fbf9d20aa7467a28d3dabd57ab8a73",
+    "restored-late-comparison.log": "2a7f6a609b5a24f763451e183c79e31d50c2616b2e59a0a1e8bc502f6b36b24e",
+    "restored-late-observation.log": "ca6183a0eea90de0c2529d41057c5ab4b4c43e9bc34e7efd279d1dbdefa4b30a",
+    "restored-query-error-clear.log": "d214d385d1ad896901e86e69ec1d05026f51c7bc05af7f1ccd9afbb29c04b1ac",
+    "scoped-green.log": "5a6e104a51ef0effa87dbac085ad85d0ddc523f19f210beb1594ea145c8b7a9e"
+  },
+  "limits": [
+    "TK-28 status/problems UI deferred",
+    "No fresh native storage runner: schema/build/vendored/storage inputs unchanged",
+    "Linux, historical isolated harnesses, real provider deadlines, large corpus, paid model/pilot and G-1/G-2 gates not run or certified"
+  ],
+  "documentation_validation": {
+    "file_links_checked": 156,
+    "missing_targets": 0,
+    "log": ".artifacts/tk22/task3/doc-links.json",
+    "sha256": "757a61e0dd86717b0f86ae9264e45ba5bd2fa5a8c5acd3893e65c3a2145bded2"
+  }
+}

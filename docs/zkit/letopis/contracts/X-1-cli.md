@@ -32,6 +32,23 @@
 
 При ошибке query embedding успешный FTS возвращает обычный search; последняя такая ошибка хранится одной строкой query_error в `.letopis/vectors.db` и видна в status.problems, пока следующий успешный embedding запроса её не удалит (D-62). Сбой запуска drain — предупреждение в необязательном поле warnings ответа любой команды; оно не сохраняется ([D-95](../decisions.md#D-95)). Ошибка фонового embedding не отменяет уже сохранённые документы и не меняет завершённый успех reindex. Публикации сериализуются flock на index.lock; читатели используют снимки SQLite. Текст документов/источников не возвращается через search/inspect/traverse; агент читает Git/Markdown самостоятельно.
 
+## Реализованные search filters TK-22 — 2026-10-25
+
+[Результаты проверки](../checks/TK-22/report.md): `needs_recheck`, `sources` и
+`source_revisions` принимаются строгим CLI и применяются совместно по AND; внутри
+списков OR, дубли не меняют ответ, пустые/отсутствующие списки не ограничивают.
+`needs_recheck:true` требует любой текущий X-1 flag, `false` — ни одного; отсутствие
+flags не подтверждает истинность/remote availability. Source — точный canonical URI;
+whole-file и range различны. Revision — полный Git tree OID. При обоих списках
+source identity и равенство адресованных bytes должны совпасть в одной binding.
+Все requested revisions проверяются до inference и пустых candidate exits:
+missing tree — not_found, wrong type/format — invalid_request, corruption — internal_error.
+Eligible candidates ранжируются внутри полных FTS/vector каналов перед fusion/limit.
+Query failure сохраняет эти же filters и обычный FTS success без query warning;
+безопасная singleton query_error удаляется следующим успешным query при неизменной
+config identity. Missing/bad config и несовместимая размерность дают filtered FTS.
+Проверка storage/executor выполнена; status/problems UI остаётся TK-28.
+
 ## Runtime-проверки сверх JSON Schema
 Приложение проверяет bytes/hash, доступность и тип объектов Git, границы строк end>=start, ссылки, уникальность якорей в файле, наличие created_at, includes DAG и принадлежность путей корню с учётом symlink. Schema не может доказать состояние файлов или аварийный протокол.
 
