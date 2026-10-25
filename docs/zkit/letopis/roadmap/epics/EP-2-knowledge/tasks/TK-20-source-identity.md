@@ -1,6 +1,6 @@
 # TK-20 — Завершить source identity, URI и доступность
 
-> **Статус:** in_progress
+> **Статус:** done
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 3 / 6 / 10 (best / expected / worst)
@@ -43,11 +43,11 @@ Source identity по нормализованному URI, выводимая и
 
 ## 5. Критерии приёмки
 
-- [ ] Нормализованный URI целого файла/lines — единственный ID source; после удаления кэша и reindex ID и created_at source совпадают с прежними.
-- [ ] адрес source без текущих ссылок даёт not_found; у source со ссылками и недоступными bytes hash=null и flags корректны.
-- [ ] Удалённый URL остаётся адресом без web fetch.
+- [x] Нормализованный URI целого файла/lines — единственный ID source; после удаления кэша и reindex ID и created_at source совпадают с прежними.
+- [x] адрес source без текущих ссылок даёт not_found; у source со ссылками и недоступными bytes hash=null и flags корректны.
+- [x] Удалённый URL остаётся адресом без web fetch.
 
-- [ ] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
+- [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
 ## 6. Как проверить
 
@@ -80,9 +80,12 @@ CLI inspect source остаётся TK-24, историческое сравне
 
 [Отчёт и карта критериев](../../../../checks/TK-20/report.md),
 [машиночитаемый receipt](../../../../checks/TK-20/verification.json).
-Критерии и статус done остаются неотмеченными до независимого Task 3/whole-branch
-review и завершения handoff. Shared Engram и разрешённые внешние действия выполняет
-контроллер. G-1/G-2, пилот и ресурсные gates не переотмечены.
+Все три task review пройдены. Единственное Important P2 итогового ревью исправлено
+в `387a68a`; scoped re-review подтвердило исправление без новых замечаний.
+Последний make verify: debug/release по 551 passed, 0 failed, 5 ignored;
+26 focused Rust и 2 Python passed; все 291 входной хеш совпадают.
+Handoff в Engram завершён, revision 271. Done относится к утверждённому
+service-level scope; G-1/G-2, пилот и ресурсные gates не переотмечены.
 
 Уточнение final review: локальная нормализация не должна открывать зарезервированный
 HTTP(S)-префикс (`./https:notes`, `dir/../HTTP:notes`, `./https://Host/a`). Такие
@@ -90,5 +93,5 @@ source-ссылки отклоняются по invalid-file policy до пуб�
 в URL; исходное написание настоящих URL сохраняется. Новые fresh-cache/CLI,
 round-trip, last-valid и repair/removal regressions и проверка находятся в
 [отдельном final-fix receipt](../../../../checks/TK-20/final-fix-verification.json).
-Исторический receipt выше сохраняет свой снимок; scoped re-review и handoff
-контроллера остаются обязательными до изменения статуса/критериев.
+Исторический receipt выше сохраняет свой снимок; актуальный verdict — в final-fix
+receipt. Ветка остаётся локальной; merge/push/GitHub выполняются отдельным действием.

@@ -157,8 +157,8 @@ assert_eq!(preserved_vector, Some(vec![1.0, 0.0, 0.0]));
 - [x] **Mutation-check lifecycle tests and restore:** substitute maximum for minimum referencing creation time, and suppress orphan-source deletion. Confirm focused tests fail; restore exact files and run the focused suite again.
 - [x] **Document the upgrade and accepted contracts.** Stop all repository Letopis/drain processes first; rebuild only derived cache.db plus its quiescent SQLite sidecars, preserving vectors/config/locks/canonical files. Explain that current `check`/refresh recreates it; CLI reindex is not implemented here. Record opaque remote addresses/no-fetch/unknown bytes in X-4, I-4 and MC-4 with a dated link to the approved specification. Clarify I-4 historical methods remain TK-21; no new public CLI fields. Do not edit captured historical evidence or mark G-1/G-2 passed.
 - [x] **Run final verification on an unchanged input tree.** Use the commands below, capture logs and inventory with Rust/tool/platform versions. If storage/native/build/vendor product files changed unexpectedly, additionally run the relevant host storage runner in a new directory and report exactly which platform/harness was executed. Root suites do not imply historical harness or Linux execution.
-- [ ] **Perform final review.** Verify spec coverage, physical module/API/import direction, constructor wiring, URI/schema parity, no remote I/O, no stored source bytes, typed missing/error distinction, selected controls/restoration and upgrade limits. Execution method determines whether per-task reviews precede this whole-branch review; do not rerun unchanged full suites only for documentation edits.
-- [ ] **Complete report/card/receipt.** Map each TK-20 criterion to evidence, distinguish service-level acceptance from pending CLI consumers, include known unchanged ignored tests/platform limits. Record outcomes in shared Engram preserving attrs. Update GitHub results when authorized; merge/push/closure require their existing concrete authorization, not a fabricated completion.
+- [x] **Perform final review.** Verify spec coverage, physical module/API/import direction, constructor wiring, URI/schema parity, no remote I/O, no stored source bytes, typed missing/error distinction, selected controls/restoration and upgrade limits. Execution method determines whether per-task reviews precede this whole-branch review; do not rerun unchanged full suites only for documentation edits.
+- [x] **Complete report/card/receipt.** Map each TK-20 criterion to evidence, distinguish service-level acceptance from pending CLI consumers, include known unchanged ignored tests/platform limits. Record outcomes in shared Engram preserving attrs. Update GitHub results when authorized; merge/push/closure require their existing concrete authorization, not a fabricated completion.
 - [x] **Commit intended Task 3 paths:** `test: verify source lifecycle and document explicit cache rebuild`.
 
 ## Commands and Evidence
@@ -204,8 +204,8 @@ All 291 inventoried verification inputs are unchanged before/after. Native stora
 runner is not required (storage/native/build/vendor product inputs unchanged).
 The root README path assumption is corrected to existing tests/cli/README.md;
 index.lock assertions preserve identity and deletion-time bytes while allowing
-normal MC-5 ownership PID updates. Independent Task 3/whole-branch review and
-shared Engram handoff remain controller work; corresponding boxes stay unchecked.
+normal MC-5 ownership PID updates. Task 3 review subsequently passed; the final
+whole-branch finding is addressed below and shared Engram handoff is complete.
 
 ## Final-review fix wave — 2026-10-25
 
@@ -218,7 +218,7 @@ or change real opaque URL spelling, RepoPath/KnowledgeId or storage decoding.
 - [x] Add the narrow domain guard; document ambiguous root-local filenames and accepted identity/classification round trips.
 - [x] Remove the guard once, observe runtime failure, restore exact source SHA-256.
 - [x] Run restored focused Rust/Python checks and one new `make verify V=1`, with complete before/after input inventory in a separate [final-fix receipt](../../zkit/letopis/checks/TK-20/final-fix-verification.json).
-- [ ] Controller: scoped re-review, acceptance metadata and shared Engram handoff.
+- [x] Controller: scoped re-review, acceptance metadata and shared Engram handoff.
 
 Task 3's [historical receipt](../../zkit/letopis/checks/TK-20/verification.json)
 and `.artifacts/tk20/task1`, `task2`, `task3` remain unchanged. New evidence belongs
@@ -228,4 +228,4 @@ Final-fix verification passed: 26 focused Rust and 2 Python tests; debug/release
 551 passed, 0 failed, 5 ignored across 39 root binaries; 291 inputs unchanged.
 The only product change is the normalized-local-prefix domain guard. Single
 removal control failed at runtime; exact restoration and restored tests passed.
-Scoped re-review and final acceptance remain controller work.
+Scoped re-review approved the fix with no new breakage. All implementation/review gates are complete; Engram task resolved at revision 271. Code acceptance is pinned to `387a68a`; integration/publication await a finishing choice.

@@ -1,8 +1,8 @@
 # TK-20 — source identity and current availability
 
-Date: 2026-10-25. Delivery: implementation and service-level proofs prepared;
-the final-review fix is verified; scoped re-review and shared-memory handoff remain pending.
-The task stays `in_progress`; G-1/G-2 and v1 readiness are unassessed.
+Date: 2026-10-25. Delivery: accepted within the approved TK-20 service boundary.
+All three task reviews passed; the final Important P2 was fixed and scoped re-review approved.
+Engram task handoff is recorded at revision 271. G-1/G-2 and v1 readiness remain unassessed.
 
 The [approved specification](../../../../superpowers/specs/2026-10-25-tk-20-source-identity-design.md)
 and [plan](../../../../superpowers/plans/2026-10-25-tk-20-source-identity.md)
@@ -149,5 +149,32 @@ CLI inspect source consumers remain TK-24; historical source_snapshot comparison
 and source_changed remain TK-21; filters/traversal/status/SIGINT remain their later
 tasks. The common typed service is the acceptance boundary, with no new public CLI
 fields or flags. Full FR-20/FR-25 coverage, pilot/resource measurements and G-1/G-2
-are not established by this work. Independent final branch review, shared Engram
-recording and any authorized GitHub/merge/push/closure actions belong to the controller.
+are not established by this work. Independent reviews and shared Engram handoff are complete.
+GitHub/merge/push/closure are separate external actions, pending the finishing choice.
+
+## Final acceptance — 2026-10-25
+
+Accepted implementation: `387a68a0f33bea3ab446e2cc19bfe53ed33779a4`.
+Tasks 1/2/3 passed independent spec/quality review. The whole-branch review found
+one Important P2 (normalized local HTTP(S) prefix could poison a fresh cache);
+the single fix wave closed it, and scoped re-review found no new breakage or
+out-of-scope observations. Private review receipts remain in
+`.superpowers/sdd/2026-10-25-tk-20-source-identity/`.
+
+The current [final-fix verification](final-fix-verification.json) records
+551 passed/0 failed/5 ignored in each debug/release profile, strict Rustdoc,
+26 focused Rust and 2 Python checks, and 291 unchanged verification inputs.
+Across implementation and final fix, eight selected manual controls were detected
+and restored exactly. The [earlier receipt](verification.json) remains unchanged
+against its pre-fix capture; it is not the current-tree verdict.
+
+Engram task `entity_0f29a3107ec74f808465b60443226298` is resolved at revision 271.
+The following completion commit changes documentation metadata only; executable
+input parity is checked against the current receipt rather than rerunning unchanged suites.
+
+Executor decisions, in order:
+
+1. Retain ignored SDD/review/TDD/control receipts as the only local evidence copies; cost: local disk.
+2. Use existing tests/cli/README.md and docs/development.md instead of the absent root README; cost: upgrade discovery remains through current docs.
+3. Preserve index.lock inode/identity and deletion-time bytes, permit normal MC-5 PID updates during refresh; cost: expected PID text changes are allowed by preservation checks.
+4. Reject normalized root-local HTTP(S):-prefixed source paths without remote promotion; cost: such files need rename or an unambiguous directory for source addressing.

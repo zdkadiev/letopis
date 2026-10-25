@@ -137,10 +137,12 @@ Private review receipt: `.artifacts/tk20/start/builder-check.md`. The user appro
 
 ## Delivery status — 2026-10-25
 
-Tasks 1/2 are implemented and independently reviewed (`71ff596`, `838c316`).
-Task 3 lifecycle/rebuild/legacy-upgrade proofs and upgrade guidance are prepared;
-its independent task review, whole-branch review and shared-memory handoff are
-pending. The [current task report](../../zkit/letopis/checks/TK-20/report.md) and
-[verification receipt](../../zkit/letopis/checks/TK-20/verification.json) distinguish
-service-level acceptance from later CLI consumers and unassessed G-1/G-2.
-Accepted behavior above is unchanged. The task card remains in_progress.
+Implementation is accepted at `387a68a0f33bea3ab446e2cc19bfe53ed33779a4` after
+three independent task reviews, one whole-branch review and scoped approval of its
+single Important P2 fix. The normalized local-prefix rejection above preserves
+canonical parse/serialize identity and is covered by actual CLI/cache regressions.
+The [current report](../../zkit/letopis/checks/TK-20/report.md) and
+[final verification](../../zkit/letopis/checks/TK-20/final-fix-verification.json)
+record 551 passed/5 ignored per debug/release profile and 291 unchanged inputs.
+Engram handoff is complete (revision 271). CLI consumers and G-1/G-2 retain their
+stated limits; main integration and publication are separate finishing actions.

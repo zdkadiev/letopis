@@ -1,5 +1,5 @@
 {
-  "status": "verification_passed_scoped_review_pending",
+  "status": "accepted_after_scoped_review",
   "date": "2026-10-25",
   "tested_revision": "aee592970efd5fa4a3482f7d3d38a1bf577228de",
   "dirty_inputs": [
@@ -1264,5 +1264,17 @@
     "scope": "Relative link file targets in changed Markdown, excluding fenced and inline code examples; git diff --check; historical receipt/evidence integrity; post-documentation executable input hashes",
     "log": ".artifacts/tk20/final-fix/document-checks.log"
   },
-  "documentation_checker_correction": "Initial checker treated inline-code Markdown example as a real link; corrected to exclude inline code, then passed; initial failure retained separately."
+  "documentation_checker_correction": "Initial checker treated inline-code Markdown example as a real link; corrected to exclude inline code, then passed; initial failure retained separately.",
+  "acceptance": {
+    "implementation_commit": "387a68a0f33bea3ab446e2cc19bfe53ed33779a4",
+    "task_reviews": "Tasks 1, 2 and 3 approved independently",
+    "whole_branch_review": ".superpowers/sdd/2026-10-25-tk-20-source-identity/final-review.md",
+    "finding": "Important P2 canonical identity round-trip hole",
+    "finding_disposition": "ADDRESSED; no new breakage or out-of-scope observations",
+    "scoped_rereview": ".superpowers/sdd/2026-10-25-tk-20-source-identity/final-rereview.md",
+    "engram_task": "entity_0f29a3107ec74f808465b60443226298",
+    "engram_revision": 271,
+    "integration": "Local tk-20 only; no merge/push/GitHub action",
+    "completion_scope": "Approved source service scope; later CLI/historical/platform/gate limits remain"
+  }
 }
