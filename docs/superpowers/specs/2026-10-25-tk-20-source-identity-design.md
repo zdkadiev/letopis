@@ -1,6 +1,6 @@
 # TK-20 — Source identity and current availability
 
-Status: reviewed full specification; awaiting user approval of the full document. Individual scope and upgrade decisions below are approved.
+Status: approved by the user on 2026-10-25; implementation planning authorized. Scope and upgrade decisions below are approved.
 Date: 2026-10-25. Branch: `tk-20`.
 Base: `main` / `origin/main` at `a5aa3029521fb97164114047c13b0e4b74ec9232`.
 
@@ -122,4 +122,4 @@ The builder chooses exact trait/method/type names, whether to split the existing
 
 A fresh reviewer (`/root/tk20_builder_check`) found one material question: whether old cached URL identities require automatic repair or an explicit rebuild. The user answered on 2026-10-25: explicit cache rebuild on upgrade. The upgrade section records that answer. The reviewer found no other material planning questions; its service/CLI boundary and unfetched remote-state checks were clear.
 
-Private review receipt: `.artifacts/tk20/start/builder-check.md`. The full document still requires user approval before implementation planning or product changes.
+Private review receipt: `.artifacts/tk20/start/builder-check.md`. The user approved the full document on 2026-10-25 and requested the implementation plan. Product implementation awaits plan review and execution-method selection.
