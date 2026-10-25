@@ -1,6 +1,6 @@
 # TK-21 — Завершить source_snapshot и проверку происхождения
 
-> **Статус:** implemented — independent review pending
+> **Статус:** done — accepted after independent task and final reviews
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 8 / 16 (best / expected / worst)
@@ -74,7 +74,7 @@
 точные команды, counts, controls/restoration, hash map и product revision.
 Task 1 — общий provenance API/byte comparison, Task 2 — retention gate/refresh,
 Task 3 — live check/search, pinned-view и CLI contracts, post-query read release.
-Независимые task/final reviews координируются отдельно; данный статус их не заменяет.
+Три независимых task reviews и whole-branch final review approved, открытых findings нет; все пять Review Focus подтверждены. Reviewed head: `a61507d8827fc5fd75c0b4d47698f9a259fbd73b`; product revision: `cd1d94ab7709901d34bdb29dbf7d226c51d982eb`. Локальные review receipts с SHA256, models/scopes/verdicts сохранены в отчёте и квитанции. Все 16 шагов утверждённого Subagent-driven плана завершены. Ограничение старого provider-failure fixture не выдаётся за live-service runtime proof; обязательная metadata-error граница имеет отдельное реальное доказательство.
 Нет заявления о G-1/G-2/v1, paid/real-model pilot или Linux runner.
 Filters остаются TK-22; source в CLI inspect — TK-24. Нативный стек/schema/build/vendor
 в TK-21 не менялись; исторические standalone harnesses не объявляются повторно пройденными.

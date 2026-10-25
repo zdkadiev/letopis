@@ -1,8 +1,8 @@
-# TK-21 provenance — verified implementation candidate
+# TK-21 provenance — independently accepted implementation
 
 Date: 2026-10-25. Product revision: `cd1d94ab7709901d34bdb29dbf7d226c51d982eb`. Task3 base: `16f837aa119dbb7c68c1af43093130bf4834b614`.
 Approved scope: [spec](../../../../superpowers/specs/2026-10-25-tk-21-provenance-design.md).
-Independent task/final reviews are controller-owned and pending; this report records implementation and self-verification.
+Three independent task reviews and the whole-branch final review approved the scoped implementation; exact review receipts and evidence limits are recorded below.
 Machine-readable full hashes, criteria, commands and executable manifests: [verification.json](verification.json).
 
 ## Result and accepted boundaries
@@ -86,3 +86,20 @@ I-4/I-7, MC-4 and the TK-21 card record approved signatures and boundaries. Test
 
 Root skipped entries remain five: three private child entrypoints invoked by parent process tests, the real 60-second deadline entry, and existing-corpus observer entry. The latter two were not explicitly selected in this run.
 Linux and historical standalone manifests were not rerun; no paid/real-model pilot, G-1/G-2/resource gates or v1 readiness is claimed. No merge, push, GitHub or Engram writes. Live bytes remain per-file observations without multi-file atomicity.
+
+## Independent acceptance and execution closure — 2026-10-25
+
+All three task gates and the independent whole-branch review are approved, with no open Critical/Important/Minor findings. The final review accepts all five Review Focus cases and reports **Ready to merge: Yes** for the approved TK-21 scope. This is acceptance evidence, not a merge/push action or a claim about broader gates.
+Execution was approved Subagent-driven after the user superseded the initial Native choice; all 16 planned steps are complete. The verified product revision remains `cd1d94ab7709901d34bdb29dbf7d226c51d982eb`; reviewed head `a61507d8827fc5fd75c0b4d47698f9a259fbd73b` adds acceptance docs only. This final reconciliation also changes documentation only.
+Local ignored review/evidence receipts are retained against their captured revisions; SHA256 values below identify their exact contents. Historical input, binary and log hash tables remain intact.
+
+| Review | Scope and verdict | Model / effort | Reviewed base → head | SHA256 |
+| --- | --- | --- | --- | --- |
+| [task-1](../../../../../.superpowers/sdd/2026-10-25-tk-21-provenance/task-1-review.md) | Task1 shared provenance API, exact byte observation, revision comparison, retention and read-only wiring. Spec compliant; task quality Approved; no open findings. | `gpt-6.1-sol` / `high` | `f3167b91e24efec51287b0f85d9b590033425c34` → `1d8b2e057401b3456ccc0e7185a04f75e28f1a91` | `c1f0f2480ca2ab3b4e56ebf13ff5102540f85bdf8a69f8966125ae624f89ae95` |
+| [task-2](../../../../../.superpowers/sdd/2026-10-25-tk-21-provenance/task-2-review.md) | Task2 pre-publication retention gate, locking, unchanged refresh and last-valid basis; mandatory late cleanup carried to Task3. Spec compliant; task quality Approved; no open findings. | `gpt-6-astra` / `high` | `1d8b2e057401b3456ccc0e7185a04f75e28f1a91` → `16f837aa119dbb7c68c1af43093130bf4834b614` | `46ba3a163ae949ad17228c84992b90bacb55d59587f26dd9e93995a35cd0d300` |
+| [task-3](../../../../../.superpowers/sdd/2026-10-25-tk-21-provenance/task-3-review.md) | Task3 check/search, X-1, same-view bindings, mandatory real-storage post-query metadata-error cleanup and acceptance evidence. Spec compliant; task quality Approved; no Critical/Important/Minor. | `gpt-6.1-sol` / `high` | `16f837aa119dbb7c68c1af43093130bf4834b614` → `a61507d8827fc5fd75c0b4d47698f9a259fbd73b` | `5a38ac039b4c69f90c384baa6ea1af137270175b3b6bb9e5c429e9a95b97d5d7` |
+| [final](../../../../../.superpowers/sdd/2026-10-25-tk-21-provenance/final-review.md) | Whole branch: all37 changed files including implementation, tests, spec/plan/contracts/card/report/receipt; all5 Review Focus cases satisfied. Ready to merge: Yes for approved TK21 scope; no Critical/Important/Minor. | `gpt-6-astra` / `high` | `9b798be522782e64375f4cbd293b76778e517117` → `a61507d8827fc5fd75c0b4d47698f9a259fbd73b` | `05bd79b116991c1142e86e0aed3419aaed0026d83372e596d0f102d6a0db555a` |
+
+Provider-failure evidence limit: the existing barrier test drops its temporary SearchService before checkpointing and alone does not establish cleanup while that service remains alive. The reviews inspected local reader ownership and RAII; the mandatory post-query metadata-error test separately proves live-service checkpoint/publication after a successful controlled query and real metadata failure. No stronger provider-live runtime claim is made.
+
+JSON search filters remain TK-22; source CLI inspect remains TK-24. Linux/native-runner reruns, historical standalone harnesses, real 60-second deadline, corpus/paid/real-model pilot, resource gates, G-1/G-2 and v1 readiness remain unclaimed. No unchanged product suites were rerun for this documentation-only closure. No Engram/GitHub/merge/push action is performed here.

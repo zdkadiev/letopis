@@ -10,7 +10,7 @@
 
 **Spec:** [Утверждённая спецификация TK-21](../specs/2026-10-25-tk-21-provenance-design.md), approved 2026-10-25 («go on», включая два уточнения).
 
-**Execution:** План ожидает review пользователя и выбора Native/Subagent-driven; продуктовая реализация ещё не разрешена этим документом.
+**Execution:** approved — Subagent-driven. Пользователь утвердил план и затем заменил первоначальный выбор Native указанием «no go subagent». Все 16 шагов выполнены; три task reviews и независимый whole-branch final review approved. Product revision: `cd1d94ab7709901d34bdb29dbf7d226c51d982eb`.
 
 ## Global Constraints
 
@@ -140,7 +140,7 @@ service через настоящие constructor calls, без нового г�
 **Produces:** точные interfaces/types выше; `wire_source_provenance`; typed
 observation/compare/retain, без привязки к CLI workflow или storage lifetime.
 
-- [ ] **Step 1: Написать failing observation/revision tests.** Общий helper
+- [x] **Step 1: Написать failing observation/revision tests.** Общий helper
   `create_basis(root: &Path, files: &[(&str, &[u8])]) -> TreeOid` создаёт дерево через
   существующий GitSnapshots; `build_note(snapshot: Option<&TreeOid>, sources: &[&str], body: &str) -> String`
   создаёт явную Markdown fixture. Helpers не вычисляют ожидаемые flags/равенство.
@@ -170,13 +170,13 @@ assert_eq!(absent_range, SourceRevisionComparison::SourceNotFound);
   нельзя случайно скрестить. InvalidRequest не превращать в NotFound; corruption и
   unsafe/I/O сохраняют private cause и безопасное сообщение.
 
-- [ ] **Step 2: Запустить RED.**
+- [x] **Step 2: Запустить RED.**
   `cargo test --locked --offline --test provenance_observation --test provenance_revisions`.
   Сначала API может отсутствовать; после добавления минимальных declarations получить
   хотя бы один runtime RED на сравнении/классификации. Сохранить фактическую причину,
   не выдавать compile failure за доказательство поведения.
 
-- [ ] **Step 3: Реализовать API из блока выше.** Для локального адреса читать complete
+- [x] **Step 3: Реализовать API из блока выше.** Для локального адреса читать complete
   Git blob, выбирать bytes через существующий LocalSource, сравнивать точные SHA-256
   выбранных bytes с live capture (не stored source hash). Приватные helpers
   `read_snapshot_hash(&self, tree: &TreeOid, source: &SourceUri) -> Result<Option<Sha256>, SnapshotError>`
@@ -186,13 +186,13 @@ assert_eq!(absent_range, SourceRevisionComparison::SourceNotFound);
   observation. Проверить retention через private fake: once-per-unique-OID, no pin
   missing/invalid, pin failure propagated. Observe/compare вообще не вызывают pin.
 
-- [ ] **Step 4: GREEN, control, архитектурная проверка.** Повторить две test binaries
+- [x] **Step 4: GREEN, control, архитектурная проверка.** Повторить две test binaries
   и `cargo test --locked --offline --lib service::provenance::tests`, затем `make check`.
   По одному control на подмену адресованного equality OID-равенством и подавление
   missing requested root; тесты обязаны упасть. Восстановить код и повторить focused
   tests. Проверить отсутствие SQL/HTTP/new runtime, actual lib.rs wiring и видимость.
 
-- [ ] **Step 5: Commit.** Добавить только перечисленные Task 1 paths;
+- [x] **Step 5: Commit.** Добавить только перечисленные Task 1 paths;
   `git commit -m "feat(tk-21): observe source provenance and compare addressed revisions"`.
   Записать SHA/команды/controls в Engram и локальный ledger.
 
@@ -209,7 +209,7 @@ constructor `new(dependencies: RefreshDependencies<G,F,M,S,P>) -> Self`;
 реэкспортируется crate-private через service/mod.rs для actual wiring;
 `Refresher::refresh`/RefreshOutcome wire API без новых persisted/public JSON fields.
 
-- [ ] **Step 1: Написать failing indexing tests.** Имена/ключевые assertions:
+- [x] **Step 1: Написать failing indexing tests.** Имена/ключевые assertions:
 
 ```rust
 // retain_basis_before_publishing_and_keep_history_after_gc
@@ -240,11 +240,11 @@ assert_eq!(capture_head_and_index(&repo), user_state_before);
   failure не начинают успешную SQL-публикацию. Пропавший root публикуется с исходным
   OID; его последующее появление проверяется без новой Markdown/SQL revision.
 
-- [ ] **Step 2: RED.** `cargo test --locked --offline --test provenance_indexing`.
+- [x] **Step 2: RED.** `cargo test --locked --offline --test provenance_indexing`.
   Получить runtime failure отсутствующего ref/ошибочно успешной публикации. Сохранить
   counts и причину; не менять существующие race/crash assertions ради GREEN.
 
-- [ ] **Step 3: Добавить preflight и retention gate.** Сохранить существующую схему
+- [x] **Step 3: Добавить preflight и retention gate.** Сохранить существующую схему
   detect → index.lock → redetect. Под lock собрать старые эффективные основания и
   новые основания только валидных изменённых файлов, проверяя captured stat/hash
   против Observation. Предварительно прочитать/разобрать по одному изменённому файлу,
@@ -281,14 +281,14 @@ assert_eq!(capture_head_and_index(&repo), user_state_before);
   старые test counters обновляются только на эту объяснённую работу. Unchanged
   файлы не перепарсивать, race/rollback/lock assertions сохраняются.
 
-- [ ] **Step 4: GREEN и controls.** Выполнить `cargo test --locked --offline --test provenance_indexing --test document_refresh --test source_lifecycle`,
+- [x] **Step 4: GREEN и controls.** Выполнить `cargo test --locked --offline --test provenance_indexing --test document_refresh --test source_lifecycle`,
   private `cargo test --locked --offline --lib service::document_refresher::tests` и
   `make check`. Controls: убрать retain call; вернуть early return для неизменного
   Markdown с missing→available tree. Соответствующие tests падают; восстановить код,
   повторить affected tests. Проверить, что source bytes/search text не накапливаются
   на весь корпус и existing atomicity/revision/checkpoints сохранены.
 
-- [ ] **Step 5: Commit.** Только Task 2 files и явно нужные constructor fixtures;
+- [x] **Step 5: Commit.** Только Task 2 files и явно нужные constructor fixtures;
   `git commit -m "feat(tk-21): retain declared source bases before cache publication"`.
   Зафиксировать runtime RED/GREEN, controls и actual scope в Engram/ledger.
 
@@ -301,7 +301,7 @@ consumer; существующие X-1 output envelope, owner selection и Graph
 **Produces:** check + search с live provenance; неизменные JSON fields, две дополнительные
 допустимые строки flags; полный TK-21 report/receipt с границами последующих задач.
 
-- [ ] **Step 1: Написать failing CLI и pinned-view tests.**
+- [x] **Step 1: Написать failing CLI и pinned-view tests.**
 
 ```rust
 // search_observes_source_only_changes_without_new_cache_revision
@@ -327,11 +327,11 @@ assert_eq!(problem["details"]["reason"], "missing_source_snapshot");
   Скорректировать старые check fixtures, где новые provenance findings теперь
   ожидаемы: объяснить каждое изменение, не ослаблять assertions до contains-only.
 
-- [ ] **Step 2: RED.** `cargo test --locked --offline --test provenance_commands` и
+- [x] **Step 2: RED.** `cargo test --locked --offline --test provenance_commands` и
   targeted private check/search cases. Получить фактическое отсутствие flags/findings,
   а не ограничиться compile failure нового constructor.
 
-- [ ] **Step 3: Подключить consumers и concrete wiring.**
+- [x] **Step 3: Подключить consumers и concrete wiring.**
   `CheckService<D,S,G,P>::new(refresher: D, storage: S, diagnostics: G, provenance: P)`
   заменяет прежний generic V:SnapshotVerifier; private root-only SnapshotChecks
   удаляется, не остаётся вторым алгоритмом. Caller группирует Source targets
@@ -349,7 +349,7 @@ assert_eq!(problem["details"]["reason"], "missing_source_snapshot");
   обновить комментарии Checker/Searcher и public reexports. Consumer helpers не
   импортируют concrete adapters. Отсутствие basis не делает knowledge invalid-file.
 
-- [ ] **Step 4: Focused GREEN, controls и итоговое ревью.**
+- [x] **Step 4: Focused GREEN, controls и итоговое ревью.**
   `cargo test --locked --offline --test provenance_observation --test provenance_revisions --test provenance_indexing --test provenance_commands --test check_command --test check_lifecycle --test knowledge_search --test search_consistency --test search_contention --test source_projection`;
   затем relevant private check/search tests. Controls: удалить merge source flags
   в search и подавить check SourceNotFound issue; tests обязаны упасть. Восстановить
@@ -358,7 +358,7 @@ assert_eq!(problem["details"]["reason"], "missing_source_snapshot");
   Итоговое independent whole-branch review по выбранному execution workflow; реальные
   findings исправить с focused regressions перед окончательным verification run.
 
-- [ ] **Step 5: Fresh verification и документация.** Выполнить один полный `make verify`
+- [x] **Step 5: Fresh verification и документация.** Выполнить один полный `make verify`
   (`make verify V=1` с выводом в новый evidence log) на фактическом финальном tree, сохранить source-input hashes и точные
   counts с исключением вложенных subprocess summaries. Проверить schema/native/build
   diff: при их изменении нужен `python3 -B tests/storage/run.py --platform host --evidence <new-directory>`;
@@ -372,7 +372,7 @@ assert_eq!(problem["details"]["reason"], "missing_source_snapshot");
   remaining TK-22/TK-24 scopes. Ссылки/JSON/diff проверить после документационных
   правок; неизменённые product suites повторно без причины не гонять.
 
-- [ ] **Step 6: Commit и handoff.** Добавить только Task 3 paths/report/docs;
+- [x] **Step 6: Commit и handoff.** Добавить только Task 3 paths/report/docs;
   `git commit -m "feat(tk-21): expose live provenance diagnostics and search flags"`.
   При doc-only acceptance metadata использовать отдельный точный commit. Сохранить
   результаты/commits в существующую задачу Engram с сохранением attrs и provenance;
@@ -402,3 +402,20 @@ Task 1 одновременно добавляет enum variants и formatter ar
 collaborators заменён request struct; private preflight types/signature и стоимость
 повторного чтения определены явно. Отдельный subagent plan review не выполнялся
 и skill его не требует: здесь проведён self-review, не code review.
+
+## Independent acceptance and execution closure — 2026-10-25
+
+All three task gates and the independent whole-branch review are approved, with no open Critical/Important/Minor findings. The final review accepts all five Review Focus cases and reports **Ready to merge: Yes** for the approved TK-21 scope. This is acceptance evidence, not a merge/push action or a claim about broader gates.
+Execution was approved Subagent-driven after the user superseded the initial Native choice; all 16 planned steps are complete. The verified product revision remains `cd1d94ab7709901d34bdb29dbf7d226c51d982eb`; reviewed head `a61507d8827fc5fd75c0b4d47698f9a259fbd73b` adds acceptance docs only. This final reconciliation also changes documentation only.
+Local ignored review/evidence receipts are retained against their captured revisions; SHA256 values below identify their exact contents. Historical input, binary and log hash tables remain intact.
+
+| Review | Scope and verdict | Model / effort | Reviewed base → head | SHA256 |
+| --- | --- | --- | --- | --- |
+| [task-1](../../../.superpowers/sdd/2026-10-25-tk-21-provenance/task-1-review.md) | Task1 shared provenance API, exact byte observation, revision comparison, retention and read-only wiring. Spec compliant; task quality Approved; no open findings. | `gpt-6.1-sol` / `high` | `f3167b91e24efec51287b0f85d9b590033425c34` → `1d8b2e057401b3456ccc0e7185a04f75e28f1a91` | `c1f0f2480ca2ab3b4e56ebf13ff5102540f85bdf8a69f8966125ae624f89ae95` |
+| [task-2](../../../.superpowers/sdd/2026-10-25-tk-21-provenance/task-2-review.md) | Task2 pre-publication retention gate, locking, unchanged refresh and last-valid basis; mandatory late cleanup carried to Task3. Spec compliant; task quality Approved; no open findings. | `gpt-6-astra` / `high` | `1d8b2e057401b3456ccc0e7185a04f75e28f1a91` → `16f837aa119dbb7c68c1af43093130bf4834b614` | `46ba3a163ae949ad17228c84992b90bacb55d59587f26dd9e93995a35cd0d300` |
+| [task-3](../../../.superpowers/sdd/2026-10-25-tk-21-provenance/task-3-review.md) | Task3 check/search, X-1, same-view bindings, mandatory real-storage post-query metadata-error cleanup and acceptance evidence. Spec compliant; task quality Approved; no Critical/Important/Minor. | `gpt-6.1-sol` / `high` | `16f837aa119dbb7c68c1af43093130bf4834b614` → `a61507d8827fc5fd75c0b4d47698f9a259fbd73b` | `5a38ac039b4c69f90c384baa6ea1af137270175b3b6bb9e5c429e9a95b97d5d7` |
+| [final](../../../.superpowers/sdd/2026-10-25-tk-21-provenance/final-review.md) | Whole branch: all37 changed files including implementation, tests, spec/plan/contracts/card/report/receipt; all5 Review Focus cases satisfied. Ready to merge: Yes for approved TK21 scope; no Critical/Important/Minor. | `gpt-6-astra` / `high` | `9b798be522782e64375f4cbd293b76778e517117` → `a61507d8827fc5fd75c0b4d47698f9a259fbd73b` | `05bd79b116991c1142e86e0aed3419aaed0026d83372e596d0f102d6a0db555a` |
+
+Provider-failure evidence limit: the existing barrier test drops its temporary SearchService before checkpointing and alone does not establish cleanup while that service remains alive. The reviews inspected local reader ownership and RAII; the mandatory post-query metadata-error test separately proves live-service checkpoint/publication after a successful controlled query and real metadata failure. No stronger provider-live runtime claim is made.
+
+JSON search filters remain TK-22; source CLI inspect remains TK-24. Linux/native-runner reruns, historical standalone harnesses, real 60-second deadline, corpus/paid/real-model pilot, resource gates, G-1/G-2 and v1 readiness remain unclaimed. No unchanged product suites were rerun for this documentation-only closure. No Engram/GitHub/merge/push action is performed here.

@@ -1,5 +1,5 @@
 {
-  "status": "verified_candidate; controller independent task/final review pending",
+  "status": "accepted after three independent task reviews and whole-branch final review",
   "product_revision": "cd1d94ab7709901d34bdb29dbf7d226c51d982eb",
   "tested_worktree_parent": "16f837aa119dbb7c68c1af43093130bf4834b614",
   "original_branch_base": "9b798be522782e64375f4cbd293b76778e517117",
@@ -2682,5 +2682,69 @@
       "sha256": "a0d0f0b51196ea6f44b04d133f4e9767738d2082d073712826859e79504605be",
       "bytes": 4131680
     }
+  },
+  "independent_reviews": [
+    {
+      "id": "task-1",
+      "path": ".superpowers/sdd/2026-10-25-tk-21-provenance/task-1-review.md",
+      "reviewer": "/root/tk21_task1_review",
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "high",
+      "base": "f3167b91e24efec51287b0f85d9b590033425c34",
+      "reviewed_head": "1d8b2e057401b3456ccc0e7185a04f75e28f1a91",
+      "scope": "Task1 shared provenance API, exact byte observation, revision comparison, retention and read-only wiring",
+      "verdict": "Spec compliant; task quality Approved; no open findings",
+      "sha256": "c1f0f2480ca2ab3b4e56ebf13ff5102540f85bdf8a69f8966125ae624f89ae95",
+      "retained_local_receipt": true
+    },
+    {
+      "id": "task-2",
+      "path": ".superpowers/sdd/2026-10-25-tk-21-provenance/task-2-review.md",
+      "reviewer": "/root/tk21_task2_review",
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "base": "1d8b2e057401b3456ccc0e7185a04f75e28f1a91",
+      "reviewed_head": "16f837aa119dbb7c68c1af43093130bf4834b614",
+      "scope": "Task2 pre-publication retention gate, locking, unchanged refresh and last-valid basis; mandatory late cleanup carried to Task3",
+      "verdict": "Spec compliant; task quality Approved; no open findings",
+      "sha256": "46ba3a163ae949ad17228c84992b90bacb55d59587f26dd9e93995a35cd0d300",
+      "retained_local_receipt": true
+    },
+    {
+      "id": "task-3",
+      "path": ".superpowers/sdd/2026-10-25-tk-21-provenance/task-3-review.md",
+      "reviewer": "/root/tk21_task3_review",
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "high",
+      "base": "16f837aa119dbb7c68c1af43093130bf4834b614",
+      "reviewed_head": "a61507d8827fc5fd75c0b4d47698f9a259fbd73b",
+      "scope": "Task3 check/search, X-1, same-view bindings, mandatory real-storage post-query metadata-error cleanup and acceptance evidence",
+      "verdict": "Spec compliant; task quality Approved; no Critical/Important/Minor",
+      "sha256": "5a38ac039b4c69f90c384baa6ea1af137270175b3b6bb9e5c429e9a95b97d5d7",
+      "retained_local_receipt": true
+    },
+    {
+      "id": "final",
+      "path": ".superpowers/sdd/2026-10-25-tk-21-provenance/final-review.md",
+      "reviewer": "/root/tk21_final_review",
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "base": "9b798be522782e64375f4cbd293b76778e517117",
+      "reviewed_head": "a61507d8827fc5fd75c0b4d47698f9a259fbd73b",
+      "scope": "Whole branch: all37 changed files including implementation, tests, spec/plan/contracts/card/report/receipt; all5 Review Focus cases satisfied",
+      "verdict": "Ready to merge: Yes for approved TK21 scope; no Critical/Important/Minor",
+      "sha256": "05bd79b116991c1142e86e0aed3419aaed0026d83372e596d0f102d6a0db555a",
+      "retained_local_receipt": true
+    }
+  ],
+  "review_evidence_limit": "The older provider-failure barrier test drops its temporary SearchService before checkpointing; it alone is not runtime proof of provider-failure cleanup with the service alive. Review accepts the actual local-reader ownership/RAII. The mandatory metadata_failure_after_query_releases_pinned_view has stronger live-service runtime evidence after a successful controlled query; no broader provider-live runtime claim is made.",
+  "finalization": {
+    "date": "2026-10-25",
+    "scope": "Documentation-only acceptance/execution reconciliation; product code, verification inputs and historical evidence hashes unchanged",
+    "execution": "Approved Subagent-driven; all16 planned steps completed",
+    "validation": "JSON/doclinks/diff; parity of304 current inputs,32 historical evidence entries and86 verified executables",
+    "product_suites_rerun": false,
+    "review_receipts_retained": true,
+    "engram_gitHub_merge_push": "Controller-owned; not performed by finalization worker"
   }
 }
