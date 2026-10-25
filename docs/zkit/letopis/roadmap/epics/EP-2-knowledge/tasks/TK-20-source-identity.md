@@ -83,3 +83,12 @@ CLI inspect source остаётся TK-24, историческое сравне
 Критерии и статус done остаются неотмеченными до независимого Task 3/whole-branch
 review и завершения handoff. Shared Engram и разрешённые внешние действия выполняет
 контроллер. G-1/G-2, пилот и ресурсные gates не переотмечены.
+
+Уточнение final review: локальная нормализация не должна открывать зарезервированный
+HTTP(S)-префикс (`./https:notes`, `dir/../HTTP:notes`, `./https://Host/a`). Такие
+source-ссылки отклоняются по invalid-file policy до публикации, без превращения
+в URL; исходное написание настоящих URL сохраняется. Новые fresh-cache/CLI,
+round-trip, last-valid и repair/removal regressions и проверка находятся в
+[отдельном final-fix receipt](../../../../checks/TK-20/final-fix-verification.json).
+Исторический receipt выше сохраняет свой снимок; scoped re-review и handoff
+контроллера остаются обязательными до изменения статуса/критериев.

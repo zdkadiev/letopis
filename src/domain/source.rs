@@ -23,7 +23,10 @@ impl SourceUri {
     /// # Errors
     /// Returns [`ValueError::InvalidPath`] for invalid local paths or remote
     /// addresses without `://` and a nonempty authority, or with controls,
-    /// whitespace or backslashes. Returns [`ValueError::InvalidRange`] for
+    /// whitespace or backslashes. Local paths whose normalization exposes a
+    /// case-insensitive `http:` or `https:` prefix are also invalid: their
+    /// serialized identity would otherwise be reclassified as remote.
+    /// Returns [`ValueError::InvalidRange`] for
     /// malformed, zero, reversed or overflowing local line ranges.
     pub fn parse(raw: &str) -> Result<Self, ValueError> {
         if has_remote_scheme(raw) {
@@ -34,6 +37,9 @@ impl SourceUri {
             });
         }
         let local = LocalSource::parse(raw)?;
+        if has_remote_scheme(local.path.as_str()) {
+            return Err(ValueError::InvalidPath);
+        }
         let mut address = local.path.as_str().to_owned();
         if let Some(lines) = local.lines {
             address.push_str(&format!("#L{}-L{}", lines.get_start(), lines.get_end()));

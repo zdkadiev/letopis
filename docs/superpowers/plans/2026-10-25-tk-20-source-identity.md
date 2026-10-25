@@ -206,3 +206,26 @@ The root README path assumption is corrected to existing tests/cli/README.md;
 index.lock assertions preserve identity and deletion-time bytes while allowing
 normal MC-5 ownership PID updates. Independent Task 3/whole-branch review and
 shared Engram handoff remain controller work; corresponding boxes stay unchecked.
+
+## Final-review fix wave — 2026-10-25
+
+The controller accepted one P2 finding: normalization can expose a reserved
+HTTP(S) prefix in a local path, yielding an identity that storage cannot decode.
+Reject it as InvalidPath before SourceUri publication; do not promote it to a URL
+or change real opaque URL spelling, RepoPath/KnowledgeId or storage decoding.
+
+- [x] Capture runtime RED for literal dot/parent/case/range inputs and real fresh-cache CLI/SQLite publication; cover last-valid retention and repair/removal.
+- [x] Add the narrow domain guard; document ambiguous root-local filenames and accepted identity/classification round trips.
+- [x] Remove the guard once, observe runtime failure, restore exact source SHA-256.
+- [x] Run restored focused Rust/Python checks and one new `make verify V=1`, with complete before/after input inventory in a separate [final-fix receipt](../../zkit/letopis/checks/TK-20/final-fix-verification.json).
+- [ ] Controller: scoped re-review, acceptance metadata and shared Engram handoff.
+
+Task 3's [historical receipt](../../zkit/letopis/checks/TK-20/verification.json)
+and `.artifacts/tk20/task1`, `task2`, `task3` remain unchanged. New evidence belongs
+to `.artifacts/tk20/final-fix/`; current-tree verification must use the new receipt.
+
+Final-fix verification passed: 26 focused Rust and 2 Python tests; debug/release each
+551 passed, 0 failed, 5 ignored across 39 root binaries; 291 inputs unchanged.
+The only product change is the normalized-local-prefix domain guard. Single
+removal control failed at runtime; exact restoration and restored tests passed.
+Scoped re-review and final acceptance remain controller work.

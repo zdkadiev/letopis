@@ -1,7 +1,7 @@
 # TK-20 — source identity and current availability
 
 Date: 2026-10-25. Delivery: implementation and service-level proofs prepared;
-independent Task 3 review, whole-branch review and shared-memory handoff remain pending.
+the final-review fix is verified; scoped re-review and shared-memory handoff remain pending.
 The task stays `in_progress`; G-1/G-2 and v1 readiness are unassessed.
 
 The [approved specification](../../../../superpowers/specs/2026-10-25-tk-20-source-identity-design.md)
@@ -23,7 +23,47 @@ without claiming future CLI source inspect, historical comparisons or reindex.
 | Expected absence differs from unsafe/I/O/storage failure; publication remains atomic | Private/public source tests cover safe typed failures; symlink/nonregular input and deliberate fixture storage corruption remain errors. Lifecycle collision test asserts unchanged complete state/revision, retained FTS and absent rejected text. |
 | Architecture remains modular, no source text storage or remote I/O | Reviewed actual domain/service/adapter/composition files listed below. No storage schema, dependency, process or provider change; result contains metadata/state only. |
 
-## Verification and input identity
+## Current final-review fix and verification
+
+One confirmed P2 is fixed in `src/domain/source.rs`: a local path whose dot/parent
+normalization exposes case-insensitive `http:`/`https:` is rejected as InvalidPath
+before publishing SourceUri. It cannot produce an unreadable persisted identity.
+Raw absolute remote URLs remain exact and opaque; RepoPath/KnowledgeId are unchanged.
+Root-local filenames with these reserved prefixes require a rename or a containing
+directory such as `docs/https:notes`, as recorded in the specification and X-4/I-4.
+
+The current executable tree is covered by the separate
+[final-fix verification receipt](final-fix-verification.json): base
+`aee592970efd5fa4a3482f7d3d38a1bf577228de` plus its exact dirty input map.
+All **291** source/test/build/schema input hashes match before/after verification.
+One new `make verify V=1` passed: debug and release each **551 passed, 0 failed,
+5 ignored across 39 root binaries**, with the counting method below. Restored
+focused checks passed **26 Rust and 2 Python tests**. New logs live only under
+`.artifacts/tk20/final-fix/`; the historical Task 3 receipt and its 20 evidence
+hashes remain unchanged. The historical phase below records its own tested tree.
+
+Runtime RED proved all three failures before the fix: ambiguous source acceptance,
+fresh-cache actual CLI `internal_error` / `cannot read graph diagnostics`, and
+invalid edits bypassing last-valid retention. New regressions cover literal
+case/range variants, accepted local/remote identity/classification round trips,
+repeated safe CLI checks over fresh SQLite, empty node/edge rows for invalid files,
+repair without rebuilding, preserved prior graph/FTS, and removal of the referrer.
+An initial GREEN attempt found a fixture assumption: ReadingRepo also contains
+unmarked `live.md`; the test now expects two files and locates `bad.md` explicitly.
+That failed attempt is retained as `green.log`; no additional product fix was needed.
+
+The single control removed only the new guard and reproduced the CLI failure
+(exit 101). Before/restored SHA-256 of `src/domain/source.rs` is
+`6081ea9a355783d4cbffd0878d9801fc22798d7ce682ece48b257ad402b0852e`;
+restored focused tests then passed before final verification. No other controls
+or historical suites were rerun. Physical review confirms the only product change
+is pure domain validation, reusing the existing scheme predicate; imports,
+visibility, service-owned traits, storage decoding and constructor wiring are
+unchanged. Native/storage/build/vendor/dependencies/schema are unchanged, so the
+conditional native runner is not required. Ignored/platform/consumer limits below
+still apply. Scoped re-review and administrative acceptance belong to the controller.
+
+## Historical Task 3 verification and input identity
 
 The machine-readable [verification receipt](verification.json) holds the exact tested
 implementation revision, dirty path list, SHA-256 input map, platform/tool versions,

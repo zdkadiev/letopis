@@ -42,6 +42,17 @@ Verified at the base revision:
 
 The sole ID is the canonical root-relative file path, optionally followed by `#Lstart-Lend`. Normalize `.`/`..`, redundant slash components and decimal line numbers using the existing TK-7 rules. Reject root escape, absolute paths, control characters and malformed, zero, reversed or overflowing ranges. Preserve path case and Unicode; do not resolve symlinks or decode percent escapes as part of lexical normalization.
 
+Reject local spellings whose normalized root path begins with case-insensitive
+`http:` or `https:` (for example `./https:notes`, `dir/../HTTP:notes`,
+`./https://Host/a`, including local line ranges). These reserved prefixes would
+change classification when the sole persisted identity is parsed again. Do not
+promote a normalized local spelling into a remote URL. Every accepted serialized
+address must parse again with the same identity and local/remote classification.
+Root-local filenames with these prefixes require renaming or an unambiguous
+containing directory such as `docs/https:notes`; RepoPath/KnowledgeId grammar is
+unchanged. This final-review clarification was approved by the controller on
+2026-10-25; raw absolute remote URLs still retain their exact original spelling.
+
 A whole-file address and each explicit range remain distinct source nodes, even when their addressed bytes happen to match. Multiple external links with equivalent local spellings identify one source. No UUID, source registration file, hidden creation timestamp or metadata ID is added.
 
 ### Remote addresses

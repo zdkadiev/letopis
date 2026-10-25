@@ -1,4 +1,4 @@
-use letopis::domain::SourceUri;
+use letopis::domain::{SourceUri, ValueError};
 
 type ByteSelectionCase<'a> = (&'a str, &'a [u8], Option<&'a [u8]>);
 
@@ -14,12 +14,22 @@ fn normalize_local_source_identity() {
         ),
         ("./src//A%2fЯ.rs", "src/A%2fЯ.rs", "src/A%2fЯ.rs", None),
         ("a#L1-L1", "a#L1-L1", "a", Some((1, 1))),
+        (
+            "./docs/https:notes",
+            "docs/https:notes",
+            "docs/https:notes",
+            None,
+        ),
+        ("http-notes", "http-notes", "http-notes", None),
     ] {
         // Act
         let source = SourceUri::parse(raw).unwrap();
         let local = source.get_local().unwrap();
         // Assert
         assert_eq!(source.as_str(), expected);
+        let reparsed = SourceUri::parse(source.as_str()).unwrap();
+        assert_eq!(reparsed.as_str(), expected);
+        assert!(reparsed.get_local().is_some());
         assert_eq!(local.get_path().as_str(), path);
         assert_eq!(
             local
@@ -49,12 +59,33 @@ fn preserve_opaque_remote_identity() {
         // Assert
         assert_eq!(remote.as_str(), raw);
         assert!(remote.get_local().is_none());
+        let reparsed = SourceUri::parse(remote.as_str()).unwrap();
+        assert_eq!(reparsed.as_str(), raw);
+        assert!(reparsed.get_local().is_none());
     }
     // Arrange / Act
     let upper = SourceUri::parse("https://Host/%2f").unwrap();
     let lower = SourceUri::parse("https://host/%2F").unwrap();
     // Assert
     assert_ne!(upper, lower);
+}
+
+#[test]
+fn reject_local_normalization_exposing_reserved_remote_prefix() {
+    // Arrange: these are local spellings, not raw absolute remote URLs.
+    for raw in [
+        "./https:notes",
+        "dir/../HTTP:notes",
+        "./https://Host/a",
+        "./hTtPs:notes#L01-L02",
+        "dir/../http://Host/a#L1-L2",
+        "./HTTP:notes#L1-L1",
+    ] {
+        // Act
+        let result = SourceUri::parse(raw);
+        // Assert
+        assert_eq!(result, Err(ValueError::InvalidPath), "{raw:?}");
+    }
 }
 
 #[test]
