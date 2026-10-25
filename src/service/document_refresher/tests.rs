@@ -1,16 +1,19 @@
-use super::DocumentRefresher;
+use super::{DocumentRefresher, RefreshDependencies};
 use crate::{
-    domain::RepoPath,
+    domain::{RepoPath, TreeOid},
     markdown::MarkdownParser,
     service::{
-        CapturedFile, CorpusLister, Diagnostic, DocumentError, DocumentErrorKind, DocumentResult,
-        FileStat, FileSystem, MarkdownCodec, ParsedFile, Refresher, Storage, StorageRead,
+        BasisRetainer, CapturedFile, CorpusLister, Diagnostic, DocumentError, DocumentErrorKind,
+        DocumentResult, FileStat, FileSystem, MarkdownCodec, ParsedFile, ProvenanceObservation,
+        ProvenanceRequest, Refresher, SnapshotError, SourceProvenance, SourceRevisionComparison,
+        SourceRevisionRequest, Storage, StorageRead,
     },
     storage::SqliteStorage,
 };
 use rusqlite::Connection;
 use std::{
     cell::{Cell, RefCell},
+    collections::BTreeSet,
     path::Path,
 };
 use tempfile::TempDir;
@@ -99,7 +102,29 @@ impl MarkdownCodec for CountingMarkdown {
         MarkdownParser::new().parse_file(path, bytes)
     }
 }
-type TestService = DocumentRefresher<Candidates, TestFiles, CountingMarkdown, SqliteStorage>;
+struct TestProvenance;
+impl SourceProvenance for TestProvenance {
+    fn observe_sources(&self, _: ProvenanceRequest<'_>) -> DocumentResult<ProvenanceObservation> {
+        Ok(ProvenanceObservation {
+            flags: BTreeSet::new(),
+            issues: BTreeSet::new(),
+        })
+    }
+    fn compare_revision(
+        &self,
+        _: SourceRevisionRequest<'_>,
+    ) -> Result<SourceRevisionComparison, SnapshotError> {
+        panic!("refresh does not compare requested revisions")
+    }
+}
+impl BasisRetainer for TestProvenance {
+    fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+        assert!(snapshots.is_empty());
+        Ok(())
+    }
+}
+type TestService =
+    DocumentRefresher<Candidates, TestFiles, CountingMarkdown, SqliteStorage, TestProvenance>;
 #[test]
 fn skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files() {
     for bytes in [
@@ -305,12 +330,13 @@ fn build_service() -> (TempDir, TestService) {
         SqliteStorage::open(&dir.path().join("cache.db"), &dir.path().join("vectors.db")).unwrap();
     (
         dir,
-        DocumentRefresher::new(
-            Candidates,
-            TestFiles::new(),
-            CountingMarkdown(Cell::new(0)),
+        DocumentRefresher::new(RefreshDependencies {
+            git: Candidates,
+            filesystem: TestFiles::new(),
+            markdown: CountingMarkdown(Cell::new(0)),
             storage,
-        ),
+            provenance: TestProvenance,
+        }),
     )
 }
 
@@ -326,4 +352,5 @@ fn read_matches(service: &mut TestService, text: &str) -> Vec<String> {
         .collect()
 }
 
+mod basis;
 pub(super) mod process;

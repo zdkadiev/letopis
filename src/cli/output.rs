@@ -46,6 +46,7 @@ struct Element<'a> {
     hash: Option<String>,
 }
 
+/// Existing X-1 metadata envelope; freshness flags never add source text or fields.
 #[derive(Serialize)]
 struct Link<'a> {
     element_id: &'a str,
@@ -121,6 +122,8 @@ fn build_link(link: &SearchLink) -> Link<'_> {
             .iter()
             .map(|flag| match flag {
                 SearchFlag::Stale => "stale",
+                SearchFlag::SourceChanged => "source_changed",
+                SearchFlag::SourceNotFound => "source_not_found",
             })
             .collect(),
     }

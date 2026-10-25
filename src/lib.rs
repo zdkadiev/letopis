@@ -23,8 +23,9 @@ use crate::service::{
     CommandResult, CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentRefresher,
     DocumentResult, EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
-    GraphDiagnostics, InspectionService, Inspector, Refresher, SearchDependencies, SearchService,
-    Searcher, SnapshotError, SnapshotVerifier, SourceReader, SourceService, Storage, StorageResult,
+    GraphDiagnostics, InspectionService, Inspector, ProvenanceService, RefreshDependencies,
+    Refresher, SearchDependencies, SearchService, Searcher, SnapshotError, SnapshotVerifier,
+    SourceProvenance, SourceReader, SourceService, Storage, StorageResult,
 };
 use crate::storage::SqliteStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -79,7 +80,24 @@ pub fn wire_source_reader(root: &Path) -> DocumentResult<impl SourceReader + use
     Ok(SourceService::new(LocalFileSystem::open(root)?))
 }
 
-/// Wire current corpus validation with a separate pinned reader and read-only Git probe.
+/// Wire read-only source provenance beneath the repository containing `root`.
+/// Does not open storage, create service state, retain refs or fetch sources.
+///
+/// # Errors
+/// Reports unsupported repositories or unsafe filesystem roots.
+pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenance + use<>> {
+    let git = GitCli::open(root).map_err(|cause| {
+        DocumentError::new_with_cause(
+            DocumentErrorKind::InternalError,
+            "cannot open provenance repository",
+            cause,
+        )
+    })?;
+    let filesystem = LocalFileSystem::open(git.get_root())?;
+    Ok(ProvenanceService::new(git, filesystem))
+}
+
+/// Wire corpus validation with one pinned reader and independent live provenance observations.
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or storage setup failures.
@@ -96,11 +114,14 @@ pub fn wire_checker(start: &Path) -> CommandResult<impl Checker + use<>> {
         refresher,
         storage,
         CurrentGraphDiagnostics::new(),
-        git,
+        ProvenanceService::new(
+            GitCli::open(start).map_err(map_check_setup)?,
+            LocalFileSystem::open(git.get_root()).map_err(map_check_setup)?,
+        ),
     ))
 }
 
-/// Wire hybrid knowledge search with independently owned read and embedding connections.
+/// Wire hybrid search with independently owned read, embedding and provenance collaborators.
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
@@ -120,6 +141,10 @@ pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
         embeddings,
         filesystem,
         markdown: MarkdownParser::new(),
+        provenance: ProvenanceService::new(
+            GitCli::open(start).map_err(map_search_setup)?,
+            LocalFileSystem::open(git.get_root()).map_err(map_search_setup)?,
+        ),
     }))
 }
 
@@ -161,12 +186,23 @@ pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + 
                 cause,
             )
         })?;
-    Ok(DocumentRefresher::new(
+    let provenance = ProvenanceService::new(
+        GitCli::open(start).map_err(|cause| {
+            DocumentError::new_with_cause(
+                DocumentErrorKind::InternalError,
+                "cannot open provenance repository",
+                cause,
+            )
+        })?,
+        LocalFileSystem::open(git.get_root())?,
+    );
+    Ok(DocumentRefresher::new(RefreshDependencies {
         git,
         filesystem,
-        MarkdownParser::new(),
+        markdown: MarkdownParser::new(),
         storage,
-    ))
+        provenance,
+    }))
 }
 
 /// Wire the existing embedding executor with confined automatic repository storage.

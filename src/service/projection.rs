@@ -7,7 +7,7 @@ use super::{
     document_refresher::{Observation, fail_changed},
 };
 use crate::domain::{
-    Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, derive_element_kind,
+    Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid, derive_element_kind,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -71,6 +71,14 @@ impl EffectiveGraph {
             edges: read.list_edges(None)?.into_iter().collect(),
             touched_sources: BTreeSet::new(),
         })
+    }
+
+    /// Return every declared root in the last effective knowledge projection.
+    pub(super) fn list_source_snapshots(&self) -> BTreeSet<TreeOid> {
+        self.knowledge
+            .values()
+            .filter_map(|node| node.source_snapshot.clone())
+            .collect()
     }
 
     fn list_file_ids(&self, path: &RepoPath) -> Vec<KnowledgeId> {

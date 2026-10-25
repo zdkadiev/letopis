@@ -385,3 +385,5 @@ fn make_vector_match(id: &str, distance: f64) -> VectorMatch {
         distance,
     }
 }
+
+mod scoped;

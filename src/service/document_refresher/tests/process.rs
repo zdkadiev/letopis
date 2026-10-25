@@ -1,13 +1,14 @@
 //! Production-process schedules. Only this private test driver reads control variables.
-use super::super::DocumentRefresher;
+use super::super::{DocumentRefresher, RefreshDependencies};
 use crate::{
     domain::{Edge, RepoPath, Sha256},
     filesystem::LocalFileSystem,
     git::GitCli,
     markdown::MarkdownParser,
     service::{
-        CacheWrite, EmbeddingFailure, FileRow, FileSystem, NodeMetadata, QueryError, Refresher,
-        Storage, StorageError, StorageRead, StorageResult, StoredNode, VectorOutcome, VectorWrite,
+        CacheWrite, EmbeddingFailure, FileRow, FileSystem, NodeMetadata, ProvenanceService,
+        QueryError, Refresher, Storage, StorageError, StorageRead, StorageResult, StoredNode,
+        VectorOutcome, VectorWrite,
     },
     storage::SqliteStorage,
     wire_document_refresher,
@@ -50,7 +51,13 @@ const CUTS: [&str; 10] = [
     "before_commit",
     "after_commit",
 ];
-type Service = DocumentRefresher<GitCli, LocalFileSystem, MarkdownParser, SqliteStorage>;
+type Service = DocumentRefresher<
+    GitCli,
+    LocalFileSystem,
+    MarkdownParser,
+    SqliteStorage,
+    ProvenanceService<GitCli, LocalFileSystem>,
+>;
 type Tokens = Vec<(String, i64, String, i64)>;
 thread_local! {
     static CONTROL: RefCell<Option<UnixStream>> = const { RefCell::new(None) };
@@ -639,7 +646,17 @@ fn build_service(root: &Path) -> Service {
     let directory = filesystem.open_service_directory().unwrap();
     let storage =
         SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory).unwrap();
-    DocumentRefresher::new(git, filesystem, MarkdownParser::new(), storage)
+    let provenance = ProvenanceService::new(
+        GitCli::open(root).unwrap(),
+        LocalFileSystem::open(root).unwrap(),
+    );
+    DocumentRefresher::new(RefreshDependencies {
+        git,
+        filesystem,
+        markdown: MarkdownParser::new(),
+        storage,
+        provenance,
+    })
 }
 
 fn read_git_objects(root: &Path) -> Vec<u8> {
