@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::{
+    collections::VecDeque,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     sync::{
@@ -72,6 +73,10 @@ struct Captures {
     requests: Vec<Value>,
     headers: Vec<String>,
 }
+enum Replies {
+    Repeated(FixtureReply),
+    Sequence(VecDeque<FixtureReply>),
+}
 pub struct HttpFixture {
     url: String,
     stop: Arc<AtomicBool>,
@@ -80,6 +85,26 @@ pub struct HttpFixture {
 }
 impl HttpFixture {
     pub fn start(reply: FixtureReply) -> Self {
+        Self::start_with_replies(Replies::Repeated(reply))
+    }
+    /// Serve each response once in request order.
+    ///
+    /// # Panics
+    /// Panics for an empty sequence, or on drop if a request exhausted it.
+    pub fn start_sequence(replies: Vec<FixtureReply>) -> Self {
+        assert!(!replies.is_empty(), "fixture response sequence is empty");
+        Self::start_with_replies(Replies::Sequence(replies.into()))
+    }
+    pub fn get_base_url(&self) -> String {
+        self.url.clone()
+    }
+    pub fn take_requests(&self) -> Vec<Value> {
+        std::mem::take(&mut self.captures.lock().unwrap().requests)
+    }
+    pub fn take_headers(&self) -> Vec<String> {
+        std::mem::take(&mut self.captures.lock().unwrap().headers)
+    }
+    fn start_with_replies(mut replies: Replies) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         listener.set_nonblocking(true).unwrap();
@@ -92,7 +117,13 @@ impl HttpFixture {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
                         capture_request(&mut stream, &worker_captures);
-                        write_reply(&mut stream, &reply, &worker_stop);
+                        let reply = match &mut replies {
+                            Replies::Repeated(reply) => reply,
+                            Replies::Sequence(replies) => &replies
+                                .pop_front()
+                                .expect("fixture response sequence exhausted"),
+                        };
+                        write_reply(&mut stream, reply, &worker_stop);
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(2));
@@ -107,15 +138,6 @@ impl HttpFixture {
             captures,
             worker: Some(worker),
         }
-    }
-    pub fn get_base_url(&self) -> String {
-        self.url.clone()
-    }
-    pub fn take_requests(&self) -> Vec<Value> {
-        std::mem::take(&mut self.captures.lock().unwrap().requests)
-    }
-    pub fn take_headers(&self) -> Vec<String> {
-        std::mem::take(&mut self.captures.lock().unwrap().headers)
     }
 }
 impl Drop for HttpFixture {

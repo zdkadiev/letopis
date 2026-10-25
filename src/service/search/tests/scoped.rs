@@ -6,12 +6,12 @@ use crate::{
     filesystem::LocalFileSystem,
     markdown::MarkdownParser,
     service::{
-        CacheWrite, CommandErrorKind, ConfigState, DocumentResult, DrainOutcome, Embedder,
-        EmbeddingConfig, EmbeddingResult, KnowledgeMetadata, NodeMetadata, ProvenanceObservation,
-        ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest, RefreshOutcome, Refresher,
-        SearchFlag, SearchRequest, Searcher, SnapshotError, SourceProvenance,
-        SourceRevisionComparison, SourceRevisionRequest, Storage, StorageRead, StorageResult,
-        VectorOutcome,
+        CacheWrite, CommandErrorKind, ConfigState, DocumentError, DocumentErrorKind,
+        DocumentResult, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingResult,
+        KnowledgeMetadata, NodeMetadata, ProvenanceObservation, ProvenanceRequest, QueryEmbedding,
+        QueryEmbeddingRequest, RecheckFilter, RefreshOutcome, Refresher, SearchFilters, SearchFlag,
+        SearchRequest, Searcher, SnapshotError, SourceProvenance, SourceRevisionComparison,
+        SourceRevisionRequest, Storage, StorageRead, StorageResult, VectorOutcome,
         search::{SearchDependencies, SearchService},
     },
     storage::SqliteStorage,
@@ -31,100 +31,76 @@ struct Query {
     hook: Option<Box<dyn FnOnce()>>,
 }
 type RecordedSources = Vec<(Option<TreeOid>, BTreeSet<SourceUri>)>;
-struct Observations(Rc<RefCell<RecordedSources>>);
+#[derive(Clone, Copy)]
+enum ProvenanceFailure {
+    Observation,
+    Comparison,
+}
+struct Observations {
+    observed: Rc<RefCell<RecordedSources>>,
+    failure: Option<ProvenanceFailure>,
+}
 struct ReadOnlyStorage {
     inner: SqliteStorage,
     reads: Rc<Cell<usize>>,
 }
 
+type ScopedSearch =
+    SearchService<NoRefresh, ReadOnlyStorage, Query, LocalFileSystem, MarkdownParser, Observations>;
+struct ScopedFixture {
+    root: tempfile::TempDir,
+    config: EmbeddingConfig,
+    calls: Rc<Cell<usize>>,
+    reads: Rc<Cell<usize>>,
+    observed: Rc<RefCell<RecordedSources>>,
+}
+
 #[test]
 fn metadata_failure_after_query_releases_pinned_view() {
-    let root = tempfile::tempdir().unwrap();
-    let mut storage = open_storage(root.path());
-    publish_candidate(&mut storage, "a", "old.rs");
-    let config = build_config(2);
-    seed_dimension(&mut storage, &config, 2);
-    let connection = rusqlite::Connection::open(root.path().join("cache.db")).unwrap();
+    let fixture = ScopedFixture::new();
+    let root = fixture.root.path();
+    let connection = rusqlite::Connection::open(root.join("cache.db")).unwrap();
     connection
         .execute("UPDATE nodes SET created_at = -1 WHERE id = ?1", ["a.md"])
         .unwrap();
-    let calls = Rc::new(Cell::new(0));
-    let reads = Rc::new(Cell::new(0));
-    let observed = Rc::new(RefCell::new(Vec::new()));
-    let mut search = SearchService::new(SearchDependencies {
-        refresher: NoRefresh,
-        storage: ReadOnlyStorage {
-            inner: storage,
-            reads: reads.clone(),
-        },
-        embeddings: Query {
-            config,
-            calls: calls.clone(),
-            hook: None,
-        },
-        filesystem: LocalFileSystem::open(root.path()).unwrap(),
-        markdown: MarkdownParser::new(),
-        provenance: Observations(observed.clone()),
-    });
+    let mut search = fixture.build_search(None, None);
 
     let error = search.search(&build_request()).unwrap_err();
 
-    assert_eq!(calls.get(), 1);
-    assert_eq!(reads.get(), 1);
-    assert!(observed.borrow().is_empty());
+    assert_eq!(fixture.calls.get(), 1);
+    assert_eq!(fixture.reads.get(), 1);
+    assert!(fixture.observed.borrow().is_empty());
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert_eq!(error.get_message(), "cannot search knowledge");
     assert!(std::error::Error::source(&error).is_some());
     assert!(!format!("{error:?} {error}").contains("created_at"));
     // Keep the service alive: returning the error itself must release its reader.
-    assert_can_checkpoint(root.path());
+    assert_can_checkpoint(root);
     connection
         .execute("UPDATE nodes SET created_at = 1 WHERE id = ?1", ["a.md"])
         .unwrap();
-    publish_candidate(&mut open_storage(root.path()), "b", "new.rs");
-    assert_eq!(
-        open_storage(root.path())
-            .begin_read()
-            .unwrap()
-            .get_revision(),
-        2
-    );
-    assert_can_checkpoint(root.path());
+    publish_candidate(&mut open_storage(root), "b", "new.rs");
+    assert_eq!(open_storage(root).begin_read().unwrap().get_revision(), 2);
+    assert_can_checkpoint(root);
+    drop(search);
 }
 
 #[test]
 fn search_observes_metadata_and_bindings_from_original_pinned_view() {
-    let root = tempfile::tempdir().unwrap();
-    let mut storage = open_storage(root.path());
-    publish_candidate(&mut storage, "a", "old.rs");
-    let config = build_config(2);
-    seed_dimension(&mut storage, &config, 2);
-    let mut writer = open_storage(root.path());
-    let calls = Rc::new(Cell::new(0));
-    let reads = Rc::new(Cell::new(0));
-    let observed = Rc::new(RefCell::new(Vec::new()));
-    let mut search = SearchService::new(SearchDependencies {
-        refresher: NoRefresh,
-        storage: ReadOnlyStorage {
-            inner: storage,
-            reads: reads.clone(),
-        },
-        embeddings: Query {
-            config,
-            calls: calls.clone(),
-            hook: Some(Box::new(move || {
-                publish_candidate(&mut writer, "b", "new.rs");
-            })),
-        },
-        filesystem: LocalFileSystem::open(root.path()).unwrap(),
-        markdown: MarkdownParser::new(),
-        provenance: Observations(observed.clone()),
-    });
+    let fixture = ScopedFixture::new();
+    let root = fixture.root.path();
+    let mut writer = open_storage(root);
+    let mut search = fixture.build_search(
+        Some(Box::new(move || {
+            publish_candidate(&mut writer, "b", "new.rs");
+        })),
+        None,
+    );
 
-    let links = search.search(&build_request()).unwrap();
+    let links = search.search(&build_filtered_request()).unwrap();
 
-    assert_eq!(calls.get(), 1);
-    assert_eq!(reads.get(), 1);
+    assert_eq!(fixture.calls.get(), 1);
+    assert_eq!(fixture.reads.get(), 1);
     assert_eq!(links.len(), 1);
     assert_eq!(links[0].revision, 1);
     assert_eq!(
@@ -132,20 +108,82 @@ fn search_observes_metadata_and_bindings_from_original_pinned_view() {
         BTreeSet::from([SearchFlag::Stale, SearchFlag::SourceChanged])
     );
     assert_eq!(
-        *observed.borrow(),
+        *fixture.observed.borrow(),
         vec![(
             Some(TreeOid::parse(&"a".repeat(40)).unwrap()),
             BTreeSet::from([SourceUri::parse("old.rs").unwrap()])
         )]
     );
-    assert_eq!(
-        open_storage(root.path())
-            .begin_read()
-            .unwrap()
-            .get_revision(),
-        2
-    );
-    assert_can_checkpoint(root.path());
+    assert_eq!(open_storage(root).begin_read().unwrap().get_revision(), 2);
+    assert_can_checkpoint(root);
+    drop(search);
+}
+
+#[test]
+fn late_provenance_failure_releases_pinned_view_while_service_stays_alive() {
+    for failure in [
+        ProvenanceFailure::Observation,
+        ProvenanceFailure::Comparison,
+    ] {
+        let fixture = ScopedFixture::new();
+        let root = fixture.root.path();
+        let mut search = fixture.build_search(None, Some(failure));
+
+        let error = search.search(&build_filtered_request()).unwrap_err();
+
+        assert_eq!(fixture.calls.get(), 1);
+        assert_eq!(fixture.reads.get(), 1);
+        assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error:?} {error}").contains("PRIVATE"));
+        assert_can_checkpoint(root);
+        publish_candidate(&mut open_storage(root), "b", "new.rs");
+        assert_eq!(open_storage(root).begin_read().unwrap().get_revision(), 2);
+        assert_can_checkpoint(root);
+        // Ownership must release the read before the still-live service is dropped.
+        drop(search);
+    }
+}
+
+impl ScopedFixture {
+    fn new() -> Self {
+        let root = tempfile::tempdir().unwrap();
+        let mut storage = open_storage(root.path());
+        publish_candidate(&mut storage, "a", "old.rs");
+        let config = build_config(2);
+        seed_dimension(&mut storage, &config, 2);
+        Self {
+            root,
+            config,
+            calls: Rc::new(Cell::new(0)),
+            reads: Rc::new(Cell::new(0)),
+            observed: Rc::new(RefCell::new(Vec::new())),
+        }
+    }
+    fn build_search(
+        &self,
+        hook: Option<Box<dyn FnOnce()>>,
+        failure: Option<ProvenanceFailure>,
+    ) -> ScopedSearch {
+        SearchService::new(SearchDependencies {
+            refresher: NoRefresh,
+            storage: ReadOnlyStorage {
+                inner: open_storage(self.root.path()),
+                reads: self.reads.clone(),
+            },
+            embeddings: Query {
+                config: self.config.clone(),
+                calls: self.calls.clone(),
+                hook,
+            },
+            filesystem: LocalFileSystem::open(self.root.path()).unwrap(),
+            markdown: MarkdownParser::new(),
+            provenance: Observations {
+                observed: self.observed.clone(),
+                failure,
+            },
+        })
+    }
 }
 
 impl Refresher for NoRefresh {
@@ -187,17 +225,21 @@ impl Embedder for Query {
 }
 impl SourceProvenance for Observations {
     fn validate_revisions(&self, revisions: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
-        assert!(
-            revisions.is_empty(),
-            "this scenario has no revision filters"
-        );
+        assert!(revisions.is_empty() || *revisions == BTreeSet::from([build_revision()]));
         Ok(())
     }
     fn observe_sources(
         &self,
         request: ProvenanceRequest<'_>,
     ) -> DocumentResult<ProvenanceObservation> {
-        self.0
+        if matches!(self.failure, Some(ProvenanceFailure::Observation)) {
+            return Err(DocumentError::new_with_cause(
+                DocumentErrorKind::InternalError,
+                "cannot observe sources",
+                std::io::Error::other("PRIVATE provenance payload"),
+            ));
+        }
+        self.observed
             .borrow_mut()
             .push((request.source_snapshot.cloned(), request.sources.clone()));
         Ok(ProvenanceObservation {
@@ -207,9 +249,21 @@ impl SourceProvenance for Observations {
     }
     fn compare_revision(
         &self,
-        _: SourceRevisionRequest<'_>,
+        request: SourceRevisionRequest<'_>,
     ) -> Result<SourceRevisionComparison, SnapshotError> {
-        panic!("search cannot compare revisions")
+        assert_eq!(
+            request.source_snapshot,
+            Some(&TreeOid::parse(&"a".repeat(40)).unwrap())
+        );
+        assert_eq!(request.source.as_str(), "old.rs");
+        assert_eq!(request.revision, &build_revision());
+        if matches!(self.failure, Some(ProvenanceFailure::Comparison)) {
+            return Err(SnapshotError::new_with_cause(
+                "cannot compare sources",
+                std::io::Error::other("PRIVATE comparison payload"),
+            ));
+        }
+        Ok(SourceRevisionComparison::Equal)
     }
 }
 impl Storage for ReadOnlyStorage {
@@ -273,12 +327,25 @@ fn publish_candidate(storage: &mut SqliteStorage, oid: &str, source: &str) {
     .unwrap();
     unit.commit().unwrap();
 }
+fn build_filtered_request() -> SearchRequest {
+    SearchRequest {
+        filters: SearchFilters {
+            needs_recheck: RecheckFilter::Required,
+            sources: BTreeSet::from([SourceUri::parse("old.rs").unwrap()]),
+            source_revisions: BTreeSet::from([build_revision()]),
+        },
+        ..build_request()
+    }
+}
 fn build_request() -> SearchRequest {
     SearchRequest {
         filters: Default::default(),
         query: "query".into(),
         limit: NonZeroUsize::new(10).unwrap(),
     }
+}
+fn build_revision() -> TreeOid {
+    TreeOid::parse(&"c".repeat(40)).unwrap()
 }
 fn assert_can_checkpoint(root: &Path) {
     for name in ["cache.db", "vectors.db"] {

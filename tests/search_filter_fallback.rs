@@ -1,0 +1,213 @@
+mod support;
+
+use letopis::{
+    domain::TreeOid,
+    service::{EmbeddingConfig, NodeMetadata, Refresher, Storage, StorageRead, VectorOutcome},
+    wire_document_refresher,
+};
+use serde_json::{Value, json};
+use support::{
+    embedding::{FixtureReply, HttpFixture},
+    provenance::{build_note, create_basis},
+    reading::ReadingRepo,
+};
+
+#[test]
+fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
+    let repo = ReadingRepo::new();
+    let basis = prepare_notes(&repo);
+    let server = HttpFixture::start_sequence(vec![
+        FixtureReply::Status {
+            status: 500,
+            body: "PRIVATE provider fixture-secret".into(),
+        },
+        FixtureReply::Status {
+            status: 200,
+            body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
+        },
+    ]);
+    let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
+    prepare_vectors(&repo, &config, 2);
+    let input = build_input(&basis);
+
+    let fallback = invoke_search(&repo, &input);
+
+    assert_eq!(read_ids(&fallback), ["a.md", "b.md"]);
+    let error = repo
+        .open_storage()
+        .begin_read()
+        .unwrap()
+        .read_query_error()
+        .unwrap()
+        .unwrap();
+    assert_eq!(error.error, "embedding provider rejected request");
+    assert!(!error.error.contains("PRIVATE"));
+    assert!(!error.error.contains("fixture-secret"));
+    assert_unchanged_vector_state(&repo, &config);
+
+    let recovered = invoke_search(&repo, &input);
+
+    // Successful query inference includes the eligible semantic-only note.
+    assert_eq!(read_ids(&recovered), ["a.md", "b.md", "semantic.md"]);
+    assert!(
+        repo.open_storage()
+            .begin_read()
+            .unwrap()
+            .read_query_error()
+            .unwrap()
+            .is_none()
+    );
+    assert_unchanged_vector_state(&repo, &config);
+    assert_eq!(
+        server.take_requests(),
+        vec![
+            json!({"model":"fixture","input":["needle"],"truncate":false}),
+            json!({"model":"fixture","input":["needle"],"truncate":false}),
+        ]
+    );
+}
+
+#[test]
+fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests() {
+    let repo = ReadingRepo::new();
+    let basis = prepare_notes(&repo);
+    let server = HttpFixture::start(FixtureReply::Status {
+        status: 500,
+        body: "must not call".into(),
+    });
+    let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
+    prepare_vectors(&repo, &config, 2);
+    std::fs::remove_file(repo.get_root().join(".letopis/config.json")).unwrap();
+
+    assert_eq!(
+        read_ids(&invoke_search(&repo, &build_input(&basis))),
+        ["a.md", "b.md"]
+    );
+    repo.write(".letopis/config.json", b"PRIVATE invalid configuration");
+    assert_eq!(
+        read_ids(&invoke_search(&repo, &build_input(&basis))),
+        ["a.md", "b.md"]
+    );
+
+    assert!(server.take_requests().is_empty());
+    assert!(
+        repo.open_storage()
+            .begin_read()
+            .unwrap()
+            .read_query_error()
+            .unwrap()
+            .is_none()
+    );
+    assert_unchanged_vector_state(&repo, &config);
+}
+
+#[test]
+fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
+    let repo = ReadingRepo::new();
+    let basis = prepare_notes(&repo);
+    let server = HttpFixture::start(FixtureReply::Status {
+        status: 500,
+        body: "must not call".into(),
+    });
+    let raw = json!({"provider":"ollama","model":"fixture",
+        "parameters":{"base_url":server.get_base_url(),"dimensions":3},"max_retries":0})
+    .to_string();
+    let config = EmbeddingConfig::parse(raw.as_bytes()).unwrap();
+    repo.write(".letopis/config.json", raw.as_bytes());
+    prepare_vectors(&repo, &config, 2);
+
+    let links = invoke_search(&repo, &build_input(&basis));
+
+    assert_eq!(read_ids(&links), ["a.md", "b.md"]);
+    assert!(server.take_requests().is_empty());
+    assert!(
+        repo.open_storage()
+            .begin_read()
+            .unwrap()
+            .read_query_error()
+            .unwrap()
+            .is_none()
+    );
+    assert_unchanged_vector_state(&repo, &config);
+}
+
+fn prepare_notes(repo: &ReadingRepo) -> TreeOid {
+    repo.write("code.rs", b"stable\n");
+    let basis = create_basis(repo.get_root(), &[("code.rs", b"stable\n")]);
+    for (id, sources, text) in [
+        ("a.md", vec!["code.rs"], "needle"),
+        ("b.md", vec!["code.rs"], "needle"),
+        ("excluded.md", vec!["other.rs"], "needle needle needle"),
+        ("semantic.md", vec!["code.rs"], "semantic"),
+    ] {
+        repo.write(id, build_note(Some(&basis), &sources, text).as_bytes());
+    }
+    basis
+}
+fn prepare_vectors(repo: &ReadingRepo, config: &EmbeddingConfig, dimensions: usize) {
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
+    let vector = vec![1.0; dimensions];
+    repo.seed_vectors(
+        config,
+        &[
+            ("a.md", &vector),
+            ("b.md", &vector),
+            ("excluded.md", &vector),
+            ("semantic.md", &vector),
+        ],
+    );
+}
+fn build_input(basis: &TreeOid) -> Value {
+    json!({"query":"needle","limit":10,"filters":{
+        "sources":["code.rs"],"source_revisions":[basis.as_str()],"needs_recheck":false}})
+}
+fn invoke_search(repo: &ReadingRepo, input: &Value) -> Value {
+    let output = repo.invoke(&["search"], input.to_string().as_bytes());
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    for text in [&stdout, &stderr] {
+        assert!(!text.contains("PRIVATE"));
+        assert!(!text.contains("fixture-secret"));
+        assert!(!text.contains("stable"));
+    }
+    let value: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(value["ok"], true, "{value}");
+    assert!(value.get("warnings").is_none(), "{value}");
+    value["result"].clone()
+}
+fn read_ids(links: &Value) -> Vec<String> {
+    links
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|link| link["element_id"].as_str().unwrap().to_owned())
+        .collect()
+}
+fn assert_unchanged_vector_state(repo: &ReadingRepo, config: &EmbeddingConfig) {
+    let mut storage = repo.open_storage();
+    let mut read = storage.begin_read().unwrap();
+    assert_eq!(read.get_config_identity(), Some(config.get_identity()));
+    assert_eq!(
+        read.read_next_embedding_work(&config.get_identity(), 1, None)
+            .unwrap(),
+        VectorOutcome::Current(None)
+    );
+    for node in read.list_nodes().unwrap() {
+        let NodeMetadata::Knowledge(node) = node.metadata else {
+            continue;
+        };
+        assert_eq!(
+            read.read_failure(&config.get_identity(), &node.search_hash)
+                .unwrap(),
+            VectorOutcome::Current(None)
+        );
+    }
+}
