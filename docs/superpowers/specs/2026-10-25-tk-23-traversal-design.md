@@ -1,6 +1,6 @@
 # TK-23 — Incremental graph traversal
 
-Status: revision prepared on 2026-10-26, reflecting the user's accepted decisions on 2026-10-25; concrete builder choices below are submitted for review with the revised implementation plan. Product implementation has not started. This replaces the earlier full-graph/private-walk and storage-dependent Graph proposals; their committed versions remain in Git history.
+Status: revised specification and implementation plan approved by the user on 2026-10-26; Subagent-driven execution explicitly authorized. The concrete builder choices below, including bounded pages/indexes/cache compatibility, are accepted with this revision. This replaces the earlier full-graph/private-walk and storage-dependent Graph proposals; their committed versions remain in Git history.
 
 ## Intent, scope and sources
 
@@ -70,7 +70,7 @@ Builder choices for the revised plan:
 - A changed/first-index publication still uses the existing publication/validation machinery, which can load graph projections. This task does not redesign publication or promise a fixed memory ceiling for the whole command. Evidence must distinguish unchanged traversal state from publication work; no full-call RSS claim is inferred from the BFS bound.
 - The required indexes change the exact recognized cache DDL. Use cache schema version 2 and retain vectors schema version 1. Older/incompatible cache schemas fail safely without automatic mutation; document an explicit quiescent cache.db rebuild following the existing TK-20 pattern. Preserve vectors.db, config, lock-file identities, Markdown and Git. No automatic migration or silently dropped user data. Schema parity and host/Linux native runners are now in the verification scope.
 
-These index/cache/query choices are concrete proposals for review with this revision. They are not presented as already-implemented results or previous project decisions.
+These index/cache/query choices were accepted with the revised specification on 2026-10-26. They are implementation requirements, not claims that the corresponding product behavior already exists.
 
 ## Metadata, provenance and lifecycle
 
@@ -96,4 +96,4 @@ Use AAA and independent expected data. Hand-mutate meaningful production conditi
 
 ## Review and next step
 
-The accepted user decisions are consolidated here. Fresh independent builder check `/root/tk23_revised_builder_check` (gpt-6.1-sol, high, isolated context) returned “nothing important left”. It covered this incremental/entity-service revision; the original builder check is historical and covered the superseded design only. The [revised implementation plan](../plans/2026-10-25-tk-23-traversal.md) contains four independently reviewable tasks and 20 unchecked steps, with controller self-review complete. The new page/index/cache/protocol choices remain submitted for user review with these documents. User review/approval of the revised documents and execution choice precede product implementation. Merge/push/GitHub closure remain separately unauthorized.
+The accepted user decisions are consolidated here. Fresh independent builder check `/root/tk23_revised_builder_check` (gpt-6.1-sol, high, isolated context) returned “nothing important left”. It covered this incremental/entity-service revision; the original builder check is historical and covered the superseded design only. The [revised implementation plan](../plans/2026-10-25-tk-23-traversal.md) contains four independently reviewable tasks and 20 unchecked steps, with controller self-review complete. The user approved the revised documents and their page/index/cache/protocol choices on 2026-10-26 and selected Subagent-driven execution. Implementation proceeds through the approved plan and its task/final review gates. Merge/push/GitHub closure remain separately unauthorized.
