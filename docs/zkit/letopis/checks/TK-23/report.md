@@ -1,6 +1,6 @@
 # TK-23 — incremental metadata-only traversal
 
-Implementation/tests/report ready for review; **required Linux native acceptance is blocked by infrastructure**. **Task 4 independent review and final whole-branch review pending**; task-card completion and integration remain controller/user decisions.
+Implementation/tests/report ready for review; **required Linux native acceptance is blocked by infrastructure**. **Task 4 review approved after I1 re-review; final whole-branch review pending**; task-card completion and integration remain controller/user decisions.
 
 ## Revisions and scope
 
@@ -59,7 +59,7 @@ BFS state is proportional to starts and selected results/optional retained edges
 
 Cache schema 2 recognizes directional indexes and narrow source roots; vectors schema remains 1. Incompatible old cache fails safely before vectors are opened. Explicit rebuild requires all commands/drains stopped and handles/locks released; remove **only derived cache.db and existing quiescent cache sidecars**, preserve vectors.db/sidecars, config, persistent lock identities, Markdown and Git, then `letopis check` with `{}`. No user database was deleted: all tests use temporary fixtures. See the development guide's existing TK-20/TK-23 rebuild procedure.
 
-Task 4 implementer self-review is complete; Linux native/standalone acceptance remains open; independent Task 4 review and final whole-branch review are separate pending controller gates. TK-24/TK-28, paid/model/pilot/resource/G-1/G-2 verdicts and exhaustive new cancellation/platform drills remain deferred. No merge/push/GitHub changes or Engram writes were performed by this delegated implementation task.
+Task 4 implementer self-review is complete; Linux native/standalone acceptance remains open; Task 4 independent review is approved after I1 re-review; final whole-branch review remains pending. TK-24/TK-28, paid/model/pilot/resource/G-1/G-2 verdicts and exhaustive new cancellation/platform drills remain deferred. No merge/push/GitHub changes or Engram writes were performed by this delegated implementation task.
 
 See the [development guide](../../../../development.md), [approved specification](../../../../superpowers/specs/2026-10-25-tk-23-traversal-design.md) and [plan](../../../../superpowers/plans/2026-10-25-tk-23-traversal.md). No captured receipt is relabeled to a later documentation commit.
 
@@ -72,3 +72,7 @@ A separate production substitution control replaces 67 bindings with distinct li
 Supplemental command: `CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target RUST_TEST_THREADS=2 make verify V=1`, exit 0 at the current test checkpoint. Fmt, all-target check/Clippy, strict Rustdoc and root debug/release suites pass; each profile reports **684 passed / 0 failed / 5 ignored across 48 roots**, excluding nested/doc summaries. Evidence: `.artifacts/tk23/task4-fix1-20261026/{supplemental-make-verify.log,supplemental-verify.json,supplemental-root-counts.json}`.
 
 The supplemental 319-input map has aggregate SHA-256 `9014d4d1a2412ad297b811e1c232734fdcc8929594352ad83d4afbc09af28af1` and differs from the original native map only in `src/service/traversal/tests/bindings.rs`; the other 318 inputs, including all production/native/build/DDL bytes, are unchanged. Exact original/new hashes are retained separately in the original frozen-inputs.json and new supplemental-inputs.json. Original host native PASS and failed Linux receipts remain pinned to e9a9cd4 and do not certify the new fixture; supplemental make verify certifies revised tests. No additional host/Linux native runner or Docker operation was performed for this test-only fix under the controller ruling. Linux native/standalone acceptance, Task4 independent rereview and whole-branch review remain open.
+
+## Controller task review gate
+
+Tasks1–3 passed independent spec/quality reviews. Task4 initially required the I1 identity/multiplicity oracle correction; its scoped re-review approved the fix with no new breakage. All code/task review findings are addressed. The final whole-branch review remains pending, and required Linux native/standalone acceptance remains open. Review reports are retained in the plan-scoped SDD workspace; receipt hashes are in verification.json.

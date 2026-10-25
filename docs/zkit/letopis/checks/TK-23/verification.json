@@ -521,7 +521,7 @@
     "36 stream query plans and one source-root plan"
   ],
   "review_gates": {
-    "task4_independent": "pending",
+    "task4_independent": "approved_after_I1_rereview",
     "whole_branch": "pending"
   },
   "limits": [
@@ -970,5 +970,27 @@
     },
     "native_scope": "original host native and failed Linux remain at e9a9cd4; no native runner rerun for test-only assertion change",
     "review_gates": "pending"
+  },
+  "review_evidence": {
+    "task-1-review.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-1-review.md",
+      "sha256": "0a3d7c26a6bd7b05eecb12540f34868465607498d0457fd00eefb513a3780b43"
+    },
+    "task-2-review.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-2-review.md",
+      "sha256": "0d6e04f36a8e6d641728539fbd4a40251acc64c3fa68f3628249637796e528ee"
+    },
+    "task-3-review.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-3-review.md",
+      "sha256": "04a50a56579e68e4d84689e5b82636e74bf8cb2e8f3f74304764791904aa024c"
+    },
+    "task-4-review.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-4-review.md",
+      "sha256": "1d5b6c30b1172adc663328ee1f778d1b1bcc8b002cb5acef0bf7da74325b2aa0"
+    },
+    "task-4-rereview.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-4-rereview.md",
+      "sha256": "b2046ab52ec13588dc556bb3bc365a8421e69141bae34b34d15795096c08b94b"
+    }
   }
 }
