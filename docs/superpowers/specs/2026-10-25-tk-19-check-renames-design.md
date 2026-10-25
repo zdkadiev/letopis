@@ -3,8 +3,9 @@
 **Статус:** approved пользователем 2026-10-25: «спецификацию TK-19 утверждаю».
 Независимый builder check: nothing important left. План утверждён; Tasks 1–2
 реализованы и независимо Approved. Приёмка Task 3 и результаты находятся в
-[отчёте](../../zkit/letopis/checks/TK-19/report.md). Финальное независимое review
-всей ветки pending; status TK-28 остаётся отложенным. Утверждённое поведение не изменено.
+[отчёте](../../zkit/letopis/checks/TK-19/report.md). Whole-branch review не нашло
+замечаний к реализации; M1 о границе отмены уточнено, scoped re-review pending.
+Status TK-28 остаётся отложенным; обработка SIGINT относится к TK-29.
 **Ветка:** tk-19; новый managed worktree от origin/main@c080ddb20418327a65b6d49768879920acb03129.
 **Решение пользователя 2026-10-25:** реализовать check сейчас; CLI status остаётся TK-28.
 Начало TK-19 явно запрошено пользователем после TK-18. Пилот TK-17 и измерения
@@ -64,7 +65,10 @@ DocumentRefresher публикует валидные изменения и со
    Полная проверка source bytes/ranges/source_changed и происхождения — TK-21.
 6. Все находки возвращаются в одном успешном X-1 ответе
    {"ok":true,"result":{"errors":[...]}} с exit 0, даже если errors непустой.
-   Invalid input, инфраструктурный сбой и отмена — один ok:false, exit 1.
+   Invalid input и инфраструктурный сбой — один ok:false, exit 1.
+   Обработанный SIGINT и гарантия одного cancelled JSON/exit 1 принадлежат TK-29.
+   Сейчас runtime использует стандартное поведение процесса: SIGINT завершает
+   процесс; cancelled JSON и exit 1 при сигнале не гарантируются и не проверены.
    Не меняем envelope/схему и не подменяем findings общей ошибкой команды.
 7. Findings имеют безопасные фиксированные сообщения и структурированные
    path/reason/element_id/target по существующим категориям. Порядок стабилен:

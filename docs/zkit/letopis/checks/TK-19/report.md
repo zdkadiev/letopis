@@ -1,7 +1,8 @@
 # TK-19: production check and lifecycle acceptance
 
 Date: 2026-10-25. Implementation and macOS host acceptance PASS.
-Independent final whole-branch review: **pending controller**. The combined
+Whole-branch review: **no implementation findings; M1 clarified; scoped re-review pending**.
+No Critical or Important findings were reported. The combined
 check/status task stays `in_progress`: status belongs to TK-28, traversal to TK-23.
 
 ## Source and reproducibility
@@ -124,6 +125,35 @@ runners were not rerun. The full historical CLI campaign and separate historical
 proof manifests were not rerun or overwritten. No Linux/x86/Windows/NFS, physical
 power-loss, handled-signal, external-provider/model-quality, capacity/pilot,
 G-1/G-2 or v1 claim follows from these host checks. Full source bytes/ranges and
-provenance remain TK-21, status TK-28 and traversal TK-23. Independent final
-whole-branch review and Engram recording remain controller-owned and pending.
+provenance remain TK-21, status TK-28 and traversal TK-23. Handled SIGINT and a
+single cancelled JSON/exit-1 guarantee remain TK-29. The current runtime installs
+no SIGINT handler and uses the default process signal behavior: SIGINT terminates
+the foreground process, without a cancelled-JSON or exit-1 guarantee. Cancellation
+handling was not tested in this acceptance. Whole-branch review found no
+implementation findings; M1 clarified this scope, and its scoped re-review and
+Engram recording remain controller-owned and pending.
 No merge, push, publication or GitHub update was performed.
+
+## Whole-branch review and M1 documentation correction
+
+2026-10-25: independent whole-branch review of
+`c080ddb20418327a65b6d49768879920acb03129..04742af23ec7660d18de872f05831955209b9bbd`
+reported no Critical/Important or implementation findings. Minor M1 identified an
+unqualified cancellation promise in the spec and plan summaries. This bounded
+documentation correction distinguishes delivered invalid-input/infrastructure
+responses from deferred handled SIGINT. The existing default signal behavior
+does not guarantee a cancelled JSON or exit 1; TK-29 owns that work.
+
+M1 clarified; scoped re-review pending. The 269 verified product/test/build input
+hashes and their canonical digest remain unchanged. Validation covers affected
+relative links, receipt JSON and `git diff --check`. Product suites were not rerun:
+this correction changes no product or test input, and the final reviewer explicitly
+requires only bounded review of the documentation. Historical execution evidence
+and the prior integrated verification remain unchanged. Engram is still pending.
+
+Documentation validation: `python3 -B .artifacts/tk19/task3/m1-docs/validate_docs.py`
+PASS (16 relative link targets, all 269 hashes equal to the accepted checkpoint,
+unchanged canonical digest); `python3 -B -m json.tool
+docs/zkit/letopis/checks/TK-19/verification.json` PASS; `git diff --check` PASS.
+New private validation output: `.artifacts/tk19/task3/m1-docs/validation.log` and
+`validation.json`. These checks do not rerun or replace the historical product suites.

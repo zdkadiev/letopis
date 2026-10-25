@@ -11,7 +11,8 @@
 **Spec:** [Утверждённая спецификация](../specs/2026-10-25-tk-19-check-renames-design.md).
 
 **Status:** approved пользователем 2026-10-25; выбран Subagent-driven. Tasks 1–2
-реализованы и независимо Approved; Task 3 acceptance выполнена, whole-branch review
+реализованы и независимо Approved; Task 3 acceptance выполнена. Whole-branch review
+не нашло замечаний к реализации; M1 о границе отмены уточнено, scoped re-review
 и запись Engram контроллером pending. [Результаты и пределы](../../zkit/letopis/checks/TK-19/report.md). Ветка tk-19 от main@c080ddb20418327a65b6d49768879920acb03129; baseline make check PASS. Работать только в /Users/zdkadiev/.codex/worktrees/tk-19/letopis.
 
 ## Global Constraints
@@ -21,7 +22,7 @@
 - Агент выбирает каталоги и файлы; Git-root и существующий отбор .md/.markdown сохраняются. ID = path/path#anchor; свободные relation names [a-z][a-z0-9_]*, системные includes/external без изменений.
 - Check refreshes весь корпус; paths фильтрует findings по точному владельцу. Не внедрять обход каталогов/glob/anchor selectors. Нет автоматического исправления ссылок или created_at.
 - Один pinned read после refresh для всех cache-derived findings; граф проверяется до фильтра. Нет inference внутри check/read/write transaction.
-- Findings => ok:true/result.errors и exit 0; malformed input/infrastructure/cancellation => ok:false и exit 1. Один JSON stdout. Не менять X-1 envelope.
+- Findings => ok:true/result.errors и exit 0; malformed input/infrastructure => один ok:false и exit 1. Не менять X-1 envelope. Обработанный SIGINT и гарантия одного cancelled JSON/exit 1 остаются TK-29; текущий runtime использует стандартное завершение процесса по SIGINT, без гарантии cancelled JSON или exit 1. Это поведение отмены не проверено здесь.
 - GraphDiagnostics TK-18 переиспользуется. Snapshot probe не создаёт tree/blob/ref и не использует pin; ошибка I/O/policy/integrity не маскируется как validation finding.
 - status остаётся TK-28, source bytes/ranges/source_changed — TK-21, traversal — TK-23. Пилот/платные запросы/долгие измерения не запускать; G-1/G-2/v1 не объявлять пройденными.
 - Методы около 40/max60 строк, caller-before-helper, документированные публичные APIs/#Errors, безопасные static messages/private causes, meaningful constants, тесты Arrange/Act/Assert с независимыми ожиданиями.
@@ -112,7 +113,7 @@ assert_eq!(response["result"]["errors"][0]["details"]["target"], "missing.md");
 - [x] **4. Run targeted tests:** `cargo test --locked --offline --test check_lifecycle`; new tests are acceptance extensions over Task2, so may start GREEN. Never invent a RED: prove selected assertions by mutation. If a regression is found, retain its failing output before the narrow fix.
 - [x] **5. Mutation controls:** suppress removal publication => rename/delete case RED; replace authored timestamp in projection with another value => literal42 check RED; temporarily drop one changed file from the detected publication delta => final two-file assertion RED. Эти controls проверяют наблюдаемый результат, не требуют новой стратегии блокировок и не оставляют production hooks. Restore files byte-for-byte and rerun all three new targets GREEN.
 - [x] **6. Run final validation once:** `make verify` (includes check, strict Rustdoc, release tests), `git diff --check`; retain logs and hashes of actual changed sources. No native stack/schema/dependency edits anticipated, so historical storage harness is not rerun by default. If those change, run relevant host/Linux runner with new evidence and report platform limits honestly.
-- [ ] **7. Review actual tree:** physical modules/visibility/trait impls/import direction/lib wiring, sync-only execution, no body/schema/Markdown rewrite, stdout/error safety, RAII releases and tests independent of external model. Native execution ends with one whole-branch reviewer; SDD adds its required task gates.
+- [ ] **7. Review actual tree:** physical modules/visibility/trait impls/import direction/lib wiring, sync-only execution, no body/schema/Markdown rewrite, stdout/error safety, RAII releases and tests independent of external model. Native execution ends with one whole-branch reviewer; SDD adds its required task gates. Whole-branch review completed with no implementation findings; M1 cancellation wording clarified; scoped re-review pending.
 - [x] **8. Write report/receipt:** base/source tree hashes, macOS host/toolchain, exact executed commands/exits, meaningful test cases, mutation outcomes and restored hashes, architectural review, link checks, unrun Linux/harness/pilot limits. New private logs under .artifacts/tk19/; don't overwrite historical TK18/TK17 evidence. Report source revision accurately even if uncommitted.
 - [x] **9. Update cards:** TK19 marks proven check/rename/created_at criteria separately; status consumer stays pending TK28 and cannot be claimed from component tests. TK18 references real check evidence but keeps status/traverse pending. Spec approved, plan execution status/current results updated. GitHub update/closure and merge/push require user instruction; no premature done/closure when combined status criteria remain unmet.
 - [ ] **10. Record Engram and checkpoint:** shared ENGRAM_DB=/Users/zdkadiev/Repos/letopis; fresh status/tokens, preserve all existing attrs/provenance, record focused findings/verification with intended source revision. Commit intended tests/report/docs as `test: prove check rename and concurrent publication lifecycle` when using task commits.
@@ -134,7 +135,9 @@ expectation control failed their named observer and restored identical source by
 The bounded transport collector runs seven actual-product cases; historical receipts
 remain immutable. [Durable report](../../zkit/letopis/checks/TK-19/report.md) records
 exact final verification, source inventory and host limits. Task 3 step 7 includes
-a completed implementer structural review; its independent final review is pending.
+a completed implementer structural review and completed whole-branch review with no
+implementation findings. M1 cancellation wording is clarified; scoped re-review is
+pending.
 Step 10 Engram remains controller-owned; the test/docs checkpoint is committed
 separately. Status/traverse, source-byte provenance, Linux/native harness and
 pilot/G-1/G-2 remain outside this execution.

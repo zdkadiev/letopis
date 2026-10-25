@@ -1,7 +1,7 @@
 {
   "task": "TK-19",
   "date": "2026-10-25",
-  "status": "implementation_and_host_acceptance_pass; independent_final_review_pending",
+  "status": "implementation_and_host_acceptance_pass; whole_branch_review_no_implementation_findings; M1_clarified; scoped_re_review_pending",
   "workspace": "/Users/zdkadiev/.codex/worktrees/tk-19/letopis",
   "branch": "tk-19",
   "source": {
@@ -600,13 +600,14 @@
     "cases": 7
   },
   "architectural_self_review": "pass; no Task3 product source changes; reviewed actual service/traits/Git/CLI/lib constructors and synchronous ownership",
-  "independent_final_review": "pending controller",
+  "independent_final_review": "whole-branch review no implementation findings; M1 clarified; scoped re-review pending",
   "scope_limits": [
     "macOS arm64 only",
     "Linux/native storage runner not rerun: no storage/build/vendor/dependency edits",
     "historical proof harnesses and full historical CLI campaign not rerun",
     "real providers, model quality, pilots and G-1/G-2/v1 not evaluated",
-    "status TK-28, traversal TK-23, full source provenance TK-21 remain pending"
+    "status TK-28, traversal TK-23, full source provenance TK-21 remain pending",
+    "Handled SIGINT and a single cancelled-JSON/exit-1 guarantee are deferred to TK-29. Current runtime has no SIGINT handler and uses default process signal termination; no cancelled JSON or exit 1 is guaranteed, and cancellation handling was not tested here."
   ],
   "verified_input_sha256": {
     "Cargo.lock": "0065802223d81cdbd244e308e7014eba2c132a42ebaa7fb844ca10524a9a93ee",
@@ -878,5 +879,33 @@
     "tests/transport/test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
     "tests/transport/test_transport.py": "ce6a499214dd43e8474247e33c81e6d4ea79a35de4997417c74805df094610ab",
     "tests/transport/tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3"
+  },
+  "whole_branch_review": {
+    "reviewed_range": "c080ddb20418327a65b6d49768879920acb03129..04742af23ec7660d18de872f05831955209b9bbd",
+    "critical": 0,
+    "important": 0,
+    "implementation_findings": 0,
+    "minor": "M1 cancellation scope clarified in bounded documentation correction",
+    "scoped_re_review": "pending controller",
+    "product_suites_rerun": false,
+    "reason": "Documentation-only clarification; all 269 tested inputs unchanged; final reviewer requires scoped documentation re-review only"
+  },
+  "documentation_follow_up": {
+    "command": "python3 -B .artifacts/tk19/task3/m1-docs/validate_docs.py",
+    "exit": 0,
+    "relative_link_targets_checked": 16,
+    "verified_input_count": 269,
+    "source_inventory_sha256": "07e46b1e9392226f3e715bddf5649dd8aa3e4a4749507c297ef2602ee23aa4f1",
+    "input_hashes_equal_to": "04742af23ec7660d18de872f05831955209b9bbd",
+    "changed_files": [
+      "docs/superpowers/plans/2026-10-25-tk-19-check-renames.md",
+      "docs/superpowers/specs/2026-10-25-tk-19-check-renames-design.md",
+      "docs/zkit/letopis/checks/TK-19/report.md",
+      "docs/zkit/letopis/checks/TK-19/verification.json"
+    ],
+    "receipt_json": "valid",
+    "git_diff_check_exit": 0,
+    "product_suites_rerun": false,
+    "scoped_re_review": "pending controller"
   }
 }
