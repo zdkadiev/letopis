@@ -13,7 +13,9 @@ observations for search success, provider-failure FTS fallback, retained-tree in
 not-found and malformed-input errors. The runner validates each against its matching
 X-1 command schema and records `product-reading-responses.json`. Injected
 `CLI_RESPONSE` receipts remain separately labelled and cannot satisfy this coverage.
-Full source inspection and check semantics remain TK-24/TK-19 work.
+Full source inspection remains TK-24 work. The transport collector accepts a real
+`check {}` with empty errors and cache initialization; malformed input must fail
+before initialization. TK-19 lifecycle acceptance is in `tests/check_lifecycle.rs`.
 
 Use Python 3.11+ with the development dependency `jsonschema==4.26.0` prepared in
 an isolated environment; it is not a product dependency. For this worktree:

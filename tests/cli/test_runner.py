@@ -169,10 +169,11 @@ class RunnerTests(unittest.TestCase):
             'PRODUCT_READING ' + json.dumps(record) + '\n' for record in records))
         run.capture_reading_responses(evidence, catalogue)
 
-    def test_actual_transport_isolates_noninitializing_and_inspection_cases(self):
+    def test_transport_accepts_check_success_and_rejects_invalid_input_before_io(self):
         root = Path(__file__).resolve().parents[2]
         catalogue = json.loads((root / run.SCHEMA).read_text())
         repositories = []
+        check_cases = []
         terminator = "\n"
         with tempfile.TemporaryDirectory() as directory:
             evidence = Path(directory)
@@ -180,7 +181,11 @@ class RunnerTests(unittest.TestCase):
                 if argv[0] == 'git':
                     return
                 repositories.append(str(cwd))
-                if argv[1] == 'inspect' and stdin != b'{}':
+                if argv[1:] == ['check'] and stdin == b'{}':
+                    self.assertEqual(expected, 0)
+                    (cwd / '.letopis').mkdir()
+                    response = {'ok': True, 'result': {'errors': []}}
+                elif argv[1] == 'inspect' and stdin != b'{}':
                     (cwd / '.letopis').mkdir(exist_ok=True)
                     response = {'ok': False, 'error': {'code': 'not_found', 'message': 'unknown', 'details': {}}}
                 elif argv[1] == 'search':
@@ -189,12 +194,18 @@ class RunnerTests(unittest.TestCase):
                 elif argv[1:] == ['embed', '--drain'] and not stdin:
                     response = {'ok': True, 'result': {}}
                 else:
-                    code = 'internal_error' if argv[1] == 'check' and stdin == b'{}' else 'invalid_request'
-                    response = {'ok': False, 'error': {'code': code, 'message': 'operation unavailable in this build' if code == 'internal_error' else 'invalid command input', 'details': {}}}
+                    self.assertEqual(expected, 1)
+                    self.assertFalse((cwd / '.letopis').exists())
+                    response = {'ok': False, 'error': {'code': 'invalid_request', 'message': 'invalid command input', 'details': {}}}
+                if argv[1:] == ['check']:
+                    check_cases.append((stdin, expected, (cwd / '.letopis').exists()))
                 (evidence / name).write_text(json.dumps(response) + terminator)
                 Path(str(evidence / name) + '.stderr').write_bytes(b'')
             run.capture_transport(root, evidence, execute, Path('/product'), catalogue)
             self.assertEqual(len(repositories), len(set(repositories)))
+            self.assertEqual(check_cases, [(b'{}', 0, True), (b'{"extra":1}', 1, False)])
+            observed = json.loads((evidence / 'product-transport-responses.json').read_text())
+            self.assertEqual(observed[0]['response'], {'ok': True, 'result': {'errors': []}})
             terminator = "\n{}\n"
             with self.assertRaises(AssertionError):
                 run.capture_transport(root, evidence, execute, Path('/product'), catalogue)
@@ -334,3 +345,7 @@ class MakeWorkflowTests(unittest.TestCase):
             cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, timeout=10,
         )
+
+
+if __name__ == '__main__':
+    unittest.main()

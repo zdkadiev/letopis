@@ -4,12 +4,18 @@ use super::{
 };
 use crate::domain::RepoPath;
 
-/// Application-owned corpus validation capability.
+/// Application-owned current corpus validation capability.
+///
+/// Implementations refresh the entire corpus before opening one pinned cache read.
+/// All cache-derived findings share that view. Exact owner selectors filter findings
+/// after full graph validation; they never restrict refresh or graph membership.
+/// Snapshot probes are read-only and repeated OIDs are checked once per invocation.
 pub trait Checker {
     /// Validate the given paths, or the whole corpus when empty.
     ///
     /// # Errors
-    /// Reports command, refresh or infrastructure failures.
+    /// Reports refresh or infrastructure failures with private causes; no partial report
+    /// is returned on failure. Validation findings are successful reports.
     fn check(&mut self, paths: &[RepoPath]) -> CommandResult<CheckReport>;
 }
 /// Consistent metadata-only hybrid knowledge search.

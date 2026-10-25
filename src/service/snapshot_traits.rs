@@ -3,6 +3,31 @@ use super::SnapshotErrorKind;
 use super::{RetainedTree, SnapshotError};
 use crate::domain::{BlobOid, RepoPath, TreeOid};
 
+/// Read-only classification of one exact snapshot root object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapshotState {
+    /// The exact tree exists and its own bytes match its object identity.
+    Available,
+    /// The root object does not exist in the repository.
+    Missing,
+    /// The object has a different type or an incompatible repository OID format.
+    Invalid,
+}
+
+/// Synchronous verification of exact snapshot root objects without side effects.
+///
+/// Implementations verify the tree object's own bytes and identity, without
+/// checking its child closure, retaining objects, changing refs or reading live
+/// source files. Commits and tags must not be peeled into trees.
+pub trait SnapshotVerifier {
+    /// Classify an exact root without creating, writing or retaining Git objects.
+    ///
+    /// # Errors
+    /// Returns [`SnapshotErrorKind::InternalError`] for repository policy, Git I/O
+    /// or object integrity failures; these failures must not become a state.
+    fn verify_snapshot(&self, tree: &TreeOid) -> Result<SnapshotState, SnapshotError>;
+}
+
 /// One captured regular file. The adapter never reads its live path.
 #[derive(Debug)]
 pub struct SnapshotFile<'a> {

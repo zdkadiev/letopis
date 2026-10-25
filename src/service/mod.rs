@@ -1,6 +1,7 @@
 //! Application contracts.
 use crate::domain::RepoPath;
 mod background;
+mod check;
 mod command;
 mod command_traits;
 mod document_refresher;
@@ -21,6 +22,7 @@ mod snapshot_traits;
 mod storage;
 
 pub(crate) use background::BackgroundService;
+pub(crate) use check::CheckService;
 pub(crate) use document_refresher::DocumentRefresher;
 pub(crate) use embedding::EmbeddingService;
 pub(crate) use graph_diagnostics::CurrentGraphDiagnostics;
@@ -50,7 +52,9 @@ pub use model::{
 };
 pub use retained_tree::RetainedTree;
 pub use snapshot_error::{SnapshotError, SnapshotErrorKind};
-pub use snapshot_traits::{GitSnapshots, SnapshotEntry, SnapshotFile};
+pub use snapshot_traits::{
+    GitSnapshots, SnapshotEntry, SnapshotFile, SnapshotState, SnapshotVerifier,
+};
 pub use storage::{CacheWrite, Storage, StorageRead, VectorWrite};
 
 /// Current graph diagnostics derived exclusively from the supplied consistent view.

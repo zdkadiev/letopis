@@ -84,7 +84,7 @@ def validate_response(catalogue, command, response, code):
 def capture_transport(root, evidence, execute, binary, catalogue):
     observations = []
     cases = [
-        (['check'], b'{}', 'internal_error', True),
+        (['check'], b'{}', None, False),
         (['inspect'], b'{"element_ids":["knowledge.md"]}', 'not_found', False),
         (['check'], b'{"extra":1}', 'invalid_request', True),
         (['inspect'], b'{}', 'invalid_request', True),
@@ -111,8 +111,8 @@ def capture_transport(root, evidence, execute, binary, catalogue):
             validate_response(catalogue, ' '.join(args), response, expected)
             if error:
                 assert response['error']['code'] == error
-            if error == 'internal_error':
-                assert response['error']['message'] == 'operation unavailable in this build'
+            if args == ['check'] and not error:
+                assert response == {'ok': True, 'result': {'errors': []}}
             if pre_io:
                 assert not (repo / '.letopis').exists()
             observations.append({'source': 'actual product executable', 'command': ' '.join(args),
@@ -285,7 +285,7 @@ def main():
                 'python': sys.version, 'commands': COMMANDS,
                 'environment': {k: os.environ[k] for k in ('PATH', 'CARGO_HOME', 'RUSTUP_HOME',
                    'CARGO_TARGET_DIR', 'RUSTFLAGS') if k in os.environ},
-                'limits': 'Real product search/knowledge inspect/drain with controlled local HTTP; check and full source inspection unavailable; no real model quality or x86 evidence.'}
+                'limits': 'Real product check/search/knowledge inspect/drain with controlled local HTTP; full source inspection unavailable; no real model quality or x86 evidence.'}
 
     def execute(argv, name, *, cwd=root, extra=None, **kwargs):
         run_command(argv, cwd=cwd, env=child_environment(evidence, extra),

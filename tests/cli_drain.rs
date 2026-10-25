@@ -328,7 +328,7 @@ fn stale_live_text_is_skipped_before_any_product_http_or_reservation() {
 }
 
 #[test]
-fn nested_unavailable_check_does_not_trigger_ready_embeddings() {
+fn nested_invalid_check_does_not_trigger_ready_embeddings() {
     let fixture = Fixture::new();
     let http = HttpFixture::start(FixtureReply::Status {
         status: 200,
@@ -345,14 +345,12 @@ fn nested_unavailable_check_does_not_trigger_ready_embeddings() {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
     );
-    child.send_input(b"{}");
+    child.send_input(b"null");
     let output = child.collect_output(WAIT);
     assert_eq!(output.status.code(), Some(1));
     let response: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(
-        response["error"]["message"],
-        "operation unavailable in this build"
-    );
+    assert_eq!(response["error"]["code"], "invalid_request");
+    assert_eq!(response["error"]["message"], "invalid command input");
     assert!(!fixture.repo.get_root().join(".letopis/embed.lock").exists());
     assert!(http.take_requests().is_empty());
     assert!(!nested.join(".letopis").exists());
