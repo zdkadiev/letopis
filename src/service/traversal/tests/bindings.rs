@@ -12,6 +12,18 @@ use crate::{
 };
 use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 
+const EXPECTED_BINDINGS: [&str; 70] = [
+    "s000.rs", "s001.rs", "s002.rs", "s003.rs", "s004.rs", "s005.rs", "s006.rs", "s007.rs",
+    "s008.rs", "s009.rs", "s010.rs", "s011.rs", "s012.rs", "s013.rs", "s014.rs", "s015.rs",
+    "s016.rs", "s017.rs", "s018.rs", "s019.rs", "s020.rs", "s021.rs", "s022.rs", "s023.rs",
+    "s024.rs", "s025.rs", "s026.rs", "s027.rs", "s028.rs", "s029.rs", "s030.rs", "s031.rs",
+    "s032.rs", "s033.rs", "s034.rs", "s035.rs", "s036.rs", "s037.rs", "s038.rs", "s039.rs",
+    "s040.rs", "s041.rs", "s042.rs", "s043.rs", "s044.rs", "s045.rs", "s046.rs", "s047.rs",
+    "s048.rs", "s049.rs", "s050.rs", "s051.rs", "s052.rs", "s053.rs", "s054.rs", "s055.rs",
+    "s056.rs", "s057.rs", "s058.rs", "s059.rs", "s060.rs", "s061.rs", "s062.rs", "s063.rs",
+    "s064.rs", "s065.rs", "s066.rs", "s067.rs", "s068.rs", "s069.rs",
+];
+
 #[test]
 fn observes_large_source_bindings_pagewise() {
     let events = Rc::new(RefCell::new(Vec::new()));
@@ -23,6 +35,7 @@ fn observes_large_source_bindings_pagewise() {
     let provenance = BindingProvenance {
         events: events.clone(),
         fail_on: None,
+        observed: RefCell::new(Vec::new()),
     };
     let node = build_knowledge();
     let flags = observe_bindings(&mut read, &node, &provenance).unwrap();
@@ -43,6 +56,16 @@ fn observes_large_source_bindings_pagewise() {
         flags,
         BTreeSet::from([SearchFlag::SourceChanged, SearchFlag::SourceNotFound])
     );
+    assert_eq!(
+        provenance
+            .observed
+            .borrow()
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        EXPECTED_BINDINGS,
+        "binding identities and multiplicity"
+    );
 }
 
 #[test]
@@ -56,6 +79,7 @@ fn observes_empty_bindings_once_to_preserve_basis_validation() {
     let provenance = BindingProvenance {
         events: events.clone(),
         fail_on: None,
+        observed: RefCell::new(Vec::new()),
     };
     let node = build_knowledge();
     let flags = observe_bindings(&mut read, &node, &provenance).unwrap();
@@ -74,6 +98,7 @@ fn propagates_late_provenance_failure_without_partial_flags_or_further_pages() {
     let provenance = BindingProvenance {
         events: events.clone(),
         fail_on: Some("s032.rs"),
+        observed: RefCell::new(Vec::new()),
     };
     let node = build_knowledge();
     let error = observe_bindings(&mut read, &node, &provenance).unwrap_err();
@@ -98,6 +123,7 @@ fn reports_late_binding_page_failure_after_completed_observations() {
     let provenance = BindingProvenance {
         events: events.clone(),
         fail_on: None,
+        observed: RefCell::new(Vec::new()),
     };
     let error = observe_bindings(&mut read, &build_knowledge(), &provenance).unwrap_err();
     assert_eq!(
@@ -125,6 +151,7 @@ struct BindingRead {
 struct BindingProvenance {
     events: Rc<RefCell<Vec<String>>>,
     fail_on: Option<&'static str>,
+    observed: RefCell<Vec<String>>,
 }
 impl GraphRead for BindingRead {
     fn resolve_node(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
@@ -192,20 +219,12 @@ impl SourceProvenance for BindingProvenance {
         self.events
             .borrow_mut()
             .push(format!("observe:{}", request.sources.len()));
-        for source in request.sources {
-            let index = source.as_str()[1..4].parse::<usize>().unwrap();
-            let observed = self
-                .events
-                .borrow()
+        self.observed.borrow_mut().extend(
+            request
+                .sources
                 .iter()
-                .filter(|event| event.starts_with("observe:"))
-                .count();
-            assert_eq!(
-                index / 32 + 1,
-                observed,
-                "source belongs to exactly this page"
-            );
-        }
+                .map(|source| source.as_str().to_owned()),
+        );
         let first = request.sources.first().map(SourceUri::as_str);
         if self.fail_on.is_some() && first == self.fail_on {
             return Err(DocumentError::new(
