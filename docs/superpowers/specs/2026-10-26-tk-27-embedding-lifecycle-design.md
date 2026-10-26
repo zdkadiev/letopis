@@ -1,6 +1,6 @@
 # TK-27 — Embedding configuration and retry lifecycle
 
-Status: approved by the user on 2026-10-26; implementation plan pending approval. Base: local main `6f59bbb` (includes TK-25 and TK-26). Task: [TK-27](../../zkit/letopis/roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md). The early pilot TK-17 and G-1 are not established as complete by this task.
+Status: spec and subagent-driven implementation plan approved by the user on 2026-10-26; Tasks 1–2 implemented and independently approved; Task 3 final verification/report complete (macOS/Linux arm64, debug/release 785 passed per profile, explicit 60s probe passed). Final whole-branch review remains pending. Evidence: [TK-27 report](../../zkit/letopis/checks/TK-27/report.md). Base: local main `6f59bbb` (includes TK-25 and TK-26). Task: [TK-27](../../zkit/letopis/roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md). The early pilot TK-17 and G-1 are not established as complete by this task.
 
 ## Goal and chosen approach
 
@@ -30,14 +30,9 @@ For changed Rust code, run repository-required checks including `make verify`; r
 
 ## Accepted correction: guard reset against an obsolete observation
 
-Code inspection identifies this schedule: P observes A and pauses; the file changes to B; Q installs B and records a vector or attempts; P resumes and unconditionally resets storage to A. This remains a risk derived from code until a deterministic regression reproduces it. The old MC-3 model only covers duplicate observations of B. A stale reset can delete both vectors and attempts, so accepting it merely as recomputation is insufficient.
+Code inspection identified this schedule: P observes A and pauses; the file changes to B; Q installs B and records a vector or attempts; P resumes and unconditionally resets storage to A. Task 1 reproduced the loss with a compiling deterministic baseline regression and then verified the guarded fix; its receipts are recorded in the task report. The MC-3 model before Task 3 covered only duplicate observations of B. A stale reset can delete both vectors and attempts, so accepting it merely as recomputation is insufficient.
 
-Use an observed identity as the precondition of reset, through the existing application-owned storage boundary:
-
-1. Observe stored identity (including the initial absent state) before reading the configuration file. Release that read view before further work.
-2. Read, parse and validate the file, obtaining the desired identity. Missing or invalid config never resets state.
-3. In the existing short vector write transaction, read current identity again. If it already equals the desired identity, keep all vectors and attempts. Otherwise, if it differs from the observed identity, report a configuration conflict without changing anything. Only if it still equals the observation may reset install the desired identity.
-4. On conflict, use existing mismatch handling to skip embeddings for this command/drain and allow the next invocation to observe current state. No unbounded reread/reset loop and no provider request using a mismatched identity. The exact typed internal result and how readiness is represented are implementation-plan decisions; they must preserve successful CLI/FTS behavior and the pinned search-view contract.
+Use the observed-identity conditional reset defined authoritatively in [MC-3](../../zkit/letopis/mechanics.md#mc-3--embeddings-работа-из-данных-и-попытки), through the existing application-owned storage boundary. The typed implementation outcome is `VectorOutcome<bool>` for storage and `ConfigState::Changed` for a superseded service observation. Drain maps it to `ConfigChanged`; query/readiness skip embeddings while search/graph remain available. This is an internal result, with no new CLI JSON code.
 
 This conditional update preserves B in the schedule above. It adds no persisted version, generation, job state, configuration lock, editing command, or requirement for external editors to cooperate. SQLite owns the conditional check and write; the application service owns observation and file parsing, so storage never reads the config file.
 

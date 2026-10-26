@@ -1,0 +1,334 @@
+{
+  "task": "TK-27",
+  "status": "verification_passed_final_whole_branch_review_pending",
+  "captured_product_revision": "14d1e4773974030430936e2aff3f76138dd5e1ac",
+  "source_base": "207dc1d",
+  "later_delta": "documentation/model/report only; not a newly compiled revision",
+  "source": {
+    "host_linux_common_count": 228,
+    "common_inputs_sha256": "cb0b30fa83c81ca0f79c608e0d8d59816ac761f0c09e339ac55ddb1dab9a2b2d",
+    "required_inputs": {
+      "src/service/embedding.rs": "6ce46ba9c058989dd882be6251cea8736a06e2e69bff2f06ed3ec5c99a741860",
+      "src/service/storage.rs": "9f8c96925d73c5e12c4e92d4817a23518d090a3b4c4fb912c6453a3889d8dec4",
+      "src/storage/vectors.rs": "43e2d215a4be610a206ef16e732a95f927a42896c62329f37da94f13602e3a3b",
+      "src/service/embedding/tests/process.rs": "d31e2aa451b9a18719c2a4d35f4ff038504aa5644895d03719b6a47fa05a248f",
+      "src/service/embedding/tests/process/configuration.rs": "271b546d907d62bf1dbe3de0b31b95e95e0321152d7fcf41e70e82d1137d09ef",
+      "tests/storage_configuration.rs": "eae34beee9df572ac2a0a537cc8eb09cfbbdccd31e20665a2f71b8a568fed0b2",
+      "tests/embedding_lifecycle.rs": "5de0077412da1f43cfd92eb2406e4de252bed615fe04a7b6f7a7311c70e6c86a",
+      "tests/cli_drain.rs": "64abbf98b7e8efb34c6d9692257aeeb333d6729e4a6f6edb4448251f4adbc791",
+      "tests/reindex_command.rs": "2dfd0d99b5802cc0315cee638d279191bf1c91d85ce5ab0cec015e380715f19e",
+      "tests/support/cli.rs": "416bcc2f21079cad8720c958c9f608e262c942a0b8bfd037c1ee34a8049b356b"
+    },
+    "current_inputs_match_captured": true,
+    "canonical_document_sha256": {
+      "docs/zkit/letopis/mechanics.md": "9747b47be29f2380884df7ff33274574d87459121de9a22a8a1fa77902b492a0",
+      "docs/zkit/letopis/mechanics/model_embedding.py": "749aca379ed4e2f7ad507449ed22d2d70ac6c5ea6efbe4aae5e4873432b10f01",
+      "docs/zkit/letopis/contracts/X-2-embeddings.md": "38edf15e493212532eb8d927bb052bc85222480cd4729744030361df7f321601",
+      "docs/zkit/letopis/contracts/I-8-read-view.md": "95fbf6b4fc85bc7bc5393e8272303b322e0f879c4a35bd31826535da1fd3774b"
+    }
+  },
+  "host": {
+    "status": "PASS",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "manifest": ".artifacts/tk27/final-host-14d1e47-20261026/manifest.json",
+    "manifest_sha256": "54570840e32952555d273f79a5c6b03a171e28d634febc99336345251d6d87e7",
+    "inputs_count": 346,
+    "inputs_sha256": "02bce40abfdef4902062cc9585e7848b9165007d878ec427fed593f99517f864",
+    "root_tests": {
+      "debug": {
+        "passed": 785,
+        "failed": 0,
+        "ignored": 5,
+        "root_executables": 61,
+        "nested_helper_passes_excluded": 8
+      },
+      "release": {
+        "passed": 785,
+        "failed": 0,
+        "ignored": 5,
+        "root_executables": 61,
+        "nested_helper_passes_excluded": 8
+      }
+    },
+    "explicit_deadline": {
+      "passed": 1,
+      "failed": 0,
+      "seconds": 60.01
+    },
+    "commands": [
+      {
+        "command": "git rev-parse HEAD",
+        "exit_code": 0,
+        "log": "source-commit.log",
+        "sha256": "bc6e265face8e594fe867a0e60c535eaf15e29edfb4a90a72aecb97ff8c5e4d2"
+      },
+      {
+        "command": "git status --short",
+        "exit_code": 0,
+        "log": "source-dirty.log",
+        "sha256": "6725c04decf7dc2badf5bad51e5c30d3d9d66ce813e4368bb124c68107c437d4"
+      },
+      {
+        "command": "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 -B tests/storage/check_schema.py /private/tmp/letopis-tk-27",
+        "exit_code": 0,
+        "log": "schema-parity.log",
+        "sha256": "1f766502744d3d719f1ae75acb585a9cf6b3b7dda489dac07a95b6cc546873a4"
+      },
+      {
+        "command": "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 -B -m unittest discover -s tests/storage -p test_runner.py -v",
+        "exit_code": 0,
+        "log": "runner-tests.log",
+        "sha256": "ed4874745206295496a9be1b0296f903f0a7c0788b3c8bdb84b207eddef0b00c"
+      },
+      {
+        "command": "rustc -vV",
+        "exit_code": 0,
+        "log": "version-rustc.log",
+        "sha256": "e61cba8ded8c60e985f759f74a221c4773649021477d00b44c7af411eb8c218c"
+      },
+      {
+        "command": "cargo --version",
+        "exit_code": 0,
+        "log": "version-cargo.log",
+        "sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5"
+      },
+      {
+        "command": "git --version",
+        "exit_code": 0,
+        "log": "version-git.log",
+        "sha256": "0a72a762b37a3800276a1004e2c169aed0610d4a3ba601ba59e70e1c4d9f3200"
+      },
+      {
+        "command": "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 --version",
+        "exit_code": 0,
+        "log": "version-python3.log",
+        "sha256": "d158ce130d26adfd848cf3cdc57bd862751698a22af43c25e9f11922b184fbbb"
+      },
+      {
+        "command": "uname -a",
+        "exit_code": 0,
+        "log": "version-uname.log",
+        "sha256": "5c022d97e8263a51e49f5865bebbcfa3259cf76d67f41d0b9db50eb7e2f4edb5"
+      },
+      {
+        "command": "make verify V=1",
+        "exit_code": 0,
+        "log": "rust-check.log",
+        "sha256": "45faa88ee0283ece53933bf2e8f0c076a77bec24f9f970c1bd58492e2ab12058"
+      },
+      {
+        "command": "cargo test --locked --offline --test embedding_provider attempt_obeys_real_sixty_second_deadline -- --ignored --exact --nocapture",
+        "exit_code": 0,
+        "log": "provider-real-deadline.log",
+        "sha256": "d2e934627662a66e4a5dde906cdfc27a9901c92273d1e0a8dde11a5c54fca782"
+      },
+      {
+        "command": "cargo doc --locked --offline --no-deps",
+        "exit_code": 0,
+        "log": "rustdoc.log",
+        "sha256": "6408d51e5cabdbf4226b0b92b9601083266c0bb01a52250bafc14437cdfbad1b"
+      },
+      {
+        "command": "cargo test --locked --offline storage::native::tests::native_capabilities_match_pinned_stack -- --nocapture",
+        "exit_code": 0,
+        "log": "native.log",
+        "sha256": "0d2375c3becfbc15d388055ac9ac3f8792e931cd9c9b4d828f4b4f37b32be3e5"
+      },
+      {
+        "command": "cargo build --locked --offline --example storage_check --message-format=json",
+        "exit_code": 0,
+        "log": "build.log",
+        "sha256": "8863bca0a6bfae5e9e300d58fd1eeecce383bd5ddb6d26dcb9f6d2cd250c7b84"
+      },
+      {
+        "command": "otool -L /var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-33jxbxv6/storage_check",
+        "exit_code": 0,
+        "log": "dynamic.log",
+        "sha256": "b4df15619933501d720c55808064ec60ff2f86e338622b7d96bfb7e3e6f0e4f9"
+      },
+      {
+        "command": "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-33jxbxv6/storage_check /var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-33jxbxv6/scratch",
+        "exit_code": 0,
+        "log": "standalone.log",
+        "sha256": "a809874ca7e2cbcf19b80efdc9b2bb22bbd4bcfa6d4e8b3173d57033eda736ad"
+      }
+    ]
+  },
+  "linux": {
+    "status": "PASS",
+    "platform": "Linux-7.0.0-22-generic-aarch64-with-glibc2.36",
+    "machine": "aarch64",
+    "manifest": ".artifacts/tk27/final-linux-14d1e47-20261026-escalated/container/manifest.json",
+    "manifest_sha256": "03d599f6333cc10ae13f0eeacf78f26856e76971373eb678a1b7141a1e29efa1",
+    "inputs_count": 228,
+    "inputs_sha256": "cb0b30fa83c81ca0f79c608e0d8d59816ac761f0c09e339ac55ddb1dab9a2b2d",
+    "root_tests": {
+      "debug": {
+        "passed": 785,
+        "failed": 0,
+        "ignored": 5,
+        "root_executables": 61,
+        "nested_helper_passes_excluded": 8
+      },
+      "release": {
+        "passed": 785,
+        "failed": 0,
+        "ignored": 5,
+        "root_executables": 61,
+        "nested_helper_passes_excluded": 8
+      }
+    },
+    "explicit_deadline": {
+      "passed": 1,
+      "failed": 0,
+      "seconds": 61.86
+    },
+    "commands": [
+      {
+        "command": "/usr/bin/python3 -B tests/storage/check_schema.py /repo",
+        "exit_code": 0,
+        "log": "schema-parity.log",
+        "sha256": "1f766502744d3d719f1ae75acb585a9cf6b3b7dda489dac07a95b6cc546873a4"
+      },
+      {
+        "command": "/usr/bin/python3 -B -m unittest discover -s tests/storage -p test_runner.py -v",
+        "exit_code": 0,
+        "log": "runner-tests.log",
+        "sha256": "edaf0bf1935436c826560dd71607bf417d394457fe8dc66e271f72f170702cca"
+      },
+      {
+        "command": "rustc -vV",
+        "exit_code": 0,
+        "log": "version-rustc.log",
+        "sha256": "9e52f76a6e81c8cce82c76c2ee87a3c9999e56d92106b19142416460b9d2c727"
+      },
+      {
+        "command": "cargo --version",
+        "exit_code": 0,
+        "log": "version-cargo.log",
+        "sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5"
+      },
+      {
+        "command": "git --version",
+        "exit_code": 0,
+        "log": "version-git.log",
+        "sha256": "469b1acf8275955250bdef50b4190688e8e36453cfcb29816ae6dcfb31097039"
+      },
+      {
+        "command": "/usr/bin/python3 --version",
+        "exit_code": 0,
+        "log": "version-python3.log",
+        "sha256": "cb64a3a0ddcaff0ce013ea3612beda0be4a4d3537087505bd8850d8f8476f4f8"
+      },
+      {
+        "command": "uname -a",
+        "exit_code": 0,
+        "log": "version-uname.log",
+        "sha256": "abc89139b4768956a56a7f8a66dd743a60efa184083a7546ff037b7abb4bb854"
+      },
+      {
+        "command": "make verify V=1",
+        "exit_code": 0,
+        "log": "rust-check.log",
+        "sha256": "240ad6a0f2ea3899401caabe59cdd3a71e04fa305ea17a23f3a7b3e9110137ad"
+      },
+      {
+        "command": "cargo test --locked --offline --test embedding_provider attempt_obeys_real_sixty_second_deadline -- --ignored --exact --nocapture",
+        "exit_code": 0,
+        "log": "provider-real-deadline.log",
+        "sha256": "59c474b1066d1fc0c58eacacaaa389f361e83c85248a6412690757befde294e0"
+      },
+      {
+        "command": "cargo doc --locked --offline --no-deps",
+        "exit_code": 0,
+        "log": "rustdoc.log",
+        "sha256": "00f0e242e6d07ca433976e76c3dd84e9cd68ad06ef9ad12c238d3b458ce43d05"
+      },
+      {
+        "command": "cargo test --locked --offline storage::native::tests::native_capabilities_match_pinned_stack -- --nocapture",
+        "exit_code": 0,
+        "log": "native.log",
+        "sha256": "2a0aac25251e2c7bfd6d2ba5bf6d0c9a68b1efaccfcb5eb34c321973c59ede31"
+      },
+      {
+        "command": "cargo build --locked --offline --example storage_check --message-format=json",
+        "exit_code": 0,
+        "log": "build.log",
+        "sha256": "8a159295295e34c3d565243b9b12da582ed9bac2c30fa1735e96fb67c4981cae"
+      },
+      {
+        "command": "ldd /tmp/tk9-standalone-czvhfaxm/storage_check",
+        "exit_code": 0,
+        "log": "dynamic.log",
+        "sha256": "f7cab10f51795b191d7228698c5e9dd0347137d03a174babcda82bc1984f6141"
+      },
+      {
+        "command": "/tmp/tk9-standalone-czvhfaxm/storage_check /tmp/tk9-standalone-czvhfaxm/scratch",
+        "exit_code": 0,
+        "log": "standalone.log",
+        "sha256": "a809874ca7e2cbcf19b80efdc9b2bb22bbd4bcfa6d4e8b3173d57033eda736ad"
+      }
+    ]
+  },
+  "initial_linux_infrastructure_failure": {
+    "manifest": ".artifacts/tk27/final-linux-14d1e47-20261026/manifest.json",
+    "sha256": "3805cffa2923e56067752fa9150f7881a4be3ef8c072fa0f89a8e0c471b2b17e",
+    "status": "FAIL",
+    "product_tests_executed": false,
+    "reason": "Docker buildx sandbox denied ~/.docker/buildx/activity write before build",
+    "build_log_sha256": "a4acca65e081c0fcb97fa226870cbebd34471c07411ef9c7d17cf3177f62a132"
+  },
+  "model": {
+    "normal_violations": 0,
+    "observed_identity_negative_control": [
+      "obsolete observation replaced B identity",
+      "obsolete observation wiped the B failure attempt",
+      "obsolete observation wiped the literal B vector"
+    ],
+    "existing_mechanics_checks": {
+      "internal_cases": 0,
+      "guard_mutations": 15,
+      "models": 3
+    }
+  },
+  "evidence": [
+    {
+      "path": ".artifacts/tk27/final-host-14d1e47-20261026",
+      "files": 224,
+      "files_sha256": "e59b9aba7ffa6e16188153f0aba411204d061642a777485c6221aeee993646c8"
+    },
+    {
+      "path": ".artifacts/tk27/final-linux-14d1e47-20261026-escalated",
+      "files": 231,
+      "files_sha256": "6430e7157ce4987140ff072004c07bf174c3ca74f93931cb353090cd56984d0f"
+    },
+    {
+      "path": ".artifacts/tk27/final-linux-14d1e47-20261026",
+      "files": 5,
+      "files_sha256": "ec4165dd57b6d13fa5e87ce1954974c22ded64b104888258158642f8352e42eb"
+    },
+    {
+      "path": ".artifacts/tk27/task1",
+      "files": 41,
+      "files_sha256": "11918e2ee8ace05579500fa57417389832a9b4baef420668bf858b553729a922"
+    },
+    {
+      "path": ".artifacts/tk27/task2",
+      "files": 19,
+      "files_sha256": "455289d7ad6296b915d4ac074877c089e14eb57b96d3909e118f43363a263317"
+    }
+  ],
+  "task3_log_sha256": {
+    ".artifacts/tk27/task3/fmt.log": "fb0d4a94c6155cf094dbcec8f39e1566057ca6789437462fa81e2e6529d93f8e",
+    ".artifacts/tk27/task3/model-embedding.json": "066b680ce7a74fdde24aefff5cdf1b31f3296f82df4fab9dd7a006f59a8d663c",
+    ".artifacts/tk27/task3/mechanics-check.json": "4331ffa058b166a0489e0413cfc8cfe2bdd28df9d55fe820342d3df0ee20f2ca",
+    ".artifacts/tk27/task3/documentation-validation.json": "a1d575f712876052a43dade502448c472c362dd09331137eddfef65a47fa75bd"
+  },
+  "scope_limits": [
+    "No external corpus/model/hardware-quality proof or power-loss drill",
+    "G-1/TK-17 not established; G-2/TK-28/TK-29/TK-37/system drills remain separate",
+    "Controller owns final independent whole-branch review and SDD archive"
+  ],
+  "count_method": "Last test-result per root Running executable; exclude nested helper summaries and Doc-tests; real deadline separate"
+}

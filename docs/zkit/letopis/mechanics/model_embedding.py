@@ -58,6 +58,23 @@ def run(broken=False, fault=None):
     if ('B', 't1') not in store:
         errors.append('duplicate reset wiped vectors of the current config')
 
+    # P observes A (or an absent store), then reads config A and pauses. Q installs
+    # B and stores an exact vector and a reserved failure. P must reject its old
+    # observation, rather than resetting B back to A. The oracle is independent
+    # literal state, not another call to the reset algorithm.
+    for observed in ('A', None):
+        desired, meta = 'A', 'B'
+        store = {('B', 't1'): (4.0, 5.0, 6.0)}
+        failures = {'t2': (1, 'safe provider failure')}
+        if meta != desired and (bad('observed_identity') or meta == observed):
+            meta, store, failures = desired, {}, {}
+        if store.get(('B', 't1')) != (4.0, 5.0, 6.0):
+            errors.append('obsolete observation wiped the literal B vector')
+        if failures.get('t2') != (1, 'safe provider failure'):
+            errors.append('obsolete observation wiped the B failure attempt')
+        if meta != 'B':
+            errors.append('obsolete observation replaced B identity')
+
     # 4. Cache rebuilt with vectors.db intact: work is only texts without a vector;
     # identical texts share one vector.
     store = {('A', 't1'), ('A', 't2')}
@@ -83,4 +100,6 @@ def run(broken=False, fault=None):
 
 if __name__ == '__main__':
     import json
-    print(json.dumps({'violations': run(), 'broken_violations': run(True)}, indent=2))
+    print(json.dumps({'violations': run(), 'broken_violations': run(True),
+                      'observed_identity_negative_control': run(fault='observed_identity')},
+                     indent=2))
