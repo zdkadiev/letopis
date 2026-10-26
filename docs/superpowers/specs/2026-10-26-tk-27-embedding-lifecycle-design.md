@@ -1,6 +1,6 @@
 # TK-27 — Embedding configuration and retry lifecycle
 
-Status: revised proposal for user review; implementation not approved. Base: local main `6f59bbb` (includes TK-25 and TK-26). Task: [TK-27](../../zkit/letopis/roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md). The early pilot TK-17 and G-1 are not established as complete by this task.
+Status: approved by the user on 2026-10-26; implementation plan pending approval. Base: local main `6f59bbb` (includes TK-25 and TK-26). Task: [TK-27](../../zkit/letopis/roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md). The early pilot TK-17 and G-1 are not established as complete by this task.
 
 ## Goal and chosen approach
 
@@ -28,7 +28,7 @@ Map every TK-27 acceptance criterion to named, reproducible checks and record co
 
 For changed Rust code, run repository-required checks including `make verify`; run the storage/native platform runner when changes warrant it. If only documentation or tests change, report the checks actually performed. Review physical module boundaries and wiring; record any untested platform or gate rather than extrapolating from host results. Save the eventual implementation plan under `docs/superpowers/plans/`, and update the TK-27 card and evidence report after execution.
 
-## Proposed correction: guard reset against an obsolete observation
+## Accepted correction: guard reset against an obsolete observation
 
 Code inspection identifies this schedule: P observes A and pauses; the file changes to B; Q installs B and records a vector or attempts; P resumes and unconditionally resets storage to A. This remains a risk derived from code until a deterministic regression reproduces it. The old MC-3 model only covers duplicate observations of B. A stale reset can delete both vectors and attempts, so accepting it merely as recomputation is insufficient.
 
@@ -43,7 +43,7 @@ This conditional update preserves B in the schedule above. It adds no persisted 
 
 The guarantee is conditional on the database observation, not immediate agreement with every arbitrary external file write. A file edit immediately after reading cannot be made atomic with SQLite under the existing file-edit contract. A subsequent invocation reconciles that change. Intentional later configuration changes can reset vectors and attempts as already specified; retry bounds apply between resets, not to the lifetime of a text across configuration changes or database deletion.
 
-## Acceptance for the proposed correction
+## Acceptance for the correction
 
 First add a deterministic regression for P(A)/Q(B)/late-P. After Q has stored both a B vector and a B failure attempt, resuming P must preserve B identity, the exact vector and attempt count, and must not call provider A. Also check two observations targeting B: the later observer must leave newly stored B data intact. Cover absent initial identity, successful A-to-B reset, and transactional rollback. Existing delayed-result tests continue to prove that old vector and error responses cannot overwrite the active identity.
 
