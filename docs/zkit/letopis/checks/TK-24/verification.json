@@ -1,5 +1,5 @@
 {
-  "status": "HOST_VERIFIED_PENDING_SCOPED_REREVIEW",
+  "status": "DONE_HOST_VERIFIED_REVIEWED",
   "base_revision": "0f8f92b205f6db48a188cc130c5a6e1190512e3d",
   "implementation_revisions": {
     "task1": ["b58108825227734b9c947ae93d4e990e012d6d93", "bb6b39e9ef5a60d2f65e3da2ec16d97a2c742865"],
@@ -81,7 +81,21 @@
     "fresh_host": {"command": "CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target RUST_TEST_THREADS=2 /Users/zdkadiev/.codex/worktrees/tk-14/letopis/.artifacts/tk14/python-env/bin/python -B tests/cli/run.py --platform host --evidence .artifacts/tk24/host-20261026-final-fix1", "exit": 0, "status": "PASS", "manifest": ".artifacts/tk24/host-20261026-final-fix1/manifest.json", "manifest_sha256": "2ae328c0a8e139647ed71e489b7b249b23b53daf9ba95e41bb59a7c9c9b32fca", "inputs": 205, "commands": 42, "make_verify_exit": 0, "debug": {"root_executables": 49, "doc_test_result_blocks": 1, "passed": 702, "failed": 0, "ignored": 5, "nested_helper_blocks": 8}, "release": {"root_executables": 49, "doc_test_result_blocks": 1, "passed": 702, "failed": 0, "ignored": 5, "nested_helper_blocks": 8}, "copied_binary": ".artifacts/tk24/host-20261026-final-fix1/letopis", "copied_binary_sha256": "11782a47c81d7058204b98996ffcdfc8d32b79fc531b640aea2c1d1014dc8359"},
     "fixed_replay": {"receipt": ".artifacts/tk24/final-fix1/replay-fixed/receipt.json", "receipt_sha256": "ff606f01bc045d95399e4b4860cb252143a704387fc30ec71cb2763fde1130b0", "binary_sha256": "11782a47c81d7058204b98996ffcdfc8d32b79fc531b640aea2c1d1014dc8359", "control_exit": 0, "marked_exit": 1, "invalid_exit": 1, "index_and_head_unchanged": true},
     "current_workflow": {"receipt": ".artifacts/tk24/final-fix1/workflow-fixed/workflow.json", "receipt_sha256": "87c853ffb577bb4398b21638507e4d57bcfadc65c4bb824bbdcb2d72752b0e82", "status": "PASS", "binary_sha256": "11782a47c81d7058204b98996ffcdfc8d32b79fc531b640aea2c1d1014dc8359", "index_and_head_unchanged": true},
-    "scope_review": "pending on corrected revision; controller-owned"
+    "fix_revision": "8c3719ed1dfba74f119bed28130f10325e7332d5",
+    "scope_review": "APPROVED: I1/M1 ADDRESSED, no new Critical/Important breakage"
   },
-  "not_run": ["Linux CLI runner", "native storage runner (no storage/native/build changes)", "historical proof harnesses", "real provider/model pilot", "handled cancellation", "G-1/G-2", "scoped rereview of corrected revision"]
+  "not_run": ["Linux CLI runner", "native storage runner (no storage/native/build changes)", "historical proof harnesses", "real provider/model pilot", "handled cancellation", "G-1/G-2", "scoped rereview of corrected revision"],
+  "review_completion": {
+    "date": "2026-10-26",
+    "original_reviewed_revision": "374c31c5b5a4d190b7cf0d51659b62fc471ab33e",
+    "original_verdict": "With fixes, preserved as historical",
+    "fixed_revision": "8c3719ed1dfba74f119bed28130f10325e7332d5",
+    "final_scoped_review": ".superpowers/sdd/2026-10-26-tk-24-inspection/final-rereview.md",
+    "final_scoped_review_sha256": "b741da651592a6758b041465361196a5c3c05036a7f4e201883ee678c5d49e80",
+    "verdict": "I1/M1 ADDRESSED; no new breakage",
+    "deferred_findings": [],
+    "current_runtime_inputs_match_fresh_host": 205,
+    "post_verification_changes": "documentation status and review closure only",
+    "unrun_limits_preserved": true
+  }
 }

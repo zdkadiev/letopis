@@ -1,6 +1,6 @@
 # TK-24 — Завершить batch inspect и навык чтения/записи
 
-> **Статус:** I1 fixed and fresh host verification PASS; scoped rereview pending
+> **Статус:** done
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 6 / 10 (best / expected / worst)
@@ -74,4 +74,4 @@
 
 Исторический host checkpoint `tests/cli/run.py --platform host` — PASS на своей зафиксированной input map: по 697 root tests passed, 0 failed, 5 ignored в debug и release. После I1 fix свежий host runner — PASS на новой карте 205 inputs, встроенный `make verify V=1` exit 0: по 702 root tests passed, 0 failed, 5 ignored в debug и release; вложенные child-helper вызовы посчитаны отдельно. Новый сохранённый executable SHA-256 `11782a47c81d7058204b98996ffcdfc8d32b79fc531b640aea2c1d1014dc8359`. Replay исходной гонки на нём: unchanged control exit 0; unmarked→marked и unmarked→invalid exit 1 с `internal_error`, без partial result, с неизменными index/HEAD. Текущий disposable workflow на том же executable — PASS с точными `source_changed` и `dangling_target`. Evidence: `.artifacts/tk24/host-20261026-final-fix1/`, `.artifacts/tk24/final-fix1/`; прежние receipts сохранены отдельно. Python collector tests: 20 passed на прежнем Task 2 checkpoint, повторно для I1 fix не запускались.
 
-Task 2 не менял `src/`; I1 fix меняет только `service/inspection.rs` и его private tests, сохраняя `Inspector` interface, CLI handler/output, domain и `lib.rs` composition root. Linux, native storage runner, реальная модель/пилот, handled cancellation, G-1/G-2 не объявлены проверенными. Native runner не требовался: storage/native/build входы не менялись. Scoped rereview исправленной ревизии и запись в Engram выполняет контроллер; до этого статус остаётся review pending, без merge/push/GitHub closure.
+Task 2 не менял `src/`; I1 fix меняет только `service/inspection.rs` и его private tests, сохраняя `Inspector` interface, CLI handler/output, domain и `lib.rs` composition root. Linux, native storage runner, реальная модель/пилот, handled cancellation, G-1/G-2 не объявлены проверенными. Native runner не требовался: storage/native/build входы не менялись. Итоговый scoped rereview `8c3719ed1dfba74f119bed28130f10325e7332d5` подтвердил I1/M1 ADDRESSED без новой поломки; функциональная приёмка и review завершены. Результаты и commit/evidence сохраняются в общем Engram. Ветка готова к выбору интеграции; main/GitHub publication не является частью этой приёмки.
