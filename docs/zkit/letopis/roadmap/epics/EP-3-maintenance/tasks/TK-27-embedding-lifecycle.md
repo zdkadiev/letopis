@@ -1,6 +1,6 @@
 # TK-27 — Завершить смену config и bounded retries
 
-> **Статус:** in_progress — реализация, task-scoped reviews и финальная проверка/отчёт завершены; whole-branch review pending
+> **Статус:** done — реализация, проверки macOS/Linux arm64 и независимое итоговое ревью приняты
 > **Эпик:** [EP-3](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 3 / 6 / 12 (best / expected / worst)
@@ -70,4 +70,4 @@
 
 2026-10-26: реализован условный reset через наблюдавшуюся identity (`c668ec6`), добавлены реальные process-restart/SIGINT, cache-loss/reuse и long-input сценарии (`14d1e47`). Tasks 1–2 прошли независимые scoped reviews. Каноническое поведение и модель согласованы с принятой спецификацией; итоговые результаты и трассировка критериев сохраняются в [отчёте TK-27](../../../../checks/TK-27/report.md) и [verification.json](../../../../checks/TK-27/verification.json).
 
-Итоговая проверка/отчёт PASS: macOS arm64 и Linux arm64, по 785 root tests / 0 failed / 5 ignored в debug и release; отдельный реальный 60s deadline, schema/native/standalone/linkage checks прошли. Все 228 общих source inputs совпадают. Первый Linux-запуск остановился до сборки из-за sandbox Docker buildx; отдельный разрешённый rerun прошёл, оба receipts сохранены. Каждый критерий выше имеет выполненные проверки в отчёте; whole-branch review остаётся pending. Статус `done` выставляет controller после него. TK-17/G-1, G-2, TK-28, TK-29, TK-37, actual model quality/capacity и полные системные drills этой задачей не закрываются. Указанный в карточке G-1 остаётся неподтверждённой проектной предпосылкой, а не результатом локального разрешения на реализацию.
+Итоговая проверка/отчёт PASS: macOS arm64 и Linux arm64, по 785 root tests / 0 failed / 5 ignored в debug и release; отдельный реальный 60s deadline, schema/native/standalone/linkage checks прошли. Все 228 общих source inputs совпадают. Первый Linux-запуск остановился до сборки из-за sandbox Docker buildx; отдельный разрешённый rerun прошёл, оба receipts сохранены. Каждый критерий выше имеет выполненные проверки в отчёте; Независимое [итоговое ревью](../../../../checks/TK-27/review.md) принято без замечаний на `02b9736`; проверенный product source — `14d1e47`. TK-17/G-1, G-2, TK-28, TK-29, TK-37, actual model quality/capacity и полные системные drills этой задачей не закрываются. Указанный в карточке G-1 остаётся неподтверждённой проектной предпосылкой, а не результатом локального разрешения на реализацию.

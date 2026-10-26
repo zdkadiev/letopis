@@ -1,8 +1,8 @@
 # TK-27 — embedding lifecycle verification
 
 2026-10-26. Реализация и scoped reviews Tasks 1–2 завершены; финальная проверка
-Task 3: PASS на macOS arm64 и Linux arm64. **Whole-branch review pending**; controller обновляет итоговый
-статус после него. [Спецификация](../../../../superpowers/specs/2026-10-26-tk-27-embedding-lifecycle-design.md),
+Task 3: PASS на macOS arm64 и Linux arm64. **TK-27 завершена**: независимое
+[итоговое ревью](review.md) принято без замечаний на `02b9736`. [Спецификация](../../../../superpowers/specs/2026-10-26-tk-27-embedding-lifecycle-design.md),
 [план](../../../../superpowers/plans/2026-10-26-tk-27-embedding-lifecycle.md),
 [карточка](../../roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md)
 и [машиночитаемый receipt](verification.json) задают scope и provenance.
@@ -110,10 +110,11 @@ SIGINT и long-input runs green. First reindex run выявил только с�
 скомпилировались, дали exit101 на нужных assertions; exact restore дал exit0.
 Их SHA-256 соответствуют финальному source; дополнительный broad suite не нужен.
 
-Полные worker reports controller архивирует с прежними именами в
-`.artifacts/tk27/sdd-final/task-1-report.md` и `task-2-report.md`; scratch ledger и
-финальные независимые reviews принадлежат controller. Этот отчёт не объявляет
-непроведённый final whole-branch review завершённым.
+Полные worker reports и ревью сохранены с прежними именами в
+`.artifacts/tk27/sdd-final/task-1-report.md` и `task-2-report.md`; полный ledger и финальное ревью находятся в том же архиве.
+Итоговый reviewer подтвердил соответствие спецификации, качество и готовность
+к слиянию в scope TK-27. Независимая controller-сверка сохранена отдельно в
+`.artifacts/tk27/controller-audit.json`.
 
 ## Архитектурная проверка фактического diff
 
@@ -137,8 +138,8 @@ vector/failure publication проверяет captured identity отдельно
 ошибки остаются typed/safe, runtime payload/credentials не включаются в JSON.
 Новых dependencies/schema/runtime/background components нет.
 
-Открытых product findings после этой self-review нет. Итоговая независимая
-whole-branch review остаётся pending. Локальные проверки не устанавливают атомарность
+Открытых product findings нет. Итоговое независимое ревью принято;
+последующие изменения статуса и сохранённый текст ревью меняют только документацию. Локальные проверки не устанавливают атомарность
 config-файла с SQLite, lifetime retry budget через reset/deletion, физический
 power-loss durability, производительность/качество реальной модели или все
 DR-5/DR-8. G-1/TK-17 не подтверждены; G-2, TK-28, handled cancellation/TK-29,

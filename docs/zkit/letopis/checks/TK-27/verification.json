@@ -1,6 +1,6 @@
 {
   "task": "TK-27",
-  "status": "verification_passed_final_whole_branch_review_pending",
+  "status": "verified_and_reviewed",
   "captured_product_revision": "14d1e4773974030430936e2aff3f76138dd5e1ac",
   "source_base": "207dc1d",
   "later_delta": "documentation/model/report only; not a newly compiled revision",
@@ -327,8 +327,14 @@
   },
   "scope_limits": [
     "No external corpus/model/hardware-quality proof or power-loss drill",
-    "G-1/TK-17 not established; G-2/TK-28/TK-29/TK-37/system drills remain separate",
-    "Controller owns final independent whole-branch review and SDD archive"
+    "G-1/TK-17 not established; G-2/TK-28/TK-29/TK-37/system drills remain separate"
   ],
-  "count_method": "Last test-result per root Running executable; exclude nested helper summaries and Doc-tests; real deadline separate"
+  "count_method": "Last test-result per root Running executable; exclude nested helper summaries and Doc-tests; real deadline separate",
+  "final_review": {
+    "verdict": "approved_no_findings",
+    "reviewed_head": "02b97365820652c851caca6371d2990ebd9c0573",
+    "path": "docs/zkit/letopis/checks/TK-27/review.md",
+    "sha256": "d572f4828a151ffe380294032c7e19ed3fd448fdd8bce671066bb4ba4537126f",
+    "controller_audit": ".artifacts/tk27/controller-audit.json"
+  }
 }

@@ -1,6 +1,6 @@
 # TK-27 — Embedding configuration and retry lifecycle
 
-Status: spec and subagent-driven implementation plan approved by the user on 2026-10-26; Tasks 1–2 implemented and independently approved; Task 3 final verification/report complete (macOS/Linux arm64, debug/release 785 passed per profile, explicit 60s probe passed). Final whole-branch review remains pending. Evidence: [TK-27 report](../../zkit/letopis/checks/TK-27/report.md). Base: local main `6f59bbb` (includes TK-25 and TK-26). Task: [TK-27](../../zkit/letopis/roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md). The early pilot TK-17 and G-1 are not established as complete by this task.
+Status: spec and subagent-driven implementation plan approved by the user on 2026-10-26; Tasks 1–2 implemented and independently approved; Task 3 final verification/report complete (macOS/Linux arm64, debug/release 785 passed per profile, explicit 60s probe passed). Final whole-branch review approved without findings on 2026-10-26 (reviewed head `02b9736`; tested product source `14d1e47`). Evidence: [TK-27 report](../../zkit/letopis/checks/TK-27/report.md). Base: local main `6f59bbb` (includes TK-25 and TK-26). Task: [TK-27](../../zkit/letopis/roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md). The early pilot TK-17 and G-1 are not established as complete by this task.
 
 ## Goal and chosen approach
 

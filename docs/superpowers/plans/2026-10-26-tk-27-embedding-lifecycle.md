@@ -4,7 +4,7 @@
 
 **Execution:** Approved by user on 2026-10-26, Subagent-driven.
 
-**Progress:** Tasks 1–2 committed and independently approved (`c668ec6`, `14d1e47`); Task 3 verification/report complete (macOS/Linux arm64; 785 root tests per debug/release profile; explicit 60s probe passed). Final whole-branch review pending. [Durable report](../../zkit/letopis/checks/TK-27/report.md).
+**Progress:** Tasks 1–2 committed and independently approved (`c668ec6`, `14d1e47`); Task 3 verification/report complete (macOS/Linux arm64; 785 root tests per debug/release profile; explicit 60s probe passed). Final whole-branch review approved without findings on 2026-10-26 (head `02b9736`, tested product `14d1e47`). [Durable report](../../zkit/letopis/checks/TK-27/report.md).
 
 **Goal:** Guard configuration resets against obsolete observations and prove durable bounded embedding attempts, vector reuse and untruncated FTS after provider rejection.
 
