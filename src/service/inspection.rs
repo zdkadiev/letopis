@@ -1,9 +1,10 @@
 use super::{
     CommandError, CommandErrorKind, CommandResult, CorpusLister, DocumentError, DocumentErrorKind,
-    ElementAddress, FileSystem, GitSnapshots, InspectedElement, Inspection, Inspector,
-    MarkdownCodec, ParsedFile, Refresher, SnapshotEntry, SnapshotError, SnapshotErrorKind,
+    ElementAddress, ElementLocation, FileSystem, GitSnapshots, InspectedElement, Inspection,
+    Inspector, MarkdownCodec, ParsedFile, Refresher, SnapshotEntry, SnapshotError,
+    SnapshotErrorKind,
 };
-use crate::domain::{EdgeTarget, RepoPath};
+use crate::domain::{BlobOid, EdgeTarget, RepoPath, Sha256, SourceUri, TreeOid};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) struct InspectionService<D, G, F, M> {
@@ -14,9 +15,10 @@ pub(crate) struct InspectionService<D, G, F, M> {
 }
 #[derive(Default)]
 struct CapturedKnowledge {
-    entries: Vec<SnapshotEntry>,
+    entries: BTreeMap<RepoPath, BlobOid>,
     elements: BTreeMap<String, InspectedElement>,
-    sources: BTreeSet<String>,
+    sources: BTreeSet<SourceUri>,
+    observations: BTreeMap<RepoPath, Option<Sha256>>,
 }
 impl<D, G, F, M> InspectionService<D, G, F, M> {
     pub(crate) fn new(refresher: D, git: G, filesystem: F, markdown: M) -> Self {
@@ -39,17 +41,17 @@ impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileSystem, M: MarkdownCod
             .collect::<BTreeSet<_>>();
         let mut captured = CapturedKnowledge::default();
         for path in self.git.list_candidates().map_err(map_document_error)? {
-            if let Some(file) = self.capture_file(path, &requested)? {
-                captured.entries.extend(file.entries);
-                captured.elements.extend(file.elements);
-                captured.sources.extend(file.sources);
-            }
+            let file = self.capture_file(path, &requested)?;
+            captured.entries.extend(file.entries);
+            captured.elements.extend(file.elements);
+            captured.sources.extend(file.sources);
+            captured.observations.extend(file.observations);
         }
         captured.validate_membership(&requested)?;
-        let tree = self
-            .git
-            .create_tree_from_blobs(&captured.entries)
-            .map_err(map_snapshot_error)?;
+        if !captured.sources.is_empty() {
+            captured = self.capture_sources(captured, &requested)?;
+        }
+        let tree = self.assemble_tree(&captured)?;
         let retained = self.git.pin(&tree).map_err(map_snapshot_error)?;
         Ok(Inspection {
             snapshot: retained.get_oid().clone(),
@@ -58,18 +60,20 @@ impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileSystem, M: MarkdownCod
     }
 }
 impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G, F, M> {
-    // Each call owns and drops one file's bytes and parsed search text before the next read.
+    // Each call drops the file's bytes and parsed search text before the next read.
     fn capture_file(
         &self,
         path: RepoPath,
         requested: &BTreeSet<&str>,
-    ) -> CommandResult<Option<CapturedKnowledge>> {
+    ) -> CommandResult<CapturedKnowledge> {
+        let mut captured = CapturedKnowledge::default();
         let Some(file) = self
             .filesystem
             .read_file(&path)
             .map_err(map_document_error)?
         else {
-            return Ok(None);
+            captured.observations.insert(path, None);
+            return Ok(captured);
         };
         let parsed = self.markdown.parse_file(&path, &file.bytes).map_err(|_| {
             CommandError::new(
@@ -78,33 +82,102 @@ impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G
             )
         })?;
         let Some(parsed) = parsed else {
-            return Ok(None);
+            captured
+                .observations
+                .insert(path, Some(Sha256::digest(&file.bytes)));
+            return Ok(captured);
         };
         let oid = self
             .git
             .write_blob(&file.bytes)
             .map_err(map_snapshot_error)?;
-        let mut captured = CapturedKnowledge::default();
         captured.collect_metadata(&path, parsed, requested);
-        captured.entries.push(SnapshotEntry { path, oid });
-        Ok(Some(captured))
+        captured.entries.insert(path, oid);
+        Ok(captured)
+    }
+
+    fn capture_sources(
+        &self,
+        mut captured: CapturedKnowledge,
+        requested: &BTreeSet<&str>,
+    ) -> CommandResult<CapturedKnowledge> {
+        let corpus = self.assemble_tree(&captured)?;
+        captured.collect_remote_metadata(requested);
+        for (path, sources) in captured.group_local_sources() {
+            let bytes = self.capture_source_bytes(&corpus, &captured, &path)?;
+            if let Some(bytes) = &bytes
+                && !captured.entries.contains_key(&path)
+            {
+                let oid = self.git.write_blob(bytes).map_err(map_snapshot_error)?;
+                captured.entries.insert(path.clone(), oid);
+            }
+            captured.collect_source_metadata(&sources, bytes.as_deref(), requested);
+        }
+        Ok(captured)
+    }
+
+    fn assemble_tree(&self, captured: &CapturedKnowledge) -> CommandResult<TreeOid> {
+        let entries = captured
+            .entries
+            .iter()
+            .map(|(path, oid)| SnapshotEntry {
+                path: path.clone(),
+                oid: oid.clone(),
+            })
+            .collect::<Vec<_>>();
+        self.git
+            .create_tree_from_blobs(&entries)
+            .map_err(map_snapshot_error)
+    }
+
+    fn capture_source_bytes(
+        &self,
+        corpus: &TreeOid,
+        captured: &CapturedKnowledge,
+        path: &RepoPath,
+    ) -> CommandResult<Option<Vec<u8>>> {
+        // A marked source may change live after capture: reuse its immutable blob.
+        if captured.entries.contains_key(path) {
+            return self
+                .git
+                .read_blob(corpus, path)
+                .map(Some)
+                .map_err(map_snapshot_error);
+        }
+        let bytes = self
+            .filesystem
+            .read_file(path)
+            .map_err(map_document_error)?
+            .map(|file| file.bytes);
+        if let Some(observed) = captured.observations.get(path)
+            && *observed != bytes.as_deref().map(Sha256::digest)
+        {
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "cannot capture current elements",
+            ));
+        }
+        Ok(bytes)
     }
 }
 impl CapturedKnowledge {
     fn validate_membership(&self, requested: &BTreeSet<&str>) -> CommandResult<()> {
+        let sources = self
+            .sources
+            .iter()
+            .map(SourceUri::as_str)
+            .collect::<BTreeSet<_>>();
         for id in requested {
-            if self.elements.contains_key(*id) {
-                continue;
+            if !self.elements.contains_key(*id) && !sources.contains(id) {
+                return Err(CommandError::new(
+                    CommandErrorKind::NotFound,
+                    "requested element is unavailable",
+                ));
             }
-            let kind = if self.sources.contains(*id) {
-                CommandErrorKind::InternalError
-            } else {
-                CommandErrorKind::NotFound
-            };
-            return Err(CommandError::new(kind, "requested element is unavailable"));
         }
         Ok(())
     }
+
     fn collect_metadata(
         &mut self,
         path: &RepoPath,
@@ -117,7 +190,7 @@ impl CapturedKnowledge {
                 self.elements.insert(
                     element.id.as_str().to_owned(),
                     InspectedElement {
-                        path: path.clone(),
+                        path: ElementLocation::Local(path.clone()),
                         lines: Some(element.lines),
                         hash: Some(element.hash),
                     },
@@ -126,8 +199,62 @@ impl CapturedKnowledge {
         }
         for edge in parsed.edges {
             if let EdgeTarget::Source(source) = edge.get_target() {
-                self.sources.insert(source.as_str().to_owned());
+                self.sources.insert(source.clone());
             }
+        }
+    }
+
+    fn collect_remote_metadata(&mut self, requested: &BTreeSet<&str>) {
+        for uri in &self.sources {
+            if uri.get_local().is_none() && requested.contains(uri.as_str()) {
+                self.elements.insert(
+                    uri.as_str().to_owned(),
+                    InspectedElement {
+                        path: ElementLocation::Remote(uri.clone()),
+                        lines: None,
+                        hash: None,
+                    },
+                );
+            }
+        }
+    }
+
+    fn group_local_sources(&self) -> BTreeMap<RepoPath, Vec<SourceUri>> {
+        let mut grouped = BTreeMap::<RepoPath, Vec<SourceUri>>::new();
+        for source in &self.sources {
+            if let Some(local) = source.get_local() {
+                grouped
+                    .entry(local.get_path().clone())
+                    .or_default()
+                    .push(source.clone());
+            }
+        }
+        grouped
+    }
+
+    fn collect_source_metadata(
+        &mut self,
+        sources: &[SourceUri],
+        bytes: Option<&[u8]>,
+        requested: &BTreeSet<&str>,
+    ) {
+        for source in sources {
+            if !requested.contains(source.as_str()) {
+                continue;
+            }
+            let Some(local) = source.get_local() else {
+                continue;
+            };
+            // A whole-file knowledge identity wins over an identical source selector.
+            self.elements
+                .entry(source.as_str().to_owned())
+                .or_insert_with(|| InspectedElement {
+                    path: ElementLocation::Local(local.get_path().clone()),
+                    lines: local.get_lines(),
+                    hash: bytes
+                        .and_then(|bytes| local.select_bytes(bytes))
+                        .map(Sha256::digest),
+                });
         }
     }
 }
@@ -136,7 +263,7 @@ fn map_document_error(cause: DocumentError) -> CommandError {
         DocumentErrorKind::InvalidRequest => CommandErrorKind::InvalidRequest,
         DocumentErrorKind::InternalError => CommandErrorKind::InternalError,
     };
-    CommandError::new_with_cause(kind, "cannot capture current knowledge", cause)
+    CommandError::new_with_cause(kind, "cannot capture current elements", cause)
 }
 fn map_snapshot_error(cause: SnapshotError) -> CommandError {
     let kind = match cause.get_kind() {
@@ -144,146 +271,8 @@ fn map_snapshot_error(cause: SnapshotError) -> CommandError {
         SnapshotErrorKind::NotFound => CommandErrorKind::NotFound,
         SnapshotErrorKind::InternalError => CommandErrorKind::InternalError,
     };
-    CommandError::new_with_cause(kind, "cannot retain current knowledge", cause)
+    CommandError::new_with_cause(kind, "cannot retain current elements", cause)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::InspectionService;
-    use crate::{
-        domain::{BlobOid, RepoPath, TreeOid},
-        markdown::MarkdownParser,
-        service::{
-            CapturedFile, CorpusLister, DocumentResult, ElementAddress, FileStat, FileSystem,
-            GitSnapshots, Inspector, RefreshOutcome, Refresher, RetainedTree, SnapshotEntry,
-            SnapshotError, SnapshotFile,
-        },
-    };
-    use std::{cell::RefCell, rc::Rc};
-
-    type Events = Rc<RefCell<Vec<String>>>;
-    struct RecordingDocuments(Events);
-    struct RecordingGit(Events);
-    struct RecordingFiles(Events);
-
-    #[test]
-    fn capture_writes_each_blob_before_reading_the_next_file() {
-        // Arrange: sequencing at the I/O boundaries proves bounded capture.
-        let events = Rc::new(RefCell::new(Vec::new()));
-        let mut service = InspectionService::new(
-            RecordingDocuments(events.clone()),
-            RecordingGit(events.clone()),
-            RecordingFiles(events.clone()),
-            MarkdownParser::new(),
-        );
-        // Act
-        let inspection = service
-            .inspect(&[ElementAddress::parse("a.md").unwrap()])
-            .unwrap();
-        // Assert: unrequested marked files must also belong to the tree.
-        assert_eq!(inspection.elements.len(), 1);
-        assert_eq!(
-            *events.borrow(),
-            [
-                "refresh",
-                "list",
-                "read a.md",
-                "write a",
-                "read b.md",
-                "write b",
-                "assemble",
-                "pin"
-            ]
-        );
-    }
-
-    impl Refresher for RecordingDocuments {
-        fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
-            self.0.borrow_mut().push("refresh".into());
-            Ok(RefreshOutcome {
-                revision: 1,
-                published: false,
-                files_updated: 0,
-                files_removed: 0,
-                invalid_files_updated: 0,
-            })
-        }
-    }
-    impl CorpusLister for RecordingGit {
-        fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
-            self.0.borrow_mut().push("list".into());
-            Ok(["a.md", "b.md"]
-                .map(|path| RepoPath::parse(path).unwrap())
-                .to_vec())
-        }
-    }
-    impl GitSnapshots for RecordingGit {
-        fn create_tree(&self, _: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
-            panic!("capture must not retain bytes for create_tree")
-        }
-        fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
-            let name = if bytes.ends_with(b"a") { "a" } else { "b" };
-            self.0.borrow_mut().push(format!("write {name}"));
-            Ok(BlobOid::parse(&name.repeat(40)).unwrap())
-        }
-        fn create_tree_from_blobs(
-            &self,
-            entries: &[SnapshotEntry],
-        ) -> Result<TreeOid, SnapshotError> {
-            assert_eq!(
-                entries
-                    .iter()
-                    .map(|entry| entry.path.as_str())
-                    .collect::<Vec<_>>(),
-                ["a.md", "b.md"]
-            );
-            assert_eq!(
-                entries
-                    .iter()
-                    .map(|entry| entry.oid.as_str())
-                    .collect::<Vec<_>>(),
-                ["a".repeat(40), "b".repeat(40)]
-            );
-            self.0.borrow_mut().push("assemble".into());
-            Ok(TreeOid::parse(&"c".repeat(40)).unwrap())
-        }
-        fn read_blob(&self, _: &TreeOid, _: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
-            panic!("capture must not reread blobs")
-        }
-        fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
-            assert_eq!(tree.as_str(), "c".repeat(40));
-            self.0.borrow_mut().push("pin".into());
-            Ok(RetainedTree::new(tree.clone()))
-        }
-    }
-    impl FileSystem for RecordingFiles {
-        type IndexLock = ();
-        fn stat_file(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
-            panic!("capture uses verified reads")
-        }
-        fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
-            self.0.borrow_mut().push(format!("read {}", path.as_str()));
-            let bytes = format!(
-                "<!-- letopis: {{\"created_at\":1}} -->\n{}",
-                &path.as_str()[..1]
-            )
-            .into_bytes();
-            Ok(Some(CapturedFile {
-                stat: FileStat {
-                    size: bytes.len() as u64,
-                    mtime_ns: 1,
-                    inode: 1,
-                    device: 1,
-                },
-                checked_at_ns: 1,
-                bytes,
-            }))
-        }
-        fn get_time_ns(&self) -> DocumentResult<i64> {
-            panic!("capture must not own publication timing")
-        }
-        fn lock_index(&self) -> DocumentResult<()> {
-            panic!("capture must not own publication lock")
-        }
-    }
-}
+mod tests;

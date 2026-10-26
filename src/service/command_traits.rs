@@ -38,12 +38,18 @@ pub trait Searcher {
     /// Reports refresh, storage, integrity, or non-configuration filesystem failures.
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>>;
 }
-/// Application-owned metadata inspection capability.
+/// Application-owned metadata inspection from one retained Git tree.
+///
+/// Membership derives from current canonical Markdown, with duplicates returned once.
+/// Knowledge hashes/lines and available source bytes match that tree. Known sources
+/// with absent files or incomplete ranges have no hash; opaque URLs are never fetched.
+/// Unknown or removed knowledge/source declarations fail the entire batch.
+/// The final tree is retained before success; working files, Git index and HEAD stay intact.
 pub trait Inspector {
     /// Inspect normalized addresses in one snapshot.
     ///
     /// # Errors
-    /// Reports invalid, missing or unreadable elements and refresh failures.
+    /// Reports unknown elements, invalid current markup, unsafe paths, refresh or Git failures.
     fn inspect(&mut self, ids: &[ElementAddress]) -> CommandResult<Inspection>;
 }
 /// Narrow readiness and execution capability of the embedding executor.

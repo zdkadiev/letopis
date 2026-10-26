@@ -117,7 +117,7 @@ class RunnerTests(unittest.TestCase):
             observed = json.loads((evidence / 'product-reading-responses.json').read_text())
             self.assertEqual([r['case'] for r in observed],
                              ['search_success', 'search_fallback', 'inspect_success',
-                              'not_found', 'malformed_input'])
+                              'inspect_mixed', 'inspect_removed', 'not_found', 'malformed_input'])
             self.assertTrue(all(r['source'] == 'actual product executable' for r in observed))
             for index in range(len(records)):
                 with self.subTest(missing=records[index]['case']):
@@ -147,7 +147,7 @@ class RunnerTests(unittest.TestCase):
             injected = 'CLI_RESPONSE ' + json.dumps(records[0]) + '\n'
             self.capture_reading(evidence, catalogue, records, injected)
             observed = json.loads((evidence / 'product-reading-responses.json').read_text())
-            self.assertEqual(len(observed), 5)
+            self.assertEqual(len(observed), 7)
             with self.assertRaises(AssertionError):
                 self.capture_reading(evidence, catalogue, records[1:], injected)
 
@@ -158,6 +158,15 @@ class RunnerTests(unittest.TestCase):
             {'command': 'search', 'case': 'search_fallback', 'exit': 0, 'response': success},
             {'command': 'inspect', 'case': 'inspect_success', 'exit': 0,
              'response': {'ok': True, 'result': {'snapshot': 'a' * 40, 'elements': {}}}},
+            {'command': 'inspect', 'case': 'inspect_mixed', 'exit': 0,
+             'response': {'ok': True, 'result': {'snapshot': 'a' * 40, 'elements': {
+                 'knowledge.md': {'path': 'knowledge.md', 'lines': [1, 2], 'hash': 'b' * 64},
+                 'src/cache.rs#L2-L2': {'path': 'src/cache.rs', 'lines': [2, 2], 'hash': 'c' * 64},
+                 'src/missing.rs': {'path': 'src/missing.rs', 'hash': None},
+                 'https://example.invalid/a?q=1#fragment': {
+                     'path': 'https://example.invalid/a?q=1#fragment', 'hash': None}}}}},
+            {'command': 'inspect', 'case': 'inspect_removed', 'exit': 1,
+             'response': {'ok': False, 'error': {'code': 'not_found', 'message': 'safe', 'details': {}}}},
             {'command': 'inspect', 'case': 'not_found', 'exit': 1,
              'response': {'ok': False, 'error': {'code': 'not_found', 'message': 'safe', 'details': {}}}},
             {'command': 'search', 'case': 'malformed_input', 'exit': 1,

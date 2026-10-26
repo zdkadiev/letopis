@@ -26,7 +26,7 @@ fn inspect_reads_current_knowledge_from_one_retained_tree() {
     // Assert
     assert_eq!(result.elements.len(), 4);
     for (path, bytes, id, start, end, hash) in fixtures {
-        assert_eq!(result.elements[id].path, RepoPath::parse(path).unwrap());
+        assert_eq!(result.elements[id].path.as_str(), path);
         assert_eq!(
             result.elements[id].lines,
             Some(LineRange::new(start, end).unwrap())
@@ -90,19 +90,18 @@ fn inspect_distinguishes_referenced_sources_from_unknown_ids() {
     repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\n[source](src/data.rs \"letopis:type=external\") [other](plain.md \"letopis:type=external\")\n");
     repo.write("plain.md", b"unmarked Markdown");
     let mut service = wire_inspector(repo.get_root()).unwrap();
-    for (id, kind) in [
-        ("src/data.rs", CommandErrorKind::InternalError),
-        ("plain.md", CommandErrorKind::InternalError),
-        ("missing.rs", CommandErrorKind::NotFound),
-        ("missing.md", CommandErrorKind::NotFound),
-    ] {
-        assert_eq!(
-            service
-                .inspect(&[ElementAddress::parse(id).unwrap()])
-                .unwrap_err()
-                .get_kind(),
-            kind
-        );
+    for id in ["src/data.rs", "plain.md"] {
+        let inspected = service
+            .inspect(&[ElementAddress::parse(id).unwrap()])
+            .unwrap();
+        assert_eq!(inspected.elements[id].path.as_str(), id);
+        assert_eq!(inspected.elements[id].hash.is_some(), id == "plain.md");
+    }
+    for id in ["missing.rs", "missing.md"] {
+        let error = service
+            .inspect(&[ElementAddress::parse(id).unwrap()])
+            .unwrap_err();
+        assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
     }
     // Removing canonical declarations removes source membership despite old SQL.
     repo.write("a.md", b"unmarked");
@@ -149,6 +148,39 @@ fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
             .read_blob(&current.snapshot, &RepoPath::parse("gone.md").unwrap())
             .is_err()
     );
+}
+
+#[test]
+fn inspect_rejects_removed_indexed_anchor_in_mixed_batch() {
+    // Arrange: keep the file marked and its source declaration current.
+    let repo = ReadingRepo::new();
+    repo.write(
+        "sections.md",
+        b"## Old {#old}\n<!-- letopis: {\"created_at\":1} -->\nOld.\n[source](source.txt \"letopis:type=external\")\n",
+    );
+    repo.write("source.txt", b"available source");
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
+    repo.write(
+        "sections.md",
+        b"## Renamed {#renamed}\n<!-- letopis: {\"created_at\":1} -->\nCurrent.\n[source](source.txt \"letopis:type=external\")\n",
+    );
+    let mut service = wire_inspector(repo.get_root()).unwrap();
+    let current = service
+        .inspect(&[ElementAddress::parse("sections.md#renamed").unwrap()])
+        .unwrap();
+    assert_eq!(current.elements.len(), 1);
+    // Act
+    let error = service
+        .inspect(&[
+            ElementAddress::parse("source.txt").unwrap(),
+            ElementAddress::parse("sections.md#old").unwrap(),
+        ])
+        .unwrap_err();
+    // Assert
+    assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
 }
 
 type InspectionFixture = (
