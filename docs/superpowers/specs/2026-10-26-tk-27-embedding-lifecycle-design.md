@@ -1,0 +1,33 @@
+# TK-27 — Embedding configuration and retry lifecycle
+
+Status: proposed for user review. Base: local main `6f59bbb` (includes TK-25 and TK-26). Task: [TK-27](../../zkit/letopis/roadmap/epics/EP-3-maintenance/tasks/TK-27-embedding-lifecycle.md). The early pilot TK-17 and G-1 are not established as complete by this task.
+
+## Goal and chosen approach
+
+Complete and demonstrate the existing configuration, vector reuse and bounded retry contracts. Assess the TK-13 implementation against the task and fix only demonstrated gaps, preserving the current service/storage boundaries. The user selected this focused approach over rewriting the lifecycle; rewriting adds risk without an identified need.
+
+Authoritative behavior: [MC-3 and MC-5](../../zkit/letopis/mechanics.md), [embedding contract](../../zkit/letopis/contracts/X-2-embeddings.md), [read view contract](../../zkit/letopis/contracts/I-8-read-view.md), and TK-27. Where existing behavior already meets a requirement, retain it and cite or add meaningful evidence; do not infer completion from code inspection alone.
+
+## Behavior
+
+- Configuration identity is SHA-256 of canonical JSON. Reordering keys or changing whitespace preserves identity, vectors and failures; changing any field, including `max_retries`, changes identity. Missing or invalid config cannot wipe existing vector state.
+- A valid changed identity triggers a single `BEGIN IMMEDIATE` vector-store transaction that rechecks identity, rebuilds vec1 and clears vector keys and embedding failures while updating identity. A concurrent observer of the same identity must not erase subsequently stored work. A failure during reset rolls back the entire change; a previously pinned read view must remain consistent across reset and rollback.
+- Work is derived from current knowledge search hashes without usable vectors and with remaining attempts. Sources are excluded; equal search hashes share a vector. Rebuilding the disposable cache leaves `vectors.db` intact and reuses matching vectors without provider calls, while newly introduced hashes are computed.
+- Before each provider call, commit an attempt reservation in `embed_failures`; computing happens outside the write transaction. `max_retries` means additional attempts: zero gives one total and three gives four. Reservation survives process termination and restart, including termination before a response; an exhausted hash does not restart automatically. Errors retain safe diagnostics and obey the same finite budget.
+- Drain captures config identity. Publication or failure recording checks it within the write transaction. Once the stored identity has changed, a late result for the old identity cannot modify new vector/failure state and the old drain stops, provided no subsequent reset changes the stored identity back. A changed document is guarded by `search_hash`; its old vector must not represent the new text.
+- For over-context input, preserve the whole searchable text in FTS and record a safe embedding failure using the ordinary retry budget; no splitting or silent truncation. Ollama native requests send `truncate: false`; compatible providers must meet the existing non-truncation contract. Do not add a universal guessed size limit or claim model-specific guarantees without evidence.
+- Verify SIGINT against an actual drain process after an attempt is committed: process termination releases the lock, the attempt remains durable, and subsequent runs respect the remaining budget. Process-level handled cancellation and a `cancelled` JSON response for CLI commands remain TK-29, not this task.
+
+## Boundaries
+
+Use existing synchronous I/O, provider interfaces, application service and SQLite/vector storage; no async runtime, background daemon, job table, model registry or speculative abstraction. Keep `domain` independent of infrastructure and maintain composition through existing application-owned interfaces. Change provider, storage, CLI or service code only for a demonstrated defect within TK-27. Current diagnostics in `status` are TK-28; broad cancellation is TK-29; actual model quality, hardware capacity, physical power loss and system-wide drills remain separate tasks.
+
+## Verification and deliverables
+
+Map every TK-27 acceptance criterion to named, reproducible checks and record commands, platform, revision, observed results and limitations in the task report. Reuse prior evidence only when its exact source and scope still apply; run focused new checks for missing coverage. Include concurrent reset, rollback and old read-view compatibility; formatting-only config versus real change; delayed old-identity result; cache deletion/reindex with provider call counts; durable retries with restart and SIGINT; and provider context rejection with retrieval of a marker at the end of the full text and a safe error. Use a real SIGINT, not SIGKILL, for the SIGINT scenario. Exercise failures as well as successful paths. Tests should check independently observable behavior and avoid unnecessary long-running model calls.
+
+For changed Rust code, run repository-required checks including `make verify`; run the storage/native platform runner when changes warrant it. If only documentation or tests change, report the checks actually performed. Review physical module boundaries and wiring; record any untested platform or gate rather than extrapolating from host results. Save the eventual implementation plan under `docs/superpowers/plans/`, and update the TK-27 card and evidence report after execution.
+
+## Open questions
+
+A process can read config A, pause, and then reset storage to A after another process has already observed and reset to B. The current reset rechecks the stored identity against its captured identity, not the current file; MC-3 models competing observations of the same new identity, not this ordering. The intended guarantee when configuration is edited concurrently remains to be agreed; do not claim linearizability with arbitrary file writes. Reproduce this sequence and resolve its intended behavior before implementation. Unexpected conflicts with canonical documents or a required design change return for user review instead of being silently decided during implementation.
