@@ -6,7 +6,7 @@ The observational `status` implementation and its host verification are complete
 product source `96639e7046271bc6507760eb02c056a4ccdc6658`. Independent final
 whole-branch review at `bd755c6` approved the source integration with no Critical or
 Important finding. Its two nonblocking test-style findings are fixed in test-only
-commit `6f8e181`; scoped fix re-review remains pending. The required Linux runner was
+commit `6f8e181`; scoped fix re-review approved both fixes; no new Critical/Important finding. The required Linux runner was
 attempted on the exact native input map but did not pass. This report therefore does
 not mark TK-18, TK-19 or TK-28 done.
 
@@ -154,11 +154,11 @@ acceptance was not duplicated for test-style-only changes.
 This physical/import/visibility/trait/composition review found no self-review issue.
 The independent final whole-branch review agreed: no Critical/Important source or
 architecture finding. Its two test-style findings are fixed in `6f8e181`; scoped
-fix re-review is the remaining review action.
+fix re-review approved both changes with no new Critical/Important finding.
 
 ## Remaining gates
 
-- Controller-owned scoped re-review of test-only fix `6f8e181` is pending. TK-18/19
+- Controller-owned scoped re-review of test-only fix `6f8e181` is APPROVED. TK-18/19
   remain `in_progress` regardless because the required Linux gate is unavailable.
 - Linux native/schema/standalone acceptance is not PASS for this source because the
   complete receipt is unavailable after the retained Docker storage failure above.

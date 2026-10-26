@@ -87,7 +87,7 @@ graph/source проблем. Реальный lifecycle проверяет parit
 repair/rename/delete/restore и restart; unrefreshed edit сохраняет прежнюю публикацию.
 [Общий отчёт](../../../../checks/TK-18-19-status/report.md) содержит команды, исходы и
 пределы. Финальное whole-branch review не нашло Critical/Important замечаний; два
-test-style замечания исправлены в `6f8e181`, scoped re-review pending. Карточка
+test-style замечания исправлены в `6f8e181`, scoped re-review APPROVED (no new Critical/Important finding). Карточка
 остаётся `in_progress`: Linux native/standalone runner не получил PASS.
 
 После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.

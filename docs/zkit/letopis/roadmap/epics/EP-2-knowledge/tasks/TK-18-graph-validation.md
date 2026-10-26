@@ -97,6 +97,6 @@ TK-23 сохраняет конечность traverse и исключение �
 выполнен. [Общий отчёт](../../../../checks/TK-18-19-status/report.md) сохраняет точные
 команды и ограничения. Финальное whole-branch review подтвердило исходную интеграцию
 без Critical/Important замечаний; два test-style замечания исправлены в `6f8e181`,
-scoped re-review pending. Карточка остаётся `in_progress`: обязательный Linux runner
+scoped re-review APPROVED (no new Critical/Important finding). Карточка остаётся `in_progress`: обязательный Linux runner
 на этом источнике не получил PASS, поэтому задача не объявляется завершённой этим
 обновлением.
