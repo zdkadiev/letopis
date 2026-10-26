@@ -117,7 +117,7 @@ CLI вызывает интерфейсы сервисов; сервисы по�
 
 #### TK-23 — данные Graph и алгоритм обхода
 
-`domain::Graph` — независимые упорядоченные данные результата, без I/O или injected storage. `service::GraphService` реализует GraphTraversal/BFS и читает object-safe GraphRead; TraversalService владеет refresh/readiness/pin/selected-link observations, сохраняя только S/F generics для scoped Storage и FileSystem lock. Storage исполняет bounded keyset pages; lib.rs создаёт реальные collaborators, CLI вызывает Traverser. Нового процесса, runtime, forwarding layer или граф-кэша нет. BFS bound не распространяется на существующие publication/file/root/JSON buffers. [Физическая проверка, host receipt, Linux native limit и pending review gates](checks/TK-23/report.md).
+`domain::Graph` — независимые упорядоченные данные результата, без I/O или injected storage. `service::GraphService` реализует GraphTraversal/BFS и читает object-safe GraphRead; TraversalService владеет refresh/readiness/pin/selected-link observations, сохраняя только S/F generics для scoped Storage и FileSystem lock. Storage исполняет bounded keyset pages; lib.rs создаёт реальные collaborators, CLI вызывает Traverser. Нового процесса, runtime, forwarding layer или граф-кэша нет. BFS bound не распространяется на существующие publication/file/root/JSON buffers. [Физическая проверка, host/Linux native receipts и завершённые reviews](checks/TK-23/report.md).
 
 <a id="program-structure-review"></a>
 #### Приёмка структуры в каждой задаче

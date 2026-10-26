@@ -1,5 +1,5 @@
 {
-  "status": "implementation_ready_linux_native_blocked",
+  "status": "complete",
   "source_commit": "e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
   "baseline_commit": "b8b89f6fe2d1a83d6f50041ceae5735b86264ec3",
   "platforms": {
@@ -200,9 +200,14 @@
       "executable_sha256": "7456d31659873f7c5db47eeb7fc31cfb086c30c462773b64a7e1a3881e13e90e"
     },
     "linux": {
-      "status": "BLOCKED_INFRASTRUCTURE",
-      "runner_exit_code": 1,
-      "manifest": ".artifacts/tk23/final-linux-task4-20261026-01/manifest.json",
+      "status": "PASS",
+      "source_commit": "741930ed871e60a0987d655cf79defdff67defd3",
+      "runner_exit_code": 0,
+      "make_verify_exit_code": 0,
+      "manifest": ".artifacts/tk23/final-linux-retry-239c5dbed5/manifest.json",
+      "manifest_sha256": "87ea7c85d67d2af0ccaeedab1c4683d25cb5b3d9dd1ea88241bd2fc254b7dd80",
+      "inner_manifest": ".artifacts/tk23/final-linux-retry-239c5dbed5/container/manifest.json",
+      "inner_manifest_sha256": "79fa86cc7bb2827a5c27e00fe4b92ec43972f0483db38d4329bf82a6e9eaf260",
       "commands": [
         {
           "argv": [
@@ -240,9 +245,9 @@
             "-f",
             "tests/storage/Dockerfile",
             "-t",
-            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3",
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f",
             "--build-arg",
-            "SOURCE_COMMIT=e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
+            "SOURCE_COMMIT=741930ed871e60a0987d655cf79defdff67defd3",
             "."
           ],
           "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
@@ -254,7 +259,7 @@
             "docker",
             "image",
             "inspect",
-            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3"
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f"
           ],
           "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
           "log": "image.json",
@@ -265,49 +270,236 @@
             "docker",
             "run",
             "--name",
-            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run",
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f-run",
             "--network",
             "none",
-            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3"
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f"
           ],
           "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
           "log": "linux.log",
-          "exit_code": 1
+          "exit_code": 0
         },
         {
           "argv": [
             "docker",
             "cp",
-            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run:/receipt/.",
-            "/Users/zdkadiev/.codex/worktrees/tk-23/letopis/.artifacts/tk23/final-linux-task4-20261026-01/container"
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f-run:/receipt/.",
+            "/Users/zdkadiev/.codex/worktrees/tk-23/letopis/.artifacts/tk23/final-linux-retry-239c5dbed5/container"
           ],
           "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
           "log": "docker-copy.log",
-          "exit_code": 1
+          "exit_code": 0
         },
         {
           "argv": [
             "docker",
             "rm",
             "-f",
-            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run"
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f-run"
           ],
           "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
           "log": "docker-cleanup.log",
-          "exit_code": 1
+          "exit_code": 0
         }
       ],
-      "captured_counts_are_partial": true,
-      "full_make_verify_exit_code": "not certified from recovered final log",
-      "native_command_exit_code": 101,
-      "native_detailed_log": "not recovered",
-      "standalone": "unavailable",
-      "dynamic_linkage": "unavailable",
-      "inner_manifest": "unavailable: read-only filesystem prevented finalization/copy",
-      "failure": "Docker overlay2 read-only; dead owned container; receipt write/copy/cleanup failed",
-      "disk_pressure": "host Data 1.8Gi available / 100 percent displayed; plausible contributor, root cause unproven",
-      "read_only_export_exit_code": 1,
-      "fresh_native_run_required": true
+      "inner_commands": [
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "-B",
+            "tests/storage/check_schema.py",
+            "/repo"
+          ],
+          "cwd": "/repo",
+          "log": "schema-parity.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "-B",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests/storage",
+            "-p",
+            "test_runner.py",
+            "-v"
+          ],
+          "cwd": "/repo",
+          "log": "runner-tests.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/repo",
+          "log": "version-rustc.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "--version"
+          ],
+          "cwd": "/repo",
+          "log": "version-cargo.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--version"
+          ],
+          "cwd": "/repo",
+          "log": "version-git.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "--version"
+          ],
+          "cwd": "/repo",
+          "log": "version-python3.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "uname",
+            "-a"
+          ],
+          "cwd": "/repo",
+          "log": "version-uname.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "make",
+            "verify",
+            "V=1"
+          ],
+          "cwd": "/repo",
+          "log": "rust-check.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "--test",
+            "embedding_provider",
+            "attempt_obeys_real_sixty_second_deadline",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture"
+          ],
+          "cwd": "/repo",
+          "log": "provider-real-deadline.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "doc",
+            "--locked",
+            "--offline",
+            "--no-deps"
+          ],
+          "cwd": "/repo",
+          "log": "rustdoc.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "storage::native::tests::native_capabilities_match_pinned_stack",
+            "--",
+            "--nocapture"
+          ],
+          "cwd": "/repo",
+          "log": "native.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "build",
+            "--locked",
+            "--offline",
+            "--example",
+            "storage_check",
+            "--message-format=json"
+          ],
+          "cwd": "/repo",
+          "log": "build.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "ldd",
+            "/tmp/tk9-standalone-rgxtb547/storage_check"
+          ],
+          "cwd": "/repo",
+          "log": "dynamic.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/tmp/tk9-standalone-rgxtb547/storage_check",
+            "/tmp/tk9-standalone-rgxtb547/scratch"
+          ],
+          "cwd": "/tmp/tk9-standalone-rgxtb547",
+          "log": "standalone.log",
+          "exit_code": 0
+        }
+      ],
+      "root_counts": {
+        "debug": {
+          "root_executables": 48,
+          "passed": 684,
+          "failed": 0,
+          "ignored": 5
+        },
+        "release": {
+          "root_executables": 48,
+          "passed": 684,
+          "failed": 0,
+          "ignored": 5
+        }
+      },
+      "standalone": "PASS",
+      "dynamic_linkage": "PASS; no shared SQLite/vec1 dependency",
+      "native": "SQLite3.53.2 / vec1 0.8 NEON; native capability test PASS",
+      "schema_parity": "PASS",
+      "runner_python_tests": {
+        "passed": 10,
+        "failed": 0
+      },
+      "explicit_deadline_probe": {
+        "passed": 1,
+        "failed": 0
+      },
+      "input_identity": {
+        "outer_inputs": 319,
+        "inner_inputs": 202,
+        "all_copied_inputs_match": true,
+        "copy_scope": "All and only Dockerfile-copied source/build/test/DDL inputs; 117 uncopied outer files are historical/docs test inputs",
+        "outer_map_matches_current_and_supplemental": true
+      },
+      "runtime_network": "none",
+      "test_threads": 2,
+      "owned_container_cleanup": "PASS",
+      "driver_receipt": ".artifacts/tk23/linux-retry-239c5dbed5/validated-result.json"
     }
   },
   "root_counts": {
@@ -337,6 +529,20 @@
         "passed": 578,
         "failed": 0,
         "ignored": 4
+      }
+    },
+    "linux": {
+      "debug": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      },
+      "release": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
       }
     }
   },
@@ -524,10 +730,9 @@
     "task4_independent": "approved_after_I1_rereview",
     "whole_branch": "approved_code_and_documentation",
     "final_documentation_corrections": "M1/M2 addressed; scoped re-review approved; no new breakage",
-    "linux_native_standalone": "open"
+    "linux_native_standalone": "PASS"
   },
   "limits": [
-    "Required Linux native/standalone acceptance remains open",
     "BFS bound is not whole-command fixed RSS",
     "initial/changed publication, candidate/file/root sets, file parsing and JSON buffers remain separate",
     "live files have no cross-file atomicity",
@@ -1008,23 +1213,222 @@
     "critical_product_findings": 0,
     "important_product_findings": 0,
     "code_quality": "approved; M1/M2 documentation corrections passed scoped re-review",
-    "disposition": "M1/M2 ADDRESSED; no new breakage; Linux native/standalone remains open",
-    "linux_native_standalone_acceptance": "open",
-    "ready_to_merge": false,
+    "disposition": "M1/M2 addressed; scoped re-review approved; required Linux native/standalone passed in fresh run. Historical final review remains pinned to its reviewed head.",
+    "linux_native_standalone_acceptance": "PASS at 741930ed871e60a0987d655cf79defdff67defd3",
+    "ready_to_merge": true,
     "cancellation_scope": "TK-23 preserves normal JSON/exit behavior and ordinary OS signal termination; handled SIGINT, cancelled JSON and stdout once-guard implementation remain TK-29"
   },
   "controller_final_state": {
     "implementation": "complete",
     "code_and_documentation_reviews": "approved",
-    "task_acceptance": "blocked_linux_native_standalone",
+    "task_acceptance": "complete",
     "final_fix_reviewed_head": "88765044d6513f632d0820749c2ee552de8f2f6d",
-    "plan_steps_completed": 19,
+    "plan_steps_completed": 20,
     "plan_steps_total": 20,
-    "remaining_step": "Task4 Step4 required Linux native/standalone run",
+    "remaining_step": null,
     "branch": "tk-23",
     "merged": false,
     "pushed": false,
     "github_issue_updated": false,
-    "engram_task": "entity_cb85baa8af564770929a3a424a9b5500"
+    "engram_task": "entity_cb85baa8af564770929a3a424a9b5500",
+    "linux_verification_source_commit": "741930ed871e60a0987d655cf79defdff67defd3",
+    "linux_manifest": ".artifacts/tk23/final-linux-retry-239c5dbed5/manifest.json",
+    "linux_driver": ".artifacts/tk23/linux-retry-239c5dbed5"
+  },
+  "acceptance_history_at_741930e": {
+    "status": "implementation_ready_linux_native_blocked",
+    "linux_platform": {
+      "status": "BLOCKED_INFRASTRUCTURE",
+      "runner_exit_code": 1,
+      "manifest": ".artifacts/tk23/final-linux-task4-20261026-01/manifest.json",
+      "commands": [
+        {
+          "argv": [
+            "git",
+            "rev-parse",
+            "HEAD"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-commit.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "git",
+            "status",
+            "--short"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-dirty.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "version"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-version.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "build",
+            "-f",
+            "tests/storage/Dockerfile",
+            "-t",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3",
+            "--build-arg",
+            "SOURCE_COMMIT=e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
+            "."
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-build.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "image",
+            "inspect",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "image.json",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "run",
+            "--name",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run",
+            "--network",
+            "none",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "linux.log",
+          "exit_code": 1
+        },
+        {
+          "argv": [
+            "docker",
+            "cp",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run:/receipt/.",
+            "/Users/zdkadiev/.codex/worktrees/tk-23/letopis/.artifacts/tk23/final-linux-task4-20261026-01/container"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-copy.log",
+          "exit_code": 1
+        },
+        {
+          "argv": [
+            "docker",
+            "rm",
+            "-f",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-cleanup.log",
+          "exit_code": 1
+        }
+      ],
+      "captured_counts_are_partial": true,
+      "full_make_verify_exit_code": "not certified from recovered final log",
+      "native_command_exit_code": 101,
+      "native_detailed_log": "not recovered",
+      "standalone": "unavailable",
+      "dynamic_linkage": "unavailable",
+      "inner_manifest": "unavailable: read-only filesystem prevented finalization/copy",
+      "failure": "Docker overlay2 read-only; dead owned container; receipt write/copy/cleanup failed",
+      "disk_pressure": "host Data 1.8Gi available / 100 percent displayed; plausible contributor, root cause unproven",
+      "read_only_export_exit_code": 1,
+      "fresh_native_run_required": true
+    },
+    "limits": [
+      "Required Linux native/standalone acceptance remains open",
+      "BFS bound is not whole-command fixed RSS",
+      "initial/changed publication, candidate/file/root sets, file parsing and JSON buffers remain separate",
+      "live files have no cross-file atomicity",
+      "opt-in existing corpus not run",
+      "TK-24/TK-28, paid/model/pilot/resource/G-1/G-2 and exhaustive new cancellation drills deferred"
+    ],
+    "controller_final_state": {
+      "implementation": "complete",
+      "code_and_documentation_reviews": "approved",
+      "task_acceptance": "blocked_linux_native_standalone",
+      "final_fix_reviewed_head": "88765044d6513f632d0820749c2ee552de8f2f6d",
+      "plan_steps_completed": 19,
+      "plan_steps_total": 20,
+      "remaining_step": "Task4 Step4 required Linux native/standalone run",
+      "branch": "tk-23",
+      "merged": false,
+      "pushed": false,
+      "github_issue_updated": false,
+      "engram_task": "entity_cb85baa8af564770929a3a424a9b5500"
+    },
+    "review_gates": {
+      "task4_independent": "approved_after_I1_rereview",
+      "whole_branch": "approved_code_and_documentation",
+      "final_documentation_corrections": "M1/M2 addressed; scoped re-review approved; no new breakage",
+      "linux_native_standalone": "open"
+    },
+    "final_review_disposition": {
+      "reviewed_head": "524b96d4e93a84d9ecbc65bc3d743841650c561e",
+      "critical_product_findings": 0,
+      "important_product_findings": 0,
+      "code_quality": "approved; M1/M2 documentation corrections passed scoped re-review",
+      "disposition": "M1/M2 ADDRESSED; no new breakage; Linux native/standalone remains open",
+      "linux_native_standalone_acceptance": "open",
+      "ready_to_merge": false,
+      "cancellation_scope": "TK-23 preserves normal JSON/exit behavior and ordinary OS signal termination; handled SIGINT, cancelled JSON and stdout once-guard implementation remain TK-29"
+    }
+  },
+  "linux_retry": {
+    "source_commit": "741930ed871e60a0987d655cf79defdff67defd3",
+    "evidence": ".artifacts/tk23/final-linux-retry-239c5dbed5",
+    "driver": ".artifacts/tk23/linux-retry-239c5dbed5",
+    "validation": {
+      "source_commit": "741930ed871e60a0987d655cf79defdff67defd3",
+      "status": "PASS",
+      "platform": "linux/arm64",
+      "outer_manifest": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis/.artifacts/tk23/final-linux-retry-239c5dbed5/manifest.json",
+      "outer_manifest_sha256": "87ea7c85d67d2af0ccaeedab1c4683d25cb5b3d9dd1ea88241bd2fc254b7dd80",
+      "inner_manifest": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis/.artifacts/tk23/final-linux-retry-239c5dbed5/container/manifest.json",
+      "inner_manifest_sha256": "79fa86cc7bb2827a5c27e00fe4b92ec43972f0483db38d4329bf82a6e9eaf260",
+      "outer_input_count": 319,
+      "inner_input_count": 202,
+      "input_relation": "All202Dockerfilecopiedinputs matchouter/current319;117uncopiedhistorical/docsinputs excluded",
+      "root_counts": {
+        "debug": {
+          "root_executables": 48,
+          "passed": 684,
+          "failed": 0,
+          "ignored": 5
+        },
+        "release": {
+          "root_executables": 48,
+          "passed": 684,
+          "failed": 0,
+          "ignored": 5
+        }
+      },
+      "outer_commands": 8,
+      "inner_commands": 14,
+      "native_lines": [
+        "SQLite=3.53.2 vec1=version 0.8 (NEON, multi-threaded)",
+        "test storage::native::tests::native_capabilities_match_pinned_stack ... ok"
+      ],
+      "standalone": "PASS: copied executable, FTS, shared native vector, exact bytes, reopen, revision=1",
+      "network": "none",
+      "test_threads": 2,
+      "owned_container_cleanup": "PASS",
+      "historical_failed_receipt_preserved": true
+    },
+    "historical_failed_receipt": ".artifacts/tk23/final-linux-task4-20261026-01/manifest.json",
+    "old_owned_container_recovery": ".artifacts/tk23/linux-retry-239c5dbed5/previous-container-recovery.json",
+    "previous_failure_preserved": true
   }
 }

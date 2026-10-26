@@ -1,6 +1,6 @@
 # TK-23 — Реализовать полный traverse
 
-> **Статус:** implementation ready; Linux native acceptance blocked; task reviews approved; final review completed with M1/M2 documentation corrections; scoped re-review approved
+> **Статус:** done
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 6 / 8 / 16 (best / expected / worst)
@@ -42,7 +42,7 @@
 
 - [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
-- [ ] Обязательный Linux native/standalone runner завершился полным PASS; текущий запуск заблокирован read-only Docker.
+- [x] Обязательный Linux arm64 native/standalone runner завершился полным PASS на741930e; исходный Docker FAIL сохранён исторически.
 
 ## 6. Как проверить
 
@@ -67,8 +67,8 @@
 
 ## 9. Отчёт о выполнении
 
-Реализация и отчёт готовы: [отчёт TK-23](../../../../checks/TK-23/report.md), [verification.json](../../../../checks/TK-23/verification.json). Code/test checkpoint `e9a9cd4a4c9d6807b0a75d79022dc8f838796e78`: host native runner прошёл, включая `make verify V=1`, debug/release отдельно 684/0/5 в 48 root executables, DDL parity, native SQLite/vec1, standalone/linkage и отдельный real-deadline probe. Новые scoped/memory/failure регрессии и десять runtime production controls восстановлены побайтно; граф, BFS, storage, CLI и lib.rs wiring проверены по физическим файлам. Task4 не потребовал product behavior fix.
+Реализованы полный metadata-only traverse CLI, инкрементальный BFS в GraphService через GraphRead, чистый domain Graph, закреплённый read view и постраничные source observations. Все продуктовые критерии и архитектурные границы подтверждены; Task1–4 reviews, I1 rereview и final whole-branch review с M1/M2 corrections завершены без открытых замечаний.
 
-**Linux native/standalone acceptance открыт:** debug snapshot 684/0/5 сохранён, release log только частичный; Docker overlay2 стал read-only и не позволил записать/скопировать финальные receipts или удалить owned container. FAIL evidence сохранён, новый Linux run нужен после восстановления инфраструктуры. **Task4 independent review и I1 rereview пройдены; final whole-branch review завершён: Critical/Important product findings нет, code quality approved with M1/M2 documentation corrections; M1/M2 documentation corrections approved by scoped re-review; no open code or documentation finding.** Продуктовые критерии выше подтверждены; итоговый `done` заблокирован обязательным Linux native/standalone gate. Memory bound относится к BFS, не к publication/file/root/JSON costs; cache-v2 rebuild — только явный quiescent cache-only путь с сохранением vectors/config/locks/Markdown/Git. TK-24/TK-28, paid/model/pilot/resource/G-1/G-2 и exhaustive cancellation drills не сертифицированы. Merge/push/GitHub publication не выполнялись.
+[Отчёт TK-23](../../../../checks/TK-23/report.md) и [verification.json](../../../../checks/TK-23/verification.json) фиксируют host native PASS на `e9a9cd4a4c9d6807b0a75d79022dc8f838796e78`, supplemental revised-test verification на `5859e3ea15929b57abc6aafdb3dc477241c87f2d` и новый Linux arm64 native/standalone PASS на `741930ed871e60a0987d655cf79defdff67defd3`. Debug/release отдельно684/0/5 в48root executables; Linux schema parity,10Python tests, real60sdeadline,nativeSQLite3.53.2/vec1 0.8, standalone/linkage прошли. Все202скопированных в контейнер входа совпадают с текущим319-file outer map. Runtime network none;2test threads; owned container cleanup выполнен. Исходный FAIL после read-only Docker и исходные hashes сохранены, не переименованы в PASS.
 
-**I1 review fix:** текущий test checkpoint `5859e3ea15929b57abc6aafdb3dc477241c87f2d` сравнивает все наблюдённые URI с literal sequence из 70 identities, включая кратность один. Отдельный production substitution control проходит прежний oracle и падает на усиленном; восстановленные 4 binding cases и supplemental `make verify V=1` проходят (debug/release 684/0/5, 48 roots каждый). Новый 319-map отличается от original native map только bindings.rs; остальные 318 входов, включая production/native/build/DDL, неизменны. Original host native PASS и Linux FAIL остаются привязаны к e9a9cd4. Task4 I1 rereview пройден без новых замечаний. Linux native открыт; final whole-branch review завершён с M1/M2 documentation corrections, исправления внесены, scoped re-review approved; итоговый статус остаётся незавершённым.
+Все20шагов плана завершены. BFS bound не означает fixed RSS всей команды; публикация/file/root/JSON имеют отдельные расходы. Cache-v2 rebuild остаётся явной quiescent cache-only процедурой с сохранением vectors/config/locks/Markdown/Git. Handled SIGINT/cancelled JSON/once-guard остаются TK-29. TK-24/TK-28, paid/model/pilot/resource/G-1/G-2 и exhaustive cancellation drills не сертифицированы. Merge/push/GitHub publication не выполнялись; интеграция требует отдельного решения пользователя.
