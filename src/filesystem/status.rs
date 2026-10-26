@@ -5,7 +5,8 @@ use crate::service::{
 };
 use std::{fs::File, io::Read, num::NonZeroU32};
 
-const MAX_PID_BYTES: u64 = 12;
+const MAX_PID_BYTES: usize = 11;
+const PID_READ_LIMIT: u64 = 12;
 const INVALID_LOCK_PID: &str = "cannot observe coordination lock owner";
 
 impl StatusFiles for LocalFileSystem {
@@ -55,9 +56,12 @@ impl LocalFileSystem {
 
 fn read_pid(file: &mut File) -> CommandResult<NonZeroU32> {
     let mut bytes = Vec::new();
-    file.take(MAX_PID_BYTES)
+    file.take(PID_READ_LIMIT)
         .read_to_end(&mut bytes)
         .map_err(map_lock_error)?;
+    if bytes.len() > MAX_PID_BYTES {
+        return Err(invalid_pid());
+    }
     let text = std::str::from_utf8(&bytes).map_err(|_| invalid_pid())?;
     let digits = text.strip_suffix('\n').unwrap_or(text);
     if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {

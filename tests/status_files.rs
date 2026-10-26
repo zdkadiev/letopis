@@ -1,5 +1,5 @@
 use letopis::open_status_files;
-use letopis::service::{LockName, StatusFiles};
+use letopis::service::{CommandErrorKind, LockName, StatusFiles};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::{MetadataExt, symlink};
@@ -72,6 +72,7 @@ fn reports_busy_recorded_pid() {
     let child = Owner::spawn(&fixture.0, "index.lock", "self");
     let lock_path = fixture.lock_path("index.lock");
     let original_bytes = fs::read(&lock_path).unwrap();
+    let original_inode = fs::metadata(&lock_path).unwrap().ino();
     let files = open_status_files(&fixture.0).unwrap();
 
     let start = Instant::now();
@@ -82,6 +83,7 @@ fn reports_busy_recorded_pid() {
     assert_eq!(locks[0].name, LockName::Index);
     assert_eq!(locks[0].pid.get(), child.0.id());
     assert_eq!(std::fs::read(&lock_path).unwrap(), original_bytes);
+    assert_eq!(fs::metadata(&lock_path).unwrap().ino(), original_inode);
 }
 
 #[test]
@@ -121,6 +123,18 @@ fn rejects_busy_invalid_pid() {
     let files = open_status_files(&fixture.0).unwrap();
 
     assert!(files.observe_locks().is_err());
+}
+
+#[test]
+fn rejects_busy_pid_with_valid_prefix_and_trailing_bytes() {
+    let fixture = Fixture::new();
+    fs::create_dir(fixture.0.join(".letopis")).unwrap();
+    let _child = Owner::spawn(&fixture.0, "embed.lock", "overlong");
+    let files = open_status_files(&fixture.0).unwrap();
+
+    let error = files.observe_locks().unwrap_err();
+
+    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
 }
 
 #[test]
@@ -176,6 +190,7 @@ fn status_files_child() {
     let pid = match std::env::var("LETOPIS_STATUS_FILES_PID").unwrap().as_str() {
         "self" => std::process::id().to_string(),
         "invalid" => "bad pid".to_owned(),
+        "overlong" => "000000000001garbage".to_owned(),
         other => panic!("unexpected pid case: {other}"),
     };
     writeln!(file, "{pid}").unwrap();
