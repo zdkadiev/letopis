@@ -214,25 +214,26 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
 }
 
 #[test]
-fn binary_inspect_unknown_and_source_errors_are_all_or_nothing() {
+fn binary_inspect_unknown_is_all_or_nothing_and_missing_source_has_null_hash() {
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "knowledge.md",
         "sqlite\n[source](source.rs \"letopis:type=external\")",
     );
-    for (ids, code) in [
-        (vec!["knowledge.md", "missing.md"], "not_found"),
-        (vec!["knowledge.md", "source.rs"], "internal_error"),
-        (vec!["unknown.rs"], "not_found"),
-    ] {
+    for ids in [vec!["knowledge.md", "missing.md"], vec!["unknown.rs"]] {
         let body = json!({"element_ids":ids}).to_string();
         let response = read_response(&repo.invoke(&["inspect"], body.as_bytes()), 1);
-        if code == "not_found" {
-            emit_reading("not_found", "inspect", 1, &response);
-        }
-        assert_eq!(response["error"]["code"], code);
+        emit_reading("not_found", "inspect", 1, &response);
+        assert_eq!(response["error"]["code"], "not_found");
         assert!(response.get("result").is_none());
     }
+    let body = json!({"element_ids":["knowledge.md", "source.rs"]}).to_string();
+    let response = read_response(&repo.invoke(&["inspect"], body.as_bytes()), 0);
+    assert_eq!(
+        response["result"]["elements"]["source.rs"]["path"],
+        "source.rs"
+    );
+    assert!(response["result"]["elements"]["source.rs"]["hash"].is_null());
     repo.write("knowledge.md", b"<!-- letopis: {broken} -->\ninvalid");
     assert_eq!(
         read_response(

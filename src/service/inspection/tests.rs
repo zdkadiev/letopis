@@ -1,0 +1,233 @@
+use super::InspectionService;
+use crate::{
+    domain::{BlobOid, RepoPath, Sha256, TreeOid},
+    markdown::MarkdownParser,
+    service::{
+        CapturedFile, CommandErrorKind, CorpusLister, DocumentResult, ElementAddress, FileStat,
+        FileSystem, GitSnapshots, Inspector, RefreshOutcome, Refresher, RetainedTree,
+        SnapshotEntry, SnapshotError, SnapshotErrorKind, SnapshotFile,
+    },
+};
+use std::{cell::RefCell, rc::Rc};
+
+const MARKED_SOURCE: &[u8] =
+    b"<!-- letopis: {\"created_at\":1} -->\nBody\n[source](a.md#L2-L2 \"letopis:type=external\")\n";
+type Events = Rc<RefCell<Vec<String>>>;
+struct RecordingDocuments(Events);
+struct RecordingGit(Events, Scenario);
+struct RecordingFiles(Events, Scenario);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Scenario {
+    Plain,
+    Overlap,
+    PinFailure,
+}
+#[test]
+fn capture_writes_each_blob_before_reading_the_next_file() {
+    // Arrange: sequencing at the I/O boundaries proves bounded capture.
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let mut service = InspectionService::new(
+        RecordingDocuments(events.clone()),
+        RecordingGit(events.clone(), Scenario::Plain),
+        RecordingFiles(events.clone(), Scenario::Plain),
+        MarkdownParser::new(),
+    );
+    // Act
+    let inspection = service
+        .inspect(&[ElementAddress::parse("a.md").unwrap()])
+        .unwrap();
+    // Assert: unrequested marked files must also belong to the tree.
+    assert_eq!(inspection.elements.len(), 1);
+    assert_eq!(
+        *events.borrow(),
+        [
+            "refresh",
+            "list",
+            "read a.md",
+            "write a",
+            "read b.md",
+            "write b",
+            "assemble",
+            "pin"
+        ]
+    );
+}
+
+#[test]
+fn inspect_reuses_captured_marked_source_after_live_edit() {
+    // Arrange: the filesystem would return different bytes on a second read.
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let mut service = InspectionService::new(
+        RecordingDocuments(events.clone()),
+        RecordingGit(events.clone(), Scenario::Overlap),
+        RecordingFiles(events.clone(), Scenario::Overlap),
+        MarkdownParser::new(),
+    );
+    // Act
+    let result = service
+        .inspect(&[ElementAddress::parse("a.md#L2-L2").unwrap()])
+        .unwrap();
+    // Assert: one captured blob serves both knowledge and source identities.
+    assert_eq!(result.elements.len(), 1);
+    assert_eq!(
+        result.elements["a.md#L2-L2"].hash,
+        Some(
+            Sha256::parse("421dc617d921c24f41441973d8476605718a14a5c2228b8344cc1d6d816e8d39")
+                .unwrap()
+        )
+    );
+    assert_eq!(
+        *events.borrow(),
+        [
+            "refresh",
+            "list",
+            "read a.md",
+            "write a",
+            "assemble",
+            "read blob a.md",
+            "assemble",
+            "pin"
+        ]
+    );
+}
+
+#[test]
+fn inspect_fails_when_final_pin_fails() {
+    // Arrange
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let mut service = InspectionService::new(
+        RecordingDocuments(events.clone()),
+        RecordingGit(events.clone(), Scenario::PinFailure),
+        RecordingFiles(events.clone(), Scenario::PinFailure),
+        MarkdownParser::new(),
+    );
+    // Act
+    let error = service
+        .inspect(&[ElementAddress::parse("a.md").unwrap()])
+        .unwrap_err();
+    // Assert
+    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+    assert_eq!(events.borrow().last().map(String::as_str), Some("pin"));
+}
+
+impl Refresher for RecordingDocuments {
+    fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
+        self.0.borrow_mut().push("refresh".into());
+        Ok(RefreshOutcome {
+            revision: 1,
+            published: false,
+            files_updated: 0,
+            files_removed: 0,
+            invalid_files_updated: 0,
+        })
+    }
+}
+impl CorpusLister for RecordingGit {
+    fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+        self.0.borrow_mut().push("list".into());
+        let paths = if self.1 == Scenario::Overlap {
+            &['a'][..]
+        } else {
+            &['a', 'b']
+        };
+        Ok(paths
+            .iter()
+            .map(|letter| format!("{letter}.md"))
+            .map(|path| RepoPath::parse(&path).unwrap())
+            .collect())
+    }
+}
+impl GitSnapshots for RecordingGit {
+    fn create_tree(&self, _: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
+        panic!("capture must not retain bytes for create_tree")
+    }
+    fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
+        let name = if self.1 == Scenario::Overlap || bytes.ends_with(b"a") {
+            "a"
+        } else {
+            "b"
+        };
+        self.0.borrow_mut().push(format!("write {name}"));
+        Ok(BlobOid::parse(&name.repeat(40)).unwrap())
+    }
+    fn create_tree_from_blobs(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
+        if self.1 == Scenario::Overlap {
+            assert_eq!(entries.len(), 1);
+            assert_eq!(entries[0].path.as_str(), "a.md");
+            self.0.borrow_mut().push("assemble".into());
+            return Ok(TreeOid::parse(&"c".repeat(40)).unwrap());
+        }
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| entry.path.as_str())
+                .collect::<Vec<_>>(),
+            ["a.md", "b.md"]
+        );
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| entry.oid.as_str())
+                .collect::<Vec<_>>(),
+            ["a".repeat(40), "b".repeat(40)]
+        );
+        self.0.borrow_mut().push("assemble".into());
+        Ok(TreeOid::parse(&"c".repeat(40)).unwrap())
+    }
+    fn read_blob(&self, _: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
+        assert_eq!(self.1, Scenario::Overlap);
+        self.0
+            .borrow_mut()
+            .push(format!("read blob {}", path.as_str()));
+        Ok(MARKED_SOURCE.to_vec())
+    }
+    fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
+        assert_eq!(tree.as_str(), "c".repeat(40));
+        self.0.borrow_mut().push("pin".into());
+        if self.1 == Scenario::PinFailure {
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                "pin failed",
+            ));
+        }
+        Ok(RetainedTree::new(tree.clone()))
+    }
+}
+impl FileSystem for RecordingFiles {
+    type IndexLock = ();
+    fn stat_file(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
+        panic!("capture uses verified reads")
+    }
+    fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+        let read_again =
+            self.1 == Scenario::Overlap && self.0.borrow().iter().any(|event| event == "read a.md");
+        self.0.borrow_mut().push(format!("read {}", path.as_str()));
+        let bytes = if read_again {
+            b"live edited after capture\n".to_vec()
+        } else if self.1 == Scenario::Overlap {
+            MARKED_SOURCE.to_vec()
+        } else {
+            format!(
+                "<!-- letopis: {{\"created_at\":1}} -->\n{}",
+                &path.as_str()[..1]
+            )
+            .into_bytes()
+        };
+        Ok(Some(CapturedFile {
+            stat: FileStat {
+                size: bytes.len() as u64,
+                mtime_ns: 1,
+                inode: 1,
+                device: 1,
+            },
+            checked_at_ns: 1,
+            bytes,
+        }))
+    }
+    fn get_time_ns(&self) -> DocumentResult<i64> {
+        panic!("capture must not own publication timing")
+    }
+    fn lock_index(&self) -> DocumentResult<()> {
+        panic!("capture must not own publication lock")
+    }
+}

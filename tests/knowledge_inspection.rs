@@ -26,7 +26,7 @@ fn inspect_reads_current_knowledge_from_one_retained_tree() {
     // Assert
     assert_eq!(result.elements.len(), 4);
     for (path, bytes, id, start, end, hash) in fixtures {
-        assert_eq!(result.elements[id].path, RepoPath::parse(path).unwrap());
+        assert_eq!(result.elements[id].path.as_str(), path);
         assert_eq!(
             result.elements[id].lines,
             Some(LineRange::new(start, end).unwrap())
@@ -90,19 +90,18 @@ fn inspect_distinguishes_referenced_sources_from_unknown_ids() {
     repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\n[source](src/data.rs \"letopis:type=external\") [other](plain.md \"letopis:type=external\")\n");
     repo.write("plain.md", b"unmarked Markdown");
     let mut service = wire_inspector(repo.get_root()).unwrap();
-    for (id, kind) in [
-        ("src/data.rs", CommandErrorKind::InternalError),
-        ("plain.md", CommandErrorKind::InternalError),
-        ("missing.rs", CommandErrorKind::NotFound),
-        ("missing.md", CommandErrorKind::NotFound),
-    ] {
-        assert_eq!(
-            service
-                .inspect(&[ElementAddress::parse(id).unwrap()])
-                .unwrap_err()
-                .get_kind(),
-            kind
-        );
+    for id in ["src/data.rs", "plain.md"] {
+        let inspected = service
+            .inspect(&[ElementAddress::parse(id).unwrap()])
+            .unwrap();
+        assert_eq!(inspected.elements[id].path.as_str(), id);
+        assert_eq!(inspected.elements[id].hash.is_some(), id == "plain.md");
+    }
+    for id in ["missing.rs", "missing.md"] {
+        let error = service
+            .inspect(&[ElementAddress::parse(id).unwrap()])
+            .unwrap_err();
+        assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
     }
     // Removing canonical declarations removes source membership despite old SQL.
     repo.write("a.md", b"unmarked");

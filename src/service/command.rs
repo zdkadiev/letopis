@@ -1,4 +1,4 @@
-use super::SearchFilters;
+use super::{ElementLocation, SearchFilters};
 use crate::domain::{KnowledgeId, LineRange, RepoPath, Sha256, SourceUri, TreeOid};
 use serde_json::Value;
 use std::{
@@ -146,8 +146,8 @@ pub struct Inspection {
 /// Metadata only, without raw knowledge or source contents.
 #[derive(Debug)]
 pub struct InspectedElement {
-    /// Root-relative file path.
-    pub path: RepoPath,
+    /// Root-relative file path or opaque remote source URL.
+    pub path: ElementLocation,
     /// Inclusive source or element lines, when available.
     pub lines: Option<LineRange>,
     /// Exact element hash, or absent for an unavailable source.
