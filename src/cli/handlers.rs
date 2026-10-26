@@ -1,12 +1,14 @@
 use super::input::Request;
 use crate::service::{
     BackgroundRunner, CheckReport, Checker, CommandError, CommandErrorKind, CommandProblem,
-    CommandResult, Inspection, Inspector, SearchLink, Searcher, Traversal, Traverser,
+    CommandResult, Inspection, Inspector, SearchLink, Searcher, StatusReader, StatusReport,
+    Traversal, Traverser,
 };
 
 /// Typed application results before X-1 transport rendering.
 #[derive(Debug)]
 pub(crate) enum ResponseResult {
+    Status(StatusReport),
     Check(CheckReport),
     Inspect(Inspection),
     Search(Vec<SearchLink>),
@@ -21,6 +23,8 @@ pub(crate) struct CommandResponse {
 /// Borrowed services available for one command; missing services fail safely.
 #[derive(Default)]
 pub(crate) struct HandlerServices<'a> {
+    /// Observational published diagnostics service.
+    pub(crate) status: Option<&'a mut dyn StatusReader>,
     /// Corpus validation service.
     pub(crate) checks: Option<&'a mut dyn Checker>,
     /// Current metadata inspection service.
@@ -45,6 +49,18 @@ impl<'a> Handlers<'a> {
     /// Service and background failures propagate without exposing partial results.
     pub(crate) fn execute(&mut self, request: Request) -> CommandResult<CommandResponse> {
         let result = match request {
+            Request::Status => {
+                let report = self
+                    .services
+                    .status
+                    .as_deref_mut()
+                    .ok_or_else(fail_unavailable)?
+                    .read_status()?;
+                return Ok(CommandResponse {
+                    result: ResponseResult::Status(report),
+                    warnings: Vec::new(),
+                });
+            }
             Request::Check(paths) => ResponseResult::Check(
                 self.services
                     .checks

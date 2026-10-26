@@ -3,6 +3,7 @@ use crate::domain::{Graph, RepoPath, SourceUri, TreeOid};
 use std::collections::BTreeSet;
 mod background;
 mod check;
+mod check_problems;
 mod command;
 mod command_traits;
 mod document_refresher;
@@ -26,6 +27,7 @@ mod search_filters;
 mod snapshot_error;
 mod snapshot_traits;
 mod source;
+mod status;
 mod status_types;
 mod storage;
 mod traversal;
@@ -48,6 +50,7 @@ pub use provenance_types::{
 pub(crate) use search::{SearchDependencies, SearchService};
 /// Concrete source observation assembly, kept inside the crate.
 pub(crate) use source::SourceService;
+pub(crate) use status::{StatusDependencies, StatusService};
 pub(crate) use traversal::{TraversalDependencies, TraversalService};
 
 pub use command::{
@@ -56,7 +59,7 @@ pub use command::{
 };
 pub use command_traits::{
     BackgroundRunner, Checker, DrainLauncher, EmbedLocker, EmbeddingExecutor, Inspector, Searcher,
-    Traverser,
+    StatusReader, Traverser,
 };
 pub use document_traits::{CorpusLister, FileSystem, MarkdownCodec, Refresher};
 pub use embedding_config::{EmbeddingConfig, ProviderKind};

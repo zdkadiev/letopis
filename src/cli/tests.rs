@@ -40,6 +40,29 @@ mod input_tests {
     }
 
     #[test]
+    fn status_accepts_only_empty_object_and_no_extra_argv() {
+        assert!(matches!(parse(&["status"], "{}"), Ok(Request::Status)));
+        for body in [
+            "",
+            "null",
+            "[]",
+            r#"{"extra":1}"#,
+            r#"{"extra":null}"#,
+            r#"{"extra":1,"extra":2}"#,
+            "{} {}",
+        ] {
+            assert_eq!(
+                parse(&["status"], body).unwrap_err().get_kind(),
+                CommandErrorKind::InvalidRequest
+            );
+        }
+        assert_eq!(
+            parse(&["status", "extra"], "{}").unwrap_err().get_kind(),
+            CommandErrorKind::InvalidRequest
+        );
+    }
+
+    #[test]
     fn parse_inspect_normalizes_without_resolving_membership() {
         let request = parse(&["inspect"], r#"{"element_ids":["./x.md","a/../x.md","./x.md#A","x.md#A","s.txt#L01-L02","s.txt#L1-L2"]}"#).unwrap();
         let Request::Inspect(ids) = request else {
@@ -160,7 +183,8 @@ mod transport_tests {
     use crate::run_cli;
     use crate::service::{
         BackgroundRunner, CheckReport, Checker, CommandError, CommandErrorKind, CommandProblem,
-        CommandResult, ElementAddress, InspectedElement, Inspection, Inspector,
+        CommandResult, ElementAddress, InspectedElement, Inspection, Inspector, StatusReader,
+        StatusReport,
     };
     use serde_json::{Value, json};
     use std::collections::BTreeMap;
@@ -212,6 +236,29 @@ mod transport_tests {
     #[derive(Default)]
     struct InspectDouble {
         calls: Vec<Vec<ElementAddress>>,
+    }
+    struct StatusDouble {
+        fail: bool,
+        calls: usize,
+    }
+    impl StatusReader for StatusDouble {
+        fn read_status(&mut self) -> CommandResult<StatusReport> {
+            self.calls += 1;
+            if self.fail {
+                return Err(CommandError::new_with_cause(
+                    CommandErrorKind::InternalError,
+                    "safe status failure",
+                    io::Error::other("SECRET_STATUS"),
+                ));
+            }
+            Ok(StatusReport {
+                revision: Some(7),
+                embedding_backlog: 2,
+                embedding_failed: 1,
+                locks: Vec::new(),
+                problems: vec![make_problem()],
+            })
+        }
     }
     impl Inspector for InspectDouble {
         fn inspect(&mut self, ids: &[ElementAddress]) -> CommandResult<Inspection> {
@@ -289,6 +336,64 @@ mod transport_tests {
             value,
             json!({"ok":true,"result":{"errors":[{"code":"validation_failed","message":"safe finding","details":{"path":"a.md"}}]}})
         );
+    }
+    #[test]
+    fn status_renders_all_fields_without_background_work() {
+        let mut status = StatusDouble {
+            fail: false,
+            calls: 0,
+        };
+        let mut background = BackgroundDouble {
+            fail: true,
+            ..BackgroundDouble::default()
+        };
+
+        let response = Handlers::new(HandlerServices {
+            status: Some(&mut status),
+            background: Some(&mut background),
+            ..HandlerServices::default()
+        })
+        .execute(Request::Status);
+
+        assert_eq!(
+            render(response),
+            (
+                0,
+                json!({"ok":true,"result":{
+                    "revision":7,"embedding_backlog":2,"embedding_failed":1,"locks":[],
+                    "problems":[{"code":"validation_failed","message":"safe finding","details":{"path":"a.md"}}]
+                }})
+            )
+        );
+        assert_eq!(status.calls, 1);
+        assert_eq!((background.starts, background.drains), (0, 0));
+    }
+    #[test]
+    fn status_failure_renders_one_safe_error_without_background_work() {
+        let mut status = StatusDouble {
+            fail: true,
+            calls: 0,
+        };
+        let mut background = BackgroundDouble::default();
+
+        let response = Handlers::new(HandlerServices {
+            status: Some(&mut status),
+            background: Some(&mut background),
+            ..HandlerServices::default()
+        })
+        .execute(Request::Status);
+
+        assert_eq!(
+            render(response),
+            (
+                1,
+                json!({"ok":false,"error":{
+                    "code":"internal_error","message":"safe status failure","details":{}
+                }})
+            )
+        );
+        assert_eq!(status.calls, 1);
+        assert_eq!((background.starts, background.drains), (0, 0));
     }
     #[test]
     fn inspection_renders_only_metadata_and_optional_lines() {

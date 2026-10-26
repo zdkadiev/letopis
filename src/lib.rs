@@ -27,8 +27,9 @@ use crate::service::{
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
     GraphDiagnostics, GraphService, InspectionService, Inspector, ProvenanceService,
     RefreshDependencies, Refresher, SearchDependencies, SearchService, Searcher, SnapshotError,
-    SnapshotVerifier, SourceProvenance, SourceReader, SourceService, StatusFiles, StatusStorage,
-    Storage, StorageResult, TraversalDependencies, TraversalService, Traverser,
+    SnapshotVerifier, SourceProvenance, SourceReader, SourceService, StatusDependencies,
+    StatusFiles, StatusService, StatusStorage, Storage, StorageResult, TraversalDependencies,
+    TraversalService, Traverser,
 };
 use crate::storage::{SqliteStatusStorage, SqliteStorage};
 use crate::utils::SERVICE_DIRECTORY;
@@ -374,12 +375,46 @@ pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLoc
 fn run_request(request: Request) -> CommandResult<CommandResponse> {
     let (directory, executable) = locate_environment()?;
     match request {
+        Request::Status => run_status(request, &directory),
         Request::Check(_) => run_check(request, &directory, &executable),
         Request::Drain => run_drain(request, &directory, &executable),
         Request::Search(_) => run_search(request, &directory, &executable),
         Request::Traverse(_) => run_traverse(request, &directory, &executable),
         Request::Inspect(_) => run_inspect(request, &directory, &executable),
     }
+}
+
+fn run_status(request: Request, directory: &Path) -> CommandResult<CommandResponse> {
+    let root = open_repository_root(directory)?;
+    let git = GitCli::open(&root).map_err(map_status_setup)?;
+    let files = LocalFileSystem::open(git.get_root()).map_err(map_status_setup)?;
+    let service_directory = files
+        .open_existing_service_directory()
+        .map_err(map_status_setup)?;
+    let storage = if let Some(pinned) = service_directory.as_ref() {
+        SqliteStatusStorage::open_confined(&root.join(SERVICE_DIRECTORY), pinned)
+            .map_err(map_status_setup)?
+    } else {
+        SqliteStatusStorage::default()
+    };
+    let provenance = ProvenanceService::new(
+        GitCli::open(&root).map_err(map_status_setup)?,
+        LocalFileSystem::open(&root).map_err(map_status_setup)?,
+    );
+    let provider = build_embedding_provider().map_err(map_status_setup)?;
+    let graph = CurrentGraphDiagnostics::new();
+    let mut status = StatusService::new(StatusDependencies {
+        storage,
+        files: &files,
+        graph: &graph,
+        provenance: &provenance,
+        provider: &provider,
+    });
+    Handlers::new(HandlerServices {
+        status: Some(&mut status),
+        ..HandlerServices::default()
+    })
+    .execute(request)
 }
 
 fn locate_environment() -> CommandResult<(PathBuf, PathBuf)> {
@@ -488,6 +523,14 @@ fn map_check_setup(error: impl std::error::Error + Send + Sync + 'static) -> Com
     CommandError::new_with_cause(
         CommandErrorKind::InternalError,
         "cannot open check service",
+        error,
+    )
+}
+
+fn map_status_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot open status service",
         error,
     )
 }

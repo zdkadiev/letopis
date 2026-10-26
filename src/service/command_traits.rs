@@ -1,6 +1,6 @@
 use super::{
     CheckReport, CommandProblem, CommandResult, DocumentResult, ElementAddress, Inspection,
-    SearchLink, SearchRequest, Traversal, TraversalRequest,
+    SearchLink, SearchRequest, StatusReport, Traversal, TraversalRequest,
 };
 use crate::domain::RepoPath;
 
@@ -18,6 +18,14 @@ pub trait Checker {
     /// Reports refresh or infrastructure failures with private causes; no partial report
     /// is returned on failure. Validation findings are successful reports.
     fn check(&mut self, paths: &[RepoPath]) -> CommandResult<CheckReport>;
+}
+/// Read the latest published diagnostics without refreshing or mutating state.
+pub trait StatusReader {
+    /// Observe one pinned database view, current configuration and busy locks.
+    ///
+    /// # Errors
+    /// Reports storage, provenance or unsafe lock failures without a partial report.
+    fn read_status(&mut self) -> CommandResult<StatusReport>;
 }
 /// Consistent metadata-only hybrid knowledge search.
 pub trait Searcher {
