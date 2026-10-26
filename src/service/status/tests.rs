@@ -1,6 +1,6 @@
 mod configuration;
 
-use super::{StatusDependencies, StatusService};
+use super::StatusService;
 use crate::{
     domain::{ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, TreeOid},
     service::{
@@ -279,7 +279,7 @@ fn build_service<'a>(
     provider: &'a Provider,
     provenance: &'a Provenance,
 ) -> StatusService<'a, Reads, Diagnostics> {
-    StatusService::new(StatusDependencies {
+    StatusService {
         storage: Reads {
             inner: storage,
             count,
@@ -288,7 +288,7 @@ fn build_service<'a>(
         graph: &Diagnostics,
         provenance,
         provider,
-    })
+    }
 }
 
 impl StatusStorage for Reads {

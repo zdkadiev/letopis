@@ -115,6 +115,9 @@ PID and lock observations are best effort, not authority to signal processes.
 
 - Pure result values remain dependency-free; no domain infrastructure dependencies.
 - A concrete StatusService owns orchestration behind an application-owned trait.
+- The incoming main simplification rule supersedes the earlier dependency-bundle
+  proposal: StatusService owns its collaborators directly and composition uses a
+  struct literal; no constructor-argument wrapper is retained.
 - Shared current check/status diagnostic logic stays in service ownership.
 - SqliteStorage implements narrow aggregate observations through scoped storage
   interfaces; use SeaQuery and bound parameters for ordinary queries.
@@ -173,3 +176,7 @@ above resolve each explicitly without a new schema or coordination protocol.
 Scope and full specification approved in chat on 2026-10-26. Freshness,
 unavailable-config counting and best-effort lock/PID policies above are accepted.
 Implementation plan requires review before product code.
+
+Integration update on 2026-10-26: the accepted behavior and boundaries remain
+unchanged; the incoming main rule against constructor-argument bundle wrappers
+supersedes only the earlier StatusDependencies shape.

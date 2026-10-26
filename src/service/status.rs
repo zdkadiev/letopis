@@ -13,24 +13,13 @@ const INVALID_CONFIG: &str = "invalid_embedding_config";
 const QUERY_FAILURE: &str = "query_embedding_failed";
 const EXHAUSTED: &str = "embedding_attempts_exhausted";
 
-/// Caller-owned storage with borrowed, read-only status collaborators.
-pub(crate) struct StatusDependencies<'a, S, G> {
+/// Observes the last publication and live coordination without changing either.
+pub(crate) struct StatusService<'a, S, G> {
     pub(crate) storage: S,
     pub(crate) files: &'a dyn StatusFiles,
     pub(crate) graph: &'a G,
     pub(crate) provenance: &'a dyn SourceProvenance,
     pub(crate) provider: &'a dyn EmbeddingProvider,
-}
-
-impl<S, G> fmt::Debug for StatusDependencies<'_, S, G> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("StatusDependencies").finish_non_exhaustive()
-    }
-}
-
-/// Observes the last publication and live coordination without changing either.
-pub(crate) struct StatusService<'a, S, G> {
-    deps: StatusDependencies<'a, S, G>,
 }
 
 impl<S, G> fmt::Debug for StatusService<'_, S, G> {
@@ -39,23 +28,15 @@ impl<S, G> fmt::Debug for StatusService<'_, S, G> {
     }
 }
 
-impl<'a, S, G> StatusService<'a, S, G> {
-    /// Assemble status collaborators without opening a view or reading configuration.
-    pub(crate) fn new(deps: StatusDependencies<'a, S, G>) -> Self {
-        Self { deps }
-    }
-}
-
 impl<S: StatusStorage, G: GraphDiagnostics> StatusReader for StatusService<'_, S, G> {
     fn read_status(&mut self) -> CommandResult<StatusReport> {
-        let (policy, config_problem) = read_config_policy(self.deps.files, self.deps.provider);
+        let (policy, config_problem) = read_config_policy(self.files, self.provider);
         let observation = self
-            .deps
             .storage
             .begin_status_read()
             .map_err(map_storage_error)?;
         let mut report = if let Some(mut view) = observation {
-            read_published(&mut view, &policy, self.deps.graph, self.deps.provenance)?
+            read_published(&mut view, &policy, self.graph, self.provenance)?
         } else {
             StatusReport {
                 revision: None,
@@ -68,7 +49,7 @@ impl<S: StatusStorage, G: GraphDiagnostics> StatusReader for StatusService<'_, S
         if let Some(problem) = config_problem {
             report.problems.push(problem);
         }
-        report.locks = self.deps.files.observe_locks()?;
+        report.locks = self.files.observe_locks()?;
         report.problems = sort_problems(report.problems);
         Ok(report)
     }

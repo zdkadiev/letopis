@@ -27,8 +27,8 @@ use crate::service::{
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
     GraphDiagnostics, GraphService, InspectionService, Inspector, ProvenanceService, Refresher,
     SearchService, Searcher, SnapshotError, SnapshotVerifier, SourceProvenance, SourceReader,
-    SourceService, StatusDependencies, StatusFiles, StatusService, StatusStorage, Storage,
-    StorageResult, TraversalService, Traverser,
+    SourceService, StatusFiles, StatusService, StatusStorage, Storage, StorageResult,
+    TraversalService, Traverser,
 };
 use crate::storage::{SqliteStatusStorage, SqliteStorage};
 use crate::utils::SERVICE_DIRECTORY;
@@ -402,13 +402,13 @@ fn run_status(request: Request, directory: &Path) -> CommandResult<CommandRespon
     );
     let provider = build_embedding_provider().map_err(map_status_setup)?;
     let graph = CurrentGraphDiagnostics::new();
-    let mut status = StatusService::new(StatusDependencies {
+    let mut status = StatusService {
         storage,
         files: &files,
         graph: &graph,
         provenance: &provenance,
         provider: &provider,
-    });
+    };
     Handlers::new(HandlerServices {
         status: Some(&mut status),
         ..HandlerServices::default()

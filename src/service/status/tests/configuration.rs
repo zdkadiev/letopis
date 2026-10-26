@@ -1,8 +1,8 @@
 use super::{
     CommandErrorKind, CommandProblem, CommandResult, Diagnostics, EmbeddingConfig, Files,
-    GraphDiagnostics, Provenance, Provider, Reads, RepoPath, Sha256, SqliteStorage,
-    StatusDependencies, StatusReader, StatusService, Storage, StorageRead, VALID_CONFIG,
-    VectorOutcome, VectorWrite, build_service, open_storage, publish_node,
+    GraphDiagnostics, Provenance, Provider, Reads, RepoPath, Sha256, SqliteStorage, StatusReader,
+    StatusService, Storage, StorageRead, VALID_CONFIG, VectorOutcome, VectorWrite, build_service,
+    open_storage, publish_node,
 };
 use std::{cell::Cell, rc::Rc};
 use tempfile::TempDir;
@@ -21,7 +21,7 @@ fn keeps_captured_config_after_live_config_changes() {
         embeds: Cell::new(0),
     };
     let graph = ChangingDiagnostics(&files);
-    let mut service = StatusService::new(StatusDependencies {
+    let mut service = StatusService {
         storage: Reads {
             inner: Some(storage),
             count: Rc::new(Cell::new(0)),
@@ -30,7 +30,7 @@ fn keeps_captured_config_after_live_config_changes() {
         graph: &graph,
         provenance: &Provenance { fail: false },
         provider: &provider,
-    });
+    };
 
     let report = service.read_status().unwrap();
 
