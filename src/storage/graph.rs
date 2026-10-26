@@ -336,15 +336,15 @@ mod tests {
             ("code.rs", Some("unexpected snapshot"), None),
             ("code.rs", None, Some("unexpected search hash")),
         ] {
-            // Arrange: each row violates exactly one source-specific invariant.
+            // Given: each row violates exactly one source-specific invariant.
             let mut statement = connection
                 .prepare("SELECT 1, ?1, 'source', 'code.rs', NULL, 0, ?2, NULL, NULL, ?3")
                 .unwrap();
             let mut rows = statement.query(params![id, snapshot, search]).unwrap();
             let row = rows.next().unwrap().unwrap();
-            // Act
+            // When
             let error = decode_node(row).unwrap_err();
-            // Assert
+            // Then
             assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
         }
     }

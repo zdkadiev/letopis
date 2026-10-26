@@ -14,56 +14,56 @@ use std::{fs, path::PathBuf, process::Command};
 
 #[test]
 fn version_gate() {
-    // Arrange
+    // Given
     for output in [
         b"git version 2.29.0\n".as_slice(),
         b"git version 2.50.1 (Apple Git-155)\n",
     ] {
-        // Act
+        // When
         let result = check_version(output);
-        // Assert
+        // Then
         assert!(result.is_ok());
     }
-    // Arrange
+    // Given
     for output in [b"git version 2.28.7\n".as_slice(), b"unknown\n"] {
-        // Act
+        // When
         let error = check_version(output).unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
     }
 }
 
 #[test]
 fn open_rejects_old_git_before_object_calls() {
-    // Arrange
+    // Given
     let repo = TempRepo::new(ObjectFormat::Sha1);
     let exe = repo.write_script(
         "old-git",
         "#!/bin/sh\nprintf '%s\\n' \"$*\" >> calls\necho 'git version 2.28.7'\n",
     );
     let process = GitProcess::new_with_executable(exe);
-    // Act
+    // When
     let error = GitCli::open_with_process(repo.get_root(), process)
         .err()
         .unwrap();
     let calls = fs::read_to_string(repo.get_root().join("calls")).unwrap();
-    // Assert
+    // Then
     assert!(error.get_message().contains("2.29"));
     assert_eq!(calls, "-c core.hooksPath=/dev/null --version\n");
 }
 
 #[test]
 fn discovers_root_from_subdirectory() {
-    // Arrange
+    // Given
     for format in fixture::FORMATS {
         let repo = TempRepo::new(format);
         let expected_length = match format {
             ObjectFormat::Sha1 => 40,
             ObjectFormat::Sha256 => 64,
         };
-        // Act
+        // When
         let git = GitCli::open(repo.get_subdir()).unwrap();
-        // Assert
+        // Then
         assert_eq!(git.root, repo.get_root());
         assert_eq!(git.oid_len, expected_length);
     }
@@ -71,16 +71,16 @@ fn discovers_root_from_subdirectory() {
 
 #[test]
 fn open_rejects_non_repository_and_bare() {
-    // Arrange
+    // Given
     let repo = TempRepo::new(ObjectFormat::Sha1);
     let bare = repo.get_root().join("bare");
     repo.run_git_successfully(&["init", "-q", "--bare", bare.to_str().unwrap()], None);
     let empty = std::env::temp_dir().join(format!("letopis-empty-{}", std::process::id()));
     fs::create_dir(&empty).unwrap();
-    // Act
+    // When
     let bare_result = GitCli::open(&bare);
     let empty_result = GitCli::open(&empty);
-    // Assert
+    // Then
     assert!(bare_result.is_err());
     assert!(empty_result.is_err());
     fs::remove_dir(empty).unwrap();
@@ -89,19 +89,19 @@ fn open_rejects_non_repository_and_bare() {
 #[test]
 fn subprocess_drains_and_reaps_on_io_failure() {
     if std::env::var_os("LETOPIS_IO_WORKER").is_none() {
-        // Arrange / Act / Assert: supervisor runs this exact worker and checks its exit.
+        // Given / When / Then: supervisor runs this exact worker and checks its exit.
         fixture::supervise_test(
             "git::cli::tests::subprocess_drains_and_reaps_on_io_failure",
             &[("LETOPIS_IO_WORKER", "1")],
         );
         return;
     }
-    // Arrange
+    // Given
     let repo = TempRepo::new(ObjectFormat::Sha1);
     let exe = repo.write_script("failing-git", "#!/bin/sh\necho $$ > child-pid\nhead -c 262144 /dev/zero >&2\necho STDERR_CANARY >&2\nhead -c 262144 /dev/zero\nhead -c 1048576 > /dev/null\nexit 7\n");
     let process = GitProcess::new_with_executable(exe);
     let input = b"STDIN_CANARY".repeat(100000);
-    // Act
+    // When
     let error = process.run(repo.get_root(), &[], Some(&input)).unwrap_err();
     let pid = fs::read_to_string(repo.get_root().join("child-pid")).unwrap();
     let child_exists = Command::new("kill")
@@ -110,7 +110,7 @@ fn subprocess_drains_and_reaps_on_io_failure() {
         .unwrap()
         .status
         .success();
-    // Assert
+    // Then
     for diagnostic in [error.to_string(), format!("{error:?}")] {
         assert!(
             diagnostic.contains('7'),
@@ -126,11 +126,11 @@ fn subprocess_drains_and_reaps_on_io_failure() {
 #[test]
 fn process_removes_inherited_overrides_and_hardens_writes() {
     if std::env::var_os("LETOPIS_POLICY_WORKER").is_none() {
-        // Arrange / Act / Assert: exercise inherited overrides in a supervised worker.
+        // Given / When / Then: exercise inherited overrides in a supervised worker.
         supervise_policy_worker();
         return;
     }
-    // Arrange
+    // Given
     let repo = TempRepo::new(ObjectFormat::Sha1);
     let exe = repo.write_script(
         "policy-git",
@@ -138,10 +138,10 @@ fn process_removes_inherited_overrides_and_hardens_writes() {
     );
     let process = GitProcess::new_with_executable(exe);
     let args = ["hash-object".into(), "-w".into(), "--stdin".into()];
-    // Act
+    // When
     let output = process.run(repo.get_root(), &args, None).unwrap();
     let text = String::from_utf8(output).unwrap();
-    // Assert
+    // Then
     assert!(!text.contains("CANARY"));
     assert!(!text.contains("GIT_CONFIG_COUNT="));
     assert!(!text.contains("GIT_CONFIG_KEY_0="));
@@ -161,7 +161,7 @@ fn process_removes_inherited_overrides_and_hardens_writes() {
 
 #[test]
 fn discovers_trailing_newline_repository_without_touching_sibling() {
-    // Arrange
+    // Given
     for format in fixture::FORMATS {
         let parent = TempRepo::new(format);
         let (sibling, target) = create_newline_repository_pair(&parent, format);
@@ -172,7 +172,7 @@ fn discovers_trailing_newline_repository_without_touching_sibling() {
         let sibling_refs =
             parent.run_git_successfully(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None);
         let path = RepoPath::parse("captured.md").unwrap();
-        // Act
+        // When
         let git = open_git_snapshots(&target).unwrap();
         let tree = git
             .create_tree(&[SnapshotFile {
@@ -200,7 +200,7 @@ fn discovers_trailing_newline_repository_without_touching_sibling() {
         );
         let bytes = git.read_blob(&tree, &path).unwrap();
         let discovered_root = GitCli::open(&target).unwrap().root;
-        // Assert
+        // Then
         assert_eq!(
             objects_after, sibling_objects,
             "opening repo\\n must not write objects into sibling repo"
@@ -221,7 +221,7 @@ fn discovers_trailing_newline_repository_without_touching_sibling() {
 #[test]
 fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
     use crate::service::CorpusLister;
-    // Arrange
+    // Given
     let repo = TempRepo::new(ObjectFormat::Sha1);
     for path in [
         "deleted.md",
@@ -241,9 +241,9 @@ fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
     let objects = repo.run_git_successfully(&["count-objects", "-v"], None);
     let refs = repo.run_git_successfully(&["show-ref"], None);
     let git = GitCli::open(repo.get_root()).unwrap();
-    // Act
+    // When
     let candidates = git.list_candidates().unwrap();
-    // Assert
+    // Then
     assert_eq!(
         candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
         [
@@ -269,7 +269,7 @@ fn candidates_reject_unsupported_raw_paths() {
         b"bad#anchor.md".to_vec(),
         b"bad\nline.md".to_vec(),
     ] {
-        // Arrange
+        // Given
         let repo = TempRepo::new(ObjectFormat::Sha1);
         // Git's index supports raw paths even when the host filesystem rejects them.
         let oid = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
@@ -278,9 +278,9 @@ fn candidates_reject_unsupported_raw_paths() {
         entry.push(0);
         repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
         let git = GitCli::open(repo.get_root()).unwrap();
-        // Act
+        // When
         let error = git.list_candidates().unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
         assert!(!error.to_string().contains("bad"));
     }
@@ -289,7 +289,7 @@ fn candidates_reject_unsupported_raw_paths() {
 #[test]
 fn candidates_deduplicate_unmerged_index_stages() {
     use crate::service::CorpusLister;
-    // Arrange
+    // Given
     let repo = TempRepo::new(ObjectFormat::Sha1);
     let oid = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"conflict"));
     let entries = format!(
@@ -298,9 +298,9 @@ fn candidates_deduplicate_unmerged_index_stages() {
     );
     repo.run_git_successfully(&["update-index", "--index-info"], Some(entries.as_bytes()));
     let git = GitCli::open(repo.get_root()).unwrap();
-    // Act
+    // When
     let candidates = git.list_candidates().unwrap();
-    // Assert
+    // Then
     assert_eq!(
         candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
         ["conflict.md", "live.md"]
@@ -315,7 +315,7 @@ fn candidates_exclude_metadata_before_validating_paths() {
         b".letopis/bad\xff.md",
         b"nested/.letopis/bad\xff.markdown",
     ] {
-        // Arrange: Git can list metadata names unsupported by the corpus model.
+        // Given: Git can list metadata names unsupported by the corpus model.
         let repo = TempRepo::new(ObjectFormat::Sha1);
         fs::write(repo.get_root().join(".letopis-notes.md"), b"candidate").unwrap();
         let oid = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
@@ -324,9 +324,9 @@ fn candidates_exclude_metadata_before_validating_paths() {
         entry.push(0);
         repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
         let git = GitCli::open(repo.get_root()).unwrap();
-        // Act
+        // When
         let candidates = git.list_candidates().unwrap();
-        // Assert
+        // Then
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
             [".letopis-notes.md", "live.md"]
@@ -336,11 +336,11 @@ fn candidates_exclude_metadata_before_validating_paths() {
 
 #[test]
 fn candidates_exclude_raw_git_metadata_components() {
-    // Arrange: Git itself forbids adding .git paths to its real index.
+    // Given: Git itself forbids adding .git paths to its real index.
     let raw = b".git/bad#anchor.md\0nested/.git/bad\xff.markdown\0.git-notes.md\0";
-    // Act
+    // When
     let candidates = parse_candidates(raw).unwrap();
-    // Assert
+    // Then
     assert_eq!(
         candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
         [".git-notes.md"]
@@ -349,33 +349,33 @@ fn candidates_exclude_raw_git_metadata_components() {
 
 #[test]
 fn rejects_non_absence_errors_when_inspecting_object_alternates() {
-    // Arrange: ENOTDIR is deterministic even when tests run with elevated privileges.
+    // Given: ENOTDIR is deterministic even when tests run with elevated privileges.
     let repo = TempRepo::new(ObjectFormat::Sha1);
     let info = repo.get_root().join(".git/objects/info");
     fs::remove_dir(&info).unwrap();
     fs::write(&info, b"not a directory").unwrap();
-    // Act
+    // When
     let error = GitCli::open(repo.get_root())
         .err()
         .expect("unsafe object store was accepted");
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
     assert_eq!(fs::read(info).unwrap(), b"not a directory");
 }
 
 #[test]
 fn rejects_unterminated_candidates_and_accepts_empty_output() {
-    // Arrange / Act
+    // Given / When
     let malformed = parse_candidates(b"note.md").unwrap_err();
     let empty = parse_candidates(b"").unwrap();
-    // Assert
+    // Then
     assert_eq!(malformed.get_kind(), DocumentErrorKind::InternalError);
     assert!(empty.is_empty());
 }
 
 #[test]
 fn rejects_object_header_with_a_different_advertised_oid() {
-    // Arrange: all subprocess work stays real except one malformed protocol header.
+    // Given: all subprocess work stays real except one malformed protocol header.
     let repo = TempRepo::new(ObjectFormat::Sha1);
     let program = repo.write_script(
         "wrong-object-header",
@@ -385,15 +385,15 @@ fn rejects_object_header_with_a_different_advertised_oid() {
     let git = GitCli::open_with_process(repo.get_root(), process).unwrap();
     let tree = git.create_tree(&[]).unwrap();
     let path = RepoPath::parse("missing.md").unwrap();
-    // Act
+    // When
     let error = git.read_blob(&tree, &path).unwrap_err();
-    // Assert: accepting the wrong OID would instead reach an ordinary missing path.
+    // Then: accepting the wrong OID would instead reach an ordinary missing path.
     assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
 }
 
 #[test]
 fn preserves_unexpected_symbolic_ref_failure_before_writing_a_ref() {
-    // Arrange
+    // Given
     let repo = TempRepo::new(ObjectFormat::Sha1);
     let program = repo.write_script(
         "failed-ref-inspection",
@@ -402,9 +402,9 @@ fn preserves_unexpected_symbolic_ref_failure_before_writing_a_ref() {
     let process = GitProcess::new_with_executable(program);
     let git = GitCli::open_with_process(repo.get_root(), process).unwrap();
     let tree = git.create_tree(&[]).unwrap();
-    // Act
+    // When
     let error = git.pin(&tree).unwrap_err();
-    // Assert: exit 1 alone means a nonsymbolic ref; other exits remain failures.
+    // Then: exit 1 alone means a nonsymbolic ref; other exits remain failures.
     assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
     assert!(error.to_string().contains('7'));
     assert!(
@@ -415,17 +415,17 @@ fn preserves_unexpected_symbolic_ref_failure_before_writing_a_ref() {
 
 #[test]
 fn hardens_tree_and_ref_writes_with_git_fsync_settings() {
-    // Arrange
+    // Given
     let repo = TempRepo::new(ObjectFormat::Sha1);
     let program = repo.write_script("write-arguments", "#!/bin/sh\nprintf '%s\\n' \"$@\"\n");
     let process = GitProcess::new_with_executable(program);
     for command in ["mktree", "update-ref"] {
-        // Act
+        // When
         let output = process
             .run(repo.get_root(), &[command.into()], None)
             .unwrap();
         let arguments = String::from_utf8(output).unwrap();
-        // Assert
+        // Then
         assert!(arguments.lines().any(|arg| arg == "core.fsync=all"));
         assert!(arguments.lines().any(|arg| arg == "core.fsyncMethod=fsync"));
     }

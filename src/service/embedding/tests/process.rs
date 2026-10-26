@@ -31,10 +31,12 @@ const SUCCESS: &str = r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#;
 #[test]
 #[ignore = "private child entrypoint explicitly invoked by process parents"]
 fn run_child() {
+    // Given
     reach_checkpoint("child");
     let root = PathBuf::from(env::var_os("LETOPIS_PROCESS_ROOT").unwrap());
     let storage = crate::open_storage(&root.join("cache"), &root.join("vectors")).unwrap();
     let mut service = wire_embedder(&root, storage).unwrap();
+    // When / Then: each action is checked in its assertion.
     if env::var("LETOPIS_PROCESS_ACTION").as_deref() == Ok("query") {
         assert_eq!(
             service.embed_query("canary query").unwrap(),
@@ -252,12 +254,12 @@ impl Drop for Process {
 }
 #[test]
 fn two_drains_have_one_owner_and_one_stored_vector() {
-    // Arrange
+    // Given
     let fixture = Fixture::new(0);
     let before = fixture.capture_cache();
     let mut owner = Process::spawn(&fixture, "owner", "reserved", "drain", "Complete");
     let mut barrier = owner.await_checkpoint();
-    // Act
+    // When
     let mut contender = Process::spawn(&fixture, "contender", "", "drain", "AlreadyRunning");
     contender.finish();
     fixture.assert_state(&fixture.config, None, Some(1));
@@ -265,7 +267,7 @@ fn two_drains_have_one_owner_and_one_stored_vector() {
     barrier.write_all(b"C").unwrap();
     reply(fixture.accept_http(), SUCCESS);
     owner.finish();
-    // Assert
+    // Then
     fixture.assert_state(&fixture.config, Some(vec![1., 2., 3.]), None);
     assert_eq!(fixture.capture_cache(), before);
     assert!(fixture.listener.accept().is_err());
@@ -273,7 +275,7 @@ fn two_drains_have_one_owner_and_one_stored_vector() {
 
 #[test]
 fn killed_reservation_keeps_budget_and_releases_stable_lock() {
-    // Arrange
+    // Given
     let fixture = Fixture::new(0);
     let before = fixture.capture_cache();
     let mut owner = Process::spawn(&fixture, "killed", "reserved", "drain", "Complete");
@@ -281,11 +283,11 @@ fn killed_reservation_keeps_budget_and_releases_stable_lock() {
     let lock = fixture.root.path().join(".letopis/embed.lock");
     let inode = fs::metadata(&lock).unwrap().ino();
     fixture.assert_state(&fixture.config, None, Some(1));
-    // Act
+    // When
     owner.kill();
     let mut restarted = Process::spawn(&fixture, "restart", "", "drain", "Complete");
     restarted.finish();
-    // Assert
+    // Then
     fixture.assert_state(&fixture.config, None, Some(1));
     assert_eq!(fs::metadata(lock).unwrap().ino(), inode);
     assert!(fixture.listener.accept().is_err());
@@ -294,12 +296,12 @@ fn killed_reservation_keeps_budget_and_releases_stable_lock() {
 
 #[test]
 fn edit_before_send_skips_stale_hash_without_reservation() {
-    // Arrange
+    // Given
     let fixture = Fixture::new(0);
     let before = fixture.capture_cache();
     let mut child = Process::spawn(&fixture, "edit", "prepare", "drain", "Complete");
     let mut barrier = child.await_checkpoint();
-    // Act
+    // When
     fs::write(
         fixture.root.path().join("a.md"),
         "<!-- letopis: {\"created_at\":1} -->\nedited canary",
@@ -321,7 +323,7 @@ fn edit_before_send_skips_stale_hash_without_reservation() {
         requests += 1;
         reply(read_http_request(stream), SUCCESS);
     }
-    // Assert stored state first to retain the compiling mutation oracle.
+    // Then: check stored state first to retain the compiling mutation oracle.
     fixture.assert_state(&fixture.config, None, None);
     assert_eq!(fixture.capture_cache(), before);
     assert_eq!(requests, 0, "stale text must never reach HTTP");
@@ -333,16 +335,16 @@ fn reset_during_http_discards_late_document_success_and_error() {
         ("late-vector", SUCCESS),
         ("late-error", "private-provider-canary"),
     ] {
-        // Arrange
+        // Given
         let fixture = Fixture::new(0);
         let mut child = Process::spawn(&fixture, label, "", "drain", "ConfigChanged");
         let stream = fixture.accept_http();
         fixture.assert_state(&fixture.config, None, Some(1));
-        // Act
+        // When
         let next = reset_with_current_state(&fixture);
         let before = fixture.capture_cache();
         reply(stream, body);
-        // Assert stored state before checking child outcome, for mutation sensitivity.
+        // Then: check stored state before child outcome, for mutation sensitivity.
         wait_for_exit(&mut child);
         fixture.assert_state(&next, None, None);
         assert_current_vector(&fixture, &next);
@@ -358,16 +360,16 @@ fn reset_during_http_preserves_current_query_error() {
         ("query-success", SUCCESS),
         ("query-error", "private-provider-canary"),
     ] {
-        // Arrange
+        // Given
         let fixture = Fixture::new(0);
         let mut child = Process::spawn(&fixture, label, "", "query", "");
         let stream = fixture.accept_http();
-        // Act
+        // When
         let next = reset_with_current_state(&fixture);
         let before = fixture.capture_cache();
         reply(stream, body);
         wait_for_exit(&mut child);
-        // Assert
+        // Then
         assert_current_error(&fixture);
         fixture.assert_state(&next, None, None);
         assert_current_vector(&fixture, &next);

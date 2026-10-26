@@ -5,6 +5,7 @@ use letopis_embedding_checks::{
 use support::*;
 #[test]
 fn stale_before_compute_spends_no_attempt() -> CheckResult<()> {
+    // Given
     let d = tempfile::tempdir()?;
     let root = d.path();
     let cfg = setup(root)?;
@@ -12,6 +13,7 @@ fn stale_before_compute_spends_no_attempt() -> CheckResult<()> {
     publish(root, false, &mut |_| Ok(()))?;
     fixture(root, "a.md", "bravo")?;
     let mut calls = Vec::new();
+    // When
     drain(
         root,
         &mut |_, text| {
@@ -20,6 +22,7 @@ fn stale_before_compute_spends_no_attempt() -> CheckResult<()> {
         },
         &mut |_| Ok(()),
     )?;
+    // Then
     assert_eq!(calls, ["beta"]);
     assert_eq!(attempts(root, "alpha")?, 0);
     assert_eq!(
@@ -38,6 +41,7 @@ fn stale_before_compute_spends_no_attempt() -> CheckResult<()> {
 }
 #[test]
 fn late_result_never_represents_new_text() -> CheckResult<()> {
+    // Given
     for retain in [false, true] {
         let d = tempfile::tempdir()?;
         let root = d.path();
@@ -46,12 +50,14 @@ fn late_result_never_represents_new_text() -> CheckResult<()> {
             fixture(root, "b.md", "alpha")?;
             publish(root, false, &mut |_| Ok(()))?;
         }
+        // When
         let mut p = Process::start(root, "valid", "after_response,after_store_commit")?;
         p.at("after_response");
         fixture(root, "a.md", "bravo")?;
         publish(root, false, &mut |_| Ok(()))?;
         p.resume()?;
         p.at("after_store_commit");
+        // Then
         assert_eq!(
             state(&attached(root)?)?["keys"],
             serde_json::json!([[1, hash("alpha")]])
@@ -108,6 +114,7 @@ fn late_result_never_represents_new_text() -> CheckResult<()> {
 }
 #[test]
 fn same_text_is_shared_and_sources_are_not_work() -> CheckResult<()> {
+    // Given
     let d = tempfile::tempdir()?;
     let root = d.path();
     let cfg = setup(root)?;
@@ -117,7 +124,9 @@ fn same_text_is_shared_and_sources_are_not_work() -> CheckResult<()> {
         "INSERT INTO nodes(id,kind,uri,created_at) VALUES('file:source','source','file:source',0)",
         [],
     )?;
+    // When
     Process::start(root, "valid", "")?.finish()?;
+    // Then
     assert_eq!(requests(root).len(), 1);
     assert_eq!(
         search_vectors(&attached(root)?, &cfg, &[1., 0., 0.])?,
@@ -131,6 +140,7 @@ fn same_text_is_shared_and_sources_are_not_work() -> CheckResult<()> {
 }
 #[test]
 fn config_change_rejects_stale_reservation_success_and_error() -> CheckResult<()> {
+    // Given
     for model in ["three", "four"] {
         for (cut, mode) in [
             ("selected", "valid"),
@@ -141,10 +151,12 @@ fn config_change_rejects_stale_reservation_success_and_error() -> CheckResult<()
             let d = tempfile::tempdir()?;
             let root = d.path();
             setup(root)?;
+            // When
             let mut p = Process::start(root, mode, cut)?;
             p.at(cut);
             let new = config(root, model, 1)?;
             // A new-config row for the SAME text makes a late UPDATE observable.
+            // Then
             assert!(letopis_embedding_checks::reserve(
                 root,
                 &new,
@@ -179,6 +191,7 @@ fn config_change_rejects_stale_reservation_success_and_error() -> CheckResult<()
 }
 #[test]
 fn restart_respects_attempt_budget() -> CheckResult<()> {
+    // Given
     for retries in [0, 2] {
         for cut in [
             "selected",
@@ -203,6 +216,7 @@ fn restart_respects_attempt_budget() -> CheckResult<()> {
                 limit
             };
             for n in 0..repeats {
+                // When
                 let mut p = Process::start(root, "valid", cut)?;
                 p.at(cut);
                 p.kill()?;
@@ -211,6 +225,7 @@ fn restart_respects_attempt_budget() -> CheckResult<()> {
                 } else {
                     i64::from(n + 1)
                 };
+                // Then
                 assert_eq!(attempts(root, "alpha")?, want, "{cut} attempt {n}");
                 let s = state(&attached(root)?)?;
                 let committed = cut == "after_store_commit";
@@ -245,12 +260,15 @@ fn restart_respects_attempt_budget() -> CheckResult<()> {
 }
 #[test]
 fn errors_and_invalid_vectors_consume_budget() -> CheckResult<()> {
+    // Given
     for mode in ["error", "empty", "nan", "wrong"] {
         let d = tempfile::tempdir()?;
         let root = d.path();
         setup(root)?;
         let cfg = config(root, "three", 1)?;
+        // When
         Process::start(root, mode, "")?.finish()?;
+        // Then
         assert_eq!(requests(root).len(), 2);
         assert_eq!(attempts(root, "alpha")?, 2);
         assert!(work(root, &cfg)?.is_empty());

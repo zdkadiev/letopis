@@ -7,7 +7,7 @@ use support::{assert_error, build_whole_file, parse_file};
 
 #[test]
 fn golden_elements_have_exact_bytes_and_metadata() {
-    // Arrange
+    // Given
     let golden: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/markdown/expected.json")).unwrap();
     for (name, expected) in golden.as_object().unwrap() {
@@ -17,9 +17,9 @@ fn golden_elements_have_exact_bytes_and_metadata() {
         ))
         .unwrap();
         let path = RepoPath::parse(&format!("knowledge/{name}")).unwrap();
-        // Act
+        // When
         let result = parse(&path, &bytes).unwrap().unwrap();
-        // Assert
+        // Then
         assert_eq!(
             result.elements.len(),
             expected.as_array().unwrap().len(),
@@ -33,42 +33,42 @@ fn golden_elements_have_exact_bytes_and_metadata() {
 
 #[test]
 fn unicode_crlf_and_eof_have_exact_spans() {
-    // Arrange
+    // Given
     let path = RepoPath::parse("a.md").unwrap();
     for bytes in [
         include_bytes!("fixtures/markdown/crlf.md").as_slice(),
         include_bytes!("fixtures/markdown/no-final-newline.md").as_slice(),
     ] {
-        // Act
+        // When
         let got = parse(&path, bytes).unwrap().unwrap();
-        // Assert
+        // Then
         assert_eq!(got.elements[0].element.bytes.get_end(), bytes.len());
         assert_eq!(got.elements[0].element.lines.get_end(), 3);
     }
-    // Arrange
+    // Given
     let text = std::str::from_utf8(include_bytes!("fixtures/markdown/unicode.md")).unwrap();
-    // Act
+    // When
     let got = parse_file("a.md", text);
-    // Assert
+    // Then
     assert_eq!(got.elements[0].element.bytes.get_start(), 11);
     assert_eq!(got.elements[0].element.lines.get_start(), 3);
 }
 
 #[test]
 fn unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected() {
-    // Arrange
+    // Given
     let path = RepoPath::parse("a.md").unwrap();
-    // Act
+    // When
     let plain = parse(&path, b"# plain\nText.\n");
     let invalid_utf8 = parse(&path, b"\xff");
-    // Assert
+    // Then
     assert!(plain.unwrap().is_none());
     assert_error(invalid_utf8, DiagnosticKind::InvalidUtf8);
 }
 
 #[test]
 fn code_examples_do_not_declare_elements() {
-    // Arrange
+    // Given
     let path = RepoPath::parse("a.md").unwrap();
     for text in [
         "```md\n## A {#a}\n<!-- letopis: {} -->\n```\n",
@@ -76,23 +76,23 @@ fn code_examples_do_not_declare_elements() {
         "`<!-- letopis: {} -->`\n",
         "```md\n## A {#a}\n<!-- letopis: {} -->\n",
     ] {
-        // Act
+        // When
         let result = parse(&path, text.as_bytes());
-        // Assert
+        // Then
         assert!(result.unwrap().is_none(), "{text}");
     }
-    // Arrange
+    // Given
     let text = std::str::from_utf8(include_bytes!("fixtures/markdown/code.md")).unwrap();
-    // Act
+    // When
     let got = parse_file("a.md", text);
-    // Assert
+    // Then
     assert_eq!(got.elements.len(), 1);
     assert!(got.edges.is_empty());
 }
 
 #[test]
 fn file_errors_never_return_partial_elements() {
-    // Arrange
+    // Given
     let path = RepoPath::parse("knowledge/a.md").unwrap();
     let prefix = "## Valid {#valid}\n<!-- letopis: {\"created_at\":1} -->\nOK.\n\n";
     for json in [
@@ -107,24 +107,24 @@ fn file_errors_never_return_partial_elements() {
         "{\"created_at\":0,\"created_at\":1}",
     ] {
         let text = format!("{prefix}## Bad {{#bad}}\n<!-- letopis: {json} -->\nOops.\n");
-        // Act
+        // When
         let result = parse(&path, text.as_bytes());
-        // Assert
+        // Then
         assert_error(result, DiagnosticKind::InvalidMetadata);
     }
-    // Arrange
+    // Given
     let text = format!(
         "{prefix}## A {{#a}}\n<!-- letopis: {{\"created_at\":2}} -->\n[self](./knowledge/../knowledge/a.md#a \"letopis:type=depends_on\")\n"
     );
-    // Act
+    // When
     let result = parse(&path, text.as_bytes());
-    // Assert
+    // Then
     assert_error(result, DiagnosticKind::SelfLoop);
 }
 
 #[test]
 fn nested_elements_and_orphan_metadata_are_rejected() {
-    // Arrange
+    // Given
     let path = RepoPath::parse("knowledge/a.md").unwrap();
     for (text, kind) in [
         (
@@ -148,43 +148,43 @@ fn nested_elements_and_orphan_metadata_are_rejected() {
             DiagnosticKind::OrphanMetadata,
         ),
     ] {
-        // Act
+        // When
         let result = parse(&path, text.as_bytes());
-        // Assert
+        // Then
         assert_error(result, kind);
     }
 }
 
 #[test]
 fn anchors_are_unique_across_real_headings() {
-    // Arrange
+    // Given
     let path = RepoPath::parse("knowledge/a.md").unwrap();
     let duplicate = b"## A {#a}\n<!-- letopis: {\"created_at\":1} -->\n## B {#a}\n";
-    // Act
+    // When
     let result = parse(&path, duplicate);
-    // Assert
+    // Then
     assert_error(result, DiagnosticKind::DuplicateAnchor);
 
-    // Arrange
+    // Given
     for anchor in ["L1-L2", "1bad", ""] {
         let text = format!("## A {{#{anchor}}}\n<!-- letopis: {{\"created_at\":1}} -->\n");
-        // Act
+        // When
         let result = parse(&path, text.as_bytes());
-        // Assert
+        // Then
         assert_error(result, DiagnosticKind::InvalidAnchor);
     }
 }
 
 #[test]
 fn snapshot_metadata_preserves_full_oid_and_zero_created_at() {
-    // Arrange: independent expected lengths cover both Git wire formats.
+    // Given: independent expected lengths cover both Git wire formats.
     for n in [40, 64] {
         let oid = "a".repeat(n);
         let text =
             format!("<!-- letopis: {{\"created_at\":0,\"source_snapshot\":\"{oid}\"}} -->\nX");
-        // Act
+        // When
         let got = parse_file("a.markdown", &text);
-        // Assert
+        // Then
         assert_eq!(got.elements[0].element.metadata.created_at, 0);
         assert_eq!(
             got.elements[0]
@@ -201,23 +201,23 @@ fn snapshot_metadata_preserves_full_oid_and_zero_created_at() {
 
 #[test]
 fn metadata_must_fit_exactly_one_standalone_line() {
-    // Arrange
+    // Given
     let path = RepoPath::parse("a.md").unwrap();
     for text in [
         "<!-- letopis: {\n\"created_at\":1} -->\n",
         "<!-- letopis: {\"created_at\":1} --> trailing\n",
         "<!-- letopis: {\"created_at\":1} --> <!-- letopis: {\"created_at\":2} -->\n",
     ] {
-        // Act
+        // When
         let result = parse(&path, text.as_bytes());
-        // Assert
+        // Then
         assert!(result.is_err(), "{text}");
     }
 }
 
 #[test]
 fn raw_html_content_does_not_declare_metadata() {
-    // Arrange
+    // Given
     let path = RepoPath::parse("a.md").unwrap();
     for (open, close) in [
         ("<script>", "</script>"),
@@ -230,10 +230,10 @@ fn raw_html_content_does_not_declare_metadata() {
             "{open}\nconst example = `\n<!-- letopis: {{\"created_at\":2}} -->\n`;\n{close}\n"
         );
         let marked = build_whole_file(&format!("\n{raw}"));
-        // Act
+        // When
         let got = parse_file("a.md", &marked);
         let unmarked = parse(&path, raw.as_bytes());
-        // Assert
+        // Then
         assert_eq!(got.elements.len(), 1, "{open}");
         assert!(
             got.elements[0].search_text.contains("created_at\":2"),
@@ -245,16 +245,16 @@ fn raw_html_content_does_not_declare_metadata() {
 
 #[test]
 fn locates_the_complete_invalid_comment_without_unrelated_prefix_text() {
-    // Arrange: coordinates must retain a multiline comment and omit ordinary prose.
+    // Given: coordinates must retain a multiline comment and omit ordinary prose.
     let path = RepoPath::parse("a.md").unwrap();
     for (prefix, comment) in [
         ("intro ", "<!-- letopis: {\"created_at\":1} -->"),
         ("", "<!-- letopis: {\n\"created_at\":1} -->"),
     ] {
         let text = format!("{prefix}{comment}\n");
-        // Act
+        // When
         let diagnostics = parse(&path, text.as_bytes()).unwrap_err();
-        // Assert
+        // Then
         let diagnostic = diagnostics
             .iter()
             .find(|diagnostic| diagnostic.kind == DiagnosticKind::InvalidMetadata)

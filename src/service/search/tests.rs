@@ -8,16 +8,25 @@ use crate::{
     open_storage,
     service::{
         CacheWrite, CommandErrorKind, ConfigState, DrainOutcome, Embedder, EmbeddingConfig,
-        EmbeddingError, EmbeddingErrorKind, EmbeddingResult, KnowledgeMetadata, NodeMetadata,
-        QueryEmbedding, QueryEmbeddingRequest, Storage, StorageRead, TextMatch, VectorMatch,
-        VectorOutcome, VectorWrite,
+        EmbeddingError, EmbeddingErrorKind, EmbeddingResult, KnowledgeMetadata, MockRefresher,
+        NodeMetadata, QueryEmbedding, QueryEmbeddingRequest, RefreshOutcome, Storage, StorageRead,
+        TextMatch, VectorMatch, VectorOutcome, VectorWrite,
     },
 };
 use std::{collections::BTreeSet, num::NonZeroUsize};
-struct FixedQuery(Option<EmbeddingResult<QueryEmbedding>>);
+mockall::mock! {
+    Query {}
+    impl Embedder for Query {
+        fn read_configuration(&mut self) -> EmbeddingResult<ConfigState>;
+        fn drain(&mut self) -> EmbeddingResult<DrainOutcome>;
+        fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding>;
+        fn embed_query_with_config<'a>(&mut self, request: QueryEmbeddingRequest<'a>) -> EmbeddingResult<QueryEmbedding>;
+    }
+}
 
 #[test]
 fn literal_query_quotes_unicode_tokens_without_fts_operators() {
+    // Given
     for (query, expected) in [
         (
             "SQLite OR блокировки",
@@ -31,11 +40,13 @@ fn literal_query_quotes_unicode_tokens_without_fts_operators() {
         ("", None),
         (" * : () \" ", None),
     ] {
+        // When / Then
         assert_eq!(build_fts_expression(query).as_deref(), expected);
     }
 }
 #[test]
 fn signed_zero_metrics_tie_by_identity_in_both_channels() {
+    // Given / When / Then
     assert_eq!(
         rank_ids(
             &[make_text_match("b.md", -0.0), make_text_match("a.md", 0.0)],
@@ -58,6 +69,7 @@ fn signed_zero_metrics_tie_by_identity_in_both_channels() {
 }
 #[test]
 fn reciprocal_rank_unions_channels_before_limit() {
+    // Given
     let fts = [make_text_match("a.md", -2.0), make_text_match("b.md", -1.0)];
     let vectors = [
         make_vector_match("c.md", 0.0),
@@ -65,11 +77,13 @@ fn reciprocal_rank_unions_channels_before_limit() {
         make_vector_match("a.md", 1.0),
     ];
     for (limit, expected) in [(3, vec!["a.md", "b.md", "c.md"]), (2, vec!["a.md", "b.md"])] {
+        // When / Then
         assert_eq!(rank_ids(&fts, &vectors, limit), expected);
     }
 }
 #[test]
 fn ranking_orders_ties_deduplicates_and_keeps_disjoint_channels() {
+    // Given / When / Then
     assert_eq!(
         rank_ids(
             &[make_text_match("b.md", 0.0), make_text_match("a.md", 0.0)],
@@ -117,11 +131,13 @@ fn ranking_orders_ties_deduplicates_and_keeps_disjoint_channels() {
 }
 #[test]
 fn ranking_rejects_nonfinite_native_metrics() {
+    // Given
     for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         for (fts, vectors) in [
             (vec![make_text_match("a.md", value)], vec![]),
             (vec![], vec![make_vector_match("a.md", value)]),
         ] {
+            // When / Then
             assert_eq!(
                 rank_candidates(&fts, &vectors, &BTreeSet::new(), NonZeroUsize::MIN)
                     .unwrap_err()
@@ -133,12 +149,15 @@ fn ranking_rejects_nonfinite_native_metrics() {
 }
 #[test]
 fn reciprocal_ranks_reward_overlap_before_applying_small_limit() {
+    // Given
     let fts = [make_text_match("z.md", -2.0), make_text_match("a.md", -1.0)];
     let vectors = [
         make_vector_match("y.md", 0.0),
         make_vector_match("a.md", 1.0),
     ];
+    // When / Then
     assert_eq!(rank_ids(&fts, &vectors, 1), ["a.md"]);
+    // Given
     let fts = [
         make_text_match("a.md", -3.0),
         make_text_match("b.md", -2.0),
@@ -149,6 +168,7 @@ fn reciprocal_ranks_reward_overlap_before_applying_small_limit() {
         make_vector_match("b.md", 0.5),
         make_vector_match("c.md", 1.0),
     ];
+    // When / Then
     assert_eq!(
         rank_ids(&fts, &vectors, 4),
         ["a.md", "b.md", "d.md", "c.md"]
@@ -168,6 +188,7 @@ fn reciprocal_ranks_reward_overlap_before_applying_small_limit() {
 }
 #[test]
 fn candidate_metadata_rejects_wrong_rows_and_search_hashes() {
+    // Given
     let root = tempfile::TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -188,6 +209,7 @@ fn candidate_metadata_rejects_wrong_rows_and_search_hashes() {
     let mut read = storage.begin_read().unwrap();
     let mut bad_row = make_text_match("a.md", 0.0);
     bad_row.row_id = row + 1;
+    // When / Then
     assert!(read_candidate_metadata(&mut read, &[bad_row], &[]).is_err());
     assert!(read_candidate_metadata(&mut read, &[], &[make_vector_match("a.md", 0.0)]).is_err());
     assert!(
@@ -197,6 +219,7 @@ fn candidate_metadata_rejects_wrong_rows_and_search_hashes() {
 }
 #[test]
 fn rank_weight_checks_integer_conversion_and_preserves_reciprocals() {
+    // Given / When / Then
     assert_eq!(calculate_rank_weight(NonZeroUsize::MIN).unwrap(), 1.0);
     assert_eq!(
         calculate_rank_weight(NonZeroUsize::new(4).unwrap()).unwrap(),
@@ -211,11 +234,13 @@ fn rank_weight_checks_integer_conversion_and_preserves_reciprocals() {
 }
 #[test]
 fn captured_vector_configuration_requires_matching_identity_and_native_dimensions() {
+    // Given
     let root = tempfile::TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let config = build_config(2);
     let ready = ConfigState::Ready(config.clone());
+    // When / Then
     assert!(
         capture_vector_config(&mut storage.begin_read().unwrap(), &ready)
             .unwrap()
@@ -258,6 +283,7 @@ fn captured_vector_configuration_requires_matching_identity_and_native_dimension
 }
 #[test]
 fn malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed() {
+    // Given
     let root = tempfile::TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -269,7 +295,9 @@ fn malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed() {
         (config.get_identity(), vec![1.0]),
         (config.get_identity(), vec![f32::NAN, 0.0]),
     ] {
-        let mut embeddings = FixedQuery(Some(Ok(QueryEmbedding::Available { identity, vector })));
+        // Given
+        let mut embeddings = build_query(Some(Ok(QueryEmbedding::Available { identity, vector })));
+        // When
         let error = find_vector_candidates(
             &mut read,
             &mut embeddings,
@@ -277,12 +305,15 @@ fn malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed() {
             "query",
         )
         .unwrap_err();
+        // Then
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
         assert_eq!(error.get_message(), "invalid search index data");
     }
-    let mut embeddings = FixedQuery(Some(Err(EmbeddingError::new(
+    // Given
+    let mut embeddings = build_query(Some(Err(EmbeddingError::new(
         EmbeddingErrorKind::InternalError,
     ))));
+    // When / Then
     assert!(
         find_vector_candidates(
             &mut read,
@@ -295,15 +326,17 @@ fn malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed() {
 }
 #[test]
 fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
+    // Given
     let root = tempfile::TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let config = build_config(2);
     let mut read = storage.begin_read().unwrap();
-    let mut embeddings = FixedQuery(Some(Ok(QueryEmbedding::Available {
+    let mut embeddings = build_query(Some(Ok(QueryEmbedding::Available {
         identity: config.get_identity(),
         vector: vec![1.0, 0.0],
     })));
+    // When / Then
     assert!(
         find_vector_candidates(
             &mut read,
@@ -314,7 +347,9 @@ fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
         .unwrap()
         .is_empty()
     );
-    let mut unavailable = FixedQuery(Some(Ok(QueryEmbedding::Unavailable)));
+    // Given
+    let mut unavailable = build_query(Some(Ok(QueryEmbedding::Unavailable)));
+    // When / Then
     assert!(
         find_vector_candidates(
             &mut read,
@@ -325,7 +360,9 @@ fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
         .unwrap()
         .is_empty()
     );
-    let mut unused = FixedQuery(None);
+    // Given
+    let mut unused = build_query(None);
+    // When / Then
     assert!(
         find_vector_candidates(&mut read, &mut unused, None, "query")
             .unwrap()
@@ -333,24 +370,21 @@ fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
     );
 }
 
-impl Embedder for FixedQuery {
-    fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
-        panic!("must use captured configuration")
+fn build_query(result: Option<EmbeddingResult<QueryEmbedding>>) -> MockQuery {
+    let mut query = MockQuery::new();
+    query.expect_read_configuration().times(0);
+    query.expect_drain().times(0);
+    query.expect_embed_query().times(0);
+    if let Some(result) = result {
+        query
+            .expect_embed_query_with_config()
+            .times(1)
+            .withf(|request| request.text == "query" && request.dimensions == NonZeroUsize::new(2))
+            .return_once(move |_| result);
+    } else {
+        query.expect_embed_query_with_config().times(0);
     }
-    fn drain(&mut self) -> EmbeddingResult<DrainOutcome> {
-        panic!("queries do not drain documents")
-    }
-    fn embed_query(&mut self, _: &str) -> EmbeddingResult<QueryEmbedding> {
-        panic!("must use captured query API")
-    }
-    fn embed_query_with_config(
-        &mut self,
-        request: QueryEmbeddingRequest<'_>,
-    ) -> EmbeddingResult<QueryEmbedding> {
-        assert_eq!(request.text, "query");
-        assert_eq!(request.dimensions, NonZeroUsize::new(2));
-        self.0.take().expect("unexpected inference")
-    }
+    query
 }
 fn build_config(dimensions: usize) -> EmbeddingConfig {
     EmbeddingConfig::parse(format!(r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","dimensions":{dimensions}}},"max_retries":0}}"#).as_bytes()).unwrap()
@@ -403,3 +437,18 @@ fn make_vector_match(id: &str, distance: f64) -> VectorMatch {
 mod scoped;
 
 mod filters;
+
+fn build_noop_refresher() -> MockRefresher {
+    let mut refresher = MockRefresher::new();
+    refresher.expect_reindex().times(0);
+    refresher.expect_refresh().returning(|| {
+        Ok(RefreshOutcome {
+            revision: 1,
+            published: false,
+            files_updated: 0,
+            files_removed: 0,
+            invalid_files_updated: 0,
+        })
+    });
+    refresher
+}

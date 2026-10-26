@@ -320,7 +320,7 @@ mod tests {
 
     #[test]
     fn query_request_debug_omits_text_and_provider_parameters() {
-        // Arrange: each private field has an independent recognizable sentinel.
+        // Given: each private field has an independent recognizable sentinel.
         let config = EmbeddingConfig::parse(
             br#"{"provider":"ollama","model":"PRIVATE_MODEL","parameters":{"base_url":"http://PRIVATE_ENDPOINT"},"max_retries":0}"#,
         )
@@ -330,9 +330,9 @@ mod tests {
             config: &config,
             dimensions: NonZeroUsize::new(2),
         };
-        // Act
+        // When
         let diagnostic = format!("{request:?}");
-        // Assert
+        // Then
         for private in ["PRIVATE_QUERY", "PRIVATE_MODEL", "PRIVATE_ENDPOINT"] {
             assert!(!diagnostic.contains(private));
         }

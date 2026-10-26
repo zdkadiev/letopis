@@ -6,11 +6,13 @@ use support::*;
 // Removing locked redetection would let P2 republish the old prepared alpha.
 #[test]
 fn waiting_publisher_redetects_after_agent_edit() -> CheckResult<()> {
+    // Given
     for edit_before_commit in [true, false] {
         let dir = tempfile::tempdir()?;
         let root = dir.path();
         base(root)?;
         fixture(root, "a.md", "amber", &[])?;
+        // When
         let mut p1 = Process::start(root, "publish", "redetected,before_commit")?;
         p1.at("redetected");
         let mut p2 = Process::start(root, "publish", "detected,waiting")?;
@@ -31,6 +33,7 @@ fn waiting_publisher_redetects_after_agent_edit() -> CheckResult<()> {
         p2.resume()?;
         p2.finish()?;
         let conn = cache(root)?;
+        // Then
         assert_nodes(
             &conn,
             root,
@@ -49,10 +52,12 @@ fn waiting_publisher_redetects_after_agent_edit() -> CheckResult<()> {
 
 #[test]
 fn same_delta_is_not_published_twice() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let root = dir.path();
     base(root)?;
     fixture(root, "a.md", "omega", &[])?;
+    // When
     let mut p1 = Process::start(root, "publish", "before_commit")?;
     p1.at("before_commit");
     let mut p2 = Process::start(root, "publish", "detected,waiting")?;
@@ -64,6 +69,7 @@ fn same_delta_is_not_published_twice() -> CheckResult<()> {
     let before = snapshot(&cache(root)?)?;
     p2.resume()?;
     p2.finish()?;
+    // Then
     assert_eq!(snapshot(&cache(root)?)?, before);
     assert_eq!(revision(&cache(root)?)?, 2);
     Ok(())
@@ -71,6 +77,7 @@ fn same_delta_is_not_published_twice() -> CheckResult<()> {
 
 #[test]
 fn killed_lock_owner_does_not_block_next_process() -> CheckResult<()> {
+    // Given
     use std::os::unix::fs::MetadataExt;
     let dir = tempfile::tempdir()?;
     let root = dir.path();
@@ -79,6 +86,7 @@ fn killed_lock_owner_does_not_block_next_process() -> CheckResult<()> {
     let inode = fs::metadata(&lock)?.ino();
     fixture(root, "a.md", "omega", &[])?;
     let disk = corpus(root)?;
+    // When
     let mut p1 = Process::start(root, "publish", "before_commit")?;
     p1.at("before_commit");
     let mut p2 = Process::start(root, "publish", "detected,waiting")?;
@@ -88,6 +96,7 @@ fn killed_lock_owner_does_not_block_next_process() -> CheckResult<()> {
     p1.kill()?;
     p2.resume()?;
     p2.finish()?;
+    // Then
     assert_eq!(matches(&cache(root)?, "omega")?, ["a.md"]);
     assert_eq!(revision(&cache(root)?)?, 2);
     assert_eq!(fs::metadata(&lock)?.ino(), inode);
@@ -97,10 +106,12 @@ fn killed_lock_owner_does_not_block_next_process() -> CheckResult<()> {
 
 #[test]
 fn reindex_serializes_with_publish() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let root = dir.path();
     base(root)?;
     fixture(root, "b.md", "bravo", &[])?;
+    // When
     let mut reindex = Process::start(root, "reindex", "before_commit")?;
     reindex.at("before_commit");
     fixture(root, "a.md", "omega", &[])?;
@@ -113,6 +124,7 @@ fn reindex_serializes_with_publish() -> CheckResult<()> {
     reindex.finish()?;
     p.resume()?;
     p.finish()?;
+    // Then
     assert_nodes(
         &cache(root)?,
         root,
@@ -128,6 +140,7 @@ fn reindex_serializes_with_publish() -> CheckResult<()> {
 
 #[test]
 fn competing_config_resets_recheck_identity() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let root = dir.path();
     base(root)?;
@@ -138,12 +151,14 @@ fn competing_config_resets_recheck_identity() -> CheckResult<()> {
     // Reset is independent of index.lock, even when another owner holds it.
     let index = fs::File::open(root.join(".letopis/index.lock"))?;
     index.lock()?;
+    // When
     let mut p1 = Process::start(root, "reset", "reset_before_commit")?;
     p1.at("reset_before_commit");
     let mut p2 = Process::start(root, "reset", "reset_detected")?;
     p2.at("reset_detected");
     p1.resume()?;
     p1.finish()?;
+    // Then
     assert_reset(root)?;
     let conn = open(&root.join(".letopis/vectors.db"))?;
     conn.execute_batch(
@@ -162,11 +177,13 @@ fn competing_config_resets_recheck_identity() -> CheckResult<()> {
 
 #[test]
 fn config_formatting_does_not_reset_vectors() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let root = dir.path();
     base(root)?;
     seed_vectors(root)?;
     config_fixture(root, "new")?;
+    // When
     Process::start(root, "reset", "")?.finish()?;
     let conn = open(&root.join(".letopis/vectors.db"))?;
     conn.execute_batch("INSERT INTO vector_keys VALUES(77,'sentinel');INSERT INTO vector_index(rowid,vector) VALUES(77,vec1_from_json('[0,1]'));")?;
@@ -176,6 +193,7 @@ fn config_formatting_does_not_reset_vectors() -> CheckResult<()> {
     fs::write(path, serde_json::to_string_pretty(&json)?)?;
     let disk = corpus(root)?;
     Process::start(root, "reset", "")?.finish()?;
+    // Then
     assert_eq!(vector_snapshot(root)?, before);
     assert_eq!(corpus(root)?, disk);
     Ok(())

@@ -173,6 +173,7 @@ mod tests {
 
     #[test]
     fn cache_and_vector_versions_are_independent() {
+        // Given / When / Then: initialize each schema and check its version.
         for (bootstrap, version) in [
             (
                 bootstrap_cache as fn(&mut Connection) -> StorageResult<()>,
@@ -194,12 +195,12 @@ mod tests {
     #[test]
     fn existing_schemas_validate_on_query_only_connections() {
         for bootstrap in [bootstrap_cache, bootstrap_vectors] {
-            // Arrange a recognized schema on a connection that forbids writes.
+            // Given a recognized schema on a connection that forbids writes.
             let root = TempDir::new().unwrap();
             let mut connection = open_database(&root.path().join("database")).unwrap();
             bootstrap(&mut connection).unwrap();
             connection.pragma_update(None, "query_only", true).unwrap();
-            // Act and assert: validation needs no SQLite write transaction.
+            // When / Then: validation needs no SQLite write transaction.
             bootstrap(&mut connection).unwrap();
         }
     }
@@ -209,7 +210,7 @@ mod tests {
             (CACHE_SCHEMA, CACHE_SCHEMA_VERSION),
             (VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION),
         ] {
-            // Arrange a first initializer holding an uncommitted real schema.
+            // Given a first initializer holding an uncommitted real schema.
             let root = TempDir::new().unwrap();
             let path = root.path().join("database");
             let mut owner = open_database(&path).unwrap();
@@ -230,11 +231,11 @@ mod tests {
                 })));
                 bootstrap_schema(&mut waiter, sql, version)
             });
-            // Act: the waiter has observed no schema, then failed to take ownership.
+            // When: the waiter has observed no schema, then failed to take ownership.
             observed.recv_timeout(Duration::from_secs(20)).unwrap();
             transaction.commit().unwrap();
             release.send(()).unwrap();
-            // Assert: rechecking accepts the owner's schema instead of replaying DDL.
+            // Then: rechecking accepts the owner's schema instead of replaying DDL.
             worker.join().unwrap().unwrap();
             assert_eq!(
                 owner
@@ -247,7 +248,7 @@ mod tests {
 
     #[test]
     fn waiting_initializer_rejects_incompatible_schema_committed_by_owner() {
-        // Arrange a virgin schema while another owner holds the initialization write.
+        // Given a virgin schema while another owner holds the initialization write.
         let root = TempDir::new().unwrap();
         let path = root.path().join("database");
         let mut owner = open_database(&path).unwrap();
@@ -267,11 +268,11 @@ mod tests {
             })));
             bootstrap_cache(&mut waiter)
         });
-        // Act: the competing initializer commits an unsupported schema.
+        // When: the competing initializer commits an unsupported schema.
         observed.recv_timeout(Duration::from_secs(20)).unwrap();
         transaction.commit().unwrap();
         release.send(()).unwrap();
-        // Assert rejection, with no partial cache creation or version rewrite.
+        // Then rejection, with no partial cache creation or version rewrite.
         assert!(worker.join().unwrap().is_err());
         assert_eq!(
             owner
@@ -300,7 +301,7 @@ mod tests {
             );
             return;
         }
-        // Arrange a missing schema whose write ownership cannot be acquired yet.
+        // Given a missing schema whose write ownership cannot be acquired yet.
         let root = TempDir::new().unwrap();
         let path = root.path().join("database");
         let mut owner = open_database(&path).unwrap();
@@ -308,10 +309,10 @@ mod tests {
         let transaction = owner
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .unwrap();
-        // Act: hold ownership throughout the bounded initialization wait.
+        // When: hold ownership throughout the bounded initialization wait.
         let started = Instant::now();
         let error = bootstrap_cache(&mut waiter).unwrap_err();
-        // Assert a safe contention error, no partial schema, and a successful retry.
+        // Then a safe contention error, no partial schema, and a successful retry.
         assert!(started.elapsed() >= Duration::from_secs(5));
         assert_eq!(
             std::error::Error::source(&error)
@@ -338,7 +339,7 @@ mod tests {
     }
     #[test]
     fn old_cache_rejection_preserves_populated_vectors_config_and_locks() {
-        // Arrange closed populated databases and independent configuration/lock identities.
+        // Given closed populated databases and independent configuration/lock identities.
         let root = TempDir::new().unwrap();
         let cache = root.path().join("cache.db");
         let vectors = root.path().join("vectors.db");
@@ -382,9 +383,9 @@ mod tests {
             .iter()
             .map(|name| capture_file(&root.path().join(name)))
             .collect();
-        // Act: cache incompatibility is detected before the vector database is opened.
+        // When: cache incompatibility is detected before the vector database is opened.
         let error = SqliteStorage::open(&cache, &vectors).unwrap_err();
-        // Assert exact content and inode identity, including populated native vector state.
+        // Then exact content and inode identity, including populated native vector state.
         assert_eq!(error.get_message(), "incompatible storage database schema");
         for (name, expected) in files.iter().zip(before) {
             assert_eq!(capture_file(&root.path().join(name)), expected, "{name}");

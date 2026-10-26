@@ -13,7 +13,7 @@ use tempfile::TempDir;
 
 #[test]
 fn cursor_orders_shared_hashes_and_excludes_sources_and_stored_hashes() {
-    // Arrange: reverse insertion order and shared text with two representatives.
+    // Given: reverse insertion order and shared text with two representatives.
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
@@ -27,10 +27,10 @@ fn cursor_orders_shared_hashes_and_excludes_sources_and_stored_hashes() {
         .unwrap();
     unit.commit().unwrap();
     store(&mut storage, &identity, "stored", 3);
-    // Act
+    // When
     let first = read_next_work(&mut storage, &identity, 4, None).unwrap();
     let second = read_next_work(&mut storage, &identity, 4, Some(&first.id)).unwrap();
-    // Assert: skipping a stale representative can advance to its valid sibling.
+    // Then: skipping a stale representative can advance to its valid sibling.
     assert_eq!(first.id.as_str(), "a.md");
     assert_eq!(second.id.as_str(), "b.md");
     assert_eq!(first.search_hash, second.search_hash);
@@ -44,7 +44,7 @@ fn cursor_orders_shared_hashes_and_excludes_sources_and_stored_hashes() {
 
 #[test]
 fn absent_and_null_error_rows_remain_eligible_until_four_attempts() {
-    // Arrange: max_retries=3 means a total budget of four reservations.
+    // Given: max_retries=3 means a total budget of four reservations.
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
@@ -52,12 +52,14 @@ fn absent_and_null_error_rows_remain_eligible_until_four_attempts() {
     storage.reset_vectors(None, &identity).unwrap();
     publish(&mut storage, &[("a.md", "shared"), ("b.md", "shared")]);
     for attempts in 1..=4 {
+        // When / Then
         assert!(read_next_work(&mut storage, &identity, 4, None).is_some());
-        // Act: reserve without a failure message, including the crash window.
+        // When: reserve without a failure message, including the crash window.
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        // Then
         assert!(unit.reserve_attempt(&hash, 4).unwrap());
         unit.commit().unwrap();
-        // Assert
+        // Then
         let failure = unwrap_current(
             storage
                 .begin_read()
@@ -69,6 +71,7 @@ fn absent_and_null_error_rows_remain_eligible_until_four_attempts() {
         assert_eq!(failure.attempts, attempts);
         assert_eq!(failure.error, None);
     }
+    // When / Then
     assert_eq!(read_next_work(&mut storage, &identity, 4, None), None);
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     assert!(!unit.reserve_attempt(&hash, 4).unwrap());
@@ -77,7 +80,7 @@ fn absent_and_null_error_rows_remain_eligible_until_four_attempts() {
 
 #[test]
 fn work_and_dimensions_use_the_pinned_identity_and_membership() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut first = open(&root);
     let mut second = open(&root);
@@ -87,11 +90,11 @@ fn work_and_dimensions_use_the_pinned_identity_and_membership() {
     publish(&mut first, &[("a.md", "pending")]);
     store(&mut first, &m1, "orphan", 3);
     let mut pinned = first.begin_read().unwrap();
-    // Act: change both databases after the read view was captured.
+    // When: change both databases after the read view was captured.
     second.reset_vectors(Some(&m1), &m2).unwrap();
     store(&mut second, &m2, "pending", 4);
     publish(&mut second, &[("a.md", "changed")]);
-    // Assert
+    // Then
     assert_eq!(
         unwrap_current(pinned.read_vector_dimensions(&m1).unwrap())
             .unwrap()
@@ -127,17 +130,17 @@ fn work_and_dimensions_use_the_pinned_identity_and_membership() {
 
 #[test]
 fn last_vector_cleanup_preserves_dimension_across_reopen() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
     storage.reset_vectors(None, &identity).unwrap();
     store(&mut storage, &identity, "orphan", 3);
-    // Act
+    // When
     prune(&mut storage, &identity);
     drop(storage);
     let mut storage = open(&root);
-    // Assert
+    // Then
     assert_eq!(count_keys(&root), 0);
     assert_eq!(read_size(&mut storage, &identity), Some(3));
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
@@ -152,17 +155,19 @@ fn last_vector_cleanup_preserves_dimension_across_reopen() {
 
 #[test]
 fn first_committed_dimension_wins_between_competing_connections() {
-    // Arrange: both connections observed an uninitialized dimension.
+    // Given: both connections observed an uninitialized dimension.
     let root = TempDir::new().unwrap();
     let mut first = open(&root);
     let mut second = open(&root);
     let identity = Sha256::digest(b"model");
     first.reset_vectors(None, &identity).unwrap();
+    // When / Then
     assert_eq!(read_size(&mut first, &identity), None);
     assert_eq!(read_size(&mut second, &identity), None);
-    // Act: hold the first write while the other tries to enter.
+    // When: hold the first write while the other tries to enter.
     let mut winner = unwrap_current(first.begin_vector_write(&identity).unwrap());
     winner.store_vector(&identity, &[1.0; 3], 3).unwrap();
+    // Then
     assert!(second.begin_vector_write(&identity).is_err());
     winner.commit().unwrap();
     let before = read_native_state(&root);
@@ -172,7 +177,7 @@ fn first_committed_dimension_wins_between_competing_connections() {
         .unwrap_err();
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
     assert!(loser.commit().is_err());
-    // Assert
+    // Then
     assert_eq!(read_native_state(&root), before);
     assert_eq!(count_keys(&root), 1);
     assert_eq!(read_size(&mut second, &identity), Some(3));
@@ -190,16 +195,16 @@ fn first_committed_dimension_wins_between_competing_connections() {
 
 #[test]
 fn rollback_of_first_insertion_does_not_pin_dimensions() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
     storage.reset_vectors(None, &identity).unwrap();
-    // Act
+    // When
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     unit.store_vector(&identity, &[1.0; 3], 3).unwrap();
     drop(unit);
-    // Assert, including reuse of the same native connection after rollback.
+    // Then, including reuse of the same native connection after rollback.
     assert_eq!(count_keys(&root), 0);
     assert_eq!(read_size(&mut storage, &identity), None);
     store(&mut storage, &identity, "different", 4);
@@ -208,7 +213,7 @@ fn rollback_of_first_insertion_does_not_pin_dimensions() {
 
 #[test]
 fn cleanup_retains_referenced_hashes_and_diagnostics_without_cache_publication() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
@@ -227,9 +232,9 @@ fn cleanup_retains_referenced_hashes_and_diagnostics_without_cache_publication()
     }
     unit.set_query_error(17, "query failure").unwrap();
     unit.commit().unwrap();
-    // Act
+    // When
     prune(&mut storage, &identity);
-    // Assert
+    // Then
     assert_eq!(store(&mut storage, &identity, "shared", 3), key);
     let mut read = storage.begin_read().unwrap();
     assert_eq!(read.get_revision(), revision_before);
@@ -253,7 +258,7 @@ fn cleanup_retains_referenced_hashes_and_diagnostics_without_cache_publication()
 
 #[test]
 fn cleanup_uses_a_pinned_cache_observation_and_new_publication_is_recomputable() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut first = open(&root);
     let mut second = open(&root);
@@ -263,14 +268,14 @@ fn cleanup_uses_a_pinned_cache_observation_and_new_publication_is_recomputable()
     store(&mut first, &identity, "keep", 3);
     let mut cleanup = unwrap_current(first.begin_vector_write(&identity).unwrap());
     cleanup.prune_unreferenced().unwrap(); // Pins cache membership.
-    // Act: publish a new hash, then put its vector into the older cleanup view.
+    // When: publish a new hash, then put its vector into the older cleanup view.
     publish(&mut second, &[("b.md", "late")]);
     cleanup
         .store_vector(&Sha256::digest(b"late"), &[1.0; 3], 3)
         .unwrap();
     cleanup.prune_unreferenced().unwrap();
     cleanup.commit().unwrap();
-    // Assert: only derived work is missing; the knowledge survives for recompute.
+    // Then: only derived work is missing; the knowledge survives for recompute.
     let work = read_next_work(&mut second, &identity, 4, None).unwrap();
     assert_eq!(work.id.as_str(), "b.md");
     assert_eq!(work.search_hash, Sha256::digest(b"late"));
@@ -279,7 +284,7 @@ fn cleanup_uses_a_pinned_cache_observation_and_new_publication_is_recomputable()
 
 #[test]
 fn late_old_identity_cannot_cleanup_current_vectors_or_query_error() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let old = Sha256::digest(b"old");
@@ -291,12 +296,12 @@ fn late_old_identity_cannot_cleanup_current_vectors_or_query_error() {
     let mut unit = unwrap_current(storage.begin_vector_write(&current).unwrap());
     unit.set_query_error(9, "current failure").unwrap();
     unit.commit().unwrap();
-    // Act
+    // When / Then
     assert!(matches!(
         storage.begin_vector_write(&old).unwrap(),
         VectorOutcome::ConfigChanged
     ));
-    // Assert
+    // Then
     let mut read = storage.begin_read().unwrap();
     assert!(unwrap_current(read.read_vector(&current, &current).unwrap()).is_some());
     assert_eq!(
@@ -307,7 +312,7 @@ fn late_old_identity_cannot_cleanup_current_vectors_or_query_error() {
 
 #[test]
 fn deleting_one_shared_representative_retains_the_shared_vector() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
@@ -318,16 +323,16 @@ fn deleting_one_shared_representative_retains_the_shared_vector() {
     unit.delete_node(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
         .unwrap();
     unit.commit().unwrap();
-    // Act
+    // When
     prune(&mut storage, &identity);
-    // Assert
+    // Then
     assert_eq!(count_keys(&root), 1);
     assert_eq!(store(&mut storage, &identity, "shared", 3), key);
 }
 
 #[test]
 fn reset_rollback_restores_native_dimensions_and_commit_releases_them() {
-    // Arrange: a late failure after reset has recreated the native table.
+    // Given: a late failure after reset has recreated the native table.
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let old = Sha256::digest(b"old");
@@ -341,10 +346,10 @@ fn reset_rollback_restores_native_dimensions_and_commit_releases_them() {
         BEGIN SELECT RAISE(ABORT, 'test reset failure'); END;",
     )
     .unwrap();
-    // Act
+    // When / Then
     assert!(storage.reset_vectors(Some(&old), &new).is_err());
     db.execute_batch("DROP TRIGGER reject_reset;").unwrap();
-    // Assert: all key/data/metadata bytes and schema are restored.
+    // Then: all key/data/metadata bytes and schema are restored.
     assert_eq!(read_native_state(&root), before);
     assert_eq!(read_size(&mut storage, &old), Some(3));
     assert_eq!(
@@ -352,7 +357,8 @@ fn reset_rollback_restores_native_dimensions_and_commit_releases_them() {
         VectorOutcome::Current(false)
     );
     assert_eq!(read_size(&mut storage, &old), Some(3));
-    // Act: commit the reset and establish a different first dimension.
+    // When: commit the reset and establish a different first dimension.
+    // Then
     assert_eq!(
         storage.reset_vectors(Some(&old), &new).unwrap(),
         VectorOutcome::Current(true)
@@ -365,18 +371,18 @@ fn reset_rollback_restores_native_dimensions_and_commit_releases_them() {
 #[test]
 fn unsupported_native_dimensions_poison_the_unit_without_keys() {
     for size in [1, 4097] {
-        // Arrange
+        // Given
         let root = TempDir::new().unwrap();
         let mut storage = open(&root);
         let identity = Sha256::digest(b"model");
         storage.reset_vectors(None, &identity).unwrap();
         let before = read_native_state(&root);
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
-        // Act
+        // When
         let error = unit
             .store_vector(&identity, &vec![1.0; size], size)
             .unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
         assert!(unit.commit().is_err());
         assert_eq!(read_native_state(&root), before);
@@ -386,7 +392,7 @@ fn unsupported_native_dimensions_poison_the_unit_without_keys() {
 
 #[test]
 fn nullable_failure_hash_does_not_hide_unrelated_work() {
-    // Arrange: SQLite rowid-table TEXT PRIMARY KEY permits a legacy NULL key.
+    // Given: SQLite rowid-table TEXT PRIMARY KEY permits a legacy NULL key.
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
@@ -399,26 +405,27 @@ fn nullable_failure_hash_does_not_hide_unrelated_work() {
         [],
     )
     .unwrap();
-    // Act
+    // When
     let work = read_next_work(&mut storage, &identity, 4, None).unwrap();
-    // Assert: a NOT IN anti-join would wrongly suppress every candidate.
+    // Then: a NOT IN anti-join would wrongly suppress every candidate.
     assert_eq!(work.id.as_str(), "a.md");
 }
 
 #[test]
 fn invalid_attempt_budgets_are_rejected_without_changing_storage() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
     storage.reset_vectors(None, &identity).unwrap();
     publish(&mut storage, &[("a.md", "pending")]);
-    // Act and assert
     let mut read = storage.begin_read().unwrap();
     for budget in [0, u64::MAX] {
+        // When
         let error = read
             .read_next_embedding_work(&identity, budget, None)
             .unwrap_err();
+        // Then
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
     }
     assert_eq!(read.get_revision(), 1);
@@ -426,7 +433,7 @@ fn invalid_attempt_budgets_are_rejected_without_changing_storage() {
 
 #[test]
 fn abandoned_cleanup_restores_vectors_failures_and_dimensions() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
@@ -436,11 +443,11 @@ fn abandoned_cleanup_restores_vectors_failures_and_dimensions() {
     unit.reserve_attempt(&identity, 4).unwrap();
     unit.commit().unwrap();
     let before = read_native_state(&root);
-    // Act
+    // When
     let mut cleanup = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     cleanup.prune_unreferenced().unwrap();
     drop(cleanup);
-    // Assert
+    // Then
     assert_eq!(read_native_state(&root), before);
     assert_eq!(read_size(&mut storage, &identity), Some(3));
     let mut read = storage.begin_read().unwrap();

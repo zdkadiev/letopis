@@ -11,7 +11,7 @@ use support::{documents::build_whole, git::isolate_command, reading::ReadingRepo
 
 #[test]
 fn check_tracks_file_and_directory_rename_without_touching_sources() {
-    // Arrange: the target is tracked, while the source keeps its original literal link.
+    // Given: the target is tracked, while the source keeps its original literal link.
     let repo = ReadingRepo::new();
     let source = build_whole(7, "[target](knowledge/old.md \"letopis:type=supports\")");
     repo.write("source.md", source.as_bytes());
@@ -22,7 +22,7 @@ fn check_tracks_file_and_directory_rename_without_touching_sources() {
     track_target(&repo, "knowledge/old.md");
     assert_eq!(check_preserving_source(&repo, &source), build_clean());
 
-    // Act / Assert: a file rename changes the ID without rewriting the declaration.
+    // When / Then: a file rename changes the ID without rewriting the declaration.
     rename_path(&repo, "knowledge/old.md", "knowledge/new.md");
     assert_eq!(
         check_preserving_source(&repo, &source),
@@ -34,7 +34,7 @@ fn check_tracks_file_and_directory_rename_without_touching_sources() {
     rename_path(&repo, "knowledge/new.md", "knowledge/old.md");
     assert_eq!(check_preserving_source(&repo, &source), build_clean());
 
-    // Act / Assert: deletion and restoration use the still-tracked missing path.
+    // When / Then: deletion and restoration use the still-tracked missing path.
     fs::remove_file(repo.get_root().join("knowledge/old.md")).unwrap();
     assert_eq!(
         check_preserving_source(&repo, &source),
@@ -47,7 +47,7 @@ fn check_tracks_file_and_directory_rename_without_touching_sources() {
     );
     assert_eq!(check_preserving_source(&repo, &source), build_clean());
 
-    // Act / Assert: moving a containing directory has the same literal-ID semantics.
+    // When / Then: moving a containing directory has the same literal-ID semantics.
     rename_path(&repo, "knowledge", "renamed");
     assert_eq!(
         check_preserving_source(&repo, &source),
@@ -66,13 +66,18 @@ fn check_tracks_file_and_directory_rename_without_touching_sources() {
 
 #[test]
 fn check_tracks_anchor_rename_removal_and_repair() {
+    // Given
     let repo = ReadingRepo::new();
     let source = build_whole(7, "[target](target.md#old \"letopis:type=supports\")");
     repo.write("source.md", source.as_bytes());
+    // Given
     repo.write("target.md", build_section("old").as_bytes());
+    // When / Then
     assert_eq!(check_preserving_source(&repo, &source), build_clean());
 
+    // Given
     repo.write("target.md", build_section("new").as_bytes());
+    // When / Then
     assert_eq!(
         check_preserving_source(&repo, &source),
         build_dangling("target.md#old")
@@ -82,26 +87,34 @@ fn check_tracks_anchor_rename_removal_and_repair() {
         42
     );
     assert!(read_knowledge(&repo, "target.md#old").is_none());
+    // Given
     repo.write("target.md", b"Ordinary Markdown without an element\n");
+    // When / Then
     assert_eq!(
         check_preserving_source(&repo, &source),
         build_dangling("target.md#old")
     );
     assert!(read_knowledge(&repo, "target.md#new").is_none());
+    // Given
     repo.write("target.md", build_section("old").as_bytes());
+    // When / Then
     assert_eq!(check_preserving_source(&repo, &source), build_clean());
     assert_eq!(
         read_knowledge(&repo, "target.md#old").unwrap().created_at,
         42
     );
 
+    // Given
     repo.write("target.md", build_section("new").as_bytes());
+    // When / Then
     assert_eq!(
         check_preserving_source(&repo, &source),
         build_dangling("target.md#old")
     );
     let repaired = build_whole(7, "[target](target.md#new \"letopis:type=supports\")");
+    // Given
     repo.write("source.md", repaired.as_bytes());
+    // When / Then
     assert_eq!(check_preserving_source(&repo, &repaired), build_clean());
     assert_eq!(
         read_knowledge(&repo, "target.md#new").unwrap().created_at,
@@ -111,11 +124,13 @@ fn check_tracks_anchor_rename_removal_and_repair() {
 
 #[test]
 fn check_keeps_last_valid_projection_while_reporting_current_file_error() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write(
         "retained.md",
         build_whole(42, "RetainedOriginal").as_bytes(),
     );
+    // When / Then
     assert_eq!(check(&repo), build_clean());
     let original = read_knowledge(&repo, "retained.md").unwrap();
     repo.write("retained.md", b"<!-- letopis: broken PRIVATE_BODY -->\n");
@@ -146,9 +161,11 @@ fn check_keeps_last_valid_projection_while_reporting_current_file_error() {
 
 #[test]
 fn concurrent_check_publishes_edits_from_both_writers() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write("a.md", build_whole(42, "BeforeA").as_bytes());
     repo.write("b.md", build_whole(73, "BeforeB").as_bytes());
+    // When / Then
     assert_eq!(check(&repo), build_clean());
     let barrier = Barrier::new(2);
 
@@ -189,6 +206,7 @@ fn concurrent_check_publishes_edits_from_both_writers() {
 
 #[test]
 fn repeated_check_preserves_corpus_and_revision() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write(
         "source.md",
@@ -197,7 +215,9 @@ fn repeated_check_preserves_corpus_and_revision() {
     repo.write("ordinary.md", b"Unmarked Markdown\n");
     let before =
         ["source.md", "ordinary.md"].map(|path| fs::read(repo.get_root().join(path)).unwrap());
+    // When
     let first = check(&repo);
+    // Then
     assert_eq!(first, build_dangling("missing.md"));
     let mut storage = repo.open_storage();
     let revision = storage.begin_read().unwrap().get_revision();

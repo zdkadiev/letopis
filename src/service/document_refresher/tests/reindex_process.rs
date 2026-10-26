@@ -6,18 +6,18 @@ use std::{fs, os::unix::process::ExitStatusExt};
 #[test]
 fn reindex_sigint_preserves_exact_old_or_complete_new_state() {
     for cut in ["locked", "begun", "fts", "before_commit", "after_commit"] {
-        // Arrange: the actual child pauses at an acknowledged operation boundary.
+        // Given: the actual child pauses at an acknowledged operation boundary.
         let fixture = Fixture::new();
         fixture.edit(NEW);
         let expected = fixture.build_expected(NEW, "BravoToken");
         let mut worker = Worker::spawn(fixture.root.path(), "reindex");
         worker.reach(cut);
-        // Act.
+        // When.
         let pid =
             rustix::process::Pid::from_raw(i32::try_from(worker.child.id()).unwrap()).unwrap();
         rustix::process::kill_process(pid, rustix::process::Signal::INT).unwrap();
         let status = worker.wait_exit();
-        // Assert: signal death is distinct from TK-29 handled JSON cancellation.
+        // Then: signal death is distinct from TK-29 handled JSON cancellation.
         assert_eq!(status.signal(), Some(2));
         assert_eq!(
             read_state(fixture.root.path()),
@@ -36,7 +36,7 @@ fn reindex_sigint_preserves_exact_old_or_complete_new_state() {
 
 #[test]
 fn reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view() {
-    // Arrange.
+    // Given.
     let fixture = Fixture::new();
     fixture.edit(NEW);
     let expected = fixture.build_expected(NEW, "BravoToken");
@@ -48,10 +48,10 @@ fn reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view() {
     let mut worker = Worker::spawn(fixture.root.path(), "reindex");
     worker.reach("before_commit");
     assert_eq!(read_state(fixture.root.path()), fixture.old);
-    // Act.
+    // When.
     worker.resume();
     worker.finish();
-    // Assert.
+    // Then.
     assert_eq!(pinned.get_revision(), 1);
     assert_eq!(pinned.list_nodes().unwrap(), fixture.old.nodes);
     assert_eq!(pinned.list_edges(None).unwrap(), fixture.old.edges);
@@ -62,7 +62,7 @@ fn reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view() {
 
 #[test]
 fn publisher_waits_for_reindex_and_redetects_latest_file_bytes() {
-    // Arrange: reindex finishes capturing the old bytes before the next edit.
+    // Given: reindex finishes capturing the old bytes before the next edit.
     let fixture = Fixture::new();
     fixture.edit(NEW);
     let mut owner = Worker::spawn(fixture.root.path(), "reindex");
@@ -72,24 +72,24 @@ fn publisher_waits_for_reindex_and_redetects_latest_file_bytes() {
     fs::write(fixture.root.path().join("a.md"), LATEST).unwrap();
     let mut expected = fixture.build_expected(LATEST, "CharlieToken");
     expected.revision = 3;
-    // Act.
+    // When.
     owner.resume();
     owner.finish();
     waiter.resume();
     waiter.finish();
-    // Assert.
+    // Then.
     assert_eq!(read_state(fixture.root.path()), expected);
     fixture.assert_preserved(LATEST);
 }
 
 #[test]
 fn reindex_late_sql_error_rolls_back_all_state_and_releases_lock() {
-    // Arrange.
+    // Given.
     let fixture = Fixture::new();
     fixture.edit(NEW);
-    // Act.
+    // When.
     Worker::spawn(fixture.root.path(), "reindex-fail").finish();
-    // Assert.
+    // Then.
     assert_eq!(read_state(fixture.root.path()), fixture.old);
     fixture.assert_preserved(NEW);
     Worker::spawn(fixture.root.path(), "reindex").finish();

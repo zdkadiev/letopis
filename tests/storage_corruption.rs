@@ -30,8 +30,10 @@ enum DatabaseDamage {
 
 #[test]
 fn nonempty_corrupt_databases_are_rejected_without_reinitialization() {
+    // Given
     for target in [CACHE_DATABASE, VECTOR_DATABASE] {
         for damage in [DatabaseDamage::InvalidHeader, DatabaseDamage::Truncated] {
+            // When / Then
             assert_damage_is_rejected(target, damage);
         }
     }
@@ -39,11 +41,13 @@ fn nonempty_corrupt_databases_are_rejected_without_reinitialization() {
 
 #[test]
 fn incompatible_existing_schemas_are_never_repaired_implicitly() {
+    // Given
     for target in [CACHE_DATABASE, VECTOR_DATABASE] {
         for damage in [
             DatabaseDamage::UnsupportedVersion,
             DatabaseDamage::PartialSchema,
         ] {
+            // When / Then
             assert_damage_is_rejected(target, damage);
         }
     }
@@ -51,6 +55,7 @@ fn incompatible_existing_schemas_are_never_repaired_implicitly() {
 
 #[test]
 fn missing_and_zero_length_cache_are_unpublished() {
+    // Given
     for create_empty_file in [false, true] {
         let root = create_private_directory();
         let cache = root.path().join(CACHE_DATABASE);
@@ -61,12 +66,14 @@ fn missing_and_zero_length_cache_are_unpublished() {
 
         let mut storage = open_storage(&cache, &vectors).unwrap();
 
+        // When / Then
         assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
     }
 }
 
 #[test]
 fn missing_and_zero_length_vectors_preserve_published_cache() {
+    // Given
     for create_empty_file in [false, true] {
         let root = create_private_directory();
         let cache = root.path().join(CACHE_DATABASE);
@@ -80,6 +87,7 @@ fn missing_and_zero_length_vectors_preserve_published_cache() {
         let mut storage = open_storage(&cache, &vectors).unwrap();
         let mut view = storage.begin_read().unwrap();
 
+        // When / Then
         assert_eq!(view.get_revision(), 1);
         assert_eq!(view.get_config_identity(), None);
         let matches = view.match_text("searchable").unwrap();
@@ -90,12 +98,14 @@ fn missing_and_zero_length_vectors_preserve_published_cache() {
 
 #[test]
 fn recreated_empty_cache_preserves_healthy_vectors() {
+    // Given
     let root = create_private_directory();
     let cache = root.path().join(CACHE_DATABASE);
     let vectors = root.path().join(VECTOR_DATABASE);
     let canonical = root.path().join("known.md");
     fs::write(&canonical, CANONICAL_TEXT).unwrap();
     let (identity, search_hash) = seed_vector(&cache, &vectors);
+    // When / Then
     assert_healthy(&cache, &vectors, &identity, &search_hash);
     remove_database(&cache);
 

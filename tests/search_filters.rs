@@ -10,6 +10,7 @@ use support::{
 
 #[test]
 fn empty_and_duplicate_selectors_preserve_literal_ids() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write("code.rs", b"old\n");
     let basis = create_basis(repo.get_root(), &[("code.rs", b"old\n")]);
@@ -17,7 +18,9 @@ fn empty_and_duplicate_selectors_preserve_literal_ids() {
     write_note(&repo, "b.md", None, &[]);
     // Each note has one query token; only a.md has an extra visible source label.
     // BM25 length normalization therefore orders the shorter b.md first.
+    // When / Then
     for filters in [json!({}), json!({"sources":[],"source_revisions":[]})] {
+        // When / Then
         assert_eq!(search_ids(&repo, &filters), ["b.md", "a.md"]);
     }
     assert_eq!(
@@ -30,12 +33,14 @@ fn empty_and_duplicate_selectors_preserve_literal_ids() {
         json!({"sources":["unknown.rs","code.rs"]}),
         json!({"source_revisions":[basis.as_str(),basis.as_str()]}),
     ] {
+        // When / Then
         assert_eq!(search_ids(&repo, &filters), ["a.md"]);
     }
 }
 
 #[test]
 fn sources_use_exact_normalized_addresses_and_opaque_urls() {
+    // Given
     let repo = ReadingRepo::new();
     write_note(&repo, "range.md", None, &["code.rs#L1-L1"]);
     write_note(
@@ -44,6 +49,7 @@ fn sources_use_exact_normalized_addresses_and_opaque_urls() {
         None,
         &["https://example.invalid/a?q=one#frag"],
     );
+    // When / Then
     for (source, expected) in [
         ("./src/../code.rs#L1-L1", vec!["range.md"]),
         ("code.rs", vec![]),
@@ -52,6 +58,7 @@ fn sources_use_exact_normalized_addresses_and_opaque_urls() {
         ("https://example.invalid/a?q=one#other", vec![]),
         ("unknown.rs", vec![]),
     ] {
+        // When / Then
         assert_eq!(
             search_ids(&repo, &json!({"sources":[source]})),
             expected,
@@ -62,6 +69,7 @@ fn sources_use_exact_normalized_addresses_and_opaque_urls() {
 
 #[test]
 fn source_and_revision_require_one_binding_and_fields_combine_with_and() {
+    // Given
     let repo = ReadingRepo::new();
     let basis = create_basis(repo.get_root(), &[("a.rs", b"a\n"), ("b.rs", b"b\n")]);
     let other = create_basis(repo.get_root(), &[("a.rs", b"changed\n"), ("b.rs", b"b\n")]);
@@ -69,6 +77,7 @@ fn source_and_revision_require_one_binding_and_fields_combine_with_and() {
     repo.write("b.rs", b"b\n");
     write_note(&repo, "both.md", Some(&basis), &["a.rs", "b.rs"]);
     write_note(&repo, "none.md", None, &[]);
+    // When / Then
     assert_eq!(
         search_ids(
             &repo,
@@ -105,6 +114,7 @@ fn source_and_revision_require_one_binding_and_fields_combine_with_and() {
 
 #[test]
 fn revision_equality_uses_per_note_basis_and_complete_selected_bytes() {
+    // Given
     let repo = ReadingRepo::new();
     let basis = create_basis(repo.get_root(), &[("code.rs", b"first\nselected\n")]);
     let equal_range = create_basis(repo.get_root(), &[("code.rs", b"outside\nselected\n")]);
@@ -117,6 +127,7 @@ fn revision_equality_uses_per_note_basis_and_complete_selected_bytes() {
     let unknown = TreeOid::parse(&"a".repeat(40)).unwrap();
     write_note(&repo, "d.md", Some(&unknown), &["code.rs"]);
     write_note(&repo, "e.md", Some(&basis), &["https://example.invalid/a"]);
+    // When / Then
     assert_ne!(basis, equal_range);
     // Both eligible notes render exactly "needle source", so their metrics tie by ID.
     assert_eq!(
@@ -128,6 +139,7 @@ fn revision_equality_uses_per_note_basis_and_complete_selected_bytes() {
         ["a.md"]
     );
     for tree in [short, missing] {
+        // When / Then
         assert_eq!(
             search_ids(&repo, &json!({"source_revisions":[tree.as_str()]})),
             Vec::<String>::new()
@@ -137,10 +149,12 @@ fn revision_equality_uses_per_note_basis_and_complete_selected_bytes() {
 
 #[test]
 fn current_changed_missing_and_invalid_notes_drive_all_recheck_modes() {
+    // Given
     let repo = ReadingRepo::new();
     let basis = create_basis(repo.get_root(), &[("code.rs", b"old\n")]);
     repo.write("code.rs", b"old\n");
     write_note(&repo, "note.md", Some(&basis), &["code.rs"]);
+    // When / Then
     assert_eq!(
         search_ids(&repo, &json!({"needs_recheck":false})),
         ["note.md"]
@@ -159,6 +173,7 @@ fn current_changed_missing_and_invalid_notes_drive_all_recheck_modes() {
             fs::remove_file(repo.get_root().join("code.rs")).unwrap();
         }
         let links = search(&repo, &json!({"needs_recheck":true}));
+        // When / Then
         assert_eq!(ids(&links), ["note.md"]);
         assert_eq!(links[0]["flags"], json!([flag]));
         assert_eq!(
@@ -167,9 +182,11 @@ fn current_changed_missing_and_invalid_notes_drive_all_recheck_modes() {
         );
         assert_eq!(search_ids(&repo, &json!({})), ["note.md"]);
     }
+    // Given
     repo.write("code.rs", b"old\n");
     repo.write("note.md", b"<!-- letopis: broken -->\nneedle\n");
     let links = search(&repo, &json!({"needs_recheck":true}));
+    // When / Then
     assert_eq!(ids(&links), ["note.md"]);
     assert_eq!(links[0]["flags"], json!(["stale"]));
     assert_eq!(
@@ -181,7 +198,9 @@ fn current_changed_missing_and_invalid_notes_drive_all_recheck_modes() {
 
 #[test]
 fn invalid_filter_shapes_and_addresses_are_invalid_requests() {
+    // Given
     let repo = ReadingRepo::new();
+    // When / Then
     for filters in [
         json!(null),
         json!([]),
@@ -200,15 +219,18 @@ fn invalid_filter_shapes_and_addresses_are_invalid_requests() {
             &repo,
             &json!({"query":"needle","limit":1,"filters":filters}),
         );
+        // When / Then
         assert_eq!(value["error"]["code"], "invalid_request", "{filters}");
     }
 }
 
 #[test]
 fn every_requested_root_is_validated_even_after_a_matching_tree() {
+    // Given
     let repo = ReadingRepo::new();
     let valid = create_basis(repo.get_root(), &[("code.rs", b"old\n")]);
     let missing = "f".repeat(40);
+    // When / Then
     assert!(valid.as_str() < missing.as_str());
     let mut command = std::process::Command::new("git");
     support::git::isolate_command(&mut command);
@@ -234,6 +256,7 @@ fn every_requested_root_is_validated_even_after_a_matching_tree() {
             &json!({"query":query,"limit":1,"filters":{
             "sources":sources,"source_revisions":[valid.as_str(),missing]}}),
         );
+        // When / Then
         assert_eq!(value["error"]["code"], "not_found", "{query:?}");
     }
     let empty = ReadingRepo::new();
@@ -246,13 +269,16 @@ fn every_requested_root_is_validated_even_after_a_matching_tree() {
 
 #[test]
 fn ineligible_fts_head_cannot_consume_the_final_limit() {
+    // Given
     let repo = ReadingRepo::new();
     write_note(&repo, "a.md", None, &["code.rs"]);
     write_note(&repo, "b.md", None, &[]);
+    // When
     let value = invoke(
         &repo,
         &json!({"query":"needle","limit":1,"filters":{"sources":["code.rs"]}}),
     );
+    // Then
     assert_eq!(value["ok"], true);
     assert_eq!(ids(&value["result"]), ["a.md"]);
 }

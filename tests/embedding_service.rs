@@ -200,7 +200,7 @@ impl<T> Drop for Operation<T> {
 
 #[test]
 fn missing_and_invalid_configuration_preserve_corpus_and_prior_vectors() {
-    // Arrange
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -208,7 +208,7 @@ fn missing_and_invalid_configuration_preserve_corpus_and_prior_vectors() {
     let mut service = fixture.open_service();
     assert_eq!(service.drain().unwrap(), DrainOutcome::Complete);
     server.take_requests();
-    // Act and assert
+    // When / Then
     for bytes in [None, Some(b"invalid".as_slice())] {
         let path = fixture.root.path().join(".letopis/config.json");
         match bytes {
@@ -233,10 +233,12 @@ fn missing_and_invalid_configuration_preserve_corpus_and_prior_vectors() {
 
 #[test]
 fn unreadable_configuration_returns_safe_invalid_state() {
+    // Given
     let fixture = Fixture::new();
     let mut service = fixture.open_service();
     fs::create_dir(fixture.root.path().join(".letopis/config.json")).unwrap();
     let before = fixture.capture_corpus();
+    // When / Then
     assert!(matches!(
         service.read_configuration().unwrap(),
         ConfigState::Invalid(_)
@@ -246,6 +248,7 @@ fn unreadable_configuration_returns_safe_invalid_state() {
 
 #[test]
 fn changed_configuration_resets_vectors_but_equal_identity_keeps_them() {
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -253,6 +256,7 @@ fn changed_configuration_resets_vectors_but_equal_identity_keeps_them() {
     let mut service = fixture.open_service();
     service.drain().unwrap();
     let before = fixture.capture_corpus();
+    // When / Then
     assert!(matches!(
         service.read_configuration().unwrap(),
         ConfigState::Ready(_)
@@ -266,6 +270,7 @@ fn changed_configuration_resets_vectors_but_equal_identity_keeps_them() {
 
 #[test]
 fn stale_first_same_hash_does_not_starve_valid_second_representative() {
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -277,6 +282,7 @@ fn stale_first_same_hash_does_not_starve_valid_second_representative() {
     )
     .unwrap();
     let before = fixture.capture_corpus();
+    // When / Then
     assert_eq!(
         fixture.open_service().drain().unwrap(),
         DrainOutcome::Complete
@@ -288,6 +294,7 @@ fn stale_first_same_hash_does_not_starve_valid_second_representative() {
 
 #[test]
 fn stale_and_missing_elements_skip_without_reservations_or_requests() {
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -296,6 +303,7 @@ fn stale_and_missing_elements_skip_without_reservations_or_requests() {
     fs::write(fixture.root.path().join("a.md"), "unmarked").unwrap();
     fs::remove_file(fixture.root.path().join("b.md")).unwrap();
     let before = fixture.capture_corpus();
+    // When / Then
     assert_eq!(
         fixture.open_service().drain().unwrap(),
         DrainOutcome::Complete
@@ -308,12 +316,14 @@ fn stale_and_missing_elements_skip_without_reservations_or_requests() {
 
 #[test]
 fn retries_are_additional_and_exhaustion_survives_restart() {
+    // Given
     for (retries, attempts) in [(0, 1), (3, 4)] {
         let fixture = Fixture::new();
         let server = start_failure();
         let config = fixture.write_config(&server.get_base_url(), retries);
         let hash = fixture.publish("a.md", "knowledge");
         let before = fixture.capture_corpus();
+        // When / Then
         assert_eq!(
             fixture.open_service().drain().unwrap(),
             DrainOutcome::Complete
@@ -334,13 +344,16 @@ fn retries_are_additional_and_exhaustion_survives_restart() {
 
 #[test]
 fn malformed_document_records_a_durable_failure_without_http() {
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
     let hash = fixture.publish("a.md", "knowledge");
     fs::write(fixture.root.path().join("a.md"), [0xff]).unwrap();
     let before = fixture.capture_corpus();
+    // When
     fixture.open_service().drain().unwrap();
+    // Then
     assert!(fixture.read_failure(&config, &hash).unwrap().attempts >= 1);
     assert_eq!(server.take_requests().len(), 0);
     assert_eq!(fixture.capture_corpus(), before);
@@ -348,6 +361,7 @@ fn malformed_document_records_a_durable_failure_without_http() {
 
 #[test]
 fn document_read_failure_uses_the_same_durable_budget() {
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -355,7 +369,9 @@ fn document_read_failure_uses_the_same_durable_budget() {
     fs::remove_file(fixture.root.path().join("a.md")).unwrap();
     fs::create_dir(fixture.root.path().join("a.md")).unwrap();
     let before = fixture.capture_corpus();
+    // When
     fixture.open_service().drain().unwrap();
+    // Then
     assert!(fixture.read_failure(&config, &hash).unwrap().attempts >= 1);
     assert_eq!(server.take_requests().len(), 0);
     assert_eq!(fixture.capture_corpus(), before);
@@ -363,6 +379,7 @@ fn document_read_failure_uses_the_same_durable_budget() {
 
 #[test]
 fn configured_dimensions_reject_wrong_size_without_graph_changes() {
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_raw_config(
@@ -372,7 +389,9 @@ fn configured_dimensions_reject_wrong_size_without_graph_changes() {
     );
     let hash = fixture.publish("a.md", "knowledge");
     let before = fixture.capture_corpus();
+    // When
     fixture.open_service().drain().unwrap();
+    // Then
     assert_eq!(fixture.read_vector(&config, &hash), None);
     assert_eq!(fixture.read_failure(&config, &hash).unwrap().attempts, 1);
     assert_eq!(fixture.capture_corpus(), before);
@@ -380,11 +399,13 @@ fn configured_dimensions_reject_wrong_size_without_graph_changes() {
 
 #[test]
 fn query_failure_is_single_attempt_without_document_reservation_or_vector() {
+    // Given
     let fixture = Fixture::new();
     let server = start_failure();
     let config = fixture.write_config(&server.get_base_url(), 3);
     let hash = fixture.publish("a.md", "knowledge");
     let before = fixture.capture_corpus();
+    // When / Then
     assert_eq!(
         fixture.open_service().embed_query("query").unwrap(),
         QueryEmbedding::Unavailable
@@ -398,6 +419,7 @@ fn query_failure_is_single_attempt_without_document_reservation_or_vector() {
 
 #[test]
 fn query_success_clears_error_without_caching_or_document_attempts() {
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -408,6 +430,7 @@ fn query_success_clears_error_without_caching_or_document_attempts() {
     unit.set_query_error(1, "old failure").unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
+    // When / Then
     assert_eq!(
         fixture.open_service().embed_query("query").unwrap(),
         QueryEmbedding::Available {
@@ -423,12 +446,14 @@ fn query_success_clears_error_without_caching_or_document_attempts() {
 
 #[test]
 fn persistent_lock_prevents_another_drain() {
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     fixture.write_config(&server.get_base_url(), 0);
     fixture.publish("a.md", "knowledge");
     let files = open_embedding_files(fixture.root.path()).unwrap();
     let guard = files.try_lock_embed().unwrap().unwrap();
+    // When / Then
     assert_eq!(
         fixture.open_service().drain().unwrap(),
         DrainOutcome::AlreadyRunning
@@ -443,13 +468,16 @@ fn persistent_lock_prevents_another_drain() {
 
 #[test]
 fn reservation_precedes_http_and_new_work_is_found_after_compute() {
+    // Given
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
     let old = fixture.publish("z.md", "old knowledge");
     let mut service = fixture.open_service();
+    // When
     let worker = Operation::spawn(barrier.clone(), move || service.drain().unwrap());
     barrier.wait_until_entered();
+    // Then
     assert_eq!(fixture.read_failure(&config, &old).unwrap().attempts, 1);
     assert_eq!(fixture.read_vector(&config, &old), None);
     let new = fixture.publish("a.md", "new knowledge");
@@ -464,6 +492,7 @@ fn reservation_precedes_http_and_new_work_is_found_after_compute() {
 
 #[test]
 fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
+    // Given
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -477,7 +506,9 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
     )
     .unwrap();
     let before = fixture.capture_corpus();
+    // When
     barrier.release();
+    // Then
     assert_eq!(worker.join().unwrap(), DrainOutcome::Complete);
     assert!(fixture.read_vector(&config, &old).is_some());
     assert_eq!(server.take_requests().len(), 1);
@@ -499,6 +530,7 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
 
 #[test]
 fn reset_during_http_discards_old_result_without_old_cleanup() {
+    // Given
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     fixture.write_config(&server.get_base_url(), 0);
@@ -514,7 +546,9 @@ fn reset_during_http_discards_old_result_without_old_cleanup() {
     unit.set_query_error(7, "current failure").unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
+    // When
     barrier.release();
+    // Then
     assert_eq!(worker.join().unwrap(), DrainOutcome::ConfigChanged);
     assert!(fixture.read_vector(&next, &hash).is_some());
     assert_eq!(fixture.read_query_error().unwrap().error, "current failure");
@@ -523,6 +557,7 @@ fn reset_during_http_discards_old_result_without_old_cleanup() {
 
 #[test]
 fn late_old_query_success_or_error_cannot_replace_new_query_state() {
+    // Given
     for (body, new_success) in [
         (r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#, false),
         ("malformed response", false),
@@ -543,7 +578,9 @@ fn late_old_query_success_or_error_cannot_replace_new_query_state() {
             start_failure()
         };
         fixture.write_config(&new_server.get_base_url(), 0);
+        // When
         let outcome = fixture.open_service().embed_query("new query").unwrap();
+        // Then
         assert_eq!(
             matches!(outcome, QueryEmbedding::Available { .. }),
             new_success
@@ -559,6 +596,7 @@ fn late_old_query_success_or_error_cannot_replace_new_query_state() {
 
 #[test]
 fn query_rechecks_dimension_established_during_http() {
+    // Given
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -573,7 +611,9 @@ fn query_rechecks_dimension_established_during_http() {
     unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
+    // When
     barrier.release();
+    // Then
     assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
     assert!(fixture.read_query_error().is_some());
     assert_eq!(
@@ -585,6 +625,7 @@ fn query_rechecks_dimension_established_during_http() {
 
 #[test]
 fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 1);
@@ -607,6 +648,7 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     unit.store_vector(&orphan, &[1., 2., 3.], 3).unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
+    // When / Then
     assert_eq!(
         fixture.open_service().drain().unwrap(),
         DrainOutcome::Complete
@@ -632,7 +674,7 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
 
 #[test]
 fn vector_storage_failure_propagates_internal_error_without_false_provider_failure() {
-    // Arrange
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -645,10 +687,10 @@ fn vector_storage_failure_propagates_internal_error_without_false_provider_failu
         BEGIN SELECT RAISE(ABORT, 'private storage payload'); END;",
     )
     .unwrap();
-    // Act
+    // When
     let error = service.drain().unwrap_err();
     db.execute_batch("DROP TRIGGER reject_key;").unwrap();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
     assert!(!format!("{error:?}").contains("private"));
     assert_eq!(fixture.read_vector(&config, &hash), None);
@@ -660,6 +702,7 @@ fn vector_storage_failure_propagates_internal_error_without_false_provider_failu
 
 #[test]
 fn valid_shape_with_invalid_endpoint_does_not_reset_or_compute() {
+    // Given
     let fixture = Fixture::new();
     let server = start_success();
     let prior = fixture.write_config(&server.get_base_url(), 0);
@@ -668,6 +711,7 @@ fn valid_shape_with_invalid_endpoint_does_not_reset_or_compute() {
     server.take_requests();
     fixture.write_config("ftp://localhost/api", 0);
     let before = fixture.capture_corpus();
+    // When / Then
     assert!(matches!(
         fixture.open_service().read_configuration().unwrap(),
         ConfigState::Invalid(_)
@@ -679,6 +723,7 @@ fn valid_shape_with_invalid_endpoint_does_not_reset_or_compute() {
 
 #[test]
 fn captured_query_checks_identity_before_http_and_before_diagnostic_commit() {
+    // Given
     // Missing identity and replacement before invocation both forbid HTTP.
     for replacement in [false, true] {
         let fixture = Fixture::new();
@@ -689,6 +734,7 @@ fn captured_query_checks_identity_before_http_and_before_diagnostic_commit() {
             seed_query_error(&fixture, &next);
         }
         let error = fixture.read_query_error();
+        // When
         let result = fixture
             .open_service()
             .embed_query_with_config(QueryEmbeddingRequest {
@@ -697,6 +743,7 @@ fn captured_query_checks_identity_before_http_and_before_diagnostic_commit() {
                 dimensions: None,
             })
             .unwrap();
+        // Then
         assert_eq!(result, QueryEmbedding::Unavailable);
         assert!(server.take_requests().is_empty());
         assert_eq!(fixture.read_query_error(), error);
@@ -705,6 +752,7 @@ fn captured_query_checks_identity_before_http_and_before_diagnostic_commit() {
 
 #[test]
 fn captured_query_preserves_replacement_diagnostics_after_http() {
+    // Given
     // Replacement during success or failure must retain its own diagnostic.
     for body in [
         r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#,
@@ -727,8 +775,10 @@ fn captured_query_preserves_replacement_diagnostics_after_http() {
         barrier.wait_until_entered();
         let next = fixture.write_config(&server.get_base_url(), 1);
         seed_query_error(&fixture, &next);
+        // When
         let error = fixture.read_query_error();
         barrier.release();
+        // Then
         assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
         assert_eq!(server.take_requests().len(), 1);
         assert_eq!(fixture.read_query_error(), error);
@@ -737,6 +787,7 @@ fn captured_query_preserves_replacement_diagnostics_after_http() {
 
 #[test]
 fn captured_query_validates_pinned_and_newly_established_dimensions() {
+    // Given
     // Pinned size must be checked before a document establishes the index size.
     let fixture = Fixture::new();
     let server = HttpFixture::start(FixtureReply::Status {
@@ -745,6 +796,7 @@ fn captured_query_validates_pinned_and_newly_established_dimensions() {
     });
     let captured = fixture.write_config(&server.get_base_url(), 0);
     fixture.open_service().read_configuration().unwrap();
+    // When
     let result = fixture
         .open_service()
         .embed_query_with_config(QueryEmbeddingRequest {
@@ -753,6 +805,7 @@ fn captured_query_validates_pinned_and_newly_established_dimensions() {
             dimensions: NonZeroUsize::new(3),
         })
         .unwrap();
+    // Then
     assert_eq!(result, QueryEmbedding::Unavailable);
     assert_eq!(server.take_requests().len(), 1);
     assert_eq!(
@@ -763,6 +816,7 @@ fn captured_query_validates_pinned_and_newly_established_dimensions() {
 
 #[test]
 fn captured_query_rejects_dimensions_established_during_http() {
+    // Given
     // First document vector can establish another size while inference is paused.
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
@@ -771,6 +825,7 @@ fn captured_query_rejects_dimensions_established_during_http() {
     fixture.open_service().read_configuration().unwrap();
     let config = captured.clone();
     let mut service = fixture.open_service();
+    // When
     let worker = Operation::spawn(barrier.clone(), move || {
         service
             .embed_query_with_config(QueryEmbeddingRequest {
@@ -786,6 +841,7 @@ fn captured_query_rejects_dimensions_established_during_http() {
     unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
     unit.commit().unwrap();
     barrier.release();
+    // Then
     assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
     assert_eq!(server.take_requests().len(), 1);
     assert_eq!(
@@ -800,6 +856,7 @@ fn captured_query_rejects_dimensions_established_during_http() {
 
 #[test]
 fn captured_query_diagnostic_write_failure_remains_an_error() {
+    // Given
     for succeeds in [false, true] {
         let fixture = Fixture::new();
         let server = if succeeds {
@@ -818,7 +875,7 @@ fn captured_query_diagnostic_write_failure_remains_an_error() {
              BEGIN SELECT RAISE(ABORT, 'private diagnostic'); END;",
         )
         .unwrap();
-        // Act
+        // When
         let error = service
             .embed_query_with_config(QueryEmbeddingRequest {
                 text: "query",
@@ -828,7 +885,7 @@ fn captured_query_diagnostic_write_failure_remains_an_error() {
             .unwrap_err();
         db.execute_batch("DROP TRIGGER reject_query_insert; DROP TRIGGER reject_query_delete;")
             .unwrap();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
         assert!(!format!("{error:?}").contains("private"));
         assert_eq!(

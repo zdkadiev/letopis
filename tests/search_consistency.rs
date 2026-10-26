@@ -20,6 +20,7 @@ struct PausedSearch {
 
 #[test]
 fn concurrent_publication_preserves_old_membership_coordinates_and_revision() {
+    // Given
     let repo = ReadingRepo::new();
     for id in ["a.md", "b.md", "c.md"] {
         repo.write_knowledge(id, "sqlite");
@@ -43,6 +44,7 @@ fn concurrent_publication_preserves_old_membership_coordinates_and_revision() {
     std::fs::remove_file(repo.get_root().join("b.md")).unwrap();
     repo.write("c.md", b"<!-- letopis: {invalid} -->\ninvalid");
     repo.write_knowledge("new.md", "sqlite");
+    // When / Then
     assert!(
         wire_document_refresher(repo.get_root())
             .unwrap()
@@ -61,6 +63,7 @@ fn concurrent_publication_preserves_old_membership_coordinates_and_revision() {
         ["a.md", "b.md", "c.md"]
     );
     for link in links {
+        // When / Then
         assert_eq!(link.revision, revision);
         assert_eq!(link.lines, LineRange::new(1, 2).unwrap());
         assert_eq!(
@@ -71,6 +74,7 @@ fn concurrent_publication_preserves_old_membership_coordinates_and_revision() {
 }
 #[test]
 fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     wire_document_refresher(repo.get_root())
@@ -82,6 +86,7 @@ fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates()
     let mut old_storage = repo.open_storage();
     let mut old = old_storage.begin_read().unwrap();
     let identity = config.get_identity();
+    // When / Then
     assert_eq!(
         old.read_vector_dimensions(&identity).unwrap(),
         VectorOutcome::Current(NonZeroUsize::new(2))
@@ -109,9 +114,11 @@ fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates()
 
 #[test]
 fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
+    // Given
     if run_with_credentials("reset_during_query_preserves_original_fts_and_new_model_diagnostic") {
         return;
     }
+    // When / Then
     for protocol in ["ollama", "openai"] {
         let repo = ReadingRepo::new();
         repo.write_knowledge("a.md", "sqlite");
@@ -138,6 +145,7 @@ fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
         unit.commit().unwrap();
         barrier.release();
         let links = worker.join().unwrap();
+        // When / Then
         assert_eq!(
             links
                 .iter()
@@ -157,6 +165,7 @@ fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
 }
 #[test]
 fn concurrent_vector_insert_cannot_add_membership_to_pinned_channel() {
+    // Given
     if run_with_credentials("concurrent_vector_insert_cannot_add_membership_to_pinned_channel") {
         return;
     }
@@ -175,7 +184,9 @@ fn concurrent_vector_insert_cannot_add_membership_to_pinned_channel() {
     barrier.wait_until_entered();
     repo.seed_vectors(&config, &[("b.md", &[1.0, 0.0])]);
     barrier.release();
+    // When
     let links = worker.join().unwrap();
+    // Then
     assert_eq!(
         links
             .iter()
@@ -188,6 +199,7 @@ fn concurrent_vector_insert_cannot_add_membership_to_pinned_channel() {
 }
 #[test]
 fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     let barrier = ResponseBarrier::default();
@@ -204,7 +216,9 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
     let worker = PausedSearch::spawn(repo.get_root(), barrier.clone());
     barrier.wait_until_entered();
     barrier.release();
+    // When
     let links = worker.join().unwrap();
+    // Then
     assert_eq!(links.len(), 1);
     assert!(
         repo.open_storage()
@@ -221,7 +235,9 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
             .unwrap(),
         VectorOutcome::Current(true)
     );
+    // Given
     repo.write_knowledge("b.md", "sqlite");
+    // When / Then
     assert!(
         wire_document_refresher(repo.get_root())
             .unwrap()
@@ -233,6 +249,7 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
 }
 #[test]
 fn live_confinement_error_releases_read_before_subsequent_reset() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     let (server, barrier) = start_paused("ollama");
@@ -247,7 +264,9 @@ fn live_confinement_error_releases_read_before_subsequent_reset() {
     std::fs::remove_file(repo.get_root().join("a.md")).unwrap();
     std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("a.md")).unwrap();
     barrier.release();
+    // When
     let error = worker.join().unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
     assert_eq!(
@@ -261,6 +280,7 @@ fn live_confinement_error_releases_read_before_subsequent_reset() {
 
 #[test]
 fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publication() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     let server = HttpFixture::start(FixtureReply::Status {
@@ -281,6 +301,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
         )
         .unwrap();
     // Refresh validates declared source roots before inference without decoding unrelated metadata.
+    // When
     let error = wire_searcher(repo.get_root())
         .unwrap()
         .search(&SearchRequest {
@@ -289,6 +310,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
             limit: NonZeroUsize::new(10).unwrap(),
         })
         .unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert!(server.take_requests().is_empty());
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
@@ -305,7 +327,9 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
             ["a.md"],
         )
         .unwrap();
+    // Given
     repo.write_knowledge("a.md", "repaired sqlite");
+    // When / Then
     assert!(
         wire_document_refresher(repo.get_root())
             .unwrap()

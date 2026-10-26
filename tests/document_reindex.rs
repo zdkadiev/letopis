@@ -9,7 +9,7 @@ use support::documents::{DocumentRepo, build_external, build_whole};
 
 #[test]
 fn reindex_preserves_invalid_owner_and_publishes_other_file() {
-    // Arrange.
+    // Given.
     let repo = DocumentRepo::new();
     repo.write("source.txt", "source bytes");
     repo.write("a.md", build_external(1, "source.txt", "AlphaToken"));
@@ -19,9 +19,9 @@ fn reindex_preserves_invalid_owner_and_publishes_other_file() {
     let before = repo.read_state();
     repo.write("a.md", "<!-- letopis: SECRET_INVALID -->\nBadToken");
     repo.write("b.md", build_whole(2, "CharlieToken"));
-    // Act.
+    // When.
     let outcome = service.reindex().unwrap();
-    // Assert.
+    // Then.
     assert_eq!((outcome.revision, outcome.invalid_files_updated), (2, 1));
     let after = repo.read_state();
     assert_eq!(after.get_node("a.md"), before.get_node("a.md"));
@@ -47,16 +47,16 @@ fn reindex_preserves_invalid_owner_and_publishes_other_file() {
 #[test]
 fn reindex_initializes_empty_and_invalid_corpus_without_inventing_history() {
     for invalid in [false, true] {
-        // Arrange.
+        // Given.
         let repo = DocumentRepo::new();
         if invalid {
             repo.write("a.md", "<!-- letopis: invalid -->");
             repo.write("b.md", build_whole(2, "BravoToken"));
         }
         let mut service = wire_document_refresher(repo.get_root()).unwrap();
-        // Act.
+        // When.
         let result = service.reindex().unwrap();
-        // Assert.
+        // Then.
         assert_eq!(result.revision, 1);
         let state = repo.read_state();
         assert_eq!(state.nodes.len(), usize::from(invalid));
@@ -72,7 +72,7 @@ fn reindex_initializes_empty_and_invalid_corpus_without_inventing_history() {
 
 #[test]
 fn reindex_reconciles_unchanged_and_invalid_source_references() {
-    // Arrange: only the source changes, so incremental refresh intentionally skips it.
+    // Given: only the source changes, so incremental refresh intentionally skips it.
     let repo = DocumentRepo::new();
     repo.write("source.txt", "OldSource");
     repo.write("a.md", build_external(3, "source.txt", "AlphaToken"));
@@ -84,9 +84,9 @@ fn reindex_reconciles_unchanged_and_invalid_source_references() {
     repo.write("b.md", "<!-- letopis: invalid -->");
     service.refresh().unwrap();
     repo.write("source.txt", "NewSource");
-    // Act.
+    // When.
     service.reindex().unwrap();
-    // Assert: even an invalid referrer contributes its old valid declaration.
+    // Then: even an invalid referrer contributes its old valid declaration.
     let state = repo.read_state();
     let NodeMetadata::Source(source) = &state.get_node("source.txt").metadata else {
         panic!()
@@ -104,7 +104,7 @@ fn reindex_reconciles_unchanged_and_invalid_source_references() {
 
 #[test]
 fn reindex_removes_deleted_unmarked_and_orphaned_projections() {
-    // Arrange.
+    // Given.
     let repo = DocumentRepo::new();
     repo.write("source.txt", "Source");
     repo.write("a.md", build_external(1, "source.txt", "AlphaToken"));
@@ -114,9 +114,9 @@ fn reindex_removes_deleted_unmarked_and_orphaned_projections() {
     service.refresh().unwrap();
     repo.remove("a.md");
     repo.write("b.md", "ordinary Markdown");
-    // Act.
+    // When.
     let result = service.reindex().unwrap();
-    // Assert.
+    // Then.
     assert_eq!((result.files_updated, result.files_removed), (2, 1));
     let state = repo.read_state();
     assert_eq!(state.nodes.len(), 1);
@@ -128,7 +128,7 @@ fn reindex_removes_deleted_unmarked_and_orphaned_projections() {
 
 #[test]
 fn reindex_source_capture_error_rolls_back_every_file() {
-    // Arrange: retain a source binding, then replace its source with an unsafe path.
+    // Given: retain a source binding, then replace its source with an unsafe path.
     let repo = DocumentRepo::new();
     repo.write("source.txt", "Source");
     repo.write("a.md", build_external(1, "source.txt", "AlphaToken"));
@@ -145,9 +145,9 @@ fn reindex_source_capture_error_rolls_back_every_file() {
     )
     .unwrap();
     repo.write("b.md", build_whole(2, "ChangedToken"));
-    // Act.
+    // When.
     let error = service.reindex().unwrap_err();
-    // Assert.
+    // Then.
     assert!(!format!("{error:?}").contains("SECRET_OUTSIDE"));
     assert_eq!(repo.read_state(), before);
     assert_eq!(repo.search("AlphaToken"), ["a.md"]);

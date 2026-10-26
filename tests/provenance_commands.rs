@@ -10,6 +10,7 @@ use support::{
 
 #[test]
 fn search_observes_source_only_changes_without_new_cache_revision() {
+    // Given
     let repo = ReadingRepo::new();
     let basis = create_basis(repo.get_root(), &[("code.rs", b"old\n")]);
     repo.write("code.rs", b"old\n");
@@ -21,8 +22,10 @@ fn search_observes_source_only_changes_without_new_cache_revision() {
     assert_eq!(initial[0]["flags"], json!([]));
     repo.write("code.rs", b"new\n");
 
+    // When
     let result = search(&repo);
 
+    // Then
     assert_eq!(result[0]["flags"], json!(["source_changed"]));
     assert_eq!(result[0]["revision"], initial[0]["revision"]);
     assert_eq!(
@@ -34,23 +37,27 @@ fn search_observes_source_only_changes_without_new_cache_revision() {
             .collect::<Vec<_>>(),
         ["element_id", "flags", "lines", "path", "revision"]
     );
-    // An explicit metadata edit is insufficient until the addressed bytes agree.
+    // Given an explicit metadata edit; addressed bytes still differ.
     let changed = create_basis(repo.get_root(), &[("code.rs", b"other\n")]);
     repo.write(
         "note.md",
         build_note(Some(&changed), &["code.rs"], "needle").as_bytes(),
     );
+    // When / Then
     assert_eq!(search(&repo)[0]["flags"], json!(["source_changed"]));
+    // Given
     let current = create_basis(repo.get_root(), &[("code.rs", b"new\n")]);
     repo.write(
         "note.md",
         build_note(Some(&current), &["code.rs"], "needle").as_bytes(),
     );
+    // When / Then
     assert_eq!(search(&repo)[0]["flags"], json!([]));
 }
 
 #[test]
 fn missing_source_remains_searchable_and_check_reports_owner() {
+    // Given
     let repo = ReadingRepo::new();
     let basis = create_basis(repo.get_root(), &[("code.rs", b"old\n")]);
     repo.write(
@@ -58,9 +65,11 @@ fn missing_source_remains_searchable_and_check_reports_owner() {
         build_note(Some(&basis), &["code.rs"], "needle").as_bytes(),
     );
 
+    // When
     let result = search(&repo);
     let problems = check(&repo, b"{}");
 
+    // Then
     assert_eq!(result[0]["element_id"], "note.md");
     assert_eq!(result[0]["flags"], json!(["source_not_found"]));
     assert_eq!(
@@ -72,6 +81,7 @@ fn missing_source_remains_searchable_and_check_reports_owner() {
 
 #[test]
 fn missing_basis_is_diagnosed_without_dropping_knowledge() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write("code.rs", b"current");
     repo.write(
@@ -79,6 +89,7 @@ fn missing_basis_is_diagnosed_without_dropping_knowledge() {
         build_note(None, &["code.rs"], "needle").as_bytes(),
     );
 
+    // When / Then
     assert_eq!(search(&repo)[0]["flags"], json!(["source_changed"]));
     assert_eq!(
         check(&repo, b"{}"),
@@ -88,6 +99,7 @@ fn missing_basis_is_diagnosed_without_dropping_knowledge() {
 
 #[test]
 fn unavailable_basis_and_missing_historical_range_keep_precise_reasons() {
+    // Given
     let repo = ReadingRepo::new();
     let unknown = TreeOid::parse(&"a".repeat(40)).unwrap();
     repo.write("code.rs", b"first\nsecond\n");
@@ -95,23 +107,27 @@ fn unavailable_basis_and_missing_historical_range_keep_precise_reasons() {
         "note.md",
         build_note(Some(&unknown), &["code.rs"], "needle").as_bytes(),
     );
+    // When / Then
     assert_eq!(search(&repo)[0]["flags"], json!(["source_changed"]));
     assert_eq!(
         check(&repo, b"{}")[0]["details"]["reason"],
         "source_snapshot_unavailable"
     );
+    // Given
     let basis = create_basis(repo.get_root(), &[("code.rs", b"first\n")]);
     repo.write(
         "note.md",
         build_note(Some(&basis), &["code.rs#L2-L2"], "needle").as_bytes(),
     );
 
+    // When / Then
     assert_eq!(search(&repo)[0]["flags"], json!(["source_not_found"]));
     assert_eq!(check(&repo, b"{}")[0]["details"]["target"], "code.rs#L2-L2");
 }
 
 #[test]
 fn stale_knowledge_merges_sorted_deduplicated_source_flags() {
+    // Given
     let repo = ReadingRepo::new();
     let basis = create_basis(
         repo.get_root(),
@@ -133,6 +149,7 @@ fn stale_knowledge_merges_sorted_deduplicated_source_flags() {
     repo.write("code.rs", b"new\n");
     fs::remove_file(repo.get_root().join("gone.rs")).unwrap();
 
+    // When / Then
     assert_eq!(
         search(&repo)[0]["flags"],
         json!(["stale", "source_changed", "source_not_found"])
@@ -141,6 +158,7 @@ fn stale_knowledge_merges_sorted_deduplicated_source_flags() {
 
 #[test]
 fn remote_unfetched_is_not_reported_as_missing() {
+    // Given
     let repo = ReadingRepo::new();
     let basis = create_basis(repo.get_root(), &[]);
     repo.write(
@@ -153,6 +171,7 @@ fn remote_unfetched_is_not_reported_as_missing() {
         .as_bytes(),
     );
 
+    // When / Then
     assert_eq!(search(&repo)[0]["flags"], json!([]));
     assert_eq!(check(&repo, b"{}"), json!([]));
 }

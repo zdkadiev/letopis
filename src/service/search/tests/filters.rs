@@ -1,4 +1,6 @@
-use super::{build_config, make_text_match, make_vector_match, seed_dimension};
+use super::{
+    build_config, build_noop_refresher, make_text_match, make_vector_match, seed_dimension,
+};
 use crate::{
     domain::{
         Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid,
@@ -7,9 +9,9 @@ use crate::{
     markdown::MarkdownParser,
     service::{
         CacheWrite, CommandErrorKind, ConfigState, DocumentResult, DrainOutcome, Embedder,
-        EmbeddingResult, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceObservation,
-        ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest, RecheckFilter, RefreshOutcome,
-        Refresher, SearchFilters, SearchFlag, SearchRequest, Searcher, SnapshotError,
+        EmbeddingResult, KnowledgeMetadata, MarkdownCodec, MockRefresher, NodeMetadata,
+        ProvenanceObservation, ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest,
+        RecheckFilter, SearchFilters, SearchFlag, SearchRequest, Searcher, SnapshotError,
         SnapshotErrorKind, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
         Storage, TextMatch, VectorMatch,
         search::{SearchService, ranking::rank_candidates},
@@ -29,7 +31,6 @@ struct Fixture {
     validations: Rc<Cell<usize>>,
     observations: Rc<Cell<usize>>,
 }
-struct NoRefresh;
 struct Query(Rc<Cell<usize>>);
 struct Probe {
     failure: Option<SnapshotErrorKind>,
@@ -38,10 +39,11 @@ struct Probe {
     validations: Rc<Cell<usize>>,
 }
 type TestSearch =
-    SearchService<NoRefresh, SqliteStorage, Query, LocalFileSystem, MarkdownParser, Probe>;
+    SearchService<MockRefresher, SqliteStorage, Query, LocalFileSystem, MarkdownParser, Probe>;
 
 #[test]
 fn eligible_channel_ranks_are_recomputed_before_fusion() {
+    // Given
     let fts = [
         make_text_match("excluded.md", -3.0),
         make_text_match("a.md", -2.0),
@@ -51,6 +53,7 @@ fn eligible_channel_ranks_are_recomputed_before_fusion() {
         make_vector_match("b.md", 0.0),
         make_vector_match("a.md", 1.0),
     ];
+    // When / Then
     assert_eq!(
         rank_filtered(&fts, &vectors, &["a.md", "b.md"], 2),
         ["a.md", "b.md"]
@@ -59,6 +62,7 @@ fn eligible_channel_ranks_are_recomputed_before_fusion() {
 
 #[test]
 fn excluded_channel_heads_do_not_consume_limit() {
+    // Given
     let fts = [
         make_text_match("excluded.md", -3.0),
         make_text_match("a.md", -2.0),
@@ -67,27 +71,32 @@ fn excluded_channel_heads_do_not_consume_limit() {
         make_vector_match("excluded.md", 0.0),
         make_vector_match("b.md", 1.0),
     ];
+    // When / Then
     assert_eq!(rank_filtered(&fts, &[], &["a.md"], 1), ["a.md"]);
     assert_eq!(rank_filtered(&[], &vectors, &["b.md"], 1), ["b.md"]);
 }
 
 #[test]
 fn eligible_ties_and_duplicates_keep_identity_order() {
+    // Given
     let fts = [
         make_text_match("excluded.md", -3.0),
         make_text_match("b.md", -2.0),
         make_text_match("a.md", -2.0),
         make_text_match("a.md", -1.0),
     ];
+    // When / Then
     assert_eq!(
         rank_filtered(&fts, &[], &["a.md", "b.md"], 2),
         ["a.md", "b.md"]
     );
+    // Given
     let vectors = [
         make_vector_match("b.md", 0.0),
         make_vector_match("b.md", 1.0),
         make_vector_match("a.md", 0.0),
     ];
+    // When / Then
     assert_eq!(
         rank_filtered(&[], &vectors, &["a.md", "b.md"], 2),
         ["a.md", "b.md"]
@@ -96,11 +105,13 @@ fn eligible_ties_and_duplicates_keep_identity_order() {
 
 #[test]
 fn excluded_nonfinite_metrics_remain_integrity_errors() {
+    // Given
     for metric in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         for (fts, vectors) in [
             (vec![make_text_match("excluded.md", metric)], vec![]),
             (vec![], vec![make_vector_match("excluded.md", metric)]),
         ] {
+            // When / Then
             assert_eq!(
                 rank_candidates(&fts, &vectors, &BTreeSet::new(), NonZeroUsize::MIN)
                     .unwrap_err()
@@ -113,6 +124,7 @@ fn excluded_nonfinite_metrics_remain_integrity_errors() {
 
 #[test]
 fn revision_preflight_precedes_provider_and_candidate_dependent_exits() {
+    // Given
     for (snapshot, command) in [
         (SnapshotErrorKind::NotFound, CommandErrorKind::NotFound),
         (
@@ -147,8 +159,10 @@ fn revision_preflight_precedes_provider_and_candidate_dependent_exits() {
                     .insert(SourceUri::parse("missing.rs").unwrap());
             }
 
+            // When
             let result = search.search(&request);
 
+            // Then
             assert_eq!(result.unwrap_err().get_kind(), command, "{query:?}");
             assert_eq!(
                 queries.get(),
@@ -162,6 +176,7 @@ fn revision_preflight_precedes_provider_and_candidate_dependent_exits() {
 
 #[test]
 fn revision_comparison_errors_preserve_typed_codes() {
+    // Given
     for (snapshot, command) in [
         (SnapshotErrorKind::NotFound, CommandErrorKind::NotFound),
         (
@@ -179,12 +194,14 @@ fn revision_comparison_errors_preserve_typed_codes() {
         let mut request = build_request("query");
         request.filters.source_revisions.insert(parse_tree("1"));
 
+        // When / Then
         assert_eq!(search.search(&request).unwrap_err().get_kind(), command);
     }
 }
 
 #[test]
 fn changing_observer_is_called_once_and_retained_flags_drive_rendering() {
+    // Given
     let root = tempfile::tempdir().unwrap();
     let Fixture {
         mut search,
@@ -194,8 +211,10 @@ fn changing_observer_is_called_once_and_retained_flags_drive_rendering() {
     let mut request = build_request("query");
     request.filters.needs_recheck = RecheckFilter::Required;
 
+    // When
     let links = search.search(&request).unwrap();
 
+    // Then
     assert_eq!(links.len(), 1);
     assert_eq!(links[0].element_id.as_str(), "note.md");
     assert_eq!(links[0].flags, BTreeSet::from([SearchFlag::SourceChanged]));
@@ -207,21 +226,6 @@ fn changing_observer_is_called_once_and_retained_flags_drive_rendering() {
     assert_eq!(observations.get(), 3);
 }
 
-impl Refresher for NoRefresh {
-    fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
-        panic!("this scenario must not trigger a full reindex")
-    }
-
-    fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
-        Ok(RefreshOutcome {
-            revision: 1,
-            published: false,
-            files_updated: 0,
-            files_removed: 0,
-            invalid_files_updated: 0,
-        })
-    }
-}
 impl Embedder for Query {
     fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
         self.0.set(self.0.get() + 1);
@@ -288,7 +292,7 @@ fn build_search(root: &Path, candidate: Candidate, failure: Option<SnapshotError
     let validations = Rc::new(Cell::new(0));
     let observations = Rc::new(Cell::new(0));
     let search = SearchService {
-        refresher: NoRefresh,
+        refresher: build_noop_refresher(),
         storage,
         embeddings: Query(queries.clone()),
         filesystem: LocalFileSystem::open(root).unwrap(),

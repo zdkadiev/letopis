@@ -5,11 +5,14 @@ use letopis_embedding_checks::{
 use support::*;
 #[test]
 fn attached_vec1_round_trip_and_dimension_rejection() -> CheckResult<()> {
+    // Given
     let d = tempfile::tempdir()?;
     let root = d.path();
     let cfg = setup(root)?;
+    // When
     seed(root, "alpha", &[1., 0., 0.])?;
     let c = attached(root)?;
+    // Then
     assert_eq!(
         state(&c)?["vectors"],
         serde_json::json!([[1, blob(&[1., 0., 0.])]])
@@ -42,6 +45,7 @@ fn attached_vec1_round_trip_and_dimension_rejection() -> CheckResult<()> {
 }
 #[test]
 fn pinned_reader_survives_dimension_reset() -> CheckResult<()> {
+    // Given
     let d = tempfile::tempdir()?;
     let root = d.path();
     let cfg = setup(root)?;
@@ -55,8 +59,10 @@ fn pinned_reader_survives_dimension_reset() -> CheckResult<()> {
         prepared.query_row([blob(&[1., 0., 0.])], |r| r.get::<_, i64>(0))?,
         1
     );
+    // When
     let new = config(root, "four", 2)?;
     seed(root, "alpha", &[1., 0., 0., 0.])?;
+    // Then
     assert_ne!(new.identity, cfg.identity);
     assert_eq!(state(&c)?, old);
     assert_eq!(
@@ -86,6 +92,7 @@ fn pinned_reader_survives_dimension_reset() -> CheckResult<()> {
 }
 #[test]
 fn reset_rollback_preserves_old_and_fresh_views() -> CheckResult<()> {
+    // Given
     let d = tempfile::tempdir()?;
     let root = d.path();
     setup(root)?;
@@ -97,6 +104,7 @@ fn reset_rollback_preserves_old_and_fresh_views() -> CheckResult<()> {
         root.join(".letopis/config.json"),
         r#"{"provider":"fixture","model":"four","parameters":{},"max_retries":2}"#,
     )?;
+    // When
     let result = reset_config(root, &mut |name| {
         if name == "reset_before_commit" {
             Err("injected abort".into())
@@ -104,6 +112,7 @@ fn reset_rollback_preserves_old_and_fresh_views() -> CheckResult<()> {
             Ok(())
         }
     });
+    // Then
     assert!(result.is_err());
     assert_eq!(state(&c)?, old);
     assert_eq!(state(&attached(root)?)?, old);
@@ -112,6 +121,7 @@ fn reset_rollback_preserves_old_and_fresh_views() -> CheckResult<()> {
 }
 #[test]
 fn late_vector_snapshot_checks_identity() -> CheckResult<()> {
+    // Given
     let d = tempfile::tempdir()?;
     let root = d.path();
     let cfg = setup(root)?;
@@ -119,8 +129,10 @@ fn late_vector_snapshot_checks_identity() -> CheckResult<()> {
     let c = attached(root)?;
     c.execute_batch("BEGIN")?;
     assert_eq!(alpha(&c)?, ["a.md"]);
+    // When
     config(root, "four", 2)?;
     seed(root, "alpha", &[1., 0., 0., 0.])?;
+    // Then
     assert_eq!(
         search_vectors(&c, &cfg, &[1., 0., 0.])?,
         ReadOutcome::FtsOnly
@@ -132,11 +144,14 @@ fn late_vector_snapshot_checks_identity() -> CheckResult<()> {
 
 #[test]
 fn reservation_is_durable_and_exhaustion_excludes_work() -> CheckResult<()> {
+    // Given
     let d = tempfile::tempdir()?;
     let root = d.path();
     let cfg = setup(root)?;
     for n in 1..=3 {
+        // When / Then
         assert!(reserve(root, &cfg, &hash("alpha"))?);
+        // Then
         assert_eq!(attempts(root, "alpha")?, n);
     }
     assert!(!reserve(root, &cfg, &hash("alpha"))?);

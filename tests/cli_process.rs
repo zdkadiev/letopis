@@ -11,17 +11,17 @@ use std::{cell::RefCell, fs, os::unix::fs::MetadataExt};
 
 #[test]
 fn detached_child_has_exact_context_null_fds_and_no_service_descriptors() {
-    // Arrange: capture immutable content before launching through production composition.
+    // Given: capture immutable content before launching through production composition.
     let fixture = Fixture::new();
     let before = fixture.read_preserved_files();
     let mut foreground = fixture.spawn_foreground(None);
     let mut drain = fixture.accept_drain();
-    // Act: the foreground must exit and both pipes reach EOF while drain is blocked.
+    // When: the foreground must exit and both pipes reach EOF while drain is blocked.
     let facts = drain.read_event();
     drain.send_command("acquire");
     assert_eq!(drain.read_event()["owned"], true);
     let parent = finish_foreground(&mut foreground);
-    // Assert: kernel/session/descriptor observations, not fixture claims of completion.
+    // Then: kernel/session/descriptor observations, not fixture claims of completion.
     assert_eq!(facts["argv"], serde_json::json!(["embed", "--drain"]));
     assert_eq!(
         facts["cwd"],
@@ -47,10 +47,13 @@ fn detached_child_has_exact_context_null_fds_and_no_service_descriptors() {
 }
 #[test]
 fn two_released_probes_yield_exactly_one_active_drain() {
+    // Given
     let fixture = Fixture::new();
     let mut first_parent = fixture.spawn_foreground(None);
+    // When
     let mut first = fixture.accept_drain();
     first.read_event();
+    // Then
     assert!(finish_foreground(&mut first_parent)["warning"].is_null());
     let mut second_parent = fixture.spawn_foreground(None);
     let mut second = fixture.accept_drain();
@@ -68,12 +71,14 @@ fn two_released_probes_yield_exactly_one_active_drain() {
 }
 #[test]
 fn owned_sigkill_and_stale_pid_preserve_inode_and_release_lock() {
+    // Given
     let fixture = Fixture::new();
     let mut foreground = fixture.spawn_foreground(None);
     let mut drain = fixture.accept_drain();
     drain.read_event();
     finish_foreground(&mut foreground);
     drain.send_command("acquire");
+    // When / Then
     assert_eq!(drain.read_event()["owned"], true);
     let lock = fixture.root.path().join(".letopis/embed.lock");
     let inode = fs::metadata(&lock).unwrap().ino();
@@ -95,10 +100,13 @@ fn owned_sigkill_and_stale_pid_preserve_inode_and_release_lock() {
 }
 #[test]
 fn exec_failure_returns_safe_warning() {
+    // Given
     let fixture = Fixture::new();
     let executable = fixture.root.path().join("secret-missing-executable");
     let mut foreground = fixture.spawn_foreground(Some(&executable));
+    // When
     let response = finish_foreground(&mut foreground);
+    // Then
     assert!(response["warning"]["message"].is_string());
     assert_eq!(response["warning"]["details"], serde_json::json!({}));
     assert!(!response.to_string().contains("secret"));
@@ -124,7 +132,7 @@ impl<F: EmbedLocker> EmbedLocker for ReleaseAfterBusyProbe<F> {
 
 #[test]
 fn lock_release_wait_retries_busy_probe_and_retains_acquired_lease() {
-    // Arrange: the observer initially sees a genuinely occupied kernel lock.
+    // Given: the observer initially sees a genuinely occupied kernel lock.
     let root = tempfile::tempdir().unwrap();
     let files = open_filesystem(root.path()).unwrap();
     let owner = files.try_lock_embed().unwrap().unwrap();
@@ -135,10 +143,10 @@ fn lock_release_wait_retries_busy_probe_and_retains_acquired_lease() {
         owner: RefCell::new(Some(owner)),
     };
 
-    // Act: the first failed probe permits the independent owner to release.
+    // When: the first failed probe permits the independent owner to release.
     let lease = wait_for_embed_lock(&delayed);
 
-    // Assert: completion requires an actual lease, retained through observation.
+    // Then: completion requires an actual lease, retained through observation.
     assert_eq!(fs::metadata(&lock).unwrap().ino(), inode);
     assert!(delayed.files.try_lock_embed().unwrap().is_none());
     drop(lease);

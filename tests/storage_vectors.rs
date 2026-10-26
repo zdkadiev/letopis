@@ -10,11 +10,13 @@ use tempfile::TempDir;
 #[test]
 fn text_hash_shares_one_vector() {
     // Catches duplicate keys, lost bytes, and one-to-one rather than text joins.
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let identity = Sha256::digest(b"M1");
     let hash = Sha256::digest(b"shared");
+    // When / Then
     assert_eq!(
         storage.reset_vectors(None, &identity).unwrap(),
         VectorOutcome::Current(true)
@@ -54,6 +56,7 @@ fn text_hash_shares_one_vector() {
 }
 #[test]
 fn vectors_require_matching_identity() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -61,6 +64,7 @@ fn vectors_require_matching_identity() {
     let m2 = Sha256::digest(b"M2");
     storage.reset_vectors(None, &m1).unwrap();
     store(&mut storage, &m1, &m1, &[1.0, 0.0, 0.0]);
+    // When / Then
     assert!(matches!(
         storage.begin_vector_write(&m2).unwrap(),
         VectorOutcome::ConfigChanged
@@ -78,6 +82,7 @@ fn vectors_require_matching_identity() {
 #[test]
 fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
     // Catches shared vec1 state or validation against a later global identity.
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache");
     let vectors = root.path().join("vectors");
@@ -89,6 +94,7 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
     store(&mut first, &m1, &m1, &[1.0, 0.0, 0.0]);
     publish_hash(&mut first, m1);
     let mut old = first.begin_read().unwrap();
+    // When / Then
     assert_nearest(&mut old, &m1, &[1.0, 0.0, 0.0]);
     assert_eq!(
         unwrap_current(old.read_vector(&m1, &m1).unwrap()),
@@ -123,6 +129,7 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
 }
 #[test]
 fn current_node_hash_excludes_old_vector() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -137,6 +144,7 @@ fn current_node_hash_excludes_old_vector() {
     cache.commit().unwrap();
     let mut read = storage.begin_read().unwrap();
     let matches = unwrap_current(read.find_nearest_vectors(&m1, &[1.0, 0.0, 0.0], 3).unwrap());
+    // When / Then
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0].search_hash, Sha256::digest(b"new"));
     assert_eq!(matches[0].id.as_str(), "a.md");
@@ -145,6 +153,7 @@ fn current_node_hash_excludes_old_vector() {
 #[test]
 fn caught_vector_error_cannot_commit_key_or_prior_write() {
     // Every malformed input must poison the whole unit, including a prior valid pair.
+    // Given
     for invalid in [
         vec![],
         vec![f32::NAN, 0.0, 0.0],
@@ -160,6 +169,7 @@ fn caught_vector_error_cannot_commit_key_or_prior_write() {
         let mut unit = unwrap_current(storage.begin_vector_write(&m1).unwrap());
         unit.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
         let error = unit.store_vector(&m1, &invalid, 3).unwrap_err();
+        // When / Then
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
         assert!(unit.commit().is_err());
         let mut read = storage.begin_read().unwrap();
@@ -169,6 +179,7 @@ fn caught_vector_error_cannot_commit_key_or_prior_write() {
 }
 #[test]
 fn dimension_reset_and_rollback() {
+    // Given
     let root = TempDir::new().unwrap();
     let vectors = root.path().join("vectors");
     let mut storage = open_storage(&root.path().join("cache"), &vectors).unwrap();
@@ -177,6 +188,7 @@ fn dimension_reset_and_rollback() {
     storage.reset_vectors(None, &m1).unwrap();
     store(&mut storage, &m1, &m1, &[1.0, 0.0, 0.0]);
     let mut unit = unwrap_current(storage.begin_vector_write(&m1).unwrap());
+    // When / Then
     assert!(unit.store_vector(&hash, &[0.0, 1.0, 0.0, 0.0], 4).is_err());
     assert!(unit.commit().is_err());
     let raw = rusqlite::Connection::open(&vectors).unwrap();
@@ -193,6 +205,7 @@ fn dimension_reset_and_rollback() {
 }
 #[test]
 fn cache_and_vector_writers_are_independent() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache");
     let vectors = root.path().join("vectors");
@@ -206,13 +219,16 @@ fn cache_and_vector_writers_are_independent() {
         .store_vector(&identity, &[1.0, 0.0, 0.0], 3)
         .unwrap();
     vector_unit.commit().unwrap();
+    // When / Then
     assert_eq!(cache_unit.commit().unwrap(), 1);
     drop(first);
     drop(second);
+    // Given
     std::fs::remove_file(&cache).unwrap();
     let mut rebuilt = open_storage(&cache, &vectors).unwrap();
     let mut unit = unwrap_current(rebuilt.begin_vector_write(&identity).unwrap());
     let reused = unit.store_vector(&identity, &[0.0, 1.0, 0.0], 3).unwrap();
+    // When / Then
     assert_eq!(reused.row_id, key.row_id);
     assert!(!reused.inserted);
     unit.commit().unwrap();
@@ -222,6 +238,7 @@ fn cache_and_vector_writers_are_independent() {
 #[test]
 fn nearest_validates_query_and_orders_all_candidates_by_distance_then_id() {
     // Catches premature limiting before hash joins, wrong metric or incorrect order.
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -252,6 +269,7 @@ fn nearest_validates_query_and_orders_all_candidates_by_distance_then_id() {
         &[0.0, 1.0, 0.0],
     );
     let mut read = storage.begin_read().unwrap();
+    // When / Then
     for (query, dimensions) in [
         (vec![], 0),
         (vec![f32::NAN], 1),
@@ -259,6 +277,7 @@ fn nearest_validates_query_and_orders_all_candidates_by_distance_then_id() {
         (vec![1.0, 0.0], 3),
         (vec![1.0, 0.0, 0.0, 0.0], 4),
     ] {
+        // When / Then
         assert!(
             read.find_nearest_vectors(&identity, &query, dimensions)
                 .is_err()

@@ -30,7 +30,7 @@ struct UserFixtureState {
 #[test]
 fn corrupt_cache_and_vectors_fail_in_each_new_command_process() {
     for target in [CACHE_DATABASE, VECTOR_DATABASE] {
-        // Arrange
+        // Given
         let repo = ReadingRepo::new();
         repo.write_knowledge(
             "known.md",
@@ -43,7 +43,7 @@ fn corrupt_cache_and_vectors_fail_in_each_new_command_process() {
         let target_path = get_database_path(&repo, target);
         replace_database(&target_path, CORRUPT_DATABASE_BYTES);
 
-        // Act / Assert: every invocation starts a separately supervised CLI process.
+        // When / Then: every invocation starts a separately supervised CLI process.
         for command in ["check", "check", "status", "status"] {
             let output = repo.invoke(&[command], b"{}");
             assert_internal_failure(&output);
@@ -52,7 +52,7 @@ fn corrupt_cache_and_vectors_fail_in_each_new_command_process() {
             assert_eq!(capture_user_state(&repo, &["known.md"]), user_snapshot);
         }
 
-        // Arrange / Act / Assert: exact test-fixture restoration enables health again.
+        // Given / When / Then: exact test-fixture restoration enables health again.
         restore_database(&target_path, get_database_bytes(target, &database_snapshot));
         assert_eq!(capture_databases(&repo), database_snapshot);
         assert_successful_check(&repo);
@@ -63,7 +63,7 @@ fn corrupt_cache_and_vectors_fail_in_each_new_command_process() {
 
 #[test]
 fn corrupt_authored_tree_has_persistent_current_command_failure() {
-    // Arrange
+    // Given
     let repo = ReadingRepo::new();
     let source = b"authored source payload CORRUPTION_CANARY\n";
     let basis = create_basis(repo.get_root(), &[("code.rs", source)]);
@@ -80,7 +80,7 @@ fn corrupt_authored_tree_has_persistent_current_command_failure() {
     let original_object = damage_object(&object_path);
     let damaged_object = fs::read(&object_path).unwrap();
 
-    // Act / Assert: corruption remains a current hard failure in every new process.
+    // When / Then: corruption remains a current hard failure in every new process.
     for command in ["check", "status"] {
         for _ in 0..2 {
             let output = repo.invoke(&[command], b"{}");
@@ -95,7 +95,7 @@ fn corrupt_authored_tree_has_persistent_current_command_failure() {
         }
     }
 
-    // Arrange / Act / Assert: the same commands recover after exact fixture restore.
+    // Given / When / Then: the same commands recover after exact fixture restore.
     fs::write(&object_path, original_object).unwrap();
     assert_successful_check(&repo);
     assert_successful_status(&repo, 1);

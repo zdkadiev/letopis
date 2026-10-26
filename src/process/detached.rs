@@ -57,24 +57,30 @@ mod tests {
 
     #[test]
     fn missing_executable_retains_private_cause() {
+        // Given
         let directory = tempfile::tempdir().unwrap();
         let process = DetachedProcess::new(
             directory.path().join("secret-executable"),
             directory.path().to_path_buf(),
         );
+        // When
         let error = process.spawn_drain().unwrap_err();
+        // Then
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
         assert!(error.source().is_some());
         assert!(!format!("{error:?} {error}").contains("secret"));
     }
     #[test]
     fn removed_working_directory_is_reported() {
+        // Given
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path().join("secret-root");
         fs::create_dir(&root).unwrap();
         let process = DetachedProcess::new(std::env::current_exe().unwrap(), root.clone());
         fs::remove_dir(root).unwrap();
+        // When
         let error = process.spawn_drain().unwrap_err();
+        // Then
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
         assert!(error.source().is_some());
         assert!(!format!("{error:?} {error}").contains("secret"));

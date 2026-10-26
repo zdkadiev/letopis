@@ -9,6 +9,7 @@ from run import create_evidence, hash_inputs, run_command, run_host
 
 class RunnerTests(unittest.TestCase):
     def test_child_receipts_use_current_evidence_and_keep_command_overrides(self):
+        # Given
         import run
         from unittest.mock import patch
         with tempfile.TemporaryDirectory() as directory:
@@ -24,14 +25,17 @@ class RunnerTests(unittest.TestCase):
                     patch.object(run, 'run_command') as command:
                 run.main()
             environment = command.call_args.kwargs['env']
+            # When / Then
             self.assertEqual(environment.get('LETOPIS_TEST_EVIDENCE'),
                              str(evidence.resolve() / 'process'))
             self.assertEqual(environment.get('RUSTDOCFLAGS'), '-D warnings')
 
     def test_nonzero_command_prevents_pass_manifest(self):
         # Catches swallowed subprocess errors.
+        # Given
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            # When / Then
             with self.assertRaises(subprocess.CalledProcessError):
                 run_command([sys.executable, '-c', 'raise SystemExit(42)'], cwd=root,
                             env=dict(os.environ), log=root / 'command.log', timeout=10)
@@ -39,23 +43,28 @@ class RunnerTests(unittest.TestCase):
 
     def test_existing_evidence_directory_is_rejected(self):
         # Catches destructive reuse of historical receipts.
+        # Given
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             sentinel = root / 'sentinel'
             sentinel.write_text('keep')
+            # When / Then
             with self.assertRaises(FileExistsError):
                 create_evidence(root)
             self.assertEqual(sentinel.read_text(), 'keep')
 
     def test_timeout_reaps_owned_process(self):
         # Catches killing without waiting, or leaving the owned child alive.
+        # Given
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             script = "import os,pathlib,time; pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"
+            # When / Then
             with self.assertRaises(subprocess.TimeoutExpired):
                 run_command([sys.executable, '-c', script], cwd=root,
                             env=dict(os.environ), log=root / 'command.log', timeout=1)
             pid = int((root / 'pid').read_text())
+            # When / Then
             with self.assertRaises(ProcessLookupError):
                 os.kill(pid, 0)
 
@@ -76,9 +85,12 @@ class PreparationTests(unittest.TestCase):
 
     def test_hash_preparation_failure_retains_fail_receipt(self):
         # Missing build inputs must not escape without a failure receipt.
+        # Given
         import json
         with tempfile.TemporaryDirectory() as directory:
+            # When
             result, evidence = self.run_copy(Path(directory), 'run.py')
+            # Then
             self.assertNotEqual(result.returncode, 0)
             self.assertTrue((evidence / 'manifest.json').is_file(), result.stderr)
             manifest = json.loads((evidence / 'manifest.json').read_text())
@@ -87,9 +99,12 @@ class PreparationTests(unittest.TestCase):
 
     def test_git_preparation_failure_retains_command_exit_and_fail_receipt(self):
         # Real Git failure must be recorded rather than bypassing the manifest.
+        # Given
         import json
         with tempfile.TemporaryDirectory() as directory:
+            # When
             result, evidence = self.run_copy(Path(directory), 'negative_controls.py')
+            # Then
             self.assertNotEqual(result.returncode, 0)
             self.assertTrue((evidence / 'manifest.json').is_file(), result.stderr)
             manifest = json.loads((evidence / 'manifest.json').read_text())
@@ -99,13 +114,16 @@ class PreparationTests(unittest.TestCase):
             self.assertTrue((evidence / manifest['commands'][0]['log']).is_file())
 
     def test_successful_git_preparation_records_both_commands(self):
+        # Given
         import json
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(['git', 'init', '-q', str(root)], check=True)
             subprocess.run(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.org',
                             'commit', '--allow-empty', '-qm', 'fixture'], cwd=root, check=True)
+            # When
             result, evidence = self.run_copy(root, 'negative_controls.py')
+            # Then
             self.assertNotEqual(result.returncode, 0)  # Empty archive lacks native inputs.
             self.assertTrue((evidence / 'manifest.json').is_file(), result.stderr)
             manifest = json.loads((evidence / 'manifest.json').read_text())
@@ -118,6 +136,7 @@ class PreparationTests(unittest.TestCase):
 class SchemaParityTests(unittest.TestCase):
     def test_parity_accepts_current_schema_and_rejects_deliberate_drift(self):
         # Product DDL drift must fail independently of runtime self-recognition.
+        # Given
         import shutil
         project = Path(__file__).resolve().parents[2]
         script = project / 'tests/storage/check_schema.py'
@@ -128,7 +147,9 @@ class SchemaParityTests(unittest.TestCase):
                 target = root / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(project / name, target)
+            # When
             good = subprocess.run([sys.executable, str(script), str(root)], capture_output=True)
+            # Then
             self.assertEqual(good.returncode, 0, good.stderr)
             path = root / 'src/storage/cache.sql'
             path.write_text(path.read_text().replace('revision INTEGER', 'revision TEXT'))
@@ -140,6 +161,7 @@ class SchemaParityTests(unittest.TestCase):
 class InputInventoryTests(unittest.TestCase):
     def test_inventory_excludes_nested_build_caches_and_keeps_source_hashes(self):
         # Catches inventories bloated by ignored historical Cargo/build output.
+        # Given
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             sources = (
@@ -162,10 +184,11 @@ class InputInventoryTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b'generated build output')
 
-            # Act.
+            # When.
             actual = hash_inputs(root)
 
-            # Assert: legitimate source names survive; generated trees do not.
+            # Then: legitimate source names survive; generated trees do not.
+            # When / Then
             self.assertEqual(set(actual), set(sources))
             self.assertEqual(actual['src/lib.rs'],
                              'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
@@ -173,6 +196,7 @@ class InputInventoryTests(unittest.TestCase):
 
 class ProcessEvidenceTests(unittest.TestCase):
     def test_process_receipt_environment_and_real_deadline_are_explicit(self):
+        # Given
         with tempfile.TemporaryDirectory() as directory:
             evidence = Path(directory)
             calls = []
@@ -180,6 +204,7 @@ class ProcessEvidenceTests(unittest.TestCase):
                 calls.append((argv, name, kwargs))
                 if name == 'build.log':
                     raise RuntimeError('stop before standalone fixture')
+            # When / Then
             with self.assertRaisesRegex(RuntimeError, 'stop before'):
                 run_host(evidence, evidence, execute)
             root = next(call for call in calls if call[1] == 'rust-check.log')

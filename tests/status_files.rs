@@ -67,6 +67,7 @@ impl Drop for Owner {
 
 #[test]
 fn reports_busy_recorded_pid() {
+    // Given
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let child = Owner::spawn(&fixture.0, "index.lock", "self");
@@ -78,6 +79,7 @@ fn reports_busy_recorded_pid() {
     let start = Instant::now();
     let locks = files.observe_locks().unwrap();
 
+    // When / Then
     assert!(start.elapsed() < Duration::from_secs(2));
     assert_eq!(locks.len(), 1);
     assert_eq!(locks[0].name, LockName::Index);
@@ -88,6 +90,7 @@ fn reports_busy_recorded_pid() {
 
 #[test]
 fn ignores_stale_unlocked_pid() {
+    // Given
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let lock_path = fixture.get_lock_path("index.lock");
@@ -96,12 +99,14 @@ fn ignores_stale_unlocked_pid() {
 
     let locks = files.observe_locks().unwrap();
 
+    // When / Then
     assert!(locks.is_empty());
     assert_eq!(fs::read(&lock_path).unwrap(), b"999999\n");
 }
 
 #[test]
 fn does_not_write_probe_pid() {
+    // Given
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let lock_path = fixture.get_lock_path("embed.lock");
@@ -109,6 +114,7 @@ fn does_not_write_probe_pid() {
     let inode = fs::metadata(&lock_path).unwrap().ino();
     let files = open_status_files(&fixture.0).unwrap();
 
+    // When / Then
     assert!(files.observe_locks().unwrap().is_empty());
 
     assert_eq!(fs::read(&lock_path).unwrap(), b"42\n");
@@ -117,31 +123,38 @@ fn does_not_write_probe_pid() {
 
 #[test]
 fn rejects_busy_invalid_pid() {
+    // Given
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let _child = Owner::spawn(&fixture.0, "embed.lock", "invalid");
     let files = open_status_files(&fixture.0).unwrap();
 
+    // When / Then
     assert!(files.observe_locks().is_err());
 }
 
 #[test]
 fn rejects_busy_pid_with_valid_prefix_and_trailing_bytes() {
+    // Given
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let _child = Owner::spawn(&fixture.0, "embed.lock", "overlong");
     let files = open_status_files(&fixture.0).unwrap();
 
+    // When
     let error = files.observe_locks().unwrap_err();
 
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
 }
 
 #[test]
 fn returns_missing_locks_without_creating_files() {
+    // Given
     let fixture = Fixture::new();
     let files = open_status_files(&fixture.0).unwrap();
 
+    // When / Then
     assert!(files.observe_locks().unwrap().is_empty());
     assert_eq!(files.read_config().unwrap(), None);
     assert!(!fixture.0.join(".letopis").exists());
@@ -149,31 +162,38 @@ fn returns_missing_locks_without_creating_files() {
 
 #[test]
 fn rejects_symlink_and_inode_replacement() {
+    // Given
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let files = open_status_files(&fixture.0).unwrap();
+    // When / Then
     assert!(files.observe_locks().unwrap().is_empty());
     symlink("/dev/null", fixture.get_lock_path("index.lock")).unwrap();
     assert!(files.observe_locks().is_err());
+    // Given
     fs::remove_file(fixture.get_lock_path("index.lock")).unwrap();
     fs::rename(fixture.0.join(".letopis"), fixture.0.join("old-service")).unwrap();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
+    // When / Then
     assert!(files.observe_locks().is_err());
     assert!(files.read_config().is_err());
 }
 
 #[test]
 fn reads_existing_config_without_mutation() {
+    // Given
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     fs::write(fixture.0.join(".letopis/config.json"), b"raw\xff").unwrap();
     let files = open_status_files(&fixture.0).unwrap();
 
+    // When / Then
     assert_eq!(files.read_config().unwrap(), Some(b"raw\xff".to_vec()));
 }
 
 #[test]
 fn status_files_child() {
+    // Given
     let Some(root) = std::env::var_os(CHILD_ROOT) else {
         return;
     };
@@ -193,7 +213,9 @@ fn status_files_child() {
         "overlong" => "000000000001garbage".to_owned(),
         other => panic!("unexpected pid case: {other}"),
     };
+    // When
     writeln!(file, "{pid}").unwrap();
     fs::write(Path::new(&root).join(format!("{name}.ready")), b"ready").unwrap();
+    // Then: keep the lock held until the parent terminates the child
     std::thread::sleep(Duration::from_secs(30));
 }

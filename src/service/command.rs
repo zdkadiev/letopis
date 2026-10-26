@@ -196,6 +196,7 @@ mod tests {
 
     #[test]
     fn preserve_local_anchor_and_range_normalization() {
+        // Given
         for (raw, expected) in [
             ("./x.md", "x.md"),
             ("a/../x.md#A", "x.md#A"),
@@ -203,6 +204,7 @@ mod tests {
             ("résumé.MD", "résumé.MD"),
             ("x.md#Lfoo-Lbar", "x.md#Lfoo-Lbar"),
         ] {
+            // When / Then
             assert_eq!(ElementAddress::parse(raw).unwrap().as_str(), expected);
         }
         for raw in [
@@ -216,6 +218,7 @@ mod tests {
             "x#L1-L18446744073709551616",
             "x\u{0}",
         ] {
+            // When / Then
             assert_eq!(
                 ElementAddress::parse(raw).unwrap_err().get_kind(),
                 CommandErrorKind::InvalidRequest
@@ -225,6 +228,7 @@ mod tests {
 
     #[test]
     fn preserve_opaque_http_addresses() {
+        // Given
         for raw in [
             "https://Host/a?q=1#L0-L2",
             "HTTP://Host/a#Anchor",
@@ -232,19 +236,23 @@ mod tests {
             "https://Host/a.md",
             "HtTp://Host/a.markdown#A",
         ] {
+            // When / Then
             assert_eq!(ElementAddress::parse(raw).unwrap().as_str(), raw);
         }
     }
 
     #[test]
     fn round_trip_http_prefix_knowledge_addresses() {
+        // Given
         for (raw, expected) in [
             ("http:notes.md", "http:notes.md"),
             ("./http:notes.md#A", "http:notes.md#A"),
             ("dir/../HTTP:notes.markdown#A", "HTTP:notes.markdown#A"),
             ("https:/Host/a.md", "https:/Host/a.md"),
         ] {
+            // When
             let parsed = ElementAddress::parse(raw).unwrap();
+            // Then
             assert_eq!(parsed.as_str(), expected);
             assert_eq!(ElementAddress::parse(expected).unwrap(), parsed);
         }
@@ -252,6 +260,7 @@ mod tests {
 
     #[test]
     fn reject_malformed_absolute_urls_and_source_http_fallbacks() {
+        // Given
         for raw in [
             "http:notes",
             "https:/Host/a",
@@ -264,17 +273,20 @@ mod tests {
             "a/../HTTP:notes",
             "https://Host/a b",
         ] {
+            // When / Then
             assert!(ElementAddress::parse(raw).is_err(), "{raw}");
         }
     }
 
     #[test]
     fn retain_error_cause_without_exposing_it_in_diagnostics() {
+        // Given / When
         let error = CommandError::new_with_cause(
             CommandErrorKind::InternalError,
             "safe failure",
             std::io::Error::other("SECRET_SENTINEL"),
         );
+        // Then
         assert_eq!(error.get_message(), "safe failure");
         assert!(
             error

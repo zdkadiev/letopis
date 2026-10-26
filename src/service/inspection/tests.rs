@@ -38,22 +38,25 @@ enum Scenario {
 }
 #[test]
 fn inspect_rejects_unmarked_candidate_changed_to_marked_source() {
+    // Given / When / Then: the helper prepares, exercises, and checks this scenario.
     assert_changed_candidate_is_rejected(Scenario::UnmarkedToMarked);
 }
 
 #[test]
 fn inspect_rejects_unmarked_candidate_changed_to_invalid_source() {
+    // Given / When / Then: the helper prepares, exercises, and checks this scenario.
     assert_changed_candidate_is_rejected(Scenario::UnmarkedToInvalid);
 }
 
 #[test]
 fn inspect_rejects_absent_candidate_changed_to_marked_source() {
+    // Given / When / Then: the helper prepares, exercises, and checks this scenario.
     assert_changed_candidate_is_rejected(Scenario::AbsentToMarked);
 }
 
 #[test]
 fn inspect_accepts_unchanged_unmarked_candidate_as_source() {
-    // Arrange
+    // Given
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut service = InspectionService::new(
         RecordingDocuments(events.clone()),
@@ -61,11 +64,11 @@ fn inspect_accepts_unchanged_unmarked_candidate_as_source() {
         RecordingFiles(events.clone(), Scenario::UnmarkedUnchanged),
         MarkdownParser::new(),
     );
-    // Act
+    // When
     let result = service
         .inspect(&[ElementAddress::parse("a.md").unwrap()])
         .unwrap();
-    // Assert
+    // Then
     assert_eq!(result.elements.len(), 1);
     assert_eq!(
         result.elements["a.md"].hash,
@@ -79,7 +82,7 @@ fn inspect_accepts_unchanged_unmarked_candidate_as_source() {
 
 #[test]
 fn inspect_keeps_absent_candidate_source_without_a_hash() {
-    // Arrange
+    // Given
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut service = InspectionService::new(
         RecordingDocuments(events.clone()),
@@ -87,18 +90,18 @@ fn inspect_keeps_absent_candidate_source_without_a_hash() {
         RecordingFiles(events.clone(), Scenario::AbsentUnchanged),
         MarkdownParser::new(),
     );
-    // Act
+    // When
     let result = service
         .inspect(&[ElementAddress::parse("a.md").unwrap()])
         .unwrap();
-    // Assert
+    // Then
     assert_eq!(result.elements.len(), 1);
     assert_eq!(result.elements["a.md"].hash, None);
     assert_eq!(events.borrow().last().map(String::as_str), Some("pin"));
 }
 #[test]
 fn capture_writes_each_blob_before_reading_the_next_file() {
-    // Arrange: sequencing at the I/O boundaries proves bounded capture.
+    // Given: sequencing at the I/O boundaries proves bounded capture.
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut service = InspectionService::new(
         RecordingDocuments(events.clone()),
@@ -106,11 +109,11 @@ fn capture_writes_each_blob_before_reading_the_next_file() {
         RecordingFiles(events.clone(), Scenario::Plain),
         MarkdownParser::new(),
     );
-    // Act
+    // When
     let inspection = service
         .inspect(&[ElementAddress::parse("a.md").unwrap()])
         .unwrap();
-    // Assert: unrequested marked files must also belong to the tree.
+    // Then: unrequested marked files must also belong to the tree.
     assert_eq!(inspection.elements.len(), 1);
     assert_eq!(
         *events.borrow(),
@@ -129,7 +132,7 @@ fn capture_writes_each_blob_before_reading_the_next_file() {
 
 #[test]
 fn inspect_reuses_captured_marked_source_after_live_edit() {
-    // Arrange: the filesystem would return different bytes on a second read.
+    // Given: the filesystem would return different bytes on a second read.
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut service = InspectionService::new(
         RecordingDocuments(events.clone()),
@@ -137,11 +140,11 @@ fn inspect_reuses_captured_marked_source_after_live_edit() {
         RecordingFiles(events.clone(), Scenario::Overlap),
         MarkdownParser::new(),
     );
-    // Act
+    // When
     let result = service
         .inspect(&[ElementAddress::parse("a.md#L2-L2").unwrap()])
         .unwrap();
-    // Assert: one captured blob serves both knowledge and source identities.
+    // Then: one captured blob serves both knowledge and source identities.
     assert_eq!(result.elements.len(), 1);
     assert_eq!(
         result.elements["a.md#L2-L2"].hash,
@@ -167,7 +170,7 @@ fn inspect_reuses_captured_marked_source_after_live_edit() {
 
 #[test]
 fn inspect_fails_when_final_pin_fails() {
-    // Arrange
+    // Given
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut service = InspectionService::new(
         RecordingDocuments(events.clone()),
@@ -175,18 +178,18 @@ fn inspect_fails_when_final_pin_fails() {
         RecordingFiles(events.clone(), Scenario::PinFailure),
         MarkdownParser::new(),
     );
-    // Act
+    // When
     let error = service
         .inspect(&[ElementAddress::parse("a.md").unwrap()])
         .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert_eq!(events.borrow().last().map(String::as_str), Some("pin"));
 }
 
 #[test]
 fn inspect_fails_safely_when_declared_source_read_has_io_error() {
-    // Arrange: corpus capture succeeds, then the source read fails with a private cause.
+    // Given: corpus capture succeeds, then the source read fails with a private cause.
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut service = InspectionService::new(
         RecordingDocuments(events.clone()),
@@ -194,14 +197,14 @@ fn inspect_fails_safely_when_declared_source_read_has_io_error() {
         RecordingFiles(events.clone(), Scenario::SourceIoFailure),
         MarkdownParser::new(),
     );
-    // Act
+    // When
     let error = service
         .inspect(&[
             ElementAddress::parse("a.md").unwrap(),
             ElementAddress::parse("source.txt").unwrap(),
         ])
         .unwrap_err();
-    // Assert: failure occurs before final assembly/pin, with no payload in diagnostics.
+    // Then: failure occurs before final assembly/pin, with no payload in diagnostics.
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert_eq!(error.get_message(), "cannot capture current elements");
     assert!(!error.to_string().contains("PRIVATE_SOURCE_BYTES"));
@@ -219,7 +222,7 @@ fn inspect_fails_safely_when_declared_source_read_has_io_error() {
 }
 
 fn assert_changed_candidate_is_rejected(scenario: Scenario) {
-    // Arrange
+    // Given
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut service = InspectionService::new(
         RecordingDocuments(events.clone()),
@@ -227,11 +230,11 @@ fn assert_changed_candidate_is_rejected(scenario: Scenario) {
         RecordingFiles(events.clone(), scenario),
         MarkdownParser::new(),
     );
-    // Act
+    // When
     let error = service
         .inspect(&[ElementAddress::parse("a.md").unwrap()])
         .unwrap_err();
-    // Assert: a changed candidate must never produce a partial retained tree.
+    // Then: a changed candidate must never produce a partial retained tree.
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert_eq!(error.get_message(), "cannot capture current elements");
     assert!(!error.to_string().contains("PRIVATE_SOURCE_BYTES"));

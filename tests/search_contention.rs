@@ -26,27 +26,30 @@ enum WritePhase {
 
 #[test]
 fn search_waits_for_drain_write_before_configuration() {
+    // Given / When / Then: the helper constructs the fixture, runs the search and checks the result.
     assert_search_survives_writer(WritePhase::BeforeConfiguration, SUCCESS);
 }
 
 #[test]
 fn query_success_waits_for_drain_write_before_clearing_diagnostic() {
+    // Given / When / Then: the helper constructs the fixture, runs the search and checks the result.
     assert_search_survives_writer(WritePhase::AfterInference, SUCCESS);
 }
 
 #[test]
 fn query_failure_waits_for_drain_write_and_returns_fts_results() {
+    // Given / When / Then: the helper constructs the fixture, runs the search and checks the result.
     assert_search_survives_writer(WritePhase::AfterInference, "malformed");
 }
 
 fn assert_search_survives_writer(phase: WritePhase, response: &str) {
-    // Arrange: production services, current vectors, and an old diagnostic.
+    // Given: production services, current vectors, and an old diagnostic.
     let (repo, server, barrier) = prepare_fixture(response);
     let searcher = wire_searcher(repo.get_root()).unwrap();
     let writer = Connection::open(repo.get_root().join(".letopis/vectors.db")).unwrap();
-    // Act: hold the same SQLite writer lock used by a drain transaction.
+    // When: hold the same SQLite writer lock used by a drain transaction.
     let links = run_during_write(searcher, &writer, &barrier, phase).unwrap();
-    // Assert: exact result and correct diagnostic publication, not just no error.
+    // Then: exact result and correct diagnostic publication, not just no error.
     assert_eq!(
         links
             .iter()

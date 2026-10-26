@@ -16,13 +16,16 @@ from validate import _reject_symlinks, validate_corpus
 
 class GeneratorTests(unittest.TestCase):
     def test_smoke_has_literal_counts_targets_and_exact_utf8_sizes(self):
+        # Given
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary).resolve() / "smoke"
             manifest = generate_corpus(output, CorpusOptions(seed=15, knowledge_count=60))
+            # When
             checked = validate_corpus(output / "corpus.json")
             first = (output / "repository/knowledge/part-0000.md").read_bytes()
             last = (output / "repository/knowledge/part-0001.md").read_bytes()
 
+            # Then
             self.assertEqual(manifest, checked)
             self.assertEqual(manifest["counts"],
                              {"knowledge": 60, "source": 60, "edges": 300, "includes": 44})
@@ -36,12 +39,15 @@ class GeneratorTests(unittest.TestCase):
             fragments = re.split(rb"(?=^## )", first, flags=re.MULTILINE)[1:]
             self.assertEqual(len(fragments), 30)
             self.assertEqual({len(fragment) for fragment in fragments}, {2000})
+            # When / Then
             self.assertGreater(len(first), len(first.decode("utf-8")))
 
     def test_bytes_are_stable_across_paths_and_hostile_git_configuration(self):
+        # Given
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
             options = CorpusOptions(seed=17, knowledge_count=60)
+            # When
             first = generate_corpus(root / "one", options)
             config = root / "hostile.gitconfig"
             config.write_text("[core]\n autocrlf = true\n[commit]\n gpgSign = true\n"
@@ -52,12 +58,14 @@ class GeneratorTests(unittest.TestCase):
                 second = generate_corpus(root / "different-parent/two", options)
                 validate_corpus(root / "different-parent/two/corpus.json")
 
+            # Then
             self.assertEqual(first, second)
             for relative in first["input_sha256"]:
                 self.assertEqual((root / "one/repository" / relative).read_bytes(),
                                  (root / "different-parent/two/repository" / relative).read_bytes())
 
     def test_includes_have_depth_at_most_three_and_sources_cross_shards(self):
+        # Given
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary).resolve() / "shards"
             generate_corpus(output, CorpusOptions(seed=15, knowledge_count=110))
@@ -74,36 +82,52 @@ class GeneratorTests(unittest.TestCase):
                 pending = [(root, ())]
                 while pending:
                     node, ancestors = pending.pop()
+                    # When / Then
                     self.assertNotIn(node, ancestors)
                     self.assertLessEqual(len(ancestors), 3)
                     pending.extend((target, (*ancestors, node)) for target in graph[node])
             last = (repository / "knowledge/part-0003.md").read_text()
             self.assertIn('sources/shard-0001.txt#L10-L10', last)
+            # When / Then
             self.assertEqual(validate_corpus(output / "corpus.json")["counts"]["source"], 110)
 
     def test_full_packing_needs_no_generated_payload(self):
+        # Given: inputs are passed inline
+        # When
         packing = plan_packing(100000, 30)
+        # Then
         self.assertEqual(len(packing), 3334)
         self.assertEqual(packing[:-1], [30] * 3333)
         self.assertEqual(packing[-1], 10)
 
     def test_small_remainder_is_redistributed(self):
+        # Given
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary).resolve() / "remainder"
+            # When
             manifest = generate_corpus(output, CorpusOptions(seed=1, knowledge_count=31))
+            # Then
             self.assertEqual(manifest["packing"]["distribution"], [21, 10])
+            # When / Then
             self.assertEqual(validate_corpus(output / "corpus.json")["counts"]["edges"], 155)
 
     def test_short_remainder_can_borrow_from_multiple_earlier_files(self):
+        # Given: inputs are passed inline
+        # When / Then
         self.assertEqual(plan_packing(40, 11), [10, 10, 10, 10])
+        # Given
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary).resolve() / "multi-donor"
+            # When
             manifest = generate_corpus(
                 output, CorpusOptions(seed=15, knowledge_count=40, elements_per_file=11))
+            # Then
             self.assertEqual(manifest["packing"]["distribution"], [10, 10, 10, 10])
+            # When / Then
             self.assertEqual(validate_corpus(output / "corpus.json")["counts"]["edges"], 200)
 
     def test_invalid_options_do_not_create_output(self):
+        # Given
         invalid = [CorpusOptions(seed=1, knowledge_count=0),
                    CorpusOptions(seed=1, knowledge_count=9),
                    CorpusOptions(seed=1, knowledge_count=11, elements_per_file=10),
@@ -114,12 +138,15 @@ class GeneratorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             for index, options in enumerate(invalid):
                 with self.subTest(options=options):
+                    # When
                     output = Path(temporary).resolve() / str(index)
+                    # When / Then
                     with self.assertRaises(ValueError):
                         generate_corpus(output, options)
                     self.assertFalse(output.exists())
 
     def test_existing_outputs_and_symlink_parents_are_rejected(self):
+        # Given
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
             existing = root / "existing"
@@ -128,28 +155,37 @@ class GeneratorTests(unittest.TestCase):
             link = root / "link"
             link.symlink_to(existing, target_is_directory=True)
             for output in (existing, link, link / "child"):
+                # When / Then
                 with self.subTest(output=output), self.assertRaises(ValueError):
                     generate_corpus(output, CorpusOptions(seed=1, knowledge_count=10))
             self.assertEqual((existing / "keep").read_text(), "preserve")
 
     def test_output_guard_rejects_lexical_parent_traversal_without_writes(self):
+        # Given: inputs are passed inline
+        # When
         base = Path(tempfile.gettempdir()).resolve() / f"letopis-path-generator-{os.getpid()}"
         intermediate, destination = base / "absent", base / "destination"
+        # Then
         self.assertFalse(base.exists())
+        # When / Then
         with self.assertRaisesRegex(ValueError, "parent traversal"):
             _validate_output(intermediate / ".." / "destination")
         self.assertFalse(intermediate.exists())
         self.assertFalse(destination.exists())
         self.assertFalse(base.exists())
+        # When / Then
         self.assertIsNone(_validate_output(base / "canonical"))
 
     def test_cli_defaults_and_flags(self):
+        # Given
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary).resolve() / "cli"
+            # When
             result = subprocess.run(["python3", "-B", str(Path(__file__).with_name("generate.py")),
                                      "--output", str(output), "--nodes", "10", "--seed", "4",
                                      "--fragment-bytes", "2101", "--elements-per-file", "10"],
                                     capture_output=True, text=True, check=False)
+            # Then
             self.assertEqual(result.returncode, 0, result.stderr)
             manifest = validate_corpus(output / "corpus.json")
             self.assertEqual(manifest["options"]["seed"], 4)
@@ -158,95 +194,130 @@ class GeneratorTests(unittest.TestCase):
 
 class ValidatorTests(unittest.TestCase):
     def test_input_guard_rejects_lexical_parent_traversal_without_writes(self):
+        # Given: inputs are passed inline
+        # When
         base = Path(tempfile.gettempdir()).resolve() / f"letopis-path-validator-{os.getpid()}"
         intermediate, destination = base / "absent", base / "corpus.json"
+        # Then
         self.assertFalse(base.exists())
+        # When / Then
         with self.assertRaisesRegex(ValueError, "parent traversal"):
             _reject_symlinks(intermediate / ".." / "corpus.json")
         self.assertFalse(intermediate.exists())
         self.assertFalse(destination.exists())
         self.assertFalse(base.exists())
+        # When / Then
         self.assertIsNone(_reject_symlinks(base / "canonical.json"))
 
     def test_rejects_cycle_even_with_updated_input_hashes(self):
+        # Given
         def mutate(text):
             return text.replace(
                 '[relation 4](knowledge/part-0000.md#node-000007 "letopis:type=depends_on")',
                 '[relation 4](knowledge/part-0000.md#node-000000 "letopis:type=includes")', 1)
+        # When / Then
         self._assert_rejected(mutate, "cycle")
 
     def test_rejects_duplicate_triples_even_with_updated_input_hashes(self):
+        # Given
         def mutate(text):
             return text.replace(
                 '[relation 2](knowledge/part-0000.md#node-000002 "letopis:type=depends_on")',
                 '[relation 2](knowledge/part-0000.md#node-000001 "letopis:type=depends_on")', 1)
+        # When / Then
         self._assert_rejected(mutate, "duplicate")
 
     def test_rejects_out_of_range_source_even_with_updated_input_hashes(self):
+        # Given: inputs are passed inline
+        # When / Then
         self._assert_rejected(lambda text: text.replace("#L1-L1", "#L101-L101", 1), "source")
 
     def test_rejects_dangling_target_even_with_updated_input_hashes(self):
+        # Given: inputs are passed inline
+        # When / Then
         self._assert_rejected(lambda text: text.replace("md#node-000001", "md#node-999999", 1),
                               "target")
 
     def test_rejects_self_link_even_with_updated_input_hashes(self):
+        # Given: inputs are passed inline
+        # When / Then
         self._assert_rejected(lambda text: text.replace("md#node-000001", "md#node-000000", 1),
                               "self")
 
     def test_rejects_removed_edge_even_with_updated_input_hashes(self):
+        # Given: inputs are passed inline
+        # When / Then
         self._assert_rejected(lambda text: re.sub(r'^\[relation 2\].*\n', '', text,
                                                   count=1, flags=re.MULTILINE), "edge")
 
     def test_rejects_shortened_payload_even_with_updated_input_hashes(self):
+        # Given: inputs are passed inline
+        # When / Then
         self._assert_rejected(lambda text: text.replace("Synthetic case", "S case", 1), "fragment")
 
     def test_rejects_unmarked_heading_that_changes_the_product_fragment_range(self):
+        # Given: inputs are passed inline
+        # When / Then
         self._assert_rejected(lambda text: text.replace("Evidence remains", "## New section  ", 1),
                               "marked")
 
     def test_rejects_extra_metadata_in_a_fragment(self):
+        # Given: inputs are passed inline
+        # When / Then
         self._assert_rejected(lambda text: text.replace("Evidence remains stable", "<!-- letopis: {} -->   ", 1),
                               "metadata")
 
     def test_rejects_code_context_graph_links_with_same_bytes_and_updated_hashes(self):
+        # Given
         for context in ("backtick fence", "tilde fence", "inline code", "spaces", "tab"):
             with self.subTest(context=context):
+                # When / Then
                 self._assert_rejected(lambda text: self._put_links_in_code(text, context), "code")
 
     def test_rejects_modified_fragment_hash(self):
+        # Given: inputs are passed inline
+        # When / Then
         self._assert_rejected(lambda text: text.replace("Synthetic", "Different", 1),
                               "hash", update_hash=False)
 
     def test_rejects_source_tree_mutation_and_symlink_input(self):
+        # Given
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary).resolve() / "fixture"
+            # When
             generate_corpus(output, CorpusOptions(seed=15, knowledge_count=10))
             source = output / "repository/sources/shard-0000.txt"
             original = source.read_bytes()
             source.write_bytes(original.replace(b"record", b"broken", 1))
             self._update_hash(output, "sources/shard-0000.txt")
+            # When / Then
             with self.assertRaisesRegex(ValueError, "source tree"):
                 validate_corpus(output / "corpus.json")
             source.write_bytes(original)
             self._update_hash(output, "sources/shard-0000.txt")
             source.unlink()
             source.symlink_to(output / "corpus.json")
+            # When / Then
             with self.assertRaisesRegex(ValueError, "symlink"):
                 validate_corpus(output / "corpus.json")
 
     def test_rejects_false_manifest_statistics_and_unlisted_inputs(self):
+        # Given
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary).resolve() / "fixture"
+            # When
             generate_corpus(output, CorpusOptions(seed=15, knowledge_count=10))
             path = output / "corpus.json"
             original = path.read_text()
             manifest = json.loads(original)
             manifest["counts"]["edges"] = 49
             path.write_text(json.dumps(manifest), encoding="utf-8")
+            # When / Then
             with self.assertRaisesRegex(ValueError, "counts"):
                 validate_corpus(path)
             path.write_text(original, encoding="utf-8")
             (output / "repository/knowledge/extra.md").write_text("unexpected", encoding="utf-8")
+            # When / Then
             with self.assertRaisesRegex(ValueError, "input"):
                 validate_corpus(path)
 

@@ -17,12 +17,12 @@ use std::{
 
 #[test]
 fn leave_remote_unknown_without_file_reads_or_retention() {
-    // Arrange
+    // Given
     let service = create_service(GitFault::None);
     let tree = create_oid('a');
     let source = SourceUri::parse("https://host/path#L1-L2").unwrap();
     let sources = BTreeSet::from([source.clone()]);
-    // Act
+    // When
     let observation = service
         .observe_sources(ProvenanceRequest {
             source_snapshot: Some(&tree),
@@ -36,7 +36,7 @@ fn leave_remote_unknown_without_file_reads_or_retention() {
             revision: &tree,
         })
         .unwrap();
-    // Assert
+    // Then
     assert!(observation.flags.is_empty());
     assert!(observation.issues.is_empty());
     assert_eq!(comparison, SourceRevisionComparison::Unfetched);
@@ -46,12 +46,12 @@ fn leave_remote_unknown_without_file_reads_or_retention() {
 
 #[test]
 fn verify_each_root_once_and_never_pin_during_read() {
-    // Arrange
+    // Given
     let service = create_service(GitFault::None);
     let tree = create_oid('a');
     let source = SourceUri::parse("a#L1-L1").unwrap();
     let sources = BTreeSet::from([source.clone(), SourceUri::parse("b").unwrap()]);
-    // Act
+    // When
     service
         .observe_sources(ProvenanceRequest {
             source_snapshot: Some(&tree),
@@ -70,7 +70,7 @@ fn verify_each_root_once_and_never_pin_during_read() {
             revision: &tree,
         })
         .unwrap();
-    // Assert
+    // Then
     assert_eq!(comparison, SourceRevisionComparison::Equal);
     assert_eq!(*service.git.verified.borrow(), [tree]);
     assert!(service.git.pins.borrow().is_empty());
@@ -78,7 +78,7 @@ fn verify_each_root_once_and_never_pin_during_read() {
 
 #[test]
 fn retain_each_unique_available_root_and_skip_missing_or_invalid() {
-    // Arrange
+    // Given
     let mut service = create_service(GitFault::None);
     let available = create_oid('a');
     let missing = create_oid('b');
@@ -97,9 +97,9 @@ fn retain_each_unique_available_root_and_skip_missing_or_invalid() {
         missing.clone(),
         invalid.clone(),
     ]);
-    // Act
+    // When
     service.retain_snapshots(&roots).unwrap();
-    // Assert
+    // Then
     assert_eq!(
         *service.git.verified.borrow(),
         [available.clone(), missing, invalid]
@@ -111,12 +111,12 @@ fn retain_each_unique_available_root_and_skip_missing_or_invalid() {
 #[test]
 fn propagate_retention_and_verification_failures_with_private_causes() {
     for fault in [GitFault::Verify, GitFault::Pin] {
-        // Arrange
+        // Given
         let service = create_service(fault);
         let roots = BTreeSet::from([create_oid('a')]);
-        // Act
+        // When
         let error = service.retain_snapshots(&roots).unwrap_err();
-        // Assert
+        // Then
         assert_private_document_error(&error);
     }
 }
@@ -124,18 +124,18 @@ fn propagate_retention_and_verification_failures_with_private_causes() {
 #[test]
 fn propagate_corruption_and_invalid_blob_instead_of_reporting_missing() {
     for fault in [GitFault::Verify, GitFault::Read, GitFault::ReadInvalid] {
-        // Arrange
+        // Given
         let service = create_service(fault);
         let tree = create_oid('a');
         let sources = BTreeSet::from([SourceUri::parse("a").unwrap()]);
-        // Act
+        // When
         let error = service
             .observe_sources(ProvenanceRequest {
                 source_snapshot: Some(&tree),
                 sources: &sources,
             })
             .unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
         assert!(error.source().is_some());
         assert!(!error.to_string().contains("PRIVATE_PROVENANCE_CAUSE"));
@@ -144,19 +144,19 @@ fn propagate_corruption_and_invalid_blob_instead_of_reporting_missing() {
 
 #[test]
 fn propagate_unsafe_live_capture_without_exposing_private_cause() {
-    // Arrange
+    // Given
     let mut service = create_service(GitFault::None);
     service.filesystem.fail = true;
     let tree = create_oid('a');
     let sources = BTreeSet::from([SourceUri::parse("a").unwrap()]);
-    // Act
+    // When
     let error = service
         .observe_sources(ProvenanceRequest {
             source_snapshot: Some(&tree),
             sources: &sources,
         })
         .unwrap_err();
-    // Assert
+    // Then
     assert_private_document_error(&error);
 }
 
@@ -167,11 +167,11 @@ fn preserve_requested_revision_corruption_and_invalid_blob_classifications() {
         (GitFault::Read, SnapshotErrorKind::InternalError),
         (GitFault::ReadInvalid, SnapshotErrorKind::InvalidRequest),
     ] {
-        // Arrange
+        // Given
         let service = create_service(fault);
         let tree = create_oid('a');
         let source = SourceUri::parse("a").unwrap();
-        // Act
+        // When
         let error = service
             .compare_revision(SourceRevisionRequest {
                 source_snapshot: Some(&tree),
@@ -179,7 +179,7 @@ fn preserve_requested_revision_corruption_and_invalid_blob_classifications() {
                 revision: &tree,
             })
             .unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), expected);
         assert!(!error.get_message().contains("PRIVATE_PROVENANCE_CAUSE"));
         if expected == SnapshotErrorKind::InternalError {

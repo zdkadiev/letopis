@@ -201,6 +201,7 @@ mod tests {
 
     #[test]
     fn pages_use_directional_indexes_without_temporary_order_sorts() {
+        // Given
         let mut db = Connection::open_in_memory().unwrap();
         bootstrap_cache(&mut db).unwrap();
         let filters = [
@@ -211,6 +212,7 @@ mod tests {
                 EdgeType::parse("supports").unwrap(),
             ]),
         ];
+        // When / Then: inspect plans across directions, modes, and filters.
         for direction in [NeighborDirection::Outgoing, NeighborDirection::Incoming] {
             for mode in [
                 TraversalMode::Relations,
@@ -224,6 +226,7 @@ mod tests {
 
     #[test]
     fn narrow_basis_query_deduplicates_non_null_roots_and_rejects_bad_oids() {
+        // Given
         let mut db = Connection::open_in_memory().unwrap();
         bootstrap_cache(&mut db).unwrap();
         db.execute_batch("INSERT INTO nodes(id,kind,uri,hash,created_at,source_snapshot,line_start,line_end,search_hash) VALUES
@@ -231,7 +234,9 @@ mod tests {
             ('b.md','vertex','b.md','unused',1,NULL,1,1,'unused'),
             ('c.md','vertex','c.md','unused',1,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',1,1,'unused'),
             ('d.md','vertex','d.md','unused',1,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,1,'unused');").unwrap();
+        // When
         let roots = list_source_snapshots(&db).unwrap();
+        // Then
         assert_eq!(
             roots,
             BTreeSet::from([
@@ -250,11 +255,13 @@ mod tests {
             !plan.iter().any(|line| line.contains("TEMP B-TREE")),
             "{plan:?}"
         );
+        // Given: introduce a malformed snapshot identity.
         db.execute(
             "UPDATE nodes SET source_snapshot='malformed' WHERE id='b.md'",
             [],
         )
         .unwrap();
+        // When / Then
         assert_eq!(
             list_source_snapshots(&db).unwrap_err().get_kind(),
             StorageErrorKind::InternalError

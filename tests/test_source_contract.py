@@ -18,28 +18,28 @@ class SourceContractTests(unittest.TestCase):
         cls.validator = Draft202012Validator(schema["$defs"]["SourceId"])
 
     def test_accept_source_addresses(self):
-        # Arrange
+        # Given
         for address in [
             "src/a.rs", "src/Я%2f.rs#L1-L20",
             "HTTP://Host/a?x=%2f#L01-L02", "https://host#arbitrary",
         ]:
             with self.subTest(address=address):
-                # Act
+                # When
                 errors = list(self.validator.iter_errors(address))
-                # Assert
+                # Then
                 self.assertEqual(errors, [])
 
     def test_reject_malformed_addresses(self):
-        # Arrange
+        # Given
         for address in [
             "/absolute", "a\n", "a\0", "https://", "http:///a",
             "https://?query", "HTTP:/host/a", "https:host", "http:bad://host", "https://host/a b",
             "https://host/\\a", "https://host/\x7f", "https://host/\u2003",
         ]:
             with self.subTest(address=address):
-                # Act
+                # When
                 errors = list(self.validator.iter_errors(address))
-                # Assert
+                # Then
                 self.assertTrue(errors)
 
 

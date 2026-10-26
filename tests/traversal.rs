@@ -12,14 +12,17 @@ use support::reading::ReadingRepo;
 
 #[test]
 fn traverses_without_configuration_with_source_urls_and_ranges() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "[child](b.md \"letopis:type=includes\") [code](code.rs#L2-L2 \"letopis:type=external\") [url](https://Host/x?q=1#part \"letopis:type=external\")");
     repo.write_knowledge("b.md", "child");
     repo.write("code.rs", b"one\ntwo\n");
+    // When
     let output = wire_traverser(repo.get_root())
         .unwrap()
         .traverse(&make_request("a.md"))
         .unwrap();
+    // Then
     assert_eq!(
         output
             .elements
@@ -50,24 +53,31 @@ fn traverses_without_configuration_with_source_urls_and_ranges() {
 
 #[test]
 fn distinguishes_missing_source_membership_from_removed_final_reference() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "[code](missing.rs \"letopis:type=external\")");
     let mut service = wire_traverser(repo.get_root()).unwrap();
     let mut request = make_request("missing.rs");
     request.direction = TraversalDirection::Incoming;
+    // When
     let output = service.traverse(&request).unwrap();
+    // Then
     assert_eq!(output.elements[0].element_id.as_str(), "a.md");
     assert_eq!(
         output.elements[0].flags,
         BTreeSet::from([SearchFlag::SourceChanged, SearchFlag::SourceNotFound])
     );
+    // Given
     repo.write_knowledge("a.md", "reference removed");
+    // When
     let error = service.traverse(&request).unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
 }
 
 #[test]
 fn retains_last_valid_knowledge_as_stale_and_missing_source_flag() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "a.md",
@@ -78,7 +88,9 @@ fn retains_last_valid_knowledge_as_stale_and_missing_source_flag() {
     let mut service = wire_traverser(repo.get_root()).unwrap();
     service.traverse(&make_request("a.md")).unwrap();
     repo.write("b.md", b"<!-- letopis: {broken} -->\nSECRET");
+    // When
     let output = service.traverse(&make_request("a.md")).unwrap();
+    // Then
     assert_eq!(
         output.elements[0].flags,
         BTreeSet::from([SearchFlag::SourceNotFound])
@@ -95,6 +107,7 @@ fn retains_last_valid_knowledge_as_stale_and_missing_source_flag() {
 
 #[test]
 fn propagates_unsafe_source_errors_without_private_paths_or_payloads() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "[code](code.rs \"letopis:type=external\")");
     repo.write("code.rs", b"SECRET");
@@ -102,7 +115,9 @@ fn propagates_unsafe_source_errors_without_private_paths_or_payloads() {
     service.traverse(&make_request("a.md")).unwrap();
     std::fs::remove_file(repo.get_root().join("code.rs")).unwrap();
     std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("code.rs")).unwrap();
+    // When
     let error = service.traverse(&make_request("a.md")).unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert!(!format!("{error:?}").contains("SECRET"));
     assert!(!error.to_string().contains("/private/tmp"));
@@ -110,6 +125,7 @@ fn propagates_unsafe_source_errors_without_private_paths_or_payloads() {
 
 #[test]
 fn observes_late_source_binding_even_when_traversing_only_containment() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "[child](b.md \"letopis:type=includes\")");
     let mut body = String::new();
@@ -126,10 +142,12 @@ fn observes_late_source_binding_even_when_traversing_only_containment() {
     request
         .edge_types
         .insert(letopis::domain::EdgeType::parse("includes").unwrap());
+    // When
     let output = wire_traverser(repo.get_root())
         .unwrap()
         .traverse(&request)
         .unwrap();
+    // Then
     assert_eq!(output.elements.len(), 1);
     assert_eq!(output.elements[0].element_id.as_str(), "b.md");
     assert_eq!(
@@ -140,6 +158,7 @@ fn observes_late_source_binding_even_when_traversing_only_containment() {
 
 #[test]
 fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "a.md",
@@ -161,10 +180,14 @@ fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
     let mut service = wire_traverser(repo.get_root()).unwrap();
     let mut request = make_request("a.md");
     request.limit = NonZeroUsize::new(1).unwrap();
+    // When
     let output = service.traverse(&request).unwrap();
+    // Then
     assert_eq!(output.elements[0].element_id.as_str(), "b.md");
     request.limit = NonZeroUsize::new(2).unwrap();
+    // When
     let error = service.traverse(&request).unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert!(!format!("{error:?}").contains("PRIVATE_INVALID"));
     let busy: i64 = connection
@@ -182,13 +205,16 @@ fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
 
 #[test]
 fn resolves_markdown_shaped_source_by_stored_membership() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "[source](plain.md \"letopis:type=external\")");
     repo.write("plain.md", b"unmarked Markdown source");
+    // When
     let output = wire_traverser(repo.get_root())
         .unwrap()
         .traverse(&make_request("a.md"))
         .unwrap();
+    // Then
     assert_eq!(output.elements[0].element_id.as_str(), "plain.md");
     assert_eq!(output.elements[0].path.as_str(), "plain.md");
     assert_eq!(output.elements[0].lines, None);
@@ -197,16 +223,21 @@ fn resolves_markdown_shaped_source_by_stored_membership() {
 
 #[test]
 fn distinguishes_nonregular_sources_from_missing_local_flags() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "[code](code.rs \"letopis:type=external\")");
     let mut service = wire_traverser(repo.get_root()).unwrap();
+    // When
     let output = service.traverse(&make_request("a.md")).unwrap();
+    // Then
     assert_eq!(
         output.elements[0].flags,
         BTreeSet::from([SearchFlag::SourceNotFound])
     );
     std::fs::create_dir(repo.get_root().join("code.rs")).unwrap();
+    // When
     let error = service.traverse(&make_request("a.md")).unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     let busy: i64 = connection
@@ -214,8 +245,10 @@ fn distinguishes_nonregular_sources_from_missing_local_flags() {
         .unwrap();
     assert_eq!(busy, 0);
     std::fs::remove_dir(repo.get_root().join("code.rs")).unwrap();
+    // Given
     repo.write("code.rs", b"now available");
     repo.write_knowledge("a.md", "[code](code.rs \"letopis:type=external\") changed");
+    // When / Then
     assert!(
         service.traverse(&make_request("a.md")).unwrap().elements[0]
             .flags

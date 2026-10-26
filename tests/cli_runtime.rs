@@ -13,6 +13,7 @@ use tempfile::TempDir;
 
 #[test]
 fn malformed_requests_fail_before_service_directory_creation() {
+    // Given
     let root = make_repository();
     for (args, input) in [
         (vec!["unknown"], "{}"),
@@ -47,13 +48,16 @@ fn malformed_requests_fail_before_service_directory_creation() {
         ),
         (vec!["embed", "--drain"], "{\"extra\":1}"),
     ] {
+        // When
         let output = invoke(root.path(), &args, input.as_bytes(), false);
+        // Then
         assert_error(&output, "invalid_request");
         assert!(!root.path().join(".letopis").exists());
     }
 }
 #[test]
 fn nested_invalid_requests_do_not_initialize_repository_or_child() {
+    // Given
     let root = make_repository();
     let nested = root.path().join("nested");
     fs::create_dir(&nested).unwrap();
@@ -85,6 +89,7 @@ fn nested_invalid_requests_do_not_initialize_repository_or_child() {
             "invalid_request",
         ),
     ] {
+        // When / Then
         assert_error(&invoke(&nested, &args, input.as_bytes(), false), code);
         assert!(!root.path().join(".letopis").exists());
         assert!(!nested.join(".letopis").exists());
@@ -93,11 +98,13 @@ fn nested_invalid_requests_do_not_initialize_repository_or_child() {
 
 #[test]
 fn check_preserves_corpus_index_and_refs_after_lost_response() {
+    // Given
     let root = make_repository();
     let corpus = fs::read(root.path().join("knowledge.md")).unwrap();
     let index = fs::read(root.path().join(".git/index")).unwrap();
     let refs = run_git(root.path(), &["show-ref"]);
     let lost = invoke(root.path(), &["check"], b"{}", true);
+    // When / Then
     assert_eq!(lost.status.code(), Some(0));
     assert!(lost.stderr.is_empty());
     for _ in 0..2 {
@@ -122,7 +129,7 @@ fn missing_current_directory_uses_one_safe_envelope_after_input_validation() {
         ("{}", "internal_error", "cannot locate command directory"),
         ("null", "invalid_request", "invalid command input"),
     ] {
-        // Arrange: keep the child blocked on stdin until its cwd is removed.
+        // Given: keep the child blocked on stdin until its cwd is removed.
         let root = tempfile::tempdir().unwrap();
         let mut child = Command::new(env!("CARGO_BIN_EXE_letopis"))
             .arg("check")
@@ -133,7 +140,7 @@ fn missing_current_directory_uses_one_safe_envelope_after_input_validation() {
             .spawn()
             .unwrap();
         fs::remove_dir(root.path()).unwrap();
-        // Act: parsing happens first; composition failure uses the same writer.
+        // When: parsing happens first; composition failure uses the same writer.
         child
             .stdin
             .take()
@@ -141,7 +148,7 @@ fn missing_current_directory_uses_one_safe_envelope_after_input_validation() {
             .write_all(body.as_bytes())
             .unwrap();
         let output = child.wait_with_output().unwrap();
-        // Assert: neither the removed path nor a raw OS diagnostic escapes.
+        // Then: neither the removed path nor a raw OS diagnostic escapes.
         assert_eq!(output.status.code(), Some(1));
         assert!(output.stderr.is_empty());
         assert_eq!(

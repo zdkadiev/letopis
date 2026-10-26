@@ -1,4 +1,4 @@
-use super::{Candidates, CountingMarkdown, TestFiles, TestProvenance, build_service};
+use super::{CountingMarkdown, TestFiles, TestProvenance, build_candidates, build_service};
 use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
     service::{
@@ -25,6 +25,7 @@ struct RetainingProvenance;
 
 #[test]
 fn warm_refresh_reads_basis_roots_without_loading_nodes() {
+    // Given
     let (_root, mut initial) = build_service();
     initial.refresh().unwrap();
     let mut node = initial
@@ -44,7 +45,7 @@ fn warm_refresh_reads_basis_roots_without_loading_nodes() {
     write.commit().unwrap();
     let reads = Rc::new(Cell::new(0));
     let mut service = DocumentRefresher {
-        git: Candidates,
+        git: build_candidates(),
         filesystem: TestFiles::new(),
         markdown: CountingMarkdown(Cell::new(0)),
         storage: ReadingStorage {
@@ -53,7 +54,9 @@ fn warm_refresh_reads_basis_roots_without_loading_nodes() {
         },
         provenance: RetainingProvenance,
     };
+    // When
     let result = service.refresh().unwrap();
+    // Then
     assert!(!result.published);
     assert_eq!(result.revision, 2);
     assert_eq!(reads.get(), 2);

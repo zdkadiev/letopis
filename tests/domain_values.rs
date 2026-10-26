@@ -6,47 +6,47 @@ use std::collections::BTreeSet;
 
 #[test]
 fn ids_and_sources_normalize_from_git_root() {
-    // Arrange: each case supplies raw input and its canonical form.
+    // Given: each case supplies raw input and its canonical form.
     for (raw, want) in [
         ("./src/../src/a.rs#L010-L025", "src/a.rs#L10-L25"),
         ("src/A.rs", "src/A.rs"),
         ("src/тест.rs#L1-L1", "src/тест.rs#L1-L1"),
     ] {
-        // Act
+        // When
         let source = SourceUri::parse(raw).unwrap();
-        // Assert
+        // Then
         assert_eq!(source.as_str(), want);
     }
-    // Arrange
+    // Given
     for (raw, want) in [
         ("./knowledge/a.md#wal", "knowledge/a.md#wal"),
         ("A.markdown", "A.markdown"),
         ("a/../b.md", "b.md"),
     ] {
-        // Act
+        // When
         let id = KnowledgeId::parse(raw).unwrap();
-        // Assert
+        // Then
         assert_eq!(id.as_str(), want);
     }
 }
 
 #[test]
 fn anchors_and_ranges_reject_invalid_values() {
-    // Arrange
+    // Given
     for raw in ["", "1start", "L01-L02", "has space", "a.b", "якорь"] {
-        // Act
+        // When
         let anchor = Anchor::parse(raw);
-        // Assert
+        // Then
         assert!(anchor.is_err(), "{raw}");
     }
-    // Arrange
+    // Given
     for raw in ["a", "WAL", "a_b-12", "L1", "Lx-Ly", "L1-Lx", "Lx-L2"] {
-        // Act
+        // When
         let anchor = Anchor::parse(raw);
-        // Assert
+        // Then
         assert!(anchor.is_ok(), "{raw}");
     }
-    // Arrange
+    // Given
     for raw in [
         "/tmp/a.rs",
         "../a.rs",
@@ -62,23 +62,23 @@ fn anchors_and_ranges_reject_invalid_values() {
         "a\n.rs",
         "a.rs#L1-L2#bad",
     ] {
-        // Act
+        // When
         let source = SourceUri::parse(raw);
-        // Assert
+        // Then
         assert!(source.is_err(), "{raw:?}");
     }
-    // Arrange
+    // Given
     for raw in ["src/a.rs", "a.md#L1-L2", "a.md#", "a.md#x#y"] {
-        // Act
+        // When
         let id = KnowledgeId::parse(raw);
-        // Assert
+        // Then
         assert!(id.is_err(), "{raw}");
     }
-    // Act: invalid byte and line ranges have independent constructors.
+    // When: invalid byte and line ranges have independent constructors.
     let bytes = ByteSpan::new(2, 1);
     let zero_line = LineRange::new(0, 1);
     let reversed_lines = LineRange::new(2, 1);
-    // Assert
+    // Then
     assert!(bytes.is_err());
     assert!(zero_line.is_err());
     assert!(reversed_lines.is_err());
@@ -86,15 +86,15 @@ fn anchors_and_ranges_reject_invalid_values() {
 
 #[test]
 fn tree_oids_are_full_lowercase_hex() {
-    // Arrange: these independent wire-length oracles cover both Git formats.
+    // Given: these independent wire-length oracles cover both Git formats.
     for n in [40, 64] {
         let raw = "a".repeat(n);
-        // Act
+        // When
         let oid = TreeOid::parse(&raw).unwrap();
-        // Assert
+        // Then
         assert_eq!(oid.as_str(), raw);
     }
-    // Arrange
+    // Given
     for raw in [
         "a".repeat(39),
         "a".repeat(41),
@@ -102,16 +102,16 @@ fn tree_oids_are_full_lowercase_hex() {
         "g".repeat(64),
         format!("{}\n", "a".repeat(40)),
     ] {
-        // Act
+        // When
         let oid = TreeOid::parse(&raw);
-        // Assert
+        // Then
         assert!(oid.is_err());
     }
 }
 
 #[test]
 fn sha256_uses_exact_bytes() {
-    // Arrange
+    // Given
     for (bytes, expected) in [
         (
             b"abc".as_slice(),
@@ -122,23 +122,23 @@ fn sha256_uses_exact_bytes() {
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         ),
     ] {
-        // Act
+        // When
         let hash = Sha256::digest(bytes);
-        // Assert
+        // Then
         assert_eq!(hash.to_hex(), expected);
     }
-    // Arrange
+    // Given
     let lf = b"x\n";
     let crlf = b"x\r\n";
-    // Act
+    // When
     let hashes = (Sha256::digest(lf), Sha256::digest(crlf));
-    // Assert
+    // Then
     assert_ne!(hashes.0, hashes.1);
 }
 
 #[test]
 fn edge_identity_and_kind_are_derived() {
-    // Arrange
+    // Given
     let a = KnowledgeId::parse("a.md").unwrap();
     let b = KnowledgeId::parse("b.md").unwrap();
     let edge = Edge::new(
@@ -147,39 +147,39 @@ fn edge_identity_and_kind_are_derived() {
         EdgeType::parse("includes").unwrap(),
     )
     .unwrap();
-    // Act
+    // When
     let mut edges = BTreeSet::from([edge.clone(), edge]);
-    // Assert
+    // Then
     assert_eq!(edges.len(), 1);
 
-    // Arrange
+    // Given
     let other = Edge::new(
         a.clone(),
         EdgeTarget::Knowledge(b.clone()),
         EdgeType::parse("depends_on").unwrap(),
     )
     .unwrap();
-    // Act
+    // When
     edges.insert(other);
     let source_kind = derive_element_kind(&a, &edges);
     let target_kind = derive_element_kind(&b, &edges);
-    // Assert
+    // Then
     assert_eq!(edges.len(), 2);
     assert_eq!(source_kind, ElementKind::Metavertex);
     assert_eq!(target_kind, ElementKind::Vertex);
 
-    // Arrange / Act: metadata accepts the epoch without a snapshot.
+    // Given / When: metadata accepts the epoch without a snapshot.
     let metadata = ElementMetadata {
         created_at: 0,
         source_snapshot: None,
     };
-    // Assert
+    // Then
     assert_eq!(metadata.created_at, 0);
 }
 
 #[test]
 fn edge_targets_and_self_loops_are_checked() {
-    // Arrange
+    // Given
     let a = KnowledgeId::parse("a.md").unwrap();
     let b = KnowledgeId::parse("b.md").unwrap();
     for (target, kind, valid) in [
@@ -202,23 +202,25 @@ fn edge_targets_and_self_loops_are_checked() {
         ),
     ] {
         let edge_type = EdgeType::parse(kind).unwrap();
-        // Act
+        // When
         let edge = Edge::new(a.clone(), target, edge_type);
-        // Assert
+        // Then
         assert_eq!(edge.is_ok(), valid);
     }
-    // Arrange
+    // Given
     for raw in ["", "Includes", "a-b", "a b", "1a"] {
-        // Act
+        // When
         let kind = EdgeType::parse(raw);
-        // Assert
+        // Then
         assert!(kind.is_err());
     }
 }
 
 #[test]
 fn sha256_hex_round_trip_and_invalid_inputs() {
+    // Given
     let hash = Sha256::digest(b"alpha");
+    // When / Then
     assert_eq!(Sha256::parse(&hash.to_hex()), Ok(hash));
     for raw in ["A".repeat(64), "a".repeat(63), "g".repeat(64)] {
         assert_eq!(Sha256::parse(&raw), Err(ValueError::InvalidHash));
@@ -227,7 +229,7 @@ fn sha256_hex_round_trip_and_invalid_inputs() {
 
 #[test]
 fn only_outgoing_includes_edges_make_an_element_a_metavertex() {
-    // Arrange
+    // Given
     let source = KnowledgeId::parse("source.md").unwrap();
     let target = KnowledgeId::parse("target.md").unwrap();
     for (kind, expected) in [
@@ -241,7 +243,7 @@ fn only_outgoing_includes_edges_make_an_element_a_metavertex() {
         )
         .unwrap();
         let edges = BTreeSet::from([edge]);
-        // Act / Assert
+        // When / Then
         assert_eq!(derive_element_kind(&source, &edges), expected);
         assert_eq!(derive_element_kind(&target, &edges), ElementKind::Vertex);
     }
@@ -253,7 +255,7 @@ fn only_outgoing_includes_edges_make_an_element_a_metavertex() {
 
 #[test]
 fn value_errors_describe_the_validation_failure() {
-    // Arrange
+    // Given
     for (error, expected) in [
         (ValueError::InvalidHash, "invalid SHA-256 hash"),
         (ValueError::InvalidPath, "invalid root-relative path"),
@@ -264,14 +266,16 @@ fn value_errors_describe_the_validation_failure() {
         (ValueError::InvalidTarget, "invalid edge target"),
         (ValueError::SelfLoop, "self-loop"),
     ] {
-        // Act / Assert
+        // When / Then
         assert_eq!(error.to_string(), expected);
     }
 }
 
 #[test]
 fn blob_oids_preserve_both_formats_and_reject_noncanonical_input() {
+    // Given
     for raw in ["0123456789abcdef".repeat(4), "f".repeat(40)] {
+        // When / Then
         assert_eq!(BlobOid::parse(&raw).unwrap().as_str(), raw);
     }
     for raw in [

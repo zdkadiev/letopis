@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn object_output_requires_canonical_oid_in_the_repository_format() {
-        // Arrange: output shape has no object-kind semantics.
+        // Given: output shape has no object-kind semantics.
         for length in [40, 64] {
             let git = GitCli {
                 root: PathBuf::new(),
@@ -313,7 +313,7 @@ mod tests {
             };
             let db = ObjectDb { git: &git };
             let valid = "0123456789abcdef".repeat(4)[..length].to_owned();
-            // Act / Assert
+            // When / Then
             assert_eq!(
                 db.parse_oid_text(format!("{valid}\n").as_bytes()).unwrap(),
                 valid

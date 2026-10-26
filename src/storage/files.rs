@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn rejects_an_out_of_range_persisted_valid_flag() {
-        // Arrange: malformed persisted data can pair valid=2 with an error.
+        // Given: malformed persisted data can pair valid=2 with an error.
         let connection = Connection::open_in_memory().unwrap();
         connection.execute_batch(
             "CREATE TABLE files(path, size, mtime_ns, inode, hash, checked_at_ns, valid, error);
@@ -129,9 +129,9 @@ mod tests {
                '0000000000000000000000000000000000000000000000000000000000000000',
                0, 2, 'invalid file');",
         ).unwrap();
-        // Act
+        // When
         let error = list_files(&connection).unwrap_err();
-        // Assert: an invalid boolean representation cannot become a valid row.
+        // Then: an invalid boolean representation cannot become a valid row.
         assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     }
 }

@@ -39,9 +39,11 @@ mod tests {
 
     #[test]
     fn native_capabilities_match_pinned_stack() {
+        // Given
         register_vec1().unwrap();
         let root = tempfile::TempDir::new().unwrap();
         let connection = open_database(&root.path().join("native.db")).unwrap();
+        // When / Then: probe the native version and required capabilities.
         assert!(rusqlite::version_number() >= 3_051_003);
         let info: String = connection
             .query_row("SELECT vec1_info()", [], |row| row.get(0))

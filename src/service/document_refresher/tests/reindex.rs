@@ -4,16 +4,16 @@ use rusqlite::Connection;
 
 #[test]
 fn reindex_rebuilds_unchanged_fts_and_advances_once() {
-    // Arrange: FTS is deliberately missing while file fingerprints are unchanged.
+    // Given: FTS is deliberately missing while file fingerprints are unchanged.
     let (dir, mut service) = build_service();
     service.refresh().unwrap();
     let db = Connection::open(dir.path().join("cache.db")).unwrap();
     db.execute("DELETE FROM text_index", []).unwrap();
     assert!(!service.refresh().unwrap().published);
     assert!(read_matches(&mut service, "AlphaToken").is_empty());
-    // Act.
+    // When.
     let rebuilt = service.reindex().unwrap();
-    // Assert: this must not be an incremental no-op.
+    // Then: this must not be an incremental no-op.
     assert_eq!(
         (rebuilt.revision, rebuilt.published, rebuilt.files_updated),
         (2, true, 1)
@@ -29,7 +29,7 @@ fn reindex_reparses_identical_valid_unmarked_and_invalid_bytes() {
         &b"ordinary markdown\n"[..],
         &b"<!-- letopis: invalid -->"[..],
     ] {
-        // Arrange.
+        // Given.
         let (_dir, mut service) = build_service();
         service.filesystem.bytes.replace(bytes.to_vec());
         service.filesystem.stat.update(|mut stat| {
@@ -39,9 +39,9 @@ fn reindex_reparses_identical_valid_unmarked_and_invalid_bytes() {
         service.refresh().unwrap();
         let parses = service.markdown.0.get();
         service.filesystem.reset_counts();
-        // Act.
+        // When.
         let outcome = service.reindex().unwrap();
-        // Assert.
+        // Then.
         assert_eq!(outcome.revision, 2);
         assert!(service.markdown.0.get() > parses);
         assert_eq!(service.filesystem.locks.get(), 1);
@@ -51,15 +51,15 @@ fn reindex_reparses_identical_valid_unmarked_and_invalid_bytes() {
 
 #[test]
 fn reindex_capture_failure_preserves_complete_publication() {
-    // Arrange: fail the publication capture after detection and preflight.
+    // Given: fail the publication capture after detection and preflight.
     let (_dir, mut service) = build_service();
     service.refresh().unwrap();
     let before = service.storage.begin_read().unwrap().list_files().unwrap();
     service.filesystem.reset_counts();
     service.filesystem.fail_on_read.set(Some(3));
-    // Act.
+    // When.
     assert!(service.reindex().is_err());
-    // Assert.
+    // Then.
     let mut read = service.storage.begin_read().unwrap();
     assert_eq!(read.get_revision(), 1);
     assert_eq!(read.list_files().unwrap(), before);

@@ -19,6 +19,7 @@ class Interruption(unittest.TestCase):
     def test_outer_interrupt_keeps_sources_and_terminates_nested_command(self):
         # The outer workspace is itself disposable so the RED reproducer cannot
         # corrupt the developer's untracked files. The actual full runner is used.
+        # Given
         with tempfile.TemporaryDirectory(prefix="tk4-interrupt-") as temp, tempfile.TemporaryDirectory(prefix="tk4-sock-", dir="/tmp") as channel:
             root = copy_crates(Path(temp))
             build = root / ".build"
@@ -43,8 +44,10 @@ class Interruption(unittest.TestCase):
                     line = conn.makefile("rb").readline()
                     event = json.loads(line)
                     mutant = Path(event["path"])
+                    # Given: validate the live fixture before the interruption.
                     self.assertTrue(mutant.is_file(), "hook must observe an actual written mutant")
                     self.assertNotEqual(hashlib.sha256(mutant.read_bytes()).hexdigest(), original[root / "src/launch.rs"], "hook did not observe an actual mutant")
+                    # When
                     runner.send_signal(signal.SIGINT)  # direct owned unreaped Popen
                     try:
                         returncode = runner.wait(timeout=20)
@@ -58,6 +61,7 @@ class Interruption(unittest.TestCase):
                     changed = [str(p.relative_to(root)) for p, h in original.items() if hashlib.sha256(p.read_bytes()).hexdigest() != h]
                     print(json.dumps({"changed_sources": changed, "nested_command_eof": gone, "runner_exit": returncode,
                                       "nested_group": event["group"], "mutation_group": event["parent_group"]}), flush=True)
+                    # Then
                     self.assertEqual(changed, [], "outer interruption left a mutant in original sources")
                     self.assertTrue(gone, "nested command escaped outer interruption")
                     self.assertIsNotNone(returncode, "outer runner did not finish after interruption")
@@ -81,6 +85,7 @@ class Interruption(unittest.TestCase):
                     runner.wait(timeout=20)
                     log.seek(0)
                     if runner.returncode == 0:
+                        # When / Then
                         self.fail("interrupted full runner unexpectedly succeeded")
 
 

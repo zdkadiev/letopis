@@ -15,16 +15,19 @@ use support::{
 
 #[test]
 fn search_refreshes_and_returns_only_knowledge_links() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "a.md",
         "sqlite\n[source](src/sqlite.rs \"letopis:type=external\")",
     );
     repo.write("plain.md", b"sqlite");
+    // When
     let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 10))
         .unwrap();
+    // Then
     assert_eq!(links.len(), 1);
     assert_eq!(links[0].element_id.as_str(), "a.md");
     assert_eq!(links[0].path.as_str(), "a.md");
@@ -37,6 +40,7 @@ fn search_refreshes_and_returns_only_knowledge_links() {
 }
 #[test]
 fn fts_literals_work_on_native_tokenizer() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("all.md", "SQLite OR блокировки NEAR x title café 42");
     repo.write_knowledge("partial.md", "SQLite");
@@ -46,7 +50,9 @@ fn fts_literals_work_on_native_tokenizer() {
         "\"NEAR(x*)\" title:café 42",
         "CAFÉ блокировки 42",
     ] {
+        // When
         let links = search.search(&make_request(query, 10)).unwrap();
+        // Then
         assert_eq!(
             links
                 .iter()
@@ -58,6 +64,7 @@ fn fts_literals_work_on_native_tokenizer() {
 }
 #[test]
 fn empty_query_never_calls_match_or_provider() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     let server = HttpFixture::start(FixtureReply::Status {
@@ -72,6 +79,7 @@ fn empty_query_never_calls_match_or_provider() {
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     repo.write_knowledge("b.md", "new");
     for query in ["", " * : () \" "] {
+        // When / Then
         assert!(
             wire_searcher(repo.get_root())
                 .unwrap()
@@ -85,6 +93,7 @@ fn empty_query_never_calls_match_or_provider() {
 }
 #[test]
 fn search_uses_prepared_vectors_and_actual_query_client() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite sqlite sqlite");
     repo.write_knowledge("b.md", "sqlite plus padding words");
@@ -107,10 +116,12 @@ fn search_uses_prepared_vectors_and_actual_query_client() {
             ("c.md", &[1.0, 0.0]),
         ],
     );
+    // When
     let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap();
+    // Then
     assert_eq!(
         links
             .iter()
@@ -130,6 +141,7 @@ fn search_uses_prepared_vectors_and_actual_query_client() {
 }
 #[test]
 fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
+    // Given
     if run_with_credentials("provider_failure_sets_query_error_without_search_warning_or_attempts")
     {
         return;
@@ -146,10 +158,12 @@ fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
         .refresh()
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
+    // When
     let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap();
+    // Then
     assert_eq!(links.len(), 1);
     assert!(links[0].flags.is_empty());
     let mut storage = repo.open_storage();
@@ -169,6 +183,7 @@ fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
 }
 #[test]
 fn invalid_live_knowledge_retains_pinned_link_as_stale() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     wire_document_refresher(repo.get_root())
@@ -176,10 +191,12 @@ fn invalid_live_knowledge_retains_pinned_link_as_stale() {
         .refresh()
         .unwrap();
     repo.write("a.md", b"<!-- letopis: {invalid} -->\ncurrent");
+    // When
     let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap();
+    // Then
     assert_eq!(links.len(), 1);
     assert_eq!(
         links[0].flags.iter().copied().collect::<Vec<_>>(),
@@ -189,6 +206,7 @@ fn invalid_live_knowledge_retains_pinned_link_as_stale() {
 }
 #[test]
 fn search_propagates_non_config_io_failures() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     wire_document_refresher(repo.get_root())
@@ -197,14 +215,17 @@ fn search_propagates_non_config_io_failures() {
         .unwrap();
     std::fs::remove_file(repo.get_root().join("a.md")).unwrap();
     std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("a.md")).unwrap();
+    // When
     let error = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
 }
 #[test]
 fn unreadable_invalid_and_missing_configuration_permit_fts_without_provider() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     for state in ["missing", "invalid", "unreadable"] {
@@ -216,10 +237,12 @@ fn unreadable_invalid_and_missing_configuration_permit_fts_without_provider() {
             }
             _ => {}
         }
+        // When
         let links = wire_searcher(repo.get_root())
             .unwrap()
             .search(&make_request("sqlite", 2))
             .unwrap();
+        // Then
         assert_eq!(
             links
                 .iter()
@@ -231,6 +254,7 @@ fn unreadable_invalid_and_missing_configuration_permit_fts_without_provider() {
 }
 #[test]
 fn missing_vector_dimensions_skip_inference_and_shared_hashes_keep_distinct_ids() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "same sqlite");
     repo.write_knowledge("b.md", "same sqlite");
@@ -240,7 +264,9 @@ fn missing_vector_dimensions_skip_inference_and_shared_hashes_keep_distinct_ids(
     });
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     let mut search = wire_searcher(repo.get_root()).unwrap();
+    // When
     let first = search.search(&make_request("sqlite", 10)).unwrap();
+    // Then
     assert_eq!(first.len(), 2);
     assert!(server.take_requests().is_empty());
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
@@ -256,6 +282,7 @@ fn missing_vector_dimensions_skip_inference_and_shared_hashes_keep_distinct_ids(
 }
 #[test]
 fn mismatched_persisted_knowledge_uri_fails_even_beyond_final_limit() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite sqlite sqlite");
     repo.write_knowledge("b.md", "sqlite plus extra words");
@@ -270,14 +297,17 @@ fn mismatched_persisted_knowledge_uri_fails_even_beyond_final_limit() {
             ["wrong.md", "b.md"],
         )
         .unwrap();
+    // When
     let error = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 1))
         .unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
 }
 #[test]
 fn stale_coordinates_are_observed_without_replacing_pinned_lines() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     wire_document_refresher(repo.get_root())
@@ -288,10 +318,12 @@ fn stale_coordinates_are_observed_without_replacing_pinned_lines() {
     connection
         .execute("UPDATE nodes SET line_start = 2 WHERE id = ?1", ["a.md"])
         .unwrap();
+    // When
     let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap();
+    // Then
     assert_eq!(links[0].lines, LineRange::new(2, 2).unwrap());
     assert_eq!(
         links[0].flags.iter().copied().collect::<Vec<_>>(),
@@ -300,6 +332,7 @@ fn stale_coordinates_are_observed_without_replacing_pinned_lines() {
 }
 #[test]
 fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "old sqlite");
     repo.write_knowledge("b.md", "old semantic");
@@ -315,10 +348,12 @@ fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
     repo.seed_vectors(&config, &[("a.md", &[0.0, 1.0]), ("b.md", &[1.0, 0.0])]);
     repo.write_knowledge("a.md", "current sqlite");
     repo.write_knowledge("b.md", "current unrelated");
+    // When
     let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 10))
         .unwrap();
+    // Then
     assert_eq!(
         links
             .iter()

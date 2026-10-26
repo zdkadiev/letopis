@@ -25,7 +25,7 @@ const PRESERVED_PATHS: [&str; 6] = [
 
 #[test]
 fn derive_minimum_from_effective_references() {
-    // Arrange: equivalent spellings and duplicate links share one range identity.
+    // Given: equivalent spellings and duplicate links share one range identity.
     let repo = DocumentRepo::new();
     repo.write("source.txt", b"one\ntwo\nthree\n");
     let duplicate = build_external(3, "./source.txt#L02-L03", "EarlyToken");
@@ -35,19 +35,26 @@ fn derive_minimum_from_effective_references() {
     );
     repo.write("late.md", build_external(8, RANGE, "LateToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
+    // When
     refresher.refresh().unwrap();
     let first = repo.read_state();
+    // Then
     assert_eq!(get_source(&first, RANGE).uri.as_str(), "source.txt#L2-L3");
     assert_eq!(get_source(&first, RANGE).created_at, 3);
     assert_eq!(first.edges.len(), 2);
 
-    // Act/Assert: removal recomputes time from the remaining effective edge.
+    // Given: the earliest referrer is removed.
     repo.remove("early.md");
+    // When
     refresher.refresh().unwrap();
+    // Then
     assert_eq!(get_source(&repo.read_state(), RANGE).created_at, 8);
+    // Given
     repo.write("late.md", "<!-- letopis: {broken} -->\ninvalid\n");
+    // When
     refresher.refresh().unwrap();
     let invalid = repo.read_state();
+    // Then
     assert!(!invalid.get_file("late.md").valid);
     assert_eq!(get_source(&invalid, RANGE).created_at, 8);
     assert_eq!(invalid.edges.len(), 1);
@@ -58,16 +65,23 @@ fn derive_minimum_from_effective_references() {
     );
     assert_eq!(repo.search("LateToken"), ["late.md"]);
 
+    // Given
     repo.remove("late.md");
+    // When
     refresher.refresh().unwrap();
+    // Then
     assert!(repo.read_state().nodes.is_empty());
+    // Given
     repo.write("new.md", build_external(11, RANGE, "NewToken"));
+    // When
     refresher.refresh().unwrap();
+    // Then
     assert_eq!(get_source(&repo.read_state(), RANGE).created_at, 11);
 }
 
 #[test]
 fn recompute_minimum_after_earliest_referrer_edit() {
+    // Given
     let repo = DocumentRepo::new();
     repo.write("early.md", build_external(3, RANGE, "EarlyToken"));
     repo.write("late.md", build_external(8, RANGE, "LateToken"));
@@ -78,6 +92,7 @@ fn recompute_minimum_after_earliest_referrer_edit() {
     refresher.refresh().unwrap();
 
     let state = repo.read_state();
+    // When / Then
     assert_eq!(get_source(&state, RANGE).created_at, 8);
     assert_eq!(state.edges.len(), 1);
     assert_eq!(repo.search("EditedToken"), ["early.md"]);
@@ -85,6 +100,7 @@ fn recompute_minimum_after_earliest_referrer_edit() {
 
 #[test]
 fn preserve_whole_and_range_nodes_when_source_file_disappears() {
+    // Given
     let repo = DocumentRepo::new();
     repo.write("source.txt", b"one\ntwo\nthree\n");
     repo.write("whole.md", build_external(4, "source.txt", "WholeToken"));
@@ -92,11 +108,13 @@ fn preserve_whole_and_range_nodes_when_source_file_disappears() {
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
     refresher.refresh().unwrap();
     let before = repo.read_state();
+    // When / Then
     assert_eq!(get_source(&before, "source.txt").created_at, 4);
     assert_eq!(get_source(&before, RANGE).created_at, 8);
     assert_eq!(before.nodes.len(), 4);
 
     // Touch referrers so projection observes the absent file too.
+    // Given
     repo.remove("source.txt");
     repo.write(
         "whole.md",
@@ -106,6 +124,7 @@ fn preserve_whole_and_range_nodes_when_source_file_disappears() {
     refresher.refresh().unwrap();
 
     let missing = repo.read_state();
+    // When / Then
     assert_eq!(missing.nodes.len(), 4);
     assert_eq!(get_source(&missing, "source.txt").hash, None);
     assert_eq!(get_source(&missing, RANGE).hash, None);
@@ -116,6 +135,7 @@ fn preserve_whole_and_range_nodes_when_source_file_disappears() {
 
 #[test]
 fn reject_source_knowledge_collision_without_publishing_or_changing_fts() {
+    // Given
     let repo = DocumentRepo::new();
     repo.write("knowledge.md", build_whole(1, "OriginalToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
@@ -126,8 +146,10 @@ fn reject_source_knowledge_collision_without_publishing_or_changing_fts() {
         build_external(2, "knowledge.md", "RejectedToken"),
     );
 
+    // When
     let error = refresher.refresh().unwrap_err();
 
+    // Then
     assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
     assert_eq!(repo.read_state(), before);
     assert_eq!(repo.search("OriginalToken"), ["knowledge.md"]);
@@ -136,6 +158,7 @@ fn reject_source_knowledge_collision_without_publishing_or_changing_fts() {
 
 #[test]
 fn rebuild_source_identity_from_canonical_files() {
+    // Given
     let repo = DocumentRepo::new();
     repo.write("source.txt", b"one\ntwo\nthree\n");
     repo.write(
@@ -155,6 +178,7 @@ fn rebuild_source_identity_from_canonical_files() {
         ("source.txt".to_owned(), 5),
         ("source.txt#L2-L3".to_owned(), 3),
     ];
+    // When / Then
     assert_eq!(before, expected);
     let vectors = fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap();
 
@@ -172,6 +196,7 @@ fn rebuild_source_identity_from_canonical_files() {
 
 #[test]
 fn repair_legacy_url_only_after_explicit_cache_rebuild() {
+    // Given
     let repo = DocumentRepo::new();
     repo.write(
         "remote.md",
@@ -191,6 +216,7 @@ fn repair_legacy_url_only_after_explicit_cache_rebuild() {
     // This explicit fixture-only upgrade is the compatibility boundary.
     let lock = read_index_lock(&repo);
     remove_fixture_cache(&repo);
+    // When / Then
     assert_eq!(read_index_lock(&repo), lock);
     refresh_once(&repo);
     assert_eq!(read_index_lock(&repo).0, lock.0);

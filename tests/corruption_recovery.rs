@@ -51,8 +51,10 @@ struct CanonicalState {
 
 #[test]
 fn reindex_recovers_explicitly_removed_cache_vectors_or_both() {
+    // Given
     for targets in [&[CACHE][..], &[VECTORS][..], &[CACHE, VECTORS][..]] {
         for damage in [Damage::Missing, Damage::NonemptyCorrupt] {
+            // When / Then: the helper performs recovery and checks the recovered state.
             verify_removed_databases_recover(targets, damage);
         }
     }
@@ -60,7 +62,7 @@ fn reindex_recovers_explicitly_removed_cache_vectors_or_both() {
 
 #[test]
 fn reindex_preserves_healthy_vectors_after_corrupt_cache_removal() {
-    // Arrange: every current knowledge hash has a known two-dimensional vector.
+    // Given: every current knowledge hash has a known two-dimensional vector.
     let repo = publish_fixture();
     let provider = HttpFixture::start(FixtureReply::Status {
         status: 500,
@@ -74,7 +76,7 @@ fn reindex_preserves_healthy_vectors_after_corrupt_cache_removal() {
     let _embed_lock = files.try_lock_embed().unwrap().unwrap();
     corrupt_owned_database(repo.get_root(), CACHE);
 
-    // Act / Assert: damage persists until the operator explicitly removes cache only.
+    // When / Then: damage persists until the operator explicitly removes cache only.
     assert_persistent_corruption(&repo, &[CACHE], &canonical);
     remove_owned_database(repo.get_root(), CACHE);
     assert_missing_cache_status(&repo);
@@ -86,7 +88,7 @@ fn reindex_preserves_healthy_vectors_after_corrupt_cache_removal() {
     assert_retained_vectors(&repo, &config, &hashes);
     assert_eq!(capture_canonical_state(&repo), canonical);
 
-    // Act / Assert: reopen storage and use another CLI process to prove stability.
+    // When / Then: reopen storage and use another CLI process to prove stability.
     assert_eq!(
         invoke_reindex(&repo),
         json!({"ok":true,"result":{"revision":2}})
@@ -101,7 +103,7 @@ fn reindex_preserves_healthy_vectors_after_corrupt_cache_removal() {
 }
 
 fn verify_removed_databases_recover(targets: &[&str], damage: Damage) {
-    // Arrange: a real publication counter of three must not be invented after loss.
+    // Given: a real publication counter of three must not be invented after loss.
     let repo = publish_fixture();
     let canonical = capture_canonical_state(&repo);
     if matches!(damage, Damage::NonemptyCorrupt) {
@@ -111,7 +113,7 @@ fn verify_removed_databases_recover(targets: &[&str], damage: Damage) {
         assert_persistent_corruption(&repo, targets, &canonical);
     }
 
-    // Act: all own connections and CLI children have closed before physical loss.
+    // When: all own connections and CLI children have closed before physical loss.
     for target in targets {
         remove_owned_database(repo.get_root(), target);
     }
@@ -124,7 +126,7 @@ fn verify_removed_databases_recover(targets: &[&str], damage: Damage) {
         json!({"ok":true,"result":{"revision":revision}})
     );
 
-    // Assert: only text projections recover without a configured inference provider.
+    // Then: only text projections recover without a configured inference provider.
     assert_projection(&repo, revision);
     assert_empty_vectors(&repo);
     assert_eq!(capture_canonical_state(&repo), canonical);

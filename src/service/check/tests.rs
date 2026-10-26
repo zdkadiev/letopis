@@ -47,6 +47,7 @@ struct Verifier {
 
 #[test]
 fn check_reports_missing_address_from_selected_knowledge() {
+    // Given
     let directory = tempfile::tempdir().unwrap();
     let mut storage = open_storage(&directory);
     publish_nodes(&mut storage, &[build_node("a.md#one", "a")]);
@@ -72,8 +73,10 @@ fn check_reports_missing_address_from_selected_knowledge() {
         },
     );
 
+    // When
     let report = service.check(&[RepoPath::parse("a.md").unwrap()]).unwrap();
 
+    // Then
     assert_eq!(report.errors.len(), 2);
     assert_eq!(report.errors[1].details["reason"], "source_not_found");
     assert_eq!(report.errors[1].details["path"], "a.md");
@@ -82,6 +85,7 @@ fn check_reports_missing_address_from_selected_knowledge() {
 
 #[test]
 fn check_refreshes_before_opening_one_read() {
+    // Given
     let directory = tempfile::tempdir().unwrap();
     let storage = open_storage(&directory);
     let mut writer = open_storage(&directory);
@@ -112,8 +116,10 @@ fn check_refreshes_before_opening_one_read() {
         },
     );
 
+    // When
     let report = service.check(&[]).unwrap();
 
+    // Then
     assert_eq!(*events.borrow(), ["refresh", "read", "diagnostics"]);
     assert_eq!(*probes.borrow(), ["a".repeat(40)]);
     assert_eq!(
@@ -126,6 +132,7 @@ fn check_refreshes_before_opening_one_read() {
 
 #[test]
 fn check_reuses_same_view_for_each_knowledge_observation() {
+    // Given
     let directory = tempfile::tempdir().unwrap();
     let mut writer = open_storage(&directory);
     publish_nodes(
@@ -147,8 +154,10 @@ fn check_reuses_same_view_for_each_knowledge_observation() {
         },
     );
 
+    // When
     let report = service.check(&[]).unwrap();
 
+    // Then
     assert_eq!(*probes.borrow(), ["a".repeat(40), "a".repeat(40)]);
     assert_eq!(
         get_findings(&report.errors),
@@ -157,8 +166,9 @@ fn check_reuses_same_view_for_each_knowledge_observation() {
             {"path":"b.md","reason":"source_snapshot_unavailable","element_id":"b.md","target":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
         ])
     );
-    // A new invocation must observe the newly committed metadata and probe afresh.
+    // When: a new invocation observes the newly committed metadata.
     let report = service.check(&[]).unwrap();
+    // Then
     assert_eq!(
         *probes.borrow(),
         [
@@ -174,11 +184,14 @@ fn check_reuses_same_view_for_each_knowledge_observation() {
 
 #[test]
 fn check_propagates_refresh_storage_and_git_failures_without_partial_report() {
+    // Given
     let directory = tempfile::tempdir().unwrap();
     let events = Events::default();
     let probes = Probes::default();
+    // When / Then
     assert_refresh_failure(&directory, &events, &probes);
     assert_storage_failure(&directory, &events, &probes);
+    // Given
     let mut storage = open_storage(&directory);
     publish_nodes(&mut storage, &[build_node("a.md", "a")]);
     let mut git_failure = CheckService::new(
@@ -192,13 +205,16 @@ fn check_propagates_refresh_storage_and_git_failures_without_partial_report() {
         },
     );
 
+    // When / Then
     assert_private_failure(&git_failure.check(&[]).unwrap_err());
 
+    // Then
     assert_eq!(*probes.borrow(), ["a".repeat(40)]);
 }
 
 #[test]
 fn check_filters_snapshot_owners_before_probing_git() {
+    // Given
     let directory = tempfile::tempdir().unwrap();
     let mut storage = open_storage(&directory);
     publish_nodes(
@@ -217,6 +233,7 @@ fn check_filters_snapshot_owners_before_probing_git() {
         },
     );
 
+    // When / Then
     assert!(
         service
             .check(&[RepoPath::parse("absent.md").unwrap()])
@@ -224,11 +241,13 @@ fn check_filters_snapshot_owners_before_probing_git() {
             .errors
             .is_empty()
     );
+    // Then
     assert!(probes.borrow().is_empty());
 }
 
 #[test]
 fn check_propagates_metadata_read_failure_after_graph_findings() {
+    // Given
     let directory = tempfile::tempdir().unwrap();
     let storage = open_storage(&directory);
     rusqlite::Connection::open(directory.path().join("cache.db"))
@@ -246,8 +265,10 @@ fn check_propagates_metadata_read_failure_after_graph_findings() {
         },
     );
 
+    // When
     let error = service.check(&[]).unwrap_err();
 
+    // Then
     assert_private_failure(&error);
     assert_eq!(error.get_message(), "cannot read corpus for check");
 }

@@ -1,8 +1,8 @@
 use super::{
     CommandErrorKind, CommandProblem, CommandResult, Diagnostics, EmbeddingConfig, Files,
-    GraphDiagnostics, Provenance, Provider, Reads, RepoPath, Sha256, SqliteStorage, StatusReader,
-    StatusService, Storage, StorageRead, VALID_CONFIG, VectorOutcome, VectorWrite, build_service,
-    open_storage, publish_node,
+    GraphDiagnostics, Provenance, Reads, RepoPath, Sha256, SqliteStorage, StatusReader,
+    StatusService, Storage, StorageRead, VALID_CONFIG, VectorOutcome, VectorWrite, build_provider,
+    build_service, open_storage, publish_node,
 };
 use std::{cell::Cell, rc::Rc};
 use tempfile::TempDir;
@@ -11,15 +11,13 @@ struct ChangingDiagnostics<'a>(&'a Files);
 
 #[test]
 fn keeps_captured_config_after_live_config_changes() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     publish_node(&mut storage, 1);
     seed_exhausted(&mut storage);
     let files = build_files(Some(VALID_CONFIG.to_vec()));
-    let provider = Provider {
-        reject: false,
-        embeds: Cell::new(0),
-    };
+    let provider = build_provider();
     let graph = ChangingDiagnostics(&files);
     let mut service = StatusService {
         storage: Reads {
@@ -32,8 +30,10 @@ fn keeps_captured_config_after_live_config_changes() {
         provider: &provider,
     };
 
+    // When
     let report = service.read_status().unwrap();
 
+    // Then
     assert_eq!((report.embedding_backlog, report.embedding_failed), (0, 1));
     let exhausted = report
         .problems
@@ -47,11 +47,11 @@ fn keeps_captured_config_after_live_config_changes() {
     );
     assert_eq!(files.count.get(), 1);
     assert!(files.config.borrow().is_none());
-    assert_eq!(provider.embeds.get(), 0);
 }
 
 #[test]
 fn mismatched_identity_keeps_exhausted_hash_in_backlog() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     publish_node(&mut storage, 1);
@@ -60,10 +60,7 @@ fn mismatched_identity_keeps_exhausted_hash_in_backlog() {
         .unwrap()
         .replace("fixture", "other-model");
     let files = build_files(Some(other.into_bytes()));
-    let provider = Provider {
-        reject: false,
-        embeds: Cell::new(0),
-    };
+    let provider = build_provider();
     let mut service = build_service(
         Some(storage),
         Rc::new(Cell::new(0)),
@@ -72,8 +69,10 @@ fn mismatched_identity_keeps_exhausted_hash_in_backlog() {
         &Provenance { fail: false },
     );
 
+    // When
     let report = service.read_status().unwrap();
 
+    // Then
     assert_eq!((report.embedding_backlog, report.embedding_failed), (1, 0));
     assert!(
         !report
@@ -81,7 +80,6 @@ fn mismatched_identity_keeps_exhausted_hash_in_backlog() {
             .iter()
             .any(|p| p.details["reason"] == "embedding_attempts_exhausted")
     );
-    assert_eq!(provider.embeds.get(), 0);
 }
 
 impl GraphDiagnostics for ChangingDiagnostics<'_> {

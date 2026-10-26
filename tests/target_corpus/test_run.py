@@ -38,7 +38,10 @@ class RunnerTests(unittest.TestCase):
         self.addCleanup(self.model_patch.stop)
 
     def test_load_pins_explicit_config_and_holds_barrier_through_observer(self) -> None:
+        # Given: fixture prepared by setUp
+        # When
         result = self._run("load", "load")
+        # Then
         self.assertEqual(result, 0)
         receipt = self._read("load/runner-receipt.json")
         self.assertEqual(receipt["status"], "backlog")
@@ -53,50 +56,68 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual((self.repository / ".letopis/embed.lock").stat().st_mode & 0o777, 0o600)
 
     def test_evidence_collision_keeps_old_receipt_byte_identical(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         old = (self.root / "load/runner-receipt.json").read_bytes()
+        # When / Then
         self.assertEqual(self._run("load", "load"), 1)
         self.assertEqual((self.root / "load/runner-receipt.json").read_bytes(), old)
 
     def test_config_and_model_drift_rejected_before_product(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         config = self.repository / ".letopis/config.json"
         original = config.read_bytes()
         config.write_bytes(original + b" ")
+        # When / Then
         self.assertEqual(self._run("drain", "config-drift"), 1)
         self.assertFalse((self.root / "config-drift/drain-process.json").exists())
         config.write_bytes(original)
         with patch.object(runner, "inspect_model", return_value={"name": runner.MODEL,
                                                                 "digest": "b" * 64}):
+            # When / Then
             self.assertEqual(self._run("drain", "model-drift"), 1)
         self.assertEqual(self._read("model-drift/runner-receipt.json")["verdict"], "not_assessed")
         self.assertFalse((self.repository / ".letopis/coverage").exists())
 
     def test_binary_and_input_drift_rejected_before_commands(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         self.binary.write_text(self.binary.read_text() + "\n# changed\n")
+        # When / Then
         self.assertEqual(self._run("drain", "binary-drift"), 1)
         path = self.repository / "knowledge/part-0000.md"
         path.write_bytes(path.read_bytes() + b"\n")
+        # When / Then
         self.assertEqual(self._run("observe", "input-drift"), 1)
         self.assertFalse((self.root / "input-drift/observer-process.json").exists())
 
     def test_timeout_observes_partial_coverage_and_resume_preserves_vectors(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         with patch.dict(os.environ, {"CONTROL": "partial"}):
+            # When / Then
             self.assertEqual(self._run("drain", "partial", "--max-seconds", "0.1"), 1)
         partial = self._read("partial/runner-receipt.json")
         self.assertEqual(partial["observation"]["covered_nodes"], 3)
         self.assertEqual(self._read("partial/drain-process.json")["outcome"], "timeout")
         saved = (self.root / "partial/observation.json").read_bytes()
+        # When / Then
         self.assertEqual(self._run("drain", "complete"), 0)
         self.assertEqual(self._read("complete/runner-receipt.json")["verdict"], "populated")
         self.assertEqual((self.root / "partial/observation.json").read_bytes(), saved)
         self.assertEqual((self.repository / ".letopis/preserved").read_text(), "three-vectors")
 
     def test_nonzero_still_observes_and_sanitizes_process_output(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         with patch.dict(os.environ, {"CONTROL": "failure"}):
+            # When / Then
             self.assertEqual(self._run("drain", "failure"), 1)
         self.assertEqual(self._read("failure/drain-process.json")["outcome"], "nonzero")
         self.assertEqual(self._read("failure/runner-receipt.json")["observation"]["missing_nodes"], 10)
@@ -104,61 +125,82 @@ class RunnerTests(unittest.TestCase):
         self.assertNotIn(b"private-provider-canary", all_bytes)
 
     def test_observe_never_drains_or_rewrites_config_and_is_incomplete(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         config = self.repository / ".letopis/config.json"
         before = config.stat()
+        # When / Then
         self.assertEqual(self._run("observe", "observe"), 1)
         self.assertEqual(config.stat().st_mtime_ns, before.st_mtime_ns)
         self.assertFalse((self.root / "observe/drain-process.json").exists())
         self.assertFalse((self.repository / ".letopis/coverage").exists())
 
     def test_interrupted_load_reuses_pin_and_config_without_reset(self) -> None:
+        # Given
         with patch.dict(os.environ, {"CONTROL": "load-failure"}):
+            # When / Then
             self.assertEqual(self._run("load", "failed-load"), 1)
         pin = (self.corpus.parent / "runner-pin.json").read_bytes()
         config = self.repository / ".letopis/config.json"
         before = config.stat().st_mtime_ns
+        # When / Then
         self.assertEqual(self._run("load", "retry-load"), 0)
         self.assertTrue((self.root / "retry-load/before-observation.json").exists())
         self.assertEqual(config.stat().st_mtime_ns, before)
         self.assertEqual((self.corpus.parent / "runner-pin.json").read_bytes(), pin)
 
     def test_missing_config_after_initial_pin_recovers_only_before_databases(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         config = self.repository / ".letopis/config.json"
         original = config.read_bytes()
         config.unlink()
+        # When / Then
         self.assertEqual(self._run("load", "deleted-config"), 1)
         for leaf in ("cache.db", "vectors.db"):
             (self.repository / ".letopis" / leaf).unlink()
+        # When / Then
         self.assertEqual(self._run("load", "pin-before-config"), 0)
         self.assertEqual(config.read_bytes(), original)
 
     def test_occupied_lock_and_symlink_lock_are_rejected_without_touching_owner(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         lock = self.repository / ".letopis/embed.lock"
         with lock.open("r+b") as stream:
             fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # When / Then
             self.assertEqual(self._run("drain", "busy"), 1)
             self.assertFalse((self.root / "busy/drain-process.json").exists())
         lock.unlink()
         other = self.root / "unrelated"
         other.write_text("owner")
         lock.symlink_to(other)
+        # When / Then
         self.assertEqual(self._run("load", "symlink"), 1)
         self.assertEqual(other.read_text(), "owner")
 
     def test_collapsed_hashes_and_false_populated_coverage_fail(self) -> None:
+        # Given
         with patch.dict(os.environ, {"CONTROL": "collapsed"}):
+            # When / Then
             self.assertEqual(self._run("load", "collapsed"), 1)
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         with patch.dict(os.environ, {"CONTROL": "false-populated"}):
+            # When / Then
             self.assertEqual(self._run("observe", "false-populated"), 1)
         self.assertEqual(self._read("false-populated/runner-receipt.json")["verdict"], "not_assessed")
 
     def test_observer_failure_has_durable_not_assessed_receipt(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         with patch.dict(os.environ, {"CONTROL": "observer-failure"}):
+            # When / Then
             self.assertEqual(self._run("observe", "observer-failure"), 1)
         result = self._read("observer-failure/runner-receipt.json")
         self.assertEqual(result["status"], "failed")
@@ -166,19 +208,26 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result["verdict"], "not_assessed")
 
     def test_environment_isolates_git_and_provider_credentials(self) -> None:
+        # Given
         with patch.dict(os.environ, {"GIT_DIR": "/bad", "OPENAI_API_KEY": "private-key",
                                     "LETOPIS_CORPUS_REQUEST": "/bad"}):
+            # When / Then
             self.assertEqual(self._run("load", "load"), 0)
 
     def test_invalid_cli_success_is_rejected_even_with_valid_observation(self) -> None:
+        # Given
         with patch.dict(os.environ, {"CONTROL": "bad-json"}):
+            # When / Then
             self.assertEqual(self._run("load", "bad-json"), 1)
         self.assertEqual(self._read("bad-json/refresh-process.json")["outcome"], "invalid_response")
         self.assertIsNotNone(self._read("bad-json/runner-receipt.json")["observation"])
 
     def test_exhaustion_is_incomplete_even_when_eligible_is_zero(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         with patch.dict(os.environ, {"CONTROL": "exhausted"}):
+            # When / Then
             self.assertEqual(self._run("drain", "exhausted"), 1)
         receipt = self._read("exhausted/runner-receipt.json")
         self.assertEqual(receipt["observation"]["eligible_hashes"], 0)
@@ -186,33 +235,44 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(receipt["verdict"], "not_assessed")
 
     def test_missing_cached_identity_rejected_before_drain_can_reset_vectors(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         with patch.dict(os.environ, {"CONTROL": "observer-failure"}):
+            # When / Then
             self.assertEqual(self._run("drain", "before-failure"), 1)
         self.assertFalse((self.root / "before-failure/drain-process.json").exists())
         self.assertFalse((self.repository / ".letopis/coverage").exists())
 
     def test_explicit_config_rejects_remote_provider_before_product(self) -> None:
+        # Given
         config = self.root / "unsafe-config.json"
         config.write_text(json.dumps({"provider": "openai", "model": runner.MODEL,
                                       "max_retries": 2, "parameters": {"base_url": "https://api.example"}}))
+        # When / Then
         self.assertEqual(self._run("load", "remote", "--config", str(config)), 1)
         self.assertFalse((self.root / "remote/refresh-process.json").exists())
 
     def test_watchdog_reaps_owned_child_and_records_its_identity(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         with patch.dict(os.environ, {"CONTROL": "partial"}):
+            # When / Then
             self.assertEqual(self._run("drain", "reaped", "--max-seconds", "0.1"), 1)
         record = self._read("reaped/drain-process.json")
         self.assertEqual(record["outcome"], "timeout")
+        # When / Then
         with self.assertRaises(ProcessLookupError):
             os.kill(record["child_pid"], 0)
 
     def test_lock_rejects_parent_replaced_with_symlink_while_owned(self) -> None:
+        # Given
         service = self.repository / ".letopis"
         service.mkdir(mode=0o700)
         moved = self.repository / "moved-service"
         try:
+            # When / Then
             with self.assertRaises(ValueError):
                 with runner._own_lock(service / "embed.lock"):
                     service.rename(moved)
@@ -222,14 +282,19 @@ class RunnerTests(unittest.TestCase):
             moved.rename(service)
 
     def test_cli_structural_errors_and_duplicate_keys_are_rejected(self) -> None:
+        # Given
         for output in (b'[]\n', b'{"ok":true,"ok":true,"result":[]}\n',
                        b'{"ok":true,"result":[],"warnings":"bad"}\n'):
+            # When / Then
             with self.subTest(output=output), self.assertRaises(ValueError):
                 runner._verify_response(output, "search", 0)
+        # When / Then
         with self.assertRaises(ValueError):
             runner._verify_response(b'{"ok":false,"error":{"code":"internal_error"}}\n', "search", 1)
 
     def test_resumed_load_rejects_stored_identity_before_refresh_preserving_state(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         old_receipt = (self.root / "load/runner-receipt.json").read_bytes()
         vectors = self.repository / ".letopis/vectors.db"
@@ -238,6 +303,7 @@ class RunnerTests(unittest.TestCase):
         (self.repository / ".letopis/coverage").write_text("3")
         (self.repository / ".letopis/preserved").write_text("three-vectors")
         before = vectors.read_bytes()
+        # When / Then
         self.assertEqual(self._run("load", "stale-load"), 1)
         self.assertFalse((self.root / "stale-load/refresh-process.json").exists())
         self.assertEqual(vectors.read_bytes(), before)
@@ -246,23 +312,30 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual((self.root / "load/runner-receipt.json").read_bytes(), old_receipt)
 
     def test_first_initialization_resumes_missing_empty_and_unconfigured_vectors(self) -> None:
+        # Given: fixture prepared by setUp
+        # When / Then
         self.assertEqual(self._run("load", "load"), 0)
         vectors = self.repository / ".letopis/vectors.db"
         vectors.unlink()
+        # When / Then
         self.assertEqual(self._run("load", "missing-vectors"), 0)
         vectors.write_bytes(b"")
+        # When / Then
         self.assertEqual(self._run("load", "empty-vectors"), 0)
         vectors.unlink()
         with sqlite3.connect(vectors) as database:
             database.execute("PRAGMA user_version=0")
+        # When / Then
         self.assertEqual(self._run("load", "empty-version-zero"), 0)
         with sqlite3.connect(vectors) as database:
             database.execute("DELETE FROM meta")
+        # When / Then
         self.assertEqual(self._run("load", "unconfigured-vectors"), 0)
         with sqlite3.connect(vectors) as database:
             database.execute("DELETE FROM meta")
             database.execute("INSERT INTO vector_keys VALUES(1, 'existing-key')")
         before = vectors.read_bytes()
+        # When / Then
         self.assertEqual(self._run("load", "unconfigured-with-keys"), 1)
         self.assertEqual(vectors.read_bytes(), before)
         self.assertFalse((self.root / "unconfigured-with-keys/refresh-process.json").exists())
@@ -280,24 +353,33 @@ class RunnerTests(unittest.TestCase):
 
 class PathTests(unittest.TestCase):
     def test_evidence_guard_rejects_lexical_parent_traversal_without_writes(self) -> None:
+        # Given: inputs are passed inline
+        # When
         base = Path(tempfile.gettempdir()).resolve() / f"letopis-path-runner-{os.getpid()}"
         intermediate, destination = base / "absent", base / "evidence"
+        # Then
         self.assertFalse(base.exists())
+        # When / Then
         with self.assertRaisesRegex(ValueError, "parent traversal"):
             runner._verify_path(intermediate / ".." / "evidence", exists=False)
         self.assertFalse(intermediate.exists())
         self.assertFalse(destination.exists())
         self.assertFalse(base.exists())
+        # When / Then
         self.assertIsNone(runner._verify_path(base / "canonical", exists=False))
 
 
 class LocalHttpTests(unittest.TestCase):
     def test_installed_model_inspection_never_pulls_or_uses_remote_model(self) -> None:
+        # Given
         with _serve_provider() as server:
             config = {"parameters": {"base_url": f"http://127.0.0.1:{server.server_port}/api"}}
+            # When
             result = runner.inspect_model(config)
+            # Then
             self.assertEqual(result, {"name": "embeddinggemma:300m-qat-q4_0", "digest": "c" * 64})
             server.remote_model = True
+            # When / Then
             with self.assertRaises(ValueError):
                 runner.inspect_model(config)
             self.assertEqual(server.paths, ["/api/tags", "/api/tags"])
@@ -305,6 +387,7 @@ class LocalHttpTests(unittest.TestCase):
     @unittest.skipUnless(os.environ.get("LETOPIS_TARGET_BINARY") and os.environ.get("LETOPIS_TARGET_OBSERVER"),
                          "set explicit compiled binary paths for actual CLI controlled-HTTP integration")
     def test_actual_cli_lock_barrier_then_timeout_and_resume(self) -> None:
+        # Given
         with tempfile.TemporaryDirectory(prefix="target-http-") as temporary, _serve_provider() as server:
             root = Path(temporary).resolve()
             generate_corpus(root / "corpus", CorpusOptions(15, 60))
@@ -314,6 +397,7 @@ class LocalHttpTests(unittest.TestCase):
             common = ["--corpus", str(root / "corpus/corpus.json"), "--binary",
                 os.environ["LETOPIS_TARGET_BINARY"], "--observer", os.environ["LETOPIS_TARGET_OBSERVER"]]
             with contextlib.redirect_stdout(io.StringIO()):
+                # When / Then
                 self.assertEqual(runner.main([*common, "--phase", "load", "--evidence", str(root / "load"),
                                                "--config", str(config)]), 0)
                 self.assertEqual(server.paths, ["/api/tags"])
@@ -321,10 +405,13 @@ class LocalHttpTests(unittest.TestCase):
                 vectors = root / "corpus/repository/.letopis/vectors.db"
                 with sqlite3.connect(vectors) as database:
                     database.execute("DELETE FROM meta")
+                # When / Then
                 self.assertEqual(runner.main([*common, "--phase", "load", "--evidence", str(root / "first-init")]), 0)
 
+                # When / Then
                 self.assertEqual(runner.main([*common, "--phase", "drain", "--evidence", str(root / "bounded"),
                                                "--max-seconds", "0.15"]), 1)
+                # When / Then
                 self.assertEqual(runner.main([*common, "--phase", "drain", "--evidence", str(root / "complete"),
                                                "--max-seconds", "30"]), 0)
             receipt = json.loads((root / "complete/observation.json").read_text())
@@ -337,6 +424,7 @@ class LocalHttpTests(unittest.TestCase):
                 database.execute("UPDATE meta SET config_identity = ?", ("d" * 64,))
             saved = vectors.read_bytes()
             with contextlib.redirect_stdout(io.StringIO()):
+                # When / Then
                 self.assertEqual(runner.main([*common, "--phase", "load", "--evidence", str(root / "stale")]), 1)
             self.assertFalse((root / "stale/refresh-process.json").exists())
             self.assertEqual(vectors.read_bytes(), saved)
@@ -344,6 +432,7 @@ class LocalHttpTests(unittest.TestCase):
             with sqlite3.connect(vectors) as database:
                 database.execute("UPDATE meta SET config_identity = ?", (identity,))
             with contextlib.redirect_stdout(io.StringIO()):
+                # When / Then
                 self.assertEqual(runner.main([*common, "--phase", "observe", "--evidence", str(root / "preserved")]), 0)
             self.assertEqual(json.loads((root / "preserved/observation.json").read_text())["covered_nodes"], 60)
 

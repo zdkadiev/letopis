@@ -14,6 +14,7 @@ use support::{
 
 #[test]
 fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
+    // Given
     let repo = ReadingRepo::new();
     let basis = prepare_notes(&repo);
     let server = HttpFixture::start_sequence(vec![
@@ -30,8 +31,10 @@ fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
     prepare_vectors(&repo, &config, 2);
     let input = build_input(&basis);
 
+    // When
     let fallback = invoke_search(&repo, &input);
 
+    // Then
     assert_eq!(read_ids(&fallback), ["a.md", "b.md"]);
     let error = repo
         .open_storage()
@@ -69,6 +72,7 @@ fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
 
 #[test]
 fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests() {
+    // Given
     let repo = ReadingRepo::new();
     let basis = prepare_notes(&repo);
     let server = HttpFixture::start(FixtureReply::Status {
@@ -79,11 +83,14 @@ fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests
     prepare_vectors(&repo, &config, 2);
     std::fs::remove_file(repo.get_root().join(".letopis/config.json")).unwrap();
 
+    // When / Then
     assert_eq!(
         read_ids(&invoke_search(&repo, &build_input(&basis))),
         ["a.md", "b.md"]
     );
+    // Given
     repo.write(".letopis/config.json", b"PRIVATE invalid configuration");
+    // When / Then
     assert_eq!(
         read_ids(&invoke_search(&repo, &build_input(&basis))),
         ["a.md", "b.md"]
@@ -103,6 +110,7 @@ fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests
 
 #[test]
 fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
+    // Given
     let repo = ReadingRepo::new();
     let basis = prepare_notes(&repo);
     let server = HttpFixture::start(FixtureReply::Status {
@@ -116,8 +124,10 @@ fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
     repo.write(".letopis/config.json", raw.as_bytes());
     prepare_vectors(&repo, &config, 2);
 
+    // When
     let links = invoke_search(&repo, &build_input(&basis));
 
+    // Then
     assert_eq!(read_ids(&links), ["a.md", "b.md"]);
     assert!(server.take_requests().is_empty());
     assert!(

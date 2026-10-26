@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn vector_writer_wait_is_bounded_without_changing_cache_or_read_policy() {
         for confined in [false, true] {
-            // Arrange: exercise both supported open paths against independent databases.
+            // Given: exercise both supported open paths against independent databases.
             let root = TempDir::new().unwrap();
             let path = root.path().canonicalize().unwrap();
             let pinned = File::open(&path).unwrap();
@@ -124,7 +124,7 @@ mod tests {
             } else {
                 SqliteStorage::open(&path.join("cache.db"), &path.join("vectors.db")).unwrap()
             };
-            // Act / Assert: only vectors writers have the five-second contention budget.
+            // When / Then: only vectors writers have the five-second contention budget.
             for (connection, expected) in [
                 (&storage.vector_writer, 5000),
                 (&storage.cache_writer, 0),
@@ -140,18 +140,18 @@ mod tests {
 
     #[test]
     fn confined_vector_pruning_uses_read_only_cache_and_closes_cleanly() {
-        // Arrange: only the confined production opener is under test.
+        // Given: only the confined production opener is under test.
         let root = TempDir::new().unwrap();
         let path = root.path().canonicalize().unwrap();
         let pinned = File::open(&path).unwrap();
         let mut storage = SqliteStorage::open_confined(&path, &pinned).unwrap();
         let identity = Sha256::digest(b"confined");
         seed_vector(&mut storage, &identity);
-        // Act: pruning requires the read-only cache attachment used for hash-reference checks.
+        // When: pruning requires the read-only cache attachment used for hash-reference checks.
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         unit.prune_unreferenced().unwrap();
         unit.commit().unwrap();
-        // Assert both native deletion and lifetime/permission policy.
+        // Then both native deletion and lifetime/permission policy.
         assert_eq!(
             unwrap_current(
                 storage
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn reset_late_meta_failure_preserves_identity_key_vector_and_query_error() {
-        // Arrange a populated native table, then fail after DROP/recreation/deletion.
+        // Given a populated native table, then fail after DROP/recreation/deletion.
         let root = TempDir::new().unwrap();
         let cache = root.path().join("cache");
         let vectors = root.path().join("vectors");
@@ -184,10 +184,10 @@ mod tests {
         let m2 = Sha256::digest(b"M2");
         let key = seed_vector(&mut storage, &m1);
         storage.vector_writer.execute_batch("INSERT INTO embed_failures VALUES('failed-text',1,'safe failure'); INSERT INTO query_error VALUES(1,7,'safe failure'); CREATE TRIGGER deny_meta_update BEFORE UPDATE ON meta BEGIN SELECT RAISE(ABORT, 'blocked meta write'); END;").unwrap();
-        // Act: the metadata update fails after native schema changes.
+        // When: the metadata update fails after native schema changes.
         assert!(storage.reset_vectors(Some(&m1), &m2).is_err());
         assert_eq!(count_failures(&storage), 1);
-        // Assert the same and a newly opened read both retain exact M1 bytes.
+        // Then the same and a newly opened read both retain exact M1 bytes.
         assert_eq!(
             storage
                 .vector_writer
@@ -232,6 +232,7 @@ mod tests {
     #[test]
     fn success_deletes_failure_atomically_and_corrupt_key_poisoning_rolls_back() {
         // Catches lost cleanup, uncommitted cleanup, and acceptance of orphan keys.
+        // Given
         let root = TempDir::new().unwrap();
         let mut storage =
             SqliteStorage::open(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -245,9 +246,11 @@ mod tests {
                 [hash.to_hex()],
             )
             .unwrap();
+        // When
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         unit.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
         drop(unit);
+        // Then
         assert_eq!(
             storage
                 .vector_writer
@@ -256,9 +259,11 @@ mod tests {
                 .unwrap(),
             1
         );
+        // When: repeat the vector write and commit it.
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         unit.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
         unit.commit().unwrap();
+        // Then
         assert_eq!(
             storage
                 .vector_writer
@@ -267,6 +272,7 @@ mod tests {
                 .unwrap(),
             0
         );
+        // Given: introduce a key without its native vector.
         storage
             .vector_writer
             .execute(
@@ -275,6 +281,7 @@ mod tests {
             )
             .unwrap();
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        // When / Then
         assert!(unit.store_vector(&identity, &[1.0, 0.0, 0.0], 3).is_err());
         assert!(unit.commit().is_err());
     }

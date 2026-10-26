@@ -25,6 +25,7 @@ struct OneRead {
 
 #[test]
 fn check_observes_metadata_and_bindings_from_original_pinned_view() {
+    // Given
     let directory = tempfile::tempdir().unwrap();
     let mut writer = open_storage(&directory);
     publish_bindings(&mut writer, "a", "old.rs");
@@ -40,8 +41,10 @@ fn check_observes_metadata_and_bindings_from_original_pinned_view() {
         Observations(observations.clone()),
     );
 
+    // When
     let report = service.check(&[]).unwrap();
 
+    // Then
     assert!(report.errors.is_empty());
     assert_eq!(count.get(), 1);
     assert_eq!(

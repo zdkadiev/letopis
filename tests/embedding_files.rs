@@ -78,7 +78,7 @@ impl Drop for OwnedChild {
 }
 #[test]
 fn reads_exact_bytes_and_stable_absence_without_decoding_config() {
-    // Arrange
+    // Given
     let fixture = Fixture::new();
     let files = open_embedding_files(&fixture.0).unwrap();
     let path = RepoPath::parse("notes/a.md").unwrap();
@@ -87,7 +87,7 @@ fn reads_exact_bytes_and_stable_absence_without_decoding_config() {
     fs::create_dir(fixture.0.join("notes")).unwrap();
     fs::write(fixture.0.join("notes/a.md"), b"\xff\r\ntext").unwrap();
     fs::write(fixture.0.join(".letopis/config.json"), b"not JSON\xff").unwrap();
-    // Act / Assert
+    // When / Then
     assert_eq!(
         files.read_document(&path).unwrap().unwrap(),
         b"\xff\r\ntext"
@@ -99,7 +99,7 @@ fn reads_exact_bytes_and_stable_absence_without_decoding_config() {
 
 #[test]
 fn rejects_final_and_ancestor_symlinks_and_nonregular_files() {
-    // Arrange
+    // Given
     let fixture = Fixture::new();
     let outside = Fixture::new();
     fs::write(outside.0.join("secret.md"), b"PRIVATE_PAYLOAD").unwrap();
@@ -107,7 +107,7 @@ fn rejects_final_and_ancestor_symlinks_and_nonregular_files() {
     symlink(&outside.0, fixture.0.join("escape")).unwrap();
     fs::create_dir(fixture.0.join("directory.md")).unwrap();
     let files = open_embedding_files(&fixture.0).unwrap();
-    // Act / Assert
+    // When / Then
     for path in ["link.md", "escape/secret.md", "directory.md"] {
         let error = files
             .read_document(&RepoPath::parse(path).unwrap())
@@ -124,13 +124,13 @@ fn rejects_final_and_ancestor_symlinks_and_nonregular_files() {
 
 #[test]
 fn rejects_replaced_service_directory_and_symlink_at_open() {
-    // Arrange
+    // Given
     let fixture = Fixture::new();
     let outside = Fixture::new();
     let files = open_embedding_files(&fixture.0).unwrap();
     fs::rename(fixture.0.join(".letopis"), fixture.0.join("old-service")).unwrap();
     symlink(&outside.0, fixture.0.join(".letopis")).unwrap();
-    // Act / Assert
+    // When / Then
     assert!(files.read_config().is_err());
     assert!(files.try_lock_embed().is_err());
     assert!(open_embedding_files(&fixture.0).is_err());
@@ -138,14 +138,14 @@ fn rejects_replaced_service_directory_and_symlink_at_open() {
 
 #[test]
 fn persistent_lock_excludes_real_process_and_survives_owner_death() {
-    // Arrange
+    // Given
     let fixture = Fixture::new();
     let mut owner = OwnedChild::spawn(&fixture.0, "owner");
     wait_for(&fixture.0.join("ready"));
     let lock_path = fixture.0.join(".letopis/embed.lock");
     let before = fs::metadata(&lock_path).unwrap();
     let files = open_embedding_files(&fixture.0).unwrap();
-    // Act / Assert: a real other process owns this inode.
+    // When / Then: a real other process owns this inode.
     assert!(files.try_lock_embed().unwrap().is_none());
     let busy = fs::metadata(&lock_path).unwrap();
     assert_eq!(
@@ -172,7 +172,7 @@ fn persistent_lock_excludes_real_process_and_survives_owner_death() {
 
 #[test]
 fn fifo_reads_and_lock_attempts_finish_promptly() {
-    // Arrange
+    // Given
     let fixture = Fixture::new();
     let _files = open_embedding_files(&fixture.0).unwrap();
     assert!(
@@ -189,12 +189,13 @@ fn fifo_reads_and_lock_attempts_finish_promptly() {
             .unwrap()
             .success()
     );
-    // Act / Assert: the parent kills and reaps a stuck child on timeout.
+    // When / Then: the parent kills and reaps a stuck child on timeout.
     OwnedChild::spawn(&fixture.0, "fifo").wait_success();
 }
 
 #[test]
 fn markdown_capability_preserves_existing_parser_projection() {
+    // Given
     let path = RepoPath::parse("knowledge/note.md").unwrap();
     for bytes in [
         b"<!-- letopis {\"kind\":\"fact\",\"created_at\":1} -->\nHello.\n".as_slice(),
@@ -202,20 +203,22 @@ fn markdown_capability_preserves_existing_parser_projection() {
             .as_slice(),
         b"# Unmarked\nhello\n".as_slice(),
     ] {
-        // Act
+        // When
         let old = parse(&path, bytes).unwrap();
         let new = MarkdownParser.parse_file(&path, bytes).unwrap();
-        // Assert
+        // Then
         assert_parsed_equal(old, new);
     }
 }
 
 #[test]
 fn embedding_files_child() {
+    // Given
     let Some(root) = std::env::var_os(CHILD_ROOT) else {
         return;
     };
     let root = Path::new(&root);
+    // When
     let files = open_embedding_files(root).unwrap();
     match std::env::var(CHILD_CASE).unwrap().as_str() {
         "owner" => {
@@ -224,6 +227,7 @@ fn embedding_files_child() {
             wait_for(&root.join("release"));
         }
         "fifo" => {
+            // Then
             assert!(
                 files
                     .read_document(&RepoPath::parse("fifo.md").unwrap())
@@ -237,7 +241,7 @@ fn embedding_files_child() {
 
 #[test]
 fn protects_existing_service_paths_and_rejects_lock_symlinks() {
-    // Arrange
+    // Given
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     fs::set_permissions(
@@ -251,10 +255,10 @@ fn protects_existing_service_paths_and_rejects_lock_symlinks() {
         fs::Permissions::from_mode(0o644),
     )
     .unwrap();
-    // Act
+    // When
     let files = open_embedding_files(&fixture.0).unwrap();
     let owner = files.try_lock_embed().unwrap().unwrap();
-    // Assert
+    // Then
     assert_eq!(
         fs::metadata(fixture.0.join(".letopis")).unwrap().mode() & 0o777,
         0o700

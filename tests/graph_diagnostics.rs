@@ -19,6 +19,7 @@ const ANCHORED: &str = "# One {#one}\n<!-- letopis: {\"created_at\":42} -->\nAnc
 
 #[test]
 fn reports_current_file_and_graph_problems_until_each_cause_is_repaired() {
+    // Given
     let repo = DocumentRepo::new();
     let source = build_whole(7, "[target](missing.md \"letopis:type=supports\")");
     let invalid = build_whole(
@@ -30,8 +31,10 @@ fn reports_current_file_and_graph_problems_until_each_cause_is_repaired() {
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
 
     documents.refresh().unwrap();
+    // When
     let problems = diagnose(&repo);
 
+    // Then
     assert_findings(
         &problems,
         &json!([
@@ -69,14 +72,17 @@ fn reports_current_file_and_graph_problems_until_each_cause_is_repaired() {
 
 #[test]
 fn preserves_anchor_identity_and_author_time_when_prefix_lines_move_coordinates() {
+    // Given
     let repo = DocumentRepo::new();
     repo.write("a.md", ANCHORED);
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
+    // When
     let before = repo.read_state();
     let NodeMetadata::Knowledge(original) = &before.get_node("a.md#one").metadata else {
         panic!("expected anchored knowledge");
     };
+    // Then
     assert_eq!(original.id.as_str(), "a.md#one");
     assert_eq!(original.created_at, 42);
     assert_eq!(original.lines, LineRange::new(1, 3).unwrap());
@@ -105,6 +111,7 @@ fn preserves_anchor_identity_and_author_time_when_prefix_lines_move_coordinates(
 
 #[test]
 fn isolates_duplicate_and_nested_anchor_errors_from_a_valid_file() {
+    // Given
     let repo = DocumentRepo::new();
     let duplicate =
         "# One {#one}\n<!-- letopis: {\"created_at\":1} -->\n# Again {#one}\nSECRET_RAW_BODY\n";
@@ -116,9 +123,11 @@ fn isolates_duplicate_and_nested_anchor_errors_from_a_valid_file() {
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
 
     let outcome = documents.refresh().unwrap();
+    // When
     let problems = diagnose(&repo);
     let state = repo.read_state();
 
+    // Then
     assert_eq!(outcome.invalid_files_updated, 2);
     assert_eq!(state.nodes.len(), 1);
     assert!(state.get_file("valid.md").valid);
@@ -140,11 +149,13 @@ fn isolates_duplicate_and_nested_anchor_errors_from_a_valid_file() {
 
 #[test]
 fn diagnoses_the_pinned_revision_after_another_connection_publishes_a_target() {
+    // Given
     let repo = DocumentRepo::new();
     let source = build_whole(1, "[target](missing.md \"letopis:type=includes\")");
     repo.write("a.md", &source);
     // The refresher owns the writer connection before the separate reader pins.
     let mut writer = wire_document_refresher(repo.get_root()).unwrap();
+    // When / Then
     assert_eq!(writer.refresh().unwrap().revision, 1);
     let mut reader = open_storage(
         &repo.get_root().join(".letopis/cache.db"),
@@ -184,6 +195,7 @@ fn diagnoses_the_pinned_revision_after_another_connection_publishes_a_target() {
 
 #[test]
 fn propagates_corrupt_edge_reads_instead_of_returning_clean_or_partial_findings() {
+    // Given
     let repo = DocumentRepo::new();
     let invalid = build_whole(
         1,
@@ -197,7 +209,9 @@ fn propagates_corrupt_edge_reads_instead_of_returning_clean_or_partial_findings(
     let cache = repo.get_root().join(".letopis/cache.db");
     let mut storage = open_storage(&cache, &repo.get_root().join(".letopis/vectors.db")).unwrap();
     {
+        // When
         let mut before = storage.begin_read().unwrap();
+        // Then
         assert_eq!(before.list_files().unwrap().len(), 1);
         assert!(!before.list_files().unwrap()[0].valid);
     }

@@ -80,13 +80,16 @@ const MODE_CASES: [(&str, &str, &str, &str); 9] = [
 
 #[test]
 fn binary_covers_every_mode_and_direction_with_original_edges() {
+    // Given
     let repo = build_graph();
     for (mode, direction, elements, edges) in MODE_CASES {
         let elements: Value = serde_json::from_str(elements).unwrap();
         let edges: Value = serde_json::from_str(edges).unwrap();
         let body = json!({"element_ids":["a.md"],"mode":mode,"direction":direction,
             "depth":1,"limit":20,"edge_limit":20});
+        // When
         let response = invoke(&repo, &body, 0);
+        // Then
         assert_eq!(read_ids(&response), elements, "{mode}/{direction}");
         assert_eq!(read_triples(&response), edges, "{mode}/{direction}");
         for link in response["result"]["elements"].as_array().unwrap() {
@@ -103,10 +106,13 @@ fn binary_covers_every_mode_and_direction_with_original_edges() {
 
 #[test]
 fn binary_excludes_multiple_starts_and_validates_unknown_at_depth_zero() {
+    // Given
     let repo = build_graph();
     let body = json!({"element_ids":["./a.md","c.md","a.md"],"mode":"both",
         "direction":"outgoing","depth":1,"limit":1});
+    // When
     let response = invoke(&repo, &body, 0);
+    // Then
     assert_eq!(
         response,
         json!({"ok":true,"result":{"elements":[{
@@ -135,10 +141,13 @@ fn binary_excludes_multiple_starts_and_validates_unknown_at_depth_zero() {
 
 #[test]
 fn binary_applies_type_intersection_and_independent_caps() {
+    // Given
     let repo = build_graph();
     let mut body = json!({"element_ids":["a.md"],"mode":"both","direction":"both",
         "depth":1,"limit":2,"edge_limit":1,"edge_types":[]});
+    // When
     let response = invoke(&repo, &body, 0);
+    // Then
     assert_eq!(read_ids(&response), json!(["c.md", "d.md"]));
     assert_eq!(
         read_triples(&response),
@@ -155,12 +164,15 @@ fn binary_applies_type_intersection_and_independent_caps() {
 
 #[test]
 fn binary_returns_missing_ranged_and_opaque_sources_without_content() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "private knowledge\n[m](missing.rs \"letopis:type=external\")\n[r](src.rs#L2-L3 \"letopis:type=external\")\n[u](https://Host/a?q=1#part \"letopis:type=external\")");
     repo.write("src.rs", b"private source\nsecond\n");
     let body = json!({"element_ids":["a.md"],"mode":"relations","direction":"outgoing",
         "depth":1,"limit":10});
+    // When
     let response = invoke(&repo, &body, 0);
+    // Then
     assert_eq!(
         response,
         json!({"ok":true,"result":{"elements":[
@@ -200,6 +212,7 @@ fn binary_returns_missing_ranged_and_opaque_sources_without_content() {
 
 #[test]
 fn binary_uses_no_inference_with_fully_seeded_backlog() {
+    // Given
     let repo = build_graph();
     let http = HttpFixture::start(FixtureReply::Status {
         status: 500,
@@ -219,6 +232,7 @@ fn binary_uses_no_inference_with_fully_seeded_backlog() {
             ("d.md", &[1.0, 0.0]),
         ],
     );
+    // When / Then
     assert!(
         !wire_embedding_executor(repo.get_root())
             .unwrap()
@@ -243,6 +257,7 @@ fn binary_uses_no_inference_with_fully_seeded_backlog() {
 
 #[test]
 fn nested_binary_discovers_root_and_launches_existing_detached_drain() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "private query is never embedded");
     let barrier = ResponseBarrier::default();
@@ -264,8 +279,10 @@ fn nested_binary_discovers_root_and_launches_existing_detached_drain() {
     child.send_input(
         br#"{"element_ids":["a.md"],"mode":"both","direction":"both","depth":0,"limit":1}"#,
     );
+    // When
     let response = read_response(&child.collect_output(Duration::from_secs(10)), 0);
     barrier.wait_until_entered();
+    // Then
     assert!(owner.read_pid() > 0);
     barrier.release();
     owner.wait_for_exit();

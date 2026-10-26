@@ -3,8 +3,8 @@ use crate::{
     domain::{RepoPath, TreeOid},
     markdown::MarkdownParser,
     service::{
-        BasisRetainer, CapturedFile, CorpusLister, Diagnostic, DocumentError, DocumentErrorKind,
-        DocumentResult, FileStat, FileSystem, MarkdownCodec, ParsedFile, ProvenanceObservation,
+        BasisRetainer, CapturedFile, Diagnostic, DocumentError, DocumentErrorKind, DocumentResult,
+        FileStat, FileSystem, MarkdownCodec, MockCorpusLister, ParsedFile, ProvenanceObservation,
         ProvenanceRequest, Refresher, SnapshotError, SourceProvenance, SourceRevisionComparison,
         SourceRevisionRequest, Storage, StorageRead,
     },
@@ -21,12 +21,7 @@ use tempfile::TempDir;
 const INITIAL: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nAlphaToken\n";
 const EDITED: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nBravoToken\n";
 const NOW: i64 = 5_000_000_000;
-struct Candidates;
-impl CorpusLister for Candidates {
-    fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
-        Ok(vec![RepoPath::parse("note.md").unwrap()])
-    }
-}
+type Candidates = MockCorpusLister;
 struct TestFiles {
     bytes: RefCell<Vec<u8>>,
     stat: Cell<FileStat>,
@@ -130,6 +125,7 @@ type TestService =
     DocumentRefresher<Candidates, TestFiles, CountingMarkdown, SqliteStorage, TestProvenance>;
 #[test]
 fn skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files() {
+    // Given
     for bytes in [
         INITIAL,
         &b"ordinary markdown\n"[..],
@@ -144,7 +140,9 @@ fn skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files() {
         service.refresh().unwrap();
         service.filesystem.reset_counts();
         let parses = service.markdown.0.get();
+        // When
         let result = service.refresh().unwrap();
+        // Then
         assert!(!result.published);
         assert_eq!(result.revision, 1);
         assert_eq!(
@@ -160,6 +158,7 @@ fn skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files() {
 
 #[test]
 fn detect_same_tick_equal_stat_edit_and_do_not_publish_unchanged_racy_bytes() {
+    // Given
     let (_dir, mut service) = build_service();
     service.filesystem.stat.update(|mut stat| {
         stat.mtime_ns = NOW;
@@ -168,7 +167,9 @@ fn detect_same_tick_equal_stat_edit_and_do_not_publish_unchanged_racy_bytes() {
     service.refresh().unwrap();
     let before = service.storage.begin_read().unwrap().list_files().unwrap();
     service.filesystem.reset_counts();
+    // When
     let unchanged = service.refresh().unwrap();
+    // Then
     assert!(!unchanged.published);
     assert_eq!(
         (
@@ -181,9 +182,11 @@ fn detect_same_tick_equal_stat_edit_and_do_not_publish_unchanged_racy_bytes() {
         service.storage.begin_read().unwrap().list_files().unwrap(),
         before
     );
-    // Exact same size, inode and mtime; only bytes differ.
+    // Given: exact same size, inode and mtime; only bytes differ.
     service.filesystem.bytes.replace(EDITED.to_vec());
+    // When
     let changed = service.refresh().unwrap();
+    // Then
     assert_eq!(changed.revision, 2);
     assert_eq!(read_matches(&mut service, "BravoToken"), ["note.md"]);
     assert!(read_matches(&mut service, "AlphaToken").is_empty());
@@ -191,6 +194,7 @@ fn detect_same_tick_equal_stat_edit_and_do_not_publish_unchanged_racy_bytes() {
 
 #[test]
 fn treat_racy_boundary_clock_regression_and_checked_arithmetic_conservatively() {
+    // Given
     let cases = [
         (NOW - 1_000_000_000, NOW, NOW),
         (1, NOW, 2),
@@ -207,7 +211,9 @@ fn treat_racy_boundary_clock_regression_and_checked_arithmetic_conservatively() 
         service.refresh().unwrap();
         service.filesystem.reset_counts();
         service.filesystem.now.set(now);
+        // When
         let result = service.refresh().unwrap();
+        // Then
         assert!(!result.published);
         assert_eq!(
             service.filesystem.reads.get(),
@@ -220,6 +226,7 @@ fn treat_racy_boundary_clock_regression_and_checked_arithmetic_conservatively() 
 
 #[test]
 fn stat_only_change_preserves_projection_and_invalid_state_without_parsing() {
+    // Given
     for bytes in [INITIAL, &b"<!-- letopis: invalid -->"[..]] {
         let (dir, mut service) = build_service();
         service.filesystem.bytes.replace(bytes.to_vec());
@@ -237,7 +244,9 @@ fn stat_only_change_preserves_projection_and_invalid_state_without_parsing() {
             stat
         });
         service.filesystem.now.set(NOW + 1);
+        // When
         let outcome = service.refresh().unwrap();
+        // Then
         assert!(outcome.published);
         assert_eq!(outcome.files_updated, 1);
         assert_eq!(service.markdown.0.get(), parses);
@@ -257,9 +266,12 @@ fn stat_only_change_preserves_projection_and_invalid_state_without_parsing() {
 
 #[test]
 fn changed_capture_between_locked_detection_and_preparation_aborts() {
+    // Given
     let (_dir, mut service) = build_service();
     service.filesystem.replace_on_read.set(Some(3));
+    // When
     let result = service.refresh();
+    // Then
     assert_eq!(service.filesystem.reads.get(), 3);
     assert!(result.is_err());
     let mut read = service.storage.begin_read().unwrap();
@@ -270,6 +282,7 @@ fn changed_capture_between_locked_detection_and_preparation_aborts() {
 
 #[test]
 fn fatal_read_is_not_an_invalid_markdown_publication() {
+    // Given
     let (_dir, mut service) = build_service();
     service.refresh().unwrap();
     let before = service.storage.begin_read().unwrap().list_files().unwrap();
@@ -279,8 +292,10 @@ fn fatal_read_is_not_an_invalid_markdown_publication() {
         stat
     });
     service.filesystem.fail_on_read.set(Some(3));
+    // When / Then
     assert!(service.refresh().is_err());
     let mut read = service.storage.begin_read().unwrap();
+    // Then
     assert_eq!(read.get_revision(), 1);
     assert_eq!(read.list_files().unwrap(), before);
     assert_eq!(read.match_text("AlphaToken").unwrap().len(), 1);
@@ -288,11 +303,14 @@ fn fatal_read_is_not_an_invalid_markdown_publication() {
 
 #[test]
 fn never_published_missing_candidate_is_not_a_delta_after_empty_initial_build() {
+    // Given
     let (_dir, mut service) = build_service();
     service.filesystem.missing.set(true);
     assert_eq!(service.refresh().unwrap().revision, 1);
     service.filesystem.reset_counts();
+    // When
     let result = service.refresh().unwrap();
+    // Then
     assert!(!result.published);
     assert_eq!(
         (
@@ -301,12 +319,15 @@ fn never_published_missing_candidate_is_not_a_delta_after_empty_initial_build() 
         ),
         (0, 0)
     );
+    // Given
     service.filesystem.missing.set(false);
+    // When / Then
     assert_eq!(service.refresh().unwrap().files_updated, 1);
 }
 
 #[test]
 fn discard_preliminary_capture_and_publish_the_locked_observation() {
+    // Given
     let (_dir, mut service) = build_service();
     service.refresh().unwrap();
     service.filesystem.reset_counts();
@@ -315,7 +336,9 @@ fn discard_preliminary_capture_and_publish_the_locked_observation() {
         stat
     });
     service.filesystem.replace_on_read.set(Some(2));
+    // When
     let outcome = service.refresh().unwrap();
+    // Then
     assert_eq!(outcome.revision, 2);
     assert_eq!(read_matches(&mut service, "BravoToken"), ["note.md"]);
     assert!(read_matches(&mut service, "AlphaToken").is_empty());
@@ -340,7 +363,7 @@ fn build_service() -> (TempDir, TestService) {
     (
         dir,
         DocumentRefresher {
-            git: Candidates,
+            git: build_candidates(),
             filesystem: TestFiles::new(),
             markdown: CountingMarkdown(Cell::new(0)),
             storage,
@@ -367,3 +390,11 @@ pub(super) mod process;
 mod reading;
 
 mod reindex;
+
+fn build_candidates() -> Candidates {
+    let mut candidates = Candidates::new();
+    candidates
+        .expect_list_candidates()
+        .returning(|| Ok(vec![RepoPath::parse("note.md").unwrap()]));
+    candidates
+}

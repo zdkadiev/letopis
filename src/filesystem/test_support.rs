@@ -75,6 +75,7 @@ fn wait_for(path: &Path) {
 
 #[test]
 fn run_mutation_child() {
+    // Given: read the parent fixture configuration.
     let Some(root) = std::env::var_os(CHILD_ROOT) else {
         return;
     };
@@ -86,6 +87,7 @@ fn run_mutation_child() {
     let target = root.join(std::env::var(CHILD_TARGET).unwrap());
     wait_for(&root.join("resume"));
     let action = std::env::var(CHILD_ACTION).unwrap();
+    // When: perform the coordinated filesystem mutation.
     if action == "write" {
         fs::write(&target, b"changed length and bytes").unwrap();
     } else {
@@ -102,6 +104,7 @@ fn run_mutation_child() {
             _ => panic!("unknown mutation"),
         }
     }
+    // Then: signal completion; the parent asserts the observed result.
     fs::write(root.join("done"), b"done").unwrap();
 }
 
@@ -216,7 +219,7 @@ fn forced_watchdog_terminates_nested_descendants() {
         std::thread::sleep(Duration::from_secs(30));
         return;
     }
-    // Arrange: a real mutator and its external descendant retain the same lease.
+    // Given: a real mutator and its external descendant retain the same lease.
     let fixture = Fixture::new();
     let mut owned = OwnedProcess::spawn(
         Command::new(std::env::current_exe().unwrap())
@@ -231,13 +234,13 @@ fn forced_watchdog_terminates_nested_descendants() {
     wait_for(&fixture.0.join("nested-ready"));
     let lease = fs::File::open(fixture.0.join("lease")).unwrap();
     assert!(flock(&lease, FlockOperation::NonBlockingLockExclusive).is_err());
-    // Act: force the real watchdog, then run its owner cleanup.
+    // When: force the real watchdog, then run its owner cleanup.
     let timeout = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         owned.wait_success(Duration::from_millis(50));
     }));
     assert!(timeout.is_err());
     drop(owned);
-    // Assert: no descendant retains the inherited open description after cleanup.
+    // Then: no descendant retains the inherited open description after cleanup.
     let start = Instant::now();
     while flock(&lease, FlockOperation::NonBlockingLockExclusive).is_err() {
         assert!(

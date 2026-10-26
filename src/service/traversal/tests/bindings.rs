@@ -26,6 +26,7 @@ const EXPECTED_BINDINGS: [&str; 70] = [
 
 #[test]
 fn observes_large_source_bindings_pagewise() {
+    // Given
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut read = BindingRead {
         events: events.clone(),
@@ -38,7 +39,9 @@ fn observes_large_source_bindings_pagewise() {
         observed: RefCell::new(Vec::new()),
     };
     let node = build_knowledge();
+    // When
     let flags = observe_bindings(&mut read, &node, &provenance).unwrap();
+    // Then
     assert_eq!(
         *events.borrow(),
         [
@@ -70,6 +73,7 @@ fn observes_large_source_bindings_pagewise() {
 
 #[test]
 fn observes_empty_bindings_once_to_preserve_basis_validation() {
+    // Given
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut read = BindingRead {
         events: events.clone(),
@@ -82,13 +86,16 @@ fn observes_empty_bindings_once_to_preserve_basis_validation() {
         observed: RefCell::new(Vec::new()),
     };
     let node = build_knowledge();
+    // When
     let flags = observe_bindings(&mut read, &node, &provenance).unwrap();
+    // Then
     assert_eq!(*events.borrow(), ["resolve", "page:0", "observe:0"]);
     assert_eq!(flags, BTreeSet::from([SearchFlag::SourceChanged]));
 }
 
 #[test]
 fn propagates_late_provenance_failure_without_partial_flags_or_further_pages() {
+    // Given
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut read = BindingRead {
         events: events.clone(),
@@ -101,7 +108,9 @@ fn propagates_late_provenance_failure_without_partial_flags_or_further_pages() {
         observed: RefCell::new(Vec::new()),
     };
     let node = build_knowledge();
+    // When
     let error = observe_bindings(&mut read, &node, &provenance).unwrap_err();
+    // Then
     assert_eq!(
         error.get_kind(),
         crate::service::CommandErrorKind::InternalError
@@ -114,6 +123,7 @@ fn propagates_late_provenance_failure_without_partial_flags_or_further_pages() {
 
 #[test]
 fn reports_late_binding_page_failure_after_completed_observations() {
+    // Given
     let events = Rc::new(RefCell::new(Vec::new()));
     let mut read = BindingRead {
         events: events.clone(),
@@ -125,7 +135,9 @@ fn reports_late_binding_page_failure_after_completed_observations() {
         fail_on: None,
         observed: RefCell::new(Vec::new()),
     };
+    // When
     let error = observe_bindings(&mut read, &build_knowledge(), &provenance).unwrap_err();
+    // Then
     assert_eq!(
         error.get_kind(),
         crate::service::CommandErrorKind::InternalError
