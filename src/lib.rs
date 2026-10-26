@@ -27,8 +27,8 @@ use crate::service::{
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
     GraphDiagnostics, GraphService, InspectionService, Inspector, ProvenanceService,
     RefreshDependencies, Refresher, SearchDependencies, SearchService, Searcher, SnapshotError,
-    SnapshotVerifier, SourceProvenance, SourceReader, SourceService, StatusStorage, Storage,
-    StorageResult, TraversalDependencies, TraversalService, Traverser,
+    SnapshotVerifier, SourceProvenance, SourceReader, SourceService, StatusFiles, StatusStorage,
+    Storage, StorageResult, TraversalDependencies, TraversalService, Traverser,
 };
 use crate::storage::{SqliteStatusStorage, SqliteStorage};
 use crate::utils::SERVICE_DIRECTORY;
@@ -344,6 +344,14 @@ pub fn open_status_storage<F: AsFd>(
     pinned: &F,
 ) -> StorageResult<impl StatusStorage + use<F>> {
     SqliteStatusStorage::open_confined(directory, pinned)
+}
+
+/// Open status observations beneath a pinned checkout without creating service state.
+///
+/// # Errors
+/// Reports an unsafe or inaccessible checkout root.
+pub fn open_status_files(root: &Path) -> DocumentResult<impl StatusFiles + use<>> {
+    LocalFileSystem::open(root)
 }
 
 /// Open the disk cache and independent vector database.

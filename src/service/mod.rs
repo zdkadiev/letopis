@@ -85,6 +85,22 @@ pub use status_types::{
 };
 pub use storage::{CacheWrite, StatusStorage, Storage, StorageRead, VectorWrite};
 
+/// Read-only live configuration and nonblocking kernel-lock observations.
+/// Implementations never create service state or write an owner PID while observing.
+pub trait StatusFiles {
+    /// Read stable raw configuration bytes, or absence.
+    ///
+    /// # Errors
+    /// Reports unsafe paths or filesystem failures without exposing file contents.
+    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
+
+    /// Return occupied index/embed locks and their best-effort recorded positive PIDs.
+    ///
+    /// # Errors
+    /// Reports unsafe paths, failed probes, or invalid/unreadable PIDs on busy locks.
+    fn observe_locks(&self) -> CommandResult<Vec<HeldLock>>;
+}
+
 /// Current graph diagnostics derived exclusively from the supplied consistent view.
 ///
 /// Implementations inspect the entire knowledge graph before filtering by exact
