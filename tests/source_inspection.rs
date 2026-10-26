@@ -9,15 +9,14 @@ use letopis::{
 use std::{fs, process::Command};
 use support::reading::ReadingRepo;
 
+const MIXED_NOTE: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nKnowledgeToken\n[source](source.txt \"letopis:type=external\")\n[source](source.txt#L1-L1 \"letopis:type=external\")\n[source](https://Host/x?q=1#part \"letopis:type=external\")\n";
+
 #[test]
 fn inspect_mixed_batch_uses_current_tree_bytes() {
     // Arrange: a stale index must not supply source bytes or knowledge coordinates.
     let repo = ReadingRepo::new();
     repo.write("source.txt", b"old");
-    write_references(
-        &repo,
-        &["source.txt", "source.txt#L1-L1", "https://Host/x?q=1#part"],
-    );
+    repo.write("note.md", MIXED_NOTE);
     inspect(&repo, &["note.md"]);
     repo.write("source.txt", b"abc");
     // Act
@@ -32,6 +31,17 @@ fn inspect_mixed_batch_uses_current_tree_bytes() {
     );
     // Assert
     assert_eq!(result.elements.len(), 4);
+    let knowledge = &result.elements["note.md"];
+    assert_eq!(knowledge.path.as_str(), "note.md");
+    assert_eq!(knowledge.lines, Some(LineRange::new(1, 5).unwrap()));
+    assert_eq!(
+        knowledge.hash,
+        Some(
+            Sha256::parse("e0e8e261083b8c8edbaefd4f06968f531205135e6b0d93f951fb635e3c71f5a8")
+                .unwrap()
+        )
+    );
+    assert_eq!(read_blob(&repo, &result, "note.md"), MIXED_NOTE);
     assert_eq!(result.elements["source.txt"].path.as_str(), "source.txt");
     let hash = Some(
         Sha256::parse("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad").unwrap(),
@@ -55,20 +65,31 @@ fn inspect_preserves_source_bytes_and_deduplicates_ranges() {
     // Arrange
     let repo = ReadingRepo::new();
     repo.write("source.txt", b"one\r\ntwo");
-    write_references(&repo, &["source.txt", "source.txt#L2-L2"]);
+    write_references(
+        &repo,
+        &["source.txt", "source.txt#L1-L1", "source.txt#L2-L2"],
+    );
     // Act
     let result = inspect(
         &repo,
         &[
             "./source.txt",
             "source.txt",
+            "source.txt#L1-L1",
             "source.txt#L02-L02",
             "source.txt#L2-L2",
         ],
     );
     // Assert
-    assert_eq!(result.elements.len(), 2);
+    assert_eq!(result.elements.len(), 3);
     assert_eq!(read_blob(&repo, &result, "source.txt"), b"one\r\ntwo");
+    assert_eq!(
+        result.elements["source.txt#L1-L1"].hash,
+        Some(
+            Sha256::parse("5259d46a49644bf76792231ef7315b5293677c49ddd7e69d95557013e10320d4")
+                .unwrap()
+        )
+    );
     assert_eq!(
         result.elements["source.txt#L2-L2"].hash,
         Some(
@@ -82,6 +103,19 @@ fn inspect_preserves_source_bytes_and_deduplicates_ranges() {
             Sha256::parse("29a776bb35efe730dabb1b1d3ad74dbf80cc3e9009e168241798ea73adca3dcf")
                 .unwrap()
         )
+    );
+    let tree = Command::new("git")
+        .current_dir(repo.get_root())
+        .args(["ls-tree", "-r", "--name-only", result.snapshot.as_str()])
+        .output()
+        .unwrap();
+    assert!(tree.status.success());
+    assert_eq!(
+        tree.stdout
+            .split(|byte| *byte == b'\n')
+            .filter(|path| *path == b"source.txt")
+            .count(),
+        1
     );
 }
 

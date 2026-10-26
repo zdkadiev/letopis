@@ -3,15 +3,18 @@ use crate::{
     domain::{BlobOid, RepoPath, Sha256, TreeOid},
     markdown::MarkdownParser,
     service::{
-        CapturedFile, CommandErrorKind, CorpusLister, DocumentResult, ElementAddress, FileStat,
-        FileSystem, GitSnapshots, Inspector, RefreshOutcome, Refresher, RetainedTree,
-        SnapshotEntry, SnapshotError, SnapshotErrorKind, SnapshotFile,
+        CapturedFile, CommandErrorKind, CorpusLister, DocumentError, DocumentErrorKind,
+        DocumentResult, ElementAddress, FileStat, FileSystem, GitSnapshots, Inspector,
+        RefreshOutcome, Refresher, RetainedTree, SnapshotEntry, SnapshotError, SnapshotErrorKind,
+        SnapshotFile,
     },
 };
 use std::{cell::RefCell, rc::Rc};
 
 const MARKED_SOURCE: &[u8] =
     b"<!-- letopis: {\"created_at\":1} -->\nBody\n[source](a.md#L2-L2 \"letopis:type=external\")\n";
+const MARKED_WITH_SOURCE: &[u8] =
+    b"<!-- letopis: {\"created_at\":1} -->\nBody\n[source](source.txt \"letopis:type=external\")\n";
 type Events = Rc<RefCell<Vec<String>>>;
 struct RecordingDocuments(Events);
 struct RecordingGit(Events, Scenario);
@@ -21,6 +24,7 @@ enum Scenario {
     Plain,
     Overlap,
     PinFailure,
+    SourceIoFailure,
 }
 #[test]
 fn capture_writes_each_blob_before_reading_the_next_file() {
@@ -110,6 +114,40 @@ fn inspect_fails_when_final_pin_fails() {
     assert_eq!(events.borrow().last().map(String::as_str), Some("pin"));
 }
 
+#[test]
+fn inspect_fails_safely_when_declared_source_read_has_io_error() {
+    // Arrange: corpus capture succeeds, then the source read fails with a private cause.
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let mut service = InspectionService::new(
+        RecordingDocuments(events.clone()),
+        RecordingGit(events.clone(), Scenario::SourceIoFailure),
+        RecordingFiles(events.clone(), Scenario::SourceIoFailure),
+        MarkdownParser::new(),
+    );
+    // Act
+    let error = service
+        .inspect(&[
+            ElementAddress::parse("a.md").unwrap(),
+            ElementAddress::parse("source.txt").unwrap(),
+        ])
+        .unwrap_err();
+    // Assert: failure occurs before final assembly/pin, with no payload in diagnostics.
+    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+    assert_eq!(error.get_message(), "cannot capture current elements");
+    assert!(!error.to_string().contains("PRIVATE_SOURCE_BYTES"));
+    assert_eq!(
+        *events.borrow(),
+        [
+            "refresh",
+            "list",
+            "read a.md",
+            "write a",
+            "assemble",
+            "read source.txt"
+        ]
+    );
+}
+
 impl Refresher for RecordingDocuments {
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
         self.0.borrow_mut().push("refresh".into());
@@ -125,7 +163,7 @@ impl Refresher for RecordingDocuments {
 impl CorpusLister for RecordingGit {
     fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
         self.0.borrow_mut().push("list".into());
-        let paths = if self.1 == Scenario::Overlap {
+        let paths = if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure) {
             &['a'][..]
         } else {
             &['a', 'b']
@@ -142,7 +180,9 @@ impl GitSnapshots for RecordingGit {
         panic!("capture must not retain bytes for create_tree")
     }
     fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
-        let name = if self.1 == Scenario::Overlap || bytes.ends_with(b"a") {
+        let name = if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure)
+            || bytes.ends_with(b"a")
+        {
             "a"
         } else {
             "b"
@@ -151,7 +191,7 @@ impl GitSnapshots for RecordingGit {
         Ok(BlobOid::parse(&name.repeat(40)).unwrap())
     }
     fn create_tree_from_blobs(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
-        if self.1 == Scenario::Overlap {
+        if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure) {
             assert_eq!(entries.len(), 1);
             assert_eq!(entries[0].path.as_str(), "a.md");
             self.0.borrow_mut().push("assemble".into());
@@ -199,6 +239,14 @@ impl FileSystem for RecordingFiles {
         panic!("capture uses verified reads")
     }
     fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+        if self.1 == Scenario::SourceIoFailure && path.as_str() == "source.txt" {
+            self.0.borrow_mut().push("read source.txt".into());
+            return Err(DocumentError::new_with_cause(
+                DocumentErrorKind::InternalError,
+                "cannot read source file",
+                std::io::Error::other("PRIVATE_SOURCE_BYTES"),
+            ));
+        }
         let read_again =
             self.1 == Scenario::Overlap && self.0.borrow().iter().any(|event| event == "read a.md");
         self.0.borrow_mut().push(format!("read {}", path.as_str()));
@@ -206,6 +254,8 @@ impl FileSystem for RecordingFiles {
             b"live edited after capture\n".to_vec()
         } else if self.1 == Scenario::Overlap {
             MARKED_SOURCE.to_vec()
+        } else if self.1 == Scenario::SourceIoFailure {
+            MARKED_WITH_SOURCE.to_vec()
         } else {
             format!(
                 "<!-- letopis: {{\"created_at\":1}} -->\n{}",

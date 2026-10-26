@@ -150,6 +150,39 @@ fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
     );
 }
 
+#[test]
+fn inspect_rejects_removed_indexed_anchor_in_mixed_batch() {
+    // Arrange: keep the file marked and its source declaration current.
+    let repo = ReadingRepo::new();
+    repo.write(
+        "sections.md",
+        b"## Old {#old}\n<!-- letopis: {\"created_at\":1} -->\nOld.\n[source](source.txt \"letopis:type=external\")\n",
+    );
+    repo.write("source.txt", b"available source");
+    wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh()
+        .unwrap();
+    repo.write(
+        "sections.md",
+        b"## Renamed {#renamed}\n<!-- letopis: {\"created_at\":1} -->\nCurrent.\n[source](source.txt \"letopis:type=external\")\n",
+    );
+    let mut service = wire_inspector(repo.get_root()).unwrap();
+    let current = service
+        .inspect(&[ElementAddress::parse("sections.md#renamed").unwrap()])
+        .unwrap();
+    assert_eq!(current.elements.len(), 1);
+    // Act
+    let error = service
+        .inspect(&[
+            ElementAddress::parse("source.txt").unwrap(),
+            ElementAddress::parse("sections.md#old").unwrap(),
+        ])
+        .unwrap_err();
+    // Assert
+    assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
+}
+
 type InspectionFixture = (
     &'static str,
     &'static [u8],
