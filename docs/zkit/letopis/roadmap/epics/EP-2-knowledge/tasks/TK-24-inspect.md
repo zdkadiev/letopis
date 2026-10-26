@@ -1,6 +1,6 @@
 # TK-24 — Завершить batch inspect и навык чтения/записи
 
-> **Статус:** planned
+> **Статус:** implementation accepted on host; final independent review pending
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 6 / 10 (best / expected / worst)
@@ -39,13 +39,13 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Пакет ID читается по общему Git-снимку, unknown ID отклоняет весь запрос.
-- [ ] Актуальные собственные хеши/lines проверены; дополнительных полей flags в inspect нет.
-- [ ] Навык покрывает формат элемента (путь/якорь, метаданные, ссылки), check, search/traverse/inspect, source_snapshot средствами Git, переименование/висячие ссылки/перепроверку и обычные live reads; поздние reindex/config/status/cancel интегрируются в TK-29.
+- [x] Пакет ID читается по общему Git-снимку, unknown ID отклоняет весь запрос.
+- [x] Актуальные собственные хеши/lines проверены; дополнительных полей flags в inspect нет.
+- [x] Навык покрывает формат элемента (путь/якорь, метаданные, ссылки), check, search/traverse/inspect, source_snapshot средствами Git, переименование/висячие ссылки/перепроверку и обычные live reads; поздние reindex/config/status/cancel интегрируются в TK-29.
 
-- [ ] Смешанный batch знаний и source, повторные ID и исчезнувший в текущем tree элемент проверены: дубли однократны, unknown или исчезнувший ID отклоняет весь batch.
+- [x] Смешанный batch знаний и source, повторные ID и исчезнувший в текущем tree элемент проверены: дубли однократны, unknown или исчезнувший ID отклоняет весь batch.
 
-- [ ] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
+- [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
 ## 6. Как проверить
 
@@ -70,6 +70,8 @@
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
+Реализация: `bb6b39e9ef5a60d2f65e3da2ec16d97a2c742865` (Inspector, Task 1) и `094c174accfe16d246645d780cd7717b3862dc9d` (CLI acceptance, portable skill, Task 2). Полный отчёт Task 2: `.superpowers/sdd/2026-10-26-tk-24-inspection/task-2-report.md`; JSON-результаты и хеши: `verification.json` рядом с ним. Отчёт Task 1 сохранён отдельно.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+На host `tests/cli/run.py --platform host` — PASS. Встроенный `make verify V=1` завершился exit 0: по 697 root tests passed, 0 failed, 5 ignored в debug и release; вложенные child-helper вызовы посчитаны отдельно. CLI runner проверил реальные mixed/removed inspect ответы выбранной X-1 схемой. Python collector tests: 20 passed. Детерминированный disposable workflow: PASS; `check`/`search`/`traverse`/`inspect` и Git tree reads, изменение источника и `source_changed`, отдельный временный индекс для нового основания, переименование с dangling-link diagnostic и исправлением. Хеш реального Git index и HEAD до/после совпал. Evidence: `.artifacts/tk24/host-20261026-task2/` и `.artifacts/tk24/workflow/` в task worktree; исторические receipts не переписывались.
+
+Task 2 не менял `src/`: границы service/Inspector, CLI handler/output, domain и composition root `lib.rs` проверены по физическим файлам и импортам. Linux, native storage runner, реальная модель/пилот, handled cancellation, G-1/G-2 не объявлены проверенными. Native runner не требовался: storage/native/build входы не менялись. Финальный независимый review всей ветки и запись в Engram выполняет контроллер; до этого статус остаётся review pending, без merge/push/GitHub closure.
