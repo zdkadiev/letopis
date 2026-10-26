@@ -4,3 +4,9 @@
 .vscode/
 /.artifacts/
 skills-lock.json
+/.superpowers/
+/.idea/
+/.letopis/
+.DS_Store
+__pycache__/
+.claude/settings.local.json
