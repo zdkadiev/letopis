@@ -1,4 +1,4 @@
-use super::{Observation, fail_changed};
+use super::{Observation, PublicationMode, fail_changed};
 use crate::{
     domain::{EdgeTarget, RepoPath, Sha256, SourceUri, TreeOid},
     service::{
@@ -25,6 +25,7 @@ pub(super) struct BasisPreparation<'a> {
     pub(super) graph: &'a EffectiveGraph,
     pub(super) updated: &'a BTreeMap<RepoPath, Observation>,
     pub(super) previous: &'a BTreeMap<RepoPath, FileRow>,
+    pub(super) mode: PublicationMode,
 }
 impl BasisPreflight {
     /// Observe new valid source bindings and retain all roots before SQL publication.
@@ -59,6 +60,7 @@ pub(super) fn prepare_basis<F: FileSystem, M: MarkdownCodec>(
         graph,
         updated,
         previous,
+        mode,
     } = request;
     let mut preflight = BasisPreflight {
         snapshots: graph.list_source_snapshots(),
@@ -66,8 +68,8 @@ pub(super) fn prepare_basis<F: FileSystem, M: MarkdownCodec>(
     };
     for (path, observed) in updated {
         // Hash-equal files reuse their last valid projection already represented by graph.
-        if previous
-            .get(path)
+        if mode
+            .get_previous(previous.get(path))
             .is_some_and(|previous| previous.hash == observed.hash)
         {
             continue;

@@ -29,6 +29,16 @@ pub(crate) struct DocumentRefresher<G, F, M, S, P> {
     /// Observes source bindings and retains author-declared roots.
     pub(crate) provenance: P,
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum PublicationMode {
+    Incremental,
+    Full,
+}
+impl PublicationMode {
+    pub(super) fn get_previous(self, previous: Option<&FileRow>) -> Option<&FileRow> {
+        previous.filter(|_| self == Self::Incremental)
+    }
+}
 struct FileState {
     revision: u64,
     source_snapshots: BTreeSet<TreeOid>,
@@ -56,10 +66,19 @@ impl<
     P: SourceProvenance + BasisRetainer,
 > Refresher for DocumentRefresher<G, F, M, S, P>
 {
+    fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
+        let _lock = self.filesystem.lock_index()?;
+        #[cfg(test)]
+        reach_checkpoint("locked");
+        self.publish_current(PublicationMode::Full)
+    }
+
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
         let preliminary = self.read_file_state()?;
-        if self.detect_changes(&preliminary)?.is_empty()
-            && preliminary.revision != 0
+        if preliminary.revision != 0
+            && self
+                .detect_changes(&preliminary, PublicationMode::Incremental)?
+                .is_empty()
             && preliminary.source_snapshots.is_empty()
         {
             return Ok(build_outcome(preliminary.revision, false));
@@ -70,15 +89,7 @@ impl<
         let _lock = self.filesystem.lock_index()?;
         #[cfg(test)]
         reach_checkpoint("locked");
-        let state = self.read_file_state()?;
-        let delta = self.detect_changes(&state)?;
-        #[cfg(test)]
-        reach_checkpoint("redetected");
-        if delta.is_empty() && state.revision != 0 {
-            self.provenance.retain_snapshots(&state.source_snapshots)?;
-            return Ok(build_outcome(state.revision, false));
-        }
-        self.publish_changes(&state, delta)
+        self.publish_current(PublicationMode::Incremental)
     }
 }
 impl<
@@ -89,6 +100,23 @@ impl<
     P: SourceProvenance + BasisRetainer,
 > DocumentRefresher<G, F, M, S, P>
 {
+    fn publish_current(&mut self, requested: PublicationMode) -> DocumentResult<RefreshOutcome> {
+        let state = self.read_file_state()?;
+        let mode = if state.revision == 0 {
+            PublicationMode::Full
+        } else {
+            requested
+        };
+        let delta = self.detect_changes(&state, mode)?;
+        #[cfg(test)]
+        reach_checkpoint("redetected");
+        if delta.is_empty() && mode == PublicationMode::Incremental {
+            self.provenance.retain_snapshots(&state.source_snapshots)?;
+            return Ok(build_outcome(state.revision, false));
+        }
+        self.publish_changes(&state, delta, mode)
+    }
+
     fn read_file_state(&mut self) -> DocumentResult<FileState> {
         let mut read = self.storage.begin_read()?;
         Ok(FileState {
@@ -102,7 +130,7 @@ impl<
         })
     }
 
-    fn detect_changes(&self, state: &FileState) -> DocumentResult<Delta> {
+    fn detect_changes(&self, state: &FileState, mode: PublicationMode) -> DocumentResult<Delta> {
         let candidates: BTreeSet<_> = self.git.list_candidates()?.into_iter().collect();
         let mut delta = Delta {
             updated: BTreeMap::new(),
@@ -123,7 +151,9 @@ impl<
                 }
                 continue;
             };
-            if let Some(observation) = detect_file(&self.filesystem, &path, stat, previous)? {
+            if let Some(observation) =
+                detect_file(&self.filesystem, &path, stat, mode.get_previous(previous))?
+            {
                 delta.updated.insert(path, observation);
             }
         }
@@ -134,8 +164,9 @@ impl<
         &mut self,
         state: &FileState,
         delta: Delta,
+        mode: PublicationMode,
     ) -> DocumentResult<RefreshOutcome> {
-        let mut graph = self.prepare_publication(state, &delta)?;
+        let mut graph = self.prepare_publication(state, &delta, mode)?;
         let mut unit = self.storage.begin_cache_write()?;
         #[cfg(test)]
         reach_checkpoint("begun");
@@ -155,7 +186,7 @@ impl<
                 base_revision: state.revision,
                 path: &path,
                 observed: &observation,
-                previous: state.files.get(&path),
+                previous: mode.get_previous(state.files.get(&path)),
                 graph: &graph,
             })?;
             graph.apply(&prepared);
@@ -176,15 +207,19 @@ impl<
         &mut self,
         state: &FileState,
         delta: &Delta,
+        mode: PublicationMode,
     ) -> DocumentResult<EffectiveGraph> {
         // Keep only metadata after releasing this pinned read, before BEGIN IMMEDIATE.
-        let graph = {
+        let mut graph = {
             let mut read = self.storage.begin_read()?;
             if read.get_revision() != state.revision {
                 return Err(fail_changed());
             }
             EffectiveGraph::read(&mut read)?
         };
+        if mode == PublicationMode::Full {
+            graph.mark_all_sources();
+        }
         let basis = prepare_basis(
             &self.filesystem,
             &self.markdown,
@@ -192,6 +227,7 @@ impl<
                 graph: &graph,
                 updated: &delta.updated,
                 previous: &state.files,
+                mode,
             },
         )?;
         basis.validate_basis(&self.provenance)?;

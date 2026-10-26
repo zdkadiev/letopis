@@ -11,6 +11,12 @@ pub trait Refresher {
     /// # Errors
     /// Reports unsafe paths, concurrent changes, or Git, filesystem and storage failures.
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome>;
+    /// Reparse every candidate under the index lock and publish once atomically.
+    /// Invalid files retain their last valid projection. Vectors are not awaited.
+    ///
+    /// # Errors
+    /// Reports capture, provenance or storage failures without a partial publication.
+    fn reindex(&mut self) -> DocumentResult<RefreshOutcome>;
 }
 /// Repository-owned discovery of Markdown candidate paths.
 ///

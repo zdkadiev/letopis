@@ -47,7 +47,7 @@ fn retain_under_index_lock_before_sql_publication() {
     assert_eq!(
         *events.borrow(),
         [
-            "read", "lock", "read", "read", "observe", "retain", "begin", "read", "commit"
+            "lock", "read", "read", "observe", "retain", "begin", "read", "commit"
         ]
     );
 }
@@ -55,19 +55,16 @@ fn retain_under_index_lock_before_sql_publication() {
 #[test]
 fn preflight_read_failure_never_opens_sql_write() {
     let (_dir, mut service, events) = build_boundary_service(None);
-    service.filesystem.inner.fail_on_read.set(Some(3));
+    service.filesystem.inner.fail_on_read.set(Some(2));
     assert!(service.refresh().is_err());
-    assert_eq!(*events.borrow(), ["read", "lock", "read", "read"]);
+    assert_eq!(*events.borrow(), ["lock", "read", "read"]);
 }
 
 #[test]
 fn observation_failure_never_opens_sql_write() {
     let (_dir, mut service, events) = build_boundary_service(Some("observe"));
     assert!(service.refresh().is_err());
-    assert_eq!(
-        *events.borrow(),
-        ["read", "lock", "read", "read", "observe"]
-    );
+    assert_eq!(*events.borrow(), ["lock", "read", "read", "observe"]);
 }
 
 #[test]
@@ -76,20 +73,18 @@ fn pin_failure_never_opens_sql_write() {
     assert!(service.refresh().is_err());
     assert_eq!(
         *events.borrow(),
-        ["read", "lock", "read", "read", "observe", "retain"]
+        ["lock", "read", "read", "observe", "retain"]
     );
 }
 
 #[test]
 fn changed_capture_after_preflight_rolls_back_without_commit() {
     let (_dir, mut service, events) = build_boundary_service(None);
-    service.filesystem.inner.replace_on_read.set(Some(4));
+    service.filesystem.inner.replace_on_read.set(Some(3));
     assert!(service.refresh().is_err());
     assert_eq!(
         *events.borrow(),
-        [
-            "read", "lock", "read", "read", "observe", "retain", "begin", "read"
-        ]
+        ["lock", "read", "read", "observe", "retain", "begin", "read"]
     );
     assert_eq!(
         service.storage.inner.begin_read().unwrap().get_revision(),
@@ -122,6 +117,26 @@ fn unchanged_basis_retention_skips_sql_write_and_body_parse() {
     assert_eq!(outcome.revision, 1);
     assert_eq!(service.markdown.0.get(), parses);
     assert_eq!(*events.borrow(), ["lock", "retain"]);
+}
+
+#[test]
+fn initial_build_and_full_reindex_lock_before_capturing_and_validate_basis() {
+    // Arrange.
+    let (_dir, mut service, events) = build_boundary_service(None);
+    // Act: the first build follows the full path, not preliminary file capture.
+    service.refresh().unwrap();
+    // Assert.
+    assert_eq!(events.borrow().first(), Some(&"lock"));
+    events.borrow_mut().clear();
+    let parses = service.markdown.0.get();
+    service.reindex().unwrap();
+    assert_eq!(
+        *events.borrow(),
+        [
+            "lock", "read", "read", "observe", "retain", "begin", "read", "commit"
+        ]
+    );
+    assert!(service.markdown.0.get() > parses);
 }
 
 fn build_boundary_service(failure: Option<&'static str>) -> (TempDir, Service, Events) {

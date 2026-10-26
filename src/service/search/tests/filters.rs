@@ -208,6 +208,10 @@ fn changing_observer_is_called_once_and_retained_flags_drive_rendering() {
 }
 
 impl Refresher for NoRefresh {
+    fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
+        panic!("this scenario must not trigger a full reindex")
+    }
+
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
         Ok(RefreshOutcome {
             revision: 1,

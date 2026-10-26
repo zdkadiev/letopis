@@ -308,9 +308,15 @@ fn never_published_missing_candidate_is_not_a_delta_after_empty_initial_build() 
 #[test]
 fn discard_preliminary_capture_and_publish_the_locked_observation() {
     let (_dir, mut service) = build_service();
+    service.refresh().unwrap();
+    service.filesystem.reset_counts();
+    service.filesystem.stat.update(|mut stat| {
+        stat.inode += 1;
+        stat
+    });
     service.filesystem.replace_on_read.set(Some(2));
     let outcome = service.refresh().unwrap();
-    assert_eq!(outcome.revision, 1);
+    assert_eq!(outcome.revision, 2);
     assert_eq!(read_matches(&mut service, "BravoToken"), ["note.md"]);
     assert!(read_matches(&mut service, "AlphaToken").is_empty());
 }
@@ -359,3 +365,5 @@ mod basis;
 pub(super) mod process;
 
 mod reading;
+
+mod reindex;

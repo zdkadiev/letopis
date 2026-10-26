@@ -244,14 +244,14 @@ pub struct CapturedFile {
     /// Clock sample, in nanoseconds since the Unix epoch, taken before the read.
     pub checked_at_ns: i64,
 }
-/// Counts for one refresh publication; all counts are zero for a no-op.
+/// Counts for one refresh or full reindex publication; all counts are zero for a no-op.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RefreshOutcome {
     /// Publication revision visible when this refresh returns.
     pub revision: u64,
     /// Whether this call committed a publication.
     pub published: bool,
-    /// Added or changed file observations, including invalid files.
+    /// Selected file observations, including every existing candidate for a full reindex.
     pub files_updated: usize,
     /// Previously stored candidates removed by this publication.
     pub files_removed: usize,
