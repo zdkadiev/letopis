@@ -38,9 +38,9 @@
 ## 5. Критерии приёмки
 
 - [x] Повреждённый требуемый Git object даёт fail-closed, а не fresh init.
-- [ ] Повреждённый или удалённый кэш/vectors.db пересобирается reindex без потери знаний; векторы неизменных текстов сохраняются, если vectors.db цел.
+- [x] Повреждённый или удалённый кэш/vectors.db пересобирается reindex без потери знаний; векторы неизменных текстов сохраняются, если vectors.db цел.
 - [x] Диагностика повреждения видна после restart, когда запись возможна.
-- [ ] Регрессия MC-2 подтверждает публикацию по файлу и повторное обнаружение после прерывания.
+- [x] Регрессия MC-2 подтверждает публикацию по файлу и повторное обнаружение после прерывания.
 
 - [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
@@ -67,18 +67,28 @@
 
 ## 9. Отчёт о выполнении
 
-Этап A реализован частично относительно полной карточки: добавлены независимые
-Git/SQLite fixtures и проверки повторной безопасной диагностики реальными новыми
-CLI-процессами. Изменены только integration tests и документы; production Rust,
-shared helpers, schema, native/build inputs и зависимости не менялись. Evidence,
-команды, hashes, архитектурная проверка и ограничения записаны в
-[отчёте этапа A](../../../../checks/TK-26/report.md).
-
-TK-26 остаётся `in_progress`. TK-25 принята как `e8eb1a2` и влита в main как
-`d265333`, но пересборка повреждённых/удалённых cache/vectors, reuse здоровых
-векторов и матрица MC-2 здесь не интегрированы и не выполнены. Для них нужен
-отдельный утверждённый Stage B integration plan с точной полной dependency revision.
-Этот результат не закрывает TK-28, G-1/G-2, TK-38/39, issue или полную приёмку TK-26.
-
 Этап A принят после task/final reviews и scoped review исправления `0fcf8bd`;
-полная карточка остаётся in_progress. План B подготовлен отдельно на утверждение.
+его captured source/evidence сохранены в [отчёте](../../../../checks/TK-26/report.md).
+
+Утверждённый пользователем Stage B потребил принятую TK-25 из exact main
+`d26533311e1443da01f7368625c9557353bd76f2` через merge
+`0f980e184a13e6d4054e38d5a234e146f35f84d9`. Task 1
+`1da09f8e1e499fdd6701843a9a941fae2a7ea3e7` проверяет отдельную/совместную потерю
+cache/vectors, explicit deletion и reuse точных здоровых vectors без inference.
+Task 2 добавляет real CLI fail-closed для требуемых root/child Git objects и
+invalid A/valid B после потери cache, fresh status и repair. Существующие MC-2
+process schedules выполнены заново: 13 passed/1 ignored child entry; refresh/reindex
+integration regression — 28 passed. Все четыре содержательных критерия выше имеют
+новое evidence; independent task/final reviews этапа B ещё выполняет controller.
+
+Изменены только integration tests и документы; production Rust, shared helpers,
+process harness, schema, native/build inputs и зависимости не менялись. Случаи,
+команды, mutation/restore hashes, точная MC-2 mapping и источник финальной
+verification записаны в [разделе B отчёта](../../../../checks/TK-26/report.md#stage-b).
+После потери cache старое invalid A не восстанавливается из отсутствующей истории;
+повторно проецируются текущие валидные файлы, канонический Markdown/Git сохраняется.
+
+TK-26 остаётся `in_progress` до независимых task-scoped и whole-branch reviews B.
+Этот результат передаёт storage evidence в TK-28, не закрывая всю TK-28; не объявляет
+G-1/G-2, пилоты, Linux, TK-29 или физические TK-38/39 пройденными. Ветка не слита
+в main, push/GitHub closure не выполнялись.

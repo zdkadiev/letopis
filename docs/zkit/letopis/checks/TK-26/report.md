@@ -1,11 +1,16 @@
-# TK-26 — evidence независимого этапа A
+# TK-26 — corruption recovery evidence A/B
 
-Дата: 2026-10-26. Состояние карточки: **in_progress**. Утверждённая
-[спецификация](../../../../../docs/superpowers/specs/2026-10-26-tk-26-corruption-design.md)
-разделяет независимый этап A и интеграционный этап B. Этот отчёт подтверждает
-только A; итоговый независимый review и scoped review исправления приняты. TK-25 принята как
-`e8eb1a2` и влита в main как `d265333`, но этот Stage A branch остаётся на своей
-проверенной базе и не потребляет новую реализацию.
+Дата: 2026-10-26. Карточка остаётся **in_progress** до task-scoped и итогового
+whole-branch review этапа B. Ниже сохранены исторические evidence этапа A и отдельно
+[новые проверки этапа B](#stage-b). Утверждённая
+[спецификация](../../../../superpowers/specs/2026-10-26-tk-26-corruption-design.md)
+и [план B](../../../../superpowers/plans/2026-10-26-tk-26-corruption-recovery.md)
+задают границы. Этап A принят; результаты B ожидают независимых reviews.
+
+## Исторический этап A
+
+Следующие разделы до «Этап B» относятся к исходным captured source/logs этапа A.
+Они не объявляются повторными проверками интегрированного дерева TK-25.
 
 ## Результат и граница
 
@@ -169,9 +174,9 @@ composition root и domain/service/adapter ownership product-кода неизм
 Этап A **не** доказывает полное corruption recovery, удаление и reindex cache/vectors,
 reuse здоровых векторов без inference, invalid-current/last-valid сценарий, полную
 MC-2 interruption matrix, pack/media corruption, power loss, TK-28 storage criterion,
-G-1/G-2, TK-38/39 или готовность пилота. Все критерии Stage B остаются unchecked:
-принятая TK-25 ещё не интегрирована в этот branch, а отдельный утверждённый plan
-должен зафиксировать её точную полную revision, реальные API и checkpoints.
+G-1/G-2, TK-38/39 или готовность пилота. На момент завершения A все критерии Stage B оставались unchecked:
+принятая TK-25 ещё не была интегрирована в этот branch, а отдельный утверждённый plan
+должен был зафиксировать её точную полную revision, реальные API и checkpoints.
 Никаких reindex stubs, auto-delete/repair, persistent corruption problems, merge,
 push, GitHub closure или Engram writes в этапе A нет.
 
@@ -192,6 +197,152 @@ anti-leak assertion проверяла реальный ввод; ошибочн
 
 Execution workspace с полными task reports, review packages и raw logs сохранён
 с SHA-256 manifest в `.artifacts/tk26/stage-a-execution-0fcf8bd/`. Ветка `tk-26`
-сохранена без слияния/публикации. Для B подготовлен отдельный
+сохранена без слияния/публикации. После A был подготовлен отдельный
 [план восстановления](../../../../superpowers/plans/2026-10-26-tk-26-corruption-recovery.md),
-который пока требует утверждения.
+который на тот момент требовал утверждения. Текущее состояние B приведено ниже.
+
+
+<a id="stage-b"></a>
+## Этап B — реальный reindex и MC-2, 2026-10-26
+
+Принятый TK-25 `e8eb1a2` вошёл в main как
+`d26533311e1443da01f7368625c9557353bd76f2`; controller интегрировал именно эту
+зависимость merge-коммитом `0f980e184a13e6d4054e38d5a234e146f35f84d9`.
+Task 1 — `1da09f8e1e499fdd6701843a9a941fae2a7ea3e7`; final B проверяет этот HEAD
+плюс новый тест с hash ниже. Исходный A, merged-source baseline и B не смешиваются.
+
+Добавлены только
+[corruption_recovery.rs](../../../../../tests/corruption_recovery.rs) и
+[corruption_reindex.rs](../../../../../tests/corruption_reindex.rs), а также документы.
+Product Rust, tests/support, process harness, schema, native/build inputs и Cargo
+зависимости не менялись относительно принятой TK-25. Второго recovery алгоритма,
+production unlink/repair или нового error store нет.
+
+### Случай → тест → независимый oracle
+
+| Случай | Тест / oracle | Проверенный исход |
+| --- | --- | --- |
+| Missing/nonempty-corrupt cache/vectors/both | `reindex_recovers_explicitly_removed_cache_vectors_or_both`; 6 отдельных fixtures, literal a/Alpha, b/Bravo, context edge, files | Corrupt сначала два reindex и два status дают safe internal_error; только явное точное удаление DB/WAL/SHM разрешает rebuild; revision 1 при потере cache, иначе 4, затем +1 |
+| Cache loss при здоровых vectors | `reindex_preserves_healthy_vectors_after_corrupt_cache_removal`; буквальные a=[0.25,0.75], b=[0.75,0.25], dimensions=2, прежние hashes/identity | Реальный reindex/reopen дважды сохраняет точные vectors; test-owned embed lock и локальный HttpFixture фиксируют 0 inference requests; whole SQLite-file equality не требуется |
+| Требуемый повреждённый author basis: root и child отдельно | `reindex_rejects_corrupt_required_basis_without_advancing`; read-only SQL snapshot всех project/nodes/edges/files полей и FTS term/doc/col/offset, literal healthy IDs/edge/basis | Два новых CLI reindex сохраняют revision 1 и полную старую проекцию; один safe internal_error/exit 1, пустой stderr; exact object restore → реальный reindex revision 2 |
+| Invalid A и valid B после потери last-valid cache | `reindex_after_cache_loss_reports_invalid_file_and_publishes_valid_peer`; Alpha/Bravo → malformed A + Charlie/B, затем Delta/A | Новый cache revision 1 содержит только Charlie/B; Alpha/Bravo не изобретаются; files.error и два fresh status показывают safe invalid_metadata; repair/reindex revision 2 содержит Delta/A и Charlie/B, error/problem исчезает |
+| Инфраструктурный отказ после restart | Stage A `corrupt_cache_and_vectors_fail_in_each_new_command_process`, новый Git-required test и Task 1 | Новые процессы снова дают hard failure, не false fresh revision:null и не успешно сохранённую corruption-строку |
+
+Сохранность проверяется по текущим canonical Markdown/source bytes, default
+staged/unstaged live.md, config presence/bytes, HEAD/index/Git config/user refs.
+Git-case дополнительно сравнивает все refs, включая retained snapshots: новый basis
+не удерживается. Повреждённые loose bytes не меняются до точного fixture-control
+restore. Удаляется только закрытый test-owned cache/vectors и точные WAL/SHM;
+canonical parent и regular file проверяются, symlinks не следуются, locks/config
+не удаляются. После потери cache старое invalid A из отсутствующей истории не
+восстанавливается. Потерянные векторы без inference не объявляются recovered.
+
+### Fresh команды и mutation receipts
+
+Все build/test/Clippy/verify запуски последовательны, с
+`CARGO_TARGET_DIR=/private/tmp/letopis-tk26-task1-target`, `CARGO_BUILD_JOBS=2`,
+`RUST_TEST_THREADS=2`, `CARGO_INCREMENTAL=0`; Python `/opt/homebrew/bin/python3 -B`.
+Host: Darwin 25.6.0 arm64, pinned Rust/Cargo 1.95.0. Новые полные логи Task 2:
+`.artifacts/tk26/stage-b-task2-20261026/`; Task 1 — отдельный
+`.artifacts/tk26/stage-b-task1-20261026/`.
+
+| Команда / stage | Exit и фактический результат | Новый log |
+| --- | --- | --- |
+| Task 1 merged baseline: Git/storage/diagnostics/reindex/document_reindex | 0; 22 passed | Task 1 initial-regression.log |
+| Task 1 restored recovery/reindex/document_reindex | 0; 14 passed | Task 1 restored-focused.log |
+| Task 1 make check V=1 | 0; 774 outer passed/0 failed/5 ignored; 8 дополнительных child summaries не считаются второй раз | Task 1 make-check.log |
+| Первый `cargo test --locked --offline --test corruption_reindex` | 101; Git case GREEN, invalid case runtime mismatch ошибочно заданного test literal, не product gap | first-reindex.log |
+| `cargo test --locked --offline --test corruption_reindex --test corruption_diagnostics --test provenance_commands --test reindex_command` | 0; 17 passed (2+2+6+7), 0 ignored | focused.log |
+| `cargo test --locked --offline --lib service::document_refresher::tests::process -- --nocapture` | 0; 13 passed/1 ignored/295 filtered; реальные matched schedules | mc2-process.log |
+| `cargo test --locked --offline --test document_refresh --test document_reindex --test reindex_command` | 0; 28 passed (16+5+7), 0 ignored | mc2-integration.log |
+| `cargo clippy --locked --offline --test corruption_reindex -- -D warnings` | 0 | clippy.log |
+
+Первый invalid-case ошибочно ожидал `invalid metadata`; существующий contract даёт
+`invalid letopis metadata`. Исправлен только test literal, новый алгоритм не
+понадобился. Это исправление oracle setup; оба сценария характеризуют существующее
+поведение GREEN, не выдуманный feature RED.
+
+Required mutation: в `decode_file` после проверки persisted invariants временно
+заменено поле `error` на `error: None`. Команда
+`cargo test --locked --offline --test corruption_reindex reindex_after_cache_loss_reports_invalid_file_and_publishes_valid_peer -- --exact`
+скомпилировалась и дала exit 101 на covering assertion: `None` вместо
+`Some("invalid letopis metadata")`. После exact restore та же команда дала exit 0,
+1 passed/1 filtered. Source `src/storage/files.rs` original/restored SHA-256
+`ffaac4ddfa7cb0e514a37e1665115933c7d27915dcb91d6a4286da3e73157cec`, mutant
+`756d5fe9ad9edd4c00b3ff0adb56f2fc2744056c5359b13269037738d7f2836a`.
+Логи: diagnostic-mutation.log, diagnostic-restored.log, diagnostic-mutation-hashes.txt.
+Task 1 vector mutation/restoration остаётся в своём task report; source read.rs
+restored hash `33fa0d9abfdb14883eba62af13bc8b4e645add25a3f73f2e468dbee205a16949`.
+
+### MC-2: соответствие фактическим controls
+
+Все test names ниже имеют prefix
+`service::document_refresher::tests::process::`; child module называется `reindex`,
+а его source — `src/service/document_refresher/tests/reindex_process.rs`.
+
+| MC-2 условие | Существующий выполненный test |
+| --- | --- |
+| Reindex SIGINT до/после commit | `reindex::reindex_sigint_preserves_exact_old_or_complete_new_state`: locked/begun/fts/before_commit/after_commit; старое либо целиком новое project/nodes/edges/files/FTS, fresh reindex после released kernel lease |
+| Reindex WAL reader | `reindex::reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view`: pinned old view, complete new view после commit |
+| Contending publisher и redetection | `reindex::publisher_waits_for_reindex_and_redetects_latest_file_bytes`: явный contended barrier, latest Charlie bytes и revision 3 |
+| Late SQL rollback/released lock | `reindex::reindex_late_sql_error_rolls_back_all_state_and_releases_lock`: old exact state, следующий child успешно публикует |
+| Остальные mutation phases refresh | `sigkill_keeps_exact_old_or_complete_new_publication` в process.rs: detected/locked/redetected/begun/cleared/projections/fts/fingerprints/before_commit/after_commit; второй файл реально заменяется; следующий refresh заново обнаруживает delta |
+| Contention, owner death, normal composition | `duplicate_publishers_commit_once_after_real_contention`, `waiting_publisher_redetects_newer_edit_after_owner_is_killed`, `normal_open_waits_at_index_lock_during_cache_write_then_redetects`, `normal_open_redetects_after_active_cache_writer_is_killed` |
+| Normal WAL, rollback и noop | `pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit`, `late_storage_error_rolls_back_every_cache_mutation`, `noop_finishes_while_another_process_holds_index_lock`, `normal_open_and_noop_finish_during_vector_write_and_held_index_lock` |
+
+Ignored `process::run_child` — entry point, который Worker действительно запускает
+через `--exact ... --ignored --nocapture` с Unix-socket checkpoints/watchdogs.
+Нулевой selected result не используется как PASS. Новых sleeps/checkpoints нет.
+Signal death не равен TK-29 handled cancelled JSON и не является физической потерей
+питания или доказательством persistence на носителе.
+
+### Финальная проверка B и handoff
+
+Единственный финальный `make verify V=1` дал **exit 0**, terminal `ok`:
+fmt/check/all-target Clippy, strict Rustdoc и root debug/release прошли. В каждом
+профиле **776 outer passed / 0 failed / 5 existing ignored** в **59 executable
+targets**. Последняя outer summary каждого Cargo Running target считается один
+раз; 8 nested child summaries в каждом профиле исключены, 0-test Doc-tests тоже.
+`count-outer-tests.py` и outer-test-counts.log/json сохраняют воспроизводимый подсчёт.
+Это новый запуск на final B inputs, отдельно от исторического Stage A.
+
+Полный make-verify.log: 2 395 строк, SHA-256
+`9a138836c8180b19e4df8317669f2fad5ed30d525cc985976d58c82792b69771`.
+Существующий MC-2 harness пишет child evidence в default .artifacts/tk10/process;
+270 новых log/receipt files этого task скопированы без изменения оригиналов в
+mc2-child-evidence нового каталога B, с hashes/paths в mc2-child-copy-manifest.txt.
+Пять ignored root entries — три entry points, реально вызываемые parent schedules,
+и отдельные real deadline/external corpus acceptance probes, не запущенные здесь.
+Новых ignored tests нет.
+
+Финальные `git diff --check` и local Markdown checker дали exit 0: 44 local links,
+10 anchors разрешаются. Сохранённый command:
+`/opt/homebrew/bin/python3 -B .artifacts/tk26/stage-b-task2-20261026/check-markdown-links.py`.
+Первый lightweight checker ошибочно прочитал fixture-link внутри inline code как
+ссылку документа; после исключения code blocks проверка зелёная, валидные ссылки
+и fixture не подменялись. Report/card/spec/plan согласованы: execution evidence
+готово, независимые controller reviews остаются pending.
+
+`source-input-sha256.txt` фиксирует product Rust/SQL, shared helpers, Cargo/toolchain,
+build.rs/Makefile и релевантные integration inputs; SHA-256 manifest
+`af3421dd5a314fb8098a7df7e92b8f857bcfd16ef4af305a4af436a5bd66544d`.
+Task 1 test hash `9b92d546eac56c7df073456195eab001abbafd3aa6f0f57bc1cfb6fa8f9dce10`;
+Task 2 test hash `487b95c8bb1e4e6fa895e528b485001fac5aafb22e7188f1e1b4cf65fe236441`.
+
+Архитектурная self-review: тестовые файлы с private helpers; product visibility,
+traits/impls, imports и lib.rs composition не менялись. Реальный CLI потребляет
+существующие services/adapters; test-owned read-only SQL — независимый oracle, а
+Storage API проверяет files/FTS. Domain не получает I/O. Product diff после mutations
+пуст относительно принятой TK-25. Независимые task/final reviews выполняет controller.
+
+[TK-28 storage-failure handoff](../../roadmap/epics/EP-3-maintenance/tasks/TK-28-diagnostics.md):
+эти tests различают безопасный infrastructure error и сохранённую files.error;
+при cache loss fresh status не создаёт БД, после rebuild invalid diagnostic текущий
+и исчезает после repair. Это evidence для storage-критерия TK-28, а не закрытие всей
+карточки: составной query/drain lifecycle остаётся отдельной приёмкой.
+
+Linux/native runner на B не запускался: accepted product/storage/native/build inputs
+не менялись, добавлены только tests/docs. Paid/live inference, отдельный real
+60-second deadline и external corpus acceptance probes не запускались. Нет новых
+claims о media/pack corruption, power loss, gates G-1/G-2, пилотах, TK-29 или TK-38/39.
+Ветка сохранена без main merge/push/GitHub closure. Engram и review ledger — controller.
