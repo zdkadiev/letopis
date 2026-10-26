@@ -10,7 +10,7 @@
 
 **Spec:** [Утверждённая спецификация TK-26](../specs/2026-10-26-tk-26-corruption-design.md), разделы «Этап B», «Регрессия публикации MC-2».
 
-**Dependency checkpoint:** TK-25 принята в `e8eb1a2`, merge main `d26533311e1443da01f7368625c9557353bd76f2`. Этап A остаётся исторически проверенным на своей базе `913b2b7`; его evidence не переносится на новую ревизию без запуска. Этот план пока **на утверждении**; B не реализован. Ветка остаётся `tk-26`.
+**Dependency checkpoint:** TK-25 принята в `e8eb1a2`, merge main `d26533311e1443da01f7368625c9557353bd76f2`. Этап A остаётся исторически проверенным на своей базе `913b2b7`; его evidence не переносится на новую ревизию без запуска. План **утверждён** пользователем сообщением «go» 2026-10-26; начато Subagent-driven выполнение B. Ветка остаётся `tk-26`.
 
 ## Global Constraints
 
@@ -25,7 +25,7 @@
 - KISS/DRY/YAGNI, существующие hexagonal boundaries; domain не получает I/O. AAA, независимые literals, caller-before-callee, явные imports, глагольные имена, около 40/максимум 60 строк, не более двух уровней вложенности.
 - Уже работающее поведение может сразу быть GREEN. Setup/compile failure не behavioral RED. Узкие временные mutations разрешены только с точным restore и повторным GREEN до commit.
 - Запуски последовательные, jobs2/tests2/incrementaloff. Полные логи в новых evidence paths, краткий итог в чат. Не повторять прошедший тяжёлый suite без изменённых входов или конкретного сомнения.
-- Не merge/push/close GitHub issue в рамках этого implementation plan. G-1/G-2, пилоты, физическая потеря питания, media/pack damage и TK-38/39 не объявляются пройденными.
+- Не сливать tk-26 в main, не push/close GitHub issue в рамках этого implementation plan. G-1/G-2, пилоты, физическая потеря питания, media/pack damage и TK-38/39 не объявляются пройденными.
 
 ## Review Focus
 
@@ -87,4 +87,4 @@ Documentation updates at completion: this plan, TK-26 spec/card/report. Historic
 
 Coverage: cache/vectors/both, missing/corrupt and vector reuse→Task1; Git required objects, invalid A/valid B and restart→Task2; MC-2→existing accepted schedules rerun by Task2; preservation/safe errors→both tasks. Native schema/bootstrap distinctions stay in Stage A. No new product API, storage model or orchestration layer.
 
-The user already selected Subagent-driven. This is a **new Stage B plan**, not approval to execute it. Review it before implementation; preserve the selected execution method after approval.
+The user already selected Subagent-driven. The user approved this Stage B plan with “go” on 2026-10-26. Execute with the preserved Subagent-driven method.
