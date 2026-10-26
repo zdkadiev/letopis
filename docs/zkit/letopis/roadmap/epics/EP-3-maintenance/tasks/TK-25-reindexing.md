@@ -1,6 +1,6 @@
 # TK-25 — Реализовать полный reindex и Git detection
 
-> **Статус:** planned
+> **Статус:** in_progress
 > **Эпик:** [EP-3](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 3 / 6 / 12 (best / expected / worst)
@@ -69,6 +69,8 @@
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
+Task 1/2 реализованы в `tk-25`, полный host verification завершён; финальное независимое review ещё впереди, поэтому критерии пока не отмечены.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+[Отчёт](../../../../checks/TK-25/report.md), [машинные результаты](../../../../checks/TK-25/verification.json), [спецификация](../../../../../../superpowers/specs/2026-10-26-tk-25-reindex-design.md), [план](../../../../../../superpowers/plans/2026-10-26-tk-25-reindex.md).
+
+Реализованы Refresher::reindex и общий full/incremental publication, строгая CLI-команда и lib.rs wiring. Проверены last-valid invalid owner + valid peer, initial/missing cache, Git checkout/reset, WAL/lock/SIGINT/SQL rollback, author basis и vector reuse. Коррупция TK-26, lifecycle TK-27, handled cancelled TK-29, пилот/ресурсные gates и Linux TK-25 не объявляются пройденными.

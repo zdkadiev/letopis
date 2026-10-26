@@ -14,6 +14,7 @@ use std::{collections::BTreeSet, ffi::OsString, io::Read, num::NonZeroUsize};
 #[derive(Debug)]
 pub(crate) enum Request {
     Status,
+    Reindex,
     Check(Vec<RepoPath>),
     Inspect(Vec<ElementAddress>),
     Search(SearchRequest),
@@ -77,32 +78,38 @@ pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResul
             let _: EmptyInput = read_object(input)?;
             Ok(Request::Status)
         }
-        ["check"] => {
-            let dto: CheckInput = read_object(input)?;
-            let paths = dto
-                .paths
-                .iter()
-                .map(|raw| RepoPath::parse(raw).map_err(|_| fail_invalid_request()))
-                .collect::<CommandResult<BTreeSet<_>>>()?;
-            Ok(Request::Check(paths.into_iter().collect()))
+        ["reindex"] => {
+            let _: EmptyInput = read_object(input)?;
+            Ok(Request::Reindex)
         }
-        ["inspect"] => {
-            let dto: InspectInput = read_object(input)?;
-            if dto.element_ids.is_empty() {
-                return Err(fail_invalid_request());
-            }
-            let ids = dto
-                .element_ids
-                .iter()
-                .map(|raw| ElementAddress::parse(raw))
-                .collect::<CommandResult<BTreeSet<_>>>()?;
-            Ok(Request::Inspect(ids.into_iter().collect()))
-        }
+        ["check"] => read_check(input),
+        ["inspect"] => read_inspection(input),
         ["search"] => read_search(input).map(Request::Search),
         ["traverse"] => read_traversal(input).map(Request::Traverse),
         ["embed", "--drain"] => read_drain(input),
         _ => Err(fail_invalid_request()),
     }
+}
+fn read_check(input: impl Read) -> CommandResult<Request> {
+    let dto: CheckInput = read_object(input)?;
+    let paths = dto
+        .paths
+        .iter()
+        .map(|raw| RepoPath::parse(raw).map_err(|_| fail_invalid_request()))
+        .collect::<CommandResult<BTreeSet<_>>>()?;
+    Ok(Request::Check(paths.into_iter().collect()))
+}
+fn read_inspection(input: impl Read) -> CommandResult<Request> {
+    let dto: InspectInput = read_object(input)?;
+    if dto.element_ids.is_empty() {
+        return Err(fail_invalid_request());
+    }
+    let ids = dto
+        .element_ids
+        .iter()
+        .map(|raw| ElementAddress::parse(raw))
+        .collect::<CommandResult<BTreeSet<_>>>()?;
+    Ok(Request::Inspect(ids.into_iter().collect()))
 }
 fn read_traversal(input: impl Read) -> CommandResult<TraversalRequest> {
     let dto: TraversalInput = read_object(input)?;

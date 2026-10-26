@@ -1,0 +1,252 @@
+{
+  "status": "DONE_HOST_VERIFIED_REVIEW_PENDING",
+  "base_commit": "913b2b7c043fa9b8df953b323659a73e74bdb742",
+  "task1_commit": "fa87c973bb5dc64c8996dbc14a9306a3508fecbf",
+  "branch": "tk-25",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "host_evidence": ".artifacts/tk25/host-continuation-20261026",
+  "baseline": "make check PASS at clean base; no exact quiet-mode count captured",
+  "task1_root": {
+    "blocks": 54,
+    "passed": 753,
+    "failed": 0,
+    "ignored": 5,
+    "result": "make check PASS"
+  },
+  "focused": {
+    "refresher_private": {
+      "passed": 32,
+      "ignored": 1,
+      "note": "Ignored child is explicitly executed by controlled process schedules."
+    },
+    "document_refresh": 16,
+    "document_reindex": 5,
+    "reindex_cli": 7,
+    "cli_handlers": 2,
+    "python_collector": 23
+  },
+  "mutations": [
+    {
+      "name": "skip-force",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "reindex_rebuilds_unchanged_fts_and_advances_once"
+      ],
+      "exit_code": 101,
+      "compiled": true,
+      "runtime_failure": true,
+      "restored_sha256": "4c8523c2286e8b22123343bde988b788f50f4301302c0e8a958ae146c9cb1f98"
+    },
+    {
+      "name": "skip-full-lock",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "reindex_reparses_identical_valid_unmarked_and_invalid_bytes"
+      ],
+      "exit_code": 101,
+      "compiled": true,
+      "runtime_failure": true,
+      "restored_sha256": "4c8523c2286e8b22123343bde988b788f50f4301302c0e8a958ae146c9cb1f98"
+    },
+    {
+      "name": "premature-commit",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "reindex_late_sql_error_rolls_back_all_state_and_releases_lock"
+      ],
+      "exit_code": 101,
+      "compiled": true,
+      "runtime_failure": true,
+      "restored_sha256": "4c8523c2286e8b22123343bde988b788f50f4301302c0e8a958ae146c9cb1f98"
+    },
+    {
+      "name": "incremental-dispatch",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "reindex_dispatches_full_operation_without_refresh_or_inline_drain"
+      ],
+      "exit_code": 101,
+      "compiled": true,
+      "runtime_failure": true,
+      "source_sha256": "0cf8213ec979611817bf8769e7f9e1bdfe277e1f4a745577a2a688bc1aafeba2",
+      "byte_exact_restore": true
+    },
+    {
+      "name": "inline-drain",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "reindex_dispatches_full_operation_without_refresh_or_inline_drain"
+      ],
+      "exit_code": 101,
+      "compiled": true,
+      "runtime_failure": true,
+      "source_sha256": "0cf8213ec979611817bf8769e7f9e1bdfe277e1f4a745577a2a688bc1aafeba2",
+      "byte_exact_restore": true
+    },
+    {
+      "name": "wrong-error-kind",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--test",
+        "reindex_command",
+        "reindex_reports_safe_capture_failure_and_keeps_previous_revision"
+      ],
+      "exit_code": 101,
+      "compiled": true,
+      "runtime_failure": true,
+      "source_sha256": "0cf8213ec979611817bf8769e7f9e1bdfe277e1f4a745577a2a688bc1aafeba2",
+      "byte_exact_restore": true
+    },
+    {
+      "name": "skip-input-validation",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "accepts_only_empty_reindex_input"
+      ],
+      "exit_code": 101,
+      "compiled": true,
+      "runtime_failure": true,
+      "source_sha256": "4fd9017eb83f95d65c522cb6926f58731b6e5dca8eff4fb8e3c3c6e85c760dac",
+      "byte_exact_restore": true
+    },
+    {
+      "name": "restored-inspect-control",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "service::inspection::tests::capture_writes_each_blob_before_reading_the_next_file"
+      ],
+      "exit_code": 101,
+      "compiled": true,
+      "runtime_failure": true,
+      "source_sha256": "c2b4246869289389d93b3979ab5638b17243204f1af9d9ca125448803edfbe49",
+      "byte_exact_restore": true
+    }
+  ],
+  "rulings": [
+    "Ruling: retain execution workspace as task evidence under AGENTS historical evidence requirement, rather than deleting it at finish — loss of audit receipts otherwise.",
+    "Ruling: use tests/document_reindex.rs for real multi-file public API scenarios, reusing existing DocumentRepo; private reindex.rs owns parser/capture instrumentation — avoids duplicated filesystem/Git fixture implementation.",
+    "Ruling: first-build now omits preliminary bytes capture to meet full lock scope; six historical tests depended on that extra capture count. Updated their failure injection indices/event expectations and seeded the preliminary-vs-locked regression with an existing publication — semantic checks remain, and the new lock-order test independently pins the intended change.",
+    "Ruling: do not rerun successful root make check solely through task-done wrapper; the completed command/log and unchanged committed source prove the task, in accordance with project verification economy — no loss of behavioral coverage.",
+    "Ruling: update only that negative-control anchor to the current collect_metadata call and prove the same mutant compiles/fails before exact restore — preserves coverage rather than dropping the unrelated failing check; no inspection product behavior changed.",
+    "Ruling: prior prepared Python interpreter no longer exists; cached offline jsonschema resolution lacked rpds wheel. Prepared task-local ignored Python 3.12.14/jsonschema 4.26.0 environment before checks; Rust dependencies/schema unchanged. Resolved packages recorded separately; no checks download dependencies.",
+    "Ruling: use CLI host runner's included make verify as the single final full verification, instead of running make verify twice consecutively — same complete checks and source inventory, less duplicate work.",
+    "Ruling: preserve failed host receipt and continue in a new evidence directory reusing only successful make-verify logs after verifying every inventoried input except the two edited Python collector/test files is byte-identical — unchanged Rust must not be retested merely for a Python receipt fix; incorrect reuse would risk stale evidence, prevented by exact whole-inventory comparison and explicit reused command provenance."
+  ],
+  "final_review": "pending; native execution requires fresh whole-branch reviewer",
+  "limits": [
+    "Linux not run for TK-25 yet; no storage/native/build/schema changes.",
+    "Native SIGINT death proves cache rollback, not TK-29 handled cancelled JSON.",
+    "No physical corruption repair, lifecycle expansion, real provider/model-quality or pilot/resource/G-1/G-2 verdict.",
+    "No merge, push or GitHub issue closure authorized/performed."
+  ],
+  "root_verification": {
+    "root_executables_per_profile": 54,
+    "doc_blocks_per_profile": 1,
+    "filtered_helpers_excluded": 16,
+    "profiles": {
+      "debug": {
+        "passed": 762,
+        "failed": 0,
+        "ignored": 5
+      },
+      "release": {
+        "passed": 762,
+        "failed": 0,
+        "ignored": 5
+      }
+    },
+    "warnings": 0
+  },
+  "host_audit": {
+    "status": "PASS",
+    "inputs": 221,
+    "commands": 51,
+    "reused_root_verify_commands": 1,
+    "binary_sha256": "9ac112d080652d3731caf8b728625fa582e1097a70ff9eb46ccdfe34ecef2bbd",
+    "manifest_sha256": "e108ad19b51b4f658be5d54551678c22da33adfe7e5ed0128ee87b2a9ec523d2",
+    "host_receipt": ".artifacts/tk25/host-continuation-20261026/manifest.json",
+    "root_verify_origin": ".artifacts/tk25/host-final-20261026",
+    "changed_between_phases": [
+      "tests/cli/run.py",
+      "tests/cli/test_runner.py"
+    ],
+    "product_inputs_unchanged": true,
+    "basis_probe_same_binary": true,
+    "json_receipts": {
+      "handler-responses.json": 15,
+      "product-reindex-responses.json": 12,
+      "product-reading-responses.json": 15,
+      "product-transport-responses.json": 9,
+      "thin-slice-responses.json": 7
+    }
+  },
+  "invalid_basis_probe": {
+    "status": "PASS",
+    "binary_sha256": "9ac112d080652d3731caf8b728625fa582e1097a70ff9eb46ccdfe34ecef2bbd",
+    "source_snapshot": "b7269e30425c85025d62aaf3b54c438d7c3a46ce",
+    "responses": [
+      {
+        "ok": true,
+        "result": {
+          "revision": 1
+        }
+      },
+      {
+        "ok": true,
+        "result": {
+          "revision": 2
+        }
+      }
+    ],
+    "invalid_owner_metadata_preserved": true,
+    "valid_peer_matches": [
+      "b.md"
+    ],
+    "index_head_unchanged": true,
+    "oracle": "sqlite read-only connection; expected literal IDs and captured author basis"
+  },
+  "ignored_limits": {
+    "driven_child_entries": 3,
+    "not_run": [
+      "attempt_obeys_real_sixty_second_deadline (provider unchanged)",
+      "observe_existing_corpus (requires external request)"
+    ]
+  },
+  "original_host_attempt": {
+    "evidence": ".artifacts/tk25/host-final-20261026",
+    "status": "FAIL in Python receipt classification after successful make verify; preserved",
+    "resolution": "23 Python regressions passed after distinguishing status embedding fields; all other 219 inventoried inputs byte-identical, only make verify logs explicitly reused in fresh continuation."
+  }
+}

@@ -39,8 +39,8 @@ READING_CONTROLS = [
      ['--test', 'search_consistency'], 'concurrent_publication_preserves_old_membership_coordinates_and_revision',
      'CommandError { kind: InternalError, message: "invalid search index data", .. }'),
     ('live-inspect-reread', 'src/service/inspection.rs',
-     '        let mut captured = CapturedKnowledge::default();\n        captured.collect_metadata(&path, parsed, requested);',
-     '        drop(parsed);\n        let live = self.filesystem.read_file(&path).map_err(map_document_error)?.unwrap();\n        let parsed = self.markdown.parse_file(&path, &live.bytes).map_err(|_| CommandError::new(CommandErrorKind::ValidationFailed, "invalid control input"))?.unwrap();\n        let mut captured = CapturedKnowledge::default();\n        captured.collect_metadata(&path, parsed, requested);',
+     '        captured.collect_metadata(&path, parsed, requested);',
+     '        drop(parsed);\n        let live = self.filesystem.read_file(&path).map_err(map_document_error)?.unwrap();\n        let parsed = self.markdown.parse_file(&path, &live.bytes).map_err(|_| CommandError::new(CommandErrorKind::ValidationFailed, "invalid control input"))?.unwrap();\n        captured.collect_metadata(&path, parsed, requested);',
      ['--lib'], 'service::inspection::tests::capture_writes_each_blob_before_reading_the_next_file',
      'assertion `left == right` failed'),
 ]

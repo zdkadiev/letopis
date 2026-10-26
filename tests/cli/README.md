@@ -206,3 +206,17 @@ This upgrade preserves canonical files, vectors, configuration and lock files.
 Focused proofs: `tests/source_addresses.rs`, `tests/source_projection.rs`,
 `tests/source_reading.rs`, `tests/source_lifecycle.rs`, and `tests/test_source_contract.py`.
 Their service acceptance does not establish later CLI consumer behavior or G-1/G-2.
+
+## TK-25: full reindex
+
+The host/Linux runner includes `reindex_command`: full reparse of unchanged files,
+strict empty input and safe errors, invalid-owner preservation, actual Git checkout/reset
+with changed contents/membership, observational status after cache deletion, vector reuse
+while embed.lock remains held, and author basis/index/HEAD preservation. Actual
+`PRODUCT_REINDEX` records are checked against the reindex command schema and retained
+in `product-reindex-responses.json`; injected handler receipts cannot replace them.
+The transport collector also checks real reindex success and selective-input rejection.
+
+Reindex process/SIGINT/WAL and late-error schedules run in the root library tests.
+These prove rollback under native signal death; the handled `cancelled` JSON protocol
+remains TK-29. No physical corruption repair or model-quality/pilot verdict is implied.
