@@ -12,7 +12,7 @@ use crate::{
         QueryEmbeddingRequest, RecheckFilter, RefreshOutcome, Refresher, SearchFilters, SearchFlag,
         SearchRequest, Searcher, SnapshotError, SourceProvenance, SourceRevisionComparison,
         SourceRevisionRequest, Storage, StorageRead, StorageResult, VectorOutcome,
-        search::{SearchDependencies, SearchService},
+        search::SearchService,
     },
     storage::SqliteStorage,
 };
@@ -165,7 +165,7 @@ impl ScopedFixture {
         hook: Option<Box<dyn FnOnce()>>,
         failure: Option<ProvenanceFailure>,
     ) -> ScopedSearch {
-        SearchService::new(SearchDependencies {
+        SearchService {
             refresher: NoRefresh,
             storage: ReadOnlyStorage {
                 inner: open_storage(self.root.path()),
@@ -182,7 +182,7 @@ impl ScopedFixture {
                 observed: self.observed.clone(),
                 failure,
             },
-        })
+        }
     }
 }
 

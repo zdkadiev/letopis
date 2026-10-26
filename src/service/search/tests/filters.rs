@@ -12,7 +12,7 @@ use crate::{
         Refresher, SearchFilters, SearchFlag, SearchRequest, Searcher, SnapshotError,
         SnapshotErrorKind, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
         Storage, TextMatch, VectorMatch,
-        search::{SearchDependencies, SearchService, ranking::rank_candidates},
+        search::{SearchService, ranking::rank_candidates},
     },
     storage::SqliteStorage,
 };
@@ -283,7 +283,7 @@ fn build_search(root: &Path, candidate: Candidate, failure: Option<SnapshotError
     let queries = Rc::new(Cell::new(0));
     let validations = Rc::new(Cell::new(0));
     let observations = Rc::new(Cell::new(0));
-    let search = SearchService::new(SearchDependencies {
+    let search = SearchService {
         refresher: NoRefresh,
         storage,
         embeddings: Query(queries.clone()),
@@ -295,7 +295,7 @@ fn build_search(root: &Path, candidate: Candidate, failure: Option<SnapshotError
             observations: observations.clone(),
             validations: validations.clone(),
         },
-    });
+    };
     Fixture {
         search,
         queries,

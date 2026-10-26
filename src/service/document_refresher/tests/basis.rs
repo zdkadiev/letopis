@@ -4,9 +4,9 @@ use crate::{
     service::{
         BasisRetainer, CacheWrite, CapturedFile, DocumentError, DocumentErrorKind,
         DocumentRefresher, DocumentResult, FileRow, FileStat, FileSystem, NodeMetadata,
-        ProvenanceObservation, ProvenanceRequest, RefreshDependencies, Refresher, SnapshotError,
-        SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage, StorageRead,
-        StorageResult, VectorOutcome,
+        ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError, SourceProvenance,
+        SourceRevisionComparison, SourceRevisionRequest, Storage, StorageRead, StorageResult,
+        VectorOutcome,
     },
     storage::SqliteStorage,
 };
@@ -127,7 +127,7 @@ fn unchanged_basis_retention_skips_sql_write_and_body_parse() {
 fn build_boundary_service(failure: Option<&'static str>) -> (TempDir, Service, Events) {
     let (dir, service) = build_service();
     let events = Rc::new(RefCell::new(Vec::new()));
-    let service = DocumentRefresher::new(RefreshDependencies {
+    let service = DocumentRefresher {
         git: service.git,
         filesystem: BoundaryFiles {
             inner: service.filesystem,
@@ -142,7 +142,7 @@ fn build_boundary_service(failure: Option<&'static str>) -> (TempDir, Service, E
             events: Rc::clone(&events),
             failure,
         },
-    });
+    };
     (dir, service, events)
 }
 impl FileSystem for BoundaryFiles {

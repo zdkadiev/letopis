@@ -25,10 +25,9 @@ use crate::service::{
     CommandResult, CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentRefresher,
     DocumentResult, EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
-    GraphDiagnostics, GraphService, InspectionService, Inspector, ProvenanceService,
-    RefreshDependencies, Refresher, SearchDependencies, SearchService, Searcher, SnapshotError,
-    SnapshotVerifier, SourceProvenance, SourceReader, SourceService, Storage, StorageResult,
-    TraversalDependencies, TraversalService, Traverser,
+    GraphDiagnostics, GraphService, InspectionService, Inspector, ProvenanceService, Refresher,
+    SearchService, Searcher, SnapshotError, SnapshotVerifier, SourceProvenance, SourceReader,
+    SourceService, Storage, StorageResult, TraversalService, Traverser,
 };
 use crate::storage::SqliteStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -84,7 +83,7 @@ pub fn wire_traverser(start: &Path) -> CommandResult<impl Traverser + use<>> {
         .map_err(map_traversal_setup)?;
     let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
         .map_err(map_traversal_setup)?;
-    Ok(TraversalService::new(TraversalDependencies {
+    Ok(TraversalService {
         storage,
         filesystem,
         refresher: Box::new(refresher),
@@ -93,7 +92,7 @@ pub fn wire_traverser(start: &Path) -> CommandResult<impl Traverser + use<>> {
         sources: Box::new(wire_source_reader(git.get_root()).map_err(map_traversal_setup)?),
         provenance: Box::new(wire_source_provenance(start).map_err(map_traversal_setup)?),
         graph: Box::new(GraphService::new()),
-    }))
+    })
 }
 
 /// Wire live source observations beneath the caller's already-selected Git root.
@@ -163,7 +162,7 @@ pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
     let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
         .map_err(map_search_setup)?;
     let embeddings = wire_embedding_executor(start)?;
-    Ok(SearchService::new(SearchDependencies {
+    Ok(SearchService {
         refresher,
         storage,
         embeddings,
@@ -173,7 +172,7 @@ pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
             GitCli::open(start).map_err(map_search_setup)?,
             LocalFileSystem::open(git.get_root()).map_err(map_search_setup)?,
         ),
-    }))
+    })
 }
 
 /// Wire canonical current-knowledge inspection for the repository containing `start`.
@@ -224,13 +223,13 @@ pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + 
         })?,
         LocalFileSystem::open(git.get_root())?,
     );
-    Ok(DocumentRefresher::new(RefreshDependencies {
+    Ok(DocumentRefresher {
         git,
         filesystem,
         markdown: MarkdownParser::new(),
         storage,
         provenance,
-    }))
+    })
 }
 
 /// Wire the existing embedding executor with confined automatic repository storage.

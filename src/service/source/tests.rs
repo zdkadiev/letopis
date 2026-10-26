@@ -1,7 +1,6 @@
 use super::super::{
     CapturedFile, DocumentError, DocumentErrorKind, DocumentRefresher, DocumentResult, FileStat,
-    FileSystem, ProvenanceService, RefreshDependencies, Refresher, SourceAvailability,
-    SourceReader, Storage,
+    FileSystem, ProvenanceService, Refresher, SourceAvailability, SourceReader, Storage,
 };
 use super::SourceService;
 use crate::{
@@ -25,13 +24,13 @@ fn publish_remote_without_file_capture_and_group_local_ranges() {
         GitCli::open(repo.path()).unwrap(),
         RecordedFiles::new(repo.path(), recorded_reads.clone()),
     );
-    let mut refresher = DocumentRefresher::new(RefreshDependencies {
+    let mut refresher = DocumentRefresher {
         git: GitCli::open(repo.path()).unwrap(),
         filesystem,
         markdown: MarkdownParser::new(),
         storage,
         provenance,
-    });
+    };
 
     refresher.refresh().unwrap();
 

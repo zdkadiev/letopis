@@ -9,8 +9,10 @@ use super::{
 use crate::domain::{EdgeTarget, EdgeType, Graph, RepoPath, SourceUri};
 use std::{collections::BTreeSet, error::Error, fmt, num::NonZeroUsize};
 
-/// Independently owned collaborators; readiness cannot write through the pinned read view.
-pub(crate) struct TraversalDependencies<S, F> {
+/// Refresh, pin, traverse and observe selected links under one scoped storage read.
+///
+/// Collaborators are independently owned; readiness cannot write through the pinned read view.
+pub(crate) struct TraversalService<S, F> {
     /// Exclusive owner of the scoped graph/metadata read capability.
     pub(crate) storage: S,
     /// Confined live knowledge observations.
@@ -28,43 +30,25 @@ pub(crate) struct TraversalDependencies<S, F> {
     /// Injected incremental graph algorithm without complete metadata access.
     pub(crate) graph: Box<dyn GraphTraversal>,
 }
-/// Refresh, pin, traverse and observe selected links under one scoped storage read.
-pub(crate) struct TraversalService<S, F> {
-    dependencies: TraversalDependencies<S, F>,
-}
 struct LinkObservations<'a, F> {
     filesystem: &'a F,
     markdown: &'a dyn MarkdownCodec,
     sources: &'a dyn SourceReader,
     provenance: &'a dyn SourceProvenance,
 }
-impl<S, F> TraversalService<S, F> {
-    /// Store owned dependencies without performing I/O.
-    pub(crate) fn new(dependencies: TraversalDependencies<S, F>) -> Self {
-        Self { dependencies }
-    }
-}
 impl<S: Storage, F: FileSystem> Traverser for TraversalService<S, F> {
     fn traverse(&mut self, request: &TraversalRequest) -> CommandResult<Traversal> {
-        let dependencies = &mut self.dependencies;
-        dependencies
-            .refresher
-            .refresh()
-            .map_err(map_traversal_error)?;
-        dependencies
-            .embeddings
+        self.refresher.refresh().map_err(map_traversal_error)?;
+        self.embeddings
             .read_configuration()
             .map_err(map_traversal_error)?;
-        let mut read = dependencies
-            .storage
-            .begin_read()
-            .map_err(map_traversal_error)?;
-        let graph = dependencies.graph.traverse(&mut read, request)?;
+        let mut read = self.storage.begin_read().map_err(map_traversal_error)?;
+        let graph = self.graph.traverse(&mut read, request)?;
         let observations = LinkObservations {
-            filesystem: &dependencies.filesystem,
-            markdown: dependencies.markdown.as_ref(),
-            sources: dependencies.sources.as_ref(),
-            provenance: dependencies.provenance.as_ref(),
+            filesystem: &self.filesystem,
+            markdown: self.markdown.as_ref(),
+            sources: self.sources.as_ref(),
+            provenance: self.provenance.as_ref(),
         };
         Self::read_links(&mut read, graph, &observations)
     }
@@ -160,12 +144,6 @@ impl<S: Storage, F: FileSystem> TraversalService<S, F> {
     }
 }
 
-impl<S, F> fmt::Debug for TraversalDependencies<S, F> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TraversalDependencies")
-            .finish_non_exhaustive()
-    }
-}
 impl<S, F> fmt::Debug for TraversalService<S, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TraversalService").finish_non_exhaustive()
