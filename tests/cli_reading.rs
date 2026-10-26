@@ -169,6 +169,76 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
 }
 
 #[test]
+fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
+    let repo = ReadingRepo::new();
+    let knowledge = b"<!-- letopis: {\"created_at\":1792800000,\"source_snapshot\":\"0000000000000000000000000000000000000000\"} -->\nCache decision.\n[range](src/cache.rs#L2-L2 \"letopis:type=external\")\n[missing](src/missing.rs \"letopis:type=external\")\n[remote](https://example.invalid/a?q=1#fragment \"letopis:type=external\")\n";
+    repo.write("knowledge.md", knowledge);
+    repo.write("src/cache.rs", b"alpha\r\nbeta\n");
+    let body = br#"{"element_ids":["knowledge.md","src/cache.rs#L2-L2","src/missing.rs","https://example.invalid/a?q=1#fragment","./knowledge.md"]}"#;
+
+    let response = read_response(&repo.invoke(&["inspect"], body), 0);
+
+    emit_reading("inspect_mixed", "inspect", 0, &response);
+    assert_eq!(response["ok"], true);
+    assert_eq!(
+        response["result"]["elements"],
+        json!({
+            "knowledge.md":{"path":"knowledge.md","lines":[1,5],"hash":"f2a2c9bdcb99213d0d3b8c6775c4899d80deaea9b4a723b9ac3269cec156a95a"},
+            "src/cache.rs#L2-L2":{"path":"src/cache.rs","lines":[2,2],"hash":"f2c82decdd7181cf98945929a62598db7e6b477e11f6e0eb0ae97020eff151ad"},
+            "src/missing.rs":{"path":"src/missing.rs","hash":null},
+            "https://example.invalid/a?q=1#fragment":{"path":"https://example.invalid/a?q=1#fragment","hash":null}
+        })
+    );
+    let tree = TreeOid::parse(response["result"]["snapshot"].as_str().unwrap()).unwrap();
+    let git = open_git_snapshots(repo.get_root()).unwrap();
+    assert_eq!(
+        git.read_blob(&tree, &RepoPath::parse("knowledge.md").unwrap())
+            .unwrap(),
+        knowledge
+    );
+    assert_eq!(
+        git.read_blob(&tree, &RepoPath::parse("src/cache.rs").unwrap())
+            .unwrap(),
+        b"alpha\r\nbeta\n"
+    );
+    assert!(
+        git.read_blob(&tree, &RepoPath::parse("src/missing.rs").unwrap())
+            .is_err()
+    );
+}
+
+#[test]
+fn binary_inspect_rejects_unknown_member_without_partial_result() {
+    let repo = ReadingRepo::new();
+    repo.write_knowledge(
+        "knowledge.md",
+        "Private fixture secret.\n[source](src/cache.rs \"letopis:type=external\")",
+    );
+    repo.write("src/cache.rs", b"private source secret\n");
+    let initial = br#"{"element_ids":["knowledge.md","src/cache.rs"]}"#;
+    assert_eq!(
+        read_response(&repo.invoke(&["inspect"], initial), 0)["ok"],
+        true
+    );
+    repo.write_knowledge("knowledge.md", "Private fixture secret after deletion.");
+
+    for unknown in ["src/cache.rs", "knowledge.md#removed"] {
+        let body = json!({"element_ids":["knowledge.md",unknown]}).to_string();
+        let output = repo.invoke(&["inspect"], body.as_bytes());
+        let response = read_response(&output, 1);
+        emit_reading("inspect_removed", "inspect", 1, &response);
+        assert_eq!(response["error"]["code"], "not_found");
+        assert!(response.get("result").is_none());
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("Private fixture secret"));
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("private source secret"));
+    }
+    fs::remove_file(repo.get_root().join("knowledge.md")).unwrap();
+    let response = read_response(&repo.invoke(&["inspect"], initial), 1);
+    assert_eq!(response["error"]["code"], "not_found");
+    assert!(response.get("result").is_none());
+}
+
+#[test]
 fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
     for provider in ["ollama", "openai"] {
         let repo = ReadingRepo::new();

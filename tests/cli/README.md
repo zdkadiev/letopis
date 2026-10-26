@@ -7,18 +7,22 @@ durable attempts, config/text races, lost responses, process death and no-work
 launch suppression. Its foreground fixture calls the production service/launcher;
 the embedding executor is always the actual product executable.
 
-Search and knowledge inspection use the actual product executable. `cli_reading`
+Search and inspection use the actual product executable. `cli_reading`
 asserts one JSON line, empty stderr and exact exit before emitting `PRODUCT_READING`
 observations for search success, provider-failure FTS fallback, retained-tree inspect,
-not-found and malformed-input errors. The runner validates each against its matching
-X-1 command schema and records `product-reading-responses.json`. Injected
-`CLI_RESPONSE` receipts remain separately labelled and cannot satisfy this coverage.
-Full source inspection remains TK-24 work. The transport collector accepts a real
+mixed knowledge/source inspect, removed-source whole-batch rejection, not-found and
+malformed-input errors. The runner validates each against its matching X-1 **command**
+schema and records `product-reading-responses.json`. Injected `CLI_RESPONSE` receipts
+remain separately labelled and cannot satisfy this coverage. The earlier TK-11/TK-14
+receipts cover only their then-current knowledge inspection; their historical limits
+remain attached to those revisions. The transport collector accepts a real
 `check {}` with empty errors and cache initialization; malformed input must fail
 before initialization. TK-19 lifecycle acceptance is in `tests/check_lifecycle.rs`.
 
 Use Python 3.11+ with the development dependency `jsonschema==4.26.0` prepared in
-an isolated environment; it is not a product dependency. For this worktree:
+an isolated environment; it is not a product dependency. The following commands
+are retained as historical TK-11/TK-12 invocations; their environment paths belong
+to the worktree that captured those receipts:
 
 ```sh
 .artifacts/tk11/python-env/bin/python -B -m unittest discover -s tests/cli -p test_runner.py -v
@@ -156,6 +160,34 @@ Prepare Python 3.11+ and `jsonschema==4.26.0` before running these checks. Use
 new evidence directories. The runner includes `make verify`; do not repeat it
 on an unchanged accepted tree just to obtain a second identical log.
 
+## TK-24 mixed inspection and agent workflow
+
+The current `cli_reading` cases require metadata for a knowledge element, a local
+source range, a declared missing local source, and an opaque remote source in one
+real binary response. They check exact addressed hashes, duplicate normalization,
+one retained Git tree, absent secret payloads, and whole-batch failure for a
+source whose last current declaration was removed. The collector requires the
+`inspect_mixed` and `inspect_removed` product receipts and validates each response
+against the selected InspectOutput success/error schema. The accepted guide is
+[skills/letopis/SKILL.md](../../skills/letopis/SKILL.md); TK-14's prior smoke
+and receipts remain historical evidence of its older guide.
+
+Run the deterministic no-provider workflow against a built binary. Use a new
+evidence directory, outside the source tree if it cannot be written there:
+
+```sh
+python3 -B tests/cli/tk24_workflow.py --binary /absolute/path/to/target/debug/letopis --evidence /private/tmp/tk24-workflow-NEW
+```
+
+`workflow.json` contains every Git/CLI argv, input, exit, stdout and stderr,
+source-basis and reading-tree OIDs, plus real-index and HEAD before/after checks.
+The repository under the evidence directory is disposable. The script covers
+write/check/search/traverse/mixed inspect and Git reads, a source edit and
+`source_changed`, isolated temporary-index basis creation with addressed-byte
+comparison, a dangling incoming link after rename and its repair. It establishes
+CLI behavior for fixed bytes; it does not establish a real agent pilot, paid
+model quality, resource targets, handled cancellation or other platforms.
+
 ## TK-20 source-service handoff
 
 The 2026-10-25 [approved source contract](../../docs/superpowers/specs/2026-10-25-tk-20-source-identity-design.md)
@@ -163,7 +195,8 @@ is implemented through `SourceReader` with the caller's pinned `StorageRead`.
 HTTP/HTTPS identities preserve original spelling/query/fragment and return unknown,
 unfetched bytes without network or local-file reads. Missing local bytes return
 `hash=None` and `SourceNotFound`; storage/unsafe-read failures remain typed errors.
-Source CLI inspect remains TK-24; historical comparisons remain TK-21. No new CLI
+At the TK-20 checkpoint, source CLI inspect remained TK-24 work; the current
+mixed-inspect acceptance is above. Historical comparisons remained TK-21. No new CLI
 fields or source flags are exposed here. Existing `check` refresh can reconstruct
 the cache; CLI `reindex` is still pending.
 
