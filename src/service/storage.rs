@@ -1,6 +1,7 @@
 use super::{
-    EmbeddingFailure, EmbeddingWork, FileRow, GraphRead, NodeMetadata, QueryError, StorageResult,
-    StoredNode, StoredVectorKey, TextMatch, VectorMatch, VectorOutcome,
+    EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary, EmbeddingWork, FileRow,
+    GraphRead, NodeMetadata, QueryError, StorageResult, StoredNode, StoredVectorKey, TextMatch,
+    VectorMatch, VectorOutcome,
 };
 use crate::domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid};
 use std::{collections::BTreeSet, num::NonZeroUsize};
@@ -47,11 +48,39 @@ pub trait Storage {
     /// Returns an internal error if the snapshot cannot be opened or decoded.
     fn begin_read(&mut self) -> StorageResult<Self::Read<'_>>;
 }
+/// Observation-only access to an optional published cache.
+///
+/// Implementations never create durable databases, bootstrap or repair schemas,
+/// change configuration or vector identity, or acquire a database writer. Ordinary
+/// read-side journal/shared-memory files may still be managed by the database engine.
+/// Missing publication is distinct from read failure.
+pub trait StatusStorage {
+    /// One exclusively borrowed consistent database view.
+    type Read<'a>: StorageRead
+    where
+        Self: 'a;
+    /// Pin the current publication, returning none only when no publication exists.
+    ///
+    /// # Errors
+    /// Reports inaccessible, malformed or incompatible persisted state.
+    fn begin_status_read(&mut self) -> StorageResult<Option<Self::Read<'_>>>;
+}
+
 /// Observations pinned within one read transaction.
 ///
 /// Every implementation answers all methods from one consistent view, so results
 /// never mix revisions, and never modifies stored data.
 pub trait StorageRead {
+    /// Count distinct current knowledge hashes under the captured policy.
+    /// Sources and orphan vector/failure rows never count. A usable vector takes
+    /// precedence over failures; unavailable or mismatched identities count only backlog.
+    ///
+    /// # Errors
+    /// Rejects invalid attempt budgets, malformed persisted values and database failures.
+    fn read_embedding_status(
+        &mut self,
+        policy: &EmbeddingStatusPolicy,
+    ) -> StorageResult<EmbeddingStatusSummary>;
     /// Read the first eligible knowledge ID strictly after the optional cursor.
     ///
     /// # Errors

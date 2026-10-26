@@ -134,6 +134,21 @@ impl LocalFileSystem {
             .map(OwnedFd::from)
             .map_err(|cause| fail_io("cannot duplicate service directory", cause))
     }
+
+    /// Pin and duplicate an existing service directory without creating or chmodding it.
+    ///
+    /// # Errors
+    /// Reports unsafe/replaced paths or failed observation/duplication.
+    pub(crate) fn open_existing_service_directory(&self) -> DocumentResult<Option<OwnedFd>> {
+        let Some(directory) = self.get_existing_service_directory()? else {
+            return Ok(None);
+        };
+        directory
+            .try_clone()
+            .map(OwnedFd::from)
+            .map(Some)
+            .map_err(|cause| fail_io("cannot duplicate service directory", cause))
+    }
 }
 
 impl EmbeddingFiles for LocalFileSystem {
@@ -244,6 +259,47 @@ impl FileSystem for LocalFileSystem {
 }
 
 impl LocalFileSystem {
+    pub(super) fn open_existing_lock_file(&self, name: &str) -> DocumentResult<Option<File>> {
+        self.open_existing_lock_with(name, || {})
+    }
+
+    fn open_existing_lock_with(
+        &self,
+        name: &str,
+        observe: impl FnOnce(),
+    ) -> DocumentResult<Option<File>> {
+        let Some(directory) = self.get_existing_service_directory()? else {
+            return Ok(None);
+        };
+        let before = match statat(directory, name, AtFlags::SYMLINK_NOFOLLOW) {
+            Ok(stat) => stat,
+            Err(Errno::NOENT) => return Ok(None),
+            Err(cause) => return Err(fail_io(COORDINATION_LOCK_ERROR, cause)),
+        };
+        build_file_stat(&before)?;
+        observe();
+        let file = File::from(
+            openat(directory, name, LOCK_FILE_FLAGS, Mode::empty())
+                .map_err(|cause| fail_io("cannot open coordination lock", cause))?,
+        );
+        let current = fstat(&file).map_err(|cause| fail_io(COORDINATION_LOCK_ERROR, cause))?;
+        require_identity(&before, &current)
+            .map_err(|cause| fail_io("coordination lock changed", cause))?;
+        observe_lock_descriptor(&file)?;
+        self.verify_existing_lock(&file, name)?;
+        Ok(Some(file))
+    }
+
+    pub(super) fn verify_existing_lock(&self, file: &File, name: &str) -> DocumentResult<()> {
+        let Some(directory) = self.get_existing_service_directory()? else {
+            return Err(fail_changed());
+        };
+        let pinned = fstat(file).map_err(|cause| fail_io(COORDINATION_LOCK_ERROR, cause))?;
+        verify_entry(directory, name, &pinned)
+            .map(|_| ())
+            .map_err(|cause| fail_io("coordination lock changed", cause))
+    }
+
     fn open_lock_file(&self, name: &str) -> DocumentResult<File> {
         self.open_lock_with(name, || {})
     }
@@ -278,7 +334,7 @@ impl LocalFileSystem {
         Ok(file)
     }
 
-    fn try_acquire_lock(&self, file: &File) -> DocumentResult<bool> {
+    pub(super) fn try_acquire_lock(&self, file: &File) -> DocumentResult<bool> {
         let acquired = retry_lock(|| file.try_lock())
             .map_err(|cause| fail_io("cannot acquire coordination lock", cause))?;
         if acquired {
@@ -334,10 +390,41 @@ impl LocalFileSystem {
             let _ = self.service.set(directory);
         }
         let directory = self.service.get().ok_or_else(fail_changed)?;
+        self.verify_service_directory(directory)?;
+        Ok(directory)
+    }
+
+    fn get_existing_service_directory(&self) -> DocumentResult<Option<&File>> {
+        if self.service.get().is_none() {
+            let before = match statat(&self.root, SERVICE_DIRECTORY, AtFlags::SYMLINK_NOFOLLOW) {
+                Ok(stat) => stat,
+                Err(Errno::NOENT) => return Ok(None),
+                Err(cause) => return Err(fail_io(SERVICE_DIRECTORY_ERROR, cause)),
+            };
+            let file = File::from(
+                openat(
+                    &self.root,
+                    SERVICE_DIRECTORY,
+                    DIRECTORY_FLAGS,
+                    Mode::empty(),
+                )
+                .map_err(|cause| fail_io(SERVICE_DIRECTORY_ERROR, cause))?,
+            );
+            let opened = fstat(&file).map_err(|cause| fail_io(SERVICE_DIRECTORY_ERROR, cause))?;
+            require_identity(&before, &opened)
+                .map_err(|cause| fail_io("service directory changed", cause))?;
+            let _ = self.service.set(file);
+        }
+        let directory = self.service.get().ok_or_else(fail_changed)?;
+        self.verify_service_directory(directory)?;
+        Ok(Some(directory))
+    }
+
+    fn verify_service_directory(&self, directory: &File) -> DocumentResult<()> {
         let pinned = fstat(directory).map_err(|cause| fail_io(SERVICE_DIRECTORY_ERROR, cause))?;
         verify_entry(&self.root, SERVICE_DIRECTORY, &pinned)
-            .map_err(|cause| fail_io("service directory changed", cause))?;
-        Ok(directory)
+            .map(|_| ())
+            .map_err(|cause| fail_io("service directory changed", cause))
     }
 
     fn create_service_directory(&self) -> DocumentResult<File> {

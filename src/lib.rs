@@ -27,14 +27,16 @@ use crate::service::{
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
     GraphDiagnostics, GraphService, InspectionService, Inspector, ProvenanceService, Refresher,
     SearchService, Searcher, SnapshotError, SnapshotVerifier, SourceProvenance, SourceReader,
-    SourceService, Storage, StorageResult, TraversalService, Traverser,
+    SourceService, StatusFiles, StatusService, StatusStorage, Storage, StorageResult,
+    TraversalService, Traverser,
 };
-use crate::storage::SqliteStorage;
+use crate::storage::{SqliteStatusStorage, SqliteStorage};
 use crate::utils::SERVICE_DIRECTORY;
 use std::{
     env,
     ffi::OsString,
     io::{Read, Write},
+    os::fd::AsFd,
     path::{Path, PathBuf},
 };
 
@@ -332,6 +334,26 @@ pub fn open_git_snapshots(
     GitCli::open(start)
 }
 
+/// Open existing published storage beneath an already pinned service directory.
+/// Does not create database files, bootstrap schemas or synchronize vector identity.
+///
+/// # Errors
+/// Reports unsafe paths, incompatible schemas or database observation failures.
+pub fn open_status_storage<F: AsFd>(
+    directory: &Path,
+    pinned: &F,
+) -> StorageResult<impl StatusStorage + use<F>> {
+    SqliteStatusStorage::open_confined(directory, pinned)
+}
+
+/// Open status observations beneath a pinned checkout without creating service state.
+///
+/// # Errors
+/// Reports an unsafe or inaccessible checkout root.
+pub fn open_status_files(root: &Path) -> DocumentResult<impl StatusFiles + use<>> {
+    LocalFileSystem::open(root)
+}
+
 /// Open the disk cache and independent vector database.
 ///
 /// # Errors
@@ -352,12 +374,46 @@ pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLoc
 fn run_request(request: Request) -> CommandResult<CommandResponse> {
     let (directory, executable) = locate_environment()?;
     match request {
+        Request::Status => run_status(request, &directory),
         Request::Check(_) => run_check(request, &directory, &executable),
         Request::Drain => run_drain(request, &directory, &executable),
         Request::Search(_) => run_search(request, &directory, &executable),
         Request::Traverse(_) => run_traverse(request, &directory, &executable),
         Request::Inspect(_) => run_inspect(request, &directory, &executable),
     }
+}
+
+fn run_status(request: Request, directory: &Path) -> CommandResult<CommandResponse> {
+    let root = open_repository_root(directory)?;
+    let git = GitCli::open(&root).map_err(map_status_setup)?;
+    let files = LocalFileSystem::open(git.get_root()).map_err(map_status_setup)?;
+    let service_directory = files
+        .open_existing_service_directory()
+        .map_err(map_status_setup)?;
+    let storage = if let Some(pinned) = service_directory.as_ref() {
+        SqliteStatusStorage::open_confined(&root.join(SERVICE_DIRECTORY), pinned)
+            .map_err(map_status_setup)?
+    } else {
+        SqliteStatusStorage::default()
+    };
+    let provenance = ProvenanceService::new(
+        GitCli::open(&root).map_err(map_status_setup)?,
+        LocalFileSystem::open(&root).map_err(map_status_setup)?,
+    );
+    let provider = build_embedding_provider().map_err(map_status_setup)?;
+    let graph = CurrentGraphDiagnostics::new();
+    let mut status = StatusService {
+        storage,
+        files: &files,
+        graph: &graph,
+        provenance: &provenance,
+        provider: &provider,
+    };
+    Handlers::new(HandlerServices {
+        status: Some(&mut status),
+        ..HandlerServices::default()
+    })
+    .execute(request)
 }
 
 fn locate_environment() -> CommandResult<(PathBuf, PathBuf)> {
@@ -466,6 +522,14 @@ fn map_check_setup(error: impl std::error::Error + Send + Sync + 'static) -> Com
     CommandError::new_with_cause(
         CommandErrorKind::InternalError,
         "cannot open check service",
+        error,
+    )
+}
+
+fn map_status_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot open status service",
         error,
     )
 }

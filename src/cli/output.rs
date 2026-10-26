@@ -1,8 +1,8 @@
 use super::handlers::{CommandResponse, ResponseResult};
 use crate::domain::{Edge, Sha256};
 use crate::service::{
-    CommandError, CommandErrorKind, CommandProblem, InspectedElement, SearchFlag, SearchLink,
-    TraversalLink,
+    CommandError, CommandErrorKind, CommandProblem, HeldLock, InspectedElement, LockName,
+    SearchFlag, SearchLink, TraversalLink,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -29,6 +29,13 @@ struct Failure<'a> {
 #[derive(Serialize)]
 #[serde(untagged)]
 enum ResultBody<'a> {
+    Status {
+        revision: Option<u64>,
+        embedding_backlog: u64,
+        embedding_failed: u64,
+        locks: Vec<Lock>,
+        problems: Vec<Problem<'a>>,
+    },
     Check {
         errors: Vec<Problem<'a>>,
     },
@@ -50,6 +57,11 @@ struct Element<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     lines: Option<[u64; 2]>,
     hash: Option<String>,
+}
+#[derive(Serialize)]
+struct Lock {
+    name: &'static str,
+    pid: u32,
 }
 
 /// Existing X-1 metadata envelope; freshness flags never add source text or fields.
@@ -111,6 +123,13 @@ pub(crate) fn write_response(
 }
 fn build_result(result: &ResponseResult) -> ResultBody<'_> {
     match result {
+        ResponseResult::Status(report) => ResultBody::Status {
+            revision: report.revision,
+            embedding_backlog: report.embedding_backlog,
+            embedding_failed: report.embedding_failed,
+            locks: report.locks.iter().map(build_lock).collect(),
+            problems: report.problems.iter().map(build_problem).collect(),
+        },
         ResponseResult::Check(report) => ResultBody::Check {
             errors: report.errors.iter().map(build_problem).collect(),
         },
@@ -135,6 +154,15 @@ fn build_result(result: &ResponseResult) -> ResultBody<'_> {
                 .map(|edges| edges.iter().map(build_edge).collect()),
         },
         ResponseResult::Drained => ResultBody::Drained {},
+    }
+}
+fn build_lock(lock: &HeldLock) -> Lock {
+    Lock {
+        name: match lock.name {
+            LockName::Index => "index",
+            LockName::Embed => "embed",
+        },
+        pid: lock.pid.get(),
     }
 }
 fn build_link(link: &SearchLink) -> Link<'_> {

@@ -1,0 +1,199 @@
+use letopis::open_status_files;
+use letopis::service::{CommandErrorKind, LockName, StatusFiles};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::os::unix::fs::{MetadataExt, symlink};
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
+
+static NEXT: AtomicU64 = AtomicU64::new(0);
+const CHILD_ROOT: &str = "LETOPIS_STATUS_FILES_ROOT";
+const CHILD_LOCK: &str = "LETOPIS_STATUS_FILES_LOCK";
+
+struct Fixture(PathBuf);
+impl Fixture {
+    fn new() -> Self {
+        let path = std::env::temp_dir().join(format!(
+            "letopis-status-files-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&path).unwrap();
+        Self(path)
+    }
+
+    fn get_lock_path(&self, name: &str) -> PathBuf {
+        self.0.join(".letopis").join(name)
+    }
+}
+impl Drop for Fixture {
+    fn drop(&mut self) {
+        fs::remove_dir_all(&self.0).unwrap();
+    }
+}
+
+struct Owner(Child);
+impl Owner {
+    fn spawn(root: &Path, name: &str, pid: &str) -> Self {
+        let child = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "status_files_child", "--nocapture"])
+            .env(CHILD_ROOT, root)
+            .env(CHILD_LOCK, name)
+            .env("LETOPIS_STATUS_FILES_PID", pid)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let ready = root.join(format!("{name}.ready"));
+        let start = Instant::now();
+        while !ready.exists() {
+            assert!(
+                start.elapsed() < Duration::from_secs(5),
+                "owner did not start"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        Self(child)
+    }
+}
+impl Drop for Owner {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        self.0.wait().unwrap();
+    }
+}
+
+#[test]
+fn reports_busy_recorded_pid() {
+    let fixture = Fixture::new();
+    fs::create_dir(fixture.0.join(".letopis")).unwrap();
+    let child = Owner::spawn(&fixture.0, "index.lock", "self");
+    let lock_path = fixture.get_lock_path("index.lock");
+    let original_bytes = fs::read(&lock_path).unwrap();
+    let original_inode = fs::metadata(&lock_path).unwrap().ino();
+    let files = open_status_files(&fixture.0).unwrap();
+
+    let start = Instant::now();
+    let locks = files.observe_locks().unwrap();
+
+    assert!(start.elapsed() < Duration::from_secs(2));
+    assert_eq!(locks.len(), 1);
+    assert_eq!(locks[0].name, LockName::Index);
+    assert_eq!(locks[0].pid.get(), child.0.id());
+    assert_eq!(std::fs::read(&lock_path).unwrap(), original_bytes);
+    assert_eq!(fs::metadata(&lock_path).unwrap().ino(), original_inode);
+}
+
+#[test]
+fn ignores_stale_unlocked_pid() {
+    let fixture = Fixture::new();
+    fs::create_dir(fixture.0.join(".letopis")).unwrap();
+    let lock_path = fixture.get_lock_path("index.lock");
+    fs::write(&lock_path, b"999999\n").unwrap();
+    let files = open_status_files(&fixture.0).unwrap();
+
+    let locks = files.observe_locks().unwrap();
+
+    assert!(locks.is_empty());
+    assert_eq!(fs::read(&lock_path).unwrap(), b"999999\n");
+}
+
+#[test]
+fn does_not_write_probe_pid() {
+    let fixture = Fixture::new();
+    fs::create_dir(fixture.0.join(".letopis")).unwrap();
+    let lock_path = fixture.get_lock_path("embed.lock");
+    fs::write(&lock_path, b"42\n").unwrap();
+    let inode = fs::metadata(&lock_path).unwrap().ino();
+    let files = open_status_files(&fixture.0).unwrap();
+
+    assert!(files.observe_locks().unwrap().is_empty());
+
+    assert_eq!(fs::read(&lock_path).unwrap(), b"42\n");
+    assert_eq!(fs::metadata(&lock_path).unwrap().ino(), inode);
+}
+
+#[test]
+fn rejects_busy_invalid_pid() {
+    let fixture = Fixture::new();
+    fs::create_dir(fixture.0.join(".letopis")).unwrap();
+    let _child = Owner::spawn(&fixture.0, "embed.lock", "invalid");
+    let files = open_status_files(&fixture.0).unwrap();
+
+    assert!(files.observe_locks().is_err());
+}
+
+#[test]
+fn rejects_busy_pid_with_valid_prefix_and_trailing_bytes() {
+    let fixture = Fixture::new();
+    fs::create_dir(fixture.0.join(".letopis")).unwrap();
+    let _child = Owner::spawn(&fixture.0, "embed.lock", "overlong");
+    let files = open_status_files(&fixture.0).unwrap();
+
+    let error = files.observe_locks().unwrap_err();
+
+    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+}
+
+#[test]
+fn returns_missing_locks_without_creating_files() {
+    let fixture = Fixture::new();
+    let files = open_status_files(&fixture.0).unwrap();
+
+    assert!(files.observe_locks().unwrap().is_empty());
+    assert_eq!(files.read_config().unwrap(), None);
+    assert!(!fixture.0.join(".letopis").exists());
+}
+
+#[test]
+fn rejects_symlink_and_inode_replacement() {
+    let fixture = Fixture::new();
+    fs::create_dir(fixture.0.join(".letopis")).unwrap();
+    let files = open_status_files(&fixture.0).unwrap();
+    assert!(files.observe_locks().unwrap().is_empty());
+    symlink("/dev/null", fixture.get_lock_path("index.lock")).unwrap();
+    assert!(files.observe_locks().is_err());
+    fs::remove_file(fixture.get_lock_path("index.lock")).unwrap();
+    fs::rename(fixture.0.join(".letopis"), fixture.0.join("old-service")).unwrap();
+    fs::create_dir(fixture.0.join(".letopis")).unwrap();
+    assert!(files.observe_locks().is_err());
+    assert!(files.read_config().is_err());
+}
+
+#[test]
+fn reads_existing_config_without_mutation() {
+    let fixture = Fixture::new();
+    fs::create_dir(fixture.0.join(".letopis")).unwrap();
+    fs::write(fixture.0.join(".letopis/config.json"), b"raw\xff").unwrap();
+    let files = open_status_files(&fixture.0).unwrap();
+
+    assert_eq!(files.read_config().unwrap(), Some(b"raw\xff".to_vec()));
+}
+
+#[test]
+fn status_files_child() {
+    let Some(root) = std::env::var_os(CHILD_ROOT) else {
+        return;
+    };
+    let name = std::env::var(CHILD_LOCK).unwrap();
+    let path = Path::new(&root).join(".letopis").join(&name);
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
+        .unwrap();
+    file.lock().unwrap();
+    let pid = match std::env::var("LETOPIS_STATUS_FILES_PID").unwrap().as_str() {
+        "self" => std::process::id().to_string(),
+        "invalid" => "bad pid".to_owned(),
+        "overlong" => "000000000001garbage".to_owned(),
+        other => panic!("unexpected pid case: {other}"),
+    };
+    writeln!(file, "{pid}").unwrap();
+    fs::write(Path::new(&root).join(format!("{name}.ready")), b"ready").unwrap();
+    std::thread::sleep(Duration::from_secs(30));
+}

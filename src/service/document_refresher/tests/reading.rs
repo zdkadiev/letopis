@@ -3,11 +3,11 @@ use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
     service::{
         BasisRetainer, CacheWrite, DocumentRefresher, DocumentResult, ElementAddress,
-        EmbeddingFailure, EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef, GraphRead,
-        NeighborPageRequest, NodeMetadata, ProvenanceObservation, ProvenanceRequest, QueryError,
-        Refresher, SnapshotError, SourceProvenance, SourceRevisionComparison,
-        SourceRevisionRequest, Storage, StorageRead, StorageResult, StoredNode, TextMatch,
-        VectorMatch, VectorOutcome,
+        EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary, EmbeddingWork, FileRow,
+        GraphNeighbor, GraphNodeRef, GraphRead, NeighborPageRequest, NodeMetadata,
+        ProvenanceObservation, ProvenanceRequest, QueryError, Refresher, SnapshotError,
+        SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage, StorageRead,
+        StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
     },
     storage::SqliteStorage,
 };
@@ -97,6 +97,13 @@ impl<R: GraphRead> GraphRead for ReadingView<R> {
     }
 }
 impl<R: StorageRead> StorageRead for ReadingView<R> {
+    fn read_embedding_status(
+        &mut self,
+        policy: &EmbeddingStatusPolicy,
+    ) -> StorageResult<EmbeddingStatusSummary> {
+        self.inner.read_embedding_status(policy)
+    }
+
     fn list_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
         panic!("warm refresh loaded node metadata")
     }

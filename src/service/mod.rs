@@ -3,6 +3,7 @@ use crate::domain::{Graph, RepoPath, SourceUri, TreeOid};
 use std::collections::BTreeSet;
 mod background;
 mod check;
+mod check_problems;
 mod command;
 mod command_traits;
 mod document_refresher;
@@ -26,6 +27,8 @@ mod search_filters;
 mod snapshot_error;
 mod snapshot_traits;
 mod source;
+mod status;
+mod status_types;
 mod storage;
 mod traversal;
 mod traversal_types;
@@ -47,6 +50,7 @@ pub use provenance_types::{
 pub(crate) use search::SearchService;
 /// Concrete source observation assembly, kept inside the crate.
 pub(crate) use source::SourceService;
+pub(crate) use status::StatusService;
 pub(crate) use traversal::TraversalService;
 
 pub use command::{
@@ -55,7 +59,7 @@ pub use command::{
 };
 pub use command_traits::{
     BackgroundRunner, Checker, DrainLauncher, EmbedLocker, EmbeddingExecutor, Inspector, Searcher,
-    Traverser,
+    StatusReader, Traverser,
 };
 pub use document_traits::{CorpusLister, FileSystem, MarkdownCodec, Refresher};
 pub use embedding_config::{EmbeddingConfig, ProviderKind};
@@ -78,7 +82,27 @@ pub use snapshot_error::{SnapshotError, SnapshotErrorKind};
 pub use snapshot_traits::{
     GitSnapshots, SnapshotEntry, SnapshotFile, SnapshotState, SnapshotVerifier,
 };
-pub use storage::{CacheWrite, Storage, StorageRead, VectorWrite};
+/// Published status observations and captured embedding classification policy.
+pub use status_types::{
+    EmbeddingStatusPolicy, EmbeddingStatusSummary, HeldLock, LockName, StatusReport,
+};
+pub use storage::{CacheWrite, StatusStorage, Storage, StorageRead, VectorWrite};
+
+/// Read-only live configuration and nonblocking kernel-lock observations.
+/// Implementations never create service state or write an owner PID while observing.
+pub trait StatusFiles {
+    /// Read stable raw configuration bytes, or absence.
+    ///
+    /// # Errors
+    /// Reports unsafe paths or filesystem failures without exposing file contents.
+    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
+
+    /// Return occupied index/embed locks and their best-effort recorded positive PIDs.
+    ///
+    /// # Errors
+    /// Reports unsafe paths, failed probes, or invalid/unreadable PIDs on busy locks.
+    fn observe_locks(&self) -> CommandResult<Vec<HeldLock>>;
+}
 
 /// Current graph diagnostics derived exclusively from the supplied consistent view.
 ///

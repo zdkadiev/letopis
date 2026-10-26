@@ -86,6 +86,23 @@ fn lock_open_rejects_replacement_and_never_recreates_observed_deletion() {
 }
 
 #[test]
+fn status_lock_open_rejects_inode_replacement() {
+    let fixture = Fixture::new();
+    let files = LocalFileSystem::open(&fixture.0).unwrap();
+    files.open_service_directory().unwrap();
+    let path = fixture.0.join(".letopis/index.lock");
+    fs::write(&path, b"old owner").unwrap();
+
+    let result = files.open_existing_lock_with("index.lock", || {
+        fs::rename(&path, fixture.0.join("old-index.lock")).unwrap();
+        fs::write(&path, b"new owner").unwrap();
+    });
+
+    assert!(result.is_err());
+    assert_eq!(fs::read(&path).unwrap(), b"new owner");
+}
+
+#[test]
 fn retries_interrupted_io_until_the_operation_succeeds() {
     // Arrange
     let mut results = [Err(ErrorKind::Interrupted.into()), Ok(())].into_iter();

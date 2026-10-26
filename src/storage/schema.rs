@@ -20,6 +20,39 @@ pub(super) fn bootstrap_vectors(connection: &mut Connection) -> StorageResult<()
     bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)
 }
 
+pub(super) fn validate_cache(connection: &Connection) -> StorageResult<()> {
+    if !has_schema_in(connection, "main", CACHE_SCHEMA, CACHE_SCHEMA_VERSION)? {
+        return Err(fail_incompatible_schema());
+    }
+    Ok(())
+}
+
+pub(super) fn validate_vector_database(connection: &Connection) -> StorageResult<()> {
+    if !has_schema_in(connection, "main", VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)? {
+        return Err(fail_incompatible_schema());
+    }
+    Ok(())
+}
+
+pub(super) fn validate_vectors(connection: &Connection) -> StorageResult<()> {
+    if !has_schema_in(connection, "vec", VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)? {
+        return Err(fail_incompatible_schema());
+    }
+    Ok(())
+}
+
+pub(super) fn attach_empty_vectors(connection: &Connection) -> StorageResult<()> {
+    connection
+        .execute("ATTACH DATABASE ?1 AS vec", ["file::memory:?mode=memory"])
+        .map_err(map_sqlite)?;
+    // Only the ephemeral attachment receives the unchanged vector schema.
+    let schema = VECTOR_SCHEMA
+        .replace("CREATE TABLE ", "CREATE TABLE vec.")
+        .replace("CREATE VIRTUAL TABLE ", "CREATE VIRTUAL TABLE vec.")
+        .replace("INSERT INTO vector_index", "INSERT INTO vec.vector_index");
+    connection.execute_batch(&schema).map_err(map_sqlite)
+}
+
 fn bootstrap_schema(
     connection: &mut Connection,
     sql: &str,
@@ -57,10 +90,21 @@ fn initialize_schema(
 }
 
 fn has_schema(connection: &Connection, sql: &str, expected_version: i64) -> StorageResult<bool> {
+    has_schema_in(connection, "main", sql, expected_version)
+}
+
+fn has_schema_in(
+    connection: &Connection,
+    schema: &str,
+    sql: &str,
+    expected_version: i64,
+) -> StorageResult<bool> {
     let version: i64 = connection
-        .pragma_query_value(None, USER_VERSION_PRAGMA, |row| row.get(0))
+        .query_row(&format!("PRAGMA {schema}.user_version"), [], |row| {
+            row.get(0)
+        })
         .map_err(map_sqlite)?;
-    let definitions = read_definitions(connection)?;
+    let definitions = read_definitions_in(connection, schema)?;
     match version {
         0 if definitions.is_empty() => Ok(false),
         version if version == expected_version => {
@@ -77,9 +121,20 @@ fn has_schema(connection: &Connection, sql: &str, expected_version: i64) -> Stor
 }
 
 fn read_definitions(connection: &Connection) -> StorageResult<Vec<Definition>> {
-    let mut statement = connection.prepare("SELECT type,name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT GLOB 'sqlite_*' AND name NOT IN (SELECT name FROM pragma_table_list WHERE schema='main' AND type='shadow') ORDER BY type,name").map_err(map_sqlite)?;
+    read_definitions_in(connection, "main")
+}
+
+fn read_definitions_in(connection: &Connection, schema: &str) -> StorageResult<Vec<Definition>> {
+    // Schema names are private literals main/vec; values remain bound.
+    let sql = format!(
+        "SELECT type,name,sql FROM {schema}.sqlite_schema
+        WHERE sql IS NOT NULL AND name NOT GLOB 'sqlite_*'
+        AND name NOT IN (SELECT name FROM pragma_table_list WHERE schema=?1 AND type='shadow')
+        ORDER BY type,name"
+    );
+    let mut statement = connection.prepare(&sql).map_err(map_sqlite)?;
     statement
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .query_map([schema], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
         .map_err(map_sqlite)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(map_sqlite)

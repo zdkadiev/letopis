@@ -285,7 +285,8 @@ pub(super) fn encode_vector(vector: &[f32], dimensions: usize) -> StorageResult<
     Ok(vector.iter().flat_map(|v| v.to_ne_bytes()).collect())
 }
 
-fn fail_invalid_stored_vector() -> StorageError {
+/// Construct the shared integrity error for unusable stored vector state.
+pub(super) fn fail_invalid_stored_vector() -> StorageError {
     StorageError::new(
         StorageErrorKind::InternalError,
         "invalid stored vector data",

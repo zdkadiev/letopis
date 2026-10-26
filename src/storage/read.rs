@@ -5,6 +5,7 @@ use super::{
     graph::{list_edges, list_nodes, read_node},
     neighbors::{list_source_snapshots, read_neighbor_page, resolve_node},
     query::{Meta, Project, Schemas, build_query},
+    status_counts::read_embedding_status,
     vectors::{
         find_nearest_vectors, read_failure, read_query_error, read_vector, read_vector_dimensions,
     },
@@ -13,9 +14,10 @@ use super::{
 use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
     service::{
-        ElementAddress, EmbeddingFailure, EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef,
-        GraphRead, NeighborPageRequest, QueryError, StorageError, StorageErrorKind, StorageRead,
-        StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
+        ElementAddress, EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary,
+        EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef, GraphRead, NeighborPageRequest,
+        QueryError, StorageError, StorageErrorKind, StorageRead, StorageResult, StoredNode,
+        TextMatch, VectorMatch, VectorOutcome,
     },
 };
 use rusqlite::{Connection, OptionalExtension, Transaction, params_from_iter};
@@ -30,34 +32,63 @@ pub(crate) struct SqliteRead<'a> {
 }
 impl<'a> SqliteRead<'a> {
     pub(super) fn begin(connection: &'a mut Connection) -> StorageResult<Self> {
+        Self::begin_available(connection)?.ok_or_else(|| {
+            StorageError::new(
+                StorageErrorKind::InternalError,
+                "storage has no published revision",
+            )
+        })
+    }
+
+    pub(super) fn begin_optional(connection: &'a mut Connection) -> StorageResult<Option<Self>> {
+        Ok(Self::begin_available(connection)?.filter(|read| read.revision != 0))
+    }
+
+    fn begin_available(connection: &'a mut Connection) -> StorageResult<Option<Self>> {
         let transaction = connection.transaction().map_err(map_sqlite)?;
+        let Some(revision) = Self::read_revision(&transaction)? else {
+            return Ok(None);
+        };
+        let config_identity = Self::read_identity(&transaction)?;
+        Ok(Some(Self {
+            transaction,
+            revision,
+            config_identity,
+        }))
+    }
+
+    fn read_revision(connection: &Connection) -> StorageResult<Option<u64>> {
         let (sql, values) = build_query(
             Query::select()
                 .column(Project::Revision)
                 .from(Project::Table)
                 .and_where(Expr::col(Project::Id).eq(1)),
         )?;
-        let revision: i64 = transaction
+        let revision: Option<i64> = connection
             .query_row(&sql, params_from_iter(values), |row| row.get(0))
+            .optional()
             .map_err(map_sqlite)?;
-        let revision = u64::try_from(revision).map_err(|error| {
+        revision.map(u64::try_from).transpose().map_err(|error| {
             StorageError::new_with_cause(
                 StorageErrorKind::InternalError,
                 "invalid storage revision",
                 error,
             )
-        })?;
+        })
+    }
+
+    fn read_identity(connection: &Connection) -> StorageResult<Option<Sha256>> {
         let (sql, values) = build_query(
             Query::select()
                 .column(Meta::ConfigIdentity)
                 .from((Schemas::Vec, Meta::Table))
                 .and_where(Expr::col(Meta::Id).eq(1)),
         )?;
-        let identity: Option<String> = transaction
+        let identity: Option<String> = connection
             .query_row(&sql, params_from_iter(values), |row| row.get(0))
             .optional()
             .map_err(map_sqlite)?;
-        let config_identity = identity
+        identity
             .map(|raw| Sha256::parse(&raw))
             .transpose()
             .map_err(|error| {
@@ -66,12 +97,7 @@ impl<'a> SqliteRead<'a> {
                     "invalid stored configuration identity",
                     error,
                 )
-            })?;
-        Ok(Self {
-            transaction,
-            revision,
-            config_identity,
-        })
+            })
     }
 }
 impl GraphRead for SqliteRead<'_> {
@@ -86,6 +112,12 @@ impl GraphRead for SqliteRead<'_> {
     }
 }
 impl StorageRead for SqliteRead<'_> {
+    fn read_embedding_status(
+        &mut self,
+        policy: &EmbeddingStatusPolicy,
+    ) -> StorageResult<EmbeddingStatusSummary> {
+        read_embedding_status(&self.transaction, self.config_identity, policy)
+    }
     fn list_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
         list_source_snapshots(&self.transaction)
     }

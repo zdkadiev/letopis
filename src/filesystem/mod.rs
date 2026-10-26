@@ -2,6 +2,7 @@
 mod confined;
 mod local;
 mod read;
+mod status;
 
 pub(crate) use local::LocalFileSystem;
 
