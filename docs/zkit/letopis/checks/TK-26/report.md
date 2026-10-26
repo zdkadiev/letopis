@@ -20,7 +20,8 @@
 
 Коммиты этапа: Task 1 `5d49337599fa82306e9e454c0ae402a0d308fa28`,
 Task 2 `9af635f20928e0aac6e4dddb015ccbcbc61d5ab7`, Task 3
-`17a8c824d86c5d2b0c34ccb0016391f59f2566d4`. Product Rust, contracts,
+`17a8c824d86c5d2b0c34ccb0016391f59f2566d4`, review fix `ee44952`.
+Product Rust, contracts,
 schema, native stack, dependencies и TK-25 reindex/detection не менялись.
 
 ## Case → oracle → evidence
@@ -75,6 +76,30 @@ Full raw logs are retained only in the ignored plan workspace
 `.superpowers/sdd/2026-10-26-tk-26-corruption-preparation/`; historical Task 1/2
 receipts were not rewritten.
 
+### Review fix round 1
+
+Scoped review found that canonical snapshots named the scenario-specific Markdown
+and config but omitted the staged/unstaged `live.md` fixture created by
+`ReadingRepo::new`. A product regression could therefore overwrite that canonical
+file without failing either new test. Commit `ee44952` adds `live.md` to every
+`UserFixtureState` capture and reorders the affected private helpers so each caller
+precedes its callees, as required by AGENTS.md. Expected state was not weakened.
+
+The test-only oracle control temporarily wrote `test-oracle negative control` to
+the owned fixture `live.md` after a real failed command and before the state
+assertion. The exact database corruption test exited 101 at runtime on the
+`UserFixtureState` mismatch. This was an oracle control, not a product fix or
+product mutant; the temporary line was removed and the test source restored to
+SHA-256 `f431ae3dd6cde7951d0253d9f69e4bda10b336f89d859075d3957b33c4f9b235`.
+
+After restoration, the required CLI/provenance matrix passed 22/22, rustfmt and
+focused Clippy passed, and one new final `make verify V=1` completed with terminal
+`ok`: debug and release each 750 passed / 0 failed / 5 ignored across 55 executable
+targets. Its 2,295-line raw log has SHA-256
+`86fa206d594a2a7acc796e8abbab4d37aa21673209ac34beee17133b457908ab`.
+The earlier `17a8c82` verification remains historical evidence; it is not presented
+as covering the strengthened canonical-state oracle.
+
 ## Финальная host-проверка
 
 Build controls: `CARGO_TARGET_DIR=/private/tmp/letopis-tk26-task1-target`,
@@ -89,8 +114,8 @@ Build controls: `CARGO_TARGET_DIR=/private/tmp/letopis-tk26-task1-target`,
 
 Counts use the last outer libtest summary for every Cargo `Running` target, so
 nested supervised child summaries are not counted twice. The 0-test Doc-tests
-target is excluded. Raw log: 2,372 lines, SHA-256
-`effbbf6d0ee231695d05ad3d502be28570926c39b12d20ddee101cdce00b66de`.
+target is excluded. Current post-review raw log: 2,295 lines, SHA-256
+`86fa206d594a2a7acc796e8abbab4d37aa21673209ac34beee17133b457908ab`.
 
 Native/Docker storage runner не запускался: production storage/schema/native/build,
 vendored inputs и зависимости не менялись. Отдельный `make check` не запускается,
@@ -107,7 +132,7 @@ vendored inputs и зависимости не менялись. Отдельн�
 | `rust-toolchain.toml` | `12dc5d64dbd96c1b07be2943241d52d9f6127a79ba47a820455ba7b873fc896a` |
 | `tests/git_corruption.rs` | `0b46907e218ce7dd98a982a191d455aa7b8cc9541ffc412b2e03561a847722ea` |
 | `tests/storage_corruption.rs` | `01c03c3a93ab32a955689da072f3c31b2e8173eeacc82685391d9fdac55e0968` |
-| `tests/corruption_diagnostics.rs` | `25ba6339e3f2c79e38ca11d3409d2decd891c8e0adcc1aa71826ddfbc49207d2` |
+| `tests/corruption_diagnostics.rs` | `f431ae3dd6cde7951d0253d9f69e4bda10b336f89d859075d3957b33c4f9b235` |
 
 Host: macOS 26.6.2 / Darwin 25.6.0 arm64; `rustc 1.95.0`, `cargo 1.95.0`,
 Git 2.50.1 (Apple Git-155).
