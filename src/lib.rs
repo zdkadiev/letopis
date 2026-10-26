@@ -55,6 +55,7 @@ pub mod service;
 /// Parse and run one CLI request, emitting one complete JSON envelope.
 /// Returns 0 only for successfully written success output, otherwise 1.
 /// Check, search, traverse and inspect refresh through their application services.
+/// Reindex forces a complete atomic publication through the same document service.
 /// Successful foreground operations may launch the existing detached embedding drain.
 pub fn run_cli(
     args: impl IntoIterator<Item = OsString>,
@@ -375,12 +376,30 @@ fn run_request(request: Request) -> CommandResult<CommandResponse> {
     let (directory, executable) = locate_environment()?;
     match request {
         Request::Status => run_status(request, &directory),
+        Request::Reindex => run_reindex(request, &directory, &executable),
         Request::Check(_) => run_check(request, &directory, &executable),
         Request::Drain => run_drain(request, &directory, &executable),
         Request::Search(_) => run_search(request, &directory, &executable),
         Request::Traverse(_) => run_traverse(request, &directory, &executable),
         Request::Inspect(_) => run_inspect(request, &directory, &executable),
     }
+}
+
+fn run_reindex(
+    request: Request,
+    directory: &Path,
+    executable: &Path,
+) -> CommandResult<CommandResponse> {
+    let root = open_repository_root(directory)?;
+    let mut tasks = wire_embedding_executor(&root)?;
+    let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
+    let mut documents = wire_document_refresher(&root).map_err(map_reindex_setup)?;
+    Handlers::new(HandlerServices {
+        refresher: Some(&mut documents),
+        background: Some(&mut background),
+        ..HandlerServices::default()
+    })
+    .execute(request)
 }
 
 fn run_status(request: Request, directory: &Path) -> CommandResult<CommandResponse> {
@@ -523,6 +542,14 @@ fn map_check_setup(error: impl std::error::Error + Send + Sync + 'static) -> Com
         CommandErrorKind::InternalError,
         "cannot open check service",
         error,
+    )
+}
+
+fn map_reindex_setup(cause: DocumentError) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot open corpus reindex service",
+        cause,
     )
 }
 

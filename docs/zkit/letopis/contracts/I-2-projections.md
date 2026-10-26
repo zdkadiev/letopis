@@ -28,3 +28,14 @@ Synchronous in-process call; no independent deadline or quota. The caller owns t
 ## Errors
 
 Storage/Git failures propagate as Result error using the existing X-1 code/message/details; no successful result is fabricated after I/O failure. Caller releases its read view or rolls back the write unit.
+
+## Реализация полного пути TK-25 — 2026-10-26
+
+`Refresher::reindex` на том же DocumentRefresher выбирает всех текущих кандидатов,
+принудительно повторяет parse и provenance preflight даже при прежнем hash и
+публикует их через общий per-file путь одной cache unit под index.lock. Первое
+построение использует тот же полный режим; обычный refresh сохраняет incremental
+fast path. Полная логическая замена валидных проекций сохраняет last-valid
+nodes/edges/contentless FTS невалидных файлов: физический DROP до разбора потерял
+бы эти данные. Схема не меняется, физическая corruption recovery сюда не входит.
+Контрольная точка и пределы приёмки: [отчёт TK-25](../checks/TK-25/report.md).

@@ -269,6 +269,10 @@ impl Fixture {
     }
 }
 impl Refresher for Refresh {
+    fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
+        panic!("this scenario must not trigger a full reindex")
+    }
+
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
         self.events.borrow_mut().push("refresh".into());
         Ok(RefreshOutcome {

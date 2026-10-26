@@ -85,6 +85,8 @@ def capture_transport(root, evidence, execute, binary, catalogue):
     observations = []
     cases = [
         (['check'], b'{}', None, False),
+        (['reindex'], b'{}', None, False),
+        (['reindex'], b'{"paths":[]}', 'invalid_request', True),
         (['inspect'], b'{"element_ids":["knowledge.md"]}', 'not_found', False),
         (['check'], b'{"extra":1}', 'invalid_request', True),
         (['inspect'], b'{}', 'invalid_request', True),
@@ -111,6 +113,8 @@ def capture_transport(root, evidence, execute, binary, catalogue):
             validate_response(catalogue, ' '.join(args), response, expected)
             if error:
                 assert response['error']['code'] == error
+            if args == ['reindex'] and not error:
+                assert response == {'ok': True, 'result': {'revision': 1}}
             if args == ['check'] and not error:
                 assert response == {'ok': True, 'result': {'errors': []}}
             if pre_io:
@@ -132,6 +136,8 @@ def capture_handler_responses(evidence, catalogue):
             command = 'search'
         else:
             command = 'inspect' if 'elements' in result else 'check'
+            if response.get('ok') and 'revision' in result:
+                command = 'status' if 'embedding_backlog' in result else 'reindex'
             if response.get('ok') and not result:
                 command = 'embed --drain'
         validate_response(catalogue, command, response, record['exit'])
@@ -177,6 +183,19 @@ def capture_reading_responses(evidence, catalogue):
     (evidence / 'product-reading-responses.json').write_text(json.dumps(responses, indent=2) + '\n')
 
 
+def capture_reindex_responses(evidence, catalogue):
+    responses = []
+    for line in (evidence / 'reindex.log').read_text().splitlines():
+        if 'PRODUCT_REINDEX ' not in line:
+            continue
+        response = json.loads(line.split('PRODUCT_REINDEX ', 1)[1])
+        validate_response(catalogue, 'reindex', response, 0)
+        responses.append({'source': 'actual product executable', 'command': 'reindex',
+                          'exit': 0, 'response': response})
+    assert responses, 'actual reindex responses missing'
+    (evidence / 'product-reindex-responses.json').write_text(json.dumps(responses, indent=2) + '\n')
+
+
 def run_host(root, evidence, execute, manifest):
     from jsonschema import Draft202012Validator
     manifest['jsonschema'] = version('jsonschema')
@@ -203,6 +222,9 @@ def run_host(root, evidence, execute, manifest):
              '--test', 'cli_runtime', '--test', 'cli_reading', '--', '--nocapture', '--test-threads=1'],
             'runtime.log', extra={'LETOPIS_CLI_FIXTURE': str(artifacts['cli_runtime_fixture'])})
     capture_reading_responses(evidence, catalogue)
+    execute(['cargo', 'test', '--locked', '--offline', '--test', 'reindex_command',
+             '--', '--nocapture', '--test-threads=1'], 'reindex.log')
+    capture_reindex_responses(evidence, catalogue)
     execute(['cargo', 'test', '--locked', '--offline', '--test', 'thin_slice',
              '--', '--nocapture', '--test-threads=1'], 'thin-slice.log')
     capture_thin_slice_responses(evidence, catalogue)
