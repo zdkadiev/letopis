@@ -1,5 +1,5 @@
 //! Production-process schedules. Only this private test driver reads control variables.
-use super::super::{DocumentRefresher, RefreshDependencies};
+use super::super::DocumentRefresher;
 use crate::{
     domain::{Edge, RepoPath, Sha256},
     filesystem::LocalFileSystem,
@@ -650,13 +650,13 @@ fn build_service(root: &Path) -> Service {
         GitCli::open(root).unwrap(),
         LocalFileSystem::open(root).unwrap(),
     );
-    DocumentRefresher::new(RefreshDependencies {
+    DocumentRefresher {
         git,
         filesystem,
         markdown: MarkdownParser::new(),
         storage,
         provenance,
-    })
+    }
 }
 
 fn read_git_objects(root: &Path) -> Vec<u8> {

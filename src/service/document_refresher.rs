@@ -15,9 +15,9 @@ mod basis;
 
 const RACY_WINDOW_NS: i64 = 1_000_000_000;
 
-/// Collaborators used to refresh and retain the effective document projection.
+/// Refreshes and retains the effective document projection from independently owned collaborators.
 #[derive(Debug)]
-pub(crate) struct RefreshDependencies<G, F, M, S, P> {
+pub(crate) struct DocumentRefresher<G, F, M, S, P> {
     /// Lists the current corpus candidates.
     pub(crate) git: G,
     /// Captures documents and owns the index exclusion lock.
@@ -28,15 +28,6 @@ pub(crate) struct RefreshDependencies<G, F, M, S, P> {
     pub(crate) storage: S,
     /// Observes source bindings and retains author-declared roots.
     pub(crate) provenance: P,
-}
-
-#[derive(Debug)]
-pub(crate) struct DocumentRefresher<G, F, M, S, P> {
-    git: G,
-    filesystem: F,
-    markdown: M,
-    storage: S,
-    provenance: P,
 }
 struct FileState {
     revision: u64,
@@ -55,25 +46,6 @@ struct Delta {
 impl Delta {
     fn is_empty(&self) -> bool {
         self.updated.is_empty() && self.removed.is_empty()
-    }
-}
-impl<G, F, M, S, P> DocumentRefresher<G, F, M, S, P> {
-    /// Assemble the refresh collaborators without reading or publishing state.
-    pub(crate) fn new(dependencies: RefreshDependencies<G, F, M, S, P>) -> Self {
-        let RefreshDependencies {
-            git,
-            filesystem,
-            markdown,
-            storage,
-            provenance,
-        } = dependencies;
-        Self {
-            git,
-            filesystem,
-            markdown,
-            storage,
-            provenance,
-        }
     }
 }
 impl<

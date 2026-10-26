@@ -36,7 +36,7 @@ mod traversal_types;
 pub(crate) use background::BackgroundService;
 pub(crate) use check::CheckService;
 /// Cache refresh implementation and its caller-owned collaborator bundle.
-pub(crate) use document_refresher::{DocumentRefresher, RefreshDependencies};
+pub(crate) use document_refresher::DocumentRefresher;
 pub(crate) use embedding::EmbeddingService;
 pub(crate) use graph::GraphService;
 pub(crate) use graph_diagnostics::CurrentGraphDiagnostics;
@@ -47,11 +47,11 @@ pub use provenance_types::{
     ProvenanceIssue, ProvenanceObservation, ProvenanceRequest, SourceRevisionComparison,
     SourceRevisionRequest,
 };
-pub(crate) use search::{SearchDependencies, SearchService};
+pub(crate) use search::SearchService;
 /// Concrete source observation assembly, kept inside the crate.
 pub(crate) use source::SourceService;
 pub(crate) use status::{StatusDependencies, StatusService};
-pub(crate) use traversal::{TraversalDependencies, TraversalService};
+pub(crate) use traversal::TraversalService;
 
 pub use command::{
     CheckReport, CommandError, CommandErrorKind, CommandProblem, CommandResult, ElementAddress,

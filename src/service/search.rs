@@ -23,9 +23,11 @@ struct SearchEligibility<'a, F, M, P> {
     provenance: &'a P,
 }
 
-/// Independently owned boundaries; inference cannot upgrade the search read into a write.
+/// Refreshes and ranks complete candidate channels from one scoped read.
+///
+/// Boundaries are independently owned; inference cannot upgrade the search read into a write.
 #[derive(Debug)]
-pub(crate) struct SearchDependencies<D, S, E, F, M, P> {
+pub(crate) struct SearchService<D, S, E, F, M, P> {
     /// Canonical document publication before pinning.
     pub(crate) refresher: D,
     /// Exclusive scoped search read connection.
@@ -38,29 +40,6 @@ pub(crate) struct SearchDependencies<D, S, E, F, M, P> {
     pub(crate) markdown: M,
     /// Read-only observations and comparisons of candidate source bindings.
     pub(crate) provenance: P,
-}
-/// Refreshes and ranks complete candidate channels from one scoped read.
-#[derive(Debug)]
-pub(crate) struct SearchService<D, S, E, F, M, P> {
-    refresher: D,
-    storage: S,
-    embeddings: E,
-    filesystem: F,
-    markdown: M,
-    provenance: P,
-}
-impl<D, S, E, F, M, P> SearchService<D, S, E, F, M, P> {
-    /// Assemble search from owned boundaries without performing I/O.
-    pub(crate) fn new(dependencies: SearchDependencies<D, S, E, F, M, P>) -> Self {
-        Self {
-            refresher: dependencies.refresher,
-            storage: dependencies.storage,
-            embeddings: dependencies.embeddings,
-            filesystem: dependencies.filesystem,
-            markdown: dependencies.markdown,
-            provenance: dependencies.provenance,
-        }
-    }
 }
 impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec, P: SourceProvenance>
     Searcher for SearchService<D, S, E, F, M, P>

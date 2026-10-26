@@ -5,9 +5,9 @@ use crate::{
         BasisRetainer, CacheWrite, DocumentRefresher, DocumentResult, ElementAddress,
         EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary, EmbeddingWork, FileRow,
         GraphNeighbor, GraphNodeRef, GraphRead, NeighborPageRequest, NodeMetadata,
-        ProvenanceObservation, ProvenanceRequest, QueryError, RefreshDependencies, Refresher,
-        SnapshotError, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage,
-        StorageRead, StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
+        ProvenanceObservation, ProvenanceRequest, QueryError, Refresher, SnapshotError,
+        SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage, StorageRead,
+        StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
     },
     storage::SqliteStorage,
 };
@@ -43,7 +43,7 @@ fn warm_refresh_reads_basis_roots_without_loading_nodes() {
     write.upsert_node(&node).unwrap();
     write.commit().unwrap();
     let reads = Rc::new(Cell::new(0));
-    let mut service = DocumentRefresher::new(RefreshDependencies {
+    let mut service = DocumentRefresher {
         git: Candidates,
         filesystem: TestFiles::new(),
         markdown: CountingMarkdown(Cell::new(0)),
@@ -52,7 +52,7 @@ fn warm_refresh_reads_basis_roots_without_loading_nodes() {
             reads: Rc::clone(&reads),
         },
         provenance: RetainingProvenance,
-    });
+    };
     let result = service.refresh().unwrap();
     assert!(!result.published);
     assert_eq!(result.revision, 2);

@@ -1,5 +1,5 @@
 use super::{
-    super::{TraversalDependencies, TraversalService},
+    super::TraversalService,
     traced_storage::{Events, TracedStorage},
 };
 use crate::{
@@ -126,7 +126,7 @@ fn synchronizes_readiness_before_one_pinned_read_without_query_inference() {
     ] {
         let fixture = Fixture::new();
         let mut service = fixture.build_service(Failure::None, None);
-        service.dependencies.embeddings = Box::new(Readiness {
+        service.embeddings = Box::new(Readiness {
             events: fixture.events.clone(),
             state,
         });
@@ -173,13 +173,7 @@ fn releases_read_after_late_failure_while_service_lives() {
         fixture.assert_released();
         publish_replacement(fixture.root.path());
         assert_eq!(
-            service
-                .dependencies
-                .storage
-                .inner
-                .begin_read()
-                .unwrap()
-                .get_revision(),
+            service.storage.inner.begin_read().unwrap().get_revision(),
             if matches!(failure, Failure::Provenance) {
                 4
             } else {
@@ -202,13 +196,7 @@ fn releases_read_after_normal_and_depth_zero_empty_results() {
         fixture.assert_released();
         publish_replacement(fixture.root.path());
         assert_eq!(
-            service
-                .dependencies
-                .storage
-                .inner
-                .begin_read()
-                .unwrap()
-                .get_revision(),
+            service.storage.inner.begin_read().unwrap().get_revision(),
             3
         );
     }
@@ -241,7 +229,7 @@ impl Fixture {
         failure: Failure,
         after_pin: Option<Box<dyn FnOnce()>>,
     ) -> TraversalService<TracedStorage, LocalFileSystem> {
-        TraversalService::new(TraversalDependencies {
+        TraversalService {
             storage: TracedStorage {
                 inner: open_storage(self.root.path()),
                 events: self.events.clone(),
@@ -267,7 +255,7 @@ impl Fixture {
                 failure,
             }),
             graph: Box::new(GraphService::new()),
-        })
+        }
     }
     fn assert_released(&self) {
         let connection = rusqlite::Connection::open(self.root.path().join("cache.db")).unwrap();

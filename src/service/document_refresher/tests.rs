@@ -1,4 +1,4 @@
-use super::{DocumentRefresher, RefreshDependencies};
+use super::DocumentRefresher;
 use crate::{
     domain::{RepoPath, TreeOid},
     markdown::MarkdownParser,
@@ -333,13 +333,13 @@ fn build_service() -> (TempDir, TestService) {
         SqliteStorage::open(&dir.path().join("cache.db"), &dir.path().join("vectors.db")).unwrap();
     (
         dir,
-        DocumentRefresher::new(RefreshDependencies {
+        DocumentRefresher {
             git: Candidates,
             filesystem: TestFiles::new(),
             markdown: CountingMarkdown(Cell::new(0)),
             storage,
             provenance: TestProvenance,
-        }),
+        },
     )
 }
 
