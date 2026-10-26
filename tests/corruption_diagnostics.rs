@@ -158,14 +158,6 @@ fn capture_databases(repo: &ReadingRepo) -> (Vec<u8>, Vec<u8>) {
     )
 }
 
-fn get_database_bytes<'a>(target: &str, snapshot: &'a (Vec<u8>, Vec<u8>)) -> &'a [u8] {
-    if target == CACHE_DATABASE {
-        &snapshot.0
-    } else {
-        &snapshot.1
-    }
-}
-
 fn assert_undamaged_database(repo: &ReadingRepo, damaged: &str, snapshot: &(Vec<u8>, Vec<u8>)) {
     let healthy = if damaged == CACHE_DATABASE {
         VECTOR_DATABASE
@@ -178,17 +170,25 @@ fn assert_undamaged_database(repo: &ReadingRepo, damaged: &str, snapshot: &(Vec<
     );
 }
 
+fn get_database_bytes<'a>(target: &str, snapshot: &'a (Vec<u8>, Vec<u8>)) -> &'a [u8] {
+    if target == CACHE_DATABASE {
+        &snapshot.0
+    } else {
+        &snapshot.1
+    }
+}
+
 fn get_database_path(repo: &ReadingRepo, name: &str) -> PathBuf {
     repo.get_root().join(".letopis").join(name)
+}
+
+fn restore_database(path: &Path, bytes: &[u8]) {
+    replace_database(path, bytes);
 }
 
 fn replace_database(path: &Path, bytes: &[u8]) {
     remove_database_sidecars(path);
     fs::write(path, bytes).unwrap();
-}
-
-fn restore_database(path: &Path, bytes: &[u8]) {
-    replace_database(path, bytes);
 }
 
 fn remove_database_sidecars(path: &Path) {
@@ -208,7 +208,7 @@ fn capture_user_state(repo: &ReadingRepo, canonical_paths: &[&str]) -> UserFixtu
         user_refs: read_user_refs(repo.get_root()),
         canonical_files: canonical_paths
             .iter()
-            .chain([&".letopis/config.json"])
+            .chain([&"live.md", &".letopis/config.json"])
             .map(|path| {
                 (
                     (*path).to_owned(),
