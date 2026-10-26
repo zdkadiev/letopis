@@ -1,7 +1,7 @@
 use super::{
     BasisRetainer, CacheWrite, CorpusLister, DocumentError, DocumentErrorKind, DocumentResult,
-    FileRow, FileStat, FileSystem, MarkdownCodec, NodeMetadata, RefreshOutcome, Refresher,
-    SourceProvenance, Storage, StorageRead,
+    FileRow, FileStat, FileSystem, MarkdownCodec, RefreshOutcome, Refresher, SourceProvenance,
+    Storage, StorageRead,
     projection::{
         EffectiveGraph, FileProjection, PreparedProjection, prepare_file, prepare_removal, publish,
     },
@@ -121,14 +121,7 @@ impl<
         let mut read = self.storage.begin_read()?;
         Ok(FileState {
             revision: read.get_revision(),
-            source_snapshots: read
-                .list_nodes()?
-                .into_iter()
-                .filter_map(|node| match node.metadata {
-                    NodeMetadata::Knowledge(knowledge) => knowledge.source_snapshot,
-                    NodeMetadata::Source(_) => None,
-                })
-                .collect(),
+            source_snapshots: read.list_source_snapshots()?,
             files: read
                 .list_files()?
                 .into_iter()

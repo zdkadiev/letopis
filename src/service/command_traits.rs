@@ -1,6 +1,6 @@
 use super::{
     CheckReport, CommandProblem, CommandResult, DocumentResult, ElementAddress, Inspection,
-    SearchLink, SearchRequest,
+    SearchLink, SearchRequest, Traversal, TraversalRequest,
 };
 use crate::domain::RepoPath;
 
@@ -92,4 +92,17 @@ pub trait BackgroundRunner {
     /// # Errors
     /// Reports an unavailable executor or execution failures.
     fn drain(&mut self) -> CommandResult<()>;
+}
+
+/// Consistent metadata-only traversal with live freshness observations.
+///
+/// Implementations refresh, synchronize embedding readiness before pinning one read
+/// view, and build selected links without inference or fetching remote sources.
+pub trait Traverser {
+    /// Traverse and observe selected elements from one pinned publication revision.
+    ///
+    /// # Errors
+    /// Returns safe refresh, storage, start-membership or observation errors without
+    /// partial output. The pinned view is released on every return path.
+    fn traverse(&mut self, request: &TraversalRequest) -> CommandResult<Traversal>;
 }

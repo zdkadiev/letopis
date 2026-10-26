@@ -1,5 +1,5 @@
 //! Injected transport doubles only; real service behavior lives in binary tests.
-use super::{Handlers, Request, parse_request, write_response};
+use super::{HandlerServices, Handlers, Request, parse_request, write_response};
 use crate::{
     domain::{KnowledgeId, LineRange, RepoPath},
     service::{
@@ -140,8 +140,11 @@ fn search_handler_dispatches_typed_request_and_renders_links() {
         query: "private query".into(),
         limit: NonZeroUsize::new(3).unwrap(),
     };
-    let response =
-        Handlers::new(None, None, Some(&mut searches), None).execute(Request::Search(request));
+    let response = Handlers::new(HandlerServices {
+        searches: Some(&mut searches),
+        ..HandlerServices::default()
+    })
+    .execute(Request::Search(request));
     let mut output = Vec::new();
     let exit = write_response(&mut output, response);
     let value: Value = serde_json::from_slice(&output).unwrap();

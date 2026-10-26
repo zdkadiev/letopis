@@ -153,7 +153,7 @@ mod input_tests {
 
 #[cfg(test)]
 mod transport_tests {
-    use crate::cli::handlers::{CommandResponse, Handlers};
+    use crate::cli::handlers::{CommandResponse, HandlerServices, Handlers};
     use crate::cli::input::{Request, parse_request};
     use crate::cli::output::write_response;
     use crate::domain::{LineRange, RepoPath, Sha256, TreeOid};
@@ -269,8 +269,12 @@ mod transport_tests {
         .unwrap();
         let mut checks = CheckDouble::default();
         let mut background = BackgroundDouble::default();
-        let response =
-            Handlers::new(Some(&mut checks), None, None, Some(&mut background)).execute(request);
+        let response = Handlers::new(HandlerServices {
+            checks: Some(&mut checks),
+            background: Some(&mut background),
+            ..HandlerServices::default()
+        })
+        .execute(request);
         let (exit, value) = render(response);
         assert_eq!(
             checks.calls,
@@ -294,8 +298,12 @@ mod transport_tests {
             warn: true,
             ..BackgroundDouble::default()
         };
-        let response = Handlers::new(None, Some(&mut inspections), None, Some(&mut background))
-            .execute(Request::Inspect(ids.clone()));
+        let response = Handlers::new(HandlerServices {
+            inspections: Some(&mut inspections),
+            background: Some(&mut background),
+            ..HandlerServices::default()
+        })
+        .execute(Request::Inspect(ids.clone()));
         let (exit, value) = render(response);
         assert_eq!(inspections.calls, [ids]);
         assert_eq!(background.starts, 1);
@@ -319,23 +327,31 @@ mod transport_tests {
             Request::Check(vec![]),
             Request::Inspect(vec![ElementAddress::parse("x.md").unwrap()]),
         ] {
-            let error = Handlers::new(None, None, None, Some(&mut background))
-                .execute(request)
-                .unwrap_err();
+            let error = Handlers::new(HandlerServices {
+                background: Some(&mut background),
+                ..HandlerServices::default()
+            })
+            .execute(request)
+            .unwrap_err();
             assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
             assert_eq!(error.get_message(), "operation unavailable in this build");
         }
-        let error = Handlers::new(None, None, None, None)
-            .execute(Request::Drain)
-            .unwrap_err();
+        let error = Handlers::new(HandlerServices {
+            ..HandlerServices::default()
+        })
+        .execute(Request::Drain)
+        .unwrap_err();
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
         assert_eq!((background.starts, background.drains), (0, 0));
     }
     #[test]
     fn drain_delegates_once_without_recursion() {
         let mut background = BackgroundDouble::default();
-        let response =
-            Handlers::new(None, None, None, Some(&mut background)).execute(Request::Drain);
+        let response = Handlers::new(HandlerServices {
+            background: Some(&mut background),
+            ..HandlerServices::default()
+        })
+        .execute(Request::Drain);
         assert_eq!(render(response), (0, json!({"ok":true,"result":{}})));
         assert_eq!((background.starts, background.drains), (0, 1));
     }
@@ -346,8 +362,12 @@ mod transport_tests {
             ..CheckDouble::default()
         };
         let mut background = BackgroundDouble::default();
-        let response = Handlers::new(Some(&mut checks), None, None, Some(&mut background))
-            .execute(Request::Check(vec![]));
+        let response = Handlers::new(HandlerServices {
+            checks: Some(&mut checks),
+            background: Some(&mut background),
+            ..HandlerServices::default()
+        })
+        .execute(Request::Check(vec![]));
         assert_eq!(
             render(response),
             (
@@ -365,9 +385,13 @@ mod transport_tests {
             fail: true,
             ..BackgroundDouble::default()
         };
-        let error = Handlers::new(Some(&mut checks), None, None, Some(&mut background))
-            .execute(Request::Check(vec![]))
-            .unwrap_err();
+        let error = Handlers::new(HandlerServices {
+            checks: Some(&mut checks),
+            background: Some(&mut background),
+            ..HandlerServices::default()
+        })
+        .execute(Request::Check(vec![]))
+        .unwrap_err();
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
         assert_eq!(background.starts, 1);
     }
@@ -457,7 +481,10 @@ mod transport_tests {
     #[test]
     fn missing_checker_uses_one_safe_error_envelope() {
         let mut output = vec![];
-        let response = Handlers::new(None, None, None, None).execute(Request::Check(vec![]));
+        let response = Handlers::new(HandlerServices {
+            ..HandlerServices::default()
+        })
+        .execute(Request::Check(vec![]));
         let exit = write_response(&mut output, response);
         assert_eq!(exit, 1);
         assert_eq!(
@@ -468,8 +495,11 @@ mod transport_tests {
     #[test]
     fn success_writes_one_complete_envelope_and_flushes_once() {
         let mut background = BackgroundDouble::default();
-        let response =
-            Handlers::new(None, None, None, Some(&mut background)).execute(Request::Drain);
+        let response = Handlers::new(HandlerServices {
+            background: Some(&mut background),
+            ..HandlerServices::default()
+        })
+        .execute(Request::Drain);
         let mut writer = FailingWriter {
             remaining: usize::MAX,
             calls: 0,
@@ -485,7 +515,11 @@ mod transport_tests {
     fn check_without_background_still_succeeds_without_warnings() {
         let mut checks = CheckDouble::default();
         let (exit, value) = render(
-            Handlers::new(Some(&mut checks), None, None, None).execute(Request::Check(vec![])),
+            Handlers::new(HandlerServices {
+                checks: Some(&mut checks),
+                ..HandlerServices::default()
+            })
+            .execute(Request::Check(vec![])),
         );
         assert_eq!(exit, 0);
         assert_eq!(checks.calls, [Vec::<RepoPath>::new()]);

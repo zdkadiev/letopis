@@ -42,3 +42,9 @@ Synchronous in-process call; no independent deadline or quota. The caller owns t
 ## Errors
 
 Storage/Git failures propagate as Result error using the existing X-1 code/message/details; no successful result is fabricated after I/O failure. Caller releases its read view or rolls back the write unit.
+
+## Проверка traverse TK-23 — 2026-10-26
+
+Refresh → configuration readiness/reset → один scoped read view: GraphService читает компактные identities и bounded neighbor pages, TraversalService гидратирует выбранные metadata и наблюдает outgoing external bindings из того же view. Источники передаются provenance по одной странице до получения следующей, независимо от traversal filters. Нет query inference, повторного pin или записи через read handle; Missing/Invalid config не мешают обходу.
+
+[Регрессии TK-23](../checks/TK-23/report.md) проверяют публикацию другим SQLite writer после первой страницы, сохранение исходных membership/coordinates/basis/revision и удалённого последнего source reference. Late page/source/provenance errors, успех и depth-zero empty result освобождают reader, пока сервис жив: настоящий WAL TRUNCATE checkpoint и последующая публикация проходят. Live files сохраняют прежнее отсутствие межфайловой атомарности. Host runner PASS; новый Linux arm64 native/standalone runner PASS на741930e, исходный read-only Docker FAIL сохранён исторически. Task4 independent review и I1 rereview пройдены; final whole-branch review завершён: Critical/Important product findings нет, code quality approved with M1/M2 documentation corrections; M1/M2 documentation corrections approved by scoped re-review; no open code or documentation finding.

@@ -139,7 +139,9 @@ fn unknown_or_partial_schema_is_not_recreated() {
         "PRAGMA user_version=99",
         "DROP TABLE files",
         "DROP INDEX nodes_search_hash",
-        "DROP INDEX edges_target; CREATE INDEX edges_target ON edges(source_id)",
+        "DROP INDEX edges_outgoing; CREATE INDEX edges_outgoing ON edges(source_id,target_id,type)",
+        "DROP INDEX edges_incoming; CREATE INDEX edges_incoming ON edges(target_id,source_id,type)",
+        "DROP INDEX nodes_source_snapshot; CREATE INDEX nodes_source_snapshot ON nodes(source_snapshot)",
         "DROP TABLE text_index; CREATE VIRTUAL TABLE text_index USING fts5(text,content='')",
         "CREATE TABLE raw_text(body TEXT); INSERT INTO raw_text VALUES('private')",
     ] {

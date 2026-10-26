@@ -187,3 +187,29 @@ probes, FTS MATCH/bm25 и vec1 search/reset-команд остаётся явн
 разработчику удалять живой кэш. `tests/source_lifecycle.rs` удаляет только кэши
 своих временных fixtures после закрытия всех handles. Тест upgrade сохраняет
 vector `[1.0, 0.0, 0.0]`, счётчик попыток и failure sentinel через публичный Storage.
+
+## TK-23: версия схемы кэша 2
+
+Утверждённые [ограниченные чтения графа](superpowers/specs/2026-10-25-tk-23-traversal-design.md#storage-access-indexes-and-compatibility)
+добавляют индексы `edges_outgoing(source_id,type,target_id)`,
+`edges_incoming(target_id,type,source_id)` вместо `edges_target` и частичный
+`nodes_source_snapshot(source_snapshot)` для непустых корней. Поэтому точная
+распознаваемая схема `cache.db` имеет версию **2**; схема `vectors.db` остаётся
+версии **1**. Старый кэш безопасно отклоняется до открытия векторов; автоматической
+миграции, удаления или изменения данных при несовместимости нет.
+
+Для обновления выполнить тот же явный quiescent-порядок из TK-20 выше: остановить
+все команды и detached drain, закрыть соединения и освободить блокировки, удалить
+только производный `cache.db` и его существующие sidecars, затем запустить
+`letopis check` с `{}` на stdin. Сохранить `vectors.db` и все его sidecars,
+`config.json`, идентичность `index.lock`/`embed.lock`, Markdown и Git.
+Пересборка заново читает и публикует весь корпус и создаёт индексы; её стоимость
+зависит от размера корпуса. После неё неизменённый refresh читает только состояния
+файлов и отдельный набор объявленных корней, а соседей можно получать ограниченными
+страницами. Это не обещание постоянной памяти при первоначальной/изменённой публикации.
+
+### Проверка bounded traversal TK-23
+
+[Отчёт TK-23](zkit/letopis/checks/TK-23/report.md) и [machine-readable receipt](zkit/letopis/checks/TK-23/verification.json) сохраняют host native PASS на `e9a9cd4a4c9d6807b0a75d79022dc8f838796e78` и новый Linux arm64 native PASS на `741930ed871e60a0987d655cf79defdff67defd3`. В обоих профилях по684passed/0failed/5ignored в48root executables. Linux также прошёл DDL parity, native SQLite/vec1, standalone/linkage и отдельный real-deadline probe. Исходный Linux FAIL после read-only Docker сохранён исторически; новый PASS находится в отдельном evidence directory и не переименовывает прежние receipts.
+
+Ограничение относится к BFS/results плюс двум страницам соседей, не ко всему RSS команды: первоначальная/изменённая публикация, candidate/file/root sets, чтение/разбор файлов и JSON имеют собственные расходы. Task4 independent review и I1 rereview пройдены; final whole-branch review завершён: Critical/Important product findings нет, code quality approved with M1/M2 documentation corrections; M1/M2 documentation corrections approved by scoped re-review; no open code or documentation finding; последующий docs commit не меняет captured revision. Описанный выше cache-only rebuild остаётся явной quiescent-процедурой; tests используют только временные fixtures.

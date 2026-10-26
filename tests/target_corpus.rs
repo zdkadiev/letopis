@@ -243,8 +243,8 @@ fn missing_databases_are_not_initialized() {
 
 #[test]
 fn empty_and_wrong_version_databases_are_unchanged() {
-    for leaf in ["cache.db", "vectors.db"] {
-        for version in [0, 2] {
+    for (leaf, wrong_version) in [("cache.db", 3), ("vectors.db", 2)] {
+        for version in [0, wrong_version] {
             let repo = load_pair("alpha", "beta");
             let path = repo.get_root().join(".letopis").join(leaf);
             fs::remove_file(&path).unwrap();
@@ -297,7 +297,7 @@ fn missing_or_non_regular_or_symlink_database_is_rejected() {
 }
 
 #[test]
-fn version_one_outside_wal_mode_is_rejected_without_header_changes() {
+fn expected_versions_outside_wal_mode_are_rejected_without_header_changes() {
     for leaf in ["cache.db", "vectors.db"] {
         let repo = load_pair("alpha", "beta");
         let path = repo.get_root().join(".letopis").join(leaf);
@@ -330,12 +330,12 @@ fn missing_or_invalid_configuration_does_not_reset_databases() {
 }
 
 #[test]
-fn version_one_without_product_schema_is_rejected() {
+fn expected_cache_version_without_product_schema_is_rejected() {
     let repo = load_pair("alpha", "beta");
     let path = repo.get_root().join(".letopis/cache.db");
     fs::remove_file(&path).unwrap();
     let raw = rusqlite::Connection::open(&path).unwrap();
-    raw.pragma_update(None, "user_version", 1).unwrap();
+    raw.pragma_update(None, "user_version", 2).unwrap();
     raw.pragma_update(None, "journal_mode", "wal").unwrap();
     drop(raw);
     let before = capture_databases(repo.get_root());

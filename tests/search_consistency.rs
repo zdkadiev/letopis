@@ -258,7 +258,7 @@ fn live_confinement_error_releases_read_before_subsequent_reset() {
 }
 
 #[test]
-fn corrupt_refresh_metadata_releases_read_before_inference_and_allows_new_publication() {
+fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publication() {
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     let server = HttpFixture::start(FixtureReply::Status {
@@ -273,9 +273,12 @@ fn corrupt_refresh_metadata_releases_read_before_inference_and_allows_new_public
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
-        .execute("UPDATE nodes SET created_at = -1 WHERE id = ?1", ["a.md"])
+        .execute(
+            "UPDATE nodes SET source_snapshot = 'malformed' WHERE id = ?1",
+            ["a.md"],
+        )
         .unwrap();
-    // Refresh reads declared bases from this pinned metadata before inference.
+    // Refresh validates declared source roots before inference without decoding unrelated metadata.
     let error = wire_searcher(repo.get_root())
         .unwrap()
         .search(&SearchRequest {
@@ -294,7 +297,10 @@ fn corrupt_refresh_metadata_releases_read_before_inference_and_allows_new_public
     );
     // Repair deliberately malformed persisted data before asking refresh to publish it.
     connection
-        .execute("UPDATE nodes SET created_at = 1 WHERE id = ?1", ["a.md"])
+        .execute(
+            "UPDATE nodes SET source_snapshot = NULL WHERE id = ?1",
+            ["a.md"],
+        )
         .unwrap();
     repo.write_knowledge("a.md", "repaired sqlite");
     assert!(

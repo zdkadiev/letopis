@@ -1,3 +1,4 @@
+use super::knowledge_link::is_current_knowledge;
 use super::{
     CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder, EmbeddingConfig,
     FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceRequest, QueryEmbedding,
@@ -308,11 +309,12 @@ fn build_link<F: FileSystem, M: MarkdownCodec>(
 ) -> CommandResult<SearchLink> {
     let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
         .map_err(map_search_error)?;
-    let flags = if is_current_knowledge(node, &path, filesystem, markdown)? {
-        BTreeSet::new()
-    } else {
-        BTreeSet::from([SearchFlag::Stale])
-    };
+    let flags =
+        if is_current_knowledge(node, &path, filesystem, markdown).map_err(map_search_error)? {
+            BTreeSet::new()
+        } else {
+            BTreeSet::from([SearchFlag::Stale])
+        };
     Ok(SearchLink {
         element_id: node.id.clone(),
         path,
@@ -320,25 +322,6 @@ fn build_link<F: FileSystem, M: MarkdownCodec>(
         revision,
         flags,
     })
-}
-
-fn is_current_knowledge<F: FileSystem, M: MarkdownCodec>(
-    node: &KnowledgeMetadata,
-    path: &RepoPath,
-    filesystem: &F,
-    markdown: &M,
-) -> CommandResult<bool> {
-    let Some(file) = filesystem.read_file(path).map_err(map_search_error)? else {
-        return Ok(false);
-    };
-    let Ok(Some(parsed)) = markdown.parse_file(path, &file.bytes) else {
-        return Ok(false);
-    };
-    Ok(parsed.elements.iter().any(|current| {
-        current.element.id == node.id
-            && current.element.hash == node.hash
-            && current.element.lines == node.lines
-    }))
 }
 
 fn fail_invalid_search_data() -> CommandError {

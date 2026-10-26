@@ -16,9 +16,9 @@ impl<F: FileSystem> SourceService<F> {
 }
 
 impl<F: FileSystem> SourceReader for SourceService<F> {
-    fn read_source<R: StorageRead>(
+    fn read_source(
         &self,
-        view: &mut R,
+        view: &mut dyn StorageRead,
         uri: &SourceUri,
     ) -> DocumentResult<Option<SourceObservation>> {
         let Some(row) = view.read_node(&EdgeTarget::Source(uri.clone()))? else {

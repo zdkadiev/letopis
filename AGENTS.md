@@ -7,7 +7,7 @@ Work as a senior software engineer: understand the affected code and contracts, 
 - Read the relevant task card under `docs/zkit/letopis/roadmap/epics/*/tasks/` before implementing a roadmap task.
 - Treat [architecture](docs/zkit/letopis/architecture.md#program-structure), [architecture review](docs/zkit/letopis/architecture.md#program-structure-review), [decisions](docs/zkit/letopis/decisions.md), and the relevant [contracts](docs/zkit/letopis/contracts/) as the design sources. Read [mechanics](docs/zkit/letopis/mechanics.md) for affected algorithms and invariants.
 - Keep agreed specifications and implementation plans in `docs/superpowers/specs/` and `docs/superpowers/plans/`. When the user requests Superpowers, follow its applicable workflow and preserve the resulting decisions in those documents.
-- Distinguish accepted decisions, proposals, and open questions. Do not silently replace an agreed design with a new runtime, dependency, process, or abstraction. Prefer KISS and YAGNI.
+- Distinguish accepted decisions, proposals, and open questions. Do not silently replace an agreed design with a new runtime, dependency, process, or abstraction. KISS, DRY and YAGNI are mandatory throughout Letopis, across every current and future task, module, API, entity, service, adapter, test and design document: choose the simplest solution to the current requirement, keep each rule in one appropriate owner, and add abstractions only for a concrete need. Do not force unrelated behavior into a shared helper merely to remove similar-looking code.
 
 ## Hexagonal architecture and physical modules
 
@@ -24,6 +24,8 @@ Use `trait` for component interfaces and concrete `struct`/`impl` for implementa
 
 Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful helpers; see [code reading order](#code-reading-order) for when to extract them. Keep domain rules and technology-specific behavior in their owners; utilities must not bypass module boundaries.
 
+Keep the DDD boundary explicit: entities and value objects own domain data, local invariants and pure behavior; they have no storage, filesystem, Git, HTTP, service or injected infrastructure dependencies. Application services own use-case orchestration and dependencies through small application-owned interfaces. Algorithms that incrementally load graph data belong to a service such as `GraphService`, while `Graph` remains dependency-free domain data. Avoid pass-through services, factories and extra interface layers that add no responsibility.
+
 ## Rust conventions
 
 - Follow the pinned toolchain in `rust-toolchain.toml` and lint policy in `Cargo.toml`; [development guide](docs/development.md) explains the checks.
@@ -32,7 +34,7 @@ Shared `src/utils.rs` and private module-local `utils.rs` are allowed for useful
 - Replace meaningful repeated domain/protocol literals with clearly named constants near their owning module; use SCREAMING_SNAKE_CASE. Do not replace literals mechanically or collect unrelated constants in a global bag.
 - Keep functions and methods focused: aim for about 40 lines, with 60 lines as the upper limit. Split longer implementations into cohesive named helpers, not arbitrary wrappers or compressed formatting. Apply the same rule to tests and test helpers.
 - Use ownership and borrowing deliberately; add cloning, shared ownership, locks, or dynamic dispatch only for an actual need.
-- Choose dispatch in this order: a concrete type, then a generic bound, then `dyn Trait`. Use `dyn` only where a generic cannot work, such as an optional collaborator (`Option<&mut dyn Trait>`, where `None` has no concrete type), a type-erased error cause (`Box<dyn Error + Send + Sync>`), a stored test hook (`Box<dyn FnOnce()>`), or a generic parameter list that would spread through public signatures.
+- Keep dispatch simple and deliberate. Use concrete types for domain data and implementations; use traits for required component boundaries. Add generics only when type variation, reuse, or a scoped associated type requires them and they keep the API clear. Do not propagate generic parameter lists through services and public signatures solely for dependency injection. An object-safe `dyn Trait` dependency is appropriate when it makes composition simpler; choose borrowed or owned access according to the actual lifetime, without adding a Box, Arc, factory or wrapper unnecessarily. Retain necessary generics for existing scoped storage capabilities and non-object-safe traits rather than building extra layers solely to erase them. Do not mechanically replace existing generics or mandate static/dynamic dispatch everywhere.
 - Do not use `unwrap`/`expect` in production code; return a typed `Result`. `expect` is allowed only for an invariant guaranteed by construction; mark it `#[expect(clippy::expect_used, reason = "...")]` and state the invariant in the reason. Tests may use both. A detected programming bug is a panic, an expected failure is an error.
 - Every public type implements `Debug`.
 - Model finite alternatives with enums and expected failures with typed `Result`. Document public APIs as described in [readability and documentation](#readability-and-documentation). Preserve useful internal error causes while keeping public diagnostics free of secrets and raw knowledge/provider/subprocess payloads.

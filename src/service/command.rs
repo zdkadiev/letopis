@@ -99,16 +99,21 @@ pub struct CommandProblem {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ElementAddress(String);
 impl ElementAddress {
-    /// Normalize a plain path, explicit knowledge anchor or source line range.
+    /// Normalize local knowledge/source addresses or preserve opaque absolute HTTP/HTTPS spelling.
     ///
     /// # Errors
-    /// Returns invalid request for malformed paths, anchors or line ranges.
+    /// Returns invalid request for malformed absolute URLs or invalid local knowledge/source addresses.
     pub fn parse(raw: &str) -> CommandResult<Self> {
-        let normalized = match raw.split_once('#') {
-            None => RepoPath::parse(raw).map(|path| path.as_str().to_owned()),
-            Some(_) => KnowledgeId::parse(raw)
+        let absolute_http = raw.split_once("://").is_some_and(|(scheme, _)| {
+            scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
+        });
+        // Absolute URLs must not become local knowledge through path normalization.
+        let normalized = if absolute_http {
+            SourceUri::parse(raw).map(|source| source.as_str().to_owned())
+        } else {
+            KnowledgeId::parse(raw)
                 .map(|id| id.as_str().to_owned())
-                .or_else(|_| SourceUri::parse(raw).map(|source| source.as_str().to_owned())),
+                .or_else(|_| SourceUri::parse(raw).map(|source| source.as_str().to_owned()))
         }
         .map_err(|cause| {
             CommandError::new_with_cause(
@@ -190,7 +195,7 @@ mod tests {
     use std::error::Error;
 
     #[test]
-    fn normalize_addresses_without_membership_lookup() {
+    fn preserve_local_anchor_and_range_normalization() {
         for (raw, expected) in [
             ("./x.md", "x.md"),
             ("a/../x.md#A", "x.md#A"),
@@ -215,6 +220,51 @@ mod tests {
                 ElementAddress::parse(raw).unwrap_err().get_kind(),
                 CommandErrorKind::InvalidRequest
             );
+        }
+    }
+
+    #[test]
+    fn preserve_opaque_http_addresses() {
+        for raw in [
+            "https://Host/a?q=1#L0-L2",
+            "HTTP://Host/a#Anchor",
+            "https://Host",
+            "https://Host/a.md",
+            "HtTp://Host/a.markdown#A",
+        ] {
+            assert_eq!(ElementAddress::parse(raw).unwrap().as_str(), raw);
+        }
+    }
+
+    #[test]
+    fn round_trip_http_prefix_knowledge_addresses() {
+        for (raw, expected) in [
+            ("http:notes.md", "http:notes.md"),
+            ("./http:notes.md#A", "http:notes.md#A"),
+            ("dir/../HTTP:notes.markdown#A", "HTTP:notes.markdown#A"),
+            ("https:/Host/a.md", "https:/Host/a.md"),
+        ] {
+            let parsed = ElementAddress::parse(raw).unwrap();
+            assert_eq!(parsed.as_str(), expected);
+            assert_eq!(ElementAddress::parse(expected).unwrap(), parsed);
+        }
+    }
+
+    #[test]
+    fn reject_malformed_absolute_urls_and_source_http_fallbacks() {
+        for raw in [
+            "http:notes",
+            "https:/Host/a",
+            "HTTP:///a",
+            "HTTP:///a.md",
+            "https://?q=a.md",
+            "http://#A.md",
+            "https://",
+            "./https:notes",
+            "a/../HTTP:notes",
+            "https://Host/a b",
+        ] {
+            assert!(ElementAddress::parse(raw).is_err(), "{raw}");
         }
     }
 

@@ -1,0 +1,1434 @@
+{
+  "status": "complete",
+  "source_commit": "e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
+  "baseline_commit": "b8b89f6fe2d1a83d6f50041ceae5735b86264ec3",
+  "platforms": {
+    "host": {
+      "status": "PASS",
+      "runner_exit_code": 0,
+      "make_verify_exit_code": 0,
+      "manifest": ".artifacts/tk23/final-host-task4-20261026-01/manifest.json",
+      "commands": [
+        {
+          "argv": [
+            "git",
+            "rev-parse",
+            "HEAD"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-commit.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "git",
+            "status",
+            "--short"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-dirty.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "-B",
+            "tests/storage/check_schema.py",
+            "/Users/zdkadiev/.codex/worktrees/tk-23/letopis"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "schema-parity.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "-B",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests/storage",
+            "-p",
+            "test_runner.py",
+            "-v"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "runner-tests.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "version-rustc.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "--version"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "version-cargo.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--version"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "version-git.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "--version"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "version-python3.14.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "uname",
+            "-a"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "version-uname.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "make",
+            "verify",
+            "V=1"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "rust-check.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "--test",
+            "embedding_provider",
+            "attempt_obeys_real_sixty_second_deadline",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "provider-real-deadline.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "doc",
+            "--locked",
+            "--offline",
+            "--no-deps"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "rustdoc.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "storage::native::tests::native_capabilities_match_pinned_stack",
+            "--",
+            "--nocapture"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "native.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "build",
+            "--locked",
+            "--offline",
+            "--example",
+            "storage_check",
+            "--message-format=json"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "build.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "otool",
+            "-L",
+            "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-6tlokhvx/storage_check"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "dynamic.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-6tlokhvx/storage_check",
+            "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-6tlokhvx/scratch"
+          ],
+          "cwd": "/var/folders/sw/f89n9_pj3mvfhr6bfn_7dnbm0000gp/T/tk9-standalone-6tlokhvx",
+          "log": "standalone.log",
+          "exit_code": 0
+        }
+      ],
+      "schema_parity": "PASS",
+      "native": "SQLite 3.53.2 / vec1 0.8 NEON",
+      "runner_python_tests": 10,
+      "explicit_deadline_probe_passed": 1,
+      "native_probe_passed": 1,
+      "standalone": "PASS: copied executable, FTS, shared native vector, exact bytes, reopen, revision=1",
+      "dynamic_linkage": "no SQLite/vec1 shared dependency",
+      "executable_sha256": "7456d31659873f7c5db47eeb7fc31cfb086c30c462773b64a7e1a3881e13e90e"
+    },
+    "linux": {
+      "status": "PASS",
+      "source_commit": "741930ed871e60a0987d655cf79defdff67defd3",
+      "runner_exit_code": 0,
+      "make_verify_exit_code": 0,
+      "manifest": ".artifacts/tk23/final-linux-retry-239c5dbed5/manifest.json",
+      "manifest_sha256": "87ea7c85d67d2af0ccaeedab1c4683d25cb5b3d9dd1ea88241bd2fc254b7dd80",
+      "inner_manifest": ".artifacts/tk23/final-linux-retry-239c5dbed5/container/manifest.json",
+      "inner_manifest_sha256": "79fa86cc7bb2827a5c27e00fe4b92ec43972f0483db38d4329bf82a6e9eaf260",
+      "commands": [
+        {
+          "argv": [
+            "git",
+            "rev-parse",
+            "HEAD"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-commit.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "git",
+            "status",
+            "--short"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-dirty.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "version"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-version.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "build",
+            "-f",
+            "tests/storage/Dockerfile",
+            "-t",
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f",
+            "--build-arg",
+            "SOURCE_COMMIT=741930ed871e60a0987d655cf79defdff67defd3",
+            "."
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-build.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "image",
+            "inspect",
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "image.json",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "run",
+            "--name",
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f-run",
+            "--network",
+            "none",
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "linux.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "cp",
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f-run:/receipt/.",
+            "/Users/zdkadiev/.codex/worktrees/tk-23/letopis/.artifacts/tk23/final-linux-retry-239c5dbed5/container"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-copy.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "rm",
+            "-f",
+            "letopis-tk9-c51498ce21a14381a243095ca63b108f-run"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-cleanup.log",
+          "exit_code": 0
+        }
+      ],
+      "inner_commands": [
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "-B",
+            "tests/storage/check_schema.py",
+            "/repo"
+          ],
+          "cwd": "/repo",
+          "log": "schema-parity.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "-B",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests/storage",
+            "-p",
+            "test_runner.py",
+            "-v"
+          ],
+          "cwd": "/repo",
+          "log": "runner-tests.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/repo",
+          "log": "version-rustc.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "--version"
+          ],
+          "cwd": "/repo",
+          "log": "version-cargo.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--version"
+          ],
+          "cwd": "/repo",
+          "log": "version-git.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "--version"
+          ],
+          "cwd": "/repo",
+          "log": "version-python3.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "uname",
+            "-a"
+          ],
+          "cwd": "/repo",
+          "log": "version-uname.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "make",
+            "verify",
+            "V=1"
+          ],
+          "cwd": "/repo",
+          "log": "rust-check.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "--test",
+            "embedding_provider",
+            "attempt_obeys_real_sixty_second_deadline",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture"
+          ],
+          "cwd": "/repo",
+          "log": "provider-real-deadline.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "doc",
+            "--locked",
+            "--offline",
+            "--no-deps"
+          ],
+          "cwd": "/repo",
+          "log": "rustdoc.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "storage::native::tests::native_capabilities_match_pinned_stack",
+            "--",
+            "--nocapture"
+          ],
+          "cwd": "/repo",
+          "log": "native.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "cargo",
+            "build",
+            "--locked",
+            "--offline",
+            "--example",
+            "storage_check",
+            "--message-format=json"
+          ],
+          "cwd": "/repo",
+          "log": "build.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "ldd",
+            "/tmp/tk9-standalone-rgxtb547/storage_check"
+          ],
+          "cwd": "/repo",
+          "log": "dynamic.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "/tmp/tk9-standalone-rgxtb547/storage_check",
+            "/tmp/tk9-standalone-rgxtb547/scratch"
+          ],
+          "cwd": "/tmp/tk9-standalone-rgxtb547",
+          "log": "standalone.log",
+          "exit_code": 0
+        }
+      ],
+      "root_counts": {
+        "debug": {
+          "root_executables": 48,
+          "passed": 684,
+          "failed": 0,
+          "ignored": 5
+        },
+        "release": {
+          "root_executables": 48,
+          "passed": 684,
+          "failed": 0,
+          "ignored": 5
+        }
+      },
+      "standalone": "PASS",
+      "dynamic_linkage": "PASS; no shared SQLite/vec1 dependency",
+      "native": "SQLite3.53.2 / vec1 0.8 NEON; native capability test PASS",
+      "schema_parity": "PASS",
+      "runner_python_tests": {
+        "passed": 10,
+        "failed": 0
+      },
+      "explicit_deadline_probe": {
+        "passed": 1,
+        "failed": 0
+      },
+      "input_identity": {
+        "outer_inputs": 319,
+        "inner_inputs": 202,
+        "all_copied_inputs_match": true,
+        "copy_scope": "All and only Dockerfile-copied source/build/test/DDL inputs; 117 uncopied outer files are historical/docs test inputs",
+        "outer_map_matches_current_and_supplemental": true
+      },
+      "runtime_network": "none",
+      "test_threads": 2,
+      "owned_container_cleanup": "PASS",
+      "driver_receipt": ".artifacts/tk23/linux-retry-239c5dbed5/validated-result.json"
+    }
+  },
+  "root_counts": {
+    "host": {
+      "debug": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      },
+      "release": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      }
+    },
+    "linux_preserved_partial_snapshot": {
+      "debug": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      },
+      "release": {
+        "root_executables": 39,
+        "passed": 578,
+        "failed": 0,
+        "ignored": 4
+      }
+    },
+    "linux": {
+      "debug": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      },
+      "release": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      }
+    }
+  },
+  "focused": {
+    "root_executables": 17,
+    "passed": 380,
+    "failed": 0,
+    "ignored": 3,
+    "restored_final_scoped": {
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "controls": [
+    {
+      "name": "reopen-after-publication",
+      "target": "service::traversal::tests::scoped::retains_original_graph_bindings_and_revision_across_pages",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "readiness-after-pin",
+      "target": "service::traversal::tests::scoped::synchronizes_readiness_before_one_pinned_read_without_query_inference",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "swallow-late-page",
+      "target": "service::traversal::tests::scoped::releases_read_after_late_failure_while_service_lives",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "1b797a733161501e9e6d8ce68dbcf015f7e13ebdeb5f44f9f39948edf0ef32c3"
+    },
+    {
+      "name": "swallow-provenance",
+      "target": "service::traversal::tests::scoped::releases_read_after_late_failure_while_service_lives",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "swallow-source",
+      "target": "service::traversal::tests::scoped::releases_read_after_late_failure_while_service_lives",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "collect-before-observe",
+      "target": "service::traversal::tests::bindings::observes_large_source_bindings_pagewise",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "overrun-node-cap",
+      "target": "service::graph::tests::traversal_work_does_not_scale_with_unrelated_nodes_or_hub_degree",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "1b797a733161501e9e6d8ce68dbcf015f7e13ebdeb5f44f9f39948edf0ef32c3"
+    },
+    {
+      "name": "swallow-binding-page",
+      "target": "service::traversal::tests::bindings::reports_late_binding_page_failure_after_completed_observations",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "retain-success-reader",
+      "target": "service::traversal::tests::scoped::releases_read_after_normal_and_depth_zero_empty_results",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7"
+    },
+    {
+      "name": "hide-unsafe-source",
+      "target": "distinguishes_nonregular_sources_from_missing_local_flags",
+      "exit_code": 101,
+      "runtime_failure": true,
+      "fixture_hashes_unchanged": {
+        "src/service/traversal/tests/bindings.rs": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99"
+      },
+      "restored_sha256": "0746895da4243cedfda24289bda35df5e267dbad04708a8ebd473c2d14bf374e"
+    }
+  ],
+  "input_identity": {
+    "source_commit": "e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
+    "input_count": 319,
+    "aggregate_sha256": "143fd382892be2c3adfbd3f259b438d4364b22e2a03e987185903d0567e3ac6a",
+    "host_outer_equal": true,
+    "linux_outer_equal": true,
+    "container_input_map": "unavailable: filesystem read-only prevented receipt copy",
+    "current_files_equal": false,
+    "scope": "historical original-native map; current test-only difference is recorded in supplemental_verification"
+  },
+  "preflight": [
+    "fmt --check",
+    "all-target Clippy -D warnings",
+    "strict Rustdoc",
+    "focused library and 16 integration targets",
+    "36 stream query plans and one source-root plan"
+  ],
+  "review_gates": {
+    "task4_independent": "approved_after_I1_rereview",
+    "whole_branch": "approved_code_and_documentation",
+    "final_documentation_corrections": "M1/M2 addressed; scoped re-review approved; no new breakage",
+    "linux_native_standalone": "PASS"
+  },
+  "limits": [
+    "BFS bound is not whole-command fixed RSS",
+    "initial/changed publication, candidate/file/root sets, file parsing and JSON buffers remain separate",
+    "live files have no cross-file atomicity",
+    "opt-in existing corpus not run",
+    "TK-24/TK-28, paid/model/pilot/resource/G-1/G-2 and exhaustive new cancellation drills deferred"
+  ],
+  "engram": "delegated controller ownership; no writes by Task4 implementer",
+  "docker_wrapper": {
+    "path": ".artifacts/tk23/task4-20261026/docker-bin/docker",
+    "sha256": "18279ccfb7ffbc2ebfa403cd9d50655f97e7a590f42b98d60e434ddd74fdad94",
+    "actual_argv_log": ".artifacts/tk23/task4-20261026/docker-invocations.jsonl"
+  },
+  "original_input_identity": {
+    "source_commit": "e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
+    "input_count": 319,
+    "aggregate_sha256": "143fd382892be2c3adfbd3f259b438d4364b22e2a03e987185903d0567e3ac6a",
+    "host_outer_equal": true,
+    "linux_outer_equal": true,
+    "container_input_map": "unavailable: filesystem read-only prevented receipt copy",
+    "current_files_equal": true
+  },
+  "source_commit_scope": "original native/control capture; current_test_checkpoint identifies revised tests",
+  "current_test_checkpoint": "5859e3ea15929b57abc6aafdb3dc477241c87f2d",
+  "historical_control_scope": "original ten controls at e9a9cd4; not rerun or relabeled by I1 fix",
+  "supplemental_verification": {
+    "finding": "I1 binding identities and multiplicity",
+    "source_commit": "5859e3ea15929b57abc6aafdb3dc477241c87f2d",
+    "parent_commit": "96c541073d915307952199dcaba63323888ca6d5",
+    "command": [
+      "make",
+      "verify",
+      "V=1"
+    ],
+    "environment": {
+      "CARGO_TARGET_DIR": "/Users/zdkadiev/Repos/letopis/target",
+      "RUST_TEST_THREADS": "2"
+    },
+    "exit_code": 0,
+    "root_counts": {
+      "debug": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      },
+      "release": {
+        "root_executables": 48,
+        "passed": 684,
+        "failed": 0,
+        "ignored": 5
+      }
+    },
+    "input_map": {
+      "source_commit": "5859e3ea15929b57abc6aafdb3dc477241c87f2d",
+      "inputs": {
+        ".dockerignore": "616f73cf137da175948bd766bab552470a7bbdab787e24c1dbb260bfa7f138ae",
+        "Cargo.lock": "0065802223d81cdbd244e308e7014eba2c132a42ebaa7fb844ca10524a9a93ee",
+        "Cargo.toml": "3fe6c97ed98cf57d1bb20856491914c60ee951ce4f6ae99261f5b9c3d0353bff",
+        "Makefile": "0fae2c54d2db733cf8c5bf4e1ecbfd838f1a84a991eb7986cd6b6e9d12745e71",
+        "build.rs": "a0ab764d71f2bea064d74cdaf545960f29fa5cc109f2eb17983da49e96009ae7",
+        "clippy.toml": "b9df5373d8d4335f6354c51dbf2e704af609848241f2bedfdae4c4d2581d6d4c",
+        "docs/zkit/letopis/mechanics/storage-schema.sql": "951a7e73c21b8986601705e06deb41e65a872dc01dc18b87c12d0155faa9988a",
+        "examples/cli_runtime_fixture.rs": "1249d3a58aff845b1731db7ddb545d5acc810d36fcb0ac35905a3618a5939499",
+        "examples/storage_check.rs": "88469b545b2e577fbfe0704a30910cc2b722cadad74b33a3e748f86e1af0fe0c",
+        "rust-toolchain.toml": "12dc5d64dbd96c1b07be2943241d52d9f6127a79ba47a820455ba7b873fc896a",
+        "scripts/check-rust.sh": "0da7333a616b93e5bb580749ea483acaa6de387a84f1525b38a7dbebeb926ebc",
+        "src/cli/handlers.rs": "e5c5c14034db7649a46acf30de7960c5fdd4ebf1d7b0b0907de341087a312efa",
+        "src/cli/input.rs": "2cb7d7acfa93468e003b3a78010317b22f523e3f896bea14a5f5e47e8e664fc5",
+        "src/cli/mod.rs": "e7220fa022bd65a669fad75cbca7b719360d27b2d344f1843daed4964341576c",
+        "src/cli/output.rs": "5002aa18e448bade700dadf3e376b46b8002e203b3f2d37c87b7ee539b4385b0",
+        "src/cli/search_tests.rs": "f660729b3f7093b998ab65cf0de618f068bd3697005e24abd89cc0d3655ff8d0",
+        "src/cli/tests.rs": "736aaf3fcb2efa4e27aa5bddf4641dd749e88fdaabd7d4e771bff0ad14758e10",
+        "src/cli/traversal_tests.rs": "0adc40bed109a9ff1d95ab2acb4d685d1346ae88fb3f4abbcb31c6f2f30dfa62",
+        "src/domain/graph.rs": "3639d08b3ef7e83c252b03b8c0f3ab6db62323d62ac72c7589ae7da2a9ca3b5a",
+        "src/domain/identity.rs": "0979f7c02bf27dcb00cb93e96454e3a49e4dfb589a83dcc5c4195e45cb7014e0",
+        "src/domain/mod.rs": "493fbbb01b8eb0af095e8879bede04f3f71f60cd2ed8a4a37640ad23e35922df",
+        "src/domain/sha256.rs": "266906a28a72909ec4d0c23f76a41c16c71be01c0bf6833bedbbc4bf14190b9d",
+        "src/domain/source.rs": "6081ea9a355783d4cbffd0878d9801fc22798d7ce682ece48b257ad402b0852e",
+        "src/domain/validation.rs": "890855106ef7cef291167a3b01451b484dd595c1c98a373e4421649cace53be5",
+        "src/domain/value.rs": "ef954b317225fe8eb93b90799bcf6ac866e7cad78f6a9cca6a33345ade022b23",
+        "src/embedding/http.rs": "6aec2ade53e2d4579405cb320ef70433017fe47989e7d91ea0a4a8e386af1368",
+        "src/embedding/mod.rs": "f8566383dd91fddc2d5fa5fa12f40c20b271e183f785824f49a260c5224a7b75",
+        "src/embedding/ollama.rs": "9f6f372b4f9f051a320f566fab77ee8f06a4e66463e7bd1779ff060a95736afa",
+        "src/embedding/openai.rs": "392382a9478dd03d38b74bee2433fc5679979822c9d5a33652f583327172e5ec",
+        "src/embedding/provider.rs": "ea6b153770287a9b6dc6b6fb5c8a00ef5575e4828e3a3513b8cedcd01980009b",
+        "src/filesystem/confined.rs": "c21c0899f142cdd23c65daf4395c6174685aa43c462c7aa1944ace95d34a691d",
+        "src/filesystem/document_tests.rs": "1246b6467224cdc79f8a5edb9848660027455216bb4e434d965f2da235ea94e8",
+        "src/filesystem/local.rs": "ab73fd3ae1bd76ccf95c70c088c76e3f347ef1b168f49a469a4233ecad4adac5",
+        "src/filesystem/local_tests.rs": "5b3eec223e7b8ec696f176d620974e09cf9f49257ed376594536c0126f9a3eca",
+        "src/filesystem/mod.rs": "ca9152ee486b6c24e76affac682777292358464758d60762a84231a9f07f714b",
+        "src/filesystem/read.rs": "88711b41d2bb8935fe682726199d363606710ba5fe6300f96d57db294452cee9",
+        "src/filesystem/read_tests.rs": "be36c0f18459c91f44b6ba48e29bc7f8575cf87dc17c1ff13e7f089f1d82ff44",
+        "src/filesystem/test_support.rs": "0906a29ae0b7f7d974f9cb7d4e7c7273924b91128ed72bab83e330d9967cfeea",
+        "src/git/cli/tests.rs": "648eace8e0a99673187b7129b993c628f2e7ea8c975e27356e6ffa7ad40f4a79",
+        "src/git/cli.rs": "81539520190e3523cca82d5719259cb6ecc332907d5588acfe92ef2e655239a9",
+        "src/git/constants.rs": "c46a35dc87622500c8c1fba232ad2c77ce7e00caad836bc19f5271247d0e14ff",
+        "src/git/mod.rs": "75dabc43412922df4e782eedaeaec63b7f28ba5896e752ecc67f3f1beb0f924f",
+        "src/git/objects.rs": "d0a6afe5a4725e55e15f50cd09748e22ed3f2e356a606708e3386f3fedd3604e",
+        "src/git/process.rs": "3d1352add43286db443d8d952dfefdc20af9f55c98693f861172715eacf3d405",
+        "src/git/refs.rs": "af6367bc7b345a5f3167f7fe53de54901cd2eade748544e8dc19922a05507bbd",
+        "src/lib.rs": "9d90f45af18bede17c8268b32c438d44740d2f2eb9a8de2da485ab6fd344aef0",
+        "src/main.rs": "22716ccbaf07e6150a72ea5a625c42ff7e6ce9916f74f931ac03e54e334d9f37",
+        "src/markdown/diagnostic.rs": "5683628acbfae1710d2c2582d8dcf8af4710ffb244e0528632ea183f5b54fb33",
+        "src/markdown/events.rs": "747036b127c4035306f3e0c79830e2c0363f84734470f43e40b881c564b443da",
+        "src/markdown/links.rs": "a9d4f48d89a3c89489a98e246eba3d20ee007ebf5b31e2f9172456132eedd4dd",
+        "src/markdown/metadata.rs": "d8dcffb23a578a056a5b395a7fe45c76885635f9c7d3aa5e068a664ed87be941",
+        "src/markdown/mod.rs": "230a7b2be7c578d5a625e5dbe4bad2756f94d6b72cf2a51caea99aff7c185cf5",
+        "src/markdown/parser.rs": "468af90b2775c8b2d22a35277fdc645b024a61cce5ddebac01ca240700b2b61e",
+        "src/markdown/scan.rs": "bf197f38d82c724263961ec777a9417166c93d6e99bac2705bca5b5fbd0bcc72",
+        "src/markdown/search.rs": "b925cfaa193f0a8308837fbed41183b0e9bf2460d75ce3490c0943d0942c43c3",
+        "src/process/detached.rs": "410e51062f68f29c614e00999cb4b4e0bce7061715d169325001865c9f364f8d",
+        "src/process/mod.rs": "48dccdc002c4a64cfb57673600ec135481d97ac64c8284ae392d7e86d95639cf",
+        "src/service/background.rs": "a67e3cedb46ce28fe6748ec39e08107f0e8e0335341c188ba900dc19293427ca",
+        "src/service/check/tests/pinned.rs": "d55f587d45dfc990fc41732e5327f45850cca39ae8fa5d43748c00f180ebd127",
+        "src/service/check/tests.rs": "99cba19b91dfc10c4712572fd581412b22eca23486cc340ea679344f9d086046",
+        "src/service/check.rs": "43bb5ab0faac3e1cd9b7a9ca9d6c61d2cf21aec5d6cee19fa14a0dcf34bdfa7f",
+        "src/service/command.rs": "333a9648411b2e8ed4800c496dadec086c5f7cc5f8e88e680c380d70ea076e1f",
+        "src/service/command_traits.rs": "a734c8d31cc9b017d0337ef02282cc46c0407ff947ea1b8b9db256e6f1b50d16",
+        "src/service/document_refresher/basis.rs": "0d06d7c08c460f270fadf64ed63b30282d01342e354e27950ee939c4ea0309ba",
+        "src/service/document_refresher/tests/basis.rs": "0254a6abd7e7cf4480acd21f12537c78f0603396b6f43512de53734441368dcb",
+        "src/service/document_refresher/tests/process.rs": "4fe5923b59d98b79cf0adce3e596bd1be055866c65d5e06190e631a7c8a3ca27",
+        "src/service/document_refresher/tests/reading.rs": "51329ff29b330d0f3cbf8184b3fc1d1542ca12e26de067a6472a78adb498ab2e",
+        "src/service/document_refresher/tests.rs": "95e127f3fbd5b97d0f0aa4b07f995f4d61a6b93e1312d82221e82a3301bef2e3",
+        "src/service/document_refresher.rs": "1945e4ad190255d9fc150cca3f1e5c397cf783b025d5e6b76d7609853dad5d90",
+        "src/service/document_traits.rs": "84cfa5c92e4da2d23d76f380cee508f741d9e53aa8e9e063c341d21741be9231",
+        "src/service/embedding/tests/process.rs": "e3bc300ff1f7a5d88b1f7f5bfd32375ed1e9269b6542340d11ec05af65a511de",
+        "src/service/embedding/tests.rs": "07ec081125d33b0cf430f377fc06aef607c0483d3a04bcb0f2653c5852b0122c",
+        "src/service/embedding.rs": "603e4deef364d8a666a4b763753e6a01a1d2a5bbf6cd73f761b4a5202766a2f7",
+        "src/service/embedding_config.rs": "e53b3977d81d2bfb7c462c3df36c02bb8e596d80b24f73fdf7d9f3cf9ad8147f",
+        "src/service/embedding_error.rs": "3633af826a08002292088e2c99973be617069f587771fbb0e73e6cb1cc1ae032",
+        "src/service/embedding_traits.rs": "0e3093a0528578e7049099f0456277d05181c805e5e21b6811c78ff2811163b5",
+        "src/service/error.rs": "64f8d2cef331e22713b20cbcc61a32b6b5805a1a051cc61d4b02188f5468aa1b",
+        "src/service/graph/tests.rs": "3b2a0b63da6ca983dbe3e6554f2cc5b1e982254e21a4dacc60482e2aaffc00ba",
+        "src/service/graph.rs": "1b797a733161501e9e6d8ce68dbcf015f7e13ebdeb5f44f9f39948edf0ef32c3",
+        "src/service/graph_diagnostics.rs": "6118ca3fe932a215554dd6275a6d7c522d4c7eab95f1504bbf8046df2729c7ef",
+        "src/service/inspection.rs": "d58d1a0d67d9fcea6c239e901267f73cbdeb101dc97e27696eaad1b77f4346c8",
+        "src/service/knowledge_link.rs": "e2edc08f79b518b49493d54c2ceecb52fece7fcd0d6236cc387e2f23d4c4d351",
+        "src/service/mod.rs": "cd3b118bfe997ffdce33519241bafaa9aee26159916d4856927887182d631cbb",
+        "src/service/model.rs": "aca57505df3ef920c9c6ba18da54ede3295b95f63e6c9591253f2601cd47e760",
+        "src/service/projection.rs": "b39b2b72aace3a82f6029335fc6573e0380816776b30f92d05898735a6279b86",
+        "src/service/provenance/tests.rs": "ca37e5f3a777b97496e9b6db2c285e3feec09e4c44ad7f6b6c30f35acb703891",
+        "src/service/provenance.rs": "e8a6a0a7241555d7130c6d2a28222fa4b4ffcc5d0513925fde9dbe942665b889",
+        "src/service/provenance_types.rs": "260821b5dba16bb5d70b0defa119a556861555d7bae5a5e5a418c2c23d7ac18e",
+        "src/service/retained_tree.rs": "f7fca0fc115907e1f7bbc804fe65e615743e51fb04a6534bc371ed593e0bc0c5",
+        "src/service/search/ranking.rs": "9b4de42ff73d9d15aaf1d7cf88eacbce6de06c7ee67e994a5e1d31e4cb70e1da",
+        "src/service/search/tests/filters.rs": "67925273eaca956b053726b595bc4f623b25a968a19c3c5d0f73c9f44c5fe95f",
+        "src/service/search/tests/scoped.rs": "e5ffc91fe3fe0a1fc4fd66be0424d85144ce22a3dc2efcdc7b6f163601acd921",
+        "src/service/search/tests.rs": "3486ba9742f777b7b6b03982771cc291e8bcbad94403dd29efc68ac86ebc29f1",
+        "src/service/search.rs": "d49c1f409657507fc8cf4fc0bdb37a9e3d81c9f0748785ddb9a3f76a283820b4",
+        "src/service/search_filters.rs": "ba6c7013d47fe4968230deebb287e006934a1497d842015bcdb452f7b421c743",
+        "src/service/snapshot_error.rs": "05457355b33f848f0f39933e0752134309ae421d9b74466bcdeab5d8f629af86",
+        "src/service/snapshot_traits.rs": "bce71bd21c028be5f1ca5805ae6ebad489cf03ffa6b8f18610f52626f0215f39",
+        "src/service/source/tests.rs": "8efe117e666381ba235e04d79c3120ab16633960d3d9e5ff85aff49b4e808277",
+        "src/service/source.rs": "0746895da4243cedfda24289bda35df5e267dbad04708a8ebd473c2d14bf374e",
+        "src/service/storage.rs": "f51fbef80d3b4d590ad374941a17a59bebde20af718ceba5466a8119ddb02ee4",
+        "src/service/traversal/tests/bindings.rs": "d7124522f2030e9a5bec994ccc64d7dfa37d07160ba4a3a460e03634ae0887ae",
+        "src/service/traversal/tests/scoped.rs": "401154b15c6df51eed00e337363f25066562c2d398c5b9c684934deb54191eee",
+        "src/service/traversal/tests/traced_storage.rs": "cad6515c253e5659372cd6155dec2bf82220187a96ecd748a50d012954801613",
+        "src/service/traversal/tests.rs": "cf08c13fcc91dbdc9377d2dd28660662cf9ec2cf3db5a0fb96da3c4cd8be9334",
+        "src/service/traversal.rs": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7",
+        "src/service/traversal_types.rs": "d71073d1e8fb1017fb38414b7ba2f7563b4816df92f67c23cd9186755d3b3bde",
+        "src/storage/cache.sql": "8ecc01afe902405194fa6dbc6cc84680d56916a8ab11d3aecf3d3836dd6bb9d5",
+        "src/storage/cache_write.rs": "c14ac4bfd01b5930661eb503b92abff1b11c3320320b2c117a3c1b5553e69dcc",
+        "src/storage/connection.rs": "6ef0c476f1f74a127a58ef17f4b6ff81e7ad135e2705414d773e86f02e71c42a",
+        "src/storage/connection_policy_tests.rs": "61079778d8475691bad5027422b7dc5b4b6869c3ad032f63947eef73e9f38e62",
+        "src/storage/connection_tests.rs": "7f739c2dfd3f9accd47c3ccb072048339a0d87632ff14bc4e348c7b676d66707",
+        "src/storage/files.rs": "ffaac4ddfa7cb0e514a37e1665115933c7d27915dcb91d6a4286da3e73157cec",
+        "src/storage/fts.rs": "4ad6ba8befb245057593b4a20721eb8fda9765cae7997daa01f03b700c8c8a9c",
+        "src/storage/graph.rs": "a6bf794c72c3789ee773d12c183a976b4f6f7cf8968d61062cc126cdd145771e",
+        "src/storage/mod.rs": "a6865babc736b44b6c8b0bb6033289699b37c3442587e5580aafd818f1c12940",
+        "src/storage/native.rs": "07525bffb694afe2753d70b0fb36ab06aeffb49b36818c0cc8011eccad4214a5",
+        "src/storage/neighbors.rs": "51ae1ca99b90034d7bd8fe5092cc365eb2ef4f655c7816e922641104bb289b7b",
+        "src/storage/query.rs": "9a4a0afcb476d360f5919331b328819a236677c7e9bf277ca29090ecb693a4ed",
+        "src/storage/read.rs": "a0c5567f0217b28b541b42b954e2bc17506312ab20544cac08ab5b95b7578734",
+        "src/storage/schema.rs": "83b5a8fb6fe1c4d8a60774356935ea006311c0cb093a838e65654512b5ecd0c4",
+        "src/storage/sqlite.rs": "02f7b75d42fd6c320492e588cddb62b490ccf305ee93f632c4497a2dc8295803",
+        "src/storage/vector_write.rs": "04becdd3dcca0403be2e23f95acbe6d9808c557719cc164b648b1dbc86ec243a",
+        "src/storage/vectors.rs": "914ff2cd15890e13e328c914666b9936a5215631d9977365b005b615ee7176fd",
+        "src/storage/vectors.sql": "2730146067837208abf0698b08d6632c1c3efcbf766b1f16c1717b3147a0e6ca",
+        "src/storage/work.rs": "0b76ee12b934d538c3c72c6d3ec49e3c6016e4d6df5307e9481305e712a9ff78",
+        "src/utils.rs": "ef89282b4fbfcd00c6ec8becef2b17a768b8cd8d3a89335a721632b643af7055",
+        "tests/check_command.rs": "9e50119aa267cf2a763dac65855386106dd81312c01ea301d5d3920641c69470",
+        "tests/check_lifecycle.rs": "84491409d0868fa13630ace6b02585eac2aef69a61b5f5e1b5e67aa0b8a5d7cc",
+        "tests/cli/Dockerfile": "6dae0ea30c463c8e11a505ccdefdef61a3f65600885207fc5310004459173acd",
+        "tests/cli/README.md": "4a7b443d11acaac19a06337fe95b17da2ca8f3f788642abec2683e66c9e5cd15",
+        "tests/cli/negative_controls.py": "eb10412b63dd9c97244f97e9feb467c83df1b71492d71dd547698cb3384d289f",
+        "tests/cli/run.py": "8f10affe55443e5530bd27e5387951773b1a43badb3bb9f8ae25794799f56475",
+        "tests/cli/test_runner.py": "6b6f839b0f77a5ae15d430970a2161ed1c7d435cde749316aa29434c486cc5ee",
+        "tests/cli_drain.rs": "641d6eac69b8dcb4a142fa6f23c6fa0f4d289737f236ee3b455ae6244b53a193",
+        "tests/cli_process.rs": "fcc2cd09c9ee2048ee37e4d748ec3948d83ecce2a3656fa5f2bdb1553e9b60ef",
+        "tests/cli_reading.rs": "4124670e3e360d9343187bf2e7af390cdcdc4e4cb3b0405892a3f0be4ce88432",
+        "tests/cli_runtime.rs": "dfb614e62d6705b7ad97bc14d251d6c0659fb6fbe64c4325b33ca562f78162b6",
+        "tests/cli_session_failure.rs": "8119170fe3acd803d745110eaea9933b9e14aad524cb543fd833160e3af22327",
+        "tests/cli_traversal.rs": "c5ccee2b74a7daa9b628f8442a6cbc103e45a8ba521783da9a33bd784f011797",
+        "tests/document_refresh.rs": "d710869a0b4927e6502061f35525e0298f3d5165c6828cf7080b56ef8985ca5e",
+        "tests/domain_values.rs": "90f00e6819a8fe8d976988cbb44d42e6df626aacfee030b197685a06bf6c3a6d",
+        "tests/embedding/.gitignore": "bedadf7a946f16555560ab12aadd87a52305a0b99bf5e49a3a452054ff39c3ea",
+        "tests/embedding/Cargo.lock": "0327cf562e92d93c1dec9c4dc9b4206c8a7e849d0c3067db97d285c8ca547c30",
+        "tests/embedding/Cargo.toml": "ebc2bcbbe4962803ce28a4d79ab8c19bf1e349d2c466e9b84aeca2d34a67fc94",
+        "tests/embedding/README.md": "f3c927aa62ed26a7766a4fe26c79a6af1daeedf7e41c6eccd4248903508b0fee",
+        "tests/embedding/processes.py": "89fc18506c355a1d12822c6e60ac8773c002faf80f46548b0e48606ebb75b98d",
+        "tests/embedding/run.py": "77bbcabf136ddd67d7b7d9f42ead37d0e1fc4646b157c1ff192568bfb561b57b",
+        "tests/embedding/rust-toolchain.toml": "7d21c66a15f41bad66b82ed06a289f5dc8a6e3751951d2696bbf20ce296f2b0f",
+        "tests/embedding/src/bin/embedder.rs": "090d33a58a7dc0ccc0d3c5f693420e8667f69a4d9ea8daab8d64fb712dd77bd4",
+        "tests/embedding/src/drain.rs": "06eb466901e1273a5da89762990eb3ffb33288e6555a64f072458e68a8243d6a",
+        "tests/embedding/src/lib.rs": "b5973289ab698a111dad39d7bb227943995fd067cd78de59013310458a1970a5",
+        "tests/embedding/src/vectors.rs": "d744f56cf2c4af314f3f8abe3b2765a3836eaa8a7b8c171c3cf02cdae0f3e223",
+        "tests/embedding/tests/drain.rs": "f17f03fe23eb7f7312cbdf0c3a809669cd5e9e4f843554856bf1637598068a4b",
+        "tests/embedding/tests/snapshots.rs": "80555705db612eb08fedb624299e1a83fe56802c8a7fa90acfb35c7f56255d82",
+        "tests/embedding/tests/support/mod.rs": "014f18d77bac2724a2386ebcfc1f86d7583913f8c7b7c67296a4e01b80b4972a",
+        "tests/embedding/tests/test_processes.py": "da2fca9718d2915d253e50989bb8ecba49c8aaa6be0d13bc7a13b514008df254",
+        "tests/embedding_boundaries.rs": "64360ac9ddc6a769af141cc3c92bf5453dd7299199f33c6999942c150fd87f8e",
+        "tests/embedding_files.rs": "07fb318aa4e74945d71a06b795fff1f1aa5ef2979e875083a266b7a55f1ab59f",
+        "tests/embedding_provider.rs": "7f46a6f3c4119725ab4d157c736aa4195c81274934a7a56620e8141070eacdd9",
+        "tests/embedding_service.rs": "a858be9341c8639bcd1e9522b73451fd302ae9b2fe1e772a38a2a169217d7698",
+        "tests/fixtures/markdown/code.md": "745c2910661730dbb4d8c94076b522837299017f8971f71cd8df368523512c62",
+        "tests/fixtures/markdown/crlf.md": "eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864",
+        "tests/fixtures/markdown/expected.json": "f457e2a05174ac9dcdd05a55646d90060098ebfc17b7ed2edaf4ece9b8719c26",
+        "tests/fixtures/markdown/no-final-newline.md": "8ae8dc48443c3b9132365da3e83a1862fe8c1be55da7ee6a9bbf478703fe58d2",
+        "tests/fixtures/markdown/references.md": "d6e82fad5e4dbf755ce529593be584a870855af446678ad18f31ddc00b408e97",
+        "tests/fixtures/markdown/sections.md": "142b27a765adec526a7dd8d33ab2dc8965c50fbbdc16916075d24c1bbcf53283",
+        "tests/fixtures/markdown/thin_slice/cache.md.in": "a2f38fe4b9f0590206a2e29e7b770a7dabe075bc7f6d7933dcb1515569c619cf",
+        "tests/fixtures/markdown/thin_slice/cache.rs": "551069b2bf2940ac6ce6ed7e27ee28b48097e5f13a70f132438ca4610b463e52",
+        "tests/fixtures/markdown/thin_slice/flow.md.in": "689e5d5117eda537e4b51cd861db930882667cd6b3134334541a2b04fe60bc9c",
+        "tests/fixtures/markdown/unicode.md": "8910a8d29ec22cd6a6a67bfddedd14f15dd0e8a9857b20f8372fb03a2ea5f4e7",
+        "tests/fixtures/markdown/whole.md": "69310cd742978c3cef6fa8c6ff86fb69981333c5eada345da90a83a5343cc70f",
+        "tests/git/Dockerfile": "2584cfff868033105cb7ac654a717b3fc52bdb8feb591eab21d7924e3cc35f59",
+        "tests/git/README.md": "deeeafcd5f75ff00f83f1624267e07a76f7704796ab9a57787aadbe35eef0308",
+        "tests/git_retention.rs": "4658fe7e0a250f4bcae5d27ce7b80692952e364af677e2bbf9ce585526a6071e",
+        "tests/git_snapshots.rs": "926f4a8ef40cc4eeffa94c6c411f5dbb9ccdea3f2cd12ba5dc3c5c2b0c9d7d28",
+        "tests/graph_diagnostics.rs": "28486df26dfa144552a1c5646e2e2e5e09af21865d308a414394c015b2e8b822",
+        "tests/graph_read.rs": "9ce769541e0714b578a57bafabaac759910e01391bd1340a27f5aaeab1b7ba49",
+        "tests/knowledge_inspection.rs": "cc37866d4f41925a0c00bacf628e35569bfac9ec7caf988cbae380533153d55f",
+        "tests/knowledge_search.rs": "307f2c57dc048b93e2a62e291ee6f651b9c37a746e6bb908f25d2e78b348521a",
+        "tests/markdown/Dockerfile": "cc22425c4b2073c54d46af47dc01daad5e1583b31adfaa5de71043a4729e4afe",
+        "tests/markdown_elements.rs": "598b0f949eca43a28b22aa06735816937820d64d88ce243780dce4a82d019133",
+        "tests/markdown_links.rs": "5196e3c94827881b8d3a1a9078f5e91804230978994bd3e2b01ee4a4d7360e69",
+        "tests/markdown_search.rs": "a30a33c0d9c16b72788576dc62a0faf8eb540fb1a860cbdbd297e7cb6691ac29",
+        "tests/pilot_protocol/.gitignore": "325c20f7594cad889e077d57b32a38a99823ce676886be1e31c681c71056d86e",
+        "tests/pilot_protocol/README.md": "85bf6df85ac910ae673e44d290f56caec0c8f0fcf97a17930882d96ed2f432d2",
+        "tests/pilot_protocol/check.py": "7256de263765ae2895c41f94599553caf2eb9c15a74ed8f4786b8529637785c9",
+        "tests/pilot_protocol/examples/demonstration/evidence/demonstration.txt": "34e31c64c9964e0fcd55be32c000f65e3fc5947e03b301bc402f33a158adfda8",
+        "tests/pilot_protocol/examples/demonstration/sessions/baseline-C1-T1.json": "c904d2b2e372c4c704ed3ac7b291d8fe6a4c71f5289b5bc3d2709df4c6fd040e",
+        "tests/pilot_protocol/examples/demonstration/sessions/baseline-C1-T2.json": "3099ec190adc6a29f7cd6898dd248711ff7db522751d6650217653aeafd3d3c3",
+        "tests/pilot_protocol/examples/demonstration/sessions/baseline-C2-T1.json": "683d867b1f0cb2af12064a9cbcef3fec14dbf7be8cdd62b845f91e48c77efea5",
+        "tests/pilot_protocol/examples/demonstration/sessions/baseline-C2-T2.json": "7684cbb2f4099f86c8f8959b77b946ae47509c5133c92f0d68b2e28a7cec5b6c",
+        "tests/pilot_protocol/examples/demonstration/sessions/memory-C1-T1.json": "4d9d6b03fadd9f3839a0da470f4b11a7e8f4b0157b2fff469e6025af5f96b288",
+        "tests/pilot_protocol/examples/demonstration/sessions/memory-C1-T2.json": "9667e894d959b59d4deda06ec0d825d475b1eedc49f5b4087c967b6251270f3c",
+        "tests/pilot_protocol/examples/demonstration/sessions/memory-C2-T1.json": "ac5f66738e8c2673428bc33dae305171cead0e4c4bcc7db64d004ffc3f1d20cd",
+        "tests/pilot_protocol/examples/demonstration/sessions/memory-C2-T2.json": "c01c8bc0ee2e6b6027dd1e5140c85149f410fa07c3b9b3bd1e7547829c992fac",
+        "tests/pilot_protocol/examples/demonstration/study.json": "16e3b8ae5afdd1fdba9b1cdbdfffa3e783abae92b48189c8b1a58d05497afb34",
+        "tests/pilot_protocol/fixtures.py": "665f94823705a97b4dc13ff4307850c34aefef13b9994b64346d9f845c62e0dd",
+        "tests/pilot_protocol/run.py": "515eaa5009ab768c4fee04d8f41a170c759c8482a44e17afbced2d9627d025d7",
+        "tests/pilot_protocol/test_check.py": "d529e585dafc3b57b93a24bcaecca47d691f76816f6c0c187049cdbebcaa2471",
+        "tests/pilot_protocol/test_validation.py": "60ac24b17be42e572ca6c31e2ebea041156c377f5884a23ec6d2b3bb401a7648",
+        "tests/pilot_protocol/validation.py": "71acf25c06f68d5a2f0a53d91cbefe81d107ba6dd85ff358b28db3bf8ad91d99",
+        "tests/process_supervision.rs": "41805a323b38d03ca4b301aeaa955528527c7c6d4554ad05f5de4692cee9d86b",
+        "tests/provenance_commands.rs": "12ec5d51f5241a18d14bb8f4888fd803e2a220275e92b0a9ae77ae95a67f28eb",
+        "tests/provenance_indexing.rs": "07f9994552e1de1746e4fbe714672035069489f9ccf508955567c0bf8e426045",
+        "tests/provenance_observation.rs": "c9d82b68bb89d736600baa7218569e8449a812baddf7ff1a86b750ed287fca42",
+        "tests/provenance_revisions.rs": "78e3e7509ccd17e0172819f997aef57d93fad6595cd60debe5b206826a4a6eac",
+        "tests/publication/.dockerignore": "08bb7a70af4ae5a9c15226f499f2e76055ebd521550f87eb102a1316cdb9df38",
+        "tests/publication/.gitignore": "bedadf7a946f16555560ab12aadd87a52305a0b99bf5e49a3a452054ff39c3ea",
+        "tests/publication/Cargo.lock": "975b3826ecd97e177a4c7049a47ebfc36c3c7de7d49e3d452f04877fa2e6c7b2",
+        "tests/publication/Cargo.toml": "395569078e28ec25f586764eeadd00dd8dcd75b1fb358e42f9076015b69f692b",
+        "tests/publication/Dockerfile": "f6cc3f1e04d89740a742132eb60f017fb1fb232056376e549c784144501d3eb8",
+        "tests/publication/README.md": "98195523fad8977cacf0b6a4e11860815add6e4a2f10f29573d925033d9af3f8",
+        "tests/publication/run.py": "b0bc19c73c70c53329f4dd6fb980631c3e8bb8b82d8845d9cbf5a25a791f1f7f",
+        "tests/publication/rust-toolchain.toml": "7d21c66a15f41bad66b82ed06a289f5dc8a6e3751951d2696bbf20ce296f2b0f",
+        "tests/publication/schema.sql": "cb59b6082d738a382ebb7450f7ee54552c8e1e26dd10217984c8de1f7f5db37c",
+        "tests/publication/src/bin/publisher.rs": "4ac2dff37548e30e6b7904cd57773a880d444338a6a2eab380320d51454ef70f",
+        "tests/publication/src/config.rs": "b4d12cf5b4463fce375abcb96dcc1855ea9b29edef08eda2eace980b3a4a5796",
+        "tests/publication/src/corpus.rs": "5ed3ba76b6f9948fd0e1177a094153cc0bf56ddead2a742f0b0f29bb39f6af0e",
+        "tests/publication/src/graph.rs": "e9ee87eb10064ee916fd63b2c316500e961aee3ff965d6d5000a07c9cfb9be18",
+        "tests/publication/src/lib.rs": "b9b2c92ab0393fedbd850f7650ac7a8735f19bd276f451768dc7eb766660fd12",
+        "tests/publication/src/publication.rs": "ebe51bca27e1d53136c2cde1c37d6fcceb4c58aaef898ef1ffb7a54439d0443e",
+        "tests/publication/tests/concurrency.rs": "c823a2d14f0749ee356320c53395249a9c4ae3bf44f061a8700dc65c9e26dd82",
+        "tests/publication/tests/interruptions.rs": "3445fcb90de3310442fd8422bbfe021af04fe8a28a4459b570f5843bc1fa2192",
+        "tests/publication/tests/publication.rs": "f4cfc648794e957ee309f44ea63f9600237208a86903f4fbe464c5adf08f3a9a",
+        "tests/publication/tests/support/mod.rs": "8c02ad9a5861b7fd20c9c4bdaab0818f17113fc8cde90f8c3e87070f77137724",
+        "tests/runtime/.gitignore": "bedadf7a946f16555560ab12aadd87a52305a0b99bf5e49a3a452054ff39c3ea",
+        "tests/runtime/Cargo.lock": "7aec67e68f60e3abdf23e039c87b3c5812b16962a567980428eb356e5a75d710",
+        "tests/runtime/Cargo.toml": "6f12712a23ed0217d39bd7a70d3950306f95ca6270944d949ce71398c3bc239e",
+        "tests/runtime/README.md": "e8dd65bc8e0fe6a23e0a715cdc87202e96600988baacde720768f33b5a0aef8d",
+        "tests/runtime/negative_controls.py": "2ef80cb2b5f81ebb80571e876064cb1ca7de6b0dbad39aa4d125ce5f476564ed",
+        "tests/runtime/run.py": "662847d1cc64c083509c51a2da0c4aef21f02538a79a9dbff2fc713764aea8a1",
+        "tests/runtime/rust-toolchain.toml": "7d21c66a15f41bad66b82ed06a289f5dc8a6e3751951d2696bbf20ce296f2b0f",
+        "tests/runtime/src/bin/runtime.rs": "4f4220c22d594b63662364ba7cd5bd32c33e59e7eed06352f00dd76c64a3ef78",
+        "tests/runtime/src/launch.rs": "2435cfd02ffc4c017e2ff688cfb140e8c288af3fcf8a018defb34ba0d94b6b35",
+        "tests/runtime/src/lib.rs": "543fd1fb4b11c7cfc08dba284e06768a266a27575bf7dd03b720e7ee0c4186d8",
+        "tests/runtime/tests/cancellation.rs": "245c55986a52215d1bfc1026dba9752f6224a46d372ff2263a8c3b58351f1534",
+        "tests/runtime/tests/contention.rs": "34e0976fd426c0aa8a42f8a7b4430131a2202b6879069c29a967cb2b6937945a",
+        "tests/runtime/tests/support/mod.rs": "e62fc9f06e4fe69479dd4c288fa3c0cc635695d42f5d58be007f63b1296f0736",
+        "tests/runtime/tests/test_interruptions.py": "178f9c3d3200f7071a5233e5d2b0700b2392e83493fe63281e56f78513798de8",
+        "tests/search_consistency.rs": "864ef41db11186fb23a7b4f1b2ff250fd4837c5c449c04e1a4e41837c0c2b6b5",
+        "tests/search_contention.rs": "609c98d1ff94a0ba407ac05deb841980933b0544149ad2bfbdafd76b5fa031a8",
+        "tests/search_filter_fallback.rs": "856ae8c250d98c79bdc72416df432adf8dac58c6913ce3e1713cb3b098203ca3",
+        "tests/search_filters.rs": "31c21f28aa2aad90b61266e12e5d58b95fe03120a0c9bd6870ba09313c91e0f0",
+        "tests/snapshot_verification.rs": "c92597066fecbc1b0d78821ada2171f3f2f1033a6694a606ec1b47d83d1d6537",
+        "tests/source_addresses.rs": "03439805764036a5956c1410a7b2d86453968049c214d221fb52d4b4b90c3d98",
+        "tests/source_lifecycle.rs": "23f5a824665388102de46e23271dc2ceefb22f5c0b5c4c81194721f73c320c47",
+        "tests/source_projection.rs": "909c941513f8997389809f2a8ce16945d71bc9b30338a952be4eecad47323a2e",
+        "tests/source_reading.rs": "cc3bfc0583e8110ece06372ddcd56328028f014b9d3332ea49f5710bc1e7ede6",
+        "tests/storage/Dockerfile": "0152c598c455c6124948a45b884d60a89f79fa2460943fc6e41179613c6e2546",
+        "tests/storage/README.md": "e003457b77ab3dab368b6b289e21f17627c7ebceb02578ecd6bad63ce5528a87",
+        "tests/storage/check_schema.py": "bbd0a1c0a7fd3aacfe283331e840747fecb0c386e69d178d013264cdff08a8d7",
+        "tests/storage/negative_controls.py": "6dae1b6980c3d1d8cb3ce5f0a7a0ee97a6a34dd1eead4e0a063d942ac68a1b4a",
+        "tests/storage/run.py": "2945e34bf4139a06f1b3130a0e1169a88a33e944249d4b3d897aa26c383a7da0",
+        "tests/storage/test_runner.py": "ca9267f6ea087e017bfc0acfc754dac8fd4dca552f5d8b02338a4cead0fb89bf",
+        "tests/storage-build/.dockerignore": "08bb7a70af4ae5a9c15226f499f2e76055ebd521550f87eb102a1316cdb9df38",
+        "tests/storage-build/.gitignore": "bedadf7a946f16555560ab12aadd87a52305a0b99bf5e49a3a452054ff39c3ea",
+        "tests/storage-build/Cargo.lock": "1554c44255045d2e9a9036919d9dccd5073fe56e0a447c91bfa5b8d2a202019f",
+        "tests/storage-build/Cargo.toml": "f935a2f597816c0bc7a0409e6eadd13384253f1f417a6c4213cd7bedf613c890",
+        "tests/storage-build/Dockerfile": "a3580bc38a611664c4cd716ddb611214944c5a3b506a93dfb681bf66cd902c75",
+        "tests/storage-build/README.md": "c5d9ae43d356a5673793921512611181ddfa43fe0fb91961f7ad1d458eafaae5",
+        "tests/storage-build/examples/check.rs": "c95fcba6df67230673cf5da3f0ed23435b3b2b300035f01b8b9f291284260371",
+        "tests/storage-build/run.py": "93d281e18e1173e89d2a7f13cbedcc16dfcc1b220ab3ea0a064535b929466c7f",
+        "tests/storage-build/rust-toolchain.toml": "7d21c66a15f41bad66b82ed06a289f5dc8a6e3751951d2696bbf20ce296f2b0f",
+        "tests/storage-build/src/lib.rs": "914e704f985a15caa30d607e454b8acb71e157cad627bc564dba8254a319c31c",
+        "tests/storage-build/test_runner.py": "9dbe971837dabf436de07fee54e3b7062c7546cdb7958eff6698dc6ed5f56c9f",
+        "tests/storage-build/tests/storage.rs": "1b143601f72a6f8fd77cf6767fe806857a5a4088c710b4e71dcc7819b4c419a5",
+        "tests/storage_bootstrap.rs": "f6967551a11182c80663684d3c4cee5cdafdde0a23ed8ff618402744504b87a7",
+        "tests/storage_cache.rs": "101233f848004526d8bc45234e9e53ea891fca0d92c383d3170b7891100b2501",
+        "tests/storage_embedding_work.rs": "4e588f7664a7f4c8c04135942b9dcfb1971afedd4e5c0c0836974894ac4bbb8f",
+        "tests/storage_failure_atomicity.rs": "e7027ffd4dded6392a7dd3be27f6e6e3741398a6497e2aba343889ebc24b47b1",
+        "tests/storage_failures.rs": "e974e213dd80694be2ebefa665ed5f23d1557892dfab8ddff61427865f5922e0",
+        "tests/storage_vectors.rs": "bf49c138834e132e27a9c5b49a3004bb32456d4a18cb28638e2231d7ebec4444",
+        "tests/support/cli.rs": "957f72bd1234296c7912572364054a68634dd5de38332e96f7f4ff8809dae6f3",
+        "tests/support/documents.rs": "e0b84e4ca422d08960cb0f7fa99a197c357b4699ad30e4f3c5c2412b4fc0648f",
+        "tests/support/drain.rs": "a65687b46341c1a70ceb1542251d91f0baa8a0841e342dd66ac17d663725954a",
+        "tests/support/embedding.rs": "f6b1ed6efa7b5a9c5bf86c6a3a6b1e0d5d0c07fb556763a307acdf4605781b43",
+        "tests/support/git.rs": "80acdb32a862a5428899422a0eeff59c1697c0d7766595d577bd954e3ae2b62a",
+        "tests/support/mod.rs": "b6fd3b57c2f74e4661c39192511a8bef189e6935d77c84fb9ee53b546acbad9b",
+        "tests/support/provenance.rs": "23bebc0d167618fa812d741f9f3dd4593fb7a754e5c5def499b27858e883934d",
+        "tests/support/reading.rs": "5e777cd983f32a07c4f862c57eb86da305e53f559358c19287343e60b17ea8b3",
+        "tests/support/storage.rs": "dca5d5da8eee0876ae9c004b417fcb1e050af70c43bf9c3ac7046744fdc438cd",
+        "tests/support/target_corpus.rs": "b76ea2e063382bd5369489ddd17af94ac3a56ddedd2a625c4904b7c8c4101f16",
+        "tests/support/thin_slice.rs": "6f082f2dcd2963d8a386c289baec6355da9291ad34e73bf2381544fa9321fa25",
+        "tests/target_corpus/README.md": "b66d6428ad87b26ef6c6be8cb862900a182299167910b8b34bdac11a65ca563e",
+        "tests/target_corpus/generate.py": "0187071e92066e35be33cf0a3266219e330ae388ccd132aa9934d4a3db6f15f2",
+        "tests/target_corpus/run.py": "c8e63be0377becad558f9cb2df519d259d23fffd89da4473dfdbf7d41bcdc86d",
+        "tests/target_corpus/test_generate.py": "d2139f5666c80111eb9981ce2d6e416d574c0822a6f3cc68846d3467cd2fcef8",
+        "tests/target_corpus/test_run.py": "401bed509927f3454ac7dfc6ee1dca132feca72dd9b36d999b4dab14cf12d1b6",
+        "tests/target_corpus/validate.py": "0bf01248bbf76aa964c737a242b3166404c65f45e3b16d6438d7b3621d7f9b74",
+        "tests/target_corpus.rs": "d8a656a80115b0b095dfa0123a485f704c8b8698940ce5b2f6f6a05772262e6a",
+        "tests/test_source_contract.py": "c153d7bb5dadb0b6e76edf43041a81805f7e2a08c8fb3b33dcd3e64647b1f43a",
+        "tests/thin_slice.rs": "a31413c3235cd14e2ec061d3cd727031daa740fce8c316a063a3116487e3a62a",
+        "tests/transport/.gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
+        "tests/transport/Cargo.lock": "f2f77dd89b9a83d171a15b6578ddf6d7af45cb64518872da48913a3617216360",
+        "tests/transport/Cargo.toml": "0ee285d70cc1125316771c5cdb03517deb48a9defbc123dba7a008cd5ddb0508",
+        "tests/transport/Dockerfile": "10762e73c4e20eacf9fd782e85986877c1d9c7bd7d12c901c086ac179e5b5cc3",
+        "tests/transport/README.md": "e8a50dfc18e8ed91af597586b4ff00391889dfa048724e43208bac52ddd87239",
+        "tests/transport/certs/README.md": "1cd589285cb971b41da1ed91c645ad123dfac7cbae3f183273138f737379af7e",
+        "tests/transport/certs/ca.key": "ec6a33fc8a1bd14ac6a90672d4c2da58cbe09f9d16958d4d16ac05a894f303f9",
+        "tests/transport/certs/ca.pem": "4cf13aed91aa672dc550cb10e6e2b28ea42208c6590248dc9d1d56ba59e05cc9",
+        "tests/transport/certs/ca.srl": "b43710933f6045f0222499ede7940d0547d7f876257a7c389b74564ae8b8bb69",
+        "tests/transport/certs/localhost.key": "dd36cca982d7c7ad10137522a0cfcfda7b3086e7e1f94a084c712dc7e3c20e77",
+        "tests/transport/certs/localhost.pem": "c0af332d975a7369f893aad59ebed12db9ef0f4dfbe67bf09cd4d37f0756a665",
+        "tests/transport/certs/mismatch.key": "e709ff839347d6af3b59cd7ad648316ece35c5c565ec0ec4334ab5011057c71b",
+        "tests/transport/certs/mismatch.pem": "09e61773abdc6c642c1b8af6c8b976e38284f5eb1fa134f411ef06dcb81077c6",
+        "tests/transport/fixtures.py": "ff0a9dd31b6effd0480d99e3b8a43c09ea3bc940f06a2fa8d216f33d7938d846",
+        "tests/transport/linux_trust.py": "db81163c04f74f31f183c51f29037446e76c08e35aa554a38903983dad497253",
+        "tests/transport/negative_controls.py": "4cd9466161888fab4714bdecd839a01178607020a766071021bb4e9160ab6c16",
+        "tests/transport/run.py": "6416f4278c75220b18888c76eb4d1334755c8ba0768726491920c15490fd1278",
+        "tests/transport/src/bin/transport_client.rs": "5279af5a2a6eb338d719b36ca659f5ae43acf198f57eb2125b6ede444c744c23",
+        "tests/transport/src/client.rs": "271857821951dd7f27ed037162e3536fa6a9654cc8fd39541036698f86e0a771",
+        "tests/transport/src/lib.rs": "4897871813970dd82ff95e629723f1a7c132d5c5c5184c8927b2275f24895ef6",
+        "tests/transport/src/protocol.rs": "986ad4505374b3a3752b933228efaeb290ec296f4182cca5e2f3c99e22fea680",
+        "tests/transport/test_runner.py": "02deb1a8ba229f41c5425ab2d781dc33a73e6aebe70bd139b6aaca9db1744d1e",
+        "tests/transport/test_transport.py": "ce6a499214dd43e8474247e33c81e6d4ea79a35de4997417c74805df094610ab",
+        "tests/transport/tests/protocol.rs": "fbd9d4e2be88289a7a8597af9152b704bb25395c0cf10ac50cc9186dc09444e3",
+        "tests/traversal.rs": "149f801cdf4dfb2b70616163ac716d885c000f474e5eca543a2534e0e9e69d99",
+        "vendor/vec1/README.md": "c08ea3a67ff0c5720cea90dc7d2a9fcfc363e0fe61e92b8a9583511ddb7ce6aa",
+        "vendor/vec1/vec1.c": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9"
+      },
+      "original_native_source_commit": "e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
+      "changed_test_only_paths": [
+        "src/service/traversal/tests/bindings.rs"
+      ],
+      "unchanged_input_count": 318,
+      "production_native_build_ddl_unchanged": true,
+      "aggregate_sha256": "9014d4d1a2412ad297b811e1c232734fdcc8929594352ad83d4afbc09af28af1"
+    },
+    "endpoint_input_hashes_equal": true,
+    "production_native_build_ddl_unchanged": true,
+    "covering_command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "service::traversal::tests::bindings",
+      "--",
+      "--nocapture"
+    ],
+    "covering_results": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "substitution_control": {
+      "before_fix": {
+        "phase": "before",
+        "argv": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "--lib",
+          "service::traversal::tests::bindings::observes_large_source_bindings_pagewise",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "production_original_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7",
+        "production_mutated_sha256": "45cbb13a9e6d8300343d3968d16aa9ea4d400c7332e9ca1d6646a1f8bfc44f66",
+        "fixture_sha256": "54228b0e0d5ec35871b198892eb7b7cf0099b2af364d3c0373b5fff348b4aa98",
+        "exit_code": 0,
+        "restored_byte_exactly": true
+      },
+      "after_fix": {
+        "phase": "after",
+        "argv": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "--lib",
+          "service::traversal::tests::bindings::observes_large_source_bindings_pagewise",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "production_original_sha256": "3d4d6600ff06d40c09c589407c56f3a84453e3b33df38962dc2e3e700b6f70d7",
+        "production_mutated_sha256": "45cbb13a9e6d8300343d3968d16aa9ea4d400c7332e9ca1d6646a1f8bfc44f66",
+        "fixture_sha256": "d7124522f2030e9a5bec994ccc64d7dfa37d07160ba4a3a460e03634ae0887ae",
+        "exit_code": 101,
+        "restored_byte_exactly": true
+      },
+      "identity_failure_message": "binding identities and multiplicity",
+      "evidence_directory": ".artifacts/tk23/task4-fix1-20261026"
+    },
+    "native_scope": "original host native and failed Linux remain at e9a9cd4; no native runner rerun for test-only assertion change",
+    "review_gates": "I1 scoped rereview approved; final M1/M2 documentation correction implemented, scoped re-review pending; Linux native/standalone open"
+  },
+  "review_evidence": {
+    "task-1-review.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-1-review.md",
+      "sha256": "0a3d7c26a6bd7b05eecb12540f34868465607498d0457fd00eefb513a3780b43"
+    },
+    "task-2-review.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-2-review.md",
+      "sha256": "0d6e04f36a8e6d641728539fbd4a40251acc64c3fa68f3628249637796e528ee"
+    },
+    "task-3-review.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-3-review.md",
+      "sha256": "04a50a56579e68e4d84689e5b82636e74bf8cb2e8f3f74304764791904aa024c"
+    },
+    "task-4-review.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-4-review.md",
+      "sha256": "1d5b6c30b1172adc663328ee1f778d1b1bcc8b002cb5acef0bf7da74325b2aa0"
+    },
+    "task-4-rereview.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/task-4-rereview.md",
+      "sha256": "b2046ab52ec13588dc556bb3bc365a8421e69141bae34b34d15795096c08b94b"
+    },
+    "final-review.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/final-review.md",
+      "sha256": "9a0eec4bff28f2263dc813d0dc28f58b00a70afb4cd291452b9c89846c01276b"
+    },
+    "final-rereview.md": {
+      "path": ".superpowers/sdd/2026-10-25-tk-23-traversal/final-rereview.md",
+      "sha256": "5d32f03a9ee8a4278a0e964eb90d5da57f64ae88f0cca4dde78e06de051fa666"
+    }
+  },
+  "final_review_disposition": {
+    "reviewed_head": "524b96d4e93a84d9ecbc65bc3d743841650c561e",
+    "critical_product_findings": 0,
+    "important_product_findings": 0,
+    "code_quality": "approved; M1/M2 documentation corrections passed scoped re-review",
+    "disposition": "M1/M2 addressed; scoped re-review approved; required Linux native/standalone passed in fresh run. Historical final review remains pinned to its reviewed head.",
+    "linux_native_standalone_acceptance": "PASS at 741930ed871e60a0987d655cf79defdff67defd3",
+    "ready_to_merge": true,
+    "cancellation_scope": "TK-23 preserves normal JSON/exit behavior and ordinary OS signal termination; handled SIGINT, cancelled JSON and stdout once-guard implementation remain TK-29"
+  },
+  "controller_final_state": {
+    "implementation": "complete",
+    "code_and_documentation_reviews": "approved",
+    "task_acceptance": "complete",
+    "final_fix_reviewed_head": "88765044d6513f632d0820749c2ee552de8f2f6d",
+    "plan_steps_completed": 20,
+    "plan_steps_total": 20,
+    "remaining_step": null,
+    "branch": "tk-23",
+    "merged": false,
+    "pushed": false,
+    "github_issue_updated": false,
+    "engram_task": "entity_cb85baa8af564770929a3a424a9b5500",
+    "linux_verification_source_commit": "741930ed871e60a0987d655cf79defdff67defd3",
+    "linux_manifest": ".artifacts/tk23/final-linux-retry-239c5dbed5/manifest.json",
+    "linux_driver": ".artifacts/tk23/linux-retry-239c5dbed5"
+  },
+  "acceptance_history_at_741930e": {
+    "status": "implementation_ready_linux_native_blocked",
+    "linux_platform": {
+      "status": "BLOCKED_INFRASTRUCTURE",
+      "runner_exit_code": 1,
+      "manifest": ".artifacts/tk23/final-linux-task4-20261026-01/manifest.json",
+      "commands": [
+        {
+          "argv": [
+            "git",
+            "rev-parse",
+            "HEAD"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-commit.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "git",
+            "status",
+            "--short"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "source-dirty.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "version"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-version.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "build",
+            "-f",
+            "tests/storage/Dockerfile",
+            "-t",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3",
+            "--build-arg",
+            "SOURCE_COMMIT=e9a9cd4a4c9d6807b0a75d79022dc8f838796e78",
+            "."
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-build.log",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "image",
+            "inspect",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "image.json",
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "docker",
+            "run",
+            "--name",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run",
+            "--network",
+            "none",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "linux.log",
+          "exit_code": 1
+        },
+        {
+          "argv": [
+            "docker",
+            "cp",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run:/receipt/.",
+            "/Users/zdkadiev/.codex/worktrees/tk-23/letopis/.artifacts/tk23/final-linux-task4-20261026-01/container"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-copy.log",
+          "exit_code": 1
+        },
+        {
+          "argv": [
+            "docker",
+            "rm",
+            "-f",
+            "letopis-tk9-0b81403f9b26463ca1de6c1f37241fd3-run"
+          ],
+          "cwd": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis",
+          "log": "docker-cleanup.log",
+          "exit_code": 1
+        }
+      ],
+      "captured_counts_are_partial": true,
+      "full_make_verify_exit_code": "not certified from recovered final log",
+      "native_command_exit_code": 101,
+      "native_detailed_log": "not recovered",
+      "standalone": "unavailable",
+      "dynamic_linkage": "unavailable",
+      "inner_manifest": "unavailable: read-only filesystem prevented finalization/copy",
+      "failure": "Docker overlay2 read-only; dead owned container; receipt write/copy/cleanup failed",
+      "disk_pressure": "host Data 1.8Gi available / 100 percent displayed; plausible contributor, root cause unproven",
+      "read_only_export_exit_code": 1,
+      "fresh_native_run_required": true
+    },
+    "limits": [
+      "Required Linux native/standalone acceptance remains open",
+      "BFS bound is not whole-command fixed RSS",
+      "initial/changed publication, candidate/file/root sets, file parsing and JSON buffers remain separate",
+      "live files have no cross-file atomicity",
+      "opt-in existing corpus not run",
+      "TK-24/TK-28, paid/model/pilot/resource/G-1/G-2 and exhaustive new cancellation drills deferred"
+    ],
+    "controller_final_state": {
+      "implementation": "complete",
+      "code_and_documentation_reviews": "approved",
+      "task_acceptance": "blocked_linux_native_standalone",
+      "final_fix_reviewed_head": "88765044d6513f632d0820749c2ee552de8f2f6d",
+      "plan_steps_completed": 19,
+      "plan_steps_total": 20,
+      "remaining_step": "Task4 Step4 required Linux native/standalone run",
+      "branch": "tk-23",
+      "merged": false,
+      "pushed": false,
+      "github_issue_updated": false,
+      "engram_task": "entity_cb85baa8af564770929a3a424a9b5500"
+    },
+    "review_gates": {
+      "task4_independent": "approved_after_I1_rereview",
+      "whole_branch": "approved_code_and_documentation",
+      "final_documentation_corrections": "M1/M2 addressed; scoped re-review approved; no new breakage",
+      "linux_native_standalone": "open"
+    },
+    "final_review_disposition": {
+      "reviewed_head": "524b96d4e93a84d9ecbc65bc3d743841650c561e",
+      "critical_product_findings": 0,
+      "important_product_findings": 0,
+      "code_quality": "approved; M1/M2 documentation corrections passed scoped re-review",
+      "disposition": "M1/M2 ADDRESSED; no new breakage; Linux native/standalone remains open",
+      "linux_native_standalone_acceptance": "open",
+      "ready_to_merge": false,
+      "cancellation_scope": "TK-23 preserves normal JSON/exit behavior and ordinary OS signal termination; handled SIGINT, cancelled JSON and stdout once-guard implementation remain TK-29"
+    }
+  },
+  "linux_retry": {
+    "source_commit": "741930ed871e60a0987d655cf79defdff67defd3",
+    "evidence": ".artifacts/tk23/final-linux-retry-239c5dbed5",
+    "driver": ".artifacts/tk23/linux-retry-239c5dbed5",
+    "validation": {
+      "source_commit": "741930ed871e60a0987d655cf79defdff67defd3",
+      "status": "PASS",
+      "platform": "linux/arm64",
+      "outer_manifest": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis/.artifacts/tk23/final-linux-retry-239c5dbed5/manifest.json",
+      "outer_manifest_sha256": "87ea7c85d67d2af0ccaeedab1c4683d25cb5b3d9dd1ea88241bd2fc254b7dd80",
+      "inner_manifest": "/Users/zdkadiev/.codex/worktrees/tk-23/letopis/.artifacts/tk23/final-linux-retry-239c5dbed5/container/manifest.json",
+      "inner_manifest_sha256": "79fa86cc7bb2827a5c27e00fe4b92ec43972f0483db38d4329bf82a6e9eaf260",
+      "outer_input_count": 319,
+      "inner_input_count": 202,
+      "input_relation": "All202Dockerfilecopiedinputs matchouter/current319;117uncopiedhistorical/docsinputs excluded",
+      "root_counts": {
+        "debug": {
+          "root_executables": 48,
+          "passed": 684,
+          "failed": 0,
+          "ignored": 5
+        },
+        "release": {
+          "root_executables": 48,
+          "passed": 684,
+          "failed": 0,
+          "ignored": 5
+        }
+      },
+      "outer_commands": 8,
+      "inner_commands": 14,
+      "native_lines": [
+        "SQLite=3.53.2 vec1=version 0.8 (NEON, multi-threaded)",
+        "test storage::native::tests::native_capabilities_match_pinned_stack ... ok"
+      ],
+      "standalone": "PASS: copied executable, FTS, shared native vector, exact bytes, reopen, revision=1",
+      "network": "none",
+      "test_threads": 2,
+      "owned_container_cleanup": "PASS",
+      "historical_failed_receipt_preserved": true
+    },
+    "historical_failed_receipt": ".artifacts/tk23/final-linux-task4-20261026-01/manifest.json",
+    "old_owned_container_recovery": ".artifacts/tk23/linux-retry-239c5dbed5/previous-container-recovery.json",
+    "previous_failure_preserved": true
+  }
+}

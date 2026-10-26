@@ -6,7 +6,7 @@ mod source;
 mod validation;
 mod value;
 pub use graph::{
-    Edge, EdgeTarget, EdgeType, Element, ElementKind, ElementMetadata, derive_element_kind,
+    Edge, EdgeTarget, EdgeType, Element, ElementKind, ElementMetadata, Graph, derive_element_kind,
 };
 pub use identity::{Anchor, KnowledgeId, RepoPath};
 pub use sha256::Sha256;
@@ -16,3 +16,6 @@ pub use source::{LocalSource, SourceUri};
 pub use validation::{GraphProblem, find_graph_problems};
 pub use value::{BlobOid, ByteSpan, LineRange, TreeOid, ValueError};
 pub(crate) use value::{SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN};
+
+/// Shared domain spelling for containment; kept out of the public API.
+pub(crate) use graph::INCLUDES_EDGE_TYPE;

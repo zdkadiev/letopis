@@ -1,6 +1,6 @@
 # TK-23 — Реализовать полный traverse
 
-> **Статус:** planned
+> **Статус:** done
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 6 / 8 / 16 (best / expected / worst)
@@ -37,10 +37,12 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Relations/containment/both, incoming/outgoing/both, типы/depth/node/edge limits проходят fixtures.
-- [ ] includes=один шаг, старты исключены, edges только реально пройденные, dedup/cycles конечны, текст не возвращается.
+- [x] Relations/containment/both, incoming/outgoing/both, типы/depth/node/edge limits проходят fixtures.
+- [x] includes=один шаг, старты исключены, edges только реально пройденные, dedup/cycles конечны, текст не возвращается.
 
-- [ ] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
+- [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
+
+- [x] Обязательный Linux arm64 native/standalone runner завершился полным PASS на741930e; исходный Docker FAIL сохранён исторически.
 
 ## 6. Как проверить
 
@@ -65,6 +67,8 @@
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
+Реализованы полный metadata-only traverse CLI, инкрементальный BFS в GraphService через GraphRead, чистый domain Graph, закреплённый read view и постраничные source observations. Все продуктовые критерии и архитектурные границы подтверждены; Task1–4 reviews, I1 rereview и final whole-branch review с M1/M2 corrections завершены без открытых замечаний.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+[Отчёт TK-23](../../../../checks/TK-23/report.md) и [verification.json](../../../../checks/TK-23/verification.json) фиксируют host native PASS на `e9a9cd4a4c9d6807b0a75d79022dc8f838796e78`, supplemental revised-test verification на `5859e3ea15929b57abc6aafdb3dc477241c87f2d` и новый Linux arm64 native/standalone PASS на `741930ed871e60a0987d655cf79defdff67defd3`. Debug/release отдельно684/0/5 в48root executables; Linux schema parity,10Python tests, real60sdeadline,nativeSQLite3.53.2/vec1 0.8, standalone/linkage прошли. Все202скопированных в контейнер входа совпадают с текущим319-file outer map. Runtime network none;2test threads; owned container cleanup выполнен. Исходный FAIL после read-only Docker и исходные hashes сохранены, не переименованы в PASS.
+
+Все20шагов плана завершены. BFS bound не означает fixed RSS всей команды; публикация/file/root/JSON имеют отдельные расходы. Cache-v2 rebuild остаётся явной quiescent cache-only процедурой с сохранением vectors/config/locks/Markdown/Git. Handled SIGINT/cancelled JSON/once-guard остаются TK-29. TK-24/TK-28, paid/model/pilot/resource/G-1/G-2 и exhaustive cancellation drills не сертифицированы. Merge/push/GitHub publication не выполнялись; интеграция требует отдельного решения пользователя.

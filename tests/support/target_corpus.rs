@@ -13,7 +13,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const SCHEMA_VERSION: i64 = 1;
+const CACHE_SCHEMA_VERSION: i64 = 2;
+const VECTOR_SCHEMA_VERSION: i64 = 1;
 const RECEIPT_VERSION: u32 = 1;
 type ObservationResult<T> = Result<T, Box<dyn Error>>;
 
@@ -76,8 +77,8 @@ pub(super) fn observe_request(path: &Path) -> ObservationResult<()> {
     let config = EmbeddingConfig::parse(&fs::read(request.root.join(".letopis/config.json"))?)?;
     let cache = request.root.join(".letopis/cache.db");
     let vectors = request.root.join(".letopis/vectors.db");
-    verify_database(&cache)?;
-    verify_database(&vectors)?;
+    verify_database(&cache, CACHE_SCHEMA_VERSION)?;
+    verify_database(&vectors, VECTOR_SCHEMA_VERSION)?;
     let mut storage = open_storage(&cache, &vectors)?;
     let mut snapshot = storage.begin_read()?;
     let receipt = observe_snapshot(&mut snapshot, &request, &config)?;
@@ -108,16 +109,16 @@ fn verify_request(request: &Request) -> ObservationResult<()> {
     }
 }
 
-fn verify_database(path: &Path) -> ObservationResult<()> {
+fn verify_database(path: &Path, expected_version: i64) -> ObservationResult<()> {
     verify_regular_file(path)?;
     let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW;
     let database = Connection::open_with_flags(path, flags)?;
     let version: i64 = database.pragma_query_value(None, "user_version", |row| row.get(0))?;
-    if version != SCHEMA_VERSION {
+    if version != expected_version {
         return Err("unsupported database schema".into());
     }
     // The product opener sets WAL before checking full schema. Reject other modes
-    // here so even a forged version-one database cannot have its header changed.
+    // here so even a forged expected-version database cannot have its header changed.
     let mode: String = database.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
     if mode != "wal" {
         return Err("existing database must use product WAL mode".into());

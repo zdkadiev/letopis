@@ -3,7 +3,7 @@ mod handlers;
 mod input;
 mod output;
 
-pub(crate) use handlers::{CommandResponse, Handlers};
+pub(crate) use handlers::{CommandResponse, HandlerServices, Handlers};
 pub(crate) use input::{Request, parse_request};
 pub(crate) use output::write_response;
 
@@ -12,3 +12,6 @@ mod tests;
 
 #[cfg(test)]
 mod search_tests;
+
+#[cfg(test)]
+mod traversal_tests;
