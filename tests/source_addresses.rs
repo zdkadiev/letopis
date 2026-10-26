@@ -4,7 +4,7 @@ type ByteSelectionCase<'a> = (&'a str, &'a [u8], Option<&'a [u8]>);
 
 #[test]
 fn normalize_local_source_identity() {
-    // Arrange
+    // Given
     for (raw, expected, path, lines) in [
         (
             "./src/../src/a.rs#L010-L025",
@@ -22,10 +22,10 @@ fn normalize_local_source_identity() {
         ),
         ("http-notes", "http-notes", "http-notes", None),
     ] {
-        // Act
+        // When
         let source = SourceUri::parse(raw).unwrap();
         let local = source.get_local().unwrap();
-        // Assert
+        // Then
         assert_eq!(source.as_str(), expected);
         let reparsed = SourceUri::parse(source.as_str()).unwrap();
         assert_eq!(reparsed.as_str(), expected);
@@ -38,41 +38,41 @@ fn normalize_local_source_identity() {
             lines
         );
     }
-    // Arrange / Act
+    // When
     let whole = SourceUri::parse("a").unwrap();
     let range = SourceUri::parse("a#L1-L1").unwrap();
-    // Assert
+    // Then
     assert_ne!(whole, range);
 }
 
 #[test]
 fn preserve_opaque_remote_identity() {
-    // Arrange
+    // Given
     for raw in [
         "HTTP://Host/a?x=%2f#L01-L02",
         "hTtPs://Host/../a//Я?x=%2F#arbitrary",
         "https://host",
         "http://host?query#fragment",
     ] {
-        // Act
+        // When
         let remote = SourceUri::parse(raw).unwrap();
-        // Assert
+        // Then
         assert_eq!(remote.as_str(), raw);
         assert!(remote.get_local().is_none());
         let reparsed = SourceUri::parse(remote.as_str()).unwrap();
         assert_eq!(reparsed.as_str(), raw);
         assert!(reparsed.get_local().is_none());
     }
-    // Arrange / Act
+    // When
     let upper = SourceUri::parse("https://Host/%2f").unwrap();
     let lower = SourceUri::parse("https://host/%2F").unwrap();
-    // Assert
+    // Then
     assert_ne!(upper, lower);
 }
 
 #[test]
 fn reject_local_normalization_exposing_reserved_remote_prefix() {
-    // Arrange: these are local spellings, not raw absolute remote URLs.
+    // Given: these are local spellings, not raw absolute remote URLs.
     for raw in [
         "./https:notes",
         "dir/../HTTP:notes",
@@ -81,16 +81,16 @@ fn reject_local_normalization_exposing_reserved_remote_prefix() {
         "dir/../http://Host/a#L1-L2",
         "./HTTP:notes#L1-L1",
     ] {
-        // Act
+        // When
         let result = SourceUri::parse(raw);
-        // Assert
+        // Then
         assert_eq!(result, Err(ValueError::InvalidPath), "{raw:?}");
     }
 }
 
 #[test]
 fn reject_malformed_source_addresses() {
-    // Arrange
+    // Given
     for raw in [
         "https://",
         "https:/host/a",
@@ -118,16 +118,16 @@ fn reject_malformed_source_addresses() {
         "a#anchor",
         "a#L1-L2#L3-L4",
     ] {
-        // Act
+        // When
         let result = SourceUri::parse(raw);
-        // Assert
+        // Then
         assert!(result.is_err(), "accepted {raw:?}");
     }
 }
 
 #[test]
 fn select_exact_source_lines() {
-    // Arrange: LF terminates a line, while CR and non-UTF-8 remain source bytes.
+    // Given: LF terminates a line, while CR and non-UTF-8 remain source bytes.
     let cases: &[ByteSelectionCase<'_>] = &[
         ("a", b"", Some(b"")),
         ("a", b"\xff\r\nx\n", Some(b"\xff\r\nx\n")),
@@ -143,9 +143,9 @@ fn select_exact_source_lines() {
     ];
     for (raw, bytes, expected) in cases {
         let source = SourceUri::parse(raw).unwrap();
-        // Act
+        // When
         let actual = source.get_local().unwrap().select_bytes(bytes);
-        // Assert
+        // Then
         assert_eq!(actual, *expected, "{raw} over {bytes:?}");
     }
 }

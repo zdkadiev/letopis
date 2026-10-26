@@ -15,7 +15,7 @@ const ABSENT_SHA256: &str = "111111111111111111111111111111111111111111111111111
 #[test]
 fn verify_snapshot_accepts_exact_tree_without_writes() {
     for format in FORMATS {
-        // Arrange: the index deliberately differs from both HEAD and live bytes.
+        // Given: the index deliberately differs from both HEAD and live bytes.
         let repo = TempRepo::new(format);
         let tree = parse_tree(&repo.read_oid(&["write-tree"], None));
         let git = open_git_snapshots(repo.get_root()).unwrap();
@@ -23,10 +23,10 @@ fn verify_snapshot_accepts_exact_tree_without_writes() {
         let before_refs = repo.run_git_successfully(&["for-each-ref"], None);
         let before_objects = repo.run_git_successfully(&["count-objects", "-v"], None);
 
-        // Act
+        // When
         let state = git.verify_snapshot(&tree).unwrap();
 
-        // Assert
+        // Then
         assert_eq!(state, SnapshotState::Available);
         assert_eq!(repo.capture_fixture_state(), before);
         assert_eq!(
@@ -43,7 +43,7 @@ fn verify_snapshot_accepts_exact_tree_without_writes() {
 #[test]
 fn verify_snapshot_classifies_absent_foreign_and_non_tree_objects() {
     for format in FORMATS {
-        // Arrange: tags deliberately point directly to a valid tree.
+        // Given: tags deliberately point directly to a valid tree.
         let repo = TempRepo::new(format);
         let tree = repo.read_oid(&["write-tree"], None);
         let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"blob bytes"));
@@ -59,7 +59,7 @@ fn verify_snapshot_classifies_absent_foreign_and_non_tree_objects() {
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let before_refs = repo.run_git_successfully(&["for-each-ref"], None);
 
-        // Act / Assert: neither commits nor tags may be peeled into trees.
+        // When / Then: neither commits nor tags may be peeled into trees.
         for (oid, expected) in [
             (missing, SnapshotState::Missing),
             (blob.as_str(), SnapshotState::Invalid),
@@ -67,8 +67,10 @@ fn verify_snapshot_classifies_absent_foreign_and_non_tree_objects() {
             (tag.as_str(), SnapshotState::Invalid),
             (foreign, SnapshotState::Invalid),
         ] {
+            // When / Then
             assert_eq!(git.verify_snapshot(&parse_tree(oid)).unwrap(), expected);
         }
+        // Then
         assert_eq!(
             repo.run_git_successfully(&["for-each-ref"], None),
             before_refs
@@ -79,7 +81,7 @@ fn verify_snapshot_classifies_absent_foreign_and_non_tree_objects() {
 #[test]
 fn verify_snapshot_propagates_policy_and_integrity_failures() {
     for format in FORMATS {
-        // Arrange: alternates appear only after opening the adapter.
+        // Given: alternates appear only after opening the adapter.
         let repo = TempRepo::new(format);
         let tree = parse_tree(&repo.read_oid(&["write-tree"], None));
         let replacement = repo.read_oid(&["mktree"], Some(b""));
@@ -88,18 +90,18 @@ fn verify_snapshot_propagates_policy_and_integrity_failures() {
         let alternates = repo.get_root().join(".git/objects/info/alternates");
         fs::write(&alternates, b"/DONOR_PATH_CANARY/objects\n").unwrap();
 
-        // Act / Assert
+        // When / Then
         assert_safe_internal_error(&git.verify_snapshot(&tree).unwrap_err(), &repo, &tree);
         assert_eq!(
             repo.run_git_successfully(&["for-each-ref"], None),
             before_refs
         );
 
-        // Arrange: valid tree bytes stored under a different tree's identity.
+        // Given: valid tree bytes stored under a different tree's identity.
         fs::remove_file(alternates).unwrap();
         repo.replace_loose_object(tree.as_str(), &replacement);
 
-        // Act / Assert
+        // When / Then
         assert_safe_internal_error(&git.verify_snapshot(&tree).unwrap_err(), &repo, &tree);
         assert_eq!(
             repo.run_git_successfully(&["for-each-ref"], None),
@@ -111,7 +113,7 @@ fn verify_snapshot_propagates_policy_and_integrity_failures() {
 #[test]
 fn verify_snapshot_checks_root_integrity_without_requiring_child_closure() {
     for format in FORMATS {
-        // Arrange: the exact root exists, but its referenced blob never existed.
+        // Given: the exact root exists, but its referenced blob never existed.
         let repo = TempRepo::new(format);
         let (missing, _) = get_absent_oids(format);
         let entry = format!("100644 blob {missing}\tabsent-child\0");
@@ -120,10 +122,10 @@ fn verify_snapshot_checks_root_integrity_without_requiring_child_closure() {
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let before_refs = repo.run_git_successfully(&["for-each-ref"], None);
 
-        // Act
+        // When
         let state = git.verify_snapshot(&tree).unwrap();
 
-        // Assert
+        // Then
         assert_eq!(state, SnapshotState::Available);
         assert_eq!(
             repo.run_git_successfully(&["for-each-ref"], None),

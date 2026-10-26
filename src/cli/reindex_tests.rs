@@ -1,14 +1,12 @@
 use super::{HandlerServices, Handlers, parse_request, write_response};
 use crate::service::{
-    BackgroundRunner, CommandErrorKind, CommandProblem, CommandResult, DocumentResult,
-    RefreshOutcome, Refresher,
+    CommandErrorKind, CommandProblem, MockBackgroundRunner, MockRefresher, RefreshOutcome,
 };
 use serde_json::{Value, json};
-use std::cell::Cell;
 
 #[test]
 fn accepts_only_empty_reindex_input() {
-    // Arrange / Act / Assert.
+    // Given / When / Then.
     assert!(parse_request(&["reindex".into()], b"{}".as_slice()).is_ok());
     for input in [
         "null",
@@ -25,12 +23,29 @@ fn accepts_only_empty_reindex_input() {
 
 #[test]
 fn reindex_dispatches_full_operation_without_refresh_or_inline_drain() {
-    // Arrange.
-    let calls = Cell::new(0);
-    let mut documents = Documents(&calls);
-    let mut background = Background;
+    // Given
+    let mut documents = MockRefresher::new();
+    documents.expect_refresh().times(0);
+    documents.expect_reindex().times(1).returning(|| {
+        Ok(RefreshOutcome {
+            revision: 42,
+            published: true,
+            files_updated: 1,
+            files_removed: 0,
+            invalid_files_updated: 0,
+        })
+    });
+    let mut background = MockBackgroundRunner::new();
+    background.expect_drain().times(0);
+    background.expect_start_if_needed().times(1).returning(|| {
+        Ok(Some(CommandProblem {
+            code: CommandErrorKind::InternalError,
+            message: "safe launch failure",
+            details: Default::default(),
+        }))
+    });
     let request = parse_request(&["reindex".into()], b"{}".as_slice()).unwrap();
-    // Act.
+    // When
     let response = Handlers::new(HandlerServices {
         refresher: Some(&mut documents),
         background: Some(&mut background),
@@ -39,42 +54,11 @@ fn reindex_dispatches_full_operation_without_refresh_or_inline_drain() {
     .execute(request);
     let mut output = Vec::new();
     assert_eq!(write_response(&mut output, response), 0);
-    // Assert.
+    // Then
     let json: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(
         json,
         json!({"ok":true,"result":{"revision":42},"warnings":[{"code":"internal_error","message":"safe launch failure","details":{}}]})
     );
-    assert_eq!(calls.get(), 1);
     println!("CLI_RESPONSE {}", json!({"response":json,"exit":0}));
-}
-
-struct Documents<'a>(&'a Cell<usize>);
-struct Background;
-impl Refresher for Documents<'_> {
-    fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
-        self.0.set(self.0.get() + 1);
-        Ok(RefreshOutcome {
-            revision: 42,
-            published: true,
-            files_updated: 1,
-            files_removed: 0,
-            invalid_files_updated: 0,
-        })
-    }
-    fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
-        panic!("reindex must not call incremental refresh")
-    }
-}
-impl BackgroundRunner for Background {
-    fn start_if_needed(&mut self) -> CommandResult<Option<CommandProblem>> {
-        Ok(Some(CommandProblem {
-            code: CommandErrorKind::InternalError,
-            message: "safe launch failure",
-            details: Default::default(),
-        }))
-    }
-    fn drain(&mut self) -> CommandResult<()> {
-        panic!("reindex must not wait for inference")
-    }
 }

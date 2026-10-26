@@ -141,11 +141,11 @@ mod tests {
 
     #[test]
     fn quoted_unicode_text_remains_bound() {
-        // Arrange
+        // Given
         let text = "mémoire '); DROP TABLE nodes; -- ?1";
-        // Act
+        // When
         let (sql, result) = read_values(vec![Value::from(text)]);
-        // Assert
+        // Then
         assert!(!sql.contains(text));
         assert!(sql.contains('?'));
         assert_eq!(result, vec![SqliteValue::Text(text.into())]);
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn nullable_and_blob_values_preserve_sqlite_types() {
-        // Arrange
+        // Given
         let values = vec![
             Value::String(None),
             Value::Bytes(None),
@@ -168,9 +168,9 @@ mod tests {
             }))),
             Value::Enum(OptionEnum::None("kind".into())),
         ];
-        // Act
+        // When
         let (_, result) = read_values(values);
-        // Assert
+        // Then
         assert_eq!(
             result,
             vec![
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn numeric_values_preserve_bounds_and_reject_overflow() {
-        // Arrange
+        // Given
         let numbers = vec![
             Value::TinyInt(Some(i8::MIN)),
             Value::SmallInt(Some(i16::MIN)),
@@ -203,10 +203,10 @@ mod tests {
             Value::Float(Some(1.25)),
             Value::Double(Some(-2.5)),
         ];
-        // Act
+        // When
         let (_, result) = read_values(numbers);
         let error = build_query(Query::select().expr(Expr::val(u64::MAX))).unwrap_err();
-        // Assert
+        // Then
         assert_eq!(
             result,
             vec![
@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn every_primitive_null_remains_null() {
-        // Arrange
+        // Given
         let values = vec![
             Value::Bool(None),
             Value::TinyInt(None),
@@ -247,9 +247,9 @@ mod tests {
             Value::Bytes(None),
         ];
         let count = values.len();
-        // Act
+        // When
         let (_, result) = read_values(values);
-        // Assert
+        // Then
         assert_eq!(result, vec![SqliteValue::Null; count]);
     }
 

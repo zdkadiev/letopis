@@ -497,16 +497,16 @@ mod tests {
 
     #[test]
     fn rejects_empty_or_partially_encoded_stored_vectors() {
-        // Arrange: retain a valid component before a truncated trailing component.
+        // Given: retain a valid component before a truncated trailing component.
         let mut truncated = 1.0_f32.to_ne_bytes().to_vec();
         truncated.push(0);
         for bytes in [Vec::new(), vec![0], truncated] {
-            // Act
+            // When
             let error = decode_vector(&bytes).unwrap_err();
-            // Assert: incomplete bytes cannot silently become a shorter vector.
+            // Then: incomplete bytes cannot silently become a shorter vector.
             assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
         }
-        // Act / Assert: complete finite components still decode without loss.
+        // When / Then: complete finite components still decode without loss.
         assert_eq!(decode_vector(&1.0_f32.to_ne_bytes()).unwrap(), vec![1.0]);
     }
 }

@@ -12,15 +12,19 @@ use support::reading::ReadingRepo;
 
 #[test]
 fn invalid_status_transport_fails_before_repository_setup() {
+    // Given
     let repo = ReadingRepo::new();
     let service_dir = repo.get_root().join(".letopis");
 
+    // When / Then
     for (args, input) in [
         (&["status"][..], b"null".as_slice()),
         (&["status", "extra"][..], b"{}".as_slice()),
     ] {
+        // When
         let output = repo.invoke(args, input);
 
+        // Then
         assert_eq!(output.status.code(), Some(1), "{output:?}");
         assert!(output.stderr.is_empty(), "{output:?}");
         let value: Value = serde_json::from_slice(&output.stdout).unwrap();
@@ -36,12 +40,15 @@ fn invalid_status_transport_fails_before_repository_setup() {
 
 #[test]
 fn status_without_publication_does_not_create_service_files() {
+    // Given
     let repo = ReadingRepo::new();
     let service_dir = repo.get_root().join(".letopis");
     assert!(!service_dir.exists());
 
+    // When
     let output = repo.invoke(&["status"], b"{}");
 
+    // Then
     assert!(output.status.success(), "{output:?}");
     assert!(output.stderr.is_empty());
     let value: Value = serde_json::from_slice(&output.stdout).unwrap();
@@ -61,6 +68,7 @@ fn status_without_publication_does_not_create_service_files() {
 
 #[test]
 fn status_with_config_never_connects_or_starts_drain() {
+    // Given
     let repo = ReadingRepo::new();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
@@ -68,8 +76,10 @@ fn status_with_config_never_connects_or_starts_drain() {
     repo.write_config("ollama", &url, "fixture");
     let service_dir = repo.get_root().join(".letopis");
 
+    // When
     let output = repo.invoke(&["status"], b"{}");
 
+    // Then
     assert!(output.status.success(), "{output:?}");
     let value: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(
@@ -91,12 +101,15 @@ fn status_with_config_never_connects_or_starts_drain() {
 
 #[test]
 fn status_reuses_published_check_findings_without_refreshing() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "owner.md",
         "[missing](missing.md \"letopis:type=supports\")",
     );
+    // When
     let checked = repo.invoke(&["check"], b"{}");
+    // Then
     assert!(checked.status.success(), "{checked:?}");
     let checked: Value = serde_json::from_slice(&checked.stdout).unwrap();
     let expected = json!({"code":"validation_failed","message":"knowledge target is missing",
@@ -106,11 +119,14 @@ fn status_reuses_published_check_findings_without_refreshing() {
     let before = fs::read(&cache).unwrap();
     let vectors = repo.get_root().join(".letopis/vectors.db");
     let before_vectors = fs::read(&vectors).unwrap();
+    // Given
     repo.write_knowledge("missing.md", "Target repaired");
     repo.write_config("ollama", "http://localhost/api", "changed-config");
 
+    // When
     let observed = repo.invoke(&["status"], b"{}");
 
+    // Then
     assert!(observed.status.success(), "{observed:?}");
     let observed: Value = serde_json::from_slice(&observed.stdout).unwrap();
     assert_eq!(observed["result"]["problems"], json!([expected]));
@@ -123,14 +139,19 @@ fn status_reuses_published_check_findings_without_refreshing() {
 
 #[test]
 fn status_and_check_track_repairs_across_processes() {
+    // Given
     let repo = ReadingRepo::new();
     seed_diagnostic_files(&repo);
 
+    // When
     let checked = repo.invoke(&["check"], b"{}");
+    // Then
     assert!(checked.status.success(), "{checked:?}");
     let checked: Value = serde_json::from_slice(&checked.stdout).unwrap();
+    // When
     let status = read_status(&repo);
     let problems = status["result"]["problems"].as_array().unwrap();
+    // Then
     assert_eq!(Value::Array(problems.clone()), checked["result"]["errors"]);
     let actual: Vec<_> = problems
         .iter()
@@ -155,6 +176,7 @@ fn status_and_check_track_repairs_across_processes() {
     );
     assert!(!status.to_string().contains("PRIVATE_BODY"));
 
+    // Given
     repo.write_knowledge("missing.md", "Restored");
     repo.write(
         "target.md",
@@ -164,12 +186,15 @@ fn status_and_check_track_repairs_across_processes() {
     repo.write_knowledge("b.md", "No cycle");
     repo.write_knowledge("sources.md", "No source");
     repo.write_knowledge("bad.md", "Valid metadata");
+    // When / Then
     assert_eq!(
         read_status(&repo)["result"]["problems"],
         status["result"]["problems"]
     );
 
+    // When
     let refreshed = repo.invoke(&["check"], b"{}");
+    // Then
     assert!(refreshed.status.success(), "{refreshed:?}");
     let refreshed: Value = serde_json::from_slice(&refreshed.stdout).unwrap();
     assert_eq!(refreshed["result"]["errors"], json!([]));
@@ -178,36 +203,48 @@ fn status_and_check_track_repairs_across_processes() {
 
 #[test]
 fn status_reports_rename_delete_and_restore_after_refresh() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("owner.md", "[target](target.md \"letopis:type=supports\")");
     repo.write_knowledge("target.md", "Target");
+    // When
     let initial = repo.invoke(&["check"], b"{}");
+    // Then
     assert!(initial.status.success(), "{initial:?}");
     assert_eq!(read_status(&repo)["result"]["problems"], json!([]));
 
+    // Given
     fs::rename(
         repo.get_root().join("target.md"),
         repo.get_root().join("renamed.md"),
     )
     .unwrap();
+    // When
     let renamed = repo.invoke(&["check"], b"{}");
+    // Then
     assert!(renamed.status.success(), "{renamed:?}");
     assert_eq!(
         read_status(&repo)["result"]["problems"][0]["details"]["target"],
         "target.md"
     );
 
+    // Given
     fs::rename(
         repo.get_root().join("renamed.md"),
         repo.get_root().join("target.md"),
     )
     .unwrap();
+    // When
     let restored = repo.invoke(&["check"], b"{}");
+    // Then
     assert!(restored.status.success(), "{restored:?}");
     assert_eq!(read_status(&repo)["result"]["problems"], json!([]));
 
+    // Given
     fs::remove_file(repo.get_root().join("target.md")).unwrap();
+    // When
     let deleted = repo.invoke(&["check"], b"{}");
+    // Then
     assert!(deleted.status.success(), "{deleted:?}");
     assert_eq!(
         read_status(&repo)["result"]["problems"][0]["details"]["target"],
@@ -217,8 +254,11 @@ fn status_reports_rename_delete_and_restore_after_refresh() {
 
 #[test]
 fn status_reports_busy_index_lock_without_waiting_or_writing_pid() {
+    // Given
     let repo = ReadingRepo::new();
+    // When
     let checked = repo.invoke(&["check"], b"{}");
+    // Then
     assert!(checked.status.success(), "{checked:?}");
     let path = repo.get_root().join(".letopis/index.lock");
     let mut owner = OpenOptions::new().write(true).open(&path).unwrap();
@@ -230,8 +270,10 @@ fn status_reports_busy_index_lock_without_waiting_or_writing_pid() {
     let original = fs::read(&path).unwrap();
 
     let start = Instant::now();
+    // When
     let status = read_status(&repo);
 
+    // Then
     assert!(start.elapsed().as_secs() < 2);
     assert_eq!(
         status["result"]["locks"],

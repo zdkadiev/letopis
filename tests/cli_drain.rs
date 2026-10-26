@@ -25,7 +25,7 @@ use support::embedding::{FixtureReply, HttpFixture, ResponseBarrier};
 
 #[test]
 fn detached_product_drain_reaches_http_and_stores_the_matching_vector() {
-    // Arrange: publish a real document through Documents, with no vector.
+    // Given: publish a real document through Documents, with no vector.
     let fixture = Fixture::new();
     let hash = fixture.publish("Actual product drain token");
     let barrier = ResponseBarrier::default();
@@ -37,7 +37,7 @@ fn detached_product_drain_reaches_http_and_stores_the_matching_vector() {
     let before = fixture.capture_corpus();
     let mut foreground = fixture.spawn_foreground();
     let mut owner = DetachedOwner::new(fixture.repo.get_root(), foreground.get_id());
-    // Act: a real product executable, launched by the production background path.
+    // When: a real product executable, launched by the production background path.
     barrier.wait_until_entered();
     fixture.finish_foreground(&mut foreground);
     assert!(
@@ -50,7 +50,7 @@ fn detached_product_drain_reaches_http_and_stores_the_matching_vector() {
     // A competing product exits while the original HTTP request is still blocked.
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
     barrier.release();
-    // Assert: HTTP delivery and real hash-addressed storage, not a fixture success.
+    // Then: HTTP delivery and real hash-addressed storage, not a fixture success.
     owner.wait_for_exit();
     assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
     fixture.assert_no_work(&config);
@@ -61,6 +61,7 @@ fn detached_product_drain_reaches_http_and_stores_the_matching_vector() {
 
 #[test]
 fn direct_product_drain_accepts_eof_and_reuses_vectors_after_lost_response() {
+    // Given
     let fixture = Fixture::new();
     let hash = fixture.publish("direct product token");
     let http = HttpFixture::start(FixtureReply::Status {
@@ -69,7 +70,7 @@ fn direct_product_drain_accepts_eof_and_reuses_vectors_after_lost_response() {
     });
     let config = fixture.write_config(&http.get_base_url(), 0);
     let before = fixture.capture_corpus();
-    // Act: discard the first response, then repeat the real idempotent operation.
+    // When: discard the first response, then repeat the real idempotent operation.
     assert!(
         fixture
             .spawn_lost_drain()
@@ -78,7 +79,7 @@ fn direct_product_drain_accepts_eof_and_reuses_vectors_after_lost_response() {
             .success()
     );
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
-    // Assert persisted vectors, no repeated inference and no corpus publication.
+    // Then persisted vectors, no repeated inference and no corpus publication.
     assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
     fixture.assert_no_work(&config);
     assert_eq!(http.take_requests().len(), 1);
@@ -87,6 +88,7 @@ fn direct_product_drain_accepts_eof_and_reuses_vectors_after_lost_response() {
 
 #[test]
 fn missing_invalid_or_empty_work_never_launches_a_product() {
+    // Given
     let http = HttpFixture::start(FixtureReply::Status {
         status: 200,
         body: SUCCESS.into(),
@@ -105,8 +107,9 @@ fn missing_invalid_or_empty_work_never_launches_a_product() {
             }
             _ => {}
         }
-        // Act / Assert: a production readiness check must return before even probing.
+        // When / Then: a production readiness check must return before even probing.
         fixture.finish_foreground(&mut fixture.spawn_foreground());
+        // When / Then
         assert!(
             !fixture.repo.get_root().join(".letopis/embed.lock").exists(),
             "{state}"
@@ -120,6 +123,7 @@ fn missing_invalid_or_empty_work_never_launches_a_product() {
 
 #[test]
 fn provider_failure_is_redacted_and_exhaustion_never_respawns() {
+    // Given
     let fixture = Fixture::new();
     let hash = fixture.publish("provider failure token");
     let http = HttpFixture::start(FixtureReply::Status {
@@ -128,7 +132,7 @@ fn provider_failure_is_redacted_and_exhaustion_never_respawns() {
     });
     let config = fixture.write_config(&http.get_base_url(), 1);
     let before = fixture.capture_corpus();
-    // Act: two durable attempts, then no eligible work under the same identity.
+    // When: two durable attempts, then no eligible work under the same identity.
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
     let failure = fixture.read_failure(&config, &hash).unwrap();
     assert_eq!(failure.attempts, 2);
@@ -139,7 +143,7 @@ fn provider_failure_is_redacted_and_exhaustion_never_respawns() {
     let lock = fixture.repo.get_root().join(".letopis/embed.lock");
     let owner = fs::read(&lock).unwrap();
     fixture.finish_foreground(&mut fixture.spawn_foreground());
-    // Assert no probe/spawn, no extra HTTP, no secret persisted and graph remains.
+    // Then no probe/spawn, no extra HTTP, no secret persisted and graph remains.
     assert_eq!(fs::read(&lock).unwrap(), owner);
     assert_eq!(http.take_requests().len(), 2);
     assert!(
@@ -153,6 +157,7 @@ fn provider_failure_is_redacted_and_exhaustion_never_respawns() {
 
 #[test]
 fn formatting_configuration_keeps_identity_and_does_not_spawn() {
+    // Given
     let fixture = Fixture::new();
     let hash = fixture.publish("formatting token");
     let http = HttpFixture::start(FixtureReply::Status {
@@ -165,10 +170,10 @@ fn formatting_configuration_keeps_identity_and_does_not_spawn() {
     let value: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     let lock = fixture.repo.get_root().join(".letopis/embed.lock");
     let owner = fs::read(&lock).unwrap();
-    // Act: use the same parsed JSON with whitespace/key serialization changes.
+    // When: use the same parsed JSON with whitespace/key serialization changes.
     fs::write(path, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
     fixture.finish_foreground(&mut fixture.spawn_foreground());
-    // Assert the existing TK-13 JCS identity and vector are reused.
+    // Then the existing TK-13 JCS identity and vector are reused.
     assert_eq!(fs::read(lock).unwrap(), owner);
     assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
     assert_eq!(http.take_requests().len(), 1);
@@ -176,6 +181,7 @@ fn formatting_configuration_keeps_identity_and_does_not_spawn() {
 
 #[test]
 fn identity_reset_during_product_http_discards_the_late_result() {
+    // Given
     let fixture = Fixture::new();
     let hash = fixture.publish("configuration race token");
     let barrier = ResponseBarrier::default();
@@ -186,7 +192,7 @@ fn identity_reset_during_product_http_discards_the_late_result() {
     fixture.write_config(&http.get_base_url(), 0);
     let mut child = fixture.spawn_drain();
     barrier.wait_until_entered();
-    // Act: another real invocation synchronizes a changed identity during HTTP.
+    // When: another real invocation synchronizes a changed identity during HTTP.
     let current = fixture.write_config(&http.get_base_url(), 1);
     let mut next = wire_embedding_executor(fixture.repo.get_root()).unwrap();
     assert!(matches!(
@@ -196,7 +202,7 @@ fn identity_reset_during_product_http_discards_the_late_result() {
     assert!(EmbeddingExecutor::has_work(&mut next).unwrap());
     barrier.release();
     assert_success(&child.collect_output(WAIT));
-    // Assert old work did not publish into the new identity; a fresh drain can finish.
+    // Then old work did not publish into the new identity; a fresh drain can finish.
     assert_eq!(fixture.read_vector(&current, &hash), None);
     assert_eq!(fixture.read_failure(&current, &hash), None);
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
@@ -206,6 +212,7 @@ fn identity_reset_during_product_http_discards_the_late_result() {
 
 #[test]
 fn text_publication_during_http_never_reuses_a_late_vector_for_new_text() {
+    // Given
     let fixture = Fixture::new();
     let old_hash = fixture.publish("old hash token");
     let barrier = ResponseBarrier::default();
@@ -216,13 +223,13 @@ fn text_publication_during_http_never_reuses_a_late_vector_for_new_text() {
     let config = fixture.write_config(&http.get_base_url(), 0);
     let mut child = fixture.spawn_drain();
     barrier.wait_until_entered();
-    // Act: real publication succeeds while the model is blocked; no HTTP transaction.
+    // When: real publication succeeds while the model is blocked; no HTTP transaction.
     let new_hash = fixture.publish("new hash token");
     assert_ne!(new_hash, old_hash);
     assert_eq!(fixture.read_vector(&config, &new_hash), None);
     barrier.release();
     assert_success(&child.collect_output(WAIT));
-    // Assert the new hash needed its own request; the old unreferenced vector is pruned.
+    // Then the new hash needed its own request; the old unreferenced vector is pruned.
     assert_eq!(http.take_requests().len(), 2);
     assert_eq!(
         fixture.read_vector(&config, &new_hash),
@@ -234,6 +241,7 @@ fn text_publication_during_http_never_reuses_a_late_vector_for_new_text() {
 
 #[test]
 fn killed_foreground_does_not_cancel_detached_product_http() {
+    // Given
     let fixture = Fixture::new();
     let hash = fixture.publish("surviving drain token");
     let barrier = ResponseBarrier::default();
@@ -245,7 +253,7 @@ fn killed_foreground_does_not_cancel_detached_product_http() {
     let mut foreground = fixture.spawn_foreground();
     let mut owner = DetachedOwner::new(fixture.repo.get_root(), foreground.get_id());
     barrier.wait_until_entered();
-    // Act: force parent death while the product owns its separate session and lock.
+    // When: force parent death while the product owns its separate session and lock.
     foreground.kill();
     assert!(
         open_filesystem(fixture.repo.get_root())
@@ -256,13 +264,14 @@ fn killed_foreground_does_not_cancel_detached_product_http() {
     );
     barrier.release();
     owner.wait_for_exit();
-    // Assert detached work survived and reached actual publication and process exit.
+    // Then detached work survived and reached actual publication and process exit.
     assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
     assert_released(fixture.repo.get_root());
 }
 
 #[test]
 fn killed_product_releases_lock_and_preserves_reserved_budget() {
+    // Given
     let fixture = Fixture::new();
     let hash = fixture.publish("killed reservation token");
     let barrier = ResponseBarrier::default();
@@ -275,11 +284,11 @@ fn killed_product_releases_lock_and_preserves_reserved_budget() {
     barrier.wait_until_entered();
     let path = fixture.repo.get_root().join(".letopis/embed.lock");
     let inode = fs::metadata(&path).unwrap().ino();
-    // Act: crash after the durable reservation, before HTTP completion.
+    // When: crash after the durable reservation, before HTTP completion.
     child.kill();
     barrier.release();
     assert_released(fixture.repo.get_root());
-    // Assert kernel release, stable inode and no reset/retry of exhausted work.
+    // Then kernel release, stable inode and no reset/retry of exhausted work.
     assert_eq!(fs::metadata(path).unwrap().ino(), inode);
     assert_eq!(fixture.read_failure(&config, &hash).unwrap().attempts, 1);
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
@@ -290,7 +299,7 @@ fn killed_product_releases_lock_and_preserves_reserved_budget() {
 
 #[test]
 fn sigint_preserves_attempt_budget_across_product_restarts() {
-    // Arrange: reserve the first of two attempts and block its actual HTTP response.
+    // Given: reserve the first of two attempts and block its actual HTTP response.
     let fixture = Fixture::new();
     let hash = fixture.publish("interrupted reservation token");
     let barrier = ResponseBarrier::default();
@@ -316,17 +325,17 @@ fn sigint_preserves_attempt_budget_across_product_restarts() {
     let reserved = fixture.read_failure(&config, &hash).unwrap();
     assert_eq!(reserved.attempts, 1);
     assert_eq!(reserved.error, None);
-    // Act: SIGINT the owned drain, reap it, and then release the server response.
+    // When: SIGINT the owned drain, reap it, and then release the server response.
     child.send_sigint();
     let interrupted = child.collect_output(WAIT);
     assert_eq!(interrupted.status.signal(), Some(libc::SIGINT));
     barrier.release();
-    // Assert: the interrupted request consumed its committed attempt.
+    // Then: the interrupted request consumed its committed attempt.
     assert_released(fixture.repo.get_root());
     assert_eq!(fixture.read_failure(&config, &hash).unwrap().attempts, 1);
     assert_eq!(fixture.read_vector(&config, &hash), None);
     assert_eq!(http.take_requests().len(), 1);
-    // Act: a new process with unchanged configuration may consume only one more.
+    // When: a new process with unchanged configuration may consume only one more.
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
     let failed = fixture.read_failure(&config, &hash).unwrap();
     assert_eq!(failed.attempts, 2);
@@ -336,7 +345,7 @@ fn sigint_preserves_attempt_budget_across_product_restarts() {
     );
     assert_eq!(http.take_requests().len(), 1);
     assert_eq!(fixture.read_vector(&config, &hash), None);
-    // Assert: a third process cannot renew the exhausted budget.
+    // Then: a third process cannot renew the exhausted budget.
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
     assert!(http.take_requests().is_empty());
     assert_eq!(fixture.read_failure(&config, &hash), Some(failed));
@@ -347,6 +356,7 @@ fn sigint_preserves_attempt_budget_across_product_restarts() {
 
 #[test]
 fn product_rejects_unsafe_automatic_storage_without_external_changes() {
+    // Given
     for name in ["cache.db", "vectors.db"] {
         let fixture = Fixture::new();
         let outside = tempfile::tempdir().unwrap();
@@ -355,8 +365,9 @@ fn product_rejects_unsafe_automatic_storage_without_external_changes() {
         let database = fixture.repo.get_root().join(".letopis").join(name);
         fs::remove_file(&database).unwrap();
         symlink(&target, database).unwrap();
-        // Act / Assert: the product uses the confined opener, not explicit open_storage.
+        // When / Then: the product uses the confined opener, not explicit open_storage.
         let output = fixture.spawn_drain().collect_output(WAIT);
+        // When / Then
         assert_eq!(output.status.code(), Some(1));
         assert!(output.stderr.is_empty());
         let response: Value = serde_json::from_slice(&output.stdout).unwrap();
@@ -375,12 +386,12 @@ fn stale_live_text_is_skipped_before_any_product_http_or_reservation() {
         body: SUCCESS.into(),
     });
     let config = fixture.write_config(&http.get_base_url(), 0);
-    // Arrange an edit after the indexed revision, without another publication.
+    // Given an edit after the indexed revision, without another publication.
     fixture.repo.write(
         "knowledge.md",
         support::documents::build_whole(1, "unpublished token"),
     );
-    // Act / Assert: reuse the executor's live-text hash guard without consuming an attempt.
+    // When / Then: reuse the executor's live-text hash guard without consuming an attempt.
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
     assert!(http.take_requests().is_empty());
     assert_eq!(fixture.read_failure(&config, &old), None);
@@ -389,6 +400,7 @@ fn stale_live_text_is_skipped_before_any_product_http_or_reservation() {
 
 #[test]
 fn nested_invalid_check_does_not_trigger_ready_embeddings() {
+    // Given
     let fixture = Fixture::new();
     let http = HttpFixture::start(FixtureReply::Status {
         status: 200,
@@ -406,7 +418,9 @@ fn nested_invalid_check_does_not_trigger_ready_embeddings() {
             .stderr(Stdio::piped()),
     );
     child.send_input(b"null");
+    // When
     let output = child.collect_output(WAIT);
+    // Then
     assert_eq!(output.status.code(), Some(1));
     let response: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(response["error"]["code"], "invalid_request");

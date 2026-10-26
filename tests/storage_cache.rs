@@ -9,6 +9,7 @@ use storage_support::{build_file, build_knowledge, build_source};
 use tempfile::TempDir;
 #[test]
 fn cache_commit_preserves_node_row_id() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(
         &root.path().join("cache.db"),
@@ -22,6 +23,7 @@ fn cache_commit_preserves_node_row_id() {
     write
         .replace_text(&KnowledgeId::parse("a.md").unwrap(), "alpha")
         .unwrap();
+    // When / Then
     assert_eq!(write.commit().unwrap(), 1);
     let mut write = storage.begin_cache_write().unwrap();
     let second = write.upsert_node(&build_knowledge("a.md", "beta")).unwrap();
@@ -48,6 +50,7 @@ use rusqlite::Connection;
 use std::error::Error;
 #[test]
 fn source_missing_bytes_and_declared_targets_round_trip() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let source = build_source("code.rs#L2-L4", None, 3);
@@ -66,6 +69,7 @@ fn source_missing_bytes_and_declared_targets_round_trip() {
     write.insert_edge(&dangling).unwrap();
     write.commit().unwrap();
     let mut read = db.begin_read().unwrap();
+    // When / Then
     assert_eq!(read.read_node(&id).unwrap().unwrap().metadata, source);
     assert_eq!(read.list_edges(None).unwrap(), vec![external, dangling]);
     assert!(
@@ -76,6 +80,7 @@ fn source_missing_bytes_and_declared_targets_round_trip() {
 }
 #[test]
 fn incoming_edges_survive_target_delete_and_reappear() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let declared = build_edge("a.md", build_target("b.md"), "supports");
@@ -92,6 +97,7 @@ fn incoming_edges_survive_target_delete_and_reappear() {
     write.delete_node(&build_target("b.md")).unwrap();
     write.commit().unwrap();
     let mut read = db.begin_read().unwrap();
+    // When / Then
     assert_eq!(read.list_edges(None).unwrap(), vec![declared.clone()]);
     assert!(read.read_node(&build_target("b.md")).unwrap().is_none());
     drop(read);
@@ -116,7 +122,7 @@ fn source_projection_can_be_recomputed_and_removed() {
         meta.created_at = 3;
     }
     let updated = build_source("code.rs", Some(Sha256::digest(b"bytes")), 7);
-    // Arrange: two referring nodes; caller supplies their minimum creation time.
+    // Given: two referring nodes; caller supplies their minimum creation time.
     let mut write = db.begin_cache_write().unwrap();
     write.upsert_node(&first).unwrap();
     write.upsert_node(&build_knowledge("b.md", "beta")).unwrap();
@@ -129,7 +135,7 @@ fn source_projection_can_be_recomputed_and_removed() {
             .unwrap();
     }
     write.commit().unwrap();
-    // Act: removing the oldest referrer recomputes the projection in the same unit.
+    // When: removing the oldest referrer recomputes the projection in the same unit.
     let mut write = db.begin_cache_write().unwrap();
     write
         .delete_outgoing(&KnowledgeId::parse("a.md").unwrap())
@@ -138,13 +144,14 @@ fn source_projection_can_be_recomputed_and_removed() {
     write.upsert_node(&updated).unwrap();
     write.commit().unwrap();
     let mut read = db.begin_read().unwrap();
+    // Then
     assert_eq!(read.read_node(&id).unwrap().unwrap().metadata, updated);
     assert_eq!(
         read.list_edges(None).unwrap(),
         vec![build_edge("b.md", id.clone(), "external")]
     );
     drop(read);
-    // Act and assert: caller removes the last reference and source together.
+    // When / Then: caller removes the last reference and source together.
     let mut write = db.begin_cache_write().unwrap();
     write
         .delete_outgoing(&KnowledgeId::parse("b.md").unwrap())
@@ -152,11 +159,13 @@ fn source_projection_can_be_recomputed_and_removed() {
     write.delete_node(&id).unwrap();
     write.commit().unwrap();
     let mut read = db.begin_read().unwrap();
+    // Then
     assert!(read.read_node(&id).unwrap().is_none());
     assert!(read.list_edges(None).unwrap().is_empty());
 }
 #[test]
 fn valid_invalid_and_unmarked_file_rows_round_trip() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let valid = build_file("a.md", "alpha");
@@ -170,7 +179,9 @@ fn valid_invalid_and_unmarked_file_rows_round_trip() {
     }
     write.commit().unwrap();
     let mut read = db.begin_read().unwrap();
+    // When / Then
     for row in [&valid, &invalid, &unmarked] {
+        // When / Then
         assert_eq!(read.read_file(&row.path).unwrap().as_ref(), Some(row));
     }
     drop(read);
@@ -187,6 +198,7 @@ fn valid_invalid_and_unmarked_file_rows_round_trip() {
 }
 #[test]
 fn caught_mutation_error_poisoned_unit_cannot_commit() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let mut write = db.begin_cache_write().unwrap();
@@ -197,6 +209,7 @@ fn caught_mutation_error_poisoned_unit_cannot_commit() {
         .replace_text(&KnowledgeId::parse("a.md").unwrap(), "alpha")
         .unwrap();
     write.upsert_file(&build_file("a.md", "alpha")).unwrap();
+    // When / Then
     assert_eq!(
         write
             .insert_edge(&build_edge("missing.md", build_target("a.md"), "supports"))
@@ -209,6 +222,7 @@ fn caught_mutation_error_poisoned_unit_cannot_commit() {
 }
 #[test]
 fn dropped_unit_rolls_back() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     {
@@ -221,10 +235,12 @@ fn dropped_unit_rolls_back() {
             .unwrap();
         write.upsert_file(&build_file("a.md", "alpha")).unwrap();
     }
+    // When / Then
     assert_empty(&mut db);
 }
 #[test]
 fn late_fts_error_rolls_back_all_changes() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let mut write = db.begin_cache_write().unwrap();
@@ -232,6 +248,7 @@ fn late_fts_error_rolls_back_all_changes() {
         .upsert_node(&build_knowledge("a.md", "alpha"))
         .unwrap();
     write.upsert_file(&build_file("a.md", "alpha")).unwrap();
+    // When / Then
     assert!(
         write
             .replace_text(&KnowledgeId::parse("missing.md").unwrap(), "alpha")
@@ -242,6 +259,7 @@ fn late_fts_error_rolls_back_all_changes() {
 }
 #[test]
 fn unsigned_values_do_not_wrap() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let mut node = build_knowledge("a.md", "alpha");
@@ -250,6 +268,7 @@ fn unsigned_values_do_not_wrap() {
     };
     meta.created_at = u64::MAX;
     let mut write = db.begin_cache_write().unwrap();
+    // When / Then
     assert!(write.upsert_node(&node).is_err());
     assert!(write.commit().is_err());
     for field in ["size", "inode"] {
@@ -260,6 +279,7 @@ fn unsigned_values_do_not_wrap() {
             file.inode = u64::MAX;
         }
         let mut write = db.begin_cache_write().unwrap();
+        // When / Then
         assert!(write.upsert_file(&file).is_err());
         assert!(write.commit().is_err());
     }
@@ -267,6 +287,7 @@ fn unsigned_values_do_not_wrap() {
 }
 #[test]
 fn revision_overflow_rolls_back() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let mut db = open_storage(&cache, &root.path().join("v")).unwrap();
@@ -278,6 +299,7 @@ fn revision_overflow_rolls_back() {
     write
         .upsert_node(&build_knowledge("a.md", "alpha"))
         .unwrap();
+    // When / Then
     assert!(write.commit().is_err());
     let mut read = db.begin_read().unwrap();
     assert_eq!(read.get_revision(), i64::MAX as u64);
@@ -285,6 +307,7 @@ fn revision_overflow_rolls_back() {
 }
 #[test]
 fn duplicate_edges_and_invalid_checks_are_rejected() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let mut db = open_storage(&cache, &root.path().join("v")).unwrap();
@@ -294,6 +317,7 @@ fn duplicate_edges_and_invalid_checks_are_rejected() {
         .unwrap();
     let e = build_edge("a.md", build_target("b.md"), "supports");
     write.insert_edge(&e).unwrap();
+    // When / Then
     assert_eq!(
         write.insert_edge(&e).unwrap_err().get_kind(),
         StorageErrorKind::InvalidRequest
@@ -311,11 +335,13 @@ fn duplicate_edges_and_invalid_checks_are_rejected() {
         "INSERT INTO files VALUES('x',1,2,3,'hash',4,0,NULL)",
         "INSERT INTO files VALUES('x',1,2,3,'hash',4,2,NULL)",
     ] {
+        // When / Then
         assert!(sql.execute(query, []).is_err());
     }
 }
 #[test]
 fn contentless_fts_does_not_return_original_text() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let mut db = open_storage(&cache, &root.path().join("v")).unwrap();
@@ -328,6 +354,7 @@ fn contentless_fts_does_not_return_original_text() {
         .unwrap();
     write.commit().unwrap();
     let sql = Connection::open(&cache).unwrap();
+    // When / Then
     assert_eq!(
         sql.query_row("SELECT text FROM text_index", [], |r| r
             .get::<_, Option<String>>(0))
@@ -347,6 +374,7 @@ fn contentless_fts_does_not_return_original_text() {
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
     assert!(error.source().is_some());
     for marker in ["privatepayload", "Authorization", expression] {
+        // When / Then
         assert!(!error.to_string().contains(marker));
         assert!(!error.get_message().contains(marker));
     }
@@ -354,6 +382,7 @@ fn contentless_fts_does_not_return_original_text() {
 
 #[test]
 fn empty_cache_publications_preserve_vector_identity_and_state() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let vectors = root.path().join("v");
@@ -366,7 +395,8 @@ fn empty_cache_publications_preserve_vector_identity_and_state() {
         ["b".repeat(64)],
     )
     .unwrap();
-    // Act: even an empty explicitly committed unit advances only the cache revision.
+    // When: even an empty explicitly committed unit advances only the cache revision.
+    // Then
     assert_eq!(db.begin_cache_write().unwrap().commit().unwrap(), 1);
     assert_eq!(db.begin_cache_write().unwrap().commit().unwrap(), 2);
     let read = db.begin_read().unwrap();
@@ -384,6 +414,7 @@ fn empty_cache_publications_preserve_vector_identity_and_state() {
 }
 #[test]
 fn fts_matches_use_native_score_then_id_without_candidate_limit() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let mut write = db.begin_cache_write().unwrap();
@@ -404,6 +435,7 @@ fn fts_matches_use_native_score_then_id_without_candidate_limit() {
         .unwrap();
     write.commit().unwrap();
     let results = db.begin_read().unwrap().match_text("alpha").unwrap();
+    // When / Then
     assert_eq!(
         results.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
         vec!["strong.md", "a.md", "b.md", "z.md"]
@@ -412,6 +444,7 @@ fn fts_matches_use_native_score_then_id_without_candidate_limit() {
 }
 #[test]
 fn malformed_persisted_values_return_internal_errors() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let mut db = open_storage(&cache, &root.path().join("v")).unwrap();
@@ -422,11 +455,13 @@ fn malformed_persisted_values_return_internal_errors() {
     write.upsert_file(&build_file("a.md", "alpha")).unwrap();
     write.commit().unwrap();
     let sql = Connection::open(&cache).unwrap();
+    // When / Then
     for update in [
         "UPDATE nodes SET hash='invalid'",
         "UPDATE nodes SET hash='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',created_at=-1",
     ] {
         sql.execute(update, []).unwrap();
+        // When / Then
         assert_eq!(
             db.begin_read()
                 .unwrap()
@@ -459,6 +494,7 @@ fn malformed_persisted_values_return_internal_errors() {
 
 #[test]
 fn knowledge_and_source_optional_fields_survive_reopen() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let vectors = root.path().join("v");
@@ -481,9 +517,10 @@ fn knowledge_and_source_optional_fields_survive_reopen() {
     write.upsert_node(&source).unwrap();
     write.commit().unwrap();
     drop(db);
-    // Act: decode every optional field through a newly opened store.
+    // When: decode every optional field through a newly opened store.
     let mut reopened = open_storage(&cache, &vectors).unwrap();
     let mut read = reopened.begin_read().unwrap();
+    // Then
     assert_eq!(
         read.read_node(&build_target("a.md#Section"))
             .unwrap()
@@ -498,6 +535,7 @@ fn knowledge_and_source_optional_fields_survive_reopen() {
 }
 #[test]
 fn source_time_and_line_overflow_poison_the_unit() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let source = build_source("code.rs", None, u64::MAX);
@@ -505,8 +543,10 @@ fn source_time_and_line_overflow_poison_the_unit() {
     if let NodeMetadata::Knowledge(ref mut n) = knowledge {
         n.lines = letopis::domain::LineRange::new(1, u64::MAX).unwrap();
     }
+    // When / Then
     for node in [&source, &knowledge] {
         let mut write = db.begin_cache_write().unwrap();
+        // When / Then
         assert_eq!(
             write.upsert_node(node).unwrap_err().get_kind(),
             StorageErrorKind::InvalidRequest
@@ -517,6 +557,7 @@ fn source_time_and_line_overflow_poison_the_unit() {
 }
 #[test]
 fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let id = KnowledgeId::parse("a.md").unwrap();
@@ -529,8 +570,9 @@ fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
         .insert_edge(&build_edge("a.md", build_target("b.md"), "supports"))
         .unwrap();
     write.commit().unwrap();
-    // Act: missing caller cleanup fails and rolls back the preceding FTS deletion.
+    // When: missing caller cleanup fails and rolls back the preceding FTS deletion.
     let mut write = db.begin_cache_write().unwrap();
+    // Then
     assert_eq!(
         write
             .delete_node(&build_target("a.md"))
@@ -555,7 +597,7 @@ fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
 
 #[test]
 fn list_edges_keeps_optional_filter_and_order() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let first = build_edge("a.md", build_target("x.md"), "refutes");
@@ -569,7 +611,7 @@ fn list_edges_keeps_optional_filter_and_order() {
         write.insert_edge(edge).unwrap();
     }
     write.commit().unwrap();
-    // Act
+    // When
     let mut read = db.begin_read().unwrap();
     let all = read.list_edges(None).unwrap();
     let selected = read
@@ -578,7 +620,7 @@ fn list_edges_keeps_optional_filter_and_order() {
     let absent = read
         .list_edges(Some(&KnowledgeId::parse("absent.md").unwrap()))
         .unwrap();
-    // Assert
+    // Then
     assert_eq!(all, vec![first.clone(), second.clone(), third]);
     assert_eq!(selected, vec![first, second]);
     assert!(absent.is_empty());
@@ -586,7 +628,7 @@ fn list_edges_keeps_optional_filter_and_order() {
 
 #[test]
 fn file_text_values_remain_literal() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let mut file = build_file("notes/é'--.md", "alpha");
@@ -597,29 +639,36 @@ fn file_text_values_remain_literal() {
     write.upsert_file(&file).unwrap();
     write.upsert_file(&untouched).unwrap();
     write.commit().unwrap();
-    // Act / Assert: read literal text, then replace and delete that row only.
+    // When: read the literal text.
     let mut read = db.begin_read().unwrap();
+    // Then
     assert_eq!(read.read_file(&file.path).unwrap(), Some(file.clone()));
     drop(read);
+    // Given: replace the existing row.
     file.error = None;
     file.valid = true;
     let mut write = db.begin_cache_write().unwrap();
     write.upsert_file(&file).unwrap();
     write.commit().unwrap();
+    // When
     let mut read = db.begin_read().unwrap();
+    // Then
     assert_eq!(read.read_file(&file.path).unwrap(), Some(file.clone()));
     drop(read);
+    // Given: delete only the selected row.
     let mut write = db.begin_cache_write().unwrap();
     write.delete_file(&file.path).unwrap();
     write.commit().unwrap();
+    // When
     let mut read = db.begin_read().unwrap();
+    // Then
     assert!(read.read_file(&file.path).unwrap().is_none());
     assert_eq!(read.read_file(&untouched.path).unwrap(), Some(untouched));
 }
 
 #[test]
 fn list_files_preserves_exact_paths_and_state() {
-    // Arrange: marked, invalid and unmarked files with literal SQL wildcards.
+    // Given: marked, invalid and unmarked files with literal SQL wildcards.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let marked = build_file("a_b.md", "alpha");
@@ -640,10 +689,10 @@ fn list_files_preserves_exact_paths_and_state() {
     write.commit().unwrap();
     let expected_file_rows = vec![invalid, marked, unmarked];
 
-    // Act.
+    // When.
     let rows = db.begin_read().unwrap().list_files().unwrap();
 
-    // Assert: every persisted field and exact deterministic path ordering.
+    // Then: every persisted field and exact deterministic path ordering.
     assert_eq!(
         rows.iter().map(|row| row.path.as_str()).collect::<Vec<_>>(),
         ["a%b.md", "a_b.md", "nested/a.markdown"]
@@ -653,7 +702,7 @@ fn list_files_preserves_exact_paths_and_state() {
 
 #[test]
 fn list_nodes_preserves_metadata_and_row_ids() {
-    // Arrange: knowledge and sources are inserted out of identity order.
+    // Given: knowledge and sources are inserted out of identity order.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let source = build_source("code.rs#L2-L4", Some(Sha256::digest(b"source")), 3);
@@ -696,10 +745,10 @@ fn list_nodes_preserves_metadata_and_row_ids() {
         },
     );
 
-    // Act.
+    // When.
     let rows = db.begin_read().unwrap().list_nodes().unwrap();
 
-    // Assert: complete metadata, identity order, and stable upsert row ID.
+    // Then: complete metadata, identity order, and stable upsert row ID.
     let updated = &rows[0];
     assert_eq!(updated.row_id, original.row_id);
     assert_eq!(rows, expected);
@@ -707,16 +756,16 @@ fn list_nodes_preserves_metadata_and_row_ids() {
 
 #[test]
 fn list_empty_published_state_returns_no_rows() {
-    // Arrange.
+    // Given.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let mut read = db.begin_read().unwrap();
 
-    // Act.
+    // When.
     let files = read.list_files().unwrap();
     let nodes = read.list_nodes().unwrap();
 
-    // Assert.
+    // Then.
     assert!(files.is_empty());
     assert!(nodes.is_empty());
 }

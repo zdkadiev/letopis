@@ -11,6 +11,7 @@ use std::{collections::BTreeSet, num::NonZeroUsize};
 
 #[test]
 fn traverses_each_mode_and_direction_in_bfs_order() {
+    // Given
     let cases = [
         (
             TraversalMode::Relations,
@@ -63,17 +64,22 @@ fn traverses_each_mode_and_direction_in_bfs_order() {
         let mut request = make_request();
         request.mode = mode;
         request.direction = direction;
+        // When
         let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        // Then
         assert_eq!(get_ids(&graph), expected, "{mode:?}/{direction:?}");
     }
 }
 
 #[test]
 fn keeps_edge_budget_independent_from_node_budget() {
+    // Given
     let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.edge_limit = NonZeroUsize::new(1);
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert_eq!(
         graph
             .get_elements()
@@ -91,24 +97,30 @@ fn keeps_edge_budget_independent_from_node_budget() {
 
 #[test]
 fn includes_consumes_one_depth_step() {
+    // Given
     let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.mode = TraversalMode::Containment;
     request.depth = 1;
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert_eq!(get_ids(&graph), ["b.md"]);
 }
 
 #[test]
 fn validates_all_starts_even_at_depth_zero() {
+    // Given
     let mut read = GeneratedRead::build_fixed();
     read.expected_roots = 2;
     let mut request = make_request();
     request.element_ids.insert(parse_address("unknown.md"));
     request.depth = 0;
+    // When
     let error = GraphService::new()
         .traverse(&mut read, &request)
         .unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
     assert_eq!(read.resolved, ["a.md", "unknown.md"]);
     assert_eq!(read.page_calls, 0);
@@ -116,11 +128,14 @@ fn validates_all_starts_even_at_depth_zero() {
 
 #[test]
 fn returns_requested_empty_edges_after_validating_depth_zero() {
+    // Given
     let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.depth = 0;
     request.edge_limit = NonZeroUsize::new(5);
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert!(graph.get_elements().is_empty());
     assert_eq!(graph.get_edges(), Some([].as_slice()));
     assert_eq!(read.resolved, ["a.md"]);
@@ -129,11 +144,14 @@ fn returns_requested_empty_edges_after_validating_depth_zero() {
 
 #[test]
 fn stops_buffered_transitions_and_queries_at_node_cap() {
+    // Given
     let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.limit = NonZeroUsize::new(2).unwrap();
     request.edge_limit = NonZeroUsize::new(20);
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert_eq!(get_ids(&graph), ["code.rs", "b.md"]);
     let triples = get_triples(&graph);
     assert_eq!(
@@ -148,12 +166,15 @@ fn stops_buffered_transitions_and_queries_at_node_cap() {
 
 #[test]
 fn previsits_multiple_starts_and_deduplicates_cycles_at_max_depth() {
+    // Given
     let mut read = GeneratedRead::build_fixed();
     read.expected_roots = 2;
     let mut request = make_request();
     request.element_ids.insert(parse_address("c.md"));
     request.depth = u64::MAX;
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert_eq!(get_ids(&graph), ["code.rs", "b.md", "d.md"]);
     assert_eq!(read.resolved, ["a.md", "c.md"]);
     assert_eq!(read.expanded.iter().filter(|key| **key == 1).count(), 1);
@@ -161,23 +182,29 @@ fn previsits_multiple_starts_and_deduplicates_cycles_at_max_depth() {
 
 #[test]
 fn terminates_includes_cycle_without_returning_start_twice() {
+    // Given
     let mut read = GeneratedRead::build_fixed();
     read.includes_cycle = true;
     let mut request = make_request();
     request.mode = TraversalMode::Containment;
     request.depth = u64::MAX;
     request.limit = NonZeroUsize::MAX;
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert_eq!(get_ids(&graph), ["b.md", "c.md"]);
 }
 
 #[test]
 fn preserves_original_incoming_edges_and_considered_back_edges() {
+    // Given
     let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.direction = TraversalDirection::Incoming;
     request.edge_limit = NonZeroUsize::new(20);
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert_eq!(
         get_triples(&graph),
         [
@@ -186,34 +213,43 @@ fn preserves_original_incoming_edges_and_considered_back_edges() {
             ("c.md", "d.md", "z_custom_link")
         ]
     );
+    // Given
     let mut read = GeneratedRead::build_fixed();
     request.direction = TraversalDirection::Outgoing;
     request.depth = u64::MAX;
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert_eq!(graph.get_edges().unwrap().len(), 7);
     assert!(get_triples(&graph).contains(&("d.md", "a.md", "z_custom_link")));
 }
 
 #[test]
 fn intersects_open_types_and_omits_edges_when_not_requested() {
+    // Given
     let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request
         .edge_types
         .insert(EdgeType::parse("z_custom_link").unwrap());
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert_eq!(get_ids(&graph), ["c.md", "d.md"]);
     assert!(graph.get_edges().is_none());
 }
 
 #[test]
 fn merges_page_crossing_ties_without_skips_and_bounds_high_degree_reads() {
+    // Given
     let mut read = GeneratedRead::build_star(100_000);
     let mut request = make_request();
     request.direction = TraversalDirection::Both;
     request.limit = NonZeroUsize::new(35).unwrap();
     request.edge_limit = NonZeroUsize::new(100);
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert_eq!(graph.get_elements().len(), 35);
     assert_eq!(graph.get_elements()[0].as_str(), "n00000.md");
     assert_eq!(graph.get_elements()[31].as_str(), "n00031.md");
@@ -232,11 +268,14 @@ fn merges_page_crossing_ties_without_skips_and_bounds_high_degree_reads() {
 
 #[test]
 fn continues_short_nonempty_pages_until_the_node_cap() {
+    // Given
     let mut read = GeneratedRead::build_star(100_000);
     read.page_size = 7;
     let mut request = make_request();
     request.limit = NonZeroUsize::new(35).unwrap();
+    // When
     let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+    // Then
     assert_eq!(graph.get_elements().len(), 35);
     assert_eq!(graph.get_elements()[34].as_str(), "n00034.md");
     assert_eq!(read.page_calls, 5);
@@ -244,25 +283,31 @@ fn continues_short_nonempty_pages_until_the_node_cap() {
 
 #[test]
 fn rejects_a_late_page_error_without_returning_partial_graph() {
+    // Given
     let mut read = GeneratedRead::build_star(100_000);
     read.fail_on_page = Some(2);
     let mut request = make_request();
     request.limit = NonZeroUsize::new(35).unwrap();
+    // When
     let error = GraphService::new()
         .traverse(&mut read, &request)
         .unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert_eq!(read.page_calls, 2);
 }
 
 #[test]
 fn rejects_empty_typed_starts_without_any_read() {
+    // Given
     let mut read = GeneratedRead::build_fixed();
     let mut request = make_request();
     request.element_ids.clear();
+    // When
     let error = GraphService::new()
         .traverse(&mut read, &request)
         .unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InvalidRequest);
     assert!(read.resolved.is_empty());
     assert_eq!(read.page_calls, 0);
@@ -271,15 +316,15 @@ fn rejects_empty_typed_starts_without_any_read() {
 #[test]
 fn traversal_work_does_not_scale_with_unrelated_nodes_or_hub_degree() {
     for degree in [64, 100_000_000] {
-        // Arrange a lazy source: neither degree nor unrelated identities are collected.
+        // Given a lazy source: neither degree nor unrelated identities are collected.
         let mut read = GeneratedRead::build_star(degree);
         let mut request = make_request();
         request.limit = NonZeroUsize::new(3).unwrap();
         request.edge_limit = NonZeroUsize::new(1);
         request.depth = u64::MAX;
-        // Act.
+        // When.
         let graph = GraphService::new().traverse(&mut read, &request).unwrap();
-        // Assert identical literal output, independent edge cap and mid-page stop.
+        // Then identical literal output, independent edge cap and mid-page stop.
         assert_eq!(get_ids(&graph), ["n00000.md", "n00001.md", "n00002.md"]);
         assert_eq!(
             get_triples(&graph),

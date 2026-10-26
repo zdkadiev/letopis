@@ -5,6 +5,7 @@ use crate::domain::RepoPath;
 ///
 /// Every implementation publishes a refresh atomically: readers see either the previous
 /// projection or the complete new one, never a partial update.
+#[cfg_attr(test, mockall::automock)]
 pub trait Refresher {
     /// Detect and atomically publish changed file projections.
     ///
@@ -21,6 +22,7 @@ pub trait Refresher {
 /// Repository-owned discovery of Markdown candidate paths.
 ///
 /// Every implementation reports only normalized root-relative paths and never reads file bodies.
+#[cfg_attr(test, mockall::automock)]
 pub trait CorpusLister {
     /// List normalized, deduplicated candidates including deleted tracked files.
     ///

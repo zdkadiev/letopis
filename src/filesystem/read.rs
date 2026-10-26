@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn rejects_each_independent_stat_change() {
-        // Arrange: initialize platform-specific fields through a real descriptor.
+        // Given: initialize platform-specific fields through a real descriptor.
         let file = File::open(".").unwrap();
         let before = fstat(&file).unwrap();
         let mut changes = [before; 5];
@@ -74,7 +74,7 @@ mod tests {
         changes[2].st_mtime_nsec += 1;
         changes[3].st_ctime += 1;
         changes[4].st_ctime_nsec += 1;
-        // Act / Assert
+        // When / Then
         assert!(require_unchanged(&before, &before).is_ok());
         for after in changes {
             let error = require_unchanged(&before, &after).unwrap_err();

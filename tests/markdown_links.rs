@@ -7,11 +7,11 @@ use support::{assert_error, build_whole_file, parse_file};
 
 #[test]
 fn only_inline_links_declare_edges() {
-    // Arrange
+    // Given
     let s = build_whole_file(
         "[a](b.md \"letopis:type=includes\") [same](b.md \"letopis:type=includes\") [different](b.md \"letopis:type=depends_on\")\n![image](z.md \"letopis:type=includes\") [ref][r] [r][] [r] <https://example.com> [nav](https://example.com \"ordinary\")\n\n[r]: z.md \"letopis:type=includes\"\n",
     );
-    // Act
+    // When
     let got = parse_file("a.md", &s);
     let triples: Vec<_> = got
         .edges
@@ -24,7 +24,7 @@ fn only_inline_links_declare_edges() {
             )
         })
         .collect();
-    // Assert
+    // Then
     assert_eq!(got.edges.len(), 2);
     assert_eq!(
         derive_element_kind(&got.elements[0].element.id, &got.edges),
@@ -38,13 +38,13 @@ fn only_inline_links_declare_edges() {
 
 #[test]
 fn sources_are_normalized_without_loading_destinations() {
-    // Arrange
+    // Given
     let text = &build_whole_file(
         "[code](./src/../src/a.rs#L010-L025 \"letopis:type=external\") [missing](knowledge/missing.md#x \"letopis:type=depends_on\")",
     );
-    // Act
+    // When
     let got = parse_file("knowledge/a.md", text);
-    // Assert
+    // Then
     assert_eq!(got.edges.len(), 2);
     assert!(
         got.edges.iter().any(
@@ -59,7 +59,7 @@ fn sources_are_normalized_without_loading_destinations() {
 
 #[test]
 fn invalid_graph_titles_and_targets_fail_file() {
-    // Arrange
+    // Given
     let path = RepoPath::parse("knowledge/a.md").unwrap();
     for title in [
         "letopis:type=",
@@ -68,12 +68,12 @@ fn invalid_graph_titles_and_targets_fail_file() {
         "letopis:other=x",
     ] {
         let text = build_whole_file(&format!("[x](b.md \"{title}\")"));
-        // Act
+        // When
         let result = parse(&path, text.as_bytes());
-        // Assert
+        // Then
         assert_error(result, DiagnosticKind::InvalidLinkTitle);
     }
-    // Arrange
+    // Given
     for (target, kind) in [
         ("../b.md", "depends_on"),
         ("/tmp/b.md", "depends_on"),
@@ -83,37 +83,37 @@ fn invalid_graph_titles_and_targets_fail_file() {
         ("x.rs#anchor", "external"),
     ] {
         let text = build_whole_file(&format!("[x]({target} \"letopis:type={kind}\")"));
-        // Act
+        // When
         let result = parse(&path, text.as_bytes());
-        // Assert
+        // Then
         assert_error(result, DiagnosticKind::InvalidTarget);
     }
-    // Arrange
+    // Given
     let text = build_whole_file("[x](./knowledge/a.md \"letopis:type=depends_on\")");
-    // Act
+    // When
     let result = parse(&path, text.as_bytes());
-    // Assert
+    // Then
     assert_error(result, DiagnosticKind::SelfLoop);
 }
 
 #[test]
 fn links_outside_elements_are_only_navigation() {
-    // Arrange
+    // Given
     let text = "[outside](../escape.md \"letopis:type=BAD\")\n\n## A {#a}\n<!-- letopis: {\"created_at\":1} -->\n[ok](b.md \"letopis:type=includes\")\n\n## End\n[x](b.md \"letopis:type=other\")\n";
-    // Act
+    // When
     let got = parse_file("a.md", text);
-    // Assert
+    // Then
     assert_eq!(got.edges.len(), 1);
     assert_eq!(got.edges.first().unwrap().get_source().as_str(), "a.md#a");
 }
 
 #[test]
 fn image_alt_links_do_not_declare_edges() {
-    // Arrange
+    // Given
     let text = &build_whole_file("![see [target](b.md \"letopis:type=includes\")](img.png)\n");
-    // Act
+    // When
     let got = parse_file("a.md", text);
-    // Assert
+    // Then
     assert_eq!(got.elements[0].search_text, "see target");
     assert!(
         got.edges.is_empty(),
@@ -128,11 +128,11 @@ fn image_alt_links_do_not_declare_edges() {
 
 #[test]
 fn links_wrapping_images_still_declare_edges() {
-    // Arrange
+    // Given
     let text = &build_whole_file("[![alt](img.png)](b.md \"letopis:type=includes\")");
-    // Act
+    // When
     let got = parse_file("a.md", text);
-    // Assert
+    // Then
     assert_eq!(got.edges.len(), 1);
     assert_eq!(got.edges.first().unwrap().get_target().as_str(), "b.md");
     assert_eq!(got.elements[0].search_text, "alt");
@@ -140,13 +140,13 @@ fn links_wrapping_images_still_declare_edges() {
 
 #[test]
 fn inline_links_after_image_alt_text_still_declare_edges() {
-    // Arrange: closing the image must end the suppression of alt-text links.
+    // Given: closing the image must end the suppression of alt-text links.
     let text = build_whole_file(
         "![see [hidden](hidden.md \"letopis:type=includes\")](img.png)\n\n[after](b.md \"letopis:type=includes\")",
     );
-    // Act
+    // When
     let got = parse_file("a.md", &text);
-    // Assert
+    // Then
     assert_eq!(got.edges.len(), 1);
     let edge = got.edges.first().unwrap();
     assert_eq!(edge.get_source().as_str(), "a.md");

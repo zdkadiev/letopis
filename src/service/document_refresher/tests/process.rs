@@ -95,6 +95,7 @@ pub(in crate::service) fn fail_late<W: CacheWrite>(unit: &mut W) -> StorageResul
 #[test]
 #[ignore = "subprocess entry; invoked only by the production schedule tests"]
 fn run_child() {
+    // Given
     let socket = std::env::var_os("TK10_SOCKET").expect("private child control");
     let root = PathBuf::from(std::env::var_os("TK10_ROOT").unwrap());
     let mode = std::env::var("TK10_MODE").unwrap();
@@ -103,6 +104,7 @@ fn run_child() {
     stream.set_write_timeout(Some(WAIT)).unwrap();
     CONTROL.with_borrow_mut(|control| *control = Some(stream));
     reach_checkpoint("connected");
+    // When
     if let Some(mode) = mode.strip_prefix("normal-") {
         run_normal_service(&root, mode);
         reach_checkpoint("finished");
@@ -122,6 +124,7 @@ fn run_child() {
         eprintln!("refresh result: {result:?}");
         if mode.ends_with("fail") {
             let error = result.unwrap_err();
+            // Then
             assert!(
                 std::error::Error::source(&error)
                     .unwrap()
@@ -139,13 +142,13 @@ fn run_child() {
 
 #[test]
 fn normal_open_waits_at_index_lock_during_cache_write_then_redetects() {
-    // Arrange: the owner holds a real cache transaction, not just index.lock.
+    // Given: the owner holds a real cache transaction, not just index.lock.
     let fixture = Fixture::new();
     fixture.edit(NEW);
     let expected = fixture.build_expected(NEW, "BravoToken");
     let mut owner = Worker::spawn(fixture.root.path(), "publish");
     owner.reach("begun");
-    // Act: normal composition must open before the owner releases its SQLite writer.
+    // When: normal composition must open before the owner releases its SQLite writer.
     let mut waiter = Worker::spawn(fixture.root.path(), "normal-noop");
     waiter.reach("opened");
     waiter.resume();
@@ -154,34 +157,34 @@ fn normal_open_waits_at_index_lock_during_cache_write_then_redetects() {
     owner.finish();
     waiter.resume();
     waiter.finish();
-    // Assert: the waiter redetects the committed publication and does not republish.
+    // Then: the waiter redetects the committed publication and does not republish.
     assert_eq!(read_state(fixture.root.path()), expected);
     fixture.assert_preserved(NEW);
 }
 
 #[test]
 fn normal_open_redetects_after_active_cache_writer_is_killed() {
-    // Arrange a real transaction with an old publication still visible.
+    // Given a real transaction with an old publication still visible.
     let fixture = Fixture::new();
     fixture.edit(NEW);
     let mut owner = Worker::spawn(fixture.root.path(), "publish");
     owner.reach("begun");
     let mut waiter = Worker::spawn(fixture.root.path(), "normal-publish");
     waiter.reach("contended");
-    // Act: change the file while waiting, then release the writer through SIGKILL.
+    // When: change the file while waiting, then release the writer through SIGKILL.
     fs::write(fixture.root.path().join("a.md"), LATEST).unwrap();
     let expected = fixture.build_expected(LATEST, "CharlieToken");
     owner.kill();
     waiter.resume();
     waiter.finish();
-    // Assert: only the newest complete publication becomes visible.
+    // Then: only the newest complete publication becomes visible.
     assert_eq!(read_state(fixture.root.path()), expected);
     fixture.assert_preserved(LATEST);
 }
 
 #[test]
 fn normal_open_and_noop_finish_during_vector_write_and_held_index_lock() {
-    // Arrange independent live vector and kernel-lock owners.
+    // Given independent live vector and kernel-lock owners.
     let fixture = Fixture::new();
     let mut owner = Worker::spawn(fixture.root.path(), "hold");
     owner.reach("holding");
@@ -191,9 +194,9 @@ fn normal_open_and_noop_finish_during_vector_write_and_held_index_lock() {
         panic!("identity changed");
     };
     unit.set_query_error(99, "uncommitted").unwrap();
-    // Act: normal composition and a no-op must finish with both owners still active.
+    // When: normal composition and a no-op must finish with both owners still active.
     Worker::spawn(fixture.root.path(), "normal-noop").finish();
-    // Assert: neither the cache nor the committed vector state was changed.
+    // Then: neither the cache nor the committed vector state was changed.
     assert_eq!(read_state(fixture.root.path()), fixture.old);
     assert_eq!(read_vectors(fixture.root.path()), fixture.vector_state);
     drop(unit);
@@ -461,7 +464,7 @@ impl Fixture {
 #[test]
 fn sigkill_keeps_exact_old_or_complete_new_publication() {
     for cut in CUTS {
-        // Arrange: independently captured old state and literal expected new state.
+        // Given: independently captured old state and literal expected new state.
         let fixture = Fixture::new();
         fixture.edit(NEW);
         let expected = fixture.build_expected(NEW, "BravoToken");
@@ -472,9 +475,9 @@ fn sigkill_keeps_exact_old_or_complete_new_publication() {
             worker.resume();
             worker.reach(cut);
         }
-        // Act: genuine process death at an acknowledged operation boundary.
+        // When: genuine process death at an acknowledged operation boundary.
         worker.kill();
-        // Assert: reopen, including SQLite recovery, before retrying refresh.
+        // Then: reopen, including SQLite recovery, before retrying refresh.
         let actual = read_state(fixture.root.path());
         assert_eq!(
             actual,
@@ -510,6 +513,7 @@ fn sigkill_keeps_exact_old_or_complete_new_publication() {
 
 #[test]
 fn duplicate_publishers_commit_once_after_real_contention() {
+    // Given
     let fixture = Fixture::new();
     fixture.edit(NEW);
     let expected = fixture.build_expected(NEW, "BravoToken");
@@ -517,16 +521,19 @@ fn duplicate_publishers_commit_once_after_real_contention() {
     owner.reach("locked");
     let mut waiter = Worker::spawn(fixture.root.path(), "noop");
     waiter.reach("contended");
+    // When
     owner.resume();
     owner.finish();
     waiter.resume();
     waiter.finish();
+    // Then
     assert_eq!(read_state(fixture.root.path()), expected);
     fixture.assert_preserved(NEW);
 }
 
 #[test]
 fn waiting_publisher_redetects_newer_edit_after_owner_is_killed() {
+    // Given
     let fixture = Fixture::new();
     fixture.edit(NEW);
     let mut owner = Worker::spawn(fixture.root.path(), "hold");
@@ -536,9 +543,11 @@ fn waiting_publisher_redetects_newer_edit_after_owner_is_killed() {
     fs::write(fixture.root.path().join("a.md"), LATEST).unwrap();
     let expected = fixture.build_expected(LATEST, "CharlieToken");
     let lock_before = fs::metadata(fixture.root.path().join(".letopis/index.lock")).unwrap();
+    // When
     owner.kill();
     waiter.resume();
     waiter.finish();
+    // Then
     assert_eq!(
         fs::metadata(fixture.root.path().join(".letopis/index.lock"))
             .unwrap()
@@ -551,16 +560,20 @@ fn waiting_publisher_redetects_newer_edit_after_owner_is_killed() {
 
 #[test]
 fn noop_finishes_while_another_process_holds_index_lock() {
+    // Given
     let fixture = Fixture::new();
     let mut owner = Worker::spawn(fixture.root.path(), "hold");
     owner.reach("holding");
+    // When
     Worker::spawn(fixture.root.path(), "noop").finish();
+    // Then
     assert_eq!(read_state(fixture.root.path()), fixture.old);
     owner.kill();
 }
 
 #[test]
 fn pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit() {
+    // Given
     let fixture = Fixture::new();
     fixture.edit(NEW);
     let expected = fixture.build_expected(NEW, "BravoToken");
@@ -569,7 +582,9 @@ fn pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit() {
     let fts = Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
     fts.execute_batch("BEGIN;").unwrap();
     assert_eq!(read_tokens(&fts), fixture.old.tokens);
+    // When
     Worker::spawn(fixture.root.path(), "publish").finish();
+    // Then
     assert_eq!(pinned.get_revision(), fixture.old.revision);
     assert_eq!(pinned.list_nodes().unwrap(), fixture.old.nodes);
     assert_eq!(pinned.list_edges(None).unwrap(), fixture.old.edges);
@@ -581,12 +596,17 @@ fn pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit() {
 
 #[test]
 fn late_storage_error_rolls_back_every_cache_mutation() {
+    // Given
     let fixture = Fixture::new();
     fixture.edit(NEW);
+    // When
     Worker::spawn(fixture.root.path(), "fail").finish();
+    // Then
     assert_eq!(read_state(fixture.root.path()), fixture.old);
     fixture.assert_preserved(NEW);
+    // When
     Worker::spawn(fixture.root.path(), "publish").finish();
+    // Then
     assert_eq!(
         read_state(fixture.root.path()),
         fixture.build_expected(NEW, "BravoToken")

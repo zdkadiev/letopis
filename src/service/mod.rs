@@ -61,7 +61,13 @@ pub use command_traits::{
     BackgroundRunner, Checker, DrainLauncher, EmbedLocker, EmbeddingExecutor, Inspector, Searcher,
     StatusReader, Traverser,
 };
+#[cfg(test)]
+pub(crate) use command_traits::{
+    MockBackgroundRunner, MockChecker, MockInspector, MockSearcher, MockStatusReader, MockTraverser,
+};
 pub use document_traits::{CorpusLister, FileSystem, MarkdownCodec, Refresher};
+#[cfg(test)]
+pub(crate) use document_traits::{MockCorpusLister, MockRefresher};
 pub use embedding_config::{EmbeddingConfig, ProviderKind};
 pub(crate) use embedding_config::{MAX_DIMENSIONS, MIN_DIMENSIONS};
 pub use embedding_error::{EmbeddingError, EmbeddingErrorKind, EmbeddingResult};

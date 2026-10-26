@@ -14,13 +14,15 @@ use std::{
 
 #[test]
 fn stale_configuration_observation_preserves_current_vectors_and_attempts() {
+    // Given
     for action in ["drain", "query", "readiness", "configuration"] {
+        // When / Then: the helper runs and checks the process scenario.
         assert_stale_observation(action);
     }
 }
 
 fn assert_stale_observation(action: &str) {
-    // Arrange: P validates A while its original storage observation is still current.
+    // Given: P validates A while its original storage observation is still current.
     let fixture = Fixture::new(0);
     let mut service = wire_embedder(fixture.root.path(), open_storage(&fixture.root)).unwrap();
     service.read_configuration().unwrap();
@@ -43,10 +45,10 @@ fn assert_stale_observation(action: &str) {
     assert!(unit.reserve_attempt(&fixture.hash, 4).unwrap());
     unit.commit().unwrap();
     let before = fixture.capture_cache();
-    // Act: obsolete P resumes after B has stored both successful and pending work.
+    // When: obsolete P resumes after B has stored both successful and pending work.
     barrier.write_all(b"C").unwrap();
     let requests = finish_http_requests(&fixture, &mut child);
-    // Assert stored state first: baseline must fail on destroyed B state.
+    // Then: check stored state first; baseline must fail on destroyed B state.
     fixture.assert_state(&next, None, Some(1));
     assert_current_vector(&fixture, &next);
     assert_eq!(fixture.capture_cache(), before);

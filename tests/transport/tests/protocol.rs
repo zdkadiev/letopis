@@ -13,9 +13,12 @@ fn texts() -> Vec<String> {
 
 #[test]
 fn native_request_is_literal_and_cannot_be_overridden() {
+    // Given
     let mut c = configuration("ollama");
     c["parameters"].as_object_mut().unwrap().extend(json!({"dimensions":3,"keep_alive":"5m","options":{"seed":42},"model":"other","input":"wrong","truncate":true,"unknown":{"kept":true}}).as_object().unwrap().clone());
+    // When
     let config = parse(&c);
+    // Then
     assert_eq!(config.parameters()["unknown"], json!({"kept":true}));
     let r = prepare(&config, &texts(), Some("KEY_CANARY")).unwrap();
     let (url, body, auth) = r.parts();
@@ -30,11 +33,14 @@ fn native_request_is_literal_and_cannot_be_overridden() {
 
 #[test]
 fn compatible_request_is_literal_and_requires_safe_bearer() {
+    // Given
     let mut c = configuration("openai");
     c["parameters"]["dimensions"] = json!(3);
     let config = parse(&c);
+    // When
     let r = prepare(&config, &texts(), Some("KEY_CANARY")).unwrap();
     let (url, body, auth) = r.parts();
+    // Then
     assert_eq!(
         url,
         "http://localhost:12345/custom/api/embeddings?route=fixture"
@@ -52,10 +58,13 @@ fn compatible_request_is_literal_and_requires_safe_bearer() {
 
 #[test]
 fn strict_configuration_rejects_invalid_shapes_without_defaulting() {
+    // Given
     let c = configuration("ollama");
+    // When
     for field in ["provider", "model", "parameters", "max_retries"] {
         let mut missing = c.clone();
         missing.as_object_mut().unwrap().remove(field);
+        // Then
         assert!(
             Config::parse(&serde_json::to_vec(&missing).unwrap()).is_err(),
             "missing {field}"
@@ -105,7 +114,9 @@ fn strict_configuration_rejects_invalid_shapes_without_defaulting() {
 
 #[test]
 fn request_validation_rejects_empty_input_and_wrong_documented_types() {
+    // Given
     let config = parse(&configuration("ollama"));
+    // When / Then
     assert!(prepare(&config, &[], None).is_err());
     assert!(prepare(&config, &[String::new()], None).is_err());
     for (key, value) in [
@@ -122,6 +133,7 @@ fn request_validation_rejects_empty_input_and_wrong_documented_types() {
 
 #[test]
 fn api_prefix_appends_exactly_one_separator() {
+    // Given
     for (base, expected) in [
         ("http://localhost:12345", "http://localhost:12345/embed"),
         ("http://localhost:12345/", "http://localhost:12345/embed"),
@@ -132,14 +144,18 @@ fn api_prefix_appends_exactly_one_separator() {
     ] {
         let mut c = configuration("ollama");
         c["parameters"]["base_url"] = json!(base);
+        // When
         let request = prepare(&parse(&c), &texts(), None).unwrap();
+        // Then
         assert_eq!(request.parts().0, expected);
     }
 }
 
 #[test]
 fn response_order_and_optional_fields_follow_each_protocol() {
+    // Given
     let native = br#"{"model":"actual-model","embeddings":[[1,2,3],[4,5,6]],"extra":true}"#;
+    // When / Then
     assert_eq!(
         decode(Provider::Ollama, native, 2, 3).unwrap(),
         vec![vec![1., 2., 3.], vec![4., 5., 6.]]
@@ -154,6 +170,7 @@ fn response_order_and_optional_fields_follow_each_protocol() {
 
 #[test]
 fn malformed_native_vectors_are_never_success() {
+    // Given
     for body in [
         "{}",
         "not-json",
@@ -161,6 +178,7 @@ fn malformed_native_vectors_are_never_success() {
         r#"{"model":"","embeddings":[[1,2,3],[4,5,6]]}"#,
         r#"{"embeddings":[[1,2,3],[4,5,6]]}"#,
     ] {
+        // When / Then
         assert!(decode(Provider::Ollama, body.as_bytes(), 2, 3).is_err());
     }
     for vectors in [
@@ -186,6 +204,7 @@ fn malformed_native_vectors_are_never_success() {
 
 #[test]
 fn compatible_indices_must_bijectively_cover_inputs() {
+    // Given
     for data in [
         json!([]),
         json!([{"index":0,"embedding":[1,2,3]},{"index":0,"embedding":[4,5,6]}]),
@@ -195,6 +214,7 @@ fn compatible_indices_must_bijectively_cover_inputs() {
         json!([{"embedding":[1,2,3]},{"index":1,"embedding":[4,5,6]}]),
         json!([{"index":0},{"index":1,"embedding":[4,5,6]}]),
     ] {
+        // When / Then
         assert!(
             decode(
                 Provider::Openai,

@@ -13,13 +13,13 @@ use support::{
 #[test]
 fn observe_exact_binary_range_and_ignore_unaddressed_edits() {
     for format in FORMATS {
-        // Arrange
+        // Given
         let repo = TempRepo::new(format);
         let basis = create_basis(repo.get_root(), &[("src.bin", b"prefix\r\n\0abc\r\nlast")]);
         fs::write(repo.get_root().join("src.bin"), b"edited\n\0abc\r\nother").unwrap();
         let service = wire_source_provenance(repo.get_root()).unwrap();
         let sources = parse_sources(&["src.bin#L2-L2"]);
-        // Act / Assert
+        // When / Then
         let equal = service
             .observe_sources(ProvenanceRequest {
                 source_snapshot: Some(&basis),
@@ -41,6 +41,7 @@ fn observe_exact_binary_range_and_ignore_unaddressed_edits() {
 }
 #[test]
 fn combine_changed_and_missing_sources_without_duplicates() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let basis = create_basis(
         repo.get_root(),
@@ -50,12 +51,14 @@ fn combine_changed_and_missing_sources_without_duplicates() {
     fs::write(repo.get_root().join("b.txt"), b"one\n").unwrap();
     let sources = parse_sources(&["a.txt", "a.txt#L1-L1", "b.txt#L2-L2", "b.txt#L2-L2"]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
+    // When
     let actual = service
         .observe_sources(ProvenanceRequest {
             source_snapshot: Some(&basis),
             sources: &sources,
         })
         .unwrap();
+    // Then
     assert_eq!(
         actual.flags,
         BTreeSet::from([SearchFlag::SourceChanged, SearchFlag::SourceNotFound])
@@ -69,15 +72,18 @@ fn combine_changed_and_missing_sources_without_duplicates() {
 }
 #[test]
 fn distinguish_missing_basis_from_missing_source() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let sources = parse_sources(&["missing.txt"]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
+    // When
     let missing = service
         .observe_sources(ProvenanceRequest {
             source_snapshot: None,
             sources: &sources,
         })
         .unwrap();
+    // Then
     assert_eq!(
         missing.flags,
         BTreeSet::from([SearchFlag::SourceChanged, SearchFlag::SourceNotFound])
@@ -99,18 +105,21 @@ fn distinguish_missing_basis_from_missing_source() {
 }
 #[test]
 fn observe_empty_and_unterminated_ranges() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let basis = create_basis(repo.get_root(), &[("empty", b""), ("lines", b"one\ntwo")]);
     fs::write(repo.get_root().join("empty"), b"").unwrap();
     fs::write(repo.get_root().join("lines"), b"one\ntwo").unwrap();
     let service = wire_source_provenance(repo.get_root()).unwrap();
     let sources = parse_sources(&["empty", "lines#L2-L2"]);
+    // When
     let actual = service
         .observe_sources(ProvenanceRequest {
             source_snapshot: Some(&basis),
             sources: &sources,
         })
         .unwrap();
+    // Then
     assert!(actual.flags.is_empty());
     let absent = parse_sources(&["empty#L1-L1", "lines#L2-L3"]);
     let actual = service
@@ -124,11 +133,13 @@ fn observe_empty_and_unterminated_ranges() {
 }
 #[test]
 fn diagnose_missing_historical_path_and_range() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let basis = create_basis(repo.get_root(), &[("a", b"one\n")]);
     fs::write(repo.get_root().join("a"), b"one\ntwo\n").unwrap();
     let sources = parse_sources(&["a#L2-L2", "new-file"]);
     fs::write(repo.get_root().join("new-file"), b"present now").unwrap();
+    // When
     let actual = wire_source_provenance(repo.get_root())
         .unwrap()
         .observe_sources(ProvenanceRequest {
@@ -136,21 +147,25 @@ fn diagnose_missing_historical_path_and_range() {
             sources: &sources,
         })
         .unwrap();
+    // Then
     assert_eq!(actual.flags, BTreeSet::from([SearchFlag::SourceNotFound]));
     assert_eq!(actual.issues.len(), 2);
 }
 #[test]
 fn leave_remote_unknown_and_no_sources_unflagged() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let basis = create_basis(repo.get_root(), &[]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
     let sources = parse_sources(&["https://Host/a?x=1#L1-L2"]);
+    // When
     let actual = service
         .observe_sources(ProvenanceRequest {
             source_snapshot: Some(&basis),
             sources: &sources,
         })
         .unwrap();
+    // Then
     assert!(actual.flags.is_empty());
     assert!(actual.issues.is_empty());
     let empty = BTreeSet::new();
@@ -168,7 +183,7 @@ fn leave_remote_unknown_and_no_sources_unflagged() {
 
 #[test]
 fn diagnose_declared_unavailable_roots_even_without_external_sources() {
-    // Arrange
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
     let sources = BTreeSet::new();
@@ -179,14 +194,14 @@ fn diagnose_declared_unavailable_roots_even_without_external_sources() {
         commit,
     ];
     for root in roots {
-        // Act
+        // When
         let actual = service
             .observe_sources(ProvenanceRequest {
                 source_snapshot: Some(&root),
                 sources: &sources,
             })
             .unwrap();
-        // Assert
+        // Then
         assert_eq!(actual.flags, BTreeSet::from([SearchFlag::SourceChanged]));
         assert_eq!(
             actual.issues,

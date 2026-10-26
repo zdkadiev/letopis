@@ -3,8 +3,8 @@ use super::{HandlerServices, Handlers, Request, parse_request, write_response};
 use crate::{
     domain::{KnowledgeId, LineRange, RepoPath},
     service::{
-        CommandErrorKind, CommandResult, RecheckFilter, SearchFlag, SearchLink, SearchRequest,
-        Searcher,
+        CommandErrorKind, CommandResult, MockSearcher, RecheckFilter, SearchFlag, SearchLink,
+        SearchRequest,
     },
 };
 use serde_json::{Value, json};
@@ -12,6 +12,7 @@ use std::{collections::BTreeSet, ffi::OsString, num::NonZeroUsize};
 
 #[test]
 fn parse_search_rejects_null_duplicate_unknown_numeric_and_trailing_inputs() {
+    // Given
     for body in [
         "{}",
         r#"{"query":"x"}"#,
@@ -50,7 +51,9 @@ fn parse_search_rejects_null_duplicate_unknown_numeric_and_trailing_inputs() {
         r#"["x",1,{}]"#,
         "",
     ] {
+        // When
         let result = parse(body);
+        // Then
         assert!(result.is_err(), "unexpected success: {body}");
         assert_eq!(
             result.unwrap_err().get_kind(),
@@ -58,14 +61,18 @@ fn parse_search_rejects_null_duplicate_unknown_numeric_and_trailing_inputs() {
             "{body}"
         );
     }
+    // Given / When / Then
     assert!(parse_request(&["search".into(), "extra".into()], &mut b"{}".as_slice()).is_err());
 }
 
 #[test]
 fn malformed_source_revisions_are_rejected() {
+    // Given
     for oid in ["A".repeat(40), "a".repeat(39), "g".repeat(64)] {
+        // Given
         let body =
             json!({"query":"x","limit":1,"filters":{"sources":["x"],"source_revisions":[oid]}});
+        // When / Then
         assert_eq!(
             parse(&body.to_string()).unwrap_err().get_kind(),
             CommandErrorKind::InvalidRequest
@@ -75,18 +82,22 @@ fn malformed_source_revisions_are_rejected() {
 
 #[test]
 fn empty_filters_equal_absence() {
+    // Given
     for filters in [
         None,
         Some(json!({})),
         Some(json!({"sources":[],"source_revisions":[]})),
     ] {
+        // Given
         let mut body = json!({"query":"private query","limit":3});
         if let Some(filters) = filters {
             body["filters"] = filters;
         }
+        // When
         let Request::Search(request) = parse(&body.to_string()).unwrap() else {
             panic!("search")
         };
+        // Then
         assert_eq!(request.query, "private query");
         assert_eq!(request.limit.get(), 3);
     }
@@ -94,6 +105,7 @@ fn empty_filters_equal_absence() {
 
 #[test]
 fn effective_filters_are_typed_and_deduplicated() {
+    // Given
     for (filters, recheck, sources, revisions) in [
         (json!({"needs_recheck":true}), RecheckFilter::Required, 0, 0),
         (
@@ -121,11 +133,13 @@ fn effective_filters_are_typed_and_deduplicated() {
             1,
         ),
     ] {
+        // When
         let Request::Search(request) =
             parse(&json!({"query":"x","limit":1,"filters":filters}).to_string()).unwrap()
         else {
             panic!("search")
         };
+        // Then
         assert_eq!(request.filters.needs_recheck, recheck);
         assert_eq!(request.filters.sources.len(), sources);
         assert_eq!(request.filters.source_revisions.len(), revisions);
@@ -134,12 +148,27 @@ fn effective_filters_are_typed_and_deduplicated() {
 
 #[test]
 fn search_handler_dispatches_typed_request_and_renders_links() {
-    let mut searches = SearchDouble;
+    // Given
+    let mut searches = MockSearcher::new();
+    searches
+        .expect_search()
+        .times(1)
+        .withf(|request| request.query == "private query" && request.limit.get() == 3)
+        .returning(|_| {
+            Ok(vec![SearchLink {
+                element_id: KnowledgeId::parse("x.md#a").unwrap(),
+                path: RepoPath::parse("x.md").unwrap(),
+                lines: LineRange::new(2, 7).unwrap(),
+                revision: 9,
+                flags: BTreeSet::from([SearchFlag::Stale]),
+            }])
+        });
     let request = SearchRequest {
         filters: Default::default(),
         query: "private query".into(),
         limit: NonZeroUsize::new(3).unwrap(),
     };
+    // When
     let response = Handlers::new(HandlerServices {
         searches: Some(&mut searches),
         ..HandlerServices::default()
@@ -148,6 +177,7 @@ fn search_handler_dispatches_typed_request_and_renders_links() {
     let mut output = Vec::new();
     let exit = write_response(&mut output, response);
     let value: Value = serde_json::from_slice(&output).unwrap();
+    // Then
     assert_eq!(exit, 0);
     assert_eq!(
         value,
@@ -156,20 +186,6 @@ fn search_handler_dispatches_typed_request_and_renders_links() {
     println!("CLI_RESPONSE {}", json!({"exit":exit,"response":value}));
 }
 
-struct SearchDouble;
-impl Searcher for SearchDouble {
-    fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
-        assert_eq!(request.query, "private query");
-        assert_eq!(request.limit.get(), 3);
-        Ok(vec![SearchLink {
-            element_id: KnowledgeId::parse("x.md#a").unwrap(),
-            path: RepoPath::parse("x.md").unwrap(),
-            lines: LineRange::new(2, 7).unwrap(),
-            revision: 9,
-            flags: BTreeSet::from([SearchFlag::Stale]),
-        }])
-    }
-}
 fn parse(body: &str) -> CommandResult<Request> {
     parse_request(&[OsString::from("search")], &mut body.as_bytes())
 }

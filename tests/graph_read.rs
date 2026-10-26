@@ -16,7 +16,7 @@ static EMPTY_TYPES: BTreeSet<EdgeType> = BTreeSet::new();
 
 #[test]
 fn pages_neighbors_in_type_and_identity_order() {
-    // Arrange a missing endpoint before the first real target.
+    // Given a missing endpoint before the first real target.
     let root = TempDir::new().unwrap();
     let mut storage = build_fixture(&root);
     let mut read = storage.begin_read().unwrap();
@@ -26,7 +26,7 @@ fn pages_neighbors_in_type_and_identity_order() {
         .unwrap()
         .key;
     let mut request = build_request(key, NeighborDirection::Outgoing, 2);
-    // Act and assert each page independently across a type boundary.
+    // When / Then each page independently across a type boundary.
     let first = read.read_neighbor_page(&request).unwrap();
     assert_eq!(
         summarize(&first),
@@ -55,6 +55,7 @@ fn pages_neighbors_in_type_and_identity_order() {
 
 #[test]
 fn intersects_modes_and_type_filters_before_the_page_bound() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = build_fixture(&root);
     let mut read = storage.begin_read().unwrap();
@@ -65,6 +66,7 @@ fn intersects_modes_and_type_filters_before_the_page_bound() {
         .key;
     let mut request = build_request(key, NeighborDirection::Outgoing, 1);
     request.mode = TraversalMode::Containment;
+    // When / Then
     assert_eq!(
         summarize(&read.read_neighbor_page(&request).unwrap()),
         ["includes:root.md>b.md"]
@@ -82,6 +84,7 @@ fn intersects_modes_and_type_filters_before_the_page_bound() {
 
 #[test]
 fn keeps_incoming_edges_in_original_orientation() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = build_fixture(&root);
     let mut read = storage.begin_read().unwrap();
@@ -91,7 +94,9 @@ fn keeps_incoming_edges_in_original_orientation() {
         .unwrap()
         .key;
     let mut request = build_request(key, NeighborDirection::Incoming, 2);
+    // When
     let first = read.read_neighbor_page(&request).unwrap();
+    // Then
     assert_eq!(
         summarize(&first),
         ["includes:root.md>b.md", "supports:a.md>b.md"]
@@ -106,6 +111,7 @@ fn keeps_incoming_edges_in_original_orientation() {
 
 #[test]
 fn filters_incoming_modes_and_types_before_limiting() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = build_fixture(&root);
     let mut read = storage.begin_read().unwrap();
@@ -116,6 +122,7 @@ fn filters_incoming_modes_and_types_before_limiting() {
         .key;
     let mut request = build_request(key, NeighborDirection::Incoming, 1);
     request.mode = TraversalMode::Containment;
+    // When / Then
     assert_eq!(
         summarize(&read.read_neighbor_page(&request).unwrap()),
         ["includes:root.md>b.md"]
@@ -132,6 +139,7 @@ fn filters_incoming_modes_and_types_before_limiting() {
 
 #[test]
 fn retains_one_snapshot_across_pages() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = build_fixture(&root);
     let mut writer = open_storage(
@@ -148,7 +156,9 @@ fn retains_one_snapshot_across_pages() {
     let types = BTreeSet::from([EdgeType::parse("supports").unwrap()]);
     let mut request = build_request(key, NeighborDirection::Outgoing, 1);
     request.edge_types = &types;
+    // When
     let first = read.read_neighbor_page(&request).unwrap();
+    // Then
     assert_eq!(summarize(&first), ["supports:root.md>a.md"]);
     let cursor = build_cursor(first.last().unwrap());
     let mut write = writer.begin_cache_write().unwrap();
@@ -180,6 +190,7 @@ fn retains_one_snapshot_across_pages() {
 
 #[test]
 fn bounds_large_degrees_and_rejects_excessive_page_limits() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = build_fixture(&root);
     let mut write = storage.begin_cache_write().unwrap();
@@ -198,7 +209,9 @@ fn bounds_large_degrees_and_rejects_excessive_page_limits() {
         .unwrap()
         .key;
     let mut request = build_request(key, NeighborDirection::Outgoing, 32);
+    // When
     let first = read.read_neighbor_page(&request).unwrap();
+    // Then
     assert_eq!(first.len(), 32);
     assert_eq!(first.first().unwrap().node.element.as_str(), "n00.md");
     assert_eq!(first.last().unwrap().node.element.as_str(), "n31.md");
@@ -217,6 +230,7 @@ fn bounds_large_degrees_and_rejects_excessive_page_limits() {
 
 #[test]
 fn resolves_local_range_and_opaque_url_identities_from_actual_node_kinds() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = build_fixture(&root);
     let mut read = storage.begin_read().unwrap();
@@ -228,6 +242,7 @@ fn resolves_local_range_and_opaque_url_identities_from_actual_node_kinds() {
         ("https://Host/A?q=1#L0-L9", "https://Host/A?q=1#L0-L9", true),
     ] {
         let node = read.resolve_node(&parse_address(raw)).unwrap().unwrap();
+        // When / Then
         assert_eq!(node.element.as_str(), expected);
         assert_eq!(matches!(node.element, EdgeTarget::Source(_)), source);
     }
@@ -240,6 +255,7 @@ fn resolves_local_range_and_opaque_url_identities_from_actual_node_kinds() {
 
 #[test]
 fn does_not_decode_unselected_node_metadata() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = build_fixture(&root);
     let db = rusqlite::Connection::open(root.path().join("cache.db")).unwrap();
@@ -249,6 +265,7 @@ fn does_not_decode_unselected_node_metadata() {
     )
     .unwrap();
     let mut read = storage.begin_read().unwrap();
+    // When / Then
     assert!(read.resolve_node(&parse_address("a.md")).unwrap().is_some());
     let key = read
         .resolve_node(&parse_address("root.md"))

@@ -38,16 +38,21 @@ class ProcessLifecycle(unittest.TestCase):
         self.assertEqual(value,b"","descendant connection must close")
     def command(self): return [sys.executable,"-c",PARENT,DESCENDANT,self.path]
     def test_timeout_terminates_descendant(self):
+        # Given
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             future=pool.submit(run_command,self.command(),cwd=Path.cwd(),env=os.environ.copy(),timeout=5)
             self.ready()
+            # When / Then
             with self.assertRaises(subprocess.TimeoutExpired): future.result(timeout=8)
             self.assert_stopped()
     def test_interrupt_terminates_descendant(self):
+        # Given
         controller="from processes import run_command; import os,sys; run_command(sys.argv[1:],cwd=os.getcwd(),env=os.environ.copy(),timeout=30)"
         p=subprocess.Popen([sys.executable,"-c",controller,*self.command()],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
         try:
+            # When
             self.ready();p.send_signal(signal.SIGINT)
+            # Then
             self.assertNotEqual(p.wait(timeout=5),0)
             self.assert_stopped()
         finally:

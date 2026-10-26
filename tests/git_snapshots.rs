@@ -14,14 +14,14 @@ use std::fs;
 #[test]
 fn incremental_blobs_reproduce_tree_without_touching_user_state() {
     for format in FORMATS {
-        // Arrange
+        // Given
         let repo = TempRepo::new(format);
         configure_filter_trap(&repo);
         let before = repo.capture_fixture_state();
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let paths = [parse_path("a.md"), parse_path("nested/文档.md")];
         let bytes = [b"a\r\n".as_slice(), "Привет 🌳".as_bytes()];
-        // Act
+        // When
         let entries: Vec<_> = paths
             .iter()
             .zip(bytes)
@@ -40,7 +40,7 @@ fn incremental_blobs_reproduce_tree_without_touching_user_state() {
                     .collect::<Vec<_>>(),
             )
             .unwrap();
-        // Assert
+        // Then
         assert_eq!(tree, expected);
         assert!(format!("{:?}", entries[0]).starts_with("SnapshotEntry {"));
         for (path, bytes) in paths.iter().zip(bytes) {
@@ -54,7 +54,7 @@ fn incremental_blobs_reproduce_tree_without_touching_user_state() {
 #[test]
 fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format() {
     for format in FORMATS {
-        // Arrange
+        // Given
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let blob = git.write_blob(b"expected").unwrap();
@@ -77,6 +77,7 @@ fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format()
                 })
                 .collect();
             let before = repo.run_git_successfully(&["count-objects", "-v"], None);
+            // When / Then
             assert_eq!(
                 git.create_tree_from_blobs(&entries).unwrap_err().get_kind(),
                 SnapshotErrorKind::InvalidRequest
@@ -115,14 +116,14 @@ fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format()
 
 #[test]
 fn incremental_operations_recheck_self_contained_object_policy() {
-    // Arrange: alternates appear after opening the repository.
+    // Given: alternates appear after opening the repository.
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let oid = git.write_blob(b"captured").unwrap();
         fs::create_dir_all(repo.get_root().join(".git/objects/info")).unwrap();
         fs::write(repo.get_root().join(".git/objects/info/alternates"), b"").unwrap();
-        // Act / Assert
+        // When / Then
         assert_eq!(
             git.write_blob(b"later").unwrap_err().get_kind(),
             SnapshotErrorKind::InternalError
@@ -194,7 +195,7 @@ fn build_captured_inputs() -> ([RepoPath; 6], [&'static [u8]; 6]) {
 
 #[test]
 fn exact_bytes_without_index_or_commit() {
-    // Arrange
+    // Given
     for format in FORMATS {
         let repo = TempRepo::new(format);
         configure_filter_trap(&repo);
@@ -206,7 +207,7 @@ fn exact_bytes_without_index_or_commit() {
             .zip(bytes)
             .map(|(path, bytes)| SnapshotFile { path, bytes })
             .collect();
-        // Act
+        // When
         let first = git.create_tree(&files).unwrap();
         let captured: Vec<_> = paths
             .iter()
@@ -215,7 +216,7 @@ fn exact_bytes_without_index_or_commit() {
         files.reverse();
         let reordered = git.create_tree(&files).unwrap();
         let after = repo.capture_fixture_state();
-        // Assert
+        // Then
         for (actual, expected) in captured.iter().zip(bytes) {
             assert_eq!(actual, expected);
         }
@@ -223,9 +224,9 @@ fn exact_bytes_without_index_or_commit() {
         assert_eq!(after, before);
         assert!(!repo.get_root().join("FILTER_RAN").exists());
 
-        // Arrange: mutate and remove live files after capturing their bytes.
+        // Given: mutate and remove live files after capturing their bytes.
         repo.change_and_delete_live_files("live.md");
-        // Act
+        // When
         let after_live_change = git.read_blob(&first, &paths[0]).unwrap();
         let second = git
             .create_tree(&[SnapshotFile {
@@ -236,7 +237,7 @@ fn exact_bytes_without_index_or_commit() {
         let after_new_tree = git.read_blob(&first, &paths[0]).unwrap();
         let listing =
             repo.run_git_successfully(&["ls-tree", "-rz", "--name-only", first.as_str()], None);
-        // Assert
+        // Then
         assert_eq!(after_live_change, bytes[0]);
         assert_ne!(first, second);
         assert_eq!(after_new_tree, bytes[0]);
@@ -249,7 +250,7 @@ fn exact_bytes_without_index_or_commit() {
 
 #[test]
 fn paths_are_literal_and_never_shell_input() {
-    // Arrange
+    // Given
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_subdir()).unwrap();
@@ -268,13 +269,13 @@ fn paths_are_literal_and_never_shell_input() {
                 bytes: b"literal",
             })
             .collect();
-        // Act
+        // When
         let tree = git.create_tree(&files).unwrap();
         let captured: Vec<_> = paths
             .iter()
             .map(|p| git.read_blob(&tree, p).unwrap())
             .collect();
-        // Assert
+        // Then
         for bytes in captured {
             assert_eq!(bytes, b"literal");
         }
@@ -285,17 +286,17 @@ fn paths_are_literal_and_never_shell_input() {
 
 #[test]
 fn empty_tree_and_invalid_paths() {
-    // Arrange
+    // Given
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        // Act
+        // When
         let empty = git.create_tree(&[]).unwrap();
         let listing = repo.run_git_successfully(&["ls-tree", empty.as_str()], None);
-        // Assert
+        // Then
         assert!(listing.is_empty());
 
-        // Arrange
+        // Given
         for names in [
             vec!["a", "a"],
             vec!["a", "a/b"],
@@ -312,10 +313,10 @@ fn empty_tree_and_invalid_paths() {
                 })
                 .collect();
             let before = repo.run_git_successfully(&["count-objects", "-v"], None);
-            // Act
+            // When
             let error = git.create_tree(&files).unwrap_err();
             let after = repo.run_git_successfully(&["count-objects", "-v"], None);
-            // Assert
+            // Then
             assert_eq!(error.get_kind(), SnapshotErrorKind::InvalidRequest);
             assert!(!format!("{error:?} {error}").contains("CANARY"));
             assert_eq!(before, after, "invalid input must not write objects");
@@ -374,23 +375,23 @@ fn create_corrupted_blob_tree(repo: &TempRepo) -> TreeOid {
 
 #[test]
 fn tree_types_and_missing_objects_are_distinct() {
-    // Arrange
+    // Given
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let leaf = parse_path("leaf");
         let empty = git.create_tree(&[]).unwrap();
         for (tree, expected) in build_tree_error_cases(&repo, &empty) {
-            // Act
+            // When
             let error = git.read_blob(&tree, &leaf).unwrap_err();
-            // Assert
+            // Then
             assert_eq!(error.get_kind(), expected);
         }
-        // Arrange
+        // Given
         let tree = create_corrupted_blob_tree(&repo);
-        // Act
+        // When
         let error = git.read_blob(&tree, &leaf).unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
         assert!(!format!("{error} {error:?}").contains("CORRUPT_CANARY"));
     }
@@ -398,7 +399,7 @@ fn tree_types_and_missing_objects_are_distinct() {
 
 #[test]
 fn replacement_refs_do_not_change_bytes() {
-    // Arrange
+    // Given
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
@@ -416,9 +417,9 @@ fn replacement_refs_do_not_change_bytes() {
             }])
             .unwrap();
         repo.run_git_successfully(&["replace", original.as_str(), replacement.as_str()], None);
-        // Act
+        // When
         let bytes = git.read_blob(&original, &p).unwrap();
-        // Assert
+        // Then
         assert_eq!(bytes, b"original");
     }
 }

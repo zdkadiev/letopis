@@ -8,7 +8,7 @@ use tempfile::TempDir;
 
 #[test]
 fn a_failed_failure_update_poisons_the_entire_vector_unit() {
-    // Arrange: reject diagnostic updates after a reservation can be written.
+    // Given: reject diagnostic updates after a reservation can be written.
     let root = TempDir::new().unwrap();
     let vector_path = root.path().join("vectors.db");
     let mut storage = open_storage(&root.path().join("cache.db"), &vector_path).unwrap();
@@ -25,11 +25,12 @@ fn a_failed_failure_update_poisons_the_entire_vector_unit() {
     let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
         panic!("configuration unexpectedly changed");
     };
+    // When / Then
     assert!(unit.reserve_attempt(&hash, 3).unwrap());
-    // Act
+    // When
     let error = unit.record_failure(&hash, "safe diagnostic").unwrap_err();
     let commit_error = unit.commit().unwrap_err();
-    // Assert: even the earlier valid reservation must roll back.
+    // Then: even the earlier valid reservation must roll back.
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(commit_error.get_kind(), StorageErrorKind::InvalidRequest);
     let count: i64 = observer
@@ -40,7 +41,7 @@ fn a_failed_failure_update_poisons_the_entire_vector_unit() {
 
 #[test]
 fn a_failed_query_error_cleanup_poisons_the_entire_vector_unit() {
-    // Arrange: retain an existing query diagnostic while rejecting its deletion.
+    // Given: retain an existing query diagnostic while rejecting its deletion.
     let root = TempDir::new().unwrap();
     let vector_path = root.path().join("vectors.db");
     let mut storage = open_storage(&root.path().join("cache.db"), &vector_path).unwrap();
@@ -58,11 +59,12 @@ fn a_failed_query_error_cleanup_poisons_the_entire_vector_unit() {
     let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
         panic!("configuration unexpectedly changed");
     };
+    // When / Then
     assert!(unit.reserve_attempt(&hash, 3).unwrap());
-    // Act
+    // When
     let error = unit.clear_query_error().unwrap_err();
     let commit_error = unit.commit().unwrap_err();
-    // Assert: the diagnostic survives and the earlier reservation rolls back.
+    // Then: the diagnostic survives and the earlier reservation rolls back.
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(commit_error.get_kind(), StorageErrorKind::InvalidRequest);
     let count: i64 = observer
@@ -77,7 +79,7 @@ fn a_failed_query_error_cleanup_poisons_the_entire_vector_unit() {
 
 #[test]
 fn a_failed_orphan_prune_poisons_the_entire_vector_unit() {
-    // Arrange: an orphan reservation reaches the final cleanup statement.
+    // Given: an orphan reservation reaches the final cleanup statement.
     let root = TempDir::new().unwrap();
     let vector_path = root.path().join("vectors.db");
     let mut storage = open_storage(&root.path().join("cache.db"), &vector_path).unwrap();
@@ -94,11 +96,12 @@ fn a_failed_orphan_prune_poisons_the_entire_vector_unit() {
     let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
         panic!("configuration unexpectedly changed");
     };
+    // When / Then
     assert!(unit.reserve_attempt(&hash, 3).unwrap());
-    // Act
+    // When
     let error = unit.prune_unreferenced().unwrap_err();
     let commit_error = unit.commit().unwrap_err();
-    // Assert: a failed cleanup cannot commit the earlier reservation.
+    // Then: a failed cleanup cannot commit the earlier reservation.
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(commit_error.get_kind(), StorageErrorKind::InvalidRequest);
     let count: i64 = observer

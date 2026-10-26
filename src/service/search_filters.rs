@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn default_filters_impose_no_restrictions() {
-        // Arrange
+        // Given
         let filters = SearchFilters::default();
         let observations = [
             BTreeSet::new(),
@@ -54,7 +54,7 @@ mod tests {
             BTreeSet::from([SearchFlag::SourceChanged]),
             BTreeSet::from([SearchFlag::SourceNotFound]),
         ];
-        // Act / Assert
+        // When / Then
         assert_eq!(filters.needs_recheck, RecheckFilter::Any);
         assert!(filters.sources.is_empty());
         assert!(filters.source_revisions.is_empty());
@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn required_recheck_matches_each_current_flag_and_rejects_no_flags() {
-        // Arrange
+        // Given
         let filters = SearchFilters {
             needs_recheck: RecheckFilter::Required,
             ..SearchFilters::default()
@@ -76,7 +76,7 @@ mod tests {
             (BTreeSet::from([SearchFlag::SourceChanged]), true),
             (BTreeSet::from([SearchFlag::SourceNotFound]), true),
         ];
-        // Act / Assert
+        // When / Then
         for (flags, expected) in cases {
             assert_eq!(filters.matches_flags(&flags), expected, "{flags:?}");
         }
@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn not_required_recheck_matches_no_flags_and_rejects_each_current_flag() {
-        // Arrange
+        // Given
         let filters = SearchFilters {
             needs_recheck: RecheckFilter::NotRequired,
             ..SearchFilters::default()
@@ -95,7 +95,7 @@ mod tests {
             (BTreeSet::from([SearchFlag::SourceChanged]), false),
             (BTreeSet::from([SearchFlag::SourceNotFound]), false),
         ];
-        // Act / Assert
+        // When / Then
         for (flags, expected) in cases {
             assert_eq!(filters.matches_flags(&flags), expected, "{flags:?}");
         }

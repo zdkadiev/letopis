@@ -211,6 +211,7 @@ mod tests {
 
     #[test]
     fn deduplicates_dangling_pairs_and_rechecks_node_membership() {
+        // Given
         let mut nodes = build_nodes(&["a.md"]);
         let edges = BTreeSet::from([
             build_edge("a.md", "missing.md", "includes"),
@@ -221,6 +222,7 @@ mod tests {
             target: parse_id("missing.md"),
         }];
 
+        // When / Then
         assert_eq!(find_graph_problems(&nodes, &edges), expected);
         nodes.insert(parse_id("missing.md"));
         assert!(find_graph_problems(&nodes, &edges).is_empty());
@@ -230,6 +232,7 @@ mod tests {
 
     #[test]
     fn ignores_absent_sources_and_external_source_targets() {
+        // Given
         let nodes = build_nodes(&["a.md"]);
         let external = Edge::new(
             parse_id("a.md"),
@@ -244,6 +247,7 @@ mod tests {
             external,
         ]);
 
+        // When / Then
         assert_eq!(
             find_graph_problems(&nodes, &edges),
             vec![GraphProblem::DanglingTarget {
@@ -255,6 +259,7 @@ mod tests {
 
     #[test]
     fn separates_components_without_including_one_way_descendants() {
+        // Given
         let nodes = build_nodes(&["a.md", "b.md", "c.md", "d.md", "e.md"]);
         let edges = BTreeSet::from([
             build_edge("a.md", "b.md", "includes"),
@@ -265,6 +270,7 @@ mod tests {
             build_edge("e.md", "d.md", "includes"),
         ]);
 
+        // When / Then
         assert_eq!(
             find_graph_problems(&nodes, &edges),
             vec![
@@ -280,6 +286,7 @@ mod tests {
 
     #[test]
     fn accepts_ordinary_cycles_and_shared_child_includes_dags() {
+        // Given
         let nodes = build_nodes(&["a.md", "b.md", "c.md", "d.md"]);
         let edges = BTreeSet::from([
             build_edge("a.md", "b.md", "depends_on"),
@@ -290,11 +297,13 @@ mod tests {
             build_edge("d.md", "b.md", "includes"),
         ]);
 
+        // When / Then
         assert!(find_graph_problems(&nodes, &edges).is_empty());
     }
 
     #[test]
     fn orders_mixed_findings_and_preserves_inputs() {
+        // Given
         let nodes = build_nodes(&["a.md", "b.md", "d.md", "e.md"]);
         let edges = BTreeSet::from([
             build_edge("e.md", "d.md", "includes"),
@@ -308,8 +317,10 @@ mod tests {
         let original_nodes = nodes.clone();
         let original_edges = edges.clone();
 
+        // When
         let problems = find_graph_problems(&nodes, &edges);
 
+        // Then
         assert_eq!(
             problems,
             vec![
@@ -339,6 +350,7 @@ mod tests {
 
     #[test]
     fn handles_ten_thousand_nodes_without_recursive_traversal() {
+        // Given
         let expected_members: Vec<KnowledgeId> = (0..10_000)
             .map(|index| parse_id(&format!("node-{index:05}.md")))
             .collect();
@@ -353,10 +365,14 @@ mod tests {
             })
             .collect();
 
+        // When / Then
         assert!(find_graph_problems(&nodes, &edges).is_empty());
+        // Given
         edges.insert(build_edge("node-09999.md", "node-00000.md", "includes"));
+        // When
         let problems = find_graph_problems(&nodes, &edges);
 
+        // Then
         assert_eq!(problems.len(), 1);
         let GraphProblem::IncludesCycle { members } = &problems[0] else {
             panic!("expected one includes cycle");

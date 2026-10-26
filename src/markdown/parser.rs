@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn parser_interface_preserves_all_free_function_outcomes() {
-        // Arrange
+        // Given
         let path = RepoPath::parse("note.md").unwrap();
         let parser = MarkdownParser::new();
         let cases: &[&[u8]] = &[
@@ -78,10 +78,10 @@ mod tests {
             b"<!-- letopis: {} -->\ntext",
         ];
         for bytes in cases {
-            // Act
+            // When
             let actual = parser.parse_file(&path, bytes);
             let existing = parse(&path, bytes);
-            // Assert: parity only; existing X-4 tests carry independent behavior expectations.
+            // Then: parity only; existing X-4 tests carry independent behavior expectations.
             assert_eq!(format!("{actual:?}"), format!("{existing:?}"));
         }
     }

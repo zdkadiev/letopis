@@ -8,24 +8,25 @@ use tempfile::TempDir;
 
 #[test]
 fn reset_commits_only_for_the_observed_identity_and_keeps_a_pinned_read() {
-    // Arrange: separate connections capture A before B is installed.
+    // Given: separate connections capture A before B is installed.
     let root = TempDir::new().unwrap();
     let mut first = open(&root);
     let mut second = open(&root);
     let a = Sha256::digest(b"A");
     let b = Sha256::digest(b"B");
+    // When / Then
     assert_eq!(
         first.reset_vectors(None, &a).unwrap(),
         VectorOutcome::Current(true)
     );
     seed_state(&mut first, &a);
     let mut pinned = first.begin_read().unwrap();
-    // Act
+    // When / Then
     assert_eq!(
         second.reset_vectors(Some(&a), &b).unwrap(),
         VectorOutcome::Current(true)
     );
-    // Assert: old view still sees the exact old vector and failure.
+    // Then: old view still sees the exact old vector and failure.
     assert_eq!(pinned.get_config_identity(), Some(a));
     assert_state(&mut pinned, &a);
     let mut fresh = second.begin_read().unwrap();
@@ -42,6 +43,7 @@ fn reset_commits_only_for_the_observed_identity_and_keeps_a_pinned_read() {
 
 #[test]
 fn same_desired_identity_preserves_vectors_and_failure_bytes() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut first = open(&root);
     let mut second = open(&root);
@@ -52,9 +54,9 @@ fn same_desired_identity_preserves_vectors_and_failure_bytes() {
     seed_state(&mut second, &b);
     let before = read_failure_bytes(&root);
     for observed in [Some(&b), Some(&a), None] {
-        // Act: a late observer may have captured B, A or initial absence.
+        // When: a late observer may have captured B, A or initial absence.
         let outcome = first.reset_vectors(observed, &b).unwrap();
-        // Assert
+        // Then
         assert_state(&mut first.begin_read().unwrap(), &b);
         assert_eq!(read_failure_bytes(&root), before);
         assert_eq!(outcome, VectorOutcome::Current(false));
@@ -63,6 +65,7 @@ fn same_desired_identity_preserves_vectors_and_failure_bytes() {
 
 #[test]
 fn obsolete_and_absent_observations_preserve_the_winning_identity_and_work() {
+    // Given
     for observed in [Some(Sha256::digest(b"A")), None] {
         let root = TempDir::new().unwrap();
         let mut first = open(&root);
@@ -75,9 +78,9 @@ fn obsolete_and_absent_observations_preserve_the_winning_identity_and_work() {
         second.reset_vectors(observed.as_ref(), &b).unwrap();
         seed_state(&mut second, &b);
         let before = read_failure_bytes(&root);
-        // Act
+        // When
         let outcome = first.reset_vectors(observed.as_ref(), &a).unwrap();
-        // Assert state before the result, so a compiling mutation fails on lost work.
+        // Then state before the result, so a compiling mutation fails on lost work.
         assert_state(&mut first.begin_read().unwrap(), &b);
         assert_eq!(read_failure_bytes(&root), before);
         assert_eq!(outcome, VectorOutcome::ConfigChanged);
@@ -86,6 +89,7 @@ fn obsolete_and_absent_observations_preserve_the_winning_identity_and_work() {
 
 #[test]
 fn malformed_stored_identity_is_a_typed_error_without_resetting_work() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let b = Sha256::digest(b"B");
@@ -95,11 +99,11 @@ fn malformed_stored_identity_is_a_typed_error_without_resetting_work() {
     db.execute("UPDATE meta SET config_identity='malformed'", [])
         .unwrap();
     let before = read_failure_bytes(&root);
-    // Act
+    // When
     let error = storage
         .reset_vectors(None, &Sha256::digest(b"A"))
         .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(read_failure_bytes(&root), before);
     assert_eq!(

@@ -21,7 +21,7 @@ enum ObjectDamage {
 #[test]
 fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
     for format in FORMATS {
-        // Arrange
+        // Given
         let repo = TempRepo::new(format);
         let (tree, _) = create_tree_case(&repo);
         let leaf = RepoPath::parse(LEAF_NAME).unwrap();
@@ -33,7 +33,7 @@ fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
         }
         let original = damage_object(&repo, tree.as_str(), ObjectDamage::Truncate);
 
-        // Act / Assert
+        // When / Then
         for _ in 0..2 {
             let git = open_git_snapshots(repo.get_root()).unwrap();
             let verify_error = git.verify_snapshot(&tree).unwrap_err();
@@ -45,7 +45,7 @@ fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
             assert_eq!(repo.capture_fixture_state(), original_user_state);
         }
 
-        // Arrange / Act / Assert: exact fixture restoration returns a fresh handle to health.
+        // Given / When / Then: exact fixture restoration returns a fresh handle to health.
         restore_object(&repo, tree.as_str(), &original);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         assert_eq!(git.read_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
@@ -57,7 +57,7 @@ fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
 #[test]
 fn corrupt_child_never_pins_an_incomplete_closure() {
     for format in FORMATS {
-        // Arrange
+        // Given
         let repo = TempRepo::new(format);
         let (tree, blob) = create_tree_case(&repo);
         let leaf = RepoPath::parse(LEAF_NAME).unwrap();
@@ -69,7 +69,7 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
         }
         let original = damage_object(&repo, blob.as_str(), ObjectDamage::Truncate);
 
-        // Act / Assert
+        // When / Then
         for _ in 0..2 {
             let git = open_git_snapshots(repo.get_root()).unwrap();
             assert_eq!(
@@ -82,7 +82,7 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
             assert!(!format!("{error} {error:?}").contains("CORRUPTION_CANARY"));
         }
 
-        // Arrange / Act / Assert: exact fixture restoration returns a fresh handle to health.
+        // Given / When / Then: exact fixture restoration returns a fresh handle to health.
         restore_object(&repo, blob.as_str(), &original);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         assert_eq!(git.read_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
@@ -94,7 +94,7 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
 #[test]
 fn missing_child_is_not_a_new_empty_snapshot() {
     for format in FORMATS {
-        // Arrange
+        // Given
         let repo = TempRepo::new(format);
         let (tree, blob) = create_tree_case(&repo);
         let leaf = RepoPath::parse(LEAF_NAME).unwrap();
@@ -106,7 +106,7 @@ fn missing_child_is_not_a_new_empty_snapshot() {
         }
         let original = damage_object(&repo, blob.as_str(), ObjectDamage::Missing);
 
-        // Act / Assert: root-only verification stays distinct from closure pinning.
+        // When / Then: root-only verification stays distinct from closure pinning.
         for _ in 0..2 {
             let git = open_git_snapshots(repo.get_root()).unwrap();
             assert_eq!(
@@ -119,7 +119,7 @@ fn missing_child_is_not_a_new_empty_snapshot() {
             assert!(!format!("{error} {error:?}").contains("CORRUPTION_CANARY"));
         }
 
-        // Arrange / Act / Assert: exact fixture restoration returns a fresh handle to health.
+        // Given / When / Then: exact fixture restoration returns a fresh handle to health.
         restore_object(&repo, blob.as_str(), &original);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         assert_eq!(git.read_blob(&tree, &leaf).unwrap(), CANARY_BYTES);

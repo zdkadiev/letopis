@@ -26,13 +26,15 @@ use thin_slice::SliceFixture;
 #[test]
 #[ignore = "Requires LETOPIS_CORPUS_REQUEST pointing to an existing corpus request"]
 fn observe_existing_corpus() {
+    // Given
     let request = std::env::var_os("LETOPIS_CORPUS_REQUEST").expect("missing request path");
+    // When / Then
     observe_request(Path::new(&request)).expect("corpus observation failed");
 }
 
 #[test]
 fn reports_current_vectors_and_excludes_sources_from_coverage() {
-    // Arrange: only the product CLI publishes the graph; vectors are test-only state.
+    // Given: only the product CLI publishes the graph; vectors are test-only state.
     let fixture = SliceFixture::new();
     fixture.load();
     let config = configure_repo(fixture.get_repo(), 0);
@@ -46,10 +48,10 @@ fn reports_current_vectors_and_excludes_sources_from_coverage() {
     );
     let before = capture_databases(fixture.get_repo().get_root());
     let request = write_request(fixture.get_repo().get_root(), (3, 2, 5));
-    // Act.
+    // When.
     observe_request(&request).unwrap();
     let receipt = read_receipt(fixture.get_repo().get_root());
-    // Assert: the two source nodes neither need nor receive vectors.
+    // Then: the two source nodes neither need nor receive vectors.
     assert_eq!(capture_databases(fixture.get_repo().get_root()), before);
     assert_eq!(
         receipt,
@@ -63,12 +65,15 @@ fn reports_current_vectors_and_excludes_sources_from_coverage() {
 
 #[test]
 fn partial_coverage_counts_current_and_missing_nodes_separately() {
+    // Given
     let repo = load_pair("alpha", "beta");
     let config = read_config(&repo);
     repo.seed_vectors(&config, &[("a.md", &[1., 0.])]);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
+    // When
     let receipt = read_receipt(repo.get_root());
+    // Then
     assert_eq!(receipt["covered_nodes"], 1);
     assert_eq!(receipt["missing_nodes"], 1);
     assert_eq!(receipt["eligible_hashes"], 1);
@@ -77,13 +82,16 @@ fn partial_coverage_counts_current_and_missing_nodes_separately() {
 
 #[test]
 fn invalid_files_prevent_populated_even_when_current_nodes_are_covered() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "alpha");
     repo.write(
         "broken.md",
         b"<!-- letopis: {\"created_at\":-1} -->\nInvalid metadata",
     );
+    // When
     let output = repo.invoke(&["search"], br#"{"query":"alpha","limit":1}"#);
+    // Then
     assert!(output.status.success(), "{output:?}");
     let config = configure_repo(&repo, 0);
     repo.seed_vectors(&config, &[("a.md", &[1., 0.])]);
@@ -97,6 +105,7 @@ fn invalid_files_prevent_populated_even_when_current_nodes_are_covered() {
 
 #[test]
 fn configured_dimension_mismatch_is_rejected() {
+    // Given
     let repo = load_pair("alpha", "beta");
     let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:1/api","dimensions":3},"max_retries":0}"#;
     repo.write(".letopis/config.json", bytes);
@@ -104,7 +113,9 @@ fn configured_dimension_mismatch_is_rejected() {
     repo.seed_vectors(&config, &[("a.md", &[1., 0.])]);
     let before = capture_databases(repo.get_root());
     let request = write_request(repo.get_root(), (2, 0, 0));
+    // When
     let error = observe_request(&request).unwrap_err();
+    // Then
     assert!(error.to_string().contains("dimensions mismatch"), "{error}");
     assert_eq!(capture_databases(repo.get_root()), before);
     assert!(!repo.get_root().join("observation.json").exists());
@@ -112,10 +123,13 @@ fn configured_dimension_mismatch_is_rejected() {
 
 #[test]
 fn missing_vectors_remain_missing_with_null_dimensions() {
+    // Given
     let repo = load_pair("alpha", "beta");
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
+    // When
     let receipt = read_receipt(repo.get_root());
+    // Then
     assert_eq!(receipt["dimensions"], Value::Null);
     assert_eq!(receipt["unique_search_hashes"], 2);
     assert_eq!(receipt["covered_nodes"], 0);
@@ -126,12 +140,15 @@ fn missing_vectors_remain_missing_with_null_dimensions() {
 
 #[test]
 fn one_shared_hash_covers_two_nodes() {
+    // Given
     let repo = load_pair("same searchable text", "same searchable text");
     let config = read_config(&repo);
     repo.seed_vectors(&config, &[("a.md", &[1., 0.])]);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
+    // When
     let receipt = read_receipt(repo.get_root());
+    // Then
     assert_eq!(receipt["unique_search_hashes"], 1);
     assert_eq!(receipt["covered_nodes"], 2);
     assert_eq!(receipt["missing_nodes"], 0);
@@ -141,6 +158,7 @@ fn one_shared_hash_covers_two_nodes() {
 
 #[test]
 fn stale_hash_vector_does_not_cover_current_nodes() {
+    // Given
     let repo = load_pair("current alpha", "current beta");
     let config = read_config(&repo);
     let mut storage = repo.open_storage();
@@ -152,7 +170,9 @@ fn stale_hash_vector_does_not_cover_current_nodes() {
     drop(storage);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
+    // When
     let receipt = read_receipt(repo.get_root());
+    // Then
     assert_eq!(receipt["dimensions"], 2);
     assert_eq!(receipt["covered_nodes"], 0);
     assert_eq!(receipt["missing_nodes"], 2);
@@ -162,11 +182,14 @@ fn stale_hash_vector_does_not_cover_current_nodes() {
 
 #[test]
 fn exhausted_failures_have_zero_eligible_work_but_stay_missing() {
+    // Given
     let repo = load_pair("alpha", "beta");
     seed_failures(&repo, 1);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
+    // When
     let receipt = read_receipt(repo.get_root());
+    // Then
     assert_eq!(receipt["covered_nodes"], 0);
     assert_eq!(receipt["missing_nodes"], 2);
     assert_eq!(receipt["eligible_hashes"], 0);
@@ -177,12 +200,15 @@ fn exhausted_failures_have_zero_eligible_work_but_stay_missing() {
 
 #[test]
 fn failed_hashes_with_budget_remaining_are_still_eligible() {
+    // Given
     let repo = load_pair("alpha", "beta");
     configure_repo(&repo, 1);
     seed_failures(&repo, 2);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
+    // When
     let receipt = read_receipt(repo.get_root());
+    // Then
     assert_eq!(receipt["eligible_hashes"], 2);
     assert_eq!(receipt["failed_hashes"], 2);
     assert_eq!(receipt["exhausted_hashes"], 0);
@@ -190,15 +216,18 @@ fn failed_hashes_with_budget_remaining_are_still_eligible() {
 
 #[test]
 fn exhausted_reservations_without_error_are_missing_but_not_failed() {
+    // Given
     let repo = load_pair("alpha", "beta");
     let config = read_config(&repo);
     let mut storage = repo.open_storage();
     let nodes = storage.begin_read().unwrap().list_nodes().unwrap();
     let mut write = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    // When / Then
     for node in nodes {
         let NodeMetadata::Knowledge(node) = node.metadata else {
             continue;
         };
+        // When / Then
         assert!(write.reserve_attempt(&node.search_hash, 1).unwrap());
     }
     write.commit().unwrap();
@@ -215,13 +244,16 @@ fn exhausted_reservations_without_error_are_missing_but_not_failed() {
 
 #[test]
 fn mismatched_configuration_fails_without_resetting_vectors() {
+    // Given
     let repo = load_pair("alpha", "beta");
     let original = read_config(&repo);
     repo.seed_vectors(&original, &[("a.md", &[1., 0.])]);
     repo.write_config("ollama", "http://127.0.0.1:1/api", "different-model");
     let before = capture_databases(repo.get_root());
     let request = write_request(repo.get_root(), (2, 0, 0));
+    // When
     let error = observe_request(&request).unwrap_err();
+    // Then
     assert!(
         error
             .to_string()
@@ -234,8 +266,10 @@ fn mismatched_configuration_fails_without_resetting_vectors() {
 
 #[test]
 fn missing_databases_are_not_initialized() {
+    // Given
     let root = TempDir::new().unwrap();
     let request = write_request(root.path(), (0, 0, 0));
+    // When / Then
     assert!(observe_request(&request).is_err());
     assert!(!root.path().join(".letopis").exists());
     assert!(!root.path().join("observation.json").exists());
@@ -243,6 +277,7 @@ fn missing_databases_are_not_initialized() {
 
 #[test]
 fn empty_and_wrong_version_databases_are_unchanged() {
+    // Given
     for (leaf, wrong_version) in [("cache.db", 3), ("vectors.db", 2)] {
         for version in [0, wrong_version] {
             let repo = load_pair("alpha", "beta");
@@ -253,7 +288,9 @@ fn empty_and_wrong_version_databases_are_unchanged() {
             drop(raw);
             let before = capture_databases(repo.get_root());
             let request = write_request(repo.get_root(), (2, 0, 0));
+            // When
             let error = observe_request(&request).unwrap_err();
+            // Then
             assert!(
                 error.to_string().contains("unsupported database schema"),
                 "{error}"
@@ -266,6 +303,7 @@ fn empty_and_wrong_version_databases_are_unchanged() {
 
 #[test]
 fn missing_or_non_regular_or_symlink_database_is_rejected() {
+    // Given
     for kind in ["missing", "directory", "symlink"] {
         let repo = load_pair("alpha", "beta");
         let path = repo.get_root().join(".letopis/vectors.db");
@@ -281,6 +319,7 @@ fn missing_or_non_regular_or_symlink_database_is_rejected() {
         }
         let cache = fs::read(repo.get_root().join(".letopis/cache.db")).unwrap();
         let request = write_request(repo.get_root(), (2, 0, 0));
+        // When / Then
         assert!(observe_request(&request).is_err());
         assert_eq!(
             fs::read(repo.get_root().join(".letopis/cache.db")).unwrap(),
@@ -298,6 +337,7 @@ fn missing_or_non_regular_or_symlink_database_is_rejected() {
 
 #[test]
 fn expected_versions_outside_wal_mode_are_rejected_without_header_changes() {
+    // Given
     for leaf in ["cache.db", "vectors.db"] {
         let repo = load_pair("alpha", "beta");
         let path = repo.get_root().join(".letopis").join(leaf);
@@ -306,7 +346,9 @@ fn expected_versions_outside_wal_mode_are_rejected_without_header_changes() {
         drop(raw);
         let before = capture_databases(repo.get_root());
         let request = write_request(repo.get_root(), (2, 0, 0));
+        // When
         let error = observe_request(&request).unwrap_err();
+        // Then
         assert!(error.to_string().contains("product WAL mode"), "{error}");
         assert_eq!(capture_databases(repo.get_root()), before);
         assert!(!repo.get_root().join("observation.json").exists());
@@ -315,6 +357,7 @@ fn expected_versions_outside_wal_mode_are_rejected_without_header_changes() {
 
 #[test]
 fn missing_or_invalid_configuration_does_not_reset_databases() {
+    // Given
     for bytes in [None, Some(b"{}".as_slice())] {
         let repo = load_pair("alpha", "beta");
         fs::remove_file(repo.get_root().join(".letopis/config.json")).unwrap();
@@ -323,6 +366,7 @@ fn missing_or_invalid_configuration_does_not_reset_databases() {
         }
         let before = capture_databases(repo.get_root());
         let request = write_request(repo.get_root(), (2, 0, 0));
+        // When / Then
         assert!(observe_request(&request).is_err());
         assert_eq!(capture_databases(repo.get_root()), before);
         assert!(!repo.get_root().join("observation.json").exists());
@@ -331,6 +375,7 @@ fn missing_or_invalid_configuration_does_not_reset_databases() {
 
 #[test]
 fn expected_cache_version_without_product_schema_is_rejected() {
+    // Given
     let repo = load_pair("alpha", "beta");
     let path = repo.get_root().join(".letopis/cache.db");
     fs::remove_file(&path).unwrap();
@@ -340,15 +385,18 @@ fn expected_cache_version_without_product_schema_is_rejected() {
     drop(raw);
     let before = capture_databases(repo.get_root());
     let request = write_request(repo.get_root(), (2, 0, 0));
+    // When / Then
     assert!(observe_request(&request).is_err());
     assert_eq!(capture_databases(repo.get_root()), before);
 }
 
 #[test]
 fn existing_receipt_is_never_overwritten() {
+    // Given
     let repo = load_pair("alpha", "beta");
     repo.write("observation.json", b"preserve this receipt");
     let request = write_request(repo.get_root(), (2, 0, 0));
+    // When / Then
     assert!(observe_request(&request).is_err());
     assert_eq!(
         fs::read(repo.get_root().join("observation.json")).unwrap(),
@@ -358,10 +406,13 @@ fn existing_receipt_is_never_overwritten() {
 
 #[test]
 fn count_mismatch_is_not_a_populated_observation() {
+    // Given
     let repo = load_pair("alpha", "beta");
     let before = capture_databases(repo.get_root());
     let request = write_request(repo.get_root(), (3, 0, 0));
+    // When
     let error = observe_request(&request).unwrap_err();
+    // Then
     assert!(
         error.to_string().contains("corpus counts mismatch"),
         "{error}"
@@ -372,8 +423,10 @@ fn count_mismatch_is_not_a_populated_observation() {
 
 #[test]
 fn malformed_request_is_rejected_without_opening_databases() {
+    // Given
     let root = TempDir::new().unwrap();
     let request = root.path().join("request.json");
+    // When / Then
     for input in [
         "{}",
         "[]",
@@ -381,6 +434,7 @@ fn malformed_request_is_rejected_without_opening_databases() {
         r#"{"root":"relative","output":"relative","expected_knowledge":0,"expected_sources":0,"expected_edges":0}"#,
     ] {
         fs::write(&request, input).unwrap();
+        // When / Then
         assert!(observe_request(&request).is_err());
         assert!(!root.path().join(".letopis").exists());
     }
@@ -388,8 +442,10 @@ fn malformed_request_is_rejected_without_opening_databases() {
 
 #[test]
 fn ignored_entry_consumes_request_from_its_process_environment() {
+    // Given
     let repo = load_pair("alpha", "beta");
     let request = write_request(repo.get_root(), (2, 0, 0));
+    // When
     let output = Command::new(std::env::current_exe().unwrap())
         .args([
             "--ignored",
@@ -400,6 +456,7 @@ fn ignored_entry_consumes_request_from_its_process_environment() {
         .env("LETOPIS_CORPUS_REQUEST", request)
         .output()
         .unwrap();
+    // Then
     assert!(
         output.status.success(),
         "{}",

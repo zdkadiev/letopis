@@ -196,20 +196,20 @@ mod tests {
 
     #[test]
     fn bounds_raw_token_traversal_before_canonicalization() {
-        // Arrange
+        // Given
         let nested = format!("{}0{}", "[".repeat(130), "]".repeat(130));
-        // Act
+        // When
         let result = serde_json::from_str::<JsonValue<true>>(&nested);
-        // Assert
+        // Then
         assert!(result.is_err());
     }
     #[test]
     fn rejects_trailing_json_after_configuration() {
-        // Arrange
+        // Given
         let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":0} null"#;
-        // Act
+        // When
         let result = EmbeddingConfig::parse(bytes);
-        // Assert
+        // Then
         assert!(result.is_err());
     }
 }

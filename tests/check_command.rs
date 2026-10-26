@@ -10,6 +10,7 @@ use support::{documents::build_whole, reading::ReadingRepo};
 
 #[test]
 fn check_binary_reports_multiple_errors_and_repairs() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write(
         "duplicate.md",
@@ -20,8 +21,10 @@ fn check_binary_reports_multiple_errors_and_repairs() {
     repo.write_knowledge("a.md", "[b](b.md \"letopis:type=includes\")");
     repo.write_knowledge("b.md", "[a](a.md \"letopis:type=includes\")");
 
+    // When
     let response = check(&repo, b"{}");
 
+    // Then
     assert_eq!(
         response,
         json!({"ok":true,"result":{"errors":[
@@ -34,7 +37,9 @@ fn check_binary_reports_multiple_errors_and_repairs() {
     );
     let mut storage = repo.open_storage();
     assert_eq!(storage.begin_read().unwrap().list_nodes().unwrap().len(), 3);
+    // Given
     repo.write_knowledge("duplicate.md", "Repaired duplicate");
+    // When / Then
     assert_eq!(
         check(&repo, b"{}")["result"]["errors"]
             .as_array()
@@ -42,7 +47,9 @@ fn check_binary_reports_multiple_errors_and_repairs() {
             .len(),
         4
     );
+    // Given
     repo.write_knowledge("nested.md", "Repaired nesting");
+    // When / Then
     assert_eq!(
         check(&repo, b"{}")["result"]["errors"]
             .as_array()
@@ -50,7 +57,9 @@ fn check_binary_reports_multiple_errors_and_repairs() {
             .len(),
         3
     );
+    // Given
     repo.write_knowledge("missing.md", "Target restored");
+    // When / Then
     assert_eq!(
         check(&repo, b"{}")["result"]["errors"]
             .as_array()
@@ -58,7 +67,9 @@ fn check_binary_reports_multiple_errors_and_repairs() {
             .len(),
         2
     );
+    // Given
     repo.write_knowledge("b.md", "Cycle repaired");
+    // When / Then
     assert_eq!(
         check(&repo, b"{}"),
         json!({"ok":true,"result":{"errors":[]}})
@@ -67,16 +78,19 @@ fn check_binary_reports_multiple_errors_and_repairs() {
 
 #[test]
 fn check_paths_filters_owners_after_full_graph_validation() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("a/item.md", "[target](target.md \"letopis:type=supports\") [other](b/item.md \"letopis:type=includes\")");
     repo.write_knowledge("b/item.md", "[other](a/item.md \"letopis:type=includes\") [missing](missing.md \"letopis:type=custom7\")");
     repo.write_knowledge("target.md", "Available outside selection");
 
+    // When
     let response = check(
         &repo,
         br#"{"paths":["a/item.md","./a/item.md","unused/../a/item.md","absent.md"]}"#,
     );
 
+    // Then
     assert_eq!(
         response,
         json!({"ok":true,"result":{"errors":[
@@ -93,6 +107,7 @@ fn check_paths_filters_owners_after_full_graph_validation() {
 
 #[test]
 fn check_preserves_agent_layout_and_relation_names() {
+    // Given
     let repo = ReadingRepo::new();
     let knowledge = build_whole(42, "[case](case.md \"letopis:type=explains_case7\")");
     repo.write("knowledge/deep/notes.markdown", knowledge.as_bytes());
@@ -101,6 +116,7 @@ fn check_preserves_agent_layout_and_relation_names() {
     repo.write(".gitignore", b"ignored.md\n");
     repo.write("ignored.md", b"<!-- letopis: broken -->\n");
 
+    // When / Then
     assert_eq!(
         check(&repo, b"{}"),
         json!({"ok":true,"result":{"errors":[]}})
@@ -126,13 +142,16 @@ fn check_preserves_agent_layout_and_relation_names() {
 
 #[test]
 fn check_binary_rejects_invalid_input_and_infrastructure_failure() {
+    // Given
     for input in [
         b"{".as_slice(),
         br#"{"paths":["../escape.md"]}"#,
         br#"{"paths":["a.md#anchor"]}"#,
     ] {
         let repo = ReadingRepo::new();
+        // When
         let output = repo.invoke(&["check"], input);
+        // Then
         assert_eq!(output.status.code(), Some(1));
         let response: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(response["ok"], false);
@@ -158,6 +177,7 @@ fn check_binary_rejects_invalid_input_and_infrastructure_failure() {
 
 #[test]
 fn check_snapshot_findings_are_current_and_safe() {
+    // Given
     let repo = ReadingRepo::new();
     let git = open_git_snapshots(repo.get_root()).unwrap();
     let valid = git.create_tree(&[]).unwrap();
@@ -181,8 +201,10 @@ fn check_snapshot_findings_are_current_and_safe() {
         );
     }
 
+    // When
     let response = check(&repo, b"{}");
 
+    // Then
     assert_eq!(
         response,
         json!({"ok":true,"result":{"errors":[
@@ -214,8 +236,10 @@ fn check_snapshot_findings_are_current_and_safe() {
 
 #[test]
 fn check_keeps_invalid_files_previous_projection_and_snapshot_findings() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write("retained.md", b"<!-- letopis: {\"created_at\":42,\"source_snapshot\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"} -->\nKnowledge\n");
+    // When / Then
     assert_eq!(
         check(&repo, b"{}")["result"]["errors"]
             .as_array()
@@ -238,14 +262,17 @@ fn check_keeps_invalid_files_previous_projection_and_snapshot_findings() {
 
 #[test]
 fn check_binary_reports_literal_single_dangling_target() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "owner.md",
         "[missing](missing.md \"letopis:type=supports\")",
     );
 
+    // When
     let response = check(&repo, b"{}");
 
+    // Then
     assert_eq!(
         response,
         json!({"ok":true,"result":{"errors":[

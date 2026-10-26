@@ -46,7 +46,7 @@ struct CanonicalState {
 #[test]
 fn reindex_rejects_corrupt_required_basis_without_advancing() {
     for object in [RequiredObject::Root, RequiredObject::Child] {
-        // Arrange: the authored basis is required by a real external source edge.
+        // Given: the authored basis is required by a real external source edge.
         let repo = ReadingRepo::new();
         let basis = create_basis(repo.get_root(), &[("source.txt", SOURCE)]);
         repo.write("source.txt", SOURCE);
@@ -72,7 +72,7 @@ fn reindex_rejects_corrupt_required_basis_without_advancing() {
         let original = damage_owned_object(repo.get_root(), &path);
         let damaged = fs::read(&path).unwrap();
 
-        // Act / Assert: each command starts a fresh process and must fail closed.
+        // When / Then: each command starts a fresh process and must fail closed.
         for _ in 0..2 {
             assert_safe_failure(&repo.invoke(&["reindex"], b"{}"));
             assert_eq!(capture_projection(&repo), projection);
@@ -80,7 +80,7 @@ fn reindex_rejects_corrupt_required_basis_without_advancing() {
             assert_eq!(fs::read(&path).unwrap(), damaged);
         }
 
-        // Arrange / Act / Assert: exact object restoration is only a fixture control.
+        // Given / When / Then: exact object restoration is only a fixture control.
         fs::write(&path, original).unwrap();
         assert_eq!(invoke_reindex(&repo)["result"]["revision"], 2);
         assert_basis_projection(&repo, basis.as_str());
@@ -90,7 +90,7 @@ fn reindex_rejects_corrupt_required_basis_without_advancing() {
 
 #[test]
 fn reindex_after_cache_loss_reports_invalid_file_and_publishes_valid_peer() {
-    // Arrange: discard the sole last-valid projection after editing both files.
+    // Given: discard the sole last-valid projection after editing both files.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
     repo.write_knowledge("b.md", "BravoToken");
@@ -100,22 +100,22 @@ fn reindex_after_cache_loss_reports_invalid_file_and_publishes_valid_peer() {
     let invalid_canonical = capture_canonical_state(&repo);
     remove_owned_cache(repo.get_root());
 
-    // Act: reindex builds a new counter from current canonical bytes.
+    // When: reindex builds a new counter from current canonical bytes.
     assert_eq!(invoke_reindex(&repo)["result"]["revision"], 1);
 
-    // Assert: invalid A has no invented old knowledge, while valid B is published.
+    // Then: invalid A has no invented old knowledge, while valid B is published.
     assert_invalid_projection(&repo);
     for _ in 0..2 {
         assert_invalid_status(&repo);
         assert_eq!(capture_canonical_state(&repo), invalid_canonical);
     }
 
-    // Arrange / Act: fix the author-owned file, then publish in another process.
+    // Given / When: fix the author-owned file, then publish in another process.
     repo.write_knowledge("a.md", "DeltaToken");
     let fixed_canonical = capture_canonical_state(&repo);
     assert_eq!(invoke_reindex(&repo)["result"]["revision"], 2);
 
-    // Assert: repair removes the current error and publishes both current texts.
+    // Then: repair removes the current error and publishes both current texts.
     assert_repaired_projection(&repo);
     let status = read_response(&repo.invoke(&["status"], b"{}"), 0);
     assert_eq!(status["result"]["revision"], 2);

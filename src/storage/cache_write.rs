@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn caught_sql_failure_poisoning_restores_metadata_and_index() {
-        // Arrange: a real schema and caller-owned transaction.
+        // Given: a real schema and caller-owned transaction.
         let root = TempDir::new().unwrap();
         let mut db = open_database(&root.path().join("cache.db")).unwrap();
         bootstrap_cache(&mut db).unwrap();
@@ -131,12 +131,12 @@ mod tests {
             .transaction
             .execute_batch("DROP TABLE text_index")
             .unwrap();
-        // Act: catch an actual SQL failure rather than an input rejection.
+        // When: catch an actual SQL failure rather than an input rejection.
         let error = write
             .replace_text(&id, "unique-payload Authorization:Bearer-secret")
             .unwrap_err();
         assert!(write.commit().is_err());
-        // Assert: neither metadata nor schema destruction was published.
+        // Then: neither metadata nor schema destruction was published.
         assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
         assert!(error.source().is_some());
         for sentinel in ["unique-payload", "Authorization", "text_index"] {

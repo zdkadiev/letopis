@@ -16,7 +16,7 @@ const PRIVATE_RESPONSE: &str = "private-over-context-response-canary";
 
 #[test]
 fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() {
-    // Arrange: this synthetic length tests preservation, not a universal model limit.
+    // Given: this synthetic length tests preservation, not a universal model limit.
     let repo = ReadingRepo::new();
     let text = format!("{}{FINAL_MARKER}", "LongKnowledgeBodyToken ".repeat(4096));
     repo.write_knowledge("long.md", &text);
@@ -26,7 +26,7 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
         body: format!(r#"{{"error":"context exceeded {PRIVATE_RESPONSE}"}}"#),
     });
     let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
-    // Act: the real drain submits the whole input, then a repeated drain does no work.
+    // When: the real drain submits the whole input, then a repeated drain does no work.
     assert_success(&repo.invoke(&["embed", "--drain"], b""));
     assert_eq!(
         http.take_requests(),
@@ -36,7 +36,7 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
     );
     assert_success(&repo.invoke(&["embed", "--drain"], b""));
     assert!(http.take_requests().is_empty());
-    // Assert: the final token is independently retrievable despite provider rejection.
+    // Then: the final token is independently retrievable despite provider rejection.
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     let matches = read.match_text(FINAL_MARKER).unwrap();

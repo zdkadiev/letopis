@@ -6,30 +6,30 @@ use letopis::{
 };
 use std::path::Path;
 
-struct ReadyWork;
-impl EmbeddingExecutor for ReadyWork {
-    fn has_work(&mut self) -> CommandResult<bool> {
-        Ok(true)
-    }
-    fn drain(&mut self) -> CommandResult<()> {
-        Ok(())
+mockall::mock! {
+    ReadyWork {}
+    impl EmbeddingExecutor for ReadyWork {
+        fn has_work(&mut self) -> CommandResult<bool>;
+        fn drain(&mut self) -> CommandResult<()>;
     }
 }
 
 #[test]
 fn reports_a_safe_warning_when_the_child_cannot_create_its_session() {
-    // Arrange: the executable exists, so failed exec cannot mask a lost setsid error.
+    // Given: the executable exists, so failed exec cannot mask a lost setsid error.
     let root = tempfile::tempdir().unwrap();
     let executable = Path::new("/usr/bin/true");
     assert!(executable.is_file());
-    let mut tasks = ReadyWork;
+    let mut tasks = MockReadyWork::new();
+    tasks.expect_has_work().times(1).returning(|| Ok(true));
+    tasks.expect_drain().times(0);
     let mut background = wire_background_runner(root.path(), executable, Some(&mut tasks)).unwrap();
-    // Act
+    // When
     let warning = background
         .start_if_needed()
         .unwrap()
         .expect("session setup must fail");
-    // Assert
+    // Then
     assert_eq!(warning.code, CommandErrorKind::InternalError);
     assert!(warning.details.is_empty());
     let root_text = root.path().display().to_string();

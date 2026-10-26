@@ -217,11 +217,14 @@ mod tests {
 
     #[test]
     fn classifies_every_known_cached_message_without_changing_parser_diagnostics() {
+        // Given
         for (kind, message, code) in PARSER_CASES {
             let row = build_invalid_file("bad.md", Some(message));
 
+            // When
             let problem = format_invalid_file(&row);
 
+            // Then
             assert_eq!(kind.get_message(), message);
             assert_eq!(kind.get_code(), code);
             assert_eq!(problem.code, CommandErrorKind::ValidationFailed);
@@ -235,6 +238,7 @@ mod tests {
 
     #[test]
     fn hides_unknown_and_absent_cached_reasons() {
+        // Given
         for reason in [
             Some("SECRET_RAW_BODY"),
             None,
@@ -242,8 +246,10 @@ mod tests {
         ] {
             let row = build_invalid_file("bad.md", reason);
 
+            // When
             let problem = format_invalid_file(&row);
 
+            // Then
             assert_eq!(problem.message, "invalid knowledge file");
             assert_eq!(
                 problem.details,
@@ -256,14 +262,17 @@ mod tests {
 
     #[test]
     fn retains_private_storage_cause_without_public_payload() {
+        // Given
         let cause = StorageError::new_with_cause(
             StorageErrorKind::InternalError,
             "storage read failed",
             io::Error::other("SECRET_SQL_CAUSE"),
         );
 
+        // When
         let error = map_read_error(cause);
 
+        // Then
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
         assert_eq!(error.to_string(), "cannot read graph diagnostics");
         assert!(!format!("{error:?}").contains("SECRET_SQL_CAUSE"));
@@ -277,6 +286,7 @@ mod tests {
 
     #[test]
     fn finds_cross_file_cycle_before_filtering_and_deduplicates_selectors() {
+        // Given
         let root = TempDir::new().unwrap();
         let mut storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -288,10 +298,12 @@ mod tests {
         let mut view = storage.begin_read().unwrap();
         let selected = RepoPath::parse("a.md").unwrap();
 
+        // When
         let problems = CurrentGraphDiagnostics::new()
             .find_problems(&mut view, &[selected.clone(), selected])
             .unwrap();
 
+        // Then
         assert_eq!(problems.len(), 1);
         assert_eq!(problems[0].code, CommandErrorKind::ValidationFailed);
         assert_eq!(
@@ -309,6 +321,7 @@ mod tests {
 
     #[test]
     fn keeps_two_components_in_one_file_with_minimum_local_representatives() {
+        // Given
         let root = TempDir::new().unwrap();
         let mut storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -324,6 +337,7 @@ mod tests {
         );
         let mut view = storage.begin_read().unwrap();
 
+        // When
         let problems = CurrentGraphDiagnostics::new()
             .find_problems(&mut view, &[])
             .unwrap();
@@ -336,11 +350,13 @@ mod tests {
                 {"path":"b.md", "reason":"includes_cycle", "element_id":"b.md"}
             ]))
             .unwrap();
+        // Then
         assert_eq!(details, expected.iter().collect::<Vec<_>>());
     }
 
     #[test]
     fn orders_file_graph_and_distinct_anchor_findings_by_safe_context() {
+        // Given
         let root = TempDir::new().unwrap();
         let mut storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -359,6 +375,7 @@ mod tests {
         write.commit().unwrap();
         let mut view = storage.begin_read().unwrap();
 
+        // When
         let problems = CurrentGraphDiagnostics::new()
             .find_problems(&mut view, &[])
             .unwrap();
@@ -373,6 +390,7 @@ mod tests {
                 {"path":"z.md", "reason":"invalid_target"}
             ]))
             .unwrap();
+        // Then
         assert_eq!(details, expected.iter().collect::<Vec<_>>());
         assert!(
             problems

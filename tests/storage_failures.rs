@@ -8,6 +8,7 @@ use tempfile::TempDir;
 #[test]
 fn reservation_is_durable_only_after_commit_and_survives_reopen() {
     // Catches implicit commit, forgotten persisted counters, and off-by-one budgets.
+    // Given
     for budget in [1, 3] {
         let root = TempDir::new().unwrap();
         let cache = root.path().join("cache");
@@ -17,11 +18,13 @@ fn reservation_is_durable_only_after_commit_and_survives_reopen() {
         let mut storage = open_storage(&cache, &vectors).unwrap();
         storage.reset_vectors(None, &identity).unwrap();
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        // When / Then
         assert!(unit.reserve_attempt(&hash, budget).unwrap());
         drop(unit);
         assert_eq!(read_failure(&mut storage, &identity, &hash), None);
         for expected in 1..=budget {
             let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+            // When / Then
             assert!(unit.reserve_attempt(&hash, budget).unwrap());
             unit.commit().unwrap();
             drop(storage);
@@ -49,12 +52,14 @@ fn reservation_is_durable_only_after_commit_and_survives_reopen() {
 #[test]
 fn absent_failure_is_not_created_by_error() {
     // Catches errors inventing attempts for requests that were never reserved.
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let identity = Sha256::digest(b"M1");
     storage.reset_vectors(None, &identity).unwrap();
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+    // When / Then
     assert!(!unit.record_failure(&identity, "safe failure").unwrap());
     unit.commit().unwrap();
     assert_eq!(read_failure(&mut storage, &identity, &identity), None);
@@ -62,6 +67,7 @@ fn absent_failure_is_not_created_by_error() {
 #[test]
 fn success_clears_only_its_failure() {
     // Catches success deleting unrelated failures or uncommitted deletes leaking.
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -69,7 +75,9 @@ fn success_clears_only_its_failure() {
     let other = Sha256::digest(b"other");
     storage.reset_vectors(None, &identity).unwrap();
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+    // When / Then
     for hash in [identity, other] {
+        // When / Then
         assert!(unit.reserve_attempt(&hash, 3).unwrap());
         assert!(unit.record_failure(&hash, "safe failure").unwrap());
     }
@@ -99,6 +107,7 @@ fn success_clears_only_its_failure() {
 #[test]
 fn query_error_replaces_and_clears_without_history() {
     // Catches reset clearing last query failure or upserts retaining history.
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache");
     let vectors = root.path().join("vectors");
@@ -114,6 +123,7 @@ fn query_error_replaces_and_clears_without_history() {
     let mut storage = open_storage(&cache, &vectors).unwrap();
     let next = Sha256::digest(b"M2");
     storage.reset_vectors(Some(&identity), &next).unwrap();
+    // When / Then
     assert_eq!(
         storage.begin_read().unwrap().read_query_error().unwrap(),
         Some(QueryError {
@@ -148,6 +158,7 @@ fn query_error_replaces_and_clears_without_history() {
 #[test]
 fn stale_identity_cannot_reserve_or_record_or_store() {
     // Every late action must be gated before it can alter populated M2 state.
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -156,6 +167,7 @@ fn stale_identity_cannot_reserve_or_record_or_store() {
     storage.reset_vectors(None, &m1).unwrap();
     storage.reset_vectors(Some(&m1), &m2).unwrap();
     let mut unit = unwrap_current(storage.begin_vector_write(&m2).unwrap());
+    // When / Then
     assert!(unit.reserve_attempt(&m2, 3).unwrap());
     assert!(unit.record_failure(&m2, "M2 failure").unwrap());
     unit.set_query_error(42, "M2 query").unwrap();
@@ -193,6 +205,7 @@ fn stale_identity_cannot_reserve_or_record_or_store() {
 #[test]
 fn invalid_budget_and_timestamp_poison_units_without_partial_writes() {
     // Catches wrapping conversions and committing writes preceding invalid input.
+    // Given
     for invalid in [0, u64::MAX] {
         let root = TempDir::new().unwrap();
         let mut storage =
@@ -200,6 +213,7 @@ fn invalid_budget_and_timestamp_poison_units_without_partial_writes() {
         let identity = Sha256::digest(b"M1");
         storage.reset_vectors(None, &identity).unwrap();
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        // When / Then
         assert!(unit.reserve_attempt(&identity, 3).unwrap());
         assert!(unit.reserve_attempt(&identity, invalid).is_err());
         assert!(unit.commit().is_err());
@@ -217,6 +231,7 @@ fn invalid_budget_and_timestamp_poison_units_without_partial_writes() {
 #[test]
 fn maximum_persisted_attempt_is_not_incremented_or_wrapped() {
     // Catches SQLite promoting integer overflow into a floating-point counter.
+    // Given
     let root = TempDir::new().unwrap();
     let vectors = root.path().join("vectors");
     let mut storage = open_storage(&root.path().join("cache"), &vectors).unwrap();
@@ -229,6 +244,7 @@ fn maximum_persisted_attempt_is_not_incremented_or_wrapped() {
     )
     .unwrap();
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+    // When / Then
     assert!(!unit.reserve_attempt(&identity, i64::MAX as u64).unwrap());
     unit.set_query_error(i64::MAX as u64, "maximum time")
         .unwrap();

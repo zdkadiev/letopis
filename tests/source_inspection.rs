@@ -13,13 +13,13 @@ const MIXED_NOTE: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nKnowledgeToken
 
 #[test]
 fn inspect_mixed_batch_uses_current_tree_bytes() {
-    // Arrange: a stale index must not supply source bytes or knowledge coordinates.
+    // Given: a stale index must not supply source bytes or knowledge coordinates.
     let repo = ReadingRepo::new();
     repo.write("source.txt", b"old");
     repo.write("note.md", MIXED_NOTE);
     inspect(&repo, &["note.md"]);
     repo.write("source.txt", b"abc");
-    // Act
+    // When
     let result = inspect(
         &repo,
         &[
@@ -29,7 +29,7 @@ fn inspect_mixed_batch_uses_current_tree_bytes() {
             "https://Host/x?q=1#part",
         ],
     );
-    // Assert
+    // Then
     assert_eq!(result.elements.len(), 4);
     let knowledge = &result.elements["note.md"];
     assert_eq!(knowledge.path.as_str(), "note.md");
@@ -56,20 +56,22 @@ fn inspect_mixed_batch_uses_current_tree_bytes() {
     assert_eq!(remote.path.as_str(), "https://Host/x?q=1#part");
     assert_eq!((remote.hash, remote.lines), (None, None));
     assert_eq!(read_blob(&repo, &result, "source.txt"), b"abc");
+    // Given
     repo.write("source.txt", b"later");
+    // When / Then
     assert_eq!(read_blob(&repo, &result, "source.txt"), b"abc");
 }
 
 #[test]
 fn inspect_preserves_source_bytes_and_deduplicates_ranges() {
-    // Arrange
+    // Given
     let repo = ReadingRepo::new();
     repo.write("source.txt", b"one\r\ntwo");
     write_references(
         &repo,
         &["source.txt", "source.txt#L1-L1", "source.txt#L2-L2"],
     );
-    // Act
+    // When
     let result = inspect(
         &repo,
         &[
@@ -80,7 +82,7 @@ fn inspect_preserves_source_bytes_and_deduplicates_ranges() {
             "source.txt#L2-L2",
         ],
     );
-    // Assert
+    // Then
     assert_eq!(result.elements.len(), 3);
     assert_eq!(read_blob(&repo, &result, "source.txt"), b"one\r\ntwo");
     assert_eq!(
@@ -121,13 +123,13 @@ fn inspect_preserves_source_bytes_and_deduplicates_ranges() {
 
 #[test]
 fn inspect_distinguishes_missing_bytes_from_missing_membership() {
-    // Arrange
+    // Given
     let repo = ReadingRepo::new();
     write_references(&repo, &["missing.txt", "short.txt#L1-L2"]);
     repo.write("short.txt", b"abc");
-    // Act
+    // When
     let result = inspect(&repo, &["note.md", "missing.txt", "short.txt#L1-L2"]);
-    // Assert: a missing range retains its existing whole file in the tree.
+    // Then: a missing range retains its existing whole file in the tree.
     assert_eq!(result.elements["missing.txt"].hash, None);
     assert_eq!(result.elements["short.txt#L1-L2"].hash, None);
     assert_eq!(read_blob(&repo, &result, "short.txt"), b"abc");
@@ -137,32 +139,35 @@ fn inspect_distinguishes_missing_bytes_from_missing_membership() {
             .read_blob(&result.snapshot, &RepoPath::parse("missing.txt").unwrap())
             .is_err()
     );
-    // Act / Assert: removing the last current declaration removes membership.
+    // Given: the last current declaration is removed.
     write_references(&repo, &[]);
     let ids = ["note.md", "missing.txt"].map(|id| ElementAddress::parse(id).unwrap());
+    // When
     let error = wire_inspector(repo.get_root())
         .unwrap()
         .inspect(&ids)
         .unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
 }
 
 #[test]
 fn inspect_includes_unrequested_declared_source_files() {
-    // Arrange
+    // Given
     let repo = ReadingRepo::new();
     repo.write("source.txt", b"abc");
     repo.write("unrelated.txt", b"private unrelated");
     repo.write("plain.md", b"unmarked source");
     write_references(&repo, &["source.txt", "plain.md"]);
-    // Act
+    // When
     let result = inspect(&repo, &["note.md"]);
-    // Assert
+    // Then
     assert_eq!(result.elements.len(), 1);
     assert_eq!(read_blob(&repo, &result, "source.txt"), b"abc");
     assert_eq!(read_blob(&repo, &result, "plain.md"), b"unmarked source");
     let git = open_git_snapshots(repo.get_root()).unwrap();
     for path in ["unrelated.txt", ".letopis/cache.db"] {
+        // When / Then
         assert!(
             git.read_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
                 .is_err()
@@ -190,13 +195,13 @@ fn inspect_hashes_empty_binary_and_complete_line_bytes() {
         ),
         (b"".as_slice(), "source.txt#L1-L1", None),
     ] {
-        // Arrange
+        // Given
         let repo = ReadingRepo::new();
         repo.write("source.txt", bytes);
         write_references(&repo, &[address]);
-        // Act
+        // When
         let result = inspect(&repo, &[address]);
-        // Assert
+        // Then
         assert_eq!(
             result.elements[address].hash,
             expected.map(|s| Sha256::parse(s).unwrap())
@@ -207,13 +212,13 @@ fn inspect_hashes_empty_binary_and_complete_line_bytes() {
 
 #[test]
 fn inspect_retains_source_through_gc_without_changing_user_git_state() {
-    // Arrange: ReadingRepo starts with a committed HEAD and staged changes.
+    // Given: ReadingRepo starts with a committed HEAD and staged changes.
     let repo = ReadingRepo::new();
     repo.write("source.txt", b"source before later edit\n");
     write_references(&repo, &["source.txt"]);
     let head = fs::read(repo.get_root().join(".git/HEAD")).unwrap();
     let index = fs::read(repo.get_root().join(".git/index")).unwrap();
-    // Act
+    // When
     let result = inspect(&repo, &["note.md", "source.txt"]);
     repo.write("source.txt", b"edited after inspect\n");
     let status = Command::new("git")
@@ -221,7 +226,7 @@ fn inspect_retains_source_through_gc_without_changing_user_git_state() {
         .args(["gc", "--prune=now"])
         .status()
         .unwrap();
-    // Assert
+    // Then
     assert!(status.success());
     assert_eq!(
         read_blob(&repo, &result, "source.txt"),
@@ -234,17 +239,17 @@ fn inspect_retains_source_through_gc_without_changing_user_git_state() {
 #[cfg(unix)]
 #[test]
 fn inspect_rejects_symlinked_declared_source_without_retaining_success() {
-    // Arrange
+    // Given
     let repo = ReadingRepo::new();
     write_references(&repo, &["source.txt"]);
     std::os::unix::fs::symlink("live.md", repo.get_root().join("source.txt")).unwrap();
     let ids = [ElementAddress::parse("source.txt").unwrap()];
-    // Act
+    // When
     let error = wire_inspector(repo.get_root())
         .unwrap()
         .inspect(&ids)
         .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InvalidRequest);
     assert!(!error.to_string().contains("unstaged live"));
 }

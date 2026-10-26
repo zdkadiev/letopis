@@ -1,4 +1,4 @@
-use super::{build_config, seed_dimension};
+use super::{build_config, build_noop_refresher, seed_dimension};
 use crate::{
     domain::{
         Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, LineRange, Sha256, SourceUri, TreeOid,
@@ -8,9 +8,9 @@ use crate::{
     service::{
         CacheWrite, CommandErrorKind, ConfigState, DocumentError, DocumentErrorKind,
         DocumentResult, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind,
-        EmbeddingResult, KnowledgeMetadata, NodeMetadata, ProvenanceObservation, ProvenanceRequest,
-        QueryEmbedding, QueryEmbeddingRequest, RecheckFilter, RefreshOutcome, Refresher,
-        SearchFilters, SearchFlag, SearchRequest, Searcher, SnapshotError, SourceProvenance,
+        EmbeddingResult, KnowledgeMetadata, MockRefresher, NodeMetadata, ProvenanceObservation,
+        ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest, RecheckFilter, SearchFilters,
+        SearchFlag, SearchRequest, Searcher, SnapshotError, SourceProvenance,
         SourceRevisionComparison, SourceRevisionRequest, Storage, StorageRead, StorageResult,
         VectorOutcome, search::SearchService,
     },
@@ -24,7 +24,6 @@ use std::{
     rc::Rc,
 };
 
-struct NoRefresh;
 struct Query {
     config: EmbeddingConfig,
     state: Option<ConfigState>,
@@ -46,8 +45,14 @@ struct ReadOnlyStorage {
     reads: Rc<Cell<usize>>,
 }
 
-type ScopedSearch =
-    SearchService<NoRefresh, ReadOnlyStorage, Query, LocalFileSystem, MarkdownParser, Observations>;
+type ScopedSearch = SearchService<
+    MockRefresher,
+    ReadOnlyStorage,
+    Query,
+    LocalFileSystem,
+    MarkdownParser,
+    Observations,
+>;
 struct ScopedFixture {
     root: tempfile::TempDir,
     config: EmbeddingConfig,
@@ -63,13 +68,13 @@ fn non_ready_configuration_preserves_fts_and_one_pinned_consumer_view() {
         ConfigState::Invalid(EmbeddingErrorKind::InvalidConfig),
         ConfigState::Changed,
     ] {
-        // Arrange: vectors exist, but readiness must still disable query inference.
+        // Given: vectors exist, but readiness must still disable query inference.
         let fixture = ScopedFixture::new();
         let mut search = fixture.build_search(None, None);
         search.embeddings.state = Some(state);
-        // Act
+        // When
         let links = search.search(&build_request()).unwrap();
-        // Assert
+        // Then
         assert_eq!(links.len(), 1);
         assert_eq!(links[0].element_id.as_str(), "a.md");
         assert_eq!(fixture.calls.get(), 0);
@@ -80,6 +85,7 @@ fn non_ready_configuration_preserves_fts_and_one_pinned_consumer_view() {
 
 #[test]
 fn metadata_failure_after_query_releases_pinned_view() {
+    // Given
     let fixture = ScopedFixture::new();
     let root = fixture.root.path();
     let connection = rusqlite::Connection::open(root.join("cache.db")).unwrap();
@@ -88,8 +94,10 @@ fn metadata_failure_after_query_releases_pinned_view() {
         .unwrap();
     let mut search = fixture.build_search(None, None);
 
+    // When
     let error = search.search(&build_request()).unwrap_err();
 
+    // Then
     assert_eq!(fixture.calls.get(), 1);
     assert_eq!(fixture.reads.get(), 1);
     assert!(fixture.observed.borrow().is_empty());
@@ -110,6 +118,7 @@ fn metadata_failure_after_query_releases_pinned_view() {
 
 #[test]
 fn search_observes_metadata_and_bindings_from_original_pinned_view() {
+    // Given
     let fixture = ScopedFixture::new();
     let root = fixture.root.path();
     let mut writer = open_storage(root);
@@ -120,8 +129,10 @@ fn search_observes_metadata_and_bindings_from_original_pinned_view() {
         None,
     );
 
+    // When
     let links = search.search(&build_filtered_request()).unwrap();
 
+    // Then
     assert_eq!(fixture.calls.get(), 1);
     assert_eq!(fixture.reads.get(), 1);
     assert_eq!(links.len(), 1);
@@ -144,6 +155,7 @@ fn search_observes_metadata_and_bindings_from_original_pinned_view() {
 
 #[test]
 fn late_provenance_failure_releases_pinned_view_while_service_stays_alive() {
+    // Given
     for failure in [
         ProvenanceFailure::Observation,
         ProvenanceFailure::Comparison,
@@ -152,8 +164,10 @@ fn late_provenance_failure_releases_pinned_view_while_service_stays_alive() {
         let root = fixture.root.path();
         let mut search = fixture.build_search(None, Some(failure));
 
+        // When
         let error = search.search(&build_filtered_request()).unwrap_err();
 
+        // Then
         assert_eq!(fixture.calls.get(), 1);
         assert_eq!(fixture.reads.get(), 1);
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
@@ -189,7 +203,7 @@ impl ScopedFixture {
         failure: Option<ProvenanceFailure>,
     ) -> ScopedSearch {
         SearchService {
-            refresher: NoRefresh,
+            refresher: build_noop_refresher(),
             storage: ReadOnlyStorage {
                 inner: open_storage(self.root.path()),
                 reads: self.reads.clone(),
@@ -210,21 +224,6 @@ impl ScopedFixture {
     }
 }
 
-impl Refresher for NoRefresh {
-    fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
-        panic!("this scenario must not trigger a full reindex")
-    }
-
-    fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
-        Ok(RefreshOutcome {
-            revision: 1,
-            published: false,
-            files_updated: 0,
-            files_removed: 0,
-            invalid_files_updated: 0,
-        })
-    }
-}
 impl Embedder for Query {
     fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
         Ok(self

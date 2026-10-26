@@ -56,7 +56,7 @@ struct Sources {
 
 #[test]
 fn retains_original_graph_bindings_and_revision_across_pages() {
-    // Arrange: publish replacement membership and basis only after revision 1 is pinned.
+    // Given: publish replacement membership and basis only after revision 1 is pinned.
     let fixture = Fixture::new();
     let root = fixture.root.path().to_owned();
     let mut service = fixture.build_service(
@@ -66,9 +66,9 @@ fn retains_original_graph_bindings_and_revision_across_pages() {
     let mut request = build_request();
     request.depth = 2;
     request.edge_limit = NonZeroUsize::new(10);
-    // Act.
+    // When.
     let output = service.traverse(&request).unwrap();
-    // Assert pinned graph/coordinates/basis separately from live observations.
+    // Then pinned graph/coordinates/basis separately from live observations.
     assert_eq!(
         output
             .elements
@@ -120,6 +120,7 @@ fn retains_original_graph_bindings_and_revision_across_pages() {
 
 #[test]
 fn synchronizes_readiness_before_one_pinned_read_without_query_inference() {
+    // Given
     for state in [
         ConfigState::Missing,
         ConfigState::Changed,
@@ -131,7 +132,9 @@ fn synchronizes_readiness_before_one_pinned_read_without_query_inference() {
             events: fixture.events.clone(),
             state,
         });
+        // When
         let output = service.traverse(&build_request()).unwrap();
+        // Then
         assert_eq!(output.elements.len(), 1);
         let events = fixture.events.borrow();
         assert_eq!(&events[..3], ["refresh", "readiness", "begin_read"]);
@@ -144,6 +147,7 @@ fn synchronizes_readiness_before_one_pinned_read_without_query_inference() {
 
 #[test]
 fn releases_read_after_late_failure_while_service_lives() {
+    // Given
     for failure in [Failure::Page, Failure::Source, Failure::Provenance] {
         let fixture = Fixture::new();
         if matches!(failure, Failure::Provenance) {
@@ -157,9 +161,9 @@ fn releases_read_after_late_failure_while_service_lives() {
         let mut service = fixture.build_service(failure, None);
         let mut request = build_request();
         request.depth = 3;
-        // Act: each failure follows at least one successfully selected graph record.
+        // When: each failure follows at least one successfully selected graph record.
         let error = service.traverse(&request).unwrap_err();
-        // Assert no partial success, safe public context, retained private error chain.
+        // Then no partial success, safe public context, retained private error chain.
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
         assert!(!error.to_string().contains("PRIVATE"));
         assert!(!format!("{error:?}").contains("PRIVATE"));
@@ -187,12 +191,15 @@ fn releases_read_after_late_failure_while_service_lives() {
 
 #[test]
 fn releases_read_after_normal_and_depth_zero_empty_results() {
+    // Given
     for depth in [0, 1] {
         let fixture = Fixture::new();
         let mut service = fixture.build_service(Failure::None, None);
         let mut request = build_request();
         request.depth = depth;
+        // When
         let output = service.traverse(&request).unwrap();
+        // Then
         assert_eq!(output.elements.len(), usize::try_from(depth).unwrap());
         fixture.assert_released();
         publish_replacement(fixture.root.path());

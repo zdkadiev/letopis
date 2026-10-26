@@ -34,6 +34,7 @@ use support::{
 
 #[test]
 fn effective_filters_initialize_repository_for_search() {
+    // Given
     for filters in [
         json!({"needs_recheck":true}),
         json!({"needs_recheck":false}),
@@ -42,8 +43,10 @@ fn effective_filters_initialize_repository_for_search() {
         let repo = ReadingRepo::new();
         let body = json!({"query":"x","limit":1,"filters":filters}).to_string();
 
+        // When
         let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 0);
 
+        // Then
         assert_eq!(response, json!({"ok":true,"result":[]}));
         assert!(repo.get_root().join(".letopis/cache.db").exists());
     }
@@ -63,6 +66,7 @@ fn effective_filters_initialize_repository_for_search() {
 
 #[test]
 fn malformed_filters_fail_before_repository_initialization() {
+    // Given
     for filters in [
         json!({"sources":null}),
         json!({"needs_recheck":null}),
@@ -71,8 +75,10 @@ fn malformed_filters_fail_before_repository_initialization() {
     ] {
         let repo = ReadingRepo::new();
         let body = json!({"query":"x","limit":1,"filters":filters}).to_string();
+        // When
         let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 1);
         emit_reading("malformed_input", "search", 1, &response);
+        // Then
         assert_eq!(response["error"]["code"], "invalid_request");
         assert!(!repo.get_root().join(".letopis").exists());
     }
@@ -80,6 +86,7 @@ fn malformed_filters_fail_before_repository_initialization() {
 
 #[test]
 fn binary_search_refreshes_and_returns_links_with_empty_filter_equivalence() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("knowledge.md", "SQLite OR блокировки café 42");
     for suffix in [
@@ -88,8 +95,10 @@ fn binary_search_refreshes_and_returns_links_with_empty_filter_equivalence() {
         r#", "filters":{"sources":[],"source_revisions":[]}"#,
     ] {
         let body = format!(r#"{{"query":"SQLite OR блокировки café 42","limit":1{suffix}}}"#);
+        // When
         let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 0);
         emit_reading("search_success", "search", 0, &response);
+        // Then
         assert_eq!(
             response,
             json!({"ok":true,"result":[{"element_id":"knowledge.md","path":"knowledge.md","lines":[1,2],"revision":1,"flags":[]}]})
@@ -100,6 +109,7 @@ fn binary_search_refreshes_and_returns_links_with_empty_filter_equivalence() {
 
 #[test]
 fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("knowledge.md", "sqlite");
     let barrier = ResponseBarrier::default();
@@ -118,7 +128,9 @@ fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
     );
     let mut owner = drain::DetachedOwner::new(repo.get_root(), child.get_id());
     child.send_input(br#"{"query":"sqlite","limit":1}"#);
+    // When
     let response = read_response(&child.collect_output(Duration::from_secs(10)), 0);
+    // Then
     assert_eq!(response["result"][0]["element_id"], "knowledge.md");
     assert!(response.get("warnings").is_none());
     barrier.wait_until_entered();
@@ -144,8 +156,10 @@ fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
 
 #[test]
 fn binary_inspect_returns_current_retained_tree_metadata() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write("knowledge.md", include_bytes!("fixtures/markdown/crlf.md"));
+    // When
     let response = read_response(
         &repo.invoke(
             &["inspect"],
@@ -154,6 +168,7 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
         0,
     );
     emit_reading("inspect_success", "inspect", 0, &response);
+    // Then
     assert_eq!(
         response["result"]["elements"],
         json!({"knowledge.md#a":{"path":"knowledge.md","lines":[1,3],"hash":"eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864"}})
@@ -170,15 +185,18 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
 
 #[test]
 fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
+    // Given
     let repo = ReadingRepo::new();
     let knowledge = b"<!-- letopis: {\"created_at\":1792800000,\"source_snapshot\":\"0000000000000000000000000000000000000000\"} -->\nCache decision.\n[range](src/cache.rs#L2-L2 \"letopis:type=external\")\n[missing](src/missing.rs \"letopis:type=external\")\n[remote](https://example.invalid/a?q=1#fragment \"letopis:type=external\")\n";
     repo.write("knowledge.md", knowledge);
     repo.write("src/cache.rs", b"alpha\r\nbeta\n");
     let body = br#"{"element_ids":["knowledge.md","src/cache.rs#L2-L2","src/missing.rs","https://example.invalid/a?q=1#fragment","./knowledge.md"]}"#;
 
+    // When
     let response = read_response(&repo.invoke(&["inspect"], body), 0);
 
     emit_reading("inspect_mixed", "inspect", 0, &response);
+    // Then
     assert_eq!(response["ok"], true);
     assert_eq!(
         response["result"]["elements"],
@@ -209,6 +227,7 @@ fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
 
 #[test]
 fn binary_inspect_rejects_unknown_member_without_partial_result() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "knowledge.md",
@@ -216,6 +235,7 @@ fn binary_inspect_rejects_unknown_member_without_partial_result() {
     );
     repo.write("src/cache.rs", b"private source secret\n");
     let initial = br#"{"element_ids":["knowledge.md","src/cache.rs"]}"#;
+    // When / Then
     assert_eq!(
         read_response(&repo.invoke(&["inspect"], initial), 0)["ok"],
         true
@@ -240,6 +260,7 @@ fn binary_inspect_rejects_unknown_member_without_partial_result() {
 
 #[test]
 fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
+    // Given
     for provider in ["ollama", "openai"] {
         let repo = ReadingRepo::new();
         repo.write_knowledge("knowledge.md", "sqlite");
@@ -253,10 +274,12 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
             .refresh()
             .unwrap();
         repo.seed_vectors(&config, &[("knowledge.md", &[1.0, 0.0])]);
+        // When
         let response = read_response(
             &repo.invoke(&["search"], br#"{"query":"sqlite","limit":1}"#),
             0,
         );
+        // Then
         assert_eq!(
             response,
             json!({"ok":true,"result":[{"element_id":"knowledge.md","path":"knowledge.md","lines":[1,2],"revision":1,"flags":[]}]})
@@ -285,6 +308,7 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
 
 #[test]
 fn binary_inspect_unknown_is_all_or_nothing_and_missing_source_has_null_hash() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "knowledge.md",
@@ -292,8 +316,10 @@ fn binary_inspect_unknown_is_all_or_nothing_and_missing_source_has_null_hash() {
     );
     for ids in [vec!["knowledge.md", "missing.md"], vec!["unknown.rs"]] {
         let body = json!({"element_ids":ids}).to_string();
+        // When
         let response = read_response(&repo.invoke(&["inspect"], body.as_bytes()), 1);
         emit_reading("not_found", "inspect", 1, &response);
+        // Then
         assert_eq!(response["error"]["code"], "not_found");
         assert!(response.get("result").is_none());
     }
@@ -316,15 +342,18 @@ fn binary_inspect_unknown_is_all_or_nothing_and_missing_source_has_null_hash() {
 
 #[test]
 fn lost_output_then_retry_preserves_corpus_user_state_and_revision() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write_knowledge("knowledge.md", "sqlite");
     run_git(&repo, &["update-ref", "refs/user/keep", "HEAD"]);
     let before = capture_user_state(&repo);
+    // When
     for (args, body) in [
         ("search", br#"{"query":"sqlite","limit":1}"#.as_slice()),
         ("inspect", br#"{"element_ids":["knowledge.md"]}"#.as_slice()),
     ] {
         let lost = repo.invoke_lost(&[args], body);
+        // Then
         assert_eq!(lost.status.code(), Some(0));
         assert!(lost.stderr.is_empty());
         for _ in 0..2 {
@@ -342,7 +371,7 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
         ("search", br#"{"query":"sqlite","limit":1}"#.as_slice()),
         ("inspect", br#"{"element_ids":["knowledge.md"]}"#.as_slice()),
     ] {
-        // Arrange: actual eligible work and an existing root drain lease.
+        // Given: actual eligible work and an existing root drain lease.
         let repo = ReadingRepo::new();
         repo.write_knowledge("knowledge.md", "sqlite");
         let http = HttpFixture::start(FixtureReply::Status {
@@ -364,11 +393,11 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
         let _lease = files.try_lock_embed().unwrap().unwrap();
         let child_service = repo.get_root().join("subdir/.letopis");
         fs::write(&child_service, b"keep unsafe child service path").unwrap();
-        // Act: the nested cwd must not change the lock or service directory owner.
+        // When: the nested cwd must not change the lock or service directory owner.
         let mut child = spawn_nested_reading(&repo, command);
         child.send_input(input);
         let response = read_response(&child.collect_output(Duration::from_secs(10)), 0);
-        // Assert: root exclusion avoids both provider calls and launch warnings.
+        // Then: root exclusion avoids both provider calls and launch warnings.
         assert_eq!(response["ok"], true);
         warnings.push((command, response.get("warnings").cloned()));
         assert_eq!(
@@ -388,6 +417,7 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
 
 #[test]
 fn nested_search_and_inspect_launch_the_existing_drain_only_at_repository_root() {
+    // Given
     let mut child_service_paths = Vec::new();
     for (command, input) in [
         ("search", br#"{"query":"sqlite","limit":1}"#.as_slice()),
@@ -404,9 +434,11 @@ fn nested_search_and_inspect_launch_the_existing_drain_only_at_repository_root()
         let mut child = spawn_nested_reading(&repo, command);
         let mut owner = drain::DetachedOwner::new(repo.get_root(), child.get_id());
         child.send_input(input);
+        // When
         let response = read_response(&child.collect_output(Duration::from_secs(10)), 0);
         // HTTP arrival establishes ownership before inspecting the root PID receipt.
         barrier.wait_until_entered();
+        // Then
         assert!(owner.read_pid() > 0);
         barrier.release();
         owner.wait_for_exit();

@@ -217,34 +217,37 @@ mod tests {
 
     #[test]
     fn bounds_waiting_for_response_headers() {
+        // Given / When / Then: the helper configures, calls, and verifies the deadline.
         run_deadline_case(Duration::from_millis(240), Duration::ZERO);
     }
     #[test]
     fn bounds_waiting_for_response_body() {
+        // Given / When / Then: the helper configures, calls, and verifies the deadline.
         run_deadline_case(Duration::ZERO, Duration::from_millis(240));
     }
     #[test]
     fn shares_one_deadline_across_headers_and_body() {
+        // Given / When / Then: the helper configures, calls, and verifies the deadline.
         run_deadline_case(Duration::from_millis(80), Duration::from_millis(80));
     }
     #[test]
     fn classifies_io_timeouts_without_exposing_transport_payloads() {
-        // Arrange
+        // Given
         for (io_kind, expected) in [
             (ErrorKind::TimedOut, EmbeddingErrorKind::Timeout),
             (ErrorKind::ConnectionReset, EmbeddingErrorKind::Connection),
         ] {
             let cause = ureq::Error::Io(io::Error::new(io_kind, "transport-secret"));
-            // Act
+            // When
             let error = classify(cause);
-            // Assert
+            // Then
             assert_eq!(error.get_kind(), expected);
             assert!(!format!("{error} {error:?}").contains("transport-secret"));
         }
     }
 
     fn run_deadline_case(header_delay: Duration, body_delay: Duration) {
-        // Arrange
+        // Given
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let endpoint = format!("http://{}/embed", listener.local_addr().unwrap());
         let worker = thread::spawn(move || {
@@ -269,11 +272,11 @@ mod tests {
         });
         let http = Http::new_with_deadline(Duration::from_millis(120));
         let start = Instant::now();
-        // Act
+        // When
         let result = http.post(&endpoint, &json!({"input":["fixture"]}), None);
         let elapsed = start.elapsed();
         worker.join().unwrap();
-        // Assert
+        // Then
         assert_eq!(result.unwrap_err().get_kind(), EmbeddingErrorKind::Timeout);
         assert!(elapsed < Duration::from_secs(2));
     }

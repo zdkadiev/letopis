@@ -4,6 +4,7 @@ use support::*;
 
 #[test]
 fn publication_crash_matrix() -> CheckResult<()> {
+    // Given
     for cut in [
         "detected",
         "locked",
@@ -22,11 +23,13 @@ fn publication_crash_matrix() -> CheckResult<()> {
         let conn = cache(root)?;
         let before = snapshot(&conn)?;
         let disk = corpus(root)?;
+        // When
         let mut child = Process::start(root, "publish", cut)?;
         child.at(cut);
         child.kill()?;
         let reopened = cache(root)?;
         if cut == "after_commit" {
+            // Then
             assert_changed(&reopened, root, &a, 2)?;
         } else {
             assert_eq!(snapshot(&reopened)?, before, "cut={cut}");
@@ -41,6 +44,7 @@ fn publication_crash_matrix() -> CheckResult<()> {
 
 #[test]
 fn reindex_crash_matrix() -> CheckResult<()> {
+    // Given
     for cut in [
         "locked",
         "redetected",
@@ -59,9 +63,11 @@ fn reindex_crash_matrix() -> CheckResult<()> {
         reader.execute_batch("BEGIN")?;
         let before = snapshot(&reader)?;
         let disk = corpus(root)?;
+        // When
         let mut child = Process::start(root, "reindex", cut)?;
         child.at(cut);
         child.kill()?;
+        // Then
         assert_eq!(snapshot(&reader)?, before, "pinned reader cut={cut}");
         let reopened = cache(root)?;
         if cut == "after_commit" {
@@ -85,6 +91,7 @@ fn reindex_crash_matrix() -> CheckResult<()> {
 
 #[test]
 fn config_reset_crash_matrix() -> CheckResult<()> {
+    // Given
     for cut in [
         "reset_detected",
         "reset_begun",
@@ -101,10 +108,12 @@ fn config_reset_crash_matrix() -> CheckResult<()> {
         let before = vector_snapshot(root)?;
         let main = snapshot(&cache(root)?)?;
         let disk = corpus(root)?;
+        // When
         let mut child = Process::start(root, "reset", cut)?;
         child.at(cut);
         child.kill()?;
         if cut == "reset_after_commit" {
+            // Then
             assert_reset(root)?;
         } else {
             assert_eq!(vector_snapshot(root)?, before, "cut={cut}");

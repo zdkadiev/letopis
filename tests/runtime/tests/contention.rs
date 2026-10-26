@@ -2,6 +2,7 @@ mod support;
 use support::*;
 #[test]
 fn ten_commands_publish_one_delta() -> CheckResult<()> {
+    // Given
     // Break: publish without index.lock, or skip the locked re-detect.
     let d = tempfile::tempdir()?;
     let r = d.path();
@@ -13,6 +14,7 @@ fn ten_commands_publish_one_delta() -> CheckResult<()> {
     let mut drain = control.start(r, "drain", "", "drain_acquired,finished")?;
     let active = control.at("drain_acquired")?;
     let mut processes = Vec::new();
+    // When
     for _ in 0..10 {
         processes.push(control.start(r, "publish", "detected,locked,redetected", " ")?);
     }
@@ -26,6 +28,7 @@ fn ten_commands_publish_one_delta() -> CheckResult<()> {
     let mut admitted = 0;
     while admitted < 10 {
         let event = control.next()?;
+        // Then
         assert_eq!(event.name(), "locked");
         assert!(held(r, "index.lock")?);
         assert_modes(r, "index.lock")?;
@@ -59,6 +62,7 @@ fn ten_commands_publish_one_delta() -> CheckResult<()> {
 }
 #[test]
 fn ten_probe_winners_admit_one_drain() -> CheckResult<()> {
+    // Given
     // Break: rely only on caller-side try-lock, allowing all spawned drains to enter.
     let d = tempfile::tempdir()?;
     let r = d.path();
@@ -66,6 +70,7 @@ fn ten_probe_winners_admit_one_drain() -> CheckResult<()> {
     let mut control = Control::new()?;
     let mut processes = Vec::new();
     let mut probes = Vec::new();
+    // When
     for _ in 0..10 {
         processes.push(control.start(
             r,
@@ -75,6 +80,7 @@ fn ten_probe_winners_admit_one_drain() -> CheckResult<()> {
         )?);
         probes.push(control.at("probe_released")?);
     }
+    // Then
     assert!(!held(r, "embed.lock")?);
     for event in probes {
         event.resume()?;
@@ -117,6 +123,7 @@ fn ten_probe_winners_admit_one_drain() -> CheckResult<()> {
 }
 #[test]
 fn dead_owners_and_stale_pids_do_not_block() -> CheckResult<()> {
+    // Given
     // Break: use PID-file existence/liveness as ownership, or unlink locked inode.
     for name in ["index.lock", "embed.lock"] {
         let d = tempfile::tempdir()?;
@@ -127,6 +134,7 @@ fn dead_owners_and_stale_pids_do_not_block() -> CheckResult<()> {
         let mut decoy = control.start(r, "publish", "ready", "")?;
         let decoy_event = control.at("ready")?;
         let path = r.join(".letopis").join(name);
+        // When
         for pid in [i32::MAX as u32, decoy.pid()] {
             std::fs::write(&path, format!("{pid}\n"))?;
             // Probe created by observer first to enforce the intended file mode.
@@ -141,6 +149,7 @@ fn dead_owners_and_stale_pids_do_not_block() -> CheckResult<()> {
                             Ok(())
                         }
                     });
+                // Then
                 assert!(
                     admitted.is_err_and(|e| e.to_string() == "fixture lease admitted"),
                     "PID contents blocked free kernel lease"
@@ -193,16 +202,19 @@ fn dead_owners_and_stale_pids_do_not_block() -> CheckResult<()> {
 }
 #[test]
 fn launcher_exit_does_not_wait_or_leak_locks() -> CheckResult<()> {
+    // Given
     // Break: synchronous drain, inherited index/probe lock, missing setsid/null streams.
     let d = tempfile::tempdir()?;
     let r = d.path();
     e::setup(r)?;
     let mut control = Control::new()?;
+    // When
     let mut caller = control.start(r, "publish", "ready", "drain_acquired")?;
     let ready = control.at("ready")?;
     let caller_sid = ready.data["sid"].clone();
     ready.resume()?;
     let event = control.at("drain_acquired")?;
+    // Then
     assert_ne!(event.data["sid"], caller_sid);
     assert_eq!(event.data["sid"].as_u64(), Some(event.pid() as u64));
     for stream in event.data["streams"].as_array().unwrap() {
@@ -226,6 +238,7 @@ fn launcher_exit_does_not_wait_or_leak_locks() -> CheckResult<()> {
 }
 #[test]
 fn expired_or_mislabelled_event_never_signals_pid() -> CheckResult<()> {
+    // Given
     // Break: signal an adopted/reaped PID claimed by an event after peer timeout.
     let d = tempfile::tempdir()?;
     let r = d.path();
@@ -235,11 +248,13 @@ fn expired_or_mislabelled_event_never_signals_pid() -> CheckResult<()> {
     let decoy_event = control.at("ready")?;
     let mut owner = control.start(r, "drain", "", "drain_acquired")?;
     let mut expired = control.at("drain_acquired")?;
+    // When
     owner.killed(libc::SIGKILL)?;
     expired.wait_closed()?;
     // Simulate PID reuse using ONLY an owned live fixture. The connection is dead,
     // so this claimed number cannot authorize any signal or affect that fixture.
     expired.data["pid"] = serde_json::json!(decoy.pid());
+    // Then
     assert!(
         expired.request_kill().is_err(),
         "disconnected event attempted numeric-PID signal"

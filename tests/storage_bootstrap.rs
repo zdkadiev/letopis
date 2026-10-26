@@ -15,12 +15,12 @@ use storage_support::assert_error;
 #[test]
 fn invalid_database_paths_return_safe_readable_diagnostics_without_side_effects() {
     for path in ["", "private-label\0cache.db"] {
-        // Arrange: invalid input must be rejected before the vector database is opened.
+        // Given: invalid input must be rejected before the vector database is opened.
         let root = TempDir::new().unwrap();
         let vectors = root.path().join("vectors.db");
-        // Act
+        // When
         let error = open_storage(Path::new(path), &vectors).err().unwrap();
-        // Assert: verify the public diagnostic contract, not only an error category.
+        // Then: verify the public diagnostic contract, not only an error category.
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
         assert_eq!(error.get_message(), "invalid storage database path");
         assert_eq!(error.to_string(), "invalid storage database path");
@@ -31,12 +31,15 @@ fn invalid_database_paths_return_safe_readable_diagnostics_without_side_effects(
 
 #[test]
 fn fresh_storage_reopens_with_empty_identity() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
+    // When / Then
     for _ in 0..2 {
         let mut storage = open_storage(&cache, &vectors).unwrap();
         let read = storage.begin_read().unwrap();
+        // When / Then
         assert_eq!(read.get_revision(), 0);
         assert_eq!(read.get_config_identity(), None);
     }
@@ -56,22 +59,26 @@ fn fresh_storage_reopens_with_empty_identity() {
 
 #[test]
 fn owned_storage_outlives_path_arguments() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = {
         let cache = root.path().join("cache.db");
         let vectors = root.path().join("vectors.db");
         open_storage(&cache, &vectors).unwrap()
     };
+    // When / Then
     assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
 }
 
 #[test]
 fn same_database_path_is_rejected() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
     drop(open_storage(&cache, &vectors).unwrap());
     let before = Sha256::digest(std::fs::read(&cache).unwrap());
+    // When / Then
     assert_error(&cache, &cache, StorageErrorKind::InvalidRequest);
     assert_eq!(Sha256::digest(std::fs::read(&cache).unwrap()), before);
 }
@@ -81,7 +88,7 @@ fn same_database_path_is_rejected() {
 fn symlink_and_hardlink_aliases_are_rejected() {
     use std::os::unix::fs::symlink;
     let root = TempDir::new().unwrap();
-    // Arrange an existing database; rejecting aliases must preserve its bytes.
+    // Given an existing database; rejecting aliases must preserve its bytes.
     let cache = root.path().join("cache.db");
     drop(open_storage(&cache, &root.path().join("vectors.db")).unwrap());
     let before = Sha256::digest(std::fs::read(&cache).unwrap());
@@ -89,7 +96,9 @@ fn symlink_and_hardlink_aliases_are_rejected() {
     let hard = root.path().join("hard.db");
     symlink(&cache, &symbolic).unwrap();
     std::fs::hard_link(&cache, &hard).unwrap();
+    // When / Then
     for alias in [&symbolic, &hard] {
+        // When / Then
         assert_error(&cache, alias, StorageErrorKind::InvalidRequest);
         assert_eq!(Sha256::digest(std::fs::read(&cache).unwrap()), before);
     }
@@ -97,10 +106,12 @@ fn symlink_and_hardlink_aliases_are_rejected() {
 
 #[test]
 fn literal_unicode_quote_and_question_mark_paths_open() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("кэш'?mode=memory.db");
     let vectors = root.path().join("векторы'?mode=ro.db");
     let mut storage = open_storage(&cache, &vectors).unwrap();
+    // When / Then
     assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
     assert!(cache.is_file());
     assert!(vectors.is_file());
@@ -108,7 +119,9 @@ fn literal_unicode_quote_and_question_mark_paths_open() {
 
 #[test]
 fn missing_parent_and_nul_paths_are_rejected() {
+    // Given
     let root = TempDir::new().unwrap();
+    // When / Then
     assert_error(
         &root.path().join("missing/cache.db"),
         &root.path().join("v.db"),
@@ -124,17 +137,21 @@ fn missing_parent_and_nul_paths_are_rejected() {
 #[cfg(unix)]
 #[test]
 fn non_utf8_attachment_path_is_rejected() {
+    // Given
     use std::os::unix::ffi::OsStringExt;
     let root = TempDir::new().unwrap();
     let bad = root.path().join(std::ffi::OsString::from_vec(vec![0xff]));
+    // When
     let Err(error) = open_storage(&root.path().join("cache.db"), &bad) else {
         panic!("non-UTF-8 attachment accepted");
     };
+    // Then
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
 }
 
 #[test]
 fn unknown_or_partial_schema_is_not_recreated() {
+    // Given
     for mutation in [
         "PRAGMA user_version=99",
         "DROP TABLE files",
@@ -155,6 +172,7 @@ fn unknown_or_partial_schema_is_not_recreated() {
             .unwrap();
         connection.execute_batch(mutation).unwrap();
         drop(connection);
+        // When / Then
         assert_error(&cache, &vectors, StorageErrorKind::InternalError);
         let connection = Connection::open(&cache).unwrap();
         assert_eq!(
@@ -176,10 +194,12 @@ fn unknown_or_partial_schema_is_not_recreated() {
 
 #[test]
 fn parallel_initializers_leave_a_complete_schema() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
     let barrier = Arc::new(Barrier::new(2));
+    // When / Then
     let successes = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..2)
             .map(|_| {
@@ -220,6 +240,8 @@ fn parallel_initializers_leave_a_complete_schema() {
 
 #[test]
 fn independent_thread_connections_register_native_vec1() {
+    // Given: each thread creates its own temporary databases.
+    // When / Then
     let handles: Vec<_> = (0..8)
         .map(|_| {
             std::thread::spawn(|| {
@@ -243,6 +265,7 @@ fn independent_thread_connections_register_native_vec1() {
 
 #[test]
 fn sqlite_like_prefix_does_not_hide_extra_user_tables() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
@@ -254,11 +277,13 @@ fn sqlite_like_prefix_does_not_hide_extra_user_tables() {
         )
         .unwrap();
     drop(connection);
+    // When / Then
     assert_error(&cache, &vectors, StorageErrorKind::InternalError);
 }
 
 #[test]
 fn vector_schema_and_unversioned_user_data_are_not_recreated() {
+    // Given
     for mutation in [
         "PRAGMA user_version=2",
         "DROP TABLE query_error",
@@ -277,6 +302,7 @@ fn vector_schema_and_unversioned_user_data_are_not_recreated() {
             .unwrap();
         connection.execute_batch(mutation).unwrap();
         drop(connection);
+        // When / Then
         assert_error(&cache, &vectors, StorageErrorKind::InternalError);
         let connection = Connection::open(&vectors).unwrap();
         assert_eq!(
@@ -295,6 +321,7 @@ fn vector_schema_and_unversioned_user_data_are_not_recreated() {
         .execute_batch("CREATE TABLE existing(value TEXT); INSERT INTO existing VALUES('retain');")
         .unwrap();
     drop(connection);
+    // When / Then
     assert_error(&cache, &vectors, StorageErrorKind::InternalError);
     let connection = Connection::open(&cache).unwrap();
     assert_eq!(
@@ -307,6 +334,7 @@ fn vector_schema_and_unversioned_user_data_are_not_recreated() {
 
 #[test]
 fn malformed_stored_observations_return_safe_typed_errors() {
+    // Given
     for (target, mutation) in [
         ("cache", "UPDATE project SET revision=-1"),
         (
@@ -327,6 +355,7 @@ fn malformed_stored_observations_return_safe_typed_errors() {
         let Err(error) = storage.begin_read() else {
             panic!("invalid observation accepted");
         };
+        // When / Then
         assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
         assert!(!error.to_string().contains("private"));
         assert!(std::error::Error::source(&error).is_some());
@@ -335,6 +364,7 @@ fn malformed_stored_observations_return_safe_typed_errors() {
 
 #[test]
 fn initialized_open_succeeds_but_cache_write_still_returns_busy() {
+    // Given
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
@@ -342,6 +372,7 @@ fn initialized_open_succeeds_but_cache_write_still_returns_busy() {
     let connection = Connection::open(&cache).unwrap();
     connection.execute_batch("BEGIN IMMEDIATE").unwrap();
     let mut storage = open_storage(&cache, &vectors).unwrap();
+    // When / Then
     assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
     let Err(error) = storage.begin_cache_write() else {
         panic!("competing cache writer was accepted");

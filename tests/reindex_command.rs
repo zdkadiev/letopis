@@ -15,15 +15,15 @@ use support::{git::isolate_command, reading::ReadingRepo};
 
 #[test]
 fn reindex_binary_rebuilds_unchanged_fts_and_returns_next_revision() {
-    // Arrange.
+    // Given.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
     assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":1}}));
     let db = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     db.execute("DELETE FROM text_index", []).unwrap();
-    // Act.
+    // When.
     assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":2}}));
-    // Assert.
+    // Then.
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     assert_eq!(
@@ -36,7 +36,7 @@ fn reindex_binary_rebuilds_unchanged_fts_and_returns_next_revision() {
 
 #[test]
 fn reindex_binary_rejects_selective_cancel_and_malformed_input_before_io() {
-    // Arrange.
+    // Given.
     let repo = ReadingRepo::new();
     for (args, input) in [
         (vec!["reindex"], r#"{"paths":["a.md"]}"#),
@@ -45,9 +45,9 @@ fn reindex_binary_rejects_selective_cancel_and_malformed_input_before_io() {
         (vec!["reindex"], "{} {}"),
         (vec!["reindex"], r#"{"extra":1}"#),
     ] {
-        // Act.
+        // When.
         let response = read_response(&repo.invoke(&args, input.as_bytes()), 1);
-        // Assert.
+        // Then.
         assert_eq!(response["error"]["code"], "invalid_request");
         assert!(!repo.get_root().join(".letopis").exists());
     }
@@ -55,16 +55,16 @@ fn reindex_binary_rejects_selective_cancel_and_malformed_input_before_io() {
 
 #[test]
 fn reindex_binary_preserves_invalid_owner_and_exposes_current_diagnostic() {
-    // Arrange.
+    // Given.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
     repo.write_knowledge("b.md", "BravoToken");
     reindex(&repo);
     repo.write("a.md", b"<!-- letopis: SECRET_RAW -->");
     repo.write_knowledge("b.md", "CharlieToken");
-    // Act.
+    // When.
     assert_eq!(reindex(&repo)["result"]["revision"], 2);
-    // Assert.
+    // Then.
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     assert_eq!(
@@ -85,7 +85,7 @@ fn reindex_binary_preserves_invalid_owner_and_exposes_current_diagnostic() {
 
 #[test]
 fn refreshing_cli_detects_external_checkout_and_reset_without_watcher() {
-    // Arrange two committed corpora with different tracked/ignored membership.
+    // Given two committed corpora with different tracked/ignored membership.
     let repo = ReadingRepo::new();
     repo.write(".gitignore", b".letopis/\nignored.md\ntracked.md\n");
     repo.write_knowledge("old.md", "OldToken SharedToken");
@@ -103,7 +103,7 @@ fn refreshing_cli_detects_external_checkout_and_reset_without_watcher() {
     run_git(&repo, &["add", "new.md", "same.md"]);
     run_git(&repo, &["commit", "-qm", "second"]);
     repo.write_knowledge("ignored.md", "IgnoredToken SharedToken");
-    // Act / Assert: an ordinary query detects the external branch change.
+    // When / Then: an ordinary query detects the external branch change.
     assert_eq!(search_ids(&repo, "SharedToken"), ["new.md"]);
     assert_eq!(search_ids(&repo, "SecondVersionToken"), ["same.md"]);
     assert!(search_ids(&repo, "FirstVersionToken").is_empty());
@@ -113,7 +113,7 @@ fn refreshing_cli_detects_external_checkout_and_reset_without_watcher() {
 
 #[test]
 fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
-    // Arrange: one cached vector, eligible work and a held lock without any HTTP server.
+    // Given: one cached vector, eligible work and a held lock without any HTTP server.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
     repo.write_knowledge("b.md", "BravoToken");
@@ -123,7 +123,7 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
     let bytes = fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap();
     let files = open_filesystem(repo.get_root()).unwrap();
     let _lock = files.try_lock_embed().unwrap().unwrap();
-    // Act: cache deletion must leave vector data and configuration alone.
+    // When: cache deletion must leave vector data and configuration alone.
     assert_eq!(reindex(&repo)["result"]["revision"], 2);
     fs::remove_file(repo.get_root().join(".letopis/cache.db")).unwrap();
     assert_eq!(
@@ -132,7 +132,7 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
     );
     assert!(!repo.get_root().join(".letopis/cache.db").exists());
     assert_eq!(reindex(&repo)["result"]["revision"], 1);
-    // Assert.
+    // Then.
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     let node = read
@@ -155,7 +155,7 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
 
 #[test]
 fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
-    // Arrange: publish two hashes, seed exactly one vector, and close storage handles.
+    // Given: publish two hashes, seed exactly one vector, and close storage handles.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
     repo.write_knowledge("b.md", "BravoToken");
@@ -168,7 +168,7 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0, 0.0])]);
     let files = open_filesystem(repo.get_root()).unwrap();
     let lock = files.try_lock_embed().unwrap().unwrap();
-    // Act: rebuild only the disposable cache while automatic embedding is excluded.
+    // When: rebuild only the disposable cache while automatic embedding is excluded.
     fs::remove_file(repo.get_root().join(".letopis/cache.db")).unwrap();
     assert_eq!(reindex(&repo)["result"]["revision"], 1);
     assert!(http.take_requests().is_empty());
@@ -177,7 +177,7 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
         read_response(&repo.invoke(&["embed", "--drain"], b""), 0),
         json!({"ok":true,"result":{}})
     );
-    // Assert: no recomputation of a.md; its exact seed and the new vector both survive.
+    // Then: no recomputation of a.md; its exact seed and the new vector both survive.
     assert_eq!(
         http.take_requests(),
         vec![json!({
@@ -205,7 +205,7 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
 
 #[test]
 fn reindex_preserves_author_basis_bytes_head_and_index() {
-    // Arrange.
+    // Given.
     let repo = ReadingRepo::new();
     let tree = create_basis(repo.get_root(), &[("source.txt", b"old source")]);
     repo.write("source.txt", b"new source");
@@ -213,10 +213,10 @@ fn reindex_preserves_author_basis_bytes_head_and_index() {
     repo.write("a.md", note.as_bytes());
     let head = run_git(&repo, &["rev-parse", "HEAD"]);
     let index = fs::read(repo.get_root().join(".git/index")).unwrap();
-    // Act.
+    // When.
     reindex(&repo);
     reindex(&repo);
-    // Assert.
+    // Then.
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     let node = read
@@ -241,7 +241,7 @@ fn reindex_preserves_author_basis_bytes_head_and_index() {
 
 #[test]
 fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
-    // Arrange.
+    // Given.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
     reindex(&repo);
@@ -253,9 +253,9 @@ fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
     )
     .unwrap();
     repo.write_knowledge("a.md", "UnpublishedToken");
-    // Act.
+    // When.
     let response = read_response(&repo.invoke(&["reindex"], b"{}"), 1);
-    // Assert.
+    // Then.
     assert_eq!(
         response,
         json!({"ok":false,"error":{"code":"invalid_request","message":"cannot rebuild corpus index","details":{}}})

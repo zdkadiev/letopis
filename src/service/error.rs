@@ -143,18 +143,18 @@ mod tests {
 
     #[test]
     fn preserves_document_context_without_exposing_its_private_cause() {
-        // Arrange: callers supply safe operation context and a separate raw cause.
+        // Given: callers supply safe operation context and a separate raw cause.
         let context = "safe document operation context";
         let error = DocumentError::new_with_cause(
             DocumentErrorKind::InternalError,
             context,
             io::Error::other("PRIVATE_DOCUMENT_CAUSE"),
         );
-        // Act
+        // When
         let message = error.get_message();
         let display = error.to_string();
         let debug = format!("{error:?}");
-        // Assert: public context remains useful while the cause stays internal.
+        // Then: public context remains useful while the cause stays internal.
         assert_eq!(message, context);
         assert_eq!(display, context);
         assert!(debug.contains(context));

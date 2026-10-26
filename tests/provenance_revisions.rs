@@ -14,6 +14,7 @@ use support::{
 
 #[test]
 fn compare_different_trees_by_one_addressed_pair() {
+    // Given
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let a = create_basis(repo.get_root(), &[("a", b"one\ntwo\n"), ("b", b"wrong")]);
@@ -23,6 +24,7 @@ fn compare_different_trees_by_one_addressed_pair() {
         );
         let service = wire_source_provenance(repo.get_root()).unwrap();
         let address = SourceUri::parse("a#L2-L2").unwrap();
+        // When
         let actual = service
             .compare_revision(SourceRevisionRequest {
                 source_snapshot: Some(&a),
@@ -30,6 +32,7 @@ fn compare_different_trees_by_one_addressed_pair() {
                 revision: &b,
             })
             .unwrap();
+        // Then
         assert_ne!(a, b);
         assert_eq!(actual, SourceRevisionComparison::Equal);
         let whole = SourceUri::parse("a").unwrap();
@@ -58,11 +61,13 @@ fn compare_different_trees_by_one_addressed_pair() {
 }
 #[test]
 fn distinguish_missing_address_from_unknown_requested_tree() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let basis = create_basis(repo.get_root(), &[("a", b"one\n")]);
     let requested = create_basis(repo.get_root(), &[]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
     let source = SourceUri::parse("a#L1-L1").unwrap();
+    // When / Then
     assert_eq!(
         service
             .compare_revision(SourceRevisionRequest {
@@ -88,10 +93,12 @@ fn distinguish_missing_address_from_unknown_requested_tree() {
 }
 #[test]
 fn reject_missing_or_invalid_requested_revision_first() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
     let source = SourceUri::parse("https://host/path").unwrap();
     let missing = TreeOid::parse(&"a".repeat(40)).unwrap();
+    // When / Then
     assert_eq!(
         service
             .compare_revision(SourceRevisionRequest {
@@ -130,10 +137,12 @@ fn reject_missing_or_invalid_requested_revision_first() {
 }
 #[test]
 fn report_unavailable_basis_and_unfetched_remote_explicitly() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let tree = create_basis(repo.get_root(), &[]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
     let source = SourceUri::parse("a").unwrap();
+    // When / Then
     assert_eq!(
         service
             .compare_revision(SourceRevisionRequest {
@@ -159,13 +168,13 @@ fn report_unavailable_basis_and_unfetched_remote_explicitly() {
 
 #[test]
 fn report_incomplete_requested_range_without_crossing_source_bindings() {
-    // Arrange
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let basis = create_basis(repo.get_root(), &[("a", b"one\ntwo\n")]);
     let requested = create_basis(repo.get_root(), &[("a", b"one\n"), ("b", b"one\ntwo\n")]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
     let source = SourceUri::parse("a#L1-L2").unwrap();
-    // Act
+    // When
     let actual = service
         .compare_revision(SourceRevisionRequest {
             source_snapshot: Some(&basis),
@@ -173,13 +182,13 @@ fn report_incomplete_requested_range_without_crossing_source_bindings() {
             revision: &requested,
         })
         .unwrap();
-    // Assert
+    // Then
     assert_eq!(actual, SourceRevisionComparison::SourceNotFound);
 }
 
 #[test]
 fn report_missing_or_invalid_basis_as_unavailable_for_valid_requested_revision() {
-    // Arrange
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let revision = create_basis(repo.get_root(), &[("a", b"one\n")]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
@@ -187,7 +196,7 @@ fn report_missing_or_invalid_basis_as_unavailable_for_valid_requested_revision()
     let commit = TreeOid::parse(&repo.read_oid(&["rev-parse", "HEAD"], None)).unwrap();
     let roots = [TreeOid::parse(&"a".repeat(40)).unwrap(), commit];
     for basis in roots {
-        // Act
+        // When
         let actual = service
             .compare_revision(SourceRevisionRequest {
                 source_snapshot: Some(&basis),
@@ -195,7 +204,7 @@ fn report_missing_or_invalid_basis_as_unavailable_for_valid_requested_revision()
                 revision: &revision,
             })
             .unwrap();
-        // Assert
+        // Then
         assert_eq!(actual, SourceRevisionComparison::BasisUnavailable);
     }
 }
@@ -203,7 +212,7 @@ fn report_missing_or_invalid_basis_as_unavailable_for_valid_requested_revision()
 #[test]
 fn validate_all_requested_trees_without_a_source() {
     for format in FORMATS {
-        // Arrange
+        // Given
         let repo = TempRepo::new(format);
         let valid = create_basis(repo.get_root(), &[]);
         let service = wire_source_provenance(repo.get_root()).unwrap();
@@ -214,7 +223,7 @@ fn validate_all_requested_trees_without_a_source() {
         let missing = TreeOid::parse(&"a".repeat(valid.as_str().len())).unwrap();
         let foreign = TreeOid::parse(&"a".repeat(foreign_length)).unwrap();
         let commit = TreeOid::parse(&repo.read_oid(&["rev-parse", "HEAD"], None)).unwrap();
-        // Act / Assert: empty input and a complete empty tree need no source.
+        // When / Then: empty input and a complete empty tree need no source.
         assert!(service.validate_revisions(&BTreeSet::new()).is_ok());
         assert!(
             service
@@ -236,15 +245,15 @@ fn validate_all_requested_trees_without_a_source() {
 #[test]
 fn validate_revisions_preserves_corrupt_root_failure() {
     for format in FORMATS {
-        // Arrange
+        // Given
         let repo = TempRepo::new(format);
         let revision = create_basis(repo.get_root(), &[("a", b"basis\n")]);
         let replacement = create_basis(repo.get_root(), &[]);
         let service = wire_source_provenance(repo.get_root()).unwrap();
         repo.replace_loose_object(revision.as_str(), replacement.as_str());
-        // Act
+        // When
         let result = service.validate_revisions(&BTreeSet::from([revision]));
-        // Assert
+        // Then
         assert_eq!(
             result.unwrap_err().get_kind(),
             SnapshotErrorKind::InternalError

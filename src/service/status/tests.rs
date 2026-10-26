@@ -28,9 +28,12 @@ struct Files {
     fail: bool,
     count: Cell<usize>,
 }
-struct Provider {
-    reject: bool,
-    embeds: Cell<usize>,
+mockall::mock! {
+    Provider {}
+    impl EmbeddingProvider for Provider {
+        fn validate_config(&self, config: &EmbeddingConfig) -> EmbeddingResult<()>;
+        fn embed<'a, 'b>(&self, config: &EmbeddingConfig, texts: &'a [&'b str], dimensions: Option<NonZeroUsize>) -> EmbeddingResult<Vec<Vec<f32>>>;
+    }
 }
 struct Diagnostics;
 struct Provenance {
@@ -39,16 +42,14 @@ struct Provenance {
 
 #[test]
 fn reports_null_revision_without_publication() {
+    // Given
     let count = Rc::new(Cell::new(0));
     let files = Files {
         config: None.into(),
         fail: false,
         count: Cell::new(0),
     };
-    let provider = Provider {
-        reject: false,
-        embeds: Cell::new(0),
-    };
+    let provider = build_provider();
     let mut service = build_service(
         None,
         count.clone(),
@@ -57,18 +58,20 @@ fn reports_null_revision_without_publication() {
         &Provenance { fail: false },
     );
 
+    // When
     let report = service.read_status().unwrap();
 
+    // Then
     assert_eq!(report.revision, None);
     assert_eq!((report.embedding_backlog, report.embedding_failed), (0, 0));
     assert!(report.problems.is_empty());
     assert_eq!(count.get(), 1);
     assert_eq!(files.count.get(), 1);
-    assert_eq!(provider.embeds.get(), 0);
 }
 
 #[test]
 fn matches_check_findings_in_one_view() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     publish_node(&mut storage, 7);
@@ -78,10 +81,7 @@ fn matches_check_findings_in_one_view() {
         fail: false,
         count: Cell::new(0),
     };
-    let provider = Provider {
-        reject: false,
-        embeds: Cell::new(0),
-    };
+    let provider = build_provider();
     let mut service = build_service(
         Some(storage),
         count.clone(),
@@ -90,8 +90,10 @@ fn matches_check_findings_in_one_view() {
         &Provenance { fail: false },
     );
 
+    // When
     let report = service.read_status().unwrap();
 
+    // Then
     assert_eq!(report.revision, Some(7));
     assert_eq!((report.embedding_backlog, report.embedding_failed), (1, 0));
     assert_eq!(report.problems.len(), 2);
@@ -101,11 +103,11 @@ fn matches_check_findings_in_one_view() {
         "missing_source_snapshot"
     );
     assert_eq!(count.get(), 1);
-    assert_eq!(provider.embeds.get(), 0);
 }
 
 #[test]
 fn reports_invalid_config_with_unavailable_counts() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     publish_node(&mut storage, 1);
@@ -114,10 +116,7 @@ fn reports_invalid_config_with_unavailable_counts() {
         fail: false,
         count: Cell::new(0),
     };
-    let provider = Provider {
-        reject: false,
-        embeds: Cell::new(0),
-    };
+    let provider = build_provider();
     let count = Rc::new(Cell::new(0));
     let mut service = build_service(
         Some(storage),
@@ -127,8 +126,10 @@ fn reports_invalid_config_with_unavailable_counts() {
         &Provenance { fail: false },
     );
 
+    // When
     let report = service.read_status().unwrap();
 
+    // Then
     assert_eq!((report.embedding_backlog, report.embedding_failed), (1, 0));
     assert!(
         report
@@ -142,6 +143,7 @@ fn reports_invalid_config_with_unavailable_counts() {
 
 #[test]
 fn keeps_query_error_without_mutation() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     publish_node(&mut storage, 1);
@@ -157,10 +159,7 @@ fn keeps_query_error_without_mutation() {
         fail: false,
         count: Cell::new(0),
     };
-    let provider = Provider {
-        reject: false,
-        embeds: Cell::new(0),
-    };
+    let provider = build_provider();
     let count = Rc::new(Cell::new(0));
     let mut service = build_service(
         Some(storage),
@@ -170,8 +169,10 @@ fn keeps_query_error_without_mutation() {
         &Provenance { fail: false },
     );
 
+    // When
     let report = service.read_status().unwrap();
 
+    // Then
     assert!(
         report
             .problems
@@ -180,11 +181,11 @@ fn keeps_query_error_without_mutation() {
     );
     assert_eq!((report.embedding_backlog, report.embedding_failed), (1, 0));
     assert_eq!(count.get(), 1);
-    assert_eq!(provider.embeds.get(), 0);
 }
 
 #[test]
 fn reports_unreadable_and_unsupported_config_without_payloads() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     publish_node(&mut storage, 1);
@@ -193,10 +194,7 @@ fn reports_unreadable_and_unsupported_config_without_payloads() {
         fail: true,
         count: Cell::new(0),
     };
-    let provider = Provider {
-        reject: false,
-        embeds: Cell::new(0),
-    };
+    let provider = build_provider();
     let mut service = build_service(
         Some(storage),
         Rc::new(Cell::new(0)),
@@ -205,8 +203,10 @@ fn reports_unreadable_and_unsupported_config_without_payloads() {
         &Provenance { fail: false },
     );
 
+    // When
     let report = service.read_status().unwrap();
 
+    // Then
     assert_eq!((report.embedding_backlog, report.embedding_failed), (1, 0));
     assert!(
         report
@@ -216,16 +216,14 @@ fn reports_unreadable_and_unsupported_config_without_payloads() {
     );
     assert_eq!(files.count.get(), 1);
 
+    // Given
     let storage = open_storage(&root);
     let files = Files {
         config: Some(VALID_CONFIG.to_vec()).into(),
         fail: false,
         count: Cell::new(0),
     };
-    let provider = Provider {
-        reject: true,
-        embeds: Cell::new(0),
-    };
+    let provider = build_rejecting_provider();
     let mut service = build_service(
         Some(storage),
         Rc::new(Cell::new(0)),
@@ -233,18 +231,20 @@ fn reports_unreadable_and_unsupported_config_without_payloads() {
         &provider,
         &Provenance { fail: false },
     );
+    // When
     let report = service.read_status().unwrap();
+    // Then
     assert!(
         report
             .problems
             .iter()
             .any(|p| p.details["reason"] == "invalid_embedding_config")
     );
-    assert_eq!(provider.embeds.get(), 0);
 }
 
 #[test]
 fn returns_error_after_late_provenance_failure() {
+    // Given
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     publish_node(&mut storage, 1);
@@ -253,10 +253,7 @@ fn returns_error_after_late_provenance_failure() {
         fail: false,
         count: Cell::new(0),
     };
-    let provider = Provider {
-        reject: false,
-        embeds: Cell::new(0),
-    };
+    let provider = build_provider();
     let count = Rc::new(Cell::new(0));
     let mut service = build_service(
         Some(storage),
@@ -266,8 +263,10 @@ fn returns_error_after_late_provenance_failure() {
         &Provenance { fail: true },
     );
 
+    // When
     let error = service.read_status().unwrap_err();
 
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert!(!format!("{error:?}").contains("SECRET_PROVENANCE"));
 }
@@ -276,7 +275,7 @@ fn build_service<'a>(
     storage: Option<SqliteStorage>,
     count: Rc<Cell<usize>>,
     files: &'a Files,
-    provider: &'a Provider,
+    provider: &'a MockProvider,
     provenance: &'a Provenance,
 ) -> StatusService<'a, Reads, Diagnostics> {
     StatusService {
@@ -310,22 +309,19 @@ impl StatusFiles for Files {
         Ok(Vec::new())
     }
 }
-impl EmbeddingProvider for Provider {
-    fn validate_config(&self, _: &EmbeddingConfig) -> EmbeddingResult<()> {
-        if self.reject {
-            return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
-        }
-        Ok(())
-    }
-    fn embed(
-        &self,
-        _: &EmbeddingConfig,
-        _: &[&str],
-        _: Option<NonZeroUsize>,
-    ) -> EmbeddingResult<Vec<Vec<f32>>> {
-        self.embeds.set(self.embeds.get() + 1);
-        panic!("status must not infer")
-    }
+fn build_provider() -> MockProvider {
+    let mut provider = MockProvider::new();
+    provider.expect_embed().times(0);
+    provider.expect_validate_config().returning(|_| Ok(()));
+    provider
+}
+fn build_rejecting_provider() -> MockProvider {
+    let mut provider = MockProvider::new();
+    provider.expect_embed().times(0);
+    provider
+        .expect_validate_config()
+        .returning(|_| Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)));
+    provider
 }
 impl GraphDiagnostics for Diagnostics {
     fn find_problems<R: StorageRead>(

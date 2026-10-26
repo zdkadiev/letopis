@@ -5,13 +5,16 @@ use support::*;
 
 #[test]
 fn fixed_and_deleted_files_clear_errors() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let root = dir.path();
     base(root)?;
     fs::write(root.join("a.md"), "broken")?;
     fs::write(root.join("new.md"), "broken")?;
+    // When
     run(root)?;
     let conn = cache(root)?;
+    // Then
     assert_eq!(
         rows(
             &conn,
@@ -40,6 +43,7 @@ fn fixed_and_deleted_files_clear_errors() -> CheckResult<()> {
 
 #[test]
 fn unchanged_invocation_is_a_noop() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let root = dir.path();
     base(root)?;
@@ -53,13 +57,16 @@ fn unchanged_invocation_is_a_noop() -> CheckResult<()> {
         .open(root.join(".letopis/index.lock"))?;
     lock.lock()?;
     // An unchanged invocation must not wait for a held index.lock.
+    // When
     Process::start(root, "publish", "")?.finish()?;
+    // Then
     assert_eq!(snapshot(&conn)?, before);
     Ok(())
 }
 
 #[test]
 fn new_deleted_and_renamed_files_update_fts() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let root = dir.path();
     base(root)?;
@@ -67,8 +74,10 @@ fn new_deleted_and_renamed_files_update_fts() -> CheckResult<()> {
     fs::remove_file(root.join("b.md"))?;
     fixture(root, "sub/new.md", "gamma", &[])?;
     let before = corpus(root)?;
+    // When
     run(root)?;
     let conn = cache(root)?;
+    // Then
     assert_nodes(
         &conn,
         root,
@@ -91,6 +100,7 @@ fn new_deleted_and_renamed_files_update_fts() -> CheckResult<()> {
 
 #[test]
 fn same_tick_same_size_edit_is_hashed() -> CheckResult<()> {
+    // Given
     use std::fs::{File, FileTimes};
     let dir = tempfile::tempdir()?;
     let root = dir.path();
@@ -102,6 +112,7 @@ fn same_tick_same_size_edit_is_hashed() -> CheckResult<()> {
         FileTimes::new().set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(10)),
     )?;
     let time = fs::metadata(root.join("a.md"))?.modified()?;
+    // When
     run(root)?;
     let before = fs::metadata(root.join("a.md"))?;
     use std::os::unix::fs::MetadataExt;
@@ -112,6 +123,7 @@ fn same_tick_same_size_edit_is_hashed() -> CheckResult<()> {
         [],
         |r| r.get(0),
     )?;
+    // Then
     assert!(
         initial_check - mtime > 1_000_000_000,
         "old timestamp must model setup outside the racy window"
@@ -152,6 +164,7 @@ fn same_tick_same_size_edit_is_hashed() -> CheckResult<()> {
 
 #[test]
 fn declared_edges_follow_target_lifecycle_and_cycles_terminate() -> CheckResult<()> {
+    // Given
     use letopis_publication_checks::{diagnostics, traverse};
     let dir = tempfile::tempdir()?;
     let root = dir.path();
@@ -162,8 +175,10 @@ fn declared_edges_follow_target_lifecycle_and_cycles_terminate() -> CheckResult<
         &[("b.md", "includes"), ("gone.md", "rel")],
     )?;
     fixture(root, "b.md", "beta", &[("a.md", "includes")])?;
+    // When
     run(root)?;
     let conn = cache(root)?;
+    // Then
     assert_eq!(
         rows(
             &conn,
@@ -204,6 +219,7 @@ fn declared_edges_follow_target_lifecycle_and_cycles_terminate() -> CheckResult<
 // Missing per-file isolation would either replace invalid A or suppress valid B.
 #[test]
 fn valid_delta_publishes_beside_invalid_file() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let root = dir.path();
     base(root)?;
@@ -223,7 +239,9 @@ fn valid_delta_publishes_beside_invalid_file() -> CheckResult<()> {
     fs::write(root.join("a.md"), "<!-- {broken -->\ninvalid")?;
     fixture(root, "b.md", "bravo", &[])?;
     let before = corpus(root)?;
+    // When
     run(root)?;
+    // Then
     assert_nodes(
         &conn,
         root,

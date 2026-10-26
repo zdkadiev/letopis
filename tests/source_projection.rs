@@ -13,6 +13,7 @@ use support::{
 
 #[test]
 fn publish_opaque_remote_without_local_interpretation() {
+    // Given
     let repo = DocumentRepo::new();
     let address = "https://Host/a?x=1#section";
     repo.write("remote.md", build_external(7, address, "RemoteToken"));
@@ -24,6 +25,7 @@ fn publish_opaque_remote_without_local_interpretation() {
     let NodeMetadata::Source(source) = &state.get_node(address).metadata else {
         panic!("expected remote source")
     };
+    // When / Then
     assert_eq!(source.uri.as_str(), address);
     assert_eq!(
         (source.hash, source.lines, source.created_at),
@@ -34,6 +36,7 @@ fn publish_opaque_remote_without_local_interpretation() {
 
 #[test]
 fn merge_equivalent_local_ranges_with_minimum_reference_time() {
+    // Given
     let repo = DocumentRepo::new();
     repo.write("source.txt", b"abc");
     repo.write(
@@ -49,6 +52,7 @@ fn merge_equivalent_local_ranges_with_minimum_reference_time() {
     refresher.refresh().unwrap();
 
     let state = repo.read_state();
+    // When / Then
     assert_eq!(state.nodes.len(), 3);
     let NodeMetadata::Source(source) = &state.get_node("source.txt#L1-L1").metadata else {
         panic!("expected local source")
@@ -66,7 +70,7 @@ fn merge_equivalent_local_ranges_with_minimum_reference_time() {
 
 #[test]
 fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
-    // Arrange: each invalid address gets its own fresh Git/SQLite fixture.
+    // Given: each invalid address gets its own fresh Git/SQLite fixture.
     for address in [
         "./https:notes",
         "dir/../HTTP:notes",
@@ -82,8 +86,9 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
             build_external(3, address, "SECRET_RAW_BODY").as_bytes(),
         );
 
-        // Act / Assert: check refreshes the real cache and returns safe file diagnostics.
+        // When / Then: check refreshes the real cache and returns safe file diagnostics.
         for _ in 0..2 {
+            // When / Then
             assert_eq!(
                 run_check(&repo),
                 json!({"ok":true,"result":{"errors":[{
@@ -104,8 +109,9 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
             assert!(!bad.valid);
         }
 
-        // Act / Assert: editing away the bad link recovers without a cache rebuild.
+        // Given: editing away the bad link allows recovery without a cache rebuild.
         repo.write("bad.md", build_whole(3, "RepairedToken").as_bytes());
+        // When / Then
         assert_eq!(run_check(&repo), json!({"ok":true,"result":{"errors":[]}}));
         let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
         assert!(!refresher.refresh().unwrap().published);
@@ -119,7 +125,7 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
 
 #[test]
 fn retain_last_valid_projection_after_ambiguous_source_edit() {
-    // Arrange
+    // Given
     let repo = DocumentRepo::new();
     repo.write("source.txt", b"abc");
     repo.write("valid.md", build_external(3, "source.txt", "RetainedToken"));
@@ -127,14 +133,14 @@ fn retain_last_valid_projection_after_ambiguous_source_edit() {
     refresher.refresh().unwrap();
     let before = repo.read_state();
 
-    // Act
+    // When
     repo.write(
         "valid.md",
         build_external(3, "./https:notes", "SECRET_RAW_BODY"),
     );
     let result = refresher.refresh().unwrap();
 
-    // Assert: invalid-file policy preserves the readable effective graph and FTS.
+    // Then: invalid-file policy preserves the readable effective graph and FTS.
     assert_eq!(result.invalid_files_updated, 1);
     let invalid = repo.read_state();
     assert!(!invalid.get_file("valid.md").valid);
@@ -143,10 +149,12 @@ fn retain_last_valid_projection_after_ambiguous_source_edit() {
     assert_eq!(repo.search("RetainedToken"), ["valid.md"]);
     assert!(repo.search("SECRET_RAW_BODY").is_empty());
 
-    // Act / Assert: deleting the invalid referrer removes its retained source.
+    // Given: the invalid referrer is deleted.
     repo.remove("valid.md");
+    // When
     refresher.refresh().unwrap();
     let removed = repo.read_state();
+    // Then
     assert!(removed.nodes.is_empty());
     assert!(removed.edges.is_empty());
 }

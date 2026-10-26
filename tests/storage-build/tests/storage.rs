@@ -18,7 +18,9 @@ fn open(path: &Path) -> CheckResult<Connection> {
 
 #[test]
 fn rejects_sqlite_below_the_supported_floor() {
+    // Given / When
     let error = require_sqlite_version(3_051_002).unwrap_err();
+    // Then
     assert!(error.to_string().contains("SQLite 3.51.3+ required"));
     require_sqlite_version(3_051_003).unwrap();
     require_sqlite_version(3_053_002).unwrap();
@@ -26,18 +28,24 @@ fn rejects_sqlite_below_the_supported_floor() {
 
 #[test]
 fn missing_extension_is_an_error() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
+    // When
     let error =
         unsafe { open_checked(&dir.path().join("db"), &dir.path().join("absent")) }.unwrap_err();
+    // Then
     assert!(error.to_string().contains("vec1 extension"), "{error}");
     Ok(())
 }
 
 #[test]
 fn checked_connection_enforces_the_storage_policy() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
+    // When
     let conn = open(&dir.path().join("db"))?;
     let journal: String = conn.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
+    // Then
     assert_eq!(journal, "wal");
     for (pragma, expected) in [("synchronous", 2), ("foreign_keys", 1)] {
         let value: i64 = conn.pragma_query_value(None, pragma, |row| row.get(0))?;
@@ -99,13 +107,16 @@ fn nearest(conn: &Connection) -> rusqlite::Result<Vec<i64>> {
 
 #[test]
 fn fts_contentless_delete_and_committed_writes_survive_reopen() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("db");
     {
+        // When
         let mut conn = open(&path)?;
         let tx = conn.transaction()?;
         create_fts(&tx)?;
         tx.commit()?;
+        // Then
         assert_eq!(matches(&conn, "memory")?, [1]);
         let text: Option<String> =
             conn.query_row("SELECT text FROM ft WHERE rowid=1", [], |row| row.get(0))?;
@@ -122,17 +133,20 @@ fn fts_contentless_delete_and_committed_writes_survive_reopen() -> CheckResult<(
 
 #[test]
 fn fts_insert_update_delete_roll_back_explicitly_and_on_drop() -> CheckResult<()> {
+    // Given
     for explicit in [true, false] {
         let dir = tempfile::tempdir()?;
         let mut conn = open(&dir.path().join("db"))?;
         create_fts(&conn)?;
         {
+            // When
             let tx = conn.transaction()?;
             tx.execute_batch(
                 "UPDATE ft SET text='replacement' WHERE rowid=1;
                               DELETE FROM ft WHERE rowid=2;
                               INSERT INTO ft(rowid,text) VALUES(3,'temporary');",
             )?;
+            // Then
             assert_eq!(matches(&tx, "replacement")?, [1]);
             assert!(matches(&tx, "graph")?.is_empty());
             assert_eq!(matches(&tx, "temporary")?, [3]);
@@ -149,14 +163,17 @@ fn fts_insert_update_delete_roll_back_explicitly_and_on_drop() -> CheckResult<()
 
 #[test]
 fn vectors_use_cosine_distance_and_persist_committed_changes() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("db");
     {
+        // When
         let mut conn = open(&path)?;
         let tx = conn.transaction()?;
         create_vectors(&tx)?;
         tx.commit()?;
         // Cosine chooses [10,0]; Euclidean would incorrectly choose [1,1].
+        // Then
         assert_eq!(nearest(&conn)?, [1, 2, 3]);
         let expected: Vec<u8> = [10.0_f32, 0.0]
             .into_iter()
@@ -182,17 +199,20 @@ fn vectors_use_cosine_distance_and_persist_committed_changes() -> CheckResult<()
 
 #[test]
 fn vector_insert_update_delete_roll_back_explicitly_and_on_drop() -> CheckResult<()> {
+    // Given
     for explicit in [true, false] {
         let dir = tempfile::tempdir()?;
         let mut conn = open(&dir.path().join("db"))?;
         create_vectors(&conn)?;
         {
+            // When
             let tx = conn.transaction()?;
             tx.execute_batch(
                 "UPDATE v SET vector=vec1_from_json('[-1,-1]') WHERE rowid=1;
                               DELETE FROM v WHERE rowid=3;
                               INSERT INTO v(rowid,vector) VALUES(4,vec1_from_json('[0.5,0]'));",
             )?;
+            // Then
             assert_eq!(nearest(&tx)?, [4, 2, 1]);
             if explicit {
                 tx.rollback()?;
@@ -213,11 +233,13 @@ fn vector_insert_update_delete_roll_back_explicitly_and_on_drop() -> CheckResult
 
 #[test]
 fn fts_and_vectors_commit_and_roll_back_together() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("db");
     let mut conn = open(&path)?;
     create_fts(&conn)?;
     create_vectors(&conn)?;
+    // When
     let tx = conn.transaction()?;
     tx.execute("INSERT INTO ft(rowid,text) VALUES(4,'atomic')", [])?;
     tx.execute(
@@ -225,6 +247,7 @@ fn fts_and_vectors_commit_and_roll_back_together() -> CheckResult<()> {
         [],
     )?;
     tx.rollback()?;
+    // Then
     assert!(matches(&conn, "atomic")?.is_empty());
     assert_eq!(nearest(&conn)?, [1, 2, 3]);
     let tx = conn.transaction()?;
@@ -247,9 +270,11 @@ fn fts_and_vectors_commit_and_roll_back_together() -> CheckResult<()> {
 
 #[test]
 fn vector_dimension_mismatch_is_rejected_without_losing_existing_rows() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let conn = open(&dir.path().join("db"))?;
     create_vectors(&conn)?;
+    // When
     assert!(
         conn.execute(
             "INSERT INTO v(rowid,vector) VALUES(?1,vec1_from_json(?2))",
@@ -257,19 +282,23 @@ fn vector_dimension_mismatch_is_rejected_without_losing_existing_rows() -> Check
         )
         .is_err()
     );
+    // Then
     assert_eq!(nearest(&conn)?, [1, 2, 3]);
     Ok(())
 }
 
 #[test]
 fn checked_connection_enforces_foreign_keys() -> CheckResult<()> {
+    // Given
     let dir = tempfile::tempdir()?;
     let conn = open(&dir.path().join("db"))?;
     conn.execute_batch(
         "CREATE TABLE parent(id INTEGER PRIMARY KEY);
                         CREATE TABLE child(parent_id INTEGER REFERENCES parent(id));",
     )?;
+    // When
     let error = conn.execute("INSERT INTO child VALUES(1)", []).unwrap_err();
+    // Then
     assert_eq!(
         error.sqlite_error_code(),
         Some(rusqlite::ErrorCode::ConstraintViolation)

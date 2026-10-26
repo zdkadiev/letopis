@@ -40,8 +40,11 @@ struct BoundaryWrite<W> {
 
 #[test]
 fn retain_under_index_lock_before_sql_publication() {
+    // Given
     let (_dir, mut service, events) = build_boundary_service(None);
+    // When
     let outcome = service.refresh().unwrap();
+    // Then
     assert!(outcome.published);
     assert_eq!(outcome.revision, 1);
     assert_eq!(
@@ -54,23 +57,32 @@ fn retain_under_index_lock_before_sql_publication() {
 
 #[test]
 fn preflight_read_failure_never_opens_sql_write() {
+    // Given
     let (_dir, mut service, events) = build_boundary_service(None);
     service.filesystem.inner.fail_on_read.set(Some(2));
+    // When / Then
     assert!(service.refresh().is_err());
+    // Then
     assert_eq!(*events.borrow(), ["lock", "read", "read"]);
 }
 
 #[test]
 fn observation_failure_never_opens_sql_write() {
+    // Given
     let (_dir, mut service, events) = build_boundary_service(Some("observe"));
+    // When / Then
     assert!(service.refresh().is_err());
+    // Then
     assert_eq!(*events.borrow(), ["lock", "read", "read", "observe"]);
 }
 
 #[test]
 fn pin_failure_never_opens_sql_write() {
+    // Given
     let (_dir, mut service, events) = build_boundary_service(Some("retain"));
+    // When / Then
     assert!(service.refresh().is_err());
+    // Then
     assert_eq!(
         *events.borrow(),
         ["lock", "read", "read", "observe", "retain"]
@@ -79,9 +91,12 @@ fn pin_failure_never_opens_sql_write() {
 
 #[test]
 fn changed_capture_after_preflight_rolls_back_without_commit() {
+    // Given
     let (_dir, mut service, events) = build_boundary_service(None);
     service.filesystem.inner.replace_on_read.set(Some(3));
+    // When / Then
     assert!(service.refresh().is_err());
+    // Then
     assert_eq!(
         *events.borrow(),
         ["lock", "read", "read", "observe", "retain", "begin", "read"]
@@ -94,6 +109,7 @@ fn changed_capture_after_preflight_rolls_back_without_commit() {
 
 #[test]
 fn unchanged_basis_retention_skips_sql_write_and_body_parse() {
+    // Given
     let (_dir, mut service, events) = build_boundary_service(None);
     let tree = TreeOid::parse(&"1".repeat(40)).unwrap();
     let note = format!(
@@ -112,7 +128,9 @@ fn unchanged_basis_retention_skips_sql_write_and_body_parse() {
     service.refresh().unwrap();
     events.borrow_mut().clear();
     let parses = service.markdown.0.get();
+    // When
     let outcome = service.refresh().unwrap();
+    // Then
     assert!(!outcome.published);
     assert_eq!(outcome.revision, 1);
     assert_eq!(service.markdown.0.get(), parses);
@@ -121,15 +139,18 @@ fn unchanged_basis_retention_skips_sql_write_and_body_parse() {
 
 #[test]
 fn initial_build_and_full_reindex_lock_before_capturing_and_validate_basis() {
-    // Arrange.
+    // Given.
     let (_dir, mut service, events) = build_boundary_service(None);
-    // Act: the first build follows the full path, not preliminary file capture.
+    // When: the first build follows the full path, not preliminary file capture.
     service.refresh().unwrap();
-    // Assert.
+    // Then.
     assert_eq!(events.borrow().first(), Some(&"lock"));
+    // Given
     events.borrow_mut().clear();
     let parses = service.markdown.0.get();
+    // When
     service.reindex().unwrap();
+    // Then
     assert_eq!(
         *events.borrow(),
         [

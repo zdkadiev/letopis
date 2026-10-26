@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use support::*;
 #[test]
 fn sigint_before_commit_keeps_exact_cache() -> CheckResult<()> {
+    // Given
     // Break: commit a partially updated cache before the publication unit finishes.
     for mode in ["publish", "reindex"] {
         for cut in ["projections", "fts", "fingerprints", "before_commit"] {
@@ -13,8 +14,10 @@ fn sigint_before_commit_keeps_exact_cache() -> CheckResult<()> {
             change(r)?;
             let corpus = p::corpus(r)?;
             let mut control = Control::new()?;
+            // When
             let mut child = control.start(r, mode, cut, "")?;
             let event = control.at(cut)?;
+            // Then
             assert!(held(r, "index.lock")?);
             child.killed(libc::SIGINT)?;
             event.dead();
@@ -30,6 +33,7 @@ fn sigint_before_commit_keeps_exact_cache() -> CheckResult<()> {
 }
 #[test]
 fn sigint_after_commit_keeps_new_cache() -> CheckResult<()> {
+    // Given
     // Break: attempt compensating rollback of an already committed publication.
     for mode in ["publish", "reindex"] {
         let d = tempfile::tempdir()?;
@@ -38,8 +42,10 @@ fn sigint_after_commit_keeps_new_cache() -> CheckResult<()> {
         change(r)?;
         let corpus = p::corpus(r)?;
         let mut control = Control::new()?;
+        // When
         let mut child = control.start(r, mode, "after_commit", "")?;
         let event = control.at("after_commit")?;
+        // Then
         expected_changed(r, 2)?;
         let committed = p::snapshot(&cache(r)?)?;
         child.killed(libc::SIGINT)?;
@@ -53,6 +59,7 @@ fn sigint_after_commit_keeps_new_cache() -> CheckResult<()> {
 }
 #[test]
 fn sigint_waiter_leaves_owner_and_drain_alive() -> CheckResult<()> {
+    // Given
     // Break: kill a process group/lock-file PID instead of the addressed process.
     let d = tempfile::tempdir()?;
     let r = d.path();
@@ -67,8 +74,10 @@ fn sigint_waiter_leaves_owner_and_drain_alive() -> CheckResult<()> {
     // kills the owner as well; the test harness and user processes are in other groups.
     let mut waiter = control.start_with(r, "publish", "waiting", "", None, Some(owner.pid()))?;
     let waiting = control.at("waiting")?;
+    // When
     waiter.killed(libc::SIGINT)?;
     waiting.dead();
+    // Then
     assert!(
         owner.alive()?,
         "SIGINT waiter killed foreign publication owner"
@@ -120,6 +129,7 @@ fn sigint_waiter_leaves_owner_and_drain_alive() -> CheckResult<()> {
 }
 #[test]
 fn failed_or_lost_spawn_keeps_work_recoverable() -> CheckResult<()> {
+    // Given
     // Break: undo publication/spend an attempt on failed spawn, retain the probe,
     // or tie a detached child's lifetime to the launcher's lifetime.
     for failure in ["missing", "before_spawn", "after_spawn"] {
@@ -129,9 +139,11 @@ fn failed_or_lost_spawn_keeps_work_recoverable() -> CheckResult<()> {
         p::fixture(r, "b.md", "alpha", &[("a.md", "includes")])?;
         let corpus = p::corpus(r)?;
         let mut control = Control::new()?;
+        // When
         if failure == "missing" {
             let mut caller =
                 control.start_with(r, "publish", "", "", Some(&r.join("no-executable")), None)?;
+            // Then
             assert!(caller.finish()?.starts_with("Failed("));
         } else if failure == "before_spawn" {
             let mut caller = control.start(r, "publish", "probe_released", "")?;
@@ -192,6 +204,7 @@ fn failed_or_lost_spawn_keeps_work_recoverable() -> CheckResult<()> {
 }
 #[test]
 fn sigint_inside_blocking_flock_leaves_other_processes_alive() -> CheckResult<()> {
+    // Given
     // Break: accept a pre-flock fixture pause as evidence of kernel waiting, or
     // signal a whole fixture group instead of the addressed blocked syscall.
     for mode in ["publish", "reindex"] {
@@ -207,10 +220,12 @@ fn sigint_inside_blocking_flock_leaves_other_processes_alive() -> CheckResult<()
         let publication = control.at("before_commit")?;
         let mut drain = control.start(r, "drain", "", "drain_acquired,finished")?;
         let active = control.at("drain_acquired")?;
+        // When
         let mut waiter = control.start_with(r, mode, "waiting", "", None, Some(owner.pid()))?;
         let waiting = control.at("waiting")?;
         let (inside, before) = waiter.observe_flock(r)?;
         retain_flock_observation(&format!("{mode}-before-flock-"), &before)?;
+        // Then
         assert!(!inside, "pre-flock checkpoint counted as kernel waiting");
         waiting.resume()?; // enter the real blocking flock, with no later fixture hook
         let observed = waiter.wait_in_flock(r)?;

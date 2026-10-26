@@ -9,7 +9,7 @@ use support::reading::ReadingRepo;
 
 #[test]
 fn inspect_reads_current_knowledge_from_one_retained_tree() {
-    // Arrange: fixed codec goldens exercise exact bytes and section boundaries.
+    // Given: fixed codec goldens exercise exact bytes and section boundaries.
     let repo = ReadingRepo::new();
     let fixtures = build_fixtures();
     for (path, bytes, ..) in fixtures {
@@ -20,10 +20,10 @@ fn inspect_reads_current_knowledge_from_one_retained_tree() {
         .iter()
         .map(|(_, _, id, ..)| ElementAddress::parse(id).unwrap())
         .collect::<Vec<_>>();
-    // Act
+    // When
     let result = service.inspect(&addresses).unwrap();
     let git = open_git_snapshots(repo.get_root()).unwrap();
-    // Assert
+    // Then
     assert_eq!(result.elements.len(), 4);
     for (path, bytes, id, start, end, hash) in fixtures {
         assert_eq!(result.elements[id].path.as_str(), path);
@@ -54,13 +54,16 @@ fn inspect_reads_current_knowledge_from_one_retained_tree() {
 
 #[test]
 fn inspect_deduplicates_cross_file_ids_and_rejects_unknown_batch() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\nalpha\n");
     repo.write("b.md", include_bytes!("fixtures/markdown/sections.md"));
     let mut service = wire_inspector(repo.get_root()).unwrap();
+    // When
     let result = service
         .inspect(&["a.md", "./a.md", "b.md#a"].map(|id| ElementAddress::parse(id).unwrap()))
         .unwrap();
+    // Then
     assert_eq!(result.elements.len(), 2);
     let error = service
         .inspect(&["a.md", "missing.md"].map(|id| ElementAddress::parse(id).unwrap()))
@@ -70,6 +73,7 @@ fn inspect_deduplicates_cross_file_ids_and_rejects_unknown_batch() {
 
 #[test]
 fn inspect_rejects_invalid_current_file_instead_of_using_old_sql() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\nold\n");
     wire_document_refresher(repo.get_root())
@@ -77,23 +81,28 @@ fn inspect_rejects_invalid_current_file_instead_of_using_old_sql() {
         .refresh()
         .unwrap();
     repo.write("a.md", b"<!-- letopis: {invalid} -->\ncurrent\n");
+    // When
     let error = wire_inspector(repo.get_root())
         .unwrap()
         .inspect(&[ElementAddress::parse("a.md").unwrap()])
         .unwrap_err();
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::ValidationFailed);
 }
 
 #[test]
 fn inspect_distinguishes_referenced_sources_from_unknown_ids() {
+    // Given
     let repo = ReadingRepo::new();
     repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\n[source](src/data.rs \"letopis:type=external\") [other](plain.md \"letopis:type=external\")\n");
     repo.write("plain.md", b"unmarked Markdown");
     let mut service = wire_inspector(repo.get_root()).unwrap();
     for id in ["src/data.rs", "plain.md"] {
+        // When
         let inspected = service
             .inspect(&[ElementAddress::parse(id).unwrap()])
             .unwrap();
+        // Then
         assert_eq!(inspected.elements[id].path.as_str(), id);
         assert_eq!(inspected.elements[id].hash.is_some(), id == "plain.md");
     }
@@ -116,7 +125,7 @@ fn inspect_distinguishes_referenced_sources_from_unknown_ids() {
 
 #[test]
 fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
-    // Arrange: refresh an indexed file which subsequently disappears.
+    // Given: refresh an indexed file which subsequently disappears.
     let repo = ReadingRepo::new();
     repo.write("gone.md", b"<!-- letopis: {\"created_at\":1} -->\ngone");
     repo.write("kept.md", b"<!-- letopis: {\"created_at\":1} -->\nkept");
@@ -132,14 +141,14 @@ fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
         .unwrap();
     std::fs::remove_file(repo.get_root().join("gone.md")).unwrap();
     let mut service = wire_inspector(repo.get_root()).unwrap();
-    // Act
+    // When
     let current = service
         .inspect(&[ElementAddress::parse("kept.md").unwrap()])
         .unwrap();
     let removed = service
         .inspect(&[ElementAddress::parse("gone.md").unwrap()])
         .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(current.elements.len(), 1);
     assert_eq!(removed.get_kind(), CommandErrorKind::NotFound);
     assert!(
@@ -152,7 +161,7 @@ fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
 
 #[test]
 fn inspect_rejects_removed_indexed_anchor_in_mixed_batch() {
-    // Arrange: keep the file marked and its source declaration current.
+    // Given: keep the file marked and its source declaration current.
     let repo = ReadingRepo::new();
     repo.write(
         "sections.md",
@@ -172,14 +181,14 @@ fn inspect_rejects_removed_indexed_anchor_in_mixed_batch() {
         .inspect(&[ElementAddress::parse("sections.md#renamed").unwrap()])
         .unwrap();
     assert_eq!(current.elements.len(), 1);
-    // Act
+    // When
     let error = service
         .inspect(&[
             ElementAddress::parse("source.txt").unwrap(),
             ElementAddress::parse("sections.md#old").unwrap(),
         ])
         .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
 }
 

@@ -15,6 +15,7 @@ use support::{
 
 #[test]
 fn retain_basis_before_publishing_and_keep_history_after_gc() {
+    // Given
     for format in FORMATS {
         let repo = TempRepo::new(format);
         repo.write("source.txt", b"new source\n");
@@ -25,8 +26,10 @@ fn retain_basis_before_publishing_and_keep_history_after_gc() {
         );
         let expected_bytes = fs::read(repo.get_root().join("note.md")).unwrap();
         let user_state_before = capture_head_and_index(&repo);
+        // When
         refresh(&repo);
         let expected_metadata = repo.read_state().get_node("note.md").metadata.clone();
+        // Then
         assert!(has_exact_service_ref(&repo, &old_tree));
         repo.expire_reflogs_gc_prune_now_and_pack_refs();
         assert_eq!(read_retained_bytes(&repo, &old_tree), b"old source\r\n");
@@ -44,6 +47,7 @@ fn retain_basis_before_publishing_and_keep_history_after_gc() {
 
 #[test]
 fn retain_newly_available_basis_without_markdown_change() {
+    // Given
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let tree = create_basis(repo.get_root(), &[("source.txt", b"later\n")]);
@@ -55,12 +59,17 @@ fn retain_newly_available_basis_without_markdown_change() {
             "note.md",
             build_note(Some(&tree), &["source.txt"], "Knowledge"),
         );
+        // When
         let first = refresh(&repo);
+        // Then
         assert!(!has_exact_service_ref(&repo, &tree));
         assert_eq!(get_basis(&repo.read_state()), Some(tree.clone()));
+        // Given
         let before = repo.read_state();
         fs::write(object_path, object).unwrap();
+        // When
         let second = refresh(&repo);
+        // Then
         assert!(!second.published);
         assert_eq!(second.revision, first.revision);
         assert_eq!(repo.read_state(), before);
@@ -70,6 +79,7 @@ fn retain_newly_available_basis_without_markdown_change() {
 
 #[test]
 fn reject_corrupt_closure_and_ref_failure_before_publication() {
+    // Given
     for corrupt in [true, false] {
         let repo = TempRepo::new(FORMATS[0]);
         repo.write("note.md", build_note(None, &[], "Original"));
@@ -94,7 +104,9 @@ fn reject_corrupt_closure_and_ref_failure_before_publication() {
             fs::write(refs.join("snapshots"), b"block namespace").unwrap();
         }
         let user_state_before = capture_head_and_index(&repo);
+        // When
         let refresh_result = wire_document_refresher(repo.get_root()).unwrap().refresh();
+        // Then
         assert!(refresh_result.is_err());
         assert_eq!(repo.read_state(), before);
         assert_eq!(capture_head_and_index(&repo), user_state_before);
@@ -103,6 +115,7 @@ fn reject_corrupt_closure_and_ref_failure_before_publication() {
 
 #[test]
 fn preserve_declared_basis_on_edit_and_reproduce_it_after_cache_rebuild() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let tree = create_basis(repo.get_root(), &[("source.txt", b"original\n")]);
     repo.write("source.txt", b"original\n");
@@ -114,7 +127,9 @@ fn preserve_declared_basis_on_edit_and_reproduce_it_after_cache_rebuild() {
     repo.write("source.txt", b"changed\n");
     let note = build_note(Some(&tree), &["source.txt"], "Edited knowledge");
     repo.write("note.md", &note);
+    // When
     refresh(&repo);
+    // Then
     assert_eq!(get_basis(&repo.read_state()), Some(tree.clone()));
     remove_cache(&repo);
     refresh(&repo);
@@ -128,6 +143,7 @@ fn preserve_declared_basis_on_edit_and_reproduce_it_after_cache_rebuild() {
 
 #[test]
 fn remove_basis_only_when_metadata_field_is_removed() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let tree = create_basis(repo.get_root(), &[("source.txt", b"source\n")]);
     repo.write("source.txt", b"source\n");
@@ -137,7 +153,9 @@ fn remove_basis_only_when_metadata_field_is_removed() {
     );
     refresh(&repo);
     repo.write("note.md", build_note(None, &["source.txt"], "Edited"));
+    // When
     refresh(&repo);
+    // Then
     assert_eq!(get_basis(&repo.read_state()), None);
     remove_cache(&repo);
     refresh(&repo);
@@ -147,6 +165,7 @@ fn remove_basis_only_when_metadata_field_is_removed() {
 
 #[test]
 fn retain_last_valid_basis_after_invalid_edit() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let tree = create_basis(repo.get_root(), &[("source.txt", b"source\n")]);
     repo.write("source.txt", b"source\n");
@@ -164,7 +183,9 @@ fn retain_last_valid_basis_after_invalid_edit() {
         None,
     );
     repo.write("note.md", b"<!-- letopis: invalid -->\n");
+    // When
     refresh(&repo);
+    // Then
     assert!(!repo.read_state().get_file("note.md").valid);
     assert_eq!(get_basis(&repo.read_state()), Some(tree.clone()));
     assert!(has_exact_service_ref(&repo, &tree));
@@ -172,6 +193,7 @@ fn retain_last_valid_basis_after_invalid_edit() {
 
 #[test]
 fn retain_shared_and_unreferenced_declared_basis_once() {
+    // Given
     let repo = TempRepo::new(FORMATS[0]);
     let shared = create_basis(repo.get_root(), &[("source.txt", b"source\n")]);
     let unreferenced = create_basis(repo.get_root(), &[("source.txt", b"unreferenced\n")]);
@@ -182,7 +204,9 @@ fn retain_shared_and_unreferenced_declared_basis_once() {
         build_note(Some(&shared), &["source.txt"], "Two"),
     );
     repo.write("orphan.md", build_note(Some(&unreferenced), &[], "Three"));
+    // When
     refresh(&repo);
+    // Then
     assert!(has_exact_service_ref(&repo, &shared));
     assert!(has_exact_service_ref(&repo, &unreferenced));
     let refs = repo.run_git_successfully(

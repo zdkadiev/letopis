@@ -3,35 +3,35 @@ use letopis::service::{EmbeddingConfig, EmbeddingProvider};
 
 #[test]
 fn ignores_object_order_for_identity() {
-    // Arrange
+    // Given
     let compact = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost:11434/api"},"max_retries":3}"#;
     let reordered = br#"{ "max_retries": 3, "parameters": {"base_url":"http://localhost:11434/api"}, "model":"fixture", "provider":"ollama" }"#;
-    // Act
+    // When
     let first = parse_config(compact);
     let second = parse_config(reordered);
-    // Assert
+    // Then
     assert_eq!(first.get_identity(), second.get_identity());
     assert_eq!(first.get_max_attempts(), 4);
 }
 
 #[test]
 fn rejects_duplicate_nested_keys() {
-    // Arrange
+    // Given
     let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","options":{"seed":1,"seed":2}},"max_retries":3}"#;
-    // Act
+    // When
     let result = EmbeddingConfig::parse(bytes);
-    // Assert
+    // Then
     assert!(result.is_err());
 }
 
 #[test]
 fn validates_endpoint_without_inference() {
-    // Arrange
+    // Given
     let config = parse_config(br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"file:///tmp/fixture"},"max_retries":3}"#);
     let provider = build_embedding_provider().unwrap();
-    // Act
+    // When
     let result = provider.validate_config(&config);
-    // Assert
+    // Then
     assert!(result.is_err());
 }
 
@@ -43,7 +43,7 @@ use support::embedding::{FixtureReply, HttpFixture};
 
 #[test]
 fn sends_native_request_without_silent_truncation_or_unknown_parameters() {
-    // Arrange
+    // Given
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3],[4,5,6]]}));
     let config = build_config(
         "ollama",
@@ -51,11 +51,11 @@ fn sends_native_request_without_silent_truncation_or_unknown_parameters() {
         &json!({"dimensions":3,"keep_alive":"5m","options":{"seed":7},"unknown":42,"input":"override","model":"override"}),
     );
     let provider = build_embedding_provider().unwrap();
-    // Act
+    // When
     let vectors = provider
         .embed(&config, &["first", "second"], NonZeroUsize::new(3))
         .unwrap();
-    // Assert
+    // Then
     assert_eq!(vectors, vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]]);
     assert_eq!(
         server.take_requests(),
@@ -69,7 +69,7 @@ fn sends_native_request_without_silent_truncation_or_unknown_parameters() {
 }
 #[test]
 fn reorders_compatible_response_and_sends_only_supported_parameters() {
-    // Arrange: isolate synthetic credentials in a child process.
+    // Given: isolate synthetic credentials in a child process.
     if std::env::var_os("LETOPIS_PROVIDER_CHILD").is_none() {
         let status = Command::new(std::env::current_exe().unwrap())
             .args([
@@ -92,9 +92,9 @@ fn reorders_compatible_response_and_sends_only_supported_parameters() {
         &json!({"dimensions":3,"options":{},"unknown":99}),
     );
     let provider = build_embedding_provider().unwrap();
-    // Act
+    // When
     let vectors = provider.embed(&config, &["first", "second"], None).unwrap();
-    // Assert
+    // Then
     assert_eq!(vectors, vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]]);
     assert_eq!(
         server.take_requests(),
@@ -108,7 +108,7 @@ fn reorders_compatible_response_and_sends_only_supported_parameters() {
 }
 #[test]
 fn rejects_malformed_native_vectors() {
-    // Arrange
+    // Given
     let bodies = [
         json!({"model":"fixture-alias","embeddings":[]}),
         json!({"model":"fixture-alias","embeddings":[[]]}),
@@ -122,12 +122,12 @@ fn rejects_malformed_native_vectors() {
     for body in bodies {
         let server = start_fixture(&body);
         let config = build_config("ollama", &server.get_base_url(), &json!({"dimensions":3}));
-        // Act
+        // When
         let error = build_embedding_provider()
             .unwrap()
             .embed(&config, &["input-secret"], None)
             .unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
         assert!(!format!("{error:?} {error}").contains("secret"));
     }
@@ -145,80 +145,80 @@ fn rejects_non_json_and_non_success_without_retrying() {
             EmbeddingErrorKind::InvalidResponse,
         ),
     ] {
-        // Arrange
+        // Given
         let server = HttpFixture::start(FixtureReply::Status {
             status,
             body: body.to_owned(),
         });
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
-        // Act
+        // When
         let error = build_embedding_provider()
             .unwrap()
             .embed(&config, &["input"], None)
             .unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), kind);
         assert_eq!(server.take_requests().len(), 1);
     }
 }
 #[test]
 fn refuses_redirects() {
-    // Arrange
+    // Given
     let destination = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let source = HttpFixture::start(FixtureReply::Redirect {
         location: destination.get_base_url(),
     });
     let config = build_config("ollama", &source.get_base_url(), &json!({}));
-    // Act
+    // When
     let error = build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), EmbeddingErrorKind::HttpStatus(302));
     assert!(destination.take_requests().is_empty());
 }
 
 #[test]
 fn changes_identity_when_retries_or_unknown_parameters_change() {
-    // Arrange
+    // Given
     let first = json!({"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","future":1},"max_retries":3});
     let mut changed_retries = first.clone();
     changed_retries["max_retries"] = 2.into();
     let mut changed_parameter = first.clone();
     changed_parameter["parameters"]["future"] = 2.into();
-    // Act
+    // When
     let original = parse_config(&serde_json::to_vec(&first).unwrap());
     let retries = parse_config(&serde_json::to_vec(&changed_retries).unwrap());
     let parameter = parse_config(&serde_json::to_vec(&changed_parameter).unwrap());
-    // Assert
+    // Then
     assert_ne!(original.get_identity(), retries.get_identity());
     assert_ne!(original.get_identity(), parameter.get_identity());
 }
 #[test]
 fn canonicalizes_jcs_number_spellings() {
     for (first, second) in [("1.0", "1"), ("-0.0", "0"), ("1e30", "1E+30")] {
-        // Arrange
+        // Given
         let build = |number| {
             format!(
                 r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","future":{number}}},"max_retries":3}}"#
             )
         };
-        // Act
+        // When
         let original = parse_config(build(first).as_bytes());
         let equivalent = parse_config(build(second).as_bytes());
-        // Assert
+        // Then
         assert_eq!(original.get_identity(), equivalent.get_identity());
     }
 }
 #[test]
 fn rejects_missing_required_fields_and_forbidden_root_fields() {
-    // Arrange
+    // Given
     let valid = json!({"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":3});
     for field in ["provider", "model", "parameters", "max_retries"] {
         let mut incomplete = valid.clone();
         incomplete.as_object_mut().unwrap().remove(field);
-        // Act / Assert
+        // When / Then
         assert!(
             EmbeddingConfig::parse(&serde_json::to_vec(&incomplete).unwrap()).is_err(),
             "{field}"
@@ -227,7 +227,7 @@ fn rejects_missing_required_fields_and_forbidden_root_fields() {
     for field in ["api_key", "authorization", "unexpected"] {
         let mut forbidden = valid.clone();
         forbidden[field] = "secret".into();
-        // Act / Assert
+        // When / Then
         assert!(
             EmbeddingConfig::parse(&serde_json::to_vec(&forbidden).unwrap()).is_err(),
             "{field}"
@@ -251,12 +251,12 @@ fn rejects_wrong_recognized_parameter_types_and_credentials() {
         ("api_key", json!("secret")),
         ("Authorization", json!("secret")),
     ] {
-        // Arrange
+        // Given
         let mut config = json!({"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":3});
         config["parameters"][field] = value;
-        // Act
+        // When
         let result = EmbeddingConfig::parse(&serde_json::to_vec(&config).unwrap());
-        // Assert
+        // Then
         assert!(result.is_err(), "{field}");
     }
 }
@@ -266,9 +266,9 @@ fn rejects_duplicate_root_keys_and_duplicates_inside_arrays() {
         r#"{"provider":"ollama","model":"fixture","model":"other","parameters":{"base_url":"http://localhost/api"},"max_retries":3}"#,
         r#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","future":[{"a":1,"a":2}]},"max_retries":3}"#,
     ] {
-        // Arrange / Act
+        // Given / When
         let result = EmbeddingConfig::parse(bytes.as_bytes());
-        // Assert
+        // Then
         assert!(result.is_err());
     }
 }
@@ -281,13 +281,13 @@ fn rejects_overflow_and_canonicalization_budget_collisions() {
         "-1",
         "1.5",
     ] {
-        // Arrange
+        // Given
         let bytes = format!(
             r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api"}},"max_retries":{retries}}}"#
         );
-        // Act
+        // When
         let result = EmbeddingConfig::parse(bytes.as_bytes());
-        // Assert
+        // Then
         assert!(result.is_err(), "{retries}");
     }
     let exact = parse_config(br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":9007199254740992}"#);
@@ -304,11 +304,11 @@ fn rejects_invalid_endpoint_schemes_userinfo_and_incomplete_hosts() {
         "http://:123/api",
         "http://localhost:invalid/api",
     ] {
-        // Arrange
+        // Given
         let config = build_config("ollama", endpoint, &json!({}));
-        // Act
+        // When
         let result = provider.validate_config(&config);
-        // Assert
+        // Then
         assert!(result.is_err(), "{endpoint}");
     }
 }
@@ -341,15 +341,15 @@ fn rejects_compatible_index_and_vector_failures() {
         json!([entry(0, json!([1, 2, 3e99])), entry(1, json!([1, 2, 3]))]),
         json!([entry(0, json!([1, 2])), entry(1, json!([1, 2, 3]))]),
     ] {
-        // Arrange
+        // Given
         let server = start_fixture(&json!({"data":data}));
         let config = build_config("openai", &server.get_base_url(), &json!({"dimensions":3}));
-        // Act
+        // When
         let error = build_embedding_provider()
             .unwrap()
             .embed(&config, &["first", "second"], None)
             .unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
     }
 }
@@ -362,16 +362,16 @@ fn keeps_ollama_available_without_compatible_credentials() {
     ) {
         return;
     }
-    // Arrange
+    // Given
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let compatible = build_config("openai", &server.get_base_url(), &json!({}));
     let native = build_config("ollama", &server.get_base_url(), &json!({}));
     let provider = build_embedding_provider().unwrap();
-    // Act
+    // When
     provider.validate_config(&compatible).unwrap();
     let error = provider.embed(&compatible, &["input"], None).unwrap_err();
     let vectors = provider.embed(&native, &["input"], None).unwrap();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), EmbeddingErrorKind::Credentials);
     assert_eq!(vectors, vec![vec![1.0, 2.0, 3.0]]);
     assert_eq!(server.take_requests().len(), 1);
@@ -385,15 +385,15 @@ fn rejects_invalid_compatible_credentials_before_network_io() {
     ) {
         return;
     }
-    // Arrange
+    // Given
     let server = start_fixture(&json!({"data":[{"index":0,"embedding":[1,2,3]}]}));
     let config = build_config("openai", &server.get_base_url(), &json!({}));
-    // Act
+    // When
     let error = build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), EmbeddingErrorKind::Credentials);
     assert!(server.take_requests().is_empty());
 }
@@ -415,15 +415,15 @@ fn disables_environment_proxies_and_native_authorization() {
     ) {
         return;
     }
-    // Arrange
+    // Given
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
-    // Act
+    // When
     let vectors = build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap();
-    // Assert
+    // Then
     assert_eq!(vectors.len(), 1);
     assert!(
         !server.take_headers()[0]
@@ -435,7 +435,7 @@ fn disables_environment_proxies_and_native_authorization() {
 fn redacts_cause_bearing_errors_and_config_debug() {
     use letopis::service::EmbeddingError;
     use std::error::Error;
-    // Arrange
+    // Given
     let error = EmbeddingError::new_with_cause(
         EmbeddingErrorKind::InvalidResponse,
         std::io::Error::other("provider-secret Authorization: fixture-secret"),
@@ -445,12 +445,12 @@ fn redacts_cause_bearing_errors_and_config_debug() {
         "http://localhost/api",
         &json!({"future":"knowledge-secret"}),
     );
-    // Act
+    // When
     let debug = format!("{error:?}");
     let config_debug = format!("{config:?}");
     let formatted = format!("{error} {debug} {config_debug}");
     let source = error.source().unwrap();
-    // Assert
+    // Then
     assert!(debug.contains(&format!("{:?}", EmbeddingErrorKind::InvalidResponse)));
     assert!(config_debug.contains(&format!("{:?}", config.get_provider())));
     assert!(!formatted.contains("secret"));
@@ -459,11 +459,11 @@ fn redacts_cause_bearing_errors_and_config_debug() {
 }
 #[test]
 fn rejects_empty_inputs_and_incompatible_requested_dimensions_without_io() {
-    // Arrange
+    // Given
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let config = build_config("ollama", &server.get_base_url(), &json!({"dimensions":3}));
     let provider = build_embedding_provider().unwrap();
-    // Act / Assert
+    // When / Then
     for (texts, dimensions) in [
         (vec![], None),
         (vec![""], None),
@@ -477,17 +477,17 @@ fn rejects_empty_inputs_and_incompatible_requested_dimensions_without_io() {
 }
 #[test]
 fn rejects_connection_failures_without_exposing_endpoint_or_input() {
-    // Arrange
+    // Given
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("http://{}/secret", listener.local_addr().unwrap());
     drop(listener);
     let config = build_config("ollama", &url, &json!({}));
-    // Act
+    // When
     let error = build_embedding_provider()
         .unwrap()
         .embed(&config, &["knowledge-secret"], None)
         .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), EmbeddingErrorKind::Connection);
     assert!(!format!("{error} {error:?}").contains("secret"));
 }
@@ -495,19 +495,19 @@ fn rejects_connection_failures_without_exposing_endpoint_or_input() {
 #[ignore = "Task 5 executes the real 60-second acceptance deadline once per platform"]
 fn attempt_obeys_real_sixty_second_deadline() {
     use std::time::{Duration, Instant};
-    // Arrange
+    // Given
     let server = HttpFixture::start(FixtureReply::DelayedBody {
         delay: Duration::from_secs(65),
         body: json!({"model":"fixture-alias","embeddings":[[1,2,3]]}).to_string(),
     });
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
     let start = Instant::now();
-    // Act
+    // When
     let error = build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), EmbeddingErrorKind::Timeout);
     assert!((Duration::from_secs(59)..Duration::from_secs(64)).contains(&start.elapsed()));
     assert_eq!(server.take_requests().len(), 1);
@@ -536,18 +536,18 @@ fn rejects_compatible_error_payload_status_and_non_json() {
         ),
         (401, "provider-secret", EmbeddingErrorKind::HttpStatus(401)),
     ] {
-        // Arrange
+        // Given
         let server = HttpFixture::start(FixtureReply::Status {
             status,
             body: body.to_owned(),
         });
         let config = build_config("openai", &server.get_base_url(), &json!({}));
-        // Act
+        // When
         let error = build_embedding_provider()
             .unwrap()
             .embed(&config, &["knowledge-secret"], None)
             .unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), kind);
         assert!(!format!("{error} {error:?}").contains("secret"));
         assert_eq!(server.take_requests().len(), 1);
@@ -556,16 +556,16 @@ fn rejects_compatible_error_payload_status_and_non_json() {
 #[test]
 fn validates_unconfigured_dimensions_without_sending_an_implicit_request_dimension() {
     for size in [2, 4096] {
-        // Arrange
+        // Given
         let vector = vec![0.5; size];
         let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[vector]}));
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
-        // Act
+        // When
         let vectors = build_embedding_provider()
             .unwrap()
             .embed(&config, &["input"], NonZeroUsize::new(size))
             .unwrap();
-        // Assert
+        // Then
         assert_eq!(vectors[0], vector);
         assert!(server.take_requests()[0].get("dimensions").is_none());
     }
@@ -576,36 +576,36 @@ fn rejects_inconsistent_unconfigured_and_unsupported_response_dimensions() {
         json!([[1, 2], [1, 2, 3]]),
         json!([vec![0.0; 4097], vec![0.0; 4097]]),
     ] {
-        // Arrange
+        // Given
         let server = start_fixture(&json!({"model":"fixture-alias","embeddings":embeddings}));
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
-        // Act
+        // When
         let error = build_embedding_provider()
             .unwrap()
             .embed(&config, &["first", "second"], None)
             .unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
     }
 }
 #[test]
 fn appends_endpoint_before_query_and_ignores_fragment() {
-    // Arrange
+    // Given
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let endpoint = format!("{}/?fixture=1#ignored", server.get_base_url());
     let config = build_config("ollama", &endpoint, &json!({}));
-    // Act
+    // When
     build_embedding_provider()
         .unwrap()
         .embed(&config, &["input"], None)
         .unwrap();
-    // Assert
+    // Then
     assert!(server.take_headers()[0].starts_with("POST /api/embed?fixture=1 "));
 }
 #[test]
 fn controlled_barrier_releases_an_owned_request() {
     use support::embedding::ResponseBarrier;
-    // Arrange
+    // Given
     let barrier = ResponseBarrier::default();
     let server = HttpFixture::start(FixtureReply::Barrier {
         barrier: barrier.clone(),
@@ -613,29 +613,29 @@ fn controlled_barrier_releases_an_owned_request() {
     });
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
     let provider = build_embedding_provider().unwrap();
-    // Act
+    // When
     let worker = std::thread::spawn(move || provider.embed(&config, &["input"], None));
     barrier.wait_until_entered();
     let requests = server.take_requests();
     barrier.release();
     let vectors = worker.join().unwrap().unwrap();
-    // Assert
+    // Then
     assert_eq!(requests.len(), 1);
     assert_eq!(vectors, vec![vec![1.0, 2.0, 3.0]]);
 }
 
 #[test]
 fn rejects_adjacent_nested_option_integers_that_alias_under_jcs() {
-    // Arrange
+    // Given
     let exact = build_config(
         "ollama",
         "http://localhost/api",
         &json!({"options":{"seed":9007199254740992_u64}}),
     );
     let distinct = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","options":{"seed":9007199254740993}},"max_retries":3}"#;
-    // Act
+    // When
     let result = EmbeddingConfig::parse(distinct);
-    // Assert
+    // Then
     assert_eq!(
         exact.get_parameters()["options"]["seed"].as_u64(),
         Some(9007199254740992)
@@ -644,16 +644,16 @@ fn rejects_adjacent_nested_option_integers_that_alias_under_jcs() {
 }
 #[test]
 fn preserves_exact_large_option_integers_and_rejects_nested_array_rounding() {
-    // Arrange
+    // Given
     let exact = build_config(
         "ollama",
         "http://localhost/api",
         &json!({"options":{"seed":9007199254740994_u64}}),
     );
     let negative = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","future":[{"counter":-9007199254740993}]},"max_retries":3}"#;
-    // Act
+    // When
     let result = EmbeddingConfig::parse(negative);
-    // Assert
+    // Then
     assert_eq!(
         exact.get_parameters()["options"]["seed"].as_u64(),
         Some(9007199254740994)
@@ -668,13 +668,13 @@ fn rejects_integer_tokens_above_unsigned_range_before_rounding() {
         "18446744073709551617",
         "18446744073709551618",
     ] {
-        // Arrange
+        // Given
         let bytes = format!(
             r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","options":{{"seed":{integer}}}}},"max_retries":3}}"#
         );
-        // Act
+        // When
         let result = EmbeddingConfig::parse(bytes.as_bytes());
-        // Assert
+        // Then
         let error = result.expect_err("overflowing integer token must remain detectable");
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidConfig);
         assert!(!format!("{error} {error:?}").contains(integer));
@@ -683,13 +683,13 @@ fn rejects_integer_tokens_above_unsigned_range_before_rounding() {
 #[test]
 fn rejects_integer_tokens_below_signed_range_inside_nested_arrays() {
     for integer in ["-9223372036854775809", "-9223372036854775810"] {
-        // Arrange
+        // Given
         let bytes = format!(
             r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","options":{{"future":[{{"seed":{integer}}}]}}}},"max_retries":3}}"#
         );
-        // Act
+        // When
         let result = EmbeddingConfig::parse(bytes.as_bytes());
-        // Assert
+        // Then
         let error = result.expect_err("overflowing integer token must remain detectable");
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidConfig);
         assert!(!format!("{error} {error:?}").contains(integer));
@@ -698,13 +698,13 @@ fn rejects_integer_tokens_below_signed_range_inside_nested_arrays() {
 
 #[test]
 fn preserves_numeric_strings_and_large_noninteger_spellings() {
-    // Arrange
+    // Given
     let first = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","options":{"text":"18446744073709551617","scale":1e30}},"max_retries":3}"#;
     let second = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","options":{"text":"18446744073709551617","scale":1E+30}},"max_retries":3}"#;
-    // Act
+    // When
     let original = parse_config(first);
     let equivalent = parse_config(second);
-    // Assert
+    // Then
     assert_eq!(original.get_identity(), equivalent.get_identity());
     assert_eq!(
         original.get_parameters()["options"]["text"],
@@ -714,26 +714,26 @@ fn preserves_numeric_strings_and_large_noninteger_spellings() {
 
 #[test]
 fn retains_bounded_json_nesting_while_preserving_raw_integer_tokens() {
-    // Arrange
+    // Given
     let nested = format!("{}0{}", "[".repeat(130), "]".repeat(130));
     let bytes = format!(
         r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","future":{nested}}},"max_retries":3}}"#
     );
-    // Act
+    // When
     let result = EmbeddingConfig::parse(bytes.as_bytes());
-    // Assert
+    // Then
     assert!(result.is_err());
 }
 
 #[test]
 fn preserves_reserved_key_objects_in_unknown_config_parameters() {
-    // Arrange
+    // Given
     let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","future":{"$serde_json::private::RawValue":"null"}},"max_retries":0}"#;
     let reordered = br#"{"max_retries":0,"parameters":{"future":{"$serde_json::private::RawValue":"null"},"base_url":"http://localhost/api"},"model":"fixture","provider":"ollama"}"#;
-    // Act
+    // When
     let first = parse_config(bytes);
     let second = parse_config(reordered);
-    // Assert
+    // Then
     assert_eq!(
         first.get_parameters()["future"],
         json!({"$serde_json::private::RawValue":"null"})
@@ -746,13 +746,13 @@ fn preserves_reserved_key_objects_in_unknown_config_parameters() {
 #[test]
 fn preserves_decimal_and_exponent_values_with_large_integer_jcs_spelling() {
     for number in ["18446744073709551616.0", "1e20", "-1e20"] {
-        // Arrange
+        // Given
         let bytes = format!(
             r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","future":{number}}},"max_retries":0}}"#
         );
-        // Act
+        // When
         let config = parse_config(bytes.as_bytes());
-        // Assert
+        // Then
         assert_eq!(
             config.get_parameters()["future"].as_f64(),
             number.parse::<f64>().ok()
@@ -762,6 +762,7 @@ fn preserves_decimal_and_exponent_values_with_large_integer_jcs_spelling() {
 
 #[test]
 fn rejects_object_wire_components_indices_and_wrapped_responses() {
+    // Given
     if run_isolated(
         "rejects_object_wire_components_indices_and_wrapped_responses",
         Some("fixture-secret"),
@@ -786,6 +787,7 @@ fn rejects_object_wire_components_indices_and_wrapped_responses() {
             invalid.push(index);
         }
         for body in invalid {
+            // When / Then
             assert_rejected_response(
                 protocol,
                 FixtureReply::Status {
@@ -807,7 +809,7 @@ fn bounds_both_protocol_bodies_with_and_without_content_length() {
         return;
     }
     for protocol in ["ollama", "openai"] {
-        // Arrange: valid protocol payload with a large unknown field.
+        // Given: valid protocol payload with a large unknown field.
         let mut body = build_response(protocol);
         body["extra"] = format!("provider-secret{}", "x".repeat(10 * 1024 * 1024)).into();
         let body = body.to_string();
@@ -820,14 +822,14 @@ fn bounds_both_protocol_bodies_with_and_without_content_length() {
         ] {
             assert_rejected_response(protocol, reply);
         }
-        // Act: a normal bounded response still succeeds, including model aliases.
+        // When: a normal bounded response still succeeds, including model aliases.
         let server = start_fixture(&build_response(protocol));
         let config = build_config(protocol, &server.get_base_url(), &json!({}));
         let vectors = build_embedding_provider()
             .unwrap()
             .embed(&config, &["input"], None)
             .unwrap();
-        // Assert
+        // Then
         assert_eq!(vectors, vec![vec![1., 2., 3.]]);
         assert_eq!(server.take_requests().len(), 1);
     }
@@ -835,6 +837,7 @@ fn bounds_both_protocol_bodies_with_and_without_content_length() {
 
 #[test]
 fn rejects_missing_empty_and_wrong_type_native_model() {
+    // Given
     for model in [
         None,
         Some(json!("")),
@@ -847,6 +850,7 @@ fn rejects_missing_empty_and_wrong_type_native_model() {
         if let Some(model) = model {
             body["model"] = model;
         }
+        // When / Then
         assert_rejected_response(
             "ollama",
             FixtureReply::Status {
@@ -859,12 +863,14 @@ fn rejects_missing_empty_and_wrong_type_native_model() {
 
 #[test]
 fn rejects_trailing_response_tokens_and_excessive_depth() {
+    // Given
     let valid = build_response("ollama").to_string();
     let deep = format!("{}0{}", "[".repeat(130), "]".repeat(130));
     for body in [
         format!("{valid} null"),
         format!(r#"{{"model":"fixture","embeddings":[[1,2,3]],"extra":{deep}}}"#),
     ] {
+        // When / Then
         assert_rejected_response("ollama", FixtureReply::Status { status: 200, body });
     }
 }
@@ -904,15 +910,15 @@ fn build_response(protocol: &str) -> Value {
 }
 
 fn assert_rejected_response(protocol: &str, reply: FixtureReply) {
-    // Arrange
+    // Given
     let server = HttpFixture::start(reply);
     let config = build_config(protocol, &server.get_base_url(), &json!({}));
-    // Act
+    // When
     let error = build_embedding_provider()
         .unwrap()
         .embed(&config, &["knowledge-secret"], None)
         .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
     assert!(!format!("{error} {error:?}").contains("secret"));
     assert_eq!(server.take_requests().len(), 1);

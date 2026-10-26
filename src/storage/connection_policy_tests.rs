@@ -20,14 +20,14 @@ struct IgnoredPolicy<'a>(&'a Connection);
 
 #[test]
 fn initialization_retry_stops_at_the_exact_budget_without_retrying_other_errors() {
-    // Arrange: exercise the real SQLite contention classification without a clock race.
+    // Given: exercise the real SQLite contention classification without a clock race.
     let busy = map_sqlite(rusqlite::Error::SqliteFailure(
         ffi::Error::new(ffi::SQLITE_BUSY),
         None,
     ));
     let ordinary = StorageError::new(StorageErrorKind::InternalError, "not contention");
     for (seconds, expected) in [(0, true), (4, true), (5, false), (6, false)] {
-        // Act / Assert: the five-second deadline is exclusive for another retry.
+        // When / Then: the five-second deadline is exclusive for another retry.
         let elapsed = Duration::from_secs(seconds);
         assert_eq!(can_retry_initialization(&busy, elapsed), expected);
         assert!(!can_retry_initialization(&ordinary, elapsed));
@@ -36,7 +36,7 @@ fn initialization_retry_stops_at_the_exact_budget_without_retrying_other_errors(
 
 #[test]
 fn rejects_a_service_symlink_back_to_the_pinned_directory() {
-    // Arrange: identity equality after following a link is not confinement.
+    // Given: identity equality after following a link is not confinement.
     let root = TempDir::new().unwrap();
     let base = fs::canonicalize(root.path()).unwrap();
     let path = base.join(".letopis");
@@ -46,9 +46,9 @@ fn rejects_a_service_symlink_back_to_the_pinned_directory() {
     let original = base.join("original");
     fs::rename(&path, &original).unwrap();
     symlink(&original, &path).unwrap();
-    // Act
+    // When
     let error = directory.verify().unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
     assert!(fs::read_dir(original).unwrap().next().is_none());
 }
@@ -63,7 +63,7 @@ fn rejects_service_directory_replacement_with_a_fifo_without_blocking() {
         );
         return;
     }
-    // Arrange: the pin was valid before an independent path replacement.
+    // Given: the pin was valid before an independent path replacement.
     let root = TempDir::new().unwrap();
     let base = fs::canonicalize(root.path()).unwrap();
     let path = base.join(".letopis");
@@ -78,9 +78,9 @@ fn rejects_service_directory_replacement_with_a_fifo_without_blocking() {
             .unwrap()
             .success()
     );
-    // Act
+    // When
     let error = directory.verify().unwrap_err();
-    // Assert: the parent's owned-child watchdog detects a blocking open.
+    // Then: the parent's owned-child watchdog detects a blocking open.
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
     assert!(
         fs::read_dir(base.join("original"))
@@ -93,15 +93,15 @@ fn rejects_service_directory_replacement_with_a_fifo_without_blocking() {
 #[test]
 fn rejects_non_regular_database_leaves_before_sqlite_opens_them() {
     for name in ["cache.db", "vectors.db"] {
-        // Arrange
+        // Given
         let root = TempDir::new().unwrap();
         let path = fs::canonicalize(root.path()).unwrap();
         let pinned = File::open(&path).unwrap();
         let directory = ConfinedDirectory::new(&path, &pinned);
         fs::create_dir(path.join(name)).unwrap();
-        // Act
+        // When
         let error = directory.verify().unwrap_err();
-        // Assert
+        // Then
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
         assert!(fs::read_dir(path.join(name)).unwrap().next().is_none());
     }
@@ -109,9 +109,9 @@ fn rejects_non_regular_database_leaves_before_sqlite_opens_them() {
 
 #[test]
 fn does_not_retry_non_contention_storage_errors() {
-    // Arrange: a finite second result exposes an accidental retry without timing.
+    // Given: a finite second result exposes an accidental retry without timing.
     let mut attempts = 0;
-    // Act
+    // When
     let error = wait_for_initialization(|| {
         attempts += 1;
         if attempts == 1 {
@@ -123,39 +123,39 @@ fn does_not_retry_non_contention_storage_errors() {
         Ok(42)
     })
     .unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(attempts, 1);
 }
 
 #[test]
 fn rejects_database_paths_with_nul_bytes() {
-    // Arrange / Act
+    // Given / When
     let error = resolve_path(Path::new("bad\0database")).unwrap_err();
-    // Assert: SQLite must never receive a path that is not a filesystem name.
+    // Then: SQLite must never receive a path that is not a filesystem name.
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
 }
 
 #[test]
 fn rejects_an_existing_directory_as_a_database_path() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
-    // Act
+    // When
     let error = resolve_path(root.path()).unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
 }
 
 #[test]
 fn preserves_non_absence_errors_when_observing_database_identity() {
-    // Arrange: a regular parent causes ENOTDIR rather than a missing leaf.
+    // Given: a regular parent causes ENOTDIR rather than a missing leaf.
     let root = TempDir::new().unwrap();
     let parent = root.path().join("ordinary-file");
     fs::write(&parent, b"preserved").unwrap();
-    // Act
+    // When
     let error =
         prepare_paths(&parent.join("cache.db"), &root.path().join("vectors.db")).unwrap_err();
-    // Assert
+    // Then
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
     assert_eq!(fs::read(&parent).unwrap(), b"preserved");
     assert!(!root.path().join("vectors.db").exists());
@@ -163,11 +163,11 @@ fn preserves_non_absence_errors_when_observing_database_identity() {
 
 #[test]
 fn rejects_a_database_that_cannot_enable_wal() {
-    // Arrange: SQLite keeps an in-memory database in memory journal mode.
+    // Given: SQLite keeps an in-memory database in memory journal mode.
     let connection = Connection::open_in_memory().unwrap();
-    // Act
+    // When
     let error = configure_database(&connection, "main").unwrap_err();
-    // Assert: successful PRAGMA execution alone does not establish durability.
+    // Then: successful PRAGMA execution alone does not establish durability.
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     let journal: String = connection
         .pragma_query_value(None, "journal_mode", |row| row.get(0))
@@ -177,16 +177,16 @@ fn rejects_a_database_that_cannot_enable_wal() {
 
 #[test]
 fn reads_the_existing_database_journal_mode() {
-    // Arrange
+    // Given
     let root = TempDir::new().unwrap();
     let connection = Connection::open(root.path().join("database")).unwrap();
     for expected in ["wal", "delete"] {
         connection
             .pragma_update(None, "journal_mode", expected)
             .unwrap();
-        // Act
+        // When
         let journal = read_journal(&connection, "main").unwrap();
-        // Assert: readiness checks must observe the mode before changing it.
+        // Then: readiness checks must observe the mode before changing it.
         assert_eq!(journal, expected);
     }
 }
@@ -194,16 +194,16 @@ fn reads_the_existing_database_journal_mode() {
 #[test]
 fn rejects_each_policy_setting_that_sqlite_does_not_apply() {
     for policy in [c"foreign_keys", c"synchronous"] {
-        // Arrange: ignore only the selected setter while allowing all observations.
+        // Given: ignore only the selected setter while allowing all observations.
         let root = TempDir::new().unwrap();
         let connection = Connection::open(root.path().join("database")).unwrap();
         let name = policy.to_str().unwrap();
         connection.pragma_update(None, name, 0).unwrap();
         let ignored = IgnoredPolicy::new(&connection, policy);
-        // Act
+        // When
         let error = configure_database(&connection, "main").unwrap_err();
         drop(ignored);
-        // Assert: WAL and the other setting work, but one bad setting must fail closed.
+        // Then: WAL and the other setting work, but one bad setting must fail closed.
         assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
         assert_eq!(read_journal(&connection, "main").unwrap(), "wal");
         for (setting, expected) in [("foreign_keys", 1), ("synchronous", 2)] {
