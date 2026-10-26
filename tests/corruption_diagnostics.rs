@@ -44,14 +44,12 @@ fn corrupt_cache_and_vectors_fail_in_each_new_command_process() {
         replace_database(&target_path, CORRUPT_DATABASE_BYTES);
 
         // Act / Assert: every invocation starts a separately supervised CLI process.
-        for command in ["check", "status"] {
-            for _ in 0..2 {
-                let output = repo.invoke(&[command], b"{}");
-                assert_internal_failure(&output);
-                assert_eq!(fs::read(&target_path).unwrap(), CORRUPT_DATABASE_BYTES);
-                assert_undamaged_database(&repo, target, &database_snapshot);
-                assert_eq!(capture_user_state(&repo, &["known.md"]), user_snapshot);
-            }
+        for command in ["check", "check", "status", "status"] {
+            let output = repo.invoke(&[command], b"{}");
+            assert_internal_failure(&output);
+            assert_eq!(fs::read(&target_path).unwrap(), CORRUPT_DATABASE_BYTES);
+            assert_undamaged_database(&repo, target, &database_snapshot);
+            assert_eq!(capture_user_state(&repo, &["known.md"]), user_snapshot);
         }
 
         // Arrange / Act / Assert: exact test-fixture restoration enables health again.

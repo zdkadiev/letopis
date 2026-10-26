@@ -100,6 +100,26 @@ targets. Its 2,295-line raw log has SHA-256
 The earlier `17a8c82` verification remains historical evidence; it is not presented
 as covering the strengthened canonical-state oracle.
 
+### Final whole-branch review fix wave
+
+The final review found one Minor readability issue: the cache/vectors case nested
+target, command and repetition loops three levels deep. The inner two loops were
+replaced by one literal sequence `["check", "check", "status", "status"]` inside
+the target loop. Command counts, process freshness and all byte/state/error oracles
+are unchanged; no assertion or expected state was weakened.
+
+The exact focused command
+`cargo test --locked --offline --test corruption_diagnostics` exited 0 with 2/2
+passed. `cargo fmt --all --check` and targeted
+`cargo clippy --locked --offline --test corruption_diagnostics -- -D warnings`
+also exited 0. Current test SHA-256 is
+`13fd42e8bc71e7c29311ef987fb742f09a5b3a4474e71b84d95b35004dc9d73d`;
+the 15-line focused log SHA-256 is
+`00000f96470290e448a5eedfff4eca6344af2945f8f822f5d7f8e88bde3a75ce`.
+The preceding full verify remains evidence for source hash `f431ae3d…4f9b235`.
+It was not rerun after this mechanical same-behavior amendment, by explicit review
+direction; the latest covering evidence is the focused target plus fmt/Clippy.
+
 ## Финальная host-проверка
 
 Build controls: `CARGO_TARGET_DIR=/private/tmp/letopis-tk26-task1-target`,
@@ -132,7 +152,7 @@ vendored inputs и зависимости не менялись. Отдельн�
 | `rust-toolchain.toml` | `12dc5d64dbd96c1b07be2943241d52d9f6127a79ba47a820455ba7b873fc896a` |
 | `tests/git_corruption.rs` | `0b46907e218ce7dd98a982a191d455aa7b8cc9541ffc412b2e03561a847722ea` |
 | `tests/storage_corruption.rs` | `01c03c3a93ab32a955689da072f3c31b2e8173eeacc82685391d9fdac55e0968` |
-| `tests/corruption_diagnostics.rs` | `f431ae3dd6cde7951d0253d9f69e4bda10b336f89d859075d3957b33c4f9b235` |
+| `tests/corruption_diagnostics.rs` | `13fd42e8bc71e7c29311ef987fb742f09a5b3a4474e71b84d95b35004dc9d73d` |
 
 Host: macOS 26.6.2 / Darwin 25.6.0 arm64; `rustc 1.95.0`, `cargo 1.95.0`,
 Git 2.50.1 (Apple Git-155).
