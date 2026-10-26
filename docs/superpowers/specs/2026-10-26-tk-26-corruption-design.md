@@ -7,8 +7,8 @@
 `d26533311e1443da01f7368625c9557353bd76f2`, интегрированной merge-коммитом
 `0f980e184a13e6d4054e38d5a234e146f35f84d9`. Новые isolated CLI tests и свежая MC-2
 регрессия перечислены в [отчёте B](../../zkit/letopis/checks/TK-26/report.md#stage-b).
-Task-scoped и итоговое independent whole-branch review B остаются pending;
-карточка TK-26 сохраняет in_progress до их завершения. Границы и accepted design
+Task-scoped и итоговое independent whole-branch review B приняты без замечаний;
+карточка TK-26 завершена в согласованном объёме. Границы и accepted design
 ниже не меняются.
 
 ## Цель и согласованная граница

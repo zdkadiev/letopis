@@ -81,7 +81,7 @@ Documentation updates at completion: this plan, TK-26 spec/card/report. Historic
 - [x] Fresh MC-2 regression: `cargo test --locked --offline --lib service::document_refresher::tests::process -- --nocapture` plus `cargo test --locked --offline --test document_refresh --test document_reindex --test reindex_command`. Confirm matched names/counts; zero selected tests is not PASS evidence. Map existing `reindex_sigint_preserves_exact_old_or_complete_new_state` cuts locked/begun/fts/before_commit/after_commit, WAL-pinned reader, contending publisher/redetection, late SQL rollback/released lock; existing normal-refresh process schedules cover other mutation phases. Child ignored entries are executed by parent schedules, not hand-waved. Reuse controls; no sleeps/new checkpoint API. Signal death is not TK-29 handled cancelled JSON or physical power-loss proof.
 - [x] Final `git diff --check`, `CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 CARGO_INCREMENTAL=0 make verify V=1` with one bounded target directory and new full log. It includes check/fmt/Clippy/Rustdoc/debug/release; no duplicate broad run. Test-only B does not require another native/storage campaign. If product/storage/build changes become necessary, stop claiming this scope suffices and apply required host/Linux runners to those inputs.
 - [x] Update report with case→test→independent oracle→command/exit and actual source/input hashes; distinguish original A, merged-source baseline and final B. Mark only evidenced criteria done; record Linux not run here, no paid inference, no media/powerloss/gate claims. Update TK-28 storage handoff by a reference in TK-26 report, not by claiming all TK-28 acceptance complete. Run local Markdown link/consistency checks.
-- [ ] Commit intended tests/docs; task-scoped review then independent final whole-branch review. Record remaining findings/limits in report and Engram; retain branch for user-directed merge/issue update/push.
+- [x] Commit intended tests/docs; task-scoped review then independent final whole-branch review. Record remaining findings/limits in report and Engram; retain branch for user-directed merge/issue update/push.
 
 ## Self-review and approval gate
 
@@ -99,6 +99,6 @@ in the [Stage B report](../../zkit/letopis/checks/TK-26/report.md#stage-b).
 Final `make verify V=1` exited 0 with terminal ok: debug/release each 776 outer
 passed/0 failed/5 ignored across 59 executable targets; 8 nested child summaries
 per profile excluded. Final source/input and full-log hashes are recorded there.
-The last Task 2 checkbox remains open for controller task-scoped review,
-final independent whole-branch review and Engram recording. No future approval is
-marked complete; no main merge/push/GitHub close is authorized by this checkpoint.
+Task-scoped reviews and final independent whole-branch review `d265333..70a4fdf`
+приняты без замечаний. Engram получает окончательный результат после metadata commit.
+Ветка сохранена; main merge/push/GitHub close не выполняются в этом плане.

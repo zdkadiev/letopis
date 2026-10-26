@@ -1,11 +1,11 @@
 # TK-26 — corruption recovery evidence A/B
 
-Дата: 2026-10-26. Карточка остаётся **in_progress** до task-scoped и итогового
+Дата: 2026-10-26. Карточка **done** после task-scoped и итогового
 whole-branch review этапа B. Ниже сохранены исторические evidence этапа A и отдельно
 [новые проверки этапа B](#stage-b). Утверждённая
 [спецификация](../../../../superpowers/specs/2026-10-26-tk-26-corruption-design.md)
 и [план B](../../../../superpowers/plans/2026-10-26-tk-26-corruption-recovery.md)
-задают границы. Этап A принят; результаты B ожидают независимых reviews.
+задают границы. Этапы A и B приняты после независимых reviews.
 
 ## Исторический этап A
 
@@ -346,3 +346,28 @@ Linux/native runner на B не запускался: accepted product/storage/n
 60-second deadline и external corpus acceptance probes не запускались. Нет новых
 claims о media/pack corruption, power loss, gates G-1/G-2, пилотах, TK-29 или TK-38/39.
 Ветка сохранена без main merge/push/GitHub closure. Engram и review ledger — controller.
+
+## Итоговая приёмка A/B
+
+Task 1 (`0f980e1..1da09f8`) и Task 2 (`1da09f8..70a4fdf`) прошли независимые
+spec/quality reviews. Minor в отчётном подсчёте Task 1 исправлен: 774 outer passes
+плюс 8 вложенных child summaries, без повторного выполнения и без изменения кода.
+Итоговое whole-branch review `d265333..70a4fdf` принято, Critical/Important/Minor — 0.
+Контроллер независимо сверил 152 source/input hashes, точное восстановление mutations
+и полный verify log: debug/release по 776 passed / 0 failed / 5 ignored, 59 executable
+targets на профиль, вложенные summaries не посчитаны повторно. После verification
+изменены только completion-документы; исходники тестов/продукта прежние.
+
+Отложенные ревьюером Linux/native, historical standalone harnesses, power loss,
+media/pack, gates/pilots, handled cancelled JSON, regeneration потерянных embeddings,
+autorepair и утраченное invalid-file history соответствуют явной границе утверждённого
+плана; новые исключения из критериев TK-26 не вводились.
+
+Решение исполнителя (Ruling): запрет merge относится к публикации tk-26 в shared main;
+потребление закреплённой принятой TK-25 в собственной tk-26 разрешено Task 1.
+Цена неверного толкования — переделка одного неопубликованного локального merge.
+
+Execution ledger, task reports и review packages сохранены с checksum manifest в
+`.artifacts/tk26/stage-b-execution-70a4fdf/`; raw evidence остаётся в отдельных
+stage-b-task1/task2 directories выше. Ветка/worktree сохранены без main merge,
+push и GitHub closure. Результат записывается в существующий Engram store.

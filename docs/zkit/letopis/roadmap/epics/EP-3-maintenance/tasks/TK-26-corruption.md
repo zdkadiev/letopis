@@ -1,6 +1,6 @@
 # TK-26 — Проверить повреждения Git, кэша и vectors.db
 
-> **Статус:** in_progress
+> **Статус:** done
 > **Эпик:** [EP-3](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 3 / 6 / 12 (best / expected / worst)
@@ -79,7 +79,7 @@ Task 2 добавляет real CLI fail-closed для требуемых root/ch
 invalid A/valid B после потери cache, fresh status и repair. Существующие MC-2
 process schedules выполнены заново: 13 passed/1 ignored child entry; refresh/reindex
 integration regression — 28 passed. Все четыре содержательных критерия выше имеют
-новое evidence; independent task/final reviews этапа B ещё выполняет controller.
+новое evidence; independent task/final reviews этапа B приняты без замечаний.
 
 Изменены только integration tests и документы; production Rust, shared helpers,
 process harness, schema, native/build inputs и зависимости не менялись. Случаи,
@@ -88,7 +88,7 @@ verification записаны в [разделе B отчёта](../../../../che
 После потери cache старое invalid A не восстанавливается из отсутствующей истории;
 повторно проецируются текущие валидные файлы, канонический Markdown/Git сохраняется.
 
-TK-26 остаётся `in_progress` до независимых task-scoped и whole-branch reviews B.
+TK-26 завершена в согласованном объёме после task-scoped и whole-branch reviews B.
 Этот результат передаёт storage evidence в TK-28, не закрывая всю TK-28; не объявляет
 G-1/G-2, пилоты, Linux, TK-29 или физические TK-38/39 пройденными. Ветка не слита
 в main, push/GitHub closure не выполнялись.
