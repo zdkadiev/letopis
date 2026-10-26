@@ -40,12 +40,12 @@ Status с текущими проблемами, выведенными из д�
 
 ## 5. Критерии приёмки
 
-- [ ] Status даёт revision, блокировки с PID, отставание векторов, исчерпанные попытки и текущие проблемы.
+- [x] Status даёт revision, блокировки с PID, отставание векторов, исчерпанные попытки и текущие проблемы.
 - [x] Ошибка файла видна, пока файл невалиден, и исчезает после публикации исправленного файла; висячие ссылки и циклы появляются и исчезают вместе с причиной без пересчёта при публикации.
 - [ ] storage failure не выдаётся за сохранённую ошибку.
 - [ ] Последняя ошибка query embedding из TK-22 хранится одной строкой vec.query_error и видна в status.problems до успешного запроса, без предупреждения в ответе search (D-62); сбой запуска drain — предупреждение «drain not started» в ответе и не сохраняется; FTS-only выдача остаётся успешной.
 
-- [ ] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
+- [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
 ## 6. Как проверить
 
@@ -74,11 +74,16 @@ Status с текущими проблемами, выведенными из д�
 одним опциональным опубликованным read view, конфигурацией, query/exhaustion,
 graph/source проблемами и best-effort busy-lock PID. Реальный lifecycle подтверждает
 отмеченный критерий текущих file/graph проблем. [Общий отчёт](../../../../checks/TK-18-19-status/report.md)
-содержит точные команды, host PASS, Linux Docker FAIL и ограничения evidence.
+содержит точные команды, host PASS, квалифицированный Linux ARM64 functional PASS и
+сохранённые standard-overlay/tmpfs3GiB failures.
 
-Задача остаётся `in_progress`: TK-26-specific corruption/storage acceptance и
-TK-27-specific embedding lifecycle/exhaustion acceptance не выводятся из component
-tests и всё ещё pending. Финальное whole-branch review не нашло Critical/Important
-замечаний; два test-style замечания исправлены в `6f8e181`, scoped re-review APPROVED (no new Critical/Important finding).
-Поэтому остальные составные критерии и архитектурная приёмка пока не отмечены, а Linux
-native/schema/standalone acceptance на этом source не объявляется PASS.
+Финальное whole-branch review не нашло Critical/Important замечаний; два test-style
+замечания исправлены в `6f8e181`, scoped re-review APPROVED без новых замечаний.
+Синхронизация с main и упрощение `StatusService` в `ad81a8c` проверены, а текущая
+архитектурная приёмка и поставленные status fields отмечены.
+
+Задача остаётся `in_progress`: критерий storage failure требует TK-26-specific
+acceptance, а составной query/drain/FTS lifecycle критерий — TK-27-specific acceptance.
+Они не выводятся из component tests и этим отчётом не закрываются. Qualified Linux
+PASS не доказывает overlay health, persistence/power-loss, resource/minimum-hardware
+или x86_64 acceptance.

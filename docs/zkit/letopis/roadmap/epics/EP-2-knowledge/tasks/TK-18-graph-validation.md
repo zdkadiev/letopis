@@ -1,6 +1,6 @@
 # TK-18 — Завершить graph validation и ID по пути/якорю
 
-> **Статус:** in_progress
+> **Статус:** done
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 8 / 12 (best / expected / worst)
@@ -97,6 +97,13 @@ TK-23 сохраняет конечность traverse и исключение �
 выполнен. [Общий отчёт](../../../../checks/TK-18-19-status/report.md) сохраняет точные
 команды и ограничения. Финальное whole-branch review подтвердило исходную интеграцию
 без Critical/Important замечаний; два test-style замечания исправлены в `6f8e181`,
-scoped re-review APPROVED (no new Critical/Important finding). Карточка остаётся `in_progress`: обязательный Linux runner
-на этом источнике не получил PASS, поэтому задача не объявляется завершённой этим
-обновлением.
+scoped re-review APPROVED без новых замечаний.
+
+После синхронизации с main и упрощения `StatusService` итоговый источник
+`ad81a8c07e3aec2e8715f7762a3dd82f8c9b1e7b` прошёл host acceptance и
+квалифицированную Linux ARM64 functional acceptance. Linux PASS ограничен target
+tmpfs4GiB, `/tmp`1GiB, networknone, jobs2/tests2, incrementaloff и отключёнными
+dev/test debug symbols; стандартный overlay FAIL и tmpfs3GiB ENOSPC FAIL сохранены.
+Независимый evidence review одобрил эти пределы для функциональных критериев TK-18.
+Все критерии карточки выполнены; статус `done`. Это не закрывает TK-16/17, G-1/G-2,
+durability/power-loss, overlay health, minimum hardware или другие платформы.

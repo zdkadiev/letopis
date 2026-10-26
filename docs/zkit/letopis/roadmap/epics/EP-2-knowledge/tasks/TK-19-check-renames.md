@@ -1,6 +1,6 @@
 # TK-19 — Завершить check, висячие ссылки и переименования
 
-> **Статус:** in_progress
+> **Статус:** done
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 3 / 6 / 10 (best / expected / worst)
@@ -75,10 +75,10 @@
 
 [Отчёт и пределы](../../../../checks/TK-19/report.md),
 [машиночитаемая проверка](../../../../checks/TK-19/verification.json).
-Проверки реализации и lifecycle выполнены; финальное независимое whole-branch review
-остаётся pending и записывается контроллером отдельно. Status TK-28 остаётся pending,
-поэтому совокупный межкомандный критерий не объявлен done. Linux/native harness,
-пилот TK-17, G-1/G-2 и v1 здесь не подтверждаются.
+Проверки реализации и lifecycle выполнены. На этом историческом снимке финальное
+whole-branch review, status TK-28 и Linux/native harness ещё оставались pending;
+последующее закрытие функциональных критериев записано ниже. Пилот TK-17, G-1/G-2 и
+v1 этим исходным evidence не подтверждаются.
 
 **Уточнение планирования 2026-10-22:** пользователь утвердил разделение с TK-11: та поставляет CLI/runtime и контрактную проверку границы, а TK-19 владеет полной проверкой check и её реальной CLI-приёмкой. Вход от TK-11 указан явно; конечные требования X-1 и scope TK-18/TK-21 сохранены. Это планирование, не новая реализация или evidence.
 
@@ -87,7 +87,14 @@ graph/source проблем. Реальный lifecycle проверяет parit
 repair/rename/delete/restore и restart; unrefreshed edit сохраняет прежнюю публикацию.
 [Общий отчёт](../../../../checks/TK-18-19-status/report.md) содержит команды, исходы и
 пределы. Финальное whole-branch review не нашло Critical/Important замечаний; два
-test-style замечания исправлены в `6f8e181`, scoped re-review APPROVED (no new Critical/Important finding). Карточка
-остаётся `in_progress`: Linux native/standalone runner не получил PASS.
+test-style замечания исправлены в `6f8e181`, scoped re-review APPROVED без новых
+замечаний.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+После синхронизации с main итоговый источник
+`ad81a8c07e3aec2e8715f7762a3dd82f8c9b1e7b` прошёл host acceptance и
+квалифицированную Linux ARM64 functional acceptance. Linux PASS ограничен target
+tmpfs4GiB, `/tmp`1GiB, networknone, jobs2/tests2, incrementaloff и отключёнными
+dev/test debug symbols; standard-overlay и tmpfs3GiB failures сохранены. Независимый
+evidence review одобрил эти пределы для функциональных критериев TK-19. Все критерии
+карточки выполнены; статус `done`. Полное завершение TK-28, TK-16/17, G-1/G-2,
+durability/power-loss, overlay health и minimum hardware не заявляется.
