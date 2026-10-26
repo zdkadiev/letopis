@@ -1,9 +1,10 @@
 use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
     service::{
-        ElementAddress, EmbeddingFailure, EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef,
-        GraphRead, NeighborPageRequest, QueryError, Storage, StorageError, StorageErrorKind,
-        StorageRead, StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
+        ElementAddress, EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary,
+        EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef, GraphRead, NeighborPageRequest,
+        QueryError, Storage, StorageError, StorageErrorKind, StorageRead, StorageResult,
+        StoredNode, TextMatch, VectorMatch, VectorOutcome,
     },
     storage::SqliteStorage,
 };
@@ -82,6 +83,13 @@ impl<R: GraphRead> GraphRead for TracedRead<R> {
     }
 }
 impl<R: StorageRead> StorageRead for TracedRead<R> {
+    fn read_embedding_status(
+        &mut self,
+        policy: &EmbeddingStatusPolicy,
+    ) -> StorageResult<EmbeddingStatusSummary> {
+        self.inner.read_embedding_status(policy)
+    }
+
     fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
         self.events
             .borrow_mut()

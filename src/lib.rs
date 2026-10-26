@@ -27,15 +27,16 @@ use crate::service::{
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
     GraphDiagnostics, GraphService, InspectionService, Inspector, ProvenanceService,
     RefreshDependencies, Refresher, SearchDependencies, SearchService, Searcher, SnapshotError,
-    SnapshotVerifier, SourceProvenance, SourceReader, SourceService, Storage, StorageResult,
-    TraversalDependencies, TraversalService, Traverser,
+    SnapshotVerifier, SourceProvenance, SourceReader, SourceService, StatusStorage, Storage,
+    StorageResult, TraversalDependencies, TraversalService, Traverser,
 };
-use crate::storage::SqliteStorage;
+use crate::storage::{SqliteStatusStorage, SqliteStorage};
 use crate::utils::SERVICE_DIRECTORY;
 use std::{
     env,
     ffi::OsString,
     io::{Read, Write},
+    os::fd::AsFd,
     path::{Path, PathBuf},
 };
 
@@ -331,6 +332,18 @@ pub fn open_git_snapshots(
     start: &Path,
 ) -> Result<impl GitSnapshots + SnapshotVerifier, SnapshotError> {
     GitCli::open(start)
+}
+
+/// Open existing published storage beneath an already pinned service directory.
+/// Does not create database files, bootstrap schemas or synchronize vector identity.
+///
+/// # Errors
+/// Reports unsafe paths, incompatible schemas or database observation failures.
+pub fn open_status_storage<F: AsFd>(
+    directory: &Path,
+    pinned: &F,
+) -> StorageResult<impl StatusStorage + use<F>> {
+    SqliteStatusStorage::open_confined(directory, pinned)
 }
 
 /// Open the disk cache and independent vector database.

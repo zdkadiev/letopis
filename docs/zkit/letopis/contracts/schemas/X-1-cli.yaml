@@ -563,10 +563,12 @@
             },
             "embedding_backlog": {
               "type": "integer",
+              "description": "Distinct current knowledge search_hash values without usable vectors, excluding exhausted attempts; all current hashes when config is unavailable or identity mismatches. Sources and orphan rows excluded.",
               "minimum": 0
             },
             "embedding_failed": {
               "type": "integer",
+              "description": "Distinct current knowledge hashes without usable vectors and attempts >= 1 + max_retries under the matching active identity; zero when config is unavailable or identity mismatches.",
               "minimum": 0
             },
             "locks": {
@@ -592,7 +594,7 @@
             "problems"
           ],
           "additionalProperties": false,
-          "description": "D-95: current state only. problems = invalid files, dangling links, includes cycles, exhausted embedding attempts, invalid config.json; no history or lifecycle flag."
+          "description": "D-95: observes the last publication without refresh, bootstrap/repair, vector reset, inference or drain. No publication: revision null, zero published counts and no cache findings; config/locks still observed. Missing databases/service directory are not created; malformed/inaccessible storage is an error. One database read view; no atomicity with config, Git or locks. problems = invalid files, dangling links, includes cycles, missing source snapshots, exhausted embedding attempts, invalid/unreadable config.json and the last query embedding error independent of config. No history or lifecycle flag."
         },
         "warnings": {
           "type": "array",

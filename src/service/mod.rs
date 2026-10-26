@@ -26,6 +26,7 @@ mod search_filters;
 mod snapshot_error;
 mod snapshot_traits;
 mod source;
+mod status_types;
 mod storage;
 mod traversal;
 mod traversal_types;
@@ -78,7 +79,11 @@ pub use snapshot_error::{SnapshotError, SnapshotErrorKind};
 pub use snapshot_traits::{
     GitSnapshots, SnapshotEntry, SnapshotFile, SnapshotState, SnapshotVerifier,
 };
-pub use storage::{CacheWrite, Storage, StorageRead, VectorWrite};
+/// Published status observations and captured embedding classification policy.
+pub use status_types::{
+    EmbeddingStatusPolicy, EmbeddingStatusSummary, HeldLock, LockName, StatusReport,
+};
+pub use storage::{CacheWrite, StatusStorage, Storage, StorageRead, VectorWrite};
 
 /// Current graph diagnostics derived exclusively from the supplied consistent view.
 ///

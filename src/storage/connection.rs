@@ -75,6 +75,39 @@ impl<'a> ConfinedDirectory<'a> {
         Ok(connection)
     }
 
+    /// Open an existing regular database read-only, returning none for an absent leaf.
+    /// The path must retain the pinned directory and observed leaf identities.
+    pub(super) fn open_observed_database(&self, name: &str) -> StorageResult<Option<Connection>> {
+        self.verify()?;
+        let Some(before) = self.read_regular_stat(name)? else {
+            return Ok(None);
+        };
+        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_URI
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW;
+        let connection = open_raw_database(&self.path.join(name), flags)?;
+        self.verify_observed_leaf(name, &before)?;
+        connection
+            .busy_timeout(Duration::ZERO)
+            .map_err(map_sqlite)?;
+        Ok(Some(connection))
+    }
+
+    /// Attach an existing confined vector file read-only; absence is not created.
+    pub(super) fn attach_observed_vectors(&self, connection: &Connection) -> StorageResult<bool> {
+        self.verify()?;
+        let Some(before) = self.read_regular_stat(VECTOR_DATABASE)? else {
+            return Ok(false);
+        };
+        let uri = encode_read_only_uri(&self.path.join(VECTOR_DATABASE))?;
+        connection
+            .execute("ATTACH DATABASE ?1 AS vec", [uri])
+            .map_err(map_sqlite)?;
+        self.verify_observed_leaf(VECTOR_DATABASE, &before)?;
+        Ok(true)
+    }
+
     /// Attach the confined vectors database under the connection's no-follow policy.
     ///
     /// # Errors
@@ -127,6 +160,17 @@ impl<'a> ConfinedDirectory<'a> {
         if let (Some(cache), Some(vectors)) = (cache, vectors)
             && has_same_identity(&cache, &vectors)
         {
+            return Err(fail_unsafe_path());
+        }
+        Ok(())
+    }
+
+    fn verify_observed_leaf(&self, name: &str, before: &Stat) -> StorageResult<()> {
+        self.verify()?;
+        let Some(after) = self.read_regular_stat(name)? else {
+            return Err(fail_unsafe_path());
+        };
+        if !has_same_identity(before, &after) {
             return Err(fail_unsafe_path());
         }
         Ok(())
@@ -319,10 +363,18 @@ fn attach_unconfigured_vectors(connection: &Connection, path: &Path) -> StorageR
 }
 
 pub(super) fn attach_cache(connection: &Connection, path: &Path) -> StorageResult<()> {
+    let uri = encode_read_only_uri(path)?;
+    connection
+        .execute("ATTACH DATABASE ?1 AS cache", [uri])
+        .map_err(map_sqlite)?;
+    Ok(())
+}
+
+fn encode_read_only_uri(path: &Path) -> StorageResult<String> {
     let filename = path.to_str().ok_or_else(|| {
         StorageError::new(
             StorageErrorKind::InvalidRequest,
-            "invalid cache database path",
+            "invalid storage database path",
         )
     })?;
     // Encode URI delimiters and UTF-8 bytes; only the absolute path's separators survive.
@@ -341,10 +393,7 @@ pub(super) fn attach_cache(connection: &Connection, path: &Path) -> StorageResul
         }
     }
     uri.push_str("?mode=ro");
-    connection
-        .execute("ATTACH DATABASE ?1 AS cache", [uri])
-        .map_err(map_sqlite)?;
-    Ok(())
+    Ok(uri)
 }
 
 fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()> {
