@@ -17,7 +17,7 @@ fn cursor_orders_shared_hashes_and_excludes_sources_and_stored_hashes() {
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     publish(
         &mut storage,
         &[("z.md", "stored"), ("b.md", "shared"), ("a.md", "shared")],
@@ -49,7 +49,7 @@ fn absent_and_null_error_rows_remain_eligible_until_four_attempts() {
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
     let hash = Sha256::digest(b"shared");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     publish(&mut storage, &[("a.md", "shared"), ("b.md", "shared")]);
     for attempts in 1..=4 {
         assert!(read_next_work(&mut storage, &identity, 4, None).is_some());
@@ -83,12 +83,12 @@ fn work_and_dimensions_use_the_pinned_identity_and_membership() {
     let mut second = open(&root);
     let m1 = Sha256::digest(b"one");
     let m2 = Sha256::digest(b"two");
-    first.reset_vectors(&m1).unwrap();
+    first.reset_vectors(None, &m1).unwrap();
     publish(&mut first, &[("a.md", "pending")]);
     store(&mut first, &m1, "orphan", 3);
     let mut pinned = first.begin_read().unwrap();
     // Act: change both databases after the read view was captured.
-    second.reset_vectors(&m2).unwrap();
+    second.reset_vectors(Some(&m1), &m2).unwrap();
     store(&mut second, &m2, "pending", 4);
     publish(&mut second, &[("a.md", "changed")]);
     // Assert
@@ -131,7 +131,7 @@ fn last_vector_cleanup_preserves_dimension_across_reopen() {
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     store(&mut storage, &identity, "orphan", 3);
     // Act
     prune(&mut storage, &identity);
@@ -157,7 +157,7 @@ fn first_committed_dimension_wins_between_competing_connections() {
     let mut first = open(&root);
     let mut second = open(&root);
     let identity = Sha256::digest(b"model");
-    first.reset_vectors(&identity).unwrap();
+    first.reset_vectors(None, &identity).unwrap();
     assert_eq!(read_size(&mut first, &identity), None);
     assert_eq!(read_size(&mut second, &identity), None);
     // Act: hold the first write while the other tries to enter.
@@ -194,7 +194,7 @@ fn rollback_of_first_insertion_does_not_pin_dimensions() {
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     // Act
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     unit.store_vector(&identity, &[1.0; 3], 3).unwrap();
@@ -212,7 +212,7 @@ fn cleanup_retains_referenced_hashes_and_diagnostics_without_cache_publication()
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let revision_before = publish(
         &mut storage,
         &[("a.md", "shared"), ("b.md", "shared"), ("c.md", "failed")],
@@ -258,7 +258,7 @@ fn cleanup_uses_a_pinned_cache_observation_and_new_publication_is_recomputable()
     let mut first = open(&root);
     let mut second = open(&root);
     let identity = Sha256::digest(b"model");
-    first.reset_vectors(&identity).unwrap();
+    first.reset_vectors(None, &identity).unwrap();
     publish(&mut first, &[("a.md", "keep")]);
     store(&mut first, &identity, "keep", 3);
     let mut cleanup = unwrap_current(first.begin_vector_write(&identity).unwrap());
@@ -284,8 +284,8 @@ fn late_old_identity_cannot_cleanup_current_vectors_or_query_error() {
     let mut storage = open(&root);
     let old = Sha256::digest(b"old");
     let current = Sha256::digest(b"current");
-    storage.reset_vectors(&old).unwrap();
-    storage.reset_vectors(&current).unwrap();
+    storage.reset_vectors(None, &old).unwrap();
+    storage.reset_vectors(Some(&old), &current).unwrap();
     publish(&mut storage, &[("a.md", "current")]);
     store(&mut storage, &current, "current", 3);
     let mut unit = unwrap_current(storage.begin_vector_write(&current).unwrap());
@@ -311,7 +311,7 @@ fn deleting_one_shared_representative_retains_the_shared_vector() {
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     publish(&mut storage, &[("a.md", "shared"), ("b.md", "shared")]);
     let key = store(&mut storage, &identity, "shared", 3);
     let mut unit = storage.begin_cache_write().unwrap();
@@ -332,7 +332,7 @@ fn reset_rollback_restores_native_dimensions_and_commit_releases_them() {
     let mut storage = open(&root);
     let old = Sha256::digest(b"old");
     let new = Sha256::digest(b"new");
-    storage.reset_vectors(&old).unwrap();
+    storage.reset_vectors(None, &old).unwrap();
     store(&mut storage, &old, "retained", 3);
     let before = read_native_state(&root);
     let db = Connection::open(root.path().join("vectors")).unwrap();
@@ -342,15 +342,21 @@ fn reset_rollback_restores_native_dimensions_and_commit_releases_them() {
     )
     .unwrap();
     // Act
-    assert!(storage.reset_vectors(&new).is_err());
+    assert!(storage.reset_vectors(Some(&old), &new).is_err());
     db.execute_batch("DROP TRIGGER reject_reset;").unwrap();
     // Assert: all key/data/metadata bytes and schema are restored.
     assert_eq!(read_native_state(&root), before);
     assert_eq!(read_size(&mut storage, &old), Some(3));
-    assert!(!storage.reset_vectors(&old).unwrap());
+    assert_eq!(
+        storage.reset_vectors(None, &old).unwrap(),
+        VectorOutcome::Current(false)
+    );
     assert_eq!(read_size(&mut storage, &old), Some(3));
     // Act: commit the reset and establish a different first dimension.
-    assert!(storage.reset_vectors(&new).unwrap());
+    assert_eq!(
+        storage.reset_vectors(Some(&old), &new).unwrap(),
+        VectorOutcome::Current(true)
+    );
     assert_eq!(read_size(&mut storage, &new), None);
     store(&mut storage, &new, "new", 4);
     assert_eq!(read_size(&mut storage, &new), Some(4));
@@ -363,7 +369,7 @@ fn unsupported_native_dimensions_poison_the_unit_without_keys() {
         let root = TempDir::new().unwrap();
         let mut storage = open(&root);
         let identity = Sha256::digest(b"model");
-        storage.reset_vectors(&identity).unwrap();
+        storage.reset_vectors(None, &identity).unwrap();
         let before = read_native_state(&root);
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         // Act
@@ -384,7 +390,7 @@ fn nullable_failure_hash_does_not_hide_unrelated_work() {
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     publish(&mut storage, &[("a.md", "pending")]);
     let db = Connection::open(root.path().join("vectors")).unwrap();
     // This malformed legacy row cannot be created by the typed writer.
@@ -405,7 +411,7 @@ fn invalid_attempt_budgets_are_rejected_without_changing_storage() {
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     publish(&mut storage, &[("a.md", "pending")]);
     // Act and assert
     let mut read = storage.begin_read().unwrap();
@@ -424,7 +430,7 @@ fn abandoned_cleanup_restores_vectors_failures_and_dimensions() {
     let root = TempDir::new().unwrap();
     let mut storage = open(&root);
     let identity = Sha256::digest(b"model");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     store(&mut storage, &identity, "orphan", 3);
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     unit.reserve_attempt(&identity, 4).unwrap();

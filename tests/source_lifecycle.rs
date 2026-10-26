@@ -282,7 +282,7 @@ fn seed_vector_sentinels(
     failure_hash: &Sha256,
 ) {
     let mut storage = open_fixture_storage(repo);
-    storage.reset_vectors(identity).unwrap();
+    storage.reset_vectors(None, identity).unwrap();
     let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
     unit.store_vector(hash, &[1.0, 0.0, 0.0], 3).unwrap();
     assert!(unit.reserve_attempt(failure_hash, 3).unwrap());

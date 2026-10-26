@@ -100,8 +100,10 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     }
 
     fn drain(&mut self) -> EmbeddingResult<DrainOutcome> {
-        let ConfigState::Ready(config) = self.read_configuration()? else {
-            return Ok(DrainOutcome::Unavailable);
+        let config = match self.read_configuration()? {
+            ConfigState::Ready(config) => config,
+            ConfigState::Changed => return Ok(DrainOutcome::ConfigChanged),
+            ConfigState::Missing | ConfigState::Invalid(_) => return Ok(DrainOutcome::Unavailable),
         };
         let Some(_guard) = self.files.try_lock_embed()? else {
             return Ok(DrainOutcome::AlreadyRunning);
@@ -110,14 +112,25 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     }
 
     fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
+        let observed = self
+            .storage
+            .begin_read()
+            .map_err(map_storage)?
+            .get_config_identity();
         match self.read_ready_config() {
             Ok(None) => Ok(ConfigState::Missing),
             Err(error) => Ok(ConfigState::Invalid(error.get_kind())),
             Ok(Some(config)) => {
-                self.storage
-                    .reset_vectors(&config.get_identity())
-                    .map_err(map_storage)?;
-                Ok(ConfigState::Ready(config))
+                #[cfg(test)]
+                tests::reach_checkpoint("configuration");
+                match self
+                    .storage
+                    .reset_vectors(observed.as_ref(), &config.get_identity())
+                    .map_err(map_storage)?
+                {
+                    VectorOutcome::Current(_) => Ok(ConfigState::Ready(config)),
+                    VectorOutcome::ConfigChanged => Ok(ConfigState::Changed),
+                }
             }
         }
     }

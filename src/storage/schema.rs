@@ -346,7 +346,7 @@ mod tests {
         let hash = Sha256::digest(b"text");
         {
             let mut storage = SqliteStorage::open(&cache, &vectors).unwrap();
-            storage.reset_vectors(&identity).unwrap();
+            storage.reset_vectors(None, &identity).unwrap();
             let VectorOutcome::Current(mut write) = storage.begin_vector_write(&identity).unwrap()
             else {
                 panic!()

@@ -25,7 +25,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     publish_nodes(&mut storage)?;
     verify_text(&mut storage)?;
     let identity = Sha256::digest(b"M1");
-    assert!(storage.reset_vectors(&identity)?);
+    assert_eq!(
+        storage.reset_vectors(None, &identity)?,
+        VectorOutcome::Current(true)
+    );
     let mut unit = require_current(storage.begin_vector_write(&identity)?)?;
     assert!(unit.reserve_attempt(&Sha256::digest(TEXT.as_bytes()), 3)?);
     unit.store_vector(&Sha256::digest(TEXT.as_bytes()), &VECTOR, 3)?;

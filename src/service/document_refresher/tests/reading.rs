@@ -75,8 +75,12 @@ impl Storage for ReadingStorage {
     fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
         self.inner.begin_cache_write()
     }
-    fn reset_vectors(&mut self, identity: &Sha256) -> StorageResult<bool> {
-        self.inner.reset_vectors(identity)
+    fn reset_vectors(
+        &mut self,
+        observed: Option<&Sha256>,
+        identity: &Sha256,
+    ) -> StorageResult<VectorOutcome<bool>> {
+        self.inner.reset_vectors(observed, identity)
     }
     fn begin_vector_write(
         &mut self,

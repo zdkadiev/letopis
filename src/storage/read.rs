@@ -4,10 +4,11 @@ use super::{
     fts::match_text,
     graph::{list_edges, list_nodes, read_node},
     neighbors::{list_source_snapshots, read_neighbor_page, resolve_node},
-    query::{Meta, Project, Schemas, build_query},
+    query::{Project, build_query},
     status_counts::read_embedding_status,
     vectors::{
-        find_nearest_vectors, read_failure, read_query_error, read_vector, read_vector_dimensions,
+        find_nearest_vectors, read_config_identity, read_failure, read_query_error, read_vector,
+        read_vector_dimensions,
     },
     work::read_next_embedding_work,
 };
@@ -49,7 +50,7 @@ impl<'a> SqliteRead<'a> {
         let Some(revision) = Self::read_revision(&transaction)? else {
             return Ok(None);
         };
-        let config_identity = Self::read_identity(&transaction)?;
+        let config_identity = read_config_identity(&transaction, true)?;
         Ok(Some(Self {
             transaction,
             revision,
@@ -75,29 +76,6 @@ impl<'a> SqliteRead<'a> {
                 error,
             )
         })
-    }
-
-    fn read_identity(connection: &Connection) -> StorageResult<Option<Sha256>> {
-        let (sql, values) = build_query(
-            Query::select()
-                .column(Meta::ConfigIdentity)
-                .from((Schemas::Vec, Meta::Table))
-                .and_where(Expr::col(Meta::Id).eq(1)),
-        )?;
-        let identity: Option<String> = connection
-            .query_row(&sql, params_from_iter(values), |row| row.get(0))
-            .optional()
-            .map_err(map_sqlite)?;
-        identity
-            .map(|raw| Sha256::parse(&raw))
-            .transpose()
-            .map_err(|error| {
-                StorageError::new_with_cause(
-                    StorageErrorKind::InternalError,
-                    "invalid stored configuration identity",
-                    error,
-                )
-            })
     }
 }
 impl GraphRead for SqliteRead<'_> {

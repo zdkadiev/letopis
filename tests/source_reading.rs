@@ -25,7 +25,7 @@ fn observe_live_source_without_referrer_edits() {
     let mut storage = open_repo_storage(&repo);
     let vector_identity =
         Sha256::parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap();
-    storage.reset_vectors(&vector_identity).unwrap();
+    storage.reset_vectors(None, &vector_identity).unwrap();
     let mut view = storage.begin_read().unwrap();
     let uri = SourceUri::parse("source.txt").unwrap();
     let revision = view.get_revision();

@@ -15,7 +15,7 @@ fn reservation_is_durable_only_after_commit_and_survives_reopen() {
         let identity = Sha256::digest(b"M1");
         let hash = Sha256::digest(b"text");
         let mut storage = open_storage(&cache, &vectors).unwrap();
-        storage.reset_vectors(&identity).unwrap();
+        storage.reset_vectors(None, &identity).unwrap();
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         assert!(unit.reserve_attempt(&hash, budget).unwrap());
         drop(unit);
@@ -53,7 +53,7 @@ fn absent_failure_is_not_created_by_error() {
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let identity = Sha256::digest(b"M1");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     assert!(!unit.record_failure(&identity, "safe failure").unwrap());
     unit.commit().unwrap();
@@ -67,7 +67,7 @@ fn success_clears_only_its_failure() {
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let identity = Sha256::digest(b"M1");
     let other = Sha256::digest(b"other");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     for hash in [identity, other] {
         assert!(unit.reserve_attempt(&hash, 3).unwrap());
@@ -104,7 +104,7 @@ fn query_error_replaces_and_clears_without_history() {
     let vectors = root.path().join("vectors");
     let identity = Sha256::digest(b"M1");
     let mut storage = open_storage(&cache, &vectors).unwrap();
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     for (at, message) in [(10, "first safe message"), (20, "latest safe message")] {
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         unit.set_query_error(at, message).unwrap();
@@ -113,7 +113,7 @@ fn query_error_replaces_and_clears_without_history() {
     drop(storage);
     let mut storage = open_storage(&cache, &vectors).unwrap();
     let next = Sha256::digest(b"M2");
-    storage.reset_vectors(&next).unwrap();
+    storage.reset_vectors(Some(&identity), &next).unwrap();
     assert_eq!(
         storage.begin_read().unwrap().read_query_error().unwrap(),
         Some(QueryError {
@@ -153,8 +153,8 @@ fn stale_identity_cannot_reserve_or_record_or_store() {
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let m1 = Sha256::digest(b"M1");
     let m2 = Sha256::digest(b"M2");
-    storage.reset_vectors(&m1).unwrap();
-    storage.reset_vectors(&m2).unwrap();
+    storage.reset_vectors(None, &m1).unwrap();
+    storage.reset_vectors(Some(&m1), &m2).unwrap();
     let mut unit = unwrap_current(storage.begin_vector_write(&m2).unwrap());
     assert!(unit.reserve_attempt(&m2, 3).unwrap());
     assert!(unit.record_failure(&m2, "M2 failure").unwrap());
@@ -198,7 +198,7 @@ fn invalid_budget_and_timestamp_poison_units_without_partial_writes() {
         let mut storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         let identity = Sha256::digest(b"M1");
-        storage.reset_vectors(&identity).unwrap();
+        storage.reset_vectors(None, &identity).unwrap();
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         assert!(unit.reserve_attempt(&identity, 3).unwrap());
         assert!(unit.reserve_attempt(&identity, invalid).is_err());
@@ -221,7 +221,7 @@ fn maximum_persisted_attempt_is_not_incremented_or_wrapped() {
     let vectors = root.path().join("vectors");
     let mut storage = open_storage(&root.path().join("cache"), &vectors).unwrap();
     let identity = Sha256::digest(b"M1");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let raw = rusqlite::Connection::open(&vectors).unwrap();
     raw.execute(
         "INSERT INTO embed_failures(search_hash,attempts,error) VALUES(?1,?2,'safe')",

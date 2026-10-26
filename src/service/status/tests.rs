@@ -146,7 +146,7 @@ fn keeps_query_error_without_mutation() {
     let mut storage = open_storage(&root);
     publish_node(&mut storage, 1);
     let identity = Sha256::digest(b"query fixture");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let VectorOutcome::Current(mut writer) = storage.begin_vector_write(&identity).unwrap() else {
         panic!("expected current vector writer")
     };

@@ -121,7 +121,11 @@ impl Storage for OneRead {
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
         panic!("check cannot write vectors")
     }
-    fn reset_vectors(&mut self, _: &Sha256) -> StorageResult<bool> {
+    fn reset_vectors(
+        &mut self,
+        _: Option<&Sha256>,
+        _: &Sha256,
+    ) -> StorageResult<VectorOutcome<bool>> {
         panic!("check cannot reset vectors")
     }
 }

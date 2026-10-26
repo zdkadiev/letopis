@@ -137,7 +137,10 @@ fn seed_vector(cache: &Path, vectors: &Path) -> (Sha256, Sha256) {
     let identity = Sha256::digest(b"known model identity");
     let search_hash = Sha256::digest(NODE_TEXT.as_bytes());
     let mut storage = open_storage(cache, vectors).unwrap();
-    assert!(storage.reset_vectors(&identity).unwrap());
+    assert_eq!(
+        storage.reset_vectors(None, &identity).unwrap(),
+        VectorOutcome::Current(true)
+    );
     let mut cache_write = storage.begin_cache_write().unwrap();
     cache_write
         .upsert_node(&support::build_knowledge(NODE_ID, NODE_TEXT))

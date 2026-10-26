@@ -86,8 +86,12 @@ impl Storage for SqliteStorage {
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
         SqliteVectorWrite::begin(&mut self.vector_writer, expected)
     }
-    fn reset_vectors(&mut self, identity: &Sha256) -> StorageResult<bool> {
-        vectors::reset_vectors(&mut self.vector_writer, identity)
+    fn reset_vectors(
+        &mut self,
+        observed: Option<&Sha256>,
+        desired: &Sha256,
+    ) -> StorageResult<VectorOutcome<bool>> {
+        vectors::reset_vectors(&mut self.vector_writer, observed, desired)
     }
     type CacheWrite<'a> = SqliteCacheWrite<'a>;
     fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
@@ -181,7 +185,7 @@ mod tests {
         let key = seed_vector(&mut storage, &m1);
         storage.vector_writer.execute_batch("INSERT INTO embed_failures VALUES('failed-text',1,'safe failure'); INSERT INTO query_error VALUES(1,7,'safe failure'); CREATE TRIGGER deny_meta_update BEFORE UPDATE ON meta BEGIN SELECT RAISE(ABORT, 'blocked meta write'); END;").unwrap();
         // Act: the metadata update fails after native schema changes.
-        assert!(storage.reset_vectors(&m2).is_err());
+        assert!(storage.reset_vectors(Some(&m1), &m2).is_err());
         assert_eq!(count_failures(&storage), 1);
         // Assert the same and a newly opened read both retain exact M1 bytes.
         assert_eq!(
@@ -211,7 +215,10 @@ mod tests {
             Some(vec![1.0, 0.0, 0.0])
         );
         drop(read);
-        assert!(reopened.reset_vectors(&m2).unwrap());
+        assert_eq!(
+            reopened.reset_vectors(Some(&m1), &m2).unwrap(),
+            VectorOutcome::Current(true)
+        );
         assert_eq!(count_failures(&reopened), 0);
         assert_eq!(
             reopened
@@ -230,7 +237,7 @@ mod tests {
             SqliteStorage::open(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         let identity = Sha256::digest(b"M1");
         let hash = Sha256::digest(b"text");
-        storage.reset_vectors(&identity).unwrap();
+        storage.reset_vectors(None, &identity).unwrap();
         storage
             .vector_writer
             .execute(
@@ -273,7 +280,7 @@ mod tests {
     }
 
     fn seed_vector(storage: &mut SqliteStorage, identity: &Sha256) -> i64 {
-        storage.reset_vectors(identity).unwrap();
+        storage.reset_vectors(None, identity).unwrap();
         let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
         let row = unit
             .store_vector(identity, &[1.0, 0.0, 0.0], 3)

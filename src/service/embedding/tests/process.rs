@@ -3,8 +3,8 @@ use crate::{
     domain::{RepoPath, Sha256},
     markdown::parse,
     service::{
-        DrainOutcome, Embedder, EmbeddingConfig, QueryEmbedding, Storage, StorageRead,
-        VectorOutcome, VectorWrite,
+        ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingExecutor, QueryEmbedding,
+        Storage, StorageRead, VectorOutcome, VectorWrite,
     },
     wire_embedder,
 };
@@ -40,6 +40,13 @@ fn run_child() {
             service.embed_query("canary query").unwrap(),
             QueryEmbedding::Unavailable
         );
+    } else if env::var("LETOPIS_PROCESS_ACTION").as_deref() == Ok("readiness") {
+        assert!(!service.has_work().unwrap());
+    } else if env::var("LETOPIS_PROCESS_ACTION").as_deref() == Ok("configuration") {
+        assert!(matches!(
+            service.read_configuration().unwrap(),
+            ConfigState::Changed
+        ));
     } else {
         let expected = match env::var("LETOPIS_PROCESS_EXPECT").unwrap().as_str() {
             "Complete" => DrainOutcome::Complete,
@@ -47,7 +54,7 @@ fn run_child() {
             "ConfigChanged" => DrainOutcome::ConfigChanged,
             other => panic!("unknown expected outcome {other}"),
         };
-        assert_eq!(service.drain().unwrap(), expected);
+        assert_eq!(Embedder::drain(&mut service).unwrap(), expected);
     }
 }
 
@@ -468,3 +475,5 @@ fn assert_current_error(fixture: &Fixture) {
     assert_eq!(error.at, 7);
     assert_eq!(error.error, "current safe error");
 }
+
+mod configuration;

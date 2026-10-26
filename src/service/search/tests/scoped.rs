@@ -7,12 +7,12 @@ use crate::{
     markdown::MarkdownParser,
     service::{
         CacheWrite, CommandErrorKind, ConfigState, DocumentError, DocumentErrorKind,
-        DocumentResult, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingResult,
-        KnowledgeMetadata, NodeMetadata, ProvenanceObservation, ProvenanceRequest, QueryEmbedding,
-        QueryEmbeddingRequest, RecheckFilter, RefreshOutcome, Refresher, SearchFilters, SearchFlag,
-        SearchRequest, Searcher, SnapshotError, SourceProvenance, SourceRevisionComparison,
-        SourceRevisionRequest, Storage, StorageRead, StorageResult, VectorOutcome,
-        search::SearchService,
+        DocumentResult, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind,
+        EmbeddingResult, KnowledgeMetadata, NodeMetadata, ProvenanceObservation, ProvenanceRequest,
+        QueryEmbedding, QueryEmbeddingRequest, RecheckFilter, RefreshOutcome, Refresher,
+        SearchFilters, SearchFlag, SearchRequest, Searcher, SnapshotError, SourceProvenance,
+        SourceRevisionComparison, SourceRevisionRequest, Storage, StorageRead, StorageResult,
+        VectorOutcome, search::SearchService,
     },
     storage::SqliteStorage,
 };
@@ -27,6 +27,7 @@ use std::{
 struct NoRefresh;
 struct Query {
     config: EmbeddingConfig,
+    state: Option<ConfigState>,
     calls: Rc<Cell<usize>>,
     hook: Option<Box<dyn FnOnce()>>,
 }
@@ -53,6 +54,28 @@ struct ScopedFixture {
     calls: Rc<Cell<usize>>,
     reads: Rc<Cell<usize>>,
     observed: Rc<RefCell<RecordedSources>>,
+}
+
+#[test]
+fn non_ready_configuration_preserves_fts_and_one_pinned_consumer_view() {
+    for state in [
+        ConfigState::Missing,
+        ConfigState::Invalid(EmbeddingErrorKind::InvalidConfig),
+        ConfigState::Changed,
+    ] {
+        // Arrange: vectors exist, but readiness must still disable query inference.
+        let fixture = ScopedFixture::new();
+        let mut search = fixture.build_search(None, None);
+        search.embeddings.state = Some(state);
+        // Act
+        let links = search.search(&build_request()).unwrap();
+        // Assert
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].element_id.as_str(), "a.md");
+        assert_eq!(fixture.calls.get(), 0);
+        assert_eq!(fixture.reads.get(), 1);
+        assert_can_checkpoint(fixture.root.path());
+    }
 }
 
 #[test]
@@ -173,6 +196,7 @@ impl ScopedFixture {
             },
             embeddings: Query {
                 config: self.config.clone(),
+                state: None,
                 calls: self.calls.clone(),
                 hook,
             },
@@ -203,7 +227,10 @@ impl Refresher for NoRefresh {
 }
 impl Embedder for Query {
     fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
-        Ok(ConfigState::Ready(self.config.clone()))
+        Ok(self
+            .state
+            .take()
+            .unwrap_or_else(|| ConfigState::Ready(self.config.clone())))
     }
     fn drain(&mut self) -> EmbeddingResult<DrainOutcome> {
         panic!("search cannot drain")
@@ -297,7 +324,11 @@ impl Storage for ReadOnlyStorage {
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
         panic!("search cannot write vectors")
     }
-    fn reset_vectors(&mut self, _: &Sha256) -> StorageResult<bool> {
+    fn reset_vectors(
+        &mut self,
+        _: Option<&Sha256>,
+        _: &Sha256,
+    ) -> StorageResult<VectorOutcome<bool>> {
         panic!("search cannot reset vectors")
     }
 }

@@ -676,7 +676,7 @@ fn read_git_objects(root: &Path) -> Vec<u8> {
 
 fn seed_vectors(storage: &mut SqliteStorage) {
     let identity = Sha256::digest(b"model identity");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
         panic!("identity changed");
     };

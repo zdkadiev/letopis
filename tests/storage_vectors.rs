@@ -15,7 +15,10 @@ fn text_hash_shares_one_vector() {
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let identity = Sha256::digest(b"M1");
     let hash = Sha256::digest(b"shared");
-    assert!(storage.reset_vectors(&identity).unwrap());
+    assert_eq!(
+        storage.reset_vectors(None, &identity).unwrap(),
+        VectorOutcome::Current(true)
+    );
     let mut cache = storage.begin_cache_write().unwrap();
     for id in ["a.md", "b.md"] {
         cache
@@ -56,7 +59,7 @@ fn vectors_require_matching_identity() {
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let m1 = Sha256::digest(b"M1");
     let m2 = Sha256::digest(b"M2");
-    storage.reset_vectors(&m1).unwrap();
+    storage.reset_vectors(None, &m1).unwrap();
     store(&mut storage, &m1, &m1, &[1.0, 0.0, 0.0]);
     assert!(matches!(
         storage.begin_vector_write(&m2).unwrap(),
@@ -82,7 +85,7 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
     let mut second = open_storage(&cache, &vectors).unwrap();
     let m1 = Sha256::digest(b"M1");
     let m2 = Sha256::digest(b"M2");
-    first.reset_vectors(&m1).unwrap();
+    first.reset_vectors(None, &m1).unwrap();
     store(&mut first, &m1, &m1, &[1.0, 0.0, 0.0]);
     publish_hash(&mut first, m1);
     let mut old = first.begin_read().unwrap();
@@ -91,10 +94,16 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
         unwrap_current(old.read_vector(&m1, &m1).unwrap()),
         Some(vec![1.0, 0.0, 0.0])
     );
-    assert!(second.reset_vectors(&m2).unwrap());
+    assert_eq!(
+        second.reset_vectors(Some(&m1), &m2).unwrap(),
+        VectorOutcome::Current(true)
+    );
     store(&mut second, &m2, &m2, &[0.0, 1.0, 0.0, 0.0]);
     publish_hash(&mut second, m2);
-    assert!(!second.reset_vectors(&m2).unwrap());
+    assert_eq!(
+        second.reset_vectors(Some(&m1), &m2).unwrap(),
+        VectorOutcome::Current(false)
+    );
     assert_nearest(&mut old, &m1, &[1.0, 0.0, 0.0]);
     assert_eq!(
         unwrap_current(old.read_vector(&m1, &m1).unwrap()),
@@ -118,7 +127,7 @@ fn current_node_hash_excludes_old_vector() {
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let m1 = Sha256::digest(b"M1");
-    storage.reset_vectors(&m1).unwrap();
+    storage.reset_vectors(None, &m1).unwrap();
     store(&mut storage, &m1, &Sha256::digest(b"old"), &[1.0, 0.0, 0.0]);
     store(&mut storage, &m1, &Sha256::digest(b"new"), &[0.0, 1.0, 0.0]);
     let mut cache = storage.begin_cache_write().unwrap();
@@ -147,7 +156,7 @@ fn caught_vector_error_cannot_commit_key_or_prior_write() {
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         let m1 = Sha256::digest(b"M1");
         let hash = Sha256::digest(b"valid");
-        storage.reset_vectors(&m1).unwrap();
+        storage.reset_vectors(None, &m1).unwrap();
         let mut unit = unwrap_current(storage.begin_vector_write(&m1).unwrap());
         unit.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
         let error = unit.store_vector(&m1, &invalid, 3).unwrap_err();
@@ -165,7 +174,7 @@ fn dimension_reset_and_rollback() {
     let mut storage = open_storage(&root.path().join("cache"), &vectors).unwrap();
     let m1 = Sha256::digest(b"M1");
     let hash = Sha256::digest(b"late");
-    storage.reset_vectors(&m1).unwrap();
+    storage.reset_vectors(None, &m1).unwrap();
     store(&mut storage, &m1, &m1, &[1.0, 0.0, 0.0]);
     let mut unit = unwrap_current(storage.begin_vector_write(&m1).unwrap());
     assert!(unit.store_vector(&hash, &[0.0, 1.0, 0.0, 0.0], 4).is_err());
@@ -190,7 +199,7 @@ fn cache_and_vector_writers_are_independent() {
     let mut first = open_storage(&cache, &vectors).unwrap();
     let mut second = open_storage(&cache, &vectors).unwrap();
     let identity = Sha256::digest(b"M1");
-    first.reset_vectors(&identity).unwrap();
+    first.reset_vectors(None, &identity).unwrap();
     let cache_unit = first.begin_cache_write().unwrap();
     let mut vector_unit = unwrap_current(second.begin_vector_write(&identity).unwrap());
     let key = vector_unit
@@ -217,7 +226,7 @@ fn nearest_validates_query_and_orders_all_candidates_by_distance_then_id() {
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let identity = Sha256::digest(b"M1");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let mut unit = storage.begin_cache_write().unwrap();
     for (id, text) in [("z.md", "close"), ("b.md", "far"), ("a.md", "far")] {
         unit.upsert_node(&support::build_knowledge(id, text))

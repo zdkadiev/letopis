@@ -221,7 +221,7 @@ fn captured_vector_configuration_requires_matching_identity_and_native_dimension
             .unwrap()
             .is_none()
     );
-    storage.reset_vectors(&config.get_identity()).unwrap();
+    storage.reset_vectors(None, &config.get_identity()).unwrap();
     assert!(
         capture_vector_config(&mut storage.begin_read().unwrap(), &ready)
             .unwrap()
@@ -237,11 +237,13 @@ fn captured_vector_configuration_requires_matching_identity_and_native_dimension
             .get(),
         2
     );
-    assert!(
-        capture_vector_config(&mut read, &ConfigState::Missing)
-            .unwrap()
-            .is_none()
-    );
+    for state in [
+        ConfigState::Missing,
+        ConfigState::Invalid(EmbeddingErrorKind::InvalidConfig),
+        ConfigState::Changed,
+    ] {
+        assert!(capture_vector_config(&mut read, &state).unwrap().is_none());
+    }
     drop(read);
     let incompatible = build_config(3);
     seed_dimension(&mut storage, &incompatible, 2);
@@ -354,7 +356,10 @@ fn build_config(dimensions: usize) -> EmbeddingConfig {
     EmbeddingConfig::parse(format!(r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","dimensions":{dimensions}}},"max_retries":0}}"#).as_bytes()).unwrap()
 }
 fn seed_dimension<S: Storage>(storage: &mut S, config: &EmbeddingConfig, dimensions: usize) {
-    storage.reset_vectors(&config.get_identity()).unwrap();
+    let observed = storage.begin_read().unwrap().get_config_identity();
+    storage
+        .reset_vectors(observed.as_ref(), &config.get_identity())
+        .unwrap();
     let VectorOutcome::Current(mut write) =
         storage.begin_vector_write(&config.get_identity()).unwrap()
     else {

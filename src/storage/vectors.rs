@@ -7,7 +7,7 @@ use crate::{
     domain::{KnowledgeId, Sha256},
     service::{
         EmbeddingFailure, QueryError, StorageError, StorageErrorKind, StorageResult,
-        StoredVectorKey, VectorMatch,
+        StoredVectorKey, VectorMatch, VectorOutcome,
     },
 };
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params, params_from_iter};
@@ -25,12 +25,20 @@ const RESET_INDEX: &str = r#"
     INSERT INTO vector_index(cmd,arg) VALUES('rebuild','{index:"none",distance:"cos"}');
 "#;
 
-pub(super) fn reset_vectors(connection: &mut Connection, identity: &Sha256) -> StorageResult<bool> {
+pub(super) fn reset_vectors(
+    connection: &mut Connection,
+    observed: Option<&Sha256>,
+    identity: &Sha256,
+) -> StorageResult<VectorOutcome<bool>> {
     let tx = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(map_sqlite)?;
-    if matches_identity(&tx, identity)? {
-        return Ok(false);
+    let current = read_config_identity(&tx, false)?;
+    if current.as_ref() == Some(identity) {
+        return Ok(VectorOutcome::Current(false));
+    }
+    if current.as_ref() != observed {
+        return Ok(VectorOutcome::ConfigChanged);
     }
     tx.execute_batch(RESET_INDEX).map_err(map_sqlite)?;
     let (sql, values) = build_query(Query::delete().from_table(VectorKeys::Table))?;
@@ -54,7 +62,37 @@ pub(super) fn reset_vectors(connection: &mut Connection, identity: &Sha256) -> S
     tx.execute(&sql, params_from_iter(values))
         .map_err(map_sqlite)?;
     tx.commit().map_err(map_sqlite)?;
-    Ok(true)
+    Ok(VectorOutcome::Current(true))
+}
+
+pub(super) fn read_config_identity(
+    connection: &Connection,
+    attached: bool,
+) -> StorageResult<Option<Sha256>> {
+    let mut query = Query::select();
+    query
+        .column(Meta::ConfigIdentity)
+        .and_where(Expr::col(Meta::Id).eq(1));
+    if attached {
+        query.from((Schemas::Vec, Meta::Table));
+    } else {
+        query.from(Meta::Table);
+    }
+    let (sql, values) = build_query(&query)?;
+    let identity: Option<String> = connection
+        .query_row(&sql, params_from_iter(values), |row| row.get(0))
+        .optional()
+        .map_err(map_sqlite)?;
+    identity
+        .map(|raw| Sha256::parse(&raw))
+        .transpose()
+        .map_err(|error| {
+            StorageError::new_with_cause(
+                StorageErrorKind::InternalError,
+                "invalid stored configuration identity",
+                error,
+            )
+        })
 }
 
 pub(super) fn matches_identity(connection: &Connection, expected: &Sha256) -> StorageResult<bool> {

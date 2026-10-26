@@ -88,7 +88,7 @@ pub struct TextMatch {
 pub enum VectorOutcome<T> {
     /// The operation used the expected configuration identity.
     Current(T),
-    /// The pinned configuration differs from the caller's identity.
+    /// The stored configuration differs from the caller's identity or prior observation.
     ConfigChanged,
 }
 /// Stable text-addressed vector key and whether this unit inserted it.
@@ -266,6 +266,8 @@ pub enum ConfigState {
     Missing,
     /// Configuration cannot currently be used; existing vectors remain intact.
     Invalid(EmbeddingErrorKind),
+    /// A valid configuration observation was superseded before synchronization.
+    Changed,
     /// Validated configuration synchronized with vector storage.
     Ready(EmbeddingConfig),
 }

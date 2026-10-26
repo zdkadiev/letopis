@@ -21,7 +21,7 @@ fn counts_distinct_current_hashes() {
     let root = TempDir::new().unwrap();
     let mut writer = open_writer(root.path());
     let identity = Sha256::digest(b"model");
-    writer.reset_vectors(&identity).unwrap();
+    writer.reset_vectors(None, &identity).unwrap();
     publish(
         &mut writer,
         &[
@@ -61,7 +61,7 @@ fn respects_attempt_boundary() {
     let root = TempDir::new().unwrap();
     let mut writer = open_writer(root.path());
     let identity = Sha256::digest(b"model");
-    writer.reset_vectors(&identity).unwrap();
+    writer.reset_vectors(None, &identity).unwrap();
     publish(&mut writer, &[("a.md", "A"), ("b.md", "B")]);
     fail(&mut writer, &identity, "A", 1);
     fail(&mut writer, &identity, "B", 2);
@@ -84,7 +84,7 @@ fn ignores_vectors_for_mismatched_identity() {
     let root = TempDir::new().unwrap();
     let mut writer = open_writer(root.path());
     let identity = Sha256::digest(b"old");
-    writer.reset_vectors(&identity).unwrap();
+    writer.reset_vectors(None, &identity).unwrap();
     publish(&mut writer, &[("a.md", "A"), ("b.md", "B"), ("c.md", "C")]);
     store(&mut writer, &identity, "A");
     fail(&mut writer, &identity, "B", 2);
@@ -139,7 +139,7 @@ fn pins_status_revision_and_counts() {
     let root = TempDir::new().unwrap();
     let mut writer = open_writer(root.path());
     let identity = Sha256::digest(b"model");
-    writer.reset_vectors(&identity).unwrap();
+    writer.reset_vectors(None, &identity).unwrap();
     publish(&mut writer, &[("a.md", "A")]);
     let pinned = File::open(root.path()).unwrap();
     let mut status = open_status_storage(&root.path().canonicalize().unwrap(), &pinned).unwrap();
@@ -157,7 +157,7 @@ fn rejects_malformed_persisted_counts_and_read_failure() {
         let root = TempDir::new().unwrap();
         let mut writer = open_writer(root.path());
         let identity = Sha256::digest(b"model");
-        writer.reset_vectors(&identity).unwrap();
+        writer.reset_vectors(None, &identity).unwrap();
         publish(&mut writer, &[("a.md", "A")]);
         let connection = Connection::open(root.path().join("vectors.db")).unwrap();
         connection
@@ -203,7 +203,7 @@ fn preserves_files_and_orders_only_uncovered_current_failures() {
     let root = TempDir::new().unwrap();
     let identity = Sha256::digest(b"model");
     let mut writer = open_writer(root.path());
-    writer.reset_vectors(&identity).unwrap();
+    writer.reset_vectors(None, &identity).unwrap();
     publish(&mut writer, &[("a.md", "A"), ("b.md", "B"), ("c.md", "C")]);
     store(&mut writer, &identity, "C");
     fail(&mut writer, &identity, "A", 2);
@@ -284,7 +284,7 @@ fn rejects_current_vector_key_without_native_row() {
     let identity = Sha256::digest(b"model");
     let hash = Sha256::digest(b"A");
     let mut writer = open_writer(root.path());
-    writer.reset_vectors(&identity).unwrap();
+    writer.reset_vectors(None, &identity).unwrap();
     publish(&mut writer, &[("a.md", "A")]);
     let connection = Connection::open(root.path().join("vectors.db")).unwrap();
     connection

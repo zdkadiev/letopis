@@ -32,11 +32,19 @@ pub trait Storage {
         &mut self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>>;
-    /// Atomically clear vectors for a changed identity; return whether changed.
+    /// Atomically synchronize vectors using a prior observed identity, including absence.
+    ///
+    /// An already current `desired` identity returns `Current(false)` without changes.
+    /// Otherwise a matching observation resets vectors and attempts, returning `Current(true)`.
+    /// A superseded observation returns `ConfigChanged` without changing any data.
     ///
     /// # Errors
     /// Reports contention, schema or database failures, rolling back all changes.
-    fn reset_vectors(&mut self, identity: &Sha256) -> StorageResult<bool>;
+    fn reset_vectors(
+        &mut self,
+        observed: Option<&Sha256>,
+        desired: &Sha256,
+    ) -> StorageResult<VectorOutcome<bool>>;
     /// Begin an exclusive cache publication transaction.
     ///
     /// # Errors

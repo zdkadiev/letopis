@@ -66,7 +66,8 @@ pub trait EmbeddingFiles {
 /// Every implementation keeps document vectors consistent with the committed configuration
 /// identity and persists only safe diagnostics.
 pub trait Embedder {
-    /// Reread, validate and synchronize ready configuration.
+    /// Observe storage before reading, validating and conditionally synchronizing configuration.
+    /// A superseded observation returns `ConfigState::Changed` without retrying or resetting.
     ///
     /// # Errors
     /// Reports storage failures; unreadable configuration is a typed invalid state.

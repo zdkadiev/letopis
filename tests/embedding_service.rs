@@ -403,7 +403,7 @@ fn query_success_clears_error_without_caching_or_document_attempts() {
     let config = fixture.write_config(&server.get_base_url(), 0);
     let hash = fixture.publish("a.md", "knowledge");
     let mut storage = fixture.open_storage();
-    storage.reset_vectors(&config.get_identity()).unwrap();
+    storage.reset_vectors(None, &config.get_identity()).unwrap();
     let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
     unit.set_query_error(1, "old failure").unwrap();
     unit.commit().unwrap();
@@ -593,7 +593,7 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     let known = fixture.publish("c.md", "known");
     fs::write(fixture.root.path().join("a.md"), "unmarked").unwrap();
     let mut storage = fixture.open_storage();
-    storage.reset_vectors(&config.get_identity()).unwrap();
+    storage.reset_vectors(None, &config.get_identity()).unwrap();
     let orphan = Sha256::digest(b"orphan");
     let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
     unit.reserve_attempt(&exhausted, 2).unwrap();
@@ -841,7 +841,10 @@ fn captured_query_diagnostic_write_failure_remains_an_error() {
 
 fn seed_query_error(fixture: &Fixture, config: &EmbeddingConfig) {
     let mut storage = fixture.open_storage();
-    storage.reset_vectors(&config.get_identity()).unwrap();
+    let observed = storage.begin_read().unwrap().get_config_identity();
+    storage
+        .reset_vectors(observed.as_ref(), &config.get_identity())
+        .unwrap();
     let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
     unit.set_query_error(7, "replacement diagnostic").unwrap();
     unit.commit().unwrap();

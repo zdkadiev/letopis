@@ -48,8 +48,12 @@ impl Storage for TracedStorage {
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
         self.inner.begin_vector_write(expected)
     }
-    fn reset_vectors(&mut self, identity: &Sha256) -> StorageResult<bool> {
-        self.inner.reset_vectors(identity)
+    fn reset_vectors(
+        &mut self,
+        observed: Option<&Sha256>,
+        identity: &Sha256,
+    ) -> StorageResult<VectorOutcome<bool>> {
+        self.inner.reset_vectors(observed, identity)
     }
 }
 impl<R: GraphRead> GraphRead for TracedRead<R> {

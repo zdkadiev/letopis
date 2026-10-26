@@ -122,6 +122,7 @@ fn retains_original_graph_bindings_and_revision_across_pages() {
 fn synchronizes_readiness_before_one_pinned_read_without_query_inference() {
     for state in [
         ConfigState::Missing,
+        ConfigState::Changed,
         ConfigState::Invalid(EmbeddingErrorKind::InvalidConfig),
     ] {
         let fixture = Fixture::new();

@@ -14,7 +14,7 @@ fn a_failed_failure_update_poisons_the_entire_vector_unit() {
     let mut storage = open_storage(&root.path().join("cache.db"), &vector_path).unwrap();
     let identity = Sha256::digest(b"model");
     let hash = Sha256::digest(b"document");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let observer = Connection::open(&vector_path).unwrap();
     observer
         .execute_batch(
@@ -46,7 +46,7 @@ fn a_failed_query_error_cleanup_poisons_the_entire_vector_unit() {
     let mut storage = open_storage(&root.path().join("cache.db"), &vector_path).unwrap();
     let identity = Sha256::digest(b"model");
     let hash = Sha256::digest(b"document");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let observer = Connection::open(&vector_path).unwrap();
     observer
         .execute_batch(
@@ -83,7 +83,7 @@ fn a_failed_orphan_prune_poisons_the_entire_vector_unit() {
     let mut storage = open_storage(&root.path().join("cache.db"), &vector_path).unwrap();
     let identity = Sha256::digest(b"model");
     let hash = Sha256::digest(b"unreferenced document");
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let observer = Connection::open(&vector_path).unwrap();
     observer
         .execute_batch(

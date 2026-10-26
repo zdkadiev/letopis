@@ -215,10 +215,11 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
             .is_some()
     );
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
-    assert!(
+    assert_eq!(
         repo.open_storage()
-            .reset_vectors(&next.get_identity())
-            .unwrap()
+            .reset_vectors(Some(&config.get_identity()), &next.get_identity())
+            .unwrap(),
+        VectorOutcome::Current(true)
     );
     repo.write_knowledge("b.md", "sqlite");
     assert!(
@@ -249,10 +250,11 @@ fn live_confinement_error_releases_read_before_subsequent_reset() {
     let error = worker.join().unwrap_err();
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
-    assert!(
+    assert_eq!(
         repo.open_storage()
-            .reset_vectors(&next.get_identity())
-            .unwrap()
+            .reset_vectors(Some(&config.get_identity()), &next.get_identity())
+            .unwrap(),
+        VectorOutcome::Current(true)
     );
     assert_can_checkpoint(&repo);
 }
@@ -290,10 +292,11 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert!(server.take_requests().is_empty());
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
-    assert!(
+    assert_eq!(
         repo.open_storage()
-            .reset_vectors(&next.get_identity())
-            .unwrap()
+            .reset_vectors(Some(&config.get_identity()), &next.get_identity())
+            .unwrap(),
+        VectorOutcome::Current(true)
     );
     // Repair deliberately malformed persisted data before asking refresh to publish it.
     connection

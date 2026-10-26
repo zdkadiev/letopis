@@ -43,7 +43,10 @@ impl ReadingRepo {
     }
     pub fn seed_vectors(&self, config: &EmbeddingConfig, vectors: &[(&str, &[f32])]) {
         let mut storage = self.open_storage();
-        storage.reset_vectors(&config.get_identity()).unwrap();
+        let observed = storage.begin_read().unwrap().get_config_identity();
+        storage
+            .reset_vectors(observed.as_ref(), &config.get_identity())
+            .unwrap();
         for (id, vector) in vectors {
             let node = storage
                 .begin_read()

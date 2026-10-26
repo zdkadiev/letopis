@@ -424,8 +424,10 @@ fn configure_repo(repo: &ReadingRepo, retries: u64) -> EmbeddingConfig {
     .unwrap();
     repo.write(".letopis/config.json", &bytes);
     let config = EmbeddingConfig::parse(&bytes).unwrap();
-    repo.open_storage()
-        .reset_vectors(&config.get_identity())
+    let mut storage = repo.open_storage();
+    let observed = storage.begin_read().unwrap().get_config_identity();
+    storage
+        .reset_vectors(observed.as_ref(), &config.get_identity())
         .unwrap();
     config
 }

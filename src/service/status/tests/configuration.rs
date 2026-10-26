@@ -106,7 +106,7 @@ fn build_files(config: Option<Vec<u8>>) -> Files {
 fn seed_exhausted(storage: &mut SqliteStorage) {
     let config = EmbeddingConfig::parse(VALID_CONFIG).unwrap();
     let identity = config.get_identity();
-    storage.reset_vectors(&identity).unwrap();
+    storage.reset_vectors(None, &identity).unwrap();
     let VectorOutcome::Current(mut writer) = storage.begin_vector_write(&identity).unwrap() else {
         panic!("current identity")
     };

@@ -166,7 +166,7 @@ fn configuration_is_reread_and_provider_validation_precedes_identity_reset() {
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     let old = Sha256::digest(b"old identity");
-    storage.reset_vectors(&old).unwrap();
+    storage.reset_vectors(None, &old).unwrap();
     let mut provider = Provider::new();
     provider.invalid_config = true;
     let mut service = EmbeddingService::new(storage, Files::new(0), MarkdownParser, provider);
@@ -368,7 +368,9 @@ fn captured_query_never_rereads_or_resets_configuration() {
     let files = Files::new(0);
     let captured = EmbeddingConfig::parse(files.config.borrow().as_ref().unwrap()).unwrap();
     let mut storage = open_storage(&root);
-    storage.reset_vectors(&captured.get_identity()).unwrap();
+    storage
+        .reset_vectors(None, &captured.get_identity())
+        .unwrap();
     let mut service = EmbeddingService::new(storage, files, MarkdownParser, Provider::new());
     service.files.config.replace(Some(br#"{"provider":"ollama","model":"new-model","parameters":{"base_url":"http://localhost/api"},"max_retries":0}"#.to_vec()));
     service.files.reject_config_reads = true;
@@ -411,7 +413,9 @@ fn captured_query_preserves_readiness_policy_and_document_attempts() {
     let mut files = Files::new(0);
     let hash = publish(&mut storage, &mut files, "a.md", "knowledge");
     let captured = EmbeddingConfig::parse(files.config.borrow().as_ref().unwrap()).unwrap();
-    storage.reset_vectors(&captured.get_identity()).unwrap();
+    storage
+        .reset_vectors(None, &captured.get_identity())
+        .unwrap();
     let VectorOutcome::Current(mut unit) = storage
         .begin_vector_write(&captured.get_identity())
         .unwrap()
@@ -467,7 +471,9 @@ fn captured_query_rejects_invalid_provider_policy_without_reset_or_http() {
     let files = Files::new(0);
     let captured = EmbeddingConfig::parse(files.config.borrow().as_ref().unwrap()).unwrap();
     let mut storage = open_storage(&root);
-    storage.reset_vectors(&captured.get_identity()).unwrap();
+    storage
+        .reset_vectors(None, &captured.get_identity())
+        .unwrap();
     let mut provider = Provider::new();
     provider.invalid_config = true;
     let mut service = EmbeddingService::new(storage, files, MarkdownParser, provider);
