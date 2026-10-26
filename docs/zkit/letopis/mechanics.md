@@ -134,6 +134,10 @@ source text. Недоступный файл/полный диапазон — S
 При upgrade старых URL нужна [явная пересборка производного кэша](../../development.md#tk-20-явная-пересборка-кэша-при-обновлении),
 с сохранением Markdown/Git/vectors/config/lock files; CLI reindex пока не реализован.
 
+Продолжение TK-25 (2026-10-26): CLI `reindex` реализован на общем publication path;
+[отчёт и пределы проверки](checks/TK-25/report.md). Это не заменяет указанное выше
+удаление несовместимого производного кэша при переходе TK-20 и не вводит physical corruption recovery.
+
 Реализованная граница TK-21 (2026-10-25): [I-4/I-7](contracts/I-4-sources.md#реализованная-граница-tk-21--2026-10-25),
 [spec](../../superpowers/specs/2026-10-25-tk-21-provenance-design.md),
 [проверка](checks/TK-21/report.md). `ProvenanceRequest` передаёт optional basis и

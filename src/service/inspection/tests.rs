@@ -242,6 +242,10 @@ fn assert_changed_candidate_is_rejected(scenario: Scenario) {
 }
 
 impl Refresher for RecordingDocuments {
+    fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
+        panic!("this scenario must not trigger a full reindex")
+    }
+
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
         self.0.borrow_mut().push("refresh".into());
         Ok(RefreshOutcome {

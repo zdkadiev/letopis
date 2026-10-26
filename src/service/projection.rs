@@ -73,6 +73,18 @@ impl EffectiveGraph {
         })
     }
 
+    /// Reobserve every declared source during a full rebuild, including invalid owners.
+    pub(super) fn mark_all_sources(&mut self) {
+        self.touched_sources.extend(
+            self.edges
+                .iter()
+                .filter_map(|edge| match edge.get_target() {
+                    EdgeTarget::Source(uri) => Some(uri.clone()),
+                    EdgeTarget::Knowledge(_) => None,
+                }),
+        );
+    }
+
     /// Return every declared root in the last effective knowledge projection.
     pub(super) fn list_source_snapshots(&self) -> BTreeSet<TreeOid> {
         self.knowledge

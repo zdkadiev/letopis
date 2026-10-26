@@ -1,6 +1,6 @@
 # TK-25 — Реализовать полный reindex и Git detection
 
-> **Статус:** planned
+> **Статус:** done
 > **Эпик:** [EP-3](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 3 / 6 / 12 (best / expected / worst)
@@ -39,12 +39,12 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Первый вызов строит graph/FTS и ждёт; полный reindex не ждёт vectors.
-- [ ] Внешняя Git-смена замечается при вызове без watcher.
-- [ ] SIGINT или ошибка во время reindex оставляют прежний кэш; reindex не меняет подтверждённое основание.
-- [ ] Reindex с невалидным A и валидным B публикует B, сохраняет прежнюю проекцию A с ошибкой в строке files; detection не пропускает B.
+- [x] Первый вызов строит graph/FTS и ждёт; полный reindex не ждёт vectors.
+- [x] Внешняя Git-смена замечается при вызове без watcher.
+- [x] SIGINT или ошибка во время reindex оставляют прежний кэш; reindex не меняет подтверждённое основание.
+- [x] Reindex с невалидным A и валидным B публикует B, сохраняет прежнюю проекцию A с ошибкой в строке files; detection не пропускает B.
 
-- [ ] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
+- [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
 ## 6. Как проверить
 
@@ -69,6 +69,8 @@
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
+Task 1/2 реализованы в `tk-25`, полный host verification и независимый whole-branch review завершены. **762 passed / 0 failed / 5 ignored** в каждом debug/release профиле; 23 Python tests, 8 compiling negative controls, реальный copied executable и source/basis/Git/signal/atomicity сценарии проверены. Reviewer: Ready to merge Yes; Critical/Important/Minor 0. Все 221 входа совпадают с проверенным коммитом `0dfe83c`; provenance прозрачного reuse успешного root verify после Python-only collector fix отражён в отчёте.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+[Отчёт](../../../../checks/TK-25/report.md), [машинные результаты](../../../../checks/TK-25/verification.json), [спецификация](../../../../../../superpowers/specs/2026-10-26-tk-25-reindex-design.md), [план](../../../../../../superpowers/plans/2026-10-26-tk-25-reindex.md).
+
+Реализованы Refresher::reindex и общий full/incremental publication, строгая CLI-команда и lib.rs wiring. Проверены last-valid invalid owner + valid peer, initial/missing cache, Git checkout/reset, WAL/lock/SIGINT/SQL rollback, author basis и vector reuse. Коррупция TK-26, lifecycle TK-27, handled cancelled TK-29, пилот/ресурсные gates и Linux TK-25 не объявляются пройденными.

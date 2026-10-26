@@ -127,7 +127,19 @@ supports the statement.
 
 The CLI has `check`, `search`, `traverse`, and mixed `inspect`. No Letopis
 `read`, `snapshot`, or `apply` command exists; use Git and edit Markdown.
-`status`, `reindex`, `config`, and handled cancellation scenarios remain later
-TK-25–29 work. Portable installation and operations remain TK-44 work. Do not
-claim handled `cancelled` JSON from the current executable. Embeddings are
+`status` reads published diagnostics without refreshing. To force all current
+Markdown candidates through the same publication path, run `letopis reindex`
+with stdin `{}`. It returns `{"ok":true,"result":{"revision":N}}` after one
+atomic graph/FTS publication under `index.lock`; it does not wait for vectors.
+Ordinary edits need only the usual refreshing command, not a full reindex.
+Invalid files retain their previous valid projections with current diagnostics;
+a fresh cache cannot recover a previous projection of currently invalid Markdown.
+Reindex preserves author-declared `source_snapshot` and never confirms changed
+sources for the agent. It also preserves existing vectors keyed by unchanged
+search hashes when rebuilding a deleted cache. It does not repair physical
+corruption or provide selective paths / `--cancel`.
+
+Physical recovery, remaining config/lifecycle and handled cancellation checks
+remain TK-26–29 work. Portable installation and operations remain TK-44 work.
+Do not claim handled `cancelled` JSON from the current executable. Embeddings are
 optional; FTS remains usable without a configured provider.

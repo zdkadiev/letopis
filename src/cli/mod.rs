@@ -15,3 +15,6 @@ mod search_tests;
 
 #[cfg(test)]
 mod traversal_tests;
+
+#[cfg(test)]
+mod reindex_tests;

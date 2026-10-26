@@ -29,6 +29,9 @@ struct Failure<'a> {
 #[derive(Serialize)]
 #[serde(untagged)]
 enum ResultBody<'a> {
+    Reindex {
+        revision: u64,
+    },
     Status {
         revision: Option<u64>,
         embedding_backlog: u64,
@@ -123,6 +126,9 @@ pub(crate) fn write_response(
 }
 fn build_result(result: &ResponseResult) -> ResultBody<'_> {
     match result {
+        ResponseResult::Reindex(revision) => ResultBody::Reindex {
+            revision: *revision,
+        },
         ResponseResult::Status(report) => ResultBody::Status {
             revision: report.revision,
             embedding_backlog: report.embedding_backlog,

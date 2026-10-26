@@ -113,10 +113,14 @@ fn run_child() {
         let _guard = service.filesystem.lock_index().unwrap();
         reach_checkpoint("holding");
     } else {
-        FAIL_LATE.with_borrow_mut(|enabled| *enabled = mode == "fail");
-        let result = service.refresh();
+        FAIL_LATE.with_borrow_mut(|enabled| *enabled = mode.ends_with("fail"));
+        let result = if mode.starts_with("reindex") {
+            service.reindex()
+        } else {
+            service.refresh()
+        };
         eprintln!("refresh result: {result:?}");
-        if mode == "fail" {
+        if mode.ends_with("fail") {
             let error = result.unwrap_err();
             assert!(
                 std::error::Error::source(&error)
@@ -684,3 +688,6 @@ fn seed_vectors(storage: &mut SqliteStorage) {
     unit.set_query_error(7, "safe query error").unwrap();
     unit.commit().unwrap();
 }
+
+#[path = "reindex_process.rs"]
+mod reindex;

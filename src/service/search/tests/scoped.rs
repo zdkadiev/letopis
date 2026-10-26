@@ -187,6 +187,10 @@ impl ScopedFixture {
 }
 
 impl Refresher for NoRefresh {
+    fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
+        panic!("this scenario must not trigger a full reindex")
+    }
+
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
         Ok(RefreshOutcome {
             revision: 1,

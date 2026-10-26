@@ -253,6 +253,10 @@ fn check_propagates_metadata_read_failure_after_graph_findings() {
 }
 
 impl<F: FnMut() -> DocumentResult<RefreshOutcome>> Refresher for Refresh<F> {
+    fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
+        panic!("this scenario must not trigger a full reindex")
+    }
+
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
         (self.0)()
     }

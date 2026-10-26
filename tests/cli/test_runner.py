@@ -178,6 +178,67 @@ class RunnerTests(unittest.TestCase):
             'PRODUCT_READING ' + json.dumps(record) + '\n' for record in records))
         run.capture_reading_responses(evidence, catalogue)
 
+    def test_handler_capture_distinguishes_status_from_reindex_revision(self):
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        records = [
+            {'exit': 0, 'response': {'ok': True, 'result': {'errors': []}}},
+            {'exit': 0, 'response': {'ok': True, 'result': {'snapshot': 'a' * 40, 'elements': {}}}},
+            {'exit': 0, 'response': {'ok': True, 'result': []}},
+            {'exit': 1, 'response': {'ok': False, 'error': {'code': 'internal_error', 'message': 'safe', 'details': {}}}},
+            {'exit': 0, 'response': {'ok': True, 'result': {'revision': 7, 'embedding_backlog': 2,
+                'embedding_failed': 1, 'locks': [], 'problems': []}}},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            (evidence / 'handlers.log').write_text(''.join(
+                'CLI_RESPONSE ' + json.dumps(r) + '\n' for r in records))
+            run.capture_handler_responses(evidence, catalogue)
+            observed = json.loads((evidence / 'handler-responses.json').read_text())
+            self.assertEqual(observed[-1]['command'], 'status')
+
+    def test_reindex_product_receipts_require_valid_actual_output(self):
+        from jsonschema import ValidationError
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            log = evidence / 'reindex.log'
+            log.write_text('PRODUCT_REINDEX {"ok":true,"result":{"revision":7}}\n')
+            run.capture_reindex_responses(evidence, catalogue)
+            observed = json.loads((evidence / 'product-reindex-responses.json').read_text())
+            self.assertEqual(observed[0]['response']['result'], {'revision': 7})
+            log.write_text('PRODUCT_REINDEX {"ok":true,"result":{"revision":"7"}}\n')
+            with self.assertRaises(ValidationError):
+                run.capture_reindex_responses(evidence, catalogue)
+            log.write_text('CLI_RESPONSE {"ok":true,"result":{"revision":7}}\n')
+            with self.assertRaises(AssertionError):
+                run.capture_reindex_responses(evidence, catalogue)
+
+    def test_handler_capture_validates_reindex_command_shape(self):
+        from jsonschema import ValidationError
+        root = Path(__file__).resolve().parents[2]
+        catalogue = json.loads((root / run.SCHEMA).read_text())
+        base = [
+            {'exit': 0, 'response': {'ok': True, 'result': {'errors': []}}},
+            {'exit': 0, 'response': {'ok': True, 'result': {'snapshot': 'a' * 40, 'elements': {}}}},
+            {'exit': 0, 'response': {'ok': True, 'result': []}},
+            {'exit': 1, 'response': {'ok': False, 'error': {'code': 'internal_error', 'message': 'safe', 'details': {}}}},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            def capture(result):
+                records = [*base, {'exit': 0, 'response': {'ok': True, 'result': result}}]
+                (evidence / 'handlers.log').write_text(''.join(
+                    'CLI_RESPONSE ' + json.dumps(r) + '\n' for r in records))
+                run.capture_handler_responses(evidence, catalogue)
+            capture({'revision': 7})
+            records = json.loads((evidence / 'handler-responses.json').read_text())
+            self.assertEqual(records[-1]['command'], 'reindex')
+            for invalid in ({'revision': '7'}, {'revision': 7, 'extra': 1}):
+                with self.assertRaises(ValidationError):
+                    capture(invalid)
+
     def test_transport_accepts_check_success_and_rejects_invalid_input_before_io(self):
         root = Path(__file__).resolve().parents[2]
         catalogue = json.loads((root / run.SCHEMA).read_text())
@@ -197,6 +258,9 @@ class RunnerTests(unittest.TestCase):
                 elif argv[1] == 'inspect' and stdin != b'{}':
                     (cwd / '.letopis').mkdir(exist_ok=True)
                     response = {'ok': False, 'error': {'code': 'not_found', 'message': 'unknown', 'details': {}}}
+                elif argv[1:] == ['reindex'] and stdin == b'{}':
+                    (cwd / '.letopis').mkdir(exist_ok=True)
+                    response = {'ok': True, 'result': {'revision': 1}}
                 elif argv[1] == 'search':
                     (cwd / '.letopis').mkdir(exist_ok=True)
                     response = {'ok': True, 'result': []}
@@ -215,6 +279,7 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(check_cases, [(b'{}', 0, True), (b'{"extra":1}', 1, False)])
             observed = json.loads((evidence / 'product-transport-responses.json').read_text())
             self.assertEqual(observed[0]['response'], {'ok': True, 'result': {'errors': []}})
+            self.assertTrue(any(r['command'] == 'reindex' and r['exit'] == 0 for r in observed))
             terminator = "\n{}\n"
             with self.assertRaises(AssertionError):
                 run.capture_transport(root, evidence, execute, Path('/product'), catalogue)
