@@ -2,6 +2,8 @@
 
 **Status:** DONE_WITH_CONCERNS. Implementation acceptance is complete on the tested host checkpoint; final independent whole-branch review and any follow-up belong to the controller. The concerns are unrun Linux/real-pilot gates, not observed host failures.
 
+The sections before “Review fix round 1” describe the historical `e2480abeebb1e1e1a0e3b3239e4352db9b283dbd` checkpoint. Their 204-input README-only delta statement is true for that checkpoint, not for the later executable workflow-helper revision. The durable combined report and current input map are under `docs/zkit/letopis/checks/TK-24/`.
+
 **Base:** `0f8f92b205f6db48a188cc130c5a6e1190512e3d`; Task 1 approved implementation/fix: `bb6b39e9ef5a60d2f65e3da2ec16d97a2c742865`.
 
 **Task 2 implementation commit:** `094c174accfe16d246645d780cd7717b3862dc9d` (skill, tests, CLI runner, workflow and README). The host runner captured its pre-commit dirty source at Task 1 HEAD and hashed all 205 inventoried inputs. That measured tree is byte-identical to the implementation commit except the README prose correction described below.
@@ -34,3 +36,19 @@ The fixed workflow checked write → check → search → traverse → mixed ins
 Task 2 changes no product `src/` file. Task 1's `InspectionService` remains in `src/service/inspection.rs` behind the application-owned `Inspector` from `src/service/mod.rs`; `src/cli/handlers.rs` delegates to that interface, `src/cli/output.rs` serializes the same metadata-only DTO and `src/lib.rs` retains concrete constructor wiring. No direct CLI-to-Git/storage call, new runtime, storage schema, or adapter layer was introduced. Domain remains I/O-free. This is a physical-file/import/visibility check in addition to fmt/Clippy, not a claim based only on lints.
 
 The proof covers host execution and fixed bytes. Linux, native storage runner, historical proof harnesses, real provider/model quality, resource targets, handled cancellation, TK-17/G-1/G-2 and TK-25–29/TK-44 are not claimed by this task. Native storage runner was not triggered because no storage/native/build input changed. Final whole-branch review, Engram write and any GitHub action remain controller-owned.
+
+## Review fix round 1 — 2026-10-26
+
+**Status:** implemented and focused verification PASS; independent rereview pending. Review input: `task-2-review.md`. Executable workflow fix commit: `5801e6b86227520e76008e71dfdd2c879de857a3`. New durable combined report and machine-readable verification are `docs/zkit/letopis/checks/TK-24/report.md` and adjacent `verification.json`; the task card now links to both. This scratch report and the original host/workflow receipts remain historical.
+
+`tests/cli/tk24_workflow.py` now has named `prepare_repository`, `verify_initial_read`, `verify_edited_source`, `verify_rename_and_repair`, `verify_user_git_state` and `run_workflow` phases with explicit state return. AST inspection found 13 functions, maximum 24 lines; `main` is 23 lines. The edited-source phase requires exactly `['source_changed']` on `knowledge/decision.md#cache`; the rename phase requires one `validation_failed` with `details.reason == 'dangling_target'`, `details.element_id == 'knowledge/referer.md'` and `details.target == 'knowledge/decision.md#cache'`. It also verifies the recheck filter empties after updating a verified basis. Git commands using the temporary index record `git_index_file` in the receipt.
+
+| Check | Result and evidence |
+| --- | --- |
+| Fresh actual workflow: `/Users/zdkadiev/.codex/worktrees/tk-14/letopis/.artifacts/tk14/python-env/bin/python -B tests/cli/tk24_workflow.py --binary /Users/zdkadiev/Repos/letopis/target/debug/letopis --evidence /private/tmp/tk24-workflow-fix1-green` | exit 0, `PASS`; `.artifacts/tk24/workflow-fix1/workflow.json` SHA-256 `b3bdb7314c2afb04a0e14867a0098a3eea3e23e80ebd489b72a7bf34eb0b6f9a`. Helper SHA-256 `79f0708c39784cebf57c6bb8b7f0d27159259284f4c946c30391030173a6794d`; executable SHA-256 `69769968563bd9fdf4fdd1ab527ffd22449e51a679638b4db40cbb9f6c043f98`, equal to captured host artifact. 30 commands; exact source flag and dangling diagnostic recorded; real index and HEAD identities unchanged. |
+| Controlled wrong source flag | In-memory return changed `flags` to `[]`; `verify_edited_source` raised the expected `AssertionError`. `.artifacts/tk24/workflow-fix1/control-source_changed.json` SHA-256 `a1698ea85077eca80bd86087b29a48cece7445655d368243a9117c77060cb080`. |
+| Controlled wrong dangling reason | In-memory return changed `details.reason` to `other_reason`; `verify_rename_and_repair` raised the expected `AssertionError`. `control-dangling_target.json` SHA-256 `fa92fa5c60b4ad5fa604b8ddc5152ab9cdca99f426b99e00cdfb51813d1e8dd3`. |
+| Post-control actual workflow | `/private/tmp/tk24-workflow-fix1-postcontrol` exit 0, `PASS`; retained `workflow-postcontrol.json` SHA-256 `791778c15e07a105228795f7840029ea6cb8cfa7016d29c64abdc34e497f55ed`, same helper hash. |
+| Prepared Python `-B -m unittest discover -s tests/cli -p test_runner.py` | 20 passed, 0 failed; exit 0. `git diff --check`, AST syntax and max-function-length checks pass. |
+
+The earlier full host manifest remains `PASS` for its measured input map. `.artifacts/tk24/workflow-fix1/input-map-delta.json` SHA-256 `4247f2ee31b52d0683162d2b1ad3aa3497b87adffb48df99679fa2cc0043255d` compares all 205 inputs: README `a06764c4...` → `062fd7db...`, executable helper `e9b76aa1...` → `79f0708c...`, other 203 byte-identical. Product and `tests/cli/run.py`/`test_runner.py` bytes match the measured tree. The helper change is executable and was rerun independently with two sensitivity controls; no unchanged full host product suite was repeated. This does not relabel the old manifest as covering the new helper.

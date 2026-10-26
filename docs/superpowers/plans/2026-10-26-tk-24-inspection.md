@@ -10,7 +10,7 @@
 
 **Spec:** [TK-24 inspection design](../specs/2026-10-26-tk-24-inspection-design.md).
 
-**State:** Approved by user “go” on 2026-10-26; explicit “go subagent” then selected Subagent-driven, superseding Native. User previously selected «по карточке» to skip design questions. Implementation in progress. Builder check: `/root/tk24_builder_check`, “nothing important left”.
+**State:** Approved by user “go” on 2026-10-26; explicit “go subagent” then selected Subagent-driven, superseding Native. User previously selected «по карточке» to skip design questions. Task 1/2 implementation and the Task 2 review fix are verified; independent Task 2 rereview and final whole-branch review remain pending. Builder check: `/root/tk24_builder_check`, “nothing important left”.
 
 ## Global Constraints
 
@@ -83,4 +83,4 @@ Spec requirements map to Task 1 for capture/current membership/metadata/memory/r
 
 ## Execution Handoff
 
-Historical preparation recommended **Native** because the tasks share one service and skill. The user subsequently approved the plan with “go” and explicitly selected **Subagent-driven** with “go subagent”; that choice superseded the recommendation. Task 1 implementation and rereview are approved. Task 2 implementation is committed at `094c174accfe16d246645d780cd7717b3862dc9d`; its final independent review and whole-branch review remain pending at this checkpoint.
+Historical preparation recommended **Native** because the tasks share one service and skill. The user subsequently approved the plan with “go” and explicitly selected **Subagent-driven** with “go subagent”; that choice superseded the recommendation. Task 1 implementation and rereview are approved. Task 2 implementation was committed at `094c174accfe16d246645d780cd7717b3862dc9d`; workflow review fix `5801e6b86227520e76008e71dfdd2c879de857a3` and focused proof are recorded in the [durable TK-24 report](../../zkit/letopis/checks/TK-24/report.md). Independent Task 2 rereview, final whole-branch review and Engram write remain controller-owned at this checkpoint; Steps 5/6 stay open until those actions finish.

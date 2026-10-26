@@ -1,0 +1,74 @@
+{
+  "status": "IMPLEMENTED_PENDING_FINAL_REVIEW",
+  "base_revision": "0f8f92b205f6db48a188cc130c5a6e1190512e3d",
+  "implementation_revisions": {
+    "task1": ["b58108825227734b9c947ae93d4e990e012d6d93", "bb6b39e9ef5a60d2f65e3da2ec16d97a2c742865"],
+    "task2": ["094c174accfe16d246645d780cd7717b3862dc9d", "e2480abeebb1e1e1a0e3b3239e4352db9b283dbd", "5801e6b86227520e76008e71dfdd2c879de857a3"]
+  },
+  "task1": {
+    "initial_red": {"command": "cargo test --locked --offline --test source_inspection", "compiled": true, "runtime_failures": 5, "evidence": ".artifacts/tk24/task1-01/red.log"},
+    "final_service_units": {"passed": 4, "failed": 0, "evidence": ".artifacts/tk24/task1-review-fix1/unit-final.log"},
+    "final_service_integrations": {"source_inspection_passed": 7, "knowledge_inspection_passed": 6, "failed": 0, "evidence": ".artifacts/tk24/task1-review-fix1/integration-final.log"},
+    "make_check_exit": 0,
+    "sensitivity_controls": ["source hash", "current membership", "marked source overlap", "final pin", "knowledge hash", "distinct ranges", "source I/O failure", "removed anchor"],
+    "product_source_sha256_restored": "e5f3d3a92e113bdbef1b4e3072040c56515d365fd1a6668c4c6a890eb6698370",
+    "independent_knowledge_hash": "e0e8e261083b8c8edbaefd4f06968f531205135e6b0d93f951fb635e3c71f5a8"
+  },
+  "task2": {
+    "focused_cli": {"command": "cargo test --locked --offline --test cli_reading binary_inspect_", "passed": 4, "failed": 0},
+    "python_collector": {"command": "/Users/zdkadiev/.codex/worktrees/tk-14/letopis/.artifacts/tk14/python-env/bin/python -B -m unittest discover -s tests/cli -p test_runner.py", "passed": 20, "failed": 0, "rerun_after_fix_exit": 0},
+    "compiled_product_hash_mutation": {"result": "exact CLI hash assertion failed at runtime", "restored_source_sha256": "e5f3d3a92e113bdbef1b4e3072040c56515d365fd1a6668c4c6a890eb6698370"},
+    "independent_cli_knowledge_hash": "f2a2c9bdcb99213d0d3b8c6775c4899d80deaea9b4a723b9ac3269cec156a95a",
+    "skill_sha256": "18a0efb6721f93cdd08d58b2d4e893b16f79a61e4c2b5f6f91ba145eb8531a18",
+    "skill_after_update_trial": "PASS reference application, not a product run or pilot"
+  },
+  "historical_host": {
+    "command": "CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target RUST_TEST_THREADS=2 /Users/zdkadiev/.codex/worktrees/tk-14/letopis/.artifacts/tk14/python-env/bin/python -B tests/cli/run.py --platform host --evidence .artifacts/tk24/host-20261026-task2",
+    "exit": 0,
+    "manifest_status": "PASS",
+    "manifest_sha256": "229530e986928de9db2f7670129e7995c2b4ed96fc87f0a2509c2e4d6b04ea00",
+    "manifest_path": ".artifacts/tk24/host-20261026-task2/manifest.json",
+    "input_count": 205,
+    "make_verify_exit": 0,
+    "debug": {"root_executables": 49, "doc_test_result_blocks": 1, "root_passed": 697, "root_failed": 0, "root_ignored": 5, "nested_helper_blocks": 8, "nested_helper_passed": 8},
+    "release": {"root_executables": 49, "doc_test_result_blocks": 1, "root_passed": 697, "root_failed": 0, "root_ignored": 5, "nested_helper_blocks": 8, "nested_helper_passed": 8},
+    "recorded_commands": 42,
+    "actual_product_reading_receipts": 15,
+    "actual_product_transport_receipts": 7,
+    "actual_product_thin_slice_receipts": 7,
+    "schema": "X-1 command-specific InspectOutput success/error"
+  },
+  "current_input_delta": {
+    "receipt": ".artifacts/tk24/workflow-fix1/input-map-delta.json",
+    "receipt_sha256": "4247f2ee31b52d0683162d2b1ad3aa3497b87adffb48df99679fa2cc0043255d",
+    "changed_inputs": {
+      "tests/cli/README.md": {"tested_sha256": "a06764c4bfc0b48a753d41a12efc3d5ddae30f38099ae485ccfb666fccc234f4", "current_sha256": "062fd7db416faff29df4e3a4e251e3823cc7112807f679dddd00e11419bfab88"},
+      "tests/cli/tk24_workflow.py": {"tested_sha256": "e9b76aa15d67329f1d8f4c5b041f1ca1d149d13e2b80f21a8a86c9e14f3693b4", "current_sha256": "79f0708c39784cebf57c6bb8b7f0d27159259284f4c946c30391030173a6794d"}
+    },
+    "unchanged_inputs": 203,
+    "product_and_runner_inputs_byte_identical": true,
+    "captured_and_current_product_executable_sha256": "69769968563bd9fdf4fdd1ab527ffd22449e51a679638b4db40cbb9f6c043f98"
+  },
+  "current_workflow": {
+    "command": "/Users/zdkadiev/.codex/worktrees/tk-14/letopis/.artifacts/tk14/python-env/bin/python -B tests/cli/tk24_workflow.py --binary /Users/zdkadiev/Repos/letopis/target/debug/letopis --evidence /private/tmp/tk24-workflow-fix1-green",
+    "exit": 0,
+    "status": "PASS",
+    "receipt": ".artifacts/tk24/workflow-fix1/workflow.json",
+    "receipt_sha256": "b3bdb7314c2afb04a0e14867a0098a3eea3e23e80ebd489b72a7bf34eb0b6f9a",
+    "helper_sha256": "79f0708c39784cebf57c6bb8b7f0d27159259284f4c946c30391030173a6794d",
+    "product_executable_sha256": "69769968563bd9fdf4fdd1ab527ffd22449e51a679638b4db40cbb9f6c043f98",
+    "observed_source_flags": ["source_changed"],
+    "observed_dangling_reason": "dangling_target",
+    "observed_dangling_target": "knowledge/decision.md#cache",
+    "initial_source_tree": "431b5aa46a31547b154cc3bb690b91df55d5d862",
+    "verified_edited_source_tree": "49ff923ee20c7e6506a0aab0c73dc6ed75dcae76",
+    "index_sha256_before_and_after": "b596266e9333a9e438aa11a65f1d1ecd63d425908482ae33800499f007f05dbe",
+    "head_oid_before_and_after": "936cd077a78e8705c5b4e44f2720ac41050eb9f9",
+    "controls": [
+      {"injection": "remove source_changed flag", "result": "expected AssertionError", "receipt": ".artifacts/tk24/workflow-fix1/control-source_changed.json"},
+      {"injection": "replace dangling_target reason", "result": "expected AssertionError", "receipt": ".artifacts/tk24/workflow-fix1/control-dangling_target.json"}
+    ],
+    "post_control_green": {"exit": 0, "receipt": ".artifacts/tk24/workflow-fix1/workflow-postcontrol.json", "receipt_sha256": "791778c15e07a105228795f7840029ea6cb8cfa7016d29c64abdc34e497f55ed"}
+  },
+  "not_run": ["Linux CLI runner", "native storage runner (no storage/native/build changes)", "historical proof harnesses", "real provider/model pilot", "handled cancellation", "G-1/G-2", "final whole-branch review"]
+}
