@@ -96,6 +96,21 @@ impl OwnedChild {
         self.0.id()
     }
 
+    /// Deliver SIGINT to this live owned child, retaining ownership until reaping.
+    ///
+    /// # Panics
+    /// Panics if the child already exited, its PID is invalid, or signaling fails.
+    pub fn send_sigint(&mut self) {
+        assert!(
+            self.0.try_wait().unwrap().is_none(),
+            "owned child already exited"
+        );
+        let pid = i32::try_from(self.0.id()).unwrap();
+        // SAFETY: the unreaped child is owned by this guard, so its PID cannot
+        // be reused before collection; signal only that process, not its group.
+        assert_eq!(unsafe { libc::kill(pid, libc::SIGINT) }, 0);
+    }
+
     /// Kill and reap this still-running owned process without consulting PID files.
     ///
     /// # Panics

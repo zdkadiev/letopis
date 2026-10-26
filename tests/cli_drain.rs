@@ -15,7 +15,10 @@ use letopis::{
 use serde_json::Value;
 use std::{
     fs,
-    os::unix::fs::{MetadataExt, symlink},
+    os::unix::{
+        fs::{MetadataExt, symlink},
+        process::ExitStatusExt,
+    },
     process::{Command, Stdio},
 };
 use support::embedding::{FixtureReply, HttpFixture, ResponseBarrier};
@@ -283,6 +286,63 @@ fn killed_product_releases_lock_and_preserves_reserved_budget() {
     assert_eq!(fixture.read_vector(&config, &hash), None);
     fixture.assert_no_work(&config);
     assert_eq!(http.take_requests().len(), 1);
+}
+
+#[test]
+fn sigint_preserves_attempt_budget_across_product_restarts() {
+    // Arrange: reserve the first of two attempts and block its actual HTTP response.
+    let fixture = Fixture::new();
+    let hash = fixture.publish("interrupted reservation token");
+    let barrier = ResponseBarrier::default();
+    let http = HttpFixture::start_sequence(vec![
+        FixtureReply::Barrier {
+            barrier: barrier.clone(),
+            body: SUCCESS.into(),
+        },
+        FixtureReply::Status {
+            status: 500,
+            body: SECRET.into(),
+        },
+        // Over-budget regressions must fail on counts, not a missing fixture response.
+        FixtureReply::Status {
+            status: 500,
+            body: SECRET.into(),
+        },
+    ]);
+    let config = fixture.write_config(&http.get_base_url(), 1);
+    let before = fixture.capture_corpus();
+    let mut child = fixture.spawn_drain();
+    barrier.wait_until_entered();
+    let reserved = fixture.read_failure(&config, &hash).unwrap();
+    assert_eq!(reserved.attempts, 1);
+    assert_eq!(reserved.error, None);
+    // Act: SIGINT the owned drain, reap it, and then release the server response.
+    child.send_sigint();
+    let interrupted = child.collect_output(WAIT);
+    assert_eq!(interrupted.status.signal(), Some(libc::SIGINT));
+    barrier.release();
+    // Assert: the interrupted request consumed its committed attempt.
+    assert_released(fixture.repo.get_root());
+    assert_eq!(fixture.read_failure(&config, &hash).unwrap().attempts, 1);
+    assert_eq!(fixture.read_vector(&config, &hash), None);
+    assert_eq!(http.take_requests().len(), 1);
+    // Act: a new process with unchanged configuration may consume only one more.
+    assert_success(&fixture.spawn_drain().collect_output(WAIT));
+    let failed = fixture.read_failure(&config, &hash).unwrap();
+    assert_eq!(failed.attempts, 2);
+    assert_eq!(
+        failed.error.as_deref(),
+        Some("embedding provider rejected request")
+    );
+    assert_eq!(http.take_requests().len(), 1);
+    assert_eq!(fixture.read_vector(&config, &hash), None);
+    // Assert: a third process cannot renew the exhausted budget.
+    assert_success(&fixture.spawn_drain().collect_output(WAIT));
+    assert!(http.take_requests().is_empty());
+    assert_eq!(fixture.read_failure(&config, &hash), Some(failed));
+    fixture.assert_no_work(&config);
+    assert_released(fixture.repo.get_root());
+    assert_eq!(fixture.capture_corpus(), before);
 }
 
 #[test]

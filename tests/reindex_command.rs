@@ -7,7 +7,10 @@ use letopis::{
 use serde_json::{Value, json};
 use std::process::Output;
 use std::{fs, process::Command};
-use support::provenance::{build_note, create_basis};
+use support::{
+    embedding::{FixtureReply, HttpFixture},
+    provenance::{build_note, create_basis},
+};
 use support::{git::isolate_command, reading::ReadingRepo};
 
 #[test]
@@ -148,6 +151,56 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
         fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap(),
         bytes
     );
+}
+
+#[test]
+fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
+    // Arrange: publish two hashes, seed exactly one vector, and close storage handles.
+    let repo = ReadingRepo::new();
+    repo.write_knowledge("a.md", "AlphaToken");
+    repo.write_knowledge("b.md", "BravoToken");
+    reindex(&repo);
+    let http = HttpFixture::start(FixtureReply::Status {
+        status: 200,
+        body: r#"{"model":"fixture","embeddings":[[0,1,0]]}"#.into(),
+    });
+    let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
+    repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0, 0.0])]);
+    let files = open_filesystem(repo.get_root()).unwrap();
+    let lock = files.try_lock_embed().unwrap().unwrap();
+    // Act: rebuild only the disposable cache while automatic embedding is excluded.
+    fs::remove_file(repo.get_root().join(".letopis/cache.db")).unwrap();
+    assert_eq!(reindex(&repo)["result"]["revision"], 1);
+    assert!(http.take_requests().is_empty());
+    drop(lock);
+    assert_eq!(
+        read_response(&repo.invoke(&["embed", "--drain"], b""), 0),
+        json!({"ok":true,"result":{}})
+    );
+    // Assert: no recomputation of a.md; its exact seed and the new vector both survive.
+    assert_eq!(
+        http.take_requests(),
+        vec![json!({
+            "model":"fixture", "input":["BravoToken"], "truncate":false
+        })]
+    );
+    let mut storage = repo.open_storage();
+    let mut read = storage.begin_read().unwrap();
+    for (id, vector) in [("a.md", vec![1., 0., 0.]), ("b.md", vec![0., 1., 0.])] {
+        let node = read
+            .read_node(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
+            .unwrap()
+            .unwrap();
+        let NodeMetadata::Knowledge(node) = node.metadata else {
+            panic!()
+        };
+        assert_eq!(
+            read.read_vector(&config.get_identity(), &node.search_hash)
+                .unwrap(),
+            VectorOutcome::Current(Some(vector)),
+            "{id}"
+        );
+    }
 }
 
 #[test]
