@@ -1,5 +1,5 @@
 {
-  "status": "DONE_HOST_VERIFIED_REVIEW_PENDING",
+  "status": "DONE_HOST_VERIFIED_REVIEWED",
   "base_commit": "913b2b7c043fa9b8df953b323659a73e74bdb742",
   "task1_commit": "fa87c973bb5dc64c8996dbc14a9306a3508fecbf",
   "branch": "tk-25",
@@ -162,9 +162,25 @@
     "Ruling: update only that negative-control anchor to the current collect_metadata call and prove the same mutant compiles/fails before exact restore — preserves coverage rather than dropping the unrelated failing check; no inspection product behavior changed.",
     "Ruling: prior prepared Python interpreter no longer exists; cached offline jsonschema resolution lacked rpds wheel. Prepared task-local ignored Python 3.12.14/jsonschema 4.26.0 environment before checks; Rust dependencies/schema unchanged. Resolved packages recorded separately; no checks download dependencies.",
     "Ruling: use CLI host runner's included make verify as the single final full verification, instead of running make verify twice consecutively — same complete checks and source inventory, less duplicate work.",
-    "Ruling: preserve failed host receipt and continue in a new evidence directory reusing only successful make-verify logs after verifying every inventoried input except the two edited Python collector/test files is byte-identical — unchanged Rust must not be retested merely for a Python receipt fix; incorrect reuse would risk stale evidence, prevented by exact whole-inventory comparison and explicit reused command provenance."
+    "Ruling: preserve failed host receipt and continue in a new evidence directory reusing only successful make-verify logs after verifying every inventoried input except the two edited Python collector/test files is byte-identical — unchanged Rust must not be retested merely for a Python receipt fix; incorrect reuse would risk stale evidence, prevented by exact whole-inventory comparison and explicit reused command provenance.",
+    "Final: Ruling: physical corruption remains TK-26 as explicitly scoped; readable-cache full projection rebuild is what users get — unreadable DB recovery remains unavailable until that task.",
+    "Final: Ruling: handled cancelled JSON remains TK-29 as explicitly scoped; native SIGINT rollback is verified — callers must not yet assume a cancelled envelope on signal death.",
+    "Final: Ruling: Linux/resource/pilot/release gates remain unassessed here; host functionality is ready — cross-platform and product qualification cannot be inferred from host tests."
   ],
-  "final_review": "pending; native execution requires fresh whole-branch reviewer",
+  "final_review": {
+    "reviewer": "/root/tk25_final_review",
+    "model": "gpt-6-astra",
+    "reasoning_effort": "high",
+    "base": "913b2b7c043fa9b8df953b323659a73e74bdb742",
+    "head": "0dfe83ceae8babd3f399fe43b69969a3db7f5367",
+    "verdict": "Ready to merge: Yes",
+    "critical": 0,
+    "important": 0,
+    "minor": 0,
+    "report": ".superpowers/sdd/2026-10-26-tk-25-reindex/final-review.md",
+    "report_sha256": "c5f3f67ecd6220d596420afeaf92e5988d5f00f05c30f80c180a0836fcf0b3be",
+    "independent_checks": "221 committed blobs, only two Python differences between phases, byte-identical reused root logs, git diff --check, clean tree; broad tests not rerun"
+  },
   "limits": [
     "Linux not run for TK-25 yet; no storage/native/build/schema changes.",
     "Native SIGINT death proves cache rollback, not TK-29 handled cancelled JSON.",
@@ -248,5 +264,13 @@
     "evidence": ".artifacts/tk25/host-final-20261026",
     "status": "FAIL in Python receipt classification after successful make verify; preserved",
     "resolution": "23 Python regressions passed after distinguishing status embedding fields; all other 219 inventoried inputs byte-identical, only make verify logs explicitly reused in fresh continuation."
+  },
+  "verified_implementation_commit": "0dfe83ceae8babd3f399fe43b69969a3db7f5367",
+  "acceptance": {
+    "initial_graph_fts_and_no_vector_wait": "PASS; evidence and independent review recorded",
+    "external_git_changes_without_watcher": "PASS; evidence and independent review recorded",
+    "precommit_failure_signal_rollback_and_basis_preservation": "PASS; evidence and independent review recorded",
+    "invalid_owner_valid_peer_and_subsequent_detection": "PASS; evidence and independent review recorded",
+    "hexagonal_structure": "PASS; evidence and independent review recorded"
   }
 }

@@ -1,6 +1,6 @@
 # TK-25 — полный reindex и Git detection
 
-**Состояние:** Task 1/2 реализованы и host-проверены; независимый review ещё впереди. Финальное закрытие карточки ожидает review.
+**Состояние:** DONE — Task 1/2 реализованы, host-проверены, независимый whole-branch review принят без замечаний. Ветка готова к слиянию; merge/push/закрытие GitHub issue не выполнялись.
 
 ## Поведение
 
@@ -39,3 +39,14 @@ TK-25 не реализует физическую corruption recovery (TK-26), 
 ## Решения исполнителя
 
 Все Ruling строки execution ledger также находятся в verification.json. Они фиксируют сохранение workspace/evidence, повторное использование test fixtures, изменение first-build контрольных точек после переноса capture под lock, отсутствие дублирующего make check только ради wrapper, восстановление stale negative-control anchor, замену удалённого Python окружения и единственный final make verify внутри host runner и прозрачное продолжение после исправления Python collector без повторного Rust-прогона.
+
+## Итоговое независимое review
+
+Fresh reviewer `/root/tk25_final_review` (gpt-6-astra/high) проверил весь диапазон
+`913b2b7..0dfe83c`: **Ready to merge: Yes**, Critical/Important/Minor — 0.
+Самостоятельно подтверждены 221 committed input hash, две Python-разницы между
+фазами, byte-identical reuse успешных root logs и чистота checkout. Broad tests
+reviewer не перезапускал. Продуктовых исправлений не запрошено.
+
+Все пять критериев карточки выполнены с указанными пределами. Final metadata
+closure меняет только документы; новые Rust-прогоны для него не требуются.
