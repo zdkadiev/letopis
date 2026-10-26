@@ -23,13 +23,13 @@ pub(super) fn collect_check_problems<R: StorageRead, G: GraphDiagnostics>(
 ) -> CommandResult<Vec<CommandProblem>> {
     let mut problems = graph.find_problems(view, paths)?;
     problems.extend(find_source_problems(view, paths, provenance)?);
-    sort_problems(&mut problems);
-    Ok(problems)
+    Ok(sort_problems(problems))
 }
 
-pub(super) fn sort_problems(problems: &mut Vec<CommandProblem>) {
+pub(super) fn sort_problems(mut problems: Vec<CommandProblem>) -> Vec<CommandProblem> {
     problems.sort_by(|left, right| get_sort_key(left).cmp(&get_sort_key(right)));
     problems.dedup_by(|left, right| get_sort_key(left) == get_sort_key(right));
+    problems
 }
 
 fn find_source_problems<R: StorageRead>(

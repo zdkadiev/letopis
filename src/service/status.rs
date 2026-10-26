@@ -69,7 +69,7 @@ impl<S: StatusStorage, G: GraphDiagnostics> StatusReader for StatusService<'_, S
             report.problems.push(problem);
         }
         report.locks = self.deps.files.observe_locks()?;
-        sort_problems(&mut report.problems);
+        report.problems = sort_problems(report.problems);
         Ok(report)
     }
 }
