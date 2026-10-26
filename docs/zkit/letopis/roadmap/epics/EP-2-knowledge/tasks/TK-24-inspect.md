@@ -1,6 +1,6 @@
 # TK-24 — Завершить batch inspect и навык чтения/записи
 
-> **Статус:** planned
+> **Статус:** done
 > **Эпик:** [EP-2](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 6 / 10 (best / expected / worst)
@@ -39,13 +39,13 @@
 
 ## 5. Критерии приёмки
 
-- [ ] Пакет ID читается по общему Git-снимку, unknown ID отклоняет весь запрос.
-- [ ] Актуальные собственные хеши/lines проверены; дополнительных полей flags в inspect нет.
-- [ ] Навык покрывает формат элемента (путь/якорь, метаданные, ссылки), check, search/traverse/inspect, source_snapshot средствами Git, переименование/висячие ссылки/перепроверку и обычные live reads; поздние reindex/config/status/cancel интегрируются в TK-29.
+- [x] Пакет ID читается по общему Git-снимку, unknown ID отклоняет весь запрос.
+- [x] Актуальные собственные хеши/lines проверены; дополнительных полей flags в inspect нет.
+- [x] Навык покрывает формат элемента (путь/якорь, метаданные, ссылки), check, search/traverse/inspect, source_snapshot средствами Git, переименование/висячие ссылки/перепроверку и обычные live reads; поздние reindex/config/status/cancel интегрируются в TK-29.
 
-- [ ] Смешанный batch знаний и source, повторные ID и исчезнувший в текущем tree элемент проверены: дубли однократны, unknown или исчезнувший ID отклоняет весь batch.
+- [x] Смешанный batch знаний и source, повторные ID и исчезнувший в текущем tree элемент проверены: дубли однократны, unknown или исчезнувший ID отклоняет весь batch.
 
-- [ ] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
+- [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
 ## 6. Как проверить
 
@@ -70,6 +70,8 @@
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
+Реализация: `bb6b39e9ef5a60d2f65e3da2ec16d97a2c742865` (Inspector, Task 1), `094c174accfe16d246645d780cd7717b3862dc9d` (CLI acceptance, portable skill, Task 2), `5801e6b86227520e76008e71dfdd2c879de857a3` (workflow fix по review). Финальный review на `374c31c` выявил I1 same-path race; исправление удерживает hash/absence первого наблюдения Markdown-кандидата и отклоняет изменённый source-read до pin. Чистый Task 2 rereview и M1 status correction отражены в текущем handoff. Общий долговечный отчёт и evidence index: [TK-24 report](../../../../checks/TK-24/report.md) и [verification.json](../../../../checks/TK-24/verification.json). Локальные task/review заметки под `.superpowers/sdd/2026-10-26-tk-24-inspection/` сохранены как история исполнения.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+Исторический host checkpoint `tests/cli/run.py --platform host` — PASS на своей зафиксированной input map: по 697 root tests passed, 0 failed, 5 ignored в debug и release. После I1 fix свежий host runner — PASS на новой карте 205 inputs, встроенный `make verify V=1` exit 0: по 702 root tests passed, 0 failed, 5 ignored в debug и release; вложенные child-helper вызовы посчитаны отдельно. Новый сохранённый executable SHA-256 `11782a47c81d7058204b98996ffcdfc8d32b79fc531b640aea2c1d1014dc8359`. Replay исходной гонки на нём: unchanged control exit 0; unmarked→marked и unmarked→invalid exit 1 с `internal_error`, без partial result, с неизменными index/HEAD. Текущий disposable workflow на том же executable — PASS с точными `source_changed` и `dangling_target`. Evidence: `.artifacts/tk24/host-20261026-final-fix1/`, `.artifacts/tk24/final-fix1/`; прежние receipts сохранены отдельно. Python collector tests: 20 passed на прежнем Task 2 checkpoint, повторно для I1 fix не запускались.
+
+Task 2 не менял `src/`; I1 fix меняет только `service/inspection.rs` и его private tests, сохраняя `Inspector` interface, CLI handler/output, domain и `lib.rs` composition root. Linux, native storage runner, реальная модель/пилот, handled cancellation, G-1/G-2 не объявлены проверенными. Native runner не требовался: storage/native/build входы не менялись. Итоговый scoped rereview `8c3719ed1dfba74f119bed28130f10325e7332d5` подтвердил I1/M1 ADDRESSED без новой поломки; функциональная приёмка и review завершены. Результаты и commit/evidence сохраняются в общем Engram. Ветка готова к выбору интеграции; main/GitHub publication не является частью этой приёмки.

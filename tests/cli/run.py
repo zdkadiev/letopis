@@ -148,6 +148,8 @@ def capture_reading_responses(evidence, catalogue):
     expected = {'search_success': ('search', 0, None),
                 'search_fallback': ('search', 0, None),
                 'inspect_success': ('inspect', 0, None),
+                'inspect_mixed': ('inspect', 0, None),
+                'inspect_removed': ('inspect', 1, 'not_found'),
                 'not_found': ('inspect', 1, 'not_found'),
                 'malformed_input': ('search', 1, 'invalid_request')}
     for line in (evidence / 'runtime.log').read_text().splitlines():
@@ -160,6 +162,16 @@ def capture_reading_responses(evidence, catalogue):
         assert (record['command'], record['exit']) == (command, code)
         if error:
             assert record['response']['error']['code'] == error
+        if record['case'] == 'inspect_mixed':
+            elements = record['response']['result']['elements']
+            assert set(elements) == {'knowledge.md', 'src/cache.rs#L2-L2',
+                                     'src/missing.rs', 'https://example.invalid/a?q=1#fragment'}
+            assert elements['src/cache.rs#L2-L2']['path'] == 'src/cache.rs'
+            assert elements['src/cache.rs#L2-L2']['lines'] == [2, 2]
+            assert elements['src/cache.rs#L2-L2']['hash'] is not None
+            assert elements['src/missing.rs'] == {'path': 'src/missing.rs', 'hash': None}
+            assert elements['https://example.invalid/a?q=1#fragment'] == {
+                'path': 'https://example.invalid/a?q=1#fragment', 'hash': None}
         responses.append({**record, 'source': 'actual product executable'})
     assert {record['case'] for record in responses} == set(expected)
     (evidence / 'product-reading-responses.json').write_text(json.dumps(responses, indent=2) + '\n')
@@ -285,7 +297,7 @@ def main():
                 'python': sys.version, 'commands': COMMANDS,
                 'environment': {k: os.environ[k] for k in ('PATH', 'CARGO_HOME', 'RUSTUP_HOME',
                    'CARGO_TARGET_DIR', 'RUSTFLAGS') if k in os.environ},
-                'limits': 'Real product check/search/knowledge inspect/drain with controlled local HTTP; full source inspection unavailable; no real model quality or x86 evidence.'}
+                'limits': 'Real product check/search/mixed inspect/drain with controlled local HTTP; no real model quality or unrun platform evidence.'}
 
     def execute(argv, name, *, cwd=root, extra=None, **kwargs):
         run_command(argv, cwd=cwd, env=child_environment(evidence, extra),

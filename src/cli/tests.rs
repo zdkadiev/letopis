@@ -160,7 +160,7 @@ mod transport_tests {
     use crate::run_cli;
     use crate::service::{
         BackgroundRunner, CheckReport, Checker, CommandError, CommandErrorKind, CommandProblem,
-        CommandResult, ElementAddress, InspectedElement, Inspection, Inspector,
+        CommandResult, ElementAddress, ElementLocation, InspectedElement, Inspection, Inspector,
     };
     use serde_json::{Value, json};
     use std::collections::BTreeMap;
@@ -222,7 +222,7 @@ mod transport_tests {
                     (
                         "a.md".into(),
                         InspectedElement {
-                            path: RepoPath::parse("a.md").unwrap(),
+                            path: ElementLocation::Local(RepoPath::parse("a.md").unwrap()),
                             lines: None,
                             hash: Some(Sha256::digest(b"private raw knowledge")),
                         },
@@ -230,7 +230,7 @@ mod transport_tests {
                     (
                         "source#L1-L2".into(),
                         InspectedElement {
-                            path: RepoPath::parse("source").unwrap(),
+                            path: ElementLocation::Local(RepoPath::parse("source").unwrap()),
                             lines: Some(LineRange::new(1, 2).unwrap()),
                             hash: None,
                         },

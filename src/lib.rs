@@ -175,7 +175,7 @@ pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
     })
 }
 
-/// Wire canonical current-knowledge inspection for the repository containing `start`.
+/// Wire canonical current knowledge/source inspection for the repository containing `start`.
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or setup failures.
