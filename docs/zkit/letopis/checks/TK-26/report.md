@@ -3,7 +3,7 @@
 Дата: 2026-10-26. Состояние карточки: **in_progress**. Утверждённая
 [спецификация](../../../../../docs/superpowers/specs/2026-10-26-tk-26-corruption-design.md)
 разделяет независимый этап A и интеграционный этап B. Этот отчёт подтверждает
-только A; итоговый независимый review ещё не завершён. TK-25 принята как
+только A; итоговый независимый review и scoped review исправления приняты. TK-25 принята как
 `e8eb1a2` и влита в main как `d265333`, но этот Stage A branch остаётся на своей
 проверенной базе и не потребляет новую реализацию.
 
@@ -174,3 +174,24 @@ G-1/G-2, TK-38/39 или готовность пилота. Все критер�
 должен зафиксировать её точную полную revision, реальные API и checkpoints.
 Никаких reindex stubs, auto-delete/repair, persistent corruption problems, merge,
 push, GitHub closure или Engram writes в этапе A нет.
+
+## Принятие этапа A
+
+Whole-branch review `913b2b7..2793f9b` приняло спецификацию этапа A, без
+Critical/Important findings. Единственное Minor — три уровня вложенных циклов —
+исправлено в `0fcf8bd`; scoped re-review подтвердило сохранение четырёх новых
+CLI-процессов и всех assertions, новых findings нет. Final source проверен
+focused `corruption_diagnostics` (2/2), fmt и Clippy; полная предыдущая verification
+сохраняет свой captured source и не выдаётся за повторный полный запуск на `0fcf8bd`.
+
+Исполнительские rulings: (1) healthy leaf содержит `CORRUPTION_CANARY`, чтобы
+anti-leak assertion проверяла реальный ввод; ошибочное решение потребует только
+переделки fixture/oracle. (2) запрет production changes означает запрет committed
+изменений: узкие временные mutations разрешены с exact restore; цена ошибки —
+восстановление локальных source bytes, без изменения TK-25 или продукта.
+
+Execution workspace с полными task reports, review packages и raw logs сохранён
+с SHA-256 manifest в `.artifacts/tk26/stage-a-execution-0fcf8bd/`. Ветка `tk-26`
+сохранена без слияния/публикации. Для B подготовлен отдельный
+[план восстановления](../../../../superpowers/plans/2026-10-26-tk-26-corruption-recovery.md),
+который пока требует утверждения.

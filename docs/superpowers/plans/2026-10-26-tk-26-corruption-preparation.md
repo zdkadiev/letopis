@@ -153,3 +153,5 @@ implementers, task-scoped reviews и независимое итоговое rev
 `e8eb1a2` и влита в main как `d265333`; этап B в этой ветке не интегрирован и не
 реализован. Для него требуется отдельный утверждённый integration plan с точной
 полной dependency revision.
+
+Этап A завершён: все task reviews и final review приняты; финальное стилевое исправление `0fcf8bd` прошло scoped review и focused тест. Полная verification сохраняет исходный source hash в отчёте. Ветка/worktree сохранены; merge/push/закрытие issue не выполнялись. Stage B — отдельный план на утверждении.
