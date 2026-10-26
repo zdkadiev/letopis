@@ -1,5 +1,5 @@
 {
-  "status": "IMPLEMENTED_PENDING_FINAL_REVIEW",
+  "status": "HOST_VERIFIED_PENDING_SCOPED_REREVIEW",
   "base_revision": "0f8f92b205f6db48a188cc130c5a6e1190512e3d",
   "implementation_revisions": {
     "task1": ["b58108825227734b9c947ae93d4e990e012d6d93", "bb6b39e9ef5a60d2f65e3da2ec16d97a2c742865"],
@@ -70,5 +70,18 @@
     ],
     "post_control_green": {"exit": 0, "receipt": ".artifacts/tk24/workflow-fix1/workflow-postcontrol.json", "receipt_sha256": "791778c15e07a105228795f7840029ea6cb8cfa7016d29c64abdc34e497f55ed"}
   },
-  "not_run": ["Linux CLI runner", "native storage runner (no storage/native/build changes)", "historical proof harnesses", "real provider/model pilot", "handled cancellation", "G-1/G-2", "final whole-branch review"]
+  "final_fix": {
+    "reviewed_revision": "374c31c5b5a4d190b7cf0d51659b62fc471ab33e",
+    "findings": ["I1 same-path unmarked candidate/source read race", "M1 stale Task 2 rereview status"],
+    "old_reproduction": {"receipt": ".artifacts/tk24/final-review-unmarked-race/original-receipt.json", "receipt_sha256": "d3ec1b92c5a70c5eef124cdd777b7a1d3da90b95498c669a735082c8482786d5", "binary_sha256": "69769968563bd9fdf4fdd1ab527ffd22449e51a679638b4db40cbb9f6c043f98", "marked_and_invalid_exit": 0},
+    "focused_red": {"command": "cargo test --locked --offline service::inspection::tests::inspect_ --lib -- --nocapture", "compiled": true, "runtime_failures": 3, "passed": 4, "evidence": ".artifacts/tk24/final-fix1/focused-red.log"},
+    "focused_green": {"same_command_passed": 8, "failed": 0, "evidence": ".artifacts/tk24/final-fix1/focused-green.log"},
+    "affected_integrations": {"command": "cargo test --locked --offline --test source_inspection --test knowledge_inspection --test cli_reading", "source_passed": 7, "knowledge_passed": 6, "cli_passed": 12, "failed": 0, "evidence": ".artifacts/tk24/final-fix1/focused-integration.log"},
+    "compiled_guard_mutation": {"change": "observed != later hash to observed == later hash", "result": "intended runtime regression failure after compile", "evidence": ".artifacts/tk24/final-fix1/compiled-mutation-fail.log", "restored_source_sha256": "c2b4246869289389d93b3979ab5638b17243204f1af9d9ca125448803edfbe49", "postmutation_passed": 8, "postmutation_evidence": ".artifacts/tk24/final-fix1/focused-postmutation-green.log"},
+    "fresh_host": {"command": "CARGO_TARGET_DIR=/Users/zdkadiev/Repos/letopis/target RUST_TEST_THREADS=2 /Users/zdkadiev/.codex/worktrees/tk-14/letopis/.artifacts/tk14/python-env/bin/python -B tests/cli/run.py --platform host --evidence .artifacts/tk24/host-20261026-final-fix1", "exit": 0, "status": "PASS", "manifest": ".artifacts/tk24/host-20261026-final-fix1/manifest.json", "manifest_sha256": "2ae328c0a8e139647ed71e489b7b249b23b53daf9ba95e41bb59a7c9c9b32fca", "inputs": 205, "commands": 42, "make_verify_exit": 0, "debug": {"root_executables": 49, "doc_test_result_blocks": 1, "passed": 702, "failed": 0, "ignored": 5, "nested_helper_blocks": 8}, "release": {"root_executables": 49, "doc_test_result_blocks": 1, "passed": 702, "failed": 0, "ignored": 5, "nested_helper_blocks": 8}, "copied_binary": ".artifacts/tk24/host-20261026-final-fix1/letopis", "copied_binary_sha256": "11782a47c81d7058204b98996ffcdfc8d32b79fc531b640aea2c1d1014dc8359"},
+    "fixed_replay": {"receipt": ".artifacts/tk24/final-fix1/replay-fixed/receipt.json", "receipt_sha256": "ff606f01bc045d95399e4b4860cb252143a704387fc30ec71cb2763fde1130b0", "binary_sha256": "11782a47c81d7058204b98996ffcdfc8d32b79fc531b640aea2c1d1014dc8359", "control_exit": 0, "marked_exit": 1, "invalid_exit": 1, "index_and_head_unchanged": true},
+    "current_workflow": {"receipt": ".artifacts/tk24/final-fix1/workflow-fixed/workflow.json", "receipt_sha256": "87c853ffb577bb4398b21638507e4d57bcfadc65c4bb824bbdcb2d72752b0e82", "status": "PASS", "binary_sha256": "11782a47c81d7058204b98996ffcdfc8d32b79fc531b640aea2c1d1014dc8359", "index_and_head_unchanged": true},
+    "scope_review": "pending on corrected revision; controller-owned"
+  },
+  "not_run": ["Linux CLI runner", "native storage runner (no storage/native/build changes)", "historical proof harnesses", "real provider/model pilot", "handled cancellation", "G-1/G-2", "scoped rereview of corrected revision"]
 }

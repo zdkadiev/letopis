@@ -10,7 +10,7 @@
 
 **Spec:** [TK-24 inspection design](../specs/2026-10-26-tk-24-inspection-design.md).
 
-**State:** Approved by user “go” on 2026-10-26; explicit “go subagent” then selected Subagent-driven, superseding Native. User previously selected «по карточке» to skip design questions. Task 1/2 implementation and the Task 2 review fix are verified; independent Task 2 rereview and final whole-branch review remain pending. Builder check: `/root/tk24_builder_check`, “nothing important left”.
+**State:** Approved by user “go” on 2026-10-26; explicit “go subagent” then selected Subagent-driven, superseding Native. User previously selected «по карточке» to skip design questions. Task 1/2 implementation and the Task 2 review fix are verified; independent Task 2 rereview found no remaining issues. Final whole-branch review at `374c31c` found I1 (same-path candidate/source read race); the focused correction, fresh host verification and copied-binary replay passed. Final scoped rereview of the corrected revision remains pending. Builder check: `/root/tk24_builder_check`, “nothing important left” at its earlier checkpoint.
 
 ## Global Constraints
 
@@ -20,6 +20,7 @@
 - No text, flags, revision, created_at, file_hash or edges in inspect. Knowledge/source ID is derived, never a UUID field in Markdown.
 - Unknown/removed knowledge fails the entire batch; referenced source with absent bytes returns null hash. Source without current declarations is unknown.
 - Metadata must match captured tree bytes. No SQL fallback for current hash/lines/membership, live reread of an already captured marked source path, or dependence on source_snapshot for current inspect bytes.
+- If a Markdown candidate was first read as unmarked or absent and later needed as a source, compare its later confined read with the first byte hash or absence. Reject a changed observation through a safe typed capture error before pin. Identical bytes remain valid. This I1 correction requires only bounded metadata; it does not add unrelated Git blobs or change cross-file temporal skew.
 - Retain one working file's bytes plus metadata/path/OID/reference collections, not whole corpus bytes. This is not a fixed RSS guarantee.
 - Keep functions near 40/max 60 lines, explicit AAA when useful, independent expected literals, named meaningful constants, verb names, smallest necessary visibility/generics/dispatch. KISS/DRY/YAGNI.
 - Preserve historical proof revisions; new evidence paths only. No paid pilot/model runs, main merge/push or GH closure in this plan without subsequent authorization. TK-17/G-1/G-2 and later task limits remain.
@@ -83,4 +84,4 @@ Spec requirements map to Task 1 for capture/current membership/metadata/memory/r
 
 ## Execution Handoff
 
-Historical preparation recommended **Native** because the tasks share one service and skill. The user subsequently approved the plan with “go” and explicitly selected **Subagent-driven** with “go subagent”; that choice superseded the recommendation. Task 1 implementation and rereview are approved. Task 2 implementation was committed at `094c174accfe16d246645d780cd7717b3862dc9d`; workflow review fix `5801e6b86227520e76008e71dfdd2c879de857a3` and focused proof are recorded in the [durable TK-24 report](../../zkit/letopis/checks/TK-24/report.md). Independent Task 2 rereview, final whole-branch review and Engram write remain controller-owned at this checkpoint; Steps 5/6 stay open until those actions finish.
+Historical preparation recommended **Native** because the tasks share one service and skill. The user subsequently approved the plan with “go” and explicitly selected **Subagent-driven** with “go subagent”; that choice superseded the recommendation. Task 1 implementation and rereview are approved. Task 2 implementation was committed at `094c174accfe16d246645d780cd7717b3862dc9d`; workflow review fix `5801e6b86227520e76008e71dfdd2c879de857a3`, focused proof and clean independent Task 2 rereview are recorded in the [durable TK-24 report](../../zkit/letopis/checks/TK-24/report.md). Final whole-branch review at `374c31c` found I1; the fix passed new host verification and copied-binary replay. A scoped rereview of the corrected revision and final bookkeeping remain controller-owned; Steps 5/6 stay open until those actions finish.

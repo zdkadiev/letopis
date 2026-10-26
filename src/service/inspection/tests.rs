@@ -15,6 +15,11 @@ const MARKED_SOURCE: &[u8] =
     b"<!-- letopis: {\"created_at\":1} -->\nBody\n[source](a.md#L2-L2 \"letopis:type=external\")\n";
 const MARKED_WITH_SOURCE: &[u8] =
     b"<!-- letopis: {\"created_at\":1} -->\nBody\n[source](source.txt \"letopis:type=external\")\n";
+const UNMARKED_SOURCE: &[u8] = b"PRIVATE_SOURCE_BYTES\n";
+const MARKED_REFERER: &[u8] =
+    b"<!-- letopis: {\"created_at\":1} -->\nReferer\n[source](a.md \"letopis:type=external\")\n";
+const CHANGED_MARKED_SOURCE: &[u8] =
+    b"<!-- letopis: {\"created_at\":1} -->\nKnowledge\n[more](second.txt \"letopis:type=external\")\n";
 type Events = Rc<RefCell<Vec<String>>>;
 struct RecordingDocuments(Events);
 struct RecordingGit(Events, Scenario);
@@ -25,6 +30,71 @@ enum Scenario {
     Overlap,
     PinFailure,
     SourceIoFailure,
+    UnmarkedToMarked,
+    UnmarkedToInvalid,
+    UnmarkedUnchanged,
+    AbsentToMarked,
+    AbsentUnchanged,
+}
+#[test]
+fn inspect_rejects_unmarked_candidate_changed_to_marked_source() {
+    assert_changed_candidate_is_rejected(Scenario::UnmarkedToMarked);
+}
+
+#[test]
+fn inspect_rejects_unmarked_candidate_changed_to_invalid_source() {
+    assert_changed_candidate_is_rejected(Scenario::UnmarkedToInvalid);
+}
+
+#[test]
+fn inspect_rejects_absent_candidate_changed_to_marked_source() {
+    assert_changed_candidate_is_rejected(Scenario::AbsentToMarked);
+}
+
+#[test]
+fn inspect_accepts_unchanged_unmarked_candidate_as_source() {
+    // Arrange
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let mut service = InspectionService::new(
+        RecordingDocuments(events.clone()),
+        RecordingGit(events.clone(), Scenario::UnmarkedUnchanged),
+        RecordingFiles(events.clone(), Scenario::UnmarkedUnchanged),
+        MarkdownParser::new(),
+    );
+    // Act
+    let result = service
+        .inspect(&[ElementAddress::parse("a.md").unwrap()])
+        .unwrap();
+    // Assert
+    assert_eq!(result.elements.len(), 1);
+    assert_eq!(
+        result.elements["a.md"].hash,
+        Some(
+            Sha256::parse("fd800c29fbc6251cd9c3ba805b5113832e21ae5e0e08853ddcbc53ea64339741")
+                .unwrap()
+        )
+    );
+    assert_eq!(events.borrow().last().map(String::as_str), Some("pin"));
+}
+
+#[test]
+fn inspect_keeps_absent_candidate_source_without_a_hash() {
+    // Arrange
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let mut service = InspectionService::new(
+        RecordingDocuments(events.clone()),
+        RecordingGit(events.clone(), Scenario::AbsentUnchanged),
+        RecordingFiles(events.clone(), Scenario::AbsentUnchanged),
+        MarkdownParser::new(),
+    );
+    // Act
+    let result = service
+        .inspect(&[ElementAddress::parse("a.md").unwrap()])
+        .unwrap();
+    // Assert
+    assert_eq!(result.elements.len(), 1);
+    assert_eq!(result.elements["a.md"].hash, None);
+    assert_eq!(events.borrow().last().map(String::as_str), Some("pin"));
 }
 #[test]
 fn capture_writes_each_blob_before_reading_the_next_file() {
@@ -148,6 +218,29 @@ fn inspect_fails_safely_when_declared_source_read_has_io_error() {
     );
 }
 
+fn assert_changed_candidate_is_rejected(scenario: Scenario) {
+    // Arrange
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let mut service = InspectionService::new(
+        RecordingDocuments(events.clone()),
+        RecordingGit(events.clone(), scenario),
+        RecordingFiles(events.clone(), scenario),
+        MarkdownParser::new(),
+    );
+    // Act
+    let error = service
+        .inspect(&[ElementAddress::parse("a.md").unwrap()])
+        .unwrap_err();
+    // Assert: a changed candidate must never produce a partial retained tree.
+    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+    assert_eq!(error.get_message(), "cannot capture current elements");
+    assert!(!error.to_string().contains("PRIVATE_SOURCE_BYTES"));
+    assert_eq!(
+        events.borrow().last().map(String::as_str),
+        Some("read a.md")
+    );
+}
+
 impl Refresher for RecordingDocuments {
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
         self.0.borrow_mut().push("refresh".into());
@@ -166,7 +259,14 @@ impl CorpusLister for RecordingGit {
         let paths = if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure) {
             &['a'][..]
         } else {
-            &['a', 'b']
+            &[
+                'a',
+                if self.1.uses_candidate_source() {
+                    'z'
+                } else {
+                    'b'
+                },
+            ]
         };
         Ok(paths
             .iter()
@@ -180,7 +280,9 @@ impl GitSnapshots for RecordingGit {
         panic!("capture must not retain bytes for create_tree")
     }
     fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
-        let name = if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure)
+        let name = if self.1.uses_candidate_source() {
+            if bytes == MARKED_REFERER { "d" } else { "a" }
+        } else if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure)
             || bytes.ends_with(b"a")
         {
             "a"
@@ -191,6 +293,14 @@ impl GitSnapshots for RecordingGit {
         Ok(BlobOid::parse(&name.repeat(40)).unwrap())
     }
     fn create_tree_from_blobs(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
+        if self.1.uses_candidate_source() {
+            assert_eq!(
+                entries.last().map(|entry| entry.path.as_str()),
+                Some("z.md")
+            );
+            self.0.borrow_mut().push("assemble".into());
+            return Ok(TreeOid::parse(&"c".repeat(40)).unwrap());
+        }
         if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure) {
             assert_eq!(entries.len(), 1);
             assert_eq!(entries[0].path.as_str(), "a.md");
@@ -248,10 +358,29 @@ impl FileSystem for RecordingFiles {
             ));
         }
         let read_again =
-            self.1 == Scenario::Overlap && self.0.borrow().iter().any(|event| event == "read a.md");
+            path.as_str() == "a.md" && self.0.borrow().iter().any(|event| event == "read a.md");
         self.0.borrow_mut().push(format!("read {}", path.as_str()));
+        if matches!(self.1, Scenario::AbsentToMarked | Scenario::AbsentUnchanged)
+            && (!read_again || self.1 == Scenario::AbsentUnchanged)
+            && path.as_str() == "a.md"
+        {
+            return Ok(None);
+        }
         let bytes = if read_again {
-            b"live edited after capture\n".to_vec()
+            match self.1 {
+                Scenario::UnmarkedToMarked | Scenario::AbsentToMarked => {
+                    CHANGED_MARKED_SOURCE.to_vec()
+                }
+                Scenario::UnmarkedToInvalid => {
+                    b"<!-- letopis: {broken} -->\nPRIVATE_SOURCE_BYTES\n".to_vec()
+                }
+                Scenario::UnmarkedUnchanged => UNMARKED_SOURCE.to_vec(),
+                _ => b"live edited after capture\n".to_vec(),
+            }
+        } else if self.1.uses_candidate_source() && path.as_str() == "a.md" {
+            UNMARKED_SOURCE.to_vec()
+        } else if self.1.uses_candidate_source() {
+            MARKED_REFERER.to_vec()
         } else if self.1 == Scenario::Overlap {
             MARKED_SOURCE.to_vec()
         } else if self.1 == Scenario::SourceIoFailure {
@@ -279,5 +408,18 @@ impl FileSystem for RecordingFiles {
     }
     fn lock_index(&self) -> DocumentResult<()> {
         panic!("capture must not own publication lock")
+    }
+}
+
+impl Scenario {
+    fn uses_candidate_source(self) -> bool {
+        matches!(
+            self,
+            Self::UnmarkedToMarked
+                | Self::UnmarkedToInvalid
+                | Self::UnmarkedUnchanged
+                | Self::AbsentToMarked
+                | Self::AbsentUnchanged
+        )
     }
 }

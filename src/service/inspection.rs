@@ -18,6 +18,7 @@ struct CapturedKnowledge {
     entries: BTreeMap<RepoPath, BlobOid>,
     elements: BTreeMap<String, InspectedElement>,
     sources: BTreeSet<SourceUri>,
+    observations: BTreeMap<RepoPath, Option<Sha256>>,
 }
 impl<D, G, F, M> InspectionService<D, G, F, M> {
     pub(crate) fn new(refresher: D, git: G, filesystem: F, markdown: M) -> Self {
@@ -40,11 +41,11 @@ impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileSystem, M: MarkdownCod
             .collect::<BTreeSet<_>>();
         let mut captured = CapturedKnowledge::default();
         for path in self.git.list_candidates().map_err(map_document_error)? {
-            if let Some(file) = self.capture_file(path, &requested)? {
-                captured.entries.extend(file.entries);
-                captured.elements.extend(file.elements);
-                captured.sources.extend(file.sources);
-            }
+            let file = self.capture_file(path, &requested)?;
+            captured.entries.extend(file.entries);
+            captured.elements.extend(file.elements);
+            captured.sources.extend(file.sources);
+            captured.observations.extend(file.observations);
         }
         captured.validate_membership(&requested)?;
         if !captured.sources.is_empty() {
@@ -64,13 +65,15 @@ impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G
         &self,
         path: RepoPath,
         requested: &BTreeSet<&str>,
-    ) -> CommandResult<Option<CapturedKnowledge>> {
+    ) -> CommandResult<CapturedKnowledge> {
+        let mut captured = CapturedKnowledge::default();
         let Some(file) = self
             .filesystem
             .read_file(&path)
             .map_err(map_document_error)?
         else {
-            return Ok(None);
+            captured.observations.insert(path, None);
+            return Ok(captured);
         };
         let parsed = self.markdown.parse_file(&path, &file.bytes).map_err(|_| {
             CommandError::new(
@@ -79,16 +82,18 @@ impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G
             )
         })?;
         let Some(parsed) = parsed else {
-            return Ok(None);
+            captured
+                .observations
+                .insert(path, Some(Sha256::digest(&file.bytes)));
+            return Ok(captured);
         };
         let oid = self
             .git
             .write_blob(&file.bytes)
             .map_err(map_snapshot_error)?;
-        let mut captured = CapturedKnowledge::default();
         captured.collect_metadata(&path, parsed, requested);
         captured.entries.insert(path, oid);
-        Ok(Some(captured))
+        Ok(captured)
     }
 
     fn capture_sources(
@@ -99,7 +104,7 @@ impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G
         let corpus = self.assemble_tree(&captured)?;
         captured.collect_remote_metadata(requested);
         for (path, sources) in captured.group_local_sources() {
-            let bytes = self.capture_source_bytes(&corpus, &captured.entries, &path)?;
+            let bytes = self.capture_source_bytes(&corpus, &captured, &path)?;
             if let Some(bytes) = &bytes
                 && !captured.entries.contains_key(&path)
             {
@@ -128,22 +133,31 @@ impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G
     fn capture_source_bytes(
         &self,
         corpus: &TreeOid,
-        entries: &BTreeMap<RepoPath, BlobOid>,
+        captured: &CapturedKnowledge,
         path: &RepoPath,
     ) -> CommandResult<Option<Vec<u8>>> {
         // A marked source may change live after capture: reuse its immutable blob.
-        if entries.contains_key(path) {
+        if captured.entries.contains_key(path) {
             return self
                 .git
                 .read_blob(corpus, path)
                 .map(Some)
                 .map_err(map_snapshot_error);
         }
-        Ok(self
+        let bytes = self
             .filesystem
             .read_file(path)
             .map_err(map_document_error)?
-            .map(|file| file.bytes))
+            .map(|file| file.bytes);
+        if let Some(observed) = captured.observations.get(path)
+            && *observed != bytes.as_deref().map(Sha256::digest)
+        {
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "cannot capture current elements",
+            ));
+        }
+        Ok(bytes)
     }
 }
 impl CapturedKnowledge {
