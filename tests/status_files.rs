@@ -24,7 +24,7 @@ impl Fixture {
         Self(path)
     }
 
-    fn lock_path(&self, name: &str) -> PathBuf {
+    fn get_lock_path(&self, name: &str) -> PathBuf {
         self.0.join(".letopis").join(name)
     }
 }
@@ -70,7 +70,7 @@ fn reports_busy_recorded_pid() {
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let child = Owner::spawn(&fixture.0, "index.lock", "self");
-    let lock_path = fixture.lock_path("index.lock");
+    let lock_path = fixture.get_lock_path("index.lock");
     let original_bytes = fs::read(&lock_path).unwrap();
     let original_inode = fs::metadata(&lock_path).unwrap().ino();
     let files = open_status_files(&fixture.0).unwrap();
@@ -90,7 +90,7 @@ fn reports_busy_recorded_pid() {
 fn ignores_stale_unlocked_pid() {
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
-    let lock_path = fixture.lock_path("index.lock");
+    let lock_path = fixture.get_lock_path("index.lock");
     fs::write(&lock_path, b"999999\n").unwrap();
     let files = open_status_files(&fixture.0).unwrap();
 
@@ -104,7 +104,7 @@ fn ignores_stale_unlocked_pid() {
 fn does_not_write_probe_pid() {
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
-    let lock_path = fixture.lock_path("embed.lock");
+    let lock_path = fixture.get_lock_path("embed.lock");
     fs::write(&lock_path, b"42\n").unwrap();
     let inode = fs::metadata(&lock_path).unwrap().ino();
     let files = open_status_files(&fixture.0).unwrap();
@@ -153,9 +153,9 @@ fn rejects_symlink_and_inode_replacement() {
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let files = open_status_files(&fixture.0).unwrap();
     assert!(files.observe_locks().unwrap().is_empty());
-    symlink("/dev/null", fixture.lock_path("index.lock")).unwrap();
+    symlink("/dev/null", fixture.get_lock_path("index.lock")).unwrap();
     assert!(files.observe_locks().is_err());
-    fs::remove_file(fixture.lock_path("index.lock")).unwrap();
+    fs::remove_file(fixture.get_lock_path("index.lock")).unwrap();
     fs::rename(fixture.0.join(".letopis"), fixture.0.join("old-service")).unwrap();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     assert!(files.observe_locks().is_err());
