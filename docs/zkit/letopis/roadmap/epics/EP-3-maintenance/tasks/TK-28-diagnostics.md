@@ -78,6 +78,7 @@ graph/source проблемами и best-effort busy-lock PID. Реальный
 
 Задача остаётся `in_progress`: TK-26-specific corruption/storage acceptance и
 TK-27-specific embedding lifecycle/exhaustion acceptance не выводятся из component
-tests и всё ещё pending; независимое финальное ревью также не завершено. Поэтому
-остальные составные критерии и архитектурная приёмка пока не отмечены, а Linux
+tests и всё ещё pending. Финальное whole-branch review не нашло Critical/Important
+замечаний; два test-style замечания исправлены в `6f8e181`, scoped re-review pending.
+Поэтому остальные составные критерии и архитектурная приёмка пока не отмечены, а Linux
 native/schema/standalone acceptance на этом source не объявляется PASS.

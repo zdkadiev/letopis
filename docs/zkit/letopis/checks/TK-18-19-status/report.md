@@ -3,10 +3,12 @@
 ## Current disposition
 
 The observational `status` implementation and its host verification are complete at
-product source `96639e7046271bc6507760eb02c056a4ccdc6658`. The required Linux
-runner was attempted on the same exact input map but did not pass because Docker's
-`overlay2` filesystem became read-only. Independent final whole-branch review is
-still pending. This report therefore does not mark TK-18, TK-19 or TK-28 done.
+product source `96639e7046271bc6507760eb02c056a4ccdc6658`. Independent final
+whole-branch review at `bd755c6` approved the source integration with no Critical or
+Important finding. Its two nonblocking test-style findings are fixed in test-only
+commit `6f8e181`; scoped fix re-review remains pending. The required Linux runner was
+attempted on the exact native input map but did not pass. This report therefore does
+not mark TK-18, TK-19 or TK-28 done.
 
 No merge, push, GitHub edit, Engram write, paid inference, pilot, TK-16/17 or G-1/G-2
 claim is part of this handoff.
@@ -55,6 +57,9 @@ PID bytes are not reported as a held lock.
 - Tasks 3/4 have fresh green receipts and caught/restored behavior-changing mutations,
   but no reliable retained original implementation RED chronology. Those receipts do
   not retroactively establish test-first order.
+- Final review found no Critical/Important code or architecture defect. Test-only
+  cleanup `6f8e181` replaces one wildcard import with explicit names and renames the
+  custom `lock_path` accessor to `get_lock_path`; no product behavior changed.
 
 The plan-scoped reports and receipts are retained under
 `.artifacts/tk18-19-status/sdd-final-96639e7/`. Final native receipts are under
@@ -84,7 +89,7 @@ strict Rustdoc and all root tests passed.
 | Platform | Result | Captured evidence |
 | --- | --- | --- |
 | macOS arm64 host | **PASS**; all 16 manifest commands exited 0 | Schema parity; 10/10 runner tests; debug/release 730/0/5 each; explicit deadline 1/0 in 60.01 s; SQLite 3.53.2, vec1 0.8 NEON/multi-threaded; native probe, copied standalone executable and linkage passed. Executable SHA-256: `c3f911da1c8d74c87dd627adfe72da3f8faf0514965f0f486802966cba9b0559`. |
-| Linux arm64 Docker | **FAIL / platform acceptance unavailable** | Image build and inspect passed. Inner `make verify V=1` exited 2 after Docker storage became read-only; writing `/receipt/manifest.json` failed with `EROFS`. Receipt copy and owned-container cleanup also failed with `overlay2` read-only errors. Owned container `letopis-tk9-29c587e3f9184a4cad1bd3b39462bfef-run` is dead, exit 1, not OOM-killed. No complete inner profile/native/standalone result exists and none is claimed. |
+| Linux arm64 Docker | **FAIL / platform acceptance unavailable** | Image build and inspect passed. Inner `make verify V=1` exited 2; its step log was not recovered, so the precise failed make step and cause are unavailable. Writing `/receipt/manifest.json` then failed with `EROFS`; receipt copy and owned-container cleanup also failed with `overlay2` read-only errors. Owned container `letopis-tk9-29c587e3f9184a4cad1bd3b39462bfef-run` is dead, exit 1, not OOM-killed. No complete inner profile/native/standalone result exists and none is claimed. |
 
 At the Linux failure the host data volume had 117 MiB available. The task had already
 removed only this worktree's inactive, rebuildable 1.2 GiB `target/` cache; no other
@@ -102,6 +107,26 @@ SHA-256 of each input map is
 the maps compare equal. Their `source-dirty.log` contains only the controller-owned
 plan approval/checklist edit. Exact maps and command exits remain in the two manifests.
 Later report/card commits must not be relabeled as the native source revision.
+
+Final test-only cleanup commit `6f8e181` changes exactly
+`src/service/status/tests/configuration.rs` and `tests/status_files.rs`. Its 330-entry
+input map hashes to
+`58180dd3fc3e3bd762e528950b49d222309be8082adf83e396aabe7a909c13dc`;
+the other 328 native inputs are byte-identical. Formatting, status 8/0, status-files
+9/0 and `make check` pass on these bytes. Per the controller ruling, native/release
+acceptance was not duplicated for test-style-only changes.
+
+## Preserved implementation rulings
+
+- All `StatusFiles::read_config` failures are represented as one safe invalid/unreadable
+  configuration finding. The confined reader cannot escape its root; storage, lock and
+  provenance observation failures remain command errors. A future need to distinguish
+  path-security classes would require a typed split rather than interpreting the current
+  embedding error kind.
+- Tasks 3/4 were implemented and reviewed as one unit because the private borrowed
+  `StatusService` could not be meaningfully production-reachable before the same-call
+  `lib.rs`/CLI composition. Splitting them would have required an unused allowance or an
+  artificial public wrapper; neither abstraction was added.
 
 ## Architecture review
 
@@ -127,14 +152,16 @@ Later report/card commits must not be relabeled as the native source revision.
   the existing composition root, whose status assembly is one direct function.
 
 This physical/import/visibility/trait/composition review found no self-review issue.
-Independent final whole-branch review remains the open review gate.
+The independent final whole-branch review agreed: no Critical/Important source or
+architecture finding. Its two test-style findings are fixed in `6f8e181`; scoped
+fix re-review is the remaining review action.
 
 ## Remaining gates
 
-- Controller-owned independent final review is pending; TK-18/19 remain `in_progress`
-  until its disposition.
-- Linux native/schema/standalone acceptance is not PASS for this source because of the
-  retained Docker storage failure above.
+- Controller-owned scoped re-review of test-only fix `6f8e181` is pending. TK-18/19
+  remain `in_progress` regardless because the required Linux gate is unavailable.
+- Linux native/schema/standalone acceptance is not PASS for this source because the
+  complete receipt is unavailable after the retained Docker storage failure above.
 - TK-28 is `in_progress`. The current status surface is delivered, but TK-26-specific
   corruption/storage acceptance and TK-27-specific embedding lifecycle/exhaustion
   acceptance remain prerequisites; this report does not infer them from component tests.
