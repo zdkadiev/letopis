@@ -1,6 +1,6 @@
 # TK-18/19 follow-up: current status diagnostics
 
-Date: 2026-10-26. State: proposed design, awaiting specification approval.
+Date: 2026-10-26. State: approved by the user on 2026-10-26 ("go on").
 Branch: `tk-18-19-status`, based on published main `0f8f92b`.
 
 ## Intent and agreed scope
@@ -170,5 +170,6 @@ above resolve each explicitly without a new schema or coordination protocol.
 
 ## Approval
 
-Scope approved in chat. Proposed freshness, unavailable-config counting and busy
-lock/PID error policies above require specification approval before product code.
+Scope and full specification approved in chat on 2026-10-26. Freshness,
+unavailable-config counting and best-effort lock/PID policies above are accepted.
+Implementation plan requires review before product code.
