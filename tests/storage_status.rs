@@ -4,8 +4,8 @@ use letopis::{
     domain::Sha256,
     open_status_storage, open_storage,
     service::{
-        CacheWrite, EmbeddingStatusPolicy, StatusStorage, Storage, StorageRead, VectorOutcome,
-        VectorWrite,
+        CacheWrite, EmbeddingStatusPolicy, StatusStorage, Storage, StorageErrorKind, StorageRead,
+        VectorOutcome, VectorWrite,
     },
 };
 use rusqlite::Connection;
@@ -275,6 +275,41 @@ fn rejects_unsafe_paths_and_existing_invalid_schemas() {
     let pinned = File::open(root.path()).unwrap();
     let different = TempDir::new().unwrap();
     assert!(open_status_storage(&different.path().canonicalize().unwrap(), &pinned).is_err());
+}
+
+#[test]
+fn rejects_current_vector_key_without_native_row() {
+    // Arrange a published current hash whose key has no corresponding native vector.
+    let root = TempDir::new().unwrap();
+    let identity = Sha256::digest(b"model");
+    let hash = Sha256::digest(b"A");
+    let mut writer = open_writer(root.path());
+    writer.reset_vectors(&identity).unwrap();
+    publish(&mut writer, &[("a.md", "A")]);
+    let connection = Connection::open(root.path().join("vectors.db")).unwrap();
+    connection
+        .execute(
+            "INSERT INTO vector_keys(search_hash) VALUES(?1)",
+            [hash.to_hex()],
+        )
+        .unwrap();
+    let pinned = File::open(root.path()).unwrap();
+    let mut status = open_status_storage(&root.path().canonicalize().unwrap(), &pinned).unwrap();
+    let mut read = status.begin_status_read().unwrap().unwrap();
+    // Act.
+    let unavailable = read
+        .read_embedding_status(&EmbeddingStatusPolicy::Unavailable)
+        .unwrap();
+    let error = read
+        .read_embedding_status(&ready_policy(identity))
+        .unwrap_err();
+    let vector_error = read.read_vector(&identity, &hash).unwrap_err();
+    // Assert configuration-unavailable counting ignores old vectors, but ready coverage fails safely.
+    assert_eq!((unavailable.backlog, unavailable.failed), (1, 0));
+    assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
+    assert_eq!(error.get_message(), "invalid stored vector data");
+    assert_eq!(vector_error.get_kind(), StorageErrorKind::InternalError);
+    assert_eq!(vector_error.get_message(), "invalid stored vector data");
 }
 
 fn open_writer(root: &Path) -> impl Storage + use<> {

@@ -50,8 +50,10 @@ pub trait Storage {
 }
 /// Observation-only access to an optional published cache.
 ///
-/// Implementations never create persistent state, repair schemas, reset vector
-/// identity or acquire a writer. Missing publication is distinct from read failure.
+/// Implementations never create durable databases, bootstrap or repair schemas,
+/// change configuration or vector identity, or acquire a database writer. Ordinary
+/// read-side journal/shared-memory files may still be managed by the database engine.
+/// Missing publication is distinct from read failure.
 pub trait StatusStorage {
     /// One exclusively borrowed consistent database view.
     type Read<'a>: StorageRead

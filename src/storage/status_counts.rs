@@ -1,7 +1,8 @@
 use super::{
     connection::map_sqlite,
     graph::{SOURCE_KIND, map_invalid_value},
-    query::{EmbedFailures, Nodes, Schemas, VectorKeys, build_query},
+    query::{EmbedFailures, Nodes, Schemas, VectorIndex, VectorKeys, build_query},
+    vectors::fail_invalid_stored_vector,
 };
 use crate::{
     domain::Sha256,
@@ -10,8 +11,8 @@ use crate::{
         StorageErrorKind, StorageResult,
     },
 };
-use rusqlite::{Connection, params_from_iter};
-use sea_query::{Expr, ExprTrait, Order, Query, SelectStatement};
+use rusqlite::{Connection, OptionalExtension, params_from_iter};
+use sea_query::{Expr, ExprTrait, JoinType, Order, Query, SelectStatement};
 
 #[derive(Clone, Copy)]
 enum HashCoverage {
@@ -49,6 +50,7 @@ pub(super) fn read_embedding_status(
             exhausted: vec![],
         });
     }
+    verify_current_vectors(connection)?;
     let covered = count_hashes(connection, HashCoverage::Stored)?;
     let exhausted = read_current_failures(connection, *max_attempts)?;
     let failed = u64::try_from(exhausted.len()).map_err(map_invalid_value)?;
@@ -66,6 +68,41 @@ pub(super) fn read_embedding_status(
         failed,
         exhausted,
     })
+}
+
+fn verify_current_vectors(connection: &Connection) -> StorageResult<()> {
+    let (sql, values) = build_query(
+        Query::select()
+            .column((VectorKeys::Table, VectorKeys::RowId))
+            .from((Schemas::Vec, VectorKeys::Table))
+            .join(
+                JoinType::LeftJoin,
+                (Schemas::Vec, VectorIndex::Table),
+                Expr::col((VectorIndex::Table, VectorIndex::Rowid))
+                    .equals((VectorKeys::Table, VectorKeys::RowId)),
+            )
+            .and_where(Expr::col((VectorIndex::Table, VectorIndex::Rowid)).is_null())
+            .and_where(Expr::exists(
+                Query::select()
+                    .expr(Expr::val(1))
+                    .from(Nodes::Table)
+                    .and_where(Expr::col(Nodes::Kind).ne(SOURCE_KIND))
+                    .and_where(
+                        Expr::col((Nodes::Table, Nodes::SearchHash))
+                            .equals((VectorKeys::Table, VectorKeys::SearchHash)),
+                    )
+                    .to_owned(),
+            ))
+            .limit(1),
+    )?;
+    let invalid: Option<i64> = connection
+        .query_row(&sql, params_from_iter(values), |row| row.get(0))
+        .optional()
+        .map_err(map_sqlite)?;
+    if invalid.is_some() {
+        return Err(fail_invalid_stored_vector());
+    }
+    Ok(())
 }
 
 fn count_hashes(connection: &Connection, coverage: HashCoverage) -> StorageResult<u64> {
