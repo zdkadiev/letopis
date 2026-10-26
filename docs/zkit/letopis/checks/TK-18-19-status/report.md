@@ -232,3 +232,13 @@ fix re-review approved both changes with no new Critical/Important finding.
 - TK-16/17, TK-26/27, G-1/G-2, paid/model/pilot/resource, Docker overlay health,
   power-loss/durability and minimum-hardware readiness remain unchanged.
 - Merge, push and GitHub issue updates are separate controller publication actions.
+
+## Main integration verification
+
+Merged into clean `main` as `da10cabc8620b190f6325ee953417561aa09c0c5`,
+with a tracked tree identical to feature closure `c8ee8f0`. Fresh merged-main
+`make check V=1` passed: 748 successful executions, 0 failed, 5 ignored
+(61 complete result-summary blocks, including nested children).
+All 333 source/build/test inputs match verified `ad81a8c`, canonical map SHA-256
+`aab63834ebc8fb093780736680fbae936b7c83f6ed9782cd7dde5f7bf77555c6`.
+The subsequent integration-note/card edits are documentation-only.
