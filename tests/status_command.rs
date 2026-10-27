@@ -7,6 +7,7 @@ use std::{
     io::{ErrorKind, Write},
     net::TcpListener,
     os::unix::fs::symlink,
+    path::PathBuf,
     time::Instant,
 };
 use support::reading::ReadingRepo;
@@ -285,19 +286,10 @@ fn status_reports_busy_index_lock_without_waiting_or_writing_pid() {
 }
 
 #[test]
-fn drain_start_failure_warns_without_persisting_and_keeps_fts() {
+fn drain_start_failure_warns_and_keeps_fts() {
     // Given: pending embedding work, a valid config, and an unsafe embed lock.
     let repo = ReadingRepo::new();
-    repo.write_knowledge("known.md", "needle");
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    listener.set_nonblocking(true).unwrap();
-    let url = format!("http://{}/api", listener.local_addr().unwrap());
-    repo.write_config("ollama", &url, "fixture");
-    let outside = tempfile::tempdir().unwrap();
-    let canary = outside.path().join("embed-canary");
-    fs::write(&canary, b"DRAIN_CANARY").unwrap();
-    let lock = repo.get_root().join(".letopis/embed.lock");
-    symlink(&canary, &lock).unwrap();
+    let (_outside, canary, listener) = prepare_failed_drain(&repo);
 
     // When: a real product search runs and the drain cannot start.
     let output = repo.invoke(
@@ -323,11 +315,24 @@ fn drain_start_failure_warns_without_persisting_and_keeps_fts() {
     assert!(matches!(listener.accept(), Err(error) if error.kind() == ErrorKind::WouldBlock));
     assert_eq!(fs::read(&canary).unwrap(), b"DRAIN_CANARY");
     assert!(!String::from_utf8_lossy(&output.stdout).contains("DRAIN_CANARY"));
+}
 
-    // Given: the injected lock fault is removed.
-    fs::remove_file(&lock).unwrap();
-    // When / Then: a fresh status contains no persisted launch warning.
+#[test]
+fn drain_start_failure_is_absent_from_status() {
+    // Given: a search that could not start the drain.
+    let repo = ReadingRepo::new();
+    let (_outside, canary, _listener) = prepare_failed_drain(&repo);
+    let output = repo.invoke(
+        &["search"],
+        json!({"query":"needle","limit":10}).to_string().as_bytes(),
+    );
+    assert!(output.status.success(), "{output:?}");
+
+    // When: the lock fault is removed and status is read afresh.
+    fs::remove_file(repo.get_root().join(".letopis/embed.lock")).unwrap();
     let status = read_status(&repo);
+
+    // Then: no launch warning is persisted and the canary is untouched.
     assert_eq!(status["result"]["problems"], json!([]));
     assert!(
         !status
@@ -335,6 +340,20 @@ fn drain_start_failure_warns_without_persisting_and_keeps_fts() {
             .contains("cannot start background embedding drain")
     );
     assert_eq!(fs::read(&canary).unwrap(), b"DRAIN_CANARY");
+}
+
+fn prepare_failed_drain(repo: &ReadingRepo) -> (tempfile::TempDir, PathBuf, TcpListener) {
+    repo.write_knowledge("known.md", "needle");
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let url = format!("http://{}/api", listener.local_addr().unwrap());
+    repo.write_config("ollama", &url, "fixture");
+    let outside = tempfile::tempdir().unwrap();
+    let canary = outside.path().join("embed-canary");
+    fs::write(&canary, b"DRAIN_CANARY").unwrap();
+    let lock = repo.get_root().join(".letopis/embed.lock");
+    symlink(&canary, &lock).unwrap();
+    (outside, canary, listener)
 }
 
 fn seed_diagnostic_files(repo: &ReadingRepo) {
