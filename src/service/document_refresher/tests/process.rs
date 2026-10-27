@@ -6,11 +6,11 @@ use crate::{
     git::GitCli,
     markdown::MarkdownParser,
     service::{
-        CacheWrite, EmbeddingFailure, FileRow, FileSystem, NodeMetadata, ProvenanceService,
-        QueryError, Refresher, Storage, StorageError, StorageRead, StorageResult, StoredNode,
-        VectorOutcome, VectorWrite,
+        CacheWrite, CurrentGraphDiagnostics, EmbeddingFailure, FileRow, FileSystem, NodeMetadata,
+        ProvenanceService, QueryError, Refresher, StatusReader, StatusReport, StatusService,
+        Storage, StorageError, StorageRead, StorageResult, StoredNode, VectorOutcome, VectorWrite,
     },
-    storage::SqliteStorage,
+    storage::{SqliteStatusStorage, SqliteStorage},
     wire_document_refresher,
 };
 use rusqlite::Connection;
@@ -38,7 +38,9 @@ const SOURCE: &[u8] = b"external source\r\nexact bytes\n";
 const OLD: &str = "<!-- letopis: {\"created_at\":1} -->\nAlphaToken [source](source.txt \"letopis:type=external\")\n";
 const NEW: &str = "<!-- letopis: {\"created_at\":3} -->\nBravoToken [source](source.txt \"letopis:type=external\")\n";
 const LATEST: &str = "<!-- letopis: {\"created_at\":3} -->\nCharlieToken [source](source.txt \"letopis:type=external\")\n";
-const INVALID: &str = "<!-- letopis: invalid -->\n";
+const DIAGNOSTIC_CANARY: &str = "TK28_DIAGNOSTIC_CANARY";
+const INVALID: &str = "<!-- letopis: invalid TK28_DIAGNOSTIC_CANARY -->\n";
+const RETAINED: &str = "<!-- letopis: {\"created_at\":2} -->\nRetainedToken [source](source.txt \"letopis:type=external\")\n";
 const CUTS: [&str; 10] = [
     "detected",
     "locked",
@@ -131,6 +133,7 @@ fn run_child() {
                     .downcast_ref::<StorageError>()
                     .is_some()
             );
+            assert!(!format!("{error:?}").contains(DIAGNOSTIC_CANARY));
         } else {
             let result = result.unwrap();
             assert_eq!(result.published, mode != "noop");
@@ -354,10 +357,7 @@ impl Fixture {
                 "b.md",
                 "<!-- letopis: {\"created_at\":1} -->\nDeletedToken\n",
             ),
-            (
-                "i.md",
-                "<!-- letopis: {\"created_at\":2} -->\nRetainedToken [source](source.txt \"letopis:type=external\")\n",
-            ),
+            ("i.md", RETAINED),
             (
                 "z.md",
                 "<!-- letopis: {\"created_at\":1} -->\nStableToken\n",
@@ -387,6 +387,12 @@ impl Fixture {
         fs::write(self.root.path().join("a.md"), bytes).unwrap();
         fs::write(self.root.path().join("i.md"), INVALID).unwrap();
         fs::remove_file(self.root.path().join("b.md")).unwrap();
+    }
+    fn invalidate_retained_file(&self) {
+        fs::write(self.root.path().join("i.md"), INVALID).unwrap();
+    }
+    fn restore_retained_file(&self) {
+        fs::write(self.root.path().join("i.md"), RETAINED).unwrap();
     }
     fn assert_preserved(&self, bytes: &str) {
         assert_eq!(
@@ -613,6 +619,44 @@ fn late_storage_error_rolls_back_every_cache_mutation() {
     );
 }
 
+#[test]
+fn uncommitted_file_diagnostic_is_absent_from_status_until_republished() {
+    // Given: a valid publication, then one authored file becomes invalid.
+    let fixture = Fixture::new();
+    fixture.invalidate_retained_file();
+
+    // When: the cache commit fails after the invalid file projection is staged.
+    Worker::spawn(fixture.root.path(), "fail").finish();
+
+    // Then: the old publication remains and a fresh status derives no file problem.
+    assert_eq!(read_state(fixture.root.path()), fixture.old);
+    let status = read_status(fixture.root.path());
+    assert_eq!(status.revision, Some(1));
+    assert!(get_invalid_file_problems(&status).is_empty());
+    assert!(!format!("{status:?}").contains(DIAGNOSTIC_CANARY));
+
+    // When: the injected fault is gone and publication retries.
+    Worker::spawn(fixture.root.path(), "publish").finish();
+
+    // Then: the real safe diagnostic is persisted and survives a fresh status.
+    let status = read_status(fixture.root.path());
+    assert_eq!(status.revision, Some(2));
+    assert_eq!(
+        get_invalid_file_problems(&status),
+        vec![("i.md".to_owned(), "invalid_metadata".to_owned())]
+    );
+    assert!(!format!("{status:?}").contains(DIAGNOSTIC_CANARY));
+
+    // Given: the authored file is repaired.
+    fixture.restore_retained_file();
+
+    // When / Then: a new publication makes the current problem disappear.
+    Worker::spawn(fixture.root.path(), "publish").finish();
+    let status = read_status(fixture.root.path());
+    assert_eq!(status.revision, Some(3));
+    assert!(get_invalid_file_problems(&status).is_empty());
+}
+
 fn run_normal_service(root: &Path, mode: &str) {
     LocalFileSystem::configure_next_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
     let mut service = wire_document_refresher(root).unwrap();
@@ -661,6 +705,40 @@ fn read_vectors(root: &Path) -> VectorState {
             .unwrap(),
         query_error: read.read_query_error().unwrap(),
     }
+}
+
+fn read_status(root: &Path) -> StatusReport {
+    let git = GitCli::open(root).unwrap();
+    let files = LocalFileSystem::open(git.get_root()).unwrap();
+    let pinned = files.open_existing_service_directory().unwrap().unwrap();
+    let storage =
+        SqliteStatusStorage::open_confined(&git.get_root().join(".letopis"), &pinned).unwrap();
+    let provenance = ProvenanceService::new(
+        GitCli::open(root).unwrap(),
+        LocalFileSystem::open(root).unwrap(),
+    );
+    let provider = crate::build_embedding_provider().unwrap();
+    let graph = CurrentGraphDiagnostics::new();
+    let mut status = StatusService {
+        storage,
+        files: &files,
+        graph: &graph,
+        provenance: &provenance,
+        provider: &provider,
+    };
+    status.read_status().unwrap()
+}
+
+fn get_invalid_file_problems(report: &StatusReport) -> Vec<(String, String)> {
+    report
+        .problems
+        .iter()
+        .filter_map(|problem| {
+            let path = problem.details.get("path")?.as_str()?.to_owned();
+            let reason = problem.details.get("reason")?.as_str()?.to_owned();
+            (path == "i.md" && reason == "invalid_metadata").then_some((path, reason))
+        })
+        .collect()
 }
 
 fn build_service(root: &Path) -> Service {
