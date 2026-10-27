@@ -2,7 +2,7 @@ CARGO ?= cargo
 V ?= 0
 MAKEFLAGS += --no-print-directory
 
-.PHONY: check verify fmt _check
+.PHONY: check verify fmt release _check
 
 # Capture one step at a time so a failure retains its complete diagnostic output.
 define run
@@ -26,6 +26,10 @@ _check:
 	$(call run,$(CARGO) check --locked --offline --all-targets)
 	$(call run,$(CARGO) clippy --locked --offline --all-targets -- -D warnings)
 	$(call run,$(CARGO) test --locked --offline)
+
+release:
+	$(call run,$(CARGO) build --locked --offline --profile dist)
+	@ls -lh target/dist/letopis | awk '{print $$5, $$9}'
 
 fmt:
 	$(CARGO) fmt --all
