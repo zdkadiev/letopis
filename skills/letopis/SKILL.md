@@ -6,8 +6,8 @@ description: Use when saving, checking, searching, traversing, or reading source
 # Letopis knowledge
 
 Letopis indexes marked Markdown. The agent edits Markdown and code; CLI commands read,
-check, and refresh the projection. Run from the Git root. In examples, `letopis`
-means the supplied executable. Requests are JSON on stdin; require exit 0 and
+check, refresh, observe and rebuild the projection. Run from the Git root. In examples,
+`letopis` means the supplied executable. Requests are JSON on stdin; require exit 0 and
 `ok:true` before using a result. A failure has `ok:false` and `error`.
 `letopis --help` and `letopis <command> --help` print the commands and each
 command's request fields as plain text.
@@ -125,23 +125,90 @@ known referers. After repairing them, run `check` and inspect the new ID. Preser
 `created_at`; keep `source_snapshot` only while its checked source binding still
 supports the statement.
 
+## Configure, observe, and reindex
+
+`config` observes `.letopis/config.json` without changing it:
+
+```sh
+printf '%s\n' '{}' | letopis config
+```
+
+Before setup it succeeds with `{"ok":true,"result":null}` and creates no service
+files. Otherwise `result` is the stored configuration value. There is no config
+setter: edit the file yourself, then observe it again. A valid example is:
+
+```json
+{"provider":"ollama","model":"code-model","parameters":{"base_url":"http://127.0.0.1:11434/api"},"max_retries":2}
+```
+
+`max_retries` is required, and `0` means one attempt. Malformed content makes
+`config` fail with exit 1 and `error.code:"embedding_failed"`; it never echoes the
+file. Search stays on FTS while the configuration is invalid. `status` reports the
+current `invalid_embedding_config` problem; fix the file and the next command sees
+it. `config` does not reset vectors, perform inference, launch a drain, or create
+service state.
+
+`status` reads the last published revision and its current diagnostics without
+refreshing:
+
+```sh
+printf '%s\n' '{}' | letopis status
+```
+
+`result` has `revision` (null before the first publication), `embedding_backlog`,
+`embedding_failed`, held `locks` and `problems`. Problems are current observations,
+not history: an invalid file, dangling link, includes cycle, missing Git
+`source_snapshot`, exhausted embedding attempts or invalid configuration disappears
+after it is repaired and the next command publishes. `status` does not rebuild a
+missing or stale cache and does not make a subsequent live-file read atomic.
+
+`reindex` is explicit maintenance, not the normal edit path:
+
+```sh
+printf '%s\n' '{}' | letopis reindex
+```
+
+It rebuilds graph and FTS from the corpus under `index.lock` and returns
+`{"ok":true,"result":{"revision":N}}`. It does not wait for vectors, does not
+confirm changed sources, and preserves author-declared `source_snapshot`. Ordinary
+edits need only the next refreshing command; use `reindex` after cache loss or
+a deliberate full rebuild. A physically corrupt cache is a separate recovery
+decision, not something this command silently repairs.
+
+## Cancel your own foreground call
+
+SIGINT is handled for your own `search`, `traverse`, `inspect`, `check` and
+`reindex` invocation. The process writes exactly one response and exits 1:
+
+```json
+{"ok":false,"error":{"code":"cancelled","message":"command cancelled","details":{}}}
+```
+
+If a normal result was already printed, a later SIGINT adds no second JSON. If the
+cancellation response won, the process cannot also exit 0 as a successful call.
+An uncommitted SQLite transaction rolls back as after a crash and the kernel
+releases `index.lock`. A publication that had already committed is not rolled
+back, so cancellation promises your caller terminates, not that no publication
+survived. Treat the outcome as uncertain, read `status` or retry the same
+idempotent command, and do not claim that SIGINT edited authored knowledge.
+
+There is no cancel subcommand and no PID-based cancel API. Signal only a process
+you started; never signal another writer. A detached `embed --drain` is an
+independent process in its own session. It has no cancellation response, keeps
+its durable attempt reservation, may finish after your cancelled caller, and never
+edits authored Markdown. Leave it alone; the next foreground command observes its
+work.
+
 ## Current boundaries
 
-The CLI has `check`, `search`, `traverse`, and mixed `inspect`. No Letopis
-`read`, `snapshot`, or `apply` command exists; use Git and edit Markdown.
-`status` reads published diagnostics without refreshing. To force all current
-Markdown candidates through the same publication path, run `letopis reindex`
-with stdin `{}`. It returns `{"ok":true,"result":{"revision":N}}` after one
-atomic graph/FTS publication under `index.lock`; it does not wait for vectors.
-Ordinary edits need only the usual refreshing command, not a full reindex.
-Invalid files retain their previous valid projections with current diagnostics;
-a fresh cache cannot recover a previous projection of currently invalid Markdown.
-Reindex preserves author-declared `source_snapshot` and never confirms changed
-sources for the agent. It also preserves existing vectors keyed by unchanged
-search hashes when rebuilding a deleted cache. It does not repair physical
-corruption or provide selective paths / `--cancel`.
-
-Physical recovery, remaining config/lifecycle and handled cancellation checks
-remain TK-26–29 work. Portable installation and operations remain TK-44 work.
-Do not claim handled `cancelled` JSON from the current executable. Embeddings are
-optional; FTS remains usable without a configured provider.
+The CLI has `check`, `config`, `search`, `status`, `traverse`, mixed `inspect`,
+and `reindex`. No Letopis `read`, `snapshot`, `apply` or `cancel` command exists;
+use Git and edit Markdown. Cancellation is a signal to your own foreground
+process, not a command. Invalid files retain their previous valid projections
+with current diagnostics; a fresh cache cannot recover a previous projection of
+currently invalid Markdown. Reindex preserves author-declared `source_snapshot`
+and never confirms changed sources for the agent. It also preserves existing
+vectors keyed by unchanged search hashes when rebuilding a deleted cache. It does
+not repair physical Git corruption or provide selective paths.
+Embeddings are optional; FTS remains usable without a configured provider.
+Packaging, installation and operational procedures remain TK-43/TK-44 work.

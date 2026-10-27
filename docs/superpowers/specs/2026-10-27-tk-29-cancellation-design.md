@@ -1,7 +1,9 @@
 # TK-29 — Handled cancellation and concurrent processes
 
 Status: approved by the user on 2026-10-27. Branch: `tk-29`. Base: `origin/main`
-`34af7d7a7f67cbde7db61622f354bcb6532b8866`. Product implementation has not started.
+`34af7d7a7f67cbde7db61622f354bcb6532b8866`. Product implementation and acceptance
+were executed on 2026-10-28; functional scope is delivered, formal G-2 remains
+pending. See [delivery status](#delivery-status-2026-10-28).
 
 ## Intent and authoritative scope
 
@@ -19,8 +21,8 @@ Sources: [D-95/D-96 and D-103](../../zkit/letopis/decisions.md),
 
 The user selected the task-card approach and approved this written specification
 on 2026-10-27, including the config completion and commit-order clarification.
-Only preparation of the implementation plan is currently authorized; execution
-must wait for a separate instruction.
+Execution was subsequently authorized and completed; the approved design below
+is unchanged.
 
 ## Approaches and decisions
 
@@ -198,3 +200,16 @@ The publication section now states the termination/commit ordering and the
 corresponding test oracle explicitly. The user subsequently approved this
 interpretation and config completion with the specification. All other reviewed
 implementation choices were sufficiently bounded.
+
+## Delivery status (2026-10-28)
+
+Base `e8e296de864d9b8c115a89235d7347083cca7b4b`; no product Rust change in Task 5.
+Functional implementation delivered and exercised on macOS arm64 and Linux
+aarch64. The maintenance workflow, cancellation protocol and X-1 envelopes pass.
+Formal G-2 is **not passed**: G-1/TK-17 remain deferred (D-103), C-10 x86_64 is the
+TK-43 exception, and several criteria retain historical-only evidence. The task
+card is `blocked` for that exact reason, not because a functional check failed.
+
+Evidence: [report](../../zkit/letopis/checks/TK-29/report.md),
+[verification.json](../../zkit/letopis/checks/TK-29/verification.json),
+[G-2 matrix](../../zkit/letopis/checks/TK-29/g2-matrix.md).

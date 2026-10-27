@@ -1,0 +1,176 @@
+{
+  "task": "TK-29",
+  "status": "blocked",
+  "functional_implementation": "delivered",
+  "g2": {
+    "status": "not_passed",
+    "reason": "G-1/TK-17 remain deferred (D-103), C-10 x86_64 remains TK-43 work, and several requirements have historical rather than final-revision evidence. See g2-matrix.md.",
+    "task_card_checkbox": "unchecked"
+  },
+  "source": {
+    "commit": "e8e296de864d9b8c115a89235d7347083cca7b4b",
+    "branch": "tk-29",
+    "product_code_changed": false,
+    "dirty_at_verification": [
+      "M skills/letopis/SKILL.md",
+      "?? tests/maintenance_workflow.rs"
+    ],
+    "hashes": {
+      "tests/maintenance_workflow.rs": "01726c747e30019c72029e54ccbd871f646f05f09195385bc94dfefe8191c8cc",
+      "skills/letopis/SKILL.md": "5f408c0d719244cac6ea9021874cee286a80e4d857631f1cba461bafca69c280",
+      "docs/zkit/letopis/contracts/schemas/X-1-cli.yaml": "e303b0daff1952921d6c70535562a8b4a8bc2092b1a9f45358ccbd7b80d612a0"
+    }
+  },
+  "platforms": {
+    "host": {
+      "status": "PASS",
+      "platform": "macOS-26.6.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "evidence": ".artifacts/tk29/host-20261028T015116",
+      "manifest_sha256": "e5cdbee5f588da3469292fc1a7e2b602f6f9116400bf7edbe820810fbfe45e25",
+      "make_verify_log_sha256": "a1dbcca08525d22d607bc158b5169b617348d2efd0637c7063f8d3f257dd26cf",
+      "inputs": 358,
+      "dev": {"passed": 843, "failed": 0, "ignored": 10},
+      "release": {"passed": 843, "failed": 0, "ignored": 10}
+    },
+    "linux": {
+      "status": "PASS",
+      "platform": "Linux-7.0.14-linuxkit-aarch64-with-glibc2.36",
+      "machine": "aarch64",
+      "docker_image": "sha256:cb886e3f0ae592bb6f961754d5bd0bcc4dd34bf0f5a3787419940f49a32d4e30",
+      "evidence": ".artifacts/tk29/linux-20261028T021500",
+      "inner_manifest_sha256": "ea350deaf0577e3e29f5c4da5165f0d2b329342640efb4a122b09a206f6a5b04",
+      "make_verify_log_sha256": "4d9df6786fb9ac2af2e9cf212dfd92ec82d1c0c5c833f69e6711aca39cfd34e1",
+      "inputs": 240,
+      "dev": {"passed": 843, "failed": 0, "ignored": 10},
+      "release": {"passed": 843, "failed": 0, "ignored": 10},
+      "repeatability_caveat": "Two earlier fresh full runs failed the unrelated pre-existing cli_runtime BrokenPipe race; no stable repeatability claim is made."
+    }
+  },
+  "commands": [
+    {
+      "command": "cargo test --locked --offline --test maintenance_workflow -- --nocapture",
+      "result": "PASS",
+      "counts": {"passed": 1, "failed": 0, "ignored": 0},
+      "log": ".artifacts/tk29/focused-final-20261028T022000/maintenance.log",
+      "log_sha256": "5a763be7c2907a0f37bcb4aee03e3a3bc5c886596ca6c8560302a12602354b50"
+    },
+    {
+      "command": "python3 -B host validation using tests/cli/run.py::validate_response + Draft202012Validator",
+      "result": "PASS",
+      "envelopes": 18,
+      "log": ".artifacts/tk29/focused-final-20261028T022000/schema-validation.log"
+    },
+    {
+      "command": "cargo test --locked --offline --test maintenance_workflow -- --nocapture (Linux storage image)",
+      "result": "PASS",
+      "counts": {"passed": 1, "failed": 0, "ignored": 0},
+      "log": ".artifacts/tk29/linux-focused-20261028T021000/maintenance.log",
+      "log_sha256": "fcbae5af19693cc54299477eaebaf9318c8588499f43fb1cf7c7510fda4f23b0"
+    },
+    {
+      "command": "python3 -B tests/storage/run.py --platform host --evidence .artifacts/tk29/host-20261028T015116",
+      "result": "PASS",
+      "profile": "macOS 26.6.2 arm64"
+    },
+    {
+      "command": "python3 -B tests/storage/run.py --platform linux --evidence .artifacts/tk29/linux-20261028T021500",
+      "result": "PASS",
+      "profile": "Linux aarch64 glibc 2.36"
+    }
+  ],
+  "envelope_validation": {
+    "tooling": "tests/cli/run.py::validate_response (Draft202012Validator) against docs/zkit/letopis/contracts/schemas/X-1-cli.yaml",
+    "total": 18,
+    "by_command": {
+      "check": 4,
+      "config": 4,
+      "inspect": 1,
+      "reindex": 1,
+      "search": 3,
+      "status": 4,
+      "traverse": 1
+    },
+    "compiled_test_depends_on_python": false
+  },
+  "mutation_controls": [
+    {
+      "file": "src/service/status.rs",
+      "mutation": "read_config_policy parse-failure branch returns (Unavailable, None) instead of the invalid-config problem",
+      "expected": "workflow fails at assert_problem_reason(status, invalid_embedding_config, true)",
+      "observed": "FAILED at the intended assertion; problems:[]",
+      "log": ".artifacts/tk29/focused-20261028T014437/mutation-status-invalid-config.log",
+      "restored_sha256": "3e1deeb816b903e4bc25db1414c6ae14d1bdb94650f264b055b7fbe381a70272",
+      "restored": true
+    },
+    {
+      "file": "src/cli/input.rs",
+      "mutation": "attempted reindex dispatch bypass to status",
+      "expected": "behavioral failure",
+      "observed": "rejected at compile time by denied dead_code (Request::Reindex unused); not counted",
+      "restored": true
+    }
+  ],
+  "shipped_vs_private": {
+    "shipped_binary": [
+      "tests/maintenance_workflow.rs",
+      "tests/cli_cancellation.rs",
+      "tests/cancellation_concurrency.rs"
+    ],
+    "private_fixture_or_in_process": [
+      "src/cli/response/tests.rs",
+      "src/storage/cancellation_tests.rs"
+    ],
+    "note": "Private proofs are not relabeled as shipped-binary evidence."
+  },
+  "historical_receipts": [
+    {"task": "TK-1", "report": "checks/TK-1/report.md", "report_commit": "ea86ead"},
+    {"task": "TK-2", "report": "checks/TK-2/report.md", "report_commit": "1e795d7"},
+    {"task": "TK-3", "report": "checks/TK-3/report.md", "report_commit": "c8f414b"},
+    {"task": "TK-4", "report": "checks/TK-4/report.md", "report_commit": "6fd2d18"},
+    {"task": "TK-6", "report": "checks/TK-6/report.md", "report_commit": "48b8ed8"},
+    {"task": "TK-8", "report": "checks/TK-8/report.md", "report_commit": "aa5367d"},
+    {"task": "TK-9", "report": "checks/TK-9/report.md", "report_commit": "360bbf7"},
+    {"task": "TK-10", "report": "checks/TK-10/report.md", "report_commit": "12c5ad0"},
+    {"task": "TK-11", "report": "checks/TK-11/report.md", "report_commit": "65c2602"},
+    {"task": "TK-12", "report": "checks/TK-12/report.md", "report_commit": "8db4814"},
+    {"task": "TK-13", "report": "checks/TK-13/report.md", "report_commit": "06dc8a1"},
+    {"task": "TK-14", "report": "checks/TK-14/report.md", "report_commit": "c8ede9e"},
+    {"task": "TK-18", "report": "checks/TK-18/report.md", "report_commit": "761d3b9"},
+    {"task": "TK-19", "report": "checks/TK-19/report.md", "report_commit": "15ccc70"},
+    {"task": "TK-20", "report": "checks/TK-20/report.md", "report_commit": "ed3e924"},
+    {"task": "TK-21", "report": "checks/TK-21/report.md", "report_commit": "46456a0"},
+    {"task": "TK-22", "report": "checks/TK-22/report.md", "report_commit": "3b27c95"},
+    {"task": "TK-23", "report": "checks/TK-23/report.md", "report_commit": "026254a"},
+    {"task": "TK-24", "report": "checks/TK-24/report.md", "report_commit": "d6657e8"},
+    {"task": "TK-25", "report": "checks/TK-25/report.md", "report_commit": "e8eb1a2"},
+    {"task": "TK-26", "report": "checks/TK-26/report.md", "report_commit": "8bc4fca"},
+    {"task": "TK-27", "report": "checks/TK-27/report.md", "report_commit": "f007c88"},
+    {"task": "TK-28", "report": "checks/TK-28-status-acceptance/report.md", "report_commit": "5a420e2"}
+  ],
+  "linux_failures_retained": [
+    {
+      "evidence": ".artifacts/tk29/linux-20261028T015700",
+      "result": "FAIL",
+      "cause": "tests/cli_runtime.rs::malformed_requests_fail_before_service_directory_creation: BrokenPipe in tests/support/cli.rs:92",
+      "scope": "pre-existing parallel-test race; unrelated to TK-29 product changes"
+    },
+    {
+      "evidence": ".artifacts/tk29/linux-20261028T020300",
+      "result": "FAIL",
+      "cause": "same test and trace"
+    }
+  ],
+  "unrun": [
+    "G-1 minimum-hardware measurement and TK-17 pilot (deferred, D-103)",
+    "x86_64 macOS/Linux (C-10, TK-43 exception)",
+    "physical power loss/crash drill (TK-38)",
+    "corruption/Git-change drill (TK-39)",
+    "backup/restore drill (TK-40)",
+    "provider/offline drill (TK-41)",
+    "storage exhaustion/trust-boundary drill (TK-42)",
+    "TK-30…TK-45 pilot, system validation, delivery and final acceptance",
+    "paid provider calls, real model quality, system load campaign",
+    "stable Linux full-suite repeatability (two earlier failures retained)"
+  ]
+}
