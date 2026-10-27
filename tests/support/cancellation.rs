@@ -4,7 +4,7 @@ use std::process::{Command, Stdio};
 use std::{
     ffi::{CString, OsStr, OsString},
     fs::{self, File, OpenOptions},
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read},
     net::Shutdown,
     os::{
         fd::AsRawFd,
@@ -84,10 +84,7 @@ pub fn observe_stdin_wait(pid: u32, _stdin: &Path) -> String {
     let deadline = Instant::now() + WAIT;
     loop {
         let trace = sample_process(pid);
-        if trace.contains("letopis::cli::input::parse_request")
-            && trace.contains("Stdin")
-            && has_native_frame(&trace, "read", "libsystem_kernel.dylib")
-        {
+        if stdin_read_observed(&trace) {
             return format!("inside=stdin\n{trace}");
         }
         assert!(
@@ -348,16 +345,27 @@ impl WrapperConnection {
     }
 
     pub fn assert_alive(&self) {
-        assert!(is_alive(self.pid), "abandoned Git wrapper exited early");
+        let stream = self.stream.as_ref().expect("observer stream");
+        let revents = poll_observer(stream, Duration::ZERO);
+        assert_eq!(
+            revents, 0,
+            "abandoned Git wrapper {} closed its observer socket",
+            self.pid
+        );
     }
 
     pub fn release_and_wait(mut self) {
-        self.release();
-        let deadline = Instant::now() + WAIT;
-        while is_alive(self.pid) {
-            assert!(Instant::now() < deadline, "Git wrapper did not exit");
-            thread::sleep(Duration::from_millis(5));
-        }
+        let stream = self.stream.take().expect("observer stream");
+        stream.shutdown(Shutdown::Write).expect("wrapper release");
+        let revents = wait_for_observer_close(&stream, WAIT);
+        assert_ne!(revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR), 0);
+        let mut reader = stream.try_clone().expect("wrapper reader");
+        let mut byte = [0];
+        assert_eq!(
+            reader.read(&mut byte).expect("wrapper EOF"),
+            0,
+            "Git wrapper wrote unexpected data"
+        );
     }
 
     fn release(&mut self) {
@@ -369,10 +377,6 @@ impl WrapperConnection {
 impl Drop for WrapperConnection {
     fn drop(&mut self) {
         self.release();
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while is_alive(self.pid) && Instant::now() < deadline {
-            thread::sleep(Duration::from_millis(5));
-        }
     }
 }
 
@@ -394,16 +398,67 @@ fn sample_process(pid: u32) -> String {
 
 #[cfg(target_os = "macos")]
 fn has_native_frame(trace: &str, symbol: &str, image: &str) -> bool {
-    trace.lines().any(|line| {
-        // Sample indents counted frames with tree glyphs such as `+`.
-        let counted = line.trim_start_matches(|character: char| !character.is_ascii_digit());
-        let mut fields = counted.split_whitespace();
-        fields
-            .next()
-            .is_some_and(|count| count.parse::<u64>().is_ok())
-            && fields.next() == Some(symbol)
-            && line.contains(image)
-    })
+    trace
+        .lines()
+        .any(|line| is_counted_native_frame(line, symbol, image))
+}
+
+#[cfg(target_os = "macos")]
+fn stdin_read_observed(trace: &str) -> bool {
+    let Some(main) = main_thread_trace(trace) else {
+        return false;
+    };
+    let Some(read) = main
+        .lines()
+        .position(|line| is_counted_native_frame(line, "read", "libsystem_kernel.dylib"))
+    else {
+        return false;
+    };
+    let Some(parse) = main
+        .lines()
+        .position(|line| line.contains("letopis::cli::input::parse_request"))
+    else {
+        return false;
+    };
+    let Some(stdin) = main.lines().position(|line| line.contains("Stdin")) else {
+        return false;
+    };
+    read > parse && read > stdin
+}
+
+#[cfg(target_os = "macos")]
+fn main_thread_trace(trace: &str) -> Option<&str> {
+    let marker = trace.find("com.apple.main-thread")?;
+    let start = trace[..marker].rfind('\n').map_or(0, |index| index + 1);
+    let rest = &trace[start..];
+    let mut end = rest.len();
+    let mut offset = 0;
+    for line in rest.split_inclusive('\n') {
+        if offset > 0 && is_thread_header(line) {
+            end = offset;
+            break;
+        }
+        offset += line.len();
+    }
+    Some(&rest[..end])
+}
+
+#[cfg(target_os = "macos")]
+fn is_thread_header(line: &str) -> bool {
+    let counted = line.split_whitespace().next();
+    counted.is_some_and(|count| count.parse::<u64>().is_ok()) && line.contains("Thread_")
+}
+
+#[cfg(target_os = "macos")]
+fn is_counted_native_frame(line: &str, symbol: &str, image: &str) -> bool {
+    // Sample indents counted frames with tree glyphs such as `+`.
+    let counted = line.trim_start_matches(|character: char| !character.is_ascii_digit());
+    let mut fields = counted.split_whitespace();
+    fields
+        .next()
+        .is_some_and(|count| count.parse::<u64>().is_ok())
+        && fields.next() == Some(symbol)
+        && line.contains(image)
 }
 
 #[cfg_attr(
@@ -438,6 +493,39 @@ fn wait_readable(fd: i32, timeout: Duration) {
     assert_eq!(ready, 1, "observer connection timeout");
 }
 
+fn poll_observer(stream: &UnixStream, timeout: Duration) -> i16 {
+    let mut poll = libc::pollfd {
+        fd: stream.as_raw_fd(),
+        events: libc::POLLIN | libc::POLLHUP | libc::POLLERR,
+        revents: 0,
+    };
+    // SAFETY: `poll` points to one initialized entry for the live wrapper socket.
+    let ready = unsafe {
+        libc::poll(
+            &raw mut poll,
+            1,
+            i32::try_from(timeout.as_millis()).expect("poll timeout"),
+        )
+    };
+    assert!(ready >= 0, "observer poll failed");
+    if ready == 0 { 0 } else { poll.revents }
+}
+
+fn wait_for_observer_close(stream: &UnixStream, timeout: Duration) -> i16 {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let revents = poll_observer(stream, Duration::ZERO);
+        if revents != 0 {
+            return revents;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Git wrapper did not close its observer socket"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+}
+
 fn resolve_program(name: &str) -> PathBuf {
     let path = std::env::var_os("PATH").unwrap_or_default();
     for directory in std::env::split_paths(&path) {
@@ -447,10 +535,4 @@ fn resolve_program(name: &str) -> PathBuf {
         }
     }
     panic!("required program {name} was not found on PATH");
-}
-
-fn is_alive(pid: i32) -> bool {
-    // SAFETY: signal 0 performs only an existence/permission probe.
-    let result = unsafe { libc::kill(pid, 0) };
-    result == 0 || std::io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH)
 }

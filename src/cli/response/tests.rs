@@ -303,6 +303,25 @@ fn large_successful_response() -> CommandResult<CommandResponse> {
     })
 }
 
+struct ChildGuard(Option<Child>);
+impl ChildGuard {
+    fn new(child: Child) -> Self {
+        Self(Some(child))
+    }
+
+    fn into_child(mut self) -> Child {
+        self.0.take().expect("guarded child")
+    }
+}
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.0.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
 struct SignalChild {
     child: Child,
     stream: UnixStream,
@@ -318,25 +337,27 @@ impl SignalChild {
         let address = directory.path().join("output.sock");
         let marker = directory.path().join("ready");
         let listener = UnixListener::bind(&address).unwrap();
-        let child = Command::new(env::current_exe().unwrap())
-            .args([
-                "--exact",
-                test,
-                "--ignored",
-                "--nocapture",
-                "--test-threads=1",
-            ])
-            .env(RESPONSE_CHILD_SOCKET, &address)
-            .env(RESPONSE_CHILD_MARKER, &marker)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap();
+        let child = ChildGuard::new(
+            Command::new(env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    test,
+                    "--ignored",
+                    "--nocapture",
+                    "--test-threads=1",
+                ])
+                .env(RESPONSE_CHILD_SOCKET, &address)
+                .env(RESPONSE_CHILD_MARKER, &marker)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
         wait_readable(listener.as_raw_fd());
         let (stream, _) = listener.accept().unwrap();
         stream.set_read_timeout(Some(CHILD_WAIT)).unwrap();
         Self {
-            child,
+            child: child.into_child(),
             stream,
             marker,
             _directory: directory,
