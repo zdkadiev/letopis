@@ -311,3 +311,7 @@ mod tests {
             .unwrap()
     }
 }
+
+#[cfg(test)]
+#[path = "cancellation_tests.rs"]
+mod cancellation_tests;

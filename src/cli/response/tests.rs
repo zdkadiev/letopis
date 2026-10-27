@@ -1,19 +1,38 @@
 use super::ResponseWriter;
-use crate::cli::CommandResponse;
-use crate::cli::ResponseResult;
-use crate::service::{CommandError, CommandErrorKind, CommandResult};
+use crate::{
+    cli::{CommandResponse, ResponseResult},
+    domain::{KnowledgeId, LineRange, RepoPath},
+    process::SigintListener,
+    service::{CommandError, CommandErrorKind, CommandResult, SearchLink},
+};
+use serde_json::Value;
 use std::{
-    io::{self, Write},
+    collections::BTreeSet,
+    env, fs,
+    io::{self, Read, Write},
+    net::Shutdown,
+    os::{
+        fd::AsRawFd,
+        unix::net::{UnixListener, UnixStream},
+    },
+    path::PathBuf,
+    process::{Child, Command, ExitStatus, Stdio},
     sync::{
         Arc, Mutex,
         mpsc::{self, Receiver, Sender},
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 const WAIT: Duration = Duration::from_secs(10);
 const SHORT_WAIT: Duration = Duration::from_millis(200);
+const CHILD_WAIT: Duration = Duration::from_secs(20);
+const RESPONSE_CHILD_SOCKET: &str = "LETOPIS_RESPONSE_CHILD_SOCKET";
+const RESPONSE_CHILD_MARKER: &str = "LETOPIS_RESPONSE_CHILD_MARKER";
+const LATE_CHILD: &str = "cli::response::tests::late_sigint_child";
+const BACKPRESSURE_CHILD: &str = "cli::response::tests::backpressure_sigint_child";
+const LARGE_LINK_COUNT: usize = 16_000;
 const CANCELLED_ENVELOPE: &[u8] =
     b"{\"ok\":false,\"error\":{\"code\":\"cancelled\",\"message\":\"command cancelled\",\"details\":{}}}\n";
 const SUCCESS_ENVELOPE: &[u8] = b"{\"ok\":true,\"result\":{}}\n";
@@ -123,6 +142,134 @@ fn guard_covers_flush() {
     assert!(second_output.is_empty());
 }
 
+#[test]
+fn cancel_output_wins_before_main_output() {
+    // Given: the command thread pauses before it attempts any output.
+    let writer = Arc::new(ResponseWriter::default());
+    let (entered, main_entered) = mpsc::channel();
+    let (release, released) = mpsc::channel();
+    let main_writer = Arc::clone(&writer);
+    let main = thread::spawn(move || {
+        entered.send(()).unwrap();
+        released.recv().unwrap();
+        let mut output = Vec::new();
+        let exit = main_writer.write_response(&mut output, successful_response());
+        (exit, output)
+    });
+    main_entered.recv_timeout(WAIT).unwrap();
+    // When: cancellation completes and flushes before main is released.
+    let mut output = Vec::new();
+    let cancellation_exit = writer.write_response(&mut output, cancelled_response());
+    release.send(()).unwrap();
+    let (normal_exit, normal_output) = main.join().unwrap();
+    // Then: main receives the winning exit code and appends no second JSON.
+    assert_eq!(cancellation_exit, 1);
+    assert_eq!(output, CANCELLED_ENVELOPE);
+    assert_eq!(normal_exit, 1);
+    assert!(normal_output.is_empty());
+}
+
+#[test]
+fn repeated_sigint_keeps_one_response() {
+    // Given: the first handled cancellation owns and writes the response.
+    let writer = ResponseWriter::default();
+    let mut output = Vec::new();
+    let first_exit = writer.write_response(&mut output, cancelled_response());
+    // When: further handled signals attempt the same response again.
+    for _ in 0..2 {
+        let mut repeated = Vec::new();
+        let exit = writer.write_response(&mut repeated, cancelled_response());
+        assert_eq!(exit, 1);
+        assert!(repeated.is_empty());
+    }
+    // Then: exactly one complete cancellation envelope exists.
+    assert_eq!(first_exit, 1);
+    assert_eq!(output, CANCELLED_ENVELOPE);
+    assert_eq!(output.iter().filter(|byte| **byte == b'\n').count(), 1);
+}
+
+#[test]
+fn success_output_survives_late_sigint() {
+    // Given: a private child has written its one success response and stays alive.
+    let mut child = SignalChild::spawn(LATE_CHILD);
+    child.wait_marker();
+    // When: the real listener receives SIGINT after output ownership is complete.
+    child.send_sigint();
+    let status = child.wait_exit();
+    let response = child.read_response();
+    // Then: the success envelope survives unchanged and the handled exit is 1.
+    assert_eq!(status.code(), Some(1), "{status:?}");
+    assert_eq!(response, SUCCESS_ENVELOPE);
+}
+
+#[test]
+fn sigint_during_backpressure_finishes_one_response() {
+    // Given: the child is blocked writing an envelope larger than the socket buffer.
+    let mut child = SignalChild::spawn(BACKPRESSURE_CHILD);
+    child.wait_marker();
+    let queued = wait_for_pressure(&mut child);
+    assert!(queued > 0, "no verified pipe pressure");
+    // When: SIGINT arrives while the original response is still incomplete.
+    child.send_sigint();
+    let response = child.read_response();
+    let status = child.wait_exit();
+    // Then: the original response completes exactly once without a replacement.
+    assert_eq!(status.code(), Some(1), "{status:?}");
+    assert_eq!(response.iter().filter(|byte| **byte == b'\n').count(), 1);
+    assert_eq!(response.last(), Some(&b'\n'));
+    let parsed: Value = serde_json::from_slice(&response).unwrap();
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["result"].as_array().unwrap().len(), LARGE_LINK_COUNT);
+    assert!(!String::from_utf8_lossy(&response).contains("cancelled"));
+}
+
+#[test]
+#[ignore = "private child fixture for success_output_survives_late_sigint"]
+fn late_sigint_child() {
+    let Some(address) = env::var_os(RESPONSE_CHILD_SOCKET) else {
+        return;
+    };
+    let marker = PathBuf::from(env::var_os(RESPONSE_CHILD_MARKER).unwrap());
+    let mut output = UnixStream::connect(PathBuf::from(address)).unwrap();
+    let signal_output = output.try_clone().unwrap();
+    let writer = Arc::new(ResponseWriter::default());
+    let signal_writer = Arc::clone(&writer);
+    let _listener = SigintListener::install(Box::new(move || {
+        let mut output = signal_output;
+        let _ = signal_writer.write_response(&mut output, cancelled_response());
+    }))
+    .unwrap();
+    assert_eq!(writer.write_response(&mut output, successful_response()), 0);
+    fs::write(marker, b"written").unwrap();
+    loop {
+        thread::park();
+    }
+}
+
+#[test]
+#[ignore = "private child fixture for sigint_during_backpressure_finishes_one_response"]
+fn backpressure_sigint_child() {
+    let Some(address) = env::var_os(RESPONSE_CHILD_SOCKET) else {
+        return;
+    };
+    let marker = PathBuf::from(env::var_os(RESPONSE_CHILD_MARKER).unwrap());
+    let mut output = UnixStream::connect(PathBuf::from(address)).unwrap();
+    let signal_output = output.try_clone().unwrap();
+    let writer = Arc::new(ResponseWriter::default());
+    let signal_writer = Arc::clone(&writer);
+    let _listener = SigintListener::install(Box::new(move || {
+        let mut output = signal_output;
+        let _ = signal_writer.write_response(&mut output, cancelled_response());
+    }))
+    .unwrap();
+    fs::write(marker, b"writing").unwrap();
+    let exit = writer.write_response(&mut output, large_successful_response());
+    assert_eq!(exit, 0);
+    loop {
+        thread::park();
+    }
+}
+
 fn successful_response() -> CommandResult<CommandResponse> {
     Ok(CommandResponse {
         result: ResponseResult::Drained,
@@ -135,6 +282,159 @@ fn cancelled_response() -> CommandResult<CommandResponse> {
         CommandErrorKind::Cancelled,
         "command cancelled",
     ))
+}
+
+fn large_successful_response() -> CommandResult<CommandResponse> {
+    let links = (0..LARGE_LINK_COUNT)
+        .map(|index| {
+            let id = format!("k{index}.md");
+            SearchLink {
+                element_id: KnowledgeId::parse(&id).unwrap(),
+                path: RepoPath::parse(&id).unwrap(),
+                lines: LineRange::new(1, 1).unwrap(),
+                revision: 1,
+                flags: BTreeSet::new(),
+            }
+        })
+        .collect();
+    Ok(CommandResponse {
+        result: ResponseResult::Search(links),
+        warnings: Vec::new(),
+    })
+}
+
+struct SignalChild {
+    child: Child,
+    stream: UnixStream,
+    marker: PathBuf,
+    _directory: tempfile::TempDir,
+}
+impl SignalChild {
+    fn spawn(test: &str) -> Self {
+        let directory = tempfile::Builder::new()
+            .prefix("tk29-response-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let address = directory.path().join("output.sock");
+        let marker = directory.path().join("ready");
+        let listener = UnixListener::bind(&address).unwrap();
+        let child = Command::new(env::current_exe().unwrap())
+            .args([
+                "--exact",
+                test,
+                "--ignored",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(RESPONSE_CHILD_SOCKET, &address)
+            .env(RESPONSE_CHILD_MARKER, &marker)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        wait_readable(listener.as_raw_fd());
+        let (stream, _) = listener.accept().unwrap();
+        stream.set_read_timeout(Some(CHILD_WAIT)).unwrap();
+        Self {
+            child,
+            stream,
+            marker,
+            _directory: directory,
+        }
+    }
+
+    fn wait_marker(&mut self) {
+        let deadline = Instant::now() + CHILD_WAIT;
+        loop {
+            if self.marker.is_file() {
+                return;
+            }
+            if let Some(status) = self.child.try_wait().unwrap() {
+                panic!("private response child exited early: {status:?}");
+            }
+            assert!(Instant::now() < deadline, "private response child timeout");
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    fn send_sigint(&mut self) {
+        assert!(self.child.try_wait().unwrap().is_none(), "child exited");
+        let pid = i32::try_from(self.child.id()).unwrap();
+        // SAFETY: the unreaped child is owned here, so its PID cannot be reused
+        // before collection; signal only that process, not its group.
+        assert_eq!(unsafe { libc::kill(pid, libc::SIGINT) }, 0);
+    }
+
+    fn wait_exit(&mut self) -> ExitStatus {
+        let deadline = Instant::now() + CHILD_WAIT;
+        loop {
+            if let Some(status) = self.child.try_wait().unwrap() {
+                return status;
+            }
+            if Instant::now() >= deadline {
+                let _ = self.child.kill();
+                let _ = self.child.wait();
+                panic!("private response child exit timeout");
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    fn read_response(&mut self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.stream.read_to_end(&mut bytes).unwrap();
+        bytes
+    }
+}
+impl Drop for SignalChild {
+    fn drop(&mut self) {
+        let _ = self.stream.shutdown(Shutdown::Both);
+        if !matches!(self.child.try_wait(), Ok(Some(_))) {
+            let _ = self.child.kill();
+        }
+        let _ = self.child.wait();
+    }
+}
+
+fn wait_for_pressure(child: &mut SignalChild) -> u64 {
+    let deadline = Instant::now() + CHILD_WAIT;
+    let mut previous = 0;
+    let mut stable = 0;
+    loop {
+        assert!(
+            child.child.try_wait().unwrap().is_none(),
+            "child exited before pipe pressure"
+        );
+        let queued = rustix::io::ioctl_fionread(&child.stream).unwrap();
+        if queued > 0 && queued == previous {
+            stable += 1;
+            if stable >= 5 {
+                return queued;
+            }
+        } else {
+            stable = 0;
+        }
+        previous = queued;
+        assert!(Instant::now() < deadline, "no verified pipe pressure");
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn wait_readable(fd: i32) {
+    let mut poll = libc::pollfd {
+        fd,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    // SAFETY: `poll` points to one initialized entry for the live listener.
+    let ready = unsafe {
+        libc::poll(
+            &raw mut poll,
+            1,
+            i32::try_from(CHILD_WAIT.as_millis()).unwrap(),
+        )
+    };
+    assert_eq!(ready, 1, "private response child did not connect");
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
