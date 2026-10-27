@@ -329,7 +329,11 @@ fn drain_start_failure_warns_without_persisting_and_keeps_fts() {
     // When / Then: a fresh status contains no persisted launch warning.
     let status = read_status(&repo);
     assert_eq!(status["result"]["problems"], json!([]));
-    assert!(!status.to_string().contains("cannot start background embedding drain"));
+    assert!(
+        !status
+            .to_string()
+            .contains("cannot start background embedding drain")
+    );
     assert_eq!(fs::read(&canary).unwrap(), b"DRAIN_CANARY");
 }
 
