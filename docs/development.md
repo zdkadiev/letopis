@@ -35,6 +35,15 @@ Runner проверяет schema parity, свой lifecycle, bundled SQLite/vec1
 самостоятельного executable с проверкой linkage; каждый evidence path новый.
 Исторические harnesses с отдельными manifest не входят в корневой gate автоматически.
 
+## Обработка SIGINT
+
+`signal-hook = "=0.3.18"` закреплён для обработки интерактивного SIGINT в
+исполняемом пути `run_process_cli`. Синхронный итератор `Signals` работает в
+отдельном std-потоке; при сигнале он пишет единственный `cancelled`-конверт через
+общий `ResponseWriter` и завершает процесс с кодом 1. `Handle::close` в `Drop`
+будит блокирующую итерацию и позволяет присоединить поток при обычном
+завершении. Async runtime, InterruptHandle и второй обработчик не добавляются.
+
 ## Правила
 
 Уровни хранятся в `Cargo.toml`:

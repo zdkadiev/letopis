@@ -17,6 +17,7 @@ serde_json = { version = "=1.0.145", features = ["raw_value"] }
 ureq = { version = "=3.4.2", default-features = false, features = ["rustls", "platform-verifier", "json"] }
 serde_json_canonicalizer = "=0.3.2"
 pulldown-cmark = { version = "=0.13.4", default-features = false }
+signal-hook = "=0.3.18"
 
 # Keep compiler diagnostics strict for every root-crate target.
 [lints.rust]

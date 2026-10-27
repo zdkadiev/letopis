@@ -6,7 +6,7 @@ mod response;
 
 pub(crate) use input::{Request, parse_request};
 pub(crate) use output::write_response;
-pub(crate) use response::{CommandResponse, ResponseResult, finish_foreground};
+pub(crate) use response::{CommandResponse, ResponseResult, ResponseWriter, finish_foreground};
 
 #[cfg(test)]
 mod tests;

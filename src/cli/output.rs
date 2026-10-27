@@ -1,15 +1,12 @@
 use super::response::{CommandResponse, ResponseResult};
 use crate::domain::{Edge, Sha256};
 use crate::service::{
-    CommandError, CommandErrorKind, CommandProblem, EmbeddingConfig, HeldLock, InspectedElement,
+    CommandErrorKind, CommandProblem, CommandResult, EmbeddingConfig, HeldLock, InspectedElement,
     LockName, ProviderKind, SearchFlag, SearchLink, TraversalLink,
 };
 use serde::Serialize;
 use serde_json::{Map, Value};
-use std::{
-    collections::BTreeMap,
-    io::{self, Write},
-};
+use std::{collections::BTreeMap, io::Write};
 
 #[derive(Serialize)]
 struct Problem<'a> {
@@ -100,17 +97,17 @@ struct TraversedEdge<'a> {
     edge_type: &'a str,
 }
 
-pub(crate) fn write_response(
-    output: impl Write,
-    response: Result<CommandResponse, CommandError>,
-) -> u8 {
+/// Serialize one complete response: the X-1 envelope with its final newline, or plain help text.
+pub(crate) fn encode_response(
+    response: CommandResult<CommandResponse>,
+) -> Result<(Vec<u8>, u8), serde_json::Error> {
     // Help is the one plain-text result; it is not wrapped in the JSON envelope.
     if let Ok(CommandResponse {
         result: ResponseResult::Help(text),
         ..
     }) = &response
     {
-        return u8::from(write_flushed(output, text.as_bytes()).is_err());
+        return Ok((text.clone().into_bytes(), 0));
     }
     let (encoded, exit) = match response {
         Ok(response) => (
@@ -133,20 +130,28 @@ pub(crate) fn write_response(
             1,
         ),
     };
-    let Ok(mut bytes) = encoded else {
+    let mut bytes = encoded?;
+    bytes.push(b'\n');
+    Ok((bytes, exit))
+}
+
+pub(crate) fn write_response(
+    mut output: impl Write,
+    response: CommandResult<CommandResponse>,
+) -> u8 {
+    let Ok((bytes, exit)) = encode_response(response) else {
         return 1;
     };
-    bytes.push(b'\n');
-    if write_flushed(output, &bytes).is_err() {
+    if output
+        .write_all(&bytes)
+        .and_then(|()| output.flush())
+        .is_err()
+    {
         return 1;
     }
     exit
 }
 
-fn write_flushed(mut output: impl Write, bytes: &[u8]) -> io::Result<()> {
-    output.write_all(bytes)?;
-    output.flush()
-}
 fn build_result(result: &ResponseResult) -> ResultBody<'_> {
     match result {
         ResponseResult::Help(text) => ResultBody::Help(text),
