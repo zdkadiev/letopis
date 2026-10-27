@@ -1,6 +1,6 @@
 # TK-28 — Реализовать status с текущими проблемами
 
-> **Статус:** in_progress
+> **Статус:** done
 > **Эпик:** [EP-3](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 6 / 10 (best / expected / worst)
@@ -42,8 +42,8 @@ Status с текущими проблемами, выведенными из д�
 
 - [x] Status даёт revision, блокировки с PID, отставание векторов, исчерпанные попытки и текущие проблемы.
 - [x] Ошибка файла видна, пока файл невалиден, и исчезает после публикации исправленного файла; висячие ссылки и циклы появляются и исчезают вместе с причиной без пересчёта при публикации.
-- [ ] storage failure не выдаётся за сохранённую ошибку.
-- [ ] Последняя ошибка query embedding из TK-22 хранится одной строкой vec.query_error и видна в status.problems до успешного запроса, без предупреждения в ответе search (D-62); сбой запуска drain — предупреждение «drain not started» в ответе и не сохраняется; FTS-only выдача остаётся успешной.
+- [x] storage failure не выдаётся за сохранённую ошибку.
+- [x] Последняя ошибка query embedding из TK-22 хранится одной строкой vec.query_error и видна в status.problems до успешного запроса, без предупреждения в ответе search (D-62); сбой запуска drain — предупреждение «drain not started» в ответе и не сохраняется; FTS-only выдача остаётся успешной.
 
 - [x] Соблюдены [структура программы и границы модулей](../../../../architecture.md#program-structure); в отчёте названы проверенные границы/файлы и evidence либо обосновано отсутствие изменений продуктового Rust-кода.
 
@@ -87,3 +87,28 @@ acceptance, а составной query/drain/FTS lifecycle критерий —
 Они не выводятся из component tests и этим отчётом не закрываются. Qualified Linux
 PASS не доказывает overlay health, persistence/power-loss, resource/minimum-hardware
 или x86_64 acceptance.
+
+2026-10-27: два оставшихся критерия закрыты acceptance-тестами на `tk-28`
+(ревизия проверки `faaecda`, host macOS/Darwin arm64), продуктовый Rust-код не
+изменён. storage failure: production-process сценарий
+`uncommitted_file_diagnostic_is_absent_from_status_until_republished` (`2d14922`)
+доказывает, что поздний storage-отказ не публикует staged `files.error`, старая
+публикация остаётся coherent, а свежий `status` не выдаёт несохранённую ошибку;
+после снятия fault повторная публикация сохраняет реальный diagnostic, он исчезает
+после исправления файла. Query/drain lifecycle: real product CLI сценарии
+`query_failure_is_visible_in_status_until_a_successful_query` (`84c9d03`) и
+`drain_start_failure_warns_without_persisting_and_keeps_fts` (`277528b`) подтверждают
+одну строку `vec.query_error` (замена, не история), видимость в `status` после
+отдельных процессов, сброс успешным запросом, отсутствие предупреждения в ответе
+search и transient «cannot start background embedding drain» без сохранения;
+FTS-only выдача успешна. Мутационные контроли выполнены; плановая мутация commit
+guard дала PASS — guard избыточен относительно распространения ошибки оператора
+(record), это задокументировано как defense-in-depth; compound-мутация
+(проглатывание ошибки + отключённый guard) детектирована тестом. `make check` и
+`make verify` — `ok`; полный root suite 796 passed / 0 failed / 5 ignored.
+Повторно использованы evidence TK-26 (`8bc4fca`) и TK-27 (`14d1e47`, ревью
+`02b9736`) без переклеймивания. Точный [отчёт](../../../../checks/TK-28-status-acceptance/report.md).
+Границы: x86_64, физический power-loss (TK-38), resource/minimum-hardware
+(TK-36/G-1/TK-17) и качество реальной модели не проверялись; G-2 закрывается
+в TK-29. Storage-failure сценарий использует production-composition в реальном
+child-процессе, не полный product binary.
