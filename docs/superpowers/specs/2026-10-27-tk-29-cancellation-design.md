@@ -203,9 +203,10 @@ implementation choices were sufficiently bounded.
 
 ## Delivery status (2026-10-28)
 
-Base `e8e296de864d9b8c115a89235d7347083cca7b4b`; no product Rust change in Task 5.
-Functional implementation delivered and exercised on macOS arm64 and Linux
-aarch64. The maintenance workflow, cancellation protocol and X-1 envelopes pass.
+Task 5 base `e8e296de864d9b8c115a89235d7347083cca7b4b`; final fix `bb7847f`.
+No product Rust change in Task 5 or the fix wave. Functional implementation
+delivered and exercised on macOS arm64 and Linux aarch64; final runners on
+`bb7847f` report 844/0/10 per profile. The maintenance workflow, cancellation protocol and X-1 envelopes pass.
 Formal G-2 is **not passed**: G-1/TK-17 remain deferred (D-103), C-10 x86_64 is the
 TK-43 exception, and several criteria retain historical-only evidence. The task
 card is `blocked` for that exact reason, not because a functional check failed.

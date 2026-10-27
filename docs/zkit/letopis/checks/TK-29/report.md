@@ -1,7 +1,8 @@
 # TK-29 — cancellation, concurrent processes and maintenance workflow
 
-Date: 2026-10-28. Base `e8e296de864d9b8c115a89235d7347083cca7b4b`
-(`test: verify cancellation and drain isolation`). Worktree
+Date: 2026-10-28. Task base `e8e296de864d9b8c115a89235d7347083cca7b4b`
+(`test: verify cancellation and drain isolation`); final fix `bb7847fb919dd2965b22c4e7518baee3827158fe`
+(`fix: bound SIGINT child wait and correct TK-29 evidence`). Worktree
 `/Users/zdkadiev/.codex/worktrees/tk-29/letopis`, branch `tk-29`.
 
 **Functional implementation delivered.** The maintenance CLI workflow and SIGINT
@@ -12,9 +13,9 @@ and several requirements have historical rather than final-revision evidence. Se
 [g2-matrix.md](g2-matrix.md) for every individual row.
 
 No product Rust, product dependency, schema or contract changed by Task 5 (since
-`e8e296d`); Tasks 1–4 delivered the config command and cancellation path. The
-final dirty tree contains only the new workflow test, the updated skill and this
-report set.
+`e8e296d`); Tasks 1–4 delivered the config command and cancellation path. Task 5's
+tracked delta contains only the new workflow test, the updated skill and this
+report set (the final fix commit is test/documentation only).
 
 ## What changed
 
@@ -117,14 +118,15 @@ accepted mutation; `git diff` for `src/` is empty after both.
 
 | Platform | Evidence | Result |
 | --- | --- | --- |
-| macOS 26.6.2 arm64 (host) | `.artifacts/tk29/host-20261028T015116` | PASS. `make verify`: dev **843 passed / 0 failed / 10 ignored**, release **843 / 0 / 10**. Manifest SHA-256 `e5cdbee5f588da3469292fc1a7e2b602f6f9116400bf7edbe820810fbfe45e25`. |
-| Linux aarch64, glibc 2.36, Docker image `sha256:cb886e3f0ae592bb6f961754d5bd0bcc4dd34bf0f5a3787419940f49a32d4e30` | `.artifacts/tk29/linux-20261028T021500` | PASS. Inner `make verify`: dev **843 / 0 / 10**, release **843 / 0 / 10**. Inner manifest SHA-256 `ea350deaf0577e3e29f5c4da5165f0d2b329342640efb4a122b09a206f6a5b04`. |
+| macOS 26.6.2 arm64 (host) | `.artifacts/tk29/host-20261028-final-bb7847f` | PASS. `make verify`: dev **844 passed / 0 failed / 10 ignored**, release **844 / 0 / 10**. Manifest SHA-256 `a814d3c0dc8d6d2961c9a843bde284cc8f92f4e5f98b1e25175d7468a2fb94ca`. |
+| Linux aarch64, glibc 2.36, Docker image `sha256:cb886e3f0ae592bb6f961754d5bd0bcc4dd34bf0f5a3787419940f49a32d4e30` | `.artifacts/tk29/linux-20261028-final-bb7847f` | PASS. Inner `make verify`: dev **844 / 0 / 10**, release **844 / 0 / 10**. Inner manifest SHA-256 `7c3be4fa8d738253bba0f5e9bb83f218ae6982da16719ffeb0c53eba6f2800d9`. |
 
-Both runners record source commit `e8e296d…` with only
-`M skills/letopis/SKILL.md` and `?? tests/maintenance_workflow.rs` dirty. Input
-hashes: 358 host, 240 Linux (the Docker build context intentionally omits host-only
-files). Host and Linux runners include `tests/maintenance_workflow.rs` in dev and
-release profiles.
+Both final runners record clean source commit `bb7847f…`. The earlier
+`a0b7614` receipts are retained under `.artifacts/tk29/` as historical evidence;
+the final run adds the bounded SIGINT test child (hence 844 rather than 843).
+Input hashes: 358 host,
+240 Linux (the Docker build context intentionally omits host-only files). Host and
+Linux runners include `tests/maintenance_workflow.rs` in dev and release profiles.
 
 ### Linux repeatability limitation
 
@@ -248,14 +250,18 @@ report; this report only consumes the resulting tests and commits.
   repeatability.
 - The two earlier Linux full-run failures above remain open as a fixture
   repeatability concern; this task did not change that fixture.
+- `python3 -B roadmap/schedule.py --check` still fails on the pre-existing TK-16
+  status string (`blocked — ...`), before reaching TK-29. TK-29 uses the exact
+  parseable status `blocked`; its links and `verification.json` were checked.
 
 ## Final-review fix wave
 
-After acceptance commit `a0b7614`, the whole-branch review found one test-watchdog
-gap and a set of report/skill wording issues. The fixes are: the owned SIGINT test
-child is now waited on with a 10-second deadline, then killed, reaped and reported
-with its captured output; and the wording above is scoped to Task 5, cites the
-existing Linux schema-validation and isolated `cli_runtime` logs, and corrects the
-skill's corruption and problem statements. These changes are test and documentation
-only. A scoped re-review of the fix wave was not performed; G-2 remains **not
-passed**.
+The independent whole-branch review of `34af7d7..a0b7614` returned **With
+fixes**: one test-watchdog gap and two report/skill wording defects, with no
+Critical product defect. The single fix wave `bb7847f` bounded the owned SIGINT
+child wait (10 s, then kill/reap with captured output), scoped the Task 5
+product-change sentence, corrected the cache-corruption wording, and applied the
+cheap report/matrix/plan fixes. A scoped re-review of `a0b7614..bb7847f` confirmed
+every finding ADDRESSED with no new Critical/Important breakage. The final host
+and Linux runners were then repeated on the clean `bb7847f` tree; their 844/0/10
+counts and hashes above replace the pre-fix receipts. G-2 remains **not passed**.

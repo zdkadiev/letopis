@@ -1,6 +1,7 @@
 # TK-29 — Завершить отмену и параллельные процессы
 
-> **Статус:** blocked — функциональная реализация и проверки выполнены, G-2 не подтверждён: G-1/TK-17 отложены (D-103), C-10 x86_64 остаётся исключением TK-43, часть критериев имеет только историческое evidence. См. [отчёт](../../../../checks/TK-29/report.md), [verification.json](../../../../checks/TK-29/verification.json) и [G-2 matrix](../../../../checks/TK-29/g2-matrix.md).
+> **Статус:** blocked
+> **Причина:** функциональная реализация и проверки выполнены, G-2 не подтверждён: G-1/TK-17 отложены (D-103), C-10 x86_64 остаётся исключением TK-43, часть критериев имеет только историческое evidence. См. [отчёт](../../../../checks/TK-29/report.md), [verification.json](../../../../checks/TK-29/verification.json) и [G-2 matrix](../../../../checks/TK-29/g2-matrix.md).
 > **Эпик:** [EP-3](../epic.md)
 > **Фаза:** PH-2
 > **Оценка, ч:** 4 / 6 / 10 (best / expected / worst)
@@ -70,8 +71,9 @@
 
 ## 9. Отчёт о выполнении
 
-2026-10-28, ветка `tk-29`, base `e8e296d`. Функциональная реализация Task 1–4
-принята в предыдущих отчётах; Task 5 добавил `tests/maintenance_workflow.rs`,
+2026-10-28, ветка `tk-29`, base `34af7d7`; Task 5 base `e8e296d`; final fix
+`bb7847f`. Функциональная реализация Task 1–4 принята в предыдущих отчётах;
+Task 5 добавил `tests/maintenance_workflow.rs`,
 обновил `skills/letopis/SKILL.md` и оформил
 [отчёт](../../../../checks/TK-29/report.md), [verification.json](../../../../checks/TK-29/verification.json),
 [G-2 matrix](../../../../checks/TK-29/g2-matrix.md). Продуктовый Rust, схема X-1 и
@@ -87,8 +89,11 @@ mixed inspect, чтение knowledge/source из одного Git-снимка 
 
 **Проверки.** `cargo test --test maintenance_workflow` — 1 passed; 18 X-1
 envelopes проверены существующим `validate_response`/Draft202012Validator.
-Host macOS arm64 `make verify` — 843/0/10 в dev и release; Linux aarch64 glibc
-2.36 — 843/0/10 в dev и release. Мутация status invalid-config projection дала
+Host macOS arm64 `make verify` на final tree `bb7847f` — 844/0/10 в dev и
+release; Linux aarch64 glibc 2.36 — 844/0/10 в dev и release. Итоговый
+independent whole-branch review `34af7d7..a0b7614` — With fixes; fix wave
+`bb7847f` и scoped re-review: все findings ADDRESSED, новых Critical/Important
+нет. Мутация status invalid-config projection дала
 ожидаемый FAIL на целевом assertion; исходник восстановлен byte-for-byte. Два
 ранних полных Linux-прогона упали на постороннем pre-existing `cli_runtime`
 BrokenPipe race; fresh focused и fresh full прогон прошли, но стабильность Linux
