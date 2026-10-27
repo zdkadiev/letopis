@@ -620,7 +620,7 @@ fn late_storage_error_rolls_back_every_cache_mutation() {
 }
 
 #[test]
-fn uncommitted_file_diagnostic_is_absent_from_status_until_republished() {
+fn uncommitted_file_diagnostic_is_absent_from_status() {
     // Given: a valid publication, then one authored file becomes invalid.
     let fixture = Fixture::new();
     fixture.invalidate_retained_file();
@@ -634,6 +634,14 @@ fn uncommitted_file_diagnostic_is_absent_from_status_until_republished() {
     assert_eq!(status.revision, Some(1));
     assert!(get_invalid_file_problems(&status).is_empty());
     assert!(!format!("{status:?}").contains(DIAGNOSTIC_CANARY));
+}
+
+#[test]
+fn failed_publication_retry_persists_the_file_diagnostic() {
+    // Given: a failed publication with one invalid authored file.
+    let fixture = Fixture::new();
+    fixture.invalidate_retained_file();
+    Worker::spawn(fixture.root.path(), "fail").finish();
 
     // When: the injected fault is gone and publication retries.
     Worker::spawn(fixture.root.path(), "publish").finish();
@@ -646,12 +654,24 @@ fn uncommitted_file_diagnostic_is_absent_from_status_until_republished() {
         vec![("i.md".to_owned(), "invalid_metadata".to_owned())]
     );
     assert!(!format!("{status:?}").contains(DIAGNOSTIC_CANARY));
+}
 
-    // Given: the authored file is repaired.
-    fixture.restore_retained_file();
-
-    // When / Then: a new publication makes the current problem disappear.
+#[test]
+fn repaired_file_problem_disappears_after_publication() {
+    // Given: a publication that stored the invalid-file diagnostic.
+    let fixture = Fixture::new();
+    fixture.invalidate_retained_file();
     Worker::spawn(fixture.root.path(), "publish").finish();
+    assert_eq!(
+        get_invalid_file_problems(&read_status(fixture.root.path())),
+        vec![("i.md".to_owned(), "invalid_metadata".to_owned())]
+    );
+
+    // When: the authored file is repaired and republished.
+    fixture.restore_retained_file();
+    Worker::spawn(fixture.root.path(), "publish").finish();
+
+    // Then: the current problem disappears.
     let status = read_status(fixture.root.path());
     assert_eq!(status.revision, Some(3));
     assert!(get_invalid_file_problems(&status).is_empty());

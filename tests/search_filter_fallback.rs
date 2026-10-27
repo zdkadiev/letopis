@@ -142,15 +142,55 @@ fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
 }
 
 #[test]
-fn query_failure_is_visible_in_status_until_a_successful_query() {
-    // Given: two failing provider replies followed by one successful reply.
-    let repo = ReadingRepo::new();
-    let basis = prepare_notes(&repo);
-    let server = HttpFixture::start_sequence(vec![
+fn query_failure_keeps_fts_and_appears_in_status() {
+    // Given: one failing provider reply.
+    let (repo, server, input) = prepare_query_scenario(vec![FixtureReply::Status {
+        status: 500,
+        body: "PRIVATE provider fixture-secret".into(),
+    }]);
+
+    // When: the query embedding fails.
+    let links = invoke_search(&repo, &input);
+
+    // Then: FTS results remain and status reports one current problem.
+    assert_eq!(read_ids(&links), ["a.md", "b.md"]);
+    assert_eq!(
+        get_query_problems(&read_status(&repo)),
+        vec![expected_query_problem()]
+    );
+    assert_eq!(server.take_requests().len(), 1);
+}
+
+#[test]
+fn repeated_query_failure_keeps_one_current_problem() {
+    // Given: two failing provider replies.
+    let (repo, server, input) = prepare_query_scenario(vec![
         FixtureReply::Status {
             status: 500,
             body: "PRIVATE provider fixture-secret".into(),
         },
+        FixtureReply::Status {
+            status: 500,
+            body: "PRIVATE provider fixture-secret".into(),
+        },
+    ]);
+
+    // When: two query embeddings fail in separate processes.
+    assert_eq!(read_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
+    assert_eq!(read_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
+
+    // Then: the one current record is replaced, not accumulated.
+    assert_eq!(
+        get_query_problems(&read_status(&repo)),
+        vec![expected_query_problem()]
+    );
+    assert_eq!(server.take_requests().len(), 2);
+}
+
+#[test]
+fn successful_query_clears_the_query_problem() {
+    // Given: a failing reply followed by one successful reply.
+    let (repo, server, input) = prepare_query_scenario(vec![
         FixtureReply::Status {
             status: 500,
             body: "PRIVATE provider fixture-secret".into(),
@@ -160,38 +200,37 @@ fn query_failure_is_visible_in_status_until_a_successful_query() {
             body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
         },
     ]);
-    let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
-    prepare_vectors(&repo, &config, 2);
-    let input = build_input(&basis);
-    let expected = json!({
-        "code": "embedding_failed",
-        "message": "query embedding failed",
-        "details": {"reason": "query_embedding_failed"}
-    });
 
-    // When: the first query embedding fails.
-    let first = invoke_search(&repo, &input);
-    // Then: FTS results remain and status reports exactly one current problem.
-    assert_eq!(read_ids(&first), ["a.md", "b.md"]);
+    // When: a failed query is followed by a successful one.
+    assert_eq!(read_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
     assert_eq!(
         get_query_problems(&read_status(&repo)),
-        vec![expected.clone()]
+        vec![expected_query_problem()]
     );
-    assert_eq!(server.take_requests().len(), 1);
-
-    // When: a second query embedding fails in a separate process.
-    let second = invoke_search(&repo, &input);
-    // Then: the one current record is replaced, not accumulated.
-    assert_eq!(read_ids(&second), ["a.md", "b.md"]);
-    assert_eq!(get_query_problems(&read_status(&repo)), vec![expected]);
-    assert_eq!(server.take_requests().len(), 1);
-
-    // When: a later query embedding succeeds.
     let recovered = invoke_search(&repo, &input);
+
     // Then: semantic results appear and status no longer reports the problem.
     assert_eq!(read_ids(&recovered), ["a.md", "b.md", "semantic.md"]);
     assert!(get_query_problems(&read_status(&repo)).is_empty());
-    assert_eq!(server.take_requests().len(), 1);
+    assert_eq!(server.take_requests().len(), 2);
+}
+
+fn prepare_query_scenario(replies: Vec<FixtureReply>) -> (ReadingRepo, HttpFixture, Value) {
+    let repo = ReadingRepo::new();
+    let basis = prepare_notes(&repo);
+    let server = HttpFixture::start_sequence(replies);
+    let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
+    prepare_vectors(&repo, &config, 2);
+    let input = build_input(&basis);
+    (repo, server, input)
+}
+
+fn expected_query_problem() -> Value {
+    json!({
+        "code": "embedding_failed",
+        "message": "query embedding failed",
+        "details": {"reason": "query_embedding_failed"}
+    })
 }
 
 fn prepare_notes(repo: &ReadingRepo) -> TreeOid {
