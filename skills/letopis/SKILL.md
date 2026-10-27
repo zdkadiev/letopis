@@ -157,10 +157,12 @@ printf '%s\n' '{}' | letopis status
 
 `result` has `revision` (null before the first publication), `embedding_backlog`,
 `embedding_failed`, held `locks` and `problems`. Problems are current observations,
-not history: an invalid file, dangling link, includes cycle, missing Git
-`source_snapshot`, exhausted embedding attempts or invalid configuration disappears
-after it is repaired and the next command publishes. `status` does not rebuild a
-missing or stale cache and does not make a subsequent live-file read atomic.
+not history: an invalid file, a dangling link, an includes cycle, a missing Git
+`source_snapshot` or invalid configuration disappears when the condition is
+repaired and the next command observes it. Exhausted embedding attempts clear only
+with a changed configuration identity or a vector reset, not merely on the next
+publication. `status` does not rebuild a missing or stale cache and does not make a
+subsequent live-file read atomic.
 
 `reindex` is explicit maintenance, not the normal edit path:
 
@@ -209,6 +211,6 @@ with current diagnostics; a fresh cache cannot recover a previous projection of
 currently invalid Markdown. Reindex preserves author-declared `source_snapshot`
 and never confirms changed sources for the agent. It also preserves existing
 vectors keyed by unchanged search hashes when rebuilding a deleted cache. It does
-not repair physical Git corruption or provide selective paths.
+not repair physical cache corruption or provide selective paths.
 Embeddings are optional; FTS remains usable without a configured provider.
 Packaging, installation and operational procedures remain TK-43/TK-44 work.

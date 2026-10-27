@@ -11,9 +11,10 @@ G-1/TK-17 prerequisite remains deferred (D-103), C-10 x86_64 remains TK-43 work,
 and several requirements have historical rather than final-revision evidence. See
 [g2-matrix.md](g2-matrix.md) for every individual row.
 
-No product Rust, product dependency, schema or contract changed in this task. The
+No product Rust, product dependency, schema or contract changed by Task 5 (since
+`e8e296d`); Tasks 1–4 delivered the config command and cancellation path. The
 final dirty tree contains only the new workflow test, the updated skill and this
-report set. Product behavior delivered by Tasks 1–4 is unchanged.
+report set.
 
 ## What changed
 
@@ -90,11 +91,12 @@ undid a committed publication.
 | --- | --- |
 | `cargo test --locked --offline --test maintenance_workflow -- --nocapture` | PASS, **1 passed / 0 failed / 0 ignored**, 18 raw envelopes in `.artifacts/tk29/focused-final-20261028T022000/maintenance.log` (SHA-256 `5a763be7c2907a0f37bcb4aee03e3a3bc5c886596ca6c8560302a12602354b50`). |
 | Host-side schema validation: `python3 -B` using `tests/cli/run.py::validate_response` + `Draft202012Validator` + `docs/zkit/letopis/contracts/schemas/X-1-cli.yaml` | **18/18 envelopes accepted** (4 check, 4 config, 1 inspect, 1 reindex, 3 search, 4 status, 1 traverse). Log `.artifacts/tk29/focused-final-20261028T022000/schema-validation.log`. |
-| Linux focused run in the storage image, `cargo test --locked --offline --test maintenance_workflow -- --nocapture` | PASS, **1 passed / 0 failed**, `.artifacts/tk29/linux-focused-20261028T021000/maintenance.log` (SHA-256 `fcbae5af19693cc54299477eaebaf9318c8588499f43fb1cf7c7510fda4f23b0`). 18 envelopes also schema-validated. |
+| Linux focused run in the storage image, `cargo test --locked --offline --test maintenance_workflow -- --nocapture` | PASS, **1 passed / 0 failed**, `.artifacts/tk29/linux-focused-20261028T021000/maintenance.log` (SHA-256 `fcbae5af19693cc54299477eaebaf9318c8588499f43fb1cf7c7510fda4f23b0`). 18 Linux envelopes also schema-validated, log `.artifacts/tk29/focused-20261028T014437/schema-validation-linux.log`. |
 
-The compiled test has no Python or `jsonschema` dependency. Envelopes are captured
-by printing `WORKFLOW_ENVELOPE {json}` and the host validation is a separate step,
-as required by the storage container's missing `jsonschema` module.
+The compiled test has no Python or `jsonschema` dependency for schema validation;
+the Git proxy fixture still requires `python3`. Envelopes are captured by printing
+`WORKFLOW_ENVELOPE {json}` and the host validation is a separate step, as required
+by the storage container's missing `jsonschema` module.
 
 ## Mutation control
 
@@ -130,7 +132,8 @@ Two earlier fresh Linux runs failed **outside this task's scenario**:
 `tests/cli_runtime.rs::malformed_requests_fail_before_service_directory_creation`
 panicked with `BrokenPipe` in `tests/support/cli.rs:92` while writing input to a
 product process that had already rejected invalid argv. The same test passes alone
-in the same image, and the third fresh full run passed. This is a pre-existing
+in the same image (`.artifacts/tk29/linux-cli-runtime-20261028T021100/cli_runtime.log`:
+1 passed, 0 failed), and the third fresh full run passed. This is a pre-existing
 parallel-test race in the TK-11 fixture, not caused by product changes in this
 task. Receipts are retained, not overwritten:
 
@@ -190,6 +193,9 @@ listed below; this report does not claim a new independent review of that code.
   cancellation in `src/cli/response/tests.rs` and
   `src/storage/cancellation_tests.rs`. They are not relabeled as shipped-binary
   evidence.
+- The production `BackgroundRunner` detached-spawn path is historical TK-27
+  evidence; `foreground_cancel_preserves_detached_drain` starts `embed --drain`
+  directly, so this task does not re-exercise that spawn path.
 - The workflow uses a local HTTP fixture and synthetic credentials only. No paid
   provider, pilot, real model request or model-quality assessment was performed.
 
@@ -242,3 +248,14 @@ report; this report only consumes the resulting tests and commits.
   repeatability.
 - The two earlier Linux full-run failures above remain open as a fixture
   repeatability concern; this task did not change that fixture.
+
+## Final-review fix wave
+
+After acceptance commit `a0b7614`, the whole-branch review found one test-watchdog
+gap and a set of report/skill wording issues. The fixes are: the owned SIGINT test
+child is now waited on with a 10-second deadline, then killed, reaped and reported
+with its captured output; and the wording above is scoped to Task 5, cites the
+existing Linux schema-validation and isolated `cli_runtime` logs, and corrects the
+skill's corruption and problem statements. These changes are test and documentation
+only. A scoped re-review of the fix wave was not performed; G-2 remains **not
+passed**.

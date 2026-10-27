@@ -11,6 +11,7 @@
     "commit": "e8e296de864d9b8c115a89235d7347083cca7b4b",
     "branch": "tk-29",
     "product_code_changed": false,
+    "product_code_changed_scope": "Task 5 since e8e296d; Tasks 1-4 delivered the config command and cancellation path.",
     "dirty_at_verification": [
       "M skills/letopis/SKILL.md",
       "?? tests/maintenance_workflow.rs"
@@ -66,7 +67,9 @@
       "result": "PASS",
       "counts": {"passed": 1, "failed": 0, "ignored": 0},
       "log": ".artifacts/tk29/linux-focused-20261028T021000/maintenance.log",
-      "log_sha256": "fcbae5af19693cc54299477eaebaf9318c8588499f43fb1cf7c7510fda4f23b0"
+      "log_sha256": "fcbae5af19693cc54299477eaebaf9318c8588499f43fb1cf7c7510fda4f23b0",
+      "schema_validation_log": ".artifacts/tk29/focused-20261028T014437/schema-validation-linux.log",
+      "schema_validated_envelopes": 18
     },
     {
       "command": "python3 -B tests/storage/run.py --platform host --evidence .artifacts/tk29/host-20261028T015116",
@@ -91,7 +94,15 @@
       "status": 4,
       "traverse": 1
     },
-    "compiled_test_depends_on_python": false
+    "compiled_test_depends_on_python": false,
+    "python_note": "Schema validation is a separate host step; the Git proxy fixture still requires python3."
+  },
+  "final_review_fix": {
+    "base_commit": "a0b7614b113ee40064364efed23d103639e603f4",
+    "scope": "Bounded SIGINT test-child wait (10 s, kill/reap then readable failure) and corrected TK-29 report/skill evidence wording.",
+    "product_behavior_changed": false,
+    "scoped_re_review": "not_performed",
+    "g2_status_unchanged": true
   },
   "mutation_controls": [
     {

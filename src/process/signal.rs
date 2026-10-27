@@ -97,6 +97,8 @@ mod tests {
     };
 
     const WAIT: Duration = Duration::from_secs(10);
+    const CHILD_WAIT: Duration = Duration::from_secs(10);
+    const CHILD_POLL: Duration = Duration::from_millis(10);
     const SHORT_WAIT: Duration = Duration::from_millis(200);
     const CHILD_MARKER_ENV: &str = "LETOPIS_SIGINT_TEST_MARKER";
     const CHILD_TEST: &str = "process::signal::tests::sigint_child_waits_for_owned_signal";
@@ -252,6 +254,23 @@ mod tests {
     }
 
     #[test]
+    fn owned_child_wait_fails_after_a_bounded_deadline() {
+        // Given: a child that never observes the cancellation protocol.
+        let mut command = Command::new("sleep");
+        command
+            .arg("30")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let child = OwnedChild::spawn(command);
+        // When: the bounded wait expires and the child is killed and reaped.
+        let error = child
+            .try_wait_with_output_within(Duration::from_millis(200))
+            .expect_err("a live child must time out");
+        // Then: the failure is readable instead of an unbounded wait.
+        assert!(error.contains("did not exit within"), "{error}");
+    }
+
+    #[test]
     fn sigint_child_waits_for_owned_signal() {
         // This test is meaningful only in the owned child of the parent above.
         let Some(marker) = env::var_os(CHILD_MARKER_ENV) else {
@@ -299,8 +318,36 @@ mod tests {
             self.child.as_ref().unwrap().id()
         }
 
-        fn wait_with_output(mut self) -> Output {
-            self.child.take().unwrap().wait_with_output().unwrap()
+        fn wait_with_output(self) -> Output {
+            match self.try_wait_with_output_within(CHILD_WAIT) {
+                Ok(output) => output,
+                Err(message) => panic!("{message}"),
+            }
+        }
+
+        fn try_wait_with_output_within(mut self, wait: Duration) -> Result<Output, String> {
+            let mut child = self.child.take().unwrap();
+            let deadline = Instant::now() + wait;
+            loop {
+                match child.try_wait() {
+                    Ok(Some(_)) => return Ok(child.wait_with_output().unwrap()),
+                    Ok(None) if Instant::now() >= deadline => {
+                        let _ = child.kill();
+                        let output = child.wait_with_output().unwrap();
+                        return Err(format!(
+                            "owned child did not exit within {wait:?}; stdout: {}; stderr: {}",
+                            String::from_utf8_lossy(&output.stdout),
+                            String::from_utf8_lossy(&output.stderr)
+                        ));
+                    }
+                    Ok(None) => thread::sleep(CHILD_POLL),
+                    Err(error) => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(format!("cannot observe owned child: {error}"));
+                    }
+                }
+            }
         }
     }
 

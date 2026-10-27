@@ -62,6 +62,8 @@ guideline. Do not rearrange unrelated code.
 
 ### Task 1: Complete observational config command
 
+> **Completed in the Task 1 report** (`.superpowers/sdd/2026-10-27-tk-29-cancellation/task-1-report.md`, commit `1584092`); the steps below are left as executed there.
+
 **Interfaces:** Add `ConfigReader::read_config(&self) -> CommandResult<Option<EmbeddingConfig>>`
 in command_traits.rs and reexport it from service/mod.rs. `ConfigurationService<'a>`
 in configuration.rs owns borrowed `&dyn StatusFiles` and `&dyn EmbeddingProvider`
@@ -84,6 +86,8 @@ this service; it does not open SqliteStorage. Use existing provider validation
 - [ ] **5. Mutation-check then commit.** Separately bypass config validation, remove parameters from output, and invoke readiness/background during config handling; relevant tests must fail. Restore exact bytes, run `make check`, commit intended paths as `feat: expose read-only configuration command`.
 
 ### Task 2: Add single-response ownership and scoped SIGINT lifecycle
+
+> **Completed in the Task 2 report** (`.superpowers/sdd/2026-10-27-tk-29-cancellation/task-2-report.md`, commit `b68dc1e`); the steps below are left as executed there.
 
 **Interfaces:** CLI owns `ResponseWriter` in response.rs, default-constructible,
 with `write_response(&self, output: &mut dyn Write, response: CommandResult<CommandResponse>) -> u8`.
@@ -115,6 +119,8 @@ on the main thread while executing services. Status/config/drain skip registrati
 
 ### Task 3: Prove cancellation at actual wait and commit boundaries
 
+> **Completed in the Task 3 report** (`.superpowers/sdd/2026-10-27-tk-29-cancellation/task-3-report.md`, commits `269e89f`/`59ad8e8`); the steps below are left as executed there.
+
 **Interfaces:** Consume Task 2's crate-private ResponseWriter and SigintListener
 inside unit child processes. Shipped-binary tests use `env!("CARGO_BIN_EXE_letopis")`.
 Reuse OwnedChild's send_sigint/collect_output; child cleanup must kill/reap only
@@ -129,6 +135,8 @@ requires a positive platform observation, not an elapsed sleep.
 - [ ] **5. Mutation-check and commit.** Disable registration for one command (then all named commands as individual cases), bypass claim/exit coordination, replace the flock observer with a pre-lock acknowledgement, commit before the held pre-commit barrier, and bypass SQL-step barrier. Each must fail the intended test, not merely time out for unrelated setup. Restore exact bytes; `make check`; commit `test: verify cancellation wait and commit boundaries`.
 
 ### Task 4: Verify publisher/drain isolation and late embedding results
+
+> **Completed in the Task 4 report** (`.superpowers/sdd/2026-10-27-tk-29-cancellation/task-4-report.md`, commit `e8e296d`); the steps below are left as executed there.
 
 **Interfaces:** Existing Refresher, EmbedLocker, EmbeddingExecutor, real CLI
 and local HTTP; no new production abstraction. Reuse existing drain support and
