@@ -141,6 +141,98 @@ fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
     assert_unchanged_vector_state(&repo, &config);
 }
 
+#[test]
+fn query_failure_keeps_fts_and_appears_in_status() {
+    // Given: one failing provider reply.
+    let (repo, server, input) = prepare_query_scenario(vec![FixtureReply::Status {
+        status: 500,
+        body: "PRIVATE provider fixture-secret".into(),
+    }]);
+
+    // When: the query embedding fails.
+    let links = invoke_search(&repo, &input);
+
+    // Then: FTS results remain and status reports one current problem.
+    assert_eq!(read_ids(&links), ["a.md", "b.md"]);
+    assert_eq!(
+        get_query_problems(&read_status(&repo)),
+        vec![expected_query_problem()]
+    );
+    assert_eq!(server.take_requests().len(), 1);
+}
+
+#[test]
+fn repeated_query_failure_keeps_one_current_problem() {
+    // Given: two failing provider replies.
+    let (repo, server, input) = prepare_query_scenario(vec![
+        FixtureReply::Status {
+            status: 500,
+            body: "PRIVATE provider fixture-secret".into(),
+        },
+        FixtureReply::Status {
+            status: 500,
+            body: "PRIVATE provider fixture-secret".into(),
+        },
+    ]);
+
+    // When: two query embeddings fail in separate processes.
+    assert_eq!(read_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
+    assert_eq!(read_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
+
+    // Then: the one current record is replaced, not accumulated.
+    assert_eq!(
+        get_query_problems(&read_status(&repo)),
+        vec![expected_query_problem()]
+    );
+    assert_eq!(server.take_requests().len(), 2);
+}
+
+#[test]
+fn successful_query_clears_the_query_problem() {
+    // Given: a failing reply followed by one successful reply.
+    let (repo, server, input) = prepare_query_scenario(vec![
+        FixtureReply::Status {
+            status: 500,
+            body: "PRIVATE provider fixture-secret".into(),
+        },
+        FixtureReply::Status {
+            status: 200,
+            body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
+        },
+    ]);
+
+    // When: a failed query is followed by a successful one.
+    assert_eq!(read_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
+    assert_eq!(
+        get_query_problems(&read_status(&repo)),
+        vec![expected_query_problem()]
+    );
+    let recovered = invoke_search(&repo, &input);
+
+    // Then: semantic results appear and status no longer reports the problem.
+    assert_eq!(read_ids(&recovered), ["a.md", "b.md", "semantic.md"]);
+    assert!(get_query_problems(&read_status(&repo)).is_empty());
+    assert_eq!(server.take_requests().len(), 2);
+}
+
+fn prepare_query_scenario(replies: Vec<FixtureReply>) -> (ReadingRepo, HttpFixture, Value) {
+    let repo = ReadingRepo::new();
+    let basis = prepare_notes(&repo);
+    let server = HttpFixture::start_sequence(replies);
+    let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
+    prepare_vectors(&repo, &config, 2);
+    let input = build_input(&basis);
+    (repo, server, input)
+}
+
+fn expected_query_problem() -> Value {
+    json!({
+        "code": "embedding_failed",
+        "message": "query embedding failed",
+        "details": {"reason": "query_embedding_failed"}
+    })
+}
+
 fn prepare_notes(repo: &ReadingRepo) -> TreeOid {
     repo.write("code.rs", b"stable\n");
     let basis = create_basis(repo.get_root(), &[("code.rs", b"stable\n")]);
@@ -201,6 +293,27 @@ fn read_ids(links: &Value) -> Vec<String> {
         .map(|link| link["element_id"].as_str().unwrap().to_owned())
         .collect()
 }
+fn read_status(repo: &ReadingRepo) -> Value {
+    let output = repo.invoke(&["status"], b"{}");
+    assert!(output.status.success(), "{output:?}");
+    assert!(output.stderr.is_empty(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    for canary in ["PRIVATE", "fixture-secret", "stable"] {
+        assert!(!stdout.contains(canary), "{stdout}");
+    }
+    serde_json::from_str(&stdout).unwrap()
+}
+
+fn get_query_problems(status: &Value) -> Vec<Value> {
+    status["result"]["problems"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|problem| problem["details"]["reason"] == "query_embedding_failed")
+        .cloned()
+        .collect()
+}
+
 fn assert_unchanged_vector_state(repo: &ReadingRepo, config: &EmbeddingConfig) {
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();

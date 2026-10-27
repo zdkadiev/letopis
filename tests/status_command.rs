@@ -6,6 +6,7 @@ use std::{
     fs::{self, OpenOptions},
     io::{ErrorKind, Write},
     net::TcpListener,
+    os::unix::fs::symlink,
     time::Instant,
 };
 use support::reading::ReadingRepo;
@@ -281,6 +282,59 @@ fn status_reports_busy_index_lock_without_waiting_or_writing_pid() {
     );
     assert_eq!(fs::read(&path).unwrap(), original);
     flock(&owner, FlockOperation::Unlock).unwrap();
+}
+
+#[test]
+fn drain_start_failure_warns_without_persisting_and_keeps_fts() {
+    // Given: pending embedding work, a valid config, and an unsafe embed lock.
+    let repo = ReadingRepo::new();
+    repo.write_knowledge("known.md", "needle");
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let url = format!("http://{}/api", listener.local_addr().unwrap());
+    repo.write_config("ollama", &url, "fixture");
+    let outside = tempfile::tempdir().unwrap();
+    let canary = outside.path().join("embed-canary");
+    fs::write(&canary, b"DRAIN_CANARY").unwrap();
+    let lock = repo.get_root().join(".letopis/embed.lock");
+    symlink(&canary, &lock).unwrap();
+
+    // When: a real product search runs and the drain cannot start.
+    let output = repo.invoke(
+        &["search"],
+        json!({"query":"needle","limit":10}).to_string().as_bytes(),
+    );
+
+    // Then: FTS succeeds with one safe warning and no provider call.
+    assert!(output.status.success(), "{output:?}");
+    assert!(output.stderr.is_empty(), "{output:?}");
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["ok"], true);
+    assert_eq!(value["result"].as_array().unwrap().len(), 1);
+    assert_eq!(value["result"][0]["element_id"], "known.md");
+    assert_eq!(
+        value["warnings"],
+        json!([{
+            "code": "internal_error",
+            "message": "cannot start background embedding drain",
+            "details": {}
+        }])
+    );
+    assert!(matches!(listener.accept(), Err(error) if error.kind() == ErrorKind::WouldBlock));
+    assert_eq!(fs::read(&canary).unwrap(), b"DRAIN_CANARY");
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("DRAIN_CANARY"));
+
+    // Given: the injected lock fault is removed.
+    fs::remove_file(&lock).unwrap();
+    // When / Then: a fresh status contains no persisted launch warning.
+    let status = read_status(&repo);
+    assert_eq!(status["result"]["problems"], json!([]));
+    assert!(
+        !status
+            .to_string()
+            .contains("cannot start background embedding drain")
+    );
+    assert_eq!(fs::read(&canary).unwrap(), b"DRAIN_CANARY");
 }
 
 fn seed_diagnostic_files(repo: &ReadingRepo) {
