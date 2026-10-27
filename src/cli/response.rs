@@ -1,12 +1,13 @@
 use crate::service::{
-    BackgroundRunner, CheckReport, CommandProblem, CommandResult, Inspection, SearchLink,
-    StatusReport, Traversal,
+    BackgroundRunner, CheckReport, CommandProblem, CommandResult, EmbeddingConfig, Inspection,
+    SearchLink, StatusReport, Traversal,
 };
 
 /// Typed application results before X-1 transport rendering.
 #[derive(Debug)]
 pub(crate) enum ResponseResult {
     Status(StatusReport),
+    Config(Option<EmbeddingConfig>),
     Reindex(u64),
     Check(CheckReport),
     Inspect(Inspection),

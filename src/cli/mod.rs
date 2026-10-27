@@ -12,6 +12,9 @@ pub(crate) use response::{CommandResponse, ResponseResult, finish_foreground};
 mod tests;
 
 #[cfg(test)]
+mod config_tests;
+
+#[cfg(test)]
 mod search_tests;
 
 #[cfg(test)]

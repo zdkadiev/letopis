@@ -6,6 +6,7 @@ mod check;
 mod check_problems;
 mod command;
 mod command_traits;
+mod configuration;
 mod document_refresher;
 mod document_traits;
 mod embedding;
@@ -35,6 +36,8 @@ mod traversal_types;
 
 pub(crate) use background::BackgroundService;
 pub(crate) use check::CheckService;
+/// Read-only configuration observation over non-creating files and local provider validation.
+pub(crate) use configuration::ConfigurationService;
 /// Cache refresh implementation and its caller-owned collaborator bundle.
 pub(crate) use document_refresher::DocumentRefreshService;
 pub(crate) use embedding::EmbeddingService;
@@ -60,8 +63,8 @@ pub use command::{
 #[cfg(test)]
 pub(crate) use command_traits::MockBackgroundRunner;
 pub use command_traits::{
-    BackgroundRunner, Checker, DrainLauncher, EmbedLocker, EmbeddingExecutor, Inspector, Searcher,
-    StatusReader, Traverser,
+    BackgroundRunner, Checker, ConfigReader, DrainLauncher, EmbedLocker, EmbeddingExecutor,
+    Inspector, Searcher, StatusReader, Traverser,
 };
 pub use document_traits::{CorpusLister, FileSystem, MarkdownCodec, Refresher};
 #[cfg(test)]

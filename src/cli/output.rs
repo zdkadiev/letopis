@@ -1,11 +1,11 @@
 use super::response::{CommandResponse, ResponseResult};
 use crate::domain::{Edge, Sha256};
 use crate::service::{
-    CommandError, CommandErrorKind, CommandProblem, HeldLock, InspectedElement, LockName,
-    SearchFlag, SearchLink, TraversalLink,
+    CommandError, CommandErrorKind, CommandProblem, EmbeddingConfig, HeldLock, InspectedElement,
+    LockName, ProviderKind, SearchFlag, SearchLink, TraversalLink,
 };
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::{
     collections::BTreeMap,
     io::{self, Write},
@@ -42,6 +42,7 @@ enum ResultBody<'a> {
         locks: Vec<Lock>,
         problems: Vec<Problem<'a>>,
     },
+    Config(Option<Configuration<'a>>),
     Check {
         errors: Vec<Problem<'a>>,
     },
@@ -69,6 +70,15 @@ struct Element<'a> {
 struct Lock {
     name: &'static str,
     pid: u32,
+}
+
+/// X-1 configuration object; identity, derived dimensions and credentials never appear.
+#[derive(Serialize)]
+struct Configuration<'a> {
+    provider: &'static str,
+    model: &'a str,
+    parameters: &'a Map<String, Value>,
+    max_retries: u64,
 }
 
 /// Existing X-1 metadata envelope; freshness flags never add source text or fields.
@@ -150,6 +160,9 @@ fn build_result(result: &ResponseResult) -> ResultBody<'_> {
             locks: report.locks.iter().map(build_lock).collect(),
             problems: report.problems.iter().map(build_problem).collect(),
         },
+        ResponseResult::Config(config) => {
+            ResultBody::Config(config.as_ref().map(build_configuration))
+        }
         ResponseResult::Check(report) => ResultBody::Check {
             errors: report.errors.iter().map(build_problem).collect(),
         },
@@ -183,6 +196,20 @@ fn build_lock(lock: &HeldLock) -> Lock {
             LockName::Embed => "embed",
         },
         pid: lock.pid.get(),
+    }
+}
+fn build_configuration(config: &EmbeddingConfig) -> Configuration<'_> {
+    Configuration {
+        provider: get_provider_name(config.get_provider()),
+        model: config.get_model(),
+        parameters: config.get_parameters(),
+        max_retries: config.get_max_attempts().saturating_sub(1),
+    }
+}
+fn get_provider_name(provider: ProviderKind) -> &'static str {
+    match provider {
+        ProviderKind::Ollama => "ollama",
+        ProviderKind::Openai => "openai",
     }
 }
 fn build_link(link: &SearchLink) -> Link<'_> {
