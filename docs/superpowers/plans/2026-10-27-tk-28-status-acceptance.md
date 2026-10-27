@@ -43,87 +43,22 @@
 
 - [ ] **Step 1: Add the acceptance test and helpers**
 
-Append this test and helpers to `tests/search_filter_fallback.rs`:
+Append three single-scenario tests and shared helpers (`prepare_query_scenario`,
+`expected_query_problem`, `read_status`, `get_query_problems`) to
+`tests/search_filter_fallback.rs`:
 
-```rust
-#[test]
-fn query_failure_is_visible_in_status_until_a_successful_query() {
-    // Given: two failing provider replies followed by one successful reply.
-    let repo = ReadingRepo::new();
-    let basis = prepare_notes(&repo);
-    let server = HttpFixture::start_sequence(vec![
-        FixtureReply::Status {
-            status: 500,
-            body: "PRIVATE provider fixture-secret".into(),
-        },
-        FixtureReply::Status {
-            status: 500,
-            body: "PRIVATE provider fixture-secret".into(),
-        },
-        FixtureReply::Status {
-            status: 200,
-            body: r#"{"model":"fixture","embeddings":[[1,0]]}"#.into(),
-        },
-    ]);
-    let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
-    prepare_vectors(&repo, &config, 2);
-    let input = build_input(&basis);
-    let expected = json!({
-        "code": "embedding_failed",
-        "message": "query embedding failed",
-        "details": {"reason": "query_embedding_failed"}
-    });
+- `query_failure_keeps_fts_and_appears_in_status` — one failing reply; search keeps
+  FTS results and status reports exactly one current problem.
+- `repeated_query_failure_keeps_one_current_problem` — two failing replies in
+  separate processes; the current record is replaced, not accumulated.
+- `successful_query_clears_the_query_problem` — a failing reply followed by a
+  successful one; semantic results appear and status no longer reports the problem.
 
-    // When: the first query embedding fails.
-    let first = invoke_search(&repo, &input);
-    // Then: FTS results remain and status reports exactly one current problem.
-    assert_eq!(read_ids(&first), ["a.md", "b.md"]);
-    assert_eq!(get_query_problems(&read_status(&repo)), vec![expected.clone()]);
-    assert_eq!(server.take_requests().len(), 1);
+- [ ] **Step 2: Run the tests**
 
-    // When: a second query embedding fails in a separate process.
-    let second = invoke_search(&repo, &input);
-    // Then: the one current record is replaced, not accumulated.
-    assert_eq!(read_ids(&second), ["a.md", "b.md"]);
-    assert_eq!(get_query_problems(&read_status(&repo)), vec![expected]);
-    // `take_requests` drains its log, so this counts requests since the previous call.
-    assert_eq!(server.take_requests().len(), 1);
+Run: `cargo test --locked --offline --test search_filter_fallback query_ -- --nocapture`
 
-    // When: a later query embedding succeeds.
-    let recovered = invoke_search(&repo, &input);
-    // Then: semantic results appear and status no longer reports the problem.
-    assert_eq!(read_ids(&recovered), ["a.md", "b.md", "semantic.md"]);
-    assert!(get_query_problems(&read_status(&repo)).is_empty());
-    assert_eq!(server.take_requests().len(), 1);
-}
-
-fn read_status(repo: &ReadingRepo) -> Value {
-    let output = repo.invoke(&["status"], b"{}");
-    assert!(output.status.success(), "{output:?}");
-    assert!(output.stderr.is_empty(), "{output:?}");
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    for canary in ["PRIVATE", "fixture-secret", "stable"] {
-        assert!(!stdout.contains(canary), "{stdout}");
-    }
-    serde_json::from_str(&stdout).unwrap()
-}
-
-fn get_query_problems(status: &Value) -> Vec<Value> {
-    status["result"]["problems"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|problem| problem["details"]["reason"] == "query_embedding_failed")
-        .cloned()
-        .collect()
-}
-```
-
-- [ ] **Step 2: Run the test**
-
-Run: `cargo test --locked --offline --test search_filter_fallback query_failure_is_visible_in_status_until_a_successful_query -- --nocapture`
-
-Expected: PASS (1 passed). If it FAILS, stop: the failure is the reproduced defect. Fix only in the owner named above, rerun, and record the exact failure in the task report.
+Expected: PASS (5 passed). If it FAILS, stop: the failure is the reproduced defect. Fix only in the owner named above, rerun, and record the exact failure in the task report.
 
 - [ ] **Step 3: Mutation-check the test**
 
@@ -150,64 +85,21 @@ git commit -m "test: accept query failure status lifecycle"
 
 - [ ] **Step 1: Add the acceptance test**
 
-Add `use std::os::unix::fs::symlink;` to the imports, then append:
+Add `use std::os::unix::fs::symlink;` and `use std::path::PathBuf;` to the imports,
+then append two single-scenario tests and the shared helper
+`prepare_failed_drain(repo) -> (TempDir, PathBuf, TcpListener)`:
 
-```rust
-#[test]
-fn drain_start_failure_warns_without_persisting_and_keeps_fts() {
-    // Given: pending embedding work, a valid config, and an unsafe embed lock.
-    let repo = ReadingRepo::new();
-    repo.write_knowledge("known.md", "needle");
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    listener.set_nonblocking(true).unwrap();
-    let url = format!("http://{}/api", listener.local_addr().unwrap());
-    repo.write_config("ollama", &url, "fixture");
-    let outside = tempfile::tempdir().unwrap();
-    let canary = outside.path().join("embed-canary");
-    fs::write(&canary, b"DRAIN_CANARY").unwrap();
-    let lock = repo.get_root().join(".letopis/embed.lock");
-    symlink(&canary, &lock).unwrap();
+- `drain_start_failure_warns_and_keeps_fts` — a search with an unsafe embed lock
+  returns FTS results, one safe warning, no provider call, and leaves the canary
+  untouched.
+- `drain_start_failure_is_absent_from_status` — after the same failed drain, a fresh
+  `status` contains no persisted launch warning and the canary is untouched.
 
-    // When: a real product search runs and the drain cannot start.
-    let output = repo.invoke(
-        &["search"],
-        json!({"query":"needle","limit":10}).to_string().as_bytes(),
-    );
+- [ ] **Step 2: Run the tests**
 
-    // Then: FTS succeeds with one safe warning and no provider call.
-    assert!(output.status.success(), "{output:?}");
-    assert!(output.stderr.is_empty(), "{output:?}");
-    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(value["ok"], true);
-    assert_eq!(value["result"].as_array().unwrap().len(), 1);
-    assert_eq!(value["result"][0]["element_id"], "known.md");
-    assert_eq!(
-        value["warnings"],
-        json!([{
-            "code": "internal_error",
-            "message": "cannot start background embedding drain",
-            "details": {}
-        }])
-    );
-    assert!(matches!(listener.accept(), Err(error) if error.kind() == ErrorKind::WouldBlock));
-    assert_eq!(fs::read(&canary).unwrap(), b"DRAIN_CANARY");
-    assert!(!String::from_utf8_lossy(&output.stdout).contains("DRAIN_CANARY"));
+Run: `cargo test --locked --offline --test status_command drain_start_failure -- --nocapture`
 
-    // Given: the injected lock fault is removed.
-    fs::remove_file(&lock).unwrap();
-    // When / Then: a fresh status contains no persisted launch warning.
-    let status = read_status(&repo);
-    assert_eq!(status["result"]["problems"], json!([]));
-    assert!(!status.to_string().contains("cannot start background embedding drain"));
-    assert_eq!(fs::read(&canary).unwrap(), b"DRAIN_CANARY");
-}
-```
-
-- [ ] **Step 2: Run the test**
-
-Run: `cargo test --locked --offline --test status_command drain_start_failure_warns_without_persisting_and_keeps_fts -- --nocapture`
-
-Expected: PASS (1 passed). If it FAILS, stop and fix only in the owner named above.
+Expected: PASS (2 passed). If it FAILS, stop and fix only in the owner named above.
 
 - [ ] **Step 3: Mutation-check the test**
 
@@ -313,51 +205,21 @@ fn restore_retained_file(&self) {
 
 - [ ] **Step 4: Add the acceptance test**
 
-```rust
-#[test]
-fn uncommitted_file_diagnostic_is_absent_from_status_until_republished() {
-    // Given: a valid publication, then one authored file becomes invalid.
-    let fixture = Fixture::new();
-    fixture.invalidate_retained_file();
+Add three single-scenario tests:
 
-    // When: the cache commit fails after the invalid file projection is staged.
-    Worker::spawn(fixture.root.path(), "fail").finish();
+- `uncommitted_file_diagnostic_is_absent_from_status` — a late storage failure
+  leaves the old publication visible, and a fresh status derives no file problem
+  and exposes no canary.
+- `failed_publication_retry_persists_the_file_diagnostic` — after the fault is gone,
+  publication persists the real safe diagnostic and a fresh status reports it.
+- `repaired_file_problem_disappears_after_publication` — after the authored file is
+  repaired and republished, the current problem disappears.
 
-    // Then: the old publication remains and a fresh status derives no file problem.
-    assert_eq!(read_state(fixture.root.path()), fixture.old);
-    let status = read_status(fixture.root.path());
-    assert_eq!(status.revision, Some(1));
-    assert!(get_invalid_file_problems(&status).is_empty());
-    assert!(!format!("{status:?}").contains(DIAGNOSTIC_CANARY));
+- [ ] **Step 5: Run the tests**
 
-    // When: the injected fault is gone and publication retries.
-    Worker::spawn(fixture.root.path(), "publish").finish();
+Run: `LETOPIS_TEST_EVIDENCE=.artifacts/tk-28/process cargo test --locked --offline --lib service::document_refresher::tests::process:: -- --nocapture`
 
-    // Then: the real safe diagnostic is persisted and survives a fresh status.
-    let status = read_status(fixture.root.path());
-    assert_eq!(status.revision, Some(2));
-    assert_eq!(
-        get_invalid_file_problems(&status),
-        vec![("i.md".to_owned(), "invalid_metadata".to_owned())]
-    );
-    assert!(!format!("{status:?}").contains(DIAGNOSTIC_CANARY));
-
-    // Given: the authored file is repaired.
-    fixture.restore_retained_file();
-
-    // When / Then: a new publication makes the current problem disappear.
-    Worker::spawn(fixture.root.path(), "publish").finish();
-    let status = read_status(fixture.root.path());
-    assert_eq!(status.revision, Some(3));
-    assert!(get_invalid_file_problems(&status).is_empty());
-}
-```
-
-- [ ] **Step 5: Run the test**
-
-Run: `LETOPIS_TEST_EVIDENCE=.artifacts/tk-28/process cargo test --locked --offline --lib service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status_until_republished -- --nocapture`
-
-Expected: PASS (1 passed). If it FAILS, stop and fix only in the owner named above.
+Expected: PASS (16 passed, 1 ignored). If it FAILS, stop and fix only in the owner named above.
 
 - [ ] **Step 6: Mutation-check the test**
 
@@ -441,9 +303,10 @@ preconditions in private helpers. Final names:
 - `uncommitted_file_diagnostic_is_absent_from_status`
 - `failed_publication_retry_persists_the_file_diagnostic`
 - `repaired_file_problem_disappears_after_publication`
-- `drain_start_failure_warns_without_persisting_and_keeps_fts` (unchanged)
+- `drain_start_failure_warns_and_keeps_fts`
+- `drain_start_failure_is_absent_from_status`
 
-Committed as `52b317a`. Mutation controls for the affected behaviors were rerun
+Committed as `52b317a`; the drain test was split in `b2efec9`. Mutation controls for the affected behaviors were rerun
 against the split tests and still fail as intended; the plan-specified
 `cache_write` commit-guard mutation still passes (the guard is defense-in-depth
 relative to statement-error propagation) and the compound mutation is detected.

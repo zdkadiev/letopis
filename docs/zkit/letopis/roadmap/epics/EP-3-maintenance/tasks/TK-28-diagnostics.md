@@ -89,7 +89,7 @@ PASS не доказывает overlay health, persistence/power-loss, resource/
 или x86_64 acceptance.
 
 2026-10-27: два оставшихся критерия закрыты acceptance-тестами на `tk-28`
-(ревизия проверки `52b317a`, host macOS/Darwin arm64), продуктовый Rust-код не
+(ревизия проверки `b2efec9`, host macOS/Darwin arm64), продуктовый Rust-код не
 изменён; каждый тест покрывает один сценарий. storage failure: production-process
 сценарии `uncommitted_file_diagnostic_is_absent_from_status`,
 `failed_publication_retry_persists_the_file_diagnostic`,
@@ -100,8 +100,9 @@ coherent, а свежий `status` не выдаёт несохранённую 
 файла. Query/drain lifecycle: real product CLI сценарии
 `query_failure_keeps_fts_and_appears_in_status`,
 `repeated_query_failure_keeps_one_current_problem`,
-`successful_query_clears_the_query_problem` (`52b317a`) и
-`drain_start_failure_warns_without_persisting_and_keeps_fts` (`277528b`) подтверждают
+`successful_query_clears_the_query_problem` (`52b317a`),
+`drain_start_failure_warns_and_keeps_fts` (бывший `277528b`, разделён) и
+`drain_start_failure_is_absent_from_status` (`b2efec9`) подтверждают
 одну строку `vec.query_error` (замена, не история), видимость в `status` после
 отдельных процессов, сброс успешным запросом, отсутствие предупреждения в ответе
 search и transient «cannot start background embedding drain» без сохранения;
