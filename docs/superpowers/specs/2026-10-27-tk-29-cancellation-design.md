@@ -1,6 +1,6 @@
 # TK-29 — Handled cancellation and concurrent processes
 
-Status: proposed for user approval. Branch: `tk-29`. Base: `origin/main`
+Status: approved by the user on 2026-10-27. Branch: `tk-29`. Base: `origin/main`
 `34af7d7a7f67cbde7db61622f354bcb6532b8866`. Product implementation has not started.
 
 ## Intent and authoritative scope
@@ -17,8 +17,10 @@ Sources: [D-95/D-96 and D-103](../../zkit/letopis/decisions.md),
 [program structure](../../zkit/letopis/architecture.md#program-structure) and its
 [review rules](../../zkit/letopis/architecture.md#program-structure-review).
 
-The user selected the task-card approach on 2026-10-27. That selection approves
-the direction; this written specification still requires approval.
+The user selected the task-card approach and approved this written specification
+on 2026-10-27, including the config completion and commit-order clarification.
+Only preparation of the implementation plan is currently authorized; execution
+must wait for a separate instruction.
 
 ## Approaches and decisions
 
@@ -46,7 +48,7 @@ the executable must acquire it only while actually writing a response.
 null standard streams. Storage publishes atomically; vector writes check current
 identity and hash. Extend these owners only for a demonstrated TK-29 defect.
 
-**Proposal requiring approval with this document:** X-1 specifies `config`, but
+**Approved completion of an existing contract:** X-1 specifies `config`, but
 the current request enum/parser/dispatch has no config command. Complete that
 existing read-only command here because the card requires the full CLI/skill
 workflow. Input is `{}`; absent config returns `ok:true,result:null`; a valid
@@ -103,8 +105,8 @@ mapping and the smallest service-owned interface for this observation.
   untouched. Signal receipt, cancellation output and process termination are
   distinct events: a commit may win between them. A `cancelled` response promises
   caller termination, not proof that no publication committed. This is the
-  proposed precise interpretation of the card's before/after-commit wording under
-  D-96, requiring approval with this document. No commit-vs-signal coordination
+  approved precise interpretation of the card's before/after-commit wording under
+  D-96. No commit-vs-signal coordination
   protocol is added. The pre-commit fixture must keep commit blocked until actual
   process death; receiving SIGINT alone is not its rollback oracle.
 - Concurrent publishers serialize through the existing persistent index lock.
@@ -193,6 +195,6 @@ and outstanding criteria in the task card, report and existing Engram store.
 Independent Superpowers builder check identified one ambiguity: signal delivery
 does not atomically prevent the main thread from committing before process exit.
 The publication section now states the termination/commit ordering and the
-corresponding test oracle explicitly. No additional user requirement was inferred;
-this interpretation and the config completion proposal remain subject to design
-approval. All other reviewed implementation choices were sufficiently bounded.
+corresponding test oracle explicitly. The user subsequently approved this
+interpretation and config completion with the specification. All other reviewed
+implementation choices were sufficiently bounded.
