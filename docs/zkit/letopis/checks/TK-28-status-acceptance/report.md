@@ -1,6 +1,6 @@
 # TK-28 — status diagnostics final acceptance
 
-2026-10-27. Ветка `tk-28` (base `main` `b20543e`), проверенная ревизия `faaecda`,
+2026-10-27. Ветка `tk-28` (base `main` `b20543e`), проверенная ревизия `52b317a`,
 платформа macOS/Darwin arm64. Задача закрывает два оставшихся критерия приёмки
 [карточки TK-28](../../roadmap/epics/EP-3-maintenance/tasks/TK-28-diagnostics.md)
 по [спецификации](../../../../superpowers/specs/2026-10-26-tk-28-status-acceptance-design.md)
@@ -13,37 +13,48 @@
 
 | Критерий | Тест (scope) | Команда | Ожидание | Факт |
 | --- | --- | --- | --- | --- |
-| storage failure не выдаётся за сохранённую ошибку | `service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status_until_republished` (`2d14922`); production-process composition в реальном child-процессе тестового бинарника, не полный product CLI | `cargo test --locked --offline --lib service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status_until_republished -- --nocapture` | PASS | **1 passed / 0 failed** (311 filtered, 1.36s) |
-| Ошибка query embedding — одна строка, видна в status, без предупреждения в search, сброс успешным запросом; drain launch failure — transient warning, не сохраняется; FTS-only остаётся успешной | `tests/search_filter_fallback.rs::query_failure_is_visible_in_status_until_a_successful_query` (`84c9d03`); реальный product CLI binary, каждая операция — отдельный процесс | `cargo test --locked --offline --test search_filter_fallback query_failure_is_visible_in_status_until_a_successful_query` | PASS | **1 passed / 0 failed** (3 filtered, 9.06s) |
+| storage failure не выдаётся за сохранённую ошибку | `service::document_refresher::tests::process::uncommitted_file_diagnostic_is_absent_from_status`; `service::document_refresher::tests::process::failed_publication_retry_persists_the_file_diagnostic`; `service::document_refresher::tests::process::repaired_file_problem_disappears_after_publication` (`52b317a`); production-process composition в реальном child-процессе тестового бинарника, не полный product CLI | `cargo test --locked --offline --lib service::document_refresher::tests::process::` | PASS | **16 passed / 0 failed / 1 ignored** (313 filtered, 13.79s) |
+| Ошибка query embedding — одна строка, видна в status, без предупреждения в search, сброс успешным запросом; drain launch failure — transient warning, не сохраняется; FTS-only остаётся успешной | `tests/search_filter_fallback.rs::query_failure_keeps_fts_and_appears_in_status`; `tests/search_filter_fallback.rs::repeated_query_failure_keeps_one_current_problem`; `tests/search_filter_fallback.rs::successful_query_clears_the_query_problem` (`52b317a`); реальный product CLI binary, каждая операция — отдельный процесс | `cargo test --locked --offline --test search_filter_fallback query_` | PASS | **5 passed / 0 failed** (1 filtered, 8.86s) |
 | — drain warning | `tests/status_command.rs::drain_start_failure_warns_without_persisting_and_keeps_fts` (`277528b`, fmt `faaecda`); реальный product CLI binary | `cargo test --locked --offline --test status_command drain_start_failure_warns_without_persisting_and_keeps_fts` | PASS | **1 passed / 0 failed** (7 filtered, 1.11s) |
+
+Каждый TK-28 `#[test]` покрывает один сценарий (правило пользователя 2026-10-27);
+общие предусловия вынесены в приватные helpers (`prepare_query_scenario`,
+`expected_query_problem`, `Fixture::invalidate_retained_file`,
+`Fixture::restore_retained_file`, `read_status`, `get_invalid_file_problems`).
 
 ### Наблюдаемое поведение
 
-- **Query failure.** Известное состояние с векторами и неизменным валидным config;
-  две последовательные ошибки query embedding (HTTP 500) оставляют FTS-результаты
+- **Query failure виден в status.** Известное состояние с векторами и неизменным
+  валидным config; одна ошибка query embedding (HTTP 500) оставляет FTS-результаты
   (`a.md`, `b.md`) без `warnings` в ответе search; `status` в отдельном процессе
-  показывает ровно один `query_embedding_failed` (второй сбой заменяет запись, не
-  накапливает историю); успешный третий запрос возвращает semantic-результат
-  (`semantic.md`) и очищает запись; `status` сам не вызывает provider и не чистит
-  запись. Канарные строки провайдера (`PRIVATE`, `fixture-secret`) не появляются
-  в stdout/stderr search и status.
+  показывает ровно один `query_embedding_failed`; канарные строки провайдера
+  (`PRIVATE`, `fixture-secret`) не появляются в stdout/stderr search и status.
+- **Повторный сбой не накапливает историю.** Два последовательных сбоя в отдельных
+  процессах заменяют ту же одну запись; `status` по-прежнему показывает ровно один
+  `query_embedding_failed`.
+- **Успешный запрос очищает запись.** После сбоя успешный query embedding
+  возвращает semantic-результат (`semantic.md`); `status` больше не сообщает
+  проблему; `status` сам не вызывает provider и не чистит запись.
 - **Drain launch failure.** Реальный product `search` при наличии backlog и
   недоступном embed lock (симлинк на внешний canary-файл): ответ успешен,
   FTS находит `known.md`, ровно одно предупреждение `internal_error` /
   «cannot start background embedding drain» с пустыми `details`; provider не
   вызван (`TcpListener` без соединений); canary не утёк; после снятия fault
   свежий `status` не содержит проблем — предупреждение не сохранено.
-- **Storage failure.** Валидная публикация (revision 1), затем authored-файл
-  становится invalid; детерминированный поздний storage-отказ (private
-  `fail_late` checkpoint в реальном child-процессе после staging проекции
+- **Незакоммиченный diagnostic не виден.** Валидная публикация (revision 1),
+  затем authored-файл становится invalid; детерминированный поздний storage-отказ
+  (private `fail_late` checkpoint в реальном child-процессе после staging проекции
   `files.error`): refresh возвращает infrastructure-ошибку (`StorageError` как
   source), Debug ошибки не содержит canary; старая публикация остаётся
   (exact old state, revision 1), свежий `status` через `StatusService` +
   `SqliteStatusStorage` (та же композиция, что в `lib.rs::run_status`) не видит
-  несохранённый file diagnostic. После снятия fault повторная публикация
-  сохраняет реальный безопасный diagnostic (`i.md` / `invalid_metadata`,
-  revision 2), он переживает свежий status; исправление файла и новая публикация
-  (revision 3) убирают проблему.
+  несохранённый file diagnostic.
+- **Повторная публикация сохраняет реальный diagnostic.** После снятия fault
+  публикация записывает безопасный diagnostic (`i.md` / `invalid_metadata`,
+  revision 2), и он переживает свежий status; canary не появляется в отчёте.
+- **Исправление убирает проблему.** Публикация с сохранённым diagnostic, затем
+  исправление файла и новая публикация (revision 3): свежий `status` больше не
+  содержит `i.md`-проблему.
 
 ### Executed scope
 
@@ -58,11 +69,15 @@ TK-10/TK-26 process-тестам, и он не выдаётся за product-bin
 
 | Мутация | Ожидание | Факт |
 | --- | --- | --- |
-| `src/service/status.rs`: инверсия условия проекции `read_query_error` (`.is_some()` → `.is_none()`) | FAIL | FAILED на `tests/search_filter_fallback.rs:176` (problems assertion); байты восстановлены, PASS |
-| `src/service/background.rs`: `Err(_) => return Ok(None)` вместо warning в lock-probe ветви | FAIL | FAILED на `tests/status_command.rs:315` (warnings assertion, `Null` ≠ массив); восстановлено, PASS |
+| `src/service/status.rs`: инверсия условия проекции `read_query_error` (`.is_some()` → `.is_none()`) | FAIL | FAILED в `query_failure_keeps_fts_and_appears_in_status` (assertion проблем status, left=`[]`); байты восстановлены, PASS |
+| `src/service/background.rs`: `Err(_) => return Ok(None)` вместо warning в lock-probe ветви | FAIL | FAILED в `drain_start_failure_warns_without_persisting_and_keeps_fts` (warnings assertion, `Null` ≠ массив); восстановлено, PASS |
 | `src/storage/cache_write.rs`: отключение `failed`-guard в `commit` (плановая мутация) | FAIL | **PASS** — плановое ожидание неверно: ошибку оператора уже возвращает `record`, транзакция откатывается без guard; guard — defense-in-depth |
-| `src/storage/cache_write.rs`: проглатывание ошибки `upsert_file` при рабочем guard | PASS (guard отклоняет commit) | **PASS** — guard единолочно предотвращает публикацию при проглоченной ошибке |
-| Обе предыдущие одновременно | FAIL | FAILED: child-процесс падает на собственном утверждении «refresh обязан вернуть ошибку» (committed-несмотря-на-отказ детектирован); восстановлено, PASS |
+| `src/storage/cache_write.rs`: проглатывание ошибки `upsert_file` при рабочем guard | PASS (guard отклоняет commit) | **PASS** — guard единолично предотвращает публикацию при проглоченной ошибке |
+| Обе предыдущие одновременно | FAIL | FAILED в `uncommitted_file_diagnostic_is_absent_from_status`: child-процесс падает на собственном утверждении «refresh обязан вернуть ошибку» (committed-несмотря-на-отказ детектирован); восстановлено, PASS |
+
+Мутации status-проекции и compound storage-мутация перепроверены после разбиения
+тестов на один сценарий на функцию (`52b317a`); остальные контроли относятся к
+неизменённым тестам.
 
 Все мутации выполнялись в рабочем дереве и восстановлены до точных байтов
 (`git diff` по продуктовым файлам пуст после каждой мутации).
@@ -83,7 +98,7 @@ TK-10/TK-26 process-тестам, и он не выдаётся за product-bin
 | --- | --- |
 | `make check` | `ok` (fmt, all-target cargo check, Clippy `-D warnings`, root tests) |
 | `make verify` | `ok` (make check + strict Rustdoc + release root tests) |
-| `cargo test --locked --offline` (root, dev profile) | 796 passed / 0 failed / 5 ignored, 70 suites, 179.60s |
+| `cargo test --locked --offline` (root, dev profile) | 800 passed / 0 failed / 5 ignored, 70 suites, 170.14s |
 | `cargo fmt --check` | чисто после `faaecda` (исправлено нарушение из `277528b`) |
 | `python3 -B tests/storage/run.py` | **не запускался**: storage schema, native stack, build и vendored inputs не менялись — только тесты и форматирование |
 

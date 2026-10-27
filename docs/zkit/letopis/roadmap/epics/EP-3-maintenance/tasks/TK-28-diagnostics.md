@@ -89,14 +89,18 @@ PASS не доказывает overlay health, persistence/power-loss, resource/
 или x86_64 acceptance.
 
 2026-10-27: два оставшихся критерия закрыты acceptance-тестами на `tk-28`
-(ревизия проверки `faaecda`, host macOS/Darwin arm64), продуктовый Rust-код не
-изменён. storage failure: production-process сценарий
-`uncommitted_file_diagnostic_is_absent_from_status_until_republished` (`2d14922`)
-доказывает, что поздний storage-отказ не публикует staged `files.error`, старая
-публикация остаётся coherent, а свежий `status` не выдаёт несохранённую ошибку;
-после снятия fault повторная публикация сохраняет реальный diagnostic, он исчезает
-после исправления файла. Query/drain lifecycle: real product CLI сценарии
-`query_failure_is_visible_in_status_until_a_successful_query` (`84c9d03`) и
+(ревизия проверки `52b317a`, host macOS/Darwin arm64), продуктовый Rust-код не
+изменён; каждый тест покрывает один сценарий. storage failure: production-process
+сценарии `uncommitted_file_diagnostic_is_absent_from_status`,
+`failed_publication_retry_persists_the_file_diagnostic`,
+`repaired_file_problem_disappears_after_publication` (`52b317a`) доказывают, что
+поздний storage-отказ не публикует staged `files.error`, старая публикация остаётся
+coherent, а свежий `status` не выдаёт несохранённую ошибку; после снятия fault
+повторная публикация сохраняет реальный diagnostic, он исчезает после исправления
+файла. Query/drain lifecycle: real product CLI сценарии
+`query_failure_keeps_fts_and_appears_in_status`,
+`repeated_query_failure_keeps_one_current_problem`,
+`successful_query_clears_the_query_problem` (`52b317a`) и
 `drain_start_failure_warns_without_persisting_and_keeps_fts` (`277528b`) подтверждают
 одну строку `vec.query_error` (замена, не история), видимость в `status` после
 отдельных процессов, сброс успешным запросом, отсутствие предупреждения в ответе
@@ -105,7 +109,7 @@ FTS-only выдача успешна. Мутационные контроли в
 guard дала PASS — guard избыточен относительно распространения ошибки оператора
 (record), это задокументировано как defense-in-depth; compound-мутация
 (проглатывание ошибки + отключённый guard) детектирована тестом. `make check` и
-`make verify` — `ok`; полный root suite 796 passed / 0 failed / 5 ignored.
+`make verify` — `ok`; полный root suite 800 passed / 0 failed / 5 ignored.
 Повторно использованы evidence TK-26 (`8bc4fca`) и TK-27 (`14d1e47`, ревью
 `02b9736`) без переклеймивания. Точный [отчёт](../../../../checks/TK-28-status-acceptance/report.md).
 Границы: x86_64, физический power-loss (TK-38), resource/minimum-hardware

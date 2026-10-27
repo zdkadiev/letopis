@@ -428,3 +428,22 @@ git commit -m "docs: report TK-28 status acceptance"
 - **Type consistency:** `read_status` returns `Value` in the CLI tests and `StatusReport` in the process driver; names match the types they return. `get_query_problems` and `get_invalid_file_problems` are separate because their value types differ.
 - **Review Focus:** all five lines map to Tasks 1–3 as listed above.
 - **Proportion:** three focused tests plus one evidence task; no production code changes are planned.
+
+## Implementation deviation (2026-10-27)
+
+The user required one scenario per test function. The combined lifecycle tests in
+Tasks 1 and 3 were split; each `#[test]` now covers one scenario, with shared
+preconditions in private helpers. Final names:
+
+- `query_failure_keeps_fts_and_appears_in_status`
+- `repeated_query_failure_keeps_one_current_problem`
+- `successful_query_clears_the_query_problem`
+- `uncommitted_file_diagnostic_is_absent_from_status`
+- `failed_publication_retry_persists_the_file_diagnostic`
+- `repaired_file_problem_disappears_after_publication`
+- `drain_start_failure_warns_without_persisting_and_keeps_fts` (unchanged)
+
+Committed as `52b317a`. Mutation controls for the affected behaviors were rerun
+against the split tests and still fail as intended; the plan-specified
+`cache_write` commit-guard mutation still passes (the guard is defense-in-depth
+relative to statement-error propagation) and the compound mutation is detected.
