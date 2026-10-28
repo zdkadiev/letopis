@@ -121,6 +121,10 @@ impl LocalFileSystem {
         self.on_contention.replace(Some(hook));
     }
 
+    pub(super) fn get_root_directory(&self) -> &File {
+        &self.root
+    }
+
     /// Create or validate the private service directory and return an owned descriptor.
     ///
     /// The first successful call pins its identity; subsequent calls reject replacement.
@@ -384,7 +388,7 @@ impl LocalFileSystem {
             .map_err(|cause| fail_io("coordination lock changed", cause))
     }
 
-    fn get_service_directory(&self) -> DocumentResult<&File> {
+    pub(super) fn get_service_directory(&self) -> DocumentResult<&File> {
         if self.service.get().is_none() {
             let directory = self.create_service_directory()?;
             let _ = self.service.set(directory);
@@ -394,7 +398,7 @@ impl LocalFileSystem {
         Ok(directory)
     }
 
-    fn get_existing_service_directory(&self) -> DocumentResult<Option<&File>> {
+    pub(super) fn get_existing_service_directory(&self) -> DocumentResult<Option<&File>> {
         if self.service.get().is_none() {
             let before = match statat(&self.root, SERVICE_DIRECTORY, AtFlags::SYMLINK_NOFOLLOW) {
                 Ok(stat) => stat,
@@ -420,7 +424,7 @@ impl LocalFileSystem {
         Ok(Some(directory))
     }
 
-    fn verify_service_directory(&self, directory: &File) -> DocumentResult<()> {
+    pub(super) fn verify_service_directory(&self, directory: &File) -> DocumentResult<()> {
         let pinned = fstat(directory).map_err(|cause| fail_io(SERVICE_DIRECTORY_ERROR, cause))?;
         verify_entry(&self.root, SERVICE_DIRECTORY, &pinned)
             .map(|_| ())
@@ -585,7 +589,7 @@ where
     }
 }
 
-fn retry_io(mut operation: impl FnMut() -> io::Result<()>) -> io::Result<()> {
+pub(super) fn retry_io(mut operation: impl FnMut() -> io::Result<()>) -> io::Result<()> {
     loop {
         match operation() {
             Err(cause) if cause.kind() == ErrorKind::Interrupted => {}
@@ -594,7 +598,10 @@ fn retry_io(mut operation: impl FnMut() -> io::Result<()>) -> io::Result<()> {
     }
 }
 
-fn fail_io(message: &'static str, cause: impl Error + Send + Sync + 'static) -> DocumentError {
+pub(super) fn fail_io(
+    message: &'static str,
+    cause: impl Error + Send + Sync + 'static,
+) -> DocumentError {
     DocumentError::new_with_cause(DocumentErrorKind::InternalError, message, cause)
 }
 fn fail_changed() -> DocumentError {

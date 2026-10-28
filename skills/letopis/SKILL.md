@@ -125,11 +125,23 @@ known referers. After repairing them, run `check` and inspect the new ID. Preser
 `created_at`; keep `source_snapshot` only while its checked source binding still
 supports the statement.
 
-## Configure, observe, and reindex
+## Initialize, configure, observe, and reindex
 
 Interactive commands use an empty request without waiting for stdin. An open pipe
 with no data after 250 ms also supplies an empty request. For commands that need
 fields, pipe a JSON object; once data arrives, it is read until EOF.
+
+Run `letopis init` once in a Git work tree to create `.letopis/`, both database
+schemas and the editable configuration:
+
+```sh
+printf '%s\n' '{}' | letopis init
+```
+
+It succeeds with `{"ok":true,"result":{}}`. It does not index the corpus or contact
+a provider. Repeating it preserves a valid edited configuration and existing data.
+Outside a non-bare Git work tree it fails with `invalid_request` and creates
+nothing.
 
 `config` observes `.letopis/config.json` without changing it:
 
@@ -138,18 +150,26 @@ printf '%s\n' '{}' | letopis config
 ```
 
 Before setup it succeeds with `{"ok":true,"result":null}` and creates no service
-files. Otherwise `result` is the stored configuration value. There is no config
-setter: edit the file yourself, then observe it again. A valid example is:
+files. Otherwise `result` is the complete nested configuration. There is no config
+setter: edit the file yourself, then observe it again. A valid enabled example is:
 
 ```json
-{"provider":"ollama","model":"code-model","parameters":{"base_url":"http://127.0.0.1:11434/api"},"max_retries":2}
+{"embedding_model":{"enabled":true,"provider":"ollama","model":"code-model","parameters":{"base_url":"http://127.0.0.1:11434/api"},"max_retries":2}}
 ```
 
-`max_retries` is required, and `0` means one attempt. Malformed content makes
-`config` fail with exit 1 and `error.code:"embedding_failed"`; it never echoes the
-file. Search stays on FTS while the configuration is invalid. `status` reports the
-current `invalid_embedding_config` problem; fix the file and the next command sees
-it. `config` does not reset vectors, perform inference, launch a drain, or create
+Only this nested form is accepted. An old flat file is rejected with a migration
+message; move its four settings under `embedding_model` and add `enabled` yourself.
+`provider` and `model` are both null (with `enabled:false` and empty `parameters`)
+or both configured. `max_retries` is required, and `0` means one attempt. Retained
+provider settings are validated locally even when `enabled:false`.
+
+Malformed content makes `config` fail with exit 1 and
+`error.code:"embedding_failed"`; it never echoes the file. Search stays on FTS while
+the configuration is invalid, and `status` reports `invalid_embedding_config`.
+A valid `enabled:false` also searches with FTS but preserves vectors and retry
+state, reports zero embedding backlog/failed counters and hides stored execution
+failures; enabling the same settings reveals them without resetting vectors.
+`config` does not reset vectors, perform inference, launch a drain, or create
 service state.
 
 `status` reads the last published revision and its current diagnostics without
@@ -207,8 +227,8 @@ work.
 
 ## Current boundaries
 
-The CLI has `check`, `config`, `search`, `status`, `traverse`, mixed `inspect`,
-and `reindex`. No Letopis `read`, `snapshot`, `apply` or `cancel` command exists;
+The CLI has `init`, `check`, `config`, `search`, `status`, `traverse`, mixed
+`inspect`, and `reindex`. No Letopis `read`, `snapshot`, `apply` or `cancel` command exists;
 use Git and edit Markdown. Cancellation is a signal to your own foreground
 process, not a command. Invalid files retain their previous valid projections
 with current diagnostics; a fresh cache cannot recover a previous projection of

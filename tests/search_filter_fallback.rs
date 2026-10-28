@@ -109,6 +109,46 @@ fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests
 }
 
 #[test]
+fn disabled_configuration_keeps_filtered_fts_without_query_provider() {
+    // Given: seeded vectors and a valid configured-disabled document.
+    let repo = ReadingRepo::new();
+    let basis = prepare_notes(&repo);
+    let server = HttpFixture::start(FixtureReply::Status {
+        status: 500,
+        body: "must not call".into(),
+    });
+    let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
+    prepare_vectors(&repo, &config, 2);
+    repo.write(
+        ".letopis/config.json",
+        json!({"embedding_model": {
+            "enabled": false,
+            "provider": "ollama",
+            "model": "fixture",
+            "parameters": {"base_url": server.get_base_url()},
+            "max_retries": 0
+        }})
+        .to_string()
+        .as_bytes(),
+    );
+
+    // When
+    let links = invoke_search(&repo, &build_input(&basis));
+
+    // Then: filtered FTS remains and no query inference is attempted.
+    assert_eq!(read_ids(&links), ["a.md", "b.md"]);
+    assert!(server.take_requests().is_empty());
+    assert!(
+        repo.open_storage()
+            .begin_read()
+            .unwrap()
+            .read_query_error()
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
 fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
     // Given
     let repo = ReadingRepo::new();
@@ -117,10 +157,12 @@ fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
         status: 500,
         body: "must not call".into(),
     });
-    let raw = json!({"provider":"ollama","model":"fixture",
-        "parameters":{"base_url":server.get_base_url(),"dimensions":3},"max_retries":0})
+    let configured = json!({"provider":"ollama","model":"fixture",
+        "parameters":{"base_url":server.get_base_url(),"dimensions":3},"max_retries":0});
+    let raw = json!({"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture",
+        "parameters":{"base_url":server.get_base_url(),"dimensions":3},"max_retries":0}})
     .to_string();
-    let config = EmbeddingConfig::parse(raw.as_bytes()).unwrap();
+    let config = EmbeddingConfig::parse(configured.to_string().as_bytes()).unwrap();
     repo.write(".letopis/config.json", raw.as_bytes());
     prepare_vectors(&repo, &config, 2);
 

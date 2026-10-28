@@ -1,8 +1,10 @@
 use super::{
-    CheckReport, CommandProblem, CommandResult, DocumentResult, ElementAddress, EmbeddingConfig,
-    Inspection, SearchLink, SearchRequest, StatusReport, Traversal, TraversalRequest,
+    CheckReport, CommandProblem, CommandResult, Configuration, DocumentResult, ElementAddress,
+    Inspection, SearchLink, SearchRequest, StatusReport, StorageResult, Traversal,
+    TraversalRequest,
 };
 use crate::domain::RepoPath;
+use std::{os::fd::OwnedFd, path::Path};
 
 /// Application-owned current corpus validation capability.
 ///
@@ -27,6 +29,49 @@ pub trait StatusReader {
     /// Reports storage, provenance or unsafe lock failures without a partial report.
     fn read_status(&mut self) -> CommandResult<StatusReport>;
 }
+/// Filesystem capability required to initialize private service state.
+///
+/// Implementations create the service directory only when explicitly asked,
+/// publish configuration without replacement and report durability work separately.
+pub trait InitFiles: super::StatusFiles {
+    /// Atomically publish complete bytes when `config.json` is absent.
+    ///
+    /// # Errors
+    /// Rejects unsafe or nonregular destinations and reports write, link or sync
+    /// failures. Existing files and another writer's winner are never replaced.
+    fn install_config_if_absent(&self, bytes: &[u8]) -> DocumentResult<()>;
+    /// Open or create the pinned private service directory.
+    ///
+    /// # Errors
+    /// Reports unsafe/replaced paths, creation or permission failures.
+    fn open_service_directory(&self) -> DocumentResult<OwnedFd>;
+    /// Sync the existing service directory and its Git-root parent.
+    ///
+    /// # Errors
+    /// Reports absent/replaced state or durability-sync failures without creating entries.
+    fn sync_service_state(&self) -> DocumentResult<()>;
+}
+
+/// Storage capability required to initialize both service schemas.
+pub trait InitStorage {
+    /// Open or validate cache and vector schemas beneath one pinned directory.
+    ///
+    /// # Errors
+    /// Reports unsafe paths, incompatible schemas, contention or database I/O failures.
+    fn initialize(&self, directory: &Path, pinned: &OwnedFd) -> StorageResult<()>;
+}
+
+/// One repository initialization operation.
+pub trait Initializer {
+    /// Prepare service schemas and publish generated configuration without
+    /// replacing existing valid state.
+    ///
+    /// # Errors
+    /// Reports unsafe repository/config/storage state, invalid retained settings or
+    /// an environment failure before success is observable.
+    fn initialize(&mut self) -> CommandResult<()>;
+}
+
 /// Read the current validated embedding configuration without changing state.
 ///
 /// Implementations observe only the non-creating configuration source and perform local
@@ -36,11 +81,12 @@ pub trait ConfigReader {
     /// Observe the current configuration, or its stable absence.
     ///
     /// # Errors
-    /// Returns `EmbeddingFailed` with `invalid embedding configuration` for malformed or
-    /// provider-rejected configuration, and `InternalError` with
-    /// `cannot read embedding configuration` for filesystem read failures. Causes stay
-    /// private; no partial configuration is returned.
-    fn read_config(&self) -> CommandResult<Option<EmbeddingConfig>>;
+    /// Returns the complete nested document on success, or stable absence. A legacy
+    /// flat document and every malformed or provider-rejected value return
+    /// `EmbeddingFailed`; unreadable or unsafe files return `InternalError` with
+    /// `cannot read embedding configuration`. Causes stay private and no partial
+    /// configuration is returned.
+    fn read_config(&self) -> CommandResult<Option<Configuration>>;
 }
 /// Consistent metadata-only hybrid knowledge search.
 pub trait Searcher {

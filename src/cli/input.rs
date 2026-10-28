@@ -14,6 +14,7 @@ use std::{collections::BTreeSet, ffi::OsString, io::Read, num::NonZeroUsize};
 /// Typed command input after transport validation.
 #[derive(Debug)]
 pub(crate) enum Request {
+    Init,
     Status,
     Config,
     Reindex,
@@ -81,6 +82,10 @@ pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResul
         .collect::<CommandResult<Vec<_>>>()?;
     // Validate all argv before reading stdin or constructing any service.
     match args.as_slice() {
+        ["init"] => {
+            let _: EmptyInput = read_object(input)?;
+            Ok(Request::Init)
+        }
         ["status"] => {
             let _: EmptyInput = read_object(input)?;
             Ok(Request::Status)

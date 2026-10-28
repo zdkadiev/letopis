@@ -24,12 +24,12 @@ use crate::service::{
     CommandResult, DocumentError, DocumentErrorKind, DocumentRefreshService, DocumentResult,
     EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles,
     EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
-    GraphDiagnostics, GraphDiagnosticsService, GraphService, InspectionService, Inspector,
-    ProvenanceService, Refresher, SearchService, Searcher, SnapshotError, SnapshotVerifier,
-    SourceProvenance, SourceReader, SourceService, StatusFiles, StatusStorage, Storage,
-    StorageResult, TraversalService, Traverser,
+    GraphDiagnostics, GraphDiagnosticsService, GraphService, InitService, Initializer,
+    InspectionService, Inspector, ProvenanceService, Refresher, SearchService, Searcher,
+    SnapshotError, SnapshotErrorKind, SnapshotVerifier, SourceProvenance, SourceReader,
+    SourceService, StatusFiles, StatusStorage, Storage, StorageResult, TraversalService, Traverser,
 };
-use crate::storage::{SqliteStatusStorage, SqliteStorage};
+use crate::storage::{SqliteBootstrap, SqliteStatusStorage, SqliteStorage};
 use crate::utils::SERVICE_DIRECTORY;
 use std::{
     env,
@@ -91,6 +91,24 @@ pub fn run_process_cli() -> u8 {
 /// The caller supplies the consistent read view to each operation.
 pub fn wire_graph_diagnostics() -> impl GraphDiagnostics {
     GraphDiagnosticsService::new()
+}
+
+/// Wire repository initialization with noncreating Git discovery and owned adapters.
+///
+/// # Errors
+/// Returns `invalid_request` outside a non-bare Git work tree, and a safe internal
+/// error for repository, filesystem or provider setup failures.
+pub fn wire_initializer(start: &Path) -> CommandResult<impl Initializer + use<>> {
+    let git = GitCli::open(start).map_err(map_initializer_git)?;
+    let root = git.get_root().to_path_buf();
+    let files = LocalFileSystem::open(&root).map_err(map_initializer_setup)?;
+    let provider = build_embedding_provider().map_err(map_initializer_setup)?;
+    Ok(InitService::new(
+        Box::new(files),
+        Box::new(SqliteBootstrap),
+        Box::new(provider),
+        root.join(SERVICE_DIRECTORY),
+    ))
 }
 
 /// Wire bounded traversal with owned graph, source, provenance and readiness collaborators.
@@ -448,6 +466,29 @@ fn requires_cancellation_handler(args: &[OsString]) -> bool {
 
 fn execute_request(args: &[OsString], input: impl Read) -> CommandResult<CommandResponse> {
     parse_request(args, input).and_then(run_request)
+}
+
+fn map_initializer_git(cause: SnapshotError) -> CommandError {
+    let kind = match cause.get_kind() {
+        SnapshotErrorKind::InvalidRequest => CommandErrorKind::InvalidRequest,
+        SnapshotErrorKind::NotFound | SnapshotErrorKind::InternalError => {
+            CommandErrorKind::InternalError
+        }
+    };
+    let message = if kind == CommandErrorKind::InvalidRequest {
+        "Git repository required"
+    } else {
+        "cannot locate repository"
+    };
+    CommandError::new_with_cause(kind, message, cause)
+}
+
+fn map_initializer_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot initialize repository",
+        error,
+    )
 }
 
 fn map_check_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {

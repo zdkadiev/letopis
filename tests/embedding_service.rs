@@ -41,9 +41,29 @@ impl Fixture {
             .to_string(),
         )
     }
-    fn write_raw_config(&self, raw: &str) -> EmbeddingConfig {
-        fs::create_dir_all(self.root.path().join(".letopis")).unwrap();
+    fn write_disabled_config(&self, url: &str, retries: u64) {
+        let raw = serde_json::to_vec(&serde_json::json!({"embedding_model": {
+            "enabled": false, "provider": "ollama", "model": "fixture",
+            "parameters": {"base_url": url}, "max_retries": retries,
+        }}))
+        .unwrap();
         fs::write(self.root.path().join(".letopis/config.json"), raw).unwrap();
+    }
+    fn write_raw_config(&self, raw: &str) -> EmbeddingConfig {
+        let configured: serde_json::Value = serde_json::from_str(raw).unwrap();
+        let file = serde_json::json!({"embedding_model": {
+            "enabled": true,
+            "provider": configured["provider"],
+            "model": configured["model"],
+            "parameters": configured["parameters"],
+            "max_retries": configured["max_retries"],
+        }});
+        fs::create_dir_all(self.root.path().join(".letopis")).unwrap();
+        fs::write(
+            self.root.path().join(".letopis/config.json"),
+            serde_json::to_vec(&file).unwrap(),
+        )
+        .unwrap();
         EmbeddingConfig::parse(raw.as_bytes()).unwrap()
     }
     fn publish(&self, path: &str, body: &str) -> Sha256 {
@@ -229,6 +249,70 @@ fn missing_and_invalid_configuration_preserve_corpus_and_prior_vectors() {
         assert_eq!(fixture.capture_corpus(), before);
         assert_eq!(server.take_requests().len(), 0);
     }
+}
+
+#[test]
+fn disabled_configuration_preserves_vectors_attempts_and_skips_execution() {
+    // Given: one stored vector, one exhausted hash and a valid disabled document.
+    let fixture = Fixture::new();
+    let server = start_success();
+    let config = fixture.write_config(&server.get_base_url(), 0);
+    let hash = fixture.publish("a.md", "knowledge");
+    let exhausted = fixture.publish("b.md", "other knowledge");
+    assert_eq!(
+        fixture.open_service().drain().unwrap(),
+        DrainOutcome::Complete
+    );
+    let mut storage = fixture.open_storage();
+    let VectorOutcome::Current(mut unit) =
+        storage.begin_vector_write(&config.get_identity()).unwrap()
+    else {
+        panic!("expected current identity")
+    };
+    assert!(unit.reserve_attempt(&exhausted, 1).unwrap());
+    unit.record_failure(&exhausted, "safe failure").unwrap();
+    unit.commit().unwrap();
+    drop(storage);
+    server.take_requests();
+    fixture.write_disabled_config(&server.get_base_url(), 0);
+    let before = fixture.capture_corpus();
+
+    // When
+    let mut service = fixture.open_service();
+    assert!(matches!(
+        service.read_configuration().unwrap(),
+        ConfigState::Disabled
+    ));
+    assert_eq!(service.drain().unwrap(), DrainOutcome::Unavailable);
+    assert_eq!(
+        service.embed_query("query").unwrap(),
+        QueryEmbedding::Unavailable
+    );
+
+    // Then: both the vector and retry state survive without inference or reset.
+    assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
+    assert_eq!(
+        fixture.read_failure(&config, &exhausted).unwrap().attempts,
+        1
+    );
+    assert_eq!(fixture.capture_corpus(), before);
+    assert!(server.take_requests().is_empty());
+
+    // When: the same settings are re-enabled.
+    let enabled = fixture.write_config(&server.get_base_url(), 0);
+    assert_eq!(enabled.get_identity(), config.get_identity());
+    assert!(matches!(
+        fixture.open_service().read_configuration().unwrap(),
+        ConfigState::Ready(_)
+    ));
+
+    // Then: the exact stored execution state remains available.
+    assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
+    assert_eq!(
+        fixture.read_failure(&config, &exhausted).unwrap().attempts,
+        1
+    );
+    assert!(server.take_requests().is_empty());
 }
 
 #[test]

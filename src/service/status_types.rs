@@ -40,6 +40,8 @@ pub struct HeldLock {
 pub enum EmbeddingStatusPolicy {
     /// Every current hash is backlog and none has current exhausted attempts.
     Unavailable,
+    /// Valid disabled configuration: report no embedding work or execution failures.
+    Disabled,
     /// Use stored coverage and attempts only when the pinned identity matches.
     Ready {
         /// Captured valid configuration identity.

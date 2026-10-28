@@ -7,6 +7,7 @@ mod check_problems;
 mod command;
 mod command_traits;
 mod configuration;
+mod configuration_value;
 mod document_refresher;
 mod document_traits;
 mod embedding;
@@ -16,6 +17,7 @@ mod embedding_traits;
 mod error;
 mod graph;
 mod graph_diagnostics;
+mod init;
 mod inspection;
 mod knowledge_link;
 mod model;
@@ -37,12 +39,18 @@ mod traversal_types;
 pub(crate) use background::BackgroundService;
 pub(crate) use check::CheckService;
 /// Read-only configuration observation over non-creating files and local provider validation.
-pub(crate) use configuration::ConfigurationService;
+pub(crate) use configuration::{
+    ConfigurationService, map_invalid_configuration, map_read_error, validate_configuration,
+};
+/// Whole-file configuration states and their strict nested parser.
+pub use configuration_value::Configuration;
+pub(crate) use configuration_value::GENERATED_CONFIG;
 /// Cache refresh implementation and its caller-owned collaborator bundle.
 pub(crate) use document_refresher::DocumentRefreshService;
 pub(crate) use embedding::EmbeddingService;
 pub(crate) use graph::GraphService;
 pub(crate) use graph_diagnostics::GraphDiagnosticsService;
+pub(crate) use init::InitService;
 pub(crate) use inspection::InspectionService;
 pub(crate) use provenance::ProvenanceService;
 /// Source comparison requests and metadata-only outcomes.
@@ -64,7 +72,7 @@ pub use command::{
 pub(crate) use command_traits::MockBackgroundRunner;
 pub use command_traits::{
     BackgroundRunner, Checker, ConfigReader, DrainLauncher, EmbedLocker, EmbeddingExecutor,
-    Inspector, Searcher, StatusReader, Traverser,
+    InitFiles, InitStorage, Initializer, Inspector, Searcher, StatusReader, Traverser,
 };
 pub use document_traits::{CorpusLister, FileSystem, MarkdownCodec, Refresher};
 #[cfg(test)]

@@ -1,9 +1,10 @@
 use super::{
-    CommandError, CommandErrorKind, CommandProblem, CommandResult, EmbeddingConfig,
+    CommandError, CommandErrorKind, CommandProblem, CommandResult, Configuration,
     EmbeddingProvider, EmbeddingStatusPolicy, EmbeddingStatusSummary, GraphDiagnostics,
     SourceProvenance, StatusFiles, StatusReader, StatusReport, StatusStorage, StorageError,
     StorageRead,
     check_problems::{collect_check_problems, sort_problems},
+    validate_configuration,
 };
 use serde_json::Value;
 use std::{collections::BTreeMap, fmt};
@@ -66,18 +67,20 @@ fn read_published<R: StorageRead, G: GraphDiagnostics>(
     let summary = view
         .read_embedding_status(policy)
         .map_err(map_storage_error)?;
-    problems.extend(collect_exhausted(&summary));
-    if view
-        .read_query_error()
-        .map_err(map_storage_error)?
-        .is_some()
-    {
-        problems.push(build_problem(
-            CommandErrorKind::EmbeddingFailed,
-            "query embedding failed",
-            QUERY_FAILURE,
-            None,
-        ));
+    if !matches!(policy, EmbeddingStatusPolicy::Disabled) {
+        problems.extend(collect_exhausted(&summary));
+        if view
+            .read_query_error()
+            .map_err(map_storage_error)?
+            .is_some()
+        {
+            problems.push(build_problem(
+                CommandErrorKind::EmbeddingFailed,
+                "query embedding failed",
+                QUERY_FAILURE,
+                None,
+            ));
+        }
     }
     Ok(StatusReport {
         revision: Some(revision),
@@ -101,25 +104,24 @@ fn read_config_policy(
     let Some(bytes) = bytes else {
         return (EmbeddingStatusPolicy::Unavailable, None);
     };
-    let Ok(config) = EmbeddingConfig::parse(&bytes) else {
+    let Ok(configuration) = validate_configuration(&bytes, provider) else {
         return (
             EmbeddingStatusPolicy::Unavailable,
             Some(invalid_config_problem()),
         );
     };
-    if provider.validate_config(&config).is_err() {
-        return (
-            EmbeddingStatusPolicy::Unavailable,
-            Some(invalid_config_problem()),
-        );
+    match configuration {
+        Configuration::Enabled(config) => (
+            EmbeddingStatusPolicy::Ready {
+                identity: config.get_identity(),
+                max_attempts: config.get_max_attempts(),
+            },
+            None,
+        ),
+        Configuration::Unconfigured { .. } | Configuration::Disabled(_) => {
+            (EmbeddingStatusPolicy::Disabled, None)
+        }
     }
-    (
-        EmbeddingStatusPolicy::Ready {
-            identity: config.get_identity(),
-            max_attempts: config.get_max_attempts(),
-        },
-        None,
-    )
 }
 
 fn collect_exhausted(summary: &EmbeddingStatusSummary) -> Vec<CommandProblem> {

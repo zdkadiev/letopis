@@ -29,8 +29,10 @@ pub struct EmbeddingConfig {
     dimensions: Option<NonZeroUsize>,
 }
 impl EmbeddingConfig {
-    /// Parse unique-key JSON and compute its RFC 8785 identity.
-    /// Endpoint syntax is subsequently checked by the provider boundary.
+    /// Parse the internal four-field configured-settings projection and compute
+    /// its RFC 8785 identity. This is not a config-file reader; use
+    /// [`Configuration::parse`](super::Configuration::parse) for
+    /// `.letopis/config.json`. Endpoint syntax is checked by the provider boundary.
     ///
     /// # Errors
     /// Rejects malformed shapes, forbidden keys, invalid parameters, unsupported

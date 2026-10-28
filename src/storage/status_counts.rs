@@ -25,6 +25,13 @@ pub(super) fn read_embedding_status(
     identity: Option<Sha256>,
     policy: &EmbeddingStatusPolicy,
 ) -> StorageResult<EmbeddingStatusSummary> {
+    if matches!(policy, EmbeddingStatusPolicy::Disabled) {
+        return Ok(EmbeddingStatusSummary {
+            backlog: 0,
+            failed: 0,
+            exhausted: vec![],
+        });
+    }
     let total = count_hashes(connection, HashCoverage::All)?;
     let EmbeddingStatusPolicy::Ready {
         identity: expected,

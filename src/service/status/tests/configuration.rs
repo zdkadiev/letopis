@@ -1,9 +1,10 @@
 use super::{
-    CommandErrorKind, CommandProblem, CommandResult, Diagnostics, EmbeddingConfig, Files,
-    GraphDiagnostics, Provenance, Reads, RepoPath, Sha256, SqliteStorage, StatusReader,
-    StatusService, Storage, StorageRead, VALID_CONFIG, VectorOutcome, VectorWrite, build_provider,
-    build_service, open_storage, publish_node,
+    CommandErrorKind, CommandProblem, CommandResult, Diagnostics, Files, GraphDiagnostics,
+    Provenance, Reads, RepoPath, Sha256, SqliteStorage, StatusReader, StatusService, Storage,
+    StorageRead, VALID_CONFIG, VectorOutcome, VectorWrite, build_provider, build_service,
+    open_storage, publish_node,
 };
+use crate::service::Configuration;
 use std::{cell::Cell, rc::Rc};
 use tempfile::TempDir;
 
@@ -102,7 +103,11 @@ fn build_files(config: Option<Vec<u8>>) -> Files {
 }
 
 fn seed_exhausted(storage: &mut SqliteStorage) {
-    let config = EmbeddingConfig::parse(VALID_CONFIG).unwrap();
+    let config = Configuration::parse(VALID_CONFIG)
+        .unwrap()
+        .get_embedding_config()
+        .unwrap()
+        .clone();
     let identity = config.get_identity();
     storage.reset_vectors(None, &identity).unwrap();
     let VectorOutcome::Current(mut writer) = storage.begin_vector_write(&identity).unwrap() else {

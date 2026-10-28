@@ -1,5 +1,5 @@
 use super::constants::REV_PARSE_COMMAND;
-use super::process::{GitProcess, check_version};
+use super::process::{GitProcess, check_version, is_exit_code};
 use super::{objects, refs};
 use crate::{
     domain::{BlobOid, RepoPath, SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN, TreeOid},
@@ -143,11 +143,19 @@ impl CorpusLister for GitCli {
     }
 }
 fn read_root(process: &GitProcess, start: &Path) -> Result<PathBuf, SnapshotError> {
-    let raw = process.run(
-        start,
-        &[REV_PARSE_COMMAND.into(), "--show-toplevel".into()],
-        None,
-    )?;
+    let raw = process
+        .run(
+            start,
+            &[REV_PARSE_COMMAND.into(), "--show-toplevel".into()],
+            None,
+        )
+        .map_err(|error| {
+            if is_exit_code(&error, 128) {
+                SnapshotError::new(SnapshotErrorKind::InvalidRequest, "Git repository required")
+            } else {
+                error
+            }
+        })?;
     let text = String::from_utf8(raw)
         .map_err(|_| SnapshotError::new(SnapshotErrorKind::InternalError, "invalid Git root"))?;
     let line = text.strip_suffix('\n').ok_or_else(|| {
@@ -174,7 +182,7 @@ fn require_work_tree(process: &GitProcess, root: &Path) -> Result<(), SnapshotEr
     )?;
     if inside != b"true\n" {
         return Err(SnapshotError::new(
-            SnapshotErrorKind::InternalError,
+            SnapshotErrorKind::InvalidRequest,
             "Git working copy required",
         ));
     }

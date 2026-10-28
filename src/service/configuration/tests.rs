@@ -6,7 +6,10 @@ use crate::service::{
 use serde_json::json;
 use std::{cell::Cell, error::Error, io, num::NonZeroUsize};
 
-const CONFIG: &[u8] = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9","custom":{"enabled":true},"dimensions":3},"max_retries":2}"#;
+const CONFIG: &[u8] = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9","custom":{"enabled":true},"dimensions":3},"max_retries":2}}"#;
+const DISABLED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":2}}"#;
+const UNCONFIGURED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#;
+const LEGACY: &[u8] = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":0}"#;
 
 #[test]
 fn reads_missing_config_without_creating_service_state() {
@@ -50,9 +53,11 @@ fn returns_preserved_config_values() {
     };
 
     // When
-    let config = service.read_config().unwrap().unwrap();
+    let configuration = service.read_config().unwrap().unwrap();
+    let config = configuration.get_embedding_config().unwrap();
 
     // Then
+    assert!(configuration.get_enabled());
     assert_eq!(config.get_provider(), ProviderKind::Ollama);
     assert_eq!(config.get_model(), "fixture");
     assert_eq!(
@@ -72,9 +77,86 @@ fn returns_preserved_config_values() {
 }
 
 #[test]
+fn accepts_unconfigured_without_provider_validation() {
+    // Given: the generated unconfigured document.
+    let files = Files {
+        config: Some(UNCONFIGURED.to_vec()),
+        fail: false,
+        reads: Cell::new(0),
+        lock_observations: Cell::new(0),
+    };
+    let provider = Provider::rejecting();
+    let service = ConfigurationService {
+        files: &files,
+        provider: &provider,
+    };
+
+    // When
+    let configuration = service.read_config().unwrap().unwrap();
+
+    // Then: no execution identity exists and the provider boundary is untouched.
+    assert!(!configuration.get_enabled());
+    assert_eq!(configuration.get_max_retries(), 0);
+    assert!(configuration.get_embedding_config().is_none());
+    assert_eq!(provider.validations.get(), 0);
+    assert_eq!(provider.embeddings.get(), 0);
+}
+
+#[test]
+fn validates_configured_disabled_settings_locally() {
+    // Given: a disabled document with retained provider settings.
+    let files = Files {
+        config: Some(DISABLED.to_vec()),
+        fail: false,
+        reads: Cell::new(0),
+        lock_observations: Cell::new(0),
+    };
+    let provider = Provider::rejecting();
+    let service = ConfigurationService {
+        files: &files,
+        provider: &provider,
+    };
+
+    // When
+    let error = service.read_config().unwrap_err();
+
+    // Then: disabled settings still pass through local provider validation.
+    assert_invalid_configuration_error(&error);
+    assert_eq!(provider.validations.get(), 1);
+    assert_eq!(provider.embeddings.get(), 0);
+}
+
+#[test]
+fn reports_legacy_flat_configuration_as_migration() {
+    // Given: an old four-field file.
+    let files = Files {
+        config: Some(LEGACY.to_vec()),
+        fail: false,
+        reads: Cell::new(0),
+        lock_observations: Cell::new(0),
+    };
+    let provider = Provider::accepting();
+    let service = ConfigurationService {
+        files: &files,
+        provider: &provider,
+    };
+
+    // When
+    let error = service.read_config().unwrap_err();
+
+    // Then: the safe top-level message names the required migration.
+    assert_eq!(error.get_kind(), CommandErrorKind::EmbeddingFailed);
+    assert_eq!(
+        error.get_message(),
+        "embedding configuration requires migration"
+    );
+    assert_eq!(provider.validations.get(), 0);
+}
+
+#[test]
 fn rejects_invalid_config_without_exposing_bytes() {
     // Given
-    let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","api_key":"CONFIG_CANARY"},"max_retries":0}"#;
+    let bytes = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","api_key":"CONFIG_CANARY"},"max_retries":0}}"#;
     let files = Files {
         config: Some(bytes.to_vec()),
         fail: false,

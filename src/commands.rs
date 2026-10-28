@@ -7,15 +7,15 @@ use crate::git::GitCli;
 use crate::service::{
     BackgroundRunner, Checker, CommandError, CommandErrorKind, CommandResult, ConfigReader,
     ConfigurationService, DocumentError, DocumentErrorKind, ElementAddress,
-    GraphDiagnosticsService, Inspector, ProvenanceService, Refresher, SearchRequest, Searcher,
-    StatusReader, StatusService, TraversalRequest, Traverser,
+    GraphDiagnosticsService, Initializer, Inspector, ProvenanceService, Refresher, SearchRequest,
+    Searcher, StatusReader, StatusService, TraversalRequest, Traverser,
 };
 use crate::storage::SqliteStatusStorage;
 use crate::utils::SERVICE_DIRECTORY;
 use crate::{
     build_embedding_provider, map_embedding_setup, wire_background_runner, wire_checker,
-    wire_document_refresher, wire_embedding_executor, wire_inspector, wire_searcher,
-    wire_traverser,
+    wire_document_refresher, wire_embedding_executor, wire_initializer, wire_inspector,
+    wire_searcher, wire_traverser,
 };
 use std::{
     env,
@@ -27,6 +27,7 @@ pub(crate) fn run_request(request: Request) -> CommandResult<CommandResponse> {
     let environment = locate_environment();
     match request {
         Request::Help(text) => Ok(CommandResponse::new(ResponseResult::Help(text))),
+        Request::Init => environment.and_then(|(directory, _)| run_init(&directory)),
         Request::Status => environment.and_then(|(directory, _)| run_status(&directory)),
         Request::Config => environment.and_then(|(directory, _)| run_config(&directory)),
         Request::Reindex => {
@@ -44,6 +45,11 @@ pub(crate) fn run_request(request: Request) -> CommandResult<CommandResponse> {
         Request::Inspect(ids) => environment
             .and_then(|(directory, executable)| run_inspect(&ids, &directory, &executable)),
     }
+}
+
+fn run_init(directory: &Path) -> CommandResult<CommandResponse> {
+    wire_initializer(directory)?.initialize()?;
+    Ok(CommandResponse::new(ResponseResult::Initialized))
 }
 
 fn run_reindex(directory: &Path, executable: &Path) -> CommandResult<CommandResponse> {

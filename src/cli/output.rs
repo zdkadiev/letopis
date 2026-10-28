@@ -1,8 +1,8 @@
 use super::response::{CommandResponse, ResponseResult};
 use crate::domain::{Edge, Sha256};
 use crate::service::{
-    CommandErrorKind, CommandProblem, CommandResult, EmbeddingConfig, HeldLock, InspectedElement,
-    LockName, ProviderKind, SearchFlag, SearchLink, TraversalLink,
+    CommandErrorKind, CommandProblem, CommandResult, Configuration, EmbeddingConfig, HeldLock,
+    InspectedElement, LockName, ProviderKind, SearchFlag, SearchLink, TraversalLink,
 };
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -29,6 +29,7 @@ struct Failure<'a> {
 #[derive(Serialize)]
 #[serde(untagged)]
 enum ResultBody<'a> {
+    Initialized {},
     Reindex {
         revision: u64,
     },
@@ -39,7 +40,7 @@ enum ResultBody<'a> {
         locks: Vec<Lock>,
         problems: Vec<Problem<'a>>,
     },
-    Config(Option<Configuration<'a>>),
+    Config(Option<ConfigurationOutput<'a>>),
     Check {
         errors: Vec<Problem<'a>>,
     },
@@ -71,10 +72,15 @@ struct Lock {
 
 /// X-1 configuration object; identity, derived dimensions and credentials never appear.
 #[derive(Serialize)]
-struct Configuration<'a> {
-    provider: &'static str,
-    model: &'a str,
-    parameters: &'a Map<String, Value>,
+struct ConfigurationOutput<'a> {
+    embedding_model: EmbeddingModelOutput<'a>,
+}
+#[derive(Serialize)]
+struct EmbeddingModelOutput<'a> {
+    enabled: bool,
+    provider: Option<&'static str>,
+    model: Option<&'a str>,
+    parameters: Value,
     max_retries: u64,
 }
 
@@ -159,6 +165,7 @@ pub(crate) fn encode_response(
 fn build_result(result: &ResponseResult) -> ResultBody<'_> {
     match result {
         ResponseResult::Help(text) => ResultBody::Help(text),
+        ResponseResult::Initialized => ResultBody::Initialized {},
         ResponseResult::Reindex(revision) => ResultBody::Reindex {
             revision: *revision,
         },
@@ -207,12 +214,18 @@ fn build_lock(lock: &HeldLock) -> Lock {
         pid: lock.pid.get(),
     }
 }
-fn build_configuration(config: &EmbeddingConfig) -> Configuration<'_> {
-    Configuration {
-        provider: get_provider_name(config.get_provider()),
-        model: config.get_model(),
-        parameters: config.get_parameters(),
-        max_retries: config.get_max_attempts().saturating_sub(1),
+fn build_configuration(configuration: &Configuration) -> ConfigurationOutput<'_> {
+    let config = configuration.get_embedding_config();
+    ConfigurationOutput {
+        embedding_model: EmbeddingModelOutput {
+            enabled: configuration.get_enabled(),
+            provider: config.map(|config| get_provider_name(config.get_provider())),
+            model: config.map(EmbeddingConfig::get_model),
+            parameters: config
+                .map(|config| Value::Object(config.get_parameters().clone()))
+                .unwrap_or_else(|| Value::Object(Map::new())),
+            max_retries: configuration.get_max_retries(),
+        },
     }
 }
 fn get_provider_name(provider: ProviderKind) -> &'static str {

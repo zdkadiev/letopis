@@ -266,6 +266,8 @@ pub enum ConfigState {
     Missing,
     /// Configuration cannot currently be used; existing vectors remain intact.
     Invalid(EmbeddingErrorKind),
+    /// A valid configuration explicitly disables embedding execution.
+    Disabled,
     /// A valid configuration observation was superseded before synchronization.
     Changed,
     /// Validated configuration synchronized with vector storage.

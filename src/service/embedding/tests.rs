@@ -3,10 +3,10 @@ use crate::{
     domain::{ElementKind, KnowledgeId, RepoPath, Sha256},
     markdown::{MarkdownParser, parse},
     service::{
-        CacheWrite, ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingError,
-        EmbeddingErrorKind, EmbeddingFailure, EmbeddingFiles, EmbeddingProvider, EmbeddingResult,
-        KnowledgeMetadata, NodeMetadata, QueryEmbedding, QueryEmbeddingRequest, Storage,
-        StorageRead, VectorOutcome, VectorWrite,
+        CacheWrite, ConfigState, Configuration, DrainOutcome, Embedder, EmbeddingConfig,
+        EmbeddingError, EmbeddingErrorKind, EmbeddingFailure, EmbeddingFiles, EmbeddingProvider,
+        EmbeddingResult, KnowledgeMetadata, NodeMetadata, QueryEmbedding, QueryEmbeddingRequest,
+        Storage, StorageRead, VectorOutcome, VectorWrite,
     },
     storage::SqliteStorage,
 };
@@ -78,10 +78,10 @@ struct Files {
 }
 impl Files {
     fn new(retries: u64) -> Self {
-        let config = serde_json::json!({
-            "provider": "ollama", "model": "m",
+        let config = serde_json::json!({"embedding_model": {
+            "enabled": true, "provider": "ollama", "model": "m",
             "parameters": {"base_url": "http://localhost/api"}, "max_retries": retries,
-        });
+        }});
         Self {
             config: RefCell::new(Some(serde_json::to_vec(&config).unwrap())),
             documents: BTreeMap::new(),
@@ -91,6 +91,13 @@ impl Files {
             config_reads: Cell::new(0),
             reject_config_reads: false,
         }
+    }
+    fn get_configured(&self) -> EmbeddingConfig {
+        Configuration::parse(self.config.borrow().as_ref().unwrap())
+            .unwrap()
+            .get_embedding_config()
+            .unwrap()
+            .clone()
     }
 }
 impl EmbeddingFiles for Files {
@@ -343,10 +350,10 @@ fn rejects_a_provider_vector_that_violates_the_first_requested_dimension() {
     // Given: no stored dimension can mask the configuration's requested size.
     let root = TempDir::new().unwrap();
     let files = Files::new(0);
-    let config = serde_json::json!({
-        "provider":"ollama", "model":"m", "max_retries":0,
+    let config = serde_json::json!({"embedding_model": {
+        "enabled":true, "provider":"ollama", "model":"m", "max_retries":0,
         "parameters":{"base_url":"http://localhost/api", "dimensions":2},
-    });
+    }});
     files
         .config
         .replace(Some(serde_json::to_vec(&config).unwrap()));
@@ -372,13 +379,13 @@ fn captured_query_never_rereads_or_resets_configuration() {
     // Given: the captured identity is committed; the file now contains another model.
     let root = TempDir::new().unwrap();
     let files = Files::new(0);
-    let captured = EmbeddingConfig::parse(files.config.borrow().as_ref().unwrap()).unwrap();
+    let captured = files.get_configured();
     let mut storage = open_storage(&root);
     storage
         .reset_vectors(None, &captured.get_identity())
         .unwrap();
     let mut service = EmbeddingService::new(storage, files, MarkdownParser, Provider::new());
-    service.files.config.replace(Some(br#"{"provider":"ollama","model":"new-model","parameters":{"base_url":"http://localhost/api"},"max_retries":0}"#.to_vec()));
+    service.files.config.replace(Some(br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"new-model","parameters":{"base_url":"http://localhost/api"},"max_retries":0}}"#.to_vec()));
     service.files.reject_config_reads = true;
     // When
     let result = service
@@ -418,7 +425,7 @@ fn captured_query_preserves_readiness_policy_and_document_attempts() {
     let mut storage = open_storage(&root);
     let mut files = Files::new(0);
     let hash = publish(&mut storage, &mut files, "a.md", "knowledge");
-    let captured = EmbeddingConfig::parse(files.config.borrow().as_ref().unwrap()).unwrap();
+    let captured = files.get_configured();
     storage
         .reset_vectors(None, &captured.get_identity())
         .unwrap();
@@ -479,7 +486,7 @@ fn captured_query_rejects_invalid_provider_policy_without_reset_or_http() {
     // Given
     let root = TempDir::new().unwrap();
     let files = Files::new(0);
-    let captured = EmbeddingConfig::parse(files.config.borrow().as_ref().unwrap()).unwrap();
+    let captured = files.get_configured();
     let mut storage = open_storage(&root);
     storage
         .reset_vectors(None, &captured.get_identity())

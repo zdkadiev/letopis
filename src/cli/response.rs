@@ -1,6 +1,6 @@
 use super::output::encode_response;
 use crate::service::{
-    BackgroundRunner, CheckReport, CommandProblem, CommandResult, EmbeddingConfig, Inspection,
+    BackgroundRunner, CheckReport, CommandProblem, CommandResult, Configuration, Inspection,
     SearchLink, StatusReport, Traversal,
 };
 use std::{io::Write, sync::Mutex};
@@ -8,8 +8,9 @@ use std::{io::Write, sync::Mutex};
 /// Typed application results before X-1 transport rendering.
 #[derive(Debug)]
 pub(crate) enum ResponseResult {
+    Initialized,
     Status(StatusReport),
-    Config(Option<EmbeddingConfig>),
+    Config(Option<Configuration>),
     Reindex(u64),
     Check(CheckReport),
     Inspect(Inspection),

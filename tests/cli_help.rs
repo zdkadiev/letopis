@@ -10,8 +10,8 @@ use std::{
 };
 use tempfile::TempDir;
 
-const COMMANDS: [&str; 7] = [
-    "check", "inspect", "search", "traverse", "reindex", "status", "config",
+const COMMANDS: [&str; 8] = [
+    "init", "check", "inspect", "search", "traverse", "reindex", "status", "config",
 ];
 
 #[test]

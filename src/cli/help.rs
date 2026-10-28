@@ -14,7 +14,13 @@ pub(super) struct CommandHelp {
 }
 
 /// Public commands in display order; `embed --drain` is internal and absent.
-pub(super) const COMMANDS: [CommandHelp; 7] = [
+pub(super) const COMMANDS: [CommandHelp; 8] = [
+    CommandHelp {
+        name: "init",
+        summary: "initialize service state in this repository",
+        details: INIT_DETAILS,
+        example: "{}",
+    },
     CommandHelp {
         name: "check",
         summary: "validate the Markdown corpus",
@@ -58,6 +64,14 @@ pub(super) const COMMANDS: [CommandHelp; 7] = [
         example: "{}",
     },
 ];
+
+const INIT_DETAILS: &str = r#"Input (JSON object): {} (no fields)
+
+Result: {}
+  Creates the private service directory, cache and vector database schemas,
+  and .letopis/config.json when absent. Requires an initialized non-bare Git
+  work tree. Repeating it preserves an existing valid configuration and data.
+"#;
 
 const CHECK_DETAILS: &str = r#"Input (JSON object):
   paths  array of repo-relative paths; optional, default is the whole corpus
@@ -127,9 +141,11 @@ Result:
 
 const CONFIG_DETAILS: &str = r#"Input (JSON object): {} (no fields)
 
-Result: configuration object, or null when no configuration exists.
-  Reads .letopis/config.json without changing it. To configure embeddings,
-  edit the file directly; there is no config setter command.
+Result: {"embedding_model": {"enabled", "provider", "model",
+                             "parameters", "max_retries"}}, or null.
+  Reads .letopis/config.json without changing it. The old flat format must be
+  migrated manually under embedding_model. Disabled settings are still
+  validated locally. Edit the file directly; there is no setter command.
 "#;
 
 const CONTRACT: &str = r#"

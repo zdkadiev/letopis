@@ -361,8 +361,10 @@ def write_config(repo: Path, server: "BarrierServer", retries: int = 0,
                  model: str = "fixture") -> None:
     (repo / ".letopis").mkdir(exist_ok=True)
     (repo / ".letopis/config.json").write_text(json.dumps(
-        {"provider": "ollama", "model": model, "parameters": {"base_url": server.url},
-         "max_retries": retries}))
+        {"embedding_model": {
+            "enabled": True, "provider": "ollama", "model": model,
+            "parameters": {"base_url": server.url}, "max_retries": retries,
+        }}))
 
 
 def initialize_git(repo: Path) -> None:

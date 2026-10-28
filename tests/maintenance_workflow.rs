@@ -162,12 +162,13 @@ fn configure_and_publish(workflow: &Workflow, endpoint: &str) {
     let observed = workflow.invoke_command("config", b"{}", 0);
     assert_eq!(
         observed["result"],
-        json!({
+        json!({"embedding_model":{
+            "enabled":true,
             "provider":"ollama",
             "model":"fixture",
             "parameters":{"base_url":endpoint},
             "max_retries":0
-        })
+        }})
     );
     let status = workflow.invoke_command("status", b"{}", 0);
     assert_eq!(status["result"]["revision"], Value::Null);
@@ -286,7 +287,10 @@ fn assert_invalid_configuration(workflow: &Workflow) {
 fn assert_repaired_configuration(workflow: &Workflow, endpoint: &str) {
     workflow.repo.write_config("ollama", endpoint, "fixture");
     let observed = workflow.invoke_command("config", b"{}", 0);
-    assert_eq!(observed["result"]["parameters"]["base_url"], endpoint);
+    assert_eq!(
+        observed["result"]["embedding_model"]["parameters"]["base_url"],
+        endpoint
+    );
     let checked = workflow.invoke_command("check", b"{}", 0);
     assert_eq!(checked["result"]["errors"], json!([]));
     let status = workflow.invoke_command("status", b"{}", 0);
