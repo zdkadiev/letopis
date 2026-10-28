@@ -99,7 +99,7 @@ Existing references: [P-1](../../zkit/letopis/pilot/protocol.md),
   JSON stdout; exit 0 — успешная локальная операция, exit 2 — неверные inputs/infra.
   `audit` с pending возвращает state unready и exit 2. Нет paid/session subcommand.
 
-- [ ] **1. Написать failing tests.** В `test_study.py` проверить exact order:
+- [x] **1. Написать failing tests.** В `test_study.py` проверить exact order:
   C1 baseline T1/T2/T3, затем memory T1/T2/T3; C2 memory перед baseline;
   C3 baseline перед memory. Отсутствующая T3, repeated ID, forward reuse и
   already-existing output directory отклоняются. `test_missing_product_model_or_gate_stays_unready`
@@ -115,10 +115,10 @@ self.assertEqual(readiness['state'], 'unready')
 self.assertIn('g2', readiness['pending'])
 ```
 
-- [ ] **2. Увидеть RED.** `python3 -B -m unittest discover -s tests/final_pilot
+- [x] **2. Увидеть RED.** `python3 -B -m unittest discover -s tests/final_pilot
   -p test_study.py`; сначала FAIL отсутствующего implementation, затем нужного
   контракта. Не принимать ошибку импорта как доказательство semantic control.
-- [ ] **3. Создать definitions и минимальные функции.** Полные prompts из
+- [x] **3. Создать definitions и минимальные функции.** Полные prompts из
   утверждённой spec, не указания решения. C1 fixed expected version берётся из
   frozen Cargo.toml (сейчас literal `0.0.0`), перечень команд — из frozen X-1.
   C2 уточнить исполнимый контракт прямо в prompts:
@@ -132,11 +132,11 @@ self.assertIn('g2', readiness['pending'])
   C3 граница 2 без runtime/config расширения. Зафиксировать `hexagonal_sync`
   и `typed_safe_errors` как оцениваемые agreements и конкретные recurring facts
   по каждой цепочке; hidden scoring rubric не попадает в participant.
-- [ ] **4. GREEN и controls.** Повторить только study suite. Временно разрешить
+- [x] **4. GREEN и controls.** Повторить только study suite. Временно разрешить
   forward reuse, убрать один required pending — каждый соответствующий тест
   обязан упасть; восстановить. Отдельно `run.py session` с trap auth path должен
   exit 2 до любых чтений auth/старта executable. Не создавать P-1 session records.
-- [ ] **5. Коммит.** Только перечисленные пути:
+- [x] **5. Коммит.** Только перечисленные пути:
   `test: define TK-30 prospective tasks and preparation manifest`.
 
 ### Task 2: Build isolated paired seeds and disposable evaluation copies
@@ -156,16 +156,16 @@ self.assertIn('g2', readiness['pending'])
 - `copies.require_unchanged(root: Path, before: dict) -> None` compares full
   participant bytes/modes including `.git`, target and per-slot HOME.
 
-- [ ] **1. Написать failing tests.** Pair inventories равны; шесть Git dirs
+- [x] **1. Написать failing tests.** Pair inventories равны; шесть Git dirs
   не shared/alternate/remote, исходный repository не меняется. Snapshot empty
   hash — literal `37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570`
   для `[]\n` (перед внесением сверить независимым SHA-256). Symlink escape,
   parent path, чужой root и изменение между inventory/capture отклоняются.
   `test_capture_precedes_evaluation` возвращает в T2 собственный captured T1,
   а не изменённую evaluation copy/peer condition. Новые HOME у каждого слота.
-- [ ] **2. Увидеть RED** focused `test_copies.py`; зафиксировать конкретное
+- [x] **2. Увидеть RED** focused `test_copies.py`; зафиксировать конкретное
   ожидание, не считать отсутствие Docker валидным failure isolation test.
-- [ ] **3. Реализовать копирование.** Перенести/адаптировать лишь snapshot,
+- [x] **3. Реализовать копирование.** Перенести/адаптировать лишь snapshot,
   preserve/restore и isolation checks из pinned TK-17 `evidence.py`/`copies.py`;
   сохранить перечень исходных файлов+hash в `source_receipts`. Git archive только
   полного OID; явные одинаковые exclusions: host state/build outputs/operator
@@ -176,14 +176,14 @@ self.assertIn('g2', readiness['pending'])
   Не задавать агенту обязательный каталог новых знаний; фиксировать фактический
   inventory записанного корпуса. Отдельные байты/Unix modes сохраняются для
   исполнимых scripts; P-1 hash по-прежнему только canonical byte inventory.
-- [ ] **4. GREEN и настоящий boundary proof.** Unittest + model-free Docker
+- [x] **4. GREEN и настоящий boundary proof.** Unittest + model-free Docker
   toy build.rs, читающий private marker и пишущий в evaluation copy. T2 mounts
   и оригинальные code/Git/target/HOME marker не видят; unsafe shared-mount control
   обязан обнаруживаться. `copies.require_unchanged` ловит удалённый audit. Нет
   обхода через hard links, host mounts или прежний cargo cache с oracle binaries.
   Останавливать только контейнер с owned run ID. Невозможный Docker proof —
   pending, не PASS; никакой модели для него не нужно.
-- [ ] **5. Коммит.** `test: isolate TK-30 seeds and evaluator state`.
+- [x] **5. Коммит.** `test: isolate TK-30 seeds and evaluator state`.
 
 ### Task 3: Implement independent acceptance oracles, not task solutions
 
@@ -206,13 +206,13 @@ self.assertIn('g2', readiness['pending'])
   `Embedder::drain`; copied to evaluation `examples/tk30_service_probe.rs` and
   compiled offline there. No product exposure or source-side test hook.
 
-- [ ] **1. Написать failing tests** для dispatch неизвестного ID, несоответствия
+- [x] **1. Написать failing tests** для dispatch неизвестного ID, несоответствия
   expected check IDs и preservation infra failures. Oracle unit inputs — literal
   filesystem/HTTP/JSON fixtures, не готовые реализации C1–C3 и не fake pilot records.
   Expected output не строится parser/normalizer участника.
   `test_buffer_pass_requires_source_audit`: два barrier requests без annotation
   дают `bounded_buffer.passed=null`; ссылка на другой captured commit отклоняется.
-- [ ] **2. Реализовать CLI/delivery наблюдения.** Для C1 open stdin остаётся
+- [x] **2. Реализовать CLI/delivery наблюдения.** Для C1 open stdin остаётся
   незакрытым; flags обязаны завершиться до watchdog, с пустым HOME и вне repo.
   Compare exact `letopis 0.0.0\n` для current frozen package version; новая версия
   меняет frozen expected при новом выборе, не извлекается из ответа программы.
@@ -223,7 +223,7 @@ self.assertIn('g2', readiness['pending'])
   inventory. Installed smoke запускает абсолютный installed binary из fresh
   temporary repo с literal note/source и без embeddings config; source tree/target
   недоступны. Это smoke проверки поставки, не полный memory pilot profile.
-- [ ] **3. Реализовать concurrent drain наблюдения.** Python
+- [x] **3. Реализовать concurrent drain наблюдения.** Python
   `ThreadingHTTPServer` принимает запросы независимо; barrier подтверждает
   **два принятых и удерживаемых запроса до release первого**, третий остаётся
   не отправлен. `test_overlap_observer_counts_two_connections` использует две
@@ -255,7 +255,7 @@ self.assertIn('g2', readiness['pending'])
 | C3-T2 | `shared_hash_durable_attempts`, `out_of_order_identity`, `invalid_retry_bound` |
 | C3-T3 | `detached_overlap`, `caller_owner_lifecycle`, `search_with_drain` |
 
-- [ ] **4. Проверить seed и oracle controls.** Для каждого из 9 tasks сохранить
+- [x] **4. Проверить seed и oracle controls.** Для каждого из 9 tasks сохранить
   хотя бы один настоящий RED нового критерия на unchanged seed; прежние regression
   checks могут быть GREEN. Если новый criterion уже GREEN, selection остаётся
   unready до пересмотра, не удалять готовое поведение из seed. Отсутствующий
@@ -266,7 +266,7 @@ self.assertIn('g2', readiness['pending'])
   changed threshold 2→3 и bypass participant audit; каждый соответствующий
   operator test обязан упасть. Controls — временные mutations oracle/fixture,
   не написание девяти корректных product implementations.
-- [ ] **5. Коммит.** `test: prepare independent TK-30 task acceptance oracles`.
+- [x] **5. Коммит.** `test: prepare independent TK-30 task acceptance oracles`.
 
 ### Task 4: Prepare credential-free environment and honest observation records
 
@@ -289,7 +289,7 @@ self.assertIn('g2', readiness['pending'])
   `fixtures.make_dataset(..., stage="final")`, kind demonstration unchanged.
   Supplied real records later enter unchanged `tests/pilot_protocol/check.py`.
 
-- [ ] **1. Написать failing tests.** Auth file is a trap; preparing/inspecting
+- [x] **1. Написать failing tests.** Auth file is a trap; preparing/inspecting
   assets/version/tools cannot open it or invoke `codex exec`/provider. Test null
   model/product/G-2, CLI version mismatch, corrupted asset and stale image digest.
   Count equality with mismatched correlation yields complete=false/null usage.
@@ -303,7 +303,7 @@ self.assertEqual(request['reasoning_output_tokens'], 5)
 self.assertFalse(unmatched['complete'])
 ```
 
-- [ ] **2. Увидеть RED**, затем реализовать только эти функции. Переносимые
+- [x] **2. Увидеть RED**, затем реализовать только эти функции. Переносимые
   куски TK-17 image/tools/collector читаются по pinned revision и hash; убрать
   его hardcoded seed/study/order, `session`, auth copy и downloader. Не переносить
   count-only `collect_usage` как доказательство correlation. Codex request trace/
@@ -312,7 +312,7 @@ self.assertFalse(unmatched['complete'])
   один request, но отдельный retry имеет отдельный ID. Конфликтующие дубликаты
   остаются unresolved. Unmatched completion сохраняется отдельно, а не теряется.
   Local fixture/tests допустимы; реальный endpoint модели не вызывается.
-- [ ] **3. Model-free preflight.** Проверить image login-shell PATH для
+- [ ] **3. Model-free preflight.** _Частично (Task 4): tools/memory/container_isolation/egress probes и pending реализованы; отдельные Git/target и изоляция участника остаются pending `preflight:git_target_separation`/`participant_isolation` до команды запуска участника (TK-31)._ Проверить image login-shell PATH для
   rustc/cargo/rustfmt/git/rg/Python/Codex 0.164.0 и fixed memory binary, пустой
   memory store по CLI/read-only SQL, отдельные Git/target, canaries peer/operator
   и отсутствие host egress. Инициализировать disposable память **до** записи
@@ -322,14 +322,14 @@ self.assertFalse(unmatched['complete'])
   Context не содержит repo с готовыми решениями/credentials; Docker socket и
   host filesystem не монтируются. Если готовых pinned assets/image нет — честный
   pending с точным недостающим input, без скачивания/расширения scopes.
-- [ ] **4. GREEN, demonstration и controls.** Запустить environment/records
+- [x] **4. GREEN, demonstration и controls.** Запустить environment/records
   unittest. Existing P-1 checker на generated final demo даёт
   `status=demonstration_only`, `agent_executions=0`, все 18 slots присутствуют.
   Unknown counters остаются null и не превращаются в нулевую экономию.
   Временно разрешить auth read, объединить unmatched counters, прибавить cached
   повторно или поставить `ready` при missing config: соответствующие tests RED;
   восстановить. Не создавать `kind=pilot` с демонстрационными данными.
-- [ ] **5. Коммит.** `test: prepare model-free TK-30 environment and record validation`.
+- [x] **5. Коммит.** `test: prepare model-free TK-30 environment and record validation`.
 
 ### Task 5: Verify the preparation and hand off explicit blockers
 
@@ -341,7 +341,7 @@ spec/plan checkboxes only for фактически выполненные шаг
 rerunning product/model work; report maps each TK-30 criterion to evidence/pending.
 No aggregate ready verdict while gate/model/final product inputs remain unresolved.
 
-- [ ] **1. Выполнить targeted verification один раз на окончательных inputs.**
+- [x] **1. Выполнить targeted verification один раз на окончательных inputs.** _Выполнено на preparation base `d260348`, а не на финальной post-TK-29 base; повтор на финальной base остаётся частью `base_drift_recheck`._
   `python3 -B -m unittest discover -s tests/final_pilot -p 'test_*.py'` — все
   доступные focused tests PASS, opt-in Docker tests явно перечислены.
   `python3 -B -m unittest discover -s tests/pilot_protocol -p 'test_*.py'` —
@@ -350,14 +350,14 @@ No aggregate ready verdict while gate/model/final product inputs remain unresolv
   исторические native/RAM/load/pilot suites и paid probes. Root `make verify`
   не нужен для operator-only changes; в evaluation copies компилируется private
   probe и выполняется оговорённая regression, не выдавать их за root change gate.
-- [ ] **2. Записать local preparation/audit results.** Например,
+- [x] **2. Записать local preparation/audit results.** Например,
   `python3 -B tests/final_pilot/run.py prepare --repo . --base FULL_OID --output
   .artifacts/tk30/preparation-NEW`, затем `audit --root ...`.
   Expected: созданные inputs/receipts и **state=unready**, exit 2 пока pending;
   это ожидаемое ограничение, не успешный запуск пилота. Отдельно `evaluate` для
   seed сохраняет реальные RED/infra results. Нет девяти task solutions, prompts
   будущих slots не смонтированы, product/skill source неизменны.
-- [ ] **3. Подготовить отчёт и evidence.** Exact source/tool/image revisions,
+- [x] **3. Подготовить отчёт и evidence.** Exact source/tool/image revisions,
   hashes, команды/exit/platform, manual mutations/restoration, критерии RED и
   пределы. Сопоставить G-2 с TK-29 evidence, когда она появится; без неё pending.
   Недоступные final post-TK-29 base, pinned assets, real model access и полный
