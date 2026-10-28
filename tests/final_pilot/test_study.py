@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 
+import run
 import study
 
 HERE = Path(__file__).resolve().parent
@@ -45,7 +46,10 @@ EXPECTED_CHECKS = {
               "regression"],
 }
 ALL_PENDING = ["seeds", "product", "memory_versions", "embedding", "assets", "model",
-               "agent_config", "g2", "prompt_freeze", "base_drift_recheck"]
+               "agent_config", "g2", "prompt_freeze", "preflight", "participant_isolation",
+               "correlation_attribute", "base_drift_recheck"]
+EVIDENCE_GATES = ("g2", "prompt_freeze", "preflight", "participant_isolation",
+                  "correlation_attribute")
 
 
 def set_in(section, key):
@@ -62,6 +66,9 @@ PENDING_SETTERS = {
     "agent_config": set_in("agent", "config_sha256"),
     "g2": set_in("gates", "g2"),
     "prompt_freeze": set_in("gates", "prompt_freeze"),
+    "preflight": set_in("gates", "preflight"),
+    "participant_isolation": set_in("gates", "participant_isolation"),
+    "correlation_attribute": set_in("gates", "correlation_attribute"),
     "base_drift_recheck": set_in("gates", "base_recheck"),
 }
 
@@ -88,6 +95,9 @@ def fill_every_input(manifest):
                             "budget": "budget-1", "config_sha256": "4" * 64})
     filled["gates"] = {"g2": {"evidence": "g2/report.md#L1"},
                        "prompt_freeze": {"evidence": "freeze/approval.md#L1"},
+                       "preflight": {"evidence": "preflight/result.json#tools"},
+                       "participant_isolation": {"evidence": "isolation/proof.md#L1"},
+                       "correlation_attribute": {"evidence": "telemetry/attribute.md#L1"},
                        "base_recheck": {"base_commit": filled["original_base"],
                                         "selection_sha256":
                                         filled["source_receipts"]["selection_sha256"]}}
@@ -279,13 +289,31 @@ class ManifestTests(unittest.TestCase):
 
         # When / Then
         for name, setter in PENDING_SETTERS.items():
-            gate = name in ("g2", "prompt_freeze")
+            gate = name in EVIDENCE_GATES
             for value in placeholders + (gate_only if gate else []):
                 with self.subTest(name=name, value=value):
                     broken = copy.deepcopy(filled)
                     setter(broken, value)
                     self.assertEqual(study.assess_readiness(broken),
                                      {"state": "unready", "pending": [name]})
+
+    def test_unproven_isolation_gates_keep_audit_unready(self):
+        # Given: every other input is filled, the three isolation gates are absent
+        _, manifest = build_unready_manifest(local_tools_ok=True)
+        filled = fill_every_input(manifest)
+        for gate in ("preflight", "participant_isolation", "correlation_attribute"):
+            del filled["gates"][gate]
+
+        # When
+        readiness = study.assess_readiness(filled)
+
+        # Then
+        self.assertEqual(readiness, {"state": "unready", "pending": [
+            "preflight", "participant_isolation", "correlation_attribute"]})
+
+    def test_python_gate_requires_tarfile_data_filter_release(self):
+        # When / Then
+        self.assertEqual(run.MINIMUM_PYTHON, (3, 11, 4))
 
     def test_missing_manifest_section_is_pending_not_an_exception(self):
         # Given
@@ -571,17 +599,17 @@ class RunCommandTests(unittest.TestCase):
     def test_old_python_exits_two_with_json_error(self):
         # Given
         old = shutil.which("python3")
-        probe = subprocess.run([old, "-c", "import sys;print(sys.version_info >= (3, 11))"],
+        probe = subprocess.run([old, "-c", "import sys;print(sys.version_info >= (3, 11, 4))"],
                                capture_output=True, text=True) if old else None
         if probe is None or probe.stdout.strip() != "False":
-            self.skipTest("default python3 is not older than 3.11")
+            self.skipTest("default python3 is not older than 3.11.4")
 
         # When
         code, report = self.run_cli("audit", "--root", self.tmp, python=old)
 
         # Then
         self.assertEqual(code, 2)
-        self.assertIn("Python 3.11", report["error"])
+        self.assertIn("Python 3.11.4", report["error"])
 
 
 if __name__ == "__main__":

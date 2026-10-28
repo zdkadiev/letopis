@@ -9,8 +9,10 @@ from __future__ import annotations
 import json
 import sys
 
-if sys.version_info < (3, 11):
-    print(json.dumps({"error": "Python 3.11 or newer is required"}))
+# tarfile extraction with filter="data" exists from 3.11.4 on.
+MINIMUM_PYTHON = (3, 11, 4)
+if sys.version_info < MINIMUM_PYTHON:
+    print(json.dumps({"error": "Python 3.11.4 or newer is required"}))
     sys.exit(2)
 
 import argparse
@@ -59,27 +61,32 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True,
                                      parser_class=JsonArgumentParser)
     prepare = commands.add_parser("prepare", add_help=False)
-    prepare.add_argument("--repo", type=Path, required=True)
+    prepare.add_argument("--repo", type=to_absolute_path, required=True)
     prepare.add_argument("--base", required=True)
-    prepare.add_argument("--output", type=Path, required=True)
+    prepare.add_argument("--output", type=to_absolute_path, required=True)
     prepare.set_defaults(handler=run_prepare)
     audit = commands.add_parser("audit", add_help=False)
-    audit.add_argument("--root", type=Path, required=True)
+    audit.add_argument("--root", type=to_absolute_path, required=True)
     audit.set_defaults(handler=run_audit)
     evaluate = commands.add_parser("evaluate", add_help=False)
-    evaluate.add_argument("--root", type=Path, required=True)
+    evaluate.add_argument("--root", type=to_absolute_path, required=True)
     evaluate.add_argument("--slot", required=True)
     evaluate.set_defaults(handler=run_evaluate)
     context = commands.add_parser("context", add_help=False)
-    context.add_argument("--source", type=Path, required=True)
-    context.add_argument("--assets", type=Path, required=True)
-    context.add_argument("--output", type=Path, required=True)
+    context.add_argument("--source", type=to_absolute_path, required=True)
+    context.add_argument("--assets", type=to_absolute_path, required=True)
+    context.add_argument("--output", type=to_absolute_path, required=True)
     context.set_defaults(handler=run_context)
     preflight = commands.add_parser("preflight", add_help=False)
-    preflight.add_argument("--root", type=Path, required=True)
+    preflight.add_argument("--root", type=to_absolute_path, required=True)
     preflight.add_argument("--image", required=True)
     preflight.set_defaults(handler=run_preflight)
     return parser
+
+
+def to_absolute_path(value: str) -> Path:
+    """Resolve a path argument against the operator's cwd before any command changes cwd."""
+    return Path(value).resolve()
 
 
 def run_prepare(args: argparse.Namespace) -> int:

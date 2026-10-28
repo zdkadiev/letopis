@@ -28,8 +28,11 @@ import study
 CHAINS = ("C1", "C2", "C3")
 HOST_STATE = (".artifacts", ".superpowers", ".engram", ".agents", ".claude", ".codex",
               ".letopis")
+# The pilot task evidence (TK-30..TK-33) holds check IDs, seed RED reasons and oracle rules.
 OPERATOR_PATHS = ("docs/zkit/letopis/pilot", "tests/pilot_protocol", "docs/superpowers",
-                  "tests/final_pilot")
+                  "tests/final_pilot", "docs/zkit/letopis/checks/TK-30",
+                  "docs/zkit/letopis/checks/TK-31", "docs/zkit/letopis/checks/TK-32",
+                  "docs/zkit/letopis/checks/TK-33")
 ARCHIVE_EXCLUSIONS = (".git", "target", *HOST_STATE, *OPERATOR_PATHS)
 # Participant work in docs/ must survive capture, so only VCS and build outputs are skipped.
 CODE_EXCLUSIONS = (".git", "target", ".letopis")

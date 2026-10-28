@@ -3,6 +3,7 @@
 Inputs are literal filesystem, HTTP and JSON fixtures and tiny toy scripts that mimic
 observable behaviour; none is a C1-C3 implementation or a pilot record.
 """
+import contextlib
 import io
 import json
 import os
@@ -144,6 +145,65 @@ class EvaluationDispatchTests(TempDirTestCase):
         self.assertEqual(result["checks"], checks)
         self.assertEqual(copies.audit_inventory(self.root / "conditions"), self.audit)
         self.assertTrue((self.root / "operator/evidence" / SLOT / "run-1/result.json").is_file())
+
+    def test_relative_root_reaches_the_oracle_as_absolute_paths(self):
+        # Given: the operator passes the study root relative to its working directory
+        seen = []
+
+        def record(copy, task, evidence):
+            seen.append((copy, evidence))
+            return [{"id": check_id, "passed": None, "evidence": "-"} for check_id in C1_T1_IDS]
+        self.install_oracle(record)
+        self.enterContext(contextlib.chdir(self.tmp))
+
+        # When
+        result = evaluation.evaluate(Path("study"), SLOT)
+
+        # Then
+        self.assertEqual(result["status"], "assessed")
+        copy, evidence = seen[0]
+        self.assertEqual((copy.is_absolute(), evidence.is_absolute()), (True, True))
+        self.assertEqual(evaluation.build_environment(copy)["CARGO_TARGET_DIR"],
+                         str(self.tmp.resolve() / "study/operator/evaluation" / SLOT / "target"))
+
+    def test_cli_path_arguments_are_absolute(self):
+        # Given
+        self.enterContext(contextlib.chdir(self.tmp))
+
+        # When
+        parser = run.build_parser()
+        audit = parser.parse_args(["audit", "--root", "study"])
+        evaluate = parser.parse_args(["evaluate", "--root", "study", "--slot", SLOT])
+        prepare = parser.parse_args(["prepare", "--repo", "r", "--base", "b", "--output", "o"])
+
+        # Then
+        self.assertEqual([audit.root, evaluate.root, prepare.repo, prepare.output],
+                         [self.tmp.resolve() / name for name in ("study", "study", "r", "o")])
+
+    def test_operator_state_tamper_is_detected_after_the_oracle(self):
+        # Given: oracle sources outside the participant, and three tamper targets
+        sources = self.tmp / "operator-sources"
+        sources.mkdir()
+        (sources / "cli.py").write_text("ORACLE = 1\n")
+        self.enterContext(mock.patch.object(evaluation, "OPERATOR_SOURCES", (sources,)))
+        targets = {"oracle source": sources / "cli.py",
+                   "selection input": self.root / "inputs/selection.json",
+                   "capture blob": self.root / "operator/blobs/planted"}
+        for name, target in targets.items():
+            with self.subTest(name):
+                original = target.read_bytes() if target.exists() else None
+                def tamper(copy, task, evidence, target=target):
+                    target.write_text("tampered")
+                    return [{"id": i, "passed": True, "evidence": "-"} for i in C1_T1_IDS]
+                self.install_oracle(tamper)
+
+                # When / Then
+                with self.assertRaisesRegex(ValueError, "operator state changed"):
+                    evaluation.evaluate(self.root, SLOT)
+                if original is None:
+                    target.unlink()
+                else:
+                    target.write_bytes(original)
 
     def test_invalid_slot_exits_two(self):
         # Given
@@ -686,6 +746,45 @@ printf '%s\\n' 'GARBAGE'
 """
 TOY_BINARY = "#!/bin/sh\ncat >/dev/null\nprintf '{\"ok\":true,\"result\":{}}\\n'\n"
 FAILING_BINARY = "#!/bin/sh\ncat >/dev/null\nprintf '{\"ok\":false}\\n'\nexit 1\n"
+
+
+class EmbedLockObservationTests(TempDirTestCase):
+    STATUSES = {"non-zero exit": "echo '{\"ok\":true,\"result\":{\"locks\":[]}}'; exit 1",
+                "garbage": "echo GARBAGE", "json list": "echo '[1, 2]'",
+                "not ok": "echo '{\"ok\":false,\"result\":{\"locks\":[]}}'"}
+
+    def make_bench(self, status):
+        binary = self.tmp / "letopis"
+        binary.write_text("#!/bin/sh\ncat >/dev/null\n"
+                          f"if [ \"$1\" = status ]; then {status}; fi\n"
+                          "echo '{\"ok\":true,\"result\":{}}'\n")
+        binary.chmod(0o755)
+        (self.tmp / "home").mkdir(exist_ok=True)
+        return drain.Bench(self.tmp, binary, binary, self.evidence)
+
+    def test_release_requires_an_observed_status(self):
+        self.enterContext(mock.patch.object(drain, "DRAIN_WATCHDOG_SECONDS", 0.5))
+        for name, status in self.STATUSES.items():
+            with self.subTest(name):
+                # When
+                released = drain.wait_for_release(self.make_bench(status), self.tmp)
+
+                # Then
+                self.assertFalse(released)
+
+    def test_observed_empty_lock_list_is_released(self):
+        # Given
+        bench = self.make_bench("echo '{\"ok\":true,\"result\":{\"locks\":[]}}'; exit 0")
+
+        # When / Then
+        self.assertTrue(drain.wait_for_release(bench, self.tmp))
+        self.assertEqual(drain.observe_embed_lock(bench, self.tmp), (True, None))
+
+    def test_non_object_output_is_not_ok_and_does_not_raise(self):
+        # When / Then
+        self.assertFalse(drain.read_ok({"stdout": b"[1, 2]"}))
+        self.assertEqual(drain.observe_embed_lock(self.make_bench("echo '[1, 2]'"), self.tmp),
+                         (False, None))
 
 
 class ChangeGradeTests(unittest.TestCase):

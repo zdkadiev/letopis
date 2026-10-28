@@ -29,6 +29,10 @@ REQUIRED_INPUTS = (
     ("agent_config", (("agent", "config_sha256"),)),
     ("g2", (("gates", "g2"),)),
     ("prompt_freeze", (("gates", "prompt_freeze"),)),
+    # Evidence objects for what local preflight can never prove on its own.
+    ("preflight", (("gates", "preflight"),)),
+    ("participant_isolation", (("gates", "participant_isolation"),)),
+    ("correlation_attribute", (("gates", "correlation_attribute"),)),
 )
 
 
@@ -68,7 +72,9 @@ def build_manifest(selection: dict, inputs: dict) -> dict:
                         "image": None, "pinned_assets": None},
         "agent": {"name": AGENT_NAME, "version": AGENT_VERSION, "model": None,
                   "model_revision": None, "budget": None, "config_sha256": None},
-        "gates": {"g2": None, "prompt_freeze": None, "base_recheck": None},
+        "gates": {"g2": None, "prompt_freeze": None, "preflight": None,
+                  "participant_isolation": None, "correlation_attribute": None,
+                  "base_recheck": None},
         "order": build_order(selection),
         "source_receipts": {"base_commit": base,
                             "selection_sha256": hash_selection(selection),

@@ -42,6 +42,9 @@ REGRESSION_TIMEOUT_SECONDS = 3600
 GIT_TIMEOUT_SECONDS = 30
 FAILURE_TAIL_LINES = 40
 OID_PATTERN = re.compile(r"[0-9a-f]{40}")
+HERE = Path(__file__).resolve().parent
+# Operator code the participant build must not be able to rewrite unnoticed.
+OPERATOR_SOURCES = (HERE / "evaluation.py", HERE / "oracles")
 
 
 class InfraError(RuntimeError):
@@ -68,15 +71,18 @@ def evaluate(root: Path, slot: str) -> dict:
     The participant audit is verified in `finally`, so a write-back or an interrupted
     oracle still raises. Raises ValueError for an unknown slot/task or a check ID mismatch.
     """
-    root = Path(root)
+    # Builds run with cwd inside the copy, so every downstream path must be absolute.
+    root = Path(root).resolve()
     task_id = read_task_id(slot)
     expected = read_check_ids(root, task_id)
     oracle = load_oracle(task_id)
     capture = read_or_capture(root, slot)
+    operator = hash_operator_state(root, slot)
     try:
         return run_oracle(root, slot, oracle, expected)
     finally:
         copies.require_unchanged(root, capture)
+        require_operator_unchanged(root, slot, operator)
 
 
 def run_observed(argv: list[str], *, cwd: Path, env: dict, evidence: Path, label: str,
@@ -186,6 +192,29 @@ def read_captured_commit(copy: Path) -> str:
     if result.returncode != 0 or OID_PATTERN.fullmatch(commit) is None:
         raise InfraError("evaluation copy has no captured commit")
     return commit
+
+
+def hash_operator_state(root: Path, slot: str) -> dict[str, str]:
+    """Hash oracle sources, copied inputs and the slot's capture plus all captured blobs.
+
+    Participant build scripts and tests run as the operator, so this detects (it does not
+    prevent) a rewrite of the evaluator, its rubric inputs or the captured state.
+    """
+    paths = [*OPERATOR_SOURCES, root / "inputs", root / "operator/blobs",
+             root / "operator/captures" / f"{slot}.json"]
+    hashes = {}
+    for path in paths:
+        files = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.is_file())
+        for file in files:
+            hashes[str(file)] = copies.hash_file(file)
+    return hashes
+
+
+def require_operator_unchanged(root: Path, slot: str, before: dict[str, str]) -> None:
+    after = hash_operator_state(root, slot)
+    if after != before:
+        changed = sorted(set(after.items()) ^ set(before.items()))
+        raise ValueError(f"operator state changed during evaluation: {changed[0][0]}")
 
 
 def read_task_id(slot: str) -> str:

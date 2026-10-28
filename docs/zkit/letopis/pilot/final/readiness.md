@@ -17,12 +17,17 @@
 | `agent_config` | SHA-256 общей конфигурации агента, одинаковой для обоих условий | оператор |
 | `g2` | ссылка на evidence G-2 | оператор |
 | `prompt_freeze` | **prompt wording**: человек читает все девять prompts и `instructions.md` и фиксирует формулировки; пока не сделано, prompts остаются черновиком | человек |
+| `preflight` | evidence полного preflight: tools, установленный memory CLI, digest image и `git_target_separation` (локальный smoke их не доказывает) | оператор |
+| `participant_isolation` | evidence изоляции participant (отдельные HOME/CODEX_HOME, нет доступа к operator/другому условию); команда запуска TK-31 обязана использовать **тот же mount builder**, что и Docker boundary proof, иначе proof тавтологичен | оператор |
+| `correlation_attribute` | evidence подтверждённого атрибута корреляции request inventory ↔ usage counters в живой telemetry | оператор |
 | `base_drift_recheck` | повторная проверка исходников выбранной base: непроходящий новый критерий каждой задачи на seed; запись действует только для точных `base_commit` и `selection_sha256` | оператор |
 
 Значения pending-ключей считаются предоставленными, только если они непустые: `null`,
 пустые строки/контейнеры, голые `true`/`false` и числа не очищают пункт. Gate (`g2`,
-`prompt_freeze`) очищается лишь объектом с непустой ссылкой `evidence`; интерпретация
-gate evidence остаётся ручным шагом человека, `audit` её не оценивает.
+`prompt_freeze`, `preflight`, `participant_isolation`, `correlation_attribute`) очищается
+лишь объектом с непустой ссылкой `evidence`; интерпретация gate evidence остаётся
+ручным шагом человека, `audit` её не оценивает. Без этих трёх evidence-gates `audit` остаётся
+`unready`, даже если все остальные значения заполнены.
 
 `audit` пересчитывает hash `selection.json` и hash копий входов в `inputs/` и сверяет их с
 `source_receipts`; расхождение, как и неполный `original_base`, даёт `input_drift`.

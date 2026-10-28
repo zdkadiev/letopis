@@ -15,6 +15,7 @@ import copies
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 RUN = HERE / "run.py"
+SELECTION = REPO / "docs/zkit/letopis/pilot/final/selection.json"
 GIT_ENV = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
 EMPTY_SNAPSHOT_SHA256 = "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
 SHA_X = "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
@@ -71,6 +72,9 @@ BASE_FILES = {
     "tests/pilot_protocol/check.py": ("operator", 0o644),
     "docs/superpowers/specs/s.md": ("operator", 0o644),
     "tests/final_pilot/x.py": ("operator", 0o644),
+    "docs/zkit/letopis/checks/TK-30/report.md": (
+        "version_value two_requests_before_release hexagonal_sync", 0o644),
+    "docs/zkit/letopis/checks/TK-33/verification.json": ('{"bounded_buffer": 1}', 0o644),
     ".superpowers/n": ("host", 0o644),
     ".artifacts/n": ("host", 0o644),
     ".engram/db": ("host", 0o644),
@@ -219,9 +223,27 @@ class SeedTests(PreparedSeedsTestCase):
 
         # Then
         self.assertEqual(present, SEED_PATHS)
-        self.assertEqual(self.result["exclusions"]["archive"][-4:],
+        self.assertEqual(self.result["exclusions"]["archive"][-8:],
                          ["docs/zkit/letopis/pilot", "tests/pilot_protocol",
-                          "docs/superpowers", "tests/final_pilot"])
+                          "docs/superpowers", "tests/final_pilot",
+                          "docs/zkit/letopis/checks/TK-30", "docs/zkit/letopis/checks/TK-31",
+                          "docs/zkit/letopis/checks/TK-32", "docs/zkit/letopis/checks/TK-33"])
+
+    def test_seed_has_no_frozen_check_or_agreement_id(self):
+        # Given: every rubric identifier of the frozen selection; `regression` is a plain word
+        selection = json.loads(SELECTION.read_text(encoding="utf-8"))
+        tasks = [task for chain in selection["chains"] for task in chain["tasks"]]
+        secrets = ({check for task in tasks for check in task["check_ids"]}
+                   | set(selection["agreement_catalog"])) - {"regression"}
+
+        # When
+        leaks = sorted((path.relative_to(self.root).as_posix(), secret)
+                       for path in (self.root / "conditions").rglob("*")
+                       if path.is_file() and ".git" not in path.parts
+                       for secret in secrets if secret in path.read_text(errors="replace"))
+
+        # Then
+        self.assertEqual(leaks, [])
 
     def test_executable_mode_survives_and_fixture_markdown_is_physical_but_untracked(self):
         # When
@@ -284,10 +306,12 @@ class SeedTests(PreparedSeedsTestCase):
         self.assertEqual(mapping[0]["git"]["remotes"], [])
 
     def test_source_repository_is_untouched(self):
+        # Given/When: setUpClass prepares the seeds from the source repository
         # Then
         self.assertEqual(read_tree(self.source), self.source_before)
 
     def test_memory_corpus_starts_empty_only_for_memory_conditions(self):
+        # Given/When: setUpClass prepares the seeds
         # Then
         for name in CONDITION_DIRS:
             memory = self.root / "conditions" / name / "memory"
@@ -731,8 +755,18 @@ TOY_FILES = {
                  'std::fs::write(target.join("leak-attempt"), data).unwrap(); }\n', 0o644),
 }
 MARKER = "TK30_PRIVATE_ORACLE_MARKER"
-DOCKER_BASE = ["docker", "run", "--rm", "--network", "none", "--cap-drop", "ALL",
-               "--security-opt", "no-new-privileges"]
+DOCKER_BASE = ["docker", "run", "--rm", "--pull", "never", "--network", "none",
+               "--cap-drop", "ALL", "--security-opt", "no-new-privileges"]
+
+
+class DockerArgumentTests(unittest.TestCase):
+    def test_boundary_proof_never_pulls_an_image(self):
+        # When
+        argv = " ".join(DOCKER_BASE)
+
+        # Then
+        self.assertIn("--pull never", argv)
+        self.assertIn("--network none", argv)
 
 
 @unittest.skipUnless(DOCKER_OUTPUT, "set TK30_CONTAINER_OUTPUT to a new private evidence "

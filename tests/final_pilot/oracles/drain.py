@@ -303,7 +303,7 @@ def observe_death(bench: Bench) -> bool:
                           env=make_runtime_env(bench)) as drain:
             held = server.wait_for_held(1, OVERLAP_WAIT_SECONDS)
             drain.kill()
-        released = read_embed_pid(bench, repo) is None
+        released = is_released(bench, repo)
         attempts = read_held_attempts(bench, repo, server, hashes)
     return held and released and bool(attempts) and all(
         value is not None and value >= 1 for value in attempts.values())
@@ -413,19 +413,39 @@ def run_binary(bench: Bench, repo: Path, argv: list[str], stdin: bytes) -> dict:
                                    timeout=COMMAND_WATCHDOG_SECONDS)
 
 
-def read_embed_pid(bench: Bench, repo: Path):
-    status = read_json(run_binary(bench, repo, ["status"], b"{}")["stdout"]) or {}
-    locks = status.get("result", {}).get("locks", [])
-    return next((lock["pid"] for lock in locks if lock.get("name") == "embed"), None)
-
-
 def wait_for_release(bench: Bench, repo: Path) -> bool:
+    """True once an observed `status` lists no embed lock; unobserved never counts."""
     deadline = time.monotonic() + DRAIN_WATCHDOG_SECONDS
     while time.monotonic() < deadline:
-        if read_embed_pid(bench, repo) is None:
+        if is_released(bench, repo):
             return True
         time.sleep(0.2)
     return False
+
+
+def is_released(bench: Bench, repo: Path) -> bool:
+    return observe_embed_lock(bench, repo) == (True, None)
+
+
+def read_embed_pid(bench: Bench, repo: Path):
+    return observe_embed_lock(bench, repo)[1]
+
+
+def observe_embed_lock(bench: Bench, repo: Path) -> tuple[bool, int | None]:
+    """Return (observed, embed lock pid) from `status`.
+
+    Observed only when `status` exits 0 with an `ok: true` object listing its locks; any
+    other output is unobserved, so it can never be mistaken for a released lock.
+    """
+    result = run_binary(bench, repo, ["status"], b"{}")
+    status = read_json(result["stdout"])
+    body = status.get("result") if isinstance(status, dict) and status.get("ok") is True else None
+    locks = body.get("locks") if isinstance(body, dict) else None
+    if result["exit"] != 0 or not isinstance(locks, list):
+        return False, None
+    pids = [lock.get("pid") for lock in locks
+            if isinstance(lock, dict) and lock.get("name") == "embed"]
+    return True, pids[0] if pids else None
 
 
 def make_runtime_env(bench: Bench) -> dict:
@@ -448,7 +468,8 @@ def is_alive(pid: int) -> bool:
 
 
 def read_ok(result: dict) -> bool:
-    return (read_json(result["stdout"]) or {}).get("ok") is True
+    value = read_json(result["stdout"])
+    return isinstance(value, dict) and value.get("ok") is True
 
 
 def read_json(data: bytes):
