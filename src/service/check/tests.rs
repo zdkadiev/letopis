@@ -6,11 +6,12 @@ use crate::{
     },
     service::{
         CacheWrite, Checker, CommandError, CommandErrorKind, CommandProblem, CommandResult,
-        CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentResult,
-        GraphDiagnostics, KnowledgeMetadata, NodeMetadata, ProvenanceIssue, ProvenanceObservation,
-        ProvenanceRequest, RefreshOutcome, Refresher, SearchFlag, SnapshotError, SnapshotState,
-        SnapshotVerifier, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
-        Storage, StorageError, StorageErrorKind, StorageRead, StorageResult, VectorOutcome,
+        DocumentError, DocumentErrorKind, DocumentResult, GraphDiagnostics,
+        GraphDiagnosticsService, KnowledgeMetadata, NodeMetadata, ProvenanceIssue,
+        ProvenanceObservation, ProvenanceRequest, RefreshOutcome, Refresher, SearchFlag,
+        SnapshotError, SnapshotState, SnapshotVerifier, SourceProvenance, SourceRevisionComparison,
+        SourceRevisionRequest, Storage, StorageError, StorageErrorKind, StorageRead, StorageResult,
+        VectorOutcome,
     },
     storage::SqliteStorage,
 };
@@ -225,7 +226,7 @@ fn check_filters_snapshot_owners_before_probing_git() {
     let mut service = CheckService::new(
         Refresh(|| Ok(build_outcome())),
         storage,
-        CurrentGraphDiagnostics::new(),
+        GraphDiagnosticsService::new(),
         Verifier {
             probes: probes.clone(),
             result: SnapshotState::Missing,
@@ -333,7 +334,7 @@ impl GraphDiagnostics for RecordingDiagnostics {
     ) -> CommandResult<Vec<CommandProblem>> {
         self.events.borrow_mut().push("diagnostics");
         assert_eq!(view.get_revision(), 1);
-        CurrentGraphDiagnostics::new().find_problems(view, paths)
+        GraphDiagnosticsService::new().find_problems(view, paths)
     }
 }
 
@@ -344,7 +345,7 @@ impl GraphDiagnostics for PublishingDiagnostics {
         paths: &[RepoPath],
     ) -> CommandResult<Vec<CommandProblem>> {
         let revision = view.get_revision();
-        let findings = CurrentGraphDiagnostics::new().find_problems(view, paths)?;
+        let findings = GraphDiagnosticsService::new().find_problems(view, paths)?;
         publish_nodes(
             &mut self.writer.borrow_mut(),
             &[build_node("a.md", "b"), build_node("b.md", "b")],

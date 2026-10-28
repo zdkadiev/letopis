@@ -1,7 +1,5 @@
-use super::{HandlerServices, Handlers, parse_request, write_response};
-use crate::service::{
-    CommandErrorKind, CommandProblem, MockBackgroundRunner, MockRefresher, RefreshOutcome,
-};
+use super::{ResponseResult, finish_foreground, parse_request, write_response};
+use crate::service::{CommandErrorKind, CommandProblem, MockBackgroundRunner};
 use serde_json::{Value, json};
 
 #[test]
@@ -22,19 +20,8 @@ fn accepts_only_empty_reindex_input() {
 }
 
 #[test]
-fn reindex_dispatches_full_operation_without_refresh_or_inline_drain() {
-    // Given
-    let mut documents = MockRefresher::new();
-    documents.expect_refresh().times(0);
-    documents.expect_reindex().times(1).returning(|| {
-        Ok(RefreshOutcome {
-            revision: 42,
-            published: true,
-            files_updated: 1,
-            files_removed: 0,
-            invalid_files_updated: 0,
-        })
-    });
+fn reindex_response_carries_revision_and_launch_warning_without_inline_drain() {
+    // Given: a reindex result and a background runner that reports a launch warning.
     let mut background = MockBackgroundRunner::new();
     background.expect_drain().times(0);
     background.expect_start_if_needed().times(1).returning(|| {
@@ -44,14 +31,8 @@ fn reindex_dispatches_full_operation_without_refresh_or_inline_drain() {
             details: Default::default(),
         }))
     });
-    let request = parse_request(&["reindex".into()], b"{}".as_slice()).unwrap();
-    // When
-    let response = Handlers::new(HandlerServices {
-        refresher: Some(&mut documents),
-        background: Some(&mut background),
-        ..HandlerServices::default()
-    })
-    .execute(request);
+    // When: the foreground command finishes.
+    let response = finish_foreground(ResponseResult::Reindex(42), &mut background);
     let mut output = Vec::new();
     assert_eq!(write_response(&mut output, response), 0);
     // Then

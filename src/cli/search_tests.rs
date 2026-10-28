@@ -1,14 +1,14 @@
 //! Injected transport doubles only; real service behavior lives in binary tests.
-use super::{HandlerServices, Handlers, Request, parse_request, write_response};
+use super::{Request, ResponseResult, finish_foreground, parse_request, write_response};
 use crate::{
     domain::{KnowledgeId, LineRange, RepoPath},
     service::{
-        CommandErrorKind, CommandResult, MockSearcher, RecheckFilter, SearchFlag, SearchLink,
-        SearchRequest,
+        CommandErrorKind, CommandResult, MockBackgroundRunner, RecheckFilter, SearchFlag,
+        SearchLink,
     },
 };
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, ffi::OsString, num::NonZeroUsize};
+use std::{collections::BTreeSet, ffi::OsString};
 
 #[test]
 fn parse_search_rejects_null_duplicate_unknown_numeric_and_trailing_inputs() {
@@ -147,33 +147,22 @@ fn effective_filters_are_typed_and_deduplicated() {
 }
 
 #[test]
-fn search_handler_dispatches_typed_request_and_renders_links() {
-    // Given
-    let mut searches = MockSearcher::new();
-    searches
-        .expect_search()
+fn search_response_renders_links() {
+    // Given: one search link and a quiet background runner.
+    let links = vec![SearchLink {
+        element_id: KnowledgeId::parse("x.md#a").unwrap(),
+        path: RepoPath::parse("x.md").unwrap(),
+        lines: LineRange::new(2, 7).unwrap(),
+        revision: 9,
+        flags: BTreeSet::from([SearchFlag::Stale]),
+    }];
+    let mut background = MockBackgroundRunner::new();
+    background
+        .expect_start_if_needed()
         .times(1)
-        .withf(|request| request.query == "private query" && request.limit.get() == 3)
-        .returning(|_| {
-            Ok(vec![SearchLink {
-                element_id: KnowledgeId::parse("x.md#a").unwrap(),
-                path: RepoPath::parse("x.md").unwrap(),
-                lines: LineRange::new(2, 7).unwrap(),
-                revision: 9,
-                flags: BTreeSet::from([SearchFlag::Stale]),
-            }])
-        });
-    let request = SearchRequest {
-        filters: Default::default(),
-        query: "private query".into(),
-        limit: NonZeroUsize::new(3).unwrap(),
-    };
-    // When
-    let response = Handlers::new(HandlerServices {
-        searches: Some(&mut searches),
-        ..HandlerServices::default()
-    })
-    .execute(Request::Search(request));
+        .returning(|| Ok(None));
+    // When: the foreground command finishes.
+    let response = finish_foreground(ResponseResult::Search(links), &mut background);
     let mut output = Vec::new();
     let exit = write_response(&mut output, response);
     let value: Value = serde_json::from_slice(&output).unwrap();

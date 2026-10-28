@@ -1,3 +1,4 @@
+use super::help::find_help;
 use crate::domain::{EdgeType, RepoPath, SourceUri, TreeOid};
 use crate::service::{
     CommandError, CommandErrorKind, CommandResult, ElementAddress, RecheckFilter, SearchFilters,
@@ -20,6 +21,8 @@ pub(crate) enum Request {
     Search(SearchRequest),
     Traverse(TraversalRequest),
     Drain,
+    /// Plain-text help or version output, produced before any input is read.
+    Help(String),
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -68,6 +71,9 @@ struct TraversalInput {
 struct EmptyInput {}
 
 pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResult<Request> {
+    if let Some(text) = find_help(args) {
+        return Ok(Request::Help(text));
+    }
     let args = args
         .iter()
         .map(|arg| arg.to_str().ok_or_else(fail_invalid_request))

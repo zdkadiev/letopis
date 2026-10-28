@@ -1,4 +1,4 @@
-use super::DocumentRefresher;
+use super::DocumentRefreshService;
 use crate::{
     domain::{RepoPath, TreeOid},
     markdown::MarkdownParser,
@@ -122,7 +122,7 @@ impl BasisRetainer for TestProvenance {
     }
 }
 type TestService =
-    DocumentRefresher<Candidates, TestFiles, CountingMarkdown, SqliteStorage, TestProvenance>;
+    DocumentRefreshService<Candidates, TestFiles, CountingMarkdown, SqliteStorage, TestProvenance>;
 #[test]
 fn skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files() {
     // Given
@@ -362,7 +362,7 @@ fn build_service() -> (TempDir, TestService) {
         SqliteStorage::open(&dir.path().join("cache.db"), &dir.path().join("vectors.db")).unwrap();
     (
         dir,
-        DocumentRefresher {
+        DocumentRefreshService {
             git: build_candidates(),
             filesystem: TestFiles::new(),
             markdown: CountingMarkdown(Cell::new(0)),

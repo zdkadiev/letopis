@@ -36,10 +36,10 @@ mod traversal_types;
 pub(crate) use background::BackgroundService;
 pub(crate) use check::CheckService;
 /// Cache refresh implementation and its caller-owned collaborator bundle.
-pub(crate) use document_refresher::DocumentRefresher;
+pub(crate) use document_refresher::DocumentRefreshService;
 pub(crate) use embedding::EmbeddingService;
 pub(crate) use graph::GraphService;
-pub(crate) use graph_diagnostics::CurrentGraphDiagnostics;
+pub(crate) use graph_diagnostics::GraphDiagnosticsService;
 pub(crate) use inspection::InspectionService;
 pub(crate) use provenance::ProvenanceService;
 /// Source comparison requests and metadata-only outcomes.
@@ -57,13 +57,11 @@ pub use command::{
     CheckReport, CommandError, CommandErrorKind, CommandProblem, CommandResult, ElementAddress,
     InspectedElement, Inspection, SearchFlag, SearchLink, SearchRequest,
 };
+#[cfg(test)]
+pub(crate) use command_traits::MockBackgroundRunner;
 pub use command_traits::{
     BackgroundRunner, Checker, DrainLauncher, EmbedLocker, EmbeddingExecutor, Inspector, Searcher,
     StatusReader, Traverser,
-};
-#[cfg(test)]
-pub(crate) use command_traits::{
-    MockBackgroundRunner, MockChecker, MockInspector, MockSearcher, MockStatusReader, MockTraverser,
 };
 pub use document_traits::{CorpusLister, FileSystem, MarkdownCodec, Refresher};
 #[cfg(test)]
