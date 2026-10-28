@@ -54,15 +54,14 @@ def load_selection(path: Path) -> dict:
 def build_manifest(selection: dict, inputs: dict) -> dict:
     """Return the private draft manifest; every unknown input stays null and pending."""
     base = inputs.get("original_base")
-    if not isinstance(base, str) or not FULL_OID.fullmatch(base):
-        raise ValueError("original_base must be a full lowercase 40-hex object id")
+    require_full_oid(base, "original_base")
     manifest = {
         "preparation_version": 1,
         "state": "unready",
         "model_executions": 0,
         "original_base": base,
-        "seed_commit": None,
-        "starting_inventory": None,
+        "seed_commit": inputs.get("seed_commit"),
+        "starting_inventory": inputs.get("starting_inventory"),
         "product": {"final_base": None, "memory_binary": None, "skill": None,
                     "embedding_config": None},
         "environment": {"local_tools_ok": bool(inputs.get("local_tools_ok", False)),
@@ -77,6 +76,12 @@ def build_manifest(selection: dict, inputs: dict) -> dict:
     }
     manifest["pending"] = assess_readiness(manifest)["pending"]
     return manifest
+
+
+def require_full_oid(value, name: str) -> None:
+    """Raise ValueError unless value is a full lowercase 40-hex Git object id."""
+    if not _is_full_oid(value):
+        raise ValueError(f"{name} must be a full lowercase 40-hex object id")
 
 
 def assess_readiness(manifest: dict, observed: dict | None = None) -> dict:

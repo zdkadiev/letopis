@@ -18,6 +18,7 @@ import hashlib
 import subprocess
 from pathlib import Path
 
+import copies
 import study
 
 HERE = Path(__file__).resolve().parent
@@ -25,6 +26,7 @@ FINAL_DIR = HERE.parent.parent / "docs/zkit/letopis/pilot/final"
 SELECTION_FILE = "selection.json"
 INPUT_FILES = (SELECTION_FILE, "instructions.md", "readiness.md")
 MANIFEST_FILE = "manifest.json"
+SEEDS_FILE = "seeds.json"
 EXIT_OK = 0
 EXIT_INVALID = 2
 GIT_TIMEOUT_SECONDS = 30
@@ -69,36 +71,59 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def run_prepare(args: argparse.Namespace) -> int:
-    """Write the unready manifest and copies of the operator inputs into a new directory."""
+    """Write the manifest, copied inputs and the six isolated seeds into a new directory."""
     selection = study.load_selection(FINAL_DIR / SELECTION_FILE)
     receipts = {name: hash_file(FINAL_DIR / name) for name in INPUT_FILES}
-    manifest = study.build_manifest(
-        selection, {"original_base": args.base, "file_sha256": receipts})
+    study.require_full_oid(args.base, "base")
     check_commit_exists(args.repo, args.base)
     args.output.mkdir(parents=True)
     inputs = args.output / "inputs"
     inputs.mkdir()
     for name in INPUT_FILES:
         (inputs / name).write_bytes((FINAL_DIR / name).read_bytes())
-    (args.output / MANIFEST_FILE).write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    seeds = copies.prepare_seeds(args.repo, args.base, args.output)
+    manifest = study.build_manifest(selection, {
+        "original_base": args.base, "file_sha256": receipts,
+        "seed_commit": seeds["seed_commit"],
+        "starting_inventory": seeds["starting_inventory"]})
+    manifest["source_receipts"]["tk17_sources"] = seeds["source_receipts"]
+    write_json(args.output / SEEDS_FILE, seeds)
+    write_json(args.output / MANIFEST_FILE, manifest)
     return emit({"state": "unready", "pending": manifest["pending"],
                  "output": str(args.output)}, EXIT_OK)
 
 
 def run_audit(args: argparse.Namespace) -> int:
-    """Report readiness from the manifest values and the recomputed copied inputs.
+    """Report readiness from the manifest values, the copied inputs and the seeds on disk.
 
     The stored `state` claim is ignored; the selection hash and input file hashes are
-    recomputed from `inputs/` so a post-recheck edit is reported as drift.
+    recomputed from `inputs/` so a post-recheck edit is reported as drift, and supplied
+    seed values are re-verified against the six seed repositories.
     """
     manifest = json.loads((args.root / MANIFEST_FILE).read_text(encoding="utf-8"))
     readiness = study.assess_readiness(manifest, observe_inputs(args.root / "inputs"))
+    if "seeds" not in readiness["pending"]:
+        add_seed_drift(readiness, args.root, manifest)
     return emit(readiness, EXIT_OK if readiness["state"] == "ready" else EXIT_INVALID)
 
 
 def run_evaluate(args: argparse.Namespace) -> int:
     return emit({"error": "evaluate is not wired until Task 3"}, EXIT_INVALID)
+
+
+def add_seed_drift(readiness: dict, root: Path, manifest: dict) -> None:
+    """Mark the readiness unready when the seeds no longer match the manifest values."""
+    try:
+        copies.audit_seeds(root, manifest["original_base"], manifest["seed_commit"],
+                           manifest["starting_inventory"])
+    except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError) as error:
+        readiness["pending"].append("seed_drift")
+        readiness["state"] = "unready"
+        readiness["seed_problem"] = str(error)
+
+
+def write_json(path: Path, value: dict) -> None:
+    path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
 def observe_inputs(inputs: Path) -> dict:

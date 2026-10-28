@@ -384,7 +384,11 @@ class RunCommandTests(unittest.TestCase):
         self.repo.mkdir()
         self.git("init", "-q")
         (self.repo / "a.txt").write_text("a\n")
-        self.git("add", "a.txt")
+        (self.repo / "AGENTS.md").write_text(
+            "# Rules\n\n- Keep agreed specifications and implementation plans in "
+            "`docs/superpowers/specs/`. When the user requests Superpowers, follow it.\n\n"
+            "## Workspace and memory\n\n- Use Engram.\n")
+        self.git("add", "a.txt", "AGENTS.md")
         self.git("-c", "user.name=t", "-c", "user.email=t@example.com",
                  "commit", "-q", "-m", "init")
         self.base = self.git("rev-parse", "HEAD").strip()
@@ -412,7 +416,9 @@ class RunCommandTests(unittest.TestCase):
         # Then
         self.assertEqual(code, 0)
         self.assertEqual(report["state"], "unready")
-        self.assertEqual(sorted(p.name for p in output.iterdir()), ["inputs", "manifest.json"])
+        self.assertEqual(sorted(p.name for p in output.iterdir()),
+                         ["conditions", "inputs", "manifest.json", "seeds.json"])
+        self.assertNotIn("seeds", report["pending"])
         self.assertEqual(sorted(p.name for p in (output / "inputs").iterdir()),
                          ["instructions.md", "readiness.md", "selection.json"])
         manifest = load_json(output / "manifest.json")
@@ -443,7 +449,7 @@ class RunCommandTests(unittest.TestCase):
         # Then
         self.assertEqual(code, 2)
         self.assertEqual(report["state"], "unready")
-        self.assertEqual(report["pending"], ALL_PENDING)
+        self.assertEqual(report["pending"], [p for p in ALL_PENDING if p != "seeds"])
 
     def test_audit_without_manifest_is_an_input_error(self):
         # When
@@ -473,7 +479,11 @@ class RunCommandTests(unittest.TestCase):
         """Fill every freeze input and a matching recheck, as an operator would."""
         self.prepare(output)
         path = output / "manifest.json"
-        path.write_text(json.dumps(fill_every_input(load_json(path))))
+        prepared = load_json(path)
+        filled = fill_every_input(prepared)
+        filled["seed_commit"] = prepared["seed_commit"]
+        filled["starting_inventory"] = prepared["starting_inventory"]
+        path.write_text(json.dumps(filled))
 
     def test_audit_accepts_fully_supplied_untouched_inputs(self):
         # Given
