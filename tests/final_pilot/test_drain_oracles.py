@@ -7,7 +7,7 @@ import threading
 import unittest
 from unittest import mock
 import copies
-from oracles import drain
+from oracles import drain, http_fixture
 from _oracle_fixtures import (
     TempDirTestCase,
 )
@@ -62,6 +62,19 @@ class OverlapObserverTests(unittest.TestCase):
 
         # Then
         self.assertEqual(reply, {"model": "fixture", "embeddings": [[0.0, 0.0, 1.0]]})
+
+
+class HoldTimeoutTests(unittest.TestCase):
+    def test_a_hold_that_times_out_is_finished_and_no_longer_active(self):
+        # Given
+        with mock.patch.object(http_fixture, "HOLD_LIMIT_SECONDS", 0.2):
+            with drain.BarrierServer() as server:
+                # When
+                reply = post_document(server, "alpha")
+
+        # Then
+        self.assertEqual(reply["embeddings"], [http_fixture.VECTORS["alpha"]])
+        self.assertEqual((server.active, [r.get("done") for r in server.requests]), (0, [True]))
 
 
 class DrainGradeTests(TempDirTestCase):

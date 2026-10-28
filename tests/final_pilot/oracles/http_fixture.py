@@ -8,6 +8,7 @@ from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import evaluation
+from evaluation import read_json
 
 VECTORS = {"alpha": [1.0, 0.0, 0.0], "beta": [0.0, 1.0, 0.0], "gamma": [0.0, 0.0, 1.0],
            "changed": [1.0, 1.0, 0.0], "delta": [0.0, 1.0, 1.0]}
@@ -45,7 +46,7 @@ class BarrierServer:
         self.server.shutdown()
         self.server.server_close()
 
-    def handle_document(self, marker: str) -> bytes:
+    def handle_document(self, marker: str) -> tuple[bytes, dict]:
         """Count the request as in flight and block until released or the hold limit."""
         with self.condition:
             record = {"marker": marker, "released": self.open}
@@ -56,18 +57,18 @@ class BarrierServer:
             self.condition.notify_all()
             self.condition.wait_for(lambda: record["released"], HOLD_LIMIT_SECONDS)
         if marker == MALFORMED_MARKER:
-            return MALFORMED_REPLY
-        return json.dumps({"model": "fixture", "embeddings": [VECTORS[marker]]}).encode()
+            return MALFORMED_REPLY, record
+        reply = json.dumps({"model": "fixture", "embeddings": [VECTORS[marker]]})
+        return reply.encode(), record
 
     def handle_query(self) -> bytes:
         """Query embeddings are answered at once; only document requests are held."""
         return json.dumps({"model": "fixture", "embeddings": [QUERY_VECTOR]}).encode()
 
-    def finish_document(self, marker: str) -> None:
+    def finish_document(self, record: dict) -> None:
         with self.condition:
             self.active -= 1
-            next(r for r in self.requests if r["marker"] == marker and not r.get("done")
-                 and r["released"])["done"] = True
+            record["done"] = True
             self.condition.notify_all()
 
     def wait_for_held(self, count: int, timeout: float) -> bool:
@@ -105,7 +106,11 @@ def make_handler(owner: BarrierServer) -> type:
             body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
             text = " ".join(map(str, (read_json(body) or {}).get("input", [])))
             match = MARKER.search(text)
-            reply = owner.handle_document(match[1]) if match else owner.handle_query()
+            record = None
+            if match:
+                reply, record = owner.handle_document(match[1])
+            else:
+                reply = owner.handle_query()
             try:
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -115,17 +120,10 @@ def make_handler(owner: BarrierServer) -> type:
             except OSError:
                 pass
             finally:
-                if match:
-                    owner.finish_document(match[1])
+                if record:
+                    owner.finish_document(record)
 
         def log_message(self, *_args) -> None:
             pass
 
     return Handler
-
-
-def read_json(data: bytes):
-    try:
-        return json.loads(data)
-    except ValueError:
-        return None

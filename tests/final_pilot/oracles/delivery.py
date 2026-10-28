@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 import evaluation
+from evaluation import make_check
 
 TOY_BINARY = b"#!/bin/sh\necho tk30-literal-binary\n"
 TOY_SKILL = b"---\nname: letopis\n---\n\nTK-30 literal skill fixture.\n"
@@ -150,8 +151,8 @@ def find_install_damage(copy: Path, work: Path, bundle: Path, evidence: Path) ->
     """Damaged bundles and a destination collision must leave the prefix as it was."""
     collision = work / "collision"
     run_script(copy, "install", ["--bundle", bundle, "--prefix", collision], evidence)
-    (collision / SKILL_PATH).unlink()
-    (collision / SKILL_PATH).mkdir()
+    (collision / SKILL_PATH).unlink(missing_ok=True)
+    (collision / SKILL_PATH).mkdir(parents=True)
     (collision / SKILL_PATH / "sentinel").write_bytes(b"keep")
     cases = {"changed binary": (damage_bundle(bundle, work / "d1", BINARY_PATH), "prefix"),
              "missing skill": (damage_bundle(bundle, work / "d2", SKILL_PATH), "prefix"),
@@ -204,6 +205,9 @@ def observe_independence(copy: Path, work: Path, prefix: Path, log: Path,
     for path in sealed:
         path.chmod(0)
     try:
+        if any(os.access(path, os.R_OK) for path in sealed):
+            # chmod(0) does not bind root, so the independence check would prove nothing.
+            raise evaluation.InfraError("build target seal is ineffective for this user")
         run = run_script(copy, "check_install", ["--prefix", prefix], evidence, cwd=outside,
                          script=script)
     finally:
@@ -245,14 +249,6 @@ def find_manifest_gaps(path: Path, copy: Path) -> list[str]:
             if manifest.get(key) != expected[key]]
 
 
-def build_manifest(copy: Path) -> dict:
-    """The manifest the contract fixes for the literal inputs of this captured commit."""
-    files = [{"path": BINARY_PATH, "sha256": hash_bytes(TOY_BINARY)},
-             {"path": SKILL_PATH, "sha256": hash_bytes(TOY_SKILL)}]
-    return {"version": EXPECTED_VERSION, "source_commit": evaluation.read_captured_commit(copy),
-            "target": read_host_target(copy), "files": files}
-
-
 def write_inputs(directory: Path) -> tuple[Path, Path]:
     directory.mkdir()
     binary, skill = directory / "letopis", directory / "SKILL.md"
@@ -267,6 +263,14 @@ def write_bundle(directory: Path, copy: Path) -> Path:
     replace_file(directory / SKILL_PATH, TOY_SKILL, 0o644)
     (directory / MANIFEST_PATH).write_text(json.dumps(build_manifest(copy), indent=2))
     return directory
+
+
+def build_manifest(copy: Path) -> dict:
+    """The manifest the contract fixes for the literal inputs of this captured commit."""
+    files = [{"path": BINARY_PATH, "sha256": hash_bytes(TOY_BINARY)},
+             {"path": SKILL_PATH, "sha256": hash_bytes(TOY_SKILL)}]
+    return {"version": EXPECTED_VERSION, "source_commit": evaluation.read_captured_commit(copy),
+            "target": read_host_target(copy), "files": files}
 
 
 def damage_bundle(bundle: Path, directory: Path, path: str) -> Path:
@@ -289,8 +293,10 @@ def create_logged_prefix(work: Path, real: Path, copy: Path) -> tuple[Path, Path
     wrapper = (f"#!{sys.executable}\nPRODUCT = {str(product)!r}\nLOG_FILE = {str(log)!r}\n"
                + INSTALLED_PROBE.read_text(encoding="utf-8"))
     replace_file(prefix / BINARY_PATH, wrapper.encode(), 0o755)
-    replace_file(prefix / SKILL_PATH, (copy / "repo/skills/letopis/SKILL.md").read_bytes(),
-                 0o644)
+    skill = copy / "repo/skills/letopis/SKILL.md"
+    if not skill.is_file():
+        raise evaluation.InfraError("installed-check fixture skill is missing from the copy")
+    replace_file(prefix / SKILL_PATH, skill.read_bytes(), 0o644)
     log.write_text("")
     return prefix, log
 
@@ -422,7 +428,3 @@ def read_json_file(path: Path):
 
 def hash_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
-
-
-def make_check(check_id: str, passed: bool, evidence: str) -> dict:
-    return {"id": check_id, "passed": bool(passed), "evidence": evidence}

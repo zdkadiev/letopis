@@ -139,5 +139,16 @@ class HelpOracleTests(TempDirTestCase):
         return binary
 
 
+class OpenStdinTests(TempDirTestCase):
+    def test_output_beyond_the_pipe_buffer_is_captured_without_blocking(self):
+        # When
+        result = cli.run_open_stdin(["sh", "-c", "head -c 300000 /dev/zero"], self.tmp,
+                                    {"PATH": "/usr/bin:/bin"})
+
+        # Then
+        self.assertEqual((result["exit"], result["timed_out"], len(result["stdout"])),
+                         (0, False, 300000))
+
+
 if __name__ == "__main__":
     unittest.main()

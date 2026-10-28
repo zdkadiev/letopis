@@ -21,6 +21,7 @@ from pathlib import Path
 
 import copies
 import evaluation
+from evaluation import make_check, read_json
 from oracles.http_fixture import BarrierServer, MALFORMED_MARKER, VECTORS
 
 BOUND = 2
@@ -144,23 +145,6 @@ def observe_process(bench: Bench) -> list[dict]:
     ]
 
 
-def grade_overlap(window: dict) -> tuple[bool, str]:
-    """Exactly BOUND requests held before the first release, never more, then completion."""
-    passed = (window["held_before_release"] == BOUND
-              and window["requests_before_release"] == BOUND
-              and window["max_active"] <= BOUND and window["completed"])
-    return passed, (f"held before release {window['held_before_release']}, requests "
-                    f"{window['requests_before_release']}, max active {window['max_active']}, "
-                    f"completed {window['completed']}")
-
-
-def grade_identity(hashes: dict, observed: dict) -> bool:
-    """Every document hash stores exactly the literal vector of its own marker."""
-    return all(isinstance(observed.get(digest), dict)
-               and observed[digest].get("vector") == VECTORS[marker]
-               for marker, digest in hashes.items())
-
-
 def grade_shared(observation: dict) -> bool:
     """Overlap reached, one hash never in flight twice, attempts durable while held."""
     return (observation["overlap"] and observation["max_same_hash"] == 1
@@ -175,28 +159,6 @@ def grade_retry(observation: dict) -> bool:
             and observation["malformed_requests"] == MAX_ATTEMPTS
             and observation["attempts"] == MAX_ATTEMPTS and observation["error"]
             and observation["vector"] is None and observation["other_identity"])
-
-
-def grade_change(change: str, old: dict, stale: dict, fresh: dict) -> bool:
-    """No stale vector survives an in-flight change; anything unobserved fails closed.
-
-    `old` maps markers to the hashes before the change and `stale` is the probe's view of
-    them afterwards. A config change leaves every old hash present with no vector; a text
-    change leaves the old beta hash without a vector and `fresh` (the new beta hash) with
-    the vector of the changed text.
-    """
-    if change == "removed":
-        return has_no_vector(stale, old["beta"])
-    if change == "text":
-        current = [item for item in fresh.values() if isinstance(item, dict)]
-        return (has_no_vector(stale, old["beta"]) and len(current) == 1
-                and current[0].get("vector") == VECTORS["changed"])
-    return bool(old) and all(has_no_vector(stale, digest) for digest in old.values())
-
-
-def has_no_vector(observed: dict, digest: str) -> bool:
-    item = observed.get(digest)
-    return isinstance(item, dict) and "vector" in item and item["vector"] is None
 
 
 def grade_buffer(window: dict, copy: Path) -> dict:
@@ -250,6 +212,28 @@ def observe_change(bench: Bench, change: str) -> dict:
             "window": window}
 
 
+def grade_change(change: str, old: dict, stale: dict, fresh: dict) -> bool:
+    """No stale vector survives an in-flight change; anything unobserved fails closed.
+
+    `old` maps markers to the hashes before the change and `stale` is the probe's view of
+    them afterwards. A config change leaves every old hash present with no vector; a text
+    change leaves the old beta hash without a vector and `fresh` (the new beta hash) with
+    the vector of the changed text.
+    """
+    if change == "removed":
+        return has_no_vector(stale, old["beta"])
+    if change == "text":
+        current = [item for item in fresh.values() if isinstance(item, dict)]
+        return (has_no_vector(stale, old["beta"]) and len(current) == 1
+                and current[0].get("vector") == VECTORS["changed"])
+    return bool(old) and all(has_no_vector(stale, digest) for digest in old.values())
+
+
+def has_no_vector(observed: dict, digest: str) -> bool:
+    item = observed.get(digest)
+    return isinstance(item, dict) and "vector" in item and item["vector"] is None
+
+
 def observe_retry(bench: Bench) -> dict:
     with BarrierServer() as server:
         repo, hashes = create_corpus(bench, server, "retry", ["alpha", MALFORMED_MARKER],
@@ -266,6 +250,23 @@ def observe_retry(bench: Bench) -> dict:
                 "attempts": malformed.get("attempts"), "error": bool(malformed.get("error")),
                 "vector": malformed.get("vector"),
                 "other_identity": grade_identity({"alpha": hashes["alpha"]}, observed)}
+
+
+def grade_identity(hashes: dict, observed: dict) -> bool:
+    """Every document hash stores exactly the literal vector of its own marker."""
+    return all(isinstance(observed.get(digest), dict)
+               and observed[digest].get("vector") == VECTORS[marker]
+               for marker, digest in hashes.items())
+
+
+def grade_overlap(window: dict) -> tuple[bool, str]:
+    """Exactly BOUND requests held before the first release, never more, then completion."""
+    passed = (window["held_before_release"] == BOUND
+              and window["requests_before_release"] == BOUND
+              and window["max_active"] <= BOUND and window["completed"])
+    return passed, (f"held before release {window['held_before_release']}, requests "
+                    f"{window['requests_before_release']}, max active {window['max_active']}, "
+                    f"completed {window['completed']}")
 
 
 def observe_owner_rules(bench: Bench, server: "BarrierServer", repo: Path,
@@ -402,13 +403,6 @@ def run_probe(bench: Bench, mode: str, repo: Path, *items: str) -> dict:
     return result
 
 
-def run_binary(bench: Bench, repo: Path, argv: list[str], stdin: bytes) -> dict:
-    return evaluation.run_observed([str(bench.binary), *argv], cwd=repo,
-                                   env=make_runtime_env(bench), evidence=bench.evidence,
-                                   label=f"letopis {' '.join(argv)}", stdin=stdin,
-                                   timeout=COMMAND_WATCHDOG_SECONDS)
-
-
 def wait_for_release(bench: Bench, repo: Path) -> bool:
     """True once an observed `status` lists no embed lock; unobserved never counts."""
     deadline = time.monotonic() + DRAIN_WATCHDOG_SECONDS
@@ -444,6 +438,13 @@ def observe_embed_lock(bench: Bench, repo: Path) -> tuple[bool, int | None]:
     return True, pids[0] if pids else None
 
 
+def run_binary(bench: Bench, repo: Path, argv: list[str], stdin: bytes) -> dict:
+    return evaluation.run_observed([str(bench.binary), *argv], cwd=repo,
+                                   env=make_runtime_env(bench), evidence=bench.evidence,
+                                   label=f"letopis {' '.join(argv)}", stdin=stdin,
+                                   timeout=COMMAND_WATCHDOG_SECONDS)
+
+
 def make_runtime_env(bench: Bench) -> dict:
     return {"PATH": os.environ.get("PATH", ""), "HOME": str(bench.copy / "home"),
             "LC_ALL": "C", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
@@ -468,21 +469,10 @@ def read_ok(result: dict) -> bool:
     return isinstance(value, dict) and value.get("ok") is True
 
 
-def read_json(data: bytes):
-    try:
-        return json.loads(data)
-    except ValueError:
-        return None
-
-
 def describe(result: dict | None) -> str:
     if result is None:
         return "not run: no request was held"
     return f"exit {result['exit']} in {result['elapsed']}s"
-
-
-def make_check(check_id: str, passed: bool, evidence: str) -> dict:
-    return {"id": check_id, "passed": bool(passed), "evidence": evidence}
 
 
 class OwnedProcess:

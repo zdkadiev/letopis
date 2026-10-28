@@ -16,7 +16,7 @@ if sys.version_info < MINIMUM_PYTHON:
     sys.exit(2)
 
 import argparse
-import hashlib
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -92,10 +92,21 @@ def to_absolute_path(value: str) -> Path:
 def run_prepare(args: argparse.Namespace) -> int:
     """Write the manifest, copied inputs and the six isolated seeds into a new directory."""
     selection = study.load_selection(FINAL_DIR / SELECTION_FILE)
-    receipts = {name: hash_file(FINAL_DIR / name) for name in INPUT_FILES}
+    receipts = {name: copies.hash_file(FINAL_DIR / name) for name in INPUT_FILES}
     study.require_full_oid(args.base, "base")
     check_commit_exists(args.repo, args.base)
     args.output.mkdir(parents=True)
+    try:
+        manifest = write_prepared(args, selection, receipts)
+    except BaseException:
+        shutil.rmtree(args.output, ignore_errors=True)
+        raise
+    return emit({"state": "unready", "pending": manifest["pending"],
+                 "output": str(args.output)}, EXIT_OK)
+
+
+def write_prepared(args: argparse.Namespace, selection: dict, receipts: dict) -> dict:
+    """Write the inputs, seeds and manifest into the new output directory."""
     inputs = args.output / "inputs"
     inputs.mkdir()
     for name in INPUT_FILES:
@@ -111,8 +122,7 @@ def run_prepare(args: argparse.Namespace) -> int:
                   **telemetry.TK17_SOURCES}}
     write_json(args.output / SEEDS_FILE, seeds)
     write_json(args.output / MANIFEST_FILE, manifest)
-    return emit({"state": "unready", "pending": manifest["pending"],
-                 "output": str(args.output)}, EXIT_OK)
+    return manifest
 
 
 def run_audit(args: argparse.Namespace) -> int:
@@ -167,7 +177,7 @@ def write_json(path: Path, value: dict) -> None:
 def observe_inputs(inputs: Path) -> dict:
     selection = study.load_selection(inputs / SELECTION_FILE)
     return {"selection_sha256": study.hash_selection(selection),
-            "file_sha256": {name: hash_file(inputs / name) for name in INPUT_FILES}}
+            "file_sha256": {name: copies.hash_file(inputs / name) for name in INPUT_FILES}}
 
 
 def check_commit_exists(repo: Path, base: str) -> None:
@@ -176,10 +186,6 @@ def check_commit_exists(repo: Path, base: str) -> None:
         capture_output=True, timeout=GIT_TIMEOUT_SECONDS)
     if result.returncode != 0:
         raise ValueError("base commit is not present in the repository")
-
-
-def hash_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def emit(payload: dict, code: int) -> int:

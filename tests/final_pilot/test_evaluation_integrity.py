@@ -125,6 +125,13 @@ class EvaluationIntegrityTests(unittest.TestCase):
             f"ready=pathlib.Path({str(ready)!r})",
             "while not ready.exists(): time.sleep(.01)", finish])
 
+    def test_build_environment_disables_bytecode_files(self):
+        # When
+        environment = evaluation.build_environment(self.tmp)
+
+        # Then
+        self.assertEqual(environment["PYTHONDONTWRITEBYTECODE"], "1")
+
     def run_parent(self, parent, timeout):
         return evaluation.run_observed([sys.executable, "-c", parent], cwd=self.tmp,
                                        env=dict(os.environ), evidence=self.tmp,

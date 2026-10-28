@@ -284,6 +284,14 @@ class DeliveryOracleTests(TempDirTestCase):
                           ("bundle_rejects_invalid_input", False), ("regression", True)])
         self.assertIn("scripts/package.py is absent", checks[0]["evidence"])
 
+    def test_install_that_writes_nothing_fails_its_checks_instead_of_raising(self):
+        # When
+        checks = delivery.observe_install(*self.make_copy("install", "raise SystemExit(0)\n"),
+                                          self.evidence)
+
+        # Then
+        self.assertFalse(all(check["passed"] for check in checks))
+
     def make_copy(self, name, script):
         copy = self.tmp / "copy"
         for directory in ("repo/scripts", "repo/skills/letopis", "home", "target"):

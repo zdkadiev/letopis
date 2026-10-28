@@ -8,7 +8,7 @@ toolchain or fixture is `infra_error`, never a feature verdict; manual criteria 
 
 Public API: evaluate, InfraError, run_observed, build_binary, observe_after_regression,
 run_regression,
-read_audit, build_environment, read_captured_commit.
+read_audit, build_environment, read_captured_commit, make_check, read_json.
 """
 from __future__ import annotations
 
@@ -200,6 +200,8 @@ def build_environment(copy: Path) -> dict:
         "RUSTUP_HOME": os.environ.get("RUSTUP_HOME", str(host_home / ".rustup")),
         "CARGO_TARGET_DIR": str(copy / "target"), "CARGO_NET_OFFLINE": "true",
         "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+        # Participant scripts must not leave __pycache__ in the tree the oracles compare.
+        "PYTHONDONTWRITEBYTECODE": "1",
     }
 
 
@@ -364,3 +366,14 @@ def terminate_process_group(process: subprocess.Popen) -> None:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
         pass
+
+
+def make_check(check_id: str, passed: bool, evidence: str) -> dict:
+    return {"id": check_id, "passed": bool(passed), "evidence": evidence}
+
+
+def read_json(data: bytes):
+    try:
+        return json.loads(data)
+    except ValueError:
+        return None

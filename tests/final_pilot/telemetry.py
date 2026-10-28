@@ -92,11 +92,6 @@ def read_collector(path: Path) -> list[dict]:
     return events
 
 
-def read_usage(event: dict) -> dict:
-    """Map raw counters to P-1 fields; a missing or non-integer counter stays None."""
-    return {public: _read_count(event.get(raw)) for public, raw in COUNTERS.items()}
-
-
 def _require_context(context: dict) -> None:
     for key in CONTEXT_KEYS:
         value = context.get(key)
@@ -150,6 +145,11 @@ def _build_row(context: dict, request_id: str, completions: list[dict]) -> dict:
     usage = read_usage(completions[0]) if len(completions) == 1 else dict.fromkeys(COUNTERS)
     return {"id": f"{context['slot']}:{request_id}", "model": context["model"],
             "purpose": context["purpose"], **usage}
+
+
+def read_usage(event: dict) -> dict:
+    """Map raw counters to P-1 fields; a missing or non-integer counter stays None."""
+    return {public: _read_count(event.get(raw)) for public, raw in COUNTERS.items()}
 
 
 def _read_attributes(log: dict) -> dict:

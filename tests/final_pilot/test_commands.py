@@ -1,4 +1,5 @@
 """Model-free tests for the TK-30 operator command boundary."""
+import argparse
 import json
 import os
 from pathlib import Path
@@ -7,7 +8,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
+import run
 from test_study import ALL_PENDING, BASE, FINAL, RUN, fill_every_input, load_json
 
 
@@ -223,6 +226,19 @@ class RunCommandTests(unittest.TestCase):
         filled["seed_commit"] = prepared["seed_commit"]
         filled["starting_inventory"] = prepared["starting_inventory"]
         path.write_text(json.dumps(filled))
+
+    def test_prepare_failure_removes_the_half_written_output(self):
+        # Given
+        output = self.tmp / "failed"
+        args = argparse.Namespace(repo=self.repo, base=self.base, output=output)
+
+        # When
+        with mock.patch.object(run.copies, "prepare_seeds", side_effect=ValueError("seed")):
+            with self.assertRaises(ValueError):
+                run.run_prepare(args)
+
+        # Then
+        self.assertFalse(output.exists())
 
     def prepare(self, output, base=None):
         return self.run_cli("prepare", "--repo", self.repo, "--base", base or self.base,

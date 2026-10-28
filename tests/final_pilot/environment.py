@@ -9,7 +9,6 @@ only observable in a later, separately authorized paid run.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shlex
@@ -56,6 +55,17 @@ DOCKER_RUN = ("docker", "run", "--rm", "--pull", "never", "--network", "none",
 CHECK_MARKER = "# tk30-check:"
 DOCKER_TIMEOUT_SECONDS = 300
 EGRESS_TIMEOUT_SECONDS = 3
+# TEST-NET-1 (RFC 5737): never routed, used only to ask the kernel for the default route.
+ROUTE_PROBE_ADDRESS = "192.0.2.1"
+EGRESS_PROBE = """python3 -c '
+import socket
+names = [row.split(":")[0].strip() for row in open("/proc/net/dev").readlines()[2:]]
+try:
+    socket.create_connection(("{host}", {port}), timeout={timeout})
+except OSError:
+    print("isolated" if names == ["lo"] else "interfaces:" + ",".join(names))
+else:
+    print("egress:open")'"""
 DETAIL_LIMIT = 500
 EMPTY_MEMORY = {"knowledge_nodes": 0}
 # The disposable store gets no provider configuration, so initializing it cannot drain.
@@ -94,7 +104,8 @@ def prepare_context(source: Path, assets: Path, output: Path) -> dict:
     image is neither built nor run.
 
     Raises ValueError when an asset differs from its pinned digest or the source leaks
-    forbidden state, and FileExistsError when output exists.
+    forbidden state, and FileExistsError when output exists. A failure after the output
+    directory was created removes it again.
     """
     missing = [name for name, _, _ in PINNED_ASSETS if not (assets / name).is_file()]
     if missing:
@@ -106,6 +117,15 @@ def prepare_context(source: Path, assets: Path, output: Path) -> dict:
     reject_leaks(relative for relative, _ in files)
     inventory = copies.snapshot(source, ())
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
+    try:
+        return write_context(assets, files, inventory, output)
+    except BaseException:
+        shutil.rmtree(output, ignore_errors=True)
+        raise
+
+
+def write_context(assets: Path, files: list, inventory: dict, output: Path) -> dict:
+    """Write the build context into the new output directory and return its result."""
     for relative, path in files:
         target = output / "source" / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -151,7 +171,7 @@ def preflight(root: Path, image: str) -> dict:
 
 def verify_asset(path: Path, expected: str) -> None:
     """Raise ValueError unless the file's SHA-256 equals the pinned digest."""
-    if hash_file(path) != expected:
+    if copies.hash_file(path) != expected:
         raise ValueError("asset differs from recorded release digest: " + path.name)
 
 
@@ -218,23 +238,21 @@ def check_memory(image_id: str) -> dict:
 
 
 def check_isolation(image_id: str, root: Path) -> dict:
-    """This preflight container sees no Docker socket, operator or peer canary path and
-    has no route to a host toy port; it says nothing about the participant run command."""
+    """This preflight container sees no Docker socket, operator or peer canary path, has
+    only a loopback interface and no route to a toy port on this host's address; it says
+    nothing about the participant run command."""
+    host = find_host_address()
     with tempfile.TemporaryDirectory() as folder, socket.socket() as listener:
         canary = Path(folder) / "operator-canary"
         canary.write_text("operator only\n", encoding="utf-8")
-        listener.bind(("127.0.0.1", 0))
+        listener.bind((host, 0))
         listener.listen()
         port = listener.getsockname()[1]
         paths = " ".join(shlex.quote(str(path)) for path in (canary, root.resolve()))
         script = "\n".join([
             "test ! -S /var/run/docker.sock || echo docker-socket",
             f'for path in {paths}; do test ! -e "$path" || echo "visible:$path"; done',
-            "python3 -c 'import socket",
-            "try: socket.create_connection((\"host.docker.internal\", "
-            f"{port}), timeout={EGRESS_TIMEOUT_SECONDS})",
-            "except OSError: print(\"isolated\")",
-            "else: print(\"egress:open\")'"])
+            EGRESS_PROBE.format(host=host, port=port, timeout=EGRESS_TIMEOUT_SECONDS)])
         result = run_check(image_id, "container_isolation", script)
         reached = has_pending_connection(listener)
     check = describe(result, result.stdout.splitlines() == ["isolated"] and not reached)
@@ -267,6 +285,15 @@ def has_pending_connection(listener: socket.socket) -> bool:
     return True
 
 
-def hash_file(path: Path) -> str:
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+def find_host_address() -> str:
+    """Address of this host's default route, so the probe tests a connection, not a name.
+
+    Connecting a UDP socket only selects the route; no packet is sent. Without any route
+    the loopback address is used and the interface-list check still guards the result.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        try:
+            probe.connect((ROUTE_PROBE_ADDRESS, 9))
+        except OSError:
+            return "127.0.0.1"
+        return probe.getsockname()[0]

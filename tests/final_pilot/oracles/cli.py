@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 import evaluation
+from evaluation import make_check, read_json
 
 EXPECTED_VERSION = b"letopis 0.0.0\n"
 INVALID_REQUEST = {"ok": False, "error": {"code": "invalid_request",
@@ -92,53 +93,6 @@ def observe_command_help(binary: Path, evidence: Path) -> list[dict]:
     ]
 
 
-def run_flag(binary: Path, argv: list[str], evidence: Path, *, in_repository: bool) -> dict:
-    """Run argv with stdin open and unread; report exit, output and any created entries.
-
-    The working directory is a new empty directory outside any repository, or a fresh
-    committed Git repository; `created` lists every entry that appeared in it or HOME.
-    """
-    with tempfile.TemporaryDirectory(prefix="tk30-flag-") as sandbox:
-        cwd, home = Path(sandbox) / "cwd", Path(sandbox) / "home"
-        cwd.mkdir()
-        home.mkdir()
-        if in_repository:
-            create_repository(cwd)
-        before = list_entries(cwd) | list_entries(home)
-        env = {"PATH": FLAG_PATH, "HOME": str(home), "LC_ALL": "C",
-               "GIT_CEILING_DIRECTORIES": sandbox}
-        observed = run_open_stdin([str(binary), *argv], cwd, env)
-        observed["created"] = sorted((list_entries(cwd) | list_entries(home)) - before)
-    label = " ".join(argv) + (" (repo)" if in_repository else "")
-    evaluation.append_command(evidence, {**observed, "label": label})
-    return observed
-
-
-def run_open_stdin(argv: list[str], cwd: Path, env: dict) -> dict:
-    """Wait for the owned child while its stdin pipe stays open; kill it at the watchdog.
-
-    The child runs in its own new session, so the watchdog also ends any helper it
-    started that could otherwise keep the output pipes open.
-    """
-    started = time.monotonic()
-    with subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                          start_new_session=True) as child:
-        try:
-            child.wait(timeout=FLAG_WATCHDOG_SECONDS)
-            timed_out = False
-        except subprocess.TimeoutExpired:
-            timed_out = True
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(child.pid, signal.SIGKILL)
-        child.wait()
-        child.stdin.close()
-        stdout, stderr = child.stdout.read(), child.stderr.read()
-    return {"exit": None if timed_out else child.returncode, "timed_out": timed_out,
-            "stdout": stdout, "stderr": stderr,
-            "elapsed": round(time.monotonic() - started, 3)}
-
-
 def find_help_gaps(text: str) -> list[str]:
     """Semantic help content: JSON on stdin and an example invocation per command."""
     gaps = []
@@ -193,6 +147,56 @@ def find_earlier_breaks(binary: Path, evidence: Path) -> list[str]:
     return breaks
 
 
+def run_flag(binary: Path, argv: list[str], evidence: Path, *, in_repository: bool) -> dict:
+    """Run argv with stdin open and unread; report exit, output and any created entries.
+
+    The working directory is a new empty directory outside any repository, or a fresh
+    committed Git repository; `created` lists every entry that appeared in it or HOME.
+    """
+    with tempfile.TemporaryDirectory(prefix="tk30-flag-") as sandbox:
+        cwd, home = Path(sandbox) / "cwd", Path(sandbox) / "home"
+        cwd.mkdir()
+        home.mkdir()
+        if in_repository:
+            create_repository(cwd)
+        before = list_entries(cwd) | list_entries(home)
+        env = {"PATH": FLAG_PATH, "HOME": str(home), "LC_ALL": "C",
+               "GIT_CEILING_DIRECTORIES": sandbox}
+        observed = run_open_stdin([str(binary), *argv], cwd, env)
+        observed["created"] = sorted((list_entries(cwd) | list_entries(home)) - before)
+    label = " ".join(argv) + (" (repo)" if in_repository else "")
+    evaluation.append_command(evidence, {**observed, "label": label})
+    return observed
+
+
+def run_open_stdin(argv: list[str], cwd: Path, env: dict) -> dict:
+    """Wait for the owned child while its stdin pipe stays open; kill it at the watchdog.
+
+    The child runs in its own new session, so the watchdog also ends any helper it
+    started that could otherwise outlive it. Output goes to files so a large
+    help text cannot block the child on a full pipe.
+    """
+    started = time.monotonic()
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err, subprocess.Popen(
+            argv, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=out, stderr=err,
+            start_new_session=True) as child:
+        try:
+            child.wait(timeout=FLAG_WATCHDOG_SECONDS)
+            timed_out = False
+        except subprocess.TimeoutExpired:
+            timed_out = True
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(child.pid, signal.SIGKILL)
+        child.wait()
+        child.stdin.close()
+        out.seek(0)
+        err.seek(0)
+        stdout, stderr = out.read(), err.read()
+    return {"exit": None if timed_out else child.returncode, "timed_out": timed_out,
+            "stdout": stdout, "stderr": stderr,
+            "elapsed": round(time.monotonic() - started, 3)}
+
+
 def is_clean_success(*runs: dict) -> bool:
     return all(run["exit"] == 0 and not run["created"] for run in runs)
 
@@ -216,17 +220,6 @@ def list_entries(root: Path) -> set[str]:
         for name in dirnames + filenames:
             entries.add(str(Path(directory, name).relative_to(root.parent)))
     return entries
-
-
-def read_json(data: bytes):
-    try:
-        return json.loads(data)
-    except ValueError:
-        return None
-
-
-def make_check(check_id: str, passed: bool, evidence: str) -> dict:
-    return {"id": check_id, "passed": bool(passed), "evidence": evidence}
 
 
 def describe(run: dict) -> str:
