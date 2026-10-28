@@ -34,8 +34,8 @@ python3.12 -B tests/final_pilot/run.py preflight --root DIR --image LOCAL_IMAGE
 **`evaluate` исполняет код участника как оператор** (`build.rs`, тесты `make check`):
 запускать его только на хосте/пользователе **без credentials** (отдельный пользователь или
 контейнер без сети и без `~/.codex`) и с preparation root **вне checkout**. До и после
-каждой оценки `evaluate` хэширует operator sources (`evaluation.py`, `oracles/`, probe),
-`inputs/` и capture/blobs слота и при расхождении завершается с ошибкой (exit 2). Это
+каждой оценки `evaluate` хэширует operator sources (всё `tests/final_pilot/` кроме `__pycache__`),
+ручные annotations, `inputs/` и capture/blobs слота и при расхождении завершается с ошибкой (exit 2). Это
 **обнаружение** подмены, не её предотвращение (containment нет).
 
 Каждая команда печатает один JSON-объект. Exit 0 — локальная операция завершена
@@ -55,7 +55,7 @@ evidence — ручной шаг. Output/evidence directories всегда но�
 пропуском. Используются только уже локальные images; ничего не скачивается и не собирается.
 
 - `TK30_CONTAINER_OUTPUT=NEW_DIR` (и необязательно `TK30_TEST_IMAGE`, по умолчанию
-  `letopis-tk17-codex:v2-0.164.0`): `ContainerBoundaryTests` в `test_copies.py` —
+  `letopis-tk17-codex:v2-0.164.0`): `ContainerBoundaryTests` в `test_copy_containers.py` —
   toy `build.rs` читает private marker и пишет только в evaluation copy; будущий
   T2-контейнер не видит oracle/target/marker; unsafe shared mount обнаруживается;
   контейнер с timeout удаляется по собственному имени.
@@ -95,7 +95,7 @@ evidence — ручной шаг. Output/evidence directories всегда но�
   paths. Annotation `operator/annotations/SLOT.json` обязана содержать
   `captured_commit` = HEAD evaluation copy, bool verdict, refs `{path,line,symbol}`
   (symbol присутствует на этой captured строке) и вывод. Без неё — `null`, не PASS.
-  Malformed annotation сейчас поднимает исключение, а не даёт `null` с пометкой.
+  Malformed annotation даёт `null` с диагностикой; verdict принимает только bool/null.
 - Допущения C3 oracle о drain semantics seed: при изменении текста заметки во время
   drain новый hash получает vector **в том же drain**, старый hash остаётся без vector;
   при изменении config во время drain под новой identity vector **не** появляется.
@@ -123,3 +123,21 @@ evidence — ручной шаг. Output/evidence directories всегда но�
   digest закрепляется после сборки.
 - Seeds содержат карточки TK-5/TK-17/TK-30…TK-33 и `checks/TK-5` (одинаково в обоих
   условиях); решение об их исключении — за человеком до freeze.
+
+## Implementation review 2026-10-28
+
+`product.final_base` must equal the full `original_base` of the prepared seeds and
+their recheck. Reprepare after a final product revision changes; an unrelated filled
+revision never establishes readiness. Chain/task IDs follow the fixed C1–C3/T1–T3
+layout and malformed selection/manifest shapes produce JSON input errors.
+
+Evaluator commands own a process group; ordinary descendants are killed before
+return, including on timeout/interruption. Escaped sessions require external
+containment. Full tooling and annotation inventories detect modification, creation
+and deletion; this remains detection, not an OS sandbox.
+
+Test responsibilities are split across `test_{copies,capture,seed_commands,copy_containers}`
+and `test_{oracles,cli_oracles,delivery_oracles,drain_oracles}`. The standard discovery
+command above runs all of them. Source extraction preserved every original test body.
+See the [review](../../docs/zkit/letopis/checks/TK-30/review-2026-10-28.md) for findings,
+current verification and remaining pilot prerequisites.

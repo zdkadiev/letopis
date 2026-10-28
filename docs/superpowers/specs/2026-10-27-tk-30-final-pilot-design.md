@@ -293,3 +293,11 @@ harness/ledger и граница C3 service/executable. Оба уточнены 
 повторная проверка: `nothing important left`. Это review проектирования, не
 приёмка реализации, окружения, model access или full P-1. Локальные ссылки и
 whitespace проверены; продуктовый код/тесты не менялись и не запускались.
+
+## Implementation clarification — 2026-10-28
+
+The final `product.final_base` must equal the full `original_base` used for the paired
+seeds and their `base_recheck`; a supplied different revision cannot clear readiness.
+Use fresh preparation after integrating the final product, then repeat the existing
+base-drift checks. This enforces sections 2/5/7 rather than changing the approved study.
+See the [implementation review](../../zkit/letopis/checks/TK-30/review-2026-10-28.md).

@@ -23,22 +23,6 @@ TOKEN_KEYS = ("input_tokens", "output_tokens", "cached_input_tokens",
               "reasoning_output_tokens")
 
 
-def request(request_id=None):
-    event = {"event.name": "codex.api_request", "endpoint": "/v1/responses"}
-    if request_id is not None:
-        event["request.id"] = request_id
-    return event
-
-
-def completion(request_id=None, input_tokens=100, output_tokens=20, cached=80, reasoning=5):
-    event = {"event.kind": "response.completed", "input_token_count": input_tokens,
-             "output_token_count": output_tokens, "cached_token_count": cached,
-             "reasoning_token_count": reasoning}
-    if request_id is not None:
-        event["request.id"] = request_id
-    return event
-
-
 class TelemetryTests(unittest.TestCase):
     def test_cached_and_reasoning_are_subsets_of_input_and_output(self):
         # Given
@@ -58,6 +42,20 @@ class TelemetryTests(unittest.TestCase):
         self.assertTrue(result["complete"])
         self.assertEqual(result["unresolved"], [])
         self.assertEqual(result["correlation_attribute"], "request.id")
+
+    def test_synthetic_unknown_ids_never_pair_with_real_request_ids(self):
+        # Given: a real correlation ID looks exactly like the synthetic unknown label.
+        events = [request("uncorrelated-1"), request(), completion("uncorrelated-1")]
+
+        # When
+        result = telemetry.normalize_events(events, CONTEXT)
+
+        # Then
+        self.assertEqual(len(set(result["request_inventory"]["ids"])), 2)
+        self.assertEqual(result["requests"][0]["input_tokens"], 100)
+        self.assertIsNone(result["requests"][1]["input_tokens"])
+        self.assertIsNone(result["requests"][1]["output_tokens"])
+        self.assertFalse(result["complete"])
 
     def test_equal_counts_without_correlation_remain_unknown(self):
         # Given: two requests and two completions, but no correlation identity
@@ -290,6 +288,22 @@ class RecordTests(unittest.TestCase):
         # When / Then
         with self.assertRaises(FileExistsError):
             records.write_demo(self.tmp / "demo")
+
+
+def request(request_id=None):
+    event = {"event.name": "codex.api_request", "endpoint": "/v1/responses"}
+    if request_id is not None:
+        event["request.id"] = request_id
+    return event
+
+
+def completion(request_id=None, input_tokens=100, output_tokens=20, cached=80, reasoning=5):
+    event = {"event.kind": "response.completed", "input_token_count": input_tokens,
+             "output_token_count": output_tokens, "cached_token_count": cached,
+             "reasoning_token_count": reasoning}
+    if request_id is not None:
+        event["request.id"] = request_id
+    return event
 
 
 if __name__ == "__main__":

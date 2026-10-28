@@ -106,3 +106,8 @@ root (`assessed`, `infra_cause=null`) — см. отчёт и receipt.
 Отклонение: при разработке Task 4 на хосте однажды выполнен `codex --version` вне
 preflight (auth не читался, модель не вызывалась). Merge, push и закрытие issues не
 выполнялись.
+
+Независимая [проверка реализации 2026-10-28](../../../../checks/TK-30/review-2026-10-28.md)
+исправила binding финальной base, telemetry, lifecycle/annotation integrity и
+пропуски oracle; итог — 168 model-free tests (3 skips; Docker proofs запущены
+отдельно) и 31 P-1 test. Это не снимает перечисленные выше freeze/gate блокеры.

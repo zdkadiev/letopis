@@ -150,6 +150,8 @@ def find_help_gaps(text: str) -> list[str]:
         invocation = re.compile(rf"\bletopis\s+{command}\b")
         if not any(invocation.search(line) and "{" in line for line in lines):
             gaps.append(f"no example invocation with JSON for {command}")
+    if re.search(r"\bletopis\s+embed\s+--drain\b", text) is None:
+        gaps.append("no example invocation for embed --drain")
     return gaps
 
 

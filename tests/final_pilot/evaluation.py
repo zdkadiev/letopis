@@ -17,6 +17,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import time
 from pathlib import Path, PurePosixPath
@@ -44,7 +45,7 @@ FAILURE_TAIL_LINES = 40
 OID_PATTERN = re.compile(r"[0-9a-f]{40}")
 HERE = Path(__file__).resolve().parent
 # Operator code the participant build must not be able to rewrite unnoticed.
-OPERATOR_SOURCES = (HERE / "evaluation.py", HERE / "oracles")
+OPERATOR_SOURCES = (HERE,)
 
 
 class InfraError(RuntimeError):
@@ -83,30 +84,6 @@ def evaluate(root: Path, slot: str) -> dict:
     finally:
         copies.require_unchanged(root, capture)
         require_operator_unchanged(root, slot, operator)
-
-
-def run_observed(argv: list[str], *, cwd: Path, env: dict, evidence: Path, label: str,
-                 timeout: float, stdin: bytes | None = None) -> dict:
-    """Run one owned process to completion or watchdog and log its exit before grading.
-
-    Returns `{label, exit, elapsed, timed_out, stdout, stderr}`; a timed-out process is
-    killed (it is our own child) and reported with `exit: None`. A missing executable
-    raises InfraError.
-    """
-    started = time.monotonic()
-    try:
-        result = subprocess.run(argv, cwd=cwd, env=env, input=stdin, capture_output=True,
-                                timeout=timeout)
-        observed = {"exit": result.returncode, "timed_out": False,
-                    "stdout": result.stdout, "stderr": result.stderr}
-    except subprocess.TimeoutExpired as expired:
-        observed = {"exit": None, "timed_out": True, "stdout": expired.stdout or b"",
-                    "stderr": expired.stderr or b""}
-    except OSError as error:
-        raise InfraError(f"{label}: cannot start {argv[0]}: {error.strerror}") from error
-    observed.update(label=label, elapsed=round(time.monotonic() - started, 3))
-    append_command(evidence, observed)
-    return observed
 
 
 def build_binary(copy: Path, evidence: Path) -> Path:
@@ -148,6 +125,39 @@ def run_regression(copy: Path, evidence: Path) -> dict:
             "evidence": f"make check exit {result['exit']}; tail in make-check.log"}
 
 
+def run_observed(argv: list[str], *, cwd: Path, env: dict, evidence: Path, label: str,
+                 timeout: float, stdin: bytes | None = None) -> dict:
+    """Run one owned process to completion or watchdog and log its exit before grading.
+
+    Returns `{label, exit, elapsed, timed_out, stdout, stderr}`; a timed-out process is
+    reported with `exit: None`. Each command owns a new process group, which is killed
+    before return or interruption so ordinary descendants cannot outlive the audit.
+    Processes that deliberately escape that group require external containment. A missing
+    executable raises InfraError.
+    """
+    started = time.monotonic()
+    try:
+        with subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              start_new_session=True) as process:
+            try:
+                stdout, stderr = process.communicate(stdin, timeout=timeout)
+                observed = {"exit": process.returncode, "timed_out": False,
+                            "stdout": stdout, "stderr": stderr}
+            except subprocess.TimeoutExpired:
+                terminate_process_group(process)
+                stdout, stderr = process.communicate()
+                observed = {"exit": None, "timed_out": True,
+                            "stdout": stdout, "stderr": stderr}
+            finally:
+                terminate_process_group(process)
+    except OSError as error:
+        raise InfraError(f"{label}: cannot start {argv[0]}: {error.strerror}") from error
+    observed.update(label=label, elapsed=round(time.monotonic() - started, 3))
+    append_command(evidence, observed)
+    return observed
+
+
 def read_audit(copy: Path, check_id: str) -> tuple[bool | None, str]:
     """Read the operator's manual verdict for one check of this evaluation copy.
 
@@ -158,17 +168,27 @@ def read_audit(copy: Path, check_id: str) -> tuple[bool | None, str]:
     path = copy.parents[2] / ANNOTATION_DIR / f"{copy.name}.json"
     if not path.is_file():
         return None, "operator audit absent"
-    annotation = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        annotation = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeError, ValueError):
+        return None, "operator audit rejected: malformed JSON"
+    if not isinstance(annotation, dict):
+        return None, "operator audit rejected: annotation must be an object"
     captured = read_captured_commit(copy)
     if annotation.get("captured_commit") != captured:
         return None, "operator audit rejected: it refers to another captured commit"
-    entry = annotation.get("checks", {}).get(check_id)
+    checks = annotation.get("checks")
+    entry = checks.get(check_id) if isinstance(checks, dict) else None
     if not isinstance(entry, dict) or not isinstance(entry.get("passed"), bool):
         return None, "operator audit has no verdict for this check"
-    problem = find_ref_problem(copy / "repo", entry.get("refs"))
-    if problem or not str(entry.get("conclusion", "")).strip():
+    try:
+        problem = find_ref_problem(copy / "repo", entry.get("refs"))
+    except (OSError, UnicodeError):
+        return None, "operator audit rejected: source ref cannot be read as text"
+    conclusion = entry.get("conclusion")
+    if problem or not isinstance(conclusion, str) or not conclusion.strip():
         return None, f"operator audit rejected: {problem or 'conclusion missing'}"
-    return entry["passed"], f"operator audit at {captured}: {entry['conclusion']}"
+    return entry["passed"], f"operator audit at {captured}: {conclusion}"
 
 
 def build_environment(copy: Path) -> dict:
@@ -183,33 +203,6 @@ def build_environment(copy: Path) -> dict:
     }
 
 
-def read_captured_commit(copy: Path) -> str:
-    """The commit that `prepare_evaluation` made from exactly the captured bytes."""
-    result = subprocess.run(["git", "-C", str(copy / "repo"), "rev-parse", "HEAD"],
-                            capture_output=True, env=copies.GIT_ENVIRONMENT,
-                            timeout=GIT_TIMEOUT_SECONDS)
-    commit = result.stdout.decode().strip()
-    if result.returncode != 0 or OID_PATTERN.fullmatch(commit) is None:
-        raise InfraError("evaluation copy has no captured commit")
-    return commit
-
-
-def hash_operator_state(root: Path, slot: str) -> dict[str, str]:
-    """Hash oracle sources, copied inputs and the slot's capture plus all captured blobs.
-
-    Participant build scripts and tests run as the operator, so this detects (it does not
-    prevent) a rewrite of the evaluator, its rubric inputs or the captured state.
-    """
-    paths = [*OPERATOR_SOURCES, root / "inputs", root / "operator/blobs",
-             root / "operator/captures" / f"{slot}.json"]
-    hashes = {}
-    for path in paths:
-        files = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.is_file())
-        for file in files:
-            hashes[str(file)] = copies.hash_file(file)
-    return hashes
-
-
 def require_operator_unchanged(root: Path, slot: str, before: dict[str, str]) -> None:
     after = hash_operator_state(root, slot)
     if after != before:
@@ -217,10 +210,22 @@ def require_operator_unchanged(root: Path, slot: str, before: dict[str, str]) ->
         raise ValueError(f"operator state changed during evaluation: {changed[0][0]}")
 
 
-def read_task_id(slot: str) -> str:
-    if copies.SLOT_PATTERN.fullmatch(slot) is None:
-        raise ValueError(f"unknown slot: {slot!r}")
-    return slot.rsplit("-", 1)[0]
+def hash_operator_state(root: Path, slot: str) -> dict[str, str]:
+    """Hash operator tooling, annotations, inputs, slot capture and all captured blobs.
+
+    Participant build scripts and tests run as the operator, so this detects (it does not
+    prevent) a rewrite of the evaluator, its rubric inputs or the captured state.
+    """
+    paths = [*OPERATOR_SOURCES, root / "inputs", root / "operator/blobs",
+             root / ANNOTATION_DIR, root / "operator/captures" / f"{slot}.json"]
+    hashes = {}
+    for path in paths:
+        files = [path] if path.is_file() else sorted(
+            file for file in path.rglob("*")
+            if file.is_file() and "__pycache__" not in file.relative_to(path).parts)
+        for file in files:
+            hashes[str(file)] = copies.hash_file(file)
+    return hashes
 
 
 def read_check_ids(root: Path, task_id: str) -> list[str]:
@@ -264,6 +269,17 @@ def run_oracle(root: Path, slot: str, oracle, expected: list[str]) -> dict:
     return result
 
 
+def read_captured_commit(copy: Path) -> str:
+    """The commit that `prepare_evaluation` made from exactly the captured bytes."""
+    result = subprocess.run(["git", "-C", str(copy / "repo"), "rev-parse", "HEAD"],
+                            capture_output=True, env=copies.GIT_ENVIRONMENT,
+                            timeout=GIT_TIMEOUT_SECONDS)
+    commit = result.stdout.decode().strip()
+    if result.returncode != 0 or OID_PATTERN.fullmatch(commit) is None:
+        raise InfraError("evaluation copy has no captured commit")
+    return commit
+
+
 def grade_oracle(oracle, copy: Path, slot: str, evidence: Path,
                  expected: list[str]) -> tuple[str, list[dict], str | None]:
     """Return status, checks and the infra cause (None when the oracle completed)."""
@@ -273,6 +289,12 @@ def grade_oracle(oracle, copy: Path, slot: str, evidence: Path,
         return grade_failure(error, expected)
     require_check_ids(checks, expected)
     return STATUS_ASSESSED, checks, None
+
+
+def read_task_id(slot: str) -> str:
+    if copies.SLOT_PATTERN.fullmatch(slot) is None:
+        raise ValueError(f"unknown slot: {slot!r}")
+    return slot.rsplit("-", 1)[0]
 
 
 def grade_failure(error: InfraError, expected: list[str]) -> tuple[str, list[dict], str]:
@@ -289,7 +311,8 @@ def require_check_ids(checks: list[dict], expected: list[str]) -> None:
     if observed != expected:
         raise ValueError(f"oracle check IDs {observed} differ from the frozen {expected}")
     for check in checks:
-        if check.get("passed") not in (True, False, None):
+        passed = check.get("passed")
+        if passed is not None and not isinstance(passed, bool):
             raise ValueError(f"{check['id']}: passed must be true, false or null")
 
 
@@ -333,3 +356,11 @@ def save_tail(evidence: Path, name: str, result: dict) -> None:
     text = (result["stdout"] + result["stderr"]).decode("utf-8", "replace")
     tail = "\n".join(text.splitlines()[-FAILURE_TAIL_LINES:])
     (evidence / name).write_text(tail + "\n", encoding="utf-8")
+
+
+def terminate_process_group(process: subprocess.Popen) -> None:
+    """Kill this command's process group, including children remaining after leader exit."""
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass

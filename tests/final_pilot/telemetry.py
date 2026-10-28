@@ -51,9 +51,15 @@ def normalize_events(events: list[dict], context: dict) -> dict:
                                    if event.get("event.kind") == COMPLETION_KIND), attribute)
     conflicts = [request_id for request_id, group in requests.items()
                  if len(group) > 1 or len(completions.get(request_id, [])) > 1]
-    names = [*requests, *(f"uncorrelated-{n}" for n in range(1, len(uncorrelated) + 1))]
     rows = [_build_row(context, name, [] if name in conflicts else completions.get(name, []))
-            for name in names]
+            for name in requests]
+    reserved = set(requests) | set(completions)
+    number = 0
+    for _event in uncorrelated:
+        number += 1
+        while f"uncorrelated-{number}" in reserved:
+            number += 1
+        rows.append(_build_row(context, f"uncorrelated-{number}", []))
     unresolved = [
         *({"reason": "conflicting_duplicate", "id": name, "usage": None} for name in conflicts),
         *({"reason": "completion_without_correlation", "id": None, "usage": read_usage(event)}

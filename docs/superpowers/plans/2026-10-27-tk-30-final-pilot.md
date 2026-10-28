@@ -194,8 +194,11 @@ self.assertIn('g2', readiness['pending'])
 - `evaluation.evaluate(root: Path, slot: str) -> dict` calls Task 2 capture/copy,
   dispatches exactly the slot's oracle and returns private
   `{task_id, status, checks, execution}`, where status is `assessed|infra_error`,
-  each check `{id, passed: bool | None, evidence}`. Infra/timeout is never a
-  successful or ordinary negative feature assertion. Preserve exits/elapsed
+  each check `{id, passed: bool | None, evidence}`. Infrastructure/build/regression
+  watchdogs are unobserved (`infra_error` or null), never successful feature checks.
+  A participant-command watchdog violates an explicit prompt-return requirement
+  (flags or bounded failure handling): grade that requirement false and retain its
+  timeout evidence. A timeout alone never proves that invalid input was rejected. Preserve exits/elapsed
   before grading; call `require_unchanged` even after failure/interruption.
   Для явно ручных критериев читает отдельный operator annotation с ref на
   captured source; без него `passed=null`, не автоматический PASS.
@@ -385,3 +388,12 @@ gate/access proofs оставлены pending намеренно, а не зам
 спецификацию и план 2026-10-27 и явно выбрал Subagent-driven Development;
 повторное утверждение не требуется. Исполнение: по одному свежему исполнителю на задачу,
 ревью задачи после каждой и независимое ревью всей ветки в конце.
+
+## Implementation review follow-up — 2026-10-28
+
+The independent [implementation review](../../zkit/letopis/checks/TK-30/review-2026-10-28.md)
+found preparation/acceptance gaps: final-base binding, usage correlation collisions,
+owned-child cleanup, annotation integrity, omitted oracle observations, and malformed
+manifest/selection input. Correct these under the existing scope; retain historical
+evidence and run the full model-free tooling suite on the stable corrected tree.
+Final readiness and paid execution prerequisites remain unchanged.

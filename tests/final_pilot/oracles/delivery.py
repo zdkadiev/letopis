@@ -12,6 +12,7 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 from pathlib import Path
 
 import evaluation
@@ -34,6 +35,7 @@ WORKFLOW_COMMANDS = ("check", "search", "inspect", "reindex")
 SCRIPT_WATCHDOG_SECONDS = 120
 # Build output, HOME and Git metadata of the copy are not part of the participant result.
 PACKAGE_SKIP = ("target", "home", "repo/.git")
+INSTALLED_PROBE = Path(__file__).with_name("installed_probe.py")
 
 
 def evaluate(copy: Path, task_id: str, evidence: Path) -> list[dict]:
@@ -194,17 +196,25 @@ def observe_independence(copy: Path, work: Path, prefix: Path, log: Path,
     log.write_text("")
     installed = read_inventory(prefix)
     source = read_inventory(copy / "repo", skip=(".git",))
-    target = copy / "target"
-    mode = stat.S_IMODE(target.stat().st_mode)
-    target.chmod(0)
+    # Run a standalone copy so __file__ cannot give the check access to source data.
+    script = outside / "check_install.py"
+    shutil.copyfile(copy / "repo/scripts/check_install.py", script)
+    sealed = [copy / "repo", copy / "target"]
+    modes = [stat.S_IMODE(path.stat().st_mode) for path in sealed]
+    for path in sealed:
+        path.chmod(0)
     try:
-        run = run_script(copy, "check_install", ["--prefix", prefix], evidence, cwd=outside)
+        run = run_script(copy, "check_install", ["--prefix", prefix], evidence, cwd=outside,
+                         script=script)
     finally:
-        target.chmod(mode)
+        for path, mode in zip(sealed, modes):
+            path.chmod(mode)
+        script.unlink()
     calls = read_calls(log)
     violations = [] if run["exit"] == 0 else [f"exit {run['exit']}"]
     violations += find_call_gaps(calls, prefix)
-    violations += [f"flag {call}" for call in calls if "--version" in call or "--help" in call]
+    violations += [f"flag {call['argv']}" for call in calls
+                   if "--version" in call["argv"] or "--help" in call["argv"]]
     if read_inventory(prefix) != installed:
         violations.append("installed files changed")
     if read_inventory(copy / "repo", skip=(".git",)) != source or any(outside.iterdir()):
@@ -276,7 +286,8 @@ def create_logged_prefix(work: Path, real: Path, copy: Path) -> tuple[Path, Path
     product = work / "product/letopis"
     product.parent.mkdir()
     shutil.copy2(real, product)
-    wrapper = f'#!/bin/sh\nprintf \'%s\\n\' "$0 $*" >> "{log}"\nexec "{product}" "$@"\n'
+    wrapper = (f"#!{sys.executable}\nPRODUCT = {str(product)!r}\nLOG_FILE = {str(log)!r}\n"
+               + INSTALLED_PROBE.read_text(encoding="utf-8"))
     replace_file(prefix / BINARY_PATH, wrapper.encode(), 0o755)
     replace_file(prefix / SKILL_PATH, (copy / "repo/skills/letopis/SKILL.md").read_bytes(),
                  0o644)
@@ -284,22 +295,67 @@ def create_logged_prefix(work: Path, real: Path, copy: Path) -> tuple[Path, Path
     return prefix, log
 
 
-def find_call_gaps(calls: list[str], prefix: Path) -> list[str]:
-    """Each logged call names the installed binary by absolute path (`$0 ARGS`)."""
+def find_call_gaps(calls: list[dict], prefix: Path) -> list[str]:
+    """Require successful, meaningful workflow results in one disposable Git fixture."""
     binary = os.path.realpath(prefix / BINARY_PATH)
-    split = [call.split(" ", 2) for call in calls]
-    gaps = [f"not absolute: {call}" for call, parts in zip(calls, split)
-            if not os.path.isabs(parts[0]) or os.path.realpath(parts[0]) != binary]
-    used = {parts[1] for parts in split if len(parts) > 1}
+    gaps = []
+    used = []
+    directories = set()
+    for call in calls:
+        if not os.path.isabs(call["binary"]) or os.path.realpath(call["binary"]) != binary:
+            gaps.append(f"not installed absolute binary: {call['binary']}")
+        if call["argv"] not in [[command] for command in WORKFLOW_COMMANDS]:
+            gaps.append(f"unexpected invocation: {call['argv']}")
+            continue
+        command = call["argv"][0]
+        if command not in used:
+            used.append(command)
+        directories.add(call["cwd"])
+        if not call["git"] or not call["notes"] or call["embedding_config"]:
+            gaps.append(f"{command}: no fresh Markdown Git fixture without embeddings config")
+        if not has_workflow_result(command, call):
+            gaps.append(f"{command}: invalid request or unsuccessful/empty result")
+    if used != list(WORKFLOW_COMMANDS):
+        gaps.append(f"workflow order {used} differs from {list(WORKFLOW_COMMANDS)}")
+    if len(directories) != 1:
+        gaps.append("workflow does not share one disposable repository")
     return gaps + [f"{command} not run" for command in WORKFLOW_COMMANDS if command not in used]
 
 
-def run_script(copy: Path, name: str, args: list, evidence: Path, cwd: Path | None = None):
+def has_workflow_result(command: str, call: dict) -> bool:
+    try:
+        request, response = json.loads(call["stdin"]), json.loads(call["stdout"])
+    except ValueError:
+        return False
+    if (not isinstance(request, dict) or not isinstance(response, dict)
+            or call["exit"] != 0 or response.get("ok") is not True):
+        return False
+    result = response.get("result")
+    if command == "search":
+        return (isinstance(request.get("query"), str) and bool(request["query"].strip())
+                and isinstance(result, list) and bool(result)
+                and any(isinstance(link, dict) and link.get("path") in call["notes"]
+                        for link in result))
+    if not isinstance(result, dict):
+        return False
+    if command == "check":
+        return result.get("errors") == []
+    if command == "reindex":
+        return type(result.get("revision")) is int and result["revision"] > 0
+    elements = result.get("elements")
+    return (isinstance(request.get("element_ids"), list) and bool(request["element_ids"])
+            and isinstance(elements, dict) and bool(elements)
+            and all(isinstance(element, dict) and element.get("path") in call["notes"]
+                    for element in elements.values()))
+
+
+def run_script(copy: Path, name: str, args: list, evidence: Path, cwd: Path | None = None,
+               script: Path | None = None):
     """Run `python3 scripts/NAME.py` with the copy's HOME and no `letopis` on PATH."""
     env = {**evaluation.build_environment(copy), "PATH": build_tool_path(),
            "TMPDIR": str(make_tmp(copy))}
     argv = [shutil.which("python3", path=env["PATH"]) or "python3",
-            str(copy / "repo/scripts" / f"{name}.py"), *map(str, args)]
+            str(script or copy / "repo/scripts" / f"{name}.py"), *map(str, args)]
     return evaluation.run_observed(argv, cwd=cwd or copy / "repo", env=env, evidence=evidence,
                                    label=" ".join(argv[1:3]), timeout=SCRIPT_WATCHDOG_SECONDS)
 
@@ -337,8 +393,8 @@ def read_host_target(copy: Path) -> str:
     return hosts[0]
 
 
-def read_calls(log: Path) -> list[str]:
-    return [line for line in log.read_text().splitlines() if line]
+def read_calls(log: Path) -> list[dict]:
+    return [json.loads(line) for line in log.read_text().splitlines() if line]
 
 
 def replace_file(path: Path, data: bytes | None, mode: int) -> None:

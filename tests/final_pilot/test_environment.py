@@ -135,22 +135,6 @@ class PreflightTests(unittest.TestCase):
         install_docker_stub(self.bin, self.log, self.responses)
         self.path = f"{self.bin}{os.pathsep}{os.environ['PATH']}"
 
-    def write_manifest(self, manifest):
-        (self.root / "manifest.json").write_text(json.dumps(manifest))
-
-    def answer(self, image_id=PINNED_IMAGE, tools=TOOLS_OK, memory=MEMORY_OK,
-               isolation=ISOLATED):
-        self.responses.write_text(json.dumps({"image_id": image_id, "tools": tools,
-                                              "memory": memory,
-                                              "container_isolation": isolation}))
-
-    def run_preflight(self):
-        with mock.patch.dict(os.environ, {"PATH": self.path}):
-            return environment.preflight(self.root, "letopis-final:pinned")
-
-    def read_docker_calls(self):
-        return [json.loads(line) for line in self.log.read_text().splitlines()]
-
     def test_passing_local_checks_never_clear_model_or_embedding_access(self):
         # Given: every freeze input supplied and the pinned image matches
         self.write_manifest(build_manifest(image=PINNED_IMAGE, filled=True))
@@ -289,6 +273,22 @@ class PreflightTests(unittest.TestCase):
         self.assertNotIn("remote-embedding-unit", memory)
         self.assertNotIn("embed", memory)
         self.assertIn("embedding_access", result["pending"])
+
+    def write_manifest(self, manifest):
+        (self.root / "manifest.json").write_text(json.dumps(manifest))
+
+    def answer(self, image_id=PINNED_IMAGE, tools=TOOLS_OK, memory=MEMORY_OK,
+               isolation=ISOLATED):
+        self.responses.write_text(json.dumps({"image_id": image_id, "tools": tools,
+                                              "memory": memory,
+                                              "container_isolation": isolation}))
+
+    def run_preflight(self):
+        with mock.patch.dict(os.environ, {"PATH": self.path}):
+            return environment.preflight(self.root, "letopis-final:pinned")
+
+    def read_docker_calls(self):
+        return [json.loads(line) for line in self.log.read_text().splitlines()]
 
 
 class CredentialTrapTests(unittest.TestCase):

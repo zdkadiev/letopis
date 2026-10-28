@@ -43,6 +43,8 @@ class SelectionError(ValueError):
 def load_selection(path: Path) -> dict:
     """Read and validate selection.json; raise SelectionError on any structural violation."""
     selection = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(selection, dict):
+        raise SelectionError("selection must be an object")
     chains = selection.get("chains")
     if not isinstance(chains, list) or len(chains) != CHAIN_COUNT:
         raise SelectionError(f"expected exactly {CHAIN_COUNT} chains")
@@ -50,8 +52,8 @@ def load_selection(path: Path) -> dict:
     if not isinstance(catalog, dict) or not catalog:
         raise SelectionError("agreement_catalog is required")
     seen: set[str] = set()
-    for chain in chains:
-        _validate_chain(chain, catalog, seen)
+    for number, chain in enumerate(chains, start=1):
+        _validate_chain(chain, f"C{number}", catalog, seen)
     return selection
 
 
@@ -101,8 +103,12 @@ def assess_readiness(manifest: dict, observed: dict | None = None) -> dict:
     `observed` is the selection hash and input file hashes recomputed by the caller from
     the copied inputs; when given, any mismatch with the stored receipts is drift.
     """
+    if not isinstance(manifest, dict):
+        raise ValueError("manifest must be an object")
     pending = [name for name, paths in REQUIRED_INPUTS
                if not all(_is_supplied(path, _read_path(manifest, path)) for path in paths)]
+    if "product" not in pending and not _is_product_current(manifest):
+        pending.append("product")
     if _has_input_drift(manifest, observed):
         pending.append("input_drift")
     if not _is_recheck_current(manifest, observed):
@@ -145,12 +151,18 @@ def _has_input_drift(manifest: dict, observed: dict | None) -> bool:
 def _is_recheck_current(manifest: dict, observed: dict | None) -> bool:
     """A recheck counts only for the exact base and selection hash it verified."""
     receipts = manifest.get("source_receipts")
-    if not isinstance(receipts, dict) or not _is_full_oid(manifest.get("original_base")):
+    if not isinstance(receipts, dict) or not _is_product_current(manifest):
         return False
     selection_sha256 = observed["selection_sha256"] if observed else receipts.get(
         "selection_sha256")
     expected = {"base_commit": manifest["original_base"], "selection_sha256": selection_sha256}
     return _read_path(manifest, ("gates", "base_recheck")) == expected
+
+
+def _is_product_current(manifest: dict) -> bool:
+    """The final product revision must be the full commit used to prepare these seeds."""
+    final_base = _read_path(manifest, ("product", "final_base"))
+    return _is_full_oid(final_base) and final_base == manifest.get("original_base")
 
 
 def _is_full_oid(value) -> bool:
@@ -164,10 +176,6 @@ def _is_supplied(path: tuple[str, ...], value) -> bool:
     return _is_text(value) or (isinstance(value, (dict, list)) and len(value) > 0)
 
 
-def _is_text(value) -> bool:
-    return isinstance(value, str) and bool(value.strip())
-
-
 def _read_path(manifest: dict, path: tuple[str, ...]):
     value = manifest
     for key in path:
@@ -177,18 +185,24 @@ def _read_path(manifest: dict, path: tuple[str, ...]):
     return value
 
 
-def _validate_chain(chain: dict, catalog: dict, seen: set[str]) -> None:
-    if sorted(chain.get("condition_order", [])) != sorted(CONDITIONS):
+def _validate_chain(chain: dict, chain_id: str, catalog: dict, seen: set[str]) -> None:
+    if not isinstance(chain, dict) or chain.get("id") != chain_id:
+        raise SelectionError(f"expected chain {chain_id}")
+    order = chain.get("condition_order")
+    if not _is_text_list(order) or sorted(order) != sorted(CONDITIONS):
         raise SelectionError(f"{chain.get('id')}: condition_order must list each condition once")
     issue = chain.get("issue", {})
-    if not isinstance(issue.get("number"), int) or not str(issue.get("url", "")).startswith(
-            ISSUE_URL_PREFIX):
+    if (not isinstance(issue, dict) or type(issue.get("number")) is not int
+            or not _is_text(issue.get("url"))
+            or not issue["url"].startswith(ISSUE_URL_PREFIX)):
         raise SelectionError(f"{chain.get('id')}: issue number and GitHub url are required")
     tasks = chain.get("tasks", [])
-    if len(tasks) != TASKS_PER_CHAIN:
+    if not isinstance(tasks, list) or len(tasks) != TASKS_PER_CHAIN:
         raise SelectionError(f"{chain.get('id')}: expected {TASKS_PER_CHAIN} tasks")
     earlier: list[str] = []
-    for task in tasks:
+    for number, task in enumerate(tasks, start=1):
+        if not isinstance(task, dict) or task.get("id") != f"{chain_id}-T{number}":
+            raise SelectionError(f"expected task {chain_id}-T{number}")
         _validate_task(task, catalog, seen, earlier)
         earlier.append(task["id"])
     _validate_facts(chain, earlier)
@@ -199,27 +213,38 @@ def _validate_task(task: dict, catalog: dict, seen: set[str], earlier: list[str]
     if not isinstance(task_id, str) or task_id in seen:
         raise SelectionError(f"task id missing or repeated: {task_id!r}")
     seen.add(task_id)
-    if not str(task.get("prompt", "")).strip():
+    if not _is_text(task.get("prompt")):
         raise SelectionError(f"{task_id}: prompt is required")
     for key in ("check_ids", "agreement_ids"):
         values = task.get(key)
-        if not values or len(set(values)) != len(values):
+        if not _is_text_list(values) or not values or len(set(values)) != len(values):
             raise SelectionError(f"{task_id}: {key} must be a non-empty unique list")
     if not set(task["agreement_ids"]) <= set(catalog):
         raise SelectionError(f"{task_id}: unknown agreement id")
     reuse = task.get("reuse_from")
-    if not isinstance(reuse, list) or not set(reuse) <= set(earlier):
+    if not _is_text_list(reuse) or not set(reuse) <= set(earlier):
         raise SelectionError(f"{task_id}: reuse_from may name only earlier tasks of its chain")
 
 
 def _validate_facts(chain: dict, task_ids: list[str]) -> None:
     facts = chain.get("recurring_facts")
-    if not facts:
+    if not isinstance(facts, list) or not facts:
         raise SelectionError(f"{chain['id']}: recurring_facts are required")
     for fact in facts:
+        if not isinstance(fact, dict):
+            raise SelectionError(f"{chain['id']}: recurring fact must be an object")
         established = fact.get("established_in")
         recurs = fact.get("recurs_in")
-        valid = (established in task_ids and str(fact.get("fact", "")).strip()
-                 and recurs and set(recurs) <= set(task_ids[task_ids.index(established) + 1:]))
+        valid = (established in task_ids and _is_text(fact.get("fact"))
+                 and _is_text_list(recurs) and recurs
+                 and set(recurs) <= set(task_ids[task_ids.index(established) + 1:]))
         if not valid:
             raise SelectionError(f"{chain['id']}: fact {fact.get('id')!r} is invalid")
+
+
+def _is_text_list(value) -> bool:
+    return isinstance(value, list) and all(_is_text(item) for item in value)
+
+
+def _is_text(value) -> bool:
+    return isinstance(value, str) and bool(value.strip())

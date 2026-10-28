@@ -12,36 +12,26 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import re
 import shutil
 import signal
 import subprocess
-import threading
 import time
-from collections import Counter
 from dataclasses import dataclass
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import copies
 import evaluation
+from oracles.http_fixture import BarrierServer, MALFORMED_MARKER, VECTORS
 
 BOUND = 2
 CHECK_IDS = {"C3-T1": ("two_requests_before_release", "bounded_buffer", "one_owner_short_writes"),
              "C3-T2": ("shared_hash_durable_attempts", "out_of_order_identity",
                        "invalid_retry_bound"),
              "C3-T3": ("detached_overlap", "caller_owner_lifecycle", "search_with_drain")}
-VECTORS = {"alpha": [1.0, 0.0, 0.0], "beta": [0.0, 1.0, 0.0], "gamma": [0.0, 0.0, 1.0],
-           "changed": [1.0, 1.0, 0.0], "delta": [0.0, 1.0, 1.0]}
-QUERY_VECTOR = [0.5, 0.5, 0.5]
-MALFORMED_MARKER = "delta"
-MALFORMED_REPLY = b'{"model":"fixture","embeddings":"malformed"}'
 RETRIES = 1
 MAX_ATTEMPTS = 2
-MARKER = re.compile(r"tk30-doc-([a-z]+)")
 OVERLAP_WAIT_SECONDS = 10
 QUIET_SECONDS = 1.0
-HOLD_LIMIT_SECONDS = 60
 DRAIN_WATCHDOG_SECONDS = 60
 COMMAND_WATCHDOG_SECONDS = 20
 PROBE_SOURCE = Path(__file__).resolve().parent / "service_probe.rs"
@@ -114,13 +104,14 @@ def observe_out_of_order(bench: Bench) -> list[dict]:
     shared = observe_shared(bench)
     changed_text = observe_change(bench, "text")
     changed_config = observe_change(bench, "config")
+    removed = observe_change(bench, "removed")
     retry = observe_retry(bench)
     return [
         make_check("shared_hash_durable_attempts", grade_shared(shared), json.dumps(shared)),
         make_check("out_of_order_identity", shared["identity"] and changed_text["passed"]
-                   and changed_config["passed"],
+                   and changed_config["passed"] and removed["passed"],
                    json.dumps({"reverse": shared["identity"], "text": changed_text,
-                               "config": changed_config})),
+                               "config": changed_config, "removed": removed})),
         make_check("invalid_retry_bound", grade_retry(retry), json.dumps(retry)),
     ]
 
@@ -194,6 +185,8 @@ def grade_change(change: str, old: dict, stale: dict, fresh: dict) -> bool:
     change leaves the old beta hash without a vector and `fresh` (the new beta hash) with
     the vector of the changed text.
     """
+    if change == "removed":
+        return has_no_vector(stale, old["beta"])
     if change == "text":
         current = [item for item in fresh.values() if isinstance(item, dict)]
         return (has_no_vector(stale, old["beta"]) and len(current) == 1
@@ -237,8 +230,11 @@ def observe_change(bench: Bench, change: str) -> dict:
         repo, hashes = create_corpus(bench, server, change, ["alpha", "beta"])
         with OwnedProcess([bench.probe, "drain", repo], env=make_runtime_env(bench)) as drain:
             window = observe_window(server)
-            if change == "text":
-                write_note(repo, CHANGED_FILE, "changed")
+            if change in ("text", "removed"):
+                if change == "removed":
+                    (repo / f"{CHANGED_FILE}.md").unlink()
+                else:
+                    write_note(repo, CHANGED_FILE, "changed")
                 run_probe(bench, "refresh", repo)
             else:
                 write_config(repo, server, model="fixture-changed")
@@ -530,108 +526,3 @@ class OwnedProcess:
     def kill(self) -> None:
         self.child.kill()
         self.child.wait()
-
-
-class BarrierServer:
-    """Concurrent loopback provider that holds document requests until released."""
-
-    def __init__(self) -> None:
-        self.condition = threading.Condition()
-        self.requests: list[dict] = []
-        self.active = 0
-        self.max_active = 0
-        self.max_same = 0
-        self.open = False
-        try:
-            self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self))
-        except OSError as error:
-            raise evaluation.InfraError(f"loopback fixture cannot bind: {error}") from error
-        self.server.daemon_threads = True
-        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
-
-    def __enter__(self) -> "BarrierServer":
-        return self
-
-    def __exit__(self, *_exc) -> None:
-        self.release_all()
-        self.server.shutdown()
-        self.server.server_close()
-
-    def handle_document(self, marker: str) -> bytes:
-        """Count the request as in flight and block until released or the hold limit."""
-        with self.condition:
-            record = {"marker": marker, "released": self.open}
-            self.requests.append(record)
-            self.active += 1
-            self.max_active = max(self.max_active, self.active)
-            self.max_same = max(self.max_same, self.count_active(marker))
-            self.condition.notify_all()
-            self.condition.wait_for(lambda: record["released"], HOLD_LIMIT_SECONDS)
-        if marker == MALFORMED_MARKER:
-            return MALFORMED_REPLY
-        return json.dumps({"model": "fixture", "embeddings": [VECTORS[marker]]}).encode()
-
-    def handle_query(self) -> bytes:
-        """Query embeddings are answered at once; only document requests are held."""
-        return json.dumps({"model": "fixture", "embeddings": [QUERY_VECTOR]}).encode()
-
-    def finish_document(self, marker: str) -> None:
-        with self.condition:
-            self.active -= 1
-            next(r for r in self.requests if r["marker"] == marker and not r.get("done")
-                 and r["released"])["done"] = True
-            self.condition.notify_all()
-
-    def wait_for_held(self, count: int, timeout: float) -> bool:
-        with self.condition:
-            return self.condition.wait_for(lambda: self.active >= count, timeout)
-
-    def release_reversed(self) -> None:
-        """Answer the held requests newest first, then everything that follows."""
-        with self.condition:
-            held = [r for r in self.requests if not r["released"]]
-        for record in reversed(held):
-            with self.condition:
-                record["released"] = True
-                self.condition.notify_all()
-                self.condition.wait_for(lambda: record.get("done"), QUIET_SECONDS)
-        self.release_all()
-
-    def release_all(self) -> None:
-        with self.condition:
-            self.open = True
-            for record in self.requests:
-                record["released"] = True
-            self.condition.notify_all()
-
-    def count(self, marker: str) -> int:
-        return Counter(r["marker"] for r in self.requests)[marker]
-
-    def count_active(self, marker: str) -> int:
-        return sum(1 for r in self.requests if r["marker"] == marker and not r.get("done"))
-
-
-def make_handler(owner: BarrierServer) -> type:
-    class Handler(BaseHTTPRequestHandler):
-        def do_POST(self) -> None:
-            body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
-            text = " ".join(map(str, (read_json(body) or {}).get("input", [])))
-            match = MARKER.search(text)
-            reply = owner.handle_document(match[1]) if match else owner.handle_query()
-            try:
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(reply)))
-                self.end_headers()
-                self.wfile.write(reply)
-            except OSError:
-                pass
-            finally:
-                if match:
-                    owner.finish_document(match[1])
-
-        def log_message(self, *_args) -> None:
-            pass
-
-    return Handler

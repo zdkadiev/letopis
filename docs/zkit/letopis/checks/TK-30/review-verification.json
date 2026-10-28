@@ -1,0 +1,225 @@
+{
+  "task": "TK-30",
+  "reviewed_commit": "850201564754e29e6e2af3b95e5e2f3fadf4c85e",
+  "branch": "tk-30",
+  "date": "2026-10-28",
+  "source_state": "uncommitted review corrections",
+  "formal_done": false,
+  "state": "unready",
+  "model_executions": 0,
+  "product_paths_changed": false,
+  "python": "3.12.0",
+  "host": "macOS arm64",
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/final_pilot",
+        "-p",
+        "test_*.py"
+      ],
+      "exit": 0,
+      "seconds": 113.684,
+      "log": "/private/tmp/letopis-tk30-review-final-hps4t85m/final-pilot.log",
+      "summary": [
+        "Ran 168 tests in 113.592s",
+        "",
+        "OK (skipped=3)"
+      ],
+      "log_sha256": "2900103995a35e97b4a66c3a7bedd89ff728b6f0bdfb571540c0d00bf3e72ef7"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/pilot_protocol",
+        "-p",
+        "test_*.py"
+      ],
+      "exit": 0,
+      "seconds": 0.533,
+      "log": "/private/tmp/letopis-tk30-review-final-hps4t85m/p1.log",
+      "summary": [
+        "Ran 31 tests in 0.485s",
+        "",
+        "OK"
+      ],
+      "log_sha256": "c77aff04cd610345c585c8b9b9d1ebebdaf0a3d1e067c8e040cb5d98d20965ae"
+    }
+  ],
+  "source_stable": true,
+  "operator_file_sha256": {
+    "docs/zkit/letopis/pilot/final/instructions.md": "518167800673642b6b6f27f8868103d81872c64dd567f30efb66c2578ac02ab7",
+    "docs/zkit/letopis/pilot/final/readiness.md": "f19e875dafb398092f72516521ba478f13f8d39c62c39515fc3df26635aecf12",
+    "docs/zkit/letopis/pilot/final/selection.json": "15910f33650b175da044151e58ca9cc58234bda3a8da6f1af6933b08a45f9f06",
+    "tests/final_pilot/README.md": "f58ceac46fa96d3f2aa3c01bbae1eaf4bd6740db15b07e23049663d1cc13fa70",
+    "tests/final_pilot/_copy_fixtures.py": "8faccea8a0860c31beee67406436151b0b5e82e95f40ef825af71e75c4626f08",
+    "tests/final_pilot/_oracle_fixtures.py": "dcdafc52a88336849b93282b714b72473fc360b2bdf9178d149683c1121503da",
+    "tests/final_pilot/copies.py": "ce571c363ab96b56b34c57d8843863f0191b3aca99027786fc60f82eb7b544b4",
+    "tests/final_pilot/environment.py": "6387624551081dd82d72c542a7231c3a2b50dbfd5d84339f00ffe843433899e6",
+    "tests/final_pilot/evaluation.py": "e626cf2cd91e0e598e96786d7e2d1589cb557ed0d307d1b0705965a292a9f4d9",
+    "tests/final_pilot/oracles/cli.py": "ba92ecfeedee952fbe3c317b257de3b1d866d91a6e2e7dfd32fb7e8255c91537",
+    "tests/final_pilot/oracles/delivery.py": "6e33bdd97168abab6f052415948a9fc51fe4b8cd7a23a5261064c22320ebc650",
+    "tests/final_pilot/oracles/drain.py": "25233421485f3e78457793894f247540125369c07c5ce7780c4b48cc93b7572b",
+    "tests/final_pilot/oracles/http_fixture.py": "2c5010c2e45ba1523477bf262b9db09a0c2f5fc7fad0e21ed7cdfdbec212e26d",
+    "tests/final_pilot/oracles/installed_probe.py": "2d7f63e94e98b58b3af651dc2a516a23caa8639d86423bfc1cb7eca2444e4414",
+    "tests/final_pilot/oracles/service_probe.rs": "e80b49fd9c14354148ee582a10b6c94aa423c7c9cbcbe31dc22c8e7f98bd9a21",
+    "tests/final_pilot/records.py": "0948fba00c3cb1e0432f1072839b7a795d8329d5ceb5dc41d5773354a01a5d49",
+    "tests/final_pilot/run.py": "3a90da04f5f024deb1fb5bb907db9808ec53d9825fc46ba59a969191064d8476",
+    "tests/final_pilot/study.py": "e6a9392eb419fc7b57342823ae1e69e829e172d37fc50ee416715e2610dbc2e3",
+    "tests/final_pilot/telemetry.py": "c6fa6e2a34fd63ff1595258f6137ab0cbb26c7dac170d5c2dc8574dbcb205fe6",
+    "tests/final_pilot/test_capture.py": "c3713c63eb1af7ac099af622d0f64a181f67137a327403786cb40925b31a2ed5",
+    "tests/final_pilot/test_cli_oracles.py": "a0a2cb4686a4661287d0173d70ae092940a991ac4d657c3ed506f71bd0a3ff77",
+    "tests/final_pilot/test_commands.py": "533c5e2e93c994a080ae6495be3866ab6a39652b3fe6b5ee1160c150503eaeee",
+    "tests/final_pilot/test_copies.py": "73c98cdaa7467e597cbf957ba58ca701717538ecc389749337d0c9e1fc3d5b82",
+    "tests/final_pilot/test_copy_containers.py": "749890b6573e41e4a68358e4886b823de5a716ff1a9026286347d6e7fa0810c0",
+    "tests/final_pilot/test_delivery_oracles.py": "c378ef7b35fb13d61361f2bb7e2c7cf6af52b72ada03fef14b1c6be22cf318ac",
+    "tests/final_pilot/test_drain_oracles.py": "85e04fd46634919fc73ef698421d537645e4d568ba7b8520d7909f9fa6942d14",
+    "tests/final_pilot/test_environment.py": "0e2821f89212aeab65c20cc40cd0750915fed8d77994c06a2d260d6af517dd80",
+    "tests/final_pilot/test_evaluation_integrity.py": "8815a86d7eba077029ab93af01c844cec719ba2ef236d35edaa6d7619954e6e3",
+    "tests/final_pilot/test_oracles.py": "c3db9267f669cd72ce31698fc8107b0f69cc632424fd424f9e0f87ce535d8368",
+    "tests/final_pilot/test_records.py": "f9622fac7bcc2ca021dda3b96da5f7c2f27bc51ef7ebf3b13602279d6a673f27",
+    "tests/final_pilot/test_seed_commands.py": "669b3d9f61e913f393468c6abecb4847d8428e5c3d26ebf015c1defda27f6a37",
+    "tests/final_pilot/test_study.py": "18c0e34610c4126f24c9bfbe7925482dfc44c7b7df272bac7a6a2fc15aefad34"
+  },
+  "docker": {
+    "image": "sha256:a8b5b012f93d3af8aa1fd2dd0ad4dd1af22a14b1397d224928950b8593c2bbe7",
+    "network": "none",
+    "pull": "never",
+    "commands": [
+      {
+        "command": [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests/final_pilot",
+          "-p",
+          "test_copy_containers.py",
+          "-k",
+          "ContainerBoundary"
+        ],
+        "env": {
+          "TK30_CONTAINER_OUTPUT": "/private/tmp/letopis-tk30-review-final-hps4t85m/docker-boundary-final"
+        },
+        "exit": 0,
+        "seconds": 5.076,
+        "log": "/private/tmp/letopis-tk30-review-final-hps4t85m/docker-boundary-final.log",
+        "log_sha256": "f511b900e2c6451b600a480bcd6bccb7a804ad8f578710ac7322707cef48504b"
+      },
+      {
+        "command": [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests/final_pilot",
+          "-p",
+          "test_environment.py",
+          "-k",
+          "LocalImagePreflight"
+        ],
+        "env": {
+          "TK30_PREFLIGHT_IMAGE": "letopis-tk17-codex:v2-0.164.0"
+        },
+        "exit": 0,
+        "seconds": 0.422,
+        "log": "/private/tmp/letopis-tk30-review-final-hps4t85m/docker-preflight-final.log",
+        "log_sha256": "0e5ea8f3b9026d3725a45c4b2023bb271fe2bdf9d7b116deb39d29130751a864"
+      }
+    ],
+    "preflight_verdict": "unready; no final letopis binary or pinned final image digest"
+  },
+  "fresh_prepare_audit": {
+    "base": "d260348619c6f4f623f24b907ca5bf41fb14eba9",
+    "root": "/private/tmp/letopis-tk30-review-final-hps4t85m/preparation",
+    "prepare_exit": 0,
+    "audit_exit": 2,
+    "state": "unready",
+    "pending_count": 12
+  },
+  "mutation_logs": [
+    {
+      "path": "/private/tmp/letopis-tk30-review-mutations-gg4dsz14/chain-id.log",
+      "sha256": "7b51265a5a7548915d21c5682bea66cf12ced81f45139cbd756c2cae1a532fc1",
+      "outcome": "caught; source byte-restored"
+    },
+    {
+      "path": "/private/tmp/letopis-tk30-review-mutations-gg4dsz14/manifest-type.log",
+      "sha256": "b49bbd0a6f7e74996229b8b91fee417e818ded6b7fc99623a12a0e53a4f55c79",
+      "outcome": "caught; source byte-restored"
+    },
+    {
+      "path": "/private/tmp/letopis-tk30-review-mutations-gg4dsz14/product-current.log",
+      "sha256": "b1bfc28cd09c7b916eda26531bcc66f76657a34efb19b287d30cb27e1d361096",
+      "outcome": "caught; source byte-restored"
+    },
+    {
+      "path": "/private/tmp/letopis-tk30-review-mutations-gg4dsz14/selection-type.log",
+      "sha256": "dab7b6f77468d2bd1b3b548ffd0a43679025e7c917ab3dc9423128014119ef1c",
+      "outcome": "caught; source byte-restored"
+    },
+    {
+      "path": "/private/tmp/letopis-tk30-review-mutations-gg4dsz14/task-id.log",
+      "sha256": "200320570c227d380cbc96373664d78e4ceb4d00603b6df22105fdfb05faa180",
+      "outcome": "caught; source byte-restored"
+    },
+    {
+      "path": "/private/tmp/tk30-nested-mutations-m67jhap_/fact-shape.log",
+      "sha256": "80286179cf2f4e0a370c7419c7668c3d9cd1e4b8558c8008e4ec51bb1c97219f",
+      "outcome": "caught; source byte-restored"
+    },
+    {
+      "path": "/private/tmp/tk30-nested-mutations-m67jhap_/issue-shape.log",
+      "sha256": "29e0a53d0c1fcb3d1769b1bc6f3098bbe75bfde55628afadfcd316e9b30c4bfa",
+      "outcome": "caught; source byte-restored"
+    },
+    {
+      "path": "/private/tmp/tk30-nested-mutations-m67jhap_/prompt-shape.log",
+      "sha256": "d427bdea62da3f6b937e4b81066ddb2ca1eba3383bc2ba9980b6e3ba382d3377",
+      "outcome": "caught; source byte-restored"
+    },
+    {
+      "path": "/private/tmp/tk30-nested-mutations-m67jhap_/text-list-shape.log",
+      "sha256": "ecaf166b9587b9717c06082a7f77fcfc970fe102882e15ce61a5c9dfcf78344f",
+      "outcome": "caught; source byte-restored"
+    }
+  ],
+  "reviewer_mutations": {
+    "count": 12,
+    "reported": "caught and restored",
+    "retained_log": null,
+    "provenance": "review tool transcript"
+  },
+  "test_split": {
+    "baseline_test_bodies_preserved": 81,
+    "pre_split_test_bodies_preserved": 85,
+    "proof": "AST function bodies identical, exactly once",
+    "previews_and_backups": "/private/tmp/tk30-style-split-lpvtm595"
+  },
+  "not_rerun": [
+    "nine complete seed oracle evaluations",
+    "product Rust suites",
+    "full native host/Linux runner"
+  ],
+  "limits": [
+    "G-2/final product/config/image/prompt/access/correlation/participant containment prerequisites remain",
+    "host evaluator is detection-only; deliberate process-group escape requires external containment",
+    "no full concurrent C3 implementation GREEN control",
+    "version metadata source requires future participant source review"
+  ],
+  "git_actions": "no commit, merge, push or GitHub mutation"
+}

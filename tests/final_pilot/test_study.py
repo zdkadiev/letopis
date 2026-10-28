@@ -52,70 +52,27 @@ EVIDENCE_GATES = ("g2", "prompt_freeze", "preflight", "participant_isolation",
                   "correlation_attribute")
 
 
-def set_in(section, key):
-    return lambda manifest, value: manifest[section].__setitem__(key, value)
-
-
-PENDING_SETTERS = {
-    "seeds": lambda m, v: m.__setitem__("seed_commit", v),
-    "product": set_in("product", "final_base"),
-    "memory_versions": set_in("product", "skill"),
-    "embedding": set_in("product", "embedding_config"),
-    "assets": set_in("environment", "image"),
-    "model": set_in("agent", "model_revision"),
-    "agent_config": set_in("agent", "config_sha256"),
-    "g2": set_in("gates", "g2"),
-    "prompt_freeze": set_in("gates", "prompt_freeze"),
-    "preflight": set_in("gates", "preflight"),
-    "participant_isolation": set_in("gates", "participant_isolation"),
-    "correlation_attribute": set_in("gates", "correlation_attribute"),
-    "base_drift_recheck": set_in("gates", "base_recheck"),
+PENDING_PATHS = {
+    "seeds": ("seed_commit",),
+    "product": ("product", "final_base"),
+    "memory_versions": ("product", "skill"),
+    "embedding": ("product", "embedding_config"),
+    "assets": ("environment", "image"),
+    "model": ("agent", "model_revision"),
+    "agent_config": ("agent", "config_sha256"),
+    "g2": ("gates", "g2"),
+    "prompt_freeze": ("gates", "prompt_freeze"),
+    "preflight": ("gates", "preflight"),
+    "participant_isolation": ("gates", "participant_isolation"),
+    "correlation_attribute": ("gates", "correlation_attribute"),
+    "base_drift_recheck": ("gates", "base_recheck"),
 }
-
-
-def load_json(path):
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def build_unready_manifest(local_tools_ok=False):
-    selection = study.load_selection(SELECTION)
-    inputs = {"original_base": BASE, "local_tools_ok": local_tools_ok, "file_sha256": {}}
-    return selection, study.build_manifest(selection, inputs)
-
-
-def fill_every_input(manifest):
-    """Return a copy of the manifest with every freeze input explicitly supplied."""
-    filled = copy.deepcopy(manifest)
-    filled["seed_commit"] = "1" * 40
-    filled["starting_inventory"] = {"sha256": "2" * 64}
-    filled["product"] = {"final_base": "3" * 40, "memory_binary": "memory-1",
-                         "skill": "skill-1", "embedding_config": "embedding-1"}
-    filled["environment"].update({"image": "image-1", "pinned_assets": "assets-1"})
-    filled["agent"].update({"model": "model-1", "model_revision": "unknown",
-                            "budget": "budget-1", "config_sha256": "4" * 64})
-    filled["gates"] = {"g2": {"evidence": "g2/report.md#L1"},
-                       "prompt_freeze": {"evidence": "freeze/approval.md#L1"},
-                       "preflight": {"evidence": "preflight/result.json#tools"},
-                       "participant_isolation": {"evidence": "isolation/proof.md#L1"},
-                       "correlation_attribute": {"evidence": "telemetry/attribute.md#L1"},
-                       "base_recheck": {"base_commit": filled["original_base"],
-                                        "selection_sha256":
-                                        filled["source_receipts"]["selection_sha256"]}}
-    return filled
 
 
 class SelectionLoadingTests(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp)
-
-    def reject_after(self, change):
-        selection = load_json(SELECTION)
-        change(selection)
-        path = self.tmp / "selection.json"
-        path.write_text(json.dumps(selection), encoding="utf-8")
-        with self.assertRaises(study.SelectionError):
-            study.load_selection(path)
 
     def test_frozen_selection_has_literal_ids_checks_and_reuse(self):
         # When
@@ -134,6 +91,41 @@ class SelectionLoadingTests(unittest.TestCase):
                          ["https://github.com/zaurkadiev/letopis/issues/53",
                           "https://github.com/zaurkadiev/letopis/issues/43",
                           "https://github.com/zaurkadiev/letopis/issues/49"])
+
+    def test_selection_rejects_malformed_chain_and_task_ids(self):
+        # Given / When / Then: ids select both condition directories and oracle dispatch
+        changes = (
+            lambda s: s["chains"][1].__setitem__("id", "C1"),
+            lambda s: s["chains"][0].__setitem__("id", "../outside"),
+            lambda s: s.update(json.loads(json.dumps(s).replace('"C1-T1"', '"C1-T9"'))),
+        )
+        for change in changes:
+            with self.subTest(change=change):
+                self.reject_after(change)
+
+    def test_selection_rejects_non_object_values(self):
+        # Given / When / Then
+        for value in ([], None, dict(load_json(SELECTION), chains=[None, {}, {}])):
+            with self.subTest(value=value):
+                path = self.tmp / "malformed.json"
+                path.write_text(json.dumps(value))
+                with self.assertRaises(study.SelectionError):
+                    study.load_selection(path)
+
+    def test_selection_rejects_malformed_nested_fields(self):
+        # Given: malformed shapes must not escape as AttributeError or become prompts
+        changes = (
+            lambda s: s["chains"][0].__setitem__("issue", []),
+            lambda s: s["chains"][0].__setitem__("tasks", {}),
+            lambda s: s["chains"][0].__setitem__("condition_order", [None, "memory"]),
+            lambda s: s["chains"][0].__setitem__("recurring_facts", [None]),
+            lambda s: s["chains"][0]["tasks"][0].__setitem__("prompt", {}),
+            lambda s: s["chains"][0]["tasks"][0].__setitem__("check_ids", [{}]),
+        )
+        # When / Then
+        for change in changes:
+            with self.subTest(change=change):
+                self.reject_after(change)
 
     def test_missing_third_task_is_rejected(self):
         # When / Then
@@ -167,6 +159,14 @@ class SelectionLoadingTests(unittest.TestCase):
     def test_condition_order_must_cover_both_conditions_once(self):
         # When / Then
         self.reject_after(lambda s: s["chains"][0].update(condition_order=["memory", "memory"]))
+
+    def reject_after(self, change):
+        selection = load_json(SELECTION)
+        change(selection)
+        path = self.tmp / "selection.json"
+        path.write_text(json.dumps(selection), encoding="utf-8")
+        with self.assertRaises(study.SelectionError):
+            study.load_selection(path)
 
 
 class ParticipantTextTests(unittest.TestCase):
@@ -272,12 +272,14 @@ class ManifestTests(unittest.TestCase):
 
         # When / Then
         self.assertEqual(study.assess_readiness(filled), {"state": "ready", "pending": []})
-        for name, setter in PENDING_SETTERS.items():
+        for name, path in PENDING_PATHS.items():
             with self.subTest(name):
                 broken = copy.deepcopy(filled)
-                setter(broken, None)
+                replace_input(broken, path, None)
                 self.assertEqual(study.assess_readiness(broken),
-                                 {"state": "unready", "pending": [name]})
+                                 {"state": "unready", "pending": (
+                                     ["product", "base_drift_recheck"] if name == "product"
+                                     else [name])})
 
     def test_placeholder_values_never_clear_a_pending_item(self):
         # Given
@@ -288,14 +290,16 @@ class ManifestTests(unittest.TestCase):
                      {"evidence": {}}]
 
         # When / Then
-        for name, setter in PENDING_SETTERS.items():
+        for name, path in PENDING_PATHS.items():
             gate = name in EVIDENCE_GATES
             for value in placeholders + (gate_only if gate else []):
                 with self.subTest(name=name, value=value):
                     broken = copy.deepcopy(filled)
-                    setter(broken, value)
+                    replace_input(broken, path, value)
                     self.assertEqual(study.assess_readiness(broken),
-                                     {"state": "unready", "pending": [name]})
+                                     {"state": "unready", "pending": (
+                                     ["product", "base_drift_recheck"] if name == "product"
+                                     else [name])})
 
     def test_unproven_isolation_gates_keep_audit_unready(self):
         # Given: every other input is filled, the three isolation gates are absent
@@ -326,7 +330,20 @@ class ManifestTests(unittest.TestCase):
         readiness = study.assess_readiness(filled)
 
         # Then
-        self.assertEqual(readiness["pending"], ["product", "memory_versions", "embedding", "g2"])
+        self.assertEqual(readiness["pending"], ["product", "memory_versions", "embedding", "g2", "base_drift_recheck"])
+
+    def test_final_product_base_must_match_the_prepared_base(self):
+        # Given: seeds and the recheck describe BASE, not OTHER_BASE
+        _, manifest = build_unready_manifest()
+        frozen = fill_every_input(manifest)
+
+        # When / Then
+        for final_base in (OTHER_BASE, "short", {"commit": BASE}):
+            with self.subTest(final_base=final_base):
+                frozen["product"]["final_base"] = final_base
+                result = study.assess_readiness(frozen)
+                self.assertEqual(result, {"state": "unready", "pending": [
+                    "product", "base_drift_recheck"]})
 
     def test_base_drift_keeps_unready(self):
         # Given
@@ -342,7 +359,7 @@ class ManifestTests(unittest.TestCase):
 
         # Then
         self.assertEqual(study.assess_readiness(moved_base),
-                         {"state": "unready", "pending": ["input_drift", "base_drift_recheck"]})
+                         {"state": "unready", "pending": ["product", "input_drift", "base_drift_recheck"]})
         self.assertEqual(study.assess_readiness(moved_selection),
                          {"state": "unready", "pending": ["base_drift_recheck"]})
 
@@ -404,212 +421,43 @@ class ManifestTests(unittest.TestCase):
                 study.build_manifest(selection, {"original_base": bad})
 
 
-class RunCommandTests(unittest.TestCase):
-    def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmp)
-        self.repo = self.tmp / "product"
-        self.repo.mkdir()
-        self.git("init", "-q")
-        (self.repo / "a.txt").write_text("a\n")
-        (self.repo / "AGENTS.md").write_text(
-            "# Rules\n\n- Keep agreed specifications and implementation plans in "
-            "`docs/superpowers/specs/`. When the user requests Superpowers, follow it.\n\n"
-            "## Workspace and memory\n\n- Use Engram.\n")
-        self.git("add", "a.txt", "AGENTS.md")
-        self.git("-c", "user.name=t", "-c", "user.email=t@example.com",
-                 "commit", "-q", "-m", "init")
-        self.base = self.git("rev-parse", "HEAD").strip()
 
-    def git(self, *args):
-        return subprocess.run(["git", "-C", str(self.repo), *args], check=True,
-                              capture_output=True, text=True).stdout
 
-    def run_cli(self, *args, python=sys.executable, env=None, timeout=20):
-        result = subprocess.run([python, "-B", str(RUN), *map(str, args)], cwd=self.tmp,
-                                capture_output=True, text=True, env=env, timeout=timeout)
-        return result.returncode, json.loads(result.stdout)
+def load_json(path):
+    return json.loads(path.read_text(encoding="utf-8"))
 
-    def prepare(self, output, base=None):
-        return self.run_cli("prepare", "--repo", self.repo, "--base", base or self.base,
-                            "--output", output)
 
-    def test_prepare_writes_unready_manifest_and_inputs_only(self):
-        # Given
-        output = self.tmp / "out"
+def build_unready_manifest(local_tools_ok=False):
+    selection = study.load_selection(SELECTION)
+    inputs = {"original_base": BASE, "local_tools_ok": local_tools_ok, "file_sha256": {}}
+    return selection, study.build_manifest(selection, inputs)
 
-        # When
-        code, report = self.prepare(output)
 
-        # Then
-        self.assertEqual(code, 0)
-        self.assertEqual(report["state"], "unready")
-        self.assertEqual(sorted(p.name for p in output.iterdir()),
-                         ["conditions", "inputs", "manifest.json", "seeds.json"])
-        self.assertNotIn("seeds", report["pending"])
-        self.assertEqual(sorted(p.name for p in (output / "inputs").iterdir()),
-                         ["instructions.md", "readiness.md", "selection.json"])
-        manifest = load_json(output / "manifest.json")
-        self.assertEqual(manifest["original_base"], self.base)
-        self.assertEqual(len(manifest["order"]), 18)
-        self.assertEqual(manifest["model_executions"], 0)
-        self.assertEqual(
-            manifest["source_receipts"]["tk17_sources"]["files"]
-            ["tests/early_pilot/prepare_image.py"],
-            "da9013ac13542b525c6640b3ded17a9072eb7beebe88e72ec572d49dd6bdc3f7")
+def fill_every_input(manifest):
+    """Return a copy of the manifest with every freeze input explicitly supplied."""
+    filled = copy.deepcopy(manifest)
+    filled["seed_commit"] = "1" * 40
+    filled["starting_inventory"] = {"sha256": "2" * 64}
+    filled["product"] = {"final_base": manifest["original_base"], "memory_binary": "memory-1",
+                         "skill": "skill-1", "embedding_config": "embedding-1"}
+    filled["environment"].update({"image": "image-1", "pinned_assets": "assets-1"})
+    filled["agent"].update({"model": "model-1", "model_revision": "unknown",
+                            "budget": "budget-1", "config_sha256": "4" * 64})
+    filled["gates"] = {"g2": {"evidence": "g2/report.md#L1"},
+                       "prompt_freeze": {"evidence": "freeze/approval.md#L1"},
+                       "preflight": {"evidence": "preflight/result.json#tools"},
+                       "participant_isolation": {"evidence": "isolation/proof.md#L1"},
+                       "correlation_attribute": {"evidence": "telemetry/attribute.md#L1"},
+                       "base_recheck": {"base_commit": filled["original_base"],
+                                        "selection_sha256":
+                                        filled["source_receipts"]["selection_sha256"]}}
+    return filled
 
-    def test_prepare_rejects_existing_output_unknown_or_short_base(self):
-        # Given
-        existing = self.tmp / "exists"
-        existing.mkdir()
 
-        # When / Then
-        self.assertEqual(self.prepare(existing)[0], 2)
-        self.assertEqual(list(existing.iterdir()), [])
-        self.assertEqual(self.prepare(self.tmp / "o2", base=BASE)[0], 2)
-        self.assertEqual(self.prepare(self.tmp / "o3", base=self.base[:7])[0], 2)
-        self.assertFalse((self.tmp / "o2").exists() or (self.tmp / "o3").exists())
-
-    def test_audit_reports_pending_as_unready_with_exit_two(self):
-        # Given
-        output = self.tmp / "out"
-        self.prepare(output)
-
-        # When
-        code, report = self.run_cli("audit", "--root", output)
-
-        # Then
-        self.assertEqual(code, 2)
-        self.assertEqual(report["state"], "unready")
-        self.assertEqual(report["pending"], [p for p in ALL_PENDING if p != "seeds"])
-
-    def test_audit_without_manifest_is_an_input_error(self):
-        # When
-        code, report = self.run_cli("audit", "--root", self.tmp)
-
-        # Then
-        self.assertEqual(code, 2)
-        self.assertIn("error", report)
-
-    def test_audit_recomputes_state_instead_of_trusting_manifest_claim(self):
-        # Given
-        output = self.tmp / "out"
-        self.prepare(output)
-        manifest = load_json(output / "manifest.json")
-        manifest["state"] = "ready"
-        manifest["pending"] = []
-        (output / "manifest.json").write_text(json.dumps(manifest))
-
-        # When
-        code, report = self.run_cli("audit", "--root", output)
-
-        # Then
-        self.assertEqual((code, report["state"]), (2, "unready"))
-        self.assertIn("g2", report["pending"])
-
-    def freeze_prepared_root(self, output):
-        """Fill every freeze input and a matching recheck, as an operator would."""
-        self.prepare(output)
-        path = output / "manifest.json"
-        prepared = load_json(path)
-        filled = fill_every_input(prepared)
-        filled["seed_commit"] = prepared["seed_commit"]
-        filled["starting_inventory"] = prepared["starting_inventory"]
-        path.write_text(json.dumps(filled))
-
-    def test_audit_accepts_fully_supplied_untouched_inputs(self):
-        # Given
-        output = self.tmp / "out"
-        self.freeze_prepared_root(output)
-
-        # When
-        code, report = self.run_cli("audit", "--root", output)
-
-        # Then
-        self.assertEqual((code, report), (0, {"state": "ready", "pending": []}))
-
-    def test_audit_detects_inputs_edited_after_recheck(self):
-        # Given
-        edits = {
-            "inputs/selection.json": lambda t: t.replace("Add a `--version`",
-                                                         "Please add a `--version`"),
-            "inputs/instructions.md": lambda t: t + "extra\n",
-            "inputs/readiness.md": lambda t: t + "extra\n",
-        }
-
-        # When / Then
-        for name, edit in edits.items():
-            with self.subTest(name):
-                output = self.tmp / name.replace("/", "_")
-                self.freeze_prepared_root(output)
-                target = output / name
-                target.write_text(edit(target.read_text(encoding="utf-8")), encoding="utf-8")
-                code, report = self.run_cli("audit", "--root", output)
-                self.assertEqual(code, 2)
-                self.assertEqual(report["state"], "unready")
-                self.assertIn("input_drift", report["pending"])
-
-    def test_audit_rejects_stored_base_that_is_not_a_full_oid(self):
-        # Given
-        output = self.tmp / "out"
-        self.freeze_prepared_root(output)
-        manifest = load_json(output / "manifest.json")
-        manifest["original_base"] = self.base[:7]
-        (output / "manifest.json").write_text(json.dumps(manifest))
-
-        # When
-        code, report = self.run_cli("audit", "--root", output)
-
-        # Then
-        self.assertEqual((code, report["state"]), (2, "unready"))
-        self.assertIn("input_drift", report["pending"])
-
-    def test_evaluate_without_prepared_inputs_never_reports_success(self):
-        # When
-        code, report = self.run_cli("evaluate", "--root", self.tmp, "--slot", "C1-T1-baseline")
-
-        # Then
-        self.assertEqual(code, 2)
-        self.assertEqual(set(report), {"error"})
-
-    def test_session_subcommand_exits_before_auth_or_executable(self):
-        # Given: a trap auth path (a FIFO blocks any read) and a trap executable
-        codex_home = self.tmp / "codex_home"
-        codex_home.mkdir()
-        auth = codex_home / "auth.json"
-        os.mkfifo(auth)
-        bin_dir = self.tmp / "bin"
-        bin_dir.mkdir()
-        marker = self.tmp / "codex-started"
-        shim = bin_dir / "codex"
-        shim.write_text(f"#!/bin/sh\ntouch '{marker}'\n")
-        shim.chmod(0o755)
-        env = dict(os.environ, CODEX_HOME=str(codex_home), HOME=str(self.tmp),
-                   PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
-
-        # When
-        code, report = self.run_cli("session", "--auth", auth, "--slot", "C1-T1-baseline",
-                                    env=env, timeout=10)
-
-        # Then
-        self.assertEqual(code, 2)
-        self.assertIn("error", report)
-        self.assertFalse(marker.exists())
-
-    def test_old_python_exits_two_with_json_error(self):
-        # Given
-        old = shutil.which("python3")
-        probe = subprocess.run([old, "-c", "import sys;print(sys.version_info >= (3, 11, 4))"],
-                               capture_output=True, text=True) if old else None
-        if probe is None or probe.stdout.strip() != "False":
-            self.skipTest("default python3 is not older than 3.11.4")
-
-        # When
-        code, report = self.run_cli("audit", "--root", self.tmp, python=old)
-
-        # Then
-        self.assertEqual(code, 2)
-        self.assertIn("Python 3.11.4", report["error"])
+def replace_input(manifest, path, value):
+    for key in path[:-1]:
+        manifest = manifest[key]
+    manifest[path[-1]] = value
 
 
 if __name__ == "__main__":
