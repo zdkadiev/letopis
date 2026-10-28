@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TK-30 operator CLI: model-free prepare, audit and private evaluate.
+"""TK-30 operator CLI: model-free prepare, audit, private evaluate, context and preflight.
 
 There is deliberately no session or exec subcommand: this tool never reads credentials,
 starts an agent or contacts a provider.
@@ -19,8 +19,10 @@ import subprocess
 from pathlib import Path
 
 import copies
+import environment
 import evaluation
 import study
+import telemetry
 
 HERE = Path(__file__).resolve().parent
 FINAL_DIR = HERE.parent.parent / "docs/zkit/letopis/pilot/final"
@@ -68,6 +70,15 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--root", type=Path, required=True)
     evaluate.add_argument("--slot", required=True)
     evaluate.set_defaults(handler=run_evaluate)
+    context = commands.add_parser("context", add_help=False)
+    context.add_argument("--source", type=Path, required=True)
+    context.add_argument("--assets", type=Path, required=True)
+    context.add_argument("--output", type=Path, required=True)
+    context.set_defaults(handler=run_context)
+    preflight = commands.add_parser("preflight", add_help=False)
+    preflight.add_argument("--root", type=Path, required=True)
+    preflight.add_argument("--image", required=True)
+    preflight.set_defaults(handler=run_preflight)
     return parser
 
 
@@ -87,7 +98,10 @@ def run_prepare(args: argparse.Namespace) -> int:
         "original_base": args.base, "file_sha256": receipts,
         "seed_commit": seeds["seed_commit"],
         "starting_inventory": seeds["starting_inventory"]})
-    manifest["source_receipts"]["tk17_sources"] = seeds["source_receipts"]
+    manifest["source_receipts"]["tk17_sources"] = {
+        "commit": seeds["source_receipts"]["commit"],
+        "files": {**seeds["source_receipts"]["files"], **environment.TK17_SOURCES,
+                  **telemetry.TK17_SOURCES}}
     write_json(args.output / SEEDS_FILE, seeds)
     write_json(args.output / MANIFEST_FILE, manifest)
     return emit({"state": "unready", "pending": manifest["pending"],
@@ -111,6 +125,21 @@ def run_audit(args: argparse.Namespace) -> int:
 def run_evaluate(args: argparse.Namespace) -> int:
     """Grade one captured slot; exit 0 even when checks fail or the status is infra_error."""
     return emit(evaluation.evaluate(args.root, args.slot), EXIT_OK)
+
+
+def run_context(args: argparse.Namespace) -> int:
+    """Create a build context from supplied pinned assets; exit 2 while any is missing."""
+    result = environment.prepare_context(args.source, args.assets, args.output)
+    return emit(result, EXIT_INVALID if result["pending"] else EXIT_OK)
+
+
+def run_preflight(args: argparse.Namespace) -> int:
+    """Probe an already-local image without a model; exit 2 while anything is pending.
+
+    Model and embedding access always stay pending, so a local smoke never exits 0.
+    """
+    result = environment.preflight(args.root, args.image)
+    return emit(result, EXIT_INVALID if result["pending"] else EXIT_OK)
 
 
 def add_seed_drift(readiness: dict, root: Path, manifest: dict) -> None:

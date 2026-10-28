@@ -425,6 +425,10 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(manifest["original_base"], self.base)
         self.assertEqual(len(manifest["order"]), 18)
         self.assertEqual(manifest["model_executions"], 0)
+        self.assertEqual(
+            manifest["source_receipts"]["tk17_sources"]["files"]
+            ["tests/early_pilot/prepare_image.py"],
+            "da9013ac13542b525c6640b3ded17a9072eb7beebe88e72ec572d49dd6bdc3f7")
 
     def test_prepare_rejects_existing_output_unknown_or_short_base(self):
         # Given
