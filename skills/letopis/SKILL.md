@@ -127,6 +127,10 @@ supports the statement.
 
 ## Configure, observe, and reindex
 
+Interactive commands use an empty request without waiting for stdin. An open pipe
+with no data after 250 ms also supplies an empty request. For commands that need
+fields, pipe a JSON object; once data arrives, it is read until EOF.
+
 `config` observes `.letopis/config.json` without changing it:
 
 ```sh
