@@ -1,4 +1,5 @@
-use super::help::find_help;
+use super::help::{COMMANDS, find_help};
+use super::input::parse_request;
 use super::output::write_text;
 use crate::run_cli;
 use serde_json::Value;
@@ -99,6 +100,78 @@ fn write_text_reports_failure_as_exit_one() {
     assert_eq!(write_text(&mut written, "x"), 0);
     assert_eq!(written, b"x");
     assert_eq!(write_text(FailingWriter, "x"), 1);
+}
+
+#[test]
+fn command_names_match_literal_list() {
+    // Given / When
+    let names = COMMANDS.map(|command| command.name);
+    // Then
+    assert_eq!(names, COMMAND_NAMES);
+}
+
+#[test]
+fn every_command_example_is_a_valid_request() {
+    for command in COMMANDS {
+        // Given
+        let args = [OsString::from(command.name)];
+        // When
+        let request = parse_request(&args, &mut command.example.as_bytes());
+        // Then
+        assert!(request.is_ok(), "{}: {}", command.name, command.example);
+    }
+}
+
+#[test]
+fn every_command_help_shows_its_example_and_usage() {
+    for command in COMMANDS {
+        // Given / When
+        let text = find_help(&to_args(&[command.name, "--help"])).unwrap();
+        // Then
+        assert!(text.contains(command.example), "{}", command.name);
+        assert!(
+            text.contains(&format!("letopis {}", command.name)),
+            "{}",
+            command.name
+        );
+    }
+}
+
+#[test]
+fn general_help_covers_contract() {
+    // Given / When
+    let text = find_help(&to_args(&["--help"])).unwrap();
+    // Then
+    for needle in COMMAND_NAMES.into_iter().chain([
+        "invalid_request",
+        "not_found",
+        "validation_failed",
+        "embedding_failed",
+        "internal_error",
+        "cancelled",
+        "stdin",
+        "\"ok\":true",
+        "warnings",
+    ]) {
+        assert!(text.contains(needle), "{needle}");
+    }
+    assert!(!text.contains("--drain"));
+    assert!(!text.contains("config"));
+}
+
+#[test]
+fn help_lines_fit_eighty_columns_except_copyable_examples() {
+    for command in COMMANDS {
+        // Given
+        let general = find_help(&to_args(&["--help"])).unwrap();
+        let specific = find_help(&to_args(&[command.name, "--help"])).unwrap();
+        // When / Then
+        // Example lines stay on one line so they can be pasted into a shell.
+        for line in general.lines().chain(specific.lines()) {
+            let is_example = line.contains("printf ");
+            assert!(is_example || line.chars().count() <= 80, "{line}");
+        }
+    }
 }
 
 fn to_args(args: &[&str]) -> Vec<OsString> {
