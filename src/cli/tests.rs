@@ -199,42 +199,26 @@ mod input_tests {
 
 #[cfg(test)]
 mod transport_tests {
-    use crate::cli::commands::{
-        CommandResponse, execute_check, execute_drain, execute_inspect, execute_status,
-    };
-    use crate::cli::input::{Request, parse_request};
     use crate::cli::output::write_response;
+    use crate::cli::response::{CommandResponse, ResponseResult, finish_foreground};
     use crate::domain::{LineRange, RepoPath, Sha256, TreeOid};
     use crate::run_cli;
     use crate::service::{
-        CheckReport, CommandError, CommandErrorKind, CommandProblem, CommandResult, ElementAddress,
-        ElementLocation, InspectedElement, Inspection, MockBackgroundRunner, MockChecker,
-        MockInspector, MockStatusReader, StatusReport,
+        CheckReport, CommandError, CommandErrorKind, CommandProblem, CommandResult,
+        ElementLocation, InspectedElement, Inspection, MockBackgroundRunner, StatusReport,
     };
     use serde_json::{Value, json};
     use std::collections::BTreeMap;
     use std::io::{self, Write};
 
     #[test]
-    fn check_dispatches_once_and_findings_remain_successful() {
-        // Given
-        let args = ["check".into()];
-        let Request::Check(paths) = parse_request(
-            &args,
-            &mut br#"{"paths":["./a.md","b/../a.md","B.md"]}"#.as_slice(),
-        )
-        .unwrap() else {
-            panic!("expected a check request");
-        };
-        let mut checks = build_checks(vec![
-            RepoPath::parse("B.md").unwrap(),
-            RepoPath::parse("a.md").unwrap(),
-        ]);
+    fn check_findings_remain_successful() {
+        // Given: a check report with one finding and a quiet background runner.
+        let result = ResponseResult::Check(build_report());
         let mut background = build_background(1, 0);
-        // When
-        let response = execute_check(&mut checks, &paths, &mut background);
-        let (exit, value) = render(response);
-        // Then
+        // When: the foreground command finishes.
+        let (exit, value) = render(finish_foreground(result, &mut background));
+        // Then: the finding is part of a successful envelope.
         assert_eq!(exit, 0);
         assert_eq!(
             value,
@@ -242,23 +226,18 @@ mod transport_tests {
         );
     }
     #[test]
-    fn status_renders_all_fields_without_background_work() {
-        // Given
-        let mut status = MockStatusReader::new();
-        status.expect_read_status().times(1).returning(|| {
-            Ok(StatusReport {
-                revision: Some(7),
-                embedding_backlog: 2,
-                embedding_failed: 1,
-                locks: Vec::new(),
-                problems: vec![make_problem()],
-            })
-        });
-
-        // When
-        let response = execute_status(&mut status);
-
-        // Then
+    fn status_renders_all_fields() {
+        // Given: a status report with every field set.
+        let report = StatusReport {
+            revision: Some(7),
+            embedding_backlog: 2,
+            embedding_failed: 1,
+            locks: Vec::new(),
+            problems: vec![make_problem()],
+        };
+        // When: the response is rendered.
+        let response = Ok(CommandResponse::new(ResponseResult::Status(report)));
+        // Then: all fields are present and no background work is implied.
         assert_eq!(
             render(response),
             (
@@ -271,41 +250,32 @@ mod transport_tests {
         );
     }
     #[test]
-    fn status_failure_renders_one_safe_error_without_background_work() {
-        // Given
-        let mut status = MockStatusReader::new();
-        status.expect_read_status().times(1).returning(|| {
-            Err(CommandError::new_with_cause(
-                CommandErrorKind::InternalError,
-                "safe status failure",
-                io::Error::other("SECRET_STATUS"),
-            ))
-        });
-
-        // When
-        let response = execute_status(&mut status);
-
-        // Then
+    fn failure_renders_one_safe_error_without_cause() {
+        // Given: an error whose cause holds a secret.
+        let error = CommandError::new_with_cause(
+            CommandErrorKind::InternalError,
+            "safe status failure",
+            io::Error::other("SECRET_STATUS"),
+        );
+        // When: the failure is rendered.
+        let (exit, value) = render(Err(error));
+        // Then: only the safe message is disclosed.
+        assert_eq!(exit, 1);
         assert_eq!(
-            render(response),
-            (
-                1,
-                json!({"ok":false,"error":{
-                    "code":"internal_error","message":"safe status failure","details":{}
-                }})
-            )
+            value,
+            json!({"ok":false,"error":{
+                "code":"internal_error","message":"safe status failure","details":{}
+            }})
         );
     }
     #[test]
     fn inspection_renders_only_metadata_and_optional_lines() {
-        // Given
-        let mut inspections = build_inspection();
-        let ids = vec![ElementAddress::parse("x.md").unwrap()];
+        // Given: an inspection and a background runner that reports a launch warning.
+        let result = ResponseResult::Inspect(build_inspection());
         let mut background = build_warning_background();
-        // When
-        let response = execute_inspect(&mut inspections, &ids, &mut background);
-        let (exit, value) = render(response);
-        // Then
+        // When: the foreground command finishes.
+        let (exit, value) = render(finish_foreground(result, &mut background));
+        // Then: only metadata is rendered, with the warning attached.
         assert_eq!(exit, 0);
         assert_eq!(value["result"]["snapshot"], "a".repeat(40));
         assert_eq!(
@@ -320,49 +290,13 @@ mod transport_tests {
         assert!(!value.to_string().contains("private raw knowledge"));
     }
     #[test]
-    fn drain_delegates_once_without_recursion() {
-        // Given
-        let mut background = build_background(0, 1);
-        // When
-        let response = execute_drain(&mut background);
-        // Then
-        assert_eq!(render(response), (0, json!({"ok":true,"result":{}})));
-    }
-    #[test]
-    fn failed_service_does_not_start_background_or_disclose_cause() {
-        // Given
-        let mut checks = MockChecker::new();
-        checks
-            .expect_check()
-            .times(1)
-            .withf(<[RepoPath]>::is_empty)
-            .returning(|_| {
-                Err(CommandError::new_with_cause(
-                    CommandErrorKind::ValidationFailed,
-                    "safe failure",
-                    io::Error::other("SECRET_SENTINEL"),
-                ))
-            });
-        let mut background = build_background(0, 0);
-        // When
-        let response = execute_check(&mut checks, &[], &mut background);
-        // Then
-        assert_eq!(
-            render(response),
-            (
-                1,
-                json!({"ok":false,"error":{"code":"validation_failed","message":"safe failure","details":{}}})
-            )
-        );
-    }
-    #[test]
     fn background_readiness_error_remains_failure() {
-        // Given
-        let mut checks = build_checks(vec![]);
+        // Given: a successful check result and a background runner that cannot get ready.
+        let result = ResponseResult::Check(build_report());
         let mut background = build_failing_background();
-        // When
-        let error = execute_check(&mut checks, &[], &mut background).unwrap_err();
-        // Then
+        // When: the foreground command finishes.
+        let error = finish_foreground(result, &mut background).unwrap_err();
+        // Then: the readiness failure replaces the success.
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     }
     #[test]
@@ -461,9 +395,7 @@ mod transport_tests {
     #[test]
     fn success_writes_one_complete_envelope_and_flushes_once() {
         // Given
-        let mut background = build_background(0, 1);
-        // When
-        let response = execute_drain(&mut background);
+        let response = Ok(CommandResponse::new(ResponseResult::Drained));
         // Given
         let mut writer = FailingWriter {
             remaining: usize::MAX,
@@ -481,10 +413,10 @@ mod transport_tests {
     #[test]
     fn check_without_background_warning_omits_warnings_field() {
         // Given
-        let mut checks = build_checks(vec![]);
+        let result = ResponseResult::Check(build_report());
         let mut background = build_background(1, 0);
         // When
-        let (exit, value) = render(execute_check(&mut checks, &[], &mut background));
+        let (exit, value) = render(finish_foreground(result, &mut background));
         // Then
         assert_eq!(exit, 0);
         assert!(value.get("warnings").is_none());
@@ -508,49 +440,33 @@ mod transport_tests {
             assert_eq!(output.iter().filter(|byte| **byte == b'\n').count(), 1);
         }
     }
-    fn build_checks(paths: Vec<RepoPath>) -> MockChecker {
-        let mut checks = MockChecker::new();
-        checks
-            .expect_check()
-            .times(1)
-            .withf(move |actual| actual == paths)
-            .returning(|_| {
-                Ok(CheckReport {
-                    errors: vec![make_problem()],
-                })
-            });
-        checks
+    fn build_report() -> CheckReport {
+        CheckReport {
+            errors: vec![make_problem()],
+        }
     }
-    fn build_inspection() -> MockInspector {
-        let mut inspections = MockInspector::new();
-        inspections
-            .expect_inspect()
-            .times(1)
-            .withf(|ids| ids == [ElementAddress::parse("x.md").unwrap()])
-            .returning(|_| {
-                Ok(Inspection {
-                    snapshot: TreeOid::parse(&"a".repeat(40)).unwrap(),
-                    elements: BTreeMap::from([
-                        (
-                            "a.md".into(),
-                            InspectedElement {
-                                path: ElementLocation::Local(RepoPath::parse("a.md").unwrap()),
-                                lines: None,
-                                hash: Some(Sha256::digest(b"private raw knowledge")),
-                            },
-                        ),
-                        (
-                            "source#L1-L2".into(),
-                            InspectedElement {
-                                path: ElementLocation::Local(RepoPath::parse("source").unwrap()),
-                                lines: Some(LineRange::new(1, 2).unwrap()),
-                                hash: None,
-                            },
-                        ),
-                    ]),
-                })
-            });
-        inspections
+    fn build_inspection() -> Inspection {
+        Inspection {
+            snapshot: TreeOid::parse(&"a".repeat(40)).unwrap(),
+            elements: BTreeMap::from([
+                (
+                    "a.md".into(),
+                    InspectedElement {
+                        path: ElementLocation::Local(RepoPath::parse("a.md").unwrap()),
+                        lines: None,
+                        hash: Some(Sha256::digest(b"private raw knowledge")),
+                    },
+                ),
+                (
+                    "source#L1-L2".into(),
+                    InspectedElement {
+                        path: ElementLocation::Local(RepoPath::parse("source").unwrap()),
+                        lines: Some(LineRange::new(1, 2).unwrap()),
+                        hash: None,
+                    },
+                ),
+            ]),
+        }
     }
     fn build_background(starts: usize, drains: usize) -> MockBackgroundRunner {
         let mut background = MockBackgroundRunner::new();

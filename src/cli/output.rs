@@ -1,4 +1,4 @@
-use super::commands::{CommandResponse, ResponseResult};
+use super::response::{CommandResponse, ResponseResult};
 use crate::domain::{Edge, Sha256};
 use crate::service::{
     CommandError, CommandErrorKind, CommandProblem, HeldLock, InspectedElement, LockName,

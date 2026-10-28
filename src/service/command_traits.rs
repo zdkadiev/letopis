@@ -11,7 +11,6 @@ use crate::domain::RepoPath;
 /// after full graph validation; they never restrict refresh or graph membership.
 /// Source bases and bindings come from that view; live byte observations are read-only.
 /// Missing sources or bases produce findings without removing knowledge.
-#[cfg_attr(test, mockall::automock)]
 pub trait Checker {
     /// Validate the given paths, or the whole corpus when empty.
     ///
@@ -21,7 +20,6 @@ pub trait Checker {
     fn check(&mut self, paths: &[RepoPath]) -> CommandResult<CheckReport>;
 }
 /// Read the latest published diagnostics without refreshing or mutating state.
-#[cfg_attr(test, mockall::automock)]
 pub trait StatusReader {
     /// Observe one pinned database view, current configuration and busy locks.
     ///
@@ -30,7 +28,6 @@ pub trait StatusReader {
     fn read_status(&mut self) -> CommandResult<StatusReport>;
 }
 /// Consistent metadata-only hybrid knowledge search.
-#[cfg_attr(test, mockall::automock)]
 pub trait Searcher {
     /// Refresh and search one pinned revision, observing live knowledge and source freshness.
     ///
@@ -48,7 +45,6 @@ pub trait Searcher {
 /// with absent files or incomplete ranges have no hash; opaque URLs are never fetched.
 /// Unknown or removed knowledge/source declarations fail the entire batch.
 /// The final tree is retained before success; working files, Git index and HEAD stay intact.
-#[cfg_attr(test, mockall::automock)]
 pub trait Inspector {
     /// Inspect normalized addresses in one snapshot.
     ///
@@ -119,7 +115,6 @@ pub trait BackgroundRunner {
 ///
 /// Implementations refresh, synchronize embedding readiness before pinning one read
 /// view, and build selected links without inference or fetching remote sources.
-#[cfg_attr(test, mockall::automock)]
 pub trait Traverser {
     /// Traverse and observe selected elements from one pinned publication revision.
     ///

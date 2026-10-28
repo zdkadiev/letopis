@@ -57,13 +57,11 @@ pub use command::{
     CheckReport, CommandError, CommandErrorKind, CommandProblem, CommandResult, ElementAddress,
     InspectedElement, Inspection, SearchFlag, SearchLink, SearchRequest,
 };
+#[cfg(test)]
+pub(crate) use command_traits::MockBackgroundRunner;
 pub use command_traits::{
     BackgroundRunner, Checker, DrainLauncher, EmbedLocker, EmbeddingExecutor, Inspector, Searcher,
     StatusReader, Traverser,
-};
-#[cfg(test)]
-pub(crate) use command_traits::{
-    MockBackgroundRunner, MockChecker, MockInspector, MockSearcher, MockStatusReader, MockTraverser,
 };
 pub use document_traits::{CorpusLister, FileSystem, MarkdownCodec, Refresher};
 #[cfg(test)]

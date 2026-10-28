@@ -1,13 +1,12 @@
 //! Strict traversal transport; graph semantics are exercised through the real binary.
-use super::{Request, execute_traverse, parse_request, write_response};
+use super::{Request, ResponseResult, finish_foreground, parse_request, write_response};
 use crate::domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, SourceUri};
 use crate::service::{
-    CommandError, CommandErrorKind, CommandProblem, CommandResult, ElementAddress, ElementLocation,
-    MockBackgroundRunner, MockTraverser, Traversal, TraversalDirection, TraversalLink,
-    TraversalMode, TraversalRequest,
+    CommandErrorKind, CommandProblem, CommandResult, ElementAddress, ElementLocation,
+    MockBackgroundRunner, Traversal, TraversalDirection, TraversalLink, TraversalMode,
 };
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, io};
+use std::collections::BTreeSet;
 
 #[test]
 fn accepts_required_traversal_fields_and_maximum_depth() {
@@ -206,8 +205,8 @@ fn rejects_malformed_identities_without_source_fallback() {
 #[test]
 fn serializes_remote_source_links_without_lines() {
     // Given
-    let response = Ok(super::commands::CommandResponse {
-        result: super::commands::ResponseResult::Traverse(Traversal {
+    let response = Ok(super::response::CommandResponse {
+        result: super::response::ResponseResult::Traverse(Traversal {
             elements: vec![TraversalLink {
                 element_id: ElementAddress::parse("https://Host/a?q=1#part").unwrap(),
                 path: ElementLocation::Remote(SourceUri::parse("https://Host/a?q=1#part").unwrap()),
@@ -253,8 +252,8 @@ fn serializes_requested_empty_and_original_incoming_edges() {
         ),
     ] {
         // Given
-        let response = Ok(super::commands::CommandResponse {
-            result: super::commands::ResponseResult::Traverse(Traversal {
+        let response = Ok(super::response::CommandResponse {
+            result: super::response::ResponseResult::Traverse(Traversal {
                 elements: vec![],
                 edges,
             }),
@@ -266,38 +265,24 @@ fn serializes_requested_empty_and_original_incoming_edges() {
 }
 
 #[test]
-fn dispatches_once_before_background_and_preserves_nonfatal_warning() {
-    // Given
-    let mut sequence = mockall::Sequence::new();
-    let mut traversals = MockTraverser::new();
-    traversals
-        .expect_traverse()
-        .times(1)
-        .in_sequence(&mut sequence)
-        .withf(matches_request)
-        .returning(|_| {
-            Ok(Traversal {
-                elements: vec![],
-                edges: None,
-            })
-        });
+fn traversal_response_preserves_nonfatal_warning() {
+    // Given: an empty traversal and a background runner that cannot launch the drain.
     let mut background = MockBackgroundRunner::new();
-    background
-        .expect_start_if_needed()
-        .times(1)
-        .in_sequence(&mut sequence)
-        .returning(|| {
-            Ok(Some(CommandProblem {
-                code: CommandErrorKind::InternalError,
-                message: "cannot start background embedding drain",
-                details: Default::default(),
-            }))
-        });
+    background.expect_start_if_needed().times(1).returning(|| {
+        Ok(Some(CommandProblem {
+            code: CommandErrorKind::InternalError,
+            message: "cannot start background embedding drain",
+            details: Default::default(),
+        }))
+    });
     background.expect_drain().times(0);
-    let request = parse_traversal(&build_input().to_string());
-    // When
-    let response = execute_traverse(&mut traversals, &request, &mut background);
-    // Then
+    let result = ResponseResult::Traverse(Traversal {
+        elements: vec![],
+        edges: None,
+    });
+    // When: the foreground command finishes.
+    let response = finish_foreground(result, &mut background);
+    // Then: the result is still successful and carries the warning.
     assert_eq!(
         render(response),
         (
@@ -308,54 +293,7 @@ fn dispatches_once_before_background_and_preserves_nonfatal_warning() {
     );
 }
 
-#[test]
-fn propagates_safe_failure_without_background_or_partial_result() {
-    // Given
-    let mut traversals = MockTraverser::new();
-    traversals
-        .expect_traverse()
-        .times(1)
-        .withf(matches_request)
-        .returning(|_| {
-            Err(CommandError::new_with_cause(
-                CommandErrorKind::NotFound,
-                "unknown traversal start",
-                io::Error::other("PRIVATE_CAUSE"),
-            ))
-        });
-    let mut background = MockBackgroundRunner::new();
-    background.expect_start_if_needed().times(0);
-    background.expect_drain().times(0);
-    // When
-    let request = parse_traversal(&build_input().to_string());
-    let response = execute_traverse(&mut traversals, &request, &mut background);
-    // Then
-    assert_eq!(
-        render(response),
-        (
-            1,
-            json!({"ok":false,"error":{
-        "code":"not_found","message":"unknown traversal start","details":{}}})
-        )
-    );
-}
-
-fn matches_request(request: &TraversalRequest) -> bool {
-    request
-        .element_ids
-        .iter()
-        .map(ElementAddress::as_str)
-        .collect::<Vec<_>>()
-        == ["a.md"]
-        && (
-            request.mode,
-            request.direction,
-            request.depth,
-            request.limit.get(),
-        ) == (TraversalMode::Both, TraversalDirection::Outgoing, 1, 3)
-}
-
-fn render(response: CommandResult<super::commands::CommandResponse>) -> (u8, Value) {
+fn render(response: CommandResult<super::response::CommandResponse>) -> (u8, Value) {
     let mut bytes = vec![];
     let exit = write_response(&mut bytes, response);
     assert_eq!(bytes.iter().filter(|byte| **byte == b'\n').count(), 1);
@@ -371,12 +309,6 @@ fn assert_invalid(body: &str) {
         CommandErrorKind::InvalidRequest,
         "{body}"
     );
-}
-fn parse_traversal(body: &str) -> TraversalRequest {
-    let Request::Traverse(request) = parse(body).unwrap() else {
-        panic!("expected a traverse request");
-    };
-    request
 }
 fn parse(body: &str) -> CommandResult<Request> {
     parse_request(&["traverse".into()], body.as_bytes())

@@ -1,7 +1,7 @@
-use super::commands::{CommandResponse, execute_help};
 use super::help::{COMMANDS, find_help};
 use super::input::{Request, parse_request};
 use super::output::write_response;
+use super::response::{CommandResponse, ResponseResult};
 use crate::run_cli;
 use crate::service::CommandResult;
 use serde_json::Value;
@@ -107,7 +107,9 @@ fn parse_request_returns_help_without_reading_stdin() {
 #[test]
 fn write_response_prints_help_as_plain_text_and_reports_write_failure() {
     // Given: a help response for a text with no JSON envelope.
-    let help = || -> CommandResult<CommandResponse> { Ok(execute_help("x".into())) };
+    let help = || -> CommandResult<CommandResponse> {
+        Ok(CommandResponse::new(ResponseResult::Help("x".into())))
+    };
     let mut written = vec![];
     // When / Then: it is written verbatim with exit 0.
     assert_eq!(write_response(&mut written, help()), 0);

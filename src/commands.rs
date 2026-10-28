@@ -1,15 +1,13 @@
 //! Command wiring: builds the services each command needs and runs it.
 
-use crate::cli::{
-    CommandResponse, Request, execute_check, execute_drain, execute_help, execute_inspect,
-    execute_reindex, execute_search, execute_status, execute_traverse,
-};
+use crate::cli::{CommandResponse, Request, ResponseResult, finish_foreground};
 use crate::domain::RepoPath;
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
 use crate::service::{
-    CommandError, CommandErrorKind, CommandResult, DocumentError, ElementAddress,
-    GraphDiagnosticsService, ProvenanceService, SearchRequest, StatusService, TraversalRequest,
+    BackgroundRunner, Checker, CommandError, CommandErrorKind, CommandResult, DocumentError,
+    DocumentErrorKind, ElementAddress, GraphDiagnosticsService, Inspector, ProvenanceService,
+    Refresher, SearchRequest, Searcher, StatusReader, StatusService, TraversalRequest, Traverser,
 };
 use crate::storage::SqliteStatusStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -27,7 +25,7 @@ pub(crate) fn run_request(request: Request) -> CommandResult<CommandResponse> {
     // A failed lookup only fails the commands that need the environment, so help works anywhere.
     let environment = locate_environment();
     match request {
-        Request::Help(text) => Ok(execute_help(text)),
+        Request::Help(text) => Ok(CommandResponse::new(ResponseResult::Help(text))),
         Request::Status => environment.and_then(|(directory, _)| run_status(&directory)),
         Request::Reindex => {
             environment.and_then(|(directory, executable)| run_reindex(&directory, &executable))
@@ -51,7 +49,8 @@ fn run_reindex(directory: &Path, executable: &Path) -> CommandResult<CommandResp
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut documents = wire_document_refresher(&root).map_err(map_reindex_setup)?;
-    execute_reindex(&mut documents, &mut background)
+    let outcome = documents.reindex().map_err(map_reindex_error)?;
+    finish_foreground(ResponseResult::Reindex(outcome.revision), &mut background)
 }
 
 fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
@@ -80,7 +79,8 @@ fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
         provenance: &provenance,
         provider: &provider,
     };
-    execute_status(&mut status)
+    let report = status.read_status()?;
+    Ok(CommandResponse::new(ResponseResult::Status(report)))
 }
 
 fn locate_environment() -> CommandResult<(PathBuf, PathBuf)> {
@@ -104,7 +104,8 @@ fn locate_environment() -> CommandResult<(PathBuf, PathBuf)> {
 fn run_drain(root: &Path, executable: &Path) -> CommandResult<CommandResponse> {
     let mut tasks = wire_embedding_executor(root)?;
     let mut background = wire_background_runner(root, executable, Some(&mut tasks))?;
-    execute_drain(&mut background)
+    background.drain()?;
+    Ok(CommandResponse::new(ResponseResult::Drained))
 }
 
 fn run_check(
@@ -116,7 +117,8 @@ fn run_check(
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut checks = wire_checker(&root)?;
-    execute_check(&mut checks, paths, &mut background)
+    let report = checks.check(paths)?;
+    finish_foreground(ResponseResult::Check(report), &mut background)
 }
 
 fn run_search(
@@ -128,7 +130,8 @@ fn run_search(
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut searches = wire_searcher(&root)?;
-    execute_search(&mut searches, request, &mut background)
+    let links = searches.search(request)?;
+    finish_foreground(ResponseResult::Search(links), &mut background)
 }
 
 fn run_traverse(
@@ -140,7 +143,8 @@ fn run_traverse(
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut traversals = wire_traverser(&root)?;
-    execute_traverse(&mut traversals, request, &mut background)
+    let traversal = traversals.traverse(request)?;
+    finish_foreground(ResponseResult::Traverse(traversal), &mut background)
 }
 
 fn run_inspect(
@@ -152,7 +156,8 @@ fn run_inspect(
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut inspections = wire_inspector(&root)?;
-    execute_inspect(&mut inspections, ids, &mut background)
+    let inspection = inspections.inspect(ids)?;
+    finish_foreground(ResponseResult::Inspect(inspection), &mut background)
 }
 
 /// Foreground services and background exclusion must share the discovered repository root.
@@ -175,4 +180,12 @@ fn map_status_setup(error: impl std::error::Error + Send + Sync + 'static) -> Co
         "cannot open status service",
         error,
     )
+}
+
+fn map_reindex_error(cause: DocumentError) -> CommandError {
+    let kind = match cause.get_kind() {
+        DocumentErrorKind::InvalidRequest => CommandErrorKind::InvalidRequest,
+        DocumentErrorKind::InternalError => CommandErrorKind::InternalError,
+    };
+    CommandError::new_with_cause(kind, "cannot rebuild corpus index", cause)
 }
