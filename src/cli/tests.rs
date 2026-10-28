@@ -13,6 +13,24 @@ mod input_tests {
     }
 
     #[test]
+    fn empty_input_uses_empty_request_and_checks_required_fields() {
+        // Given: commands with optional and required request fields.
+        for body in ["", " \n\t"] {
+            // When / Then: absent input behaves as an empty JSON object.
+            assert!(matches!(parse(&["config"], body), Ok(Request::Config)));
+            assert!(matches!(parse(&["status"], body), Ok(Request::Status)));
+            assert!(matches!(parse(&["check"], body), Ok(Request::Check(_))));
+            assert!(matches!(parse(&["reindex"], body), Ok(Request::Reindex)));
+            for command in ["search", "inspect", "traverse"] {
+                assert_eq!(
+                    parse(&[command], body).unwrap_err().get_kind(),
+                    CommandErrorKind::InvalidRequest
+                );
+            }
+        }
+    }
+
+    #[test]
     fn parse_check_requires_object_and_rejects_unknown_or_duplicate_fields() {
         // Given
         for body in ["{}", r#"{"paths":[]}"#] {
@@ -23,7 +41,6 @@ mod input_tests {
         }
         // Given
         for body in [
-            "",
             "null",
             "[]",
             r#"{"paths":[],"paths":[]}"#,
@@ -49,7 +66,6 @@ mod input_tests {
         assert!(matches!(parse(&["status"], "{}"), Ok(Request::Status)));
         // Given
         for body in [
-            "",
             "null",
             "[]",
             r#"{"extra":1}"#,

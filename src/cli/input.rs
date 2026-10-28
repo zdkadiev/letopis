@@ -243,6 +243,12 @@ fn read_object<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
             cause,
         )
     })?;
+    if bytes
+        .iter()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+    {
+        bytes = b"{}".to_vec();
+    }
     if bytes.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'{') {
         return Err(fail_invalid_request());
     }

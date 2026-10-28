@@ -18,7 +18,7 @@ use crate::embedding::{HttpProviders, Ollama, Openai};
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
 use crate::markdown::MarkdownParser;
-use crate::process::{DetachedProcess, SigintListener};
+use crate::process::{DetachedProcess, ProcessInput, SigintListener};
 use crate::service::{
     BackgroundRunner, BackgroundService, CheckService, Checker, CommandError, CommandErrorKind,
     CommandResult, DocumentError, DocumentErrorKind, DocumentRefreshService, DocumentResult,
@@ -75,13 +75,16 @@ pub fn run_cli(
 ///
 /// Registers one listener for the exact `search`, `traverse`, `inspect`, `check`
 /// and `reindex` argv shapes before stdin or services are used. Other commands
-/// keep their default signal behavior. A handled SIGINT writes one cancellation
+/// keep their default signal behavior. Terminal stdin and a pipe that sends no
+/// bytes within 250 ms are treated as empty requests; after the first byte,
+/// non-terminal input is read to EOF. A handled SIGINT writes one cancellation
 /// envelope through the shared response owner and exits 1; normal output retains
 /// its own exit code.
 pub fn run_process_cli() -> u8 {
     let args = env::args_os().skip(1).collect::<Vec<_>>();
     let mut output = io::stdout();
-    run_process_cli_with(&args, io::stdin(), &mut output, SigintListener::install)
+    let input = ProcessInput::new(io::stdin());
+    run_process_cli_with(&args, input, &mut output, SigintListener::install)
 }
 
 /// Construct current diagnostics without opening storage or performing I/O.

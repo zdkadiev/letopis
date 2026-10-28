@@ -22,7 +22,6 @@ fn rejects_nonempty_config_request_before_io() {
 
     // Given
     for body in [
-        "",
         "null",
         "[]",
         r#"{"provider":"ollama"}"#,

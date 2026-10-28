@@ -18,7 +18,6 @@ fn malformed_requests_fail_before_service_directory_creation() {
     for (args, input) in [
         (vec!["unknown"], "{}"),
         (vec!["check", "extra"], "{}"),
-        (vec!["check"], ""),
         (vec!["check"], "{\"paths\":null}"),
         (vec!["check"], "{\"extra\":1}"),
         (vec!["inspect"], "{}"),

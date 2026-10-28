@@ -11,9 +11,29 @@ use std::{
     os::unix::ffi::OsStringExt,
 };
 
-const COMMAND_NAMES: [&str; 6] = [
-    "check", "inspect", "search", "traverse", "reindex", "status",
+const COMMAND_NAMES: [&str; 7] = [
+    "check", "inspect", "search", "traverse", "reindex", "status", "config",
 ];
+
+#[test]
+fn config_is_discoverable_and_describes_read_only_configuration() {
+    // Given: the general and config-specific help requests.
+    let general_args = to_args(&["--help"]);
+    let config_args = to_args(&["config", "--help"]);
+    // When: help is requested without a repository or input.
+    let general = find_help(&general_args).unwrap();
+    let config = find_help(&config_args);
+    // Then: both describe the command and its configuration file.
+    assert!(
+        general
+            .lines()
+            .any(|line| line.trim_start().starts_with("config "))
+    );
+    let config = config.unwrap();
+    assert!(config.contains(".letopis/config.json"));
+    assert!(config.contains("null"));
+    assert!(config.contains("edit"));
+}
 
 #[test]
 fn find_help_recognizes_flags_and_every_command() {
@@ -172,7 +192,6 @@ fn general_help_covers_contract() {
         assert!(text.contains(needle), "{needle}");
     }
     assert!(!text.contains("--drain"));
-    assert!(!text.contains("config"));
 }
 
 #[test]

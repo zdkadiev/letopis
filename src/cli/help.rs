@@ -14,7 +14,7 @@ pub(super) struct CommandHelp {
 }
 
 /// Public commands in display order; `embed --drain` is internal and absent.
-pub(super) const COMMANDS: [CommandHelp; 6] = [
+pub(super) const COMMANDS: [CommandHelp; 7] = [
     CommandHelp {
         name: "check",
         summary: "validate the Markdown corpus",
@@ -49,6 +49,12 @@ pub(super) const COMMANDS: [CommandHelp; 6] = [
         name: "status",
         summary: "show the current index state",
         details: STATUS_DETAILS,
+        example: "{}",
+    },
+    CommandHelp {
+        name: "config",
+        summary: "show the current embedding configuration",
+        details: CONFIG_DETAILS,
         example: "{}",
     },
 ];
@@ -119,9 +125,19 @@ Result:
   Read-only: does not refresh or rebuild the index.
 "#;
 
+const CONFIG_DETAILS: &str = r#"Input (JSON object): {} (no fields)
+
+Result: configuration object, or null when no configuration exists.
+  Reads .letopis/config.json without changing it. To configure embeddings,
+  edit the file directly; there is no config setter command.
+"#;
+
 const CONTRACT: &str = r#"
 Input and output:
-  Input is one JSON object on stdin; send {} when a command has no fields.
+  Input is one JSON object on stdin. A terminal means {}.
+  A pipe that sends no data within 250 ms also means {}.
+  Once data arrives, the command reads through EOF; empty input means {}.
+  To supply fields, pipe a JSON object into the command.
   Unknown fields are rejected. Run inside a Git repository.
   Output is one JSON line on stdout:
     {"ok":true,"result":...}   (may also carry a "warnings" array)
