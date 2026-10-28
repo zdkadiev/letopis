@@ -65,6 +65,49 @@
 
 ## 9. Отчёт о выполнении
 
-Задача ещё не выполнялась. Критерии не отмечены; evidence отсутствует.
+**Статус: подготовка выполнена частично, задача не done.** Статус карточки остаётся
+`planned`: критерии раздела 5 не отмечены, потому что финальные inputs и реальный
+доступ ещё не существуют. Состояние подготовки — `unready`
+(`run.py audit` → exit 2); `model_executions=0`, платных сессий, чтения credentials и
+`codex exec` не было. Девять заданий не реализованы.
 
-После выполнения заполнить здесь: фактический результат и изменённые файлы; выполненные проверки с исходами; ссылки на evidence; оставшиеся блокеры/отклонения. `done` допустим только при выполненных критериях. При препятствии поставить `blocked` и указать причину, следующий шаг и затронутые зависимости.
+Сделано на ветке `tk-30` (operator-only, без изменений `src/`, Cargo, schema, skill и
+P-1): prospective [selection, instructions и readiness](../../../../pilot/final/readiness.md),
+[operator tooling](../../../../../../../tests/final_pilot/README.md) (парные seeds,
+одноразовая оценка, 9 private oracles, credential-free preflight, telemetry/templates).
+Проверки и evidence — [отчёт TK-30](../../../../checks/TK-30/report.md) и
+[receipt](../../../../checks/TK-30/verification.json): на `74e0f82` 142 focused tests (2 opt-in
+Docker skip; на `4c308cd` оба запущены отдельно на уже локальном image: boundary proof PASS,
+а preflight-тест прошёл, подтвердив unready), P-1 31 tests, свежий
+`prepare` от `d260348` и `audit` unready, seed RED каждой из девяти задач на
+неизменной base.
+
+Явные блокеры до TK-31 (владелец → шаг):
+
+- финальная post-TK-29 base (после TK-29) → повторить `prepare`/`audit`/base-drift
+  recheck и подтвердить, что все девять задач на ней ещё не решены;
+- G-2/TK-29 evidence → `g2` (сейчас без evidence);
+- prompt wording freeze (человек) → `prompt_freeze`;
+- pinned assets (Codex archives) и digest финального image с бинарником `letopis`
+  (оператор) → `assets`, `preflight:tools/memory/image_digest`;
+- model/revision/budget/agent config (оператор) → `model`, `agent_config`;
+- embedding config/профиль и версии memory binary/skill → `embedding`, `memory_versions`;
+- реальный доступ к модели/embeddings и полный usage telemetry, включая проверку
+  атрибута корреляции (`request.id` — допущение) на настоящем capture Codex 0.164.0
+  → отдельно разрешённый запуск TK-31;
+- изоляция участника и разделение Git/target → команда запуска участника (TK-31).
+
+Найденный в Task 5 дефект оператора (`evaluate` с относительным `--root` давал ложный
+`infra_error` `participant_build` из-за относительного `CARGO_TARGET_DIR`) исправлен
+commit `74e0f82`: тесты `test_relative_root_reaches_the_oracle_as_absolute_paths`,
+`test_cli_path_arguments_are_absolute` и повторный `evaluate` C1-T1 с относительным
+root (`assessed`, `infra_cause=null`) — см. отчёт и receipt.
+
+Отклонение: при разработке Task 4 на хосте однажды выполнен `codex --version` вне
+preflight (auth не читался, модель не вызывалась). Merge, push и закрытие issues не
+выполнялись.
+
+Независимая [проверка реализации 2026-10-28](../../../../checks/TK-30/review-2026-10-28.md)
+исправила binding финальной base, telemetry, lifecycle/annotation integrity и
+пропуски oracle; итог — 168 model-free tests (3 skips; Docker proofs запущены
+отдельно) и 31 P-1 test. Это не снимает перечисленные выше freeze/gate блокеры.

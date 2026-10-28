@@ -1,0 +1,539 @@
+{
+  "task": "TK-30",
+  "status": "preparation_unready",
+  "formal_done": false,
+  "model_executions": 0,
+  "date": "2026-10-28",
+  "operator_source_commit": "73311873254c3399a2fc133d9d45064a2807c7c6",
+  "preparation_base": "d260348619c6f4f623f24b907ca5bf41fb14eba9",
+  "preparation_base_is_final_post_tk29": false,
+  "platform": {
+    "os": "macOS 26.6.2 (25G83)",
+    "kernel": "Darwin 25.6.0",
+    "arch": "arm64"
+  },
+  "tools": {
+    "python": "3.12.0",
+    "rustc": "1.95.0",
+    "cargo": "1.95.0",
+    "git": "2.50.1",
+    "docker": "29.9.2"
+  },
+  "local_image": {
+    "name": "letopis-tk17-codex:v2-0.164.0",
+    "id": "sha256:a8b5b012f93d3af8aa1fd2dd0ad4dd1af22a14b1397d224928950b8593c2bbe7",
+    "platform": "linux/arm64",
+    "final": false,
+    "pulled": false
+  },
+  "operator_file_sha256": {
+    "docs/zkit/letopis/pilot/final/instructions.md": "518167800673642b6b6f27f8868103d81872c64dd567f30efb66c2578ac02ab7",
+    "docs/zkit/letopis/pilot/final/readiness.md": "f19e875dafb398092f72516521ba478f13f8d39c62c39515fc3df26635aecf12",
+    "docs/zkit/letopis/pilot/final/selection.json": "15910f33650b175da044151e58ca9cc58234bda3a8da6f1af6933b08a45f9f06",
+    "tests/final_pilot/README.md": "37a5140a3a79ea2aac5f0b1364c637dd5395788ef0afc695e47ebaf8a2021260",
+    "tests/final_pilot/copies.py": "ce571c363ab96b56b34c57d8843863f0191b3aca99027786fc60f82eb7b544b4",
+    "tests/final_pilot/environment.py": "6387624551081dd82d72c542a7231c3a2b50dbfd5d84339f00ffe843433899e6",
+    "tests/final_pilot/evaluation.py": "f9acb0ac60aab430421946e6142f4d6045c3d0d7b54513238f6d6d7d16e24e86",
+    "tests/final_pilot/oracles/cli.py": "9cd9a3a08cca88cfc9685af0d66b5510d8daff913eedb8f34bbaae9f027480ee",
+    "tests/final_pilot/oracles/delivery.py": "7f7715e6d785f24aa93c285d6e5672d95aa7aba62757071812079971ea75ffea",
+    "tests/final_pilot/oracles/drain.py": "b211eb4dc27fe1b12c9ccb2d67bb91b5c536847a269d9f19dfb962e2df0806ba",
+    "tests/final_pilot/oracles/service_probe.rs": "e80b49fd9c14354148ee582a10b6c94aa423c7c9cbcbe31dc22c8e7f98bd9a21",
+    "tests/final_pilot/records.py": "0948fba00c3cb1e0432f1072839b7a795d8329d5ceb5dc41d5773354a01a5d49",
+    "tests/final_pilot/run.py": "3a90da04f5f024deb1fb5bb907db9808ec53d9825fc46ba59a969191064d8476",
+    "tests/final_pilot/study.py": "d01aa9a59e63ad8fbe6fa5e5e4149231506a5c8cd8dbba8761410934a23cbedc",
+    "tests/final_pilot/telemetry.py": "605cb78dda78b6f30c27b4d700a78d4e1a7df49d16b153d259c721ba47265069",
+    "tests/final_pilot/test_copies.py": "6b9af61c800cf4dcacf0fde512067ab1c8ab8999c71c236fe3fda4e42acf3000",
+    "tests/final_pilot/test_environment.py": "6741645b9b611fa29c46ff317300f58727757d8a45c138053cc28f4aca7f5d31",
+    "tests/final_pilot/test_oracles.py": "a572523d81e7258be35d2f6b7099aa8bd661a2800d06d03bca48b938b6386bdc",
+    "tests/final_pilot/test_records.py": "0219d48c6d71fbe58d1f9d671b36d3daaace2e7b8309821f2dd4ea098b82a061",
+    "tests/final_pilot/test_study.py": "b63896e0005cd06ca0ebb0818b27e96b40ff98e57b9c13abd6f9c3de815dc474"
+  },
+  "tk17_sources": {
+    "commit": "a53ba2cc7fe2803c564d54ac89f777aee61bfd56",
+    "files": {
+      "tests/early_pilot/copies.py": {
+        "pinned": "ffd1f300f4cf0cd5204e4bf3dd14e823612d2d6a84e74ea3f174ef22f9783770",
+        "recomputed": "ffd1f300f4cf0cd5204e4bf3dd14e823612d2d6a84e74ea3f174ef22f9783770",
+        "ok": true
+      },
+      "tests/early_pilot/evidence.py": {
+        "pinned": "2eb639cbae82783f992d9a6a3081cf45659ba443850561b4aa98d605a8c54d0f",
+        "recomputed": "2eb639cbae82783f992d9a6a3081cf45659ba443850561b4aa98d605a8c54d0f",
+        "ok": true
+      },
+      "tests/early_pilot/prepare_image.py": {
+        "pinned": "da9013ac13542b525c6640b3ded17a9072eb7beebe88e72ec572d49dd6bdc3f7",
+        "recomputed": "da9013ac13542b525c6640b3ded17a9072eb7beebe88e72ec572d49dd6bdc3f7",
+        "ok": true
+      },
+      "tests/early_pilot/records.py": {
+        "pinned": "3421de72e4e979a0760cf07111f14aa49c666354baf0057a6b72e7b12b682805",
+        "recomputed": "3421de72e4e979a0760cf07111f14aa49c666354baf0057a6b72e7b12b682805",
+        "ok": true
+      },
+      "tests/early_pilot/run.py": {
+        "pinned": "76c60a8a9d27f0a85456ea0257ed555890d781e31cdc2a1c3b570421720eb1d6",
+        "recomputed": "76c60a8a9d27f0a85456ea0257ed555890d781e31cdc2a1c3b570421720eb1d6",
+        "ok": true
+      },
+      "tests/early_pilot/study.py": {
+        "pinned": "9f9c40b908ab5338baf3346c97e813d11e2075a430b819031226ad3bebf04cc3",
+        "recomputed": "9f9c40b908ab5338baf3346c97e813d11e2075a430b819031226ad3bebf04cc3",
+        "ok": true
+      },
+      "tests/early_pilot/test_containers.py": {
+        "pinned": "d5d1f9e91df73c89ec2183670b9e3098faaee8f6493eab83e70d0679f1912559",
+        "recomputed": "d5d1f9e91df73c89ec2183670b9e3098faaee8f6493eab83e70d0679f1912559",
+        "ok": true
+      },
+      "tests/early_pilot/test_image.py": {
+        "pinned": "eda666022fca2083a4350305eb06f33c5920f305de93d15e5dc9c36518e15606",
+        "recomputed": "eda666022fca2083a4350305eb06f33c5920f305de93d15e5dc9c36518e15606",
+        "ok": true
+      }
+    }
+  },
+  "commands": [
+    {
+      "command": "python3.12 -B -m unittest discover -s tests/final_pilot -p 'test_*.py'",
+      "exit": 0,
+      "elapsed_s": 106,
+      "result": "Ran 140 tests in 105.490s OK (skipped=2)",
+      "source_commit": "4c308cda7d9dd1f508ce1eab03fcace4a1e813d3",
+      "superseded_by": "head_74e0f82 final_pilot run"
+    },
+    {
+      "command": "python3.12 -B -m unittest discover -s tests/pilot_protocol -p 'test_*.py'",
+      "exit": 0,
+      "elapsed_s": 0,
+      "result": "Ran 31 tests in 0.522s OK",
+      "source_commit": "4c308cda7d9dd1f508ce1eab03fcace4a1e813d3"
+    },
+    {
+      "command": "TK30_CONTAINER_OUTPUT=<new private dir> python3.12 -B -m unittest discover -v -s tests/final_pilot -p 'test_copies.py' -k ContainerBoundary",
+      "exit": 0,
+      "elapsed_s": 6,
+      "result": "Ran 1 test OK",
+      "receipt": {
+        "status": "PASS",
+        "model_executions": 0,
+        "image": "letopis-tk17-codex:v2-0.164.0",
+        "tk17_sources_commit": "a53ba2cc7fe2803c564d54ac89f777aee61bfd56",
+        "build_script_writeback_only_disposable": true,
+        "future_t2_marker_denied": true,
+        "unsafe_shared_mount_detected": true,
+        "owned_timeout_removed": true
+      },
+      "source_commit": "4c308cda7d9dd1f508ce1eab03fcace4a1e813d3"
+    },
+    {
+      "command": "TK30_PREFLIGHT_IMAGE=letopis-tk17-codex:v2-0.164.0 python3.12 -B -m unittest discover -v -s tests/final_pilot -p 'test_environment.py' -k LocalImagePreflight",
+      "exit": 0,
+      "elapsed_s": 0,
+      "result": "Ran 1 test OK: the test passed by asserting unready (not a preflight PASS)",
+      "observed": {
+        "image_digest": null,
+        "tools": false,
+        "memory": false,
+        "container_isolation": true
+      },
+      "source_commit": "4c308cda7d9dd1f508ce1eab03fcace4a1e813d3"
+    },
+    {
+      "command": "python3.12 -B tests/final_pilot/run.py prepare --repo \"$PWD\" --base d260348619c6f4f623f24b907ca5bf41fb14eba9 --output \"$PWD/.artifacts/tk30/preparation-task5-abs-20261028\"",
+      "exit": 0,
+      "elapsed_s": 12,
+      "result": {
+        "state": "unready",
+        "pending": [
+          "product",
+          "memory_versions",
+          "embedding",
+          "assets",
+          "model",
+          "agent_config",
+          "g2",
+          "prompt_freeze",
+          "base_drift_recheck"
+        ],
+        "output": "$PWD/.artifacts/tk30/preparation-task5-abs-20261028"
+      },
+      "source_commit": "4c308cda7d9dd1f508ce1eab03fcace4a1e813d3"
+    },
+    {
+      "command": "python3.12 -B tests/final_pilot/run.py audit --root \"$PWD/.artifacts/tk30/preparation-task5-abs-20261028\"",
+      "exit": 2,
+      "elapsed_s": 2,
+      "expected_exit": 2,
+      "result": {
+        "state": "unready",
+        "pending": [
+          "product",
+          "memory_versions",
+          "embedding",
+          "assets",
+          "model",
+          "agent_config",
+          "g2",
+          "prompt_freeze",
+          "base_drift_recheck"
+        ]
+      },
+      "source_commit": "4c308cda7d9dd1f508ce1eab03fcace4a1e813d3"
+    }
+  ],
+  "seed": {
+    "seed_commit": "6da9e9af718a3a075e3400976257917337b9c394",
+    "items": 2231,
+    "inventory_sha256": "3229b8f83db5ca7aff088c339510549b5b27a35d8e5a7cb890b30670ffcb0cea",
+    "modes_sha256": "cbccf91cd5def56bac65e2e64d8877f25f7764aa0963be9a268f4a1499e1cc64",
+    "selection_sha256": "84beb7ce6cd4f3c7fb96e71176c7f28877cc214b55769ea6377be81d9a6bb812",
+    "slots": 18
+  },
+  "seed_evaluation": {
+    "C1-T1-baseline": {
+      "exit": 0,
+      "elapsed_s": 217,
+      "status": "assessed",
+      "infra_cause": null,
+      "checks": {
+        "version_value": false,
+        "version_no_stdin_or_state": false,
+        "regression": true
+      }
+    },
+    "C1-T2-baseline": {
+      "exit": 0,
+      "elapsed_s": 212,
+      "status": "assessed",
+      "infra_cause": null,
+      "checks": {
+        "help_commands_and_examples": false,
+        "help_no_stdin_or_state": false,
+        "regression": true
+      }
+    },
+    "C1-T3-baseline": {
+      "exit": 0,
+      "elapsed_s": 215,
+      "status": "assessed",
+      "infra_cause": null,
+      "checks": {
+        "command_help_forms": false,
+        "help_rejects_invalid_argv": false,
+        "regression": true
+      }
+    },
+    "C2-T1-baseline": {
+      "exit": 0,
+      "elapsed_s": 208,
+      "status": "assessed",
+      "infra_cause": null,
+      "checks": {
+        "bundle_layout": false,
+        "manifest_integrity": false,
+        "bundle_rejects_invalid_input": false,
+        "regression": true
+      }
+    },
+    "C2-T2-baseline": {
+      "exit": 0,
+      "elapsed_s": 212,
+      "status": "assessed",
+      "infra_cause": null,
+      "checks": {
+        "install_layout_and_repeat": false,
+        "install_failure_preserves_previous": false,
+        "regression": true
+      }
+    },
+    "C2-T3-baseline": {
+      "exit": 0,
+      "elapsed_s": 207,
+      "status": "assessed",
+      "infra_cause": null,
+      "checks": {
+        "installed_workflow": false,
+        "installed_missing_or_damaged": false,
+        "installed_independence": false,
+        "regression": true
+      }
+    },
+    "C3-T1-baseline": {
+      "exit": 0,
+      "elapsed_s": 227,
+      "status": "assessed",
+      "infra_cause": null,
+      "checks": {
+        "two_requests_before_release": false,
+        "bounded_buffer": false,
+        "one_owner_short_writes": false,
+        "regression": true
+      }
+    },
+    "C3-T2-baseline": {
+      "exit": 0,
+      "elapsed_s": 261,
+      "status": "assessed",
+      "infra_cause": null,
+      "checks": {
+        "shared_hash_durable_attempts": false,
+        "out_of_order_identity": false,
+        "invalid_retry_bound": false,
+        "regression": true
+      }
+    },
+    "C3-T3-baseline": {
+      "exit": 0,
+      "elapsed_s": 230,
+      "status": "assessed",
+      "infra_cause": null,
+      "checks": {
+        "detached_overlap": false,
+        "caller_owner_lifecycle": true,
+        "search_with_drain": true,
+        "regression": true
+      }
+    }
+  },
+  "extra": {
+    "relative_root_defect": {
+      "command": "run.py evaluate --root .artifacts/tk30/preparation-task5-20261028 --slot C1-T1-baseline",
+      "exit": 0,
+      "status": "infra_error",
+      "infra_cause": "participant_build",
+      "cargo_build_exit": 0,
+      "cause": "relative CARGO_TARGET_DIR from evaluation.build_environment resolves against copy/repo; build_binary checks copy/target/debug/letopis against operator cwd",
+      "fixed": true,
+      "fixed_by": "74e0f829a3702a6c9fad034e77abea632e9dea3a test: resolve evaluation root before building",
+      "fix_evidence": [
+        "test_oracles.EvaluationDispatchTests.test_relative_root_reaches_the_oracle_as_absolute_paths",
+        "test_oracles.EvaluationDispatchTests.test_cli_path_arguments_are_absolute",
+        "head_74e0f82 relative-root evaluate C1-T1-baseline: assessed, infra_cause null"
+      ],
+      "observed_before_fix": {
+        "source_commit": "4c308cd",
+        "status": "infra_error",
+        "infra_cause": "participant_build",
+        "cargo_build_exit": 0
+      }
+    },
+    "context": {
+      "command": "run.py context --source docs/zkit/letopis/pilot/final --assets <empty dir> --output <new>",
+      "exit": 2,
+      "pending": [
+        "asset:codex-linux.tar.gz",
+        "asset:code-mode-host.tar.gz"
+      ]
+    },
+    "preflight_on_preparation_root": {
+      "command": "run.py preflight --root <abs preparation root> --image letopis-tk17-codex:v2-0.164.0",
+      "exit": 2,
+      "checks": {
+        "image_digest": null,
+        "tools": false,
+        "memory": false,
+        "container_isolation": true
+      },
+      "model_executions": 0
+    },
+    "deterministic_seed": "relative and absolute prepare runs produced identical seed_commit/inventory/selection hashes"
+  },
+  "not_run": [
+    "root make check/make verify (no product Rust change)",
+    "cargo-mutants",
+    "historical native/RAM/load/pilot suites",
+    "storage platform runner",
+    "paid/model/provider probes",
+    "codex exec",
+    "Linux run of the focused unittest"
+  ],
+  "pending": [
+    "product",
+    "memory_versions",
+    "embedding",
+    "assets",
+    "model",
+    "agent_config",
+    "g2",
+    "prompt_freeze",
+    "preflight",
+    "correlation_attribute",
+    "participant_isolation",
+    "base_drift_recheck",
+    "preflight:image_digest",
+    "preflight:tools",
+    "preflight:memory",
+    "preflight:git_target_separation",
+    "model_access",
+    "embedding_access",
+    "correlation_attribute_confirmation"
+  ],
+  "g2": {
+    "maps_to": "TK-29",
+    "evidence": null
+  },
+  "scope": {
+    "diff_range": "d260348..HEAD",
+    "forbidden_paths_changed": []
+  },
+  "operator_source_note": "8aba7d0 is the last commit touching operator code (final-review fixes: seed exclusion of checks/TK-30..33, evidence gates preflight/participant_isolation/correlation_attribute in audit, observed-only C3 lock release, operator-state tamper detection, --pull never, Python 3.11.4 gate). Unit suites, prepare/audit and the real-seed leak scan ran on it; the 9-slot seed evaluation, Docker proofs, context and preflight ran on earlier commits (seed bytes unchanged: same seed_commit and inventory).",
+  "operator_file_sha256_at": "73311873254c3399a2fc133d9d45064a2807c7c6",
+  "head_74e0f82": [
+    {
+      "command": "python3.12 -B -m unittest discover -s tests/final_pilot -p 'test_*.py'",
+      "exit": 0,
+      "elapsed_s": 109,
+      "result": "Ran 142 tests in 109.136s OK (skipped=2)",
+      "skipped": "2 opt-in Docker tests"
+    },
+    {
+      "command": "python3.12 -B -m unittest discover -s tests/pilot_protocol -p 'test_*.py'",
+      "exit": 0,
+      "elapsed_s": 1,
+      "result": "Ran 31 tests in 0.522s OK"
+    },
+    {
+      "command": "python3.12 -B tests/final_pilot/run.py prepare --repo . --base d260348619c6f4f623f24b907ca5bf41fb14eba9 --output .artifacts/tk30/preparation-task5-fix1-rel-20261028",
+      "exit": 0,
+      "result": {
+        "state": "unready",
+        "pending": [
+          "product",
+          "memory_versions",
+          "embedding",
+          "assets",
+          "model",
+          "agent_config",
+          "g2",
+          "prompt_freeze",
+          "base_drift_recheck"
+        ],
+        "output": ".artifacts/tk30/preparation-task5-fix1-rel-20261028"
+      },
+      "seed_commit": "6da9e9af718a3a075e3400976257917337b9c394",
+      "inventory_sha256": "3229b8f83db5ca7aff088c339510549b5b27a35d8e5a7cb890b30670ffcb0cea"
+    },
+    {
+      "command": "python3.12 -B tests/final_pilot/run.py audit --root .artifacts/tk30/preparation-task5-fix1-rel-20261028",
+      "exit": 2,
+      "expected_exit": 2,
+      "result": {
+        "state": "unready",
+        "pending": [
+          "product",
+          "memory_versions",
+          "embedding",
+          "assets",
+          "model",
+          "agent_config",
+          "g2",
+          "prompt_freeze",
+          "base_drift_recheck"
+        ]
+      }
+    },
+    {
+      "command": "python3.12 -B tests/final_pilot/run.py evaluate --root .artifacts/tk30/preparation-task5-fix1-rel-20261028 --slot C1-T1-baseline",
+      "exit": 0,
+      "elapsed_s": 217,
+      "status": "assessed",
+      "infra_cause": null,
+      "checks": {
+        "version_value": false,
+        "version_no_stdin_or_state": false,
+        "regression": true
+      },
+      "commands_jsonl": {
+        "make check": 0,
+        "cargo build": 0,
+        "--version": 1,
+        "--version (repo)": 1
+      }
+    }
+  ],
+  "seed_evaluation_source_commit": "4c308cda7d9dd1f508ce1eab03fcace4a1e813d3",
+  "head_8aba7d0": [
+    {
+      "command": "python3.12 -B -m unittest discover -s tests/final_pilot -p 'test_*.py'",
+      "exit": 0,
+      "elapsed_s": 115,
+      "result": "Ran 150 tests in 114.974s OK (skipped=2)",
+      "skipped": "2 opt-in Docker tests"
+    },
+    {
+      "command": "python3.12 -B -m unittest discover -s tests/pilot_protocol -p 'test_*.py'",
+      "exit": 0,
+      "elapsed_s": 1,
+      "result": "Ran 31 tests in 0.524s OK"
+    },
+    {
+      "command": "python3.12 -B tests/final_pilot/run.py prepare --repo \"$PWD\" --base d260348619c6f4f623f24b907ca5bf41fb14eba9 --output <new scratch dir outside the checkout>",
+      "exit": 0,
+      "result": {
+        "state": "unready",
+        "pending": [
+          "product",
+          "memory_versions",
+          "embedding",
+          "assets",
+          "model",
+          "agent_config",
+          "g2",
+          "prompt_freeze",
+          "preflight",
+          "participant_isolation",
+          "correlation_attribute",
+          "base_drift_recheck"
+        ],
+        "output": "/private/tmp/claude-502/-Users-zdkadiev--codex-worktrees-tk-30-letopis/67f8d752-64a9-4d7c-b577-01386cc537dd/scratchpad/seed-final3"
+      }
+    },
+    {
+      "command": "python3.12 -B tests/final_pilot/run.py audit --root <same dir>",
+      "exit": 2,
+      "expected_exit": 2,
+      "result": {
+        "state": "unready",
+        "pending": [
+          "product",
+          "memory_versions",
+          "embedding",
+          "assets",
+          "model",
+          "agent_config",
+          "g2",
+          "prompt_freeze",
+          "preflight",
+          "participant_isolation",
+          "correlation_attribute",
+          "base_drift_recheck"
+        ]
+      }
+    },
+    {
+      "command": "scan of all six seeds for every frozen check/agreement ID (except the plain word regression) and tk30_service_probe",
+      "result": "0 hits",
+      "seed_commit": "6da9e9af718a3a075e3400976257917337b9c394",
+      "inventory_sha256": "3229b8f83db5ca7aff088c339510549b5b27a35d8e5a7cb890b30670ffcb0cea",
+      "items": 2231
+    }
+  ],
+  "history_rewrite": {
+    "note": "Short SHAs inside this receipt (4c308cd, 74e0f82, 8aba7d0, head_*) name revisions of the branch history before it was squashed into logical commits; none of those commits exists any more.",
+    "operator_code_commit": "73311873254c3399a2fc133d9d45064a2807c7c6",
+    "mapping": {
+      "4c308cd": {
+        "tree_identical_to": "d4b2386336c7133ca944f4efc2b1e399958a8da2",
+        "scope": "environment/records state before the report"
+      },
+      "8aba7d0": {
+        "operator_code_identical_to": "73311873254c3399a2fc133d9d45064a2807c7c6",
+        "scope": "final-review fixes; docs differ"
+      },
+      "74e0f82": {
+        "preserved_as": "intermediate tree (not a commit any more); its code change is part of 73311873254c3399a2fc133d9d45064a2807c7c6"
+      }
+    }
+  }
+}
