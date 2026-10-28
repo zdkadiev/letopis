@@ -1,10 +1,10 @@
 //! Injected transport doubles only; real service behavior lives in binary tests.
-use super::{HandlerServices, Handlers, Request, parse_request, write_response};
+use super::{Request, execute_search, parse_request, write_response};
 use crate::{
     domain::{KnowledgeId, LineRange, RepoPath},
     service::{
-        CommandErrorKind, CommandResult, MockSearcher, RecheckFilter, SearchFlag, SearchLink,
-        SearchRequest,
+        CommandErrorKind, CommandResult, MockBackgroundRunner, MockSearcher, RecheckFilter,
+        SearchFlag, SearchLink, SearchRequest,
     },
 };
 use serde_json::{Value, json};
@@ -168,12 +168,13 @@ fn search_handler_dispatches_typed_request_and_renders_links() {
         query: "private query".into(),
         limit: NonZeroUsize::new(3).unwrap(),
     };
+    let mut background = MockBackgroundRunner::new();
+    background
+        .expect_start_if_needed()
+        .times(1)
+        .returning(|| Ok(None));
     // When
-    let response = Handlers::new(HandlerServices {
-        searches: Some(&mut searches),
-        ..HandlerServices::default()
-    })
-    .execute(Request::Search(request));
+    let response = execute_search(&mut searches, &request, &mut background);
     let mut output = Vec::new();
     let exit = write_response(&mut output, response);
     let value: Value = serde_json::from_slice(&output).unwrap();

@@ -199,7 +199,9 @@ mod input_tests {
 
 #[cfg(test)]
 mod transport_tests {
-    use crate::cli::handlers::{CommandResponse, HandlerServices, Handlers};
+    use crate::cli::commands::{
+        CommandResponse, execute_check, execute_drain, execute_inspect, execute_status,
+    };
     use crate::cli::input::{Request, parse_request};
     use crate::cli::output::write_response;
     use crate::domain::{LineRange, RepoPath, Sha256, TreeOid};
@@ -217,23 +219,20 @@ mod transport_tests {
     fn check_dispatches_once_and_findings_remain_successful() {
         // Given
         let args = ["check".into()];
-        let request = parse_request(
+        let Request::Check(paths) = parse_request(
             &args,
             &mut br#"{"paths":["./a.md","b/../a.md","B.md"]}"#.as_slice(),
         )
-        .unwrap();
+        .unwrap() else {
+            panic!("expected a check request");
+        };
         let mut checks = build_checks(vec![
             RepoPath::parse("B.md").unwrap(),
             RepoPath::parse("a.md").unwrap(),
         ]);
         let mut background = build_background(1, 0);
         // When
-        let response = Handlers::new(HandlerServices {
-            checks: Some(&mut checks),
-            background: Some(&mut background),
-            ..HandlerServices::default()
-        })
-        .execute(request);
+        let response = execute_check(&mut checks, &paths, &mut background);
         let (exit, value) = render(response);
         // Then
         assert_eq!(exit, 0);
@@ -255,15 +254,9 @@ mod transport_tests {
                 problems: vec![make_problem()],
             })
         });
-        let mut background = build_background(0, 0);
 
         // When
-        let response = Handlers::new(HandlerServices {
-            status: Some(&mut status),
-            background: Some(&mut background),
-            ..HandlerServices::default()
-        })
-        .execute(Request::Status);
+        let response = execute_status(&mut status);
 
         // Then
         assert_eq!(
@@ -288,15 +281,9 @@ mod transport_tests {
                 io::Error::other("SECRET_STATUS"),
             ))
         });
-        let mut background = build_background(0, 0);
 
         // When
-        let response = Handlers::new(HandlerServices {
-            status: Some(&mut status),
-            background: Some(&mut background),
-            ..HandlerServices::default()
-        })
-        .execute(Request::Status);
+        let response = execute_status(&mut status);
 
         // Then
         assert_eq!(
@@ -316,12 +303,7 @@ mod transport_tests {
         let ids = vec![ElementAddress::parse("x.md").unwrap()];
         let mut background = build_warning_background();
         // When
-        let response = Handlers::new(HandlerServices {
-            inspections: Some(&mut inspections),
-            background: Some(&mut background),
-            ..HandlerServices::default()
-        })
-        .execute(Request::Inspect(ids.clone()));
+        let response = execute_inspect(&mut inspections, &ids, &mut background);
         let (exit, value) = render(response);
         // Then
         assert_eq!(exit, 0);
@@ -338,41 +320,11 @@ mod transport_tests {
         assert!(!value.to_string().contains("private raw knowledge"));
     }
     #[test]
-    fn unavailable_routes_fail_without_starting_background() {
-        // Given
-        let mut background = build_background(0, 0);
-        for request in [
-            Request::Check(vec![]),
-            Request::Inspect(vec![ElementAddress::parse("x.md").unwrap()]),
-        ] {
-            // When
-            let error = Handlers::new(HandlerServices {
-                background: Some(&mut background),
-                ..HandlerServices::default()
-            })
-            .execute(request)
-            .unwrap_err();
-            // Then
-            assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
-            assert_eq!(error.get_message(), "operation unavailable in this build");
-        }
-        let error = Handlers::new(HandlerServices {
-            ..HandlerServices::default()
-        })
-        .execute(Request::Drain)
-        .unwrap_err();
-        assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
-    }
-    #[test]
     fn drain_delegates_once_without_recursion() {
         // Given
         let mut background = build_background(0, 1);
         // When
-        let response = Handlers::new(HandlerServices {
-            background: Some(&mut background),
-            ..HandlerServices::default()
-        })
-        .execute(Request::Drain);
+        let response = execute_drain(&mut background);
         // Then
         assert_eq!(render(response), (0, json!({"ok":true,"result":{}})));
     }
@@ -393,12 +345,7 @@ mod transport_tests {
             });
         let mut background = build_background(0, 0);
         // When
-        let response = Handlers::new(HandlerServices {
-            checks: Some(&mut checks),
-            background: Some(&mut background),
-            ..HandlerServices::default()
-        })
-        .execute(Request::Check(vec![]));
+        let response = execute_check(&mut checks, &[], &mut background);
         // Then
         assert_eq!(
             render(response),
@@ -414,13 +361,7 @@ mod transport_tests {
         let mut checks = build_checks(vec![]);
         let mut background = build_failing_background();
         // When
-        let error = Handlers::new(HandlerServices {
-            checks: Some(&mut checks),
-            background: Some(&mut background),
-            ..HandlerServices::default()
-        })
-        .execute(Request::Check(vec![]))
-        .unwrap_err();
+        let error = execute_check(&mut checks, &[], &mut background).unwrap_err();
         // Then
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     }
@@ -518,32 +459,11 @@ mod transport_tests {
         assert!(serde_json::from_slice::<Value>(&writer.bytes).is_ok());
     }
     #[test]
-    fn missing_checker_uses_one_safe_error_envelope() {
-        // Given
-        let mut output = vec![];
-        // When
-        let response = Handlers::new(HandlerServices {
-            ..HandlerServices::default()
-        })
-        .execute(Request::Check(vec![]));
-        let exit = write_response(&mut output, response);
-        // Then
-        assert_eq!(exit, 1);
-        assert_eq!(
-            serde_json::from_slice::<Value>(&output).unwrap(),
-            json!({"ok":false,"error":{"code":"internal_error","message":"operation unavailable in this build","details":{}}})
-        );
-    }
-    #[test]
     fn success_writes_one_complete_envelope_and_flushes_once() {
         // Given
         let mut background = build_background(0, 1);
         // When
-        let response = Handlers::new(HandlerServices {
-            background: Some(&mut background),
-            ..HandlerServices::default()
-        })
-        .execute(Request::Drain);
+        let response = execute_drain(&mut background);
         // Given
         let mut writer = FailingWriter {
             remaining: usize::MAX,
@@ -559,17 +479,12 @@ mod transport_tests {
         assert_eq!(writer.bytes, b"{\"ok\":true,\"result\":{}}\n");
     }
     #[test]
-    fn check_without_background_still_succeeds_without_warnings() {
+    fn check_without_background_warning_omits_warnings_field() {
         // Given
         let mut checks = build_checks(vec![]);
+        let mut background = build_background(1, 0);
         // When
-        let (exit, value) = render(
-            Handlers::new(HandlerServices {
-                checks: Some(&mut checks),
-                ..HandlerServices::default()
-            })
-            .execute(Request::Check(vec![])),
-        );
+        let (exit, value) = render(execute_check(&mut checks, &[], &mut background));
         // Then
         assert_eq!(exit, 0);
         assert!(value.get("warnings").is_none());

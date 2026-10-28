@@ -1,4 +1,4 @@
-use super::{HandlerServices, Handlers, parse_request, write_response};
+use super::{execute_reindex, parse_request, write_response};
 use crate::service::{
     CommandErrorKind, CommandProblem, MockBackgroundRunner, MockRefresher, RefreshOutcome,
 };
@@ -44,14 +44,8 @@ fn reindex_dispatches_full_operation_without_refresh_or_inline_drain() {
             details: Default::default(),
         }))
     });
-    let request = parse_request(&["reindex".into()], b"{}".as_slice()).unwrap();
     // When
-    let response = Handlers::new(HandlerServices {
-        refresher: Some(&mut documents),
-        background: Some(&mut background),
-        ..HandlerServices::default()
-    })
-    .execute(request);
+    let response = execute_reindex(&mut documents, &mut background);
     let mut output = Vec::new();
     assert_eq!(write_response(&mut output, response), 0);
     // Then

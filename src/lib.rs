@@ -12,10 +12,8 @@
     )
 )]
 
-use crate::cli::{
-    CommandResponse, HandlerServices, Handlers, Request, find_help, parse_request, write_response,
-    write_text,
-};
+use crate::cli::{find_help, parse_request, write_response, write_text};
+use crate::commands::run_request;
 use crate::embedding::{HttpProviders, Ollama, Openai};
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
@@ -28,8 +26,7 @@ use crate::service::{
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
     GraphDiagnostics, GraphService, InspectionService, Inspector, ProvenanceService, Refresher,
     SearchService, Searcher, SnapshotError, SnapshotVerifier, SourceProvenance, SourceReader,
-    SourceService, StatusFiles, StatusService, StatusStorage, Storage, StorageResult,
-    TraversalService, Traverser,
+    SourceService, StatusFiles, StatusStorage, Storage, StorageResult, TraversalService, Traverser,
 };
 use crate::storage::{SqliteStatusStorage, SqliteStorage};
 use crate::utils::SERVICE_DIRECTORY;
@@ -38,10 +35,11 @@ use std::{
     ffi::OsString,
     io::{Read, Write},
     os::fd::AsFd,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 mod cli;
+mod commands;
 pub mod domain;
 mod embedding;
 mod filesystem;
@@ -378,191 +376,10 @@ pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLoc
     LocalFileSystem::open(root)
 }
 
-fn run_request(request: Request) -> CommandResult<CommandResponse> {
-    let (directory, executable) = locate_environment()?;
-    match request {
-        Request::Status => run_status(request, &directory),
-        Request::Reindex => run_reindex(request, &directory, &executable),
-        Request::Check(_) => run_check(request, &directory, &executable),
-        Request::Drain => run_drain(request, &directory, &executable),
-        Request::Search(_) => run_search(request, &directory, &executable),
-        Request::Traverse(_) => run_traverse(request, &directory, &executable),
-        Request::Inspect(_) => run_inspect(request, &directory, &executable),
-    }
-}
-
-fn run_reindex(
-    request: Request,
-    directory: &Path,
-    executable: &Path,
-) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let mut tasks = wire_embedding_executor(&root)?;
-    let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut documents = wire_document_refresher(&root).map_err(map_reindex_setup)?;
-    Handlers::new(HandlerServices {
-        refresher: Some(&mut documents),
-        background: Some(&mut background),
-        ..HandlerServices::default()
-    })
-    .execute(request)
-}
-
-fn run_status(request: Request, directory: &Path) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let git = GitCli::open(&root).map_err(map_status_setup)?;
-    let files = LocalFileSystem::open(git.get_root()).map_err(map_status_setup)?;
-    let service_directory = files
-        .open_existing_service_directory()
-        .map_err(map_status_setup)?;
-    let storage = if let Some(pinned) = service_directory.as_ref() {
-        SqliteStatusStorage::open_confined(&root.join(SERVICE_DIRECTORY), pinned)
-            .map_err(map_status_setup)?
-    } else {
-        SqliteStatusStorage::default()
-    };
-    let provenance = ProvenanceService::new(
-        GitCli::open(&root).map_err(map_status_setup)?,
-        LocalFileSystem::open(&root).map_err(map_status_setup)?,
-    );
-    let provider = build_embedding_provider().map_err(map_status_setup)?;
-    let graph = CurrentGraphDiagnostics::new();
-    let mut status = StatusService {
-        storage,
-        files: &files,
-        graph: &graph,
-        provenance: &provenance,
-        provider: &provider,
-    };
-    Handlers::new(HandlerServices {
-        status: Some(&mut status),
-        ..HandlerServices::default()
-    })
-    .execute(request)
-}
-
-fn locate_environment() -> CommandResult<(PathBuf, PathBuf)> {
-    let directory = env::current_dir().map_err(|cause| {
-        CommandError::new_with_cause(
-            CommandErrorKind::InternalError,
-            "cannot locate command directory",
-            cause,
-        )
-    })?;
-    let executable = env::current_exe().map_err(|cause| {
-        CommandError::new_with_cause(
-            CommandErrorKind::InternalError,
-            "cannot locate command executable",
-            cause,
-        )
-    })?;
-    Ok((directory, executable))
-}
-
-fn run_drain(request: Request, root: &Path, executable: &Path) -> CommandResult<CommandResponse> {
-    let mut tasks = wire_embedding_executor(root)?;
-    let mut background = wire_background_runner(root, executable, Some(&mut tasks))?;
-    Handlers::new(HandlerServices {
-        background: Some(&mut background),
-        ..HandlerServices::default()
-    })
-    .execute(request)
-}
-
-fn run_check(
-    request: Request,
-    directory: &Path,
-    executable: &Path,
-) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let mut tasks = wire_embedding_executor(&root)?;
-    let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut checks = wire_checker(&root)?;
-    Handlers::new(HandlerServices {
-        checks: Some(&mut checks),
-        background: Some(&mut background),
-        ..HandlerServices::default()
-    })
-    .execute(request)
-}
-
-fn run_search(
-    request: Request,
-    directory: &Path,
-    executable: &Path,
-) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let mut tasks = wire_embedding_executor(&root)?;
-    let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut searches = wire_searcher(&root)?;
-    Handlers::new(HandlerServices {
-        searches: Some(&mut searches),
-        background: Some(&mut background),
-        ..HandlerServices::default()
-    })
-    .execute(request)
-}
-
-fn run_traverse(
-    request: Request,
-    directory: &Path,
-    executable: &Path,
-) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let mut tasks = wire_embedding_executor(&root)?;
-    let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut traversals = wire_traverser(&root)?;
-    Handlers::new(HandlerServices {
-        traversals: Some(&mut traversals),
-        background: Some(&mut background),
-        ..HandlerServices::default()
-    })
-    .execute(request)
-}
-
-fn run_inspect(
-    request: Request,
-    directory: &Path,
-    executable: &Path,
-) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let mut tasks = wire_embedding_executor(&root)?;
-    let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut inspections = wire_inspector(&root)?;
-    Handlers::new(HandlerServices {
-        inspections: Some(&mut inspections),
-        background: Some(&mut background),
-        ..HandlerServices::default()
-    })
-    .execute(request)
-}
-
-/// Foreground services and background exclusion must share the discovered repository root.
-fn open_repository_root(directory: &Path) -> CommandResult<PathBuf> {
-    let git = GitCli::open(directory).map_err(map_embedding_setup)?;
-    Ok(git.get_root().to_path_buf())
-}
-
 fn map_check_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
     CommandError::new_with_cause(
         CommandErrorKind::InternalError,
         "cannot open check service",
-        error,
-    )
-}
-
-fn map_reindex_setup(cause: DocumentError) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot open corpus reindex service",
-        cause,
-    )
-}
-
-fn map_status_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot open status service",
         error,
     )
 }

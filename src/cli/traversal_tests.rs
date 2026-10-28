@@ -1,5 +1,5 @@
 //! Strict traversal transport; graph semantics are exercised through the real binary.
-use super::{HandlerServices, Handlers, Request, parse_request, write_response};
+use super::{Request, execute_traverse, parse_request, write_response};
 use crate::domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, SourceUri};
 use crate::service::{
     CommandError, CommandErrorKind, CommandProblem, CommandResult, ElementAddress, ElementLocation,
@@ -206,8 +206,8 @@ fn rejects_malformed_identities_without_source_fallback() {
 #[test]
 fn serializes_remote_source_links_without_lines() {
     // Given
-    let response = Ok(super::handlers::CommandResponse {
-        result: super::handlers::ResponseResult::Traverse(Traversal {
+    let response = Ok(super::commands::CommandResponse {
+        result: super::commands::ResponseResult::Traverse(Traversal {
             elements: vec![TraversalLink {
                 element_id: ElementAddress::parse("https://Host/a?q=1#part").unwrap(),
                 path: ElementLocation::Remote(SourceUri::parse("https://Host/a?q=1#part").unwrap()),
@@ -253,8 +253,8 @@ fn serializes_requested_empty_and_original_incoming_edges() {
         ),
     ] {
         // Given
-        let response = Ok(super::handlers::CommandResponse {
-            result: super::handlers::ResponseResult::Traverse(Traversal {
+        let response = Ok(super::commands::CommandResponse {
+            result: super::commands::ResponseResult::Traverse(Traversal {
                 elements: vec![],
                 edges,
             }),
@@ -294,14 +294,9 @@ fn dispatches_once_before_background_and_preserves_nonfatal_warning() {
             }))
         });
     background.expect_drain().times(0);
-    let request = parse(&build_input().to_string()).unwrap();
+    let request = parse_traversal(&build_input().to_string());
     // When
-    let response = Handlers::new(HandlerServices {
-        traversals: Some(&mut traversals),
-        background: Some(&mut background),
-        ..HandlerServices::default()
-    })
-    .execute(request);
+    let response = execute_traverse(&mut traversals, &request, &mut background);
     // Then
     assert_eq!(
         render(response),
@@ -332,12 +327,8 @@ fn propagates_safe_failure_without_background_or_partial_result() {
     background.expect_start_if_needed().times(0);
     background.expect_drain().times(0);
     // When
-    let response = Handlers::new(HandlerServices {
-        traversals: Some(&mut traversals),
-        background: Some(&mut background),
-        ..HandlerServices::default()
-    })
-    .execute(parse(&build_input().to_string()).unwrap());
+    let request = parse_traversal(&build_input().to_string());
+    let response = execute_traverse(&mut traversals, &request, &mut background);
     // Then
     assert_eq!(
         render(response),
@@ -364,7 +355,7 @@ fn matches_request(request: &TraversalRequest) -> bool {
         ) == (TraversalMode::Both, TraversalDirection::Outgoing, 1, 3)
 }
 
-fn render(response: CommandResult<super::handlers::CommandResponse>) -> (u8, Value) {
+fn render(response: CommandResult<super::commands::CommandResponse>) -> (u8, Value) {
     let mut bytes = vec![];
     let exit = write_response(&mut bytes, response);
     assert_eq!(bytes.iter().filter(|byte| **byte == b'\n').count(), 1);
@@ -380,6 +371,12 @@ fn assert_invalid(body: &str) {
         CommandErrorKind::InvalidRequest,
         "{body}"
     );
+}
+fn parse_traversal(body: &str) -> TraversalRequest {
+    let Request::Traverse(request) = parse(body).unwrap() else {
+        panic!("expected a traverse request");
+    };
+    request
 }
 fn parse(body: &str) -> CommandResult<Request> {
     parse_request(&["traverse".into()], body.as_bytes())
