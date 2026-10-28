@@ -114,6 +114,13 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     }
 
     fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
+        let observed = self
+            .storage
+            .begin_read()
+            .map_err(map_storage)?
+            .get_config_identity();
+        #[cfg(test)]
+        tests::reach_checkpoint("observed");
         let config = match self.read_config_file() {
             Ok(None) => return Ok(ConfigState::Missing),
             Err(error) => return Ok(ConfigState::Invalid(error.get_kind())),
@@ -122,11 +129,6 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
             }
             Ok(Some(Configuration::Enabled(config))) => config,
         };
-        let observed = self
-            .storage
-            .begin_read()
-            .map_err(map_storage)?
-            .get_config_identity();
         #[cfg(test)]
         tests::reach_checkpoint("configuration");
         match self

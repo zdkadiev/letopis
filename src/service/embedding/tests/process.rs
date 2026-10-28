@@ -49,6 +49,11 @@ fn run_child() {
             service.read_configuration().unwrap(),
             ConfigState::Changed
         ));
+    } else if env::var("LETOPIS_PROCESS_ACTION").as_deref() == Ok("observed") {
+        assert!(matches!(
+            service.read_configuration().unwrap(),
+            ConfigState::Changed | ConfigState::Ready(_)
+        ));
     } else {
         let expected = match env::var("LETOPIS_PROCESS_EXPECT").unwrap().as_str() {
             "Complete" => DrainOutcome::Complete,

@@ -116,7 +116,7 @@ impl InitFiles for LocalFileSystem {
     }
 
     fn open_service_directory(&self) -> DocumentResult<rustix::fd::OwnedFd> {
-        self.open_service_directory()
+        self.open_private_service_directory()
     }
 
     fn sync_service_state(&self) -> DocumentResult<()> {

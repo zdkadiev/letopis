@@ -133,6 +133,24 @@ impl LocalFileSystem {
     /// Reports unsafe/replaced paths, creation/permission failures or failed duplication.
     pub(crate) fn open_service_directory(&self) -> DocumentResult<OwnedFd> {
         let directory = self.get_service_directory()?;
+        self.clone_service_directory(directory)
+    }
+
+    /// Protect an existing or newly created service directory before initialization writes.
+    ///
+    /// Unlike observational reads, initialization applies mode 0700 to the verified
+    /// pinned directory so a permissive preexisting `.letopis` cannot expose databases.
+    /// # Errors
+    /// Reports unsafe/replaced paths, permission failure or failed duplication.
+    pub(super) fn open_private_service_directory(&self) -> DocumentResult<OwnedFd> {
+        let directory = self.get_service_directory()?;
+        fchmod(directory, Mode::RWXU)
+            .map_err(|cause| fail_io("cannot protect service directory", cause))?;
+        self.verify_service_directory(directory)?;
+        self.clone_service_directory(directory)
+    }
+
+    fn clone_service_directory(&self, directory: &File) -> DocumentResult<OwnedFd> {
         directory
             .try_clone()
             .map(OwnedFd::from)

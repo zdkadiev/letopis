@@ -105,6 +105,34 @@ fn init_accepts_empty_repository_and_rejects_non_repository_or_bare() {
 }
 
 #[test]
+fn init_protects_a_preexisting_permissive_service_directory() {
+    // Given: a precreated permissive service directory, with and without valid config.
+    for config in [None, Some(DISABLED)] {
+        let repo = ReadingRepo::new();
+        let service = repo.get_root().join(".letopis");
+        fs::create_dir(&service).unwrap();
+        fs::set_permissions(&service, fs::Permissions::from_mode(0o755)).unwrap();
+        if let Some(config) = config {
+            let path = service.join("config.json");
+            fs::write(&path, config).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        }
+
+        // When
+        let output = repo.invoke(&["init"], b"{}");
+
+        // Then: initialization completes only after making the directory private.
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
+        assert_eq!(
+            fs::metadata(&service).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        assert!(service.join("cache.db").is_file());
+        assert!(service.join("vectors.db").is_file());
+    }
+}
+
+#[test]
 fn init_preserves_an_edited_valid_configuration_and_logical_database_state() {
     // Given: a published cache with a valid configured-disabled file.
     let repo = ReadingRepo::new();

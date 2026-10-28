@@ -30,6 +30,25 @@ fn installs_exact_private_complete_bytes() {
 }
 
 #[test]
+fn protects_a_preexisting_permissive_service_directory() {
+    // Given: `.letopis` already exists with group/other access.
+    let fixture = Fixture::new();
+    let directory = fixture.0.join(".letopis");
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o755)).unwrap();
+    let files = LocalFileSystem::open(&fixture.0).unwrap();
+
+    // When: initialization opens a private service directory.
+    files.open_private_service_directory().unwrap();
+
+    // Then: the pinned directory is private before any database is created.
+    assert_eq!(
+        fs::metadata(&directory).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+}
+
+#[test]
 fn existing_configuration_is_never_replaced() {
     // Given
     let fixture = Fixture::new();
