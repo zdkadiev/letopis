@@ -1,0 +1,312 @@
+{
+  "selection_version": 1,
+  "visibility": "operator-only; each prompt is issued to a participant only at the start of its session",
+  "agreement_catalog": {
+    "hexagonal_sync": "Follow AGENTS.md architecture: domain stays pure, services depend on application traits, adapters do not orchestrate each other, I/O stays synchronous (no async runtime).",
+    "typed_safe_errors": "Expected failures are typed Result errors with no unwrap/expect in production code, and public diagnostics carry no secrets or raw payloads."
+  },
+  "chains": [
+    {
+      "id": "C1",
+      "issue": {
+        "number": 53,
+        "url": "https://github.com/zaurkadiev/letopis/issues/53"
+      },
+      "scope": "Partial increment of #53: version flag, general help, per-command help.",
+      "condition_order": [
+        "baseline",
+        "memory"
+      ],
+      "selection_rationale": "Open backlog issue #53 (CLI help/version). At the preparation base src/cli/input.rs has no help or version flag, so each task adds new observable behaviour. T2 and T3 reuse what T1 establishes about argv validation order and CLI wiring; T3 also reuses the command list and input forms researched for T2.",
+      "recurring_facts": [
+        {
+          "id": "c1_argv_before_stdin",
+          "fact": "parse_request in src/cli/input.rs validates all argv before reading stdin or constructing any service, and unknown argv yields the existing JSON invalid-request failure.",
+          "established_in": "C1-T1",
+          "recurs_in": [
+            "C1-T2",
+            "C1-T3"
+          ]
+        },
+        {
+          "id": "c1_cli_wiring",
+          "fact": "src/main.rs is a thin entry; src/lib.rs is the composition root; src/cli/handlers.rs executes the typed Request through service interfaces.",
+          "established_in": "C1-T1",
+          "recurs_in": [
+            "C1-T2",
+            "C1-T3"
+          ]
+        },
+        {
+          "id": "c1_command_set_and_inputs",
+          "fact": "The public command set and each command's stdin JSON form are defined in docs/zkit/letopis/contracts/X-1-cli.md and mirrored by Request and the *Input structs (deny_unknown_fields) in src/cli/input.rs; embed --drain has its own reader.",
+          "established_in": "C1-T2",
+          "recurs_in": [
+            "C1-T3"
+          ]
+        },
+        {
+          "id": "c1_cli_test_gate",
+          "fact": "CLI behaviour is covered by src/cli/tests.rs and tests/cli_*.rs, and make check is the required gate (fmt, check, clippy -D warnings, tests).",
+          "established_in": "C1-T1",
+          "recurs_in": [
+            "C1-T2",
+            "C1-T3"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "C1-T1",
+          "prompt": "Add a `--version` flag to the `letopis` command-line binary. `letopis --version` must print the package name and the package version taken from the package metadata in Cargo.toml, as `letopis <version>` followed by a single newline, to standard output and exit with status 0; for the current package that output is `letopis 0.0.0`. It must work when standard input is left open and unread, outside any repository, with no network access, and without creating any state file or directory. The existing JSON request handling and its error behaviour must remain unchanged, and the version must not be a separately maintained literal that can drift from the package metadata.",
+          "check_ids": [
+            "version_value",
+            "version_no_stdin_or_state",
+            "regression"
+          ],
+          "agreement_ids": [
+            "hexagonal_sync",
+            "typed_safe_errors"
+          ],
+          "reuse_from": []
+        },
+        {
+          "id": "C1-T2",
+          "prompt": "Add a general help flag to the `letopis` binary: `letopis --help` prints human-readable usage to standard output and exits with status 0. The text must name every public command of the current build, state that commands take a single JSON object on standard input, and include a concrete example invocation for each command. Printing help must not read standard input, must not construct any service, and must not touch repository or state files. `letopis --version` and the existing handling of invalid argv must keep working exactly as before.",
+          "check_ids": [
+            "help_commands_and_examples",
+            "help_no_stdin_or_state",
+            "regression"
+          ],
+          "agreement_ids": [
+            "hexagonal_sync",
+            "typed_safe_errors"
+          ],
+          "reuse_from": [
+            "C1-T1"
+          ]
+        },
+        {
+          "id": "C1-T3",
+          "prompt": "Add per-command help to the `letopis` binary: `letopis COMMAND --help` must, for every public command, print to standard output and exit with status 0 an explanation of that command's actual stdin JSON input form (its fields, which are required and which are optional) and its constraints. `embed --drain` has its own explicit help rule and must be answered before standard input is read. The per-command help must agree with the general `--help` text and with docs/zkit/letopis/contracts/X-1-cli.md. Invalid argv combinations (unknown commands, extra arguments, and other combinations the contract does not define) must keep failing with the existing JSON failure and must never turn into a successful help response. `--version`, `--help` and all earlier behaviour must keep working.",
+          "check_ids": [
+            "command_help_forms",
+            "help_rejects_invalid_argv",
+            "regression"
+          ],
+          "agreement_ids": [
+            "hexagonal_sync",
+            "typed_safe_errors"
+          ],
+          "reuse_from": [
+            "C1-T1",
+            "C1-T2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C2",
+      "issue": {
+        "number": 43,
+        "url": "https://github.com/zaurkadiev/letopis/issues/43"
+      },
+      "scope": "Partial local-delivery increment of #43: package, install, check; no release, no four-target installation, no G-3.",
+      "condition_order": [
+        "memory",
+        "baseline"
+      ],
+      "selection_rationale": "Open backlog issue #43 (delivery). make release builds target/dist/letopis but no package/install/check scripts exist at the preparation base. T2 consumes the bundle contract fixed in T1 and T3 consumes the installed layout from T2.",
+      "recurring_facts": [
+        {
+          "id": "c2_dist_profile",
+          "fact": "make release builds target/dist/letopis with the dist profile (--locked --offline); packaging must consume that prebuilt binary and not rebuild it.",
+          "established_in": "C2-T1",
+          "recurs_in": [
+            "C2-T2",
+            "C2-T3"
+          ]
+        },
+        {
+          "id": "c2_skill_source",
+          "fact": "The only skill is skills/letopis/SKILL.md and must be delivered unmodified.",
+          "established_in": "C2-T1",
+          "recurs_in": [
+            "C2-T2",
+            "C2-T3"
+          ]
+        },
+        {
+          "id": "c2_layout_and_manifest_contract",
+          "fact": "Bundle and prefix share the relative paths bin/letopis and share/letopis/skills/letopis/SKILL.md; manifest.json lists sorted files[{path,sha256}].",
+          "established_in": "C2-T1",
+          "recurs_in": [
+            "C2-T2",
+            "C2-T3"
+          ]
+        },
+        {
+          "id": "c2_safe_replacement",
+          "fact": "An install must not leave a half-written or lost previous installation: stage in the prefix and replace atomically after verification.",
+          "established_in": "C2-T2",
+          "recurs_in": [
+            "C2-T3"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "C2-T1",
+          "prompt": "Create a local packaging script, standard library Python 3 only, invoked as `python3 scripts/package.py --binary PATH --skill PATH --output NEW_DIR`. It builds an installable bundle in the new directory NEW_DIR (which must not exist before the run) from an already built binary (the `make release` output at target/dist/letopis) and the skill file. Bundle layout: `bin/letopis` (a copy of the binary, executable), `share/letopis/skills/letopis/SKILL.md` (a copy of the skill file) and `manifest.json`. `manifest.json` is a JSON object with `version` (the package version from Cargo.toml), `source_commit` (the full Git commit of the repository the script runs in), `target` (the host target triple actually used; make no claim about other platforms) and `files`, a list of `{path, sha256}` objects sorted by path that covers every bundle file except `manifest.json`, with `path` relative to the bundle root using forward slashes and `sha256` as lowercase hex of the file bytes. Exit 0 on success and nonzero with a message on standard error otherwise. The script must not compile, download or publish anything. A missing, empty or non-file input, or an output directory that already exists, must be rejected without modifying anything in the source tree and without leaving a partial bundle. Do not rely on any `letopis` flags beyond what already exists.",
+          "check_ids": [
+            "bundle_layout",
+            "manifest_integrity",
+            "bundle_rejects_invalid_input",
+            "regression"
+          ],
+          "agreement_ids": [
+            "hexagonal_sync",
+            "typed_safe_errors"
+          ],
+          "reuse_from": []
+        },
+        {
+          "id": "C2-T2",
+          "prompt": "Create `scripts/install.py`, standard library Python 3 only, invoked as `python3 scripts/install.py --bundle DIR --prefix DIR`. It installs a bundle produced by `scripts/package.py` into the explicitly given user prefix, creating the prefix if it is missing: `PREFIX/bin/letopis` and `PREFIX/share/letopis/skills/letopis/SKILL.md`, the same relative paths as in the bundle. Before it changes anything it must verify `manifest.json` and the sha256 and presence of every listed file against the bundle contents. Exit 0 on success and nonzero on any failure. Installing the same bundle again must succeed and leave an identical result. A damaged or inconsistent bundle, or a collision at a destination path (for example a directory where a file belongs), must be rejected and must leave any previous installation in the prefix exactly as it was. No root privileges, no network access, and nothing written outside the prefix.",
+          "check_ids": [
+            "install_layout_and_repeat",
+            "install_failure_preserves_previous",
+            "regression"
+          ],
+          "agreement_ids": [
+            "hexagonal_sync",
+            "typed_safe_errors"
+          ],
+          "reuse_from": [
+            "C2-T1"
+          ]
+        },
+        {
+          "id": "C2-T3",
+          "prompt": "Create `scripts/check_install.py`, standard library Python 3 only, invoked as `python3 scripts/check_install.py --prefix DIR`. It verifies an installed delivery using only `PREFIX/bin/letopis` (by absolute path) and `PREFIX/share/letopis/skills/letopis/SKILL.md`, never the source tree, the Cargo target directory or a PATH lookup. In a fresh disposable Git repository that the script itself creates with a small Markdown note, it must run the workflow check, search, inspect and reindex through the installed binary (stdin JSON as in docs/zkit/letopis/contracts/X-1-cli.md, no embedding configuration) and verify that each step succeeds with sensible results. Exit 0 only when everything works; otherwise exit nonzero with a diagnostic naming what is wrong when the binary or the skill is missing, not executable, empty or damaged. It must not depend on the `--version` or `--help` flags, and it must not change the installed files or any project outside its own disposable repository.",
+          "check_ids": [
+            "installed_workflow",
+            "installed_missing_or_damaged",
+            "installed_independence",
+            "regression"
+          ],
+          "agreement_ids": [
+            "hexagonal_sync",
+            "typed_safe_errors"
+          ],
+          "reuse_from": [
+            "C2-T1",
+            "C2-T2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C3",
+      "issue": {
+        "number": 49,
+        "url": "https://github.com/zaurkadiev/letopis/issues/49"
+      },
+      "scope": "Partial bounded-drain increment of #49 with fixed bound 2; no throughput or whole-stack RAM verdict.",
+      "condition_order": [
+        "baseline",
+        "memory"
+      ],
+      "selection_rationale": "Open backlog issue #49 (concurrent document embedding). The executor at the preparation base runs document requests sequentially. T2 reuses the drain flow, attempt reservation and lock facts researched in T1; T3 reuses all of them for process-level behaviour.",
+      "recurring_facts": [
+        {
+          "id": "c3_drain_flow",
+          "fact": "wire_embedder -> Embedder::drain in src/service/embedding.rs reads work with read_next_embedding_work, calls reserve_attempt before the HTTP request, and bounds tries with the config's get_max_attempts.",
+          "established_in": "C3-T1",
+          "recurs_in": [
+            "C3-T2",
+            "C3-T3"
+          ]
+        },
+        {
+          "id": "c3_no_transaction_around_inference",
+          "fact": "No storage write unit spans inference (contract in src/service/embedding_traits.rs); the HTTP call happens between short writes.",
+          "established_in": "C3-T1",
+          "recurs_in": [
+            "C3-T2",
+            "C3-T3"
+          ]
+        },
+        {
+          "id": "c3_embed_lock_owner",
+          "fact": "embed.lock (src/filesystem/local.rs) is the single-owner lock of a drain; a second owner must not proceed and process death releases it.",
+          "established_in": "C3-T1",
+          "recurs_in": [
+            "C3-T3"
+          ]
+        },
+        {
+          "id": "c3_existing_http_fixture_is_serial",
+          "fact": "tests/support/embedding.rs serves requests one at a time, so an overlap test needs its own concurrent fixture; tests/support/drain.rs holds the existing drain helpers.",
+          "established_in": "C3-T1",
+          "recurs_in": [
+            "C3-T2",
+            "C3-T3"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "C3-T1",
+          "prompt": "Change the existing document-embedding drain (wired through `wire_embedder`, executed by `Embedder::drain`) so that two document embedding operations for different content hashes can be in flight at the same time. Neither the number of in-flight requests nor the number of buffered document texts and results may ever exceed 2, so do not load the text or results of the whole corpus into memory. A single coordinator owns the embedding lock for the drain and performs the short, serialized storage writes; no HTTP request may run inside a storage transaction. Constraints that apply to every part of this work: the bound is fixed at 2 and is not configurable (no new configuration field or option), use bounded `std` threads with blocking I/O, no async runtime, no batching of documents into one request, and no new dependency for concurrency. Respect the repository's hexagonal layout and synchronous design described in AGENTS.md. Existing behaviour and tests must keep passing.",
+          "check_ids": [
+            "two_requests_before_release",
+            "bounded_buffer",
+            "one_owner_short_writes",
+            "regression"
+          ],
+          "agreement_ids": [
+            "hexagonal_sync",
+            "typed_safe_errors"
+          ],
+          "reuse_from": []
+        },
+        {
+          "id": "C3-T2",
+          "prompt": "Make the concurrent embedding drain correct when results and errors arrive out of order. Documents with the same content hash must never be sent concurrently, and an attempt must be durably recorded before its HTTP request is sent. A malformed response or a failed request must not be lost and must not be retried forever: the existing attempt limit stays in force. If a document's text or the embedding configuration changes, or the document is removed, while its request is in flight, the stale result must not be accepted. Constraints that apply to every part of this work: the bound is fixed at 2 and is not configurable (no new configuration field or option), use bounded `std` threads with blocking I/O, no async runtime, no batching of documents into one request, and no new dependency for concurrency. Respect the repository's hexagonal layout and synchronous design described in AGENTS.md. If your earlier work already covers part of this, keep it and build on it; do not remove behaviour that is already correct.",
+          "check_ids": [
+            "shared_hash_durable_attempts",
+            "out_of_order_identity",
+            "invalid_retry_bound",
+            "regression"
+          ],
+          "agreement_ids": [
+            "hexagonal_sync",
+            "typed_safe_errors"
+          ],
+          "reuse_from": [
+            "C3-T1"
+          ]
+        },
+        {
+          "id": "C3-T3",
+          "prompt": "Integrate the bounded concurrent drain end to end with the real `letopis` binary and its process lifecycle, and add executable integration tests that run the actual binary. A genuinely detached drain process must perform overlapping HTTP requests against a local fixture server; while it owns the embedding lock a second drain owner must not proceed; `search` must keep working in parallel with the drain; when the drain process dies the lock must be released and the recorded attempts preserved; interrupting a foreground command with SIGINT must end only that command and must never kill a drain owned by another process. The documented drain and lock lifecycle semantics must be preserved. Fix any process-boundary defect you find. Constraints that apply to every part of this work: the bound is fixed at 2 and is not configurable (no new configuration field or option), use bounded `std` threads with blocking I/O, no async runtime, no batching of documents into one request, and no new dependency for concurrency. Respect the repository's hexagonal layout and synchronous design described in AGENTS.md. Do not add a new layer purely to wire components together.",
+          "check_ids": [
+            "detached_overlap",
+            "caller_owner_lifecycle",
+            "search_with_drain",
+            "regression"
+          ],
+          "agreement_ids": [
+            "hexagonal_sync",
+            "typed_safe_errors"
+          ],
+          "reuse_from": [
+            "C3-T1",
+            "C3-T2"
+          ]
+        }
+      ]
+    }
+  ]
+}
