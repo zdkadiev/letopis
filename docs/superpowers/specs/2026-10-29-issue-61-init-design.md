@@ -1,0 +1,27 @@
+# Issue 61 — Initialize a repository with a valid disabled configuration
+
+Status: implementation design for [issue #61](https://github.com/zaurkadiev/letopis/issues/61). The issue authorizes the new `init` behavior; this document records implementation choices where the issue leaves a choice.
+
+## Intent and boundaries
+
+A user in a Git work tree can run `letopis init` once before using Letopis. It prepares the existing private service directory and both database schemas, and creates an editable configuration that does not select a model or contact a provider. Running it again is safe. The old lazy behavior of other commands remains valid, and `config` continues to return `null` when the file is absent.
+
+Sources: [program structure](../../zkit/letopis/architecture.md#program-structure), [D-70](../../zkit/letopis/decisions.md#D-70), [D-95](../../zkit/letopis/decisions.md#D-95), [X-1](../../zkit/letopis/contracts/X-1-cli.md), and [MC-7](../../zkit/letopis/mechanics.md#mc-7--текущие-проблемы-и-status). This is an addition to D-70 and D-95, not a new configuration setter or model default.
+
+## Configuration contract
+
+The generated UTF-8 file is exactly `{"enabled":false}\n`. This is the sole disabled form: it has one required property, `enabled`, whose only valid value is `false`, and no other properties. The existing active form remains exactly `provider`, `model`, `parameters`, and `max_retries`, with no `enabled` field. A partial active form, `enabled:true`, `enabled:false` with provider fields, or any unknown root key is invalid. Duplicate JSON keys, nonfinite or inexact numbers, malformed JSON, provider-specific invalid values and unreadable files remain invalid. The X-1 `Configuration` schema is a `oneOf` for these two mutually exclusive forms; semantic URL and retry checks remain in the runtime/provider validation path.
+
+The application parses a file into a finite `Disabled | Ready(EmbeddingConfig)` value. It calls provider validation only for `Ready`. A successful `config` returns the validated disabled object or active object; a missing file still returns `null`. Malformed/unsupported content returns a safe `embedding_failed` error, while read failures return a safe `internal_error`. No raw bytes, endpoint, credentials, or file path are included in public diagnostics. `status` reports `invalid_embedding_config` for malformed, unreadable or provider-invalid files and none for absent/disabled/valid active files. Disabled and absent configurations leave search on FTS and make `embed --drain` finish successfully without inference. Status keeps the existing unavailable-policy count: `embedding_backlog` is the number of distinct indexed texts lacking a ready vector and may be nonzero, while `embedding_failed` is zero. Invalid configuration also falls back to FTS; it never resets vector identity or invokes the provider. A valid active file retains existing vector-identity semantics.
+
+## `init` lifecycle
+
+`letopis init` accepts only the empty JSON input `{}` through the normal CLI parser and returns `{"ok":true,"result":{}}` on success. `init --help` is a public help form. Before creating anything, resolve the current directory through the existing Git adapter and require an initialized, non-bare work tree. A subdirectory resolves to the Git root. Outside a work tree, return one safe `invalid_request` error saying that a Git repository is required; do not create service state. Use the existing self-contained Git object-store policy.
+
+After that guard, use the filesystem adapter to pin/create `.letopis/` and the storage adapter to open/bootstrap `cache.db` and `vectors.db`. The application service coordinates those interfaces. It validates any existing config through the same parser and provider boundary used by `config` before reporting success. A missing file is installed atomically without replacing another writer's file: write and sync a private temporary regular file in the pinned service directory, publish it with a no-clobber operation, then sync the directory. If publication loses a race, read and validate the winner. Never expose a partially written config to a reader. Existing valid edited config and valid schemas are preserved byte-for-byte; an existing malformed config, unsafe service path, inaccessible file, or incompatible database returns a safe failure and is never overwritten. If setup fails after creating some state, a later `init` can complete it; success never claims all-or-nothing initialization across the three files.
+
+Concurrent `init` processes may both succeed after one wins config publication and storage's existing bootstrap serialization completes. They leave one complete config and usable schemas. No new lock, daemon, provider, dependency, migration, or database state is introduced.
+
+## Evidence and delivery
+
+Cover absent, disabled, active edited, malformed, duplicate-key, unreadable and provider-invalid config; root/subdirectory/outside Git; repeated and concurrent init; existing malformed/incompatible state; schema/runtime agreement; and a smoke test invoking the real executable. Use independent expected literals, Given/When/Then markers, and mutation checks for new behavior. Update CLI help, X-1 prose/schema, the Letopis skill, and a new decision that explicitly amends D-70/D-95. Run `make check`, `make verify`, and the host storage runner with a new evidence directory because both product and storage-opening behavior are exercised. Inspect module boundaries and report exact results and any platform limits.
