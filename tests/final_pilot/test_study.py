@@ -532,13 +532,13 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual((code, report["state"]), (2, "unready"))
         self.assertIn("input_drift", report["pending"])
 
-    def test_evaluate_is_not_wired_and_never_reports_success(self):
+    def test_evaluate_without_prepared_inputs_never_reports_success(self):
         # When
         code, report = self.run_cli("evaluate", "--root", self.tmp, "--slot", "C1-T1-baseline")
 
         # Then
         self.assertEqual(code, 2)
-        self.assertEqual(report, {"error": "evaluate is not wired until Task 3"})
+        self.assertEqual(set(report), {"error"})
 
     def test_session_subcommand_exits_before_auth_or_executable(self):
         # Given: a trap auth path (a FIFO blocks any read) and a trap executable

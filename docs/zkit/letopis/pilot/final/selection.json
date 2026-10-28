@@ -68,7 +68,12 @@
             "hexagonal_sync",
             "typed_safe_errors"
           ],
-          "reuse_from": []
+          "reuse_from": [],
+          "acceptance": {
+            "oracle": "tests/final_pilot/oracles/cli.py",
+            "evaluate": "python3 tests/final_pilot/run.py evaluate --root ROOT --slot C1-T1-CONDITION",
+            "manual_checks": []
+          }
         },
         {
           "id": "C1-T2",
@@ -84,7 +89,12 @@
           ],
           "reuse_from": [
             "C1-T1"
-          ]
+          ],
+          "acceptance": {
+            "oracle": "tests/final_pilot/oracles/cli.py",
+            "evaluate": "python3 tests/final_pilot/run.py evaluate --root ROOT --slot C1-T2-CONDITION",
+            "manual_checks": []
+          }
         },
         {
           "id": "C1-T3",
@@ -101,7 +111,12 @@
           "reuse_from": [
             "C1-T1",
             "C1-T2"
-          ]
+          ],
+          "acceptance": {
+            "oracle": "tests/final_pilot/oracles/cli.py",
+            "evaluate": "python3 tests/final_pilot/run.py evaluate --root ROOT --slot C1-T3-CONDITION",
+            "manual_checks": []
+          }
         }
       ]
     },
@@ -168,7 +183,12 @@
             "hexagonal_sync",
             "typed_safe_errors"
           ],
-          "reuse_from": []
+          "reuse_from": [],
+          "acceptance": {
+            "oracle": "tests/final_pilot/oracles/delivery.py",
+            "evaluate": "python3 tests/final_pilot/run.py evaluate --root ROOT --slot C2-T1-CONDITION",
+            "manual_checks": []
+          }
         },
         {
           "id": "C2-T2",
@@ -184,7 +204,12 @@
           ],
           "reuse_from": [
             "C2-T1"
-          ]
+          ],
+          "acceptance": {
+            "oracle": "tests/final_pilot/oracles/delivery.py",
+            "evaluate": "python3 tests/final_pilot/run.py evaluate --root ROOT --slot C2-T2-CONDITION",
+            "manual_checks": []
+          }
         },
         {
           "id": "C2-T3",
@@ -202,7 +227,12 @@
           "reuse_from": [
             "C2-T1",
             "C2-T2"
-          ]
+          ],
+          "acceptance": {
+            "oracle": "tests/final_pilot/oracles/delivery.py",
+            "evaluate": "python3 tests/final_pilot/run.py evaluate --root ROOT --slot C2-T3-CONDITION",
+            "manual_checks": []
+          }
         }
       ]
     },
@@ -269,7 +299,15 @@
             "hexagonal_sync",
             "typed_safe_errors"
           ],
-          "reuse_from": []
+          "reuse_from": [],
+          "acceptance": {
+            "oracle": "tests/final_pilot/oracles/drain.py",
+            "evaluate": "python3 tests/final_pilot/run.py evaluate --root ROOT --slot C3-T1-CONDITION",
+            "manual_checks": [
+              "bounded_buffer"
+            ],
+            "probe": "tests/final_pilot/oracles/service_probe.rs"
+          }
         },
         {
           "id": "C3-T2",
@@ -286,7 +324,13 @@
           ],
           "reuse_from": [
             "C3-T1"
-          ]
+          ],
+          "acceptance": {
+            "oracle": "tests/final_pilot/oracles/drain.py",
+            "evaluate": "python3 tests/final_pilot/run.py evaluate --root ROOT --slot C3-T2-CONDITION",
+            "manual_checks": [],
+            "probe": "tests/final_pilot/oracles/service_probe.rs"
+          }
         },
         {
           "id": "C3-T3",
@@ -304,7 +348,13 @@
           "reuse_from": [
             "C3-T1",
             "C3-T2"
-          ]
+          ],
+          "acceptance": {
+            "oracle": "tests/final_pilot/oracles/drain.py",
+            "evaluate": "python3 tests/final_pilot/run.py evaluate --root ROOT --slot C3-T3-CONDITION",
+            "manual_checks": [],
+            "probe": "tests/final_pilot/oracles/service_probe.rs"
+          }
         }
       ]
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TK-30 operator CLI: model-free prepare, audit and (not yet wired) evaluate.
+"""TK-30 operator CLI: model-free prepare, audit and private evaluate.
 
 There is deliberately no session or exec subcommand: this tool never reads credentials,
 starts an agent or contacts a provider.
@@ -19,6 +19,7 @@ import subprocess
 from pathlib import Path
 
 import copies
+import evaluation
 import study
 
 HERE = Path(__file__).resolve().parent
@@ -47,7 +48,7 @@ def main(argv: list[str]) -> int:
         args = build_parser().parse_args(argv)
         return args.handler(args)
     except (UsageError, OSError, ValueError, KeyError, TypeError,
-            subprocess.SubprocessError) as error:
+            subprocess.SubprocessError, evaluation.InfraError) as error:
         return emit({"error": str(error)}, EXIT_INVALID)
 
 
@@ -108,7 +109,8 @@ def run_audit(args: argparse.Namespace) -> int:
 
 
 def run_evaluate(args: argparse.Namespace) -> int:
-    return emit({"error": "evaluate is not wired until Task 3"}, EXIT_INVALID)
+    """Grade one captured slot; exit 0 even when checks fail or the status is infra_error."""
+    return emit(evaluation.evaluate(args.root, args.slot), EXIT_OK)
 
 
 def add_seed_drift(readiness: dict, root: Path, manifest: dict) -> None:
