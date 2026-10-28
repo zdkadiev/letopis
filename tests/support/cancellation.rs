@@ -1,6 +1,4 @@
 use serde_json::Value;
-#[cfg(target_os = "macos")]
-use std::process::{Command, Stdio};
 use std::{
     ffi::{CString, OsStr, OsString},
     fs::{self, File, OpenOptions},
@@ -21,7 +19,13 @@ use std::{
 };
 use tempfile::TempDir;
 
+/// Native observations that distinguish real stdin and flock waits from startup.
+#[path = "cancellation/observation.rs"]
+pub(crate) mod observation;
+
+/// Maximum wait for an owned process or readiness checkpoint.
 pub const WAIT: Duration = Duration::from_secs(20);
+/// Independent literal expected from handled cancellation.
 pub const CANCELLED_ENVELOPE: &[u8] =
     b"{\"ok\":false,\"error\":{\"code\":\"cancelled\",\"message\":\"command cancelled\",\"details\":{}}}\n";
 
@@ -75,120 +79,6 @@ pub fn create_stdin_fifo(directory: &Path) -> (File, PathBuf) {
     (file, path)
 }
 
-/// Wait until the process main thread is blocked reading the test FIFO.
-///
-/// # Panics
-/// Panics when no native read observation appears before the watchdog expires.
-#[cfg(target_os = "macos")]
-pub fn observe_stdin_wait(pid: u32, _stdin: &Path) -> String {
-    let deadline = Instant::now() + WAIT;
-    loop {
-        let trace = sample_process(pid);
-        if stdin_read_observed(&trace) {
-            return format!("inside=stdin\n{trace}");
-        }
-        assert!(
-            Instant::now() < deadline,
-            "process never entered stdin read:\n{trace}"
-        );
-        thread::sleep(Duration::from_millis(5));
-    }
-}
-
-/// Wait until the process main thread is blocked reading the test FIFO.
-///
-/// # Panics
-/// Panics when no matching syscall and descriptor identity appears before the watchdog expires.
-#[cfg(target_os = "linux")]
-pub fn observe_stdin_wait(pid: u32, stdin: &Path) -> String {
-    wait_for_trace(
-        || {
-            let syscall = fs::read_to_string(format!("/proc/{pid}/syscall")).ok()?;
-            let fields = syscall.split_whitespace().collect::<Vec<_>>();
-            let number = fields.first()?.parse::<libc::c_long>().ok()?;
-            let descriptor = fields.get(1)?.strip_prefix("0x")?;
-            if number != libc::SYS_read || u64::from_str_radix(descriptor, 16).ok()? != 0 {
-                return None;
-            }
-            let observed = fs::read_link(format!("/proc/{pid}/fd/0")).ok()?;
-            if observed.as_path() != stdin {
-                return None;
-            }
-            Some(format!(
-                "inside=stdin\n{}",
-                serde_json::json!({
-                    "pid": pid,
-                    "syscall": syscall,
-                    "stdin": observed,
-                })
-            ))
-        },
-        "stdin read",
-    )
-}
-
-/// Wait until the process main thread is blocked in the real index lock syscall.
-///
-/// # Panics
-/// Panics when no matching native observation appears before the watchdog expires.
-#[cfg(target_os = "macos")]
-pub fn observe_index_flock(pid: u32, _lock: &Path) -> String {
-    let deadline = Instant::now() + WAIT;
-    loop {
-        let trace = sample_process(pid);
-        if trace.contains("lock_index")
-            && has_native_frame(&trace, "flock", "libsystem_kernel.dylib")
-        {
-            return format!("inside=flock\n{trace}");
-        }
-        assert!(
-            Instant::now() < deadline,
-            "process never entered blocking flock:\n{trace}"
-        );
-        thread::sleep(Duration::from_millis(5));
-    }
-}
-
-/// Wait until the process main thread is blocked in the real index lock syscall.
-///
-/// # Panics
-/// Panics when no matching syscall and descriptor identity appears before the watchdog expires.
-#[cfg(target_os = "linux")]
-pub fn observe_index_flock(pid: u32, lock: &Path) -> String {
-    wait_for_trace(
-        || {
-            let syscall = fs::read_to_string(format!("/proc/{pid}/syscall")).ok()?;
-            let fields = syscall.split_whitespace().collect::<Vec<_>>();
-            let number = fields.first()?.parse::<libc::c_long>().ok()?;
-            let descriptor = fields.get(1)?.strip_prefix("0x")?;
-            let operation = fields.get(2)?.strip_prefix("0x")?;
-            if number != libc::SYS_flock
-                || i32::try_from(u64::from_str_radix(operation, 16).ok()?).ok()? != libc::LOCK_EX
-            {
-                return None;
-            }
-            let descriptor = u64::from_str_radix(descriptor, 16).ok()?;
-            let path = PathBuf::from(format!("/proc/{pid}/fd/{descriptor}"));
-            let observed = fs::metadata(&path).ok()?;
-            let expected = fs::metadata(lock).ok()?;
-            if observed.ino() != expected.ino() || observed.dev() != expected.dev() {
-                return None;
-            }
-            Some(format!(
-                "inside=flock\n{}",
-                serde_json::json!({
-                    "pid": pid,
-                    "syscall": syscall,
-                    "descriptor": path,
-                    "device": observed.dev(),
-                    "inode": observed.ino(),
-                })
-            ))
-        },
-        "blocking flock",
-    )
-}
-
 /// Assert that another open description cannot take the index lock.
 ///
 /// # Panics
@@ -228,17 +118,22 @@ pub fn wait_until_index_lock_free(path: &Path) {
 }
 
 /// Capture the stable device/inode identity of the persistent lock file.
-pub fn lock_identity(path: &Path) -> (u64, u64) {
+pub fn read_lock_identity(path: &Path) -> (u64, u64) {
     let metadata = fs::metadata(path).expect("index lock metadata");
     (metadata.dev(), metadata.ino())
 }
 
 /// Own the Unix listener that receives a live wrapper acknowledgement.
+#[derive(Debug)]
 pub struct ObserverSocket {
     _directory: TempDir,
     listener: UnixListener,
 }
 impl ObserverSocket {
+    /// Bind an owned observer socket in a short temporary path.
+    ///
+    /// # Panics
+    /// Panics if temporary directory creation or socket binding fails.
     pub fn new() -> Self {
         let directory = tempfile::Builder::new()
             .prefix("tk29-observer-")
@@ -262,11 +157,16 @@ impl ObserverSocket {
 }
 
 /// Test-owned Git executable that proxies non-target argv and reports the live `ls-files` child.
+#[derive(Debug)]
 pub struct GitProxy {
     _directory: TempDir,
     path: OsString,
 }
 impl GitProxy {
+    /// Create an executable Git proxy that acknowledges the targeted child.
+    ///
+    /// # Panics
+    /// Panics if tools cannot be resolved or the executable cannot be created.
     pub fn new(observer: &Path) -> Self {
         let python = resolve_program("python3").display().to_string();
         let real_git = resolve_program("git");
@@ -310,11 +210,16 @@ impl GitProxy {
 }
 
 /// The acknowledged live Git wrapper and a guard that releases it on every exit path.
+#[derive(Debug)]
 pub struct WrapperConnection {
     stream: Option<UnixStream>,
     pid: i32,
 }
 impl WrapperConnection {
+    /// Accept and validate one live ls-files acknowledgement within the watchdog.
+    ///
+    /// # Panics
+    /// Panics on timeout, I/O failure or a malformed child acknowledgement.
     pub fn accept(listener: &UnixListener) -> Self {
         wait_readable(listener.as_raw_fd(), WAIT);
         let (stream, _) = listener.accept().expect("wrapper connection");
@@ -344,6 +249,10 @@ impl WrapperConnection {
         }
     }
 
+    /// Assert that the acknowledged child still holds its observer connection.
+    ///
+    /// # Panics
+    /// Panics if the stream is absent or has closed or unexpected pending data.
     pub fn assert_alive(&self) {
         let stream = self.stream.as_ref().expect("observer stream");
         let revents = poll_observer(stream, Duration::ZERO);
@@ -354,6 +263,10 @@ impl WrapperConnection {
         );
     }
 
+    /// Release the child and consume its observer EOF within the watchdog.
+    ///
+    /// # Panics
+    /// Panics on I/O failure, timeout or unexpected child output.
     pub fn release_and_wait(mut self) {
         let stream = self.stream.take().expect("observer stream");
         stream.shutdown(Shutdown::Write).expect("wrapper release");
@@ -367,112 +280,12 @@ impl WrapperConnection {
             "Git wrapper wrote unexpected data"
         );
     }
-
-    fn release(&mut self) {
-        if let Some(stream) = self.stream.take() {
-            let _ = stream.shutdown(Shutdown::Both);
-        }
-    }
 }
 impl Drop for WrapperConnection {
     fn drop(&mut self) {
-        self.release();
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn sample_process(pid: u32) -> String {
-    let trace = tempfile::NamedTempFile::new().expect("sample file");
-    let status = Command::new("/usr/bin/sample")
-        .arg(pid.to_string())
-        .args(["1", "1", "-file"])
-        .arg(trace.path())
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .expect("run sample");
-    assert!(status.success(), "sample failed for pid {pid}");
-    fs::read_to_string(trace.path()).expect("sample trace")
-}
-
-#[cfg(target_os = "macos")]
-fn has_native_frame(trace: &str, symbol: &str, image: &str) -> bool {
-    trace
-        .lines()
-        .any(|line| is_counted_native_frame(line, symbol, image))
-}
-
-#[cfg(target_os = "macos")]
-fn stdin_read_observed(trace: &str) -> bool {
-    let Some(main) = main_thread_trace(trace) else {
-        return false;
-    };
-    let Some(read) = main
-        .lines()
-        .position(|line| is_counted_native_frame(line, "read", "libsystem_kernel.dylib"))
-    else {
-        return false;
-    };
-    let Some(parse) = main
-        .lines()
-        .position(|line| line.contains("letopis::cli::input::parse_request"))
-    else {
-        return false;
-    };
-    let Some(stdin) = main.lines().position(|line| line.contains("Stdin")) else {
-        return false;
-    };
-    read > parse && read > stdin
-}
-
-#[cfg(target_os = "macos")]
-fn main_thread_trace(trace: &str) -> Option<&str> {
-    let marker = trace.find("com.apple.main-thread")?;
-    let start = trace[..marker].rfind('\n').map_or(0, |index| index + 1);
-    let rest = &trace[start..];
-    let mut end = rest.len();
-    let mut offset = 0;
-    for line in rest.split_inclusive('\n') {
-        if offset > 0 && is_thread_header(line) {
-            end = offset;
-            break;
+        if let Some(stream) = self.stream.take() {
+            let _ = stream.shutdown(Shutdown::Both);
         }
-        offset += line.len();
-    }
-    Some(&rest[..end])
-}
-
-#[cfg(target_os = "macos")]
-fn is_thread_header(line: &str) -> bool {
-    let counted = line.split_whitespace().next();
-    counted.is_some_and(|count| count.parse::<u64>().is_ok()) && line.contains("Thread_")
-}
-
-#[cfg(target_os = "macos")]
-fn is_counted_native_frame(line: &str, symbol: &str, image: &str) -> bool {
-    // Sample indents counted frames with tree glyphs such as `+`.
-    let counted = line.trim_start_matches(|character: char| !character.is_ascii_digit());
-    let mut fields = counted.split_whitespace();
-    fields
-        .next()
-        .is_some_and(|count| count.parse::<u64>().is_ok())
-        && fields.next() == Some(symbol)
-        && line.contains(image)
-}
-
-#[cfg_attr(
-    target_os = "macos",
-    expect(dead_code, reason = "Only Linux observers use the polling helper")
-)]
-fn wait_for_trace(mut observe: impl FnMut() -> Option<String>, waiting: &str) -> String {
-    let deadline = Instant::now() + WAIT;
-    loop {
-        if let Some(trace) = observe() {
-            return trace;
-        }
-        assert!(Instant::now() < deadline, "process never entered {waiting}");
-        thread::sleep(Duration::from_millis(5));
     }
 }
 
@@ -493,6 +306,21 @@ fn wait_readable(fd: i32, timeout: Duration) {
     assert_eq!(ready, 1, "observer connection timeout");
 }
 
+fn wait_for_observer_close(stream: &UnixStream, timeout: Duration) -> i16 {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let revents = poll_observer(stream, Duration::ZERO);
+        if revents != 0 {
+            return revents;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Git wrapper did not close its observer socket"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+}
+
 fn poll_observer(stream: &UnixStream, timeout: Duration) -> i16 {
     let mut poll = libc::pollfd {
         fd: stream.as_raw_fd(),
@@ -509,21 +337,6 @@ fn poll_observer(stream: &UnixStream, timeout: Duration) -> i16 {
     };
     assert!(ready >= 0, "observer poll failed");
     if ready == 0 { 0 } else { poll.revents }
-}
-
-fn wait_for_observer_close(stream: &UnixStream, timeout: Duration) -> i16 {
-    let deadline = Instant::now() + timeout;
-    loop {
-        let revents = poll_observer(stream, Duration::ZERO);
-        if revents != 0 {
-            return revents;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "Git wrapper did not close its observer socket"
-        );
-        thread::sleep(Duration::from_millis(5));
-    }
 }
 
 fn resolve_program(name: &str) -> PathBuf {

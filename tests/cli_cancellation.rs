@@ -9,14 +9,15 @@ mod support;
 #[path = "support/cancellation.rs"]
 mod cancellation;
 
+use cancellation::observation::{observe_index_flock, observe_stdin_wait};
 use cancellation::{
     CANCELLED_ENVELOPE, GitProxy, ObserverSocket, WAIT, WrapperConnection, assert_cancelled_output,
-    assert_index_lock_held, create_stdin_fifo, lock_identity, observe_index_flock,
-    observe_stdin_wait, wait_until_index_lock_free,
+    assert_index_lock_held, create_stdin_fifo, read_lock_identity, wait_until_index_lock_free,
 };
 use letopis::{open_filesystem, service::FileSystem};
 use serde_json::{Value, json};
 use std::{
+    ffi::OsStr,
     io::Write,
     process::{Command, Stdio},
 };
@@ -67,7 +68,7 @@ fn cancels_waiting_index_lock_without_killing_holder() {
     let filesystem = open_filesystem(repo.get_root()).expect("filesystem");
     let holder = filesystem.lock_index().expect("holder lock");
     let lock = repo.get_root().join(".letopis/index.lock");
-    let identity = lock_identity(&lock);
+    let identity = read_lock_identity(&lock);
     let mut child = spawn_reading(&repo, "reindex");
     child.send_input(b"{}");
     // When: signal only after the product main thread is blocked in flock.
@@ -78,7 +79,7 @@ fn cancels_waiting_index_lock_without_killing_holder() {
     // Then: the holder is intact and its lock file is unchanged.
     assert_cancelled_output(&output, "lock waiter", &[CANCELLATION_CANARY]);
     assert_index_lock_held(&lock);
-    assert_eq!(lock_identity(&lock), identity);
+    assert_eq!(read_lock_identity(&lock), identity);
     drop(holder);
     let completed = repo.invoke(&["reindex"], b"{}");
     assert_eq!(completed.status.code(), Some(0), "{completed:?}");
@@ -146,11 +147,7 @@ fn spawn_reading(repo: &ReadingRepo, command: &str) -> cli::OwnedChild {
     spawn_reading_with_path(repo, command, &path)
 }
 
-fn spawn_reading_with_path(
-    repo: &ReadingRepo,
-    command: &str,
-    path: &std::ffi::OsStr,
-) -> cli::OwnedChild {
+fn spawn_reading_with_path(repo: &ReadingRepo, command: &str, path: &OsStr) -> cli::OwnedChild {
     let mut process = Command::new(env!("CARGO_BIN_EXE_letopis"));
     isolate_command(&mut process);
     process

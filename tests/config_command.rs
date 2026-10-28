@@ -7,6 +7,7 @@ use std::{
     io::{ErrorKind, Seek, Write},
     net::TcpListener,
     os::unix::fs::{MetadataExt, PermissionsExt, symlink},
+    path::PathBuf,
     process::{Command, Output, Stdio},
 };
 use support::{git::isolate_command, reading::ReadingRepo};
@@ -256,7 +257,7 @@ fn service_entry_names(repo: &ReadingRepo) -> Vec<String> {
     service_entries(repo).into_keys().collect()
 }
 
-fn service_entries(repo: &ReadingRepo) -> BTreeMap<String, std::path::PathBuf> {
+fn service_entries(repo: &ReadingRepo) -> BTreeMap<String, PathBuf> {
     let directory = repo.get_root().join(".letopis");
     fs::read_dir(&directory)
         .unwrap()

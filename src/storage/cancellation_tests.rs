@@ -5,12 +5,13 @@ use crate::{
     process::SigintListener,
     service::{
         CacheWrite, CommandError, CommandErrorKind, FileRow, KnowledgeMetadata, NodeMetadata,
-        Storage, StorageRead,
+        Storage, StorageRead, StoredNode,
     },
 };
 use rusqlite::Connection;
 use serde_json::Value;
 use std::{
+    ffi::{c_int, c_void},
     fs::{self, File},
     io::{BufRead, BufReader, Read, Write},
     os::{
@@ -104,13 +105,16 @@ fn sqlite_step_child() {
     let Some(paths) = Paths::from_environment() else {
         return;
     };
+    // Given: a parent-owned publication and cancellation output.
     let mut storage = open_storage(&paths);
     let _listener = install_listener(&paths.output);
     let control = UnixStream::connect(&paths.socket).expect("control connection");
     write_event(control.try_clone().expect("barrier clone"), "staged");
     let barrier = register_sql_barrier(&storage.cache_writer, control);
+    // When: stage real changes at the selected cancellation boundary.
     let mut unit = storage.begin_cache_write().expect("cache unit");
     stage(&mut unit, "b.md", "NewToken");
+    // Then: the armed callback holds the SQL step until process termination.
     barrier.arm();
     let _ = unit.commit();
 }
@@ -121,11 +125,14 @@ fn before_commit_child() {
     let Some(paths) = Paths::from_environment() else {
         return;
     };
+    // Given: a parent-owned publication and cancellation output.
     let mut storage = open_storage(&paths);
     let _listener = install_listener(&paths.output);
     let mut control = UnixStream::connect(&paths.socket).expect("control connection");
+    // When: stage real changes at the selected cancellation boundary.
     let mut unit = storage.begin_cache_write().expect("cache unit");
     stage(&mut unit, "b.md", "NewToken");
+    // Then: keep the transaction uncommitted until process termination.
     writeln!(control, "staged").expect("staged acknowledgement");
     hold_until_parent_closes(control);
 }
@@ -136,12 +143,15 @@ fn after_commit_child() {
     let Some(paths) = Paths::from_environment() else {
         return;
     };
+    // Given: a parent-owned publication and cancellation output.
     let mut storage = open_storage(&paths);
     let _listener = install_listener(&paths.output);
     let mut control = UnixStream::connect(&paths.socket).expect("control connection");
+    // When: stage real changes at the selected cancellation boundary.
     let mut unit = storage.begin_cache_write().expect("cache unit");
     stage(&mut unit, "b.md", "NewToken");
     let revision = unit.commit().expect("committed publication");
+    // Then: acknowledge only the completed commit before awaiting cancellation.
     writeln!(control, "committed {revision}").expect("commit acknowledgement");
     hold_until_parent_closes(control);
 }
@@ -220,7 +230,7 @@ impl ProgressBarrier {
     }
 }
 
-unsafe extern "C" fn sqlite_progress(context: *mut std::ffi::c_void) -> std::ffi::c_int {
+unsafe extern "C" fn sqlite_progress(context: *mut c_void) -> c_int {
     // SAFETY: SQLite passes the exact leaked context registered above; it lives
     // until this private child process exits even when the callback blocks.
     let state = unsafe { &*context.cast::<ProgressState>() };
@@ -320,7 +330,7 @@ fn read_publication(paths: &Paths) -> Publication {
     }
 }
 
-fn get_node_id(node: &crate::service::StoredNode) -> String {
+fn get_node_id(node: &StoredNode) -> String {
     match &node.metadata {
         NodeMetadata::Knowledge(knowledge) => knowledge.id.as_str().to_owned(),
         NodeMetadata::Source(source) => source.uri.as_str().to_owned(),

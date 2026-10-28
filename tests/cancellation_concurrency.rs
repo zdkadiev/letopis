@@ -14,7 +14,8 @@ mod support;
 
 use cancellation::{
     GitProxy, ObserverSocket, WAIT, WrapperConnection, assert_cancelled_output,
-    assert_index_lock_held, lock_identity, observe_index_flock, wait_until_index_lock_free,
+    assert_index_lock_held, observation::observe_index_flock, read_lock_identity,
+    wait_until_index_lock_free,
 };
 use letopis::{
     domain::{EdgeTarget, KnowledgeId, Sha256},
@@ -48,7 +49,7 @@ fn cancelling_holder_releases_index_lock() {
     let wrapper = WrapperConnection::accept(observer.get_listener());
     let lock = repo.get_root().join(".letopis/index.lock");
     assert_index_lock_held(&lock);
-    let identity = lock_identity(&lock);
+    let identity = read_lock_identity(&lock);
     // When
     child.send_sigint();
     let output = child.collect_output(WAIT);
@@ -56,7 +57,7 @@ fn cancelling_holder_releases_index_lock() {
     assert_cancelled_output(&output, "index holder", &["HolderToken", "ls-files"]);
     wrapper.release_and_wait();
     wait_until_index_lock_free(&lock);
-    assert_eq!(lock_identity(&lock), identity);
+    assert_eq!(read_lock_identity(&lock), identity);
     assert_eq!(publish(&repo), 1);
     assert_search_result(&repo, "HolderToken", 1);
 }
@@ -69,7 +70,7 @@ fn cancelling_waiter_preserves_holder_and_lock_inode() {
     let files = open_filesystem(repo.get_root()).expect("filesystem");
     let holder = files.lock_index().expect("holder lock");
     let lock = repo.get_root().join(".letopis/index.lock");
-    let identity = lock_identity(&lock);
+    let identity = read_lock_identity(&lock);
     let mut child = spawn_product(&repo, &["reindex"], None);
     child.send_input(b"{}");
     let observation = observe_index_flock(child.get_id(), &lock);
@@ -80,7 +81,7 @@ fn cancelling_waiter_preserves_holder_and_lock_inode() {
     // Then: the foreign holder and its lock file survive the waiter's death.
     assert_cancelled_output(&output, "index waiter", &["WaiterToken"]);
     assert_index_lock_held(&lock);
-    assert_eq!(lock_identity(&lock), identity);
+    assert_eq!(read_lock_identity(&lock), identity);
     drop(holder);
     wait_until_index_lock_free(&lock);
     assert_eq!(publish(&repo), 1);

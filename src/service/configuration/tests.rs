@@ -1,6 +1,6 @@
 use super::ConfigurationService;
 use crate::service::{
-    CommandErrorKind, CommandResult, ConfigReader, EmbeddingConfig, EmbeddingError,
+    CommandError, CommandErrorKind, CommandResult, ConfigReader, EmbeddingConfig, EmbeddingError,
     EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult, HeldLock, ProviderKind, StatusFiles,
 };
 use serde_json::json;
@@ -153,7 +153,7 @@ fn maps_read_failure_without_exposing_causes() {
     assert_eq!(provider.embeddings.get(), 0);
 }
 
-fn assert_invalid_configuration_error(error: &crate::service::CommandError) {
+fn assert_invalid_configuration_error(error: &CommandError) {
     assert_eq!(error.get_kind(), CommandErrorKind::EmbeddingFailed);
     assert_eq!(error.get_message(), "invalid embedding configuration");
     assert!(!format!("{error:?}").contains("CONFIG_CANARY"));

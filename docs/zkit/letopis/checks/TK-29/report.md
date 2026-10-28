@@ -265,3 +265,11 @@ cheap report/matrix/plan fixes. A scoped re-review of `a0b7614..bb7847f` confirm
 every finding ADDRESSED with no new Critical/Important breakage. The final host
 and Linux runners were then repeated on the clean `bb7847f` tree; their 844/0/10
 counts and hashes above replace the pre-fix receipts. G-2 remains **not passed**.
+
+
+## Independent review follow-up (2026-10-28)
+
+A subsequent [implementation and AGENTS.md review](review-2026-10-28.md) found
+two test-proof gaps and minor style violations, now corrected in the worktree.
+These follow-up results supplement the captured receipts above; formal G-2
+remains not passed.

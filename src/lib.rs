@@ -84,64 +84,6 @@ pub fn run_process_cli() -> u8 {
     run_process_cli_with(&args, io::stdin(), &mut output, SigintListener::install)
 }
 
-fn run_process_cli_with<F>(
-    args: &[OsString],
-    input: impl Read,
-    output: &mut dyn Write,
-    install: F,
-) -> u8
-where
-    F: FnOnce(Box<dyn FnOnce() + Send>) -> io::Result<SigintListener>,
-{
-    let writer = Arc::new(ResponseWriter::default());
-    let Ok(listener) = install_foreground_listener(args, &writer, install) else {
-        let error = CommandError::new(
-            CommandErrorKind::InternalError,
-            "cannot install command cancellation",
-        );
-        return writer.write_response(output, Err(error));
-    };
-    let exit = writer.write_response(output, execute_request(args, input));
-    drop(listener);
-    exit
-}
-
-fn install_foreground_listener<F>(
-    args: &[OsString],
-    writer: &Arc<ResponseWriter>,
-    install: F,
-) -> io::Result<Option<SigintListener>>
-where
-    F: FnOnce(Box<dyn FnOnce() + Send>) -> io::Result<SigintListener>,
-{
-    if !requires_cancellation_handler(args) {
-        return Ok(None);
-    }
-    let writer = Arc::clone(writer);
-    let on_interrupt = Box::new(move || {
-        let response = Err(CommandError::new(
-            CommandErrorKind::Cancelled,
-            "command cancelled",
-        ));
-        let mut output = io::stdout();
-        let _ = writer.write_response(&mut output, response);
-    });
-    install(on_interrupt).map(Some)
-}
-
-fn requires_cancellation_handler(args: &[OsString]) -> bool {
-    match args {
-        [command] => command
-            .to_str()
-            .is_some_and(|command| FOREGROUND_COMMANDS.contains(&command)),
-        _ => false,
-    }
-}
-
-fn execute_request(args: &[OsString], input: impl Read) -> CommandResult<CommandResponse> {
-    parse_request(args, input).and_then(run_request)
-}
-
 /// Construct current diagnostics without opening storage or performing I/O.
 /// The caller supplies the consistent read view to each operation.
 pub fn wire_graph_diagnostics() -> impl GraphDiagnostics {
@@ -445,6 +387,64 @@ pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage 
 /// Reports an inaccessible or non-directory root, including a symlink root.
 pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLocker + use<>> {
     LocalFileSystem::open(root)
+}
+
+fn run_process_cli_with<F>(
+    args: &[OsString],
+    input: impl Read,
+    output: &mut dyn Write,
+    install: F,
+) -> u8
+where
+    F: FnOnce(Box<dyn FnOnce() + Send>) -> io::Result<SigintListener>,
+{
+    let writer = Arc::new(ResponseWriter::default());
+    let Ok(listener) = install_foreground_listener(args, &writer, install) else {
+        let error = CommandError::new(
+            CommandErrorKind::InternalError,
+            "cannot install command cancellation",
+        );
+        return writer.write_response(output, Err(error));
+    };
+    let exit = writer.write_response(output, execute_request(args, input));
+    drop(listener);
+    exit
+}
+
+fn install_foreground_listener<F>(
+    args: &[OsString],
+    writer: &Arc<ResponseWriter>,
+    install: F,
+) -> io::Result<Option<SigintListener>>
+where
+    F: FnOnce(Box<dyn FnOnce() + Send>) -> io::Result<SigintListener>,
+{
+    if !requires_cancellation_handler(args) {
+        return Ok(None);
+    }
+    let writer = Arc::clone(writer);
+    let on_interrupt = Box::new(move || {
+        let response = Err(CommandError::new(
+            CommandErrorKind::Cancelled,
+            "command cancelled",
+        ));
+        let mut output = io::stdout();
+        let _ = writer.write_response(&mut output, response);
+    });
+    install(on_interrupt).map(Some)
+}
+
+fn requires_cancellation_handler(args: &[OsString]) -> bool {
+    match args {
+        [command] => command
+            .to_str()
+            .is_some_and(|command| FOREGROUND_COMMANDS.contains(&command)),
+        _ => false,
+    }
+}
+
+fn execute_request(args: &[OsString], input: impl Read) -> CommandResult<CommandResponse> {
+    parse_request(args, input).and_then(run_request)
 }
 
 fn map_check_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {

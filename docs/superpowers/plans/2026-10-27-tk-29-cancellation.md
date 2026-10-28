@@ -181,3 +181,11 @@ user selects Subagent-driven instead, preserve these task interfaces and apply
 fresh implementation/review gates. This is a recommendation, not a selected method.
 Wait for plan approval and execution authorization; the user explicitly requested
 plan preparation only.
+
+
+## Independent implementation review (2026-10-28)
+
+The subsequent review strengthened actual repeated-SIGINT coverage, replaced
+the pressure timing heuristic with a WouldBlock checkpoint and corrected scoped
+AGENTS.md violations. The accepted behavior and task boundaries are unchanged.
+See [review findings and verification](../../zkit/letopis/checks/TK-29/review-2026-10-28.md).

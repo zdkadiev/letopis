@@ -6,6 +6,7 @@ mod response;
 
 pub(crate) use input::{Request, parse_request};
 pub(crate) use output::write_response;
+/// Owns response serialization and write/flush arbitration for one process.
 pub(crate) use response::{CommandResponse, ResponseResult, ResponseWriter, finish_foreground};
 
 #[cfg(test)]

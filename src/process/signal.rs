@@ -31,6 +31,15 @@ impl SigintListener {
         Self::start_with(signals, spawn_listener, on_interrupt)
     }
 
+    #[cfg(test)]
+    fn install_with(
+        register: impl FnOnce() -> io::Result<Signals>,
+        spawn: impl FnOnce(Box<dyn FnOnce() + Send + 'static>) -> io::Result<JoinHandle<()>>,
+        on_interrupt: Box<dyn FnOnce() + Send>,
+    ) -> io::Result<Self> {
+        Self::start_with(register()?, spawn, on_interrupt)
+    }
+
     fn start_with(
         mut signals: Signals,
         spawn: impl FnOnce(Box<dyn FnOnce() + Send + 'static>) -> io::Result<JoinHandle<()>>,
@@ -48,15 +57,6 @@ impl SigintListener {
             handle,
             thread: Some(thread),
         })
-    }
-
-    #[cfg(test)]
-    fn install_with(
-        register: impl FnOnce() -> io::Result<Signals>,
-        spawn: impl FnOnce(Box<dyn FnOnce() + Send + 'static>) -> io::Result<JoinHandle<()>>,
-        on_interrupt: Box<dyn FnOnce() + Send>,
-    ) -> io::Result<Self> {
-        Self::start_with(register()?, spawn, on_interrupt)
     }
 }
 
@@ -279,6 +279,7 @@ mod tests {
         // Given
         let writer = Arc::new(ResponseWriter::default());
         let callback_writer = Arc::clone(&writer);
+        // When: install the actual process listener.
         let _listener = SigintListener::install(Box::new(move || {
             let response = Err(CommandError::new(
                 CommandErrorKind::Cancelled,
@@ -288,8 +289,8 @@ mod tests {
             let _ = callback_writer.write_response(&mut output, response);
         }))
         .unwrap();
+        // Then: advertise registration and remain alive for the owned signal.
         fs::write(marker, b"ready").unwrap();
-        // When: wait for the parent to deliver SIGINT.
         loop {
             thread::park();
         }

@@ -97,7 +97,28 @@ struct TraversedEdge<'a> {
     edge_type: &'a str,
 }
 
+/// Write and flush one complete X-1 envelope to the caller-owned output.
+/// Returns 0 for a fully written success, or 1 for command, encoding or I/O failure.
+pub(crate) fn write_response(
+    mut output: impl Write,
+    response: CommandResult<CommandResponse>,
+) -> u8 {
+    let Ok((bytes, exit)) = encode_response(response) else {
+        return 1;
+    };
+    if output
+        .write_all(&bytes)
+        .and_then(|()| output.flush())
+        .is_err()
+    {
+        return 1;
+    }
+    exit
+}
 /// Serialize one complete response: the X-1 envelope with its final newline, or plain help text.
+///
+/// # Errors
+/// Returns a serialization error without emitting any response bytes.
 pub(crate) fn encode_response(
     response: CommandResult<CommandResponse>,
 ) -> Result<(Vec<u8>, u8), serde_json::Error> {
@@ -133,23 +154,6 @@ pub(crate) fn encode_response(
     let mut bytes = encoded?;
     bytes.push(b'\n');
     Ok((bytes, exit))
-}
-
-pub(crate) fn write_response(
-    mut output: impl Write,
-    response: CommandResult<CommandResponse>,
-) -> u8 {
-    let Ok((bytes, exit)) = encode_response(response) else {
-        return 1;
-    };
-    if output
-        .write_all(&bytes)
-        .and_then(|()| output.flush())
-        .is_err()
-    {
-        return 1;
-    }
-    exit
 }
 
 fn build_result(result: &ResponseResult) -> ResultBody<'_> {
