@@ -12,13 +12,13 @@
     )
 )]
 
-use crate::cli::{parse_request, write_response};
+use crate::cli::{CommandResponse, ResponseWriter, parse_request, write_response};
 use crate::commands::run_request;
 use crate::embedding::{HttpProviders, Ollama, Openai};
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
 use crate::markdown::MarkdownParser;
-use crate::process::DetachedProcess;
+use crate::process::{DetachedProcess, SigintListener};
 use crate::service::{
     BackgroundRunner, BackgroundService, CheckService, Checker, CommandError, CommandErrorKind,
     CommandResult, DocumentError, DocumentErrorKind, DocumentRefreshService, DocumentResult,
@@ -34,9 +34,10 @@ use crate::utils::SERVICE_DIRECTORY;
 use std::{
     env,
     ffi::OsString,
-    io::{Read, Write},
+    io::{self, Read, Write},
     os::fd::AsFd,
     path::Path,
+    sync::Arc,
 };
 
 mod cli;
@@ -52,6 +53,8 @@ mod utils;
 
 pub mod service;
 
+const FOREGROUND_COMMANDS: [&str; 5] = ["search", "traverse", "inspect", "check", "reindex"];
+
 /// Parse and run one CLI request, emitting one complete JSON envelope.
 /// The exact forms `--help`, `<command> --help` and `--version` are ordinary
 /// requests that print plain text without reading `input` or touching any service.
@@ -65,8 +68,20 @@ pub fn run_cli(
     output: impl Write,
 ) -> u8 {
     let args = args.into_iter().collect::<Vec<_>>();
-    let response = parse_request(&args, input).and_then(run_request);
-    write_response(output, response)
+    write_response(output, execute_request(&args, input))
+}
+
+/// Run the executable entry path with scoped foreground SIGINT handling.
+///
+/// Registers one listener for the exact `search`, `traverse`, `inspect`, `check`
+/// and `reindex` argv shapes before stdin or services are used. Other commands
+/// keep their default signal behavior. A handled SIGINT writes one cancellation
+/// envelope through the shared response owner and exits 1; normal output retains
+/// its own exit code.
+pub fn run_process_cli() -> u8 {
+    let args = env::args_os().skip(1).collect::<Vec<_>>();
+    let mut output = io::stdout();
+    run_process_cli_with(&args, io::stdin(), &mut output, SigintListener::install)
 }
 
 /// Construct current diagnostics without opening storage or performing I/O.
@@ -372,6 +387,64 @@ pub fn open_storage(cache: &Path, vectors: &Path) -> StorageResult<impl Storage 
 /// Reports an inaccessible or non-directory root, including a symlink root.
 pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLocker + use<>> {
     LocalFileSystem::open(root)
+}
+
+fn run_process_cli_with<F>(
+    args: &[OsString],
+    input: impl Read,
+    output: &mut dyn Write,
+    install: F,
+) -> u8
+where
+    F: FnOnce(Box<dyn FnOnce() + Send>) -> io::Result<SigintListener>,
+{
+    let writer = Arc::new(ResponseWriter::default());
+    let Ok(listener) = install_foreground_listener(args, &writer, install) else {
+        let error = CommandError::new(
+            CommandErrorKind::InternalError,
+            "cannot install command cancellation",
+        );
+        return writer.write_response(output, Err(error));
+    };
+    let exit = writer.write_response(output, execute_request(args, input));
+    drop(listener);
+    exit
+}
+
+fn install_foreground_listener<F>(
+    args: &[OsString],
+    writer: &Arc<ResponseWriter>,
+    install: F,
+) -> io::Result<Option<SigintListener>>
+where
+    F: FnOnce(Box<dyn FnOnce() + Send>) -> io::Result<SigintListener>,
+{
+    if !requires_cancellation_handler(args) {
+        return Ok(None);
+    }
+    let writer = Arc::clone(writer);
+    let on_interrupt = Box::new(move || {
+        let response = Err(CommandError::new(
+            CommandErrorKind::Cancelled,
+            "command cancelled",
+        ));
+        let mut output = io::stdout();
+        let _ = writer.write_response(&mut output, response);
+    });
+    install(on_interrupt).map(Some)
+}
+
+fn requires_cancellation_handler(args: &[OsString]) -> bool {
+    match args {
+        [command] => command
+            .to_str()
+            .is_some_and(|command| FOREGROUND_COMMANDS.contains(&command)),
+        _ => false,
+    }
+}
+
+fn execute_request(args: &[OsString], input: impl Read) -> CommandResult<CommandResponse> {
+    parse_request(args, input).and_then(run_request)
 }
 
 fn map_check_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {

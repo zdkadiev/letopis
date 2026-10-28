@@ -1,6 +1,6 @@
 use super::{
-    CheckReport, CommandProblem, CommandResult, DocumentResult, ElementAddress, Inspection,
-    SearchLink, SearchRequest, StatusReport, Traversal, TraversalRequest,
+    CheckReport, CommandProblem, CommandResult, DocumentResult, ElementAddress, EmbeddingConfig,
+    Inspection, SearchLink, SearchRequest, StatusReport, Traversal, TraversalRequest,
 };
 use crate::domain::RepoPath;
 
@@ -26,6 +26,21 @@ pub trait StatusReader {
     /// # Errors
     /// Reports storage, provenance or unsafe lock failures without a partial report.
     fn read_status(&mut self) -> CommandResult<StatusReport>;
+}
+/// Read the current validated embedding configuration without changing state.
+///
+/// Implementations observe only the non-creating configuration source and perform local
+/// provider validation. They never expose raw bytes, identity, dimensions-derived data or
+/// credentials, and never start readiness, vector resets, storage bootstrap or inference.
+pub trait ConfigReader {
+    /// Observe the current configuration, or its stable absence.
+    ///
+    /// # Errors
+    /// Returns `EmbeddingFailed` with `invalid embedding configuration` for malformed or
+    /// provider-rejected configuration, and `InternalError` with
+    /// `cannot read embedding configuration` for filesystem read failures. Causes stay
+    /// private; no partial configuration is returned.
+    fn read_config(&self) -> CommandResult<Option<EmbeddingConfig>>;
 }
 /// Consistent metadata-only hybrid knowledge search.
 pub trait Searcher {

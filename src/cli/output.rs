@@ -1,15 +1,12 @@
 use super::response::{CommandResponse, ResponseResult};
 use crate::domain::{Edge, Sha256};
 use crate::service::{
-    CommandError, CommandErrorKind, CommandProblem, HeldLock, InspectedElement, LockName,
-    SearchFlag, SearchLink, TraversalLink,
+    CommandErrorKind, CommandProblem, CommandResult, EmbeddingConfig, HeldLock, InspectedElement,
+    LockName, ProviderKind, SearchFlag, SearchLink, TraversalLink,
 };
 use serde::Serialize;
-use serde_json::Value;
-use std::{
-    collections::BTreeMap,
-    io::{self, Write},
-};
+use serde_json::{Map, Value};
+use std::{collections::BTreeMap, io::Write};
 
 #[derive(Serialize)]
 struct Problem<'a> {
@@ -42,6 +39,7 @@ enum ResultBody<'a> {
         locks: Vec<Lock>,
         problems: Vec<Problem<'a>>,
     },
+    Config(Option<Configuration<'a>>),
     Check {
         errors: Vec<Problem<'a>>,
     },
@@ -71,6 +69,15 @@ struct Lock {
     pid: u32,
 }
 
+/// X-1 configuration object; identity, derived dimensions and credentials never appear.
+#[derive(Serialize)]
+struct Configuration<'a> {
+    provider: &'static str,
+    model: &'a str,
+    parameters: &'a Map<String, Value>,
+    max_retries: u64,
+}
+
 /// Existing X-1 metadata envelope; freshness flags never add source text or fields.
 #[derive(Serialize)]
 struct Link<'a> {
@@ -90,17 +97,38 @@ struct TraversedEdge<'a> {
     edge_type: &'a str,
 }
 
+/// Write and flush one complete X-1 envelope to the caller-owned output.
+/// Returns 0 for a fully written success, or 1 for command, encoding or I/O failure.
 pub(crate) fn write_response(
-    output: impl Write,
-    response: Result<CommandResponse, CommandError>,
+    mut output: impl Write,
+    response: CommandResult<CommandResponse>,
 ) -> u8 {
+    let Ok((bytes, exit)) = encode_response(response) else {
+        return 1;
+    };
+    if output
+        .write_all(&bytes)
+        .and_then(|()| output.flush())
+        .is_err()
+    {
+        return 1;
+    }
+    exit
+}
+/// Serialize one complete response: the X-1 envelope with its final newline, or plain help text.
+///
+/// # Errors
+/// Returns a serialization error without emitting any response bytes.
+pub(crate) fn encode_response(
+    response: CommandResult<CommandResponse>,
+) -> Result<(Vec<u8>, u8), serde_json::Error> {
     // Help is the one plain-text result; it is not wrapped in the JSON envelope.
     if let Ok(CommandResponse {
         result: ResponseResult::Help(text),
         ..
     }) = &response
     {
-        return u8::from(write_flushed(output, text.as_bytes()).is_err());
+        return Ok((text.clone().into_bytes(), 0));
     }
     let (encoded, exit) = match response {
         Ok(response) => (
@@ -123,20 +151,11 @@ pub(crate) fn write_response(
             1,
         ),
     };
-    let Ok(mut bytes) = encoded else {
-        return 1;
-    };
+    let mut bytes = encoded?;
     bytes.push(b'\n');
-    if write_flushed(output, &bytes).is_err() {
-        return 1;
-    }
-    exit
+    Ok((bytes, exit))
 }
 
-fn write_flushed(mut output: impl Write, bytes: &[u8]) -> io::Result<()> {
-    output.write_all(bytes)?;
-    output.flush()
-}
 fn build_result(result: &ResponseResult) -> ResultBody<'_> {
     match result {
         ResponseResult::Help(text) => ResultBody::Help(text),
@@ -150,6 +169,9 @@ fn build_result(result: &ResponseResult) -> ResultBody<'_> {
             locks: report.locks.iter().map(build_lock).collect(),
             problems: report.problems.iter().map(build_problem).collect(),
         },
+        ResponseResult::Config(config) => {
+            ResultBody::Config(config.as_ref().map(build_configuration))
+        }
         ResponseResult::Check(report) => ResultBody::Check {
             errors: report.errors.iter().map(build_problem).collect(),
         },
@@ -183,6 +205,20 @@ fn build_lock(lock: &HeldLock) -> Lock {
             LockName::Embed => "embed",
         },
         pid: lock.pid.get(),
+    }
+}
+fn build_configuration(config: &EmbeddingConfig) -> Configuration<'_> {
+    Configuration {
+        provider: get_provider_name(config.get_provider()),
+        model: config.get_model(),
+        parameters: config.get_parameters(),
+        max_retries: config.get_max_attempts().saturating_sub(1),
+    }
+}
+fn get_provider_name(provider: ProviderKind) -> &'static str {
+    match provider {
+        ProviderKind::Ollama => "ollama",
+        ProviderKind::Openai => "openai",
     }
 }
 fn build_link(link: &SearchLink) -> Link<'_> {

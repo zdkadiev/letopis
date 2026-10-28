@@ -15,6 +15,7 @@ use std::{collections::BTreeSet, ffi::OsString, io::Read, num::NonZeroUsize};
 #[derive(Debug)]
 pub(crate) enum Request {
     Status,
+    Config,
     Reindex,
     Check(Vec<RepoPath>),
     Inspect(Vec<ElementAddress>),
@@ -83,6 +84,10 @@ pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResul
         ["status"] => {
             let _: EmptyInput = read_object(input)?;
             Ok(Request::Status)
+        }
+        ["config"] => {
+            let _: EmptyInput = read_object(input)?;
+            Ok(Request::Config)
         }
         ["reindex"] => {
             let _: EmptyInput = read_object(input)?;

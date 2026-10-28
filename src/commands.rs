@@ -5,9 +5,10 @@ use crate::domain::RepoPath;
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
 use crate::service::{
-    BackgroundRunner, Checker, CommandError, CommandErrorKind, CommandResult, DocumentError,
-    DocumentErrorKind, ElementAddress, GraphDiagnosticsService, Inspector, ProvenanceService,
-    Refresher, SearchRequest, Searcher, StatusReader, StatusService, TraversalRequest, Traverser,
+    BackgroundRunner, Checker, CommandError, CommandErrorKind, CommandResult, ConfigReader,
+    ConfigurationService, DocumentError, DocumentErrorKind, ElementAddress,
+    GraphDiagnosticsService, Inspector, ProvenanceService, Refresher, SearchRequest, Searcher,
+    StatusReader, StatusService, TraversalRequest, Traverser,
 };
 use crate::storage::SqliteStatusStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -27,6 +28,7 @@ pub(crate) fn run_request(request: Request) -> CommandResult<CommandResponse> {
     match request {
         Request::Help(text) => Ok(CommandResponse::new(ResponseResult::Help(text))),
         Request::Status => environment.and_then(|(directory, _)| run_status(&directory)),
+        Request::Config => environment.and_then(|(directory, _)| run_config(&directory)),
         Request::Reindex => {
             environment.and_then(|(directory, executable)| run_reindex(&directory, &executable))
         }
@@ -81,6 +83,19 @@ fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
     };
     let report = status.read_status()?;
     Ok(CommandResponse::new(ResponseResult::Status(report)))
+}
+
+/// Observe the current configuration through non-creating files without background work.
+fn run_config(directory: &Path) -> CommandResult<CommandResponse> {
+    let root = open_repository_root(directory)?;
+    let files = LocalFileSystem::open(&root).map_err(map_config_setup)?;
+    let provider = build_embedding_provider().map_err(map_config_setup)?;
+    let configuration = ConfigurationService {
+        files: &files,
+        provider: &provider,
+    };
+    let config = configuration.read_config()?;
+    Ok(CommandResponse::new(ResponseResult::Config(config)))
 }
 
 fn locate_environment() -> CommandResult<(PathBuf, PathBuf)> {
@@ -178,6 +193,14 @@ fn map_status_setup(error: impl std::error::Error + Send + Sync + 'static) -> Co
     CommandError::new_with_cause(
         CommandErrorKind::InternalError,
         "cannot open status service",
+        error,
+    )
+}
+
+fn map_config_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
+    CommandError::new_with_cause(
+        CommandErrorKind::InternalError,
+        "cannot read embedding configuration",
         error,
     )
 }
