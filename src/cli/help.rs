@@ -58,7 +58,8 @@ const CHECK_DETAILS: &str = r#"Input (JSON object):
 
 Result:
   {"errors": [{"code", "message", "details"}]}
-  An empty errors array means the corpus is valid. Never writes files.
+  An empty errors array means the corpus is valid. Never modifies corpus
+  files; refreshes the index cache.
 "#;
 
 const INSPECT_DETAILS: &str = r#"Input (JSON object):
@@ -68,7 +69,7 @@ const INSPECT_DETAILS: &str = r#"Input (JSON object):
 
 Result:
   {"snapshot": "<git tree oid>",
-   "elements": {"<id>": {"path", "lines"?, "hash"}}}
+   "elements": {"<id>": {"path", "lines"?, "hash": <sha256 hex or null>}}}
   Metadata only, never file text. An unknown id rejects the whole batch.
 "#;
 
@@ -77,7 +78,8 @@ const SEARCH_DETAILS: &str = r#"Input (JSON object):
   limit    required integer >= 1
   filters  optional object:
     needs_recheck     true: only results with flags; false: only without
-    sources           array of source URIs (path or path#Lstart-Lend)
+    sources           array of source URIs: path, path#Lstart-Lend or
+                      an http(s) URL
     source_revisions  array of full Git tree OIDs
 
 Result: array of links
@@ -92,7 +94,8 @@ const TRAVERSE_DETAILS: &str = r#"Input (JSON object):
   direction    required: "outgoing", "incoming" or "both"
   depth        required integer >= 0 (0 returns nothing)
   limit        required integer >= 1, maximum elements returned
-  edge_types   optional array of lowercase edge type names
+  edge_types   optional array of edge type names, [a-z][a-z0-9_]*; built-in
+               types are "includes" and "external"
   edge_limit   optional integer >= 1; edges are returned only when it is set
 
 Result:

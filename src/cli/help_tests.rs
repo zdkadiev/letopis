@@ -174,6 +174,26 @@ fn help_lines_fit_eighty_columns_except_copyable_examples() {
     }
 }
 
+#[test]
+fn command_help_states_side_effects_and_value_forms() {
+    // Given
+    let help = |name: &str| find_help(&to_args(&[name, "--help"])).unwrap();
+    // When
+    let (check, inspect, search, traverse) = (
+        help("check"),
+        help("inspect"),
+        help("search"),
+        help("traverse"),
+    );
+    // Then
+    assert!(!check.contains("Never writes files"));
+    assert!(check.contains("refreshes the index cache"));
+    assert!(search.contains("http(s) URL"));
+    assert!(inspect.contains("sha256 hex or null"));
+    assert!(traverse.contains("[a-z][a-z0-9_]*"));
+    assert!(traverse.contains("includes") && traverse.contains("external"));
+}
+
 fn to_args(args: &[&str]) -> Vec<OsString> {
     args.iter().map(OsString::from).collect()
 }
