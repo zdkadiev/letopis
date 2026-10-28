@@ -1,8 +1,8 @@
 //! Command wiring: builds the services each command needs and runs it.
 
 use crate::cli::{
-    CommandResponse, Request, execute_check, execute_drain, execute_inspect, execute_reindex,
-    execute_search, execute_status, execute_traverse,
+    CommandResponse, Request, execute_check, execute_drain, execute_help, execute_inspect,
+    execute_reindex, execute_search, execute_status, execute_traverse,
 };
 use crate::domain::RepoPath;
 use crate::filesystem::LocalFileSystem;
@@ -24,15 +24,25 @@ use std::{
 };
 
 pub(crate) fn run_request(request: Request) -> CommandResult<CommandResponse> {
-    let (directory, executable) = locate_environment()?;
+    // A failed lookup only fails the commands that need the environment, so help works anywhere.
+    let environment = locate_environment();
     match request {
-        Request::Status => run_status(&directory),
-        Request::Reindex => run_reindex(&directory, &executable),
-        Request::Check(paths) => run_check(&paths, &directory, &executable),
-        Request::Drain => run_drain(&directory, &executable),
-        Request::Search(request) => run_search(&request, &directory, &executable),
-        Request::Traverse(request) => run_traverse(&request, &directory, &executable),
-        Request::Inspect(ids) => run_inspect(&ids, &directory, &executable),
+        Request::Help(text) => Ok(execute_help(text)),
+        Request::Status => environment.and_then(|(directory, _)| run_status(&directory)),
+        Request::Reindex => {
+            environment.and_then(|(directory, executable)| run_reindex(&directory, &executable))
+        }
+        Request::Check(paths) => environment
+            .and_then(|(directory, executable)| run_check(&paths, &directory, &executable)),
+        Request::Drain => {
+            environment.and_then(|(directory, executable)| run_drain(&directory, &executable))
+        }
+        Request::Search(request) => environment
+            .and_then(|(directory, executable)| run_search(&request, &directory, &executable)),
+        Request::Traverse(request) => environment
+            .and_then(|(directory, executable)| run_traverse(&request, &directory, &executable)),
+        Request::Inspect(ids) => environment
+            .and_then(|(directory, executable)| run_inspect(&ids, &directory, &executable)),
     }
 }
 

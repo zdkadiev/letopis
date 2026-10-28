@@ -16,11 +16,17 @@ pub(crate) enum ResponseResult {
     Search(Vec<SearchLink>),
     Traverse(Traversal),
     Drained,
+    Help(String),
 }
 #[derive(Debug)]
 pub(crate) struct CommandResponse {
     pub result: ResponseResult,
     pub warnings: Vec<CommandProblem>,
+}
+
+/// Return help or version text; needs no repository, services or input.
+pub(crate) fn execute_help(text: String) -> CommandResponse {
+    respond(ResponseResult::Help(text), None)
 }
 
 /// Read the published status; observational, so no background work starts.

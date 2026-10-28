@@ -56,6 +56,7 @@ enum ResultBody<'a> {
         edges: Option<Vec<TraversedEdge<'a>>>,
     },
     Drained {},
+    Help(&'a str),
 }
 #[derive(Serialize)]
 struct Element<'a> {
@@ -93,6 +94,14 @@ pub(crate) fn write_response(
     output: impl Write,
     response: Result<CommandResponse, CommandError>,
 ) -> u8 {
+    // Help is the one plain-text result; it is not wrapped in the JSON envelope.
+    if let Ok(CommandResponse {
+        result: ResponseResult::Help(text),
+        ..
+    }) = &response
+    {
+        return u8::from(write_flushed(output, text.as_bytes()).is_err());
+    }
     let (encoded, exit) = match response {
         Ok(response) => (
             serde_json::to_vec(&Success {
@@ -124,16 +133,13 @@ pub(crate) fn write_response(
     exit
 }
 
-/// Write plain help or version text, returning 0, or 1 when stdout fails.
-pub(crate) fn write_text(output: impl Write, text: &str) -> u8 {
-    u8::from(write_flushed(output, text.as_bytes()).is_err())
-}
 fn write_flushed(mut output: impl Write, bytes: &[u8]) -> io::Result<()> {
     output.write_all(bytes)?;
     output.flush()
 }
 fn build_result(result: &ResponseResult) -> ResultBody<'_> {
     match result {
+        ResponseResult::Help(text) => ResultBody::Help(text),
         ResponseResult::Reindex(revision) => ResultBody::Reindex {
             revision: *revision,
         },
