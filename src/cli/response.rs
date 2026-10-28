@@ -62,29 +62,30 @@ impl ResponseWriter {
     ///
     /// Encoding finishes before the output guard is taken. The guard covers both
     /// writing and flushing. Returns the winning response exit code, or 1 for a
-    /// poisoned state, encoding failure or failed output.
+    /// poisoned state, encoding failure or failed output. An encoding failure
+    /// still claims the response, so a later caller never emits a second one.
     pub(crate) fn write_response(
         &self,
         output: &mut dyn Write,
         response: CommandResult<CommandResponse>,
     ) -> u8 {
-        let Ok((bytes, exit)) = encode_response(response) else {
-            return 1;
-        };
+        let encoded = encode_response(response);
         let Ok(mut completion) = self.completion.lock() else {
             return 1;
         };
         if let Some(exit) = *completion {
             return exit;
         }
-        let exit = if output
-            .write_all(&bytes)
-            .and_then(|()| output.flush())
-            .is_ok()
-        {
-            exit
-        } else {
-            1
+        let exit = match encoded {
+            Ok((bytes, exit))
+                if output
+                    .write_all(&bytes)
+                    .and_then(|()| output.flush())
+                    .is_ok() =>
+            {
+                exit
+            }
+            _ => 1,
         };
         *completion = Some(exit);
         exit
