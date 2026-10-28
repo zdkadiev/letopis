@@ -6,7 +6,10 @@ use crate::service::{
 };
 use serde::Serialize;
 use serde_json::Value;
-use std::{collections::BTreeMap, io::Write};
+use std::{
+    collections::BTreeMap,
+    io::{self, Write},
+};
 
 #[derive(Serialize)]
 struct Problem<'a> {
@@ -87,7 +90,7 @@ struct TraversedEdge<'a> {
 }
 
 pub(crate) fn write_response(
-    mut output: impl Write,
+    output: impl Write,
     response: Result<CommandResponse, CommandError>,
 ) -> u8 {
     let (encoded, exit) = match response {
@@ -115,14 +118,19 @@ pub(crate) fn write_response(
         return 1;
     };
     bytes.push(b'\n');
-    if output
-        .write_all(&bytes)
-        .and_then(|()| output.flush())
-        .is_err()
-    {
+    if write_flushed(output, &bytes).is_err() {
         return 1;
     }
     exit
+}
+
+/// Write plain help or version text, returning 0, or 1 when stdout fails.
+pub(crate) fn write_text(output: impl Write, text: &str) -> u8 {
+    u8::from(write_flushed(output, text.as_bytes()).is_err())
+}
+fn write_flushed(mut output: impl Write, bytes: &[u8]) -> io::Result<()> {
+    output.write_all(bytes)?;
+    output.flush()
 }
 fn build_result(result: &ResponseResult) -> ResultBody<'_> {
     match result {

@@ -9,6 +9,8 @@ Letopis indexes marked Markdown. The agent edits Markdown and code; CLI commands
 check, and refresh the projection. Run from the Git root. In examples, `letopis`
 means the supplied executable. Requests are JSON on stdin; require exit 0 and
 `ok:true` before using a result. A failure has `ok:false` and `error`.
+`letopis --help` and `letopis <command> --help` print the commands and each
+command's request fields as plain text.
 
 ## Find, check, and read
 

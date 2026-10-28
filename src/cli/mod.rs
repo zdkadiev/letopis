@@ -1,11 +1,13 @@
 //! Strict CLI transport; application semantics stay behind service traits.
 mod handlers;
+mod help;
 mod input;
 mod output;
 
 pub(crate) use handlers::{CommandResponse, HandlerServices, Handlers};
+pub(crate) use help::find_help;
 pub(crate) use input::{Request, parse_request};
-pub(crate) use output::write_response;
+pub(crate) use output::{write_response, write_text};
 
 #[cfg(test)]
 mod tests;
@@ -18,3 +20,6 @@ mod traversal_tests;
 
 #[cfg(test)]
 mod reindex_tests;
+
+#[cfg(test)]
+mod help_tests;

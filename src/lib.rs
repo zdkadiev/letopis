@@ -13,7 +13,8 @@
 )]
 
 use crate::cli::{
-    CommandResponse, HandlerServices, Handlers, Request, parse_request, write_response,
+    CommandResponse, HandlerServices, Handlers, Request, find_help, parse_request, write_response,
+    write_text,
 };
 use crate::embedding::{HttpProviders, Ollama, Openai};
 use crate::filesystem::LocalFileSystem;
@@ -53,6 +54,8 @@ mod utils;
 pub mod service;
 
 /// Parse and run one CLI request, emitting one complete JSON envelope.
+/// The exact forms `--help`, `<command> --help` and `--version` instead print
+/// plain text first, without reading `input` or touching any service.
 /// Returns 0 only for successfully written success output, otherwise 1.
 /// Check, search, traverse and inspect refresh through their application services.
 /// Reindex forces a complete atomic publication through the same document service.
@@ -63,6 +66,9 @@ pub fn run_cli(
     output: impl Write,
 ) -> u8 {
     let args = args.into_iter().collect::<Vec<_>>();
+    if let Some(text) = find_help(&args) {
+        return write_text(output, &text);
+    }
     let response = parse_request(&args, input).and_then(run_request);
     write_response(output, response)
 }
