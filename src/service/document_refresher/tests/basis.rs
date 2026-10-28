@@ -3,7 +3,7 @@ use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
     service::{
         BasisRetainer, CacheWrite, CapturedFile, DocumentError, DocumentErrorKind,
-        DocumentRefresher, DocumentResult, FileRow, FileStat, FileSystem, NodeMetadata,
+        DocumentRefreshService, DocumentResult, FileRow, FileStat, FileSystem, NodeMetadata,
         ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError, SourceProvenance,
         SourceRevisionComparison, SourceRevisionRequest, Storage, StorageRead, StorageResult,
         VectorOutcome,
@@ -14,7 +14,7 @@ use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 use tempfile::TempDir;
 
 type Events = Rc<RefCell<Vec<&'static str>>>;
-type Service = DocumentRefresher<
+type Service = DocumentRefreshService<
     Candidates,
     BoundaryFiles,
     CountingMarkdown,
@@ -163,7 +163,7 @@ fn initial_build_and_full_reindex_lock_before_capturing_and_validate_basis() {
 fn build_boundary_service(failure: Option<&'static str>) -> (TempDir, Service, Events) {
     let (dir, service) = build_service();
     let events = Rc::new(RefCell::new(Vec::new()));
-    let service = DocumentRefresher {
+    let service = DocumentRefreshService {
         git: service.git,
         filesystem: BoundaryFiles {
             inner: service.filesystem,

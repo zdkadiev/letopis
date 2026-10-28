@@ -17,7 +17,7 @@ const RACY_WINDOW_NS: i64 = 1_000_000_000;
 
 /// Refreshes and retains the effective document projection from independently owned collaborators.
 #[derive(Debug)]
-pub(crate) struct DocumentRefresher<G, F, M, S, P> {
+pub(crate) struct DocumentRefreshService<G, F, M, S, P> {
     /// Lists the current corpus candidates.
     pub(crate) git: G,
     /// Captures documents and owns the index exclusion lock.
@@ -64,7 +64,7 @@ impl<
     M: MarkdownCodec,
     S: Storage,
     P: SourceProvenance + BasisRetainer,
-> Refresher for DocumentRefresher<G, F, M, S, P>
+> Refresher for DocumentRefreshService<G, F, M, S, P>
 {
     fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
         let _lock = self.filesystem.lock_index()?;
@@ -98,7 +98,7 @@ impl<
     M: MarkdownCodec,
     S: Storage,
     P: SourceProvenance + BasisRetainer,
-> DocumentRefresher<G, F, M, S, P>
+> DocumentRefreshService<G, F, M, S, P>
 {
     fn publish_current(&mut self, requested: PublicationMode) -> DocumentResult<RefreshOutcome> {
         let state = self.read_file_state()?;

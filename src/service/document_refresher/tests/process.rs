@@ -1,12 +1,12 @@
 //! Production-process schedules. Only this private test driver reads control variables.
-use super::super::DocumentRefresher;
+use super::super::DocumentRefreshService;
 use crate::{
     domain::{Edge, RepoPath, Sha256},
     filesystem::LocalFileSystem,
     git::GitCli,
     markdown::MarkdownParser,
     service::{
-        CacheWrite, CurrentGraphDiagnostics, EmbeddingFailure, FileRow, FileSystem, NodeMetadata,
+        CacheWrite, EmbeddingFailure, FileRow, FileSystem, GraphDiagnosticsService, NodeMetadata,
         ProvenanceService, QueryError, Refresher, StatusReader, StatusReport, StatusService,
         Storage, StorageError, StorageRead, StorageResult, StoredNode, VectorOutcome, VectorWrite,
     },
@@ -53,7 +53,7 @@ const CUTS: [&str; 10] = [
     "before_commit",
     "after_commit",
 ];
-type Service = DocumentRefresher<
+type Service = DocumentRefreshService<
     GitCli,
     LocalFileSystem,
     MarkdownParser,
@@ -738,7 +738,7 @@ fn read_status(root: &Path) -> StatusReport {
         LocalFileSystem::open(root).unwrap(),
     );
     let provider = crate::build_embedding_provider().unwrap();
-    let graph = CurrentGraphDiagnostics::new();
+    let graph = GraphDiagnosticsService::new();
     let mut status = StatusService {
         storage,
         files: &files,
@@ -772,7 +772,7 @@ fn build_service(root: &Path) -> Service {
         GitCli::open(root).unwrap(),
         LocalFileSystem::open(root).unwrap(),
     );
-    DocumentRefresher {
+    DocumentRefreshService {
         git,
         filesystem,
         markdown: MarkdownParser::new(),

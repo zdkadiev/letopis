@@ -8,8 +8,8 @@ use crate::domain::RepoPath;
 use crate::filesystem::LocalFileSystem;
 use crate::git::GitCli;
 use crate::service::{
-    CommandError, CommandErrorKind, CommandResult, CurrentGraphDiagnostics, DocumentError,
-    ElementAddress, ProvenanceService, SearchRequest, StatusService, TraversalRequest,
+    CommandError, CommandErrorKind, CommandResult, DocumentError, ElementAddress,
+    GraphDiagnosticsService, ProvenanceService, SearchRequest, StatusService, TraversalRequest,
 };
 use crate::storage::SqliteStatusStorage;
 use crate::utils::SERVICE_DIRECTORY;
@@ -62,7 +62,7 @@ fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
         LocalFileSystem::open(&root).map_err(map_status_setup)?,
     );
     let provider = build_embedding_provider().map_err(map_status_setup)?;
-    let graph = CurrentGraphDiagnostics::new();
+    let graph = GraphDiagnosticsService::new();
     let mut status = StatusService {
         storage,
         files: &files,

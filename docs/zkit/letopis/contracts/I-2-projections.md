@@ -31,7 +31,7 @@ Storage/Git failures propagate as Result error using the existing X-1 code/messa
 
 ## Реализация полного пути TK-25 — 2026-10-26
 
-`Refresher::reindex` на том же DocumentRefresher выбирает всех текущих кандидатов,
+`Refresher::reindex` на том же DocumentRefreshService выбирает всех текущих кандидатов,
 принудительно повторяет parse и provenance preflight даже при прежнем hash и
 публикует их через общий per-file путь одной cache unit под index.lock. Первое
 построение использует тот же полный режим; обычный refresh сохраняет incremental

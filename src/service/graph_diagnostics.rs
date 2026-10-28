@@ -24,15 +24,15 @@ const PARSER_KINDS: [DiagnosticKind; 9] = [
 
 /// Derives safe current findings from a caller-owned read view.
 #[derive(Debug, Default)]
-pub(crate) struct CurrentGraphDiagnostics;
+pub(crate) struct GraphDiagnosticsService;
 
-impl CurrentGraphDiagnostics {
+impl GraphDiagnosticsService {
     pub(crate) fn new() -> Self {
         Self
     }
 }
 
-impl GraphDiagnostics for CurrentGraphDiagnostics {
+impl GraphDiagnostics for GraphDiagnosticsService {
     fn find_problems<R: StorageRead>(
         &self,
         view: &mut R,
@@ -152,7 +152,7 @@ fn get_detail<'a>(problem: &'a CommandProblem, key: &str) -> &'a str {
 
 #[cfg(test)]
 mod tests {
-    use super::{CurrentGraphDiagnostics, format_invalid_file, map_read_error};
+    use super::{GraphDiagnosticsService, format_invalid_file, map_read_error};
     use crate::{
         domain::{
             Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256,
@@ -299,7 +299,7 @@ mod tests {
         let selected = RepoPath::parse("a.md").unwrap();
 
         // When
-        let problems = CurrentGraphDiagnostics::new()
+        let problems = GraphDiagnosticsService::new()
             .find_problems(&mut view, &[selected.clone(), selected])
             .unwrap();
 
@@ -338,7 +338,7 @@ mod tests {
         let mut view = storage.begin_read().unwrap();
 
         // When
-        let problems = CurrentGraphDiagnostics::new()
+        let problems = GraphDiagnosticsService::new()
             .find_problems(&mut view, &[])
             .unwrap();
 
@@ -376,7 +376,7 @@ mod tests {
         let mut view = storage.begin_read().unwrap();
 
         // When
-        let problems = CurrentGraphDiagnostics::new()
+        let problems = GraphDiagnosticsService::new()
             .find_problems(&mut view, &[])
             .unwrap();
 

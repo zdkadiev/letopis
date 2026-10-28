@@ -21,12 +21,13 @@ use crate::markdown::MarkdownParser;
 use crate::process::DetachedProcess;
 use crate::service::{
     BackgroundRunner, BackgroundService, CheckService, Checker, CommandError, CommandErrorKind,
-    CommandResult, CurrentGraphDiagnostics, DocumentError, DocumentErrorKind, DocumentRefresher,
-    DocumentResult, EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
-    EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
-    GraphDiagnostics, GraphService, InspectionService, Inspector, ProvenanceService, Refresher,
-    SearchService, Searcher, SnapshotError, SnapshotVerifier, SourceProvenance, SourceReader,
-    SourceService, StatusFiles, StatusStorage, Storage, StorageResult, TraversalService, Traverser,
+    CommandResult, DocumentError, DocumentErrorKind, DocumentRefreshService, DocumentResult,
+    EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles,
+    EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
+    GraphDiagnostics, GraphDiagnosticsService, GraphService, InspectionService, Inspector,
+    ProvenanceService, Refresher, SearchService, Searcher, SnapshotError, SnapshotVerifier,
+    SourceProvenance, SourceReader, SourceService, StatusFiles, StatusStorage, Storage,
+    StorageResult, TraversalService, Traverser,
 };
 use crate::storage::{SqliteStatusStorage, SqliteStorage};
 use crate::utils::SERVICE_DIRECTORY;
@@ -74,7 +75,7 @@ pub fn run_cli(
 /// Construct current diagnostics without opening storage or performing I/O.
 /// The caller supplies the consistent read view to each operation.
 pub fn wire_graph_diagnostics() -> impl GraphDiagnostics {
-    CurrentGraphDiagnostics::new()
+    GraphDiagnosticsService::new()
 }
 
 /// Wire bounded traversal with owned graph, source, provenance and readiness collaborators.
@@ -147,7 +148,7 @@ pub fn wire_checker(start: &Path) -> CommandResult<impl Checker + use<>> {
     Ok(CheckService::new(
         refresher,
         storage,
-        CurrentGraphDiagnostics::new(),
+        GraphDiagnosticsService::new(),
         ProvenanceService::new(
             GitCli::open(start).map_err(map_check_setup)?,
             LocalFileSystem::open(git.get_root()).map_err(map_check_setup)?,
@@ -230,7 +231,7 @@ pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + 
         })?,
         LocalFileSystem::open(git.get_root())?,
     );
-    Ok(DocumentRefresher {
+    Ok(DocumentRefreshService {
         git,
         filesystem,
         markdown: MarkdownParser::new(),

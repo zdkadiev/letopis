@@ -36,10 +36,10 @@ mod traversal_types;
 pub(crate) use background::BackgroundService;
 pub(crate) use check::CheckService;
 /// Cache refresh implementation and its caller-owned collaborator bundle.
-pub(crate) use document_refresher::DocumentRefresher;
+pub(crate) use document_refresher::DocumentRefreshService;
 pub(crate) use embedding::EmbeddingService;
 pub(crate) use graph::GraphService;
-pub(crate) use graph_diagnostics::CurrentGraphDiagnostics;
+pub(crate) use graph_diagnostics::GraphDiagnosticsService;
 pub(crate) use inspection::InspectionService;
 pub(crate) use provenance::ProvenanceService;
 /// Source comparison requests and metadata-only outcomes.

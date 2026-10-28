@@ -2,7 +2,7 @@ use super::{CountingMarkdown, TestFiles, TestProvenance, build_candidates, build
 use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
     service::{
-        BasisRetainer, CacheWrite, DocumentRefresher, DocumentResult, ElementAddress,
+        BasisRetainer, CacheWrite, DocumentRefreshService, DocumentResult, ElementAddress,
         EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary, EmbeddingWork, FileRow,
         GraphNeighbor, GraphNodeRef, GraphRead, NeighborPageRequest, NodeMetadata,
         ProvenanceObservation, ProvenanceRequest, QueryError, Refresher, SnapshotError,
@@ -44,7 +44,7 @@ fn warm_refresh_reads_basis_roots_without_loading_nodes() {
     write.upsert_node(&node).unwrap();
     write.commit().unwrap();
     let reads = Rc::new(Cell::new(0));
-    let mut service = DocumentRefresher {
+    let mut service = DocumentRefreshService {
         git: build_candidates(),
         filesystem: TestFiles::new(),
         markdown: CountingMarkdown(Cell::new(0)),
