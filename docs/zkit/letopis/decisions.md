@@ -2131,3 +2131,15 @@ check/status/traverse остаются за их владельцами TK-19/TK
 **Уточняет:** D-69 (полная замена настроенных полей), D-70 (явная инициализация и disabled состояние), D-78 (max_retries в вложенной форме), D-95 (disabled observation policy и сохранение execution state).
 
 **Связи:** [X-1](contracts/X-1-cli.md), [X-2](contracts/X-2-embeddings.md), [mechanics](mechanics.md), [проверка issue 61](checks/issue-61/report.md).
+
+<a id="D-105"></a>
+### D-105: Быстрое чтение и явный полный аудит снимков
+> **Статус:** принято пользователем · **Дата:** 2026-10-29
+
+Search/traverse/inspect сохраняют auto-refresh Markdown → DB; основания удерживаются после проверки root/ref, адресованные bytes проверяются при чтении. Полный обход авторского source_snapshot выполняют whole-corpus check (пустой/отсутствующий paths) и reindex до SQL под index.lock. Непустой paths остаётся scoped даже при перечислении всех файлов. Полный check сверяет audited revision с pinned read revision, иначе safe internal_error/retry. Invalid Markdown оставляет last-valid основание; валидная замена/удаление исключает устаревшие roots.
+
+Сильный pin сохраняет полную проверку каждого вызова и тип RetainedTree. Owned cat-file --batch и один hash-object --stdin-paths по приватному временному spool tree metadata заменяют Git subprocess на объект и сохраняют строгие структурные проверки Git; SHA-1 collision detection и SHA-256, exact refs/CAS, no alternates/replace/lazy fetch сохраняются. Inspect сильно проверяет собственный новый снимок захваченных bytes. Повреждение несвязанного потомка может быть обнаружено позже, при полном аудите. Ref не является сертификатом целостности.
+
+Новых runtime, daemon, watcher, схемы/кэша verification, CLI флагов или конфигурации нет. Зависимость sha1-checked 0.10.0 прошла compile/vector/collision probe; unchecked SHA-1 не используется.
+
+**Связи:** [spec](../../superpowers/specs/2026-10-29-read-workflow-performance-design.md), [plan](../../superpowers/plans/2026-10-29-read-workflow-performance.md), [инварианты](checks/read-workflow-performance/invariants.md), [X-1](contracts/X-1-cli.md), [X-3](contracts/X-3-git.md).

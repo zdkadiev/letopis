@@ -1,8 +1,10 @@
 use super::{
     GitCli,
-    constants::{BLOB_KIND, GITLINK_KIND, SNAPSHOT_REF_PREFIX, TREE_KIND, UPDATE_REF_COMMAND},
+    batch::{BatchReader, VerifiedObject, tree::read_children},
+    constants::{SNAPSHOT_REF_PREFIX, TREE_KIND, UPDATE_REF_COMMAND},
     objects::ObjectDb,
     process::is_exit_code,
+    validation::TreeValidator,
 };
 use crate::{
     domain::TreeOid,
@@ -13,15 +15,24 @@ pub(super) struct Retainer<'a> {
     pub(super) git: &'a GitCli,
 }
 impl Retainer<'_> {
+    pub(super) fn retain(&self, oid: &TreeOid) -> Result<(), SnapshotError> {
+        let db = ObjectDb { git: self.git };
+        db.validate_tree(oid)?;
+        self.retain_ref(&db, oid)
+    }
     pub(super) fn pin(&self, oid: &TreeOid) -> Result<RetainedTree, SnapshotError> {
         let db = ObjectDb { git: self.git };
         db.validate_tree(oid)?;
         verify_closure(&db, oid)?;
-        let name = format!("{SNAPSHOT_REF_PREFIX}{}", oid.as_str());
-        if !self.has_exact_ref(&db, &name, oid)? {
-            self.publish_ref(&db, &name, oid)?;
-        }
+        self.retain_ref(&db, oid)?;
         Ok(RetainedTree::new(oid.clone()))
+    }
+    fn retain_ref(&self, db: &ObjectDb<'_>, oid: &TreeOid) -> Result<(), SnapshotError> {
+        let name = format!("{SNAPSHOT_REF_PREFIX}{}", oid.as_str());
+        if !self.has_exact_ref(db, &name, oid)? {
+            self.publish_ref(db, &name, oid)?;
+        }
+        Ok(())
     }
     // A concurrent writer may publish the same ref first; that is success once confirmed.
     fn publish_ref(
@@ -97,6 +108,8 @@ impl Retainer<'_> {
 
 /// Verify every object reachable from `root`, ignoring gitlinks, and reject type conflicts.
 fn verify_closure(db: &ObjectDb<'_>, root: &TreeOid) -> Result<(), SnapshotError> {
+    let mut validator = TreeValidator::new()?;
+    let mut reader = BatchReader::open(&db.git.process, &db.git.root, db.git.oid_len)?;
     let mut pending = vec![(root.as_str().to_owned(), TREE_KIND.to_owned())];
     let mut visited = BTreeMap::new();
     while let Some((oid, kind)) = pending.pop() {
@@ -109,22 +122,17 @@ fn verify_closure(db: &ObjectDb<'_>, root: &TreeOid) -> Result<(), SnapshotError
             }
             continue;
         }
-        if kind == TREE_KIND {
-            let entries = db.read_entries(&oid)?;
-            pending.extend(
-                entries
-                    .into_iter()
-                    .filter(|entry| entry.kind != GITLINK_KIND)
-                    .map(|entry| (entry.oid, entry.kind)),
-            );
-        } else {
-            db.verify_object(
-                &oid,
-                BLOB_KIND,
-                SnapshotErrorKind::InternalError,
-                SnapshotErrorKind::InternalError,
-            )?;
+        let object = reader.read_object(
+            &oid,
+            &kind,
+            SnapshotErrorKind::InternalError,
+            SnapshotErrorKind::InternalError,
+        )?;
+        if let VerifiedObject::Tree(bytes) = object {
+            validator.add_tree(&oid, &bytes)?;
+            pending.extend(read_children(&bytes, db.git.oid_len)?);
         }
     }
-    Ok(())
+    reader.finish()?;
+    validator.verify(db)
 }

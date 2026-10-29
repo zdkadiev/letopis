@@ -79,7 +79,8 @@ const CHECK_DETAILS: &str = r#"Input (JSON object):
 Result:
   {"errors": [{"code", "message", "details"}]}
   An empty errors array means the corpus is valid. Never modifies corpus
-  files; refreshes the index cache.
+  files; refreshes the index cache. Empty/omitted paths also audit complete
+  source snapshots before publication. Nonempty paths skip that full audit.
 "#;
 
 const INSPECT_DETAILS: &str = r#"Input (JSON object):
@@ -128,7 +129,8 @@ const REINDEX_DETAILS: &str = r#"Input (JSON object): {} (no fields)
 
 Result:
   {"revision": <integer>}
-  Rebuilds the graph and full-text index from Git. Safe to repeat.
+  Rebuilds the graph and full-text index from Git. Audits complete effective
+  source snapshots before publication. Safe to repeat.
 "#;
 
 const STATUS_DETAILS: &str = r#"Input (JSON object): {} (no fields)

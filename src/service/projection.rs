@@ -86,9 +86,11 @@ impl EffectiveGraph {
     }
 
     /// Return every declared root in the last effective knowledge projection.
-    pub(super) fn list_source_snapshots(&self) -> BTreeSet<TreeOid> {
+    pub(super) fn list_source_snapshots(&self, excluded: &BTreeSet<RepoPath>) -> BTreeSet<TreeOid> {
+        let paths: BTreeSet<_> = excluded.iter().map(RepoPath::as_str).collect();
         self.knowledge
             .values()
+            .filter(|node| !paths.contains(node.id.as_str().split('#').next().unwrap_or_default()))
             .filter_map(|node| node.source_snapshot.clone())
             .collect()
     }

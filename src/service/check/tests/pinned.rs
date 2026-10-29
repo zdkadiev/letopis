@@ -32,7 +32,12 @@ fn check_observes_metadata_and_bindings_from_original_pinned_view() {
     let observations = Rc::new(RefCell::new(Vec::new()));
     let count = Rc::new(Cell::new(0));
     let mut service = CheckService::new(
-        Refresh(|| Ok(build_outcome())),
+        Refresh(|| {
+            Ok(crate::service::RefreshOutcome {
+                revision: 2,
+                ..build_outcome()
+            })
+        }),
         OneRead {
             inner: open_storage(&directory),
             count: count.clone(),

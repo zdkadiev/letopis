@@ -12,8 +12,14 @@ pub trait Refresher {
     /// # Errors
     /// Reports unsafe paths, concurrent changes, or Git, filesystem and storage failures.
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome>;
+    /// Refresh incrementally and audit all resulting source closures under index.lock.
+    /// Verification precedes SQL publication even when the file delta is empty.
+    ///
+    /// # Errors
+    /// Reports capture, integrity, retention and storage failures without partial publication.
+    fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome>;
     /// Reparse every candidate under the index lock and publish once atomically.
-    /// Invalid files retain their last valid projection. Vectors are not awaited.
+    /// Audits resulting source closures before SQL. Invalid files retain their last valid projection. Vectors are not awaited.
     ///
     /// # Errors
     /// Reports capture, provenance or storage failures without a partial publication.

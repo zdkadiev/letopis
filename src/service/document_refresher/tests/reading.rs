@@ -198,6 +198,13 @@ impl SourceProvenance for RetainingProvenance {
     }
 }
 impl BasisRetainer for RetainingProvenance {
+    fn verify_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+        assert_eq!(
+            snapshots,
+            &BTreeSet::from([TreeOid::parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap()])
+        );
+        Ok(())
+    }
     fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
         assert_eq!(
             snapshots,

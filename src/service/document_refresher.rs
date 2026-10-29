@@ -39,6 +39,23 @@ impl PublicationMode {
         previous.filter(|_| self == Self::Incremental)
     }
 }
+#[derive(Clone, Copy)]
+pub(super) enum SnapshotVerification {
+    Root,
+    Closure,
+}
+impl SnapshotVerification {
+    fn validate<P: BasisRetainer>(
+        self,
+        provenance: &P,
+        snapshots: &BTreeSet<TreeOid>,
+    ) -> DocumentResult<()> {
+        match self {
+            Self::Root => provenance.retain_snapshots(snapshots),
+            Self::Closure => provenance.verify_snapshots(snapshots),
+        }
+    }
+}
 struct FileState {
     revision: u64,
     source_snapshots: BTreeSet<TreeOid>,
@@ -66,11 +83,18 @@ impl<
     P: SourceProvenance + BasisRetainer,
 > Refresher for DocumentRefreshService<G, F, M, S, P>
 {
+    fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
+        let _lock = self.filesystem.lock_index()?;
+        #[cfg(test)]
+        reach_checkpoint("locked");
+        self.publish_current(PublicationMode::Incremental, SnapshotVerification::Closure)
+    }
+
     fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
         let _lock = self.filesystem.lock_index()?;
         #[cfg(test)]
         reach_checkpoint("locked");
-        self.publish_current(PublicationMode::Full)
+        self.publish_current(PublicationMode::Full, SnapshotVerification::Closure)
     }
 
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
@@ -89,7 +113,7 @@ impl<
         let _lock = self.filesystem.lock_index()?;
         #[cfg(test)]
         reach_checkpoint("locked");
-        self.publish_current(PublicationMode::Incremental)
+        self.publish_current(PublicationMode::Incremental, SnapshotVerification::Root)
     }
 }
 impl<
@@ -100,7 +124,11 @@ impl<
     P: SourceProvenance + BasisRetainer,
 > DocumentRefreshService<G, F, M, S, P>
 {
-    fn publish_current(&mut self, requested: PublicationMode) -> DocumentResult<RefreshOutcome> {
+    fn publish_current(
+        &mut self,
+        requested: PublicationMode,
+        verification: SnapshotVerification,
+    ) -> DocumentResult<RefreshOutcome> {
         let state = self.read_file_state()?;
         let mode = if state.revision == 0 {
             PublicationMode::Full
@@ -111,10 +139,10 @@ impl<
         #[cfg(test)]
         reach_checkpoint("redetected");
         if delta.is_empty() && mode == PublicationMode::Incremental {
-            self.provenance.retain_snapshots(&state.source_snapshots)?;
+            verification.validate(&self.provenance, &state.source_snapshots)?;
             return Ok(build_outcome(state.revision, false));
         }
-        self.publish_changes(&state, delta, mode)
+        self.publish_changes(&state, delta, mode, verification)
     }
 
     fn read_file_state(&mut self) -> DocumentResult<FileState> {
@@ -165,8 +193,9 @@ impl<
         state: &FileState,
         delta: Delta,
         mode: PublicationMode,
+        verification: SnapshotVerification,
     ) -> DocumentResult<RefreshOutcome> {
-        let mut graph = self.prepare_publication(state, &delta, mode)?;
+        let mut graph = self.prepare_publication(state, &delta, mode, verification)?;
         let mut unit = self.storage.begin_cache_write()?;
         #[cfg(test)]
         reach_checkpoint("begun");
@@ -208,6 +237,7 @@ impl<
         state: &FileState,
         delta: &Delta,
         mode: PublicationMode,
+        verification: SnapshotVerification,
     ) -> DocumentResult<EffectiveGraph> {
         // Keep only metadata after releasing this pinned read, before BEGIN IMMEDIATE.
         let mut graph = {
@@ -226,11 +256,12 @@ impl<
             BasisPreparation {
                 graph: &graph,
                 updated: &delta.updated,
+                removed: &delta.removed,
                 previous: &state.files,
                 mode,
             },
         )?;
-        basis.validate_basis(&self.provenance)?;
+        basis.validate_basis(&self.provenance, verification)?;
         Ok(graph)
     }
 }

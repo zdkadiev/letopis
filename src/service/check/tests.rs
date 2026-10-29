@@ -47,6 +47,65 @@ struct Verifier {
 }
 
 #[test]
+fn whole_check_requests_verified_refresh_and_rejects_a_newer_revision() {
+    // Given: the audit completed at revision 0; another writer publishes revision 1.
+    let directory = tempfile::tempdir().unwrap();
+    let mut storage = open_storage(&directory);
+    publish_nodes(&mut storage, &[build_node("fresh.md", "a")]);
+    let mut refresher = crate::service::MockRefresher::new();
+    refresher.expect_refresh_verified().once().returning(|| {
+        Ok(RefreshOutcome {
+            revision: 0,
+            ..build_outcome()
+        })
+    });
+    let mut service = CheckService::new(
+        refresher,
+        storage,
+        FindingDiagnostics,
+        Verifier {
+            probes: Probes::default(),
+            result: SnapshotState::Available,
+            fail: false,
+        },
+    );
+    // When: full check opens an unaudited view.
+    let error = service.check(&[]).unwrap_err();
+    // Then: it cannot report that revision as clean.
+    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+    assert!(error.get_message().contains("changed"));
+}
+
+#[test]
+fn scoped_check_requests_routine_refresh() {
+    // Given: a nonempty selection, even when it names every stored file.
+    let directory = tempfile::tempdir().unwrap();
+    let mut storage = open_storage(&directory);
+    publish_nodes(&mut storage, &[build_node("fresh.md", "a")]);
+    let mut refresher = crate::service::MockRefresher::new();
+    refresher
+        .expect_refresh()
+        .once()
+        .returning(|| Ok(build_outcome()));
+    let mut service = CheckService::new(
+        refresher,
+        storage,
+        FindingDiagnostics,
+        Verifier {
+            probes: Probes::default(),
+            result: SnapshotState::Available,
+            fail: false,
+        },
+    );
+    // When: the selected corpus is checked.
+    let report = service
+        .check(&[RepoPath::parse("fresh.md").unwrap()])
+        .unwrap();
+    // Then: regular diagnostics are returned without an exhaustive audit.
+    assert_eq!(report.errors.len(), 1);
+}
+
+#[test]
 fn check_reports_missing_address_from_selected_knowledge() {
     // Given
     let directory = tempfile::tempdir().unwrap();
@@ -144,8 +203,15 @@ fn check_reuses_same_view_for_each_knowledge_observation() {
     let diagnostics = PublishingDiagnostics {
         writer: RefCell::new(writer),
     };
+    let mut revision = 0;
     let mut service = CheckService::new(
-        Refresh(|| Ok(build_outcome())),
+        Refresh(move || {
+            revision += 1;
+            Ok(RefreshOutcome {
+                revision,
+                ..build_outcome()
+            })
+        }),
         open_storage(&directory),
         diagnostics,
         Verifier {
@@ -256,7 +322,12 @@ fn check_propagates_metadata_read_failure_after_graph_findings() {
         .execute("DROP TABLE nodes", [])
         .unwrap();
     let mut service = CheckService::new(
-        Refresh(|| Ok(build_outcome())),
+        Refresh(|| {
+            Ok(RefreshOutcome {
+                revision: 0,
+                ..build_outcome()
+            })
+        }),
         storage,
         FindingDiagnostics,
         Verifier {
@@ -275,6 +346,9 @@ fn check_propagates_metadata_read_failure_after_graph_findings() {
 }
 
 impl<F: FnMut() -> DocumentResult<RefreshOutcome>> Refresher for Refresh<F> {
+    fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
+        (self.0)()
+    }
     fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
         panic!("this scenario must not trigger a full reindex")
     }

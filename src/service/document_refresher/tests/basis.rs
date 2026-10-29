@@ -39,6 +39,38 @@ struct BoundaryWrite<W> {
 }
 
 #[test]
+fn verified_unchanged_refresh_audits_without_sql_write() {
+    // Given: an already published document and no file delta.
+    let (_dir, mut service, events) = build_boundary_service(None);
+    service.refresh().unwrap();
+    events.borrow_mut().clear();
+    let parses = service.markdown.0.get();
+    // When: full-corpus check requests a verified incremental refresh.
+    let outcome = service.refresh_verified().unwrap();
+    // Then: audit runs under lock, with no SQL write or body parse.
+    assert_eq!(*events.borrow(), ["lock", "verify"]);
+    assert!(!outcome.published);
+    assert_eq!(service.markdown.0.get(), parses);
+}
+
+#[test]
+fn verified_refresh_failure_preserves_previous_publication() {
+    // Given: a new projection whose source audit fails.
+    let (_dir, mut service, events) = build_boundary_service(Some("verify"));
+    // When: verification fails before any SQL write begins.
+    assert!(service.refresh_verified().is_err());
+    // Then: no partial graph is published.
+    assert_eq!(
+        *events.borrow(),
+        ["lock", "read", "read", "observe", "verify"]
+    );
+    assert_eq!(
+        service.storage.inner.begin_read().unwrap().get_revision(),
+        0
+    );
+}
+
+#[test]
 fn retain_under_index_lock_before_sql_publication() {
     // Given
     let (_dir, mut service, events) = build_boundary_service(None);
@@ -154,7 +186,7 @@ fn initial_build_and_full_reindex_lock_before_capturing_and_validate_basis() {
     assert_eq!(
         *events.borrow(),
         [
-            "lock", "read", "read", "observe", "retain", "begin", "read", "commit"
+            "lock", "read", "read", "observe", "verify", "begin", "read", "commit"
         ]
     );
     assert!(service.markdown.0.get() > parses);
@@ -220,6 +252,13 @@ impl SourceProvenance for BoundaryProvenance {
     }
 }
 impl BasisRetainer for BoundaryProvenance {
+    fn verify_snapshots(&self, _: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+        self.events.borrow_mut().push("verify");
+        if self.failure == Some("verify") {
+            return Err(build_failure());
+        }
+        Ok(())
+    }
     fn retain_snapshots(&self, _: &BTreeSet<TreeOid>) -> DocumentResult<()> {
         self.events.borrow_mut().push("retain");
         if self.failure == Some("retain") {

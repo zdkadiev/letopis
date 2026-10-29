@@ -81,6 +81,10 @@ impl GitCli {
 }
 
 impl GitSnapshots for GitCli {
+    fn retain(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
+        self.require_self_contained_objects()?;
+        refs::Retainer { git: self }.retain(tree)
+    }
     fn create_tree(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
         self.require_self_contained_objects()?;
         objects::ObjectDb { git: self }.create_tree(files)

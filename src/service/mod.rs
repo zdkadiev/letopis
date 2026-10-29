@@ -228,18 +228,20 @@ pub trait SourceProvenance {
         request: SourceRevisionRequest<'_>,
     ) -> Result<SourceRevisionComparison, SnapshotError>;
 }
-/// Index publication's retention capability; the caller must hold index.lock.
-///
-/// Every implementation verifies each unique root once per call and pins every
-/// available root, including roots without external sources. A pin failure after
-/// successful verification is an error, even if the root disappeared meanwhile.
+/// Source retention and audit before publication; the caller holds index.lock.
+/// Missing/invalid author roots remain findings; available root/ref failures are errors.
 pub trait BasisRetainer {
-    /// Verify unique declared roots and pin every available complete tree closure.
-    /// Missing/invalid roots are validation findings, not publication failures.
+    /// Validate unique roots and retain direct refs without traversing descendants.
     ///
     /// # Errors
-    /// Returns safe errors for corruption, Git I/O or failed ref publication.
+    /// Reports root corruption, policy, Git I/O and ref failures.
     fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()>;
+    /// Audit every available unique root's complete local closure and retain its ref.
+    /// Existing refs must not bypass repeated corruption checks.
+    ///
+    /// # Errors
+    /// Reports incomplete/corrupt closures, policy, Git I/O and ref failures.
+    fn verify_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()>;
 }
 
 /// Minimal pinned graph identities and bounded directional page requests.

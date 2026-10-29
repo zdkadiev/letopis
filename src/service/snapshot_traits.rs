@@ -72,6 +72,13 @@ pub trait GitSnapshots {
     /// non-tree root or non-blob path, and [`SnapshotErrorKind::InternalError`]
     /// for repository policy, Git I/O or integrity failures.
     fn read_blob(&self, tree: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError>;
+    /// Validate the exact root and retain its direct ref without auditing descendants.
+    /// A retained ref protects healthy reachable objects from normal GC, not corruption.
+    ///
+    /// # Errors
+    /// Missing roots are not found; wrong types/formats are invalid requests.
+    /// Root corruption, policy, Git I/O and ref conflicts are internal errors.
+    fn retain(&self, tree: &TreeOid) -> Result<(), SnapshotError>;
     /// Validate the complete local closure and retain it through Git GC.
     ///
     /// # Errors

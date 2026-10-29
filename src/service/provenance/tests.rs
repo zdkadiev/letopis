@@ -16,6 +16,20 @@ use std::{
 };
 
 #[test]
+fn full_audit_still_pins_available_roots() {
+    // Given: one available author root.
+    let service = create_service(GitFault::None);
+    let tree = create_oid('a');
+    // When: exhaustive verification is explicitly requested.
+    service
+        .verify_snapshots(&BTreeSet::from([tree.clone()]))
+        .unwrap();
+    // Then: strong pin is used instead of lightweight retention.
+    assert_eq!(*service.git.strong_pins.borrow(), [tree]);
+    assert!(service.git.pins.borrow().is_empty());
+}
+
+#[test]
 fn leave_remote_unknown_without_file_reads_or_retention() {
     // Given
     let service = create_service(GitFault::None);
@@ -200,6 +214,7 @@ struct RecordedGit {
     states: BTreeMap<TreeOid, SnapshotState>,
     verified: RefCell<Vec<TreeOid>>,
     pins: RefCell<Vec<TreeOid>>,
+    strong_pins: RefCell<Vec<TreeOid>>,
     fault: GitFault,
 }
 struct RecordedFiles {
@@ -221,6 +236,13 @@ impl SnapshotVerifier for RecordedGit {
     }
 }
 impl GitSnapshots for RecordedGit {
+    fn retain(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
+        self.pins.borrow_mut().push(tree.clone());
+        if matches!(self.fault, GitFault::Pin) {
+            return Err(create_git_failure());
+        }
+        Ok(())
+    }
     fn create_tree(&self, _: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
         panic!("provenance must not create trees")
     }
@@ -241,7 +263,7 @@ impl GitSnapshots for RecordedGit {
         }
     }
     fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
-        self.pins.borrow_mut().push(tree.clone());
+        self.strong_pins.borrow_mut().push(tree.clone());
         if matches!(self.fault, GitFault::Pin) {
             return Err(create_git_failure());
         }
@@ -286,6 +308,7 @@ fn create_service(fault: GitFault) -> ProvenanceService<RecordedGit, RecordedFil
             states: BTreeMap::new(),
             verified: RefCell::new(Vec::new()),
             pins: RefCell::new(Vec::new()),
+            strong_pins: RefCell::new(Vec::new()),
             fault,
         },
         RecordedFiles {

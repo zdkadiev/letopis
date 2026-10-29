@@ -89,8 +89,19 @@ impl<G: GitSnapshots + SnapshotVerifier, F: FileSystem> SourceProvenance
 impl<G: GitSnapshots + SnapshotVerifier, F> BasisRetainer for ProvenanceService<G, F> {
     fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
         for tree in snapshots {
-            let state = self.git.verify_snapshot(tree).map_err(map_snapshot_error)?;
-            if state == SnapshotState::Available {
+            if self.git.verify_snapshot(tree).map_err(map_snapshot_error)?
+                == SnapshotState::Available
+            {
+                self.git.retain(tree).map_err(map_snapshot_error)?;
+            }
+        }
+        Ok(())
+    }
+    fn verify_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+        for tree in snapshots {
+            if self.git.verify_snapshot(tree).map_err(map_snapshot_error)?
+                == SnapshotState::Available
+            {
                 self.git.pin(tree).map_err(map_snapshot_error)?;
             }
         }
