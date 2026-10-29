@@ -1,6 +1,6 @@
 # Read optimization — invariant audit
 
-Date: 2026-10-29. Status: implementation and regression/mutation checks are present; final whole-tree/native gates are in progress. Historical design-audit requirements below are retained as the original checklist; see report.md for execution results. Scope: [revised spec](../../../../superpowers/specs/2026-10-29-read-workflow-performance-design.md) and [plan](../../../../superpowers/plans/2026-10-29-read-workflow-performance.md).
+Date: 2026-10-29. Status: implementation and regression/mutation checks are present; final whole-tree/native gates passed. Historical design-audit requirements below are retained as the original checklist; see report.md for execution results. Scope: [revised spec](../../../../superpowers/specs/2026-10-29-read-workflow-performance-design.md) and [plan](../../../../superpowers/plans/2026-10-29-read-workflow-performance.md).
 
 Evidence labels: **current** means inspected in the current product or existing tests; **required** names a test that must be implemented/run for the revised behavior. Neither static review nor passing the old tests establishes that new behavior works. Physical object-store damage concurrent with the check cannot be ruled out indefinitely by any one verification pass.
 
@@ -76,4 +76,38 @@ Total: 45 existing tests passed. This verifies the unchanged baseline's pinned-v
 
 ## Implementation review corrections
 
-Independent review found that old hash-object calls also validated tree structure. The final strong path keeps those exact Git checks through one additional batched tree-validator process over private transient metadata files. Noncanonical-mode decoder normalization is not a relaxation of strong-pin acceptance. Nested malformed-tree regression was observed RED then GREEN. I-22 now includes early BrokenPipe and external process-group watchdogs; disabling stderr draining caused a bounded test failure. Additional mutation removing structural validation also failed the expected regression. Final gate results are recorded in the execution report.
+Independent review found that old hash-object calls also validated tree structure. The final strong path keeps those exact Git checks through one additional batched tree-validator process over private transient metadata files. Noncanonical-mode decoder normalization is not a relaxation of strong-pin acceptance. Nested malformed-tree regression was observed RED then GREEN. I-22 now includes early BrokenPipe and external process-group watchdogs; disabling stderr draining caused a bounded test failure. Mutations removing structural validation, existing-ref rechecks, process-count work, spool permissions/cleanup/quoting also failed their expected regressions. Final gate results are recorded in the execution report.
+
+## Execution evidence against all 27 invariants
+
+The final `make verify` passed 926 root tests in debug and 926 in release, with no failures. The following maps each invariant to current implementation/review or executed tests; it is not a claim of exhaustive state-space or power-loss proof. Host/native receipt and platform limits are recorded in [report](report.md).
+
+| ID | Current evidence |
+| --- | --- |
+| I-01 | `read_verification::all_commands_and_freshness_preserve_canonical_bytes`, document_refresh/search_consistency/cli_traversal and inspection suites |
+| I-02 | E2E argv counts for unchanged reads, new bases and Markdown edits; unrelated damaged descendants remain unread |
+| I-03 | CheckService whole/scoped tests, nonempty selection naming all files, CLI decoding and E2E whole/scoped checks |
+| I-04 | `verified_unchanged_refresh_audits_without_sql_write`; separate reindex process/publication tests |
+| I-05 | Boundary event ordering and `verified_refresh_failure_preserves_previous_publication`; real E2E edited knowledge retains old revision after audit failure; audit mutation caught |
+| I-06 | Retain-before-BEGIN boundary tests, unchanged retention test, new-basis E2E and missing-root/provenance tests |
+| I-07 | Invalid last-valid owner plus valid replacement/deletion E2E; prospective-root mutation caught |
+| I-08 | Newer-revision rejection test; original-pinned-view and publication-after-pin tests; revision mutation caught |
+| I-09 | Shared stat/hash recheck pipeline reviewed; process schedules for refresh/reindex, post-preflight replacement rollback and commit cancellation passed |
+| I-10 | Provenance/search_consistency/source_inspection tests preserve authored basis/time while source-only edits change observations |
+| I-11 | retain returns unit; root-type/missing-root tests and incomplete-child lightweight retention test |
+| I-12 | Repeated/reopened pin corruption and missing/swapped object tests in both formats; strong closure mutation caught |
+| I-13 | Separate unrelated-descendant and addressed-object corruption E2E; root corruption suites |
+| I-14 | Light GC survival plus symbolic/conflicting ref tests; shared exact-ref/CAS implementation and concurrent pin tests |
+| I-15 | Root/author/requested/missing-child classifications in provenance, git_snapshots, retention and corruption suites |
+| I-16 | Git-oracle SHA-1/SHA-256 and binary fixtures; wrong-OID tests; sha1-checked compile/empty-object/SHAttered probe; hash mutation caught |
+| I-17 | Decoder versus ls-tree oracle in both formats; strong nested malformed-tree rejection versus Git hash-object; Git keeps ordering/duplicate/path/mode/alias policy; structural-check mutation caught |
+| I-18 | Existing replacement/alternate/promisor/environment tests; both batch processes reuse hardened GitProcess |
+| I-19 | Knowledge/source inspection suites plus real snapshot/hash E2E; exact current bytes and source membership behavior preserved |
+| I-20 | Inspect succeeds with damaged unrelated author descendant; only its new captured tree has a batch pin in argv count |
+| I-21 | Binary multi-response framing; malformed/oversized/missing/wrong-ID/type/size/EOF/trailer tests under watchdog; OID/trailer mutants caught |
+| I-22 | Early BrokenPipe, failed exit/private cause, Drop/reaping, stderr-pressure tests; external process-group deadlines and removed-drainer mutant; private spool cleanup tests |
+| I-23 | `cancellation_closes_batch_pipes_and_real_git_exits` plus all foreground cancellation and once-response tests |
+| I-24 | 64-KiB blob buffer and tree-only metadata spool reviewed; no blob body accumulation or persistent verification cache; private 0700/0600 spool and cleanup verified |
+| I-25 | All eight public commands plus internal embedding drain, config/provider/fallback/help/version suites passed; JSON shapes unchanged |
+| I-26 | Fixed corpus/cache/build inputs, three warmed before/after runs, separate argv counts, symbolized Rust samples, constant-per-closure process-count test; host-load/sampler limits disclosed |
+| I-27 | Isolated branch; main status unchanged; no recreated main knowledge fixture; historical raw evidence copied byte-for-byte, not overwritten; contract/help/skill/decision updates and local links checked |

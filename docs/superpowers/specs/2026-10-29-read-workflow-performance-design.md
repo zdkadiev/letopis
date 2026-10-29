@@ -104,3 +104,7 @@ The [invariant matrix](../../zkit/letopis/checks/read-workflow-performance/invar
 - [RustCrypto SHA-1 guidance](https://docs.rs/sha1/latest/sha1/): legacy SHA-1 interoperability and collision-detecting alternative.
 - [sha1-checked 0.10.0 metadata and API](https://docs.rs/crate/sha1-checked/0.10.0): collision reporting, MSRV and docs-build limitation.
 - [Git 2.50.1 mode normalization](https://github.com/git/git/blob/v2.50.1/object.h) and [tree decoding](https://github.com/git/git/blob/v2.50.1/tree-walk.c): compatibility oracle for the batch traversal parser.
+
+## Implementation outcome
+
+Implemented in product commit `8d3a406`; [execution report](../../zkit/letopis/checks/read-workflow-performance/report.md) contains the matched measurements, 27-invariant evidence, review correction, 15 hand mutants, complete debug/release gates and host/native receipt. No merge/push performed.

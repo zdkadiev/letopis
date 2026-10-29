@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** implementation authorized by the user on 2026-10-29; execution in progress in isolated branch `perf/read-snapshot-verification`. Scope/invariant tests and hand mutations passed; final all-target gates, native receipt, matched profiling and independent review remain in progress. See the execution report for final results.
+**Status:** complete on isolated branch `perf/read-snapshot-verification`, product commit `8d3a406`. All-command E2E, 15 hand mutants, 926 debug + 926 release tests, strict Rustdoc and host/native/standalone receipt PASS. Actual execution details and scope limits are in the [report](../../zkit/letopis/checks/read-workflow-performance/report.md). The checklist below remains the original task brief; equivalent actual test names, combined commit boundaries and structural-validation correction are documented in the report.
 
 **Goal:** Make routine reads avoid exhaustive author-source verification, and batch that verification in full-corpus check/reindex while preserving freshness, addressed-byte integrity and atomic publication.
 
@@ -133,3 +133,7 @@ Do not add a storage table, service wrapper, verification-certificate type or pu
 ## Execution corrections from independent review
 
 The old `hash-object -t tree` command checked structure as well as identity. Full pin now uses one cat-file batch plus one hash-object --stdin-paths batch over private transient tree files, preserving Git's exact strict format policy (including noncanonical-mode rejection) before refs/SQL. No subprocess per object. Tests independently compare decoder normalization with ls-tree, and separately prove strict nested-tree rejection through the public strong pin. The scratch directory owns 0700/0600 inputs, quotes arbitrary path bytes and removes them on all ordinary paths. This replaces the earlier incomplete assumption that ls-tree normalization alone defined accepted strong-pin input. See execution report for process counts, tests and limits.
+
+## Completion receipt
+
+Tasks 1–5 complete. Fixed corpus/cache and release settings: search median0.679s (85.3x), traverse0.641s (97.8x), inspect1.256s (59.7x). Search/traverse met sub-second aspiration; inspect did not, and its remaining capture/one-shot verification cost was profiled. Tenfold target exceeded for all three. Git subprocess counts fell6239/6239/6350 ->66/66/128. Full check6253->81, reindex6242->71. Before/after response metadata parity9/9. Native host receipt PASS, 408 final input hashes match; Linux/actual Git2.29 execution unrun. Independent final review findings fixed via RED/GREEN and mutations, no deferred minors. Existing isolation preference retained: branch/worktree kept; no merge/push.
