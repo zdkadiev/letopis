@@ -3,6 +3,7 @@
 **Status:** verified on macOS arm64. Implementation, review fixes, contracts and clean-tree host storage receipt are committed.
 
 **Branch:** `issue-61-init` at `/private/tmp/letopis-issue-61`
+**PR:** https://github.com/zaurkadiev/letopis/pull/63
 **Plan:** [2026-10-29 issue 61 plan](../../../../superpowers/plans/2026-10-29-issue-61-init.md)
 **Spec:** [2026-10-29 issue 61 design](../../../../superpowers/specs/2026-10-29-issue-61-init-design.md)
 **Base:** `4624d91` (`docs: adopt revised issue 61 specification and plan`)
