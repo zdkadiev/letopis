@@ -1,6 +1,6 @@
 # Issue 61 — initialization and disabled embeddings verification
 
-**Status:** implementation and review fixes verified; final host storage receipt pending.
+**Status:** verified on macOS arm64. Implementation, review fixes, contracts and clean-tree host storage receipt are committed.
 
 **Branch:** `issue-61-init` at `/private/tmp/letopis-issue-61`
 **Plan:** [2026-10-29 issue 61 plan](../../../../superpowers/plans/2026-10-29-issue-61-init.md)
@@ -24,7 +24,6 @@
 - New filesystem and init service APIs were first compiled only after their behavioral tests existed; focused suites then passed.
 - Full Rust suite before review: `cargo test --locked --offline` → **895 passed, 11 ignored**. Final `make check` and `make verify` after review fixes → **ok**.
 - `make check` → `ok`.
-- The host storage runner result is recorded below after it finishes.
 
 ## Mutation checks
 
@@ -54,11 +53,11 @@ All mutations were temporary; each file was restored and its SHA-256 compared wi
 - `python3 -B docs/zkit/letopis/checks/contracts/check_contract_examples.py docs/zkit/letopis` → 82 CLI examples, 113 assertions, 0 errors.
 - `make check` → `ok`.
 - `make verify` → `ok` (strict Rustdoc, root tests in release profile).
-- `python3 -B tests/storage/run.py --platform host --evidence .artifacts/issue-61/2026-10-29-host-1` → pending.
+- `python3 -B tests/storage/run.py --platform host --evidence .artifacts/issue-61/2026-10-29-host-2` → **PASS**, source commit `5ae57cc`, clean source tree; provider real-deadline test 60.01 s; standalone/FTS/native/vec1 PASS.
 
 ## Platform limits
 
-- `python3.12 -B -m unittest discover -s tests/final_pilot -p 'test_*.py'` → 173 tests OK, 2 skipped (opt-in Docker proofs), after updating the pilot config writer and service probe to the nested format; the full pilot was not rerun.
+- `python3.12 -B -m unittest discover -s tests/final_pilot -p 'test_*.py'` → 173 tests OK, 2 skipped (opt-in Docker proofs), after updating the pilot config writer and service probe to the nested format. A temporary `cargo check --example` copy of the updated service probe compiled successfully; the full pilot was not rerun.
 - Host platform is macOS arm64; no Linux/Docker run was performed for this issue.
 - No physical power-loss drill, live provider call, performance measurement, or full pilot rerun was performed.
 - macOS file durability uses `F_FULLFSYNC` for the published configuration; directory entry durability uses `fsync` through the existing filesystem boundary.
@@ -66,7 +65,7 @@ All mutations were temporary; each file was restored and its SHA-256 compared wi
 
 ## Review
 
-A fresh read-only whole-branch review was run by GPT-6.1 Sol (high) over `4624d91..72fc908`.
+A fresh read-only whole-branch review was run by GPT-6.1 Sol (high) over `4624d91..72fc908`; material fixes are in `c012b34`.
 
 **Critical:** none.
 
@@ -82,4 +81,4 @@ A fresh read-only whole-branch review was run by GPT-6.1 Sol (high) over `4624d9
 
 **Declined to judge:** fresh runtime results (the reviewer was read-only), physical power-loss durability, Linux/Docker behavior, live-provider compatibility/performance, hostile same-UID isolation, and uncommitted report/plan edits.
 
-**Ready to merge after fixes:** yes, subject to the rerun gates below.
+**Ready to merge after fixes:** yes; `make check`, `make verify`, contract/schema checks and the clean-tree storage runner all pass.
