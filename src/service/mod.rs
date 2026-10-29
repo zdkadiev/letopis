@@ -82,7 +82,8 @@ pub(crate) use embedding_config::{MAX_DIMENSIONS, MIN_DIMENSIONS};
 pub use embedding_error::{EmbeddingError, EmbeddingErrorKind, EmbeddingResult};
 pub use embedding_traits::{Embedder, EmbeddingFiles, EmbeddingProvider};
 pub use error::{
-    DocumentError, DocumentErrorKind, DocumentResult, StorageError, StorageErrorKind, StorageResult,
+    DocumentError, DocumentErrorKind, DocumentResult, ServiceError, ServiceErrorKind,
+    ServiceResult, StorageError, StorageErrorKind, StorageResult,
 };
 pub use model::{
     CapturedFile, ConfigState, Diagnostic, DiagnosticKind, DrainOutcome, EmbeddingFailure,

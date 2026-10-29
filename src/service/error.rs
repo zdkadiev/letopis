@@ -126,6 +126,78 @@ impl Error for DocumentError {
 /// A document operation's typed outcome.
 pub type DocumentResult<T> = Result<T, DocumentError>;
 
+/// Application service construction or setup failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServiceErrorKind {
+    /// No initialized Git work tree is available.
+    RepositoryRequired,
+    /// Repository discovery or object policy failed.
+    Repository,
+    /// Initialization setup failed.
+    Initialization,
+    /// Corpus validation service setup failed.
+    Check,
+    /// Search service setup failed.
+    Search,
+    /// Traversal service setup failed.
+    Traversal,
+    /// Inspection service setup failed.
+    Inspection,
+    /// Status service setup failed.
+    Status,
+    /// Configuration service setup failed.
+    Configuration,
+    /// Embedding service setup failed.
+    Embedding,
+    /// Background coordination setup failed.
+    Background,
+    /// Corpus reindex setup failed.
+    Reindex,
+}
+
+/// Safe application-service setup error with a private cause.
+pub struct ServiceError {
+    kind: ServiceErrorKind,
+    cause: Option<Box<dyn Error + Send + Sync>>,
+}
+impl ServiceError {
+    /// Construct an error from a service setup kind and private cause.
+    pub(crate) fn new_with_cause(
+        kind: ServiceErrorKind,
+        cause: impl Error + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            kind,
+            cause: Some(Box::new(cause)),
+        }
+    }
+    /// Return the service setup classification.
+    pub fn get_kind(&self) -> ServiceErrorKind {
+        self.kind
+    }
+}
+impl fmt::Display for ServiceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("application service operation failed")
+    }
+}
+impl fmt::Debug for ServiceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ServiceError")
+            .field("kind", &self.kind)
+            .finish_non_exhaustive()
+    }
+}
+impl Error for ServiceError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.cause
+            .as_deref()
+            .map(|cause| cause as &(dyn Error + 'static))
+    }
+}
+/// Result of constructing an application service.
+pub type ServiceResult<T> = Result<T, ServiceError>;
+
 impl From<StorageError> for DocumentError {
     fn from(cause: StorageError) -> Self {
         Self::new_with_cause(
@@ -138,7 +210,7 @@ impl From<StorageError> for DocumentError {
 
 #[cfg(test)]
 mod tests {
-    use super::{DocumentError, DocumentErrorKind};
+    use super::{DocumentError, DocumentErrorKind, ServiceError, ServiceErrorKind};
     use std::{error::Error, io};
 
     #[test]
@@ -165,6 +237,27 @@ mod tests {
                 .unwrap()
                 .to_string()
                 .contains("PRIVATE_DOCUMENT_CAUSE")
+        );
+    }
+
+    #[test]
+    fn service_error_keeps_kind_without_exposing_private_cause() {
+        // Given
+        let error = ServiceError::new_with_cause(
+            ServiceErrorKind::Initialization,
+            io::Error::other("PRIVATE_SERVICE_CAUSE"),
+        );
+        // When
+        let diagnostic = format!("{error:?}");
+        // Then
+        assert_eq!(error.get_kind(), ServiceErrorKind::Initialization);
+        assert!(!diagnostic.contains("PRIVATE_SERVICE_CAUSE"));
+        assert!(
+            error
+                .source()
+                .unwrap()
+                .to_string()
+                .contains("PRIVATE_SERVICE_CAUSE")
         );
     }
 }

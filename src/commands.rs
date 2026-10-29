@@ -8,14 +8,14 @@ use crate::service::{
     BackgroundRunner, Checker, CommandError, CommandErrorKind, CommandResult, ConfigReader,
     ConfigurationService, DocumentError, DocumentErrorKind, ElementAddress,
     GraphDiagnosticsService, Initializer, Inspector, ProvenanceService, Refresher, SearchRequest,
-    Searcher, StatusReader, StatusService, TraversalRequest, Traverser,
+    Searcher, ServiceError, ServiceErrorKind, StatusReader, StatusService, TraversalRequest,
+    Traverser,
 };
 use crate::storage::SqliteStatusStorage;
 use crate::utils::SERVICE_DIRECTORY;
 use crate::{
-    build_embedding_provider, map_embedding_setup, wire_background_runner, wire_checker,
-    wire_document_refresher, wire_embedding_executor, wire_initializer, wire_inspector,
-    wire_searcher, wire_traverser,
+    build_embedding_provider, wire_background_runner, wire_checker, wire_document_refresher,
+    wire_embedding_executor, wire_initializer, wire_inspector, wire_searcher, wire_traverser,
 };
 use std::{
     env,
@@ -56,29 +56,35 @@ fn run_reindex(directory: &Path, executable: &Path) -> CommandResult<CommandResp
     let root = open_repository_root(directory)?;
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut documents = wire_document_refresher(&root).map_err(map_reindex_setup)?;
+    let mut documents = wire_document_refresher(&root)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Reindex, cause))?;
     let outcome = documents.reindex().map_err(map_reindex_error)?;
     finish_foreground(ResponseResult::Reindex(outcome.revision), &mut background)
 }
 
 fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
-    let git = GitCli::open(&root).map_err(map_status_setup)?;
-    let files = LocalFileSystem::open(git.get_root()).map_err(map_status_setup)?;
+    let git = GitCli::open(&root)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
+    let files = LocalFileSystem::open(git.get_root())
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let service_directory = files
         .open_existing_service_directory()
-        .map_err(map_status_setup)?;
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let storage = if let Some(pinned) = service_directory.as_ref() {
         SqliteStatusStorage::open_confined(&root.join(SERVICE_DIRECTORY), pinned)
-            .map_err(map_status_setup)?
+            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?
     } else {
         SqliteStatusStorage::default()
     };
     let provenance = ProvenanceService::new(
-        GitCli::open(&root).map_err(map_status_setup)?,
-        LocalFileSystem::open(&root).map_err(map_status_setup)?,
+        GitCli::open(&root)
+            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?,
+        LocalFileSystem::open(&root)
+            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?,
     );
-    let provider = build_embedding_provider().map_err(map_status_setup)?;
+    let provider = build_embedding_provider()
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let graph = GraphDiagnosticsService::new();
     let mut status = StatusService {
         storage,
@@ -94,8 +100,10 @@ fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
 /// Observe the current configuration through non-creating files without background work.
 fn run_config(directory: &Path) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
-    let files = LocalFileSystem::open(&root).map_err(map_config_setup)?;
-    let provider = build_embedding_provider().map_err(map_config_setup)?;
+    let files = LocalFileSystem::open(&root)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Configuration, cause))?;
+    let provider = build_embedding_provider()
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Configuration, cause))?;
     let configuration = ConfigurationService {
         files: &files,
         provider: &provider,
@@ -183,32 +191,9 @@ fn run_inspect(
 
 /// Foreground services and background exclusion must share the discovered repository root.
 fn open_repository_root(directory: &Path) -> CommandResult<PathBuf> {
-    let git = GitCli::open(directory).map_err(map_embedding_setup)?;
+    let git = GitCli::open(directory)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Repository, cause))?;
     Ok(git.get_root().to_path_buf())
-}
-
-fn map_reindex_setup(cause: DocumentError) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot open corpus reindex service",
-        cause,
-    )
-}
-
-fn map_status_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot open status service",
-        error,
-    )
-}
-
-fn map_config_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot read embedding configuration",
-        error,
-    )
 }
 
 fn map_reindex_error(cause: DocumentError) -> CommandError {
@@ -217,4 +202,153 @@ fn map_reindex_error(cause: DocumentError) -> CommandError {
         DocumentErrorKind::InternalError => CommandErrorKind::InternalError,
     };
     CommandError::new_with_cause(kind, "cannot rebuild corpus index", cause)
+}
+
+impl From<ServiceError> for CommandError {
+    fn from(error: ServiceError) -> Self {
+        map_service_error(error)
+    }
+}
+
+fn map_service_error(error: ServiceError) -> CommandError {
+    let (kind, message) = match error.get_kind() {
+        ServiceErrorKind::RepositoryRequired => {
+            (CommandErrorKind::InvalidRequest, "Git repository required")
+        }
+        ServiceErrorKind::Repository => {
+            (CommandErrorKind::InternalError, "cannot locate repository")
+        }
+        ServiceErrorKind::Initialization => (
+            CommandErrorKind::InternalError,
+            "cannot initialize repository",
+        ),
+        ServiceErrorKind::Check => (CommandErrorKind::InternalError, "cannot open check service"),
+        ServiceErrorKind::Search => (
+            CommandErrorKind::InternalError,
+            "cannot open search service",
+        ),
+        ServiceErrorKind::Traversal => {
+            (CommandErrorKind::InternalError, "cannot prepare traversal")
+        }
+        ServiceErrorKind::Inspection => (
+            CommandErrorKind::InternalError,
+            "cannot open inspection service",
+        ),
+        ServiceErrorKind::Status => (
+            CommandErrorKind::InternalError,
+            "cannot open status service",
+        ),
+        ServiceErrorKind::Configuration => (
+            CommandErrorKind::InternalError,
+            "cannot read embedding configuration",
+        ),
+        ServiceErrorKind::Embedding => (
+            CommandErrorKind::InternalError,
+            "cannot open embedding service",
+        ),
+        ServiceErrorKind::Background => (
+            CommandErrorKind::InternalError,
+            "cannot open background root",
+        ),
+        ServiceErrorKind::Reindex => (
+            CommandErrorKind::InternalError,
+            "cannot open corpus reindex service",
+        ),
+    };
+    CommandError::new_with_cause(kind, message, error)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::map_service_error;
+    use crate::service::{CommandErrorKind, ServiceError, ServiceErrorKind};
+    use std::{error::Error, io};
+
+    #[test]
+    fn maps_each_service_kind_and_keeps_causes_private() {
+        // Given: every service setup kind with one private cause sentinel.
+        // When / Then: public classification/message is stable and the cause stays private.
+        for (service_kind, command_kind, message) in SERVICE_MAPPINGS {
+            let error = ServiceError::new_with_cause(
+                service_kind,
+                io::Error::other("PRIVATE_SERVICE_CAUSE"),
+            );
+            let mapped = map_service_error(error);
+            assert_eq!(mapped.get_kind(), command_kind, "{service_kind:?}");
+            assert_eq!(mapped.get_message(), message, "{service_kind:?}");
+            assert!(!format!("{mapped:?}").contains("PRIVATE_SERVICE_CAUSE"));
+            let source = mapped.source().unwrap();
+            let service = source.downcast_ref::<ServiceError>().unwrap();
+            assert!(
+                service
+                    .source()
+                    .unwrap()
+                    .to_string()
+                    .contains("PRIVATE_SERVICE_CAUSE")
+            );
+        }
+    }
+
+    const SERVICE_MAPPINGS: [(ServiceErrorKind, CommandErrorKind, &str); 12] = [
+        (
+            ServiceErrorKind::RepositoryRequired,
+            CommandErrorKind::InvalidRequest,
+            "Git repository required",
+        ),
+        (
+            ServiceErrorKind::Repository,
+            CommandErrorKind::InternalError,
+            "cannot locate repository",
+        ),
+        (
+            ServiceErrorKind::Initialization,
+            CommandErrorKind::InternalError,
+            "cannot initialize repository",
+        ),
+        (
+            ServiceErrorKind::Check,
+            CommandErrorKind::InternalError,
+            "cannot open check service",
+        ),
+        (
+            ServiceErrorKind::Search,
+            CommandErrorKind::InternalError,
+            "cannot open search service",
+        ),
+        (
+            ServiceErrorKind::Traversal,
+            CommandErrorKind::InternalError,
+            "cannot prepare traversal",
+        ),
+        (
+            ServiceErrorKind::Inspection,
+            CommandErrorKind::InternalError,
+            "cannot open inspection service",
+        ),
+        (
+            ServiceErrorKind::Status,
+            CommandErrorKind::InternalError,
+            "cannot open status service",
+        ),
+        (
+            ServiceErrorKind::Configuration,
+            CommandErrorKind::InternalError,
+            "cannot read embedding configuration",
+        ),
+        (
+            ServiceErrorKind::Embedding,
+            CommandErrorKind::InternalError,
+            "cannot open embedding service",
+        ),
+        (
+            ServiceErrorKind::Background,
+            CommandErrorKind::InternalError,
+            "cannot open background root",
+        ),
+        (
+            ServiceErrorKind::Reindex,
+            CommandErrorKind::InternalError,
+            "cannot open corpus reindex service",
+        ),
+    ];
 }

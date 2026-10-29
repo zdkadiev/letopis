@@ -83,3 +83,7 @@ A fresh read-only whole-branch review was run by GPT-6.1 Sol (high) over `4624d9
 **Declined to judge:** fresh runtime results (the reviewer was read-only), physical power-loss durability, Linux/Docker behavior, live-provider compatibility/performance, hostile same-UID isolation, and uncommitted report/plan edits.
 
 **Ready to merge after fixes:** yes; `make check`, `make verify`, contract/schema checks and the clean-tree storage runner all pass.
+
+## Follow-up error boundary
+
+Service wiring now returns typed `ServiceResult<T>` with `ServiceErrorKind` per setup area (repository, init, check, search, traversal, inspection, status, configuration, embedding, background, reindex). `commands.rs` owns one `ServiceError -> CommandError` mapper with stable public messages and private causes; the previous generic `impl Error` setup mappers are removed.
