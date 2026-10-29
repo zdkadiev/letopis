@@ -32,6 +32,15 @@ It excludes the starting IDs and includes `edges` only if `edge_limit` is sent.
 `search` accepts optional filters: `needs_recheck`, `sources`, `source_revisions`.
 Treat a recheck flag as a prompt to examine current source bytes and provenance.
 
+Search/traverse/inspect automatically refresh the database from Markdown without
+editing Markdown. Routine refresh retains source roots/refs and verifies addressed
+objects; it does not audit unrelated descendants. Run `check` with omitted or empty
+`paths` for a full source-snapshot audit. Any nonempty `paths` selects scoped findings
+without that audit. `reindex` reparses the corpus and fully audits effective source
+snapshots before publication. A full audit failure preserves the previous cache.
+A successful routine read or an existing retention ref is not proof that every
+source object is intact. Inspect fully verifies its own newly captured reading tree.
+
 One `inspect` call returns `result.snapshot` (a retained Git tree OID) and
 `result.elements` keyed by normalized requested IDs. Each value has `path`,
 optional inclusive `lines`, and `hash` (SHA-256 of addressed bytes or null).

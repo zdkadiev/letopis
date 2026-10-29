@@ -116,6 +116,10 @@ impl SourceProvenance for TestProvenance {
     }
 }
 impl BasisRetainer for TestProvenance {
+    fn verify_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
+        assert!(snapshots.is_empty());
+        Ok(())
+    }
     fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
         assert!(snapshots.is_empty());
         Ok(())

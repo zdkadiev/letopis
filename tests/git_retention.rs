@@ -18,6 +18,62 @@ use std::{
     time::{Duration, Instant},
 };
 #[test]
+fn lightweight_retention_validates_roots_and_survives_gc() {
+    // Given: a healthy captured tree in each supported object format.
+    for format in FORMATS {
+        let repo = TempRepo::new(format);
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        let path = parse_path("file");
+        let tree = git
+            .create_tree(&[SnapshotFile {
+                path: &path,
+                bytes: b"light retained bytes",
+            }])
+            .unwrap();
+        let blob = repo.read_oid(&["rev-parse", &format!("{}:file", tree.as_str())], None);
+        // When: only lightweight retention protects the closure from ordinary GC.
+        git.retain(&tree).unwrap();
+        repo.expire_reflogs_gc_prune_now_and_pack_refs();
+        // Then: bytes remain readable, while wrong-type/missing roots are rejected.
+        assert_eq!(
+            git.read_blob(&tree, &path).unwrap(),
+            b"light retained bytes"
+        );
+        assert_eq!(
+            git.retain(&TreeOid::parse(&blob).unwrap())
+                .unwrap_err()
+                .get_kind(),
+            SnapshotErrorKind::InvalidRequest
+        );
+        assert_eq!(
+            git.retain(&TreeOid::parse(&"1".repeat(blob.len())).unwrap())
+                .unwrap_err()
+                .get_kind(),
+            SnapshotErrorKind::NotFound
+        );
+    }
+}
+
+#[test]
+fn lightweight_retain_preserves_refs_without_claiming_complete_closure() {
+    // Given: an intact root referencing a locally missing unrelated blob.
+    for format in FORMATS {
+        let repo = TempRepo::new(format);
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        let width = repo.read_oid(&["rev-parse", "HEAD"], None).len();
+        let tree = create_external_tree(&repo, &"1".repeat(width), "unrelated", BLOB_KIND);
+        // When: routine retention checks the root/ref but does not inspect children.
+        git.retain(&tree).unwrap();
+        // Then: reachability is retained; a strong pin still rejects missing bytes.
+        assert_eq!(repo.read_direct_ref(tree.as_str()), tree.as_str());
+        assert_eq!(
+            git.pin(&tree).unwrap_err().get_kind(),
+            SnapshotErrorKind::InternalError
+        );
+    }
+}
+
+#[test]
 fn retained_snapshots_survive_gc() {
     // Given
     for format in FORMATS {
@@ -163,8 +219,10 @@ fn symbolic_and_conflicting_refs_are_rejected() {
                 }
             }
             // When
+            let light = git.retain(&tree).unwrap_err();
             let err = git.pin(&tree).unwrap_err();
             // Then
+            assert_eq!(light.get_kind(), SnapshotErrorKind::InternalError);
             assert_eq!(err.get_kind(), SnapshotErrorKind::InternalError);
             assert!(!format!("{err} {err:?}").contains("CANARY"));
             assert_eq!(repo.capture_fixture_state(), before);

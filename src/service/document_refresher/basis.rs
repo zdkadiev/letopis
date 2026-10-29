@@ -1,4 +1,4 @@
-use super::{Observation, PublicationMode, fail_changed};
+use super::{Observation, PublicationMode, SnapshotVerification, fail_changed};
 use crate::{
     domain::{EdgeTarget, RepoPath, Sha256, SourceUri, TreeOid},
     service::{
@@ -24,6 +24,7 @@ struct PreparedBasis {
 pub(super) struct BasisPreparation<'a> {
     pub(super) graph: &'a EffectiveGraph,
     pub(super) updated: &'a BTreeMap<RepoPath, Observation>,
+    pub(super) removed: &'a BTreeMap<RepoPath, bool>,
     pub(super) previous: &'a BTreeMap<RepoPath, FileRow>,
     pub(super) mode: PublicationMode,
 }
@@ -36,6 +37,7 @@ impl BasisPreflight {
     pub(super) fn validate_basis<P: SourceProvenance + BasisRetainer>(
         &self,
         provenance: &P,
+        verification: SnapshotVerification,
     ) -> DocumentResult<()> {
         for basis in &self.bases {
             provenance.observe_sources(ProvenanceRequest {
@@ -43,7 +45,7 @@ impl BasisPreflight {
                 sources: &basis.sources,
             })?;
         }
-        provenance.retain_snapshots(&self.snapshots)
+        verification.validate(provenance, &self.snapshots)
     }
 }
 
@@ -59,13 +61,15 @@ pub(super) fn prepare_basis<F: FileSystem, M: MarkdownCodec>(
     let BasisPreparation {
         graph,
         updated,
+        removed,
         previous,
         mode,
     } = request;
     let mut preflight = BasisPreflight {
-        snapshots: graph.list_source_snapshots(),
+        snapshots: BTreeSet::new(),
         bases: Vec::new(),
     };
+    let mut replaced: BTreeSet<_> = removed.keys().cloned().collect();
     for (path, observed) in updated {
         // Hash-equal files reuse their last valid projection already represented by graph.
         if mode
@@ -78,7 +82,11 @@ pub(super) fn prepare_basis<F: FileSystem, M: MarkdownCodec>(
         if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
             return Err(fail_changed());
         }
-        let Ok(Some(parsed)) = markdown.parse_file(path, &captured.bytes) else {
+        let Ok(parsed) = markdown.parse_file(path, &captured.bytes) else {
+            continue;
+        };
+        replaced.insert(path.clone());
+        let Some(parsed) = parsed else {
             continue;
         };
         for element in parsed.elements {
@@ -100,5 +108,8 @@ pub(super) fn prepare_basis<F: FileSystem, M: MarkdownCodec>(
             });
         }
     }
+    preflight
+        .snapshots
+        .extend(graph.list_source_snapshots(&replaced));
     Ok(preflight)
 }

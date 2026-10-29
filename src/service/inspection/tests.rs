@@ -245,6 +245,9 @@ fn assert_changed_candidate_is_rejected(scenario: Scenario) {
 }
 
 impl Refresher for RecordingDocuments {
+    fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
+        panic!("routine reads must not request a full audit")
+    }
     fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
         panic!("this scenario must not trigger a full reindex")
     }
@@ -283,6 +286,9 @@ impl CorpusLister for RecordingGit {
     }
 }
 impl GitSnapshots for RecordingGit {
+    fn retain(&self, _: &TreeOid) -> Result<(), SnapshotError> {
+        panic!("inspection must not retain author roots")
+    }
     fn create_tree(&self, _: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
         panic!("capture must not retain bytes for create_tree")
     }

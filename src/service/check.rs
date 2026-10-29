@@ -1,6 +1,6 @@
 use super::{
     CheckReport, Checker, CommandError, CommandErrorKind, CommandResult, DocumentError,
-    GraphDiagnostics, Refresher, SourceProvenance, Storage, StorageError,
+    GraphDiagnostics, Refresher, SourceProvenance, Storage, StorageError, StorageRead,
     check_problems::collect_check_problems,
 };
 use crate::domain::RepoPath;
@@ -30,8 +30,19 @@ impl<D: Refresher, S: Storage, G: GraphDiagnostics, P: SourceProvenance> Checker
     for CheckService<D, S, G, P>
 {
     fn check(&mut self, paths: &[RepoPath]) -> CommandResult<CheckReport> {
-        self.refresher.refresh().map_err(map_refresh_error)?;
+        let outcome = if paths.is_empty() {
+            self.refresher.refresh_verified()
+        } else {
+            self.refresher.refresh()
+        }
+        .map_err(map_refresh_error)?;
         let mut view = self.storage.begin_read().map_err(map_storage_error)?;
+        if paths.is_empty() && view.get_revision() != outcome.revision {
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "corpus changed during check; retry",
+            ));
+        }
         let errors = collect_check_problems(&mut view, paths, &self.diagnostics, &self.provenance)?;
         Ok(CheckReport { errors })
     }

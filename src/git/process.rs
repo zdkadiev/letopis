@@ -53,7 +53,7 @@ impl GitProcess {
         exchange_pipes(&mut child, input)
     }
 
-    fn build_command(&self, cwd: &Path, args: &[OsString]) -> Command {
+    pub(super) fn build_command(&self, cwd: &Path, args: &[OsString]) -> Command {
         let mut command = Command::new(&self.program);
         command.current_dir(cwd);
         for (key, _) in env::vars_os() {
@@ -151,10 +151,7 @@ fn exchange_pipes(child: &mut Child, input: Option<&[u8]>) -> Result<Vec<u8>, Sn
         let drained = drainer.join();
         let status = status.map_err(|e| make_io_error("Git wait failed", e))?;
         if !status.success() {
-            return Err(SnapshotError::new_with_cause(
-                "Git command failed",
-                SafeCause::Exit(status),
-            ));
+            return Err(make_exit_error("Git command failed", status));
         }
         written
             .map_err(|_| {
@@ -173,6 +170,10 @@ fn exchange_pipes(child: &mut Child, input: Option<&[u8]>) -> Result<Vec<u8>, Sn
     })
 }
 
-fn make_io_error(message: &'static str, error: io::Error) -> SnapshotError {
+pub(super) fn make_io_error(message: &'static str, error: io::Error) -> SnapshotError {
     SnapshotError::new_with_cause(message, SafeCause::Io(error))
+}
+
+pub(super) fn make_exit_error(message: &'static str, status: ExitStatus) -> SnapshotError {
+    SnapshotError::new_with_cause(message, SafeCause::Exit(status))
 }

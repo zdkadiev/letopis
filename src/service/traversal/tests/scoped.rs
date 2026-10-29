@@ -277,6 +277,9 @@ impl Fixture {
     }
 }
 impl Refresher for Refresh {
+    fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
+        panic!("routine reads must not request a full audit")
+    }
     fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
         panic!("this scenario must not trigger a full reindex")
     }

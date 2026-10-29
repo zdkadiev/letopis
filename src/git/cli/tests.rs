@@ -13,6 +13,113 @@ use fixture::{ObjectFormat, TempRepo};
 use std::{fs, path::PathBuf, process::Command};
 
 #[test]
+fn strong_pin_rejects_malformed_nested_trees_like_git() {
+    // Given: valid roots wrap malformed nested trees written only with --literally.
+    for format in fixture::FORMATS {
+        let repo = TempRepo::new(format);
+        let git = GitCli::open(repo.get_root()).unwrap();
+        let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b""));
+        let raw_oid: Vec<_> = (0..blob.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&blob[i..i + 2], 16).unwrap())
+            .collect();
+        for (mode, name) in [
+            ("100644", "x/y"),
+            ("100644", ".git"),
+            ("100644", "."),
+            ("100664", "x"),
+            ("100600", "x"),
+            ("120000", ".gitmodules"),
+            ("100644", "git~1"),
+            ("100644", ".GIT"),
+            ("100644", "a\\.git"),
+            ("120000", ".gitignore"),
+        ] {
+            let mut raw = format!("{mode} {name}\0").into_bytes();
+            raw.extend_from_slice(&raw_oid);
+            assert!(
+                !repo
+                    .run_git(
+                        &["hash-object", "-t", "tree", "--no-filters", "--stdin"],
+                        Some(&raw)
+                    )
+                    .status
+                    .success()
+            );
+            let nested = repo.read_oid(
+                &["hash-object", "--literally", "-t", "tree", "-w", "--stdin"],
+                Some(&raw),
+            );
+            let root = repo.read_oid(
+                &["mktree"],
+                Some(format!("040000 tree {nested}\tnested\n").as_bytes()),
+            );
+            let root = crate::domain::TreeOid::parse(&root).unwrap();
+            // When: strong pin audits the nested closure.
+            let error = git.pin(&root).unwrap_err();
+            // Then: Git structural checks remain mandatory before publishing a ref.
+            assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
+            assert!(
+                !repo
+                    .run_git(
+                        &[
+                            "show-ref",
+                            "--verify",
+                            &format!("{SNAPSHOT_REF_PREFIX}{}", root.as_str())
+                        ],
+                        None
+                    )
+                    .status
+                    .success()
+            );
+        }
+    }
+}
+
+#[test]
+fn batch_pin_process_count_is_independent_of_blob_count() {
+    // Given: closures of very different sizes and an argv-counting Git executable.
+    for count in [1, 80] {
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let real = GitCli::open(repo.get_root()).unwrap();
+        let paths: Vec<_> = (0..count)
+            .map(|i| RepoPath::parse(&format!("nested/{i}")).unwrap())
+            .collect();
+        let contents: Vec<_> = (0..count).map(|i| format!("blob {i}\n")).collect();
+        let files: Vec<_> = paths
+            .iter()
+            .zip(&contents)
+            .map(|(path, bytes)| SnapshotFile {
+                path,
+                bytes: bytes.as_bytes(),
+            })
+            .collect();
+        let tree = real.create_tree(&files).unwrap();
+        let exe = repo.write_script(
+            "count-git",
+            "#!/bin/sh\nprintf '%s\n' \"$*\" >> calls\nexec /usr/bin/git \"$@\"\n",
+        );
+        let git = GitCli::open_with_process(repo.get_root(), GitProcess::new_with_executable(exe))
+            .unwrap();
+        fs::write(repo.get_root().join("calls"), b"").unwrap();
+        // When: strong pin verifies every object.
+        git.pin(&tree).unwrap();
+        let calls = fs::read_to_string(repo.get_root().join("calls")).unwrap();
+        // Then: exactly one batch session replaces all per-child subprocesses.
+        assert_eq!(
+            calls
+                .lines()
+                .filter(|c| c.ends_with("cat-file --batch"))
+                .count(),
+            1
+        );
+        assert!(!calls.lines().any(|c| c.contains("ls-tree")));
+        assert!(calls.lines().filter(|c| c.contains("cat-file")).count() <= 3);
+        assert!(calls.lines().filter(|c| c.contains("hash-object")).count() <= 2);
+    }
+}
+
+#[test]
 fn version_gate() {
     // Given
     for output in [

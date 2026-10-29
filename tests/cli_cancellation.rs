@@ -32,6 +32,51 @@ const STDIN_PREFIX: &str = r#"{"canary":"TK29_CANCELLATION_CANARY"#;
 const FOREGROUND_COMMANDS: [&str; 5] = ["search", "traverse", "inspect", "check", "reindex"];
 
 #[test]
+fn cancellation_closes_batch_pipes_and_real_git_exits() {
+    use std::{
+        fs,
+        os::unix::fs::PermissionsExt,
+        thread,
+        time::{Duration, Instant},
+    };
+    // Given: a real Git batch child is idle on stdin behind an owned protocol proxy.
+    let repo = ReadingRepo::new();
+    let basis = support::provenance::create_basis(repo.get_root(), &[("source", b"bytes")]);
+    repo.write(
+        "a.md",
+        support::provenance::build_note(Some(&basis), &[], "AlphaToken").as_bytes(),
+    );
+    let proxy = tempfile::tempdir().unwrap();
+    let ready = proxy.path().join("ready");
+    let done = proxy.path().join("done");
+    let script = proxy.path().join("git");
+    fs::write(&script, format!("#!/usr/bin/env python3\nimport os,sys,subprocess\nif sys.argv[-2:] != ['cat-file','--batch']:\n os.execv('/usr/bin/git',['git']+sys.argv[1:])\np=subprocess.Popen(['/usr/bin/git']+sys.argv[1:],stdin=subprocess.PIPE)\nopen({ready:?},'w').write(str(p.pid))\nsys.stdin.buffer.read()\np.stdin.close()\ncode=p.wait(timeout=10)\nopen({done:?},'w').write(str(code))\nsys.exit(code)\n")).unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    let path = format!(
+        "{}:{}",
+        proxy.path().display(),
+        std::env::var("PATH").unwrap()
+    );
+    let mut child = spawn_reading_with_path(&repo, "check", OsStr::new(&path));
+    child.send_input(b"{}");
+    let deadline = Instant::now() + WAIT;
+    while !ready.exists() {
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(5));
+    }
+    // When: SIGINT terminates the CLI, closing the input writer without running Drop.
+    child.send_sigint();
+    let output = child.collect_output(WAIT);
+    // Then: exactly one cancellation response and the real Git child exited successfully.
+    assert_cancelled_output(&output, "batch waiter", &[CANCELLATION_CANARY]);
+    while !done.exists() {
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(fs::read_to_string(done).unwrap(), "0");
+}
+
+#[test]
 fn cancels_each_foreground_command_while_reading_stdin() {
     // Given: the shipped binary reads a partial request from a live test FIFO.
     let repo = ReadingRepo::new();
