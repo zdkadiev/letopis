@@ -12,6 +12,55 @@ check, refresh, observe and rebuild the projection. Run from the Git root. In ex
 `letopis --help` and `letopis <command> --help` print the commands and each
 command's request fields as plain text.
 
+## Organize concept files
+
+Store knowledge in a `letopis/` folder at the repository root. No corpus
+registration is required. Reuse the repository's existing organization.
+The `letopis/` knowledge folder is distinct from the private `.letopis/`
+service directory, which is excluded from indexing.
+
+Letopis discovers `.md` and `.markdown` files from
+`git ls-files --cached --others --exclude-standard`: tracked files and untracked
+files allowed by Git's ignore rules. Ignored untracked files are not indexed;
+directories named `.git` or `.letopis` are excluded. Only Letopis markup outside
+code blocks declares knowledge; ordinary Markdown alone creates no elements.
+A clean `check` does not prove an ignored file was indexed. If a new concept is
+missing, check its eligibility before changing its content or rebuilding the cache.
+
+Each knowledge file represents one concept. Keep its explanation, rationale,
+limits and sources together; give independently useful concepts separate files.
+Search first and update an existing concept rather than creating a duplicate.
+
+Name the file after its concept so its purpose is clear from the path. Follow
+the repository's naming convention; otherwise use descriptive lowercase
+hyphenated names with `.md`, such as `cache-key.md` or `http-retry-budget.md`.
+Keep names stable as the explanation grows. Avoid generic buckets such as
+`notes.md` or `decisions.md` for unrelated concepts.
+
+A folder represents a collection of related concepts. The agent chooses the
+grouping and creates a collection folder when the current concepts need one;
+ordinary grouping needs no separate user instruction. Reuse suitable existing
+collections and keep the hierarchy shallow, without scaffolding future topics.
+Avoid accumulating hundreds of files in one folder: as a collection grows,
+organize related concepts into clearly named, meaningful subfolders. Choose
+groups by their conceptual relationships, not by arbitrary file counts.
+For example:
+
+```text
+letopis/
+  cache/
+    cache-key.md
+    cache-invalidation.md
+  http-retry-budget.md
+```
+
+Folders organize files; they do not create graph elements or containment.
+When a collection needs to be searched or traversed as knowledge, represent
+the collection itself in a marked Markdown file and link to its members with
+`letopis:type=includes`. Create that overview only when it serves a current
+need. A concept may belong to several such collections through explicit links
+without duplicating its file. Keep `includes` acyclic.
+
 ## Find, check, and read
 
 Search before creating another record. Search and traverse return metadata, never
@@ -20,8 +69,8 @@ file contents; an empty search is not proof that a claim is true.
 ```sh
 printf '%s\n' '{"query":"cache","limit":10}' | letopis search
 printf '%s\n' '{}' | letopis check
-printf '%s\n' '{"element_ids":["knowledge/decisions.md#cache"],"mode":"both","direction":"both","depth":2,"limit":20,"edge_limit":40}' | letopis traverse
-printf '%s\n' '{"element_ids":["knowledge/decisions.md#cache","src/cache.rs#L2-L4"]}' | letopis inspect
+printf '%s\n' '{"element_ids":["letopis/cache/cache-key.md"],"mode":"both","direction":"both","depth":2,"limit":20,"edge_limit":40}' | letopis traverse
+printf '%s\n' '{"element_ids":["letopis/cache/cache-key.md","src/cache.rs#L2-L4"]}' | letopis inspect
 ```
 
 `check` succeeds with `{"ok":true,"result":{"errors":[]}}` only when it finds
@@ -32,14 +81,10 @@ It excludes the starting IDs and includes `edges` only if `edge_limit` is sent.
 `search` accepts optional filters: `needs_recheck`, `sources`, `source_revisions`.
 Treat a recheck flag as a prompt to examine current source bytes and provenance.
 
-Search/traverse/inspect automatically refresh the database from Markdown without
-editing Markdown. Routine refresh retains source roots/refs and verifies addressed
-objects; it does not audit unrelated descendants. Run `check` with omitted or empty
-`paths` for a full source-snapshot audit. Any nonempty `paths` selects scoped findings
-without that audit. `reindex` reparses the corpus and fully audits effective source
-snapshots before publication. A full audit failure preserves the previous cache.
-A successful routine read or an existing retention ref is not proof that every
-source object is intact. Inspect fully verifies its own newly captured reading tree.
+Search/traverse/inspect automatically refresh the database without editing Markdown.
+Routine reads verify addressed source objects; a full source-snapshot audit needs
+unscoped `check` or `reindex`. For audit guarantees and rebuild behavior, read
+[operations](references/operations.md#source-snapshot-audits).
 
 One `inspect` call returns `result.snapshot` (a retained Git tree OID) and
 `result.elements` keyed by normalized requested IDs. Each value has `path`,
@@ -48,7 +93,7 @@ Inspect returns no text, flags, edges, or provenance basis. Read **both** knowle
 and local source from that same tree, using the returned path and lines:
 
 ```sh
-git show <inspect-snapshot>:knowledge/decisions.md
+git show <inspect-snapshot>:letopis/cache/cache-key.md
 git show <inspect-snapshot>:src/cache.rs
 ```
 
@@ -64,31 +109,34 @@ snapshot. Search/traverse results likewise do not lock later filesystem reads.
 
 ## Write marked Markdown
 
-Choose useful folders, filenames, anchors, and relation types for the repository.
 IDs derive from Git-root-relative path and optional anchor; do not write a UUID.
-Keep `created_at` when editing or renaming an existing element. A whole-file
-element starts with metadata on line one:
+Keep `created_at` when editing or renaming an existing element. For new concept
+files, use a whole-file element with metadata on line one:
 
 ```markdown
 <!-- letopis: {"created_at":1792800000,"source_snapshot":"<verified-tree-oid>"} -->
-Cache choice follows the checked code.
+# Cache key
+
+Cache keys use the source hash.
 [code](src/cache.rs#L2-L4 "letopis:type=external")
 ```
 
-For separate elements, place metadata immediately after each explicit heading:
+Existing documents may use section elements. When maintaining one, place metadata
+immediately after its explicit heading; use separate files for new independent
+concepts:
 
 ```markdown
-## Cache choice {#cache}
+## Cache key {#cache-key}
 <!-- letopis: {"created_at":1792800000,"source_snapshot":"<verified-tree-oid>"} -->
-The checked implementation uses the cache.
+Cache keys use the source hash.
 [code](src/cache.rs#L2-L4 "letopis:type=external")
-[related](knowledge/other.md#decision "letopis:type=depends_on")
+[invalidation](letopis/cache/cache-invalidation.md "letopis:type=related_to")
 ```
 
 Do not mix a whole-file element with marked sections or nest marked elements.
 Knowledge anchors begin with a letter and contain letters, digits, `_` or `-`;
 source `#Lstart-Lend` is an inclusive line address. Link paths remain Git-root
-relative even inside `knowledge/`. `external` binds a source and `includes`
+relative even inside nested folders. `external` binds a source and `includes`
 defines containment; other relation names follow lowercase underscore grammar.
 Plain Markdown links do not create graph edges. Check after every edit, then
 search/inspect the saved ID and read its returned tree bytes.
@@ -134,116 +182,13 @@ known referers. After repairing them, run `check` and inspect the new ID. Preser
 `created_at`; keep `source_snapshot` only while its checked source binding still
 supports the statement.
 
-## Initialize, configure, observe, and reindex
+## Operational guidance
 
-Interactive commands use an empty request without waiting for stdin. An open pipe
-with no data after 250 ms also supplies an empty request. For commands that need
-fields, pipe a JSON object; once data arrives, it is read until EOF.
+For first-time setup, embedding configuration, status diagnostics, or a deliberate
+rebuild, read [operations](references/operations.md). Ordinary Markdown edits need
+the next refreshing command, not a manual reindex. Before cancelling a command,
+read [foreground cancellation](references/operations.md#cancel-your-own-foreground-call).
 
-Run `letopis init` once in a Git work tree to create `.letopis/`, both database
-schemas and the editable configuration:
-
-```sh
-printf '%s\n' '{}' | letopis init
-```
-
-It succeeds with `{"ok":true,"result":{}}`. It does not index the corpus or contact
-a provider. Repeating it preserves a valid edited configuration and existing data.
-Outside a non-bare Git work tree it fails with `invalid_request` and creates
-nothing.
-
-`config` observes `.letopis/config.json` without changing it:
-
-```sh
-printf '%s\n' '{}' | letopis config
-```
-
-Before setup it succeeds with `{"ok":true,"result":null}` and creates no service
-files. Otherwise `result` is the complete nested configuration. There is no config
-setter: edit the file yourself, then observe it again. A valid enabled example is:
-
-```json
-{"embedding_model":{"enabled":true,"provider":"ollama","model":"code-model","parameters":{"base_url":"http://127.0.0.1:11434/api"},"max_retries":2}}
-```
-
-Only this nested form is accepted. An old flat file is rejected with a migration
-message; move its four settings under `embedding_model` and add `enabled` yourself.
-`provider` and `model` are both null (with `enabled:false` and empty `parameters`)
-or both configured. `max_retries` is required, and `0` means one attempt. Retained
-provider settings are validated locally even when `enabled:false`.
-
-Malformed content makes `config` fail with exit 1 and
-`error.code:"embedding_failed"`; it never echoes the file. Search stays on FTS while
-the configuration is invalid, and `status` reports `invalid_embedding_config`.
-A valid `enabled:false` also searches with FTS but preserves vectors and retry
-state, reports zero embedding backlog/failed counters and hides stored execution
-failures; enabling the same settings reveals them without resetting vectors.
-`config` does not reset vectors, perform inference, launch a drain, or create
-service state.
-
-`status` reads the last published revision and its current diagnostics without
-refreshing:
-
-```sh
-printf '%s\n' '{}' | letopis status
-```
-
-`result` has `revision` (null before the first publication), `embedding_backlog`,
-`embedding_failed`, held `locks` and `problems`. Problems are current observations,
-not history: an invalid file, a dangling link, an includes cycle, a missing Git
-`source_snapshot` or invalid configuration disappears when the condition is
-repaired and the next command observes it. Exhausted embedding attempts clear only
-with a changed configuration identity or a vector reset, not merely on the next
-publication. `status` does not rebuild a missing or stale cache and does not make a
-subsequent live-file read atomic.
-
-`reindex` is explicit maintenance, not the normal edit path:
-
-```sh
-printf '%s\n' '{}' | letopis reindex
-```
-
-It rebuilds graph and FTS from the corpus under `index.lock` and returns
-`{"ok":true,"result":{"revision":N}}`. It does not wait for vectors, does not
-confirm changed sources, and preserves author-declared `source_snapshot`. Ordinary
-edits need only the next refreshing command; use `reindex` after cache loss or
-a deliberate full rebuild. A physically corrupt cache is a separate recovery
-decision, not something this command silently repairs.
-
-## Cancel your own foreground call
-
-SIGINT is handled for your own `search`, `traverse`, `inspect`, `check` and
-`reindex` invocation. The process writes exactly one response and exits 1:
-
-```json
-{"ok":false,"error":{"code":"cancelled","message":"command cancelled","details":{}}}
-```
-
-If a normal result was already printed, a later SIGINT adds no second JSON. If the
-cancellation response won, the process cannot also exit 0 as a successful call.
-An uncommitted SQLite transaction rolls back as after a crash and the kernel
-releases `index.lock`. A publication that had already committed is not rolled
-back, so cancellation promises your caller terminates, not that no publication
-survived. Treat the outcome as uncertain, read `status` or retry the same
-idempotent command, and do not claim that SIGINT edited authored knowledge.
-
-There is no cancel subcommand and no PID-based cancel API. Signal only a process
-you started; never signal another writer. A detached `embed --drain` is an
-independent process in its own session. It has no cancellation response, keeps
-its durable attempt reservation, may finish after your cancelled caller, and never
-edits authored Markdown. Leave it alone; the next foreground command observes its
-work.
-
-## Current boundaries
-
-The CLI has `init`, `check`, `config`, `search`, `status`, `traverse`, mixed
-`inspect`, and `reindex`. No Letopis `read`, `snapshot`, `apply` or `cancel` command exists;
-use Git and edit Markdown. Cancellation is a signal to your own foreground
-process, not a command. Invalid files retain their previous valid projections
-with current diagnostics; a fresh cache cannot recover a previous projection of
-currently invalid Markdown. Reindex preserves author-declared `source_snapshot`
-and never confirms changed sources for the agent. It also preserves existing
-vectors keyed by unchanged search hashes when rebuilding a deleted cache. It does
-not repair physical cache corruption or provide selective paths.
-Embeddings are optional; FTS remains usable without a configured provider.
-Packaging, installation and operational procedures remain TK-43/TK-44 work.
+The public CLI has `init`, `check`, `config`, `search`, `status`, `traverse`,
+`inspect`, and `reindex`. Use Git to read captured bytes and edit Markdown to
+change knowledge; there are no `read`, `snapshot`, `apply`, or `cancel` commands.
