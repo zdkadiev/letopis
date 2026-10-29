@@ -2,6 +2,7 @@
 .engram
 .agents
 .vscode/
+.codex
 /.artifacts/
 skills-lock.json
 /.superpowers/

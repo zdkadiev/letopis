@@ -97,5 +97,4 @@ Run commands from the repository root; from elsewhere use `make -C <path> <targe
 
 - Inspect the current branch/worktree and dirty files first. Preserve user edits and unrelated work; do not stash, reset, overwrite, or clean them away.
 - Keep changes in the intended task worktree. Commit only the intended paths. Merge, push, publish, and update GitHub issues when authorized by the user; preserve authorization already given in the conversation.
-- Use the existing Engram store through its CLI: start with `engram status`, retrieve relevant prior constraints, and record useful decisions, findings, changes, and verification. Worktrees reuse the project's existing store through the appropriate `ENGRAM_DB`; do not initialize a second store implicitly.
-- Never edit Engram's database directly or commit/discard another writer's dirty graph. Preserve existing attributes on updates and keep historical provenance accurate.
+- Use the Letopis skill in `skills/letopis/` for repository knowledge.
