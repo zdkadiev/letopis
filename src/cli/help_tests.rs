@@ -11,8 +11,8 @@ use std::{
     os::unix::ffi::OsStringExt,
 };
 
-const COMMAND_NAMES: [&str; 7] = [
-    "check", "inspect", "search", "traverse", "reindex", "status", "config",
+const COMMAND_NAMES: [&str; 8] = [
+    "init", "check", "inspect", "search", "traverse", "reindex", "status", "config",
 ];
 
 #[test]
@@ -32,7 +32,7 @@ fn config_is_discoverable_and_describes_read_only_configuration() {
     let config = config.unwrap();
     assert!(config.contains(".letopis/config.json"));
     assert!(config.contains("null"));
-    assert!(config.contains("edit"));
+    assert!(config.contains("Edit"));
 }
 
 #[test]

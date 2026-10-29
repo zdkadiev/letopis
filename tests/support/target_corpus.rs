@@ -1,7 +1,7 @@
 use letopis::{
     domain::Sha256,
     open_storage,
-    service::{EmbeddingConfig, NodeMetadata, Storage, StorageRead, VectorOutcome},
+    service::{Configuration, EmbeddingConfig, NodeMetadata, Storage, StorageRead, VectorOutcome},
 };
 use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
@@ -74,7 +74,12 @@ pub(super) fn observe_request(path: &Path) -> ObservationResult<()> {
     verify_regular_file(path)?;
     let request: Request = serde_json::from_slice(&fs::read(path)?)?;
     verify_request(&request)?;
-    let config = EmbeddingConfig::parse(&fs::read(request.root.join(".letopis/config.json"))?)?;
+    let configuration =
+        Configuration::parse(&fs::read(request.root.join(".letopis/config.json"))?)?;
+    let config = configuration
+        .get_embedding_config()
+        .ok_or("embedding settings required")?
+        .clone();
     let cache = request.root.join(".letopis/cache.db");
     let vectors = request.root.join(".letopis/vectors.db");
     verify_database(&cache, CACHE_SCHEMA_VERSION)?;

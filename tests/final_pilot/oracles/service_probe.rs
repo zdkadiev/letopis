@@ -12,8 +12,8 @@ use letopis::{
     markdown::parse,
     open_embedding_files, open_storage,
     service::{
-        Embedder, EmbeddingConfig, EmbeddingFiles, Refresher, Storage, StorageRead,
-        VectorOutcome, VectorWrite,
+        Configuration, Embedder, EmbeddingFiles, Refresher, Storage, StorageRead, VectorOutcome,
+        VectorWrite,
     },
     wire_document_refresher, wire_embedder,
 };
@@ -137,7 +137,11 @@ fn open_root_storage(root: &Path) -> Result<impl Storage + use<>, String> {
 
 fn read_identity(root: &Path) -> Result<Sha256, String> {
     let bytes = fs::read(root.join(CONFIG_FILE)).map_err(describe)?;
-    Ok(EmbeddingConfig::parse(&bytes).map_err(describe)?.get_identity())
+    Configuration::parse(&bytes)
+        .map_err(describe)?
+        .get_embedding_config()
+        .ok_or_else(|| "configured embedding model required".to_owned())
+        .map(|config| config.get_identity())
 }
 
 fn describe(error: impl Debug) -> String {

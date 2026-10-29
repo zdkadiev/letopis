@@ -2,6 +2,34 @@
   "note": "Schema examples only, no runtime or performance evidence. IDs/hashes are synthetic valid-shape values.",
   "cases": [
     {
+      "command": "init",
+      "kind": "input",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "command": "init",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {}
+      }
+    },
+    {
+      "command": "init",
+      "kind": "error",
+      "valid": true,
+      "value": {
+        "ok": false,
+        "error": {
+          "code": "invalid_request",
+          "message": "Git repository required",
+          "details": {}
+        }
+      }
+    },
+    {
       "command": "inspect",
       "kind": "input",
       "valid": true,
@@ -42,6 +70,25 @@
           "code": "internal_error",
           "message": "Ошибка операции",
           "details": {}
+        }
+      }
+    },
+    {
+      "command": "config",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "embedding_model": {
+            "enabled": false,
+            "provider": "ollama",
+            "model": "embeddinggemma:300m-qat-q4_0",
+            "parameters": {
+              "base_url": "http://localhost:11434/api"
+            },
+            "max_retries": 3
+          }
         }
       }
     },
@@ -220,12 +267,15 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama",
-          "model": "embeddinggemma:300m-qat-q4_0",
-          "parameters": {
-            "base_url": "http://localhost:11434/api"
-          },
-          "max_retries": 3
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama",
+            "model": "embeddinggemma:300m-qat-q4_0",
+            "parameters": {
+              "base_url": "http://localhost:11434/api"
+            },
+            "max_retries": 3
+          }
         }
       }
     },
@@ -314,7 +364,10 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama"
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama"
+          }
         }
       }
     },
@@ -325,12 +378,15 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama",
-          "model": "embeddinggemma:300m-qat-q4_0",
-          "parameters": {
-            "api_key": "fake-placeholder"
-          },
-          "max_retries": 3
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama",
+            "model": "embeddinggemma:300m-qat-q4_0",
+            "parameters": {
+              "api_key": "fake-placeholder"
+            },
+            "max_retries": 3
+          }
         }
       }
     },
@@ -341,10 +397,13 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama",
-          "model": "embeddinggemma:300m-qat-q4_0",
-          "parameters": [],
-          "max_retries": 3
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama",
+            "model": "embeddinggemma:300m-qat-q4_0",
+            "parameters": [],
+            "max_retries": 3
+          }
         }
       }
     },
@@ -385,12 +444,15 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama",
-          "model": "fixture",
-          "parameters": {
-            "base_url": "http://127.0.0.1:11434/api"
-          },
-          "max_retries": 0
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama",
+            "model": "fixture",
+            "parameters": {
+              "base_url": "http://127.0.0.1:11434/api"
+            },
+            "max_retries": 0
+          }
         }
       }
     },
@@ -401,12 +463,15 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama",
-          "model": "fixture",
-          "parameters": {
-            "base_url": "http://127.0.0.1:11434/api"
-          },
-          "max_retries": -1
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama",
+            "model": "fixture",
+            "parameters": {
+              "base_url": "http://127.0.0.1:11434/api"
+            },
+            "max_retries": -1
+          }
         }
       }
     },
@@ -417,12 +482,15 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama",
-          "model": "fixture",
-          "parameters": {
-            "base_url": "http://127.0.0.1:11434/api"
-          },
-          "max_retries": 1.5
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama",
+            "model": "fixture",
+            "parameters": {
+              "base_url": "http://127.0.0.1:11434/api"
+            },
+            "max_retries": 1.5
+          }
         }
       }
     },
@@ -433,12 +501,15 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama",
-          "model": "fixture",
-          "parameters": {
-            "base_url": "http://127.0.0.1:11434/api"
-          },
-          "max_retries": true
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama",
+            "model": "fixture",
+            "parameters": {
+              "base_url": "http://127.0.0.1:11434/api"
+            },
+            "max_retries": true
+          }
         }
       }
     },
@@ -449,12 +520,15 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama",
-          "model": "fixture",
-          "parameters": {
-            "base_url": "http://127.0.0.1:11434/api"
-          },
-          "max_retries": "3"
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama",
+            "model": "fixture",
+            "parameters": {
+              "base_url": "http://127.0.0.1:11434/api"
+            },
+            "max_retries": "3"
+          }
         }
       }
     },
@@ -465,12 +539,15 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama",
-          "model": "fixture",
-          "parameters": {
-            "base_url": "http://127.0.0.1:11434/api"
-          },
-          "max_retries": null
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama",
+            "model": "fixture",
+            "parameters": {
+              "base_url": "http://127.0.0.1:11434/api"
+            },
+            "max_retries": null
+          }
         }
       }
     },
@@ -481,10 +558,13 @@
       "value": {
         "ok": true,
         "result": {
-          "provider": "ollama",
-          "model": "fixture",
-          "parameters": {
-            "base_url": "http://127.0.0.1:11434/api"
+          "embedding_model": {
+            "enabled": true,
+            "provider": "ollama",
+            "model": "fixture",
+            "parameters": {
+              "base_url": "http://127.0.0.1:11434/api"
+            }
           }
         }
       }

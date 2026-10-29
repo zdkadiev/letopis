@@ -300,6 +300,42 @@ fn rejects_unsafe_paths_and_existing_invalid_schemas() {
 }
 
 #[test]
+fn disabled_policy_returns_zero_without_touching_execution_state() {
+    // Given: current knowledge, a broken executable vector row and stored failures.
+    let root = TempDir::new().unwrap();
+    let identity = Sha256::digest(b"model");
+    let mut writer = open_writer(root.path());
+    writer.reset_vectors(None, &identity).unwrap();
+    publish(&mut writer, &[("a.md", "A"), ("b.md", "B")]);
+    fail(&mut writer, &identity, "A", 2);
+    let VectorOutcome::Current(mut unit) = writer.begin_vector_write(&identity).unwrap() else {
+        panic!()
+    };
+    unit.set_query_error(7, "safe query failure").unwrap();
+    unit.commit().unwrap();
+    let connection = Connection::open(root.path().join("vectors.db")).unwrap();
+    connection
+        .execute(
+            "INSERT INTO vector_keys(search_hash) VALUES(?1)",
+            [Sha256::digest(b"B").to_hex()],
+        )
+        .unwrap();
+    let pinned = File::open(root.path()).unwrap();
+    let mut status = open_status_storage(&root.path().canonicalize().unwrap(), &pinned).unwrap();
+    let mut read = status.begin_status_read().unwrap().unwrap();
+
+    // When
+    let disabled = read
+        .read_embedding_status(&EmbeddingStatusPolicy::Disabled)
+        .unwrap();
+
+    // Then: no coverage or stored-failure read can fail or leak into disabled counts.
+    assert_eq!((disabled.backlog, disabled.failed), (0, 0));
+    assert!(disabled.exhausted.is_empty());
+    assert!(read.read_query_error().unwrap().is_some());
+}
+
+#[test]
 fn rejects_current_vector_key_without_native_row() {
     // Given a published current hash whose key has no corresponding native vector.
     let root = TempDir::new().unwrap();

@@ -1,9 +1,9 @@
 use super::{CommandResponse, Request, ResponseResult, parse_request, write_response};
-use crate::service::{CommandErrorKind, EmbeddingConfig};
+use crate::service::{CommandErrorKind, Configuration};
 use serde_json::{Value, json};
 use std::{ffi::OsString, io::Read};
 
-const LITERAL_CONFIG: &[u8] = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9","custom":{"enabled":true},"dimensions":3},"max_retries":2}"#;
+const LITERAL_CONFIG: &[u8] = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9","custom":{"enabled":true},"dimensions":3},"max_retries":2}}"#;
 
 #[test]
 fn rejects_nonempty_config_request_before_io() {
@@ -47,7 +47,7 @@ fn rejects_nonempty_config_request_before_io() {
 #[test]
 fn renders_exact_contract_object_without_warnings() {
     // Given
-    let config = EmbeddingConfig::parse(LITERAL_CONFIG).unwrap();
+    let config = Configuration::parse(LITERAL_CONFIG).unwrap();
     let response = Ok(CommandResponse::new(ResponseResult::Config(Some(config))));
 
     // When
@@ -59,7 +59,8 @@ fn renders_exact_contract_object_without_warnings() {
     let value: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(
         value,
-        json!({"ok":true,"result":{
+        json!({"ok":true,"result":{"embedding_model":{
+            "enabled":true,
             "provider":"ollama",
             "model":"fixture",
             "parameters":{
@@ -68,7 +69,7 @@ fn renders_exact_contract_object_without_warnings() {
                 "dimensions":3
             },
             "max_retries":2
-        }})
+        }}})
     );
     assert!(value.get("warnings").is_none());
     assert_eq!(output.iter().filter(|byte| **byte == b'\n').count(), 1);

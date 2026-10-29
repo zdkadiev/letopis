@@ -17,7 +17,7 @@ use crate::{
 use std::{cell::Cell, collections::BTreeSet, num::NonZeroUsize, rc::Rc};
 use tempfile::TempDir;
 
-const VALID_CONFIG: &[u8] = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","dimensions":3},"max_retries":0}"#;
+const VALID_CONFIG: &[u8] = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","dimensions":3},"max_retries":0}}"#;
 
 struct Reads {
     inner: Option<SqliteStorage>,
@@ -67,6 +67,90 @@ fn reports_null_revision_without_publication() {
     assert!(report.problems.is_empty());
     assert_eq!(count.get(), 1);
     assert_eq!(files.count.get(), 1);
+}
+
+#[test]
+fn disabled_configuration_hides_execution_failures_and_reports_zero_counts() {
+    // Given: stored exhausted work, a query error and a valid disabled document.
+    let root = TempDir::new().unwrap();
+    let mut storage = open_storage(&root);
+    publish_node(&mut storage, 1);
+    let identity = Sha256::digest(b"disabled fixture");
+    storage.reset_vectors(None, &identity).unwrap();
+    let hash = Sha256::digest(b"search");
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+        panic!("expected current vector writer")
+    };
+    assert!(unit.reserve_attempt(&hash, 1).unwrap());
+    unit.record_failure(&hash, "private failure").unwrap();
+    unit.set_query_error(7, "safe query failure").unwrap();
+    unit.commit().unwrap();
+    let disabled = String::from_utf8(VALID_CONFIG.to_vec())
+        .unwrap()
+        .replace("\"enabled\":true", "\"enabled\":false");
+    let files = Files {
+        config: Some(disabled.into_bytes()).into(),
+        fail: false,
+        count: Cell::new(0),
+    };
+    let provider = build_provider();
+    let mut service = build_service(
+        Some(storage),
+        Rc::new(Cell::new(0)),
+        &files,
+        &provider,
+        &Provenance { fail: false },
+    );
+
+    // When
+    let report = service.read_status().unwrap();
+
+    // Then: graph/file observations remain, execution failures do not.
+    assert_eq!((report.embedding_backlog, report.embedding_failed), (0, 0));
+    assert!(
+        report
+            .problems
+            .iter()
+            .any(|p| p.details["reason"] == "graph_fixture")
+    );
+    assert!(!report.problems.iter().any(|p| matches!(
+        p.details["reason"].as_str(),
+        Some("query_embedding_failed" | "embedding_attempts_exhausted")
+    )));
+}
+
+#[test]
+fn invalid_disabled_configuration_remains_a_visible_problem() {
+    // Given: nested disabled settings with an endpoint rejected locally.
+    let root = TempDir::new().unwrap();
+    let mut storage = open_storage(&root);
+    publish_node(&mut storage, 1);
+    let invalid = br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"ftp://localhost/api"},"max_retries":0}}"#;
+    let files = Files {
+        config: Some(invalid.to_vec()).into(),
+        fail: false,
+        count: Cell::new(0),
+    };
+    let provider = build_rejecting_provider();
+    let mut service = build_service(
+        Some(storage),
+        Rc::new(Cell::new(0)),
+        &files,
+        &provider,
+        &Provenance { fail: false },
+    );
+
+    // When
+    let report = service.read_status().unwrap();
+
+    // Then: invalid configuration keeps unavailable-policy counting and a current problem.
+    assert_eq!((report.embedding_backlog, report.embedding_failed), (1, 0));
+    assert!(
+        report
+            .problems
+            .iter()
+            .any(|p| p.details["reason"] == "invalid_embedding_config")
+    );
 }
 
 #[test]

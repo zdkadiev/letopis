@@ -82,13 +82,17 @@ impl Fixture {
     /// # Panics
     /// Panics if the file cannot be written or the supplied configuration is invalid.
     pub fn write_config(&self, url: &str, retries: u64) -> EmbeddingConfig {
-        let bytes = serde_json::to_vec(&json!({
+        let configured = json!({
             "provider":"ollama", "model":"fixture", "parameters":{"base_url":url},
             "max_retries":retries,
-        }))
+        });
+        let bytes = serde_json::to_vec(&json!({"embedding_model": {
+            "enabled":true, "provider":"ollama", "model":"fixture",
+            "parameters":{"base_url":url}, "max_retries":retries,
+        }}))
         .unwrap();
         self.repo.write(".letopis/config.json", &bytes);
-        EmbeddingConfig::parse(&bytes).unwrap()
+        EmbeddingConfig::parse(configured.to_string().as_bytes()).unwrap()
     }
 
     /// Start the actual product drain with EOF stdin and captured output.

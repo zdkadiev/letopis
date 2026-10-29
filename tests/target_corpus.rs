@@ -10,7 +10,10 @@ mod thin_slice;
 
 use letopis::{
     domain::Sha256,
-    service::{EmbeddingConfig, NodeMetadata, Storage, StorageRead, VectorOutcome, VectorWrite},
+    service::{
+        Configuration, EmbeddingConfig, NodeMetadata, Storage, StorageRead, VectorOutcome,
+        VectorWrite,
+    },
 };
 use serde_json::{Value, json};
 use std::{
@@ -107,9 +110,13 @@ fn invalid_files_prevent_populated_even_when_current_nodes_are_covered() {
 fn configured_dimension_mismatch_is_rejected() {
     // Given
     let repo = load_pair("alpha", "beta");
-    let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:1/api","dimensions":3},"max_retries":0}"#;
-    repo.write(".letopis/config.json", bytes);
-    let config = EmbeddingConfig::parse(bytes).unwrap();
+    let configured = json!({"provider":"ollama","model":"fixture",
+        "parameters":{"base_url":"http://127.0.0.1:1/api","dimensions":3},"max_retries":0});
+    let bytes = json!({"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture",
+        "parameters":{"base_url":"http://127.0.0.1:1/api","dimensions":3},"max_retries":0}})
+    .to_string();
+    repo.write(".letopis/config.json", bytes.as_bytes());
+    let config = EmbeddingConfig::parse(configured.to_string().as_bytes()).unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1., 0.])]);
     let before = capture_databases(repo.get_root());
     let request = write_request(repo.get_root(), (2, 0, 0));
@@ -476,11 +483,14 @@ fn load_pair(first: &str, second: &str) -> ReadingRepo {
 }
 
 fn configure_repo(repo: &ReadingRepo, retries: u64) -> EmbeddingConfig {
-    let bytes = serde_json::to_vec(&json!({"provider":"ollama","model":"fixture",
-        "parameters":{"base_url":"http://127.0.0.1:1/api"},"max_retries":retries}))
+    let configured = json!({"provider":"ollama","model":"fixture",
+        "parameters":{"base_url":"http://127.0.0.1:1/api"},"max_retries":retries});
+    let bytes = serde_json::to_vec(&json!({"embedding_model":{"enabled":true,
+        "provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:1/api"},
+        "max_retries":retries}}))
     .unwrap();
     repo.write(".letopis/config.json", &bytes);
-    let config = EmbeddingConfig::parse(&bytes).unwrap();
+    let config = EmbeddingConfig::parse(configured.to_string().as_bytes()).unwrap();
     let mut storage = repo.open_storage();
     let observed = storage.begin_read().unwrap().get_config_identity();
     storage
@@ -525,8 +535,11 @@ fn seed_failures(repo: &ReadingRepo, budget: u64) {
 }
 
 fn read_config(repo: &ReadingRepo) -> EmbeddingConfig {
-    EmbeddingConfig::parse(&fs::read(repo.get_root().join(".letopis/config.json")).unwrap())
+    Configuration::parse(&fs::read(repo.get_root().join(".letopis/config.json")).unwrap())
         .unwrap()
+        .get_embedding_config()
+        .unwrap()
+        .clone()
 }
 
 fn capture_databases(root: &Path) -> Vec<Vec<u8>> {

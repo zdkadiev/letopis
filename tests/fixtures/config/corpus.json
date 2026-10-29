@@ -1,0 +1,188 @@
+{
+  "cases": [
+    {
+      "name": "generated defaults",
+      "raw": "{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  }\n}\n",
+      "schema_check": true,
+      "schema_valid": true,
+      "parse_valid": true,
+      "validate_valid": true
+    },
+    {
+      "name": "configured enabled",
+      "raw": "{\"embedding_model\":{\"enabled\":true,\"provider\":\"ollama\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://127.0.0.1:9/api\"},\"max_retries\":2}}",
+      "schema_check": true,
+      "schema_valid": true,
+      "parse_valid": true,
+      "validate_valid": true
+    },
+    {
+      "name": "configured disabled retains settings",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":\"openai\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"https://example.test/v1\"},\"max_retries\":0}}",
+      "schema_check": true,
+      "schema_valid": true,
+      "parse_valid": true,
+      "validate_valid": true
+    },
+    {
+      "name": "unconfigured retains retry count",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":3}}",
+      "schema_check": true,
+      "schema_valid": true,
+      "parse_valid": true,
+      "validate_valid": true
+    },
+    {
+      "name": "provider without model",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":\"ollama\",\"model\":null,\"parameters\":{\"base_url\":\"http://localhost/api\"},\"max_retries\":0}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "model without provider",
+      "raw": "{\"embedding_model\":{\"enabled\":true,\"provider\":null,\"model\":\"fixture\",\"parameters\":{},\"max_retries\":0}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "enabled without configured settings",
+      "raw": "{\"embedding_model\":{\"enabled\":true,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "unconfigured with parameters",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{\"base_url\":\"http://localhost/api\"},\"max_retries\":0}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "unconfigured with unknown parameter",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{\"future\":1},\"max_retries\":0}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "missing section field",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{}}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "unknown section field",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0,\"future\":1}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "unknown root field",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0},\"future\":1}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "section is null",
+      "raw": "{\"embedding_model\":null}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "malformed JSON",
+      "raw": "{\"embedding_model\":",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "legacy flat configuration",
+      "raw": "{\"provider\":\"ollama\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://localhost/api\"},\"max_retries\":0}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "duplicate root section",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0},\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0}}",
+      "schema_check": false,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "duplicate section field",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"enabled\":true,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0}}",
+      "schema_check": false,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "duplicate parameter",
+      "raw": "{\"embedding_model\":{\"enabled\":true,\"provider\":\"ollama\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://one/api\",\"base_url\":\"http://two/api\"},\"max_retries\":0}}",
+      "schema_check": false,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "negative retries",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":-1}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "retry count outside storage integer",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":18446744073709551615}}",
+      "schema_check": true,
+      "schema_valid": true,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "secret parameter",
+      "raw": "{\"embedding_model\":{\"enabled\":true,\"provider\":\"ollama\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://localhost/api\",\"api_key\":\"CONFIG_CANARY\"},\"max_retries\":0}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "unsupported provider",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":\"fixture\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://localhost/api\"},\"max_retries\":0}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "provider-invalid endpoint",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":\"ollama\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"ftp://localhost/api\"},\"max_retries\":0}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": true,
+      "validate_valid": false
+    }
+  ]
+}

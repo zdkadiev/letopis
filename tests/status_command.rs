@@ -1,5 +1,6 @@
 mod support;
 
+use letopis::service::{NodeMetadata, Storage, StorageRead, VectorOutcome, VectorWrite};
 use rustix::fs::{FlockOperation, flock};
 use serde_json::{Value, json};
 use std::{
@@ -340,6 +341,78 @@ fn drain_start_failure_is_absent_from_status() {
             .contains("cannot start background embedding drain")
     );
     assert_eq!(fs::read(&canary).unwrap(), b"DRAIN_CANARY");
+}
+
+#[test]
+fn disabled_configuration_reports_zero_and_hides_then_reveals_stored_failures() {
+    // Given: current knowledge with an exhausted hash and a stored query failure.
+    let repo = ReadingRepo::new();
+    repo.write_knowledge("known.md", "needle");
+    let checked = repo.invoke(&["check"], b"{}");
+    assert!(checked.status.success(), "{checked:?}");
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let url = format!("http://{}/api", listener.local_addr().unwrap());
+    let config = repo.write_config("ollama", &url, "fixture");
+    let mut storage = repo.open_storage();
+    storage.reset_vectors(None, &config.get_identity()).unwrap();
+    let node = storage
+        .begin_read()
+        .unwrap()
+        .list_nodes()
+        .unwrap()
+        .into_iter()
+        .find_map(|node| match node.metadata {
+            NodeMetadata::Knowledge(node) => Some(node),
+            NodeMetadata::Source(_) => None,
+        })
+        .unwrap();
+    let VectorOutcome::Current(mut unit) =
+        storage.begin_vector_write(&config.get_identity()).unwrap()
+    else {
+        panic!("expected current identity")
+    };
+    assert!(unit.reserve_attempt(&node.search_hash, 1).unwrap());
+    unit.record_failure(&node.search_hash, "safe failure")
+        .unwrap();
+    unit.set_query_error(7, "safe query failure").unwrap();
+    unit.commit().unwrap();
+    drop(storage);
+    repo.write(
+        ".letopis/config.json",
+        format!(
+            r#"{{"embedding_model":{{"enabled":false,"provider":"ollama","model":"fixture","parameters":{{"base_url":"{url}"}},"max_retries":0}}}}"#
+        )
+        .as_bytes(),
+    );
+
+    // When: status and a drain observe the disabled document.
+    let status = read_status(&repo);
+    let drained = repo.invoke(&["embed", "--drain"], b"{}");
+
+    // Then: execution counters and failures are hidden and no work starts.
+    assert_eq!(status["result"]["embedding_backlog"], 0);
+    assert_eq!(status["result"]["embedding_failed"], 0);
+    assert!(!status.to_string().contains("query_embedding_failed"));
+    assert!(!status.to_string().contains("embedding_attempts_exhausted"));
+    assert!(drained.status.success(), "{drained:?}");
+    assert_eq!(drained.stdout, b"{\"ok\":true,\"result\":{}}\n");
+    assert!(matches!(listener.accept(), Err(error) if error.kind() == ErrorKind::WouldBlock));
+
+    // Given: the same settings are re-enabled without changing their identity.
+    repo.write(
+        ".letopis/config.json",
+        format!(
+            r#"{{"embedding_model":{{"enabled":true,"provider":"ollama","model":"fixture","parameters":{{"base_url":"{url}"}},"max_retries":0}}}}"#
+        )
+        .as_bytes(),
+    );
+
+    // When / Then: stored execution failures become visible under enabled semantics.
+    let enabled = read_status(&repo);
+    assert_eq!(enabled["result"]["embedding_failed"], 1);
+    assert!(enabled.to_string().contains("embedding_attempts_exhausted"));
+    assert!(enabled.to_string().contains("query_embedding_failed"));
 }
 
 fn prepare_failed_drain(repo: &ReadingRepo) -> (tempfile::TempDir, PathBuf, TcpListener) {

@@ -1,9 +1,9 @@
 use super::{
-    CommandError, CommandErrorKind, CommandResult, ConfigState, DrainOutcome, Embedder,
-    EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles,
-    EmbeddingProvider, EmbeddingResult, EmbeddingWork, MarkdownCodec, QueryEmbedding,
-    QueryEmbeddingRequest, Storage, StorageError, StorageErrorKind, StorageRead, VectorOutcome,
-    VectorWrite,
+    CommandError, CommandErrorKind, CommandResult, ConfigState, Configuration, DrainOutcome,
+    Embedder, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
+    EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingWork, MarkdownCodec,
+    QueryEmbedding, QueryEmbeddingRequest, Storage, StorageError, StorageErrorKind, StorageRead,
+    VectorOutcome, VectorWrite, validate_configuration,
 };
 use crate::domain::{KnowledgeId, RepoPath, Sha256};
 use std::{collections::BTreeSet, num::NonZeroUsize, time::Duration};
@@ -103,7 +103,9 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
         let config = match self.read_configuration()? {
             ConfigState::Ready(config) => config,
             ConfigState::Changed => return Ok(DrainOutcome::ConfigChanged),
-            ConfigState::Missing | ConfigState::Invalid(_) => return Ok(DrainOutcome::Unavailable),
+            ConfigState::Missing | ConfigState::Invalid(_) | ConfigState::Disabled => {
+                return Ok(DrainOutcome::Unavailable);
+            }
         };
         let Some(_guard) = self.files.try_lock_embed()? else {
             return Ok(DrainOutcome::AlreadyRunning);
@@ -117,21 +119,25 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
             .begin_read()
             .map_err(map_storage)?
             .get_config_identity();
-        match self.read_ready_config() {
-            Ok(None) => Ok(ConfigState::Missing),
-            Err(error) => Ok(ConfigState::Invalid(error.get_kind())),
-            Ok(Some(config)) => {
-                #[cfg(test)]
-                tests::reach_checkpoint("configuration");
-                match self
-                    .storage
-                    .reset_vectors(observed.as_ref(), &config.get_identity())
-                    .map_err(map_storage)?
-                {
-                    VectorOutcome::Current(_) => Ok(ConfigState::Ready(config)),
-                    VectorOutcome::ConfigChanged => Ok(ConfigState::Changed),
-                }
+        #[cfg(test)]
+        tests::reach_checkpoint("observed");
+        let config = match self.read_config_file() {
+            Ok(None) => return Ok(ConfigState::Missing),
+            Err(error) => return Ok(ConfigState::Invalid(error.get_kind())),
+            Ok(Some(Configuration::Unconfigured { .. } | Configuration::Disabled(_))) => {
+                return Ok(ConfigState::Disabled);
             }
+            Ok(Some(Configuration::Enabled(config))) => config,
+        };
+        #[cfg(test)]
+        tests::reach_checkpoint("configuration");
+        match self
+            .storage
+            .reset_vectors(observed.as_ref(), &config.get_identity())
+            .map_err(map_storage)?
+        {
+            VectorOutcome::Current(_) => Ok(ConfigState::Ready(config)),
+            VectorOutcome::ConfigChanged => Ok(ConfigState::Changed),
         }
     }
 }
@@ -139,14 +145,10 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
 impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     EmbeddingService<S, F, M, P>
 {
-    fn read_ready_config(&self) -> EmbeddingResult<Option<EmbeddingConfig>> {
+    fn read_config_file(&self) -> EmbeddingResult<Option<Configuration>> {
         self.files
             .read_config()?
-            .map(|bytes| {
-                let config = EmbeddingConfig::parse(&bytes)?;
-                self.provider.validate_config(&config)?;
-                Ok(config)
-            })
+            .map(|bytes| validate_configuration(&bytes, &self.provider))
             .transpose()
     }
 

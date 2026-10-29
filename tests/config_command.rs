@@ -12,8 +12,11 @@ use std::{
 };
 use support::{git::isolate_command, reading::ReadingRepo};
 
-const LITERAL_CONFIG: &[u8] = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9","custom":{"enabled":true},"dimensions":3},"max_retries":2}"#;
-const LITERAL_OUTPUT: &[u8] = b"{\"ok\":true,\"result\":{\"provider\":\"ollama\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://127.0.0.1:9\",\"custom\":{\"enabled\":true},\"dimensions\":3},\"max_retries\":2}}\n";
+const LITERAL_CONFIG: &[u8] = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9","custom":{"enabled":true},"dimensions":3},"max_retries":2}}"#;
+const LITERAL_OUTPUT: &[u8] = b"{\"ok\":true,\"result\":{\"embedding_model\":{\"enabled\":true,\"provider\":\"ollama\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://127.0.0.1:9\",\"custom\":{\"enabled\":true},\"dimensions\":3},\"max_retries\":2}}}\n";
+const GENERATED_CONFIG: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  }\n}\n";
+const GENERATED_OUTPUT: &[u8] = b"{\"ok\":true,\"result\":{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0}}}\n";
+const MIGRATION_OUTPUT: &[u8] = b"{\"ok\":false,\"error\":{\"code\":\"embedding_failed\",\"message\":\"embedding configuration requires migration\",\"details\":{}}}\n";
 
 #[test]
 fn config_without_file_returns_null_without_service_state() {
@@ -30,6 +33,21 @@ fn config_without_file_returns_null_without_service_state() {
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(output.stdout, b"{\"ok\":true,\"result\":null}\n");
     assert!(!service_dir.exists());
+}
+
+#[test]
+fn config_returns_complete_generated_defaults() {
+    // Given: the exact template init publishes.
+    let repo = ReadingRepo::new();
+    repo.write(".letopis/config.json", GENERATED_CONFIG);
+
+    // When
+    let output = repo.invoke(&["config"], b"{}");
+
+    // Then: the whole nested object is returned with stable field order.
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert!(output.stderr.is_empty(), "{output:?}");
+    assert_eq!(output.stdout, GENERATED_OUTPUT);
 }
 
 #[test]
@@ -56,43 +74,61 @@ fn config_never_connects_to_the_configured_provider() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
     let url = format!("http://{}/api", listener.local_addr().unwrap());
-    let config = serde_json::json!({
-        "provider": "ollama",
-        "model": "fixture",
-        "parameters": {"base_url": url},
-        "max_retries": 0
-    })
-    .to_string();
-    repo.write(".letopis/config.json", config.as_bytes());
+    for enabled in [false, true] {
+        // Given: both configured states must validate locally without inference.
+        let config = serde_json::json!({
+            "embedding_model": {
+                "enabled": enabled,
+                "provider": "ollama",
+                "model": "fixture",
+                "parameters": {"base_url": url},
+                "max_retries": 0
+            }
+        })
+        .to_string();
+        repo.write(".letopis/config.json", config.as_bytes());
 
-    // When
-    let output = repo.invoke(&["config"], b"{}");
+        // When
+        let output = repo.invoke(&["config"], b"{}");
 
-    // Then
-    assert_eq!(output.status.code(), Some(0), "{output:?}");
-    assert_eq!(
-        serde_json::from_slice::<Value>(&output.stdout).unwrap()["result"]["parameters"]["base_url"],
-        url
-    );
-    assert!(matches!(listener.accept(), Err(error) if error.kind() == ErrorKind::WouldBlock));
-    assert_eq!(
-        service_entry_names(&repo),
-        ["config.json"],
-        "config must not start a drain or other service state"
-    );
+        // Then
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&output.stdout).unwrap()["result"]["embedding_model"]["parameters"]
+                ["base_url"],
+            url
+        );
+        assert!(matches!(listener.accept(), Err(error) if error.kind() == ErrorKind::WouldBlock));
+        assert_eq!(
+            service_entry_names(&repo),
+            ["config.json"],
+            "config must not start a drain or other service state"
+        );
+    }
 }
 
 #[test]
 fn config_rejects_malformed_config_with_safe_diagnostics() {
     // Given
     let repo = ReadingRepo::new();
-    let cases: [&[u8]; 6] = [
+    let cases: &[&[u8]] = &[
         b"CONFIG_CANARY not json",
-        br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":0} null"#,
-        br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":0,"max_retries":0}"#,
-        br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://one/api","base_url":"http://two/api"},"max_retries":0}"#,
-        br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","api_key":"CONFIG_CANARY"},"max_retries":0}"#,
-        br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","authorization":"CONFIG_CANARY"},"max_retries":0}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}} null"#,
+        br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0},"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#,
+        br#"{"embedding_model":{"enabled":false,"enabled":true,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#,
+        br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://one/api","base_url":"http://two/api"},"max_retries":0}}"#,
+        br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","api_key":"CONFIG_CANARY"},"max_retries":0}}"#,
+        br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","authorization":"CONFIG_CANARY"},"max_retries":0}}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{}}}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0,"future":1}}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0},"future":1}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":null,"parameters":{"base_url":"http://localhost/api"},"max_retries":0}}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":null,"model":"fixture","parameters":{},"max_retries":0}}"#,
+        br#"{"embedding_model":{"enabled":true,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{"base_url":"http://localhost/api"},"max_retries":0}}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"ftp://localhost/api"},"max_retries":0}}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":-1}}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":18446744073709551615}}"#,
     ];
     for raw in cases {
         // Given
@@ -111,6 +147,24 @@ fn config_rejects_malformed_config_with_safe_diagnostics() {
         assert!(!String::from_utf8_lossy(&output.stdout).contains("CONFIG_CANARY"));
         assert!(!String::from_utf8_lossy(&output.stderr).contains("CONFIG_CANARY"));
     }
+}
+
+#[test]
+fn config_rejects_old_flat_configuration_with_migration_diagnostic() {
+    // Given: a valid configuration in the superseded flat format.
+    let repo = ReadingRepo::new();
+    repo.write(
+        ".letopis/config.json",
+        br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":0}"#,
+    );
+
+    // When
+    let output = repo.invoke(&["config"], b"{}");
+
+    // Then: the user is told to migrate without echoing the old file.
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert!(output.stderr.is_empty(), "{output:?}");
+    assert_eq!(output.stdout, MIGRATION_OUTPUT);
 }
 
 #[test]
@@ -157,7 +211,7 @@ fn config_preserves_existing_databases_and_metadata() {
     assert_eq!(checked.status.code(), Some(0), "{checked:?}");
     repo.write(
         ".letopis/config.json",
-        br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":1}"#,
+        br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":1}}"#,
     );
     let before = capture_service_files(&repo);
     assert!(before.contains_key("cache.db"));
@@ -169,7 +223,7 @@ fn config_preserves_existing_databases_and_metadata() {
     // Then
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     assert_eq!(
-        serde_json::from_slice::<Value>(&output.stdout).unwrap()["result"]["max_retries"],
+        serde_json::from_slice::<Value>(&output.stdout).unwrap()["result"]["embedding_model"]["max_retries"],
         1
     );
     assert_eq!(capture_service_files(&repo), before);
@@ -181,7 +235,7 @@ fn config_reads_valid_openai_configuration_without_credentials() {
     let repo = ReadingRepo::new();
     repo.write(
         ".letopis/config.json",
-        br#"{"provider":"openai","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":0}"#,
+        br#"{"embedding_model":{"enabled":false,"provider":"openai","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":0}}"#,
     );
 
     // When
@@ -192,7 +246,7 @@ fn config_reads_valid_openai_configuration_without_credentials() {
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(
         output.stdout,
-        b"{\"ok\":true,\"result\":{\"provider\":\"openai\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://127.0.0.1:9\"},\"max_retries\":0}}\n"
+        b"{\"ok\":true,\"result\":{\"embedding_model\":{\"enabled\":false,\"provider\":\"openai\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://127.0.0.1:9\"},\"max_retries\":0}}}\n"
     );
 }
 

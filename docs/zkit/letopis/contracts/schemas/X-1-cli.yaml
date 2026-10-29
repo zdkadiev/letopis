@@ -488,6 +488,23 @@
       ],
       "additionalProperties": false
     },
+    "InitOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/Empty"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false,
+      "description": "Successful repository initialization; no partial all-or-nothing claim."
+    },
     "ReindexOutput": {
       "type": "object",
       "properties": {
@@ -635,35 +652,84 @@
         "base_url"
       ]
     },
-    "Configuration": {
+    "EmbeddingModel": {
       "type": "object",
       "properties": {
-        "provider": {
-          "enum": [
-            "ollama",
-            "openai"
-          ]
+        "enabled": {
+          "type": "boolean"
         },
-        "model": {
-          "$ref": "#/$defs/Text"
-        },
+        "provider": {},
+        "model": {},
         "parameters": {
-          "$ref": "#/$defs/Parameters"
+          "type": "object"
         },
         "max_retries": {
           "type": "integer",
           "minimum": 0,
-          "description": "Additional attempts after the initial embedding attempt; letopis setting, not provider request data."
+          "description": "Additional attempts after the initial embedding attempt; letopis setting, not provider request data. Runtime also requires the exact integer to survive JCS and SQLite storage."
         }
       },
       "required": [
+        "enabled",
         "provider",
         "model",
         "parameters",
         "max_retries"
       ],
       "additionalProperties": false,
-      "description": "D-95: content of .letopis/config.json, edited as a file; read by config."
+      "oneOf": [
+        {
+          "properties": {
+            "enabled": {
+              "const": false
+            },
+            "provider": {
+              "type": "null"
+            },
+            "model": {
+              "type": "null"
+            },
+            "parameters": {
+              "maxProperties": 0
+            }
+          },
+          "description": "Unconfigured: embeddings disabled and no provider settings retained."
+        },
+        {
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "provider": {
+              "enum": [
+                "ollama",
+                "openai"
+              ]
+            },
+            "model": {
+              "$ref": "#/$defs/Text"
+            },
+            "parameters": {
+              "$ref": "#/$defs/Parameters"
+            }
+          },
+          "description": "Configured: both provider and model are present; disabled settings are still locally validated."
+        }
+      ],
+      "description": "Nested embedding settings for .letopis/config.json."
+    },
+    "Configuration": {
+      "type": "object",
+      "properties": {
+        "embedding_model": {
+          "$ref": "#/$defs/EmbeddingModel"
+        }
+      },
+      "required": [
+        "embedding_model"
+      ],
+      "additionalProperties": false,
+      "description": "Content of .letopis/config.json, edited as a file; read by config. The legacy flat four-field form is rejected and must be migrated manually."
     },
     "ConfigOutput": {
       "type": "object",
@@ -817,6 +883,24 @@
     }
   ],
   "x-commands": {
+    "init": {
+      "input": {
+        "$ref": "#/$defs/Empty"
+      },
+      "success": {
+        "$ref": "#/$defs/InitOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "natural",
+      "description": "Initialize a non-bare Git work tree with schemas and generated config without replacing valid existing state.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
     "check": {
       "input": {
         "$ref": "#/$defs/CheckInput"

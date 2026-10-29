@@ -21,6 +21,41 @@ fn stale_configuration_observation_preserves_current_vectors_and_attempts() {
     }
 }
 
+#[test]
+fn configuration_change_after_storage_observation_never_resets_newer_state() {
+    // Given: P has observed the old stored identity and pauses before reading config.
+    let fixture = Fixture::new(0);
+    let mut child = Process::spawn(
+        &fixture,
+        "observed-config",
+        "observed",
+        "observed",
+        "ConfigChanged",
+    );
+    let mut barrier = child.await_checkpoint();
+
+    // When: B replaces the config and publishes newer vectors and attempts.
+    let next = reset_with_current_state(&fixture);
+    let mut storage = open_storage(&fixture.root);
+    let VectorOutcome::Current(mut unit) =
+        storage.begin_vector_write(&next.get_identity()).unwrap()
+    else {
+        panic!()
+    };
+    assert!(unit.reserve_attempt(&fixture.hash, 4).unwrap());
+    unit.commit().unwrap();
+    let before = fixture.capture_cache();
+    barrier.write_all(b"C").unwrap();
+    let requests = finish_http_requests(&fixture, &mut child);
+
+    // Then: P reads the new config but its old observation prevents a destructive reset.
+    fixture.assert_state(&next, None, Some(1));
+    assert_current_vector(&fixture, &next);
+    assert_eq!(fixture.capture_cache(), before);
+    assert_eq!(requests, 0, "stale observation must never reach HTTP");
+    child.finish();
+}
+
 fn assert_stale_observation(action: &str) {
     // Given: P validates A while its original storage observation is still current.
     let fixture = Fixture::new(0);

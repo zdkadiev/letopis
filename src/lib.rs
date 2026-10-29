@@ -24,12 +24,13 @@ use crate::service::{
     CommandResult, DocumentError, DocumentErrorKind, DocumentRefreshService, DocumentResult,
     EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles,
     EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
-    GraphDiagnostics, GraphDiagnosticsService, GraphService, InspectionService, Inspector,
-    ProvenanceService, Refresher, SearchService, Searcher, SnapshotError, SnapshotVerifier,
-    SourceProvenance, SourceReader, SourceService, StatusFiles, StatusStorage, Storage,
-    StorageResult, TraversalService, Traverser,
+    GraphDiagnostics, GraphDiagnosticsService, GraphService, InitService, Initializer,
+    InspectionService, Inspector, ProvenanceService, Refresher, SearchService, Searcher,
+    ServiceError, ServiceErrorKind, ServiceResult, SnapshotError, SnapshotErrorKind,
+    SnapshotVerifier, SourceProvenance, SourceReader, SourceService, StatusFiles, StatusStorage,
+    Storage, StorageResult, TraversalService, Traverser,
 };
-use crate::storage::{SqliteStatusStorage, SqliteStorage};
+use crate::storage::{SqliteBootstrap, SqliteStatusStorage, SqliteStorage};
 use crate::utils::SERVICE_DIRECTORY;
 use std::{
     env,
@@ -93,27 +94,58 @@ pub fn wire_graph_diagnostics() -> impl GraphDiagnostics {
     GraphDiagnosticsService::new()
 }
 
+/// Wire repository initialization with noncreating Git discovery and owned adapters.
+///
+/// # Errors
+/// Returns `invalid_request` outside a non-bare Git work tree, and a safe internal
+/// error for repository, filesystem or provider setup failures.
+pub fn wire_initializer(start: &Path) -> ServiceResult<impl Initializer + use<>> {
+    let git = GitCli::open(start).map_err(map_snapshot_2_service_error)?;
+    let root = git.get_root().to_path_buf();
+    let files = LocalFileSystem::open(&root)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Initialization, cause))?;
+    let provider = build_embedding_provider()
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Initialization, cause))?;
+    Ok(InitService::new(
+        Box::new(files),
+        Box::new(SqliteBootstrap),
+        Box::new(provider),
+        root.join(SERVICE_DIRECTORY),
+    ))
+}
+
 /// Wire bounded traversal with owned graph, source, provenance and readiness collaborators.
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
-pub fn wire_traverser(start: &Path) -> CommandResult<impl Traverser + use<>> {
-    let refresher = wire_document_refresher(start).map_err(map_traversal_setup)?;
-    let git = GitCli::open(start).map_err(map_traversal_setup)?;
-    let filesystem = LocalFileSystem::open(git.get_root()).map_err(map_traversal_setup)?;
+pub fn wire_traverser(start: &Path) -> ServiceResult<impl Traverser + use<>> {
+    let refresher = wire_document_refresher(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
+    let git = GitCli::open(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
+    let filesystem = LocalFileSystem::open(git.get_root())
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     let directory = filesystem
         .open_service_directory()
-        .map_err(map_traversal_setup)?;
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
-        .map_err(map_traversal_setup)?;
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     Ok(TraversalService {
         storage,
         filesystem,
         refresher: Box::new(refresher),
         embeddings: Box::new(wire_embedding_executor(start)?),
         markdown: Box::new(MarkdownParser::new()),
-        sources: Box::new(wire_source_reader(git.get_root()).map_err(map_traversal_setup)?),
-        provenance: Box::new(wire_source_provenance(start).map_err(map_traversal_setup)?),
+        sources: Box::new(
+            wire_source_reader(git.get_root()).map_err(|cause| {
+                ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause)
+            })?,
+        ),
+        provenance: Box::new(
+            wire_source_provenance(start).map_err(|cause| {
+                ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause)
+            })?,
+        ),
         graph: Box::new(GraphService::new()),
     })
 }
@@ -151,22 +183,27 @@ pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenan
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or storage setup failures.
-pub fn wire_checker(start: &Path) -> CommandResult<impl Checker + use<>> {
-    let refresher = wire_document_refresher(start).map_err(map_check_setup)?;
-    let git = GitCli::open(start).map_err(map_check_setup)?;
-    let filesystem = LocalFileSystem::open(git.get_root()).map_err(map_check_setup)?;
+pub fn wire_checker(start: &Path) -> ServiceResult<impl Checker + use<>> {
+    let refresher = wire_document_refresher(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
+    let git = GitCli::open(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
+    let filesystem = LocalFileSystem::open(git.get_root())
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     let directory = filesystem
         .open_service_directory()
-        .map_err(map_check_setup)?;
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
-        .map_err(map_check_setup)?;
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     Ok(CheckService::new(
         refresher,
         storage,
         GraphDiagnosticsService::new(),
         ProvenanceService::new(
-            GitCli::open(start).map_err(map_check_setup)?,
-            LocalFileSystem::open(git.get_root()).map_err(map_check_setup)?,
+            GitCli::open(start)
+                .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
+            LocalFileSystem::open(git.get_root())
+                .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
         ),
     ))
 }
@@ -175,15 +212,18 @@ pub fn wire_checker(start: &Path) -> CommandResult<impl Checker + use<>> {
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
-pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
-    let refresher = wire_document_refresher(start).map_err(map_search_setup)?;
-    let git = GitCli::open(start).map_err(map_search_setup)?;
-    let filesystem = LocalFileSystem::open(git.get_root()).map_err(map_search_setup)?;
+pub fn wire_searcher(start: &Path) -> ServiceResult<impl Searcher + use<>> {
+    let refresher = wire_document_refresher(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
+    let git = GitCli::open(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
+    let filesystem = LocalFileSystem::open(git.get_root())
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     let directory = filesystem
         .open_service_directory()
-        .map_err(map_search_setup)?;
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
-        .map_err(map_search_setup)?;
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     let embeddings = wire_embedding_executor(start)?;
     Ok(SearchService {
         refresher,
@@ -192,8 +232,10 @@ pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
         filesystem,
         markdown: MarkdownParser::new(),
         provenance: ProvenanceService::new(
-            GitCli::open(start).map_err(map_search_setup)?,
-            LocalFileSystem::open(git.get_root()).map_err(map_search_setup)?,
+            GitCli::open(start)
+                .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
+            LocalFileSystem::open(git.get_root())
+                .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
         ),
     })
 }
@@ -202,10 +244,13 @@ pub fn wire_searcher(start: &Path) -> CommandResult<impl Searcher + use<>> {
 ///
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or setup failures.
-pub fn wire_inspector(start: &Path) -> CommandResult<impl Inspector + use<>> {
-    let refresher = wire_document_refresher(start).map_err(map_inspection_setup)?;
-    let git = GitCli::open(start).map_err(map_inspection_setup)?;
-    let files = LocalFileSystem::open(git.get_root()).map_err(map_inspection_setup)?;
+pub fn wire_inspector(start: &Path) -> ServiceResult<impl Inspector + use<>> {
+    let refresher = wire_document_refresher(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
+    let git = GitCli::open(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
+    let files = LocalFileSystem::open(git.get_root())
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
     Ok(InspectionService::new(
         refresher,
         git,
@@ -263,19 +308,22 @@ pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + 
 /// Reports unsupported repositories, unsafe service/database paths or setup failures.
 pub fn wire_embedding_executor(
     start: &Path,
-) -> CommandResult<impl EmbeddingExecutor + Embedder + use<>> {
-    let git = GitCli::open(start).map_err(map_embedding_setup)?;
-    let files = LocalFileSystem::open(git.get_root()).map_err(map_embedding_setup)?;
+) -> ServiceResult<impl EmbeddingExecutor + Embedder + use<>> {
+    let git = GitCli::open(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
+    let files = LocalFileSystem::open(git.get_root())
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
     let directory = files
         .open_service_directory()
-        .map_err(map_embedding_setup)?;
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
     let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
-        .map_err(map_embedding_setup)?;
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
     Ok(EmbeddingService::new(
         storage,
         files,
         MarkdownParser::new(),
-        build_embedding_provider().map_err(map_embedding_setup)?,
+        build_embedding_provider()
+            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?,
     ))
 }
 
@@ -287,14 +335,9 @@ pub fn wire_background_runner<'a>(
     root: &Path,
     executable: &Path,
     tasks: Option<&'a mut dyn EmbeddingExecutor>,
-) -> CommandResult<impl BackgroundRunner + use<'a>> {
-    let files = LocalFileSystem::open(root).map_err(|cause| {
-        CommandError::new_with_cause(
-            CommandErrorKind::InternalError,
-            "cannot open background root",
-            cause,
-        )
-    })?;
+) -> ServiceResult<impl BackgroundRunner + use<'a>> {
+    let files = LocalFileSystem::open(root)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Background, cause))?;
     Ok(BackgroundService::new(
         tasks,
         files,
@@ -450,48 +493,18 @@ fn execute_request(args: &[OsString], input: impl Read) -> CommandResult<Command
     parse_request(args, input).and_then(run_request)
 }
 
-fn map_check_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot open check service",
-        error,
-    )
-}
-
-fn map_search_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot open search service",
-        error,
-    )
-}
-
-fn map_traversal_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot prepare traversal",
-        error,
-    )
-}
-
-fn map_inspection_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot open inspection service",
-        error,
-    )
+fn map_snapshot_2_service_error(cause: SnapshotError) -> ServiceError {
+    let kind = match cause.get_kind() {
+        SnapshotErrorKind::InvalidRequest => ServiceErrorKind::RepositoryRequired,
+        SnapshotErrorKind::NotFound | SnapshotErrorKind::InternalError => {
+            ServiceErrorKind::Repository
+        }
+    };
+    ServiceError::new_with_cause(kind, cause)
 }
 
 fn map_embedding_files(error: DocumentError) -> EmbeddingError {
     EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
-}
-
-fn map_embedding_setup(error: impl std::error::Error + Send + Sync + 'static) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot open embedding service",
-        error,
-    )
 }
 
 #[cfg(test)]

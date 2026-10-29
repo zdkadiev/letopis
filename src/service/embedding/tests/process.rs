@@ -49,6 +49,11 @@ fn run_child() {
             service.read_configuration().unwrap(),
             ConfigState::Changed
         ));
+    } else if env::var("LETOPIS_PROCESS_ACTION").as_deref() == Ok("observed") {
+        assert!(matches!(
+            service.read_configuration().unwrap(),
+            ConfigState::Changed | ConfigState::Ready(_)
+        ));
     } else {
         let expected = match env::var("LETOPIS_PROCESS_EXPECT").unwrap().as_str() {
             "Complete" => DrainOutcome::Complete,
@@ -88,13 +93,18 @@ impl Fixture {
         }
     }
     fn write_config(root: &TempDir, listener: &TcpListener, retries: u64) -> EmbeddingConfig {
-        let bytes = serde_json::to_vec(&serde_json::json!({
+        let url = format!("http://{}/api", listener.local_addr().unwrap());
+        let configured = serde_json::json!({
             "provider":"ollama", "model":"fixture", "max_retries": retries,
-            "parameters":{"base_url":format!("http://{}/api", listener.local_addr().unwrap())}
-        }))
+            "parameters":{"base_url":url}
+        });
+        let bytes = serde_json::to_vec(&serde_json::json!({"embedding_model": {
+            "enabled":true, "provider":"ollama", "model":"fixture",
+            "parameters":{"base_url":url}, "max_retries": retries,
+        }}))
         .unwrap();
         fs::write(root.path().join(".letopis/config.json"), &bytes).unwrap();
-        EmbeddingConfig::parse(&bytes).unwrap()
+        EmbeddingConfig::parse(configured.to_string().as_bytes()).unwrap()
     }
     fn accept_http(&self) -> TcpStream {
         let start = Instant::now();

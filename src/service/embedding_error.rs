@@ -5,6 +5,8 @@ use std::{error::Error, fmt};
 pub enum EmbeddingErrorKind {
     /// Configuration fails the local contract.
     InvalidConfig,
+    /// A legacy flat configuration must be moved under `embedding_model`.
+    MigrationRequired,
     /// Compatible-provider credentials are absent or invalid.
     Credentials,
     /// Provider output fails the vector contract.
@@ -55,6 +57,7 @@ impl fmt::Display for EmbeddingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self.kind {
             EmbeddingErrorKind::InvalidConfig => "invalid embedding configuration",
+            EmbeddingErrorKind::MigrationRequired => "embedding configuration requires migration",
             EmbeddingErrorKind::Credentials => "embedding credentials unavailable",
             EmbeddingErrorKind::InvalidResponse => "invalid embedding response",
             EmbeddingErrorKind::HttpStatus(_) => "embedding provider rejected request",

@@ -21,25 +21,34 @@ impl ReadingRepo {
     /// # Panics
     /// Panics if process setup fails or the owned child exceeds the watchdog.
     pub fn invoke(&self, args: &[&str], input: &[u8]) -> Output {
-        self.invoke_output(args, input, Stdio::piped())
+        self.invoke_in(self.get_root(), args, input)
+    }
+    /// Run the binary from a caller-selected directory in the fixture repository.
+    pub fn invoke_in(&self, directory: &Path, args: &[&str], input: &[u8]) -> Output {
+        self.invoke_output(directory, args, input, Stdio::piped())
+    }
+    pub fn get_subdir(&self) -> &Path {
+        self.0.get_subdir()
     }
     /// Run the binary with discarded stdout to test retries after a lost response.
     ///
     /// # Panics
     /// Panics if process setup fails or the owned child exceeds the watchdog.
     pub fn invoke_lost(&self, args: &[&str], input: &[u8]) -> Output {
-        self.invoke_output(args, input, Stdio::null())
+        self.invoke_output(self.get_root(), args, input, Stdio::null())
     }
 
     pub fn write_knowledge(&self, path: &str, body: &str) {
         self.write(path, super::build_whole_file(body).as_bytes());
     }
     pub fn write_config(&self, provider: &str, url: &str, model: &str) -> EmbeddingConfig {
-        let raw = serde_json::json!({"provider":provider,"model":model,
-            "parameters":{"base_url":url},"max_retries":0})
+        let configured = serde_json::json!({"provider":provider,"model":model,
+            "parameters":{"base_url":url},"max_retries":0});
+        let raw = serde_json::json!({"embedding_model":{"enabled":true,"provider":provider,
+            "model":model,"parameters":{"base_url":url},"max_retries":0}})
         .to_string();
         self.write(".letopis/config.json", raw.as_bytes());
-        EmbeddingConfig::parse(raw.as_bytes()).unwrap()
+        EmbeddingConfig::parse(configured.to_string().as_bytes()).unwrap()
     }
     pub fn seed_vectors(&self, config: &EmbeddingConfig, vectors: &[(&str, &[f32])]) {
         let mut storage = self.open_storage();
@@ -82,14 +91,20 @@ impl ReadingRepo {
     pub fn get_root(&self) -> &Path {
         self.0.get_root()
     }
-    fn invoke_output(&self, args: &[&str], input: &[u8], stdout: Stdio) -> Output {
+    fn invoke_output(
+        &self,
+        directory: &Path,
+        args: &[&str],
+        input: &[u8],
+        stdout: Stdio,
+    ) -> Output {
         let mut stdin = tempfile::tempfile().unwrap();
         stdin.write_all(input).unwrap();
         stdin.rewind().unwrap();
         let mut command = Command::new(env!("CARGO_BIN_EXE_letopis"));
         isolate_command(&mut command);
         command
-            .current_dir(self.get_root())
+            .current_dir(directory)
             .args(args)
             .stdin(Stdio::from(stdin))
             .stdout(stdout)

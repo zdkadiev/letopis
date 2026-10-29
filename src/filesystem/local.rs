@@ -121,6 +121,10 @@ impl LocalFileSystem {
         self.on_contention.replace(Some(hook));
     }
 
+    pub(super) fn get_root_directory(&self) -> &File {
+        &self.root
+    }
+
     /// Create or validate the private service directory and return an owned descriptor.
     ///
     /// The first successful call pins its identity; subsequent calls reject replacement.
@@ -129,6 +133,24 @@ impl LocalFileSystem {
     /// Reports unsafe/replaced paths, creation/permission failures or failed duplication.
     pub(crate) fn open_service_directory(&self) -> DocumentResult<OwnedFd> {
         let directory = self.get_service_directory()?;
+        self.clone_service_directory(directory)
+    }
+
+    /// Protect an existing or newly created service directory before initialization writes.
+    ///
+    /// Unlike observational reads, initialization applies mode 0700 to the verified
+    /// pinned directory so a permissive preexisting `.letopis` cannot expose databases.
+    /// # Errors
+    /// Reports unsafe/replaced paths, permission failure or failed duplication.
+    pub(super) fn open_private_service_directory(&self) -> DocumentResult<OwnedFd> {
+        let directory = self.get_service_directory()?;
+        fchmod(directory, Mode::RWXU)
+            .map_err(|cause| fail_io("cannot protect service directory", cause))?;
+        self.verify_service_directory(directory)?;
+        self.clone_service_directory(directory)
+    }
+
+    fn clone_service_directory(&self, directory: &File) -> DocumentResult<OwnedFd> {
         directory
             .try_clone()
             .map(OwnedFd::from)
@@ -384,7 +406,7 @@ impl LocalFileSystem {
             .map_err(|cause| fail_io("coordination lock changed", cause))
     }
 
-    fn get_service_directory(&self) -> DocumentResult<&File> {
+    pub(super) fn get_service_directory(&self) -> DocumentResult<&File> {
         if self.service.get().is_none() {
             let directory = self.create_service_directory()?;
             let _ = self.service.set(directory);
@@ -394,7 +416,7 @@ impl LocalFileSystem {
         Ok(directory)
     }
 
-    fn get_existing_service_directory(&self) -> DocumentResult<Option<&File>> {
+    pub(super) fn get_existing_service_directory(&self) -> DocumentResult<Option<&File>> {
         if self.service.get().is_none() {
             let before = match statat(&self.root, SERVICE_DIRECTORY, AtFlags::SYMLINK_NOFOLLOW) {
                 Ok(stat) => stat,
@@ -420,7 +442,7 @@ impl LocalFileSystem {
         Ok(Some(directory))
     }
 
-    fn verify_service_directory(&self, directory: &File) -> DocumentResult<()> {
+    pub(super) fn verify_service_directory(&self, directory: &File) -> DocumentResult<()> {
         let pinned = fstat(directory).map_err(|cause| fail_io(SERVICE_DIRECTORY_ERROR, cause))?;
         verify_entry(&self.root, SERVICE_DIRECTORY, &pinned)
             .map(|_| ())
@@ -585,7 +607,7 @@ where
     }
 }
 
-fn retry_io(mut operation: impl FnMut() -> io::Result<()>) -> io::Result<()> {
+pub(super) fn retry_io(mut operation: impl FnMut() -> io::Result<()>) -> io::Result<()> {
     loop {
         match operation() {
             Err(cause) if cause.kind() == ErrorKind::Interrupted => {}
@@ -594,7 +616,10 @@ fn retry_io(mut operation: impl FnMut() -> io::Result<()>) -> io::Result<()> {
     }
 }
 
-fn fail_io(message: &'static str, cause: impl Error + Send + Sync + 'static) -> DocumentError {
+pub(super) fn fail_io(
+    message: &'static str,
+    cause: impl Error + Send + Sync + 'static,
+) -> DocumentError {
     DocumentError::new_with_cause(DocumentErrorKind::InternalError, message, cause)
 }
 fn fail_changed() -> DocumentError {
