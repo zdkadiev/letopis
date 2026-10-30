@@ -10,7 +10,8 @@ import sys
 import time
 
 OPERATIONS = {"rev-parse", "cat-file", "hash-object", "ls-files", "ls-tree", "mktree",
-              "update-ref", "for-each-ref", "config", "version", "diff", "status"}
+              "update-ref", "for-each-ref", "config", "version", "diff", "status",
+              "show", "show-ref", "check-ref-format", "rev-list", "read-tree", "write-tree"}
 
 
 def main() -> None:

@@ -1,6 +1,5 @@
 """Coverage claims and tiny real-CLI ownership checks."""
 
-import json
 import os
 from pathlib import Path
 import tempfile

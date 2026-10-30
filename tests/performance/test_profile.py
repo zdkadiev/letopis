@@ -9,10 +9,35 @@ import sys
 import tempfile
 import unittest
 
-from profile import record_profile, validate_profile
+from profile import record_profile, summarize_stacks, validate_profile
 
 
 class ProfileTests(unittest.TestCase):
+    def test_symbolized_stacks_keep_inclusive_costs_nonadditive(self):
+        # Given: one ten-microsecond CPU delta observed under two nested frames.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            thread = {"name": "fixture", "pid": 1, "samples": {"stack": [1], "threadCPUDelta": [10]},
+                      "stackTable": {"prefix": [None, 0], "frame": [0, 1]},
+                      "frameTable": {"address": [100, 200], "func": [0, 1]},
+                      "funcTable": {"resource": [0, 0], "name": [0, 1]},
+                      "resourceTable": {"lib": [0]}, "stringArray": ["0x64", "0xc8"]}
+            data = {"meta": {"sampleUnits": {"threadCPUDelta": "µs"}}, "libs": [{"name": "letopis"}],
+                    "threads": [thread]}
+            with gzip.open(root / "profile.gz", "wt") as stream:
+                json.dump(data, stream)
+            symbols = {"string_table": ["source_check", "__wait4"], "data": [{"debug_name": "letopis",
+                "symbol_table": [{"symbol": 0}, {"symbol": 1}], "known_addresses": [[100, 0], [200, 1]]}]}
+            (root / "symbols.json").write_text(json.dumps(symbols))
+            # When: summarizing inclusive stack observations.
+            summary = summarize_stacks(root / "profile.gz", root / "symbols.json")
+            # Then: each frame sees ten, while total observed CPU remains ten, not twenty.
+            costs = {item["function"]: item["inclusive_cpu_delta"] for item in summary["functions"]}
+            self.assertEqual(costs["source_check"], 10)
+            self.assertEqual(costs["__wait4"], 10)
+            self.assertEqual(summary["observed_cpu_delta"], 10)
+            self.assertTrue(summary["inclusive_costs_overlap"])
+
     def test_rejects_empty_truncated_and_missing_profiles(self):
         # Given: a known two-sample profile and several invalid artifacts.
         with tempfile.TemporaryDirectory() as directory:

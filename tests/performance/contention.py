@@ -4,7 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 import fcntl
 import json
-import os
 from pathlib import Path
 import re
 import subprocess
@@ -110,10 +109,16 @@ def run_campaign(args, build: dict, evidence: Path) -> None:
                                  "counts": fixture["counts"]}, "timeout": args.timeout}
         run_drain_overlap(scenario, build, provider, evidence / "drain-overlap")
         observe_vectors(scenario, Path(observer["executable"]), evidence / "coverage")
-        record, _ = invoke_cli(Path(build["executable"]), repository,
+        before = provider.get_counters()["requests"]
+        record, result = invoke_cli(Path(build["executable"]), repository,
                                {"args": ["search"], "request": {"query": "vectorprobe", "limit": 1}})
+        delta = provider.get_counters()["requests"] - before
         record.update(embedding_mode="fake_vectors", scope="client/storage overhead, not semantic model performance")
+        record.update(query_request_delta=delta, validation={"valid": delta >= 1 and len(result) == 1,
+                                                           "fts_query_absent_by_fixture": True})
         write_json(evidence / "fake-query.json", record)
+        if not record["validation"]["valid"]:
+            raise ValueError("fake-vector query participation not demonstrated")
         _, checked = invoke_cli(Path(build["executable"]), repository, {"args": ["check"], "request": {}})
         if checked["errors"]:
             raise ValueError("post-contention integrity failure")

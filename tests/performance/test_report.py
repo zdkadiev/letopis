@@ -2,11 +2,13 @@
 
 import json
 import hashlib
+import sqlite3
+import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from report import summarize_samples, validate_result
+from report import summarize_samples, validate_result, verify_projection_counts
 
 
 def make_record(value: float, outcome: str = "success", mode: str = "fts_disabled") -> dict:
@@ -21,6 +23,29 @@ def make_measurement(response) -> dict:
 
 
 class ReportTests(unittest.TestCase):
+    def test_projection_count_oracle_reads_independent_metadata(self):
+        # Given: literal metadata with two knowledge nodes, one source and one edge.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / ".letopis").mkdir()
+            database = sqlite3.connect(root / ".letopis/cache.db")
+            database.executescript("CREATE TABLE nodes(kind TEXT); INSERT INTO nodes VALUES('vertex'),('metavertex'),('source'); CREATE TABLE edges(id INTEGER); INSERT INTO edges VALUES(1);")
+            database.close()
+            scenario = {"repository": root, "expected": {"counts": {"knowledge": 2, "source": 1, "edges": 1}}}
+            # When: observing normal metadata without a vec1 extension.
+            observed = verify_projection_counts(scenario)
+            # Then: exact independent counts pass; a wrong expected cardinality fails.
+            self.assertEqual(observed, {"knowledge": 2, "source": 1, "edges": 1})
+            scenario["expected"]["counts"]["knowledge"] = 3
+            with self.assertRaises(ValueError):
+                verify_projection_counts(scenario)
+    def test_rejects_wrong_freshness_flags_on_expected_search_id(self):
+        # Given: a search result has the right ID but falsely reports stale knowledge.
+        scenario = {"repository": Path.cwd(), "expected": {"command": "search", "id": "a.md"}}
+        response = {"ok": True, "result": [{"element_id": "a.md", "flags": ["stale"]}]}
+        # When / Then: an ID match alone is insufficient correctness evidence.
+        self.assertFalse(validate_result(scenario, make_measurement(response))["valid"])
+
     def test_statistics_exclude_timeouts_and_hide_unstable_quantiles(self):
         # Given: four known timings and one timed-out attempt.
         records = [make_record(value) for value in (1, 2, 3, 4)] + [make_record(100, "timeout")]
@@ -30,6 +55,7 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(summary["n"], 4)
         self.assertEqual(summary["attempts"], 5)
         self.assertEqual(summary["median"], 2.5)
+        self.assertAlmostEqual(summary["throughput_success_per_s"], 4 / 110)
         self.assertEqual((summary["min"], summary["max"]), (1, 4))
         self.assertIsNone(summary["p95"])
         self.assertIsNone(summary["p99"])

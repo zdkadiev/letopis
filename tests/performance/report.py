@@ -7,6 +7,8 @@ import math
 from pathlib import Path, PurePosixPath
 import re
 import statistics
+import sqlite3
+import subprocess
 
 from scenarios import run_git, write_json
 
@@ -22,8 +24,11 @@ def validate_result(scenario: dict, measurement: dict) -> dict:
         if response.get("ok") is not True or response.get("warnings"):
             raise ValueError("CLI failure or warning")
         observed = validate_command(scenario, response["result"])
+        if "counts" in scenario["expected"]:
+            observed["projection_counts"] = verify_projection_counts(scenario)
         return {"valid": True, "observed": observed}
-    except (ValueError, KeyError, TypeError, AttributeError, OSError, IndexError) as error:
+    except (ValueError, KeyError, TypeError, AttributeError, OSError, IndexError,
+            sqlite3.Error, subprocess.CalledProcessError) as error:
         return {"valid": False, "reason": type(error).__name__}
 
 
@@ -36,12 +41,15 @@ def summarize_samples(records: list[dict]) -> dict:
                     if record["outcome"] == "success" and record["validation"]["valid"])
     failures = sum(record["outcome"] != "success" or not record["validation"]["valid"]
                    for record in records)
+    occupied = sum(record["duration_seconds"] for record in records)
     return {"schema_version": 1, "n": len(values), "attempts": len(records), "failures": failures,
             "min": min(values) if values else None, "max": max(values) if values else None,
             "median": statistics.median(values) if values else None,
             "p95": values[math.ceil(len(values) * .95) - 1] if len(values) >= 100 else None,
             "p99": values[math.ceil(len(values) * .99) - 1] if len(values) >= 1000 else None,
             "quantile_method": "nearest_rank; median averages middle pair",
+            "throughput_success_per_s": len(values) / occupied if occupied else None,
+            "throughput_scope": "sequential occupied call time including failed attempts, excludes setup",
             "tail_limit": "p95 requires 100 successes; p99 requires 1000 successes",
             "values_seconds": values}
 
@@ -65,7 +73,7 @@ def validate_command(scenario: dict, result) -> dict:
     command = expected["command"]
     if command == "search":
         identifiers = [item["element_id"] for item in result]
-        if identifiers != [expected["id"]]:
+        if identifiers != [expected["id"]] or any(item.get("flags") != [] for item in result):
             raise ValueError("unexpected search IDs")
         return {"ids": identifiers}
     if command == "check":
@@ -117,6 +125,23 @@ def validate_traversal(expected: dict, result: dict) -> dict:
     if not required or edges != required:
         raise ValueError("unexpected traversal edges")
     ids = {item["element_id"] for item in result["elements"]}
-    if ids != set(expected["element_ids"]):
+    if ids != set(expected["element_ids"]) or any(item.get("flags") != [] for item in result["elements"]):
         raise ValueError("unexpected traversal IDs")
     return {"ids": sorted(ids), "edge_count": len(edges)}
+
+
+def verify_projection_counts(scenario: dict) -> dict:
+    """Read ordinary metadata after timing; never load vec1 through Python SQLite."""
+    path = scenario["repository"] / ".letopis/cache.db"
+    connection = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+    try:
+        nodes = dict(connection.execute("SELECT kind, count(*) FROM nodes GROUP BY kind"))
+        edges = connection.execute("SELECT count(*) FROM edges").fetchone()[0]
+    finally:
+        connection.close()
+    observed = {"knowledge": nodes.get("vertex", 0) + nodes.get("metavertex", 0),
+                "source": nodes.get("source", 0), "edges": edges}
+    expected = scenario["expected"]["counts"]
+    if any(observed[key] != expected[key] for key in observed):
+        raise ValueError("projection counts differ from independent fixture counts")
+    return observed

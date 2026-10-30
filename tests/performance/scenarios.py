@@ -39,6 +39,26 @@ def prepare_fixture(output: Path, nodes: int) -> dict:
     return dict(manifest, repository=repository)
 
 
+def prepare_existing_fixture(manifest_path: Path, output: Path) -> dict:
+    """Copy verified generated inputs and idle projection; never measure in the original."""
+    verify_new_output(output, manifest_path.parent)
+    specification = importlib.util.spec_from_file_location("performance_validator", GENERATOR.with_name("validate.py"))
+    module = importlib.util.module_from_spec(specification)
+    sys.modules[specification.name] = module
+    specification.loader.exec_module(module)
+    manifest = module.validate_corpus(manifest_path)
+    repository = manifest_path.parent / "repository"
+    config = json.loads((repository / ".letopis/config.json").read_text())
+    if manifest["options"]["seed"] != 65 or config["embedding_model"]["enabled"] is not False:
+        raise ValueError("only disabled synthetic issue-65 fixtures may be reused")
+    if not (repository / ".git").is_dir() or (repository / ".git").is_symlink():
+        raise ValueError("standalone generated repository required")
+    output.mkdir(parents=True)
+    shutil.copytree(repository, output / "repository")
+    write_json(output / "corpus.json", manifest)
+    return dict(manifest, repository=output / "repository", reused_manifest=str(manifest_path))
+
+
 def build_release(source: Path, target: Path, evidence: Path) -> dict:
     """Build a locked release from clean product inputs and pin its provenance."""
     before = read_product_inputs(source)
@@ -57,7 +77,14 @@ def build_release(source: Path, target: Path, evidence: Path) -> dict:
                     if item.get("reason") == "compiler-artifact"
                     and item.get("target", {}).get("name") == "letopis"
                     and item.get("executable"))
-    binary = Path(artifact["executable"]).resolve()
+    artifact_path = Path(artifact["executable"]).resolve()
+    product = evidence / "product"
+    product.mkdir()
+    binary = product / "letopis"
+    shutil.copy2(artifact_path, binary)
+    symbols = artifact_path.with_name(artifact_path.name + ".dSYM")
+    if symbols.exists():
+        shutil.copytree(symbols, product / "letopis.dSYM")
     pin = {"executable": str(binary), "sha256": hash_file(binary), "inputs": before,
            "product_commit": run_git(source, "rev-parse", "HEAD").decode().strip(),
            "rustc": subprocess.check_output(["rustc", "--version"], text=True).strip(),
@@ -139,10 +166,13 @@ def initialize_projection(repository: Path, binary: str, full_audit: bool = True
 
 def verify_build(pin: dict) -> None:
     """Reject executable/source drift before a measured invocation."""
+    required = {"executable", "sha256", "inputs", "product_commit", "rustc", "command", "release_debug", "target"}
+    if not required <= pin.keys() or not {"--release", "--locked", "--offline"} <= set(pin["command"]):
+        raise ValueError("missing locked release build provenance")
     binary = Path(pin["executable"])
     if binary.is_symlink() or hash_file(binary) != pin["sha256"]:
         raise ValueError("binary differs from pinned build")
-    if "inputs" in pin and read_product_inputs(ROOT) != pin["inputs"]:
+    if read_product_inputs(ROOT) != pin["inputs"]:
         raise ValueError("product source differs from pinned build")
 
 
