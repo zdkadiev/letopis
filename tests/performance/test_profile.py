@@ -8,11 +8,67 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from profile import record_profile, summarize_stacks, validate_profile
+from profile import record_profile, record_wall_stacks, run_profile_pair, summarize_stacks, validate_profile
 
 
 class ProfileTests(unittest.TestCase):
+    def test_missing_samply_returns_a_failed_measurement_receipt(self):
+        # Given: this host has no profiler executable.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            scenario = {"repository": root, "argv": ["check"], "stdin": b"{}"}
+            # When: attempting a profile through the normal adapter.
+            with patch("profile.shutil.which", return_value=None):
+                result = record_profile(scenario, {"executable": "fixture"}, root / "capture")
+            # Then: callers get a persisted unavailable result, not a missing-key crash.
+            self.assertEqual(result["outcome"], "unavailable")
+            self.assertEqual(result["measurement"]["outcome"], "spawn_failed")
+            self.assertTrue((root / "capture/receipt.json").exists())
+
+    def test_missing_sampler_artifact_cannot_enter_profiled_latency_series(self):
+        # Given: the CLI exits successfully but sampler produces no valid profile.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            scenario = {"repository": root, "argv": ["check"], "stdin": b"{}",
+                        "expected": {"command": "check"}}
+            def make_result():
+                return {"outcome": "success", "duration_seconds": .1, "exit_code": 0,
+                        "stdout": {"truncated": False, "capture_hex":
+                            b'{"ok":true,"result":{"errors":[]}}'.hex()}}
+            # When: recording an ordinary/profiled pair with an unavailable artifact.
+            with (root / "samples").open("wb") as stream, patch("profile.verify_build"), \
+                    patch("profile.prepare_scenario", return_value=scenario), \
+                    patch("profile.measure_process", return_value=make_result()), \
+                    patch("profile.record_profile", return_value={"measurement": make_result(), "outcome": "unavailable"}), \
+                    patch("builtins.print"):
+                run_profile_pair(SimpleNamespace(timeout=1, nodes=60), {"executable": "fixture"},
+                                 {}, root, stream, "check", 0)
+            rows = [json.loads(line) for line in (root / "samples").read_text().splitlines()]
+            # Then: only the unprofiled call is a valid successful timing observation.
+            self.assertTrue(rows[0]["validation"]["valid"])
+            self.assertFalse(rows[1]["validation"]["valid"])
+    def test_wall_sampler_attaches_by_owned_pid_and_finishes(self):
+        # Given: a tiny fake sampler and a child that lives long enough to observe.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            sampler = root / "wall-sampler"
+            sampler.write_text(f'#!{sys.executable}\nimport sys\nfrom pathlib import Path\n'
+                               'Path(sys.argv[-1]).write_text(sys.argv[1])\n')
+            sampler.chmod(0o755)
+            code = 'import time;time.sleep(.1);print(\'{"ok":true,"result":{"errors":[]}}\')'
+            scenario = {"repository": root, "argv": ["-c", code], "stdin": b"",
+                        "expected": {"command": "check"}}
+            # When: observing only the owned process using its exact PID.
+            result = record_wall_stacks(scenario, {"executable": sys.executable,
+                                                   "wall_sampler": str(sampler)}, root / "capture")
+            # Then: the sample belongs to this invocation and its child is reaped.
+            self.assertEqual(Path(result["path"]).read_text(), str(result["child"]["pid"]))
+            self.assertEqual(result["child"]["outcome"], "success")
+            self.assertTrue(result["validation"]["valid"])
+
     def test_symbolized_stacks_keep_inclusive_costs_nonadditive(self):
         # Given: one ten-microsecond CPU delta observed under two nested frames.
         with tempfile.TemporaryDirectory() as directory:

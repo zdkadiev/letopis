@@ -14,6 +14,24 @@ from measure import measure_process
 
 
 class MeasurementTests(unittest.TestCase):
+    def test_timeout_retains_resource_observation_for_killed_child(self):
+        # Given: a live owned child that exceeds its bounded deadline.
+        result = measure_process([sys.executable, "-c", "import time;time.sleep(60)"],
+                                 Path.cwd(), b"", {"timeout": .05})
+        # When / Then: cancellation is censored, but available wait4 RAM/CPU are retained.
+        self.assertEqual(result["outcome"], "timeout")
+        self.assertIn("peak_rss", result["resources"])
+        self.assertGreater(result["resources"]["peak_rss"]["value"], 0)
+
+    def test_spawn_observer_receives_only_the_owned_pid(self):
+        # Given: a callback used to attach a stack sampler to this exact child.
+        observed = []
+        # When: starting one owned process.
+        result = measure_process([sys.executable, "-c", "print('fixture')"], Path.cwd(), b"",
+                                 {"on_spawn": observed.append})
+        # Then: attachment never relies on a process-name search.
+        self.assertEqual(observed, [result["pid"]])
+
     def test_explicit_cancellation_stops_only_owned_session(self):
         # Given: an owned long-running child and an explicit cancellation event.
         cancel = threading.Event()

@@ -2,18 +2,48 @@
 
 import unittest
 import json
+import io
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from run import parse_arguments
+from run import parse_arguments, run_series
 
 
 class RunnerTests(unittest.TestCase):
+    def test_profile_window_rejects_zero_and_invalid_limits(self):
+        # Given: zero, negative, non-finite and excessive recording windows.
+        for value in ("0", "-1", "nan", "121"):
+            arguments = ["run.py", "--stage", "profile", "--profile-window", value]
+            # When / Then: malformed windows fail rather than run a different campaign.
+            with patch("sys.argv", arguments), patch("sys.stderr", io.StringIO()):
+                with self.assertRaises(SystemExit):
+                    parse_arguments()
+
+    def test_successful_process_with_wrong_result_is_rejected(self):
+        # Given: a fast exit-zero process returns an incorrect search ID.
+        args = SimpleNamespace(nodes=60, repetitions=1, timeout=120)
+        scenario = {"repository": Path.cwd(), "argv": ["search"], "stdin": b"{}",
+                    "setup_seconds": 0, "cache_label": "uncontrolled",
+                    "expected": {"command": "search", "id": "right.md"}}
+        record = {"outcome": "success", "duration_seconds": .1, "exit_code": 0,
+                  "stdout": {"truncated": False, "capture_hex": json.dumps({"ok": True,
+                    "result": [{"element_id": "wrong.md", "flags": []}]}).encode().hex()}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            # When / Then: persist the rejected attempt and fail rather than quietly complete.
+            with (root / "samples").open("wb") as stream, \
+                    patch("run.prepare_scenario", return_value=scenario), \
+                    patch("run.verify_build"), patch("run.measure_process", return_value=record):
+                with self.assertRaises(ValueError):
+                    run_series(args, {"executable": "fixture"}, {}, root, stream, "search", time.monotonic() + 10)
+            self.assertFalse(json.loads((root / "samples").read_text())["validation"]["valid"])
+
     @unittest.skipUnless(os.environ.get("PERF_BASELINE_FILE"), "requires pinned release build receipt")
     def test_stage_watchdog_preserves_partial_evidence_during_setup(self):
         # Given: a fresh campaign whose budget cannot cover real first publication.

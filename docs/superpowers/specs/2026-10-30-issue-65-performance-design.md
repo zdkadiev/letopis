@@ -218,5 +218,7 @@ states assessed coverage and remaining model/platform/scale gaps; it must not
 present an unavailable measurement as passed or close unrelated gates.
 
 Builder check: no important unanswered questions. Local document links checked.
-Next: implementation plan and separate plan approval before implementation or
-benchmark execution. No Letopis benchmarks have run during specification work.
+Implementation plan separately approved; Native execution produced model-free
+measurements, samply profiles and causal controls. See the [report](../../zkit/letopis/checks/issue-65/report.md)
+for assessed coverage, explicit gaps and final review status. Real models and
+paid sessions remain unassessed. Specification work itself ran no Letopis benchmarks.

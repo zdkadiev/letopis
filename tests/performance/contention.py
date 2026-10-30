@@ -62,11 +62,14 @@ def run_contention(scenario: dict, build: dict, evidence: Path) -> dict:
     verify_new_output(evidence)
     evidence.mkdir(parents=True)
     repository = scenario["repository"]
+    baseline = measure_process([build["executable"], *scenario["argv"]], repository,
+                               scenario["stdin"], {"timeout": scenario.get("timeout", 120)})
     cancel = threading.Event()
     with ThreadPoolExecutor(max_workers=1) as executor:
         writer = executor.submit(measure_process, [build["executable"], "reindex"], repository,
                                  b"{}\n", {"timeout": scenario.get("timeout", 120), "cancel_event": cancel})
         try:
+            index_locked = wait_for_index_writer(repository, writer)
             reader = measure_process([build["executable"], *scenario["argv"]], repository,
                                      scenario["stdin"], {"timeout": scenario.get("timeout", 120)})
             written = writer.result()
@@ -76,12 +79,32 @@ def run_contention(scenario: dict, build: dict, evidence: Path) -> dict:
                          written["started_monotonic"] + written["duration_seconds"])
                   - max(reader["started_monotonic"], written["started_monotonic"]))
     from report import validate_result
-    receipt = {"reader": reader, "writer": written, "overlap_seconds": overlap,
+    duration = (max(reader["started_monotonic"] + reader["duration_seconds"],
+                    written["started_monotonic"] + written["duration_seconds"])
+                - min(reader["started_monotonic"], written["started_monotonic"]))
+    receipt = {"reader": reader, "writer": written, "baseline_reader": baseline,
+               "baseline_validation": validate_result(scenario, baseline),
+               "overlap_seconds": overlap, "writer_index_lock_observed": index_locked,
+               "throughput_success_per_s": sum(call["outcome"] == "success" for call in (reader, written)) / duration,
                "reader_validation": validate_result(scenario, reader),
                "writer_validation": validate_result({"expected": {"command": "reindex"}}, written),
                "scope": "CLI lifetime overlap; no direct SQL lock-wait attribution"}
     write_json(evidence / "receipt.json", receipt)
     return receipt
+
+
+def wait_for_index_writer(repository: Path, writer) -> bool:
+    """Observe this isolated writer's index lock without stealing or unlinking it."""
+    deadline = time.monotonic() + 10
+    with (repository / ".letopis/index.lock").open("a+b") as stream:
+        while not writer.done() and time.monotonic() < deadline:
+            try:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+            except BlockingIOError:
+                return True
+            time.sleep(.005)
+    return False
 
 
 def run_campaign(args, build: dict, evidence: Path) -> None:

@@ -19,7 +19,7 @@ PRODUCT_PREFIXES = ("src/", "vendor/", "native/", "vendored/")
 PRODUCT_FILES = {"Cargo.toml", "Cargo.lock", "build.rs", "rust-toolchain.toml"}
 
 
-def prepare_fixture(output: Path, nodes: int) -> dict:
+def prepare_fixture(output: Path, nodes: int, elements_per_file: int = 30) -> dict:
     """Generate new, model-free input; no product process is invoked."""
     verify_new_output(output)
     specification = importlib.util.spec_from_file_location("performance_generator", GENERATOR)
@@ -28,7 +28,7 @@ def prepare_fixture(output: Path, nodes: int) -> dict:
     specification.loader.exec_module(module)
     manifest = module.generate_corpus(
         output, module.CorpusOptions(seed=65, knowledge_count=nodes,
-                                     fragment_bytes=2000, elements_per_file=30))
+                                     fragment_bytes=2000, elements_per_file=elements_per_file))
     repository = output / "repository"
     service = repository / ".letopis"
     service.mkdir(mode=0o700)

@@ -27,6 +27,8 @@ def measure_process(argv: list[str], repository: Path, data: bytes, options: dic
                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                  start_new_session=True)
         record["pid"] = child.pid
+        if options.get("on_spawn"):
+            options["on_spawn"](child.pid)
         usage = collect_process(child, data, streams,
                                 {"deadline": started + options.get("timeout", 120),
                                  "cancel_event": options.get("cancel_event")})
@@ -37,7 +39,9 @@ def measure_process(argv: list[str], repository: Path, data: bytes, options: dic
                              "interrupted" if isinstance(error, KeyboardInterrupt) else "spawn_failed")
     finally:
         if child is not None:
-            stop_session(child)
+            usage = stop_session(child)
+            if not record["resources"] and usage is not None:
+                record["resources"] = describe_resources(usage)
             record["exit_code"] = child.returncode
             for pipe in (child.stdin, child.stdout, child.stderr):
                 pipe.close()
@@ -134,17 +138,23 @@ def read_output(selector, key, streams: dict) -> None:
         selector.unregister(key.fileobj)
 
 
-def stop_session(child: subprocess.Popen) -> None:
+def stop_session(child: subprocess.Popen):
     """Close this session even when an exited parent left pipe-holding children."""
+    usage = None
     for sig in (signal.SIGTERM, signal.SIGKILL):
         try:
             os.killpg(child.pid, sig)
         except ProcessLookupError:
             break
-        if sig == signal.SIGTERM and child.returncode is None:
-            try:
-                child.wait(timeout=0.2)
-            except subprocess.TimeoutExpired:
-                continue
+        deadline = time.monotonic() + .2
+        while child.returncode is None and time.monotonic() < deadline:
+            pid, status, observed = os.wait4(child.pid, os.WNOHANG)
+            if pid:
+                child.returncode = os.waitstatus_to_exitcode(status)
+                usage = observed
+            else:
+                time.sleep(.005)
     if child.returncode is None:
-        child.wait()
+        _, status, usage = os.wait4(child.pid, 0)
+        child.returncode = os.waitstatus_to_exitcode(status)
+    return usage

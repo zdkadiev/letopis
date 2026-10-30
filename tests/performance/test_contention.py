@@ -97,6 +97,8 @@ class ContentionTests(unittest.TestCase):
             # Then: both results validate and there is observed lifetime overlap.
             self.assertTrue(receipt["reader_validation"]["valid"])
             self.assertTrue(receipt["writer_validation"]["valid"])
+            self.assertTrue(receipt["baseline_validation"]["valid"])
+            self.assertTrue(receipt["writer_index_lock_observed"])
             self.assertGreater(receipt["overlap_seconds"], 0)
 
 

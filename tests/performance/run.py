@@ -62,6 +62,7 @@ def parse_arguments():
     parser.add_argument("--evidence", type=Path)
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--fixture-manifest", type=Path, help="copy a verified idle disabled synthetic fixture")
+    parser.add_argument("--profile-window", type=float, help="censored first-publication CPU profile, at most 120s")
     parser.add_argument("--scenarios", nargs="+", choices=SCENARIOS)
     parser.add_argument("--repetitions", type=int, help="explicit smoke/extended sampling override")
     parser.add_argument("--timeout", type=float, default=120)
@@ -79,6 +80,9 @@ def parse_arguments():
         parser.error("extended timeout requires the 100k/full-audit campaign")
     if args.fixture_manifest and args.stage != "profile":
         parser.error("fixture reuse is currently supported only for profiling")
+    if args.profile_window is not None and (args.stage != "profile" or args.fixture_manifest
+                               or not 0 < args.profile_window <= 120):
+        parser.error("profile window requires fresh profile stage and must be in (0,120]")
     return args
 
 
@@ -108,6 +112,7 @@ def get_manifest(args) -> dict:
             "settings": {"timeout": args.timeout, "stage_seconds": args.stage_seconds,
                          "initial_timeout": args.initial_timeout,
                          "fixture_manifest": str(args.fixture_manifest) if args.fixture_manifest else None,
+                         "profile_window_seconds": args.profile_window,
                          "repetitions_override": args.repetitions, "selected_scenarios": args.scenarios},
             "coverage_limits": {"true_hybrid": "not_assessed: no real model authorization",
                                 "real_model_drain": "not_assessed: no authorization",
@@ -178,6 +183,8 @@ def run_series(args, build: dict, fixture: dict, evidence: Path, stream, name: s
                           "seconds": round(record["duration_seconds"], 4),
                           "valid": record["validation"]["valid"]}), flush=True)
         if not record["validation"]["valid"]:
+            if record["outcome"] == "success":
+                raise ValueError("CLI result failed independent correctness oracle")
             break
 
 

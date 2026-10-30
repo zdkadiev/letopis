@@ -13,6 +13,20 @@ from scenarios import (ROOT, build_release, build_traversal_oracle, prepare_exis
 
 
 class ScenarioTests(unittest.TestCase):
+    def test_packing_control_preserves_target_bytes_and_source_tree(self):
+        # Given: identical seed/count/fragment bytes with different file packing.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            original = prepare_fixture(root / "thirty", 60)
+            # When: varying only the generator's elements-per-file setting.
+            packed = prepare_fixture(root / "ten", 60, elements_per_file=10)
+            # Then: the addressed first fragment and author tree remain identical.
+            self.assertEqual(packed["packing"]["file_count"], 6)
+            self.assertEqual(packed["counts"]["edges"], 300)
+            self.assertEqual(packed["source_tree"], original["source_tree"])
+            self.assertEqual((original["repository"] / "knowledge/part-0000.md").read_bytes()[:2000],
+                             (packed["repository"] / "knowledge/part-0000.md").read_bytes()[:2000])
+
     def test_reuses_only_verified_disabled_synthetic_fixture_copy(self):
         # Given: a generated model-free fixture with independently verifiable bytes.
         with tempfile.TemporaryDirectory() as directory:

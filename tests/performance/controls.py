@@ -3,6 +3,7 @@
 import argparse
 import copy
 import json
+import signal
 from pathlib import Path
 
 from measure import measure_process
@@ -17,27 +18,37 @@ def main() -> None:
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--nodes", type=int, default=60)
+    parser.add_argument("--variable", choices=("external", "packing"), default="external")
     args = parser.parse_args()
     build = json.loads(args.baseline.read_text())
     verify_build(build)
     evidence = args.evidence.absolute()
     verify_new_output(evidence)
     evidence.mkdir(parents=True)
-    from run import capture_harness
+    from run import capture_harness, stop_stage
     write_json(evidence / "manifest.json", {"build": build, "harness_archive": capture_harness(evidence),
-               "variable": "external declaration presence only", "nodes": args.nodes,
-               "fixed": ["knowledge count", "fragment sizes", "source bytes/tree", "packing", "build", "check request"]})
-    results = {}
-    for variant in ("with_external", "masked_external"):
-        fixture = prepare_fixture(evidence / variant, args.nodes)
-        if variant == "masked_external":
-            fixture = mask_external_edges(fixture)
-        initialize_projection(fixture["repository"], build["executable"], full_audit=False)
-        fixture["binary"] = build["executable"]
-        scenario = prepare_scenario(fixture, "check", evidence / f"case-{variant}")
-        results[variant] = measure_control(scenario, build, evidence / f"results-{variant}")
-    write_json(evidence / "comparison.json", {"results": results,
-               "interpretation": "external declaration presence changes required behavior, not an equivalent optimization"})
+               "variable": args.variable, "nodes": args.nodes,
+               "fixed": ["knowledge count", "fragment sizes", "source bytes/tree", "build"],
+               "packing_note": "derived path IDs and includes boundaries can differ; first requested fragment bytes remain fixed"})
+    previous = signal.signal(signal.SIGALRM, stop_stage)
+    signal.setitimer(signal.ITIMER_REAL, 1200)
+    try:
+        results = {}
+        variants = ("with_external", "masked_external") if args.variable == "external" else ("packing30", "packing10")
+        for variant in variants:
+            fixture = prepare_fixture(evidence / variant, args.nodes, elements_per_file=10 if variant == "packing10" else 30)
+            if variant == "masked_external":
+                fixture = mask_external_edges(fixture)
+            initialize_projection(fixture["repository"], build["executable"], full_audit=False)
+            fixture["binary"] = build["executable"]
+            scenario = prepare_scenario(fixture, "check" if args.variable == "external" else "inspect",
+                                        evidence / f"case-{variant}")
+            results[variant] = measure_control(scenario, build, evidence / f"results-{variant}")
+        write_json(evidence / "comparison.json", {"results": results,
+                   "interpretation": "workload control changes required behavior, not an equivalent optimization"})
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 def mask_external_edges(fixture: dict) -> dict:
@@ -68,7 +79,7 @@ def measure_control(scenario: dict, build: dict, evidence: Path) -> dict:
         for _ in range(3):
             record = measure_process([build["executable"], *scenario["argv"]],
                                      scenario["repository"], scenario["stdin"], {"timeout": 120})
-            record.update(name="check", nodes=scenario["expected"]["counts"]["knowledge"],
+            record.update(name=scenario["name"], nodes=scenario["expected"]["counts"]["knowledge"],
                           phase="measured", embedding_mode="fts_disabled", profile_mode="none",
                           validation=validate_result(scenario, record))
             append_record(stream, record)
