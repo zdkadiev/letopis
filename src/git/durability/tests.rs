@@ -1,8 +1,16 @@
-use super::{StagedObject, retain_ref};
-use crate::process_test_support as fixture;
+use super::{StagedObject, is_ref_lock_busy, retain_ref};
+use crate::{process_test_support as fixture, service::SnapshotError};
 use fixture::{FORMATS, TempRepo};
-use gix::objs::Kind;
-use std::{fs, os::unix::fs::PermissionsExt};
+use gix::{Repository, hash::ObjectId, objs::Kind};
+use std::{
+    cell::{Cell, RefCell},
+    fs,
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+    time::{Duration, Instant},
+};
+
+mod confirmation;
 
 #[test]
 fn stages_syncs_publishes_and_retains_git_compatible_objects() {
@@ -126,9 +134,11 @@ fn respects_foreign_locks_and_equal_ref_noops() {
     assert_eq!(fs::read(&lock_path).unwrap(), b"foreign lock CANARY");
     // Given: the concurrent winner now published the exact value, retaining its lock.
     fs::write(&path, format!("{oid}\n")).unwrap();
-    // When / Then: idempotent success neither opens nor replaces the foreign lock.
-    retain_ref(&repo, oid).unwrap();
+    // When / Then: matching bytes cannot bypass ownership; the foreign lock stays untouched.
+    assert!(is_ref_lock_busy(&retain_ref(&repo, oid).unwrap_err()));
     assert_eq!(fs::read(&lock_path).unwrap(), b"foreign lock CANARY");
+    fs::remove_file(&lock_path).unwrap();
+    retain_ref(&repo, oid).unwrap();
 }
 
 #[test]
@@ -177,26 +187,19 @@ fn concurrent_creators_and_packed_refs_preserve_exact_target() {
                     let object = StagedObject::new(&repo, Kind::Blob, b"concurrent").unwrap();
                     let oid = object.get_oid();
                     object.publish().unwrap();
-                    retain_ref(&repo, oid)
+                    retain_after_contention(&repo, oid)
                 })
             })
             .collect();
         assert!(
             writers
                 .into_iter()
-                .map(|writer| writer.join().unwrap())
-                .filter(Result::is_ok)
-                .count()
-                >= 1
+                .all(|writer| writer.join().unwrap().is_ok())
         );
     });
     fixture.run_git_successfully(&["pack-refs", "--all", "--prune"], None);
     let repo = gix::open(&root).unwrap();
-    retain_ref(
-        &repo,
-        gix::hash::ObjectId::from_hex(expected.as_bytes()).unwrap(),
-    )
-    .unwrap();
+    retain_ref(&repo, ObjectId::from_hex(expected.as_bytes()).unwrap()).unwrap();
     // Then: Git's packed-ref reader sees exactly the expected direct target.
     assert_eq!(fixture.read_direct_ref(&expected), expected);
 }
@@ -340,13 +343,87 @@ pub(super) enum FailurePoint {
     RefPublish,
     RefDirectorySync,
 }
-thread_local! { static FAILURE: std::cell::Cell<Option<FailurePoint>> = const { std::cell::Cell::new(None) }; }
+thread_local! { static FAILURE: Cell<Option<FailurePoint>> = const { Cell::new(None) }; }
 
-pub(super) fn inject_failure(point: FailurePoint) -> Result<(), crate::service::SnapshotError> {
+pub(super) fn inject_failure(point: FailurePoint) -> Result<(), SnapshotError> {
     if FAILURE.with(|slot| slot.get() == Some(point)) {
         return Err(super::fail_io(std::io::Error::other(
             "injected I/O failure",
         )));
     }
     Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum ConcurrentLock {
+    Released,
+    Held,
+}
+thread_local! {
+    static CONCURRENT_PUBLICATION: RefCell<Option<(PathBuf, ObjectId, ConcurrentLock)>> = const { RefCell::new(None) };
+}
+
+pub(super) fn publish_concurrent_ref() {
+    let Some((path, oid, state)) = CONCURRENT_PUBLICATION.with(|slot| slot.borrow_mut().take())
+    else {
+        return;
+    };
+    let lock = path.with_extension("lock");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&lock, format!("{oid}\n")).unwrap();
+    fs::rename(&lock, &path).unwrap();
+    if matches!(state, ConcurrentLock::Held) {
+        fs::write(lock, b"foreign lock CANARY").unwrap();
+    }
+}
+
+fn retain_after_contention(repo: &Repository, oid: ObjectId) -> Result<(), SnapshotError> {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let result = retain_ref(repo, oid);
+        if !result.as_ref().is_err_and(is_ref_lock_busy) || Instant::now() >= deadline {
+            return result;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LockObservation {
+    Pending,
+    Observed {
+        ref_available: bool,
+        packed_available: bool,
+    },
+}
+thread_local! { static LOCK_OBSERVATION: Cell<Option<LockObservation>> = const { Cell::new(None) }; }
+
+pub(super) fn observe_confirmation_locks(repo: &Repository, name: &str) {
+    if LOCK_OBSERVATION.with(Cell::get) != Some(LockObservation::Pending) {
+        return;
+    }
+    let ref_available = try_create_probe_lock(&repo.common_dir().join(name).with_extension("lock"));
+    let packed_available = try_create_probe_lock(&repo.common_dir().join("packed-refs.lock"));
+    LOCK_OBSERVATION.with(|slot| {
+        slot.set(Some(LockObservation::Observed {
+            ref_available,
+            packed_available,
+        }));
+    });
+}
+
+fn try_create_probe_lock(path: &Path) -> bool {
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+    {
+        Ok(file) => {
+            drop(file);
+            fs::remove_file(path).unwrap();
+            true
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => false,
+        Err(error) => panic!("unexpected probe failure: {error}"),
+    }
 }

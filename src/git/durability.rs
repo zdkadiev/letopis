@@ -8,12 +8,23 @@ use gix::{
     refs::Target,
 };
 use std::{
+    error::Error,
+    fmt,
     fs::{self, File},
     io::{self, Write},
-    os::unix::fs::PermissionsExt,
+    os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
 };
 use tempfile::TempDir;
+
+#[derive(Debug)]
+struct RefLockBusy;
+impl fmt::Display for RefLockBusy {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("Git ref lock is busy")
+    }
+}
+impl Error for RefLockBusy {}
 
 /// Owns one private, completed loose object until no-clobber publication or drop.
 pub(super) struct StagedObject {
@@ -105,29 +116,32 @@ impl StagedObject {
     }
 }
 
+/// Identifies contention that a command may retry through the full durable protocol.
+/// Other I/O/integrity failures must not be converted to equality-only success.
+pub(super) fn is_ref_lock_busy(error: &SnapshotError) -> bool {
+    error.source().is_some_and(<dyn Error>::is::<RefLockBusy>)
+}
+
 /// Creates only the exact immutable direct ref, using an owned lock for pre-rename fsync.
 /// The caller validates the root/closure first. Existing reflogs and user refs are untouched.
 ///
 /// # Errors
 /// Returns an internal error for invalid/conflicting refs or lock/write/sync failures.
+/// Contention has a safe typed cause recognized by `is_ref_lock_busy`; retries must
+/// reenter this protocol. No success path bypasses owned-lock durability confirmation.
 pub(super) fn retain_ref(repo: &Repository, oid: ObjectId) -> Result<(), SnapshotError> {
     let name = format!("{SNAPSHOT_REF_PREFIX}{oid}");
-    if has_exact_ref(repo, &name, oid)? {
-        return Ok(());
-    }
+    #[cfg(test)]
+    tests::publish_concurrent_ref();
     let path = repo.common_dir().join(&name);
-    let acquired = gix::lock::File::acquire_to_update_resource(
+    let mut lock = gix::lock::File::acquire_to_update_resource(
         &path,
         gix::lock::acquire::Fail::Immediately,
         Some(repo.common_dir().to_owned()),
         read_shared_permissions(repo)?,
-    );
-    let mut lock = match acquired {
-        Ok(lock) => lock,
-        Err(_) if has_exact_ref(repo, &name, oid)? => return Ok(()),
-        Err(_) => return Err(fail_integrity()),
-    };
-    if has_exact_ref(repo, &name, oid)? {
+    )
+    .map_err(|error| make_lock_error(&error))?;
+    if confirm_durable_ref(repo, &name, oid)? {
         return Ok(());
     }
     #[cfg(test)]
@@ -137,10 +151,87 @@ pub(super) fn retain_ref(repo: &Repository, oid: ObjectId) -> Result<(), Snapsho
     #[cfg(test)]
     tests::inject_failure(tests::FailurePoint::RefPublish)?;
     lock.commit().map_err(|error| fail_io(error.error))?;
+    confirm_published_ref(repo, &name, oid)
+}
+
+// Publication releases the write lock. Reacquire ownership before selecting the
+// current backing: pack-refs may have moved this value into packed-refs meanwhile.
+fn confirm_published_ref(
+    repo: &Repository,
+    name: &str,
+    oid: ObjectId,
+) -> Result<(), SnapshotError> {
+    let _lock = gix::lock::Marker::acquire_to_hold_resource(
+        repo.common_dir().join(name),
+        gix::lock::acquire::Fail::Immediately,
+        Some(repo.common_dir().to_owned()),
+        read_shared_permissions(repo)?,
+    )
+    .map_err(|error| make_lock_error(&error))?;
+    if !confirm_durable_ref(repo, name, oid)? {
+        return Err(fail_integrity());
+    }
+    Ok(())
+}
+
+// The caller holds the exact ref lock. Packed-only confirmation additionally
+// holds packed-refs.lock so neither Git update-ref nor pack-refs can replace the backing file.
+fn confirm_durable_ref(
+    repo: &Repository,
+    name: &str,
+    oid: ObjectId,
+) -> Result<bool, SnapshotError> {
+    let loose = repo.common_dir().join(name);
+    let packed_lock = match fs::symlink_metadata(&loose) {
+        Ok(metadata) if metadata.file_type().is_file() => None,
+        Ok(_) => return Err(fail_integrity()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Some(
+            gix::lock::Marker::acquire_to_hold_resource(
+                repo.refs.packed_refs_path(),
+                gix::lock::acquire::Fail::Immediately,
+                None,
+                read_shared_permissions(repo)?,
+            )
+            .map_err(|error| make_lock_error(&error))?,
+        ),
+        Err(error) => return Err(fail_io(error)),
+    };
+    if !has_exact_ref(repo, name, oid)? {
+        return Ok(false);
+    }
+    let backing = if packed_lock.is_some() {
+        repo.refs.packed_refs_path()
+    } else {
+        loose
+    };
+    sync_existing_ref(repo, name, oid, &backing)?;
+    Ok(true)
+}
+
+// Both identity reads and the backing file's sync occur under the required locks.
+fn sync_existing_ref(
+    repo: &Repository,
+    name: &str,
+    oid: ObjectId,
+    backing: &Path,
+) -> Result<(), SnapshotError> {
+    #[cfg(test)]
+    tests::inject_failure(tests::FailurePoint::RefSync)?;
+    #[cfg(test)]
+    tests::observe_confirmation_locks(repo, name);
+    File::options()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(backing)
+        .and_then(|file| file.sync_all())
+        .map_err(fail_io)?;
     #[cfg(test)]
     tests::inject_failure(tests::FailurePoint::RefDirectorySync)?;
-    sync_parent_chain(path.parent().ok_or_else(fail_integrity)?, repo.common_dir())?;
-    if !has_exact_ref(repo, &name, oid)? {
+    sync_parent_chain(
+        backing.parent().ok_or_else(fail_integrity)?,
+        repo.common_dir(),
+    )?;
+    if !has_exact_ref(repo, name, oid)? {
         return Err(fail_integrity());
     }
     Ok(())
@@ -201,6 +292,19 @@ fn sync_parent_chain(path: &Path, boundary: &Path) -> Result<(), SnapshotError> 
         }
     }
     Err(fail_integrity())
+}
+
+fn make_lock_error(error: &gix::Error) -> SnapshotError {
+    if error.is_retryable() {
+        return SnapshotError::new_with_cause(
+            "Git ref durability confirmation is contended",
+            RefLockBusy,
+        );
+    }
+    let kind = error
+        .downcast_any_ref::<io::Error>()
+        .map_or(io::ErrorKind::Other, io::Error::kind);
+    fail_io(io::Error::from(kind))
 }
 
 fn fail_io(error: io::Error) -> SnapshotError {

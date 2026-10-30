@@ -133,13 +133,30 @@ sync ordering automatically. The gate proves these narrower adapter-owned paths:
    Fanout and object-root directories are synced. Ordinary error/drop removes the
    owned staging directory. A post-link failure can leave a complete orphan and
    must still return failure. No unsynced pack is accepted as a durable write.
-3. `retain_ref(repo, oid)` uses the exact private ref name and an owned lower-level
-   `gix::lock::File`. It rechecks a fresh direct ref while holding the lock,
-   rejects malformed/symbolic/conflicting targets, writes OID plus newline,
-   syncs the actual owned descriptor, commits the rename, syncs ancestor
-   directories through the common Git directory, then confirms the target.
-   A lock-acquisition failure can succeed only after a matching direct winner
-   is confirmed. Sync failures are never swallowed as CAS races.
+3. `retain_ref(repo, oid)` acquires the exact private ref lock before it may
+   acknowledge any existing value. Loose confirmation syncs the actual ref file
+   and its parent chain under that lock. Packed-only confirmation additionally
+   holds an immediate, owned `packed-refs.lock`, reloads the exact direct target,
+   syncs `packed-refs` and the common Git directory, then checks identity again.
+   Backing opens use `O_NOFOLLOW`. A new publication still syncs its writable lock
+   before rename; since rename releases that lock, it reacquires an owned marker
+   and enters the same confirmation protocol, selecting the then-current backing
+   if packing intervened. No equality-only success branch remains.
+4. Ref and packed-ref acquisition are nonblocking, so this fixed lock order never
+   waits on an inverted packer's order. Contention returns a safe `RefLockBusy`
+   cause under the unchanged `InternalError` classification, recognized by
+   `is_ref_lock_busy(&SnapshotError)`. Task 4 must retry this condition through the
+   entire durable protocol within its command budget, preserving ordinary
+   concurrent exact-target idempotence at the public boundary. Sync/integrity
+   failures are not contention and must not be swallowed. A long-held foreign
+   lock remains an error and is never opened, synced or removed by confirmation.
+
+The four-thread fixture now requires **all** ordinary matching creators to
+complete through bounded, test-only retries. That test's five-second deadline is
+not a new product setting. Deterministic confirmation regressions cover retry
+while a post-rename sync fault remains active, both concurrent acquisition
+outcomes, packed file/directory sync failures, held foreign packing locks and
+independent create-new probes showing both required locks remain held at sync.
 
 The source and probes cover SHA-1/SHA-256, normal publication, corrupt preexisting
 objects, matching concurrent creators, packed-ref reads, foreign locks,
@@ -205,7 +222,8 @@ not introduce unsafe cleanup of other processes' files.
 bypasses ordinary Drop too. Therefore the helper's normal/error RAII tests do
 **not** establish cleanup during handled SIGINT. Tasks 4/7 must connect explicit
 command-owned stage/ref-lock ownership to that cancellation path and test
-interruptions during creation, write/sync and promotion before product adoption.
+interruptions during creation, write/sync and promotion before product adoption. This includes the
+new packed-ref and post-publication ref markers, not just the writable ref lock.
 A stale private ref lock must not become permanent contention after a handled
 cancellation. Do not remove foreign/other-process files.
 
@@ -220,15 +238,30 @@ not a complete cancellation solution or a passed Task 2 claim.
 
 ## Validation
 
-`make check` and `make verify` passed on the accepted product tree, including
-strict Rustdoc and release tests. The restored focused Git suite passed 44 tests.
-Three required semantic mutations (full digest comparison, oversized capacity
-release and collision propagation) failed as expected. Eleven further durability
-mutations were rejected by their targeted tests. Removing the actual staged-file
-sync produced four missing pre-publication syncs in the independent syscall
-oracle; restoring it produced zero. All mutated/instrumented files were restored
-byte-for-byte. Evidence is in `mutations.json`, `durable-mutations.json` and
-`sync-mutation.json`, with each command's log retained.
+Original Task 2 `make check`/`make verify` receipts under
+`.artifacts/issue-67/task2-20261030/` apply to commit
+`1b755a7cc5ca973bb70e273b74dd342c1c95f895`; they **predate the I1 fix** and are not
+current-tree full-verification evidence. The original reader/resource receipts
+remain valid for that unchanged reader implementation. M1's maintained per-size
+delta assertion remains assigned to later final review; this fix does not change
+that matrix.
 
-Validation completion and exact final commands are recorded in the task report
+I1 evidence is separate: `.artifacts/issue-67/task2-fix1-20261030/`.
+Four deterministic regressions failed on the original equality-only paths.
+The restored focused durability suite passes 20 tests. Five semantic mutations
+(visibility bypass, swallowed sync errors, prematurely released packing lock,
+erased contention classification, followed packed backing symlink) fail through
+runtime assertions. Removing the actual backing sync or the actual parent sync
+is detected by the syscall oracle in each of loose, packed and concurrent
+confirmation. Restored traces require backing sync before all parent syncs, and
+for the concurrent case after the winner's rename; they record no foreign-lock
+sync. All source mutations were restored byte-for-byte.
+
+Current-tree `make check` passed (`make-check.log`: `ok`), and
+`cargo test --locked --offline --release --lib git::durability` passed 20 tests
+(`release-focused.log`). Full `make verify`, Linux/native acceptance
+and handled-SIGINT integration must be checked on the eventual adopted tree;
+this fix does not relabel the original full run as current evidence.
+
+Exact commands, results and scoped commit are appended to
 `.superpowers/sdd/2026-10-30-issue-67-product-git-optimization/task-2-report.md`.
