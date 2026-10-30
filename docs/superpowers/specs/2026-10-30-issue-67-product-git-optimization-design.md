@@ -1,6 +1,7 @@
 # Product Git and provenance optimization — issue #67
 
-Date: 2026-10-30. Status: draft for user approval; implementation has not started.
+Date: 2026-10-30. Status: approved by the user on 2026-10-30;
+implementation has not started. Implementation-plan preparation is authorized.
 
 Task: [product optimization issue #67](https://github.com/zaurkadiev/letopis/issues/67).
 Base: `32ca0af282a1321d0137b4aba115c6fddc086259`, containing the diagnostic
