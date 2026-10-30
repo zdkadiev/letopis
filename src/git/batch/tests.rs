@@ -1,5 +1,8 @@
 use super::{BatchReader, VerifiedObject};
-use crate::{git::process::GitProcess, service::SnapshotErrorKind};
+use crate::{
+    git::{process::GitProcess, tree::read_children},
+    service::SnapshotErrorKind,
+};
 use std::{error::Error, fs, os::unix::fs::PermissionsExt, path::PathBuf, process::Command};
 use tempfile::TempDir;
 
@@ -278,7 +281,7 @@ fn raw_tree_modes_match_git_normalization() {
             raw.extend_from_slice(&raw_oid);
         }
         // When: raw entries are decoded with Git's canonical type rules.
-        let entries = super::tree::read_children(&raw, oid.len()).unwrap();
+        let entries = read_children(&raw, oid.len()).unwrap();
         let tree = write_typed_object(&dir, &raw, "tree");
         let oracle = Command::new("git")
             .args(["ls-tree", "-z", &tree])
@@ -304,7 +307,7 @@ fn raw_tree_modes_match_git_normalization() {
             b"100644 x",
             b"100644 x\0x",
         ] {
-            assert!(super::tree::read_children(broken, raw_oid.len() * 2).is_err());
+            assert!(read_children(broken, raw_oid.len() * 2).is_err());
         }
     }
 }

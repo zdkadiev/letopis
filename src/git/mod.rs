@@ -10,6 +10,7 @@ mod process;
 #[cfg(test)]
 mod reader;
 mod refs;
+mod tree;
 mod validation;
 
 pub(crate) use cli::GitCli;

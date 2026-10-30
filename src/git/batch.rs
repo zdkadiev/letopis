@@ -11,7 +11,6 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-pub(super) mod tree;
 const MAX_HEADER_BYTES: u64 = 256;
 const BUFFER_BYTES: usize = 64 * 1024;
 

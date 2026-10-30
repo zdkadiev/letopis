@@ -1,10 +1,11 @@
 use super::{
     GitCli,
-    batch::{BatchReader, VerifiedObject, tree::read_children},
+    batch::{BatchReader, VerifiedObject},
     constants::{SNAPSHOT_REF_PREFIX, TREE_KIND, UPDATE_REF_COMMAND},
     objects::ObjectDb,
     process::is_exit_code,
-    validation::TreeValidator,
+    tree::read_children,
+    validation::validate_tree_bytes,
 };
 use crate::{
     domain::TreeOid,
@@ -108,7 +109,6 @@ impl Retainer<'_> {
 
 /// Verify every object reachable from `root`, ignoring gitlinks, and reject type conflicts.
 fn verify_closure(db: &ObjectDb<'_>, root: &TreeOid) -> Result<(), SnapshotError> {
-    let mut validator = TreeValidator::new()?;
     let mut reader = BatchReader::open(&db.git.process, &db.git.root, db.git.oid_len)?;
     let mut pending = vec![(root.as_str().to_owned(), TREE_KIND.to_owned())];
     let mut visited = BTreeMap::new();
@@ -129,10 +129,9 @@ fn verify_closure(db: &ObjectDb<'_>, root: &TreeOid) -> Result<(), SnapshotError
             SnapshotErrorKind::InternalError,
         )?;
         if let VerifiedObject::Tree(bytes) = object {
-            validator.add_tree(&oid, &bytes)?;
+            validate_tree_bytes(&bytes, db.git.oid_len)?;
             pending.extend(read_children(&bytes, db.git.oid_len)?);
         }
     }
-    reader.finish()?;
-    validator.verify(db)
+    reader.finish()
 }
