@@ -1,6 +1,7 @@
 """Explicit ownership of fake-vector work and controlled reader/writer schedules."""
 
 from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Callable
 from contextlib import contextmanager
 import fcntl
 import json
@@ -57,19 +58,26 @@ def run_canary(binary: Path, root: Path) -> dict:
         return receipt
 
 
-def run_contention(scenario: dict, build: dict, evidence: Path) -> dict:
-    """Run an owned reindex writer and a read call; retain actual overlap evidence."""
+def run_contention(scenario: dict, build: dict, evidence: Path,
+                   *, verify: Callable[[], None] | None = None) -> dict:
+    """Run owned writer/readers, optionally verifying their build before each launch."""
     verify_new_output(evidence)
     evidence.mkdir(parents=True)
     repository = scenario["repository"]
+    if verify is not None:
+        verify()
     baseline = measure_process([build["executable"], *scenario["argv"]], repository,
                                scenario["stdin"], {"timeout": scenario.get("timeout", 120)})
     cancel = threading.Event()
     with ThreadPoolExecutor(max_workers=1) as executor:
+        if verify is not None:
+            verify()
         writer = executor.submit(measure_process, [build["executable"], "reindex"], repository,
                                  b"{}\n", {"timeout": scenario.get("timeout", 120), "cancel_event": cancel})
         try:
             index_locked = wait_for_index_writer(repository, writer)
+            if verify is not None:
+                verify()
             reader = measure_process([build["executable"], *scenario["argv"]], repository,
                                      scenario["stdin"], {"timeout": scenario.get("timeout", 120)})
             if reader["outcome"] == "interrupted":

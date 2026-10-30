@@ -138,3 +138,66 @@ Discover the native observer via Cargo JSON as implemented by `build_observer`;
 the hashed name above is a retained local example, not a portable fixed name.
 Historical generator tests invoke bare `python3`: prepend the chosen interpreter's
 directory to PATH when running them. [Report and remaining gaps](../../docs/zkit/letopis/checks/issue-65/report.md).
+
+## Frozen optimization comparisons (#67)
+
+`compare.py` keeps the original locked release receipt, a read-only copy of every
+clean product input, executable and available symbols. It verifies archive hashes
+before calls without requiring the working checkout to remain on the old revision.
+`scenarios.verify_build` retains its existing checkout-bound single-revision contract.
+An executable/hash alone is insufficient: comparisons require a frozen receipt and
+its original release receipt and archives. These are local provenance records,
+not signed compiler attestations; preserve the entire evidence directory.
+
+```sh
+/opt/homebrew/bin/python3.12 -B tests/performance/compare.py --freeze-build \
+  --source "$PWD" --evidence "$PWD/.artifacts/issue-67/before-unique"
+# Freeze the optimized clean product separately after its checks pass.
+/opt/homebrew/bin/python3.12 -B tests/performance/compare.py --stage timings \
+  --before "$PWD/.artifacts/issue-67/before-unique/build.json" \
+  --after "$PWD/.artifacts/issue-67/after-unique/build.json" \
+  --nodes 60 --scenarios check --pairs 10 --timeout 120 --initial-timeout 600 \
+  --evidence "$PWD/.artifacts/issue-67/check60-unique"
+```
+
+Every evidence path must be absolute, normalized and absent, with no symlink
+parents. Fixtures use seed 65, 2,000 bytes per fragment, 30 elements per file and
+disabled embeddings. Before and after must use the same compiler. Fixture bytes,
+requests, configuration and independent expected outputs must match before timing.
+Copy refreshes happen outside timing; initialized read scenarios reuse separate
+stable before/after repositories and record projection revision counters.
+
+Stages share the bounded defaults of 120 seconds per ordinary call, 600 seconds
+per first publication and 1,200 seconds per stage, including setup. A shorter
+`--stage-seconds` is an explicit recorded override. Each side's first publication
+is recorded separately, once. An invalid publication stops initialized probes.
+Attempts are flushed and synced before another call, including timeout, cancellation
+and invalid output. Watchdog interruption is censored, never a successful latency.
+Missing or rejected observations remain failures; medians exclude them. An
+incomplete campaign exits nonzero and keeps its summary and failure receipts.
+
+- `timings`: two warmups per side, then ten alternating before/after pairs.
+  `--pairs` overrides this stage only; use at least ten successful samples for a
+  feasible acceptance comparison. Defaults are check at 60, inspect/traverse/search
+  at 1k. Explicit existing scenario names are accepted. Mutation/reindex attempts
+  receive fresh copies rather than reusing their changed state.
+- `initialization`: one first publication and three fresh attempts per requested
+  audit/maintenance scenario and side. Defaults: check, reindex, status, refresh_bulk.
+- `contention`: three reindex/reader schedules per side; default reader is search.
+  Read scenarios are check, inspect, traverse and search. Existing kernel-lock
+  acknowledgement, process cleanup and overlap receipts remain authoritative.
+  `overlap_assessed:false` means not assessed at this workload; it never establishes
+  zero lock wait. CLI lifetime overlap is distinct from SQLite wait duration.
+- `profiles`: three alternating ordinary/samply pairs per side and requested read
+  scenario (default check/inspect/traverse), save-only at 1,000 Hz. Separate wrapper
+  Git counters run once per side/scenario. Profiles, ordinary overhead controls and
+  counters retain separate receipts; profile timings never enter ordinary series.
+  Missing sampler/permissions are unavailable evidence, not empty success.
+
+No stage automatically retries a censored operation. Reattempt once only after a
+specific setup/product defect is resolved, under a new evidence path. The initial
+Task 1 baseline uses the existing `run.py` survey with `--repetitions 10` for one
+pre-change binary: two warmups and ten checks, without inventing an after build.
+Direct child wait4 CPU/RSS retain their existing descendant-accounting scope;
+concurrent whole-stack peak, exact lock waits and real-provider performance remain
+unassessed. [Issue-67 evidence index](../../docs/zkit/letopis/checks/issue-67/evidence-index.md).

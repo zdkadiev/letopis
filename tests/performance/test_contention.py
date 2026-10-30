@@ -6,6 +6,7 @@ import tempfile
 import unittest
 import time
 import threading
+import sys
 from unittest.mock import patch
 
 from measure import measure_process as actual_measure
@@ -16,6 +17,30 @@ from provider import start_provider
 
 
 class ContentionTests(unittest.TestCase):
+    def test_verification_rejects_reader_and_cleans_owned_writer(self):
+        # Given: a writer holding the fixture lock and a rejected third launch.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / ".letopis").mkdir()
+            binary = root / "cli"
+            binary.write_text(f"#!{sys.executable}\n" + _VERIFIED_CLI)
+            binary.chmod(0o755)
+            scenario = {"repository": root, "argv": ["check"], "stdin": b"{}",
+                        "expected": {"command": "check"}, "timeout": 5}
+            def verify():
+                with (root / "events").open("a") as stream:
+                    stream.write("verify\n")
+                if (root / "events").read_text().count("verify") == 3:
+                    raise ValueError("binary drift")
+            # When: verification refuses the concurrent reader before it launches.
+            with self.assertRaisesRegex(ValueError, "binary drift"):
+                run_contention(scenario, {"executable": str(binary)}, root / "evidence", verify=verify)
+            # Then: each actual launch was preceded by verification; writer is reaped.
+            events = (root / "events").read_text().splitlines()
+            self.assertEqual(events, ["verify", "check", "verify", "reindex", "verify"])
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int((root / "writer.pid").read_text()), 0)
+
     @unittest.skipUnless(os.environ.get("PERF_LETOPIS_BINARY"), "requires pinned release executable")
     def test_early_writer_exit_stops_reader_and_records_aborted_schedule(self):
         # Given: the owned drain is interrupted while a deliberately slow reader is active.
@@ -143,6 +168,18 @@ class ContentionTests(unittest.TestCase):
             self.assertTrue(receipt["baseline_validation"]["valid"])
             self.assertTrue(receipt["writer_index_lock_observed"])
             self.assertGreater(receipt["overlap_seconds"], 0)
+
+
+_VERIFIED_CLI = '''import fcntl, json, os, pathlib, sys, time
+with open('events', 'a') as stream:
+    stream.write(sys.argv[1] + '\\n')
+if sys.argv[1] == 'reindex':
+    pathlib.Path('writer.pid').write_text(str(os.getpid()))
+    with open('.letopis/index.lock', 'a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        time.sleep(60)
+print(json.dumps({'ok': True, 'result': {'errors': []}}))
+'''
 
 
 if __name__ == "__main__":
