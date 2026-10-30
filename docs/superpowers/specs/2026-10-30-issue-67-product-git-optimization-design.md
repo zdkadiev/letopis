@@ -92,6 +92,17 @@ establish the current strict acceptance/rejection behavior. Independent Git fixt
 oracles must pin malformed-tree, mode, name and ordering behavior before replacing
 `TreeValidator`. Do not silently tighten or loosen accepted historical trees.
 
+Test-oracle version clarified during Task 7: strict tree parity is against the
+captured host Git 2.50.1 `hash-object -t tree --no-filters` operation. Debian
+Git 2.39.5 performs weaker parse-only checks and accepts malformed cases rejected
+by that approved reference. Pin upstream Git 2.50.1 as the Linux fixture/oracle
+build tool, with a recorded source checksum/version; do not relax the product
+validator or skip differential cases. This adds no product Git executable
+dependency and does not promise every historical version's malformed-tree
+acceptance. Keep the exact hash-object operation, not a full `git fsck --strict`
+substitute. Versioned primary sources: [2.50.1](https://github.com/git/git/blob/v2.50.1/object-file.c#L1089-L1095)
+and [2.39.5](https://github.com/git/git/blob/v2.39.5/object-file.c#L2165-L2219).
+
 Preserve the distinction: root verification checks its own type/bytes; routine
 reads verify addressed objects; `retain` verifies the root and exact direct ref;
 `pin` verifies the full local closure even when its retention ref already exists.
