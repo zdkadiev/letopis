@@ -1,0 +1,495 @@
+{
+  "branch": "issue-67",
+  "builds": {
+    "after": {
+      "binary_sha256": "18288faf715310d6ceccd03bedd35adc21e1ab1654c4765c30eff1f3a85a2870",
+      "original_release_receipt": {
+        "bytes": 17204,
+        "path": ".artifacts/issue-67/after-20261031-task8/release/build.json",
+        "sha256": "b09fe782cf822ad9492a936d5a8ed7939b03e06c007c2fb5f1339373a9ecc4cd"
+      },
+      "pin": {
+        "bytes": 17779,
+        "path": ".artifacts/issue-67/after-20261031-task8/build.json",
+        "sha256": "92f7a729ccb1de88f74380a28b16873089e6cf2a9a3728c652744ff3dac06c8e"
+      },
+      "product_commit": "ba4a11db26705999018187e8301a51e9942fe1ba",
+      "product_input_count": 171,
+      "release_debug": "1",
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "source_archive": ".artifacts/issue-67/after-20261031-task8/source"
+    },
+    "before": {
+      "binary_sha256": "a132acb0a19c24440e8e97b881657c7b7adcc5c17052469f5dbc9d1e1b336f62",
+      "original_release_receipt": {
+        "bytes": 15651,
+        "path": ".artifacts/issue-67/before-20261030-task1/release/build.json",
+        "sha256": "49cc06cedb55af346802345af80fb2a8deceb020238fe8581b3524fec44f5e28"
+      },
+      "pin": {
+        "bytes": 16229,
+        "path": ".artifacts/issue-67/before-20261030-task1/build.json",
+        "sha256": "cc60ea3a88567e7b34e2bdea28d61e827fa9a8d5ed2c4670a6924e415744d744"
+      },
+      "product_commit": "881cc6417073110e852fbebf2b9bce5ed1ea3d29",
+      "product_input_count": 156,
+      "release_debug": "1",
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "source_archive": ".artifacts/issue-67/before-20261030-task1/source"
+    }
+  },
+  "campaigns": [
+    {
+      "command": {
+        "bytes": 755,
+        "path": ".artifacts/issue-67/task8-control-20261031/check60-command.json",
+        "sha256": "3cbb17c8204696046fbf569ec14c3c1af86392fe6eaaee693c00b68e9509d01c"
+      },
+      "directory": ".artifacts/issue-67/task8-check60-20261031",
+      "harness": {
+        "tests/performance/compare.py": "3c698ee186a637cbaa34db5b021ab3ce040b85ff5535cc16d1270a9415a5223f",
+        "tests/performance/contention.py": "f6ddfd5680436eedbb3ec30686deb78eb2543406d80f8a2421636af8127b3400",
+        "tests/performance/controls.py": "f1f384070a9cc6fdc2ff401905c7712e7a6330bc54827ba3a6b72ddf19ae96b7",
+        "tests/performance/git_wrapper.py": "e32c22a60d917d666e3b046a8c576d3c4005cce6bbd55d41c7d6ea7e0eee6386",
+        "tests/performance/measure.py": "a73416d5406ea0dfd61836265ba0e1dc2d48536dd1445917e0165a062d6cb160",
+        "tests/performance/ownership.py": "5ddbb36891230deaa00deb739d15272ad350b30599788c3d156da7f1f71741cb",
+        "tests/performance/profile.py": "e9074d11996b353e997a5ce0e1d69dd9aee44bc2baad9e39e8e64d21440cbbe0",
+        "tests/performance/provider.py": "ad89d48c0d9c795d50f53de771db3d947fa0768652c5a63666ef2db935e185d6",
+        "tests/performance/report.py": "1c3c0da54d39568d70fa4a00815cf194d2a39a2bf31c0251833c928c5d6e79b9",
+        "tests/performance/run.py": "bb7bd13cf38ac962219a66e26f9b5d61649de5ba70bfddd989a5facdd3235750",
+        "tests/performance/scenarios.py": "7ed757f5c64d4fce7905845c49f4def9677ba9cfc55f3a4265823a397eb9ca96",
+        "tests/performance/test_compare.py": "a1a913249ec2c8d4186eec7532259264fb34a5e65161de3006ad4dd04462abd7",
+        "tests/performance/test_contention.py": "4da884e7b7f2df4f040b5b5bc4e075c964f7882a42bfe5635b9b17de0ac9dcd7",
+        "tests/performance/test_controls.py": "52addf54577a0fbef5814dae973f18492a624a38b5a11bb327f3ad05f3d46409",
+        "tests/performance/test_measure.py": "75dbe9d81f6bf867cbd928c517bb7db200d1d0c6ca94955c1919ddbdcebc08e4",
+        "tests/performance/test_ownership.py": "0e1f53fbb8ea412be8f2ec32b12d37fb16ec62dd1b5972b63123c710e88811c0",
+        "tests/performance/test_profile.py": "9fd10f2d5024dda3146e5b01c3b85544eb9f255317763741e793da599b6943d9",
+        "tests/performance/test_provider.py": "d69d20e5bf9e4e440b023dcab5d8d9bbfa4f73da2d269cc358dbee4048ba2492",
+        "tests/performance/test_report.py": "2638127e509b429c792834f1d4f8a9898b919d0704760e742b35ac43165f9e22",
+        "tests/performance/test_run.py": "4a8ba3d172023412153bd8f90329fe6e922028ff92c9bb84e432b18c028a60a7",
+        "tests/performance/test_scenarios.py": "9cbed03af3f5a906b158c87f496be283bfe944a34687a420b91e2d7e92b5da33",
+        "tests/performance/test_window.py": "9653ef4acf8ac2a8b1dac45535b730580638abfdeeb1dc0ec6637c109aa1395f",
+        "tests/performance/window.py": "e9f4648e4b141c3f76f8f523c409ee5404e80c8c278bd35ac6f21b6d10b527d3",
+        "tests/target_corpus/generate.py": "0187071e92066e35be33cf0a3266219e330ae388ccd132aa9934d4a3db6f15f2",
+        "tests/target_corpus/validate.py": "0bf01248bbf76aa964c737a242b3166404c65f45e3b16d6438d7b3621d7f9b74"
+      },
+      "interrupted": 0,
+      "label": "check60",
+      "manifest": {
+        "bytes": 37586,
+        "path": ".artifacts/issue-67/task8-check60-20261031/manifest.json",
+        "sha256": "19749250df56de941919164c0af1d77ba3f0a0bf7174c13e9ab27f82027b4e36"
+      },
+      "samples": {
+        "bytes": 37258,
+        "path": ".artifacts/issue-67/task8-check60-20261031/samples.jsonl",
+        "sha256": "99ea5995ea2428aa98a7d466f31d8e224b5e754318eaf95e80c826d80f9a4b90"
+      },
+      "summary": {
+        "bytes": 2899,
+        "path": ".artifacts/issue-67/task8-check60-20261031/summary.json",
+        "sha256": "fe55c7be200756833d68949f6efe7462f9df47ade08aa63a56cce8fdc81aeb3d"
+      },
+      "summary_outcome": "complete",
+      "timeouts": 0,
+      "top_level_attempts": 26,
+      "valid_successes": 26
+    },
+    {
+      "command": {
+        "bytes": 776,
+        "path": ".artifacts/issue-67/task8-control-20261031/reads1k-command.json",
+        "sha256": "8d30a3f2c4a46c6725825328acb1f2bc75b4d46da05e367091105a1235aa068b"
+      },
+      "directory": ".artifacts/issue-67/task8-reads1k-20261031",
+      "harness": {
+        "tests/performance/compare.py": "3c698ee186a637cbaa34db5b021ab3ce040b85ff5535cc16d1270a9415a5223f",
+        "tests/performance/contention.py": "f6ddfd5680436eedbb3ec30686deb78eb2543406d80f8a2421636af8127b3400",
+        "tests/performance/controls.py": "f1f384070a9cc6fdc2ff401905c7712e7a6330bc54827ba3a6b72ddf19ae96b7",
+        "tests/performance/git_wrapper.py": "e32c22a60d917d666e3b046a8c576d3c4005cce6bbd55d41c7d6ea7e0eee6386",
+        "tests/performance/measure.py": "a73416d5406ea0dfd61836265ba0e1dc2d48536dd1445917e0165a062d6cb160",
+        "tests/performance/ownership.py": "5ddbb36891230deaa00deb739d15272ad350b30599788c3d156da7f1f71741cb",
+        "tests/performance/profile.py": "e9074d11996b353e997a5ce0e1d69dd9aee44bc2baad9e39e8e64d21440cbbe0",
+        "tests/performance/provider.py": "ad89d48c0d9c795d50f53de771db3d947fa0768652c5a63666ef2db935e185d6",
+        "tests/performance/report.py": "1c3c0da54d39568d70fa4a00815cf194d2a39a2bf31c0251833c928c5d6e79b9",
+        "tests/performance/run.py": "bb7bd13cf38ac962219a66e26f9b5d61649de5ba70bfddd989a5facdd3235750",
+        "tests/performance/scenarios.py": "7ed757f5c64d4fce7905845c49f4def9677ba9cfc55f3a4265823a397eb9ca96",
+        "tests/performance/test_compare.py": "a1a913249ec2c8d4186eec7532259264fb34a5e65161de3006ad4dd04462abd7",
+        "tests/performance/test_contention.py": "4da884e7b7f2df4f040b5b5bc4e075c964f7882a42bfe5635b9b17de0ac9dcd7",
+        "tests/performance/test_controls.py": "52addf54577a0fbef5814dae973f18492a624a38b5a11bb327f3ad05f3d46409",
+        "tests/performance/test_measure.py": "75dbe9d81f6bf867cbd928c517bb7db200d1d0c6ca94955c1919ddbdcebc08e4",
+        "tests/performance/test_ownership.py": "0e1f53fbb8ea412be8f2ec32b12d37fb16ec62dd1b5972b63123c710e88811c0",
+        "tests/performance/test_profile.py": "9fd10f2d5024dda3146e5b01c3b85544eb9f255317763741e793da599b6943d9",
+        "tests/performance/test_provider.py": "d69d20e5bf9e4e440b023dcab5d8d9bbfa4f73da2d269cc358dbee4048ba2492",
+        "tests/performance/test_report.py": "2638127e509b429c792834f1d4f8a9898b919d0704760e742b35ac43165f9e22",
+        "tests/performance/test_run.py": "4a8ba3d172023412153bd8f90329fe6e922028ff92c9bb84e432b18c028a60a7",
+        "tests/performance/test_scenarios.py": "9cbed03af3f5a906b158c87f496be283bfe944a34687a420b91e2d7e92b5da33",
+        "tests/performance/test_window.py": "9653ef4acf8ac2a8b1dac45535b730580638abfdeeb1dc0ec6637c109aa1395f",
+        "tests/performance/window.py": "e9f4648e4b141c3f76f8f523c409ee5404e80c8c278bd35ac6f21b6d10b527d3",
+        "tests/target_corpus/generate.py": "0187071e92066e35be33cf0a3266219e330ae388ccd132aa9934d4a3db6f15f2",
+        "tests/target_corpus/validate.py": "0bf01248bbf76aa964c737a242b3166404c65f45e3b16d6438d7b3621d7f9b74"
+      },
+      "interrupted": 0,
+      "label": "reads1k",
+      "manifest": {
+        "bytes": 37612,
+        "path": ".artifacts/issue-67/task8-reads1k-20261031/manifest.json",
+        "sha256": "f68eade2f6ccdbedc21fb5e9dfd335acccda76a601340fcedfa8482088f3bf9c"
+      },
+      "samples": {
+        "bytes": 308158,
+        "path": ".artifacts/issue-67/task8-reads1k-20261031/samples.jsonl",
+        "sha256": "dcbc9b10e4971443bc834ca8ac4c60b7e88f02d20e96a4d0521f8d24957a8c5f"
+      },
+      "summary": {
+        "bytes": 6099,
+        "path": ".artifacts/issue-67/task8-reads1k-20261031/summary.json",
+        "sha256": "5eb91cff11490a0af51a7f380e90c872f0b43cedc8921db7441b80ed987c0b5c"
+      },
+      "summary_outcome": "complete",
+      "timeouts": 0,
+      "top_level_attempts": 74,
+      "valid_successes": 74
+    },
+    {
+      "command": {
+        "bytes": 784,
+        "path": ".artifacts/issue-67/task8-control-20261031/initialization1k-command.json",
+        "sha256": "f4355fb936886de5f2861c2d03ac9e3310ece8ad718328abe42c5fc280e85bbf"
+      },
+      "directory": ".artifacts/issue-67/task8-initialization1k-20261031",
+      "harness": {
+        "tests/performance/compare.py": "5ff9eb5603259d4c8dc7d3190185c5f3ac48379b560c8c931d06367413793c2d",
+        "tests/performance/contention.py": "f6ddfd5680436eedbb3ec30686deb78eb2543406d80f8a2421636af8127b3400",
+        "tests/performance/controls.py": "f1f384070a9cc6fdc2ff401905c7712e7a6330bc54827ba3a6b72ddf19ae96b7",
+        "tests/performance/git_wrapper.py": "e32c22a60d917d666e3b046a8c576d3c4005cce6bbd55d41c7d6ea7e0eee6386",
+        "tests/performance/measure.py": "a73416d5406ea0dfd61836265ba0e1dc2d48536dd1445917e0165a062d6cb160",
+        "tests/performance/ownership.py": "5ddbb36891230deaa00deb739d15272ad350b30599788c3d156da7f1f71741cb",
+        "tests/performance/profile.py": "e9074d11996b353e997a5ce0e1d69dd9aee44bc2baad9e39e8e64d21440cbbe0",
+        "tests/performance/provider.py": "ad89d48c0d9c795d50f53de771db3d947fa0768652c5a63666ef2db935e185d6",
+        "tests/performance/report.py": "1c3c0da54d39568d70fa4a00815cf194d2a39a2bf31c0251833c928c5d6e79b9",
+        "tests/performance/run.py": "bb7bd13cf38ac962219a66e26f9b5d61649de5ba70bfddd989a5facdd3235750",
+        "tests/performance/scenarios.py": "7ed757f5c64d4fce7905845c49f4def9677ba9cfc55f3a4265823a397eb9ca96",
+        "tests/performance/test_compare.py": "a33ef3d63a282d0710c685e2385a44b8995e2b382ee08a42c0247f3d32087d28",
+        "tests/performance/test_contention.py": "4da884e7b7f2df4f040b5b5bc4e075c964f7882a42bfe5635b9b17de0ac9dcd7",
+        "tests/performance/test_controls.py": "52addf54577a0fbef5814dae973f18492a624a38b5a11bb327f3ad05f3d46409",
+        "tests/performance/test_measure.py": "75dbe9d81f6bf867cbd928c517bb7db200d1d0c6ca94955c1919ddbdcebc08e4",
+        "tests/performance/test_ownership.py": "0e1f53fbb8ea412be8f2ec32b12d37fb16ec62dd1b5972b63123c710e88811c0",
+        "tests/performance/test_profile.py": "9fd10f2d5024dda3146e5b01c3b85544eb9f255317763741e793da599b6943d9",
+        "tests/performance/test_provider.py": "d69d20e5bf9e4e440b023dcab5d8d9bbfa4f73da2d269cc358dbee4048ba2492",
+        "tests/performance/test_report.py": "2638127e509b429c792834f1d4f8a9898b919d0704760e742b35ac43165f9e22",
+        "tests/performance/test_run.py": "4a8ba3d172023412153bd8f90329fe6e922028ff92c9bb84e432b18c028a60a7",
+        "tests/performance/test_scenarios.py": "9cbed03af3f5a906b158c87f496be283bfe944a34687a420b91e2d7e92b5da33",
+        "tests/performance/test_window.py": "9653ef4acf8ac2a8b1dac45535b730580638abfdeeb1dc0ec6637c109aa1395f",
+        "tests/performance/window.py": "e9f4648e4b141c3f76f8f523c409ee5404e80c8c278bd35ac6f21b6d10b527d3",
+        "tests/target_corpus/generate.py": "0187071e92066e35be33cf0a3266219e330ae388ccd132aa9934d4a3db6f15f2",
+        "tests/target_corpus/validate.py": "0bf01248bbf76aa964c737a242b3166404c65f45e3b16d6438d7b3621d7f9b74"
+      },
+      "interrupted": 0,
+      "label": "initialization1k",
+      "manifest": {
+        "bytes": 37650,
+        "path": ".artifacts/issue-67/task8-initialization1k-20261031/manifest.json",
+        "sha256": "50a243c54c0fa8265af5a1499c6cdf32ad218749c8555af9913d0b08f6e2b035"
+      },
+      "samples": {
+        "bytes": 26712,
+        "path": ".artifacts/issue-67/task8-initialization1k-20261031/samples.jsonl",
+        "sha256": "8614e8e6eb8933ce8d03c2eb891835bcaf4c0fcba2c0460c1ae6fa7328f7ee89"
+      },
+      "summary": {
+        "bytes": 5944,
+        "path": ".artifacts/issue-67/task8-initialization1k-20261031/summary.json",
+        "sha256": "c9e81fabb00898ad972a7ba2ff54a82ee64410094bfe54138a953016405c1cef"
+      },
+      "summary_outcome": "incomplete",
+      "timeouts": 4,
+      "top_level_attempts": 18,
+      "valid_successes": 14
+    },
+    {
+      "command": {
+        "bytes": 726,
+        "path": ".artifacts/issue-67/task8-control-20261031/contention60-command.json",
+        "sha256": "205f1f68adba2a9a3c201baf13235eae881391a3706e5b10c50388a11aa9d33e"
+      },
+      "directory": ".artifacts/issue-67/task8-contention60-20261031",
+      "harness": {
+        "tests/performance/compare.py": "5ff9eb5603259d4c8dc7d3190185c5f3ac48379b560c8c931d06367413793c2d",
+        "tests/performance/contention.py": "f6ddfd5680436eedbb3ec30686deb78eb2543406d80f8a2421636af8127b3400",
+        "tests/performance/controls.py": "f1f384070a9cc6fdc2ff401905c7712e7a6330bc54827ba3a6b72ddf19ae96b7",
+        "tests/performance/git_wrapper.py": "e32c22a60d917d666e3b046a8c576d3c4005cce6bbd55d41c7d6ea7e0eee6386",
+        "tests/performance/measure.py": "a73416d5406ea0dfd61836265ba0e1dc2d48536dd1445917e0165a062d6cb160",
+        "tests/performance/ownership.py": "5ddbb36891230deaa00deb739d15272ad350b30599788c3d156da7f1f71741cb",
+        "tests/performance/profile.py": "e9074d11996b353e997a5ce0e1d69dd9aee44bc2baad9e39e8e64d21440cbbe0",
+        "tests/performance/provider.py": "ad89d48c0d9c795d50f53de771db3d947fa0768652c5a63666ef2db935e185d6",
+        "tests/performance/report.py": "1c3c0da54d39568d70fa4a00815cf194d2a39a2bf31c0251833c928c5d6e79b9",
+        "tests/performance/run.py": "bb7bd13cf38ac962219a66e26f9b5d61649de5ba70bfddd989a5facdd3235750",
+        "tests/performance/scenarios.py": "7ed757f5c64d4fce7905845c49f4def9677ba9cfc55f3a4265823a397eb9ca96",
+        "tests/performance/test_compare.py": "a33ef3d63a282d0710c685e2385a44b8995e2b382ee08a42c0247f3d32087d28",
+        "tests/performance/test_contention.py": "4da884e7b7f2df4f040b5b5bc4e075c964f7882a42bfe5635b9b17de0ac9dcd7",
+        "tests/performance/test_controls.py": "52addf54577a0fbef5814dae973f18492a624a38b5a11bb327f3ad05f3d46409",
+        "tests/performance/test_measure.py": "75dbe9d81f6bf867cbd928c517bb7db200d1d0c6ca94955c1919ddbdcebc08e4",
+        "tests/performance/test_ownership.py": "0e1f53fbb8ea412be8f2ec32b12d37fb16ec62dd1b5972b63123c710e88811c0",
+        "tests/performance/test_profile.py": "9fd10f2d5024dda3146e5b01c3b85544eb9f255317763741e793da599b6943d9",
+        "tests/performance/test_provider.py": "d69d20e5bf9e4e440b023dcab5d8d9bbfa4f73da2d269cc358dbee4048ba2492",
+        "tests/performance/test_report.py": "2638127e509b429c792834f1d4f8a9898b919d0704760e742b35ac43165f9e22",
+        "tests/performance/test_run.py": "4a8ba3d172023412153bd8f90329fe6e922028ff92c9bb84e432b18c028a60a7",
+        "tests/performance/test_scenarios.py": "9cbed03af3f5a906b158c87f496be283bfe944a34687a420b91e2d7e92b5da33",
+        "tests/performance/test_window.py": "9653ef4acf8ac2a8b1dac45535b730580638abfdeeb1dc0ec6637c109aa1395f",
+        "tests/performance/window.py": "e9f4648e4b141c3f76f8f523c409ee5404e80c8c278bd35ac6f21b6d10b527d3",
+        "tests/target_corpus/generate.py": "0187071e92066e35be33cf0a3266219e330ae388ccd132aa9934d4a3db6f15f2",
+        "tests/target_corpus/validate.py": "0bf01248bbf76aa964c737a242b3166404c65f45e3b16d6438d7b3621d7f9b74"
+      },
+      "interrupted": 0,
+      "label": "contention60",
+      "manifest": {
+        "bytes": 37594,
+        "path": ".artifacts/issue-67/task8-contention60-20261031/manifest.json",
+        "sha256": "b94e15b750df74de9d7dc303c6c14f76f9687d3134002e414e89a38f3589fc4b"
+      },
+      "samples": {
+        "bytes": 13360,
+        "path": ".artifacts/issue-67/task8-contention60-20261031/samples.jsonl",
+        "sha256": "b805926225b628b296c35988380f9cb487616e13c117dcdca148b04dbe69ad96"
+      },
+      "summary": {
+        "bytes": 2616,
+        "path": ".artifacts/issue-67/task8-contention60-20261031/summary.json",
+        "sha256": "ad8f7ecf1e45e134e87a76d6de08702577e43dda881cef1d65d3dfb83f84de9f"
+      },
+      "summary_outcome": "complete",
+      "timeouts": 0,
+      "top_level_attempts": 8,
+      "valid_successes": 8
+    },
+    {
+      "command": {
+        "bytes": 721,
+        "path": ".artifacts/issue-67/task8-control-20261031/profiles60-command.json",
+        "sha256": "5c023ed53525021bb0dfc1e856f7473cb0485b56917b47ffc190cdfa4a63390e"
+      },
+      "directory": ".artifacts/issue-67/task8-profiles60-20261031",
+      "harness": {
+        "tests/performance/compare.py": "5ff9eb5603259d4c8dc7d3190185c5f3ac48379b560c8c931d06367413793c2d",
+        "tests/performance/contention.py": "f6ddfd5680436eedbb3ec30686deb78eb2543406d80f8a2421636af8127b3400",
+        "tests/performance/controls.py": "f1f384070a9cc6fdc2ff401905c7712e7a6330bc54827ba3a6b72ddf19ae96b7",
+        "tests/performance/git_wrapper.py": "e32c22a60d917d666e3b046a8c576d3c4005cce6bbd55d41c7d6ea7e0eee6386",
+        "tests/performance/measure.py": "a73416d5406ea0dfd61836265ba0e1dc2d48536dd1445917e0165a062d6cb160",
+        "tests/performance/ownership.py": "5ddbb36891230deaa00deb739d15272ad350b30599788c3d156da7f1f71741cb",
+        "tests/performance/profile.py": "e9074d11996b353e997a5ce0e1d69dd9aee44bc2baad9e39e8e64d21440cbbe0",
+        "tests/performance/provider.py": "ad89d48c0d9c795d50f53de771db3d947fa0768652c5a63666ef2db935e185d6",
+        "tests/performance/report.py": "1c3c0da54d39568d70fa4a00815cf194d2a39a2bf31c0251833c928c5d6e79b9",
+        "tests/performance/run.py": "bb7bd13cf38ac962219a66e26f9b5d61649de5ba70bfddd989a5facdd3235750",
+        "tests/performance/scenarios.py": "7ed757f5c64d4fce7905845c49f4def9677ba9cfc55f3a4265823a397eb9ca96",
+        "tests/performance/test_compare.py": "a33ef3d63a282d0710c685e2385a44b8995e2b382ee08a42c0247f3d32087d28",
+        "tests/performance/test_contention.py": "4da884e7b7f2df4f040b5b5bc4e075c964f7882a42bfe5635b9b17de0ac9dcd7",
+        "tests/performance/test_controls.py": "52addf54577a0fbef5814dae973f18492a624a38b5a11bb327f3ad05f3d46409",
+        "tests/performance/test_measure.py": "75dbe9d81f6bf867cbd928c517bb7db200d1d0c6ca94955c1919ddbdcebc08e4",
+        "tests/performance/test_ownership.py": "0e1f53fbb8ea412be8f2ec32b12d37fb16ec62dd1b5972b63123c710e88811c0",
+        "tests/performance/test_profile.py": "9fd10f2d5024dda3146e5b01c3b85544eb9f255317763741e793da599b6943d9",
+        "tests/performance/test_provider.py": "d69d20e5bf9e4e440b023dcab5d8d9bbfa4f73da2d269cc358dbee4048ba2492",
+        "tests/performance/test_report.py": "2638127e509b429c792834f1d4f8a9898b919d0704760e742b35ac43165f9e22",
+        "tests/performance/test_run.py": "4a8ba3d172023412153bd8f90329fe6e922028ff92c9bb84e432b18c028a60a7",
+        "tests/performance/test_scenarios.py": "9cbed03af3f5a906b158c87f496be283bfe944a34687a420b91e2d7e92b5da33",
+        "tests/performance/test_window.py": "9653ef4acf8ac2a8b1dac45535b730580638abfdeeb1dc0ec6637c109aa1395f",
+        "tests/performance/window.py": "e9f4648e4b141c3f76f8f523c409ee5404e80c8c278bd35ac6f21b6d10b527d3",
+        "tests/target_corpus/generate.py": "0187071e92066e35be33cf0a3266219e330ae388ccd132aa9934d4a3db6f15f2",
+        "tests/target_corpus/validate.py": "0bf01248bbf76aa964c737a242b3166404c65f45e3b16d6438d7b3621d7f9b74"
+      },
+      "interrupted": 0,
+      "label": "profiles60",
+      "manifest": {
+        "bytes": 37591,
+        "path": ".artifacts/issue-67/task8-profiles60-20261031/manifest.json",
+        "sha256": "0ec5d1aa1dd24d110cada6f307ff2c1e91aa7957c70452721bb6958188958ec5"
+      },
+      "samples": {
+        "bytes": 13541,
+        "path": ".artifacts/issue-67/task8-profiles60-20261031/samples.jsonl",
+        "sha256": "b70beeedeeff9c171d697cf2ca038704eb54f778edd7d8b1ec12090fe41ce1ee"
+      },
+      "summary": {
+        "bytes": 2601,
+        "path": ".artifacts/issue-67/task8-profiles60-20261031/summary.json",
+        "sha256": "df385ce839cbfb136c7c3a995e262b40d35aca90237238e8c62d218b5e902cea"
+      },
+      "summary_outcome": "complete",
+      "timeouts": 0,
+      "top_level_attempts": 8,
+      "valid_successes": 8
+    },
+    {
+      "command": {
+        "bytes": 755,
+        "path": ".artifacts/issue-67/task8-control-20261031/profiles1k-command.json",
+        "sha256": "5cba629cf658e6bf8956c9a0f6b79f5e1bf6a5ae1c3e90c17d82de9ec6e75fe9"
+      },
+      "directory": ".artifacts/issue-67/task8-profiles1k-20261031",
+      "harness": {
+        "tests/performance/compare.py": "5ff9eb5603259d4c8dc7d3190185c5f3ac48379b560c8c931d06367413793c2d",
+        "tests/performance/contention.py": "f6ddfd5680436eedbb3ec30686deb78eb2543406d80f8a2421636af8127b3400",
+        "tests/performance/controls.py": "f1f384070a9cc6fdc2ff401905c7712e7a6330bc54827ba3a6b72ddf19ae96b7",
+        "tests/performance/git_wrapper.py": "e32c22a60d917d666e3b046a8c576d3c4005cce6bbd55d41c7d6ea7e0eee6386",
+        "tests/performance/measure.py": "a73416d5406ea0dfd61836265ba0e1dc2d48536dd1445917e0165a062d6cb160",
+        "tests/performance/ownership.py": "5ddbb36891230deaa00deb739d15272ad350b30599788c3d156da7f1f71741cb",
+        "tests/performance/profile.py": "e9074d11996b353e997a5ce0e1d69dd9aee44bc2baad9e39e8e64d21440cbbe0",
+        "tests/performance/provider.py": "ad89d48c0d9c795d50f53de771db3d947fa0768652c5a63666ef2db935e185d6",
+        "tests/performance/report.py": "1c3c0da54d39568d70fa4a00815cf194d2a39a2bf31c0251833c928c5d6e79b9",
+        "tests/performance/run.py": "bb7bd13cf38ac962219a66e26f9b5d61649de5ba70bfddd989a5facdd3235750",
+        "tests/performance/scenarios.py": "7ed757f5c64d4fce7905845c49f4def9677ba9cfc55f3a4265823a397eb9ca96",
+        "tests/performance/test_compare.py": "a33ef3d63a282d0710c685e2385a44b8995e2b382ee08a42c0247f3d32087d28",
+        "tests/performance/test_contention.py": "4da884e7b7f2df4f040b5b5bc4e075c964f7882a42bfe5635b9b17de0ac9dcd7",
+        "tests/performance/test_controls.py": "52addf54577a0fbef5814dae973f18492a624a38b5a11bb327f3ad05f3d46409",
+        "tests/performance/test_measure.py": "75dbe9d81f6bf867cbd928c517bb7db200d1d0c6ca94955c1919ddbdcebc08e4",
+        "tests/performance/test_ownership.py": "0e1f53fbb8ea412be8f2ec32b12d37fb16ec62dd1b5972b63123c710e88811c0",
+        "tests/performance/test_profile.py": "9fd10f2d5024dda3146e5b01c3b85544eb9f255317763741e793da599b6943d9",
+        "tests/performance/test_provider.py": "d69d20e5bf9e4e440b023dcab5d8d9bbfa4f73da2d269cc358dbee4048ba2492",
+        "tests/performance/test_report.py": "2638127e509b429c792834f1d4f8a9898b919d0704760e742b35ac43165f9e22",
+        "tests/performance/test_run.py": "4a8ba3d172023412153bd8f90329fe6e922028ff92c9bb84e432b18c028a60a7",
+        "tests/performance/test_scenarios.py": "9cbed03af3f5a906b158c87f496be283bfe944a34687a420b91e2d7e92b5da33",
+        "tests/performance/test_window.py": "9653ef4acf8ac2a8b1dac45535b730580638abfdeeb1dc0ec6637c109aa1395f",
+        "tests/performance/window.py": "e9f4648e4b141c3f76f8f523c409ee5404e80c8c278bd35ac6f21b6d10b527d3",
+        "tests/target_corpus/generate.py": "0187071e92066e35be33cf0a3266219e330ae388ccd132aa9934d4a3db6f15f2",
+        "tests/target_corpus/validate.py": "0bf01248bbf76aa964c737a242b3166404c65f45e3b16d6438d7b3621d7f9b74"
+      },
+      "interrupted": 0,
+      "label": "profiles1k",
+      "manifest": {
+        "bytes": 37618,
+        "path": ".artifacts/issue-67/task8-profiles1k-20261031/manifest.json",
+        "sha256": "63643258da45213961d26c66c46a4e61466877d0b920cde58ebbccca1750f5c6"
+      },
+      "samples": {
+        "bytes": 85894,
+        "path": ".artifacts/issue-67/task8-profiles1k-20261031/samples.jsonl",
+        "sha256": "fd7b97acafba88678644bb92f49971867ecc721a2892e69a54d33f3bf1a72555"
+      },
+      "summary": {
+        "bytes": 5213,
+        "path": ".artifacts/issue-67/task8-profiles1k-20261031/summary.json",
+        "sha256": "5086107adad4bd127394f577233908c78ad947800b44ef726dc43b413a584650"
+      },
+      "summary_outcome": "complete",
+      "timeouts": 0,
+      "top_level_attempts": 20,
+      "valid_successes": 20
+    }
+  ],
+  "captured_utc": "2026-10-30T22:28:18Z",
+  "direct_pid_rss": {
+    "directory": ".artifacts/issue-67/task8-direct-rss-20261031",
+    "scope": "one separate instrumented call per side/scenario; observed sampled direct-process RSS lower bound, excludes descendants, not whole-stack peak",
+    "source": {
+      "bytes": 7155,
+      "path": ".artifacts/issue-67/task8-control-20261031/direct_rss.py",
+      "sha256": "cf7c3306bb15b877c6180ae1080a151964c4943ff3c036d3c39d840ad2b1cdeb"
+    },
+    "summary": {
+      "bytes": 3163,
+      "path": ".artifacts/issue-67/task8-direct-rss-20261031/summary.json",
+      "sha256": "9bcc86e95caa93450425c86b068244495bc6c35d0dc22e1537eca7225a48cfff"
+    }
+  },
+  "limits": [
+    "four baseline 120 s timeouts; no successful before audit/maintenance ratio",
+    "first-publication n1 per side, stage initializations not pooled",
+    "sampled direct RSS and wait4 lifetime/accounted-descendant scope are distinct and neither is simultaneous whole-stack peak",
+    "inclusive CPU observations are not wall-time attribution; short optimized captures have few samples",
+    "Minor M3 initial eligibility mutant, no specific stale-second-read mutant",
+    "Task 7 39 traced invocations exclude eligible foreground-to-detached interval",
+    "pre-existing direct-drain caller-dir/root lock concern unverified and unchanged",
+    "no real-provider/model session; no scale above 1k; no x86_64/NFS/power-loss claim",
+    "final independent branch review pending controller"
+  ],
+  "local_artifact_inventory": {
+    "bytes": 1804739,
+    "entries": 7975,
+    "path": ".artifacts/issue-67/task8-control-20261031/artifact-files.json",
+    "scope": "all issue67 evidence at capture, including failed earlier tasks and raw profiles/receipts/sources; issue65 remains separate and unchanged",
+    "sha256": "4a4a8afafb48398f51b1ee12ca661f0c22e97a7b64b7958292e144c2f6121bea"
+  },
+  "measured_optimized_source": "ba4a11db26705999018187e8301a51e9942fe1ba",
+  "post_inventory_tail": {
+    "directory": ".artifacts/issue-67/task8-control-20261031",
+    "paths": [
+      "commit-before.json",
+      "commit.log",
+      "commit.json"
+    ],
+    "scope": "guarded scoped commit receipts are produced after this point-in-time inventory and identified by the resulting Git commit; controller may hash them with later final review evidence"
+  },
+  "schema_version": 1,
+  "sdd_archives": {
+    "future_final_reviews": "controller must append final review/rulings under fresh artifact paths and a fresh hash index; not claimed here",
+    "measurement_final": {
+      "bytes": 4201,
+      "files": 45,
+      "path": ".artifacts/issue-67/task8-control-20261031/sdd-task8-index.json",
+      "sha256": "ce22d48ceada63e8d4caf3f22adfd12612c4a6a00b23eaa009eada3fbf154280"
+    },
+    "start": {
+      "bytes": 4444,
+      "path": ".artifacts/issue-67/task8-control-20261031/sdd-start-index.json",
+      "sha256": "cc28cea608fe1c1d9265c08374e1f9c1e6205104231c26fc79c4d10da905b878"
+    }
+  },
+  "status": "measurement_complete_final_independent_branch_review_pending",
+  "validation": {
+    "administrative_failures": {
+      "bytes": 1508,
+      "path": ".artifacts/issue-67/task8-control-20261031/administrative-attempts.json",
+      "sha256": "ba518484f2a7a44fffb4c3fb86f48126db3cd21a2a427999564a14cd777439f4"
+    },
+    "doc_links": {
+      "bytes": 3115,
+      "path": ".artifacts/issue-67/task8-control-20261031/doc-links.json",
+      "sha256": "24f58cd1f2234da54f2ead61ba4de6d7b22f26b4fc7177cf483fc948e3add726"
+    },
+    "driver_handoff": {
+      "bytes": 1667,
+      "path": ".artifacts/issue-67/task8-control-20261031/driver-handoff.json",
+      "sha256": "5c90c756eb9f150612a2d9eb5a8fa1d2d026cdbda76b05a00ec5b310c3a70dbb"
+    },
+    "final_pins": {
+      "bytes": 245,
+      "path": ".artifacts/issue-67/task8-control-20261031/final-pin-verification.json",
+      "sha256": "7abdb67c22c98c6387774ff52a4953748ddb1e512051fbb4c68ec112cd7770bb"
+    },
+    "harness_green": {
+      "bytes": 10580,
+      "path": ".artifacts/issue-67/task8-control-20261031/harness-restored-green.log",
+      "sha256": "3cf4f0855d8d0cecc677ac4935fb6aee62ef642e187589ea33ab0790930d6bf0"
+    },
+    "harness_mutation": {
+      "bytes": 377,
+      "path": ".artifacts/issue-67/task8-control-20261031/harness-mutation.json",
+      "sha256": "3ab57c88f657ed397b2057c7d462796e479451d06ec6af81b258d088db8b1ffe"
+    },
+    "harness_red": {
+      "bytes": 5168,
+      "path": ".artifacts/issue-67/task8-control-20261031/harness-red.log",
+      "sha256": "34811bf9c627c7e14d3390e92fc826829d7bfbeecec3836c1656c7186f9525ce"
+    },
+    "harness_sources": {
+      "bytes": 313,
+      "path": ".artifacts/issue-67/task8-control-20261031/harness-final-sha256.json",
+      "sha256": "7831e42f57a12def9ea66977cadcce2af02a767f3314d4de5cd0b921bdf0dfed"
+    },
+    "profile_findings": {
+      "bytes": 8751,
+      "path": ".artifacts/issue-67/task8-control-20261031/profile-findings.json",
+      "sha256": "e7e89945dcaa06e7478a34d948e20f44abb99c2ac43136e5362794c80a53de9d"
+    },
+    "rss_green": {
+      "bytes": 102,
+      "path": ".artifacts/issue-67/task8-control-20261031/direct-rss-tests-green.log",
+      "sha256": "95ab3ab7f7c8e3875ab168641f413d218ca3f5522e7aee1c6ec0cf763a19c56d"
+    },
+    "rss_unit_mutation": {
+      "bytes": 220,
+      "path": ".artifacts/issue-67/task8-control-20261031/direct-rss-unit-mutation.json",
+      "sha256": "e7fd2b34b857904cb3db127787cb75d949a7ff65648981700df6dbde00a591fa"
+    }
+  }
+}

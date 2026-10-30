@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from compare import (freeze_build, run_comparison, summarize_comparison,
-                     run_profile_probe, verify_equivalent_cases, verify_frozen_build)
+                     run_probe_series, run_profile_probe, verify_equivalent_cases, verify_frozen_build)
 from scenarios import (hash_file, prepare_fixture, prepare_scenario, read_product_inputs,
                        run_git, write_json)
 from report import validate_result
@@ -19,6 +19,47 @@ from measure import measure_process
 
 
 class ComparisonTests(unittest.TestCase):
+    def test_initialization_does_not_retry_censored_side_but_finishes_feasible_side(self):
+        # Given: before times out once while all after-side probes remain feasible.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = SimpleNamespace(stage="initialization", timeout=120, nodes=1000)
+            cases = {side: {"name": "check", "side": side} for side in ("before", "after")}
+            calls, rows = [], []
+            def probe(args, case, build, output, index):
+                calls.append(case["side"])
+                return _record(120 if case["side"] == "before" else 1,
+                               "timeout" if case["side"] == "before" else "success")
+            # When: the three-attempt initialization schedule executes.
+            with (root / "samples.jsonl").open("wb") as stream, \
+                    patch("compare.prepare_pair", return_value=cases), \
+                    patch("compare.verify_frozen_build"), \
+                    patch("compare.run_probe", side_effect=probe):
+                run_probe_series(args, {"before": {}, "after": {}}, {}, root, stream, rows, "check")
+            # Then: one censored attempt stays durable and the feasible side gets three.
+            self.assertEqual(calls, ["before", "after", "after", "after"])
+            saved = [json.loads(line) for line in (root / "samples.jsonl").read_text().splitlines()]
+            self.assertEqual([row["outcome"] for row in saved], ["timeout", "success", "success", "success"])
+            self.assertEqual([row["pair"] for row in saved], [0, 0, 1, 2])
+
+    def test_initialization_keeps_correctness_failures_visible_without_censoring_them(self):
+        # Given: successful transports have invalid outputs rather than timeouts.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = SimpleNamespace(stage="initialization", timeout=120, nodes=1000)
+            cases = {side: {"name": "check"} for side in ("before", "after")}
+            rows = []
+            record = dict(_record(1), validation={"valid": False, "reason": "wrong output"})
+            # When: the initialization schedule observes these independent failures.
+            with (root / "samples.jsonl").open("wb") as stream, \
+                    patch("compare.prepare_pair", return_value=cases), \
+                    patch("compare.verify_frozen_build"), \
+                    patch("compare.run_probe", side_effect=lambda *args: dict(record)):
+                run_probe_series(args, {"before": {}, "after": {}}, {}, root, stream, rows, "check")
+            # Then: all six actual correctness failures remain available for diagnosis.
+            self.assertEqual(len(rows), 6)
+            self.assertTrue(all(not row["validation"]["valid"] for row in rows))
+
     def test_interrupted_contention_is_flushed_before_next_schedule(self):
         # Given: an interrupted owned baseline inside the composite contention probe.
         with tempfile.TemporaryDirectory() as directory:

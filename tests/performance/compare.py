@@ -177,15 +177,21 @@ def run_timing_series(args, builds, fixtures, evidence, stream, rows, name):
 
 
 def run_probe_series(args, builds, fixtures, evidence, stream, rows, name):
+    censored_sides = set()
     for index in range(3):
         cases = prepare_pair(fixtures, name, evidence, f"{name}-{index}", builds)
         for side in get_order(index):
+            if side in censored_sides:
+                continue
             case, build = cases[side], builds[side]
             case["timeout"] = args.timeout
             verify_frozen_build(build)
             record = run_probe(args, case, build, evidence / f"probe-{name}-{index}-{side}", index)
             record.update(name=name, nodes=args.nodes, side=side, pair=index, phase="measured",
                           embedding_mode="fts_disabled", profile_mode=args.stage)
+            if args.stage == "initialization" and record["outcome"] == "timeout":
+                censored_sides.add(side)
+                record["subsequent_attempts_skipped"] = 2 - index
             save_attempt(stream, rows, record)
 
 

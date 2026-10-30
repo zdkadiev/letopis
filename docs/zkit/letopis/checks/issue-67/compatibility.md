@@ -416,3 +416,34 @@ tests; a later release run exposed the CLI fixture BrokenPipe race. All failed
 attempts remain in separate directories. The final CLI fixture keeps stdin open
 without a body or EOF, checks the same error/exit and is mutation-sensitive to an
 incorrect stdin read before argv rejection.
+
+
+### Task 8 frozen performance scope (2026-10-31)
+
+The measured optimized product is committed revision
+`ba4a11db26705999018187e8301a51e9942fe1ba`, executable SHA-256
+`18288faf715310d6ceccd03bedd35adc21e1ab1654c4765c30eff1f3a85a2870`.
+The baseline is the unchanged Task 1 frozen release at
+`881cc6417073110e852fbebf2b9bce5ed1ea3d29`, with base-equivalent product inputs
+from `32ca0af282a1321d0137b4aba115c6fddc086259`. Both use Rust 1.95.0,
+`cargo build --release --locked --offline --message-format=json` and
+`CARGO_PROFILE_RELEASE_DEBUG=1`; sources, Mach-O/debug identities, receipts and
+executable hashes are independently preserved and reverified.
+
+Task 8 changes no Rust/native/dependency input. The accepted Task 7 host/Linux
+source and platform scopes above remain the product verification evidence. Its
+comparison-harness timeout scheduling correction is covered by focused Python
+RED/GREEN and mutation evidence, separately pinned from the unchanged binaries.
+The original check60/reads1k campaigns retain the earlier captured harness; later
+stages capture the corrected harness. No unchanged root Rust/native checks were
+rerun solely to attach a newer timestamp.
+
+The performance campaign runs on the same arm64 macOS host, with disabled
+embeddings and unchanged synthetic external declarations, at 60 and 1,000
+elements. No larger-scale, real-provider, x86_64 or Linux timing claim is made.
+Owned-PID sampled RSS uses macOS libproc in separate instrumented calls; OS wait4
+lifetime RSS/accounted descendants remain separately labeled. Neither proves
+whole-stack concurrent peak or replaces the per-object allocation/capacity gate.
+See [report.md](report.md) for the actual outcomes and budgets,
+[review.md](review.md) for unresolved review scope and
+[evidence-index.json](evidence-index.json) for the canonical local hash index.

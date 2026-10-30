@@ -181,8 +181,11 @@ incomplete campaign exits nonzero and keeps its summary and failure receipts.
   feasible acceptance comparison. Defaults are check at 60, inspect/traverse/search
   at 1k. Explicit existing scenario names are accepted. Mutation/reindex attempts
   receive fresh copies rather than reusing their changed state.
-- `initialization`: one first publication and three fresh attempts per requested
-  audit/maintenance scenario and side. Defaults: check, reindex, status, refresh_bulk.
+- `initialization`: one first publication and up to three fresh attempts per
+  requested audit/maintenance scenario and side. A timed-out side/scenario retains
+  its censored receipt and skips later attempts; feasible sides retain three.
+  Successful transports with invalid outputs remain visible as correctness failures.
+  No automatic timeout retry occurs. Defaults: check, reindex, status, refresh_bulk.
 - `contention`: three reindex/reader schedules per side; default reader is search.
   Read scenarios are check, inspect, traverse and search. Existing kernel-lock
   acknowledgement, process cleanup and overlap receipts remain authoritative.
