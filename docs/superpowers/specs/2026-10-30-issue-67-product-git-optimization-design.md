@@ -135,6 +135,19 @@ after use, and avoid retaining every source blob or the full graph. The implemen
 chooses the smallest concrete helper/lifetime after tracing actual service calls;
 do not broaden trait surfaces merely to share a cache. Tests must demonstrate an
 edit between separate observation/capture boundaries remains detectable.
+Unavailable basis classifications and infrastructure failures are recomputed,
+not cached; a missing or invalid author root may become available during the
+operation. Revision-comparison reuse also skips `BasisUnavailable` outcomes.
+
+Implementation boundary clarified during Task 6: preflight and check/status
+already hold the metadata needed for bounded multi-binding observation batches.
+Search interleaves candidate-edge reads, revision checks, live knowledge reads
+and provenance; traversal interleaves metadata, neighbor pages, provenance and
+live reads. Keep those existing demand/error and capture orders. Their singleton
+observations retain fresh state; this change does not provide cross-binding
+historical reuse there. Search still reuses equivalent revision comparisons within
+its eligibility operation. Do not add a cache-session interface or eager graph
+loads merely to extend reuse beyond an existing observation boundary.
 
 ### Inspect capture
 
