@@ -1,7 +1,7 @@
 use super::{
     CommandError, CommandErrorKind, CommandProblem, CommandResult, DocumentError, GraphDiagnostics,
-    KnowledgeMetadata, NodeMetadata, ProvenanceIssue, ProvenanceRequest, SourceProvenance,
-    StorageError, StorageRead,
+    KnowledgeMetadata, NodeMetadata, PROVENANCE_BATCH_SIZE, ProvenanceIssue, ProvenanceRequest,
+    SourceProvenance, StorageError, StorageRead,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
 use serde_json::Value;
@@ -42,25 +42,40 @@ fn find_source_problems<R: StorageRead>(
     let selected: BTreeSet<&str> = paths.iter().map(RepoPath::as_str).collect();
     let empty = BTreeSet::new();
     let mut problems = Vec::new();
-    for node in nodes {
-        let NodeMetadata::Knowledge(metadata) = node.metadata else {
-            continue;
-        };
-        if !selected.is_empty() && !selected.contains(get_owner_path(&metadata.id)) {
-            continue;
+    let mut selected_nodes = nodes.iter().filter_map(|node| match &node.metadata {
+        NodeMetadata::Knowledge(metadata)
+            if selected.is_empty() || selected.contains(get_owner_path(&metadata.id)) =>
+        {
+            Some(metadata)
         }
-        let observation = provenance
-            .observe_sources(ProvenanceRequest {
+        _ => None,
+    });
+    loop {
+        let batch: Vec<_> = selected_nodes
+            .by_ref()
+            .take(PROVENANCE_BATCH_SIZE)
+            .collect();
+        if batch.is_empty() {
+            break;
+        }
+        let requests: Vec<_> = batch
+            .iter()
+            .map(|metadata| ProvenanceRequest {
                 source_snapshot: metadata.source_snapshot.as_ref(),
                 sources: sources.get(&metadata.id).unwrap_or(&empty),
             })
+            .collect();
+        let observations = provenance
+            .observe_sources_batch(&requests)
             .map_err(map_provenance_error)?;
-        problems.extend(
-            observation
-                .issues
-                .iter()
-                .map(|issue| format_source_problem(&metadata, issue)),
-        );
+        for (metadata, observation) in batch.into_iter().zip(observations) {
+            problems.extend(
+                observation
+                    .issues
+                    .iter()
+                    .map(|issue| format_source_problem(metadata, issue)),
+            );
+        }
     }
     Ok(problems)
 }

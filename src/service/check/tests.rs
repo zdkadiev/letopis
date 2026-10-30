@@ -599,3 +599,5 @@ fn assert_private_failure(error: &CommandError) {
 }
 
 mod pinned;
+
+mod batches;

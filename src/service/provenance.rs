@@ -7,6 +7,9 @@ use super::{
 use crate::domain::{Sha256, SourceUri, TreeOid};
 use std::collections::BTreeSet;
 
+mod observations;
+use observations::HistoricalObservations;
+
 /// Compares exact addressed bytes and separately retains author-declared bases.
 #[derive(Debug)]
 pub(crate) struct ProvenanceService<G, F> {
@@ -35,30 +38,18 @@ impl<G: GitSnapshots + SnapshotVerifier, F: FileSystem> SourceProvenance
         &self,
         request: ProvenanceRequest<'_>,
     ) -> DocumentResult<ProvenanceObservation> {
-        let state = request
-            .source_snapshot
-            .map(|tree| self.git.verify_snapshot(tree))
-            .transpose()
-            .map_err(map_snapshot_error)?;
-        let mut observation = build_observation(request, state);
-        let basis = request
-            .source_snapshot
-            .filter(|_| state == Some(SnapshotState::Available));
-        for source in request.sources {
-            if source.get_local().is_none() {
-                continue;
-            }
-            let Some(flag) = self.observe_local_source(basis, source)? else {
-                continue;
-            };
-            if flag == SearchFlag::SourceNotFound {
-                observation.issues.insert(ProvenanceIssue::SourceNotFound {
-                    source: source.clone(),
-                });
-            }
-            observation.flags.insert(flag);
-        }
-        Ok(observation)
+        HistoricalObservations::new().observe_sources(self, request)
+    }
+
+    fn observe_sources_batch(
+        &self,
+        requests: &[ProvenanceRequest<'_>],
+    ) -> DocumentResult<Vec<ProvenanceObservation>> {
+        let mut observations = HistoricalObservations::new();
+        requests
+            .iter()
+            .map(|request| observations.observe_sources(self, *request))
+            .collect()
     }
 
     fn compare_revision(
@@ -110,24 +101,6 @@ impl<G: GitSnapshots + SnapshotVerifier, F> BasisRetainer for ProvenanceService<
 }
 
 impl<G: GitSnapshots + SnapshotVerifier, F: FileSystem> ProvenanceService<G, F> {
-    fn observe_local_source(
-        &self,
-        basis: Option<&TreeOid>,
-        source: &SourceUri,
-    ) -> DocumentResult<Option<SearchFlag>> {
-        let historical = basis
-            .map(|tree| self.read_snapshot_hash(tree, source))
-            .transpose()
-            .map_err(map_snapshot_error)?;
-        let current = self.read_current_hash(source)?;
-        if current.is_none() || historical == Some(None) {
-            return Ok(Some(SearchFlag::SourceNotFound));
-        }
-        Ok(historical
-            .filter(|hash| *hash != current)
-            .map(|_| SearchFlag::SourceChanged))
-    }
-
     fn verify_requested_revision(&self, revision: &TreeOid) -> Result<(), SnapshotError> {
         match self.git.verify_snapshot(revision)? {
             SnapshotState::Available => Ok(()),

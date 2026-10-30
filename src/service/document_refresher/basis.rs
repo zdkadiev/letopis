@@ -2,8 +2,8 @@ use super::{Observation, PublicationMode, SnapshotVerification, fail_changed};
 use crate::{
     domain::{EdgeTarget, RepoPath, Sha256, SourceUri, TreeOid},
     service::{
-        BasisRetainer, DocumentResult, FileRow, FileSystem, MarkdownCodec, ProvenanceRequest,
-        SourceProvenance, projection::EffectiveGraph,
+        BasisRetainer, DocumentResult, FileRow, FileSystem, MarkdownCodec, PROVENANCE_BATCH_SIZE,
+        ProvenanceRequest, SourceProvenance, projection::EffectiveGraph,
     },
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -39,11 +39,15 @@ impl BasisPreflight {
         provenance: &P,
         verification: SnapshotVerification,
     ) -> DocumentResult<()> {
-        for basis in &self.bases {
-            provenance.observe_sources(ProvenanceRequest {
-                source_snapshot: basis.source_snapshot.as_ref(),
-                sources: &basis.sources,
-            })?;
+        for bases in self.bases.chunks(PROVENANCE_BATCH_SIZE) {
+            let requests: Vec<_> = bases
+                .iter()
+                .map(|basis| ProvenanceRequest {
+                    source_snapshot: basis.source_snapshot.as_ref(),
+                    sources: &basis.sources,
+                })
+                .collect();
+            provenance.observe_sources_batch(&requests)?;
         }
         verification.validate(provenance, &self.snapshots)
     }

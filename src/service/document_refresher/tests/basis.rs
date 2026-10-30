@@ -26,6 +26,7 @@ struct BoundaryFiles {
     events: Events,
 }
 struct BoundaryProvenance {
+    batches: RefCell<Vec<usize>>,
     events: Events,
     failure: Option<&'static str>,
 }
@@ -36,6 +37,39 @@ struct BoundaryStorage {
 struct BoundaryWrite<W> {
     inner: W,
     events: Events,
+}
+
+#[test]
+fn preflight_batches_only_prepared_bindings_in_bounded_chunks() {
+    // Given: one document with 257 independently marked knowledge sections.
+    let (_dir, mut service, events) = build_boundary_service(None);
+    let bytes: String = (0..257)
+        .map(|n| {
+            format!("## Item {{#item{n}}}\n<!-- letopis: {{\"created_at\":1}} -->\nKnowledge\n")
+        })
+        .collect();
+    service.filesystem.inner.stat.update(|mut stat| {
+        stat.size = bytes.len() as u64;
+        stat
+    });
+    service.filesystem.inner.bytes.replace(bytes.into_bytes());
+    // When: preflight validates the prepared projection before publishing it.
+    let outcome = service.refresh().unwrap();
+    // Then: each binding is observed in bounded batches, before retention and SQL write.
+    assert!(outcome.published);
+    assert_eq!(*service.provenance.batches.borrow(), [256, 1]);
+    assert_eq!(
+        events
+            .borrow()
+            .iter()
+            .filter(|event| **event == "observe")
+            .count(),
+        257
+    );
+    let events = events.borrow();
+    let retain = events.iter().position(|event| *event == "retain").unwrap();
+    let begin = events.iter().position(|event| *event == "begin").unwrap();
+    assert!(retain < begin);
 }
 
 #[test]
@@ -207,6 +241,7 @@ fn build_boundary_service(failure: Option<&'static str>) -> (TempDir, Service, E
             events: Rc::clone(&events),
         },
         provenance: BoundaryProvenance {
+            batches: RefCell::new(Vec::new()),
             events: Rc::clone(&events),
             failure,
         },
@@ -243,6 +278,16 @@ impl SourceProvenance for BoundaryProvenance {
             flags: BTreeSet::new(),
             issues: BTreeSet::new(),
         })
+    }
+    fn observe_sources_batch(
+        &self,
+        requests: &[ProvenanceRequest<'_>],
+    ) -> DocumentResult<Vec<ProvenanceObservation>> {
+        self.batches.borrow_mut().push(requests.len());
+        requests
+            .iter()
+            .map(|request| self.observe_sources(*request))
+            .collect()
     }
     fn compare_revision(
         &self,
