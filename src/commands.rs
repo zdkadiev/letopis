@@ -7,16 +7,17 @@ use crate::git::{GitRepository, GitWriteCleanup};
 use crate::service::{
     BackgroundRunner, Checker, CommandError, CommandErrorKind, CommandResult, ConfigReader,
     ConfigurationService, DocumentError, DocumentErrorKind, ElementAddress,
-    GraphDiagnosticsService, Initializer, Inspector, ProvenanceService, Refresher, SearchRequest,
-    Searcher, ServiceError, ServiceErrorKind, StatusReader, StatusService, TraversalRequest,
-    Traverser,
+    GraphDiagnosticsService, Initializer, Inspector, Refresher, SearchRequest, Searcher,
+    ServiceError, ServiceErrorKind, StatusReader, StatusService, TraversalRequest, Traverser,
 };
 use crate::storage::SqliteStatusStorage;
 use crate::utils::SERVICE_DIRECTORY;
 use crate::{
-    build_embedding_provider, wire_background_runner, wire_checker_with_cleanup,
-    wire_document_refresher_with_cleanup, wire_embedding_executor, wire_initializer,
-    wire_inspector_with_cleanup, wire_searcher_with_cleanup, wire_traverser_with_cleanup,
+    build_embedding_provider, wire_background_runner, wire_checker_with_repository,
+    wire_document_refresher_with_repository, wire_embedding_executor,
+    wire_embedding_executor_at_root, wire_initializer, wire_inspector_with_repository,
+    wire_searcher_with_repository, wire_source_provenance_with_repository,
+    wire_traverser_with_repository,
 };
 use std::{
     env,
@@ -65,19 +66,19 @@ fn run_reindex(
     executable: &Path,
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let mut tasks = wire_embedding_executor(&root)?;
+    let git = open_repository(directory, cleanup)?;
+    let root = git.get_root().to_path_buf();
+    let mut tasks = wire_embedding_executor_at_root(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut documents = wire_document_refresher_with_cleanup(&root, cleanup)
+    let mut documents = wire_document_refresher_with_repository(git)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Reindex, cause))?;
     let outcome = documents.reindex().map_err(map_reindex_error)?;
     finish_foreground(ResponseResult::Reindex(outcome.revision), &mut background)
 }
 
 fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let git = GitRepository::open(&root)
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
+    let git = open_repository(directory, Arc::new(GitWriteCleanup::new()))?;
+    let root = git.get_root().to_path_buf();
     let files = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let service_directory = files
@@ -89,12 +90,8 @@ fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
     } else {
         SqliteStatusStorage::default()
     };
-    let provenance = ProvenanceService::new(
-        GitRepository::open(&root)
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?,
-        LocalFileSystem::open(&root)
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?,
-    );
+    let provenance = wire_source_provenance_with_repository(git)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let provider = build_embedding_provider()
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let graph = GraphDiagnosticsService::new();
@@ -155,10 +152,11 @@ fn run_check(
     executable: &Path,
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let mut tasks = wire_embedding_executor(&root)?;
+    let git = open_repository(directory, cleanup)?;
+    let root = git.get_root().to_path_buf();
+    let mut tasks = wire_embedding_executor_at_root(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut checks = wire_checker_with_cleanup(&root, cleanup)?;
+    let mut checks = wire_checker_with_repository(git)?;
     let report = checks.check(paths)?;
     finish_foreground(ResponseResult::Check(report), &mut background)
 }
@@ -169,10 +167,11 @@ fn run_search(
     executable: &Path,
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let mut tasks = wire_embedding_executor(&root)?;
+    let git = open_repository(directory, cleanup)?;
+    let root = git.get_root().to_path_buf();
+    let mut tasks = wire_embedding_executor_at_root(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut searches = wire_searcher_with_cleanup(&root, cleanup)?;
+    let mut searches = wire_searcher_with_repository(git)?;
     let links = searches.search(request)?;
     finish_foreground(ResponseResult::Search(links), &mut background)
 }
@@ -183,10 +182,11 @@ fn run_traverse(
     executable: &Path,
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let mut tasks = wire_embedding_executor(&root)?;
+    let git = open_repository(directory, cleanup)?;
+    let root = git.get_root().to_path_buf();
+    let mut tasks = wire_embedding_executor_at_root(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut traversals = wire_traverser_with_cleanup(&root, cleanup)?;
+    let mut traversals = wire_traverser_with_repository(git)?;
     let traversal = traversals.traverse(request)?;
     finish_foreground(ResponseResult::Traverse(traversal), &mut background)
 }
@@ -197,19 +197,28 @@ fn run_inspect(
     executable: &Path,
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
-    let root = open_repository_root(directory)?;
-    let mut tasks = wire_embedding_executor(&root)?;
+    let git = open_repository(directory, cleanup)?;
+    let root = git.get_root().to_path_buf();
+    let mut tasks = wire_embedding_executor_at_root(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut inspections = wire_inspector_with_cleanup(&root, cleanup)?;
+    let mut inspections = wire_inspector_with_repository(git)?;
     let inspection = inspections.inspect(ids)?;
     finish_foreground(ResponseResult::Inspect(inspection), &mut background)
 }
 
-/// Foreground services and background exclusion must share the discovered repository root.
+/// Resolve the repository root for commands using only filesystem collaborators.
 fn open_repository_root(directory: &Path) -> CommandResult<PathBuf> {
-    let git = GitRepository::open(directory)
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Repository, cause))?;
+    let git = open_repository(directory, Arc::new(GitWriteCleanup::new()))?;
     Ok(git.get_root().to_path_buf())
+}
+
+/// Discover once while preserving the foreground signal handler's cleanup owner.
+fn open_repository(
+    directory: &Path,
+    cleanup: Arc<GitWriteCleanup>,
+) -> CommandResult<GitRepository> {
+    GitRepository::open_with_cleanup(directory, cleanup)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Repository, cause).into())
 }
 
 fn map_reindex_error(cause: DocumentError) -> CommandError {
@@ -368,3 +377,7 @@ mod tests {
         ),
     ];
 }
+
+#[cfg(test)]
+#[path = "commands/construction_tests.rs"]
+mod construction_tests;

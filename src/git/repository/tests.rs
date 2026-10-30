@@ -7,9 +7,29 @@ use crate::{
     service::{GitSnapshots, SnapshotErrorKind, SnapshotFile},
 };
 use fixture::{ObjectFormat, TempRepo};
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, rc::Rc, sync::Arc};
 
 mod corpus;
+
+#[test]
+fn repository_open_counter_excludes_clones() {
+    // Given: an independently prepared repository and this thread's open count.
+    let repo = TempRepo::new(ObjectFormat::Sha1);
+    let before = GitRepository::get_repository_open_count();
+    // When: one discovery is followed by a cheap clone and an independent open.
+    let git = GitRepository::open(repo.get_root()).unwrap();
+    let shared = git.clone();
+    // Then: clones share both the repository and reader without discovering again.
+    assert_eq!(GitRepository::get_repository_open_count() - before, 1);
+    assert!(Rc::ptr_eq(&git.repo, &shared.repo));
+    assert!(Rc::ptr_eq(&git.reader, &shared.reader));
+    assert!(Arc::ptr_eq(&git.cleanup, &shared.cleanup));
+    // When: an independent caller opens the same worktree.
+    let independent = GitRepository::open(repo.get_root()).unwrap();
+    // Then: it owns fresh state and performs its own discovery.
+    assert_eq!(GitRepository::get_repository_open_count() - before, 2);
+    assert!(!Rc::ptr_eq(&git.repo, &independent.repo));
+}
 
 #[test]
 fn snapshots_work_without_git_executable() {

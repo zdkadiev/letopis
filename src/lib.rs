@@ -122,17 +122,14 @@ pub fn wire_initializer(start: &Path) -> ServiceResult<impl Initializer + use<>>
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
 pub fn wire_traverser(start: &Path) -> ServiceResult<impl Traverser + use<>> {
-    wire_traverser_with_cleanup(start, Arc::new(GitWriteCleanup::new()))
+    let git = GitRepository::open(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
+    wire_traverser_with_repository(git)
 }
 
-/// Compose this service with the foreground command's Git write-resource owner.
-fn wire_traverser_with_cleanup(
-    start: &Path,
-    cleanup: Arc<GitWriteCleanup>,
-) -> ServiceResult<impl Traverser + use<>> {
-    let refresher = wire_document_refresher_with_cleanup(start, Arc::clone(&cleanup))
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
-    let git = GitRepository::open_with_cleanup(start, cleanup)
+/// Compose collaborators from the command's shared repository and cleanup owner.
+fn wire_traverser_with_repository(git: GitRepository) -> ServiceResult<impl Traverser + use<>> {
+    let refresher = wire_document_refresher_with_repository(git.clone())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     let filesystem = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
@@ -145,7 +142,7 @@ fn wire_traverser_with_cleanup(
         storage,
         filesystem,
         refresher: Box::new(refresher),
-        embeddings: Box::new(wire_embedding_executor(start)?),
+        embeddings: Box::new(wire_embedding_executor_at_root(git.get_root())?),
         markdown: Box::new(MarkdownParser::new()),
         sources: Box::new(
             wire_source_reader(git.get_root()).map_err(|cause| {
@@ -153,7 +150,7 @@ fn wire_traverser_with_cleanup(
             })?,
         ),
         provenance: Box::new(
-            wire_source_provenance(start).map_err(|cause| {
+            wire_source_provenance_with_repository(git).map_err(|cause| {
                 ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause)
             })?,
         ),
@@ -186,8 +183,7 @@ pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenan
             cause,
         )
     })?;
-    let filesystem = LocalFileSystem::open(git.get_root())?;
-    Ok(ProvenanceService::new(git, filesystem))
+    wire_source_provenance_with_repository(git)
 }
 
 /// Wire corpus validation with one pinned reader and independent live provenance observations.
@@ -195,17 +191,14 @@ pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenan
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or storage setup failures.
 pub fn wire_checker(start: &Path) -> ServiceResult<impl Checker + use<>> {
-    wire_checker_with_cleanup(start, Arc::new(GitWriteCleanup::new()))
+    let git = GitRepository::open(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
+    wire_checker_with_repository(git)
 }
 
-/// Compose this service with the foreground command's Git write-resource owner.
-fn wire_checker_with_cleanup(
-    start: &Path,
-    cleanup: Arc<GitWriteCleanup>,
-) -> ServiceResult<impl Checker + use<>> {
-    let refresher = wire_document_refresher_with_cleanup(start, Arc::clone(&cleanup))
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
-    let git = GitRepository::open_with_cleanup(start, Arc::clone(&cleanup))
+/// Compose collaborators from the command's shared repository and cleanup owner.
+fn wire_checker_with_repository(git: GitRepository) -> ServiceResult<impl Checker + use<>> {
+    let refresher = wire_document_refresher_with_repository(git.clone())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     let filesystem = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
@@ -218,12 +211,8 @@ fn wire_checker_with_cleanup(
         refresher,
         storage,
         GraphDiagnosticsService::new(),
-        ProvenanceService::new(
-            GitRepository::open_with_cleanup(start, cleanup)
-                .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
-            LocalFileSystem::open(git.get_root())
-                .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
-        ),
+        wire_source_provenance_with_repository(git)
+            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
     ))
 }
 
@@ -232,17 +221,14 @@ fn wire_checker_with_cleanup(
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
 pub fn wire_searcher(start: &Path) -> ServiceResult<impl Searcher + use<>> {
-    wire_searcher_with_cleanup(start, Arc::new(GitWriteCleanup::new()))
+    let git = GitRepository::open(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
+    wire_searcher_with_repository(git)
 }
 
-/// Compose this service with the foreground command's Git write-resource owner.
-fn wire_searcher_with_cleanup(
-    start: &Path,
-    cleanup: Arc<GitWriteCleanup>,
-) -> ServiceResult<impl Searcher + use<>> {
-    let refresher = wire_document_refresher_with_cleanup(start, Arc::clone(&cleanup))
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
-    let git = GitRepository::open_with_cleanup(start, Arc::clone(&cleanup))
+/// Compose collaborators from the command's shared repository and cleanup owner.
+fn wire_searcher_with_repository(git: GitRepository) -> ServiceResult<impl Searcher + use<>> {
+    let refresher = wire_document_refresher_with_repository(git.clone())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     let filesystem = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
@@ -251,19 +237,15 @@ fn wire_searcher_with_cleanup(
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
-    let embeddings = wire_embedding_executor(start)?;
+    let embeddings = wire_embedding_executor_at_root(git.get_root())?;
     Ok(SearchService {
         refresher,
         storage,
         embeddings,
         filesystem,
         markdown: MarkdownParser::new(),
-        provenance: ProvenanceService::new(
-            GitRepository::open_with_cleanup(start, cleanup)
-                .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
-            LocalFileSystem::open(git.get_root())
-                .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
-        ),
+        provenance: wire_source_provenance_with_repository(git)
+            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
     })
 }
 
@@ -272,17 +254,14 @@ fn wire_searcher_with_cleanup(
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or setup failures.
 pub fn wire_inspector(start: &Path) -> ServiceResult<impl Inspector + use<>> {
-    wire_inspector_with_cleanup(start, Arc::new(GitWriteCleanup::new()))
+    let git = GitRepository::open(start)
+        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
+    wire_inspector_with_repository(git)
 }
 
-/// Compose this service with the foreground command's Git write-resource owner.
-fn wire_inspector_with_cleanup(
-    start: &Path,
-    cleanup: Arc<GitWriteCleanup>,
-) -> ServiceResult<impl Inspector + use<>> {
-    let refresher = wire_document_refresher_with_cleanup(start, Arc::clone(&cleanup))
-        .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
-    let git = GitRepository::open_with_cleanup(start, cleanup)
+/// Compose collaborators from the command's shared repository and cleanup owner.
+fn wire_inspector_with_repository(git: GitRepository) -> ServiceResult<impl Inspector + use<>> {
+    let refresher = wire_document_refresher_with_repository(git.clone())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
     let files = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
@@ -299,21 +278,20 @@ fn wire_inspector_with_cleanup(
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths, or storage/I/O failures.
 pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + use<>> {
-    wire_document_refresher_with_cleanup(start, Arc::new(GitWriteCleanup::new()))
-}
-
-/// Compose this service with the foreground command's Git write-resource owner.
-fn wire_document_refresher_with_cleanup(
-    start: &Path,
-    cleanup: Arc<GitWriteCleanup>,
-) -> DocumentResult<impl Refresher + use<>> {
-    let git = GitRepository::open_with_cleanup(start, Arc::clone(&cleanup)).map_err(|cause| {
+    let git = GitRepository::open(start).map_err(|cause| {
         DocumentError::new_with_cause(
             DocumentErrorKind::InternalError,
             "cannot open document repository",
             cause,
         )
     })?;
+    wire_document_refresher_with_repository(git)
+}
+
+/// Compose document refresh and provenance from the command's shared repository.
+fn wire_document_refresher_with_repository(
+    git: GitRepository,
+) -> DocumentResult<impl Refresher + use<>> {
     let filesystem = LocalFileSystem::open(git.get_root())?;
     let directory = filesystem.open_service_directory()?;
     let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
@@ -324,16 +302,7 @@ fn wire_document_refresher_with_cleanup(
                 cause,
             )
         })?;
-    let provenance = ProvenanceService::new(
-        GitRepository::open_with_cleanup(start, cleanup).map_err(|cause| {
-            DocumentError::new_with_cause(
-                DocumentErrorKind::InternalError,
-                "cannot open provenance repository",
-                cause,
-            )
-        })?,
-        LocalFileSystem::open(git.get_root())?,
-    );
+    let provenance = ProvenanceService::new(git.clone(), LocalFileSystem::open(git.get_root())?);
     Ok(DocumentRefreshService {
         git,
         filesystem,
@@ -341,6 +310,14 @@ fn wire_document_refresher_with_cleanup(
         storage,
         provenance,
     })
+}
+
+/// Wire provenance without rediscovering the command's repository.
+fn wire_source_provenance_with_repository(
+    git: GitRepository,
+) -> DocumentResult<impl SourceProvenance + use<>> {
+    let filesystem = LocalFileSystem::open(git.get_root())?;
+    Ok(ProvenanceService::new(git, filesystem))
 }
 
 /// Wire the existing embedding executor with confined automatic repository storage.
@@ -354,12 +331,19 @@ pub fn wire_embedding_executor(
 ) -> ServiceResult<impl EmbeddingExecutor + Embedder + use<>> {
     let git = GitRepository::open(start)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
-    let files = LocalFileSystem::open(git.get_root())
+    wire_embedding_executor_at_root(git.get_root())
+}
+
+/// Wire embedding collaborators beneath an already discovered repository root.
+fn wire_embedding_executor_at_root(
+    root: &Path,
+) -> ServiceResult<impl EmbeddingExecutor + Embedder + use<>> {
+    let files = LocalFileSystem::open(root)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
     let directory = files
         .open_service_directory()
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
-    let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
+    let storage = SqliteStorage::open_confined(&root.join(SERVICE_DIRECTORY), &directory)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
     Ok(EmbeddingService::new(
         storage,

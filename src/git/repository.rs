@@ -15,6 +15,14 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(test)]
+use std::cell::Cell;
+
+#[cfg(test)]
+thread_local! {
+    static REPOSITORY_OPEN_COUNT: Cell<usize> = const { Cell::new(0) };
+}
+
 /// One foreground-owned repository and uncached raw reader, shared within a command.
 #[derive(Clone, Debug)]
 pub(crate) struct GitRepository {
@@ -45,6 +53,8 @@ impl GitRepository {
             .permissions(permissions)
             .bail_if_untrusted(true)
             .config_overrides(["core.useReplaceRefs=false"]);
+        #[cfg(test)]
+        REPOSITORY_OPEN_COUNT.with(|count| count.set(count.get() + 1));
         let mut repo = gix::ThreadSafeRepository::discover_opts(
             start,
             Default::default(),
@@ -85,6 +95,11 @@ impl GitRepository {
             cleanup,
             alternates,
         })
+    }
+    /// Count actual library discovery calls on this test thread, excluding clones.
+    #[cfg(test)]
+    pub(crate) fn get_repository_open_count() -> usize {
+        REPOSITORY_OPEN_COUNT.with(Cell::get)
     }
     /// Return the discovered worktree root.
     pub(crate) fn get_root(&self) -> &Path {
