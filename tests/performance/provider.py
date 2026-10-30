@@ -27,6 +27,7 @@ class FakeProvider:
         self.active = 0
         self.max_active = 0
         self.cpu_seconds = 0.0
+        self.barrier_timeout = 10
 
     def __enter__(self):
         verify_new_output(self.evidence)
@@ -46,10 +47,11 @@ class FakeProvider:
         self.thread.join(timeout=2)
         write_json(self.evidence / "provider.json", self.get_counters())
 
-    def arm_barrier(self) -> None:
+    def arm_barrier(self, timeout: float = 10) -> None:
         """Pause only the next document request after drain acquires its lock."""
         self.arrived.clear()
         self.release.clear()
+        self.barrier_timeout = timeout
 
     def get_counters(self) -> dict:
         with self.lock:
@@ -80,7 +82,7 @@ class Handler(BaseHTTPRequestHandler):
                 owner.max_active = max(owner.max_active, owner.active)
             if not owner.release.is_set() and not owner.arrived.is_set():
                 owner.arrived.set()
-                if not owner.release.wait(timeout=10):
+                if not owner.release.wait(timeout=owner.barrier_timeout):
                     raise ValueError("fixture barrier timed out")
             self.send_json(200, {"model": "performance-fixture", "embeddings": [build_vector(t) for t in texts]})
         except (ValueError, KeyError, TypeError, OSError):

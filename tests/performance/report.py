@@ -104,6 +104,9 @@ def validate_inspection(scenario: dict, result: dict) -> dict:
     if set(result["elements"]) != {expected_id} or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", result["snapshot"]):
         raise ValueError("invalid inspect identity")
     element = result["elements"][expected_id]
+    oracle = scenario["expected"].get("inspection")
+    if not oracle or any(element.get(key) != oracle[key] for key in ("path", "lines", "hash")):
+        raise ValueError("inspect location/hash differs from independently frozen fragment")
     relative = PurePosixPath(element["path"])
     if relative.is_absolute() or ".." in relative.parts or str(relative) != expected_id.split("#")[0]:
         raise ValueError("unexpected inspect path")

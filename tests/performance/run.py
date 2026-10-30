@@ -189,10 +189,12 @@ def run_series(args, build: dict, fixture: dict, evidence: Path, stream, name: s
 
 
 def append_record(stream, record: dict) -> None:
-    """Persist completed attempts so interruption cannot erase prior evidence."""
+    """Persist an attempt, then propagate user cancellation to the stage controller."""
     stream.write(encode_json(record))
     stream.flush()
     os.fsync(stream.fileno())
+    if record["outcome"] == "interrupted":
+        raise KeyboardInterrupt
 
 
 def stop_stage(*_) -> None:

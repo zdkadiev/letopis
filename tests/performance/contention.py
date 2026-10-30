@@ -72,6 +72,9 @@ def run_contention(scenario: dict, build: dict, evidence: Path) -> dict:
             index_locked = wait_for_index_writer(repository, writer)
             reader = measure_process([build["executable"], *scenario["argv"]], repository,
                                      scenario["stdin"], {"timeout": scenario.get("timeout", 120)})
+            if reader["outcome"] == "interrupted":
+                write_json(evidence / "interrupted-reader.json", reader)
+                raise KeyboardInterrupt
             written = writer.result()
         finally:
             cancel.set()
@@ -149,40 +152,89 @@ def run_campaign(args, build: dict, evidence: Path) -> None:
 
 
 def run_drain_overlap(scenario: dict, build: dict, provider, evidence: Path) -> dict:
-    """Hold the first inference while a reader finishes; then drain with owned cleanup."""
+    """Supervise early writer exit and own any detached fixture successor."""
+    from ownership import FixtureProcesses
     from report import validate_result
     verify_new_output(evidence)
     evidence.mkdir(parents=True)
-    cancel = threading.Event()
-    provider.arm_barrier()
-    with ThreadPoolExecutor(max_workers=1) as executor:
+    with FixtureProcesses(Path(build["executable"]), evidence / "processes") as owner:
+        owned = dict(build, executable=str(owner.get_executable()))
+        result = coordinate_drain(scenario, owned, provider)
+        stopped = owner.stop_all()
+        reader, writer = result["reader"], result["writer"]
+        validation = (validate_result(scenario, reader) if reader
+                      else {"valid": False, "reason": "reader did not start"})
+        overlap = (min(reader["duration_seconds"], max(0., writer["started_monotonic"]
+                   + writer["duration_seconds"] - reader["started_monotonic"])) if reader else 0.)
+        assert_embed_released(scenario["repository"])
+        result.update(reader_validation=validation, overlap_seconds=overlap,
+                      scope="reader during paused inference, not exact SQLite wait time",
+                      provider=provider.get_counters(), owned_embed_lock_released=True,
+                      detached_cleanup_pids=stopped)
+        write_json(evidence / "receipt.json", result)
+    if result["interrupted"] or (reader and reader["outcome"] == "interrupted" and not result["early_writer_exit"]):
+        raise KeyboardInterrupt
+    if (result["error_type"] or result["early_writer_exit"] or stopped or not validation["valid"]
+            or (not scenario.get("cancel_writer") and writer["outcome"] != "success")):
+        raise ValueError("drain/reader schedule aborted or failed correctness")
+    return result
+
+
+def coordinate_drain(scenario: dict, build: dict, provider) -> dict:
+    """Stop/reap readers before requesting writer cleanup, including exception paths."""
+    reader_cancel, writer_cancel = threading.Event(), threading.Event()
+    reader = None
+    read_record, write_record = None, None
+    early, interrupted, error_type = False, False, None
+    provider.arm_barrier(timeout=scenario.get("timeout", 120) + 5)
+    with ThreadPoolExecutor(max_workers=2) as executor:
         writer = executor.submit(measure_process, [build["executable"], "embed", "--drain"],
                                  scenario["repository"], b"{}\n",
-                                 {"timeout": scenario.get("timeout", 120), "cancel_event": cancel})
+                                 {"timeout": scenario.get("timeout", 120), "cancel_event": writer_cancel})
         try:
-            if not provider.arrived.wait(timeout=10):
-                raise ValueError("owned drain did not reach fake inference barrier")
-            reader = measure_process([build["executable"], *scenario["argv"]], scenario["repository"],
-                                     scenario["stdin"], {"timeout": scenario.get("timeout", 120)})
+            if not await_inference(provider, writer):
+                early = writer.done()
+                raise ValueError("owned drain did not reach inference barrier")
+            reader = executor.submit(measure_process, [build["executable"], *scenario["argv"]],
+                                     scenario["repository"], scenario["stdin"],
+                                     {"timeout": scenario.get("timeout", 120), "cancel_event": reader_cancel})
+            early = await_reader(reader, writer, reader_cancel)
+            read_record = reader.result()
             if scenario.get("cancel_writer"):
-                cancel.set()
-            # Reader is reaped before the writer can lose ownership of embed.lock.
+                writer_cancel.set()
             provider.release.set()
-            written = writer.result()
+            write_record = writer.result()
+        except KeyboardInterrupt:
+            interrupted = True
+        except Exception as error:
+            error_type = type(error).__name__
         finally:
-            cancel.set()
+            reader_cancel.set()
+            if reader is not None:
+                read_record = reader.result()
+            writer_cancel.set()
             provider.release.set()
-    assert_embed_released(scenario["repository"])
-    receipt = {"reader": reader, "reader_validation": validate_result(scenario, reader), "writer": written,
-               "scope": "reader during paused model inference; not evidence of SQLite lock contention",
-               "overlap_seconds": min(reader["duration_seconds"], max(0., written["started_monotonic"]
-                    + written["duration_seconds"] - reader["started_monotonic"])),
-               "provider": provider.get_counters(), "owned_embed_lock_released": True}
-    write_json(evidence / "receipt.json", receipt)
-    if not receipt["reader_validation"]["valid"] or (not scenario.get("cancel_writer")
-                                                      and written["outcome"] != "success"):
-        raise ValueError("drain/reader schedule failed correctness or completion")
-    return receipt
+            write_record = writer.result()
+    return {"reader": read_record, "writer": write_record, "early_writer_exit": early,
+            "interrupted": interrupted, "error_type": error_type}
+
+
+def await_reader(reader, writer, cancellation: threading.Event) -> bool:
+    while not reader.done():
+        if writer.done():
+            cancellation.set()
+            return True
+        time.sleep(.005)
+    return False
+
+
+def await_inference(provider, writer) -> bool:
+    deadline = time.monotonic() + 10
+    while not provider.arrived.is_set() and time.monotonic() < deadline:
+        if writer.done():
+            return False
+        provider.arrived.wait(timeout=.005)
+    return provider.arrived.is_set()
 
 
 def build_observer(source: Path, target: Path, evidence: Path) -> dict:
@@ -248,6 +300,8 @@ def configure_provider(repository: Path, url: str, enabled: bool) -> None:
 def invoke_cli(binary: Path, repository: Path, invocation: dict) -> tuple[dict, object]:
     record = measure_process([str(binary), *invocation["args"]], repository,
                              encode_json(invocation["request"]), {"timeout": invocation.get("timeout", 120)})
+    if record["outcome"] == "interrupted":
+        raise KeyboardInterrupt
     if record["outcome"] != "success" or record["stdout"]["truncated"]:
         raise ValueError("CLI invocation failed")
     response = json.loads(bytes.fromhex(record["stdout"]["capture_hex"]))

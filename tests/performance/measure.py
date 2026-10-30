@@ -32,17 +32,22 @@ def measure_process(argv: list[str], repository: Path, data: bytes, options: dic
         usage = collect_process(child, data, streams,
                                 {"deadline": started + options.get("timeout", 120),
                                  "cancel_event": options.get("cancel_event")})
-        record.update(exit_code=child.returncode, outcome="success" if child.returncode == 0 else "nonzero",
+        cancelled = options.get("cancel_event")
+        outcome = ("interrupted" if cancelled is not None and cancelled.is_set()
+                   else "success" if child.returncode == 0 else "nonzero")
+        record.update(exit_code=child.returncode, outcome=outcome,
                       resources=describe_resources(usage))
     except (TimeoutError, KeyboardInterrupt, OSError) as error:
         record["outcome"] = ("timeout" if isinstance(error, TimeoutError) else
                              "interrupted" if isinstance(error, KeyboardInterrupt) else "spawn_failed")
     finally:
         if child is not None:
-            usage = stop_session(child)
+            usage = stop_session(child, options.get("cleanup_grace", .5))
             if not record["resources"] and usage is not None:
                 record["resources"] = describe_resources(usage)
             record["exit_code"] = child.returncode
+            for name, capture in streams.items():
+                drain_remaining(getattr(child, name), capture)
             for pipe in (child.stdin, child.stdout, child.stderr):
                 pipe.close()
     record["duration_seconds"] = time.monotonic() - started
@@ -138,23 +143,56 @@ def read_output(selector, key, streams: dict) -> None:
         selector.unregister(key.fileobj)
 
 
-def stop_session(child: subprocess.Popen):
-    """Close this session even when an exited parent left pipe-holding children."""
+def stop_session(child: subprocess.Popen, grace: float = .5):
+    """Give the whole owned group cleanup grace even after its leader exits."""
     usage = None
     for sig in (signal.SIGTERM, signal.SIGKILL):
+        denied = False
         try:
             os.killpg(child.pid, sig)
         except ProcessLookupError:
             break
-        deadline = time.monotonic() + .2
-        while child.returncode is None and time.monotonic() < deadline:
-            pid, status, observed = os.wait4(child.pid, os.WNOHANG)
-            if pid:
-                child.returncode = os.waitstatus_to_exitcode(status)
-                usage = observed
-            else:
-                time.sleep(.005)
+        except PermissionError:
+            denied = True
+        deadline = time.monotonic() + grace
+        while time.monotonic() < deadline:
+            if child.returncode is None:
+                pid, status, observed = os.wait4(child.pid, os.WNOHANG)
+                if pid:
+                    child.returncode = os.waitstatus_to_exitcode(status)
+                    usage = observed
+            if not has_process_group(child.pid):
+                break
+            time.sleep(.005)
+        if denied and child.returncode is None:
+            raise PermissionError("cannot terminate live owned process")
+        if not has_process_group(child.pid):
+            break
     if child.returncode is None:
         _, status, usage = os.wait4(child.pid, 0)
         child.returncode = os.waitstatus_to_exitcode(status)
     return usage
+
+
+def has_process_group(pid: int) -> bool:
+    try:
+        os.killpg(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # A macOS zombie-only group can reject signals until reaped.
+        return True
+
+
+def drain_remaining(pipe, capture: StreamCapture) -> None:
+    """Retain bounded diagnostics emitted during cleanup without waiting for EOF."""
+    os.set_blocking(pipe.fileno(), False)
+    while True:
+        try:
+            data = os.read(pipe.fileno(), 65536)
+        except BlockingIOError:
+            break
+        if not data:
+            break
+        capture.append_bytes(data)

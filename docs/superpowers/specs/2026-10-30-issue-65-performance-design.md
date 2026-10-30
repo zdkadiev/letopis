@@ -54,7 +54,7 @@ platform, or speculative optimization in this scope.
    before knowing which command, scale or wait dominates. Rejected for this task.
 
 The user approved this specification and selected samply on 2026-10-30.
-Implementation still requires separate implementation-plan approval.
+The implementation plan was separately approved before execution.
 
 ## Diagnostic tooling
 

@@ -14,6 +14,17 @@ from measure import measure_process
 
 
 class MeasurementTests(unittest.TestCase):
+    def test_retains_diagnostics_emitted_during_timeout_cleanup(self):
+        # Given: a child writes a small diagnostic while handling TERM.
+        code = ("import signal,sys,time;"
+                "signal.signal(signal.SIGTERM,lambda *_:(sys.stderr.write('cleanup diagnostic'),sys.stderr.flush(),sys.exit(1)));"
+                "time.sleep(60)")
+        # When: timeout cleanup terminates that owned child.
+        result = measure_process([sys.executable, "-c", code], Path.cwd(), b"", {"timeout": .1})
+        # Then: bounded failure evidence includes bytes produced during cleanup.
+        self.assertEqual(result["outcome"], "timeout")
+        self.assertIn(b"cleanup diagnostic", bytes.fromhex(result["stderr"]["capture_hex"]))
+
     def test_timeout_retains_resource_observation_for_killed_child(self):
         # Given: a live owned child that exceeds its bounded deadline.
         result = measure_process([sys.executable, "-c", "import time;time.sleep(60)"],

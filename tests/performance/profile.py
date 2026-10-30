@@ -67,6 +67,8 @@ def record_wall_stacks(scenario: dict, build: dict, evidence: Path) -> dict:
             pid = observed.get(timeout=5)
             command = [sampler, str(pid), "3", "1", "-mayDie", "-file", str(output)]
             recorded = measure_process(command, scenario["repository"], b"", {"timeout": 15})
+            if recorded["outcome"] == "interrupted":
+                cancel.set()
             child = job.result()
         finally:
             cancel.set()
@@ -76,6 +78,8 @@ def record_wall_stacks(scenario: dict, build: dict, evidence: Path) -> dict:
     result["outcome"] = ("recorded" if recorded["outcome"] == "success" and output.exists()
                          and output.stat().st_size else "unavailable")
     write_json(evidence / "receipt.json", result)
+    if recorded["outcome"] == "interrupted":
+        raise KeyboardInterrupt
     return result
 
 
@@ -211,7 +215,9 @@ def run_profiles(args, build: dict, evidence: Path) -> None:
                 scenario["timeout"] = args.timeout
                 record_git_calls(scenario, build, evidence / f"git-{name}")
                 if sys.platform == "darwin" and time.monotonic() - started < args.stage_seconds:
-                    record_wall_stacks(scenario, build, evidence / f"wall-{name}")
+                    wall = prepare_scenario(fixture, name, evidence / f"wall-case-{name}")
+                    wall["timeout"] = args.timeout
+                    record_wall_stacks(wall, build, evidence / f"wall-{name}")
     from report import write_report
     write_report(evidence)
 
@@ -260,4 +266,6 @@ def record_profile_window(scenario: dict, build: dict, evidence: Path, seconds: 
         stacks = summarize_stacks(Path(captured["path"]), symbols, child["pid"])
         write_json(evidence / "letopis-stacks.json", stacks)
     write_json(evidence / "receipt.json", result)
+    if captured["measurement"]["outcome"] == "interrupted":
+        raise KeyboardInterrupt
     return result

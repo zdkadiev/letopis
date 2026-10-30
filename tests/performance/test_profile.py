@@ -11,10 +11,45 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from profile import record_profile, record_wall_stacks, run_profile_pair, summarize_stacks, validate_profile
+from profile import record_profile, record_profile_window, record_wall_stacks, run_profile_pair, run_profiles, summarize_stacks, validate_profile
 
 
 class ProfileTests(unittest.TestCase):
+    def test_interrupted_profile_window_is_persisted_then_propagated(self):
+        # Given: Ctrl-C interrupted the sampler rather than the bounded CLI window.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            case = {"repository": root, "argv": ["search"], "stdin": b"{}"}
+            failed = {"outcome": "unavailable", "measurement": {"outcome": "interrupted"}}
+            # When / Then: window receipts survive, and the campaign cannot continue.
+            with patch("profile.record_profile", return_value=failed):
+                with self.assertRaises(KeyboardInterrupt):
+                    record_profile_window(case, {"executable": "fixture"}, root / "window", .1)
+            self.assertTrue((root / "window/receipt.json").exists())
+
+    def test_wall_refresh_uses_separate_unpublished_edit_fixture(self):
+        # Given: the Git-counter invocation publishes its own prepared refresh.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            args = SimpleNamespace(nodes=60, fixture_manifest=None, profile_window=None,
+                scenarios=["refresh_one"], repetitions=1, stage_seconds=120, timeout=1)
+            published = {}
+            def prepare(_, name, output):
+                return {"repository": output, "name": name}
+            def count(scenario, *_):
+                published[scenario["repository"]] = True
+            def wall(scenario, *_):
+                self.assertFalse(published.get(scenario["repository"], False), "wall inherited a published edit")
+            # When: completing the counter run before wall sampling.
+            with patch("profile.prepare_fixture", return_value={"counts": {"knowledge": 60}, "repository": root}), \
+                    patch("profile.initialize_projection"), patch("profile.run_profile_pair"), \
+                    patch("profile.prepare_scenario", side_effect=prepare), \
+                    patch("profile.record_git_calls", side_effect=count), patch("profile.record_wall_stacks", side_effect=wall), \
+                    patch("profile.subprocess.check_output", return_value="samply fixture"), patch("profile.sys.platform", "darwin"):
+                run_profiles(args, {"executable": "fixture"}, root)
+            # Then: counter publication never changes the wall sampler's starting state.
+            self.assertEqual(len(published), 1)
+
     def test_missing_samply_returns_a_failed_measurement_receipt(self):
         # Given: this host has no profiler executable.
         with tempfile.TemporaryDirectory() as directory:

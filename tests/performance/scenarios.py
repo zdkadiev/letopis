@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -116,11 +117,27 @@ def prepare_scenario(fixture: dict, name: str, output: Path) -> dict:
                 "counts": fixture["counts"], "changed": bool(changed)}
     if command == "traverse":
         expected.update(build_traversal_oracle())
+    if command == "inspect":
+        expected["inspection"] = build_inspection_oracle(output, FIRST_ID)
     return {"repository": output, "argv": [command], "stdin": encode_json(request),
             "expected": expected,
             "setup_seconds": time.monotonic() - started, "state_hashes": hashes,
             "cache_label": "initialized_projection_os_cache_uncontrolled",
             "embedding_mode": "fts_disabled", "changed_paths": changed, "name": name}
+
+
+def build_inspection_oracle(repository: Path, element_id: str) -> dict:
+    """Freeze the synthetic anchor's location and bytes before invoking the product."""
+    relative, anchor = element_id.split("#", 1)
+    lines = (repository / relative).read_bytes().splitlines(keepends=True)
+    pattern = rb"^## .+ \{#" + re.escape(anchor.encode()) + rb"\}\n$"
+    starts = [index for index, line in enumerate(lines) if re.match(pattern, line)]
+    if len(starts) != 1:
+        raise ValueError("fixture must contain exactly one requested marked anchor")
+    start = starts[0]
+    end = next((index for index in range(start + 1, len(lines)) if lines[index].startswith(b"## ")), len(lines))
+    return {"path": relative, "lines": [start + 1, end],
+            "hash": hashlib.sha256(b"".join(lines[start:end])).hexdigest()}
 
 
 def build_traversal_oracle() -> dict:

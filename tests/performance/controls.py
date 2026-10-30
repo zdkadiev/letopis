@@ -46,6 +46,12 @@ def main() -> None:
             results[variant] = measure_control(scenario, build, evidence / f"results-{variant}")
         write_json(evidence / "comparison.json", {"results": results,
                    "interpretation": "workload control changes required behavior, not an equivalent optimization"})
+    except KeyboardInterrupt:
+        write_json(evidence / "completion.json", {"outcome": "interrupted"})
+        raise
+    except Exception as error:
+        write_json(evidence / "completion.json", {"outcome": "failed", "error_type": type(error).__name__})
+        raise
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous)

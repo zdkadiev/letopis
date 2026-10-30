@@ -1,6 +1,7 @@
 # #65 — диагностика производительности Letopis
 
-2026-10-30. Статус: измерения model-free выполнены; независимое итоговое ревью ещё впереди.
+2026-10-30. Статус: model-free диагностика завершена; независимое ревью выполнено,
+пять существенных замечаний исправлены и проверены регрессиями.
 Оптимизации продукта не реализованы. Issue/gates не закрывались.
 
 ## Сборка и условия
@@ -225,13 +226,21 @@ zero-sample profile, stdin forwarding, vector coverage, writer cancellation,
 control edge counts и inclusive CPU double counting. Файлы восстановлены.
 Обнаруженные runner defects (mutable Cargo artifact, missing provenance,
 timeout RSS, freshness flag validation, short stage budget) закреплены отдельными
-регрессионными тестами. [Evidence index](evidence-index.json): 140 raw artifacts с SHA-256;
-проверены 177 сохранённых файлов harness из manifests. Raw profiles/receipts
+регрессионными тестами. [Evidence index](evidence-index.json): 153 raw artifacts с SHA-256;
+проверены 223 сохранённых файлов harness из manifests. Raw profiles/receipts
 локальны и git-ignored; индекс сохраняет ссылки и проверяемые hashes.
 
-Перед review повторно проверены все 140 indexed hashes, длины функций ≤60,
+Перед review повторно проверены исходные 140 indexed hashes; итоговый index содержит 153 artifacts, длины функций ≤60,
 ссылки документации и `git diff --check`.
 
-Независимое итоговое ревью: pending. Два optimization drafts ещё не опубликованы.
+[Независимое итоговое ревью и авторский fix pass](review.md): Critical 0,
+Important 5 исправлены, Minor 0. После исправлений **56/56 тестов PASS без skips**;
+пять review guards mutation-checked, файлы восстановлены. Дополнительный
+[независимый oracle replay](../../../../../.artifacts/issue-65/inspection-revalidation-01/revalidation.json)
+проверил все 17 retained inspect timings. Численные результаты не изменены;
+дорогие кампании после lifecycle/oracle fixes не повторялись. Настоящий samply
+проверен на намеренном внешнем watchdog: child interrupted/-15, без живого workload.
+Повторное независимое одобрение исправленного дерева не заявляется.
+Два optimization drafts ещё не опубликованы.
 Продуктовые Rust/native inputs совпадают с исходным main; новые инфраструктурные
 слои, runtime и изменения composition root отсутствуют.

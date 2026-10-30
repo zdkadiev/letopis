@@ -23,6 +23,19 @@ def make_measurement(response) -> dict:
 
 
 class ReportTests(unittest.TestCase):
+    def test_inspect_rejects_another_valid_fragment_and_missing_location(self):
+        # Given: independently frozen bytes for the first of two marked sections.
+        first, second = b"## Zero {#zero}\nzero\n", b"## One {#one}\none\n"
+        scenario = {"repository": Path.cwd(), "expected": {"command": "inspect", "id": "a.md#zero",
+            "inspection": {"path": "a.md", "lines": [1, 2], "hash": hashlib.sha256(first).hexdigest()}}}
+        bad = [{"path": "a.md", "lines": [3, 4], "hash": hashlib.sha256(second).hexdigest()},
+               {"path": "a.md", "hash": hashlib.sha256(first + second).hexdigest()}]
+        # When / Then: internally consistent bytes/hash do not excuse a wrong anchor.
+        with patch("report.run_git", return_value=first + second):
+            for element in bad:
+                response = {"ok": True, "result": {"snapshot": "1" * 40, "elements": {"a.md#zero": element}}}
+                self.assertFalse(validate_result(scenario, make_measurement(response))["valid"])
+
     def test_projection_count_oracle_reads_independent_metadata(self):
         # Given: literal metadata with two knowledge nodes, one source and one edge.
         with tempfile.TemporaryDirectory() as directory:
@@ -102,9 +115,10 @@ class ReportTests(unittest.TestCase):
 
     def test_inspect_hash_uses_captured_range_bytes(self):
         # Given: two lines in a captured tree, with only line two addressed.
-        scenario = {"repository": Path.cwd(), "expected": {"command": "inspect", "id": "a.md"}}
         element = {"path": "a.md", "lines": [2, 2], "hash": hashlib.sha256(b"two\n").hexdigest()}
-        response = {"ok": True, "result": {"snapshot": "1" * 40, "elements": {"a.md": element}}}
+        scenario = {"repository": Path.cwd(), "expected": {"command": "inspect", "id": "a.md#L2-L2",
+                    "inspection": dict(element)}}
+        response = {"ok": True, "result": {"snapshot": "1" * 40, "elements": {"a.md#L2-L2": element}}}
         # When: checking the claimed bytes, independently of live file contents.
         with patch("report.run_git", return_value=b"one\ntwo\n"):
             valid = validate_result(scenario, make_measurement(response))

@@ -98,6 +98,20 @@ and lets a root wrapper finish so samply can save. Wrapper success is explicitly
 It is never included in ordinary successful latency. `letopis-stacks.json` filters
 the profile to the actual CLI PID rather than mixing Python CPU into its frames.
 
+Cancellation propagates after persisting the interrupted attempt; it stops later
+scenarios/pairs. Outer TERM/INT also cancels nested window workloads. Cleanup
+allows bounded grace for the entire process group, including when its leader
+already exited. Wall sampling of a refresh uses a separate pre-edit fixture.
+The inspect oracle freezes the expected anchor/range/hash before invocation;
+an internally consistent hash for the wrong section is rejected.
+
+Drain-overlap assessment monitors early writer exit. It uses a unique private
+copy of the pinned executable so detached successors remain attributable by exact
+path, rechecks PID identity before signalling, and never kills by process basename.
+If this host cannot inspect those identities, it refuses that assessment before
+launch. Unexpected early exit aborts the schedule; expected cancel-after-reader
+is explicitly labeled. Historical receipts retain the harness version that ran.
+
 ## Metric scopes and tests
 
 Per-child wait4 records CPU and lifetime max RSS with explicit OS accounting of

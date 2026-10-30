@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-30",
   "scope": "diagnostic receipts/profiles plus immutable release; corpus bytes separately pinned in corpus manifests; SQL databases are derived state",
-  "verified_archived_harness_files": 177,
+  "verified_archived_harness_files": 223,
   "files": [
     {
       "path": ".artifacts/issue-65/build-01/build.json",
@@ -93,6 +93,16 @@
       "path": ".artifacts/issue-65/contention-60-01/reindex-overlap/receipt.json",
       "sha256": "66608ff3c112554f963beb713f6d532812dd339dbae3bce8de1b18fb5ae09b95",
       "bytes": 4263
+    },
+    {
+      "path": ".artifacts/issue-65/inspection-revalidation-01/manifest.json",
+      "sha256": "a3b5eaf9aa5bf443f12e09512552c103443da690e216d62a9c3f69392193925d",
+      "bytes": 2473
+    },
+    {
+      "path": ".artifacts/issue-65/inspection-revalidation-01/revalidation.json",
+      "sha256": "c252106840418ccd01826dfb9dc54e155d3cec8f247959bc301e40ad7e80090b",
+      "bytes": 6421
     },
     {
       "path": ".artifacts/issue-65/observer-build-01/build.json",
@@ -328,6 +338,61 @@
       "path": ".artifacts/issue-65/profile-1k-01/summary.json",
       "sha256": "bf0f3850b7b777d5f122f3e959569ad3d9a3fb4371074955e35e816d4bc6a679",
       "bytes": 2595
+    },
+    {
+      "path": ".artifacts/issue-65/review-cancel-smoke-01/build.json",
+      "sha256": "c745f802a66237d2a4684815adde589ce25362e248e6883da2d5d8d3e9db9bc3",
+      "bytes": 15630
+    },
+    {
+      "path": ".artifacts/issue-65/review-cancel-smoke-01/completion.json",
+      "sha256": "13cbe4ef2f6940608b752cd0245abdef829a27f7d94cb7bd55bcac2200623585",
+      "bytes": 119
+    },
+    {
+      "path": ".artifacts/issue-65/review-cancel-smoke-01/manifest.json",
+      "sha256": "82119951cd1b3b2b6ec15516bc84f23ca53b697c2b68f9cce48ad1d7211bbd07",
+      "bytes": 5698
+    },
+    {
+      "path": ".artifacts/issue-65/review-cancel-smoke-01/window/child.json",
+      "sha256": "7e8406e55ffd28b8f12f053c94ac7999e0513e818252430d8d99ccef11c772e3",
+      "bytes": 991
+    },
+    {
+      "path": ".artifacts/issue-65/review-cancel-smoke-01/window/request.json",
+      "sha256": "25a003b3dc3f2f1c8f7b3fdbfc6ea53b3cf0c17293b28fdd0a7b517faa99a22e",
+      "bytes": 359
+    },
+    {
+      "path": ".artifacts/issue-65/review-fix-mutations-01/inspect_location.log",
+      "sha256": "7e336d91420648db8b37c49f476c283f8a7f155f3949730e8a0211cd5905878c",
+      "bytes": 742
+    },
+    {
+      "path": ".artifacts/issue-65/review-fix-mutations-01/nested_cleanup.log",
+      "sha256": "857453a76d78003f0a4279bf3bbf55335f2c0bd6219baf42e86fbb0eec6f4ee1",
+      "bytes": 747
+    },
+    {
+      "path": ".artifacts/issue-65/review-fix-mutations-01/results.json",
+      "sha256": "269b3aad9525e5360399691a3e8694428326e7115e46f2e6b0e6515f494b8623",
+      "bytes": 1479
+    },
+    {
+      "path": ".artifacts/issue-65/review-fix-mutations-01/stage_cancel.log",
+      "sha256": "209aa26ec31602e2afb6f3419f809c2dd527aab879f7bd0da00058f901b06a96",
+      "bytes": 770
+    },
+    {
+      "path": ".artifacts/issue-65/review-fix-mutations-01/wall_reset.log",
+      "sha256": "56f176bb1c116ba389e42a34cf7892bd58d55bca75198c961da25ce45b20ed1e",
+      "bytes": 1839
+    },
+    {
+      "path": ".artifacts/issue-65/review-fix-mutations-01/writer_supervision.log",
+      "sha256": "4f27814d8723b1ed048649281381a3a7c5eb3c3e303803ccab82d065be7cf65e",
+      "bytes": 736
     },
     {
       "path": ".artifacts/issue-65/scale-100k-01/build.json",

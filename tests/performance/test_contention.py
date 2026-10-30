@@ -4,6 +4,11 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+import time
+import threading
+from unittest.mock import patch
+
+from measure import measure_process as actual_measure
 
 from contention import (configure_provider, embed_lease, invoke_cli, observe_vectors, run_canary,
                         run_contention, run_drain_overlap, verify_coverage)
@@ -11,6 +16,44 @@ from provider import start_provider
 
 
 class ContentionTests(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get("PERF_LETOPIS_BINARY"), "requires pinned release executable")
+    def test_early_writer_exit_stops_reader_and_records_aborted_schedule(self):
+        # Given: the owned drain is interrupted while a deliberately slow reader is active.
+        binary = Path(os.environ["PERF_LETOPIS_BINARY"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            run_canary(binary, root / "canary")
+            repository = root / "canary/repository"
+            with start_provider(root / "provider") as provider:
+                configure_provider(repository, provider.url, True)
+                with embed_lease(repository):
+                    invoke_cli(binary, repository, {"args": ["search"], "request": {"query": "", "limit": 1}})
+                scenario = {"repository": repository, "argv": ["check"], "stdin": b"{}",
+                            "expected": {"command": "check"}, "timeout": 5}
+                def route(argv, cwd, data, options):
+                    if argv[-1] == "check":
+                        import sys
+                        return actual_measure([sys.executable, "-c", "import time;time.sleep(60)"],
+                                              cwd, b"", dict(options, timeout=5))
+                    def interrupt_writer():
+                        if provider.arrived.wait(timeout=3):
+                            time.sleep(.15)
+                            options["cancel_event"].set()
+                    fault = threading.Thread(target=interrupt_writer, daemon=True)
+                    fault.start()
+                    return actual_measure(argv, cwd, data, options)
+                # When: the supervisor observes early writer termination.
+                started = time.monotonic()
+                with patch("contention.measure_process", side_effect=route):
+                    with self.assertRaises(ValueError):
+                        run_drain_overlap(scenario, {"executable": str(binary)}, provider, root / "overlap")
+                # Then: the five-second reader does not outlive writer ownership.
+                self.assertLess(time.monotonic() - started, 3)
+                import json
+                receipt = json.loads((root / "overlap/receipt.json").read_text())
+                self.assertTrue(receipt["early_writer_exit"])
+                self.assertEqual(receipt["reader"]["outcome"], "interrupted")
+
     @unittest.skipUnless(os.environ.get("PERF_OBSERVER_BINARY") and os.environ.get("PERF_LETOPIS_BINARY"),
                          "requires pinned product and observer")
     def test_native_observer_checks_current_coverage_and_rejects_wrong_counts(self):
