@@ -2,8 +2,13 @@
 mod batch;
 mod cli;
 mod constants;
+#[cfg(test)]
+mod durability;
+mod hashing;
 mod objects;
 mod process;
+#[cfg(test)]
+mod reader;
 mod refs;
 mod validation;
 

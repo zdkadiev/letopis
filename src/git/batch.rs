@@ -1,9 +1,9 @@
+use super::hashing::ObjectHasher;
 use super::{
     constants::{BLOB_KIND, TREE_KIND},
     process::{GitProcess, make_exit_error, make_io_error},
 };
 use crate::service::{SnapshotError, SnapshotErrorKind};
-use hashing::ObjectHasher;
 use std::{
     io::{self, BufRead, BufReader, Read, Write},
     path::Path,
@@ -11,7 +11,6 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-mod hashing;
 pub(super) mod tree;
 const MAX_HEADER_BYTES: u64 = 256;
 const BUFFER_BYTES: usize = 64 * 1024;

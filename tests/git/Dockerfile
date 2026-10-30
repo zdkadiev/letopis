@@ -9,5 +9,6 @@ COPY src ./src
 COPY tests/*.rs ./tests/
 COPY tests/support ./tests/support
 COPY tests/fixtures/markdown ./tests/fixtures/markdown
+COPY tests/fixtures/git ./tests/fixtures/git
 RUN cargo fetch --locked
 CMD ["sh", "-c", "git --version && rustc --version && cargo --version && uname -sm && cargo test --locked --offline && cargo fmt --all --check && cargo clippy --locked --offline --all-targets -- -D warnings"]

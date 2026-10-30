@@ -6,5 +6,6 @@ COPY src ./src
 COPY tests/domain_values.rs tests/markdown_elements.rs tests/markdown_links.rs tests/markdown_search.rs ./tests/
 COPY tests/support ./tests/support
 COPY tests/fixtures/markdown ./tests/fixtures/markdown
+COPY tests/fixtures/git ./tests/fixtures/git
 RUN cargo fetch --locked
 CMD ["sh", "-c", "rustc --version && cargo --version && uname -m && cargo test --locked --offline && cargo fmt --all --check && cargo clippy --locked --offline --all-targets -- -D warnings"]
