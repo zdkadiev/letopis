@@ -1,12 +1,38 @@
 # Issue 67 review status
 
-Final whole-branch independent review is **pending**. Task 8's measurement author
-has not dispatched a reviewer or certified the branch. The controller owns the
-Task 8 review and final base/head review, including final findings and rulings.
+Final whole-branch independent review at `8af440a` found **0 Critical, 1 Important
+(F-I1 sparse-index membership), 1 Minor (F-M1 copied command notes)** and was not
+ready to merge. The consolidated fix is implemented; **scoped independent re-review
+is pending**. The implementer has not certified acceptance. The controller owns
+the review/rulings and plan progress. The original independent report is preserved
+in the fresh hash-indexed final-fix archive.
 The accepted Task 1–7 reviews, fixes and receipts are preserved in the local
 hash-indexed SDD archive referenced by [the evidence index](evidence-index.json).
 
-## Task 8 self-review
+## Consolidated final fixes
+
+F-I1 is fixed at `b488aeb4a7faa33f58e6e9c87a4f4d638631680b`: sparse-directory
+entries expand from their index OID through the existing verified raw tree reader,
+into an in-memory index used by both listing and ignores/walk. Ordinary indexes
+stay borrowed. No persistent index/HEAD/worktree write, subprocess fallback,
+service interface, runtime or dependency was added. SHA-1/SHA-256 tests assert a
+real collapsed directory, staged membership distinct from HEAD, tracked ignored
+restoration, deleted membership, nested index-backed ignores, complete unrequested
+inspect capture and unchanged user state. The omission mutant compiles and fails.
+
+Current `make verify` passes; focused Linux Git 2.50.1 passes 22 repository tests,
+5 helper-denial tests and 41 traced intervals. Two failed Linux image setup/oracle
+attempts are retained. Current performance after measurements use the corrected
+freeze; original optimized `ba4a11d` values are historical. Fresh ordinary paired
+controls and after-only publication/maintenance/contention/profile/counter/RSS
+refreshes are distinguished from reused historical baseline evidence.
+
+F-M1's four current notes now match their own receipts (18/14/four timeouts/exit1;
+8/8; 8/8; 20/20). A new corrected task-8 archive preserves the old point-in-time
+archive unchanged. The stale specification opening is corrected. No reviewer or
+subagent was spawned by this fix implementer; scoped acceptance remains open.
+
+## Historical Task 8 self-review (pre-fix `ba4a11d`)
 
 - Product inputs are committed at `ba4a11db26705999018187e8301a51e9942fe1ba`;
   the frozen release uses the same locked compiler/profile/debug settings as the
@@ -41,9 +67,15 @@ hash-indexed SDD archive referenced by [the evidence index](evidence-index.json)
 2. Task 7's 39 traced foreground/direct-drain invocations exclude the eligible
    foreground-to-detached interval. Separate lifecycle tests and source audit
    cover that boundary; the 39 traces do not independently establish it.
-3. The pre-existing direct-drain caller-directory versus resolved-root lock
-   inconsistency remains unverified and unfixed. The root-based matrix does not
-   resolve it, and Task 8 introduces no change to that path.
+3. Direct-drain wrong-root locking was not substantiated. `commands.rs:142–145`
+   builds the background wrapper at the caller directory, but
+   `BackgroundService::drain` (`src/service/background.rs:35–44`) only calls
+   `tasks.drain()` and never uses that wrapper's filesystem/process.
+   `wire_embedding_executor` (`src/lib.rs:329–350`) resolves the Git root;
+   `EmbeddingService::drain` (`src/service/embedding.rs:102–113`) acquires
+   `self.files.try_lock_embed()` on that root-bound executor. The unused
+   collaborator is not evidence of a concurrency defect. No runtime change or
+   dynamic subdirectory-lock test was performed or claimed.
 4. Performance results concern this synthetic 60/1k corpus and host. Profiles are
    sampled CPU evidence; CLI lifetime overlap is not SQLite/flock wait accounting;
    sampled direct RSS and wait4 lifetime accounting are not whole-stack peak RAM.

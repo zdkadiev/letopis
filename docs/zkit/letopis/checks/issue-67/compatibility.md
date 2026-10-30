@@ -447,3 +447,40 @@ whole-stack concurrent peak or replaces the per-object allocation/capacity gate.
 See [report.md](report.md) for the actual outcomes and budgets,
 [review.md](review.md) for unresolved review scope and
 [evidence-index.json](evidence-index.json) for the canonical local hash index.
+
+
+### Consolidated final-review fix, 2026-10-31
+
+The preceding Task 8 optimized pin `ba4a11d` is **pre-fix historical evidence**.
+Corrected product commit `b488aeb4a7faa33f58e6e9c87a4f4d638631680b` expands
+collapsed sparse index entries in memory from the actual index tree OID, using
+the existing verified reader/parser and alternates policy. Both the tracked union
+and ignore/walk receive the expanded view. No service API, dependency, native
+input, schema, runtime or closure verifier changed. Ordinary indexes take the
+borrowed fast path; expansion does not read their objects or clone their state.
+
+Current `make verify` passed (format/check/Clippy/debug/strict-doc/release).
+Focused Linux aarch64 verification passed 22 Git repository tests plus 5 no-helper
+tests, with 41 product trace intervals including two sparse inspect calls. The
+successful fresh image derives from `letopis-issue67-task7-oracle-20261031`, verifies
+Git 2.50.1, overlays current Rust/test sources, and executes with networking off.
+Exact source hashes, image IDs and traces are in the final-fix evidence. The earlier
+trace-base attempt lacked the configuration fixture; its successor used Git 2.39
+and failed the known strict malformed-tree oracle. Both failed attempts remain
+archived; neither establishes a product failure or a passing Linux gate.
+
+The real collapsed-index fixtures cover SHA-1/SHA-256, staged membership absent
+from HEAD, tracked ignored restoration, deleted files, nested missing `.gitignore`,
+replacement immunity, missing/corrupt tree failure, late alternates, complete
+unrequested inspect capture and user-state preservation. The compiled omission
+mutant fails exact membership; restoration is hash-checked. Existing raw-byte
+validation, mode/gitlink behavior and strict tree checks remain in their owners.
+
+Storage/native and large-object harnesses were not rerun because their affected
+code and dependency inputs did not change. Their old receipts retain original
+revision/platform scope. This new Linux run is focused, not a new full native
+campaign. No x86_64, NFS, physical crash, real-provider or whole-stack NFR guarantee
+is implied. The source-traced direct-drain lock disposition is in [review.md](review.md),
+without a newly claimed dynamic subdirectory test. Scoped independent re-review
+is still pending; [report.md](report.md) and [evidence-index.json](evidence-index.json)
+distinguish corrected-pin measurements from retained historical observations.

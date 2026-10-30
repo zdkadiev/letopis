@@ -1,14 +1,23 @@
 # Issue 67 evidence index
 
-The single authoritative inventory is [evidence-index.json](evidence-index.json).
-It records frozen build identities, campaign receipts and the SHA-256 of the
-complete local artifact file index, including failed/censored attempts, profiles,
-source archives, runner scripts and substantive SDD reports/reviews/rulings.
+The authoritative [evidence-index.json](evidence-index.json) distinguishes the
+corrected `b488aeb` freeze and fresh campaigns from historical Task 8 `ba4a11d`
+measurements. The unchanged baseline remains pinned separately. Every current
+after measurement belongs to the corrected executable; before-only historical
+publication/censors/contention/diagnostics are explicitly scoped.
 
-Raw evidence remains local and ignored under `.artifacts/issue-67/`; binaries and
-raw payloads are not committed. Earlier issue 67 and all issue 65 evidence remain
-unchanged. New review evidence must be appended in fresh paths and indexed by the
-controller; the current inventory does not claim a future final review exists.
+`local_artifact_inventory` preserves the original Task 8 point-in-time inventory.
+`final_fix.inventory` adds the fresh code/tests/receipts, failed setup attempts,
+immutable corrected source/binary, paired samples, profiles/counters/RSS, exact
+fixture-membership validation, original independent review and corrected task-8
+notes. The old SDD archive is unchanged; a new corrected report is hash-indexed.
 
-See [report.md](report.md) for measurements, [compatibility.md](compatibility.md)
-for platform/source scope and [review.md](review.md) for pending independent review.
+Raw evidence is local and ignored under `.artifacts/issue-67/`; binaries and raw
+payloads are not committed. Commit receipts produced after each inventory are
+explicitly identified as its tail. Issue 65 evidence and protected staged/worktree
+state remain unchanged. The original final review found F-I1/F-M1; their fix is
+recorded, while controller-owned **scoped independent re-review is pending**.
+No future acceptance is claimed by this index.
+
+See [report.md](report.md) for current measurements, [compatibility.md](compatibility.md)
+for exact platform scope and [review.md](review.md) for findings and rulings.

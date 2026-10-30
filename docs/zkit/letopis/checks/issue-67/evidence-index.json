@@ -2,6 +2,24 @@
   "branch": "issue-67",
   "builds": {
     "after": {
+      "binary_sha256": "950f522946a4611885f6ef8fbb26e94b336c45c9a9fa7f1b328e41b6ba9050d3",
+      "original_release_receipt": {
+        "bytes": 17208,
+        "path": ".artifacts/issue-67/after-final-fix-20261031/release/build.json",
+        "sha256": "6712844cfba32b7b6c2d6296e95ca97301ee58a06d3aaf4e972af00fe657af36"
+      },
+      "pin": {
+        "bytes": 17795,
+        "path": ".artifacts/issue-67/after-final-fix-20261031/build.json",
+        "sha256": "1da30af6f5eb7fcc6dff90b1ecdc2429073a1e81f08b99933f17e21aa0f2371a"
+      },
+      "product_commit": "b488aeb4a7faa33f58e6e9c87a4f4d638631680b",
+      "product_input_count": 171,
+      "release_debug": "1",
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "source_archive": ".artifacts/issue-67/after-final-fix-20261031/source"
+    },
+    "after_pre_fix_historical": {
       "binary_sha256": "18288faf715310d6ceccd03bedd35adc21e1ab1654c4765c30eff1f3a85a2870",
       "original_release_receipt": {
         "bytes": 17204,
@@ -85,6 +103,7 @@
         "path": ".artifacts/issue-67/task8-check60-20261031/samples.jsonl",
         "sha256": "99ea5995ea2428aa98a7d466f31d8e224b5e754318eaf95e80c826d80f9a4b90"
       },
+      "scope": "historical Task8; after pin ba4a11d, before unchanged baseline",
       "summary": {
         "bytes": 2899,
         "path": ".artifacts/issue-67/task8-check60-20261031/summary.json",
@@ -141,6 +160,7 @@
         "path": ".artifacts/issue-67/task8-reads1k-20261031/samples.jsonl",
         "sha256": "dcbc9b10e4971443bc834ca8ac4c60b7e88f02d20e96a4d0521f8d24957a8c5f"
       },
+      "scope": "historical Task8; after pin ba4a11d, before unchanged baseline",
       "summary": {
         "bytes": 6099,
         "path": ".artifacts/issue-67/task8-reads1k-20261031/summary.json",
@@ -197,6 +217,7 @@
         "path": ".artifacts/issue-67/task8-initialization1k-20261031/samples.jsonl",
         "sha256": "8614e8e6eb8933ce8d03c2eb891835bcaf4c0fcba2c0460c1ae6fa7328f7ee89"
       },
+      "scope": "historical Task8; after pin ba4a11d, before unchanged baseline",
       "summary": {
         "bytes": 5944,
         "path": ".artifacts/issue-67/task8-initialization1k-20261031/summary.json",
@@ -253,6 +274,7 @@
         "path": ".artifacts/issue-67/task8-contention60-20261031/samples.jsonl",
         "sha256": "b805926225b628b296c35988380f9cb487616e13c117dcdca148b04dbe69ad96"
       },
+      "scope": "historical Task8; after pin ba4a11d, before unchanged baseline",
       "summary": {
         "bytes": 2616,
         "path": ".artifacts/issue-67/task8-contention60-20261031/summary.json",
@@ -309,6 +331,7 @@
         "path": ".artifacts/issue-67/task8-profiles60-20261031/samples.jsonl",
         "sha256": "b70beeedeeff9c171d697cf2ca038704eb54f778edd7d8b1ec12090fe41ce1ee"
       },
+      "scope": "historical Task8; after pin ba4a11d, before unchanged baseline",
       "summary": {
         "bytes": 2601,
         "path": ".artifacts/issue-67/task8-profiles60-20261031/summary.json",
@@ -365,6 +388,7 @@
         "path": ".artifacts/issue-67/task8-profiles1k-20261031/samples.jsonl",
         "sha256": "fd7b97acafba88678644bb92f49971867ecc721a2892e69a54d33f3bf1a72555"
       },
+      "scope": "historical Task8; after pin ba4a11d, before unchanged baseline",
       "summary": {
         "bytes": 5213,
         "path": ".artifacts/issue-67/task8-profiles1k-20261031/summary.json",
@@ -374,12 +398,152 @@
       "timeouts": 0,
       "top_level_attempts": 20,
       "valid_successes": 20
+    },
+    {
+      "directory": ".artifacts/issue-67/final-fix-ordinary60-20261031-v2",
+      "driver": {
+        "bytes": 7929,
+        "path": ".artifacts/issue-67/final-fix-20261031/refresh-v2.py",
+        "sha256": "8fab709dee2e11958c88998c187b718c7f4cf3d635d397ac8c3fc270cbcbea9a"
+      },
+      "initial_manifest": {
+        "bytes": 37359,
+        "path": ".artifacts/issue-67/final-fix-ordinary60-20261031-v2/manifest.json",
+        "sha256": "c0d9e62920a0d0afa390cf1c4b410ceafd0e923bd9c7ae0764d3e6fb4197ee1b"
+      },
+      "interrupted": 0,
+      "label": "final-fix-ordinary60",
+      "manifest": {
+        "bytes": 42486,
+        "path": ".artifacts/issue-67/final-fix-ordinary60-20261031-v2/manifest-final.json",
+        "sha256": "2c720189d997751e9da71eba4bf5f338c98ef10dcf4de28337efd4b143668087"
+      },
+      "samples": {
+        "bytes": 33929,
+        "path": ".artifacts/issue-67/final-fix-ordinary60-20261031-v2/samples.jsonl",
+        "sha256": "fa8bc88cecd0c66d8b44fb04f64a7d6ee230e4a2aba61f8b264affc7f5b1f9f0"
+      },
+      "scope": "fresh matched/interleaved before+corrected after",
+      "summary": {
+        "bytes": 1667,
+        "path": ".artifacts/issue-67/final-fix-ordinary60-20261031-v2/summary.json",
+        "sha256": "5c9a751ddeb98264297550f3202dd7f2b91dbce9cec25521aeeca908ceefd482"
+      },
+      "summary_outcome": "complete",
+      "timeouts": 0,
+      "top_level_attempts": 24,
+      "valid_successes": 24
+    },
+    {
+      "directory": ".artifacts/issue-67/final-fix-ordinary1k-20261031-v3",
+      "driver": {
+        "bytes": 9354,
+        "path": ".artifacts/issue-67/final-fix-20261031/refresh-v3.py",
+        "sha256": "b464b72b6b212b116774d15df445ad0a6b762bc3019aa076553437b586f642f2"
+      },
+      "initial_manifest": {
+        "bytes": 37356,
+        "path": ".artifacts/issue-67/final-fix-ordinary1k-20261031-v3/manifest.json",
+        "sha256": "85496325e7fecf4131f415baa7f42a6973bdcd4c0aa601ecaa4f6c988bfb8768"
+      },
+      "interrupted": 0,
+      "label": "final-fix-ordinary1k",
+      "manifest": {
+        "bytes": 55021,
+        "path": ".artifacts/issue-67/final-fix-ordinary1k-20261031-v3/manifest-final.json",
+        "sha256": "c5e02704637667f0698bbddb35468830905e9d767514efb3ebe7f17f5435ab11"
+      },
+      "samples": {
+        "bytes": 304837,
+        "path": ".artifacts/issue-67/final-fix-ordinary1k-20261031-v3/samples.jsonl",
+        "sha256": "73a7d19a7ce644480a3880caa191961ced9901d150a7633fa1505da5e855aaa6"
+      },
+      "scope": "fresh matched/interleaved before+corrected after",
+      "summary": {
+        "bytes": 4860,
+        "path": ".artifacts/issue-67/final-fix-ordinary1k-20261031-v3/summary.json",
+        "sha256": "c65aaed4b59f546a73bb111b987ed09d08c0090f9eeae2ad9ba48070b0cd9189"
+      },
+      "summary_outcome": "complete",
+      "timeouts": 0,
+      "top_level_attempts": 72,
+      "valid_successes": 72
+    },
+    {
+      "directory": ".artifacts/issue-67/final-fix-after-probes-20261031-v3",
+      "driver": {
+        "bytes": 9354,
+        "path": ".artifacts/issue-67/final-fix-20261031/refresh-v3.py",
+        "sha256": "b464b72b6b212b116774d15df445ad0a6b762bc3019aa076553437b586f642f2"
+      },
+      "initial_manifest": {
+        "bytes": 37360,
+        "path": ".artifacts/issue-67/final-fix-after-probes-20261031-v3/manifest.json",
+        "sha256": "eafb169f82223942920bf1c82ec46971d765b137b17cd60020a13efa8855ae77"
+      },
+      "interrupted": 0,
+      "label": "final-fix-after-probes",
+      "manifest": {
+        "bytes": 42907,
+        "path": ".artifacts/issue-67/final-fix-after-probes-20261031-v3/manifest-final.json",
+        "sha256": "87f0ce00c6af9dc765a8b9d7199e03e631210e435f50100f840c10aa4c99c7df"
+      },
+      "samples": {
+        "bytes": 24673,
+        "path": ".artifacts/issue-67/final-fix-after-probes-20261031-v3/samples.jsonl",
+        "sha256": "c274ac2ab37a8d3c338036d7c14c3689afb3192e3afa3f1f8029b76fe7eefb3c"
+      },
+      "scope": "fresh corrected after only; baseline historical",
+      "summary": {
+        "bytes": 7003,
+        "path": ".artifacts/issue-67/final-fix-after-probes-20261031-v3/summary.json",
+        "sha256": "79810b90cf899e426bec3e34718b4bf0973297ea7929086c0f84896301e2edce"
+      },
+      "summary_outcome": "complete",
+      "timeouts": 0,
+      "top_level_attempts": 16,
+      "valid_successes": 16
+    },
+    {
+      "directory": ".artifacts/issue-67/final-fix-after-diagnostics-20261031-v3",
+      "driver": {
+        "bytes": 9354,
+        "path": ".artifacts/issue-67/final-fix-20261031/refresh-v3.py",
+        "sha256": "b464b72b6b212b116774d15df445ad0a6b762bc3019aa076553437b586f642f2"
+      },
+      "initial_manifest": {
+        "bytes": 37370,
+        "path": ".artifacts/issue-67/final-fix-after-diagnostics-20261031-v3/manifest.json",
+        "sha256": "1b454560d8a5bb5b4812a69f22110841df92fd482bb3573fae9f822bbc7f81fb"
+      },
+      "interrupted": 0,
+      "label": "final-fix-after-diagnostics",
+      "manifest": {
+        "bytes": 60747,
+        "path": ".artifacts/issue-67/final-fix-after-diagnostics-20261031-v3/manifest-final.json",
+        "sha256": "c1026cc53494768c5865701601f518701df4854206a291b3c5e4998a328d78a3"
+      },
+      "samples": {
+        "bytes": 46165,
+        "path": ".artifacts/issue-67/final-fix-after-diagnostics-20261031-v3/samples.jsonl",
+        "sha256": "4d498bef66b6a3e4fdc082de9e61779143db38c1e1f94ced6d0a9dac09c7b3fc"
+      },
+      "scope": "fresh corrected after only; baseline historical",
+      "summary": {
+        "bytes": 4670,
+        "path": ".artifacts/issue-67/final-fix-after-diagnostics-20261031-v3/summary.json",
+        "sha256": "b6dd0b725dde80f7f5c4f1660335cd3fdba9a710c44bed97b6066aa616cf3ede"
+      },
+      "summary_outcome": "complete",
+      "timeouts": 0,
+      "top_level_attempts": 12,
+      "valid_successes": 12
     }
   ],
-  "captured_utc": "2026-10-30T22:28:18Z",
+  "captured_utc": "2026-10-30T23:08:49Z",
   "direct_pid_rss": {
     "directory": ".artifacts/issue-67/task8-direct-rss-20261031",
-    "scope": "one separate instrumented call per side/scenario; observed sampled direct-process RSS lower bound, excludes descendants, not whole-stack peak",
+    "scope": "historical Task8 before and pre-fix after; corrected after is final_fix.direct_pid_rss",
     "source": {
       "bytes": 7155,
       "path": ".artifacts/issue-67/task8-control-20261031/direct_rss.py",
@@ -391,6 +555,86 @@
       "sha256": "9bcc86e95caa93450425c86b068244495bc6c35d0dc22e1537eca7225a48cfff"
     }
   },
+  "final_fix": {
+    "code_commit": {
+      "bytes": 315,
+      "path": ".artifacts/issue-67/final-fix-20261031/code-commit.json",
+      "sha256": "fe38d4da0d942746a094abf99f76fffcf6f01b6e78ef32ea698fe43d147fa321"
+    },
+    "direct_pid_rss": {
+      "check": {
+        "bytes": 2681,
+        "path": ".artifacts/issue-67/final-fix-after-diagnostics-20261031-v3/rss-check.json",
+        "sha256": "bac149f9f8bcfd25d031c91616dd5bd1fbc446efc1ac0464c37687daa515c090"
+      },
+      "inspect": {
+        "bytes": 14297,
+        "path": ".artifacts/issue-67/final-fix-after-diagnostics-20261031-v3/rss-inspect.json",
+        "sha256": "9ff6db8362fc49daccfca05c2a40ffc99ace711f3a57a5f85e27208c711e61f0"
+      },
+      "search": {
+        "bytes": 2840,
+        "path": ".artifacts/issue-67/final-fix-after-diagnostics-20261031-v3/rss-search.json",
+        "sha256": "c3a49fc814d6933283f3a436fc3b7bfd75acc434a69ab4c4d7f5955dc9768e14"
+      },
+      "traverse": {
+        "bytes": 10244,
+        "path": ".artifacts/issue-67/final-fix-after-diagnostics-20261031-v3/rss-traverse.json",
+        "sha256": "285cc8e2bfd98e9501b7b766786bf923a1a78f0df9a2ab4a10291a513952c0cf"
+      }
+    },
+    "inventory": {
+      "bytes": 764317,
+      "entries": 3222,
+      "path": ".artifacts/issue-67/final-fix-20261031/artifact-files-final.json",
+      "sha256": "529f35d199bcf0744fa7d2f0318adf336505becff8bb197a8c07a83301dcde24"
+    },
+    "linux": {
+      "bytes": 525,
+      "path": ".artifacts/issue-67/final-fix-20261031/linux-result.json",
+      "sha256": "6fc0f5d2211024157c9524e7e2a1b12e82c0d379a8641267456ebe39cc7da0f8"
+    },
+    "linux_source_inputs": {
+      "bytes": 24340,
+      "path": ".artifacts/issue-67/final-fix-20261031/linux-source-inputs.json",
+      "sha256": "c846dfd6c67440dd5b333eada5e0defc76f8dc23eda7f9406b95193e86b69075"
+    },
+    "make_verify": {
+      "bytes": 3,
+      "path": ".artifacts/issue-67/final-fix-20261031/make-verify.log",
+      "sha256": "dc51b8c96c2d745df3bd5590d990230a482fd247123599548e0632fdbf97fc22"
+    },
+    "mutation": {
+      "bytes": 194,
+      "path": ".artifacts/issue-67/final-fix-20261031/issue67-sparse-mutation.json",
+      "sha256": "77bba121d3b19502c3dc69172caddd6ed10c6da545426d9bdadc8a269bbf37a2"
+    },
+    "note_correction": {
+      "bytes": 541,
+      "path": ".artifacts/issue-67/final-fix-20261031/task8-note-correction-receipts.json",
+      "sha256": "f2cbc900ac13c488d28413be16773cfb9f07d0e842f9dc3a143909c97b3d28b7"
+    },
+    "pin_verification": {
+      "bytes": 18152,
+      "path": ".artifacts/issue-67/final-fix-20261031/current-pin-verification.json",
+      "sha256": "e34c85fa34bc9c9103ba94510bfdda6f5d7fbf56b2bc13d08b95811a4d7a6fb2"
+    },
+    "post_inventory_tail": [
+      ".artifacts/issue-67/final-fix-20261031/doc-commit-before.json",
+      ".artifacts/issue-67/final-fix-20261031/doc-commit.log",
+      ".artifacts/issue-67/final-fix-20261031/doc-commit.json"
+    ],
+    "reused_fixture_membership": {
+      "bytes": 13959,
+      "path": ".artifacts/issue-67/final-fix-20261031/reused-fixture-membership.json",
+      "sha256": "6225d5fb65d2e849c6f37d3fc43e4d972b43a634d8916aa21a3aec9e1b7e21dc"
+    },
+    "statistics": {
+      "bytes": 1982,
+      "path": ".artifacts/issue-67/final-fix-20261031/refreshed-statistics.json",
+      "sha256": "434dc54cea103ac5551e74a13e65cdba326e620ed6eff42428b62d74b9fd38bf"
+    }
+  },
   "limits": [
     "four baseline 120 s timeouts; no successful before audit/maintenance ratio",
     "first-publication n1 per side, stage initializations not pooled",
@@ -398,18 +642,19 @@
     "inclusive CPU observations are not wall-time attribution; short optimized captures have few samples",
     "Minor M3 initial eligibility mutant, no specific stale-second-read mutant",
     "Task 7 39 traced invocations exclude eligible foreground-to-detached interval",
-    "pre-existing direct-drain caller-dir/root lock concern unverified and unchanged",
     "no real-provider/model session; no scale above 1k; no x86_64/NFS/power-loss claim",
-    "final independent branch review pending controller"
+    "Direct-drain wrong-root locking not demonstrated by actual source path; no dynamic subdirectory contention test claimed",
+    "Scoped independent re-review pending controller",
+    "Original optimized ba4a11d diagnostics historical; all current after measurements corrected b488aeb; non-ordinary baseline values reused historically"
   ],
   "local_artifact_inventory": {
     "bytes": 1804739,
     "entries": 7975,
     "path": ".artifacts/issue-67/task8-control-20261031/artifact-files.json",
-    "scope": "all issue67 evidence at capture, including failed earlier tasks and raw profiles/receipts/sources; issue65 remains separate and unchanged",
+    "scope": "Historical Task8 point-in-time inventory; fresh correction inventory is final_fix.inventory",
     "sha256": "4a4a8afafb48398f51b1ee12ca661f0c22e97a7b64b7958292e144c2f6121bea"
   },
-  "measured_optimized_source": "ba4a11db26705999018187e8301a51e9942fe1ba",
+  "measured_optimized_source": "b488aeb4a7faa33f58e6e9c87a4f4d638631680b",
   "post_inventory_tail": {
     "directory": ".artifacts/issue-67/task8-control-20261031",
     "paths": [
@@ -421,7 +666,17 @@
   },
   "schema_version": 1,
   "sdd_archives": {
-    "future_final_reviews": "controller must append final review/rulings under fresh artifact paths and a fresh hash index; not claimed here",
+    "final_fix_report": {
+      "bytes": 11504,
+      "path": ".artifacts/issue-67/final-fix-20261031/final-fix-report.md",
+      "sha256": "b10de3ab496d91fb14bda7d2a0c3f7645ecaa24c5afa6d4bd9224e1e18165342"
+    },
+    "final_review": {
+      "bytes": 16618,
+      "path": ".artifacts/issue-67/final-fix-20261031/original-final-review.md",
+      "sha256": "7f51a6c486e0acc2f2af8b51923a87b2f20300f68b78ba74dabdd95b51de8944"
+    },
+    "future_final_reviews": "original final review is archived; controller scoped re-review remains pending and must be appended separately",
     "measurement_final": {
       "bytes": 4201,
       "files": 45,
@@ -432,9 +687,14 @@
       "bytes": 4444,
       "path": ".artifacts/issue-67/task8-control-20261031/sdd-start-index.json",
       "sha256": "cc28cea608fe1c1d9265c08374e1f9c1e6205104231c26fc79c4d10da905b878"
+    },
+    "task8_corrected": {
+      "bytes": 31753,
+      "path": ".artifacts/issue-67/final-fix-20261031/task-8-report-corrected.md",
+      "sha256": "10f6de81f9b7ecb6ecf121fd87e04c3100ee0f3f82d44772d3799afb7f3268f3"
     }
   },
-  "status": "measurement_complete_final_independent_branch_review_pending",
+  "status": "final_findings_fixed_scoped_independent_re_review_pending",
   "validation": {
     "administrative_failures": {
       "bytes": 1508,
@@ -490,6 +750,7 @@
       "bytes": 220,
       "path": ".artifacts/issue-67/task8-control-20261031/direct-rss-unit-mutation.json",
       "sha256": "e7fd2b34b857904cb3db127787cb75d949a7ff65648981700df6dbde00a591fa"
-    }
+    },
+    "scope": "Historical Task8 captured validation; current source verification is under final_fix"
   }
 }
