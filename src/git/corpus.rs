@@ -1,19 +1,29 @@
+use super::{GitRepository, objects::ObjectDb, tree::read_entry};
 use crate::{
     domain::RepoPath,
-    service::{DocumentError, DocumentErrorKind, DocumentResult},
+    service::{DocumentError, DocumentErrorKind, DocumentResult, SnapshotErrorKind},
     utils::SERVICE_DIRECTORY,
 };
-use gix::Repository;
+use gix::{
+    bstr::ByteSlice,
+    hash::ObjectId,
+    index::{
+        State,
+        entry::{Flags, Mode},
+    },
+};
 use gix_dir::{
     entry::{Kind, Status},
     walk::{Context, Options, delegate::Collect},
 };
 use gix_pathspec::Search;
-use std::{collections::BTreeSet, path::Path};
+use std::{borrow::Cow, collections::BTreeSet, path::Path};
 
 /// List the actual worktree index plus non-ignored untracked files, without filters.
-pub(super) fn list_candidates(repo: &Repository, root: &Path) -> DocumentResult<Vec<RepoPath>> {
+pub(super) fn list_candidates(git: &GitRepository, root: &Path) -> DocumentResult<Vec<RepoPath>> {
+    let repo = &git.repo;
     let index = repo.index_or_empty().map_err(|_| fail_listing())?;
+    let index = expand_sparse_index(git, &index)?;
     let mut raw = Vec::new();
     for entry in index.entries() {
         raw.extend_from_slice(entry.path(&index));
@@ -60,6 +70,69 @@ pub(super) fn list_candidates(repo: &Repository, root: &Path) -> DocumentResult<
         }
     }
     parse_candidates(&raw)
+}
+/// Expand only metadata in a private copy: excludes and walk need the same tracked view.
+fn expand_sparse_index<'a>(
+    git: &GitRepository,
+    index: &'a State,
+) -> DocumentResult<Cow<'a, State>> {
+    if !index.is_sparse() {
+        return Ok(Cow::Borrowed(index));
+    }
+    git.require_self_contained_objects()
+        .map_err(|_| fail_listing())?;
+    let mut pending: Vec<_> = index
+        .entries()
+        .iter()
+        .filter(|entry| entry.mode.is_sparse())
+        .map(|entry| (entry.path(index).to_vec(), entry.id, entry.mode))
+        .collect();
+    let mut expanded = index.clone();
+    expanded.remove_entries(|_, _, entry| entry.mode.is_sparse());
+    while let Some((path, id, mode)) = pending.pop() {
+        if mode.is_sparse() {
+            pending.extend(read_sparse_children(git, &path, id)?);
+            continue;
+        }
+        expanded.dangerously_push_entry(
+            Default::default(),
+            id,
+            Flags::SKIP_WORKTREE,
+            mode,
+            path.as_bstr(),
+        );
+    }
+    expanded.sort_entries();
+    Ok(Cow::Owned(expanded))
+}
+/// Keep only child metadata between reads; verified tree payloads never accumulate.
+fn read_sparse_children(
+    git: &GitRepository,
+    prefix: &[u8],
+    oid: ObjectId,
+) -> DocumentResult<Vec<(Vec<u8>, ObjectId, Mode)>> {
+    let bytes = ObjectDb { git }
+        .read_tree(
+            &oid.to_string(),
+            SnapshotErrorKind::InternalError,
+            SnapshotErrorKind::InternalError,
+        )
+        .map_err(|_| fail_listing())?;
+    let mut remaining = bytes.as_slice();
+    let mut children = Vec::new();
+    while !remaining.is_empty() {
+        let (entry, rest) = read_entry(remaining, git.oid_len).map_err(|_| fail_listing())?;
+        let mut path = prefix.to_vec();
+        path.extend_from_slice(entry.name);
+        let id = ObjectId::try_from(entry.oid).map_err(|_| fail_listing())?;
+        let mode = Mode::from_bits(u32::from(entry.mode)).ok_or_else(fail_listing)?;
+        if mode.is_sparse() {
+            path.push(b'/');
+        }
+        children.push((path, id, mode));
+        remaining = rest;
+    }
+    Ok(children)
 }
 fn fail_listing() -> DocumentError {
     DocumentError::new(

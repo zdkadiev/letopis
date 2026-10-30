@@ -26,6 +26,40 @@ struct Denial {
 }
 
 #[test]
+fn sparse_index_inspect_captures_unrequested_tracked_ignored_members_without_helpers() {
+    for format in FORMATS {
+        // Given: both formats contain a real collapsed index and staged membership absent from HEAD.
+        let repo = TempRepo::new(format);
+        repo.prepare_sparse_index();
+        let before = repo.capture_fixture_state();
+        let restored = fs::read(repo.get_root().join("omit/staged.md")).unwrap();
+        let denial = Denial::new();
+        // When: a request addresses only a file inside the sparse cone.
+        let result = denial.success(
+            repo.get_root(),
+            &["inspect"],
+            r#"{"element_ids":["keep/a.md"]}"#,
+        );
+        // Then: Git independently enumerates complete marked membership, preserving user state.
+        let tree = result["snapshot"].as_str().unwrap();
+        assert_eq!(
+            repo.run_git_successfully(&["ls-tree", "-r", "--name-only", tree], None),
+            b"keep/a.md\nomit/b.md\nomit/nested/c.markdown\nomit/staged.md\n"
+        );
+        assert_eq!(
+            repo.run_git_successfully(&["show", &format!("{tree}:omit/staged.md")], None),
+            restored
+        );
+        assert_eq!(repo.capture_fixture_state(), before);
+        assert_eq!(
+            fs::read(repo.get_root().join("omit/staged.md")).unwrap(),
+            restored
+        );
+        assert!(!repo.get_root().join("omit/deleted.md").exists());
+    }
+}
+
+#[test]
 fn model_free_commands_use_only_local_library_git() {
     for format in FORMATS {
         // Given: real Git prepares each format before any denied/traced product call.

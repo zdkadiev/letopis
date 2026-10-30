@@ -121,7 +121,8 @@ impl ObjectDb<'_> {
         )
         .map(|_| ())
     }
-    fn read_tree(
+    /// Read one verified tree body without traversing its children.
+    pub(super) fn read_tree(
         &self,
         oid: &str,
         missing: SnapshotErrorKind,

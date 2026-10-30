@@ -153,7 +153,7 @@ impl SnapshotVerifier for GitRepository {
 
 impl CorpusLister for GitRepository {
     fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
-        corpus::list_candidates(&self.repo, &self.root)
+        corpus::list_candidates(self, &self.root)
     }
 }
 fn require_absent_alternates(path: &Path) -> Result<(), SnapshotError> {

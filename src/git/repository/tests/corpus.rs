@@ -303,6 +303,87 @@ fn corpus_ignores_replacements_for_index_backed_ignore_files() {
     );
 }
 
+#[test]
+fn sparse_index_expands_index_tree_membership_without_changing_user_state() {
+    use crate::service::CorpusLister;
+    for format in crate::process_test_support::FORMATS {
+        // Given: a collapsed staged tree differs from HEAD and restored files match ignores.
+        let repo = TempRepo::new(format);
+        let tree = repo.prepare_sparse_index();
+        let expected = [
+            "keep/a.md",
+            "live.md",
+            "omit/b.md",
+            "omit/deleted.md",
+            "omit/nested/c.markdown",
+            "omit/staged.md",
+        ];
+        let oracle = repo.run_git_successfully(
+            &[
+                "ls-files",
+                "-z",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+            ],
+            None,
+        );
+        let mut oracle: Vec<_> = oracle
+            .split(|byte| *byte == 0)
+            .filter(|path| path.ends_with(b".md") || path.ends_with(b".markdown"))
+            .map(|path| std::str::from_utf8(path).unwrap())
+            .collect();
+        oracle.sort_unstable();
+        assert_eq!(oracle, expected);
+        let empty = repo.read_oid(&["mktree"], Some(b""));
+        repo.run_git_successfully(&["replace", &tree, &empty], None);
+        let before = repo.capture_fixture_state();
+        // When: listing expands the actual index's tree, including deleted tracked paths.
+        let actual = GitRepository::open(repo.get_root())
+            .unwrap()
+            .list_candidates()
+            .unwrap();
+        // Then: tracked paths survive ignores, untracked ignored paths do not.
+        assert_eq!(
+            actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            expected
+        );
+        assert_eq!(repo.capture_fixture_state(), before);
+    }
+}
+
+#[test]
+fn sparse_index_rejects_missing_corrupt_trees_and_late_alternates_safely() {
+    use crate::service::CorpusLister;
+    for format in crate::process_test_support::FORMATS {
+        for failure in ["missing", "corrupt", "alternates"] {
+            // Given: a valid collapsed index was opened before its object store changed.
+            let repo = TempRepo::new(format);
+            let tree = repo.prepare_sparse_index();
+            let git = GitRepository::open(repo.get_root()).unwrap();
+            match failure {
+                "missing" => fs::remove_file(repo.build_object_path(&tree)).unwrap(),
+                "corrupt" => {
+                    let empty = repo.read_oid(&["mktree"], Some(b""));
+                    repo.replace_loose_object(&tree, &empty);
+                }
+                _ => fs::write(
+                    repo.get_root().join(".git/objects/info/alternates"),
+                    b"PRIVATE_DONOR_PATH\n",
+                )
+                .unwrap(),
+            }
+            let before = repo.capture_fixture_state();
+            // When: listing needs the collapsed tree rather than trusting HEAD or prior policy.
+            let error = git.list_candidates().unwrap_err();
+            // Then: no incomplete successful listing or raw object/path payload escapes.
+            assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
+            assert_eq!(error.to_string(), "cannot list document candidates");
+            assert_eq!(repo.capture_fixture_state(), before);
+        }
+    }
+}
+
 fn prepare_exclude_fixture(repo: &TempRepo) {
     let commit = repo.read_oid(&["rev-parse", "HEAD"], None);
     repo.run_git_successfully(
