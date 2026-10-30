@@ -140,10 +140,13 @@ fn verify_pack(binary: &Path, root: &Path, oids: &[String]) {
         .map(|line| line.split_whitespace().collect())
         .filter(|row: &Vec<&str>| row.len() >= 5 && row[1] == "blob")
         .collect();
-    assert!(
-        rows.iter().any(|r| r.len() == 7),
-        "no actual delta: {entries}"
-    );
+    for pair in oids.chunks_exact(2) {
+        assert!(
+            rows.iter()
+                .any(|row| row.len() == 7 && pair.iter().any(|oid| oid == row[0])),
+            "no actual delta for size pair {pair:?}: {entries}"
+        );
+    }
     for oid in oids {
         fs::remove_file(loose_path(root, oid)).unwrap();
     }

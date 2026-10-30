@@ -52,3 +52,11 @@
 !skills/
 !skills/letopis/
 !skills/letopis/SKILL.md
+
+!tests/fixtures/git/
+!tests/fixtures/git/sha-mbles-1.bin
+
+!tests/fixtures/config/
+!tests/fixtures/config/corpus.json
+
+!tests/git/install-oracle.sh

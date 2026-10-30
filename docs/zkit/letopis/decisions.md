@@ -1932,6 +1932,20 @@ D-84…D-88 сохраняются: 45 задач, 8 эпиков, 204/372/672 �
 ### D-96: Стек зависимостей v1: синхронный Rust без async runtime
 > **Статус:** принято пользователем · **Дата:** 2026-10-21
 
+**Уточнение принято 2026-10-30, записано 2026-10-31 (issue #67):** строка Git
+ниже отражает исторический выбор 2026-10-21. Текущая реализация — `gix =0.90.0`
+с отключёнными default features и включёнными sha1/sha256/index/excludes,
+`gix-dir =0.32.0` и `gix-pathspec =0.22.1`. Все продуктовые операции Git
+выполняются внутри процесса; CLI fallback, helpers, filters, lazy fetch и transport
+не используются. Git CLI нужен для авторских операций и независимых fixtures/oracles.
+`tempfile` теперь runtime-зависимость для приватной staging-области. SIGINT очищает
+принадлежащие invocation stages/ref locks до выхода; arbitrary filesystem errors
+могут оставить остатки и не объявляются power-loss гарантией. Служебные retention
+refs не создают/не дописывают reflogs даже при `core.logAllRefUpdates=always`;
+существующие private/user logs и refs сохраняются. Обоснование и границы:
+[согласованная спецификация](../../superpowers/specs/2026-10-30-issue-67-product-git-optimization-design.md).
+
+
 **Основание:** сверка библиотек и инструментов 2026-10-21. Пользователь выбрал: HTTP-клиент `ureq`, обработанную отмену по SIGINT, vec1 статически в бинарнике, системное хранилище сертификатов TLS.
 
 | Область | Выбор | Почему | Проверка |
@@ -2141,5 +2155,18 @@ Search/traverse/inspect сохраняют auto-refresh Markdown → DB; осн�
 Сильный pin сохраняет полную проверку каждого вызова и тип RetainedTree. Owned cat-file --batch и один hash-object --stdin-paths по приватному временному spool tree metadata заменяют Git subprocess на объект и сохраняют строгие структурные проверки Git; SHA-1 collision detection и SHA-256, exact refs/CAS, no alternates/replace/lazy fetch сохраняются. Inspect сильно проверяет собственный новый снимок захваченных bytes. Повреждение несвязанного потомка может быть обнаружено позже, при полном аудите. Ref не является сертификатом целостности.
 
 Новых runtime, daemon, watcher, схемы/кэша verification, CLI флагов или конфигурации нет. Зависимость sha1-checked 0.10.0 прошла compile/vector/collision probe; unchecked SHA-1 не используется.
+
+**Уточнение 2026-10-31, issue #67:** описанные выше cat-file/hash-object subprocess
+и tree spool относятся к реализации 2026-10-29. Теперь существующий closure walk
+использует независимое collision-detecting хеширование raw gix-объектов и локальную
+структурную проверку деревьев с Git-oracle parity. Root/ref retention не становится
+полным аудитом; существующий ref никогда не пропускает сильный pin. Текущий payload
+и delta buffers могут расти с объектом; между объектами payload освобождается,
+reusable allocation сохраняется только до 4 MiB, hash chunks — 64 KiB, payload
+caches выключены. Historical hash cache ограничен 4096 записями на observation
+operation; переполнение пересчитывает, не отклоняет ввод. Батчи по 256 bindings
+есть в preflight/check/status, при этом последняя observation предшествует retain,
+а retain — SQL publication; search/traverse сохраняют последовательность live reads.
+
 
 **Связи:** [spec](../../superpowers/specs/2026-10-29-read-workflow-performance-design.md), [plan](../../superpowers/plans/2026-10-29-read-workflow-performance.md), [инварианты](checks/read-workflow-performance/invariants.md), [X-1](contracts/X-1-cli.md), [X-3](contracts/X-3-git.md).

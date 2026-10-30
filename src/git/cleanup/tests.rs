@@ -54,6 +54,52 @@ fn handled_sigint_cleans_actual_resources_before_process_exit() {
 }
 
 #[test]
+fn failed_stage_cleanup_preserves_owner_and_releases_other_resources() {
+    if supervise("failed_stage_cleanup_preserves_owner_and_releases_other_resources") {
+        return;
+    }
+    // Given: a real missing parent makes detachment fail; other resources remain reachable.
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let stages = root.join("stages");
+    let moved = root.join("moved");
+    fs::create_dir(&stages).unwrap();
+    let cleanup = Arc::new(GitWriteCleanup::new());
+    let (_stage, path) = cleanup.create_stage(&stages).unwrap();
+    fs::write(path.join("payload"), b"owned bytes").unwrap();
+    let (_reference, _writer) = cleanup
+        .acquire_ref(&root.join("snapshot"), root, 0)
+        .unwrap();
+    let _marker = cleanup
+        .acquire_marker(&root.join("packed-refs"), root, 0)
+        .unwrap();
+    let foreign = root.join("foreign.lock");
+    fs::write(&foreign, b"foreign bytes").unwrap();
+    let inode = fs::metadata(&foreign).unwrap().ino();
+    fs::rename(&stages, &moved).unwrap();
+    // When: the first stage fails cleanup, without skipping later lock owners.
+    assert!(cleanup.cancel_and_cleanup().is_err());
+    // Then: residual ownership is retained, other owned locks are gone, foreign ownership survives.
+    assert_eq!(cleanup.lock_state().resources.len(), 1);
+    assert!(!root.join("snapshot.lock").exists());
+    assert!(!root.join("packed-refs.lock").exists());
+    assert_eq!(fs::read(&foreign).unwrap(), b"foreign bytes");
+    assert_eq!(fs::metadata(&foreign).unwrap().ino(), inode);
+    assert!(cleanup.create_stage(root).is_err());
+    // Given: restore availability of the original parent without replacing the owner.
+    fs::rename(&moved, &stages).unwrap();
+    assert_eq!(fs::read(path.join("payload")).unwrap(), b"owned bytes");
+    // When: retry cleanup, then repeat it after all resources have gone.
+    cleanup.cancel_and_cleanup().unwrap();
+    cleanup.cancel_and_cleanup().unwrap();
+    // Then: the terminal owner is empty and no spool or foreign-lock damage remains.
+    assert!(cleanup.lock_state().resources.is_empty());
+    assert_eq!(fs::read_dir(&stages).unwrap().count(), 0);
+    assert_eq!(fs::read(&foreign).unwrap(), b"foreign bytes");
+    assert_eq!(fs::metadata(&foreign).unwrap().ino(), inode);
+}
+
+#[test]
 fn cancelled_ref_writer_cannot_publish_or_touch_successor_lock() {
     if supervise("cancelled_ref_writer_cannot_publish_or_touch_successor_lock") {
         return;
@@ -255,6 +301,15 @@ fn run_signal_child(root: &std::path::Path) -> ! {
     let _packed = cleanup
         .acquire_marker(&root.join("packed-refs"), root, 0)
         .unwrap();
+    let (detached, resume) = register_namespace_checkpoint(&cleanup);
+    thread::spawn(move || {
+        detached.recv_timeout(Duration::from_secs(5)).unwrap();
+        // Repeated delivery while cleanup is acknowledged but not complete.
+        for _ in 0..16 {
+            signal_hook::low_level::raise(signal_hook::consts::SIGINT).unwrap();
+        }
+        resume.send(()).unwrap();
+    });
     signal_hook::low_level::raise(signal_hook::consts::SIGINT).unwrap();
     loop {
         thread::park();

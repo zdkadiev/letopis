@@ -157,6 +157,10 @@ fn inspect_includes_unrequested_declared_source_files() {
     let repo = ReadingRepo::new();
     repo.write("source.txt", b"abc");
     repo.write("unrelated.txt", b"private unrelated");
+    repo.write(
+        "unrequested.md",
+        b"<!-- letopis: {\"created_at\":1} -->\nother knowledge\n",
+    );
     repo.write("plain.md", b"unmarked source");
     write_references(&repo, &["source.txt", "plain.md"]);
     // When
@@ -165,6 +169,10 @@ fn inspect_includes_unrequested_declared_source_files() {
     assert_eq!(result.elements.len(), 1);
     assert_eq!(read_blob(&repo, &result, "source.txt"), b"abc");
     assert_eq!(read_blob(&repo, &result, "plain.md"), b"unmarked source");
+    assert_eq!(
+        read_blob(&repo, &result, "unrequested.md"),
+        b"<!-- letopis: {\"created_at\":1} -->\nother knowledge\n"
+    );
     let git = open_git_snapshots(repo.get_root()).unwrap();
     for path in ["unrelated.txt", ".letopis/cache.db"] {
         // When / Then

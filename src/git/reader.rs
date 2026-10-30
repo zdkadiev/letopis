@@ -29,6 +29,8 @@ pub(super) struct ObjectReader {
     objects: Handle<Rc<Store>>,
     oid_len: usize,
     buffer: Vec<u8>,
+    #[cfg(test)]
+    object_reads: usize,
 }
 
 impl fmt::Debug for ObjectReader {
@@ -66,6 +68,8 @@ impl ObjectReader {
             objects: Rc::new(store).to_handle(),
             oid_len,
             buffer: Vec::new(),
+            #[cfg(test)]
+            object_reads: 0,
         })
     }
 
@@ -81,6 +85,10 @@ impl ObjectReader {
         missing: SnapshotErrorKind,
         wrong_type: SnapshotErrorKind,
     ) -> Result<VerifiedObject, SnapshotError> {
+        #[cfg(test)]
+        {
+            self.object_reads += 1;
+        }
         let result = self
             .verify_object(oid, expected, missing, wrong_type)
             .map(|()| {
@@ -98,6 +106,12 @@ impl ObjectReader {
             self.buffer.clear();
         }
         result
+    }
+
+    /// Count object verification requests on this owned test reader.
+    #[cfg(test)]
+    pub(super) fn get_object_read_count(&self) -> usize {
+        self.object_reads
     }
 
     /// Read verified bytes for an addressed object; no payload survives in a cache.

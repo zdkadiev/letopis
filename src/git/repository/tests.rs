@@ -32,6 +32,39 @@ fn repository_open_counter_excludes_clones() {
 }
 
 #[test]
+fn assembly_checks_unique_oids_once_without_weakening_supplied_or_final_validation() {
+    use crate::service::SnapshotEntry;
+    for format in fixture::FORMATS {
+        // Given: one independently written blob supplied under three distinct paths.
+        let repo = TempRepo::new(format);
+        let git = GitRepository::open(repo.get_root()).unwrap();
+        let oid = git.write_blob(b"original bytes").unwrap();
+        let entries = ["a.md", "b.md", "nested/c.md"].map(|path| SnapshotEntry {
+            path: RepoPath::parse(path).unwrap(),
+            oid: oid.clone(),
+        });
+        let before = git.reader.borrow().get_object_read_count();
+        // When: assemble from repeated caller-supplied object identities.
+        let tree = git.create_tree_from_blobs(&entries).unwrap();
+        // Then: exactly one addressed verification occurs in this assembly.
+        assert_eq!(git.reader.borrow().get_object_read_count() - before, 1);
+        git.pin(&tree).unwrap();
+        // Given: valid compressed bytes replace that blob under its old identity.
+        let other = git.write_blob(b"corrupt substitute").unwrap();
+        repo.replace_loose_object(oid.as_str(), other.as_str());
+        // When / Then: neither another assembly nor strong pin trusts the prior success/ref.
+        assert_eq!(
+            git.create_tree_from_blobs(&entries).unwrap_err().get_kind(),
+            SnapshotErrorKind::InternalError
+        );
+        assert_eq!(
+            git.pin(&tree).unwrap_err().get_kind(),
+            SnapshotErrorKind::InternalError
+        );
+    }
+}
+
+#[test]
 fn snapshots_work_without_git_executable() {
     use crate::{
         domain::TreeOid,

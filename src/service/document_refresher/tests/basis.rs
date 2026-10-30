@@ -69,6 +69,11 @@ fn preflight_batches_only_prepared_bindings_in_bounded_chunks() {
     let events = events.borrow();
     let retain = events.iter().position(|event| *event == "retain").unwrap();
     let begin = events.iter().position(|event| *event == "begin").unwrap();
+    let last_observe = events
+        .iter()
+        .rposition(|event| *event == "observe")
+        .unwrap();
+    assert!(last_observe < retain);
     assert!(retain < begin);
 }
 

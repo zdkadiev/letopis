@@ -47,6 +47,40 @@ fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
 }
 
 #[test]
+fn shared_repository_observes_index_and_ignore_edits_between_listings() {
+    use crate::service::CorpusLister;
+    for format in crate::process_test_support::FORMATS {
+        // Given: one shared repository whose index and ignore stack have already been read.
+        let repo = TempRepo::new(format);
+        fs::write(repo.get_root().join("ignored.md"), b"ignored").unwrap();
+        fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
+        let git = GitRepository::open(repo.get_root()).unwrap();
+        let shared = git.clone();
+        assert_eq!(
+            git.list_candidates().unwrap(),
+            [RepoPath::parse("live.md").unwrap()]
+        );
+        // When: Git stages an ignored file and removes the previous index entry.
+        repo.run_git_successfully(&["add", "-f", "ignored.md"], None);
+        repo.run_git_successfully(&["rm", "--cached", "-f", "live.md"], None);
+        fs::write(repo.get_root().join(".gitignore"), b"ignored.md\nlive.md\n").unwrap();
+        // Then: the clone sees the new index and fresh ignore bytes without reopening.
+        assert_eq!(
+            shared.list_candidates().unwrap(),
+            [RepoPath::parse("ignored.md").unwrap()]
+        );
+        // When: remove the tracked file and make the other live file eligible again.
+        repo.run_git_successfully(&["rm", "--cached", "-f", "ignored.md"], None);
+        fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
+        // Then: the original handle also refreshes its index/exclude observation.
+        assert_eq!(
+            git.list_candidates().unwrap(),
+            [RepoPath::parse("live.md").unwrap()]
+        );
+    }
+}
+
+#[test]
 fn candidates_reject_unsupported_raw_paths() {
     use crate::service::{CorpusLister, DocumentErrorKind};
     for raw in [
