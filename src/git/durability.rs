@@ -1,5 +1,10 @@
-//! Compatibility-gate implementation; production wiring remains in the process adapter.
-use super::{constants::SNAPSHOT_REF_PREFIX, hashing::ObjectHasher, process::make_io_error};
+//! Durable raw objects and exact private refs, with command-owned cancellation.
+use super::{
+    cleanup::{GitWriteCleanup, WriteLease},
+    constants::{HASH_CHUNK_BYTES, SNAPSHOT_REF_PREFIX},
+    error::make_io_error,
+    hashing::ObjectHasher,
+};
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use gix::{
     Repository,
@@ -12,10 +17,10 @@ use std::{
     fmt,
     fs::{self, File},
     io::{self, Write},
-    os::unix::fs::{OpenOptionsExt, PermissionsExt},
+    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
+    sync::Arc,
 };
-use tempfile::TempDir;
 
 #[derive(Debug)]
 struct RefLockBusy;
@@ -27,8 +32,9 @@ impl fmt::Display for RefLockBusy {
 impl Error for RefLockBusy {}
 
 /// Owns one private, completed loose object until no-clobber publication or drop.
+#[derive(Debug)]
 pub(super) struct StagedObject {
-    directory: TempDir,
+    directory: WriteLease,
     staged: PathBuf,
     destination: PathBuf,
     object_root: PathBuf,
@@ -42,14 +48,23 @@ impl StagedObject {
     ///
     /// # Errors
     /// Returns an internal error on identity, configuration, filesystem or sync failure.
+    #[cfg(test)]
     pub(super) fn new(repo: &Repository, kind: Kind, bytes: &[u8]) -> Result<Self, SnapshotError> {
+        Self::new_with_cleanup(repo, kind, bytes, &Arc::new(GitWriteCleanup::new()))
+    }
+    /// Stage, independently verify and sync raw bytes under the command's cleanup owner.
+    ///
+    /// # Errors
+    /// Reports cancellation, invalid identity/configuration, or filesystem/sync failure.
+    pub(super) fn new_with_cleanup(
+        repo: &Repository,
+        kind: Kind,
+        bytes: &[u8],
+        cleanup: &Arc<GitWriteCleanup>,
+    ) -> Result<Self, SnapshotError> {
         let object_root = repo.objects.store_ref().path().to_owned();
-        let directory = tempfile::Builder::new()
-            .prefix(".letopis-stage-")
-            .permissions(fs::Permissions::from_mode(0o700))
-            .tempdir_in(&object_root)
-            .map_err(fail_io)?;
-        let store = gix::odb::loose::Store::at(directory.path(), repo.object_hash());
+        let (directory, path) = cleanup.create_stage(&object_root)?;
+        let store = gix::odb::loose::Store::at(path, repo.object_hash());
         let oid = store.write_buf(kind, bytes).map_err(|_| fail_integrity())?;
         verify_identity(oid, kind, bytes)?;
         let staged = store.object_path(&oid);
@@ -83,14 +98,14 @@ impl StagedObject {
     /// Fails closed on invalid existing bytes or any write/sync failure; a complete orphan may remain.
     pub(super) fn publish(self) -> Result<(), SnapshotError> {
         let parent = self.destination.parent().ok_or_else(fail_integrity)?;
-        gix::fs::dir::create::all(parent, Default::default(), self.shared_permissions)
-            .map_err(fail_io)?;
         #[cfg(test)]
         tests::inject_failure(tests::FailurePoint::ObjectPublish)?;
-        match fs::hard_link(&self.staged, &self.destination) {
-            Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => self.verify_existing()?,
-            Err(error) => return Err(fail_io(error)),
+        if !self.directory.publish_object(
+            &self.staged,
+            &self.destination,
+            self.shared_permissions,
+        )? {
+            self.verify_existing()?;
         }
         // A racing winner can still be between its link and sync. Sync its inode too.
         File::open(&self.destination)
@@ -99,7 +114,7 @@ impl StagedObject {
         #[cfg(test)]
         tests::inject_failure(tests::FailurePoint::DirectorySync)?;
         sync_parent_chain(parent, &self.object_root)?;
-        self.directory.close().map_err(fail_io)
+        self.directory.close_stage()
     }
 
     fn verify_existing(&self) -> Result<(), SnapshotError> {
@@ -129,29 +144,29 @@ pub(super) fn is_ref_lock_busy(error: &SnapshotError) -> bool {
 /// Returns an internal error for invalid/conflicting refs or lock/write/sync failures.
 /// Contention has a safe typed cause recognized by `is_ref_lock_busy`; retries must
 /// reenter this protocol. No success path bypasses owned-lock durability confirmation.
-pub(super) fn retain_ref(repo: &Repository, oid: ObjectId) -> Result<(), SnapshotError> {
+pub(super) fn retain_ref(
+    repo: &Repository,
+    oid: ObjectId,
+    cleanup: &Arc<GitWriteCleanup>,
+) -> Result<(), SnapshotError> {
     let name = format!("{SNAPSHOT_REF_PREFIX}{oid}");
     #[cfg(test)]
     tests::publish_concurrent_ref();
     let path = repo.common_dir().join(&name);
-    let mut lock = gix::lock::File::acquire_to_update_resource(
-        &path,
-        gix::lock::acquire::Fail::Immediately,
-        Some(repo.common_dir().to_owned()),
-        read_shared_permissions(repo)?,
-    )
-    .map_err(|error| make_lock_error(&error))?;
-    if confirm_durable_ref(repo, &name, oid)? {
+    let (lock, mut file) =
+        cleanup.acquire_ref(&path, repo.common_dir(), read_shared_permissions(repo)?)?;
+    if confirm_durable_ref(repo, &name, oid, cleanup)? {
         return Ok(());
     }
     #[cfg(test)]
     tests::inject_failure(tests::FailurePoint::RefSync)?;
-    lock.with_mut(|file| writeln!(file, "{oid}").and_then(|()| file.sync_all()))
+    writeln!(file, "{oid}")
+        .and_then(|()| file.sync_all())
         .map_err(fail_io)?;
     #[cfg(test)]
     tests::inject_failure(tests::FailurePoint::RefPublish)?;
-    lock.commit().map_err(|error| fail_io(error.error))?;
-    confirm_published_ref(repo, &name, oid)
+    lock.commit_ref()?;
+    confirm_published_ref(repo, &name, oid, cleanup)
 }
 
 // Publication releases the write lock. Reacquire ownership before selecting the
@@ -160,15 +175,14 @@ fn confirm_published_ref(
     repo: &Repository,
     name: &str,
     oid: ObjectId,
+    cleanup: &Arc<GitWriteCleanup>,
 ) -> Result<(), SnapshotError> {
-    let _lock = gix::lock::Marker::acquire_to_hold_resource(
-        repo.common_dir().join(name),
-        gix::lock::acquire::Fail::Immediately,
-        Some(repo.common_dir().to_owned()),
+    let _lock = cleanup.acquire_marker(
+        &repo.common_dir().join(name),
+        repo.common_dir(),
         read_shared_permissions(repo)?,
-    )
-    .map_err(|error| make_lock_error(&error))?;
-    if !confirm_durable_ref(repo, name, oid)? {
+    )?;
+    if !confirm_durable_ref(repo, name, oid, cleanup)? {
         return Err(fail_integrity());
     }
     Ok(())
@@ -180,20 +194,17 @@ fn confirm_durable_ref(
     repo: &Repository,
     name: &str,
     oid: ObjectId,
+    cleanup: &Arc<GitWriteCleanup>,
 ) -> Result<bool, SnapshotError> {
     let loose = repo.common_dir().join(name);
     let packed_lock = match fs::symlink_metadata(&loose) {
         Ok(metadata) if metadata.file_type().is_file() => None,
         Ok(_) => return Err(fail_integrity()),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Some(
-            gix::lock::Marker::acquire_to_hold_resource(
-                repo.refs.packed_refs_path(),
-                gix::lock::acquire::Fail::Immediately,
-                None,
-                read_shared_permissions(repo)?,
-            )
-            .map_err(|error| make_lock_error(&error))?,
-        ),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Some(cleanup.acquire_marker(
+            &repo.refs.packed_refs_path(),
+            repo.common_dir(),
+            read_shared_permissions(repo)?,
+        )?),
         Err(error) => return Err(fail_io(error)),
     };
     if !has_exact_ref(repo, name, oid)? {
@@ -273,7 +284,7 @@ fn read_shared_permissions(repo: &Repository) -> Result<i32, SnapshotError> {
 fn verify_identity(oid: ObjectId, kind: Kind, bytes: &[u8]) -> Result<(), SnapshotError> {
     let kind = std::str::from_utf8(kind.as_bytes()).map_err(|_| fail_integrity())?;
     let mut hash = ObjectHasher::new(oid.kind().len_in_hex(), kind, bytes.len() as u64)?;
-    for chunk in bytes.chunks(64 * 1024) {
+    for chunk in bytes.chunks(HASH_CHUNK_BYTES) {
         hash.update(chunk);
     }
     if hash.finish()? != oid {
@@ -294,7 +305,8 @@ fn sync_parent_chain(path: &Path, boundary: &Path) -> Result<(), SnapshotError> 
     Err(fail_integrity())
 }
 
-fn make_lock_error(error: &gix::Error) -> SnapshotError {
+/// Preserve only typed lock contention and safe I/O classifications for retry decisions.
+pub(super) fn make_lock_error(error: &gix::Error) -> SnapshotError {
     if error.is_retryable() {
         return SnapshotError::new_with_cause(
             "Git ref durability confirmation is contended",

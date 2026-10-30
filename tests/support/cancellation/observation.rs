@@ -124,6 +124,55 @@ pub fn observe_index_flock(pid: u32, lock: &Path) -> String {
     )
 }
 
+/// Observe a real Git ignore-file read, not stdin or a test-only product checkpoint.
+///
+/// # Panics
+/// Panics unless the native main-thread stack reaches the ignore reader before the watchdog.
+#[cfg(target_os = "macos")]
+pub fn observe_git_read(pid: u32, _path: &Path) -> String {
+    let deadline = Instant::now() + WAIT;
+    loop {
+        let trace = sample_process(pid);
+        let main = get_main_thread_trace(&trace).unwrap_or("");
+        if main.contains("gix_glob::search::pattern::read_in_full")
+            && main.contains("letopis::git::corpus::list_candidates")
+            && has_native_frame(main, "read", "libsystem_kernel.dylib")
+        {
+            return format!("inside=git-read\n{trace}");
+        }
+        assert!(
+            Instant::now() < deadline,
+            "no native Git read observed:\n{trace}"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+}
+
+/// Observe the native read syscall and its exact independently owned FIFO descriptor.
+///
+/// # Panics
+/// Panics unless the matching syscall/descriptor is observed before the watchdog.
+#[cfg(target_os = "linux")]
+pub fn observe_git_read(pid: u32, path: &Path) -> String {
+    wait_for_trace(
+        || {
+            let syscall = fs::read_to_string(format!("/proc/{pid}/syscall")).ok()?;
+            let fields: Vec<_> = syscall.split_whitespace().collect();
+            if fields.first()?.parse::<libc::c_long>().ok()? != libc::SYS_read {
+                return None;
+            }
+            let fd = u64::from_str_radix(fields.get(1)?.strip_prefix("0x")?, 16).ok()?;
+            let metadata = fs::metadata(format!("/proc/{pid}/fd/{fd}")).ok()?;
+            let expected = fs::metadata(path).ok()?;
+            if (metadata.dev(), metadata.ino()) != (expected.dev(), expected.ino()) {
+                return None;
+            }
+            Some(format!("inside=git-read\n{syscall}"))
+        },
+        "Git ignore FIFO read",
+    )
+}
+
 #[cfg(target_os = "macos")]
 fn sample_process(pid: u32) -> String {
     let trace = tempfile::NamedTempFile::new().expect("sample file");

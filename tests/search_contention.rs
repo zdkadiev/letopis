@@ -8,7 +8,7 @@ use letopis::{
     wire_document_refresher, wire_searcher,
 };
 use rusqlite::Connection;
-use std::{num::NonZeroUsize, sync::mpsc, thread, time::Duration};
+use std::{num::NonZeroUsize, path::PathBuf, sync::mpsc, thread, time::Duration};
 use support::{
     embedding::{FixtureReply, HttpFixture, ResponseBarrier},
     reading::ReadingRepo,
@@ -45,10 +45,9 @@ fn query_failure_waits_for_drain_write_and_returns_fts_results() {
 fn assert_search_survives_writer(phase: WritePhase, response: &str) {
     // Given: production services, current vectors, and an old diagnostic.
     let (repo, server, barrier) = prepare_fixture(response);
-    let searcher = wire_searcher(repo.get_root()).unwrap();
     let writer = Connection::open(repo.get_root().join(".letopis/vectors.db")).unwrap();
     // When: hold the same SQLite writer lock used by a drain transaction.
-    let links = run_during_write(searcher, &writer, &barrier, phase).unwrap();
+    let links = run_during_write(repo.get_root().to_owned(), &writer, &barrier, phase).unwrap();
     // Then: exact result and correct diagnostic publication, not just no error.
     assert_eq!(
         links
@@ -96,17 +95,20 @@ fn prepare_fixture(response: &str) -> (ReadingRepo, HttpFixture, ResponseBarrier
     (repo, server, barrier)
 }
 
-fn run_during_write<S: Searcher + Send + 'static>(
-    mut searcher: S,
+fn run_during_write(
+    root: PathBuf,
     writer: &Connection,
     barrier: &ResponseBarrier,
     phase: WritePhase,
 ) -> CommandResult<Vec<SearchLink>> {
-    if matches!(phase, WritePhase::BeforeConfiguration) {
-        writer.execute_batch("BEGIN IMMEDIATE").unwrap();
-    }
     let (sender, receiver) = mpsc::channel();
+    let (ready, prepared) = mpsc::channel();
+    let (start, admitted) = mpsc::channel();
     let worker = thread::spawn(move || {
+        // Keep the synchronous non-Send repository on the thread that owns the search.
+        let mut searcher = wire_searcher(&root).unwrap();
+        ready.send(()).unwrap();
+        admitted.recv().unwrap();
         sender
             .send(searcher.search(&SearchRequest {
                 filters: Default::default(),
@@ -115,6 +117,11 @@ fn run_during_write<S: Searcher + Send + 'static>(
             }))
             .unwrap();
     });
+    prepared.recv_timeout(RESULT_WAIT).unwrap();
+    if matches!(phase, WritePhase::BeforeConfiguration) {
+        writer.execute_batch("BEGIN IMMEDIATE").unwrap();
+    }
+    start.send(()).unwrap();
     if matches!(phase, WritePhase::AfterInference) {
         barrier.wait_until_entered();
         writer.execute_batch("BEGIN IMMEDIATE").unwrap();

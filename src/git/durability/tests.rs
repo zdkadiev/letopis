@@ -1,4 +1,4 @@
-use super::{StagedObject, is_ref_lock_busy, retain_ref};
+use super::{StagedObject, is_ref_lock_busy, retain_ref as retain_ref_with_cleanup};
 use crate::{process_test_support as fixture, service::SnapshotError};
 use fixture::{FORMATS, TempRepo};
 use gix::{Repository, hash::ObjectId, objs::Kind};
@@ -24,7 +24,7 @@ fn stages_syncs_publishes_and_retains_git_compatible_objects() {
         assert_eq!(oid.to_string(), expected);
         assert!(!object.destination.exists());
         assert_eq!(
-            fs::metadata(object.directory.path())
+            fs::metadata(object.staged.parent().unwrap().parent().unwrap())
                 .unwrap()
                 .permissions()
                 .mode()
@@ -76,7 +76,7 @@ fn refuses_corrupt_existing_objects_and_cleans_private_staging() {
     let fixture = TempRepo::new(FORMATS[0]);
     let repo = gix::open(fixture.get_root()).unwrap();
     let object = StagedObject::new(&repo, Kind::Blob, b"corrupt winner").unwrap();
-    let stage = object.directory.path().to_owned();
+    let stage = object.staged.parent().unwrap().parent().unwrap().to_owned();
     let destination = object.destination.clone();
     fs::create_dir_all(destination.parent().unwrap()).unwrap();
     fs::write(&destination, b"CANARY invalid zlib").unwrap();
@@ -426,4 +426,15 @@ fn try_create_probe_lock(path: &Path) -> bool {
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => false,
         Err(error) => panic!("unexpected probe failure: {error}"),
     }
+}
+
+fn retain_ref(
+    repo: &gix::Repository,
+    oid: gix::hash::ObjectId,
+) -> Result<(), crate::service::SnapshotError> {
+    retain_ref_with_cleanup(
+        repo,
+        oid,
+        &std::sync::Arc::new(super::GitWriteCleanup::new()),
+    )
 }

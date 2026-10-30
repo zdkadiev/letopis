@@ -16,7 +16,7 @@ use crate::cli::{CommandResponse, ResponseWriter, parse_request, write_response}
 use crate::commands::run_request;
 use crate::embedding::{HttpProviders, Ollama, Openai};
 use crate::filesystem::LocalFileSystem;
-use crate::git::GitCli;
+use crate::git::{GitRepository, GitWriteCleanup};
 use crate::markdown::MarkdownParser;
 use crate::process::{DetachedProcess, ProcessInput, SigintListener};
 use crate::service::{
@@ -69,7 +69,10 @@ pub fn run_cli(
     output: impl Write,
 ) -> u8 {
     let args = args.into_iter().collect::<Vec<_>>();
-    write_response(output, execute_request(&args, input))
+    write_response(
+        output,
+        execute_request(&args, input, Arc::new(GitWriteCleanup::new())),
+    )
 }
 
 /// Run the executable entry path with scoped foreground SIGINT handling.
@@ -100,7 +103,7 @@ pub fn wire_graph_diagnostics() -> impl GraphDiagnostics {
 /// Returns `invalid_request` outside a non-bare Git work tree, and a safe internal
 /// error for repository, filesystem or provider setup failures.
 pub fn wire_initializer(start: &Path) -> ServiceResult<impl Initializer + use<>> {
-    let git = GitCli::open(start).map_err(map_snapshot_2_service_error)?;
+    let git = GitRepository::open(start).map_err(map_snapshot_2_service_error)?;
     let root = git.get_root().to_path_buf();
     let files = LocalFileSystem::open(&root)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Initialization, cause))?;
@@ -119,9 +122,17 @@ pub fn wire_initializer(start: &Path) -> ServiceResult<impl Initializer + use<>>
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
 pub fn wire_traverser(start: &Path) -> ServiceResult<impl Traverser + use<>> {
-    let refresher = wire_document_refresher(start)
+    wire_traverser_with_cleanup(start, Arc::new(GitWriteCleanup::new()))
+}
+
+/// Compose this service with the foreground command's Git write-resource owner.
+fn wire_traverser_with_cleanup(
+    start: &Path,
+    cleanup: Arc<GitWriteCleanup>,
+) -> ServiceResult<impl Traverser + use<>> {
+    let refresher = wire_document_refresher_with_cleanup(start, Arc::clone(&cleanup))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
-    let git = GitCli::open(start)
+    let git = GitRepository::open_with_cleanup(start, cleanup)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     let filesystem = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
@@ -168,7 +179,7 @@ pub fn wire_source_reader(root: &Path) -> DocumentResult<impl SourceReader + use
 /// # Errors
 /// Reports unsupported repositories or unsafe filesystem roots.
 pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenance + use<>> {
-    let git = GitCli::open(root).map_err(|cause| {
+    let git = GitRepository::open(root).map_err(|cause| {
         DocumentError::new_with_cause(
             DocumentErrorKind::InternalError,
             "cannot open provenance repository",
@@ -184,9 +195,17 @@ pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenan
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or storage setup failures.
 pub fn wire_checker(start: &Path) -> ServiceResult<impl Checker + use<>> {
-    let refresher = wire_document_refresher(start)
+    wire_checker_with_cleanup(start, Arc::new(GitWriteCleanup::new()))
+}
+
+/// Compose this service with the foreground command's Git write-resource owner.
+fn wire_checker_with_cleanup(
+    start: &Path,
+    cleanup: Arc<GitWriteCleanup>,
+) -> ServiceResult<impl Checker + use<>> {
+    let refresher = wire_document_refresher_with_cleanup(start, Arc::clone(&cleanup))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
-    let git = GitCli::open(start)
+    let git = GitRepository::open_with_cleanup(start, Arc::clone(&cleanup))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     let filesystem = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
@@ -200,7 +219,7 @@ pub fn wire_checker(start: &Path) -> ServiceResult<impl Checker + use<>> {
         storage,
         GraphDiagnosticsService::new(),
         ProvenanceService::new(
-            GitCli::open(start)
+            GitRepository::open_with_cleanup(start, cleanup)
                 .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
             LocalFileSystem::open(git.get_root())
                 .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
@@ -213,9 +232,17 @@ pub fn wire_checker(start: &Path) -> ServiceResult<impl Checker + use<>> {
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
 pub fn wire_searcher(start: &Path) -> ServiceResult<impl Searcher + use<>> {
-    let refresher = wire_document_refresher(start)
+    wire_searcher_with_cleanup(start, Arc::new(GitWriteCleanup::new()))
+}
+
+/// Compose this service with the foreground command's Git write-resource owner.
+fn wire_searcher_with_cleanup(
+    start: &Path,
+    cleanup: Arc<GitWriteCleanup>,
+) -> ServiceResult<impl Searcher + use<>> {
+    let refresher = wire_document_refresher_with_cleanup(start, Arc::clone(&cleanup))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
-    let git = GitCli::open(start)
+    let git = GitRepository::open_with_cleanup(start, Arc::clone(&cleanup))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     let filesystem = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
@@ -232,7 +259,7 @@ pub fn wire_searcher(start: &Path) -> ServiceResult<impl Searcher + use<>> {
         filesystem,
         markdown: MarkdownParser::new(),
         provenance: ProvenanceService::new(
-            GitCli::open(start)
+            GitRepository::open_with_cleanup(start, cleanup)
                 .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
             LocalFileSystem::open(git.get_root())
                 .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
@@ -245,9 +272,17 @@ pub fn wire_searcher(start: &Path) -> ServiceResult<impl Searcher + use<>> {
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or setup failures.
 pub fn wire_inspector(start: &Path) -> ServiceResult<impl Inspector + use<>> {
-    let refresher = wire_document_refresher(start)
+    wire_inspector_with_cleanup(start, Arc::new(GitWriteCleanup::new()))
+}
+
+/// Compose this service with the foreground command's Git write-resource owner.
+fn wire_inspector_with_cleanup(
+    start: &Path,
+    cleanup: Arc<GitWriteCleanup>,
+) -> ServiceResult<impl Inspector + use<>> {
+    let refresher = wire_document_refresher_with_cleanup(start, Arc::clone(&cleanup))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
-    let git = GitCli::open(start)
+    let git = GitRepository::open_with_cleanup(start, cleanup)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
     let files = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
@@ -264,7 +299,15 @@ pub fn wire_inspector(start: &Path) -> ServiceResult<impl Inspector + use<>> {
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths, or storage/I/O failures.
 pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + use<>> {
-    let git = GitCli::open(start).map_err(|cause| {
+    wire_document_refresher_with_cleanup(start, Arc::new(GitWriteCleanup::new()))
+}
+
+/// Compose this service with the foreground command's Git write-resource owner.
+fn wire_document_refresher_with_cleanup(
+    start: &Path,
+    cleanup: Arc<GitWriteCleanup>,
+) -> DocumentResult<impl Refresher + use<>> {
+    let git = GitRepository::open_with_cleanup(start, Arc::clone(&cleanup)).map_err(|cause| {
         DocumentError::new_with_cause(
             DocumentErrorKind::InternalError,
             "cannot open document repository",
@@ -282,7 +325,7 @@ pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + 
             )
         })?;
     let provenance = ProvenanceService::new(
-        GitCli::open(start).map_err(|cause| {
+        GitRepository::open_with_cleanup(start, cleanup).map_err(|cause| {
             DocumentError::new_with_cause(
                 DocumentErrorKind::InternalError,
                 "cannot open provenance repository",
@@ -309,7 +352,7 @@ pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + 
 pub fn wire_embedding_executor(
     start: &Path,
 ) -> ServiceResult<impl EmbeddingExecutor + Embedder + use<>> {
-    let git = GitCli::open(start)
+    let git = GitRepository::open(start)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
     let files = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
@@ -385,17 +428,17 @@ pub fn build_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + us
 }
 
 /// Open immutable Git snapshot operations and read-only root verification at `start`.
-/// Requires Git 2.29 or newer, a UTF-8 checkout root, and a SHA-1 or SHA-256
+/// Requires a UTF-8 checkout root and a SHA-1 or SHA-256
 /// working repository without an object alternates path (even empty/inactive).
 /// Alternates are checked again before each operation; use a self-contained clone.
 ///
 /// # Errors
-/// Returns a snapshot error when Git or the working repository is unsupported,
+/// Returns a snapshot error when the working repository is unsupported,
 /// the checkout root cannot be decoded, an alternates path exists, or Git I/O fails.
 pub fn open_git_snapshots(
     start: &Path,
 ) -> Result<impl GitSnapshots + SnapshotVerifier, SnapshotError> {
-    GitCli::open(start)
+    GitRepository::open(start)
 }
 
 /// Open existing published storage beneath an already pinned service directory.
@@ -445,14 +488,16 @@ where
     F: FnOnce(Box<dyn FnOnce() + Send>) -> io::Result<SigintListener>,
 {
     let writer = Arc::new(ResponseWriter::default());
-    let Ok(listener) = install_foreground_listener(args, &writer, install) else {
+    let cleanup = Arc::new(GitWriteCleanup::new());
+    let Ok(listener) = install_foreground_listener(args, &writer, Arc::clone(&cleanup), install)
+    else {
         let error = CommandError::new(
             CommandErrorKind::InternalError,
             "cannot install command cancellation",
         );
         return writer.write_response(output, Err(error));
     };
-    let exit = writer.write_response(output, execute_request(args, input));
+    let exit = writer.write_response(output, execute_request(args, input, cleanup));
     drop(listener);
     exit
 }
@@ -460,6 +505,7 @@ where
 fn install_foreground_listener<F>(
     args: &[OsString],
     writer: &Arc<ResponseWriter>,
+    cleanup: Arc<GitWriteCleanup>,
     install: F,
 ) -> io::Result<Option<SigintListener>>
 where
@@ -476,6 +522,7 @@ where
         ));
         let mut output = io::stdout();
         let _ = writer.write_response(&mut output, response);
+        let _ = cleanup.cancel_and_cleanup();
     });
     install(on_interrupt).map(Some)
 }
@@ -489,8 +536,12 @@ fn requires_cancellation_handler(args: &[OsString]) -> bool {
     }
 }
 
-fn execute_request(args: &[OsString], input: impl Read) -> CommandResult<CommandResponse> {
-    parse_request(args, input).and_then(run_request)
+fn execute_request(
+    args: &[OsString],
+    input: impl Read,
+    cleanup: Arc<GitWriteCleanup>,
+) -> CommandResult<CommandResponse> {
+    parse_request(args, input).and_then(|request| run_request(request, cleanup))
 }
 
 fn map_snapshot_2_service_error(cause: SnapshotError) -> ServiceError {

@@ -6,7 +6,7 @@ use super::SourceService;
 use crate::{
     domain::{RepoPath, SourceUri},
     filesystem::LocalFileSystem,
-    git::GitCli,
+    git::GitRepository,
     markdown::MarkdownParser,
     storage::SqliteStorage,
 };
@@ -22,11 +22,11 @@ fn publish_remote_without_file_capture_and_group_local_ranges() {
     let filesystem = RecordedFiles::new(repo.path(), recorded_reads.clone());
     let storage = open_storage(repo.path());
     let provenance = ProvenanceService::new(
-        GitCli::open(repo.path()).unwrap(),
+        GitRepository::open(repo.path()).unwrap(),
         RecordedFiles::new(repo.path(), recorded_reads.clone()),
     );
     let mut refresher = DocumentRefreshService {
-        git: GitCli::open(repo.path()).unwrap(),
+        git: GitRepository::open(repo.path()).unwrap(),
         filesystem,
         markdown: MarkdownParser::new(),
         storage,

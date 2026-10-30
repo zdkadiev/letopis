@@ -85,20 +85,14 @@ fn unrelated_damage_is_deferred_but_full_audits_prevent_publication() {
     let revision = get_revision(&repo);
     damage_child(&repo, basis.as_str(), "unrelated");
     // When / Then: routine reads do not touch unrelated author bytes.
-    assert_no_source_audit(&repo, "search", br#"{"query":"AlphaToken","limit":10}"#, 0);
+    assert_no_source_audit(&repo, "search", br#"{"query":"AlphaToken","limit":10}"#);
     assert_no_source_audit(
         &repo,
         "traverse",
         br#"{"element_ids":["a.md"],"mode":"both","direction":"both","depth":1,"limit":10}"#,
-        0,
     );
-    assert_no_source_audit(
-        &repo,
-        "inspect",
-        br#"{"element_ids":["a.md","used.rs"]}"#,
-        1,
-    );
-    assert_no_source_audit(&repo, "check", br#"{"paths":["a.md"]}"#, 0);
+    assert_no_source_audit(&repo, "inspect", br#"{"element_ids":["a.md","used.rs"]}"#);
+    assert_no_source_audit(&repo, "check", br#"{"paths":["a.md"]}"#);
     // Given: an unpublished edit to valid knowledge.
     repo.write(
         "a.md",
@@ -136,7 +130,7 @@ fn newly_declared_bases_and_markdown_edits_never_trigger_source_audit() {
         build_note(Some(&basis), &["used.rs"], "AlphaToken").as_bytes(),
     );
     // When / Then: first publication retains only the root and addressed bytes.
-    assert_no_source_audit(&repo, "search", br#"{"query":"AlphaToken","limit":10}"#, 0);
+    assert_no_source_audit(&repo, "search", br#"{"query":"AlphaToken","limit":10}"#);
     let retained = run_git(
         &repo,
         &[
@@ -151,12 +145,7 @@ fn newly_declared_bases_and_markdown_edits_never_trigger_source_audit() {
         build_note(Some(&basis), &["used.rs"], "ChangedToken").as_bytes(),
     );
     // When / Then: incremental refresh remains light; full audit still detects damage.
-    assert_no_source_audit(
-        &repo,
-        "search",
-        br#"{"query":"ChangedToken","limit":10}"#,
-        0,
-    );
+    assert_no_source_audit(&repo, "search", br#"{"query":"ChangedToken","limit":10}"#);
     assert_internal(&repo.invoke(&["check"], b"{}"));
 }
 
@@ -235,21 +224,8 @@ fn run_git(repo: &ReadingRepo, args: &[&str]) -> Vec<u8> {
     assert!(output.status.success(), "{output:?}");
     output.stdout
 }
-fn assert_no_source_audit(
-    repo: &ReadingRepo,
-    command: &str,
-    request: &[u8],
-    expected_batches: usize,
-) {
-    let dir = tempfile::tempdir().unwrap();
-    let script = dir.path().join("git");
-    fs::write(
-        &script,
-        "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$LETOPIS_TEST_CALLS\"\nexec /usr/bin/git \"$@\"\n",
-    )
-    .unwrap();
-    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
-    let log = dir.path().join("calls");
+fn assert_no_source_audit(repo: &ReadingRepo, command: &str, request: &[u8]) {
+    // Given: unrelated damaged historical bytes and no executable Git transport.
     let mut input = tempfile::tempfile().unwrap();
     input.write_all(request).unwrap();
     input.rewind().unwrap();
@@ -257,27 +233,11 @@ fn assert_no_source_audit(
     isolate_command(&mut cmd);
     cmd.current_dir(repo.get_root())
         .arg(command)
-        .env(
-            "PATH",
-            format!(
-                "{}:{}",
-                dir.path().display(),
-                std::env::var("PATH").unwrap()
-            ),
-        )
-        .env("LETOPIS_TEST_CALLS", &log)
+        .env("PATH", "/nonexistent-letopis-git")
         .stdin(Stdio::from(input))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let child = OwnedChild::spawn(&mut cmd);
     assert_ok(&child.wait(Instant::now() + Duration::from_secs(30)));
-    let calls = fs::read_to_string(log).unwrap();
-    assert_eq!(
-        calls
-            .lines()
-            .filter(|c| c.ends_with("cat-file --batch"))
-            .count(),
-        expected_batches,
-        "{calls}"
-    );
+    // Then: success despite damaged unaddressed bytes proves the read did not audit them.
 }

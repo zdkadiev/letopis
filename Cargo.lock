@@ -1583,6 +1583,7 @@ dependencies = [
  "cc",
  "gix",
  "gix-dir",
+ "gix-pathspec",
  "libc",
  "libsqlite3-sys",
  "mockall",

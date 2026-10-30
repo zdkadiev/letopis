@@ -1,8 +1,7 @@
 use super::{
-    batch::VerifiedObject,
-    constants::{BLOB_KIND, TREE_KIND},
+    constants::{BLOB_KIND, HASH_CHUNK_BYTES, TREE_KIND},
+    error::make_io_error,
     hashing::ObjectHasher,
-    process::make_io_error,
 };
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use gix::{
@@ -14,16 +13,32 @@ use gix::{
         store::{Handle, init::Options},
     },
 };
-use std::{io, rc::Rc};
+use std::{fmt, io, rc::Rc};
 
-const HASH_CHUNK_BYTES: usize = 64 * 1024;
 const MAX_REUSABLE_BYTES: usize = 4 * 1024 * 1024;
+
+/// Keep only the current verified tree body; blob payloads are discarded after hashing.
+#[derive(Debug)]
+pub(super) enum VerifiedObject {
+    Blob,
+    Tree(Vec<u8>),
+}
 
 /// Owns one uncached local ODB view and a bounded reusable decode allocation.
 pub(super) struct ObjectReader {
     objects: Handle<Rc<Store>>,
     oid_len: usize,
     buffer: Vec<u8>,
+}
+
+impl fmt::Debug for ObjectReader {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ObjectReader")
+            .field("oid_len", &self.oid_len)
+            .field("buffer_capacity", &self.buffer.capacity())
+            .finish_non_exhaustive()
+    }
 }
 
 impl ObjectReader {
@@ -66,9 +81,39 @@ impl ObjectReader {
         missing: SnapshotErrorKind,
         wrong_type: SnapshotErrorKind,
     ) -> Result<VerifiedObject, SnapshotError> {
-        let result = self.verify_object(oid, expected, missing, wrong_type);
+        let result = self
+            .verify_object(oid, expected, missing, wrong_type)
+            .map(|()| {
+                if expected == TREE_KIND {
+                    VerifiedObject::Tree(self.buffer.clone())
+                } else {
+                    VerifiedObject::Blob
+                }
+            });
         // Delta decoding may grow this allocation beyond the reconstructed body.
         // Release it on both success and error; the threshold is not a size limit.
+        if self.buffer.capacity() > MAX_REUSABLE_BYTES {
+            self.buffer = Vec::new();
+        } else {
+            self.buffer.clear();
+        }
+        result
+    }
+
+    /// Read verified bytes for an addressed object; no payload survives in a cache.
+    ///
+    /// # Errors
+    /// Uses caller-selected missing/type errors; decoding and checksum failures are internal.
+    pub(super) fn read_bytes(
+        &mut self,
+        oid: &str,
+        expected: &str,
+        missing: SnapshotErrorKind,
+        wrong_type: SnapshotErrorKind,
+    ) -> Result<Vec<u8>, SnapshotError> {
+        let result = self
+            .verify_object(oid, expected, missing, wrong_type)
+            .map(|()| self.buffer.clone());
         if self.buffer.capacity() > MAX_REUSABLE_BYTES {
             self.buffer = Vec::new();
         } else {
@@ -83,7 +128,7 @@ impl ObjectReader {
         expected: &str,
         missing: SnapshotErrorKind,
         wrong_type: SnapshotErrorKind,
-    ) -> Result<VerifiedObject, SnapshotError> {
+    ) -> Result<(), SnapshotError> {
         if oid.len() != self.oid_len
             || !oid
                 .bytes()
@@ -113,11 +158,7 @@ impl ObjectReader {
         if hash.finish()? != oid {
             return Err(fail_integrity());
         }
-        Ok(if kind == TREE_KIND {
-            VerifiedObject::Tree(object.data.to_vec())
-        } else {
-            VerifiedObject::Blob
-        })
+        Ok(())
     }
 }
 

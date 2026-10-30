@@ -6,7 +6,9 @@ rust-version = "1.95.0"
 publish = false
 
 [dependencies]
+tempfile = "=3.27.0"
 gix = { version = "=0.90.0", default-features = false, features = ["sha1", "sha256", "index", "excludes"] }
+gix-pathspec = "=0.22.1"
 gix-dir = { version = "=0.32.0", default-features = false, features = ["sha1", "sha256"] }
 libc = "=0.2.191"
 rustix = { version = "=1.1.5", default-features = false, features = ["fs", "std"] }
@@ -68,7 +70,6 @@ sha2 = "=0.10.9"
 mockall = "=0.15.0"
 # Private filesystem watchdogs terminate their owned process groups.
 rustix = { version = "=1.1.5", default-features = false, features = ["process", "std"] }
-tempfile = "=3.27.0"
 
 # Distribution build: `make release`. Kept separate from `release` so `make verify` stays fast.
 [profile.dist]

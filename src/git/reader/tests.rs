@@ -1,5 +1,5 @@
 use super::ObjectReader;
-use crate::git::batch::VerifiedObject;
+use crate::git::reader::VerifiedObject;
 use crate::service::SnapshotErrorKind;
 use std::env;
 

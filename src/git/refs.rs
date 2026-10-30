@@ -1,9 +1,9 @@
 use super::{
-    GitCli,
-    batch::{BatchReader, VerifiedObject},
-    constants::{SNAPSHOT_REF_PREFIX, TREE_KIND, UPDATE_REF_COMMAND},
+    GitRepository,
+    constants::TREE_KIND,
+    durability::{is_ref_lock_busy, retain_ref},
     objects::ObjectDb,
-    process::is_exit_code,
+    reader::VerifiedObject,
     tree::read_children,
     validation::validate_tree_bytes,
 };
@@ -11,105 +11,48 @@ use crate::{
     domain::TreeOid,
     service::{RetainedTree, SnapshotError, SnapshotErrorKind},
 };
-use std::collections::BTreeMap;
+use gix::hash::ObjectId;
+use std::{collections::BTreeMap, thread, time::Duration};
+// Retry safe lock contention through the entire confirmation protocol; not a command deadline.
+const REF_LOCK_ATTEMPTS: usize = 32;
+const REF_RETRY_DELAY: Duration = Duration::from_millis(10);
+/// Keep lightweight root retention distinct from full closure verification.
+#[derive(Debug)]
 pub(super) struct Retainer<'a> {
-    pub(super) git: &'a GitCli,
+    pub(super) git: &'a GitRepository,
 }
 impl Retainer<'_> {
+    /// Verify the root and durably confirm its exact direct ref, without loading descendants.
     pub(super) fn retain(&self, oid: &TreeOid) -> Result<(), SnapshotError> {
-        let db = ObjectDb { git: self.git };
-        db.validate_tree(oid)?;
-        self.retain_ref(&db, oid)
+        ObjectDb { git: self.git }.validate_tree(oid)?;
+        self.retain_ref(oid)
     }
+    /// Revalidate the entire closure on every call before durably retaining its root.
     pub(super) fn pin(&self, oid: &TreeOid) -> Result<RetainedTree, SnapshotError> {
         let db = ObjectDb { git: self.git };
         db.validate_tree(oid)?;
         verify_closure(&db, oid)?;
-        self.retain_ref(&db, oid)?;
+        self.retain_ref(oid)?;
         Ok(RetainedTree::new(oid.clone()))
     }
-    fn retain_ref(&self, db: &ObjectDb<'_>, oid: &TreeOid) -> Result<(), SnapshotError> {
-        let name = format!("{SNAPSHOT_REF_PREFIX}{}", oid.as_str());
-        if !self.has_exact_ref(db, &name, oid)? {
-            self.publish_ref(db, &name, oid)?;
-        }
-        Ok(())
-    }
-    // A concurrent writer may publish the same ref first; that is success once confirmed.
-    fn publish_ref(
-        &self,
-        db: &ObjectDb<'_>,
-        name: &str,
-        oid: &TreeOid,
-    ) -> Result<(), SnapshotError> {
-        let zero = "0".repeat(self.git.oid_len);
-        if let Err(cause) = db.run(
-            &[UPDATE_REF_COMMAND, "--no-deref", name, oid.as_str(), &zero],
-            None,
-        ) && !self.has_exact_ref(db, name, oid)?
-        {
-            return Err(cause);
-        }
-        if !self.has_exact_ref(db, name, oid)? {
-            return Err(SnapshotError::new(
-                SnapshotErrorKind::InternalError,
-                "snapshot ref was not confirmed",
-            ));
-        }
-        Ok(())
-    }
-    // Only an exact, direct ref to this exact tree is idempotent success.
-    fn has_exact_ref(
-        &self,
-        db: &ObjectDb<'_>,
-        name: &str,
-        oid: &TreeOid,
-    ) -> Result<bool, SnapshotError> {
-        // for-each-ref omits dangling symbolic refs. Probe first so zero-OID
-        // CAS cannot silently replace one of them. Exit 1 alone means non-symbolic.
-        match db.run(&["symbolic-ref", "-q", name], None) {
-            Ok(_) => {
-                return Err(SnapshotError::new(
-                    SnapshotErrorKind::InternalError,
-                    "snapshot ref is symbolic",
-                ));
-            }
-            Err(error) if is_exit_code(&error, 1) => {}
-            Err(error) => return Err(error),
-        }
-        let raw = db.run(
-            &[
-                "for-each-ref",
-                "--format=%(refname)%00%(objectname)%00%(symref)%00",
-                name,
-            ],
-            None,
-        )?;
-        for record in raw.split(|b| *b == b'\n').filter(|r| !r.is_empty()) {
-            let fields: Vec<_> = record.split(|b| *b == 0).collect();
-            if fields.len() != 4 {
-                return Err(SnapshotError::new(
-                    SnapshotErrorKind::InternalError,
-                    "invalid snapshot ref response",
-                ));
-            }
-            if fields[0] == name.as_bytes() {
-                if fields[1] != oid.as_str().as_bytes() || !fields[2].is_empty() {
-                    return Err(SnapshotError::new(
-                        SnapshotErrorKind::InternalError,
-                        "snapshot ref conflicts",
-                    ));
+    fn retain_ref(&self, oid: &TreeOid) -> Result<(), SnapshotError> {
+        let oid = ObjectId::from_hex(oid.as_str().as_bytes()).map_err(|_| {
+            SnapshotError::new(SnapshotErrorKind::InternalError, "invalid Git identity")
+        })?;
+        for attempt in 0..REF_LOCK_ATTEMPTS {
+            match retain_ref(&self.git.repo, oid, &self.git.cleanup) {
+                Err(error) if is_ref_lock_busy(&error) && attempt + 1 < REF_LOCK_ATTEMPTS => {
+                    thread::sleep(REF_RETRY_DELAY);
                 }
-                return Ok(true);
+                result => return result,
             }
         }
-        Ok(false)
+        unreachable!("bounded retry always returns on the last attempt")
     }
 }
-
 /// Verify every object reachable from `root`, ignoring gitlinks, and reject type conflicts.
 fn verify_closure(db: &ObjectDb<'_>, root: &TreeOid) -> Result<(), SnapshotError> {
-    let mut reader = BatchReader::open(&db.git.process, &db.git.root, db.git.oid_len)?;
+    let mut reader = db.git.reader.borrow_mut();
     let mut pending = vec![(root.as_str().to_owned(), TREE_KIND.to_owned())];
     let mut visited = BTreeMap::new();
     while let Some((oid, kind)) = pending.pop() {
@@ -133,5 +76,5 @@ fn verify_closure(db: &ObjectDb<'_>, root: &TreeOid) -> Result<(), SnapshotError
             pending.extend(read_children(&bytes, db.git.oid_len)?);
         }
     }
-    reader.finish()
+    Ok(())
 }

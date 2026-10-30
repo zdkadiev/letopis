@@ -3,7 +3,7 @@
 use crate::cli::{CommandResponse, Request, ResponseResult, finish_foreground};
 use crate::domain::RepoPath;
 use crate::filesystem::LocalFileSystem;
-use crate::git::GitCli;
+use crate::git::{GitRepository, GitWriteCleanup};
 use crate::service::{
     BackgroundRunner, Checker, CommandError, CommandErrorKind, CommandResult, ConfigReader,
     ConfigurationService, DocumentError, DocumentErrorKind, ElementAddress,
@@ -14,15 +14,20 @@ use crate::service::{
 use crate::storage::SqliteStatusStorage;
 use crate::utils::SERVICE_DIRECTORY;
 use crate::{
-    build_embedding_provider, wire_background_runner, wire_checker, wire_document_refresher,
-    wire_embedding_executor, wire_initializer, wire_inspector, wire_searcher, wire_traverser,
+    build_embedding_provider, wire_background_runner, wire_checker_with_cleanup,
+    wire_document_refresher_with_cleanup, wire_embedding_executor, wire_initializer,
+    wire_inspector_with_cleanup, wire_searcher_with_cleanup, wire_traverser_with_cleanup,
 };
 use std::{
     env,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
-pub(crate) fn run_request(request: Request) -> CommandResult<CommandResponse> {
+pub(crate) fn run_request(
+    request: Request,
+    cleanup: Arc<GitWriteCleanup>,
+) -> CommandResult<CommandResponse> {
     // A failed lookup only fails the commands that need the environment, so help works anywhere.
     let environment = locate_environment();
     match request {
@@ -30,20 +35,23 @@ pub(crate) fn run_request(request: Request) -> CommandResult<CommandResponse> {
         Request::Init => environment.and_then(|(directory, _)| run_init(&directory)),
         Request::Status => environment.and_then(|(directory, _)| run_status(&directory)),
         Request::Config => environment.and_then(|(directory, _)| run_config(&directory)),
-        Request::Reindex => {
-            environment.and_then(|(directory, executable)| run_reindex(&directory, &executable))
-        }
-        Request::Check(paths) => environment
-            .and_then(|(directory, executable)| run_check(&paths, &directory, &executable)),
+        Request::Reindex => environment
+            .and_then(|(directory, executable)| run_reindex(&directory, &executable, cleanup)),
+        Request::Check(paths) => environment.and_then(|(directory, executable)| {
+            run_check(&paths, &directory, &executable, cleanup)
+        }),
         Request::Drain => {
             environment.and_then(|(directory, executable)| run_drain(&directory, &executable))
         }
-        Request::Search(request) => environment
-            .and_then(|(directory, executable)| run_search(&request, &directory, &executable)),
-        Request::Traverse(request) => environment
-            .and_then(|(directory, executable)| run_traverse(&request, &directory, &executable)),
-        Request::Inspect(ids) => environment
-            .and_then(|(directory, executable)| run_inspect(&ids, &directory, &executable)),
+        Request::Search(request) => environment.and_then(|(directory, executable)| {
+            run_search(&request, &directory, &executable, cleanup)
+        }),
+        Request::Traverse(request) => environment.and_then(|(directory, executable)| {
+            run_traverse(&request, &directory, &executable, cleanup)
+        }),
+        Request::Inspect(ids) => environment.and_then(|(directory, executable)| {
+            run_inspect(&ids, &directory, &executable, cleanup)
+        }),
     }
 }
 
@@ -52,11 +60,15 @@ fn run_init(directory: &Path) -> CommandResult<CommandResponse> {
     Ok(CommandResponse::new(ResponseResult::Initialized))
 }
 
-fn run_reindex(directory: &Path, executable: &Path) -> CommandResult<CommandResponse> {
+fn run_reindex(
+    directory: &Path,
+    executable: &Path,
+    cleanup: Arc<GitWriteCleanup>,
+) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut documents = wire_document_refresher(&root)
+    let mut documents = wire_document_refresher_with_cleanup(&root, cleanup)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Reindex, cause))?;
     let outcome = documents.reindex().map_err(map_reindex_error)?;
     finish_foreground(ResponseResult::Reindex(outcome.revision), &mut background)
@@ -64,7 +76,7 @@ fn run_reindex(directory: &Path, executable: &Path) -> CommandResult<CommandResp
 
 fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
-    let git = GitCli::open(&root)
+    let git = GitRepository::open(&root)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let files = LocalFileSystem::open(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
@@ -78,7 +90,7 @@ fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
         SqliteStatusStorage::default()
     };
     let provenance = ProvenanceService::new(
-        GitCli::open(&root)
+        GitRepository::open(&root)
             .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?,
         LocalFileSystem::open(&root)
             .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?,
@@ -141,11 +153,12 @@ fn run_check(
     paths: &[RepoPath],
     directory: &Path,
     executable: &Path,
+    cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut checks = wire_checker(&root)?;
+    let mut checks = wire_checker_with_cleanup(&root, cleanup)?;
     let report = checks.check(paths)?;
     finish_foreground(ResponseResult::Check(report), &mut background)
 }
@@ -154,11 +167,12 @@ fn run_search(
     request: &SearchRequest,
     directory: &Path,
     executable: &Path,
+    cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut searches = wire_searcher(&root)?;
+    let mut searches = wire_searcher_with_cleanup(&root, cleanup)?;
     let links = searches.search(request)?;
     finish_foreground(ResponseResult::Search(links), &mut background)
 }
@@ -167,11 +181,12 @@ fn run_traverse(
     request: &TraversalRequest,
     directory: &Path,
     executable: &Path,
+    cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut traversals = wire_traverser(&root)?;
+    let mut traversals = wire_traverser_with_cleanup(&root, cleanup)?;
     let traversal = traversals.traverse(request)?;
     finish_foreground(ResponseResult::Traverse(traversal), &mut background)
 }
@@ -180,18 +195,19 @@ fn run_inspect(
     ids: &[ElementAddress],
     directory: &Path,
     executable: &Path,
+    cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
     let root = open_repository_root(directory)?;
     let mut tasks = wire_embedding_executor(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
-    let mut inspections = wire_inspector(&root)?;
+    let mut inspections = wire_inspector_with_cleanup(&root, cleanup)?;
     let inspection = inspections.inspect(ids)?;
     finish_foreground(ResponseResult::Inspect(inspection), &mut background)
 }
 
 /// Foreground services and background exclusion must share the discovered repository root.
 fn open_repository_root(directory: &Path) -> CommandResult<PathBuf> {
-    let git = GitCli::open(directory)
+    let git = GitRepository::open(directory)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Repository, cause))?;
     Ok(git.get_root().to_path_buf())
 }

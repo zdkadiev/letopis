@@ -1,6 +1,8 @@
-use super::{CONCURRENT_PUBLICATION, ConcurrentLock, FAILURE, FORMATS, FailurePoint, TempRepo};
+use super::{
+    CONCURRENT_PUBLICATION, ConcurrentLock, FAILURE, FORMATS, FailurePoint, TempRepo, retain_ref,
+};
 use super::{LOCK_OBSERVATION, LockObservation};
-use crate::git::durability::{StagedObject, is_ref_lock_busy, retain_ref};
+use crate::git::durability::{StagedObject, is_ref_lock_busy};
 use gix::{Repository, hash::ObjectId, objs::Kind};
 use std::{cell::Cell, fs};
 
