@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+import threading
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -10,13 +11,108 @@ import unittest
 from unittest.mock import patch
 
 from compare import (freeze_build, run_comparison, summarize_comparison,
-                     verify_equivalent_cases, verify_frozen_build)
+                     run_profile_probe, verify_equivalent_cases, verify_frozen_build)
 from scenarios import (hash_file, prepare_fixture, prepare_scenario, read_product_inputs,
                        run_git, write_json)
 from report import validate_result
+from measure import measure_process
 
 
 class ComparisonTests(unittest.TestCase):
+    def test_interrupted_contention_is_flushed_before_next_schedule(self):
+        # Given: an interrupted owned baseline inside the composite contention probe.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            _, pin = _freeze(root)
+            args = _args(root, pin)
+            args.stage = "contention"
+            cancellation = threading.Event()
+            cancellation.set()
+            def interrupt_call(argv, cwd, data, options):
+                return measure_process(argv, cwd, data, dict(options, cancel_event=cancellation))
+            # When: the cancellation reaches the campaign's composite boundary.
+            with patch("contention.measure_process", side_effect=interrupt_call):
+                with self.assertRaises(KeyboardInterrupt):
+                    run_comparison(args)
+            # Then: a censored measured attempt is durable and no later side starts.
+            rows = [json.loads(line) for line in (args.evidence / "samples.jsonl").read_text().splitlines()]
+            self.assertEqual(rows[-1]["phase"], "measured")
+            self.assertEqual(rows[-1]["outcome"], "interrupted")
+            self.assertFalse(rows[-1]["validation"]["valid"])
+            self.assertFalse((args.evidence / "probe-check-0-after").exists())
+
+    def test_failed_required_counter_marks_profile_campaign_incomplete(self):
+        # Given: valid profile/control calls but a real counter process times out.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            _, pin = _freeze(root)
+            args = _args(root, pin)
+            args.stage = "profiles"
+            # When: running the campaign with only expensive instrumentation replaced.
+            with patch("profile.record_profile", side_effect=_record_fixture_profile), \
+                    patch("profile.record_git_calls", side_effect=_record_failed_counter):
+                result = run_comparison(args)
+            # Then: failed required observations cannot produce a complete campaign.
+            self.assertEqual(result["outcome"], "incomplete")
+            series = next(row for row in result["series"] if row["phase"] == "measured")
+            self.assertEqual(series["before"]["failures"], 1)
+            self.assertEqual(series["after"]["failures"], 1)
+
+    def test_interrupted_required_counter_is_flushed_before_next_profile(self):
+        # Given: valid profile/control calls followed by a cancelled owned counter.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            _, pin = _freeze(root)
+            args = _args(root, pin)
+            args.stage = "profiles"
+            def interrupted_counter(case, build, output):
+                return _record_failed_counter(case, build, output, interrupted=True)
+            # When: the required counter observation is interrupted.
+            with patch("profile.record_profile", side_effect=_record_fixture_profile), \
+                    patch("profile.record_git_calls", side_effect=interrupted_counter):
+                with self.assertRaises(KeyboardInterrupt):
+                    run_comparison(args)
+            # Then: its censored attempt is durable and no after-side profile starts.
+            rows = [json.loads(line) for line in (args.evidence / "samples.jsonl").read_text().splitlines()]
+            self.assertEqual(rows[-1]["outcome"], "interrupted")
+            self.assertEqual(rows[-1]["counter_outcome"], "interrupted")
+            self.assertFalse(rows[-1]["validation"]["valid"])
+            self.assertFalse((args.evidence / "probe-check-0-after").exists())
+
+    def test_invalid_counter_output_rejects_an_otherwise_valid_profile_probe(self):
+        # Given: a counter process exits successfully with incorrect CLI output.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            _, pin = _freeze(root)
+            fixture = prepare_fixture(root / "fixture", 60)
+            case = prepare_scenario(fixture, "check", root / "case")
+            def invalid_counter(case, build, output):
+                return _record_failed_counter(case, build, output, invalid=True)
+            # When: independent validation rejects the required counter's output.
+            with patch("profile.record_profile", side_effect=_record_fixture_profile), \
+                    patch("profile.record_git_calls", side_effect=invalid_counter):
+                record = run_profile_probe(_args(root, pin), case, pin, root / "probe", 0)
+            # Then: successful transport does not establish a valid profile probe.
+            self.assertEqual(record["counter_outcome"], "success")
+            self.assertFalse(record["counter_validation"]["valid"])
+            self.assertFalse(record["validation"]["valid"])
+
+    def test_valid_required_counter_keeps_profile_probe_valid(self):
+        # Given: valid ordinary/profile and counter calls on the same fixture.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            _, pin = _freeze(root)
+            fixture = prepare_fixture(root / "fixture", 60)
+            case = prepare_scenario(fixture, "check", root / "case")
+            # When: all mandatory observations validate independently.
+            with patch("profile.record_profile", side_effect=_record_fixture_profile), \
+                    patch("profile.record_git_calls", side_effect=_record_valid_counter):
+                record = run_profile_probe(_args(root, pin), case, pin, root / "probe", 0)
+            # Then: counter failure handling leaves a successful probe usable.
+            self.assertEqual(record["counter_outcome"], "success")
+            self.assertTrue(record["counter_validation"]["valid"])
+            self.assertTrue(record["validation"]["valid"])
+
     def test_successful_medians_exclude_censored_and_invalid_attempts(self):
         # Given: known successful times and independently invalid attempts.
         before = [_record(value) for value in (2, 4, 6)] + [_record(120, "timeout")]
@@ -231,6 +327,41 @@ class ComparisonTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["outcome"], "interrupted")
             self.assertEqual(rows[0]["censor_reason"], "stage watchdog")
+
+
+def _record_fixture_profile(case, build, output):
+    output.mkdir()
+    measurement = measure_process([build["executable"], *case["argv"]], case["repository"], case["stdin"], {"timeout": 5})
+    receipt = {"outcome": "recorded", "measurement": measurement, "path": str(output / "fixture-profile"),
+               "scope": "test fixture process, no actual sampling"}
+    write_json(output / "receipt.json", receipt)
+    return receipt
+
+
+def _record_failed_counter(case, build, output, interrupted=False, invalid=False):
+    output.mkdir()
+    cancellation = threading.Event()
+    if interrupted:
+        cancellation.set()
+    script = 'print(\'{"ok":true,"result":{"errors":[{"code":"bad"}]}}\')' if invalid else "import time;time.sleep(60)"
+    measurement = measure_process([sys.executable, "-c", script], case["repository"], b"",
+                                  {"timeout": 5 if invalid else 0.01, "cancel_event": cancellation})
+    return _write_counter_receipt(case, output, measurement)
+
+
+def _record_valid_counter(case, build, output):
+    output.mkdir()
+    measurement = measure_process([build["executable"], *case["argv"]], case["repository"],
+                                  case["stdin"], {"timeout": 5})
+    return _write_counter_receipt(case, output, measurement)
+
+
+def _write_counter_receipt(case, output, measurement):
+    receipt = {"measurement": measurement, "validation": validate_result(case, measurement),
+               "count": 0, "operations": {}, "real_git": "test process",
+               "timing_scope": "instrumented; nested intervals may overlap"}
+    write_json(output / "receipt.json", receipt)
+    return receipt
 
 
 def _record(seconds, outcome="success"):

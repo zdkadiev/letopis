@@ -193,8 +193,11 @@ def run_probe(args, case, build, output, index):
     if args.stage == "initialization":
         return measure_case(args, build, case, case["name"], "pending", "measured", index, args.timeout)
     if args.stage == "contention":
-        from contention import run_contention
-        receipt = run_contention(case, build, output, verify=lambda: verify_frozen_build(build))
+        from contention import ContentionInterrupted, run_contention
+        try:
+            receipt = run_contention(case, build, output, verify=lambda: verify_frozen_build(build))
+        except ContentionInterrupted as error:
+            return error.record
         record = receipt["reader"]
         valid = (receipt["reader_validation"]["valid"] and receipt["writer_validation"]["valid"]
                  and receipt["baseline_validation"]["valid"])
@@ -227,7 +230,14 @@ def run_profile_probe(args, case, build, output, index):
                 return profiled
     if index == 0:
         verify_frozen_build(build)
-        record_git_calls(case, build, output / "git-counts")
+        counter = record_git_calls(case, build, output / "git-counts")
+        profiled.update(counter_outcome=counter["measurement"]["outcome"],
+                        counter_validation=counter["validation"], counter_receipt=str(output / "git-counts/receipt.json"))
+        if counter["measurement"]["outcome"] == "interrupted":
+            return dict(counter["measurement"], counter_outcome="interrupted",
+                        counter_receipt=profiled["counter_receipt"], validation={"valid": False, "reason": "counter interrupted"})
+        if counter["measurement"]["outcome"] != "success" or not counter["validation"]["valid"]:
+            profiled["validation"] = {"valid": False, "reason": "required Git counter failed"}
     if not plain["validation"]["valid"]:
         profiled["validation"] = {"valid": False, "reason": "ordinary profile control failed"}
     profiled["ordinary_duration_seconds"] = plain["duration_seconds"]

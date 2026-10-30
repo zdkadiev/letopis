@@ -5,6 +5,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 import fcntl
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -15,6 +16,14 @@ from measure import measure_process
 from provider import start_provider
 from scenarios import (ROOT, encode_json, get_environment, hash_file, initialize_projection,
                        prepare_fixture, read_product_inputs, run_git, verify_new_output, write_json)
+
+
+class ContentionInterrupted(KeyboardInterrupt):
+    """Carry the durably recorded interrupted schedule to its campaign owner."""
+
+    def __init__(self, record: dict):
+        super().__init__("contention schedule interrupted")
+        self.record = record
 
 
 def run_canary(binary: Path, root: Path) -> dict:
@@ -60,32 +69,77 @@ def run_canary(binary: Path, root: Path) -> dict:
 
 def run_contention(scenario: dict, build: dict, evidence: Path,
                    *, verify: Callable[[], None] | None = None) -> dict:
-    """Run owned writer/readers, optionally verifying their build before each launch."""
+    """Persist each owned subcall before continuing; preserve and propagate cancellation."""
     verify_new_output(evidence)
     evidence.mkdir(parents=True)
-    repository = scenario["repository"]
-    if verify is not None:
-        verify()
-    baseline = measure_process([build["executable"], *scenario["argv"]], repository,
-                               scenario["stdin"], {"timeout": scenario.get("timeout", 120)})
+    try:
+        if verify is not None:
+            verify()
+        baseline = measure_contention_call(scenario, build, evidence, {"role": "baseline"})
+        if baseline["outcome"] == "interrupted":
+            raise KeyboardInterrupt
+        reader, written, index_locked = coordinate_reindex(scenario, build, evidence, verify)
+    except KeyboardInterrupt:
+        record = preserve_interrupted_contention(evidence)
+        raise ContentionInterrupted(record) from None
+    receipt = build_contention_receipt(scenario, baseline, reader, written, index_locked)
+    write_json(evidence / "receipt.json", receipt)
+    return receipt
+
+
+def coordinate_reindex(scenario, build, evidence, verify):
     cancel = threading.Event()
     with ThreadPoolExecutor(max_workers=1) as executor:
         if verify is not None:
             verify()
-        writer = executor.submit(measure_process, [build["executable"], "reindex"], repository,
-                                 b"{}\n", {"timeout": scenario.get("timeout", 120), "cancel_event": cancel})
+        writer = executor.submit(measure_contention_call, scenario, build, evidence,
+                                 {"role": "writer", "cancel_event": cancel})
         try:
-            index_locked = wait_for_index_writer(repository, writer)
+            index_locked = wait_for_index_writer(scenario["repository"], writer)
+            if writer.done() and writer.result()["outcome"] == "interrupted":
+                raise KeyboardInterrupt
             if verify is not None:
                 verify()
-            reader = measure_process([build["executable"], *scenario["argv"]], repository,
-                                     scenario["stdin"], {"timeout": scenario.get("timeout", 120)})
+            reader = measure_contention_call(scenario, build, evidence, {"role": "reader"})
             if reader["outcome"] == "interrupted":
-                write_json(evidence / "interrupted-reader.json", reader)
                 raise KeyboardInterrupt
             written = writer.result()
+            if written["outcome"] == "interrupted":
+                raise KeyboardInterrupt
         finally:
             cancel.set()
+    return reader, written, index_locked
+
+
+def measure_contention_call(scenario, build, evidence, options):
+    """Publish an exclusive, synced subcall receipt before its result is consumed."""
+    role = options["role"]
+    argv = ["reindex"] if role == "writer" else scenario["argv"]
+    data = b"{}\n" if role == "writer" else scenario["stdin"]
+    settings = {"timeout": scenario.get("timeout", 120), "cancel_event": options.get("cancel_event")}
+    record = measure_process([build["executable"], *argv], scenario["repository"], data, settings)
+    record["contention_role"] = role
+    with (evidence / f"{role}.json").open("xb") as stream:
+        stream.write(encode_json(record))
+        stream.flush()
+        os.fsync(stream.fileno())
+    return record
+
+
+def preserve_interrupted_contention(evidence):
+    """Retain all finished/cleaned subcalls and identify the censored schedule."""
+    calls = {role: json.loads(path.read_text()) for role in ("baseline", "reader", "writer")
+             if (path := evidence / f"{role}.json").exists()}
+    interrupted = [call for call in calls.values() if call["outcome"] == "interrupted"]
+    record = dict(interrupted[0] if interrupted else next(reversed(calls.values()),
+                  {"duration_seconds": 0, "resources": {"unavailable": "no completed subcall"}}))
+    record.update(outcome="interrupted", validation={"valid": False, "reason": "contention interrupted"},
+                  contention_receipt=str(evidence / "receipt.json"))
+    write_json(evidence / "receipt.json", {"interrupted": True, "subcalls": calls, "attempt": record})
+    return record
+
+
+def build_contention_receipt(scenario, baseline, reader, written, index_locked):
     overlap = max(0., min(reader["started_monotonic"] + reader["duration_seconds"],
                          written["started_monotonic"] + written["duration_seconds"])
                   - max(reader["started_monotonic"], written["started_monotonic"]))
@@ -93,15 +147,13 @@ def run_contention(scenario: dict, build: dict, evidence: Path,
     duration = (max(reader["started_monotonic"] + reader["duration_seconds"],
                     written["started_monotonic"] + written["duration_seconds"])
                 - min(reader["started_monotonic"], written["started_monotonic"]))
-    receipt = {"reader": reader, "writer": written, "baseline_reader": baseline,
+    return {"reader": reader, "writer": written, "baseline_reader": baseline,
                "baseline_validation": validate_result(scenario, baseline),
                "overlap_seconds": overlap, "writer_index_lock_observed": index_locked,
                "throughput_success_per_s": sum(call["outcome"] == "success" for call in (reader, written)) / duration,
                "reader_validation": validate_result(scenario, reader),
                "writer_validation": validate_result({"expected": {"command": "reindex"}}, written),
                "scope": "CLI lifetime overlap; no direct SQL lock-wait attribution"}
-    write_json(evidence / "receipt.json", receipt)
-    return receipt
 
 
 def wait_for_index_writer(repository: Path, writer) -> bool:

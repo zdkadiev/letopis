@@ -7,6 +7,8 @@ import unittest
 import time
 import threading
 import sys
+import json
+import signal
 from unittest.mock import patch
 
 from measure import measure_process as actual_measure
@@ -17,6 +19,49 @@ from provider import start_provider
 
 
 class ContentionTests(unittest.TestCase):
+    def test_interrupted_baseline_is_persisted_before_any_writer_launch(self):
+        # Given: an owned baseline reader still running when cancellation arrives.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            binary, scenario = _prepare_interruptible_cli(root, slow_baseline=True)
+            previous = signal.signal(signal.SIGALRM, _interrupt)
+            signal.setitimer(signal.ITIMER_REAL, 0.2)
+            try:
+                # When: cancellation interrupts the baseline measurement.
+                with self.assertRaises(KeyboardInterrupt):
+                    run_contention(scenario, {"executable": str(binary)}, root / "evidence")
+            finally:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                signal.signal(signal.SIGALRM, previous)
+            # Then: the baseline and aborted schedule are durable; no writer starts.
+            self.assertEqual((root / "events").read_text().splitlines(), ["check"])
+            baseline = json.loads((root / "evidence/baseline.json").read_text())
+            self.assertEqual(baseline["outcome"], "interrupted")
+            self.assertTrue(json.loads((root / "evidence/receipt.json").read_text())["interrupted"])
+
+    def test_active_writer_interruption_preserves_subcalls_and_reaps_writer(self):
+        # Given: a completed baseline, concurrent reader and a long-lived writer.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            binary, scenario = _prepare_interruptible_cli(root)
+            previous = signal.signal(signal.SIGALRM, _interrupt)
+            signal.setitimer(signal.ITIMER_REAL, 0.3)
+            try:
+                # When: cancellation interrupts the controller waiting for its writer.
+                with self.assertRaises(KeyboardInterrupt):
+                    run_contention(scenario, {"executable": str(binary)}, root / "evidence")
+            finally:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                signal.signal(signal.SIGALRM, previous)
+            # Then: completed and cancelled subcalls survive; the writer is gone.
+            evidence = root / "evidence"
+            self.assertEqual(json.loads((evidence / "baseline.json").read_text())["outcome"], "success")
+            self.assertEqual(json.loads((evidence / "reader.json").read_text())["outcome"], "success")
+            self.assertEqual(json.loads((evidence / "writer.json").read_text())["outcome"], "interrupted")
+            self.assertTrue(json.loads((evidence / "receipt.json").read_text())["interrupted"])
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int((root / "writer.pid").read_text()), 0)
+
     def test_verification_rejects_reader_and_cleans_owned_writer(self):
         # Given: a writer holding the fixture lock and a rejected third launch.
         with tempfile.TemporaryDirectory() as directory:
@@ -168,6 +213,22 @@ class ContentionTests(unittest.TestCase):
             self.assertTrue(receipt["baseline_validation"]["valid"])
             self.assertTrue(receipt["writer_index_lock_observed"])
             self.assertGreater(receipt["overlap_seconds"], 0)
+
+
+def _prepare_interruptible_cli(root, slow_baseline=False):
+    (root / ".letopis").mkdir()
+    binary = root / "cli"
+    script = _VERIFIED_CLI
+    if slow_baseline:
+        script = script.replace("if sys.argv[1] == 'reindex':", "if sys.argv[1] == 'check':\n    time.sleep(60)\nif sys.argv[1] == 'reindex':")
+    binary.write_text(f"#!{sys.executable}\n" + script)
+    binary.chmod(0o755)
+    return binary, {"repository": root, "argv": ["check"], "stdin": b"{}",
+                    "expected": {"command": "check"}, "timeout": 5}
+
+
+def _interrupt(*_):
+    raise KeyboardInterrupt
 
 
 _VERIFIED_CLI = '''import fcntl, json, os, pathlib, sys, time
