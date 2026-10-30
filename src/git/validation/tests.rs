@@ -127,6 +127,63 @@ fn validates_special_symlink_names_like_hash_object() {
 }
 
 #[test]
+fn validates_hfs_noncharacter_termination_like_hash_object() {
+    // Given: Git stops HFS decoding only at these two valid noncharacter scalars.
+    for format in FORMATS {
+        let repo = TempRepo::new(format);
+        let width = get_oid_length(format);
+        for (name, expected) in [
+            (b".git\xef\xbf\xbe".as_slice(), false),
+            (b".git\xef\xbf\xbf", false),
+            (b".git\xef\xbf\xbetail", false),
+            (b".git\xef\xbf\xbftail", false),
+            (b".gi\xef\xbf\xbet", true),
+            (b"\xef\xbf\xbe.git", true),
+            (b"ordinary\xef\xbf\xbe", true),
+            (b"ordinary\xef\xbf\xbf", true),
+            (b".git\xef\xbf\xbd", true),
+            (b".git\xef\xb7\x90", true),
+            (b".git\xef\xb7\xaf", true),
+            (b".git\xf0\x9f\xbf\xbe", true),
+            (b".git\xf0\x9f\xbf\xbf", true),
+            (b".git\xf4\x8f\xbf\xbe", true),
+            (b".git\xf4\x8f\xbf\xbf", true),
+        ] {
+            // When / Then: exact alias termination agrees with the independent Git oracle.
+            assert_matches_oracle(&repo, &build_entry("100644", name, width), width, expected);
+        }
+    }
+}
+
+#[test]
+fn validates_hfs_noncharacter_termination_for_symlinks_like_hash_object() {
+    // Given: protected symlink aliases and ordinary names end with noncharacters.
+    for format in FORMATS {
+        let repo = TempRepo::new(format);
+        let width = get_oid_length(format);
+        for (name, expected) in [
+            (b".gitignore\xef\xbf\xbe".as_slice(), false),
+            (b".gitignore\xef\xbf\xbf", false),
+            (b".gitmodules\xef\xbf\xbe", false),
+            (b".gitmodules\xef\xbf\xbf", false),
+            (b".gitattributes\xef\xbf\xbe", false),
+            (b".gitattributes\xef\xbf\xbf", false),
+            (b".mailmap\xef\xbf\xbe", false),
+            (b".mailmap\xef\xbf\xbf", false),
+            (b".gitignore\xef\xbf\xbd", true),
+            (b".gitignore\xef\xb7\x90", true),
+            (b".gitignore\xf0\x9f\xbf\xbe", true),
+            (b".gitignore\xf4\x8f\xbf\xbf", true),
+            (b"ordinary\xef\xbf\xbe", true),
+            (b"ordinary\xef\xbf\xbf", true),
+        ] {
+            // When / Then: decoding termination protects aliases without banning Unicode names.
+            assert_matches_oracle(&repo, &build_entry("120000", name, width), width, expected);
+        }
+    }
+}
+
+#[test]
 fn validates_entry_boundaries_like_hash_object() {
     // Given: both hash widths and malformed delimiters, object IDs, and trailing bytes.
     for format in FORMATS {

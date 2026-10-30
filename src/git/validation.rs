@@ -88,14 +88,17 @@ fn compare_names(left: &[u8], left_mode: u16, right: &[u8], right_mode: u16) -> 
 }
 
 fn is_hfs_alias(name: &[u8], needle: &[u8]) -> bool {
-    // Git stops HFS decoding at malformed UTF-8, treating it as end of name.
+    // Git's HFS decoder treats malformed UTF-8 and U+FFFE/U+FFFF as end of name.
     let valid = match std::str::from_utf8(name) {
         Ok(valid) => valid,
         Err(error) => std::str::from_utf8(&name[..error.valid_up_to()]).unwrap_or_default(),
     };
-    let mut characters = valid.chars().filter(|character| {
-        !matches!(*character as u32, 0x200c..=0x200f | 0x202a..=0x202e | 0x206a..=0x206f | 0xfeff)
-    });
+    let mut characters = valid
+        .chars()
+        .take_while(|character| !matches!(*character, '\u{fffe}' | '\u{ffff}'))
+        .filter(|character| {
+            !matches!(*character as u32, 0x200c..=0x200f | 0x202a..=0x202e | 0x206a..=0x206f | 0xfeff)
+        });
     if characters.next() != Some('.') {
         return false;
     }
