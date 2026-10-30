@@ -146,16 +146,18 @@ unavailable/remote source semantics. No requested-ID-only partial snapshot.
 Do not introduce a whole-object-database or whole-source-content cache. Reuse bounded
 buffers; any enabled library cache has an explicit byte cap and command lifetime.
 Full audits retain visited identities/metadata proportional to reached objects,
-not all their payloads. For full-audit blob verification, preserve the existing
-fixed-size streaming buffers: working payload memory must not grow with blob
-size, including transient allocation of one complete blob by the library. This
-is the specification author's explicit preservation choice, not approval of an
-unmeasured library behavior. Existing addressed-blob APIs may return one blob's
-bytes; that separate contract does not permit buffering blobs during closure
-audits. Loose/packed access, including delta reconstruction, is an early
-compatibility gate. If bounded streaming requires an operation-owned temporary
-spool, the plan must document its disk/cleanup/cancellation behavior; do not add
-a persistent object store or reject previously valid large blobs to avoid it.
+not all their payloads. **Approved revision, 2026-10-30:** the user permits the
+current object's in-process decoding buffers, including delta bases/results and
+instructions. Audit working memory may therefore scale with that object/delta
+chain; a fixed 64 KiB total payload bound is no longer required. Keep independent
+hashing in bounded chunks and release payloads before advancing through the
+closure. Keep object/delta caches disabled initially; do not retain every blob
+or a giant reusable capacity indefinitely. Measure actual allocation/RSS and
+report the per-object tradeoff rather than claiming constant audit memory.
+Existing addressed-blob APIs may return one blob's bytes. Loose/packed/delta
+correctness and resource behavior remain an early compatibility gate. No new
+pack/delta engine or persistent spool/store is needed or authorized by this
+revision; do not reject previously valid large blobs just to enforce a new cap.
 Cache limits and oversized-object behavior are implementation choices to record
 in the plan and measure, not new arbitrary rejection limits on existing inputs.
 
@@ -248,9 +250,12 @@ options, storage formats or public service abstractions are needed by this desig
 Unknown library streaming/durability/strict-tree capabilities must be checked early;
 an unresolvable guarantee is a reported blocker rather than a hidden compromise.
 
-Independent builder review found one ambiguity: whether a full audit could
-temporarily allocate an entire blob. Resolved above by explicitly preserving
-fixed-buffer audit payload memory; the addressed-blob API remains separate.
+Independent builder review originally resolved audit-memory ambiguity in favor
+of fixed buffers. Subsequent pinned-source inspection found ordinary gix packed
+decoding cannot meet that condition. The user explicitly superseded that choice
+on 2026-10-30 by permitting operation-local per-object/delta buffers while keeping
+caches bounded and all integrity/durability requirements. See the
+[compatibility findings](../../zkit/letopis/checks/issue-67/compatibility.md).
 
 This specification does not mark #67 implemented, close #65, alter #65 evidence,
 authorize paid runs, or merge/push unrelated local documentation changes.
