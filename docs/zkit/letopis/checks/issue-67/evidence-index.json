@@ -540,7 +540,7 @@
       "valid_successes": 12
     }
   ],
-  "captured_utc": "2026-10-30T23:08:49Z",
+  "captured_utc": "2026-10-30T23:26:29.580851+00:00",
   "direct_pid_rss": {
     "directory": ".artifacts/issue-67/task8-direct-rss-20261031",
     "scope": "historical Task8 before and pre-fix after; corrected after is final_fix.direct_pid_rss",
@@ -694,7 +694,7 @@
       "sha256": "10f6de81f9b7ecb6ecf121fd87e04c3100ee0f3f82d44772d3799afb7f3268f3"
     }
   },
-  "status": "final_findings_fixed_scoped_independent_re_review_pending",
+  "status": "complete_independent_whole_branch_and_scoped_reviews_accepted",
   "validation": {
     "administrative_failures": {
       "bytes": 1508,
@@ -752,5 +752,46 @@
       "sha256": "e7fd2b34b857904cb3db127787cb75d949a7ff65648981700df6dbde00a591fa"
     },
     "scope": "Historical Task8 captured validation; current source verification is under final_fix"
+  },
+  "final_acceptance": {
+    "verdict": "F-I1 and F-M1 addressed; no new finding",
+    "whole_branch_review_base": "32ca0af282a1321d0137b4aba115c6fddc086259",
+    "whole_branch_review_head": "8af440a3238924cfe522dbf20d59a572daefbef7",
+    "scoped_fix_base": "8af440a3238924cfe522dbf20d59a572daefbef7",
+    "scoped_fix_head": "ae9e568f9570cf353abe284cb552bf2c2f8a2e3a",
+    "product_commit": "b488aeb4a7faa33f58e6e9c87a4f4d638631680b",
+    "whole_branch_report": {
+      "path": ".artifacts/issue-67/closure-20261031/execution/final-review.md",
+      "bytes": 16618,
+      "sha256": "7f51a6c486e0acc2f2af8b51923a87b2f20300f68b78ba74dabdd95b51de8944"
+    },
+    "scoped_review_report": {
+      "path": ".artifacts/issue-67/closure-20261031/execution/final-rereview.md",
+      "bytes": 10892,
+      "sha256": "5e27f9a536c1a67c9778edfb3d06d015c001aff2f12a70d062b8e24f2da6b9fd"
+    },
+    "execution_inventory": {
+      "path": ".artifacts/issue-67/closure-20261031/execution-inventory.json",
+      "bytes": 10703,
+      "sha256": "10d5a519a114bdad77994f64d8c0d78cfa05e312152b98144a12a3612ddbcc5c"
+    },
+    "rulings": {
+      "path": ".artifacts/issue-67/closure-20261031/rulings.json",
+      "bytes": 26686,
+      "sha256": "b0222c164222ab3f45a23919f7ec7988c4f6176f99f2704177e7ecda5fc726fe"
+    },
+    "closure_inventory": {
+      "path": ".artifacts/issue-67/closure-20261031/inventory.json",
+      "bytes": 11685,
+      "sha256": "d7d7332c421574b9356fb230392d427cf01823d88597af7cb5ad728133e6de3c"
+    },
+    "validation": {
+      "path": ".artifacts/issue-67/closure-20261031/validation.json",
+      "bytes": 1952,
+      "sha256": "b655de13ba3f8bc7c177ead21c9af97f3a9a5b3776e8f47f30a927f1e91e8ea4"
+    },
+    "publication": "not performed; user authorization required",
+    "post_inventory_commit_tail": ".artifacts/issue-67/closure-20261031/completion-commit.json",
+    "tail_scope": "created after this point-in-time inventory; not claimed hashed here"
   }
 }

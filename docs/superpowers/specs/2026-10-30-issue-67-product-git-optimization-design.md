@@ -3,7 +3,7 @@
 Date: 2026-10-30. Status: approved by the user on 2026-10-30;
 implementation and the measured campaign are complete through Task 8. The final
 independent review found a sparse-index regression; its focused fix and evidence
-refresh are recorded in the current report, with scoped re-review pending.
+refresh are recorded in the current report. Scoped independent re-review passed: both findings are addressed, with no new findings.
 
 Task: [product optimization issue #67](https://github.com/zaurkadiev/letopis/issues/67).
 Base: `32ca0af282a1321d0137b4aba115c6fddc086259`, containing the diagnostic

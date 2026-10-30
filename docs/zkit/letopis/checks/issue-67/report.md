@@ -3,8 +3,9 @@
 After the final review's sparse-index fix, fresh matched 60-element check median
 is **13.486335 s → 0.031300 s** (10 valid observations per side),
 **99.768% lower, 430.87×**. The provisional 50% goal is met
-on this workload. F-I1 and F-M1 have focused fixes and refreshed evidence;
-**scoped independent re-review remains pending**, owned by the controller.
+on this workload. F-I1 and F-M1 have focused fixes and refreshed evidence.
+**Scoped independent re-review passed**: both findings are addressed, with no new findings.
+The branch is technically ready within the documented scopes; integration remains a user decision.
 
 ## Current before/after results
 

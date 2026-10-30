@@ -482,5 +482,5 @@ revision/platform scope. This new Linux run is focused, not a new full native
 campaign. No x86_64, NFS, physical crash, real-provider or whole-stack NFR guarantee
 is implied. The source-traced direct-drain lock disposition is in [review.md](review.md),
 without a newly claimed dynamic subdirectory test. Scoped independent re-review
-is still pending; [report.md](report.md) and [evidence-index.json](evidence-index.json)
+passed with both findings addressed and no new findings; [report.md](report.md) and [evidence-index.json](evidence-index.json)
 distinguish corrected-pin measurements from retained historical observations.

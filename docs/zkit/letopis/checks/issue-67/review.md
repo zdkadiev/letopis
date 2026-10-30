@@ -1,11 +1,12 @@
 # Issue 67 review status
 
-Final whole-branch independent review at `8af440a` found **0 Critical, 1 Important
-(F-I1 sparse-index membership), 1 Minor (F-M1 copied command notes)** and was not
-ready to merge. The consolidated fix is implemented; **scoped independent re-review
-is pending**. The implementer has not certified acceptance. The controller owns
-the review/rulings and plan progress. The original independent report is preserved
-in the fresh hash-indexed final-fix archive.
+Final whole-branch review at `8af440a` identified F-I1 (sparse-index membership)
+and F-M1 (copied internal command notes). The consolidated fixes are committed
+as `b488aeb` (code) and `ae9e568` (report/evidence). **Independent scoped
+re-review accepted both findings as addressed, with no new findings.**
+The branch is technically ready within the stated evidence limits. No merge,
+push, PR, issue update or publication is implied. The full original review
+and scoped verdict are preserved under `final_acceptance` in the evidence index.
 The accepted Task 1–7 reviews, fixes and receipts are preserved in the local
 hash-indexed SDD archive referenced by [the evidence index](evidence-index.json).
 
@@ -30,7 +31,8 @@ refreshes are distinguished from reused historical baseline evidence.
 F-M1's four current notes now match their own receipts (18/14/four timeouts/exit1;
 8/8; 8/8; 20/20). A new corrected task-8 archive preserves the old point-in-time
 archive unchanged. The stale specification opening is corrected. No reviewer or
-subagent was spawned by this fix implementer; scoped acceptance remains open.
+subagent was spawned by this fix implementer; the controller supplied the
+independent scoped review and recorded acceptance.
 
 ## Historical Task 8 self-review (pre-fix `ba4a11d`)
 
@@ -84,5 +86,54 @@ subagent was spawned by this fix implementer; scoped acceptance remains open.
    performance guarantee is inferred.
 
 The final report records the exact successful/censored counts and command paths.
-Independent review findings and their resolutions must be appended by the
-controller before final branch acceptance.
+Independent review and scoped re-review are complete. F-I1 and F-M1 are
+closed; M3 remains the explicitly nonblocking test-strengthening limit above.
+
+## Rulings I made
+
+The complete ruling audit below is ordered by execution phase. Original
+ledger positions and verbatim text are retained in the hash-indexed
+`final_acceptance.rulings` artifact, alongside the full final execution
+ledger. Costs describe what would need revisiting if a ruling were wrong.
+The per-object/delta buffer revision was explicitly approved by the user.
+
+| Phase | Ruling | Cost if wrong |
+| --- | --- | --- |
+| Preflight | Treat the explicit Subagent-driven selection as execution approval. | Rework if that contextual authorization were wrong; no broader publication authority. |
+| Preflight | Gate the reader privately before product adoption. | Rework the compatibility driver if it does not represent the adopted implementation. |
+| Preflight | Include collision fixtures in Linux build inputs. | Repair missing build context; no runtime change. |
+| Task 1 | Resolve the dangling schedule reference with the approved bounded campaign. | Rework orchestration or disclose censored coverage if the schedule is wrong. |
+| Task 1 | Add an optional verification callback to the existing contention helper. | Check ownership/receipt compatibility for existing callers. |
+| Task 2 | Keep durability probes and reusable publication helpers in their own private owner. | Rework the helper boundary if adoption cannot reuse it safely. |
+| Task 2 | Use necessary exact tempfile 3.27.0 dependency resolution. | A reversible dependency update; locked/MSRV checks remain necessary. |
+| Task 2 | Judge reachable helper execution rather than unconditional command-crate presence. | A false reachability judgment could hide a helper; source audit and negative-control tracing are required. |
+| Task 2 | Keep durable direct private refs without automatic reflogs or identity emulation. | Automatic private-ref history would require an explicit later feature; existing logs are preserved. |
+| Task 2 | Copy the required collision fixture into all root-test Docker contexts. | A small build-context correction, not runtime behavior. |
+| Task 2 | Reuse a controlled uncapped local ODB with empty replacements. | Rework the reader if pinned library allocation/replacement behavior differs. |
+| Before adoption | Require actual command-owned cancellation resources before replacing the transport. | Private ownership API rework if active writers cannot be cleaned safely. |
+| Verification | One unchanged make verify covers make check; use focused iterations. | Run again when changed inputs or a real failure invalidates prior evidence. |
+| Task 4 | Expose locked gix-pathspec directly instead of enabling a broader feature bundle. | A reversible manifest edge; no new package version or runtime feature. |
+| Task 4 | Migrate obsolete Git-process checkpoints while preserving behavioral assertions. | Rework test observations if they are weaker than the replaced checkpoints. |
+| Task 4 | Construct the non-Send service on its worker before explicit barriers. | Preserve setup-before-lock ordering; no new public Send guarantee. |
+| Task 4 | Use an owned test checkpoint and real dirfd namespace model. | The model is not an exhaustive paused-kernel proof; rework a missing boundary if found. |
+| Task 5 | Leave already-single-open direct drain behavior unchanged. | Avoid an unrelated normalization change; later source tracing found no wrong-root lock. |
+| Task 6 | Batch preflight/check/status; preserve search/traversal demand order. | No cross-binding historical reuse for those two read callers in this change. |
+| Task 6 | Recompute all BasisUnavailable results rather than cache negative roots. | Cheap absent-basis work repeats; repaired roots are not hidden. |
+| Task 7 | Whitelist exact Git collision inputs in Docker context. | A small packaging correction; other exclusions stay intact. |
+| Task 7 | Copy the required config corpus fixture into both Linux contexts. | A small fixture-only context addition; failed attempts remain evidence. |
+| Task 7 | Accept either evidenced optimized corpus frame with all other readiness predicates. | Overbroad matching could falsely acknowledge readiness; negative fixtures retain main-thread/Git/native requirements. |
+| Task 7 | Pin upstream Git 2.50.1 as the independent strict Linux oracle. | Historical weaker malformed-tree acceptance is not promised; no runtime Git dependency. |
+| Task 7 | Use held-open untouched stdin for argv-rejection tests. | Keep exact error/exit intent; do not hide generic BrokenPipe failures. |
+| Task 8 | Keep one aggregate initialization budget and skip infeasible repeats. | Some baseline maintenance remains unassessed instead of overrunning or inventing medians. |
+| Task 8 | Update the stale Markdown pointer to one canonical JSON inventory. | Documentation repair if links or inventory scope drift. |
+| Task 8 | Document the corrected timeout-side scheduling behavior. | Keep documentation and tested implementation consistent. |
+| Final scope | Do not infer physical-power-loss or NFS durability from local sync tests. | Separate hardware/fault validation is required for those guarantees. |
+| Final scope | Limit platform claims to macOS arm64 and Linux aarch64 evidence. | Run another platform gate before promising it. |
+| Final scope | Do not infer larger-scale or whole-stack NFR acceptance. | A separate capacity/resource assessment remains necessary. |
+| Final scope | Keep real-provider/model performance outside this provider-free campaign. | A separately authorized provider experiment is required. |
+| Final scope | Claim concrete cancellation schedules rather than exhaustive fault/SIGKILL cleanup. | Further fault models or drills are needed for broader guarantees. |
+| Final scope | Do not promise adversarial same-mtime detection on an open index handle. | A stronger freshness contract would need separate design and evidence. |
+| Final scope | Preserve historical proof receipts without claiming every standalone harness reran. | Run a relevant historical manifest separately when needed. |
+| Final scope | Resolve the drain suspicion through the actual root-bound executor call path. | No new dynamic subdirectory contention experiment was performed. |
+| Integration | Keep publication and integration subject to explicit user choice. | The branch stays local until authorized. |
+| Final fix | Refresh affected corrected-pin evidence and retain unchanged baseline observations explicitly. | Mis-scoped pins could misattribute results; fresh identities/oracles and historical labels are required. |
