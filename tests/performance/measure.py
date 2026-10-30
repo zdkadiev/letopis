@@ -27,7 +27,9 @@ def measure_process(argv: list[str], repository: Path, data: bytes, options: dic
                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                  start_new_session=True)
         record["pid"] = child.pid
-        usage = collect_process(child, data, streams, started + options.get("timeout", 120))
+        usage = collect_process(child, data, streams,
+                                {"deadline": started + options.get("timeout", 120),
+                                 "cancel_event": options.get("cancel_event")})
         record.update(exit_code=child.returncode, outcome="success" if child.returncode == 0 else "nonzero",
                       resources=describe_resources(usage))
     except (TimeoutError, KeyboardInterrupt, OSError) as error:
@@ -65,9 +67,10 @@ class StreamCapture:
                 "capture_hex": self.capture.hex(), "truncated": self.length > self.limit}
 
 
-def collect_process(child: subprocess.Popen, data: bytes, streams: dict, deadline: float):
+def collect_process(child: subprocess.Popen, data: bytes, streams: dict, options: dict):
     """Drain pipes and per-child wait4 within one deadline, without global counters."""
     usage = None
+    deadline, cancel_event = options["deadline"], options.get("cancel_event")
     remaining = memoryview(data)
     with selectors.DefaultSelector() as selector:
         for name in ("stdout", "stderr"):
@@ -80,6 +83,8 @@ def collect_process(child: subprocess.Popen, data: bytes, streams: dict, deadlin
         else:
             child.stdin.close()
         while selector.get_map() or child.returncode is None:
+            if cancel_event is not None and cancel_event.is_set():
+                raise KeyboardInterrupt
             if time.monotonic() >= deadline:
                 raise TimeoutError("owned process or stream exceeded deadline")
             for key, _ in selector.select(min(0.005, max(0, deadline - time.monotonic()))):

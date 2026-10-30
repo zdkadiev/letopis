@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -13,6 +14,17 @@ from measure import measure_process
 
 
 class MeasurementTests(unittest.TestCase):
+    def test_explicit_cancellation_stops_only_owned_session(self):
+        # Given: an owned long-running child and an explicit cancellation event.
+        cancel = threading.Event()
+        cancel.set()
+        # When: a scheduler cancels its writer after stopping readers.
+        result = measure_process([sys.executable, "-c", "import time;time.sleep(60)"],
+                                 Path.cwd(), b"", {"cancel_event": cancel, "timeout": 0.1})
+        # Then: the collector stops and reaps rather than awaiting the full sleep.
+        self.assertEqual(result["outcome"], "interrupted")
+        self.assertLess(result["duration_seconds"], 1)
+
     def test_collects_binary_streams_and_exit_status(self):
         # Given: a process echoing binary stdin and returning a nonzero status.
         code = "import sys;sys.stdout.buffer.write(sys.stdin.buffer.read());sys.stderr.buffer.write(b'\\xff');sys.exit(7)"
