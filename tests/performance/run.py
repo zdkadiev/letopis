@@ -103,11 +103,13 @@ def run_survey(args, build: dict, evidence: Path) -> None:
     deadline = started + args.stage_seconds
     coverage = []
     with (evidence / "samples.jsonl").open("xb") as stream:
-        first = measure_process([build["executable"], "check"], fixture["repository"], b"{}\n",
+        first = measure_process([build["executable"], "search"], fixture["repository"],
+                                b'{"query":"\\"case 000000\\"","limit":10}\n',
                                 {"timeout": min(args.timeout, deadline - time.monotonic())})
-        first.update(name="check", nodes=args.nodes, phase="first_use", embedding_mode="fts_disabled",
+        first.update(name="search", nodes=args.nodes, phase="first_use", embedding_mode="fts_disabled",
                      profile_mode="none", cache_label="uninitialized_projection_os_cache_uncontrolled",
-                     validation=validate_result({"expected": {"command": "check"}}, first))
+                     validation=validate_result({"expected": {"command": "search",
+                                                             "id": "knowledge/part-0000.md#node-000000"}}, first))
         append_record(stream, first)
         if not first["validation"]["valid"]:
             raise ValueError("initial projection failed; inspect first-use receipt")
