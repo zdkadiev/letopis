@@ -109,6 +109,15 @@ ref durability. Prove the selected library's write/flush/lock behavior against t
 current contract; a transaction API alone does not establish multi-ref atomicity
 or power-loss safety. Do not claim a new crash or NFR guarantee without evidence.
 
+Implementation choice following contract review, 2026-10-30: Letopis's private
+retention refs do not create or append reflogs, even when Git configuration would
+make CLI update-ref do so. Existing private/user logs and user refs stay untouched.
+X-3 and the application traits require durable direct refs and snapshot retention,
+not automatic reflog creation or OS-derived committer identities. Do not implement
+a Git identity/DNS-emulation subsystem or invent a dummy identity for internal
+retention. This intentionally differs from an incidental CLI side effect and must
+be covered/documented; it does not relax ref durability or historical object access.
+
 ### Provenance deduplication
 
 Own reuse at the narrow operation that already owns the observations; do not add a
