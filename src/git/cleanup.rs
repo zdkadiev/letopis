@@ -24,6 +24,8 @@ pub(crate) struct GitWriteCleanup {
 struct WriteState {
     next_id: u64,
     resources: BTreeMap<u64, WriteResource>,
+    #[cfg(test)]
+    after_stage_detach: Option<tests::NamespaceCheckpoint>,
 }
 #[derive(Debug)]
 enum WriteResource {
@@ -53,10 +55,16 @@ impl GitWriteCleanup {
     pub(crate) fn cancel_and_cleanup(&self) -> Result<(), SnapshotError> {
         self.cancelled.store(true, Ordering::SeqCst);
         let resources = std::mem::take(&mut self.lock_state().resources);
+        #[cfg(test)]
+        let mut checkpoint = self.lock_state().after_stage_detach.take();
         let mut failure = None;
         for (id, resource) in resources {
             if let WriteResource::Stage(mut directory) = resource
-                && let Err(error) = detach_and_remove(&mut directory)
+                && let Err(error) = detach_and_remove(
+                    &mut directory,
+                    #[cfg(test)]
+                    checkpoint.take(),
+                )
             {
                 failure = Some(error);
                 self.lock_state()
@@ -213,13 +221,20 @@ impl Drop for WriteLease {
     }
 }
 
-fn detach_and_remove(directory: &mut TempDir) -> Result<(), SnapshotError> {
+fn detach_and_remove(
+    directory: &mut TempDir,
+    #[cfg(test)] checkpoint: Option<tests::NamespaceCheckpoint>,
+) -> Result<(), SnapshotError> {
     let parent = directory.path().parent().ok_or_else(fail_cancelled)?;
     let detached = create_directory(parent)?;
     fs::rename(directory.path(), detached.path()).map_err(fail_cleanup)?;
     // Only after rename succeeds does the old name lose ownership; it is never reused.
     let previous = std::mem::replace(directory, detached);
     let _ = previous.keep();
+    #[cfg(test)]
+    if let Some(checkpoint) = checkpoint {
+        checkpoint.pause_after_detach(directory.path());
+    }
     for _ in 0..4 {
         match fs::remove_dir_all(directory.path()) {
             Ok(()) => return Ok(()),

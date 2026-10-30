@@ -3,8 +3,10 @@ use std::{
     fs,
     io::{self, Read, Write},
     os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
     sync::{Arc, mpsc},
     thread,
+    time::Duration,
 };
 
 #[test]
@@ -124,6 +126,56 @@ fn cancelled_stage_cannot_be_recreated_or_published_by_resumed_writer() {
 }
 
 #[test]
+fn resolved_parent_operations_remain_confined_to_detached_stage() {
+    if supervise("resolved_parent_operations_remain_confined_to_detached_stage") {
+        return;
+    }
+    // Given: a held dirfd models a namespace operation whose parent was resolved before cancellation.
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let cleanup = Arc::new(GitWriteCleanup::new());
+    let (_lease, stage) = cleanup.create_stage(root).unwrap();
+    fs::write(stage.join("payload"), b"pending object").unwrap();
+    let parent = fs::File::open(&stage).unwrap();
+    let reference = root.join("snapshot");
+    let (ref_lease, mut old_writer) = cleanup.acquire_ref(&reference, root, 0).unwrap();
+    let (detached, resume) = register_namespace_checkpoint(&cleanup);
+    let cancelling = Arc::clone(&cleanup);
+    let worker = thread::spawn(move || cancelling.cancel_and_cleanup());
+    // When: cancellation detaches the parent inode, then the pending mkdir/persist operations finish.
+    let detached = detached.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert!(!stage.exists(), "active pathname is not isolated");
+    let parent_inode = parent.metadata().unwrap().ino();
+    assert_eq!(fs::metadata(&detached).unwrap().ino(), parent_inode);
+    let fresh_lookup = fs::create_dir(stage.join("new-lookup")).unwrap_err();
+    assert_eq!(fresh_lookup.kind(), io::ErrorKind::NotFound);
+    complete_resolved_namespace(&parent).unwrap();
+    assert_eq!(
+        fs::read(detached.join("aa/object")).unwrap(),
+        b"pending object"
+    );
+    resume.send(()).unwrap();
+    worker.join().unwrap().unwrap();
+    // Then: both stage names are gone; an unlinked parent rejects further additions.
+    assert!(!stage.exists());
+    assert!(!detached.exists());
+    let late = rustix::fs::mkdirat(&parent, "late", rustix::fs::Mode::RWXU);
+    assert_eq!(late.unwrap_err(), rustix::io::Errno::NOENT);
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 0);
+    // When: an independent successor acquires the released lock and the old descriptor resumes.
+    let lock = reference.with_extension("lock");
+    let successor = acquire_successor(&lock);
+    let inode = successor.metadata().unwrap().ino();
+    old_writer.write_all(b"late old writer").unwrap();
+    old_writer.sync_all().unwrap();
+    // Then: neither the old publication lease nor late inode writes touch the successor.
+    assert!(ref_lease.commit_ref().is_err());
+    assert_eq!(fs::read(&lock).unwrap(), b"successor");
+    assert_eq!(fs::metadata(&lock).unwrap().ino(), inode);
+    assert!(!reference.exists());
+}
+
+#[test]
 fn cancellation_releases_both_confirmation_markers_but_preserves_foreign_lock() {
     if supervise("cancellation_releases_both_confirmation_markers_but_preserves_foreign_lock") {
         return;
@@ -155,6 +207,31 @@ struct SuspendedRead<'a> {
     entered: Option<mpsc::Sender<()>>,
     wait: mpsc::Receiver<()>,
     bytes: &'a [u8],
+}
+
+/// An owned, test-only pause after detachment; no global hook or product input controls it.
+#[derive(Debug)]
+pub(super) struct NamespaceCheckpoint {
+    detached: mpsc::Sender<PathBuf>,
+    resume: mpsc::Receiver<()>,
+}
+impl NamespaceCheckpoint {
+    pub(super) fn pause_after_detach(self, path: &Path) {
+        self.detached.send(path.to_owned()).unwrap();
+        self.resume.recv_timeout(Duration::from_secs(5)).unwrap();
+    }
+}
+
+fn register_namespace_checkpoint(
+    cleanup: &GitWriteCleanup,
+) -> (mpsc::Receiver<PathBuf>, mpsc::Sender<()>) {
+    let (detached, observed) = mpsc::channel();
+    let (resume, admitted) = mpsc::channel();
+    cleanup.lock_state().after_stage_detach = Some(NamespaceCheckpoint {
+        detached,
+        resume: admitted,
+    });
+    (observed, resume)
 }
 
 fn run_signal_child(root: &std::path::Path) -> ! {
@@ -201,4 +278,21 @@ fn supervise(case: &str) -> bool {
         &[("LETOPIS_CLEANUP_CASE", case)],
     );
     true
+}
+
+// A dirfd represents the parent already resolved by a pending path-based syscall.
+// These real *at operations model mkdir/persist; they do not pause gix inside the kernel.
+fn complete_resolved_namespace(parent: &fs::File) -> rustix::io::Result<()> {
+    rustix::fs::mkdirat(parent, "aa", rustix::fs::Mode::RWXU)?;
+    rustix::fs::renameat(parent, "payload", parent, "aa/object")
+}
+
+fn acquire_successor(path: &Path) -> fs::File {
+    let mut file = fs::File::options()
+        .create_new(true)
+        .write(true)
+        .open(path)
+        .unwrap();
+    file.write_all(b"successor").unwrap();
+    file
 }
