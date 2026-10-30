@@ -6,10 +6,21 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scenarios import prepare_fixture, prepare_scenario, verify_build
+from scenarios import build_traversal_oracle, prepare_fixture, prepare_scenario, verify_build
 
 
 class ScenarioTests(unittest.TestCase):
+    def test_fixed_neighborhood_includes_the_next_element(self):
+        # Given: root zero includes node one, duplicating a relation target.
+        root = "knowledge/part-0000.md#node-000000"
+        next_node = "knowledge/part-0000.md#node-000001"
+        # When: freezing the depth-two neighborhood of this literal fixture.
+        oracle = build_traversal_oracle()
+        # Then: four expanded knowledge nodes produce twenty edges and eleven IDs.
+        self.assertEqual(len(oracle["edges"]), 20)
+        self.assertEqual(len(oracle["element_ids"]), 11)
+        self.assertIn([root, next_node, "includes"], oracle["edges"])
+
     def test_generates_literal_smoke_counts(self):
         # Given: a new output directory.
         with tempfile.TemporaryDirectory() as directory:

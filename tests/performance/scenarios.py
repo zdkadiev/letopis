@@ -76,7 +76,7 @@ def prepare_scenario(fixture: dict, name: str, output: Path) -> dict:
     binary = fixture.get("binary")
     if binary:
         # Copying changes inodes. Refresh the copy before applying measured edits.
-        initialize_projection(output, binary)
+        initialize_projection(output, binary, full_audit=False)
     hashes = {relative: hash_file(output / relative) for relative in fixture["input_sha256"]}
     files = sorted(key for key in hashes if key.startswith("knowledge/"))
     count = {"refresh_one": 1, "refresh_several": 2, "refresh_bulk": len(files)}.get(name, 0)
@@ -85,12 +85,31 @@ def prepare_scenario(fixture: dict, name: str, output: Path) -> dict:
         path = output / relative
         path.write_bytes(path.read_bytes().replace(b"Synthetic case", b"Altered___case"))
     command, request = build_request(name)
+    expected = {"command": command, "id": FIRST_ID,
+                "counts": fixture["counts"], "changed": bool(changed)}
+    if command == "traverse":
+        expected.update(build_traversal_oracle())
     return {"repository": output, "argv": [command], "stdin": encode_json(request),
-            "expected": {"command": command, "id": FIRST_ID,
-                         "counts": fixture["counts"], "changed": bool(changed)},
+            "expected": expected,
             "setup_seconds": time.monotonic() - started, "state_hashes": hashes,
             "cache_label": "initialized_projection_os_cache_uncontrolled",
             "embedding_mode": "fts_disabled", "changed_paths": changed, "name": name}
+
+
+def build_traversal_oracle() -> dict:
+    """Freeze the depth-two first-node neighborhood without product traversal."""
+    def address(index):
+        return f"knowledge/part-0000.md#node-{index:06d}"
+    edges = []
+    for index in range(4):
+        edges.append([address(index), f"sources/shard-0000.txt#L{index + 1}-L{index + 1}", "external"])
+        for offset in range(1, 5):
+            kind = "includes" if offset == 4 and index % 4 < 3 else "depends_on"
+            target = index + 1 if kind == "includes" else index + offset
+            edges.append([address(index), address(target), kind])
+    ids = [address(i) for i in range(1, 8)]
+    ids.extend(f"sources/shard-0000.txt#L{i}-L{i}" for i in range(1, 5))
+    return {"edges": edges, "element_ids": ids}
 
 
 def build_request(name: str) -> tuple[str, dict]:
@@ -106,12 +125,15 @@ def build_request(name: str) -> tuple[str, dict]:
                        else '"Altered___case 000000"', "limit": 10}
 
 
-def initialize_projection(repository: Path, binary: str) -> None:
+def initialize_projection(repository: Path, binary: str, full_audit: bool = True) -> None:
     """Publish a validated projection outside the latency interval."""
-    output = subprocess.run([binary, "check"], input=b"{}\n", cwd=repository,
+    command = "check" if full_audit else "search"
+    request = b"{}\n" if full_audit else b'{"query":"","limit":1}\n'
+    output = subprocess.run([binary, command], input=request, cwd=repository,
                             env=get_environment(), capture_output=True, timeout=120, check=True)
     response = json.loads(output.stdout)
-    if response.get("ok") is not True or response.get("result", {}).get("errors") != []:
+    expected = {"errors": []} if full_audit else []
+    if response.get("ok") is not True or response.get("result") != expected:
         raise ValueError("fixture projection is invalid")
 
 
