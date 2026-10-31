@@ -3,6 +3,6 @@
 
 EmbeddingService coordinates provider configuration, stored vector work, query embeddings and drain operations through application interfaces. If a ready configuration is unavailable, query embedding is unavailable and the executor reports no pending work. Search still obtains full-text candidates when vector candidates are unavailable.
 
-[Source: src/service/embedding.rs](src/service/embedding.rs "letopis:type=external")
+[Source: src/service/embedding.rs](../../src/service/embedding.rs "letopis:type=external;path=src/service/embedding.rs")
 
-[Source: src/service/search.rs](src/service/search.rs "letopis:type=external")
+[Source: src/service/search.rs](../../src/service/search.rs "letopis:type=external;path=src/service/search.rs")

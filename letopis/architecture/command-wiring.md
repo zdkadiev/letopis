@@ -3,4 +3,4 @@
 
 `run_request` selects the typed request, constructs the services required by that command, and returns a typed response. Help can succeed when environment lookup fails; other commands that need the environment use its result. Foreground commands such as check, search and reindex finish through the shared background runner.
 
-[Command dispatch and wiring](src/commands.rs "letopis:type=external")
+[Command dispatch and wiring](../../src/commands.rs "letopis:type=external;path=src/commands.rs")

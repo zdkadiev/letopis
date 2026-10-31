@@ -185,7 +185,8 @@ probes, FTS MATCH/bm25 и vec1 search/reset-команд остаётся явн
 обычной политике invalid-file: прежняя валидная проекция сохраняется, а в свежий
 кэш некорректный source/edge не попадает; исправление ссылки не требует пересборки.
 
-Для одноразового обновления:
+Историческая процедура TK-20 до реализации CLI reindex (для текущего markup
+upgrade применяется отдельный порядок issue 69 ниже):
 
 1. Остановить все Letopis-команды и detached `embed --drain`, работающие с этим
    репозиторием. Дождаться закрытия всех соединений SQLite и освобождения блокировок.
@@ -257,3 +258,35 @@ Differential tree tests используют строгую семантику G
 закрепляют независимый Git 2.50.1 с проверкой SHA-256 исходного архива; локальный
 запуск parity tests также требует соответствующего strict oracle. Это test-tool
 contract, не runtime-зависимость или обещание parity всех исторических Git.
+
+
+## Issue 69: обязательный path и явный reindex
+
+2026-10-31, [D-106](zkit/letopis/decisions.md#D-106),
+[действующий X-4](zkit/letopis/contracts/X-4-markdown.md): только
+`letopis:type=TYPE;path=ADDRESS`; `path` — обязательный терминальный canonical
+адрес от Git-корня, destination — относительная навигация от документа.
+Title не percent-decode: пробел имени — пробел, `%20` — буквальные три символа;
+destination декодируется ровно один раз. Сравнение локальных файлов лексическое,
+без fragments, existence I/O или viewer validation; remote HTTP/HTTPS source
+исключён. Legacy fallback, автоматического rewrite и parser-version migration нет.
+
+1. Дождаться завершения прежних CLI/drain и установить новый бинарник. Не смешивать
+   версии на одном кэше.
+2. Добавить `path` с прежним намеренным canonical ID и исправить относительные
+   destinations активного корпуса. Сохранить created_at и честные source bases.
+3. В Git-корне передать `{}` в `letopis reindex`, затем `{}` в `letopis check`.
+   Reindex обязателен: обычный refresh вправе пропустить неизменённый файл.
+4. Устранить markup findings и отдельно разобрать provenance findings. Успешный
+   reindex сам по себе недостаточен: last-valid проекции invalid files сохраняются.
+
+Для этого markup upgrade не удалять cache.db, vectors.db, config, locks,
+Git-снимки или Markdown; это отдельный порядок от старых schema-upgrades выше.
+`LinkPathMismatch` сохраняется успешным refresh/reindex в `files.error` и виден в
+`check`/`status.result.problems` как `validation_failed`, reason
+`link_path_mismatch`, фиксированное безопасное сообщение
+`Markdown link path does not match letopis path`; details.path — содержащий файл.
+Status read-only: до публикации новой ошибки её не видно, а после правки автора
+сохранённая ошибка исчезнет только после успешного refresh/reindex. SQL failure
+не заменяет опубликованное состояние. Свежий кэш не публикует часть invalid файла.
+Исторические спецификации/receipts сохраняют синтаксис своей ревизии.

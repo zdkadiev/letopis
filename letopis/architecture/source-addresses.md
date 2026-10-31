@@ -3,4 +3,4 @@
 
 `SourceUri` distinguishes normalized repository-relative paths, optionally with inclusive line ranges, from opaque absolute HTTP/HTTPS addresses. Remote addresses retain their original spelling and are not fetched by parsing. Local range selection returns exact bytes including line endings and fails when the full range is unavailable.
 
-[Source address implementation](src/domain/source.rs "letopis:type=external")
+[Source address implementation](../../src/domain/source.rs "letopis:type=external;path=src/domain/source.rs")
