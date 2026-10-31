@@ -1,6 +1,6 @@
 # Explicit graph paths in Markdown links — issue #69
 
-Date: 2026-10-31. Status: accepted for implementation planning on 2026-10-31 after the user's “ок продолжай по задаче”; implementation has not started.
+Date: 2026-10-31. Status: accepted for implementation planning on 2026-10-31 after the user's “ок продолжай по задаче”; implementation and per-task reviews are complete; final whole-branch review is pending.
 Task: [issue #69](https://github.com/zaurkadiev/letopis/issues/69).
 Base: `main@a82565ee8f590b959d2fd1cdf3e50cbe5d800187`.
 Branch: `issue-69`, in a separate managed worktree.
@@ -303,7 +303,7 @@ this breaking change.
   explicitly historical or negative-test material; that is not a legacy runtime
   path. Classify active versus historical examples before bulk replacement.
 
-## Acceptance and verification to plan after approval
+## Acceptance and verification
 
 | Area | Required evidence |
 | --- | --- |
@@ -341,11 +341,12 @@ inline-link destinations and titles and describes Markdown-level title escapes.
 This design uses the already decoded title event and adds no second Markdown
 parser. Viewer and rendering policies are outside this contract.
 
-The issue and current code were read on the pinned base. This worktree initially
-had no tracked or untracked edits. This specification is the only planned change
-at this stage. Product builds, root tests, model runs and viewer checks are not run
-for this document-only work; verify its local references, examples and diff, and
-perform the independent builder check before handing it over for approval.
+At specification-writing time, the issue and code were read on the pinned base
+and the worktree was clean. That document-only stage ran reference/diff checks and
+independent builder review, without product builds or model/viewer runs. The
+subsequently approved implementation plan has now been executed and each task
+reviewed; current validation evidence and limitations are in the issue-69 report.
+The controller's final whole-branch review is pending.
 
 ### Design review receipts — 2026-10-31
 
@@ -356,5 +357,5 @@ left”. Local verification passed for nine document references/explicit anchors
 three example navigation paths, fenced blocks, superseded-decision/scope checks
 and `git diff --check`. Product suites were not rerun for this document-only
 revision; no product code, schema, dependency or active contract is changed. The
-user subsequently authorized continuing to the implementation plan. That plan
-requires separate approval before coding.
+user subsequently approved the implementation plan and Subagent-driven execution.
+Implementation and per-task reviews are complete; final whole-branch review is pending.

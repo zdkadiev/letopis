@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Execution approval:** 2026-10-31, Subagent-driven with per-task review. Implementation in progress.
+**Execution approval:** 2026-10-31, Subagent-driven with per-task review. Implementation and task reviews complete; final whole-branch review pending.
 
 **Goal:** Use mandatory `path` as the sole graph target, compare local navigation file paths, and persist mismatches for `check`/`status`.
 
@@ -66,7 +66,7 @@ fn decode_navigation_path(raw: &str) -> Result<String, DiagnosticKind>;
 
 Deriving the owner from the already validated element ID is a planning simplification of the spec's document-path plumbing, not a new target-resolution rule. Keep all four helpers private, callers above callees; no new wrapper or module is required.
 
-- [ ] **Step 1: Add red parser tests and migrate the focused tests' positive input syntax.**
+- [x] **Step 1: Add red parser tests and migrate the focused tests' positive input syntax.**
 
 In `tests/markdown_link_paths.rs`, use existing `build_whole_file`, `parse_file`, `assert_error`. Include tests named `uses_path_as_the_only_target`, `compares_paths_from_the_containing_section_file`, `ignores_navigation_fragments_and_target_existence`, `rejects_legacy_titles`, `preserves_terminal_address_bytes`, and `decodes_only_navigation_paths_once`. Independent positive/negative cases:
 
@@ -88,23 +88,23 @@ assert_error(result, DiagnosticKind::LinkPathMismatch);
 assert_eq!(DiagnosticKind::LinkPathMismatch.get_code(), "link_path_mismatch");
 ```
 
-- [ ] **Step 2: Run the focused tests and confirm failure for the intended missing behavior.**
+- [x] **Step 2: Run the focused tests and confirm failure for the intended missing behavior.**
 
 Run `cargo test --locked --offline --test markdown_link_paths`. A missing diagnostic/old grammar rejection is expected at this stage; dependency/toolchain failures are infrastructure failures, not a red behavior test.
 
-- [ ] **Step 3: Implement the parser/helpers and diagnostic mapping.**
+- [x] **Step 3: Implement the parser/helpers and diagnostic mapping.**
 
 Split once at `;path=`, validate the exact `letopis:type=` prefix/type, require a nonempty terminal address, and parse that whole address with existing domain types. Verify only local file paths. Implement one-pass navigation UTF-8 percent decoding per the spec, without a URL library or filesystem calls; do not decode metadata. Before constructing the edge, run the comparison and map its reason to the inline-link byte range. Add LinkPathMismatch's fixed message/code and include it in `PARSER_KINDS` and the cached-message test table in `graph_diagnostics.rs`. Do not persist raw addresses.
 
-- [ ] **Step 4: Run focused green tests, including search rendering and cached-reason mapping.**
+- [x] **Step 4: Run focused green tests, including search rendering and cached-reason mapping.**
 
 Run `cargo test --locked --offline --test markdown_link_paths --test markdown_links --test markdown_elements --test markdown_search` and `cargo test --locked --offline --lib classifies_every_known_cached_message_without_changing_parser_diagnostics`. All selected tests must pass. Extend the search test to assert unchanged literal visible text/hash for equivalent link-only syntax changes and a changed exact element hash. Independently recompute affected exact-byte golden hashes, preserving CRLF and no-final-newline fixtures.
 
-- [ ] **Step 5: Mutation-check the behavior and restore the tree.**
+- [x] **Step 5: Mutation-check the behavior and restore the tree.**
 
 Temporarily remove comparison, use the destination instead of path, then percent-decode metadata in separate compiled mutations. Each relevant new test must fail at its expected behavior assertion. Restore the exact production bytes and rerun affected tests; record results. Do not treat compiler errors as proof of sensitivity.
 
-- [ ] **Step 6: Commit only Task 1's intended files.**
+- [x] **Step 6: Commit only Task 1's intended files.**
 
 Run `make fmt`, rerun focused tests, `git diff --check`, then commit as `feat: parse explicit link paths and diagnose navigation mismatches`. Remaining old positive consumers belong to Task 2: a focused green result is not the final root gate.
 
@@ -112,27 +112,27 @@ Run `make fmt`, rerun focused tests, `git diff --check`, then commit as `feat: p
 
 **Interfaces:** Consume Task 1's parser unchanged. Existing fixture helper signatures remain stable unless the actual containing path is required; fix each caller explicitly rather than adding a legacy-to-new conversion layer. Existing generator and manifest APIs stay the same.
 
-- [ ] **Step 1: Inventory and classify active declarations.**
+- [x] **Step 1: Inventory and classify active declarations.**
 
 For each inventory file, record the containing Markdown path, intended canonical target, and whether the declaration is positive input, deliberately invalid input, visible text in code, or a historical artifact. For positive local links, set path to the existing intended root-relative ID and destination to the appropriate document-relative path. Repair nested thin-slice links explicitly; preserve anchors, line ranges, relation names, labels and missing-target scenarios. Retain legacy syntax only in named negative tests or intentionally quoted content.
 
-- [ ] **Step 2: Add red generator/oracle assertions and confirm failure.**
+- [x] **Step 2: Add red generator/oracle assertions and confirm failure.**
 
 Extend `test_smoke_has_literal_counts_targets_and_exact_utf8_sizes` with literal examples of document-relative source and knowledge links plus canonical path fields. Add a validator-negative case where only the navigation file path disagrees but manifest byte hashes are independently updated, so failure is not merely a stale digest. Run `python3 -B -m unittest discover -s tests/target_corpus -p 'test_generate.py'`; new-format assertions must fail before generator changes.
 
-- [ ] **Step 3: Migrate all active positive producers and the independent validator.**
+- [x] **Step 3: Migrate all active positive producers and the independent validator.**
 
 Update Task 2's inventory. In the generator, add path and repair destinations before final fragment padding; retain the exact 2,000-byte profile and deterministic packing. Update the independent validator to check the declared canonical targets and navigation agreement without importing production parser logic. Update performance edge masking for the new title while preserving byte counts and the intended causal variant. Do not regenerate old .artifacts, profiles, baseline hashes or published receipts.
 
-- [ ] **Step 4: Run root tests and the affected model-free Python suites.**
+- [x] **Step 4: Run root tests and the affected model-free Python suites.**
 
 Run `cargo test --locked --offline`, `python3 -B -m unittest discover -s tests/target_corpus -p 'test_*.py'`, and `python3 -B -m unittest discover -s tests/performance -p 'test_*.py'`. Also run `python3 -B tests/cli/tk24_workflow.py --binary "$PWD/target/debug/letopis" --evidence /private/tmp/issue69-tk24-NEW` using a fresh evidence path and the prepared schema-validation Python environment (`jsonschema`, `yaml`). Expect pass; report explicit optional skips. Use fresh temporary fixtures, no model/provider calls or full-scale drain.
 
-- [ ] **Step 5: Mutation-check the independent fixture oracle.**
+- [x] **Step 5: Mutation-check the independent fixture oracle.**
 
 Change one generated destination while leaving metadata canonical, update the input digest independently, and confirm the new validator-negative test rejects lexical disagreement. Restore and rerun it. This must detect a path defect beyond a manifest checksum mismatch.
 
-- [ ] **Step 6: Commit the fixture/tooling migration.**
+- [x] **Step 6: Commit the fixture/tooling migration.**
 
 Run `make fmt`, rerun changed focused tests and `git diff --check`; commit only classified active consumers as `test: migrate executable fixtures to explicit link paths`. A remaining old token is acceptable only with an explained negative/historical purpose.
 
@@ -140,7 +140,7 @@ Run `make fmt`, rerun changed focused tests and `git diff --check`; commit only 
 
 **Interfaces:** Use `ReadingRepo::{new,write,invoke,open_storage,seed_vectors}` and public `Storage`/`CacheWrite`/`StorageRead` capabilities. `invoke(&["status"], b"{}")` returns a process output; inspect literal JSON fields. Do not change StatusService, SQLite schemas or CLI response types merely to add tests.
 
-- [ ] **Step 1: Add lifecycle tests with exact public outcomes.**
+- [x] **Step 1: Add lifecycle tests with exact public outcomes.**
 
 Create `tests/markdown_link_lifecycle.rs` with:
 
@@ -158,19 +158,19 @@ Create `tests/markdown_link_lifecycle.rs` with:
 
 Keep each scenario and helper within the project's function-size guidance; split genuinely sequential phases into focused tests instead of hiding assertions inside one large helper.
 
-- [ ] **Step 2: Run focused tests and investigate genuine failures.**
+- [x] **Step 2: Run focused tests and investigate genuine failures.**
 
 Run `cargo test --locked --offline --test markdown_link_lifecycle --test check_lifecycle --test status_command --test source_lifecycle`. These tests may already pass after Task 1 because they verify existing publication contracts; do not manufacture a failing production change merely to get a red run.
 
-- [ ] **Step 3: Mutation-check persistence, classification and reindex sensitivity.**
+- [x] **Step 3: Mutation-check persistence, classification and reindex sensitivity.**
 
 Individually bypass cached mismatch classification, suppress storing that file error, and make reindex use incremental detection. Relevant tests must fail on the exact asserted reason/state, then pass after byte-for-byte restoration. Do not weaken the default invalid-file or read-only status rules to satisfy tests.
 
-- [ ] **Step 4: Verify purity and absence of additional I/O.**
+- [x] **Step 4: Verify purity and absence of additional I/O.**
 
 Review actual imports/calls in the Markdown helpers; no fs/Git/network/service concrete type is reachable from comparison. Test matching missing targets and ignored malformed navigation fragments. Record that current graph/source checks continue to perform their own existing I/O; this is not a claim that the entire command is I/O-free.
 
-- [ ] **Step 5: Commit lifecycle proof.**
+- [x] **Step 5: Commit lifecycle proof.**
 
 Run `make fmt`, rerun focused tests and `git diff --check`; commit as `test: verify link mismatch status and explicit reindex upgrade`. If a real production gap emerges, fix only its owner, rerun required root checks and record that justified change.
 
@@ -180,15 +180,15 @@ Run `make fmt`, rerun focused tests and `git diff --check`; commit as `test: ver
 
 Active corpus: `overview.md`, `component-boundaries.md`, `command-wiring.md`, `source-addresses.md`, `git-snapshots.md`, `markdown-projection.md`, `graph-model-and-traversal.md`, `search-pipeline.md`, `embedding-execution.md`, `cli-observation.md` under `letopis/architecture/`.
 
-- [ ] **Step 1: Update current contracts, skill and upgrade instructions.**
+- [x] **Step 1: Update current contracts, skill and upgrade instructions.**
 
 Document the one mandatory title grammar, local lexical comparison, no fragment/existence checking, remote exemption, mismatch reason/status timing and explicit reindex. Distinguish literal title paths from percent-encoded navigation. Add a dated decision without renumbering historical decisions. Remove active instructions teaching legacy marked syntax; preserve historical specifications/reports and recorded evidence.
 
-- [ ] **Step 2: Migrate the active corpus with honest provenance.**
+- [x] **Step 2: Migrate the active corpus with honest provenance.**
 
 Add canonical path fields and repair relative destinations. Address the observed stale `git-snapshots.md` reference to removed `src/git/cli.rs`/GitCli by reading the current GitRepository implementation and updating the claim/reference. Verify any changed source basis against exact tree bytes as required by the Letopis skill; do not swap OIDs blindly. Preserve created_at. Other existing source-change findings must be reported or resolved by actually reviewing their source, never hidden by rewriting a basis.
 
-- [ ] **Step 3: Run required final checks on the actual changed tree.**
+- [x] **Step 3: Run required final checks on the actual changed tree.**
 
 Run `make verify` once after the complete migration; it includes make check, strict Rustdoc and release tests. Run the affected Python suites from Task 2 once after their final changes. Use an isolated copied active corpus with the real new CLI, disabled embeddings and copied/available source bases to exercise reindex → check → status; inspect any pre-existing provenance limitations and report them rather than claiming an unassessed clean corpus. Preserve user cache, config, Git/index and author bytes outside the intended edits. If Linux is available, run focused parser/lifecycle tests there; otherwise explicitly record that platform as unrun. No native storage harness is needed unless its owned behavior/inputs change.
 
@@ -196,7 +196,7 @@ Run `make verify` once after the complete migration; it includes make check, str
 
 Use superpowers:requesting-code-review after implementation. Review source boundaries, path decoding, title grammar, private APIs, diagnostics persistence, fixture fidelity and active/historical documentation. Resolve material findings and rerun affected checks after actual fixes. Report source revision, platforms, exact verification/mutation commands and outcomes, remaining findings and unrun suites. No claim of viewer compatibility, provider performance or full pilot acceptance.
 
-- [ ] **Step 5: Commit docs/report and hand off the branch.**
+- [x] **Step 5: Commit docs/report and hand off the branch.**
 
 Check local links, `git diff --check`, actual changed-file scope and restored mutations. Commit intended docs/corpus/report as `docs: document link paths diagnostics and upgrade`. Use superpowers:finishing-a-development-branch only after verification, and wait for the user's integration instructions. Do not merge/push or close issue #69 as part of executing this plan without that authorization.
 
@@ -205,4 +205,4 @@ Check local links, `git diff --check`, actual changed-file scope and restored mu
 - Coverage: title/domain rules → Task 1; active inputs and independent generation → Task 2; persistence/read-only status, upgrade and vectors → Task 3; current documentation, source corpus and final gate → Task 4.
 - Type consistency: no new public parse signature or new storage/service trait; the private helper signatures above are the shared parsing contract. Error message and reason match the specification exactly.
 - Proportion: four testable tasks, with fixed decisions and commands; implementation bodies remain with the implementer. All five review-focus conditions have named owning tests.
-- Planning checks passed before execution; no product tests were run during planning. User approved this plan and Subagent-driven execution on 2026-10-31; implementation is in progress.
+- Planning checks passed before execution; no product tests were run during planning. User approved this plan and Subagent-driven execution on 2026-10-31; implementation and per-task reviews are complete; the final whole-branch gate is pending.
