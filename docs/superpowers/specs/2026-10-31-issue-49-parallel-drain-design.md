@@ -1,6 +1,8 @@
 # Bounded parallel embedding drain — issue #49
 
-Date: 2026-10-31. Status: draft for user approval; no implementation plan or product changes.
+Date: 2026-10-31. Status: accepted for implementation planning after the user approved
+the thread-pool approach, per-result publication and final four-worker bound.
+Implementation awaits separate plan approval; no product changes.
 Task: [issue #49](https://github.com/zaurkadiev/letopis/issues/49).
 Base: `main@b7f627d1d63d2d7b72989b733838a55925947c17`.
 Branch: `codex/issue-49`, reusing the clean managed worktree after issue #69 merged.
@@ -18,10 +20,20 @@ transport. The worker count is a named constant, not a config/environment/CLI kn
 Use Superpowers: approve this specification, then prepare and approve a separate
 implementation plan before changing product code or dependencies.
 
-**Author proposals requiring specification approval:** use the `threadpool` crate,
-exactly pinned to `=1.8.1`, and `DRAIN_WORKERS: usize = 4`. Four is a starting
-engineering bound, not a measured optimal or resource-approved value. The same
-constant bounds all dispatched work whose result has not yet been consumed.
+The user also explicitly approved completion-by-completion publication: the
+coordinator saves each valid returned vector in its own short transaction without
+waiting for the other requests or the full corpus. Only after handling that result
+does its slot become available for another job. HTTP requests overlap; SQLite
+publication stays sequential. A result committed before process death remains
+saved; outstanding/uncommitted work follows the existing restart/attempt policy.
+
+The user approved four workers, held in one clearly visible named constant at the
+top of the scheduling implementation file, after imports and before types/impls:
+`const DRAIN_WORKERS: usize = 4;`. The same constant bounds all dispatched work
+whose result has not yet been consumed; do not duplicate it across production
+modules. Four is an agreed initial bound, not a measured optimal or a passed
+minimum-hardware resource verdict. Use the `threadpool` crate, exactly pinned to
+`=1.8.1`, as the author-selected implementation of the agreed pool approach.
 The builder may settle private helper names, channel representation and focused
 file splits, but may not change these public behavior and resource boundaries.
 
@@ -110,11 +122,23 @@ Do not enqueue the corpus into `threadpool`'s internal queue. At most four jobs
 can be submitted and unconsumed across that queue, active workers and result
 buffers together. Prepare the next text only when a slot is available. The
 bounded hash set and completion channel cannot become unbounded work backlogs.
+
+For example, three jobs may be waiting for provider responses while a fourth has
+returned a vector that the coordinator is writing. All four slots remain occupied.
+Only after that write or failure/discard handling finishes can the coordinator
+admit another job. Eligible work beyond these four stays represented by the
+existing database query; it is not loaded into a separate in-memory job queue.
+
 This is a bound on scheduling payload count, not a claim of constant total process
 bytes: per-response JSON decoding, text/file buffers, thread stacks and existing
 stale-ID tracking retain their own costs. Measure actual RSS and state its scope.
 
 ## Completion, retries and races
+
+For example, if the second of four submitted requests finishes first, commit its
+validated vector, release its slot and dispatch the fifth job while the first,
+third and fourth requests continue. There is no all-four barrier or whole-drain
+transaction. Failed or obsolete results follow the guarded handling below.
 
 - Successful vectors use the existing validation rules: exactly one nonempty,
   finite vector; supported/requested/current dimensions; original hash key;
@@ -257,10 +281,11 @@ Check the exact pinned source and transitive dependencies in the implementation
 plan, particularly worker creation/panic/join behavior. The existing transport
 remains pinned; do not silently update `ureq` while adding this dependency.
 
-This draft records decisions and proposed behavior only. No product code,
+This specification records the approved design. No product code,
 manifest/lockfile, benchmark campaign or GitHub write has been performed for #49.
-A fresh builder check precedes presentation; specification approval precedes the
-separate plan and its approval precedes implementation.
+The independent builder check below preceded presentation; the user subsequently
+approved the discussed decisions. A separate implementation plan is next, and its
+approval must precede implementation.
 
 ## Specification review
 
@@ -268,4 +293,6 @@ separate plan and its approval precedes implementation.
 “nothing important left”; no decision-changing questions remained before planning.
 All ten local document/source links resolve. This is document/source consistency
 verification only: no product suites, benchmarks or provider calls were run.
-The document remains a draft until the user approves its full description.
+Subsequent user approval confirmed per-result transactions, four workers and one
+top-of-file constant. These refinements preserve the reviewed ownership, lifecycle
+and measurement rules; the implementation plan still requires separate approval.
