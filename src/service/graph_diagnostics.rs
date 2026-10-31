@@ -10,7 +10,7 @@ const PATH: &str = "path";
 const REASON: &str = "reason";
 const ELEMENT_ID: &str = "element_id";
 const TARGET: &str = "target";
-const PARSER_KINDS: [DiagnosticKind; 9] = [
+const PARSER_KINDS: [DiagnosticKind; 10] = [
     DiagnosticKind::InvalidUtf8,
     DiagnosticKind::InvalidMetadata,
     DiagnosticKind::InvalidAnchor,
@@ -19,6 +19,7 @@ const PARSER_KINDS: [DiagnosticKind; 9] = [
     DiagnosticKind::NestedElement,
     DiagnosticKind::InvalidLinkTitle,
     DiagnosticKind::InvalidTarget,
+    DiagnosticKind::LinkPathMismatch,
     DiagnosticKind::SelfLoop,
 ];
 
@@ -167,7 +168,7 @@ mod tests {
     use std::{error::Error, io};
     use tempfile::TempDir;
 
-    const PARSER_CASES: [(DiagnosticKind, &str, &str); 9] = [
+    const PARSER_CASES: [(DiagnosticKind, &str, &str); 10] = [
         (
             DiagnosticKind::InvalidUtf8,
             "Markdown is not UTF-8",
@@ -207,6 +208,11 @@ mod tests {
             DiagnosticKind::InvalidTarget,
             "invalid graph target",
             "invalid_target",
+        ),
+        (
+            DiagnosticKind::LinkPathMismatch,
+            "Markdown link path does not match letopis path",
+            "link_path_mismatch",
         ),
         (
             DiagnosticKind::SelfLoop,

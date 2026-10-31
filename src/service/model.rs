@@ -177,6 +177,8 @@ pub enum DiagnosticKind {
     InvalidLinkTitle,
     /// A link target is not a valid graph address.
     InvalidTarget,
+    /// A local Markdown navigation path differs from the declared graph file.
+    LinkPathMismatch,
     /// An element links to itself.
     SelfLoop,
 }
@@ -192,6 +194,7 @@ impl DiagnosticKind {
             Self::NestedElement => "knowledge elements cannot be nested",
             Self::InvalidLinkTitle => "invalid letopis link title",
             Self::InvalidTarget => "invalid graph target",
+            Self::LinkPathMismatch => "Markdown link path does not match letopis path",
             Self::SelfLoop => "knowledge cannot link to itself",
         }
     }
@@ -207,6 +210,7 @@ impl DiagnosticKind {
             Self::NestedElement => "nested_element",
             Self::InvalidLinkTitle => "invalid_link_title",
             Self::InvalidTarget => "invalid_target",
+            Self::LinkPathMismatch => "link_path_mismatch",
             Self::SelfLoop => "self_loop",
         }
     }

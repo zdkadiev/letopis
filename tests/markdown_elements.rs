@@ -92,7 +92,7 @@ fn code_examples_do_not_declare_elements() {
 
 #[test]
 fn file_errors_never_return_partial_elements() {
-    // Given
+    // Given: a valid element precedes an invalid declaration.
     let path = RepoPath::parse("knowledge/a.md").unwrap();
     let prefix = "## Valid {#valid}\n<!-- letopis: {\"created_at\":1} -->\nOK.\n\n";
     for json in [
@@ -107,18 +107,18 @@ fn file_errors_never_return_partial_elements() {
         "{\"created_at\":0,\"created_at\":1}",
     ] {
         let text = format!("{prefix}## Bad {{#bad}}\n<!-- letopis: {json} -->\nOops.\n");
-        // When
+        // When: parse all declarations in the file.
         let result = parse(&path, text.as_bytes());
-        // Then
+        // Then: reject the whole file without a partial projection.
         assert_error(result, DiagnosticKind::InvalidMetadata);
     }
-    // Given
+    // Given: a valid element precedes an invalid declaration.
     let text = format!(
-        "{prefix}## A {{#a}}\n<!-- letopis: {{\"created_at\":2}} -->\n[self](./knowledge/../knowledge/a.md#a \"letopis:type=depends_on\")\n"
+        "{prefix}## A {{#a}}\n<!-- letopis: {{\"created_at\":2}} -->\n[self](./a.md#a \"letopis:type=depends_on;path=knowledge/a.md#a\")\n"
     );
-    // When
+    // When: parse all declarations in the file.
     let result = parse(&path, text.as_bytes());
-    // Then
+    // Then: reject the whole file without a partial projection.
     assert_error(result, DiagnosticKind::SelfLoop);
 }
 
