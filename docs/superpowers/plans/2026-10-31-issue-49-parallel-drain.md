@@ -374,7 +374,7 @@ source/build/harness provenance, invariant matrix, before/after table, limitatio
 and remaining real-provider acceptance. Update this plan's checkboxes only from
 evidence; do not claim full issue completion while required real runs are deferred.
 
-- [ ] **Step 1: Reconcile design descriptions with the implemented behavior.**
+- [x] **Step 1: Reconcile design descriptions with the implemented behavior.**
 
 Update MC-3/MC-5 and its memory statement, architecture/dependency list,
 resource-math concurrency assumptions and affected provider-interface wording.
@@ -382,7 +382,7 @@ Keep the fixed limit in the owning Rust constant; docs may state its agreed valu
 No config/CLI schema changes, hardware/gate claims or historical evidence rewrites.
 Record package/source review, joins, imports, trait boundaries and actual lib wiring.
 
-- [ ] **Step 2: Run the required final host checks once on the actual changed tree.**
+- [x] **Step 2: Run the required final host checks once on the actual changed tree.**
 
 Run `make verify` (which includes required `make check`, root debug/release tests
 and strict Rustdoc); capture compact logs. Repeating checks is justified only by
@@ -391,7 +391,7 @@ new changes/failures. Run the relevant storage runner because selection changed:
 Rerun new measurement-tool tests if its inputs changed since Task 4; historical
 standalone manifests require separate relevant commands, not an implied root pass.
 
-- [ ] **Step 3: Verify Linux with matching input hashes.**
+- [x] **Step 3: Verify Linux with matching input hashes.**
 
 Run new `parallel_drain`, `parallel_drain_process`, `storage_embedding_work`,
 `embedding_provider`, `cli_drain` and `search_contention` targets and the storage
@@ -400,7 +400,7 @@ Compare source/lock/build/vendor/toolchain input hashes to the host tree. Record
 architecture/libc/toolchain and unrun targets; no x86_64 or power-loss claims from
 an ARM64 host/container. If environment is unavailable, state the actual limit.
 
-- [ ] **Step 4: Complete architectural/semantic review and resolve findings.**
+- [x] **Step 4: Complete architectural/semantic review and resolve findings.**
 
 Review physical files, visibility, bounds and `lib.rs` constructor calls against
 AGENTS; check the constant is visible at the top of its single owning file. Audit
@@ -409,7 +409,7 @@ implementation request one independent whole-branch review (plus per-task gates 
 Subagent-driven was selected); fix actionable findings and rerun affected checks.
 Record reviewer scope separately from actual executable verification.
 
-- [ ] **Step 5: Finalize the report and save the complete branch.**
+- [x] **Step 5: Finalize the report and save the complete branch.**
 
 Write exact commands/results/input revisions and the controlled before/after table.
 State unrun real model/provider/whole-stack/minimum-hardware acceptance. Preserve
@@ -432,3 +432,23 @@ redundant whole-suite reruns. The pinned crate's fatal thread-creation startup
 behavior is explicit; no typed recovery is fabricated. No independent plan review
 or implementation has been claimed. Native execution was subsequently authorized in voice; implementation starts after
 this plan and the final accepted specification are saved.
+
+
+## Execution result — 2026-10-31
+
+Native implementation complete on `codex/issue-49`. Independent read-only review
+of `b7f627d..14df46e` found one Important HTTP/1.0 reuse regression and no minors.
+The single fix pass at `ccb1d6d` explicitly requests connection closure through
+pinned ureq. Gated 4/8 RED → 8/8 GREEN; compiled keep-alive mutation rejected;
+restored final tree passed full macOS/Linux ARM64 acceptance. No second review.
+
+Final frozen A/B/C campaign: 21/21 valid, 64 unique vectors covering 68 nodes per
+case, document concurrency 1/1/4, no errors; medians 2.5644/2.5674/0.6849 s.
+C/A median speedup 3.74×, throughput ratio 3.68×, scoped to local model-free delay.
+Fresh native runners passed 1,034/1,028 tests per debug and release respectively,
+12 default ignored per profile, plus explicitly selected deadline/native/linkage
+checks. Final receipt gate verifies 467/467 current-tree/host/Linux hashes.
+See [report](../../zkit/letopis/checks/issue-49/report.md) for immutable pins,
+all commands, negative controls, retained incomplete/historical campaigns and
+implementation rulings. Real models/whole-stack/minimum-hardware/x86_64/power-loss
+acceptance remains open; no merge, push or issue closure is implied.

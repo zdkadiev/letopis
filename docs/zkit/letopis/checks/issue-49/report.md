@@ -1,177 +1,215 @@
 # Issue #49 — bounded parallel drain
 
-2026-10-31. Implementation and model-free verification; **real-provider acceptance remains open**.
+2026-10-31. Final product includes the HTTP/1.0 correction at `ccb1d6d`.
+**Real-provider and whole-stack acceptance remain open.**
 
 [Issue #49](https://github.com/zaurkadiev/letopis/issues/49) ·
-[accepted specification](../../../../superpowers/specs/2026-10-31-issue-49-parallel-drain-design.md) ·
-[implementation plan](../../../../superpowers/plans/2026-10-31-issue-49-parallel-drain.md) ·
+[specification](../../../../superpowers/specs/2026-10-31-issue-49-parallel-drain-design.md) ·
+[plan](../../../../superpowers/plans/2026-10-31-issue-49-parallel-drain.md) ·
 [D-107](../../decisions.md#D-107) · [measurement instructions](../../../../../tests/performance/README.md#bounded-parallel-drain-comparison-49).
 
-## Product behavior and boundaries
+## Implementation and review correction
 
-One process still owns `embed.lock`. `DRAIN_WORKERS = 4` at the top of
-`src/service/embedding/drain.rs` bounds worker threads **and all submitted results
-not yet handled**, including completed responses. A coordinator performs storage,
-file reads and Markdown preparation; only provider work crosses to workers through
-`Arc<dyn EmbeddingProvider + Send + Sync>`. The existing synchronous ureq client,
-60-second per-attempt deadline, query path, finite retry policy and JSON/config
-schemas remain. `threadpool =1.8.1` is the only new direct dependency; locked
-transitives are num_cpus 1.17.0 and hermit-abi 0.5.3.
+`DRAIN_WORKERS = 4` is above the types in `src/service/embedding/drain.rs`.
+One coordinator owns `embed.lock`, file/Markdown work and SQLite writes. Only
+provider work crosses to four `threadpool =1.8.1` OS threads through a shared
+`Arc<dyn EmbeddingProvider + Send + Sync>`. The sole new direct dependency is
+threadpool; locked transitives add num_cpus 1.17.0 and hermit-abi 0.5.3.
 
-The coordinator excludes active hashes, reserves attempts durably before dispatch,
-and consumes whichever result arrives first. One short transaction publishes each
-result or failure before freeing its slot. HTTP runs outside transactions; ready
-responses do not wait for their batch peers. Empty selection is final only with no
-pending jobs. Normal/error/unwind cleanup joins admitted jobs before releasing the
-lock. Programming panics remain panics; forced process death relies on OS/SQLite
-cleanup and leaves spent attempts durable. A provider retry delay may temporarily
-pause the coordinator, including handling other completed results.
+Four slots include running requests **and completed responses not yet handled**.
+Work selection excludes active hashes inside SQL, before `LIMIT 1`. The coordinator
+reserves attempts durably, then sends one text per HTTP call outside transactions.
+It publishes whichever result arrives first in one short transaction, frees that
+slot only after handling, and selects replacement work immediately. No all-four
+barrier, persisted queue, batching, whole-corpus text/vector load or async runtime.
+Config/dimension/hash guards remain; empty selection is final only without pending
+jobs. Normal/error/unwind cleanup joins every admitted job before releasing the
+lock; programming panics remain panics. Forced process death uses existing OS/WAL
+cleanup and durable attempts. Existing retry delay may pause the coordinator.
 
-## Reproducible evidence and provenance
+The independent read-only whole-branch review (`b7f627d..14df46e`, gpt-6-astra/high)
+found **one Important issue**, no Critical/Minor issues. Campaign-2 had real
+HTTP/1.0 implicit-close reuse failures under parallel load: some C cases published
+62–63 of 64 vectors while A/B completed 64. A shared-ureq diagnostic probe recorded
+245/256 successful requests. Adding a close header only to the fixture did not fix
+production behavior. HTTP/1.0 persistence requires negotiated keep-alive; an absent
+close header does not permit reuse. [RFC 9112 §9.3](https://www.rfc-editor.org/rfc/rfc9112.html#section-9.3).
 
-Ignored raw artifacts are under `.artifacts/issue-49/`; preserve that directory to
-inspect local receipts. No historical evidence was overwritten.
+The single fix pass keeps pinned ureq and explicitly sends `Connection: close` on
+every provider POST, via the imported header identifier and named close value.
+There is no extra retry, runtime, dependency, payload, auth, TLS, deadline, schema
+or configuration change. This is an implementation ruling, not an earlier user
+selection: **every call now establishes a new TCP/TLS connection**, which can hurt
+real-provider performance. The final measurement below includes that policy.
 
-| Variant | Product source | Frozen receipt | Binary SHA-256 |
+`parallel_drain_http10` uses valid Content-Length HTTP/1.0 responses without a
+server close header; a gate holds completed response sockets open. Before the fix
+only four of eight requests arrive (RED), so the test kills/reaps only its child.
+After the fix all eight literal vectors are stored with zero retained failures
+(GREEN). Replacing the client header with keep-alive compiles and reproduces the
+four-versus-eight failure; restored bytes pass. See `final-http10-red-2.log`,
+`final-http10-close-control-2/receipt.json` and `final-http10-close-final.log`.
+No second review was commissioned: RED→GREEN, the negative control and final full
+platform suites verify the one review finding, as required by Native execution.
+
+## Final measurement provenance
+
+All raw evidence is local and ignored under `.artifacts/issue-49/`. Preserve it to
+inspect receipts; no historical evidence was rewritten.
+
+| Variant | Exact product commit | Frozen receipt | Executable SHA-256 |
 |---|---|---|---|
 | A | `b7f627d1d63d2d7b72989b733838a55925947c17` | `builds/before/build.json` | `010036d3498a365768ee3c6c1aeac0d5c4ab201d58fa817012279acf6d4a6791` |
-| B | `a4d458ab135c341de559cd93aa85337e9d1975b2` | `builds/one-worker/build.json` | `6ae202c87eb998f53872297c0abf12051175758d8b9e2c2c705f1d1cf4261287` |
-| C | `68c9861458912cda070bdc44c24a44bc80ce9c74` | `builds/after-corrected/build.json` | `7f18c20fef8c679227edc59db2a6090be4eb299b47c51d52bc847cb942a187fa` |
+| B | `8fdab91be6c41c0775f5fcd22905ac9911a560d4` | `builds-final/one-worker/build.json` | `19966884db1b8e81ad750549e0e8911af2ad98c49b21cdc179159a619a8b758d` |
+| C | `ccb1d6dcac29b77708f1241b9941ef333b9a05ce` | `builds-final/after/build.json` | `20429d0a7131ef51723c70ab090ffb336cfc0db03603f20dd2a7f7703e7bfbb7` |
 
-A is branch base `b7f627d1d63d2d7b72989b733838a55925947c17`. B is Task-3 product
-with the single `DRAIN_WORKERS: 4 → 1` evaluation patch preserved as
-`builds/one-worker.patch`; C is unchanged Task-3 product (`68c9861`). Source archives,
-original release receipts, artifact/symbol hashes and the compiler are pinned.
-`builds/correction.json` rejects a provisional C executable reused from B by shared
-Cargo-target freshness. No timing campaign used that invalid pin; a forced package
-rebuild produced the distinct C hash above. Disposable source target symlinks were
-removed. Frozen manifests and actual observed concurrency both guard this mistake.
+A is unchanged sequential main. B is the corrected product with **only** the
+worker constant changed to one in a disposable evaluation checkout; C is unchanged
+four-worker corrected product. The B patch and commits are in
+`builds-final/one-worker.patch` and `builds-final/sources.json`. B used an independent
+APFS-cloned release cache; each product package was explicitly cleaned/rebuilt.
+There are no target symlinks/hard links. Original receipts, read-only source
+archives, binaries/symbols and toolchain hashes remain pinned and verified.
+Generated evaluation target caches were reclaimed after freezing; immutable pins
+and executable/source archives remain intact.
 
-`campaign-4/manifest.json` captures host, exact fixture/config hashes, all harness
-source hashes and the native observer binary/source. 21/21 cases are valid: one
-conditioning plus five measured cases per variant, followed by one query-overlap
-case each. Inputs are byte-identical across all cases. Setup, observation and
-build time are outside drain timing. Fresh standalone projections contain 64
-unique ASCII texts (roughly 120 repeated words each) and four extra same-text nodes.
-The concurrent loopback provider returns independent literal three-component
-vectors with 25 ms delay; overlap cases use 100 ms delay. No external forwarding,
-real model or paid session is involved. Trials run interleaved A/B/C on the same
-Apple M4 Pro / macOS 26.6.2 ARM64 host. OS page cache and unrelated host load are uncontrolled.
+An earlier shared-target build had reused the B package as provisional C; it was
+rejected before any timing, preserved in `builds/correction.json`, and replaced.
+Campaigns-1/2 preserve setup/transport failures. Campaigns-3/4 measured the product
+**before** the review fix and are historical, not final-product evidence.
+`campaign-final` was interrupted by the tool session, retained without a success
+claim, and audited for exact owned-process cleanup. `campaign-final-2` is its fresh
+completed rerun; it was not selected for a favorable speedup.
+
+The final campaign has **21/21 valid cases**: one conditioning plus five measured
+fresh projections per variant in interleaved A/B/C order, then one three-query
+overlap schedule per variant. There are 68 knowledge nodes sharing 64 distinct
+synthetic texts. Independently supplied literal three-component vectors are checked
+through the native observer, outside timing. Each case must publish all 64 unique
+vectors, cover all 68 nodes, make exactly 64 document requests and retain no failed
+hash/query error. Fixtures/config/input bytes match across all cases.
+
+The owned concurrent loopback provider delays ordinary responses by 25 ms and
+query-overlap responses by 100 ms. It explicitly closes connections for all three
+variants, so A/B/C all incur connection setup; HTTP/1.0 compatibility without that
+header is checked separately by the gated regression. Build/setup/observation are
+outside drain time. Deadline: 120 seconds per drain and 20 minutes for the campaign
+including setup, with cancellation receipts and exact owned-process cleanup.
+Host: Apple M4 Pro, macOS 26.6.2 ARM64; Rust 1.95.0. No external inference or paid
+session. Page cache and unrelated host load are uncontrolled. Manifest records
+host, every fixture/config/harness hash and native observer source/executable.
 
 ```sh
 /opt/homebrew/bin/python3.12 -B tests/performance/drain_compare.py \
   --before "$PWD/.artifacts/issue-49/builds/before/build.json" \
-  --one-worker "$PWD/.artifacts/issue-49/builds/one-worker/build.json" \
-  --after "$PWD/.artifacts/issue-49/builds/after-corrected/build.json" \
-  --evidence "$PWD/.artifacts/issue-49/campaign-4"
+  --one-worker "$PWD/.artifacts/issue-49/builds-final/one-worker/build.json" \
+  --after "$PWD/.artifacts/issue-49/builds-final/after/build.json" \
+  --evidence "$PWD/.artifacts/issue-49/campaign-final-2"
 ```
 
-The command refuses reusing an existing directory; choose a new suffix to rerun.
-Campaign-1 stopped during setup (create-only writer used for mutable private
-configuration). Campaign-2 retained incomplete vector coverage: implicit-close
-HTTP/1.0 fixture responses raced pooled connection reuse. An isolated shared-ureq
-probe reproduced 245/256 delivered requests; explicit `Connection: close` made
-256/256 pass. This framing fix is confined to the fixture, not product transport.
-The incorrect campaigns, probe source/logs and their failures remain retained.
-HTTP/1.0 peers that close without an explicit header remain a transport compatibility
-risk; no arbitrary transport change or extra retry was added here.
+Use an absent evidence directory to rerun; existing evidence is never overwritten.
 
-## Controlled results
+## Results after the HTTP/1.0 correction
 
 | Variant | Valid measured calls | Unique vectors / nodes per call | Median seconds (range) | Vectors/s | Max document calls | HTTP attempts / errors per call | Drain RSS median / max MiB | Median CPU seconds | Overlap query median ms |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| A — sequential base | 5/5 | 64 / 68 | 2.4403 (2.3998–2.8576) | 25.29 | 1 | 64 / 0 | 12.84 / 12.89 | 0.1005 | 135.37 |
-| B — new scheduler, 1 worker | 5/5 | 64 / 68 | 2.4355 (2.3921–2.5021) | 26.21 | 1 | 64 / 0 | 12.91 / 12.98 | 0.1091 | 130.84 |
-| C — new scheduler, 4 workers | 5/5 | 64 / 68 | 0.6952 (0.6838–1.7804) | 70.44 | 4 | 64 / 0 | 14.78 / 14.83 | 0.0949 | 127.78 |
+| A — sequential base | 5/5 | 64 / 68 | 2.5644 (2.5004–2.5887) | 25.01 | 1 | 64 / 0 | 12.64 / 12.81 | 0.1780 | 129.08 |
+| B — corrected scheduler, 1 worker | 5/5 | 64 / 68 | 2.5674 (2.4872–2.5837) | 25.19 | 1 | 64 / 0 | 12.58 / 12.61 | 0.1863 | 133.16 |
+| C — corrected scheduler, 4 workers | 5/5 | 64 / 68 | 0.6849 (0.6831–0.7132) | 92.15 | 4 | 64 / 0 | 14.30 / 14.44 | 0.1220 | 135.05 |
 
-Each variant produced 320 verified unique vectors across five measured calls,
-with 64 document requests and zero failed hashes per call. No retries were needed
-in this zero-retry fixture. C/A median speedup is **3.51×** (throughput ratio 2.79×);
-B/A median ratio is 0.998, separating scheduler overhead from parallelism.
-One C sample took 1.7804 s while the others took 0.6838–0.6980 s;
-that slower sample remains in the range and throughput denominator. The cause is
-not established; host load/page cache are uncontrolled. Earlier valid campaign-3
-reported 3.67× median / 3.65× throughput. Campaign-4 was repeated after extending
-the watchdog to setup, not selected to maximize speedup. These are observations of
-hiding synthetic HTTP wait, not a real-model speedup forecast.
+C/A median speedup: **3.74×**; aggregate throughput ratio: **3.68×**.
+B/A median ratio is 1.0012, separating
+scheduler overhead from parallelism. Each variant produces 320 verified unique
+vectors over five measured cases; all case times remain in the denominator and
+no requests/retries/failures are omitted. These are descriptive synthetic results,
+not a real-model forecast or a drain SLA. Five samples do not estimate p95/p99.
 
-Every overlap case ran three actual vector-only search calls, returned the exact
-canary ID, and recorded all three during document inference. Maximum total HTTP
-concurrency was A/B/C = 2/2/5, while document concurrency stayed 1/1/4. These three
-queries per variant are descriptive observations; p95/p99 are not estimated.
+All nine overlap queries return the literal canary ID; all three per variant
+occur during document inference. Maximum total HTTP concurrency is A/B/C=2/2/5,
+while document concurrency stays 1/1/4. Queries do not spend drain slots. Three
+queries per variant do not establish tail-latency acceptance.
 
-RSS is wait4 lifetime maximum for the direct drain child and OS-accounted reaped
-descendants, **not simultaneous whole-stack peak**. The provider runs in the Python
-runner, whose separate RSS is unavailable; worker stacks are in drain RSS. CPU
-uses the same wait4 accounting scope. Memory is bounded in number of jobs, not
-claimed to fit a fixed byte budget for arbitrary documents. Do not sum process
-RSS maxima or extrapolate these tiny vectors to a 100k corpus/model workload.
+RSS is the drain process lifetime maximum, through wait4 direct-child plus
+OS-accounted reaped-descendant accounting; CPU has the same accounting scope.
+It includes worker stacks, but **is not simultaneous whole-stack RAM**. The
+provider shares the Python runner, whose separate RSS is unavailable. Do not sum
+RSS maxima or extrapolate tiny vectors to a 100k/model workload. Slots bound job
+count, not a fixed byte budget for arbitrary files or responses.
 
-## Invariant evidence
+## Invariants and negative controls
 
-| Contract | Executable evidence | Outcome |
+| Contract | Actual executable coverage | Result |
 |---|---|---|
-| Exclude active/shared hashes, reach later work, pinned identity | `storage_embedding_work`; `parallel_drain` with max_retries=3 | PASS; compiling exclusion/dedup mutations rejected |
-| Four active requests, no extra pending capacity | real HTTP readiness + `completed_results_hold_capacity_until_coordinator_handling_finishes` | PASS; overfull admission mutation rejected |
-| Publish/refill while another response is held | `parallel_drain` completion-order case, actual DB observations | PASS; exact literal vector and fifth-request readiness |
-| Reserve before HTTP, durable restart budget | `parallel_drain_process`; cancellation suites | PASS; rolled-back reservation mutation rejected |
-| Late edited/deleted text cannot represent new text | process/thin-slice tests, new/old hash observation | PASS; no request-arrival order assumed |
-| Config reset/dimension races | process tests with winning-identity canary and exact key counts | PASS; identity/dimension bypass mutations rejected |
-| Empty selection does not discard outstanding work | supervised `tests/parallel.rs` scenario | PASS; premature-exit mutation rejected |
-| Single owner; termination releases lock | second real drain, kill/restart and cancellation cases | PASS; ownership bypass mutation rejected |
-| Cleanup joins before lock release; panics remain panics | supervised storage-error/worker-panic/error-plus-panic children | PASS; missing-join/lost-panic/swallowed-panic/wrong-hash mutations rejected |
-| A child test really ran; no zero-match false success | exact libtest name and one-pass assertion; owned watchdog | PASS; nonexistent-test mutation rejected |
-| Measurement rejects wrong contents/count/cap/failure accounting/interruption | 9 Python tests; 2 native observer tests | PASS; 7 Task-4 plus 1 watchdog negative controls rejected and exact bytes restored |
+| Shared/active hashes cannot hide later work; pinned identity | `storage_embedding_work`, `parallel_drain` with retry budget allowing duplicates | PASS; exclusion/dedup mutations rejected |
+| Four submitted/unhandled jobs, including ready responses | real held HTTP, durable reservations and direct completed-but-unhandled capacity test | PASS; overfull admission mutation rejected |
+| Publish/refill before a held peer completes | exact DB vector and fifth-request readiness in `parallel_drain` | PASS |
+| Attempts reserve before HTTP and survive death | `parallel_drain_process`, cancellation suites | PASS; rollback mutation rejected |
+| Late edit/delete cannot represent a new text | process/thin-slice new/old hash assertions, unordered exact request set | PASS |
+| Config/dimension races preserve current state | winning-identity canary and key counts; native dimension guards | PASS; identity/dimension bypass rejected |
+| Empty selection waits for outstanding work | supervised embedding unit child | PASS; premature completion rejected |
+| Single drain owner, restart and lock release | second real process, kill/restart/cancellation | PASS; ownership bypass rejected |
+| Join before lock release; panic stays panic | supervised error/panic/error-plus-panic cases and watchdog | PASS; missing joins, lost/swallowed panic and wrong hash rejected |
+| Libtest child actually ran | exact case name and one-pass check | PASS; zero-match mutation rejected |
+| Correct vectors/counts/cap/accounting/cleanup/watchdog | 9 Python runner tests and native literal-vector observer | PASS; 7 Task-4 controls plus setup-timer omission rejected |
+| Valid HTTP/1.0 without server close header | gated `parallel_drain_http10` and keep-alive mutation | PASS after correction; 4/8 before, 8/8 after |
 
-Task-3 controls are in `task3-mutations/receipts.json` (8) and
-`task3-extra-controls/receipts.json` (2). Task-4 controls are in
-`task4-controls/receipts.json` (7). Earlier cap/dedup and storage-exclusion controls
-have separate logs. `task5-watchdog-control-2/receipt.json` additionally rejects a
-missing setup timer. Its first version asserted inside the caught boundary and
-survived the mutation; the strengthened test asserts the observed deadline outside
-that boundary. The final runner installs the stage timer before pin/setup/build
-work and retains an incomplete summary on setup cancellation. Failed first-generation oracles were strengthened before
-counting those mutations as evidence.
+Receipts: `task3-mutations/receipts.json` (8),
+`task3-extra-controls/receipts.json` (2), `task4-controls/receipts.json` (7),
+`task5-watchdog-control-2/receipt.json`, `final-http10-close-control-2/receipt.json`.
+Earlier capacity/dedup/exclusion controls have separate logs. Initial oracles that
+survived adverse mutations were strengthened before counting the final rejection.
+All mutated source bytes were restored. An extra close+keep-alive header experiment
+retained close and was not an adverse mutation; the final control replaces its value.
 
-## Actual-tree verification
+## Final-tree platform verification
 
-Host and Linux runner results are recorded below. They cover
-current source and locked dependencies; historical standalone proof harnesses
-with their own manifests are not implied rerun by a root pass.
+Final platform receipts below are complete and verified against the current tree.
+Historical `final-host`/`final-linux` are pre-fix evidence; they are not reused.
 
-- Full performance-tooling suite: `python3.12 -B -m unittest discover -s tests/performance -p 'test_*.py' -q`: **90 tests, 8 optional skips, PASS** (`task5-python-suite-final.log`).
-- Native observation oracle: `cargo test --locked --offline --test drain_measurement`: **2 passed, 1 explicit fixture-only ignored**, restored GREEN after its negative control (`task4-native-restored.log`). Campaign cases explicitly execute the ignored observation with a prepared fixture.
-- Host storage acceptance: `/opt/homebrew/bin/python3.12 -B tests/storage/run.py --platform host --evidence .artifacts/issue-49/final-host`: **PASS**, all 16 captured commands exit 0. Includes `make verify V=1`: **1,033 passed / 12 ignored in debug and independently in release**, across 75 executable targets each, plus strict Rustdoc. The explicitly ignored real 60-second provider deadline was then selected and passed; schema parity, runner tests, native FTS5/vec1, copied standalone executable and linkage checks passed. No dynamic SQLite/vec1 dependency was found.
-- Linux storage acceptance: **PASS** (`final-linux/manifest.json`), all captured commands exit 0, including full `make verify`, explicit real deadline, strict Rustdoc, native capability and copied-executable/linkage checks. Aarch64 Linux / glibc 2.36 / Rust 1.95.0, prepared image `sha256:05ad58ffe40619db2e8231a145571fc0f843d3962072caa26da80ba43f0f07d7`, network disabled. The runner's `--platform host` entry point ran **inside Linux**, not as a claim that the outer `--platform linux` Docker-build wrapper was executed. Only the three locked registry additions were copied into the prepared offline cache. The first attempt is preserved in `linux-initial-failed`: linking ran out of disk before tests. Retry used `CARGO_BUILD_JOBS=2` and `CARGO_PROFILE_{DEV,TEST,RELEASE}_STRIP=symbols`, retaining assertions and stripping symbol tables; these are verification build flags, not benchmark inputs. Native/host captures have identical hashes for all **466** recorded inputs (`linux-parity.json`).
+- macOS corrected tree: **PASS**, `final-host-fixed/manifest.json`. Command: `CARGO_INCREMENTAL=0 /opt/homebrew/bin/python3.12 -B tests/storage/run.py --platform host --evidence .artifacts/issue-49/final-host-fixed`. Its `make verify V=1` ran formatting, all-target check/Clippy, strict Rustdoc and root suites: **1,034 passed / 12 ignored in each of debug and release**, 76 executable targets per profile. All captured commands exited 0.
+- Linux corrected tree: **PASS**, `final-linux-fixed/manifest.json`. Command inside the owned container: `python3 -B tests/storage/run.py --platform host --evidence /receipt-issue49-fixed`. Full `make verify` passed: **1,028 passed / 12 ignored in each of debug and release**, 76 executable targets per profile. All captured commands exited 0.
+- Performance tooling: 90 tests, 8 optional skips, PASS in `task5-python-suite-final.log`; these Python sources are unchanged by the HTTP fix.
 
-The two Python files changed after native-run input capture only to cover setup
-watchdog/cancellation and strengthen its oracle. They passed the final 90-test
-Python suite separately; Rust, Cargo, build, vendor, native/schema and Rust test
-inputs remain identical. `final-tooling-inputs.json` records that exact delta; it
-is not hidden as a purported full-tree hash match. Campaign-4 archives the final
-measurement runner; the later oracle-only assertion strengthening does not alter
-measurements. All frozen C product input hashes still match the final checkout.
+Both suites contain the gated HTTP/1.0 regression. Their explicitly selected
+ignored real 60-second provider deadline also passed (60.00 s macOS / 62.71 s
+Linux wall time under load). Schema parity, runner tests, strict Rustdoc, native
+FTS5/vec1, copied standalone executable/reopen and linkage checks passed; no dynamic
+SQLite/vec1 library dependency was found. Twelve default ignored cases per root
+profile are disclosed, not counted as passed; the selected deadline is additional.
 
-## Architectural review
+`final-receipts.json` and `final-receipts-check.log` verify **467/467 identical
+input hashes across macOS, Linux and the final current tree**, complete command
+exit codes, both regression results, exact frozen-product parity, all 21 final
+campaign cases, and the compiled keep-alive negative control. No post-capture
+Python/source delta remains in this final verification. The final nine-test
+measurement oracle rerun passed as part of that gate. All three frozen source and
+executable manifests were reverified; measured C exactly matches final product
+inputs at `ccb1d6dcac29b77708f1241b9941ef333b9a05ce`.
 
-The algorithm lives in application service `embedding/drain.rs`; no infrastructure
-entered domain entities. Storage implements its selection interface using bound
-SeaQuery values; SQLite handles never cross threads. Only provider sharing adds
-Arc/dynamic dispatch, replacing its former injection generic; existing scoped
-storage generics remain. `lib.rs` constructs the real provider and service; CLI
-handlers retain their existing responsibilities. No worker process, async runtime,
-query batching, schema/config knob, or second owner was introduced. The named
-constant is above types/implementations. Private test fixtures are shared only by
-their actual consumers. Tests keep Given/When/Then and independent literal oracles;
-touched unit/query cases were split into cohesive files rather than growing the
-parent test module. Final independent review is pending, separately from tests.
+The Linux runner uses its `--platform host` entry point **inside** a prepared
+network-isolated Linux ARM64 container, not the outer `--platform linux` image-build
+wrapper. Pinned image: `sha256:05ad58ffe40619db2e8231a145571fc0f843d3962072caa26da80ba43f0f07d7`;
+glibc 2.36, Rust 1.95.0. Only three new locked registry packages were copied into
+its offline cache. It uses `CARGO_BUILD_JOBS=2`, stripped symbol tables and the
+image's zero-debug/incremental settings to fit disk. macOS sets `CARGO_INCREMENTAL=0`
+to avoid cache growth. These verification flags do not alter benchmark builds.
+The earlier Linux disk-exhaustion receipt is retained; only task-owned generated
+incremental/evaluation caches and owned containers were reclaimed. No unrelated
+source, image, volume or container was pruned.
+
+Root suites include all plan targets and the new HTTP/1.0 target. Historical
+standalone manifests not named in the receipts were not implicitly rerun. Physical
+modules, visibility, trait implementation/import direction and `lib.rs` wiring
+were checked separately: pure domain, service-owned orchestration, SQLite staying
+on the coordinator, bound SeaQuery values and actual composition are preserved.
+No wrapper-only service, speculative interface, new generic propagation or async
+layer was introduced. New/touched code keeps focused verb-named functions and
+Given/When/Then tests. Independent review found no additional minor issues.
 
 ## Remaining acceptance
 
-- Real local-model/provider throughput, actual model-side serialization, rate limits,
-  retries under real quotas, and whether concurrency helps that provider.
-- Simultaneous whole-stack RSS including the model, 4 GB minimum hardware, large
-  vectors/texts/corpus and NFR/gate acceptance. Synthetic RSS is not their substitute.
-- x86_64, physical power loss and historical standalone harnesses not named above.
-- No merge/push/PR/issue closure is performed by this implementation task. Issue #49
-  stays open until its remaining measurement acceptance is explicitly resolved.
+Real-model/provider throughput (including any TLS/connection-setup cost), model-side
+serialization, provider quotas/retries, simultaneous whole-stack RSS, minimum 4 GB
+hardware, large vectors/texts/corpus and NFR/gates remain **not assessed**. Also
+unassessed: x86_64 and physical power loss. No paid/model sessions were authorized.
+Issue #49 remains open for that acceptance; no merge/push/PR/closure is performed.
