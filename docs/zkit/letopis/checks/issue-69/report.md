@@ -1,8 +1,8 @@
 # Issue #69 — явный path в marked Markdown links
 
-Дата: 2026-10-31. Состояние: реализация Tasks 1–4 подготовлена; независимый review
-Task 4 и whole-branch review выполняет controller после этого handoff. Этот отчёт
-не утверждает, что review, интеграция или закрытие issue уже выполнены.
+Дата: 2026-10-31. Состояние: Tasks 1–4, проверки и независимые ревью завершены.
+Итоговый whole-branch review: Ready to merge — Yes; actionable замечаний нет.
+Интеграция, push и закрытие issue не выполнялись и требуют отдельного решения.
 
 Проверенная продуктовая ревизия: `1d910911fecc18e06aa07a591816d9f915525c5b`,
 полный tree `2f8c5badf7c901f677e7498ee5ea2fdab9b1287d`. Task 4 меняет только
@@ -137,9 +137,13 @@ Self-review Task 4 проверил все physical files, текущую реа
 canonical identities, source bases, hrefs, created_at, upgrade policy, diagnostic
 timing, active/historical scope, отсутствие production/visibility/trait/import/
 lib.rs wiring changes. Совпадение build/test inputs исключает оставленные
-продуктовые mutations. Независимые Task 4 review и whole-branch review остаются
-controller-owned и здесь не помечены завершёнными; их выводы/исправления должны
-быть добавлены после проверки.
+продуктовые mutations. Все четыре task review завершены: Spec compliant / Quality
+Approved. Whole-branch review на gpt-6-astra/high проверил диапазон
+`a82565e..95ef8a8`: Ready to merge — Yes, без actionable Critical/Important/Minor.
+Reviewer независимо сверил 450 host/Linux и 29 Python входов, mutation restoration,
+corpus responses и сохранённые результаты команд. Новых product fixes не требуется.
+Последующая финализация меняет только статусы спецификации/плана/отчёта; проверенные
+Rust/test/build/vendor/Python inputs остаются побайтно прежними.
 
 Не запускались x86_64, полный Linux root gate, storage/native platform runner,
 исторические harnesses с отдельным manifest, power-loss, реальные providers,
@@ -147,3 +151,23 @@ viewer compatibility, resource/performance campaign или полный pilot ac
 Storage/native inputs не менялись; root tests и focused Linux tests не означают
 новую независимую проверку standalone linkage/native capabilities. Нет merge,
 push, публикации issue или закрытия issue #69.
+
+## Решения контроллера и границы итогового вердикта
+
+| Решение | Основание | Цена ошибочного решения |
+| --- | --- | --- |
+| Временно принять красный общий прогон Task 1 до миграции старых положительных фикстур в Task 2. | План сознательно разделяет breaking parser и его потребителей; ошибки поимённо сохранены. Итоговые make check и make verify зелёные. | Пропущенная интеграционная ошибка потребовала бы повторной миграции; без финального зелёного gate завершение запрещено. |
+| Отдельно исправить только readiness-синхронизацию двух SIGALRM-тестов инструментов. | Диагностика показала слишком ранний сигнал; runtime/budgets/assertions не ослаблены, compiled mutations и review подтверждают чувствительность. | Ошибочная синхронизация могла бы ослабить interruption-покрытие; изменение изолировано в обратимом test-only commit c7414d6. |
+| Принять восемь явно перечисленных исключений reviewer как ограничения scope/evidence. | Они соответствуют утверждённой спецификации и фактически выполненным проверкам, а не подменяют завершение #69. | Иначе возникло бы необоснованное обещание общей готовности; более широкие гарантии не заявляются. |
+
+Последнее решение охватывает: конкретные viewers/существование/fragments/symlinks;
+эквивалентность remote URL; legacy/mixed/automatic migration; синтаксически сломанный
+Markdown без inline event; переоценку всех прежних knowledge claims; глубинную
+причину transient comparison test; универсальную Markdown/URI-конформность oracle;
+непройденные платформенные/native/model/performance/pilot gates. Для каждого пункта
+вердикт — сохранить ранее согласованную границу и честно указать ограничение,
+не добавляя скрытую функциональность или неподтверждённое обещание.
+
+Все briefs/reports/reviews, ledger с rulings и diff packages сохранены с SHA-256
+inventory в локальном `.artifacts/issue-69/closure-20261031/`. Исходные raw receipts
+Tasks 1–4 не изменялись; archive не публикует профили/бинарники в Git.

@@ -1,6 +1,6 @@
 # Explicit graph paths in Markdown links — issue #69
 
-Date: 2026-10-31. Status: accepted for implementation planning on 2026-10-31 after the user's “ок продолжай по задаче”; implementation and per-task reviews are complete; final whole-branch review is pending.
+Date: 2026-10-31. Status: accepted for implementation planning on 2026-10-31 after the user's “ок продолжай по задаче”; implementation, verification and all independent reviews are complete; integration awaits user choice.
 Task: [issue #69](https://github.com/zaurkadiev/letopis/issues/69).
 Base: `main@a82565ee8f590b959d2fd1cdf3e50cbe5d800187`.
 Branch: `issue-69`, in a separate managed worktree.
@@ -346,7 +346,7 @@ and the worktree was clean. That document-only stage ran reference/diff checks a
 independent builder review, without product builds or model/viewer runs. The
 subsequently approved implementation plan has now been executed and each task
 reviewed; current validation evidence and limitations are in the issue-69 report.
-The controller's final whole-branch review is pending.
+The final whole-branch review approved the implementation without actionable findings.
 
 ### Design review receipts — 2026-10-31
 
@@ -358,4 +358,4 @@ three example navigation paths, fenced blocks, superseded-decision/scope checks
 and `git diff --check`. Product suites were not rerun for this document-only
 revision; no product code, schema, dependency or active contract is changed. The
 user subsequently approved the implementation plan and Subagent-driven execution.
-Implementation and per-task reviews are complete; final whole-branch review is pending.
+Implementation, verification and all independent reviews are complete; no integration was performed.

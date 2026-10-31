@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Execution approval:** 2026-10-31, Subagent-driven with per-task review. Implementation and task reviews complete; final whole-branch review pending.
+**Execution approval:** 2026-10-31, Subagent-driven with per-task review. All four tasks, required verification and independent reviews complete; integration awaits user choice.
 
 **Goal:** Use mandatory `path` as the sole graph target, compare local navigation file paths, and persist mismatches for `check`/`status`.
 
@@ -192,7 +192,7 @@ Add canonical path fields and repair relative destinations. Address the observed
 
 Run `make verify` once after the complete migration; it includes make check, strict Rustdoc and release tests. Run the affected Python suites from Task 2 once after their final changes. Use an isolated copied active corpus with the real new CLI, disabled embeddings and copied/available source bases to exercise reindex → check → status; inspect any pre-existing provenance limitations and report them rather than claiming an unassessed clean corpus. Preserve user cache, config, Git/index and author bytes outside the intended edits. If Linux is available, run focused parser/lifecycle tests there; otherwise explicitly record that platform as unrun. No native storage harness is needed unless its owned behavior/inputs change.
 
-- [ ] **Step 4: Perform independent whole-branch review and write the report.**
+- [x] **Step 4: Perform independent whole-branch review and write the report.**
 
 Use superpowers:requesting-code-review after implementation. Review source boundaries, path decoding, title grammar, private APIs, diagnostics persistence, fixture fidelity and active/historical documentation. Resolve material findings and rerun affected checks after actual fixes. Report source revision, platforms, exact verification/mutation commands and outcomes, remaining findings and unrun suites. No claim of viewer compatibility, provider performance or full pilot acceptance.
 
@@ -205,4 +205,4 @@ Check local links, `git diff --check`, actual changed-file scope and restored mu
 - Coverage: title/domain rules → Task 1; active inputs and independent generation → Task 2; persistence/read-only status, upgrade and vectors → Task 3; current documentation, source corpus and final gate → Task 4.
 - Type consistency: no new public parse signature or new storage/service trait; the private helper signatures above are the shared parsing contract. Error message and reason match the specification exactly.
 - Proportion: four testable tasks, with fixed decisions and commands; implementation bodies remain with the implementer. All five review-focus conditions have named owning tests.
-- Planning checks passed before execution; no product tests were run during planning. User approved this plan and Subagent-driven execution on 2026-10-31; implementation and per-task reviews are complete; the final whole-branch gate is pending.
+- Planning checks passed before execution; no product tests were run during planning. User approved this plan and Subagent-driven execution on 2026-10-31; implementation, verification and all independent reviews are complete. Integration remains a separate user decision.
