@@ -1,8 +1,10 @@
 # Bounded parallel embedding drain — issue #49
 
-Date: 2026-10-31. Status: accepted for implementation planning after the user approved
-the thread-pool approach, per-result publication and final four-worker bound.
-Implementation awaits separate plan approval; no product changes.
+Date: 2026-10-31. Status: accepted; separate implementation plan and Native execution
+were subsequently approved. Implementation and model-free results are tracked in
+the [report](../../zkit/letopis/checks/issue-49/report.md); real-provider acceptance
+remains open. The thread-pool approach, per-result publication and four-worker bound
+are user decisions.
 Task: [issue #49](https://github.com/zaurkadiev/letopis/issues/49).
 Base: `main@b7f627d1d63d2d7b72989b733838a55925947c17`.
 Branch: `codex/issue-49`, reusing the clean managed worktree after issue #69 merged.
@@ -37,7 +39,10 @@ minimum-hardware resource verdict. Use the `threadpool` crate, exactly pinned to
 The builder may settle private helper names, channel representation and focused
 file splits, but may not change these public behavior and resource boundaries.
 
-## Existing behavior and design sources
+## Baseline behavior and design sources
+
+This section describes the pinned main revision before issue #49, not the final
+implementation. Current mechanics are updated by D-107.
 
 - [AGENTS.md](../../../AGENTS.md) and
   [program structure](../../zkit/letopis/architecture.md#program-structure):

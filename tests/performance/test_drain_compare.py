@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import os
+import signal
 from pathlib import Path
 import sys
 import tempfile
@@ -16,6 +17,28 @@ from drain_compare import prepare_campaign, run_drain, summarize, validate_sampl
 
 
 class DrainComparisonTests(unittest.TestCase):
+    def test_campaign_arms_watchdog_before_observer_setup(self):
+        # Given: valid pins and an observer build cancelled during bounded setup.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            pin = root / "pin.json"
+            pin.write_text('{"rustc":"fixture","inputs":{}}')
+            args = argparse.Namespace(before=pin, one_worker=pin, after=pin, evidence=root / "campaign")
+            deadlines = []
+            def stop_setup(*_):
+                deadlines.append(signal.getitimer(signal.ITIMER_REAL)[0])
+                raise KeyboardInterrupt
+            with patch("drain_compare.verify_frozen_build"), \
+                    patch("drain_compare.read_product_inputs", return_value={}), \
+                    patch("drain_compare.build_observer", side_effect=stop_setup):
+                # When: setup observes the live campaign deadline and is interrupted.
+                result = run_campaign(args)
+            # Then: setup cancellation retains an incomplete summary and disarms the timer.
+            self.assertGreater(deadlines[0], 0)
+            self.assertEqual(result["outcome"], "incomplete")
+            self.assertTrue((args.evidence / "summary.json").is_file())
+            self.assertEqual(signal.getitimer(signal.ITIMER_REAL)[0], 0)
+
     def test_campaign_stops_after_persisting_an_interrupted_case(self):
         # Given: one cancelled owned case and three already verified frozen build receipts.
         with tempfile.TemporaryDirectory() as directory:

@@ -49,33 +49,17 @@ def main() -> None:
 
 
 def run_campaign(args: argparse.Namespace) -> dict:
-    started = time.monotonic()
     evidence = args.evidence.absolute()
     prepare_campaign(evidence)
-    builds = {label: json.loads(getattr(args, label.replace("-", "_")).read_text()) for label in VARIANTS}
-    for build in builds.values():
-        verify_frozen_build(build)
-    if len({build["rustc"] for build in builds.values()}) != 1:
-        raise ValueError("all variants require the same toolchain")
-    if read_product_inputs(ROOT) != builds["after"]["inputs"]:
-        raise ValueError("observer source must match the frozen final product")
-    spec = build_corpus_spec()
-    observer = build_observer(builds["after"], evidence / "observer")
-    write_json(evidence / "manifest.json", {"builds": builds, "corpus": spec,
-        "host": {"platform": platform.platform(), "machine": platform.machine(), "cpu": get_cpu_model(),
-                 "load_average": os.getloadavg()}, "harness_inputs": capture_harness(evidence),
-        "observer": observer, "conditioning_per_variant": 1, "measured_per_variant": 5,
-        "service_delay_seconds": .025, "query_overlap_delay_seconds": .1,
-        "cache_state": "fresh initialized projections; OS page cache uncontrolled",
-        "scope": "synthetic native-protocol provider; no model or external inference"})
     records, outcome, expired = [], "complete", False
     def stop_stage(*_):
         nonlocal expired
         expired = True
         raise KeyboardInterrupt
     previous = signal.signal(signal.SIGALRM, stop_stage)
-    signal.setitimer(signal.ITIMER_REAL, max(.001, 1200 - (time.monotonic() - started)))
+    signal.setitimer(signal.ITIMER_REAL, 1200)
     try:
+        builds, spec, observer = prepare_comparison(args, evidence)
         with ExitStack() as stack, (evidence / "samples.jsonl").open("xb") as stream:
             provider = stack.enter_context(DrainProvider(spec["by_text"], evidence / "provider"))
             owners = {label: stack.enter_context(FixtureProcesses(Path(builds[label]["executable"]),
@@ -106,6 +90,27 @@ def run_campaign(args: argparse.Namespace) -> dict:
     result = build_summary(records, outcome)
     write_json(evidence / "summary.json", result)
     return result
+
+
+def prepare_comparison(args: argparse.Namespace, evidence: Path) -> tuple:
+    """Verify pins and capture setup under the campaign's already-armed watchdog."""
+    builds = {label: json.loads(getattr(args, label.replace("-", "_")).read_text()) for label in VARIANTS}
+    for build in builds.values():
+        verify_frozen_build(build)
+    if len({build["rustc"] for build in builds.values()}) != 1:
+        raise ValueError("all variants require the same toolchain")
+    if read_product_inputs(ROOT) != builds["after"]["inputs"]:
+        raise ValueError("observer source must match the frozen final product")
+    spec = build_corpus_spec()
+    observer = build_observer(builds["after"], evidence / "observer")
+    write_json(evidence / "manifest.json", {"builds": builds, "corpus": spec,
+        "host": {"platform": platform.platform(), "machine": platform.machine(), "cpu": get_cpu_model(),
+                 "load_average": os.getloadavg()}, "harness_inputs": capture_harness(evidence),
+        "observer": observer, "conditioning_per_variant": 1, "measured_per_variant": 5,
+        "service_delay_seconds": .025, "query_overlap_delay_seconds": .1,
+        "cache_state": "fresh initialized projections; OS page cache uncontrolled",
+        "scope": "synthetic native-protocol provider; no model or external inference"})
+    return builds, spec, observer
 
 
 def build_corpus_spec() -> dict:
