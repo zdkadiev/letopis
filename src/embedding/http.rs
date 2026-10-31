@@ -7,11 +7,14 @@ use serde_json::{Value, json};
 use std::{io::ErrorKind, num::NonZeroUsize, time::Duration};
 use ureq::{
     Agent,
-    http::Uri,
+    http::{Uri, header::CONNECTION},
     tls::{RootCerts, TlsConfig},
 };
 
 const ATTEMPT_DEADLINE: Duration = Duration::from_secs(60);
+// Pinned ureq can recycle HTTP/1.0 sockets without negotiated keep-alive.
+// Request closure explicitly rather than spend durable attempts on unsafe reuse.
+const CONNECTION_CLOSE: &str = "close";
 // Match ureq's ordinary read_to_vec cap explicitly for the configured reader.
 const MAX_RESPONSE_BYTES: u64 = 10 * 1024 * 1024;
 
@@ -44,7 +47,10 @@ impl Http {
         body: &Value,
         authorization: Option<&str>,
     ) -> EmbeddingResult<Value> {
-        let mut request = self.agent.post(endpoint);
+        let mut request = self
+            .agent
+            .post(endpoint)
+            .header(CONNECTION, CONNECTION_CLOSE);
         if let Some(authorization) = authorization {
             request = request.header("Authorization", authorization);
         }

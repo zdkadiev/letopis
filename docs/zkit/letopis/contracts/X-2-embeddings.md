@@ -20,6 +20,15 @@ Provider/model/parameters заменяются целиком, без merge, D-6
 ## Timing and limits
 2026-10-19, [D-83](../decisions.md#D-83): assumed внутренний client deadline 60s на одну попытку, без нового config поля. Это граница ожидания HTTP клиента, не отсечка всего search/reindex. Timeout → embedding_failed; query продолжает FTS, фоновые attempts/max_retries сохраняются. Снятие ожидания клиента не обещает остановку remote compute. Неявные environment proxies/redirects отключены; HTTPS сертификат проверяется, выбранный HTTP endpoint не получает гарантии конфиденциальности транспорта. Клиент — блокирующий `ureq` 3 без async runtime (D-96): `max_redirects(0)`, прокси из окружения не читаются, таймаут попытки 60 s, TLS — rustls с `rustls-platform-verifier` (системное хранилище сертификатов); повторы и attempts — код letopis, не клиента. Проверка DR-5/DR-8 ещё не выполнена.
 
+Исправление совместимости #49: каждый provider POST явно передаёт
+`Connection: close`. Это предотвращает небезопасный reuse закрывающихся
+HTTP/1.0-соединений в закреплённом ureq, включая ответы без явного close header.
+Постоянное соединение HTTP/1.0 требует согласованного keep-alive
+([RFC 9112 §9.3](https://www.rfc-editor.org/rfc/rfc9112.html#section-9.3)).
+Payload, auth, TLS validation, deadline и attempts не меняются; цена — новое
+TCP/TLS-соединение на запрос. Это реализационная поправка по независимому ревью,
+не измеренное обещание real-provider throughput.
+
 Согласно [D-107](../decisions.md#D-107), один drain отправляет до четырёх
 однотекстовых запросов через прежний синхронный client; provider batching не
 добавляется. `EmbeddingProvider` разделяется между worker threads как

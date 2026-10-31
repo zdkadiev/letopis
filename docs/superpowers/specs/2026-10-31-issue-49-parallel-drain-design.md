@@ -301,3 +301,17 @@ verification only: no product suites, benchmarks or provider calls were run.
 Subsequent user approval confirmed per-result transactions, four workers and one
 top-of-file constant. These refinements preserve the reviewed ownership, lifecycle
 and measurement rules; the implementation plan still requires separate approval.
+
+
+## Implementation correction after independent review
+
+The final review reproduced valid HTTP/1.0 implicit-close reuse failures in the
+pinned client under concurrent execution. This is a confirmed compatibility
+regression, not a new provider contract or a requirement for servers to add headers.
+Implementation ruling: every provider POST explicitly sends `Connection: close`
+through the same ureq client; no retry, runtime, library version, configuration or
+payload field changes. This avoids pooled reuse for both protocols. The cost is
+TCP/TLS setup on each request; real-provider throughput remains unassessed.
+A gated valid HTTP/1.0 regression, client-policy mutation, fresh final measurements
+and host/Linux suites verify the correction. This ruling is distinct from the
+user's original design selections.
