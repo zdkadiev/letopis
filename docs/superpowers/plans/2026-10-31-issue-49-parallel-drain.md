@@ -62,7 +62,7 @@ runs are authorized.
 | Task | Files and responsibility |
 |---|---|
 | 1 | `src/service/storage.rs`, `src/storage/{work,read}.rs`: exclude outstanding hashes in existing work selection. Update direct call sites and forwarding test implementations; test in `tests/storage_embedding_work.rs`. |
-| 2 | `Cargo.toml`, `Cargo.lock`, `src/service/embedding.rs`, new `src/service/embedding/drain.rs`, `src/lib.rs`: provider sharing, bounded scheduler and per-result publication. Adapt the existing private provider double in `src/service/embedding/tests.rs`; create `tests/support/parallel_provider.rs` and `tests/parallel_drain.rs`; declare shared support in `tests/support/mod.rs`. |
+| 2 | `Cargo.toml`, `Cargo.lock`, `src/service/embedding.rs`, new `src/service/embedding/drain.rs`, `src/lib.rs`: provider sharing, bounded scheduler and per-result publication. Adapt the existing private provider double in `src/service/embedding/tests.rs`; split its query scenarios into `src/service/embedding/tests/query.rs` to keep files focused; create `tests/support/parallel_provider.rs` and `tests/parallel_drain.rs`; declare that fixture privately in its consuming integration targets. |
 | 3 | New `tests/parallel_drain_process.rs`; focused private tests in `src/service/embedding/drain.rs` or its `tests.rs` if size warrants. Extend the Task 2 concurrent fixture for real HTTP/process races. Product fixes stay in their Task 2 owners. |
 | 4 | New `tests/performance/drain_compare.py`, `tests/performance/test_drain_compare.py`; update performance README. Reuse existing frozen-build/process ownership/measurement helpers without changing historical campaigns. |
 | 5 | New `docs/zkit/letopis/checks/issue-49/report.md`; affected mechanics, architecture, resource-math, provider contract and development descriptions. Final checks, semantic mutations and whole-branch review. |
@@ -88,7 +88,7 @@ fn read_next_embedding_work(
 exclusions preserve current behavior. Do not impose the drain's four-worker
 constant on this general storage interface; only the caller owns that limit.
 
-- [ ] **Step 1: Write red exclusion tests in `tests/storage_embedding_work.rs`.**
+- [x] **Step 1: Write red exclusion tests in `tests/storage_embedding_work.rs`.**
 
 Add `excludes_every_representative_of_an_outstanding_hash`,
 `empty_exclusions_preserve_cursor_and_attempt_policy`, and
@@ -102,12 +102,12 @@ assert_eq!(selected.unwrap().id.as_str(), "c.md");
 assert_eq!(all_excluded, VectorOutcome::Current(None));
 ```
 
-- [ ] **Step 2: Run `cargo test --locked --offline --test storage_embedding_work`.**
+- [x] **Step 2: Run `cargo test --locked --offline --test storage_embedding_work`.**
 
 Confirm the red result is the new missing exclusion behavior/API, not unavailable
 dependencies. Existing callers compile after adding empty slices in the next step.
 
-- [ ] **Step 3: Implement the bounded exclusion query and update consumers.**
+- [x] **Step 3: Implement the bounded exclusion query and update consumers.**
 
 Use SeaQuery `NOT IN` with bound hash values only for a nonempty slice. Preserve
 identity preflight, eligible attempt/storage predicates, ID cursor and limit one.
@@ -116,13 +116,13 @@ document_refresher/tests/reading.rs}`, and root tests/support consumers found by
 `rg -n 'read_next_embedding_work\(' src tests --glob '*.rs'`; pass `&[]` outside
 the parallel scheduler. No schema/version changes or extra storage trait.
 
-- [ ] **Step 4: Run focused green tests and an exclusion mutation.**
+- [x] **Step 4: Run focused green tests and an exclusion mutation.**
 
 Run the storage target plus `cargo check --locked --offline --all-targets`.
 Temporarily omit the new exclusion predicate: the `c.md` test must fail, then
 restore exact bytes and rerun green. Confirm cursor and config tests remain green.
 
-- [ ] **Step 5: Commit only the storage/API/test changes.**
+- [x] **Step 5: Commit only the storage/API/test changes.**
 
 Commit message: `feat: exclude active hashes from embedding work selection`.
 
@@ -163,7 +163,7 @@ fn compute_vector(
 the pool/channel/outstanding hashes and lifecycle behavior; it is actual bounded
 state, not a new service/interface layer. Private helper signatures remain local.
 
-- [ ] **Step 1: Add a real concurrent provider fixture and red product tests.**
+- [x] **Step 1: Add a real concurrent provider fixture and red product tests.**
 
 Create `ParallelProvider` in `tests/support/parallel_provider.rs`. It accepts
 requests independently, captures synthetic text/request identity, exposes bounded
@@ -194,13 +194,13 @@ in the pool queue even though only four HTTP calls can be active. No replacement
 reservation may occur while a completed slot still awaits publication. Use barriers/readiness,
 owned watchdogs and condition predicates, not sleeps as proof of non-arrival.
 
-- [ ] **Step 2: Run the new target against sequential behavior and confirm red.**
+- [x] **Step 2: Run the new target against sequential behavior and confirm red.**
 
 Run `cargo test --locked --offline --test parallel_drain`. The bounded readiness
 oracle must fail because fewer than four requests arrive before release. Fixture
 cleanup must release all barriers even when the test unwinds.
 
-- [ ] **Step 3: Implement the pool, owned jobs, sharing and bounded loop.**
+- [x] **Step 3: Implement the pool, owned jobs, sharing and bounded loop.**
 
 Pin `threadpool =1.8.1` and resolve/fetch locked dependencies only now that execution
 is authorized; preserve all unrelated versions, especially `ureq =3.4.2`. Inspect
@@ -233,7 +233,7 @@ and retain a typed `Arc<Provider>` handle for assertions/configuration. Keep
 coordinator-only `Files` state single-threaded; do not send its `Cell`/`RefCell`
 or SQLite into workers. A shared provider lock must not span HTTP.
 
-- [ ] **Step 4: Run green concurrency, old behavior and cap/dedup mutations.**
+- [x] **Step 4: Run green concurrency, old behavior and cap/dedup mutations.**
 
 Run `cargo test --locked --offline --test parallel_drain`,
 `cargo test --locked --offline --lib service::embedding::tests`, and root
@@ -242,7 +242,7 @@ targets. Temporarily admit a fifth job or remove active-hash exclusion: the rele
 new assertions fail. Restore exact bytes and rerun focused green. Ensure query
 validation still passes through the same computation rule.
 
-- [ ] **Step 5: Commit the scheduler, wiring, dependency and focused proof.**
+- [x] **Step 5: Commit the scheduler, wiring, dependency and focused proof.**
 
 Commit message: `feat: drain embeddings with four bounded synchronous workers`.
 

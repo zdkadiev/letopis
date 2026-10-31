@@ -349,8 +349,11 @@ fn wire_embedding_executor_at_root(
         storage,
         files,
         MarkdownParser::new(),
-        build_embedding_provider()
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?,
+        Arc::new(
+            build_embedding_provider().map_err(|cause| {
+                ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause)
+            })?,
+        ),
     ))
 }
 
@@ -384,7 +387,7 @@ pub fn wire_embedder<S: Storage>(
         storage,
         open_embedding_files(root)?,
         MarkdownParser::new(),
-        build_embedding_provider()?,
+        Arc::new(build_embedding_provider()?),
     ))
 }
 
@@ -406,7 +409,7 @@ pub fn open_embedding_files(root: &Path) -> EmbeddingResult<impl EmbeddingFiles 
 ///
 /// # Errors
 /// Reserved for failures constructing the provider boundary.
-pub fn build_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + use<>> {
+pub fn build_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + Send + Sync + use<>> {
     let key = env::var("OPENAI_API_KEY").ok();
     Ok(HttpProviders::new(Ollama::new(), Openai::new(key)))
 }
