@@ -2203,3 +2203,39 @@ operation; переполнение пересчитывает, не откло�
 **Уточняет:** D-93 (authoring), D-95 (diagnostic publication), D-105 (full audit).
 **Связи:** [X-4](contracts/X-4-markdown.md), [MC-1/MC-7](mechanics.md),
 [upgrade](../../development.md#issue-69-обязательный-path-и-явный-reindex).
+
+
+<a id="D-107"></a>
+### D-107: Issue 49 — bounded parallel drain с блокирующим HTTP
+> **Статус:** принято пользователем · **Дата:** 2026-10-31
+
+**Основание:** отдельно утверждены [спецификация](../../superpowers/specs/2026-10-31-issue-49-parallel-drain-design.md)
+и [план](../../superpowers/plans/2026-10-31-issue-49-parallel-drain.md), затем Native execution без real/paid inference.
+
+1. Текущий `ureq`, `threadpool =1.8.1`, четыре OS threads. Одна именованная
+   константа `DRAIN_WORKERS` наверху owning file, без нового config/CLI поля,
+   async runtime, provider batching или второго владельца embed.lock.
+2. Четыре места включают исполняющиеся запросы и готовые, ещё не обработанные
+   ответы. Координатор выбирает работу с исключением активных hashes, готовит
+   текст и резервирует durable попытку. Workers выполняют только provider work.
+3. Публикация по готовности: одна короткая tx на результат; место освобождается
+   после обработки, затем выбирается следующее знание. Никакого HTTP под write tx,
+   загрузки всего корпуса или ожидания группы из четырёх ответов.
+4. Hash/config/dimension guards, finite attempts, skip_once, pruning и смерть
+   процесса сохраняют прежние правила. Normal/error/unwind join предшествует
+   освобождению lock; programming panic не становится retry. Аварийный выход не
+   обещает graceful completion и не сбрасывает attempts.
+5. Отдельные A/B/C release-варианты (sequential / scheduler=1 / scheduler=4),
+   локальный concurrent provider, буквальные векторы, запросы поиска и scoped
+   CPU/RSS подтверждают механизм. Реальные модели, provider quotas, whole-stack
+   peak и минимальное оборудование не проверены и не заменены фикстурой.
+
+**Поправка реализации по независимому ревью:** concurrent reuse в закреплённом
+ureq выявил ошибки на корректном HTTP/1.0 без keep-alive. Каждый provider POST
+теперь явно отправляет `Connection: close`, сохраняя библиотеку, payload, auth,
+TLS validation, deadline и бюджет попыток. Это решение исполнителя для устранения
+подтверждённого дефекта, не дополнительный выбор пользователя. Цена — TCP/TLS
+setup на каждый запрос; реальные provider/RAM критерии остаются открытыми.
+
+**Уточняет:** MC-3/MC-5, D-96 (sync I/O сохраняется), X-2; не закрывает NFR/G gates.
+**Связи:** [отчёт](checks/issue-49/report.md), [issue #49](https://github.com/zaurkadiev/letopis/issues/49).

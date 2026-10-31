@@ -6,6 +6,7 @@ rust-version = "1.95.0"
 publish = false
 
 [dependencies]
+threadpool = "=1.8.1"
 tempfile = "=3.27.0"
 gix = { version = "=0.90.0", default-features = false, features = ["sha1", "sha256", "index", "excludes"] }
 gix-pathspec = "=0.22.1"

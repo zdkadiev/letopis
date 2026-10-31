@@ -260,6 +260,16 @@ impl OwnedChild {
     pub fn spawn(command: &mut Command) -> Self {
         Self(Some(command.spawn().unwrap()))
     }
+    /// Kill and reap only this guard's owned process, retaining its captured output.
+    ///
+    /// # Panics
+    /// Panics if the owned process cannot be terminated or reaped.
+    pub fn kill(&mut self) {
+        let child = self.0.as_mut().unwrap();
+        child.kill().unwrap();
+        child.wait().unwrap();
+    }
+
     pub fn wait(mut self, deadline: Instant) -> Output {
         let child = self.0.as_mut().unwrap();
         loop {

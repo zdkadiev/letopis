@@ -104,11 +104,13 @@ impl StorageRead for SqliteRead<'_> {
         expected: &Sha256,
         max_attempts: u64,
         after: Option<&KnowledgeId>,
+        excluded_hashes: &[Sha256],
     ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>> {
         if self.config_identity != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        read_next_embedding_work(&self.transaction, max_attempts, after).map(VectorOutcome::Current)
+        read_next_embedding_work(&self.transaction, max_attempts, after, excluded_hashes)
+            .map(VectorOutcome::Current)
     }
     fn read_vector_dimensions(
         &mut self,

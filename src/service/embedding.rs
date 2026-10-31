@@ -5,24 +5,34 @@ use super::{
     QueryEmbedding, QueryEmbeddingRequest, Storage, StorageError, StorageErrorKind, StorageRead,
     VectorOutcome, VectorWrite, validate_configuration,
 };
-use crate::domain::{KnowledgeId, RepoPath, Sha256};
-use std::{collections::BTreeSet, num::NonZeroUsize, time::Duration};
+use crate::domain::{RepoPath, Sha256};
+use std::{fmt, num::NonZeroUsize, sync::Arc, time::Duration};
+
+mod drain;
 
 const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 /// Coordinates ready configuration, durable document work and transient queries.
-#[derive(Debug)]
-pub(crate) struct EmbeddingService<S, F, M, P> {
+pub(crate) struct EmbeddingService<S, F, M> {
     storage: S,
     files: F,
     markdown: M,
-    provider: P,
+    provider: Arc<dyn EmbeddingProvider + Send + Sync>,
 }
-impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
-    EmbeddingService<S, F, M, P>
-{
+impl<S, F, M> fmt::Debug for EmbeddingService<S, F, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EmbeddingService").finish_non_exhaustive()
+    }
+}
+
+impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec> EmbeddingService<S, F, M> {
     /// Construct the application service from its owned boundary implementations.
-    pub(crate) fn new(storage: S, files: F, markdown: M, provider: P) -> Self {
+    pub(crate) fn new(
+        storage: S,
+        files: F,
+        markdown: M,
+        provider: Arc<dyn EmbeddingProvider + Send + Sync>,
+    ) -> Self {
         Self {
             storage,
             files,
@@ -32,8 +42,8 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     }
 }
 
-impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> EmbeddingExecutor
-    for EmbeddingService<S, F, M, P>
+impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec> EmbeddingExecutor
+    for EmbeddingService<S, F, M>
 {
     fn has_work(&mut self) -> CommandResult<bool> {
         let ConfigState::Ready(config) = self.read_configuration().map_err(map_command)? else {
@@ -44,7 +54,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
             .begin_read()
             .map_err(map_storage)
             .map_err(map_command)?
-            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None)
+            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None, &[])
             .map_err(map_storage)
             .map_err(map_command)?;
         Ok(matches!(next, VectorOutcome::Current(Some(_))))
@@ -60,9 +70,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     }
 }
 
-impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embedder
-    for EmbeddingService<S, F, M, P>
-{
+impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec> Embedder for EmbeddingService<S, F, M> {
     fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding> {
         let ConfigState::Ready(config) = self.read_configuration()? else {
             return Ok(QueryEmbedding::Unavailable);
@@ -87,7 +95,12 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
         let VectorOutcome::Current(_) = self.read_dimensions(request.config)? else {
             return Ok(QueryEmbedding::Unavailable);
         };
-        let mut result = self.compute_vector(request.config, request.text, request.dimensions);
+        let mut result = compute_vector(
+            self.provider.as_ref(),
+            request.config,
+            request.text,
+            request.dimensions,
+        );
         let VectorOutcome::Current(current) = self.read_dimensions(request.config)? else {
             return Ok(QueryEmbedding::Unavailable);
         };
@@ -142,53 +155,12 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     }
 }
 
-impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
-    EmbeddingService<S, F, M, P>
-{
+impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec> EmbeddingService<S, F, M> {
     fn read_config_file(&self) -> EmbeddingResult<Option<Configuration>> {
         self.files
             .read_config()?
-            .map(|bytes| validate_configuration(&bytes, &self.provider))
+            .map(|bytes| validate_configuration(&bytes, self.provider.as_ref()))
             .transpose()
-    }
-
-    fn drain_ready(&mut self, config: &EmbeddingConfig) -> EmbeddingResult<DrainOutcome> {
-        let mut skipped = BTreeSet::<KnowledgeId>::new();
-        let mut after = None;
-        loop {
-            let next = self
-                .storage
-                .begin_read()
-                .map_err(map_storage)?
-                .read_next_embedding_work(
-                    &config.get_identity(),
-                    config.get_max_attempts(),
-                    after.as_ref(),
-                )
-                .map_err(map_storage)?;
-            let work = match next {
-                VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
-                VectorOutcome::Current(None) => return self.prune(config),
-                VectorOutcome::Current(Some(work)) => work,
-            };
-            if skipped.contains(&work.id) {
-                after = Some(work.id);
-                continue;
-            }
-            let prepared = match self.prepare_text(&work) {
-                Ok(None) => {
-                    after = Some(work.id.clone());
-                    skipped.insert(work.id);
-                    continue;
-                }
-                Ok(Some(text)) => Ok(text),
-                Err(error) => Err(error),
-            };
-            if self.process_work(config, &work, prepared)? == DrainOutcome::ConfigChanged {
-                return Ok(DrainOutcome::ConfigChanged);
-            }
-            after = None;
-        }
     }
 
     fn prune(&mut self, config: &EmbeddingConfig) -> EmbeddingResult<DrainOutcome> {
@@ -225,40 +197,6 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
                 })
             })
             .map(|element| element.search_text))
-    }
-
-    fn process_work(
-        &mut self,
-        config: &EmbeddingConfig,
-        work: &EmbeddingWork,
-        text: EmbeddingResult<String>,
-    ) -> EmbeddingResult<DrainOutcome> {
-        let VectorOutcome::Current(dimensions) = self.read_dimensions(config)? else {
-            return Ok(DrainOutcome::ConfigChanged);
-        };
-        match self.reserve(config, &work.search_hash)? {
-            VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
-            VectorOutcome::Current(false) => return Ok(DrainOutcome::Complete),
-            VectorOutcome::Current(true) => {}
-        }
-        #[cfg(test)]
-        tests::reach_checkpoint("reserved");
-        let text = match text {
-            Ok(text) => text,
-            Err(error) => return self.finish_failure(config, &work.search_hash, &error),
-        };
-        let vector = match self.compute_vector(config, &text, dimensions) {
-            Ok(vector) => vector,
-            Err(error) => return self.finish_failure(config, &work.search_hash, &error),
-        };
-        match self.publish_vector(config, &work.search_hash, &vector) {
-            Ok(VectorOutcome::ConfigChanged) => Ok(DrainOutcome::ConfigChanged),
-            Ok(VectorOutcome::Current(())) => Ok(DrainOutcome::Complete),
-            Err(error) if error.get_kind() == EmbeddingErrorKind::InvalidResponse => {
-                self.finish_failure(config, &work.search_hash, &error)
-            }
-            Err(error) => Err(error),
-        }
     }
 
     fn read_dimensions(
@@ -340,28 +278,6 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
         Ok(VectorOutcome::Current(()))
     }
 
-    fn compute_vector(
-        &self,
-        config: &EmbeddingConfig,
-        text: &str,
-        dimensions: Option<NonZeroUsize>,
-    ) -> EmbeddingResult<Vec<f32>> {
-        let requested = config.get_dimensions().or(dimensions);
-        let mut vectors = self.provider.embed(config, &[text], requested)?;
-        if vectors.len() != 1 {
-            return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
-        }
-        let vector = vectors.remove(0);
-        if vector.is_empty()
-            || vector.iter().any(|value| !value.is_finite())
-            || requested.is_some_and(|size| vector.len() != size.get())
-            || dimensions.is_some_and(|size| vector.len() != size.get())
-        {
-            return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
-        }
-        Ok(vector)
-    }
-
     fn publish_vector(
         &mut self,
         config: &EmbeddingConfig,
@@ -424,6 +340,28 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
         unit.commit().map_err(map_storage)?;
         Ok(outcome)
     }
+}
+
+fn compute_vector(
+    provider: &dyn EmbeddingProvider,
+    config: &EmbeddingConfig,
+    text: &str,
+    dimensions: Option<NonZeroUsize>,
+) -> EmbeddingResult<Vec<f32>> {
+    let requested = config.get_dimensions().or(dimensions);
+    let mut vectors = provider.embed(config, &[text], requested)?;
+    if vectors.len() != 1 {
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
+    }
+    let vector = vectors.remove(0);
+    if vector.is_empty()
+        || vector.iter().any(|value| !value.is_finite())
+        || requested.is_some_and(|size| vector.len() != size.get())
+        || dimensions.is_some_and(|size| vector.len() != size.get())
+    {
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
+    }
+    Ok(vector)
 }
 
 fn map_command(error: EmbeddingError) -> CommandError {

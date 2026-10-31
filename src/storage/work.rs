@@ -14,6 +14,7 @@ pub(super) fn read_next_embedding_work(
     connection: &Connection,
     max_attempts: u64,
     after: Option<&KnowledgeId>,
+    excluded_hashes: &[Sha256],
 ) -> StorageResult<Option<EmbeddingWork>> {
     if max_attempts == 0 {
         return Err(StorageError::new(
@@ -30,6 +31,11 @@ pub(super) fn read_next_embedding_work(
         .and_where(Expr::exists(select_exhausted_hash(max_attempts)).not())
         .order_by(Nodes::Id, Order::Asc)
         .limit(1);
+    if !excluded_hashes.is_empty() {
+        query.and_where(
+            Expr::col(Nodes::SearchHash).is_not_in(excluded_hashes.iter().map(Sha256::to_hex)),
+        );
+    }
     if let Some(after) = after {
         query.and_where(Expr::col(Nodes::Id).gt(after.as_str()));
     }

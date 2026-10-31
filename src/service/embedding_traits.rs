@@ -74,10 +74,16 @@ pub trait Embedder {
     /// # Errors
     /// Reports storage failures; unreadable or invalid configuration is a typed invalid state.
     fn read_configuration(&mut self) -> EmbeddingResult<ConfigState>;
-    /// Drain current eligible documents using durable bounded attempts.
+    /// Drain current eligible documents with bounded concurrent provider attempts.
+    /// Each completion is published independently; normal return waits for all
+    /// owned requests, including when configuration changes or storage fails.
     ///
     /// # Errors
     /// Reports storage or environment failures that prevent safe coordination.
+    ///
+    /// # Panics
+    /// The fixed worker pool can panic if the OS cannot create its threads.
+    /// A worker programming panic is propagated after joining outstanding work.
     fn drain(&mut self) -> EmbeddingResult<DrainOutcome>;
     /// Compute one transient query vector, persisting only a safe diagnostic.
     ///

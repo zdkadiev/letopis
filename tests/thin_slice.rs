@@ -280,7 +280,7 @@ fn binary_invalid_file_keeps_last_projection_and_publishes_valid_neighbor() {
 
 #[test]
 fn binary_text_edit_during_document_http_requires_its_own_vector() {
-    // Given: the first cache inference is held before any vector is published.
+    // Given: document inference is held before any vector is published.
     let fixture = SliceFixture::new();
     fixture.load();
     let barrier = ResponseBarrier::default();
@@ -312,10 +312,22 @@ fn binary_text_edit_during_document_http_requires_its_own_vector() {
     // Then: both texts required inference; the obsolete result cannot stand in.
     let requests = http.take_requests();
     assert_eq!(requests.len(), 4);
-    assert_eq!(requests[0]["input"], json!([CACHE_TEXT]));
+    let inputs = requests
+        .iter()
+        .map(|request| {
+            let input = request["input"].as_array().unwrap();
+            assert_eq!(input.len(), 1);
+            input[0].as_str().unwrap()
+        })
+        .collect::<BTreeSet<_>>();
     assert_eq!(
-        requests[1]["input"],
-        json!(["CacheScope reconstructs derived state.\nsource"])
+        inputs,
+        BTreeSet::from([
+            CACHE_TEXT,
+            "CacheScope reconstructs derived state.\nsource",
+            "Reuse\nCacheReuse uses CacheScope.\ndecision\nsource",
+            "Scope\nCacheScopeMap groups decisions.\ndecision\nsource",
+        ])
     );
     assert_eq!(
         read_vector(&fixture, &config, &new_hash),

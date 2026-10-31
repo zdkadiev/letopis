@@ -203,7 +203,7 @@ impl Fixture {
             .open_storage()
             .begin_read()
             .unwrap()
-            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None)
+            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None, &[])
             .unwrap();
         assert_eq!(work, VectorOutcome::Current(None));
     }

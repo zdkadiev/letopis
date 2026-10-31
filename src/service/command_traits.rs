@@ -128,6 +128,10 @@ pub trait EmbeddingExecutor {
     ///
     /// # Errors
     /// Reports unexpected storage, coordination or embedding infrastructure failures.
+    ///
+    /// # Panics
+    /// The document executor can panic on OS worker creation failure or a worker
+    /// programming failure; normal cleanup joins owned work before returning.
     fn drain(&mut self) -> CommandResult<()>;
 }
 /// Nonblocking persistent embedding exclusion.

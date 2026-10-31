@@ -89,7 +89,8 @@ pub trait StorageRead {
         &mut self,
         policy: &EmbeddingStatusPolicy,
     ) -> StorageResult<EmbeddingStatusSummary>;
-    /// Read the first eligible knowledge ID strictly after the optional cursor.
+    /// Read the first eligible knowledge ID strictly after the optional cursor,
+    /// excluding every node whose text hash is already outstanding.
     ///
     /// # Errors
     /// Rejects zero or unrepresentable attempt budgets; reports I/O or invalid data.
@@ -98,6 +99,7 @@ pub trait StorageRead {
         expected: &Sha256,
         max_attempts: u64,
         after: Option<&KnowledgeId>,
+        excluded_hashes: &[Sha256],
     ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>>;
     /// Observe the native vector dimension under the pinned configuration identity.
     ///

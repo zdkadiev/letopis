@@ -361,7 +361,7 @@ fn assert_unchanged_vector_state(repo: &ReadingRepo, config: &EmbeddingConfig) {
     let mut read = storage.begin_read().unwrap();
     assert_eq!(read.get_config_identity(), Some(config.get_identity()));
     assert_eq!(
-        read.read_next_embedding_work(&config.get_identity(), 1, None)
+        read.read_next_embedding_work(&config.get_identity(), 1, None, &[])
             .unwrap(),
         VectorOutcome::Current(None)
     );

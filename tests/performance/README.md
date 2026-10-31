@@ -204,3 +204,44 @@ pre-change binary: two warmups and ten checks, without inventing an after build.
 Direct child wait4 CPU/RSS retain their existing descendant-accounting scope;
 concurrent whole-stack peak, exact lock waits and real-provider performance remain
 unassessed. [Issue-67 evidence index](../../docs/zkit/letopis/checks/issue-67/evidence-index.md).
+
+## Bounded parallel drain comparison (#49)
+
+`drain_compare.py` compares three frozen releases: unchanged sequential base,
+final implementation with only `DRAIN_WORKERS` changed to one in a disposable
+checkout, and unchanged final four-worker product. Freeze each with `compare.py`
+as above, using independent Cargo target directories (or force a package rebuild
+between checkouts). Verify binary hashes **and actual observed concurrency**;
+shared-target freshness can otherwise reuse a stale package. Preserve the
+one-worker evaluation patch; never edit the active product for a measurement.
+
+```sh
+/opt/homebrew/bin/python3.12 -B tests/performance/drain_compare.py \
+  --before "$PWD/.artifacts/issue-49/builds/before/build.json" \
+  --one-worker "$PWD/.artifacts/issue-49/builds/one-worker/build.json" \
+  --after "$PWD/.artifacts/issue-49/builds/after-corrected/build.json" \
+  --evidence "$PWD/.artifacts/issue-49/drain-new"
+/opt/homebrew/bin/python3.12 -B -m unittest discover \
+  -s tests/performance -p test_drain_compare.py
+```
+
+The runner owns a concurrent loopback-only provider (`drain_provider.py`) with
+literal vectors and explicit connection-close framing; it never forwards calls.
+There are 64 distinct synthetic texts and four extra shared-text nodes. Each
+variant gets one conditioning and five measured fresh projections, in interleaved
+A/B/C order, with 25 ms service delay. A separate three-query overlap schedule
+uses 100 ms delay and checks real vector-only search results. The native observer
+in `tests/drain_measurement.rs` reads actual vector contents outside timing and
+rejects wrong literal associations, incomplete coverage and persisted failures.
+
+The drain deadline is 120 seconds and the campaign budget 20 minutes including
+setup; the separately bounded observer build is outside drain timing. Evidence
+paths must be new. Attempts and failures remain in receipts and throughput time;
+interruption stops scheduling after persisting the cancelled case. Provider
+counters distinguish document and query requests: a foreground query may raise
+total concurrency above four without exceeding the drain's document limit.
+Five samples do not establish p95/p99; the runner leaves them unavailable.
+CPU/RSS retain the measurement helper's exact wait4 scope; RSS is a process
+lifetime peak, not concurrent whole-stack memory. Synthetic delay, three-component
+vectors and this corpus establish scheduling behavior, not real-model throughput,
+quality, provider quota behavior or minimum-hardware acceptance.
