@@ -40,6 +40,14 @@ struct DrainJobs {
 }
 
 impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec> EmbeddingService<S, F, M> {
+    /// Run bounded inference and join every admitted job before normal return.
+    ///
+    /// # Errors
+    /// Returns the original operational failure after outstanding work is joined.
+    ///
+    /// # Panics
+    /// Propagates worker startup or programming failures; a worker panic remains
+    /// a panic even if it is first observed during operational-error cleanup.
     pub(super) fn drain_ready(
         &mut self,
         config: &EmbeddingConfig,
@@ -52,6 +60,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec> EmbeddingService<S, F, M> 
             Ok(result) => result,
             Err(payload) => resume_unwind(payload),
         };
+        // A programming panic must not become an ordinary provider/storage error.
         if let Some(payload) = worker_panic {
             resume_unwind(payload);
         }

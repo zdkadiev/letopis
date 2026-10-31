@@ -21,6 +21,7 @@ use std::{
 };
 use tempfile::TempDir;
 
+mod parallel;
 mod query;
 
 mod tasks {

@@ -13,7 +13,9 @@ const WAIT: Duration = Duration::from_secs(3);
 /// One synthetic request independently observed at the HTTP boundary.
 #[derive(Clone, Debug)]
 pub struct CapturedRequest {
+    /// Index in the independently captured HTTP arrival order.
     pub index: usize,
+    /// Synthetic text received at this boundary.
     pub text: String,
 }
 
@@ -119,6 +121,7 @@ impl ParallelProvider {
         );
     }
 
+    /// Release one captured request with an explicitly selected status and body.
     pub fn release_response(&self, index: usize, status: u16, body: String) {
         self.shared
             .state

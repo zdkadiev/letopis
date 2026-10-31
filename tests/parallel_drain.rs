@@ -1,14 +1,12 @@
+#[path = "support/parallel_drain.rs"]
+mod drain;
 #[path = "support/parallel_provider.rs"]
 mod provider;
 mod support;
 
+use drain::{assert_success, prepare_repo, read_hash, read_reserved, read_vector, spawn_drain};
 use provider::ParallelProvider;
-use serde_json::Value;
-use std::{
-    process::{Command, Output, Stdio},
-    time::{Duration, Instant},
-};
-use support::{git::OwnedChild, reading::ReadingRepo};
+use std::time::{Duration, Instant};
 
 #[test]
 fn overlaps_four_requests_without_dispatching_a_fifth() {
@@ -46,14 +44,7 @@ fn publishes_a_completion_before_other_requests_finish() {
     provider.release(second.index, &[0., 1., 0.]);
     provider.wait_requests(5);
     // Then: publication and replacement admission happen before the held responses finish.
-    use letopis::service::{Storage, StorageRead, VectorOutcome};
-    let stored = repo
-        .open_storage()
-        .begin_read()
-        .unwrap()
-        .read_vector(&config.get_identity(), &hash)
-        .unwrap();
-    assert_eq!(stored, VectorOutcome::Current(Some(vec![0., 1., 0.])));
+    assert_eq!(read_vector(&repo, &config, &hash), Some(vec![0., 1., 0.]));
     provider.release_all();
     assert_success(&child.wait(Instant::now() + Duration::from_secs(10)));
 }
@@ -109,56 +100,4 @@ fn keeps_completed_unpublished_results_inside_the_four_slot_bound() {
     provider.release_all();
     assert_success(&child.wait(Instant::now() + Duration::from_secs(10)));
     assert_eq!(provider.get_requests().len(), 8);
-}
-
-fn read_hash(repo: &ReadingRepo, id: &str) -> letopis::domain::Sha256 {
-    use letopis::{
-        domain::{EdgeTarget, KnowledgeId},
-        service::{NodeMetadata, Storage, StorageRead},
-    };
-    let node = repo
-        .open_storage()
-        .begin_read()
-        .unwrap()
-        .read_node(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
-        .unwrap()
-        .unwrap();
-    let NodeMetadata::Knowledge(node) = node.metadata else {
-        panic!("expected knowledge");
-    };
-    node.search_hash
-}
-
-fn prepare_repo() -> ReadingRepo {
-    let repo = ReadingRepo::new();
-    for i in 0..8 {
-        repo.write_knowledge(&format!("k{i}.md"), &format!("parallel document {i}"));
-    }
-    assert_success(&repo.invoke(&["reindex"], b"{}"));
-    repo
-}
-
-fn spawn_drain(repo: &ReadingRepo) -> OwnedChild {
-    OwnedChild::spawn(
-        Command::new(env!("CARGO_BIN_EXE_letopis"))
-            .args(["embed", "--drain"])
-            .current_dir(repo.get_root())
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped()),
-    )
-}
-
-fn read_reserved(repo: &ReadingRepo) -> i64 {
-    rusqlite::Connection::open(repo.get_root().join(".letopis/vectors.db"))
-        .unwrap()
-        .query_row("SELECT count(*) FROM embed_failures", [], |row| row.get(0))
-        .unwrap()
-}
-
-fn assert_success(output: &Output) {
-    assert!(output.status.success(), "{output:?}");
-    assert!(output.stderr.is_empty(), "{output:?}");
-    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(value["ok"], true, "{value}");
 }

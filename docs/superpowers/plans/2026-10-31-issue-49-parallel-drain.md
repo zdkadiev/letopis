@@ -63,7 +63,7 @@ runs are authorized.
 |---|---|
 | 1 | `src/service/storage.rs`, `src/storage/{work,read}.rs`: exclude outstanding hashes in existing work selection. Update direct call sites and forwarding test implementations; test in `tests/storage_embedding_work.rs`. |
 | 2 | `Cargo.toml`, `Cargo.lock`, `src/service/embedding.rs`, new `src/service/embedding/drain.rs`, `src/lib.rs`: provider sharing, bounded scheduler and per-result publication. Adapt the existing private provider double in `src/service/embedding/tests.rs`; split its query scenarios into `src/service/embedding/tests/query.rs` to keep files focused; create `tests/support/parallel_provider.rs` and `tests/parallel_drain.rs`; declare that fixture privately in its consuming integration targets. |
-| 3 | New `tests/parallel_drain_process.rs`; focused private tests in `src/service/embedding/drain.rs` or its `tests.rs` if size warrants. Extend the Task 2 concurrent fixture for real HTTP/process races. Product fixes stay in their Task 2 owners. |
+| 3 | New `tests/parallel_drain_process.rs` and shared `tests/support/parallel_drain.rs`; focused private service-lifecycle tests in `src/service/embedding/tests/parallel.rs` reuse existing real-storage fixtures. Update drain interface Rustdoc in `src/service/{embedding_traits,command_traits}.rs`. Extend the Task 2 concurrent fixture for real HTTP/process races. Product fixes stay in their Task 2 owners. |
 | 4 | New `tests/performance/drain_compare.py`, `tests/performance/test_drain_compare.py`; update performance README. Reuse existing frozen-build/process ownership/measurement helpers without changing historical campaigns. |
 | 5 | New `docs/zkit/letopis/checks/issue-49/report.md`; affected mechanics, architecture, resource-math, provider contract and development descriptions. Final checks, semantic mutations and whole-branch review. |
 
@@ -253,7 +253,7 @@ Commit message: `feat: drain embeddings with four bounded synchronous workers`.
 private scheduler state only inside its own unit module. No production test knobs,
 new public drain commands or generic mock layers.
 
-- [ ] **Step 1: Add red regression scenarios with independent expected state.**
+- [x] **Step 1: Add red regression scenarios with independent expected state.**
 
 In `tests/parallel_drain_process.rs` add
 `keeps_one_drain_owner_with_four_active_requests`,
@@ -264,7 +264,8 @@ In `tests/parallel_drain_process.rs` add
 
 In focused private scheduler tests add
 `joins_submitted_jobs_before_returning_storage_failure`,
-`propagates_worker_panic_after_joining_other_jobs`, and
+`propagates_worker_panic_after_joining_other_jobs`,
+`propagates_worker_panic_during_error_cleanup`, and
 `waits_for_active_jobs_before_treating_empty_selection_as_complete`.
 Check shared-hash retry non-overlap, malformed/wrong-count/nonfinite responses,
 preparation failures and one-second retry waits using existing literal/error cases.
@@ -281,14 +282,14 @@ Use owned children/actual lock observers. Stop only the test-owned drain, not a
 PID read from arbitrary state; release the server to prevent orphaned handlers.
 A detached drain retains default SIGINT behavior, not foreground cancelled JSON.
 
-- [ ] **Step 2: Run targeted scenarios and establish semantic sensitivity.**
+- [x] **Step 2: Run targeted scenarios and establish semantic sensitivity.**
 
 Run `cargo test --locked --offline --test parallel_drain_process` and the private
 drain test filter. If complete behavior already passes from Task 2, demonstrate
 red by compiled, isolated mutations of the exact guarded path; do not weaken an
 assertion or manufacture unrelated syntax failures.
 
-- [ ] **Step 3: Fix only evidenced gaps in existing owners.**
+- [x] **Step 3: Fix only evidenced gaps in existing owners.**
 
 Preserve old-identity attempts/errors after reset by rejecting stale completions;
 concurrent first vectors must use storage's committed dimension check. Ensure
@@ -296,7 +297,7 @@ all normal exits join before lock drop, including errors and old config. A panic
 remains a panic after cleanup; a disconnected completion without a panic is an
 internal error, not successful completion. No global locks around provider work.
 
-- [ ] **Step 4: Run focused process/storage/foreground regressions and mutations.**
+- [x] **Step 4: Run focused process/storage/foreground regressions and mutations.**
 
 Run new targets plus `cli_drain`, `search_contention`, `storage_embedding_work`
 and existing `service::embedding::tests::process` tests. Run existing root
@@ -304,7 +305,7 @@ cancellation tests found by `rg -n 'fn .*sigint|fn .*cancel' tests src/service/e
 Mutate reservation, identity guard, dimension guard and early cleanup separately;
 confirm intended assertion failures, restore hashes, then rerun green.
 
-- [ ] **Step 5: Commit the lifecycle proof and any narrowly justified fixes.**
+- [x] **Step 5: Commit the lifecycle proof and any narrowly justified fixes.**
 
 Commit message: `test: verify parallel drain races and worker lifecycle`.
 
