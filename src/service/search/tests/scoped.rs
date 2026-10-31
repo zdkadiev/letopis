@@ -1,3 +1,5 @@
+mod revisions;
+
 use super::{build_config, build_noop_refresher, seed_dimension};
 use crate::{
     domain::{
@@ -37,6 +39,7 @@ enum ProvenanceFailure {
     Comparison,
 }
 struct Observations {
+    events: RefCell<Vec<String>>,
     observed: Rc<RefCell<RecordedSources>>,
     failure: Option<ProvenanceFailure>,
 }
@@ -217,6 +220,7 @@ impl ScopedFixture {
             filesystem: LocalFileSystem::open(self.root.path()).unwrap(),
             markdown: MarkdownParser::new(),
             provenance: Observations {
+                events: RefCell::new(Vec::new()),
                 observed: self.observed.clone(),
                 failure,
             },
@@ -255,6 +259,7 @@ impl Embedder for Query {
 }
 impl SourceProvenance for Observations {
     fn validate_revisions(&self, revisions: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
+        self.events.borrow_mut().push("validate".into());
         assert!(revisions.is_empty() || *revisions == BTreeSet::from([build_revision()]));
         Ok(())
     }
@@ -262,6 +267,7 @@ impl SourceProvenance for Observations {
         &self,
         request: ProvenanceRequest<'_>,
     ) -> DocumentResult<ProvenanceObservation> {
+        self.events.borrow_mut().push("observe".into());
         if matches!(self.failure, Some(ProvenanceFailure::Observation)) {
             return Err(DocumentError::new_with_cause(
                 DocumentErrorKind::InternalError,
@@ -281,6 +287,7 @@ impl SourceProvenance for Observations {
         &self,
         request: SourceRevisionRequest<'_>,
     ) -> Result<SourceRevisionComparison, SnapshotError> {
+        self.events.borrow_mut().push("compare".into());
         assert_eq!(
             request.source_snapshot,
             Some(&TreeOid::parse(&"a".repeat(40)).unwrap())

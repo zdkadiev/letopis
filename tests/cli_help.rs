@@ -113,17 +113,8 @@ fn unrecognized_help_forms_still_return_json_errors() {
         vec!["--help", "search"],
         vec!["-h"],
     ] {
-        // When
-        let mut command = Command::new(env!("CARGO_BIN_EXE_letopis"));
-        command
-            .args(&args)
-            .current_dir(root.path())
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let mut child = cli::OwnedChild::spawn(&mut command);
-        child.send_input(b"{}");
-        let output = child.collect_output(Duration::from_secs(10));
+        // When: stdin stays open with no body or EOF while argv is rejected.
+        let output = spawn_without_input(&root, &args);
         // Then
         assert_eq!(output.status.code(), Some(1), "{args:?}");
         assert!(output.stderr.is_empty(), "{args:?}");

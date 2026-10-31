@@ -1,149 +1,179 @@
-use super::{objects::ObjectDb, process::make_io_error};
+use super::tree::read_entry;
 use crate::service::{SnapshotError, SnapshotErrorKind};
-use std::{
-    fs::{self, DirBuilder, OpenOptions},
-    io::Write,
-    os::unix::{
-        ffi::OsStrExt,
-        fs::{DirBuilderExt, OpenOptionsExt},
-    },
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::{cmp::Ordering, collections::BTreeSet};
 
-static NEXT: AtomicU64 = AtomicU64::new(0);
+const TREE_MODE: u16 = 0o040000;
+const SYMLINK_MODE: u16 = 0o120000;
+const VALID_MODES: [u16; 5] = [0o100644, 0o100755, SYMLINK_MODE, TREE_MODE, 0o160000];
+const MAX_NAME_BYTES: usize = 4096;
 
-/// Operation-owned tree metadata spool for one Git structural-validation process.
-pub(super) struct TreeValidator {
-    directory: PathBuf,
-    paths: Vec<u8>,
-    expected: Vec<u8>,
-    count: usize,
-}
-impl TreeValidator {
-    pub(super) fn new() -> Result<Self, SnapshotError> {
-        let directory = create_directory()?;
-        Ok(Self {
-            directory,
-            paths: Vec::new(),
-            expected: Vec::new(),
-            count: 0,
-        })
+/// Check the own-body acceptance rules of `hash-object -t tree --no-filters`.
+///
+/// Raw identity is never normalized and referenced objects are not read. Malformed
+/// framing, modes, names, null IDs, duplicates and ordering return a safe error.
+///
+/// # Errors
+/// Returns `InternalError` when the body fails Git's structural checks.
+pub(super) fn validate_tree_bytes(mut bytes: &[u8], oid_len: usize) -> Result<(), SnapshotError> {
+    if !matches!(oid_len, 40 | 64) {
+        return Err(make_integrity_error());
     }
-    pub(super) fn add_tree(&mut self, oid: &str, bytes: &[u8]) -> Result<(), SnapshotError> {
-        let path = self.directory.join(self.count.to_string());
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&path)
-            .map_err(|e| make_io_error("cannot create Git validation input", e))?;
-        file.write_all(bytes)
-            .map_err(|e| make_io_error("cannot write Git validation input", e))?;
-        // C-style octal quoting preserves arbitrary temporary-directory path bytes.
-        self.paths.push(b'"');
-        for byte in path.as_os_str().as_bytes() {
-            self.paths
-                .extend_from_slice(format!("\\{byte:03o}").as_bytes());
+    let mut names = BTreeSet::new();
+    let mut previous = None;
+    while !bytes.is_empty() {
+        // Git's tree descriptor also checks the final entry's NUL boundary.
+        if bytes.get(bytes.len().saturating_sub(oid_len / 2 + 1)) != Some(&0) || bytes[0] == b'0' {
+            return Err(make_integrity_error());
         }
-        self.paths.extend_from_slice(b"\"\n");
-        self.expected.extend_from_slice(oid.as_bytes());
-        self.expected.push(b'\n');
-        self.count += 1;
-        Ok(())
-    }
-    pub(super) fn verify(self, db: &ObjectDb<'_>) -> Result<(), SnapshotError> {
-        // hash-object includes Git's own strict tree-format checks, including
-        // platform path aliases and special-file rules. Hashing alone cannot replace them.
-        let actual = db.run(
-            &["hash-object", "-t", "tree", "--no-filters", "--stdin-paths"],
-            Some(&self.paths),
-        )?;
-        if actual != self.expected {
-            return Err(SnapshotError::new(
-                SnapshotErrorKind::InternalError,
-                "Git tree validation identity mismatch",
-            ));
+        let (entry, remaining) = read_entry(bytes, oid_len)?;
+        if !VALID_MODES.contains(&entry.mode)
+            || entry.oid.iter().all(|byte| *byte == 0)
+            || !names.insert(entry.name)
+        {
+            return Err(make_integrity_error());
         }
-        fs::remove_dir_all(&self.directory)
-            .map_err(|e| make_io_error("cannot remove Git validation inputs", e))
+        validate_name(entry.name, entry.mode)?;
+        if let Some((name, mode)) = previous
+            && compare_names(name, mode, entry.name, entry.mode) != Ordering::Less
+        {
+            return Err(make_integrity_error());
+        }
+        previous = Some((entry.name, entry.mode));
+        bytes = remaining;
     }
+    Ok(())
 }
-impl Drop for TreeValidator {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.directory);
+
+fn validate_name(name: &[u8], mode: u16) -> Result<(), SnapshotError> {
+    if name.len() > MAX_NAME_BYTES
+        || matches!(name, b"." | b"..")
+        || name.contains(&b'/')
+        || is_hfs_alias(name, b"git")
+        || name.split(|byte| *byte == b'\\').any(is_ntfs_dotgit)
+    {
+        return Err(make_integrity_error());
     }
-}
-fn create_directory() -> Result<PathBuf, SnapshotError> {
-    for _ in 0..16 {
-        let path = std::env::temp_dir().join(format!(
-            "letopis-trees-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        match DirBuilder::new().mode(0o700).create(&path) {
-            Ok(()) => return Ok(path),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(e) => return Err(make_io_error("cannot create Git validation directory", e)),
+    if mode != SYMLINK_MODE {
+        return Ok(());
+    }
+    for (needle, short_prefix) in [
+        (b"gitmodules".as_slice(), b"gi7eba".as_slice()),
+        (b"gitattributes", b"gi7d29"),
+        (b"gitignore", b"gi250a"),
+        (b"mailmap", b"maba30"),
+    ] {
+        if is_hfs_alias(name, needle) || is_ntfs_alias(name, needle, short_prefix) {
+            return Err(make_integrity_error());
         }
     }
-    Err(SnapshotError::new(
+    // Only .gitmodules is protected after backslashes by Git's structural check.
+    if name.iter().enumerate().any(|(offset, byte)| {
+        *byte == b'\\' && is_ntfs_alias(&name[offset + 1..], b"gitmodules", b"gi7eba")
+    }) {
+        return Err(make_integrity_error());
+    }
+    Ok(())
+}
+
+fn compare_names(left: &[u8], left_mode: u16, right: &[u8], right_mode: u16) -> Ordering {
+    let left = left
+        .iter()
+        .copied()
+        .chain((left_mode == TREE_MODE).then_some(b'/'));
+    let right = right
+        .iter()
+        .copied()
+        .chain((right_mode == TREE_MODE).then_some(b'/'));
+    left.cmp(right)
+}
+
+fn is_hfs_alias(name: &[u8], needle: &[u8]) -> bool {
+    // Git's HFS decoder treats malformed UTF-8 and U+FFFE/U+FFFF as end of name.
+    let valid = match std::str::from_utf8(name) {
+        Ok(valid) => valid,
+        Err(error) => std::str::from_utf8(&name[..error.valid_up_to()]).unwrap_or_default(),
+    };
+    let mut characters = valid
+        .chars()
+        .take_while(|character| !matches!(*character, '\u{fffe}' | '\u{ffff}'))
+        .filter(|character| {
+            !matches!(*character as u32, 0x200c..=0x200f | 0x202a..=0x202e | 0x206a..=0x206f | 0xfeff)
+        });
+    if characters.next() != Some('.') {
+        return false;
+    }
+    for byte in needle {
+        if characters
+            .next()
+            .is_none_or(|character| !character.eq_ignore_ascii_case(&char::from(*byte)))
+        {
+            return false;
+        }
+    }
+    characters.next().is_none()
+}
+
+fn is_ntfs_dotgit(name: &[u8]) -> bool {
+    let suffix = if name
+        .get(..4)
+        .is_some_and(|part| part.eq_ignore_ascii_case(b".git"))
+    {
+        &name[4..]
+    } else if name
+        .get(..5)
+        .is_some_and(|part| part.eq_ignore_ascii_case(b"git~1"))
+    {
+        &name[5..]
+    } else {
+        return false;
+    };
+    has_ntfs_suffix(suffix)
+}
+
+fn is_ntfs_alias(name: &[u8], needle: &[u8], short_prefix: &[u8]) -> bool {
+    let long_length = needle.len() + 1;
+    if name.first() == Some(&b'.')
+        && name
+            .get(1..long_length)
+            .is_some_and(|part| part.eq_ignore_ascii_case(needle))
+    {
+        return has_ntfs_suffix(&name[long_length..]);
+    }
+    if name
+        .get(..6)
+        .is_some_and(|part| part.eq_ignore_ascii_case(&needle[..6]))
+        && name.get(6) == Some(&b'~')
+        && name.get(7).is_some_and(|byte| (b'1'..=b'4').contains(byte))
+    {
+        return has_ntfs_suffix(&name[8..]);
+    }
+    let Some(short) = name.get(..8) else {
+        return false;
+    };
+    let Some(tilde) = short.iter().position(|byte| *byte == b'~') else {
+        return false;
+    };
+    tilde <= short_prefix.len()
+        && tilde < 7
+        && short[..tilde].eq_ignore_ascii_case(&short_prefix[..tilde])
+        && (b'1'..=b'9').contains(&short[tilde + 1])
+        && short[tilde + 2..].iter().all(u8::is_ascii_digit)
+        && has_ntfs_suffix(&name[8..])
+}
+
+fn has_ntfs_suffix(suffix: &[u8]) -> bool {
+    suffix
+        .iter()
+        .take_while(|byte| **byte != b':')
+        .all(|byte| matches!(byte, b' ' | b'.'))
+}
+
+fn make_integrity_error() -> SnapshotError {
+    SnapshotError::new(
         SnapshotErrorKind::InternalError,
-        "cannot allocate Git validation directory",
-    ))
+        "Git tree integrity failed",
+    )
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{ObjectDb, TreeValidator};
-    use crate::{
-        git::GitCli,
-        process_test_support::{ObjectFormat, TempRepo},
-    };
-    use std::{fs, os::unix::fs::PermissionsExt};
-
-    #[test]
-    fn quotes_private_paths_and_cleans_up_successful_validation() {
-        // Given: a private spool path containing spaces, quotes and a newline.
-        let repo = TempRepo::new(ObjectFormat::Sha1);
-        let git = GitCli::open(repo.get_root()).unwrap();
-        let mut validator = TreeValidator::new().unwrap();
-        let directory = validator.directory.with_extension("space \" quote\n");
-        fs::rename(&validator.directory, &directory).unwrap();
-        validator.directory = directory.clone();
-        validator
-            .add_tree("4b825dc642cb6eb9a060e54bf8d69288fbee4904", b"")
-            .unwrap();
-        assert_eq!(
-            fs::metadata(&directory).unwrap().permissions().mode() & 0o777,
-            0o700
-        );
-        assert_eq!(
-            fs::metadata(directory.join("0"))
-                .unwrap()
-                .permissions()
-                .mode()
-                & 0o777,
-            0o600
-        );
-        // When: Git reads C-quoted input paths through stdin-paths.
-        validator.verify(&ObjectDb { git: &git }).unwrap();
-        // Then: matching identities succeed and no owned metadata remains.
-        assert!(!directory.exists());
-    }
-
-    #[test]
-    fn rejects_changed_validation_input_and_cleans_up_failure() {
-        // Given: the supplied identity does not match the valid tree bytes.
-        let repo = TempRepo::new(ObjectFormat::Sha1);
-        let git = GitCli::open(repo.get_root()).unwrap();
-        let mut validator = TreeValidator::new().unwrap();
-        let directory = validator.directory.clone();
-        validator.add_tree(&"1".repeat(40), b"").unwrap();
-        // When: independent Git verification observes the different identity.
-        let result = validator.verify(&ObjectDb { git: &git });
-        // Then: no success or leftover sensitive metadata.
-        assert!(result.is_err());
-        assert!(!directory.exists());
-    }
-}
+mod tests;

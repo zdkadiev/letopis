@@ -78,6 +78,52 @@ impl TempRepo {
         fs::write(repo.root.join("live.md"), b"unstaged live\n").unwrap();
         repo
     }
+    pub fn prepare_sparse_index(&self) -> String {
+        for directory in ["keep", "omit/nested"] {
+            fs::create_dir_all(self.root.join(directory)).unwrap();
+        }
+        let note = b"<!-- letopis: {\"created_at\":1} -->\nNeedle\n";
+        for path in [
+            "keep/a.md",
+            "omit/b.md",
+            "omit/deleted.md",
+            "omit/nested/c.markdown",
+        ] {
+            fs::write(self.root.join(path), note).unwrap();
+        }
+        fs::write(self.root.join(".gitignore"), b"omit/*.md\n.letopis/\n").unwrap();
+        fs::write(self.root.join("omit/nested/.gitignore"), b"*.hidden.md\n").unwrap();
+        self.run_git_successfully(&["add", "-f", "."], None);
+        self.run_git_successfully(&["commit", "-qm", "sparse base"], None);
+        let head = self.read_oid(&["rev-parse", "HEAD"], None);
+        fs::write(self.root.join("omit/staged.md"), note).unwrap();
+        self.run_git_successfully(&["add", "-f", "omit/staged.md"], None);
+        self.run_git_successfully(&["commit", "-qm", "index-only membership"], None);
+        let tree = self.read_oid(&["rev-parse", "HEAD:omit"], None);
+        self.run_git_successfully(
+            &["sparse-checkout", "init", "--cone", "--sparse-index"],
+            None,
+        );
+        self.run_git_successfully(&["sparse-checkout", "set", "keep"], None);
+        self.run_git_successfully(&["update-ref", "HEAD", &head], None);
+        let sparse = self.run_git_successfully(&["ls-files", "--sparse", "--stage"], None);
+        assert!(
+            String::from_utf8(sparse)
+                .unwrap()
+                .contains(&format!("040000 {tree} 0\tomit/\n"))
+        );
+        fs::create_dir_all(self.root.join("omit/nested")).unwrap();
+        for path in [
+            "omit/b.md",
+            "omit/staged.md",
+            "omit/nested/c.markdown",
+            "omit/untracked.md",
+            "omit/nested/drop.hidden.md",
+        ] {
+            fs::write(self.root.join(path), note).unwrap();
+        }
+        tree
+    }
     pub fn create_shared_clone(&self) -> Self {
         let root = self.root.join("BORROWER_PATH_CANARY");
         self.run_git_successfully(
@@ -148,10 +194,22 @@ impl TempRepo {
                 .flatten()
                 .copied()
                 .collect(),
-            live: ["live.md", ".gitattributes"]
-                .into_iter()
-                .filter_map(|p| fs::read(self.root.join(p)).ok().map(|b| (p.to_owned(), b)))
-                .collect(),
+            live: [
+                "live.md",
+                ".gitattributes",
+                ".gitignore",
+                "keep/a.md",
+                "omit/b.md",
+                "omit/deleted.md",
+                "omit/staged.md",
+                "omit/untracked.md",
+                "omit/nested/.gitignore",
+                "omit/nested/c.markdown",
+                "omit/nested/drop.hidden.md",
+            ]
+            .into_iter()
+            .filter_map(|p| fs::read(self.root.join(p)).ok().map(|b| (p.to_owned(), b)))
+            .collect(),
         }
     }
     pub fn change_and_delete_live_files(&self, path: &str) {

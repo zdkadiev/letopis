@@ -13,9 +13,8 @@ mod cli;
 mod support;
 
 use cancellation::{
-    GitProxy, ObserverSocket, WAIT, WrapperConnection, assert_cancelled_output,
-    assert_index_lock_held, observation::observe_index_flock, read_lock_identity,
-    wait_until_index_lock_free,
+    GitReadBarrier, WAIT, assert_cancelled_output, assert_index_lock_held,
+    observation::observe_index_flock, read_lock_identity, wait_until_index_lock_free,
 };
 use letopis::{
     domain::{EdgeTarget, KnowledgeId, Sha256},
@@ -39,14 +38,13 @@ use support::{
 
 #[test]
 fn cancelling_holder_releases_index_lock() {
-    // Given: the real reindex holds index.lock and blocks inside ls-files.
+    // Given: real reindex holds index.lock and blocks in the Git ignore reader.
     let repo = ReadingRepo::new();
     repo.write_knowledge("knowledge.md", "HolderToken");
-    let observer = ObserverSocket::new();
-    let proxy = GitProxy::new(&observer.get_path());
-    let mut child = spawn_product(&repo, &["reindex"], Some(proxy.get_path()));
+    let barrier_read = GitReadBarrier::new(repo.get_root());
+    let mut child = spawn_product(&repo, &["reindex"], None);
     child.send_input(b"{}");
-    let wrapper = WrapperConnection::accept(observer.get_listener());
+    barrier_read.observe(child.get_id());
     let lock = repo.get_root().join(".letopis/index.lock");
     assert_index_lock_held(&lock);
     let identity = read_lock_identity(&lock);
@@ -55,7 +53,8 @@ fn cancelling_holder_releases_index_lock() {
     let output = child.collect_output(WAIT);
     // Then: one cancelled envelope, and no replacement lock or surviving owner.
     assert_cancelled_output(&output, "index holder", &["HolderToken", "ls-files"]);
-    wrapper.release_and_wait();
+    barrier_read.assert_owned();
+    barrier_read.release();
     wait_until_index_lock_free(&lock);
     assert_eq!(read_lock_identity(&lock), identity);
     assert_eq!(publish(&repo), 1);
@@ -105,21 +104,21 @@ fn foreground_cancel_preserves_detached_drain() {
     barrier.wait_until_entered();
     let reserved = read_failure(&repo, &config, &hash).expect("durable reservation");
     assert_eq!(reserved.attempts, 1);
-    let observer = ObserverSocket::new();
-    let proxy = GitProxy::new(&observer.get_path());
-    let mut search = spawn_product(&repo, &["search"], Some(proxy.get_path()));
+    let barrier_read = GitReadBarrier::new(repo.get_root());
+    let mut search = spawn_product(&repo, &["search"], None);
     search.send_input(
         json!({"query":"DrainSurvivesToken","limit":1})
             .to_string()
             .as_bytes(),
     );
-    let wrapper = WrapperConnection::accept(observer.get_listener());
+    barrier_read.observe(search.get_id());
     // When: only the foreground caller is cancelled while the drain stays blocked.
     search.send_sigint();
     let cancelled = search.collect_output(WAIT);
     // Then: the drain completes, stores its vector and serves the exact query later.
     assert_cancelled_output(&cancelled, "foreground search", &["DrainSurvivesToken"]);
-    wrapper.release_and_wait();
+    barrier_read.assert_owned();
+    barrier_read.release();
     barrier.release();
     assert_drain_success(&drain.collect_output(WAIT));
     assert_eq!(read_vector(&repo, &config, &hash), Some(vec![1., 2., 3.]));

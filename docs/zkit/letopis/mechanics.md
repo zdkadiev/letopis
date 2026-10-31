@@ -62,7 +62,7 @@ X-4 и его JSON Schema — единственная грамматика ра
 
 ### MC-2 — обнаружение, публикация по файлу и reindex
 
-Перед каждой командой search/traverse/inspect/check процесс получает кандидатов `git ls-files -z --cached --others --exclude-standard` (файлы `.md`/`.markdown` с учётом `.gitignore`, [D-97](decisions.md#D-97)) и сравнивает их с таблицей files кэша (path, size, mtime_ns, inode, hash). Строка files есть у каждого кандидата, в том числе без разметки letopis (узлов у него нет), поэтому неизменённый файл не перечитывается; кандидат, выпавший из списка, — удаление. Совпавшие size/mtime/inode считаются неизменными, кроме «racy» файлов, у которых записанный mtime не старше одного тика до момента прошлой проверки: такие файлы хешируются всегда (как racy-git). Изменённые, новые и удалённые .md/.markdown файлы образуют дельту. Пустая дельта — публикации нет, блокировка не берётся. Уточнение [TK-10](../../superpowers/specs/2026-10-22-tk-10-change-detection-design.md), [D-101](decisions.md#D-101): окно racy — консервативная одна секунда (1 000 000 000 нс); регресс часов/неопределённость арифметики требуют хеширования. Повторное хеширование прежних байтов само по себе не меняет checked_at и revision. При новом stat и прежнем hash обновляется только files в unit публикации, без повторного разбора и замены FTS. Git продолжает перечислять удалённые tracked-пути: подтверждённый stat NotFound тоже означает удаление. Игнорирование исключает untracked-кандидатов; tracked-файл остаётся кандидатом даже при совпадении с ignore-правилом. Symlink-кандидаты/родители и нерегулярные файлы не следуются и дают безопасную ошибку с сохранением прежней публикации. Граница окна: timestamp resolution грубее секунды и намеренный возврат старого non-racy mtime этой гарантией не покрываются.
+Перед каждой командой search/traverse/inspect/check процесс получает кандидатов через локальный index/ignore walk, эквивалентный `git ls-files -z --cached --others --exclude-standard` (файлы `.md`/`.markdown` с учётом `.gitignore`, [D-97](decisions.md#D-97)) и сравнивает их с таблицей files кэша (path, size, mtime_ns, inode, hash). Строка files есть у каждого кандидата, в том числе без разметки letopis (узлов у него нет), поэтому неизменённый файл не перечитывается; кандидат, выпавший из списка, — удаление. Совпавшие size/mtime/inode считаются неизменными, кроме «racy» файлов, у которых записанный mtime не старше одного тика до момента прошлой проверки: такие файлы хешируются всегда (как racy-git). Изменённые, новые и удалённые .md/.markdown файлы образуют дельту. Пустая дельта — публикации нет, блокировка не берётся. Уточнение [TK-10](../../superpowers/specs/2026-10-22-tk-10-change-detection-design.md), [D-101](decisions.md#D-101): окно racy — консервативная одна секунда (1 000 000 000 нс); регресс часов/неопределённость арифметики требуют хеширования. Повторное хеширование прежних байтов само по себе не меняет checked_at и revision. При новом stat и прежнем hash обновляется только files в unit публикации, без повторного разбора и замены FTS. Git продолжает перечислять удалённые tracked-пути: подтверждённый stat NotFound тоже означает удаление. Игнорирование исключает untracked-кандидатов; tracked-файл остаётся кандидатом даже при совпадении с ignore-правилом. Symlink-кандидаты/родители и нерегулярные файлы не следуются и дают безопасную ошибку с сохранением прежней публикации. Граница окна: timestamp resolution грубее секунды и намеренный возврат старого non-racy mtime этой гарантией не покрываются.
 
 | State | Event | Guard | Next state | Effects |
 |---|---|---|---|---|
@@ -193,7 +193,7 @@ source_snapshot знания пишет агент в метаданные ([D-9
 
 Гонка двух вызывающих процессов при запуске drain безопасна: лишний drain не получит embed.lock и сразу завершится. Блокировку определяет только ядро: наличие lock-файла или PID в нём ничего не значит (model_runtime.py, guard owner).
 
-**Отмена.** SIGINT отменяет собственный процесс (search, traverse, inspect, check, reindex); незафиксированная транзакция откатывается, частичного результата нет. Отмена обрабатывается (D-96): поток `signal-hook` принимает SIGINT, печатает единственный ответ ok:false/cancelled (once-guard на stdout: если результат уже напечатан, второй JSON не печатается) и завершает процесс с exit 1 в любой точке — SQL-шаг, ожидание flock, git-подпроцесс, HTTP. Незафиксированная транзакция SQLite откатывается как после сбоя (WAL, доказано TK-2), flock снимает ядро, оставленные git-объекты безвредны и чистятся как после сбоя; зафиксированная публикация остаётся (late SIGINT). InterruptHandle не используется. У отсоединённого drain обработчика нет: сигнал завершает его по умолчанию, ответа нет, attempts в embed_failures сохранены. Обработанный ответ во всех пяти командах, в том числе во время ожидания flock, git и HTTP, и ровно один JSON проверяет TK-29. Отмены чужого процесса по PID нет ([D-95](decisions.md#D-95)); status показывает PID держателя index.lock, и пользователь при необходимости завершает его средствами ОС.
+**Отмена.** SIGINT отменяет собственный процесс (search, traverse, inspect, check, reindex); незафиксированная транзакция откатывается, частичного результата нет. Отмена обрабатывается (D-96): поток `signal-hook` принимает SIGINT, печатает единственный ответ ok:false/cancelled (once-guard на stdout: если результат уже напечатан, второй JSON не печатается) и завершает процесс с exit 1 в любой точке — SQL-шаг, ожидание flock, локальное чтение Git-объекта, HTTP. Незафиксированная транзакция SQLite откатывается как после сбоя (WAL, доказано TK-2), flock снимает ядро, оставленные git-объекты безвредны и чистятся как после сбоя; зафиксированная публикация остаётся (late SIGINT). InterruptHandle не используется. У отсоединённого drain обработчика нет: сигнал завершает его по умолчанию, ответа нет, attempts в embed_failures сохранены. Обработанный ответ во всех пяти командах, в том числе во время ожидания flock, git и HTTP, и ровно один JSON проверяет TK-29. Отмены чужого процесса по PID нет ([D-95](decisions.md#D-95)); status показывает PID держателя index.lock, и пользователь при необходимости завершает его средствами ОС.
 
 Нет общего execution timeout в 1 секунду, TTL, lifecycle-команд, TCP API, IPC и process registry. Команды letopis не меняют корпус, поэтому потеря ответа безопасна: повтор вызова идемпотентен.
 
@@ -410,3 +410,30 @@ OpenAiProvider ..|> EmbeddingProvider
 ## Sources
 
 [R-8: первичные примитивы](research/R-8-durability-and-search-primitives.md); [SQLite WAL](https://sqlite.org/wal.html), [isolation](https://sqlite.org/isolation.html), [FTS5](https://www.sqlite.org/fts5.html#contentless_delete_tables), [Vec1](https://www.sqlite.org/vec1doc.html), [Git config](https://git-scm.com/docs/git-config). Документированные возможности не подменяют проверку составного протокола. [R-2](research/R-2-rust-sqlite.md)/[R-6](research/R-6-sqlite-capacity-probe.md) остаются историческими ограниченными пробами; их flat/cos и числа не объявляются новым runtime verdict.
+
+
+## Уточнение 2026-10-31 — local Git library, issue #67
+
+Discovery и raw object/index/ignore/ref operations выполняет приватная
+`GitRepository` через закреплённую gix; один repository/reader/cleanup owner
+разделяется collaborators одного invocation. Git CLI остаётся авторским и тестовым
+инструментом. Root-only verification, addressed reads, lightweight retain и strong
+pin различаются по [X-3](contracts/X-3-git.md); ref не заменяет closure audit.
+Inspect сохраняет все marked files и доступные declared local sources, повторно
+использует captured marked source blob и делает strong final pin.
+
+Объект сначала записывается в приватный stage, независимо проверяется и fsync-ится;
+публикация no-clobber и sync каталогов предшествуют ref. Actual lock owners
+хранятся у invocation cleanup. SIGINT закрывает admission/publication, отсоединяет
+stage rename-ом перед удалением, освобождает свои locks и оставляет чужих владельцев.
+Повторная очистка идемпотентна; ошибка одного stage сохраняет residual owner и не
+пропускает остальные ресурсы. Произвольный отказ filesystem может оставить residue;
+это не обещание recovery после power loss, не модель всех kernel interleavings и
+не гарантия для NFS. Detached drain сохраняет собственный жизненный цикл.
+
+Preflight/check/status наблюдают группы до 256 bindings; historical hashes
+кэшируются до 4096 записей только внутри observation operation, затем пересчитываются.
+Current-file bytes не кэшируются между наблюдениями search/traverse. Последняя
+preflight observation завершается перед retention, retention перед SQL write.
+Current-object/delta buffers масштабируются с объектом; caches payload выключены,
+между объектами сохраняется не более 4 MiB decode allocation, hash chunk 64 KiB.

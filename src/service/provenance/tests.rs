@@ -1,3 +1,5 @@
+mod batches;
+
 use super::ProvenanceService;
 use crate::{
     domain::{BlobOid, RepoPath, SourceUri, TreeOid},
@@ -216,10 +218,14 @@ struct RecordedGit {
     pins: RefCell<Vec<TreeOid>>,
     strong_pins: RefCell<Vec<TreeOid>>,
     fault: GitFault,
+    reads: Cell<usize>,
+    bytes: BTreeMap<TreeOid, Vec<u8>>,
+    states_sequence: RefCell<Vec<SnapshotState>>,
 }
 struct RecordedFiles {
     reads: Cell<usize>,
     fail: bool,
+    changes: RefCell<Vec<Option<Vec<u8>>>>,
 }
 
 impl SnapshotVerifier for RecordedGit {
@@ -227,6 +233,9 @@ impl SnapshotVerifier for RecordedGit {
         self.verified.borrow_mut().push(tree.clone());
         if matches!(self.fault, GitFault::Verify) {
             return Err(create_git_failure());
+        }
+        if !self.states_sequence.borrow().is_empty() {
+            return Ok(self.states_sequence.borrow_mut().remove(0));
         }
         Ok(self
             .states
@@ -252,14 +261,19 @@ impl GitSnapshots for RecordedGit {
     fn create_tree_from_blobs(&self, _: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
         panic!("provenance must not create trees")
     }
-    fn read_blob(&self, _: &TreeOid, _: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
+    fn read_blob(&self, tree: &TreeOid, _: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
+        self.reads.set(self.reads.get() + 1);
         match self.fault {
             GitFault::Read => Err(create_git_failure()),
             GitFault::ReadInvalid => Err(SnapshotError::new(
                 SnapshotErrorKind::InvalidRequest,
                 "not a blob",
             )),
-            _ => Ok(b"basis\n".to_vec()),
+            _ => Ok(self
+                .bytes
+                .get(tree)
+                .cloned()
+                .unwrap_or_else(|| b"basis\n".to_vec())),
         }
     }
     fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
@@ -284,8 +298,16 @@ impl FileSystem for RecordedFiles {
                 io::Error::other("PRIVATE_PROVENANCE_CAUSE"),
             ));
         }
+        let bytes = if self.changes.borrow().is_empty() {
+            Some(b"basis\n".to_vec())
+        } else {
+            self.changes.borrow_mut().remove(0)
+        };
+        let Some(bytes) = bytes else {
+            return Ok(None);
+        };
         Ok(Some(CapturedFile {
-            bytes: b"basis\n".to_vec(),
+            bytes,
             stat: FileStat {
                 size: 6,
                 mtime_ns: 1,
@@ -310,10 +332,14 @@ fn create_service(fault: GitFault) -> ProvenanceService<RecordedGit, RecordedFil
             pins: RefCell::new(Vec::new()),
             strong_pins: RefCell::new(Vec::new()),
             fault,
+            reads: Cell::new(0),
+            bytes: BTreeMap::new(),
+            states_sequence: RefCell::new(Vec::new()),
         },
         RecordedFiles {
             reads: Cell::new(0),
             fail: false,
+            changes: RefCell::new(Vec::new()),
         },
     )
 }

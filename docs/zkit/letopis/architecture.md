@@ -21,6 +21,12 @@
 
 2026-10-19: сохранены шесть согласованных частей и их ID, DDD/hexagonal, единый worker и границы записи/поиска. Модель сверена с data E-1…E-12, ресурсным итогом и [D-65](decisions.md#D-65)…[D-73](decisions.md#D-73). Добавлены владельцы диагностики, окружения embedding-адаптера и состояния reindex, C4 уровни 1–3, внутренние взаимодействия и сценарии отказов. Два инженерных выбора автора (IPC worker, позже заменён [D-94](decisions.md#D-94), и общий порт диагностики, позже заменён [D-95](decisions.md#D-95)) явно обозначены assumed с проверками; новых продуктовых вопросов/замеров нет. Прежние предложения, уже заменённые [D-7](decisions.md#D-7)/D-14/D-65/D-66, не считаются действующими альтернативами.
 
+Уточнение 2026-10-31, issue #67: одна `GitRepository` и один владелец cleanup
+на invocation; gix-типы остаются приватными в `src/git/`. Корневые/адресованные
+проверки, `retain` и сильный `pin` сохраняют разные гарантии по [X-3](contracts/X-3-git.md).
+Батчи provenance ограничены preflight/check/status; search/traverse сохраняют
+последовательные live-наблюдения. Исторические receipts не переписываются.
+
 ## 1. Summary
 
 letopis — локальное CLI-приложение без постоянного процесса ([D-94](decisions.md#D-94)): каждый вызов — отдельный процесс, а embeddings считает отсоединённый процесс `letopis embed --drain`, который завершается, когда не осталось текстов без вектора. Агенты правят размеченные Markdown-документы напрямую ([D-93](decisions.md#D-93)); letopis их читает, проверяет и индексирует. Каждый вызов search/traverse/inspect/check перед ответом обнаруживает изменённые файлы и публикует их валидные изменения в граф/FTS под `flock` на `.letopis/index.lock`. Документы/Git — источник содержимого; служебная база — пересоздаваемый кэш (граф/FTS/строки files), векторы — в `.letopis/vectors.db` по search_hash ([D-91](decisions.md#D-91), [D-92](decisions.md#D-92)). Общие доменные правила отделены портами от Markdown, Git, базы и провайдера. Основные риски — стоимость обнаружения изменений на каждом вызове, корректность публикации по файлу при параллельных процессах и общий ресурсный бюджет; измерения ещё впереди.
@@ -67,9 +73,9 @@ letopis — локальное CLI-приложение без постоянн�
 | Embeddings | Общий порт с адаптерами Ollama и совместимого API | [D-13](decisions.md#D-13), [D-65](decisions.md#D-65)…[D-68](decisions.md#D-68) | Локальная модель входит в бюджет; цены/квоты произвольного remote не оценены |
 | HTTP и TLS (X-2) | `ureq` 3, блокирующий: без редиректов и прокси из окружения, таймаут попытки 60 s; rustls + `rustls-platform-verifier` (системные сертификаты) | [D-96](decisions.md#D-96), [D-83](decisions.md#D-83) | [TK-6 PASS](checks/TK-6/report.md), macOS/Linux ARM64, синтетические endpoints; без tokio/reqwest; повторы считает letopis в embed_failures, production-интеграция — TK-13/TK-27/TK-41 |
 | Markdown, JSON, хеши | `pulldown-cmark` (только разбор, байтовые диапазоны и `{#anchor}`); `serde`/`serde_json` со строгим вводом; `serde_json_canonicalizer` (JCS) для отпечатка config.json; `sha2` | [D-96](decisions.md#D-96) | Сериализатора Markdown нет: letopis не пишет корпус |
-| Git (X-3) | CLI `git` подпроцессом, argv/stdin без shell; минимум Git 2.29 (assumed) | [D-96](decisions.md#D-96) | Без libgit2/gix; версия проверяется в TK-8 |
+| Git (X-3) | Локальная `gix =0.90.0`, SHA-1/SHA-256, без subprocess/helpers/filters/network | [D-96](decisions.md#D-96), уточнение 2026-10-31 | Историческая CLI-граница TK-8 заменена; Git нужен авторам и fixture/oracle workflow |
 | Координация процессов | `flock` на `.letopis/index.lock` и `.letopis/embed.lock` (std::fs::File::lock); argv разбирается std | [D-94](decisions.md#D-94), [D-96](decisions.md#D-96) | Блокировку держит ядро и снимает при завершении процесса; NFS не поддерживается |
-| Процессы и сигналы | `libc::setsid` и 0/1/2 → /dev/null для drain; `signal-hook`: на SIGINT поток печатает единственный ответ ok:false/`cancelled` (once-guard на stdout) и завершает процесс с exit 1 в любой точке — SQL-шаг, ожидание flock, git-подпроцесс, HTTP | [D-96](decisions.md#D-96) | Незафиксированная транзакция откатывается как после сбоя (WAL, TK-2), flock снимает ядро, зафиксированная публикация остаётся; у drain обработчика нет: завершение по умолчанию, ответа нет, attempts сохранены. Доказательства: TK-2, TK-4 (смерть по сигналу), [TK-6](checks/TK-6/review.md) (HTTP и согласование cancelled с exit 1); TK-29 — все команды и остальные точки ожидания |
+| Процессы и сигналы | `libc::setsid` и 0/1/2 → /dev/null для drain; `signal-hook`: на SIGINT поток печатает единственный ответ ok:false/`cancelled` (once-guard на stdout) и завершает процесс с exit 1 в любой точке — SQL-шаг, ожидание flock, локальное чтение Git-объекта, HTTP | [D-96](decisions.md#D-96) | Незафиксированная транзакция откатывается как после сбоя (WAL, TK-2), flock снимает ядро, зафиксированная публикация остаётся; у drain обработчика нет: завершение по умолчанию, ответа нет, attempts сохранены. Доказательства: TK-2, TK-4 (смерть по сигналу), [TK-6](checks/TK-6/review.md) (HTTP и согласование cancelled с exit 1); TK-29 — все команды и остальные точки ожидания |
 
 Ни цена удалённого сервера, ни достаточность локального CPU/GPU не следуют из этой таблицы. Здесь не добавляются async runtime, ORM, брокер, HTTP-сервер, IPC или библиотека concurrency ([D-96](decisions.md#D-96)).
 
@@ -108,7 +114,7 @@ CLI-обработчики команд — отдельный входной с
 
 В одном crate `domain/` содержит чистые сущности/правила; `service/` — прикладные интерфейсы и реализации сценариев. По [D-99](decisions.md#D-99) отдельного каталога contracts/ports нет: небольшие принадлежащие приложению traits (`Storage`, `GitSnapshots` и интерфейсы сервисов) объявляются в `service/mod.rs`. Когда интерфейсы вырастают, их определения можно выделить по ответственности в приватные файлы и явно реэкспортировать из mod.rs, сохранив короткий путь `service::Storage`.
 
-Технологические реализации расположены в отдельных корневых модулях `storage/`, `git/`, `embedding/`, `markdown/` и `filesystem/`, без промежуточного каталога adapters. Их структуры реализуют принадлежащие service интерфейсы. Каждая конкретная реализация занимает собственный файл: `git/cli.rs` содержит `GitCli` и его inherent/trait impl, `storage/sqlite.rs` — `SqliteStorage` и его impl. То же правило действует для конкретных сервисов и других реализаций. mod.rs задаёт интерфейс модуля, объявляет дочерние модули и явно реэкспортирует нужные имена; тела конкретных реализаций находятся в отдельных файлах. Имена типов описывают ответственность/технологию без суффиксов Port/Adapter. Вспомогательные модули сохраняют собственную ответственность; пустые будущие файлы не создаются.
+Технологические реализации расположены в отдельных корневых модулях `storage/`, `git/`, `embedding/`, `markdown/` и `filesystem/`, без промежуточного каталога adapters. Их структуры реализуют принадлежащие service интерфейсы. Каждая конкретная реализация занимает собственный файл: `git/repository.rs` содержит `GitRepository` и его inherent/trait impl, `storage/sqlite.rs` — `SqliteStorage` и его impl. То же правило действует для конкретных сервисов и других реализаций. mod.rs задаёт интерфейс модуля, объявляет дочерние модули и явно реэкспортирует нужные имена; тела конкретных реализаций находятся в отдельных файлах. Имена типов описывают ответственность/технологию без суффиксов Port/Adapter. Вспомогательные модули сохраняют собственную ответственность; пустые будущие файлы не создаются.
 
 CLI вызывает интерфейсы сервисов; сервисы получают нужные реализации через конструктор и не импортируют конкретные Git/SQLite/provider-типы. По явному уточнению пользователя composition root расположен в `src/lib.rs`: здесь создаются конкретные структуры и передаются конструкторам сервисов через их интерфейсы. `src/main.rs` остаётся тонким запуском CLI. Storage, Git и Embedding не вызывают друг друга напрямую. Бизнес-алгоритмы остаются в service, Git/SQL/HTTP — в соответствующих модулях; ни домен, ни сервисы не зависят от корневой сборки.
 
@@ -145,7 +151,7 @@ flowchart LR
     Agent -->|"X-1 CLI / JSON"| System["⚙️ letopis"]
     Agent -->|"Edit and read files"| Docs["📄 Knowledge Markdown / X-4"]
     System -->|"X-4 read and check"| Docs
-    System -->|"X-3 local commands"| Git["Git tool and object store"]
+    System -->|"X-3 in-process library"| Git["Local Git object store"]
     Git -->|"Retained snapshots"| Docs
     System -->|"X-2 texts to vectors"| Provider["Embedding provider: local or explicitly configured remote"]
     System -->|"Read source locations via Git boundary"| Sources["Project source files"]
@@ -178,7 +184,7 @@ flowchart LR
         CLI -->|"X-4 read / check"| Markdown["📄 Knowledge Markdown"]
         CLI -->|"X-3 raw snapshots"| Objects["Git objects and service refs"]
     end
-    CLI -->|"X-3 command adapter"| Git["Local Git tool"]
+    CLI -->|"X-3 in-process library"| Git["Local Git object store"]
     CLI -->|"X-2 query vectors"| Provider["Local embedding process or configured remote server"]
     Drain -->|"X-2 document vectors"| Provider
     classDef primary fill:#d8eafe,stroke:#153e75,color:#102a43
@@ -295,7 +301,7 @@ Inspect отличается от search/traverse: B-4 запрашивает у
 
 **Ресурсы:** модель живёт в provider; процессы letopis её не загружают, поэтому «одна модель на агента» невозможна. Каждый вызов открывает кэш заново; горячие страницы держит кэш ОС. Обнаружение изменений стоит stat каждого файла корпуса на вызов (2 000–10 000 файлов по A-5) — измеряется в P-2. Снимок читателя живёт до конца запроса.
 
-**Поставка/эксплуатация:** Git и provider — внешние зависимости. letopis запускает только drain-процесс, который завершается сам; автоматическая установка модели, запуск Ollama, фоновый watcher и постоянный процесс не вводятся. Навык объясняет поиск, формат элемента, check, исправление висячих ссылок и получение source_snapshot средствами Git.
+**Поставка/эксплуатация (уточнение 2026-10-31):** бинарник Git не является runtime-зависимостью letopis; локальный object store читается библиотекой. Git нужен авторам для commits, чтения inspect snapshots и подготовки source_snapshot, разработчикам — для fixture/oracle workflow. Provider нужен только при включённых embeddings. letopis запускает только drain-процесс, который завершается сам; автоматическая установка модели, запуск Ollama, фоновый watcher и постоянный процесс не вводятся. Навык объясняет поиск, формат элемента, check, исправление висячих ссылок и получение source_snapshot средствами Git.
 
 ## 9. Traceability
 

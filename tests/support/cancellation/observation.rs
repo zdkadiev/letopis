@@ -124,6 +124,66 @@ pub fn observe_index_flock(pid: u32, lock: &Path) -> String {
     )
 }
 
+/// Observe a real Git ignore-file read, not stdin or a test-only product checkpoint.
+///
+/// # Panics
+/// Panics unless the native main-thread stack reaches the ignore reader before the watchdog.
+#[cfg(target_os = "macos")]
+pub fn observe_git_read(pid: u32, _path: &Path) -> String {
+    let deadline = Instant::now() + WAIT;
+    loop {
+        let trace = sample_process(pid);
+        if is_git_read_observed(&trace) {
+            return format!("inside=git-read\n{trace}");
+        }
+        assert!(
+            Instant::now() < deadline,
+            "no native Git read observed:\n{trace}"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+}
+
+/// Observe the native read syscall and its exact independently owned FIFO descriptor.
+///
+/// # Panics
+/// Panics unless the matching syscall/descriptor is observed before the watchdog.
+#[cfg(target_os = "linux")]
+pub fn observe_git_read(pid: u32, path: &Path) -> String {
+    wait_for_trace(
+        || {
+            let syscall = fs::read_to_string(format!("/proc/{pid}/syscall")).ok()?;
+            let fields: Vec<_> = syscall.split_whitespace().collect();
+            if fields.first()?.parse::<libc::c_long>().ok()? != libc::SYS_read {
+                return None;
+            }
+            let fd = u64::from_str_radix(fields.get(1)?.strip_prefix("0x")?, 16).ok()?;
+            let metadata = fs::metadata(format!("/proc/{pid}/fd/{fd}")).ok()?;
+            let expected = fs::metadata(path).ok()?;
+            if (metadata.dev(), metadata.ino()) != (expected.dev(), expected.ino()) {
+                return None;
+            }
+            Some(format!("inside=git-read\n{syscall}"))
+        },
+        "Git ignore FIFO read",
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn is_git_read_observed(trace: &str) -> bool {
+    let main = get_main_thread_trace(trace).unwrap_or("");
+    let corpus = main.lines().any(|line| {
+        line.contains("letopis::git::corpus::list_candidates")
+            || (line.contains("letopis..git..repository..GitRepository")
+                && line.contains("..CorpusLister")
+                && line.contains("::list_candidates"))
+    });
+    // Optimized builds may inline the free function into its trait caller.
+    corpus
+        && main.contains("gix_glob::search::pattern::read_in_full")
+        && has_native_frame(main, "read", "libsystem_kernel.dylib")
+}
+
 #[cfg(target_os = "macos")]
 fn sample_process(pid: u32) -> String {
     let trace = tempfile::NamedTempFile::new().expect("sample file");
@@ -217,5 +277,40 @@ fn wait_for_trace(mut observe: impl FnMut() -> Option<String>, waiting: &str) ->
         }
         assert!(Instant::now() < deadline, "process never entered {waiting}");
         thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::is_git_read_observed;
+
+    #[test]
+    fn git_read_observer_recognizes_debug_and_inlined_release_frames() {
+        // Given: independent abbreviated frames from the actual debug/release native stacks.
+        for caller in [
+            "letopis::git::corpus::list_candidates::h123",
+            "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..document_traits..CorpusLister$GT$::list_candidates::h123",
+        ] {
+            let trace = format!(
+                "900 Thread_1 com.apple.main-thread\n+ 900 {caller} (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full_ignore_missing (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n900 Thread_2 letopis-sigint\n"
+            );
+            // When: the observer classifies the stack without relying on one uninlined symbol.
+            let observed = is_git_read_observed(&trace);
+            // Then: either real corpus call path acknowledges the main-thread Git read.
+            assert!(observed, "{caller}");
+        }
+    }
+
+    #[test]
+    fn git_read_observer_rejects_incomplete_or_wrong_thread_evidence() {
+        // Given: counted native reads alone, another thread's Git stack, or no native read.
+        let other_thread = "900 Thread_1 com.apple.main-thread\n+ 900 read (in libsystem_kernel.dylib)\n900 Thread_2 worker\n+ 900 letopis::git::corpus::list_candidates (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let no_native = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::corpus::list_candidates (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n";
+        let no_corpus = "900 Thread_1 com.apple.main-thread\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let no_git_reader = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::corpus::list_candidates (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        // When / Then: none authorizes signalling at the required product boundary.
+        for trace in [other_thread, no_native, no_corpus, no_git_reader] {
+            assert!(!is_git_read_observed(trace));
+        }
     }
 }

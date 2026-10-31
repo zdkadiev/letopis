@@ -104,6 +104,9 @@ pub use status_types::{
 };
 pub use storage::{CacheWrite, StatusStorage, Storage, StorageRead, VectorWrite};
 
+/// Maximum number of already available bindings submitted in one observation batch.
+const PROVENANCE_BATCH_SIZE: usize = 256;
+
 /// Read-only live configuration and nonblocking kernel-lock observations.
 /// Implementations never create service state or write an owner PID while observing.
 pub trait StatusFiles {
@@ -215,6 +218,25 @@ pub trait SourceProvenance {
         &self,
         request: ProvenanceRequest<'_>,
     ) -> DocumentResult<ProvenanceObservation>;
+    /// Observe ordered bindings with one result per request and fresh live captures.
+    ///
+    /// Stops at the same first demanded error as sequential observation. Implementations
+    /// may reuse bounded immutable historical successes for this call only; no persistent
+    /// cache or retention is allowed. The default preserves existing test doubles and
+    /// implementations by calling `observe_sources` sequentially.
+    ///
+    /// # Errors
+    /// Returns the first filesystem, Git policy, I/O or corruption failure.
+    fn observe_sources_batch(
+        &self,
+        requests: &[ProvenanceRequest<'_>],
+    ) -> DocumentResult<Vec<ProvenanceObservation>> {
+        requests
+            .iter()
+            .map(|request| self.observe_sources(*request))
+            .collect()
+    }
+
     /// Compare one address across a declared basis and an explicit requested tree.
     ///
     /// Validates the requested root before returning any unavailable/unknown state.

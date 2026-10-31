@@ -1,17 +1,8 @@
 use serde_json::Value;
 use std::{
-    ffi::{CString, OsStr, OsString},
+    ffi::CString,
     fs::{self, File, OpenOptions},
-    io::{BufRead, BufReader, Read},
-    net::Shutdown,
-    os::{
-        fd::AsRawFd,
-        unix::{
-            ffi::OsStrExt,
-            fs::{MetadataExt, PermissionsExt},
-            net::{UnixListener, UnixStream},
-        },
-    },
+    os::unix::{ffi::OsStrExt, fs::MetadataExt},
     path::{Path, PathBuf},
     process::Output,
     thread,
@@ -123,229 +114,46 @@ pub fn read_lock_identity(path: &Path) -> (u64, u64) {
     (metadata.dev(), metadata.ino())
 }
 
-/// Own the Unix listener that receives a live wrapper acknowledgement.
+/// Own a FIFO read by the real in-process Git ignore stack while index.lock is held.
 #[derive(Debug)]
-pub struct ObserverSocket {
-    _directory: TempDir,
-    listener: UnixListener,
+pub struct GitReadBarrier {
+    directory: TempDir,
+    file: File,
+    path: PathBuf,
 }
-impl ObserverSocket {
-    /// Bind an owned observer socket in a short temporary path.
+impl GitReadBarrier {
+    /// Create an untracked directory whose ignore file cannot reach EOF until released.
     ///
     /// # Panics
-    /// Panics if temporary directory creation or socket binding fails.
-    pub fn new() -> Self {
+    /// Panics if the private fixture directory/FIFO cannot be created.
+    pub fn new(root: &Path) -> Self {
         let directory = tempfile::Builder::new()
-            .prefix("tk29-observer-")
-            .tempdir_in("/tmp")
-            .expect("observer directory");
-        let address = directory.path().join("control.sock");
-        let listener = UnixListener::bind(&address).expect("observer listener");
+            .prefix("cancel-git-")
+            .tempdir_in(root)
+            .unwrap();
+        let (file, temporary) = create_stdin_fifo(directory.path());
+        let path = directory.path().join(".gitignore");
+        fs::rename(temporary, &path).unwrap();
         Self {
-            _directory: directory,
-            listener,
+            directory,
+            file,
+            path,
         }
     }
-
-    pub fn get_path(&self) -> PathBuf {
-        self._directory.path().join("control.sock")
+    /// Require native evidence that this process reached the actual ignore-file read.
+    pub fn observe(&self, pid: u32) {
+        let trace = observation::observe_git_read(pid, &self.path);
+        assert!(trace.starts_with("inside=git-read"), "{trace}");
     }
-
-    pub fn get_listener(&self) -> &UnixListener {
-        &self.listener
+    /// Check cancellation did not remove or replace this independently owned FIFO.
+    pub fn assert_owned(&self) {
+        let held = self.file.metadata().unwrap();
+        let named = fs::metadata(&self.path).unwrap();
+        assert_eq!((held.dev(), held.ino()), (named.dev(), named.ino()));
     }
-}
-
-/// Test-owned Git executable that proxies non-target argv and reports the live `ls-files` child.
-#[derive(Debug)]
-pub struct GitProxy {
-    _directory: TempDir,
-    path: OsString,
-}
-impl GitProxy {
-    /// Create an executable Git proxy that acknowledges the targeted child.
-    ///
-    /// # Panics
-    /// Panics if tools cannot be resolved or the executable cannot be created.
-    pub fn new(observer: &Path) -> Self {
-        let python = resolve_program("python3").display().to_string();
-        let real_git = resolve_program("git");
-        let directory = tempfile::Builder::new()
-            .prefix("tk29-git-")
-            .tempdir_in("/tmp")
-            .expect("proxy directory");
-        let script = directory.path().join("git");
-        fs::write(
-            &script,
-            format!(
-                "#!{python}\n\
-                 import json, os, socket, sys\n\
-                 REAL = {real_git:?}\n\
-                 OBSERVER = {observer:?}\n\
-                 arguments = sys.argv[1:]\n\
-                 if \"ls-files\" not in arguments:\n\
-                 \x20   os.execv(REAL, [REAL] + arguments)\n\
-                 connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)\n\
-                 connection.connect(OBSERVER)\n\
-                 connection.sendall(json.dumps({{\"pid\": os.getpid(), \"argv\": arguments}}).encode() + b\"\\n\")\n\
-                 while connection.recv(4096):\n\
-                 \x20   pass\n"
-            ),
-        )
-        .expect("write Git proxy");
-        fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).expect("proxy mode");
-        let mut entries = vec![directory.path().to_path_buf()];
-        if let Some(existing) = std::env::var_os("PATH") {
-            entries.extend(std::env::split_paths(&existing));
-        }
-        Self {
-            _directory: directory,
-            path: std::env::join_paths(entries).expect("proxy PATH"),
-        }
+    /// Release and remove the fixture before retrying the normal command.
+    pub fn release(self) {
+        drop(self.file);
+        self.directory.close().unwrap();
     }
-
-    pub fn get_path(&self) -> &OsStr {
-        &self.path
-    }
-}
-
-/// The acknowledged live Git wrapper and a guard that releases it on every exit path.
-#[derive(Debug)]
-pub struct WrapperConnection {
-    stream: Option<UnixStream>,
-    pid: i32,
-}
-impl WrapperConnection {
-    /// Accept and validate one live ls-files acknowledgement within the watchdog.
-    ///
-    /// # Panics
-    /// Panics on timeout, I/O failure or a malformed child acknowledgement.
-    pub fn accept(listener: &UnixListener) -> Self {
-        wait_readable(listener.as_raw_fd(), WAIT);
-        let (stream, _) = listener.accept().expect("wrapper connection");
-        stream
-            .set_read_timeout(Some(WAIT))
-            .expect("wrapper read timeout");
-        let mut reader = BufReader::new(stream.try_clone().expect("wrapper stream"));
-        let mut line = String::new();
-        assert!(
-            reader
-                .read_line(&mut line)
-                .expect("wrapper acknowledgement")
-                > 0,
-            "wrapper closed before acknowledgement"
-        );
-        let acknowledgement: Value = serde_json::from_str(&line).expect("wrapper JSON");
-        let pid = i32::try_from(acknowledgement["pid"].as_u64().expect("wrapper pid"))
-            .expect("wrapper pid range");
-        let argv = acknowledgement["argv"].as_array().expect("wrapper argv");
-        assert!(
-            argv.iter().any(|value| value.as_str() == Some("ls-files")),
-            "wrapper was not the target Git invocation"
-        );
-        Self {
-            stream: Some(stream),
-            pid,
-        }
-    }
-
-    /// Assert that the acknowledged child still holds its observer connection.
-    ///
-    /// # Panics
-    /// Panics if the stream is absent or has closed or unexpected pending data.
-    pub fn assert_alive(&self) {
-        let stream = self.stream.as_ref().expect("observer stream");
-        let revents = poll_observer(stream, Duration::ZERO);
-        assert_eq!(
-            revents, 0,
-            "abandoned Git wrapper {} closed its observer socket",
-            self.pid
-        );
-    }
-
-    /// Release the child and consume its observer EOF within the watchdog.
-    ///
-    /// # Panics
-    /// Panics on I/O failure, timeout or unexpected child output.
-    pub fn release_and_wait(mut self) {
-        let stream = self.stream.take().expect("observer stream");
-        stream.shutdown(Shutdown::Write).expect("wrapper release");
-        let revents = wait_for_observer_close(&stream, WAIT);
-        assert_ne!(revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR), 0);
-        let mut reader = stream.try_clone().expect("wrapper reader");
-        let mut byte = [0];
-        assert_eq!(
-            reader.read(&mut byte).expect("wrapper EOF"),
-            0,
-            "Git wrapper wrote unexpected data"
-        );
-    }
-}
-impl Drop for WrapperConnection {
-    fn drop(&mut self) {
-        if let Some(stream) = self.stream.take() {
-            let _ = stream.shutdown(Shutdown::Both);
-        }
-    }
-}
-
-fn wait_readable(fd: i32, timeout: Duration) {
-    let mut poll = libc::pollfd {
-        fd,
-        events: libc::POLLIN,
-        revents: 0,
-    };
-    // SAFETY: `poll` points to one initialized entry for the live listener.
-    let ready = unsafe {
-        libc::poll(
-            &raw mut poll,
-            1,
-            i32::try_from(timeout.as_millis()).expect("poll timeout"),
-        )
-    };
-    assert_eq!(ready, 1, "observer connection timeout");
-}
-
-fn wait_for_observer_close(stream: &UnixStream, timeout: Duration) -> i16 {
-    let deadline = Instant::now() + timeout;
-    loop {
-        let revents = poll_observer(stream, Duration::ZERO);
-        if revents != 0 {
-            return revents;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "Git wrapper did not close its observer socket"
-        );
-        thread::sleep(Duration::from_millis(5));
-    }
-}
-
-fn poll_observer(stream: &UnixStream, timeout: Duration) -> i16 {
-    let mut poll = libc::pollfd {
-        fd: stream.as_raw_fd(),
-        events: libc::POLLIN | libc::POLLHUP | libc::POLLERR,
-        revents: 0,
-    };
-    // SAFETY: `poll` points to one initialized entry for the live wrapper socket.
-    let ready = unsafe {
-        libc::poll(
-            &raw mut poll,
-            1,
-            i32::try_from(timeout.as_millis()).expect("poll timeout"),
-        )
-    };
-    assert!(ready >= 0, "observer poll failed");
-    if ready == 0 { 0 } else { poll.revents }
-}
-
-fn resolve_program(name: &str) -> PathBuf {
-    let path = std::env::var_os("PATH").unwrap_or_default();
-    for directory in std::env::split_paths(&path) {
-        let candidate = directory.join(name);
-        if candidate.is_file() {
-            return candidate;
-        }
-    }
-    panic!("required program {name} was not found on PATH");
 }

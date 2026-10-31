@@ -12,10 +12,7 @@ mod cancellation;
 mod cli;
 mod support;
 
-use cancellation::{
-    GitProxy, ObserverSocket, WAIT, WrapperConnection, assert_cancelled_output,
-    wait_until_index_lock_free,
-};
+use cancellation::{GitReadBarrier, WAIT, assert_cancelled_output, wait_until_index_lock_free};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -173,6 +170,10 @@ fn configure_and_publish(workflow: &Workflow, endpoint: &str) {
     let status = workflow.invoke_command("status", b"{}", 0);
     assert_eq!(status["result"]["revision"], Value::Null);
     assert_eq!(status["result"]["problems"], json!([]));
+    // The fixture seeds vectors itself; exclude the detached drain while owning that setup.
+    use letopis::service::EmbeddingFiles;
+    let files = letopis::open_embedding_files(workflow.repo.get_root()).unwrap();
+    let _embedding_setup = files.try_lock_embed().unwrap().unwrap();
     assert_eq!(
         workflow.invoke_command("reindex", b"{}", 0),
         json!({"ok":true,"result":{"revision":1}})
@@ -304,11 +305,10 @@ fn assert_repaired_configuration(workflow: &Workflow, endpoint: &str) {
 }
 
 fn assert_cancelled_refresh_is_retryable(workflow: &Workflow) {
-    let observer = ObserverSocket::new();
-    let proxy = GitProxy::new(&observer.get_path());
-    let mut child = spawn_check_with_path(&workflow.repo, proxy.get_path());
+    let barrier = GitReadBarrier::new(workflow.repo.get_root());
+    let mut child = spawn_check_with_path(&workflow.repo, OsStr::new("/nonexistent-letopis-git"));
     child.send_input(b"{}");
-    let wrapper = WrapperConnection::accept(observer.get_listener());
+    barrier.observe(child.get_id());
     child.send_sigint();
     let output = child.collect_output(WAIT);
     assert_cancelled_output(
@@ -320,8 +320,8 @@ fn assert_cancelled_refresh_is_retryable(workflow: &Workflow) {
     emit_envelope("check", 1, &response);
     let lock = workflow.repo.get_root().join(".letopis/index.lock");
     wait_until_index_lock_free(&lock);
-    wrapper.assert_alive();
-    wrapper.release_and_wait();
+    barrier.assert_owned();
+    barrier.release();
     let retried = workflow.invoke_command("check", b"{}", 0);
     assert_eq!(retried, json!({"ok":true,"result":{"errors":[]}}));
 }

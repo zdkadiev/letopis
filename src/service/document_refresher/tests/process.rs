@@ -3,7 +3,7 @@ use super::super::DocumentRefreshService;
 use crate::{
     domain::{Edge, RepoPath, Sha256},
     filesystem::LocalFileSystem,
-    git::GitCli,
+    git::GitRepository,
     markdown::MarkdownParser,
     service::{
         CacheWrite, EmbeddingFailure, FileRow, FileSystem, GraphDiagnosticsService, NodeMetadata,
@@ -54,11 +54,11 @@ const CUTS: [&str; 10] = [
     "after_commit",
 ];
 type Service = DocumentRefreshService<
-    GitCli,
+    GitRepository,
     LocalFileSystem,
     MarkdownParser,
     SqliteStorage,
-    ProvenanceService<GitCli, LocalFileSystem>,
+    ProvenanceService<GitRepository, LocalFileSystem>,
 >;
 type Tokens = Vec<(String, i64, String, i64)>;
 thread_local! {
@@ -728,13 +728,13 @@ fn read_vectors(root: &Path) -> VectorState {
 }
 
 fn read_status(root: &Path) -> StatusReport {
-    let git = GitCli::open(root).unwrap();
+    let git = GitRepository::open(root).unwrap();
     let files = LocalFileSystem::open(git.get_root()).unwrap();
     let pinned = files.open_existing_service_directory().unwrap().unwrap();
     let storage =
         SqliteStatusStorage::open_confined(&git.get_root().join(".letopis"), &pinned).unwrap();
     let provenance = ProvenanceService::new(
-        GitCli::open(root).unwrap(),
+        GitRepository::open(root).unwrap(),
         LocalFileSystem::open(root).unwrap(),
     );
     let provider = crate::build_embedding_provider().unwrap();
@@ -762,14 +762,14 @@ fn get_invalid_file_problems(report: &StatusReport) -> Vec<(String, String)> {
 }
 
 fn build_service(root: &Path) -> Service {
-    let git = GitCli::open(root).unwrap();
+    let git = GitRepository::open(root).unwrap();
     let mut filesystem = LocalFileSystem::open(git.get_root()).unwrap();
     filesystem.configure_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
     let directory = filesystem.open_service_directory().unwrap();
     let storage =
         SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory).unwrap();
     let provenance = ProvenanceService::new(
-        GitCli::open(root).unwrap(),
+        GitRepository::open(root).unwrap(),
         LocalFileSystem::open(root).unwrap(),
     );
     DocumentRefreshService {

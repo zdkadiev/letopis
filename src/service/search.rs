@@ -13,7 +13,9 @@ use std::{
     num::NonZeroUsize,
 };
 
+mod comparisons;
 mod ranking;
+use comparisons::RevisionComparisons;
 use ranking::{rank_candidates, validate_metrics};
 
 /// Borrow disjoint read-only boundaries while storage owns the pinned read view.
@@ -85,10 +87,11 @@ impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
         metadata: &BTreeMap<KnowledgeId, KnowledgeMetadata>,
         filters: &SearchFilters,
     ) -> CommandResult<BTreeMap<KnowledgeId, SearchLink>> {
+        let mut comparisons = RevisionComparisons::new(self.provenance);
         let mut links = BTreeMap::new();
         for (id, node) in metadata {
             let sources = read_source_bindings(read, id)?;
-            if !self.matches_sources(node, &sources, filters)? {
+            if !Self::matches_sources(&mut comparisons, node, &sources, filters)? {
                 continue;
             }
             let mut link = build_link(node, read.get_revision(), self.filesystem, self.markdown)?;
@@ -108,7 +111,7 @@ impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
     }
 
     fn matches_sources(
-        &self,
+        comparisons: &mut RevisionComparisons<'_>,
         node: &KnowledgeMetadata,
         sources: &BTreeSet<SourceUri>,
         filters: &SearchFilters,
@@ -123,7 +126,7 @@ impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
             if filters.source_revisions.is_empty() {
                 return Ok(true);
             }
-            if self.matches_revision(node, source, filters)? {
+            if Self::matches_revision(comparisons, node, source, filters)? {
                 return Ok(true);
             }
         }
@@ -131,14 +134,13 @@ impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
     }
 
     fn matches_revision(
-        &self,
+        comparisons: &mut RevisionComparisons<'_>,
         node: &KnowledgeMetadata,
         source: &SourceUri,
         filters: &SearchFilters,
     ) -> CommandResult<bool> {
         for revision in &filters.source_revisions {
-            let comparison = self
-                .provenance
+            let comparison = comparisons
                 .compare_revision(SourceRevisionRequest {
                     source_snapshot: node.source_snapshot.as_ref(),
                     source,
