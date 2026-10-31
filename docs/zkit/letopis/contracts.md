@@ -8,6 +8,12 @@
 > **Links:** [требования](requirements.md) · [решения](decisions.md) · [отчёт](appendix/migration.md)
 
 ## Changes since previous version
+
+2026-10-31: [D-106](decisions.md#D-106), issue #69: X-4 требует единственный title
+`letopis:type=TYPE;path=ADDRESS` с terminal canonical path. Локальный destination
+сравнивается лексически от документа без fragments/existence I/O; remote source
+исключён. LinkPathMismatch публикуется в files.error, check/status показывают
+link_path_mismatch; status read-only. Upgrade требует [явного reindex](../../development.md#issue-69-обязательный-path-и-явный-reindex), fallback нет.
 2026-10-29: По [D-104](decisions.md#D-104) X-1 добавляет `init` и вложенную `embedding_model`; старый плоский config требует ручной миграции, disabled настройки валидируются локально, векторы/попытки сохраняются. X-2 уточняет disabled FTS/inference. Новых runtime, зависимостей и таблиц нет.
 2026-10-21: По [D-96](decisions.md#D-96) зафиксирован стек: X-1 — SIGINT отменяет вызов единственным ответом ok:false/cancelled и exit 1 в любой точке (SQL, flock, git, HTTP), у drain обработчика нет; X-2 — `ureq` 3 без redirect и прокси окружения, 60 s на попытку, системное хранилище сертификатов; X-3 — CLI `git` подпроцессом, минимум 2.29 (assumed); X-4 — разбор `pulldown-cmark`, сериализатора нет. По [D-95](decisions.md#D-95) сняты остатки в I-4/I-8/I-12 (снимок только у inspect, без file_hash и mutation replay). Поля и команды не меняются.
 2026-10-20: По [D-95](decisions.md#D-95) производное состояние не хранится. X-1: удалены errors, errors --clear, config --set, reindex --cancel и выборочный reindex; status = revision (счётчик публикаций), embedding_backlog, embedding_failed, locks, problems (текущие проблемы, без details.active); config только читает файл, который правится напрямую; Link.revision — счётчик, не OID. X-4: поле kind удалено, метавершина выводится. I-11 — текущие проблемы вместо хранения диагностики; I-2 без признака активности рёбер, заданий и Git-дерева публикации; I-8 без прогресса reindex; I-12 только для inspect. X-2: очередь заданий заменена текстами без вектора.

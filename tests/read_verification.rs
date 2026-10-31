@@ -21,7 +21,7 @@ fn all_commands_and_freshness_preserve_canonical_bytes() {
     assert_ok(&repo.invoke(&["init"], b"{}"));
     repo.write_knowledge(
         "a.md",
-        "AlphaToken [peer](b.md \"letopis:type=depends_on\")",
+        "AlphaToken [peer](b.md \"letopis:type=depends_on;path=b.md\")",
     );
     repo.write_knowledge("b.md", "BravoToken");
     let before = fs::read(repo.get_root().join("a.md")).unwrap();

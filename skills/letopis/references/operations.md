@@ -89,6 +89,34 @@ edits need only the next refreshing command; use `reindex` after cache loss or
 a deliberate full rebuild. A physically corrupt cache is a separate recovery
 decision, not something this command silently repairs.
 
+## Mandatory-path upgrade (issue #69)
+
+Marked links require `letopis:type=TYPE;path=ADDRESS` with the complete terminal
+address as the sole graph/source target. There is no legacy fallback, automatic
+rewrite or parser-version migration. For this breaking binary upgrade:
+
+1. Wait for prior Letopis calls and detached drains using this repository to finish.
+2. Install/use the new binary consistently; do not mix versions on the same cache.
+3. Add the intended canonical root-relative `path` to every marked title. Repair
+   local destinations relative to their containing document; fragments remain
+   independent. Preserve created_at and checked source_snapshot bases.
+4. Run `printf '%s\n' '{}' | letopis reindex`, then the same empty request to
+   `letopis check`. Ordinary incremental refresh can skip unchanged files.
+5. Resolve markup findings and review other provenance findings before trusting
+   the migration. Reindex retains last-valid projections of invalid files, so its
+   success alone does not prove every declaration migrated.
+
+Preserve cache.db, vectors.db, configuration, locks, Git and authored documents.
+`status` never reparses or upgrades the cache. A local path mismatch is published
+through existing `files.error`; check/status expose `validation_failed`, reason
+`link_path_mismatch`, message `Markdown link path does not match letopis path`,
+and only the containing file in details.path. A fresh cache publishes no partial
+projection of an invalid file. Status shows a new mismatch only after refresh or
+reindex publishes it; an author fix alone leaves the cached finding until the
+next successful refresh/reindex. Other valid files continue to publish. There is
+no fragment/existence/viewer validation or lookup; HTTP/HTTPS sources are exempt
+from local-file comparison. This does not replace independent graph/provenance checks.
+
 ## Cancel your own foreground call
 
 SIGINT is handled for your own `search`, `traverse`, `inspect`, `check` and

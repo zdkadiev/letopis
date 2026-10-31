@@ -36,7 +36,9 @@ pub fn build_note(snapshot: Option<&TreeOid>, sources: &[&str], body: &str) -> S
     }
     let mut note = format!("<!-- letopis: {metadata} -->\n{body}\n");
     for source in sources {
-        note.push_str(&format!("[source]({source} \"letopis:type=external\")\n"));
+        note.push_str(&format!(
+            "[source]({source} \"letopis:type=external;path={source}\")\n"
+        ));
     }
     note
 }

@@ -63,9 +63,9 @@ fn metadata_and_link_changes_keep_search_hash() {
 
 #[test]
 fn own_text_label_and_code_change_search_hash() {
-    // Given
+    // Given: independently varying visible prose, label and code.
     let original = build_whole_file(
-        "Own text [Label](b.md \"letopis:type=depends_on\").\n\n```rs\nlet a = 1;\n```\n",
+        "Own text [Label](b.md \"letopis:type=depends_on;path=b.md\").\n\n```rs\nlet a = 1;\n```\n",
     );
     let base = parse_file("a.md", &original);
     // Fixture baseline supplies the expected search hash.
@@ -74,9 +74,9 @@ fn own_text_label_and_code_change_search_hash() {
         original.replace("Label", "Other label"),
         original.replace("a = 1", "a = 2"),
     ] {
-        // When
+        // When: parse each visible-content edit.
         let next = parse_file("a.md", &changed);
-        // Then
+        // Then: changed visible bytes must alter the search hash.
         assert_ne!(base.elements[0].search_hash, next.elements[0].search_hash);
     }
 }
@@ -155,8 +155,31 @@ fn crlf_metadata_line_does_not_add_search_whitespace() {
     assert_ne!(a.elements[0].element.hash, b.elements[0].element.hash);
 }
 
+#[test]
+fn equivalent_link_syntax_preserves_literal_search_text_and_hash() {
+    // Given: canonical and navigation spellings may change without visible text.
+    let original = build_whole_file("Static [Label](b.md \"letopis:type=related_to;path=b.md\").");
+    let base = parse_file("a.md", &original);
+    for changed in [
+        original.replace("(b.md ", "(./b.md#viewer "),
+        original.replace("(b.md ", "(%62.md#different "),
+        original.replace("path=b.md", "path=./b.md"),
+    ] {
+        // When: parse equivalent local link spellings.
+        let next = parse_file("a.md", &changed);
+        // Then: exact bytes change while the independently hashed visible text stays fixed.
+        assert_ne!(base.elements[0].element.hash, next.elements[0].element.hash);
+        assert_eq!(next.elements[0].search_text, "Static Label.");
+        assert_eq!(
+            next.elements[0].search_hash.to_hex(),
+            "81355fad83b8908a4d1b457f6110f23d6adfb887d5ec9cbd7514e683a932e01d"
+        );
+        assert_eq!(base.elements[0].search_hash, next.elements[0].search_hash);
+    }
+}
+
 fn build_note(anchor: &str, created: u64, snapshot: &str, target: &str, kind: &str) -> String {
     format!(
-        "## WAL {{#{anchor}}}\n<!-- letopis: {{\"created_at\":{created},\"source_snapshot\":\"{snapshot}\"}} -->\nUse **safe** [SQLite]({target} \"letopis:type={kind}\").\n"
+        "## WAL {{#{anchor}}}\n<!-- letopis: {{\"created_at\":{created},\"source_snapshot\":\"{snapshot}\"}} -->\nUse **safe** [SQLite]({target} \"letopis:type={kind};path={target}\").\n"
     )
 }

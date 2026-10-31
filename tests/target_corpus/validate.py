@@ -6,13 +6,14 @@ from dataclasses import dataclass, field
 import hashlib
 import json
 import os
+import posixpath
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
 
 HEADER = re.compile(rb'^## Synthetic knowledge (\d{6,}) \{#(node-\d{6,})\}\n'
                     rb'<!-- letopis: (\{[^\n]+\}) -->\n', re.MULTILINE)
-LINK = re.compile(r'\[([^\]\n]+)\]\(([^\s)]+) "letopis:type=([a-z][a-z0-9_]*)"\)')
+LINK = re.compile(r'\[([^\]\n]+)\]\(([^\s)]+) "letopis:type=([a-z][a-z0-9_]*);path=([^"\n]+)"\)')
 SOURCE = re.compile(r'(sources/shard-\d{4,}\.txt)#L([1-9]\d*)-L([1-9]\d*)')
 
 
@@ -187,7 +188,12 @@ def _read_fragment(inspection: Inspection, fragment: _Fragment, tree: str) -> No
     links = LINK.findall(text)
     if text.count('"letopis:type=') != len(links):
         raise ValueError("invalid graph link")
-    for _, target, relation in links:
+    for _, navigation, relation, target in links:
+        containing_file = identity.split("#", 1)[0]
+        navigation_file = posixpath.normpath(posixpath.join(
+            posixpath.dirname(containing_file), navigation.split("#", 1)[0]))
+        if navigation_file != target.split("#", 1)[0]:
+            raise ValueError("navigation path disagrees with canonical target")
         edge = (identity, target, relation)
         if edge in inspection.edges:
             raise ValueError("duplicate edge triple")

@@ -64,7 +64,7 @@ def mask_external_edges(fixture: dict) -> dict:
     for path in sorted(fixture["repository"].glob("knowledge/*.md")):
         lines = path.read_bytes().splitlines(keepends=True)
         for index, line in enumerate(lines):
-            if line.startswith(b"[source](") and b'"letopis:type=external"' in line:
+            if line.startswith(b"[source](") and b'"letopis:type=external;path=' in line:
                 lines[index] = b" " * (len(line) - 1) + b"\n"
                 removed += 1
         path.write_bytes(b"".join(lines))

@@ -111,14 +111,15 @@ snapshot. Search/traverse results likewise do not lock later filesystem reads.
 
 IDs derive from Git-root-relative path and optional anchor; do not write a UUID.
 Keep `created_at` when editing or renaming an existing element. For new concept
-files, use a whole-file element with metadata on line one:
+files, use a whole-file element with metadata on line one. Both examples below
+are authored in `letopis/cache/cache-key.md`:
 
 ```markdown
 <!-- letopis: {"created_at":1792800000,"source_snapshot":"<verified-tree-oid>"} -->
 # Cache key
 
 Cache keys use the source hash.
-[code](src/cache.rs#L2-L4 "letopis:type=external")
+[code](../../src/cache.rs#L2-L4 "letopis:type=external;path=src/cache.rs#L2-L4")
 ```
 
 Existing documents may use section elements. When maintaining one, place metadata
@@ -129,14 +130,30 @@ concepts:
 ## Cache key {#cache-key}
 <!-- letopis: {"created_at":1792800000,"source_snapshot":"<verified-tree-oid>"} -->
 Cache keys use the source hash.
-[code](src/cache.rs#L2-L4 "letopis:type=external")
-[invalidation](letopis/cache/cache-invalidation.md "letopis:type=related_to")
+[code](../../src/cache.rs#L2-L4 "letopis:type=external;path=src/cache.rs#L2-L4")
+[invalidation](cache-invalidation.md "letopis:type=related_to;path=letopis/cache/cache-invalidation.md")
 ```
 
 Do not mix a whole-file element with marked sections or nest marked elements.
 Knowledge anchors begin with a letter and contain letters, digits, `_` or `-`;
-source `#Lstart-Lend` is an inclusive line address. Link paths remain Git-root
-relative even inside nested folders. `external` binds a source and `includes`
+source `#Lstart-Lend` is an inclusive line address. The mandatory title is exactly
+`letopis:type=TYPE;path=ADDRESS`, where TYPE
+matches `[a-z][a-z0-9_]*`. `path` is terminal: its complete nonempty remainder is
+the canonical target, including allowed semicolons, equals signs and spaces.
+Keys/order are fixed; no extra field or `target` alias is accepted. Old marked
+links without `path` are invalid, with no fallback. Markdown handles its own
+escapes/entities; the title receives no extra percent decoding or trimming.
+Canonical local paths remain Git-root relative even inside nested folders.
+Author ordinary destinations relative to the containing document. Letopis compares
+only their local file path, lexically normalizing `.`/`..` within the root after
+one UTF-8 percent decode. The title keeps literal filenames: a space stays a
+space, `%20` stays `%20`; use `%20`/`%25` in navigation for space/percent filenames.
+Unsupported absolute/scheme/query paths, root escapes, malformed encoding, controls,
+backslashes and encoded `/` produce a mismatch. Destination fragments are ignored;
+no existence, fragment, symlink, viewer or network lookup is performed. Remote
+HTTP/HTTPS source targets are exempt from this comparison and remain opaque.
+See the [exact navigation rules](../../docs/zkit/letopis/contracts/X-4-markdown.md#link-path).
+`external` binds a source and `includes`
 defines containment; other relation names follow lowercase underscore grammar.
 Plain Markdown links do not create graph edges. Check after every edit, then
 search/inspect the saved ID and read its returned tree bytes.
@@ -186,7 +203,9 @@ supports the statement.
 
 For first-time setup, embedding configuration, status diagnostics, or a deliberate
 rebuild, read [operations](references/operations.md). Ordinary Markdown edits need
-the next refreshing command, not a manual reindex. Before cancelling a command,
+the next refreshing command. The mandatory-path binary upgrade requires an
+[explicit reindex](references/operations.md#mandatory-path-upgrade-issue-69), even
+for unchanged files; status alone cannot perform it. Before cancelling a command,
 read [foreground cancellation](references/operations.md#cancel-your-own-foreground-call).
 
 The public CLI has `init`, `check`, `config`, `search`, `status`, `traverse`,

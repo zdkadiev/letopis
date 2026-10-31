@@ -13,7 +13,10 @@ use support::{documents::build_whole, git::isolate_command, reading::ReadingRepo
 fn check_tracks_file_and_directory_rename_without_touching_sources() {
     // Given: the target is tracked, while the source keeps its original literal link.
     let repo = ReadingRepo::new();
-    let source = build_whole(7, "[target](knowledge/old.md \"letopis:type=supports\")");
+    let source = build_whole(
+        7,
+        "[target](knowledge/old.md \"letopis:type=supports;path=knowledge/old.md\")",
+    );
     repo.write("source.md", source.as_bytes());
     repo.write(
         "knowledge/old.md",
@@ -68,7 +71,10 @@ fn check_tracks_file_and_directory_rename_without_touching_sources() {
 fn check_tracks_anchor_rename_removal_and_repair() {
     // Given
     let repo = ReadingRepo::new();
-    let source = build_whole(7, "[target](target.md#old \"letopis:type=supports\")");
+    let source = build_whole(
+        7,
+        "[target](target.md#old \"letopis:type=supports;path=target.md#old\")",
+    );
     repo.write("source.md", source.as_bytes());
     // Given
     repo.write("target.md", build_section("old").as_bytes());
@@ -111,7 +117,10 @@ fn check_tracks_anchor_rename_removal_and_repair() {
         check_preserving_source(&repo, &source),
         build_dangling("target.md#old")
     );
-    let repaired = build_whole(7, "[target](target.md#new \"letopis:type=supports\")");
+    let repaired = build_whole(
+        7,
+        "[target](target.md#new \"letopis:type=supports;path=target.md#new\")",
+    );
     // Given
     repo.write("source.md", repaired.as_bytes());
     // When / Then
@@ -210,7 +219,11 @@ fn repeated_check_preserves_corpus_and_revision() {
     let repo = ReadingRepo::new();
     repo.write(
         "source.md",
-        build_whole(42, "[absent](missing.md \"letopis:type=supports\")").as_bytes(),
+        build_whole(
+            42,
+            "[absent](missing.md \"letopis:type=supports;path=missing.md\")",
+        )
+        .as_bytes(),
     );
     repo.write("ordinary.md", b"Unmarked Markdown\n");
     let before =

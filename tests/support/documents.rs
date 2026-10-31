@@ -92,7 +92,7 @@ pub fn build_whole(created: u64, body: &str) -> String {
 pub fn build_external(created: u64, target: &str, body: &str) -> String {
     build_whole(
         created,
-        &format!("{body} [source]({target} \"letopis:type=external\")"),
+        &format!("{body} [source]({target} \"letopis:type=external;path={target}\")"),
     )
 }
 pub fn get_target(id: &str, source: bool) -> EdgeTarget {

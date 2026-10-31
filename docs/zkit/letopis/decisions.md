@@ -2170,3 +2170,36 @@ operation; переполнение пересчитывает, не откло�
 
 
 **Связи:** [spec](../../superpowers/specs/2026-10-29-read-workflow-performance-design.md), [plan](../../superpowers/plans/2026-10-29-read-workflow-performance.md), [инварианты](checks/read-workflow-performance/invariants.md), [X-1](contracts/X-1-cli.md), [X-3](contracts/X-3-git.md).
+
+
+<a id="D-106"></a>
+### D-106: Issue 69 — обязательный canonical path в marked links
+> **Статус:** принято пользователем · **Дата:** 2026-10-31
+
+**Основание:** принята [спецификация issue 69](../../superpowers/specs/2026-10-31-issue-69-markdown-link-path-design.md)
+и отдельно одобрен план реализации. Раннее предложение legacy compatibility снято.
+
+1. Единственный title — `letopis:type=TYPE;path=ADDRESS`; `path` обязателен и
+   терминален, весь остаток — адрес. Он один задаёт graph/source target; локальные
+   ID остаются Git-root-relative. После Markdown escaping/entities нет extra
+   percent decode/trim. Поля/порядок фиксированы, новых адресных типов нет.
+2. Локальный destination проверяется чисто лексически от содержащего документа
+   с одним UTF-8 percent decode и root-confined normalization. Сравнивается только
+   файл; fragments и существование не проверяются, I/O/viewer validation нет.
+   Непрозрачные HTTP/HTTPS sources исключены из сравнения.
+3. `LinkPathMismatch` сохраняется в существующем files.error одной публикацией;
+   invalid-file сохраняет прежнюю валидную проекцию, свежий кэш не получает часть
+   файла. Check/status показывают validation_failed, reason link_path_mismatch и
+   `Markdown link path does not match letopis path`, без conflicting payloads.
+   Status read-only: отражает ошибку/очистку после refresh/reindex, не после одной
+   авторской правки. Ошибка SQL оставляет прежнее состояние.
+4. Upgrade: завершить старые calls/drain, установить новый бинарник, мигрировать
+   Markdown, выполнить полный reindex и check, разобрать findings. БД/векторы/locks/
+   Git/корпус не удаляются. Нет fallback, legacy mode, rewrite, автоматической
+   миграции/parser-version; смешанные версии на кэше не поддержаны процедурой.
+5. Exact element hash меняется с title/destination; прежние labels/search text
+   сохраняют search_hash/vector reuse. Исторические specs/evidence неизменны.
+
+**Уточняет:** D-93 (authoring), D-95 (diagnostic publication), D-105 (full audit).
+**Связи:** [X-4](contracts/X-4-markdown.md), [MC-1/MC-7](mechanics.md),
+[upgrade](../../development.md#issue-69-обязательный-path-и-явный-reindex).

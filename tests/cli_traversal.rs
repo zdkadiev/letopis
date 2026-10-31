@@ -166,7 +166,7 @@ fn binary_applies_type_intersection_and_independent_caps() {
 fn binary_returns_missing_ranged_and_opaque_sources_without_content() {
     // Given
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "private knowledge\n[m](missing.rs \"letopis:type=external\")\n[r](src.rs#L2-L3 \"letopis:type=external\")\n[u](https://Host/a?q=1#part \"letopis:type=external\")");
+    repo.write_knowledge("a.md", "private knowledge\n[m](missing.rs \"letopis:type=external;path=missing.rs\")\n[r](src.rs#L2-L3 \"letopis:type=external;path=src.rs#L2-L3\")\n[u](https://Host/a?q=1#part \"letopis:type=external;path=https://Host/a?q=1#part\")");
     repo.write("src.rs", b"private source\nsecond\n");
     let body = json!({"element_ids":["a.md"],"mode":"relations","direction":"outgoing",
         "depth":1,"limit":10});
@@ -300,11 +300,14 @@ fn build_graph() -> ReadingRepo {
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "a.md",
-        "private a\n[b](b.md \"letopis:type=supports\")\n[c](c.md \"letopis:type=includes\")",
+        "private a\n[b](b.md \"letopis:type=supports;path=b.md\")\n[c](c.md \"letopis:type=includes;path=c.md\")",
     );
     repo.write_knowledge("b.md", "private b");
     repo.write_knowledge("c.md", "private c");
-    repo.write_knowledge("d.md", "private d\n[a](a.md \"letopis:type=refutes\")");
+    repo.write_knowledge(
+        "d.md",
+        "private d\n[a](a.md \"letopis:type=refutes;path=a.md\")",
+    );
     repo
 }
 fn invoke(repo: &ReadingRepo, body: &Value, exit: i32) -> Value {

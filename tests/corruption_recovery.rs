@@ -138,7 +138,10 @@ fn verify_removed_databases_recover(targets: &[&str], damage: Damage) {
 
 fn publish_fixture() -> ReadingRepo {
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "AlphaToken [peer](b.md \"letopis:type=context\")");
+    repo.write_knowledge(
+        "a.md",
+        "AlphaToken [peer](b.md \"letopis:type=context;path=b.md\")",
+    );
     repo.write_knowledge("b.md", "BravoToken");
     repo.write("source.txt", b"authored source CORRUPTION_CANARY\n");
     run_git(&repo, &["update-ref", "refs/heads/user-preserved", "HEAD"]);

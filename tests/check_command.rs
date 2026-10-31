@@ -17,9 +17,12 @@ fn check_binary_reports_multiple_errors_and_repairs() {
         b"# One {#one}\n<!-- letopis: {\"created_at\":1} -->\n# Again {#one}\nSECRET_RAW_BODY\n",
     );
     repo.write("nested.md", b"# Outer {#outer}\n<!-- letopis: {\"created_at\":2} -->\n## Inner {#inner}\n<!-- letopis: {\"created_at\":3} -->\nSECRET_RAW_BODY\n");
-    repo.write_knowledge("valid.md", "[target](missing.md \"letopis:type=supports\")");
-    repo.write_knowledge("a.md", "[b](b.md \"letopis:type=includes\")");
-    repo.write_knowledge("b.md", "[a](a.md \"letopis:type=includes\")");
+    repo.write_knowledge(
+        "valid.md",
+        "[target](missing.md \"letopis:type=supports;path=missing.md\")",
+    );
+    repo.write_knowledge("a.md", "[b](b.md \"letopis:type=includes;path=b.md\")");
+    repo.write_knowledge("b.md", "[a](a.md \"letopis:type=includes;path=a.md\")");
 
     // When
     let response = check(&repo, b"{}");
@@ -80,8 +83,8 @@ fn check_binary_reports_multiple_errors_and_repairs() {
 fn check_paths_filters_owners_after_full_graph_validation() {
     // Given
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a/item.md", "[target](target.md \"letopis:type=supports\") [other](b/item.md \"letopis:type=includes\")");
-    repo.write_knowledge("b/item.md", "[other](a/item.md \"letopis:type=includes\") [missing](missing.md \"letopis:type=custom7\")");
+    repo.write_knowledge("a/item.md", "[target](../target.md \"letopis:type=supports;path=target.md\") [other](../b/item.md \"letopis:type=includes;path=b/item.md\")");
+    repo.write_knowledge("b/item.md", "[other](../a/item.md \"letopis:type=includes;path=a/item.md\") [missing](../missing.md \"letopis:type=custom7;path=missing.md\")");
     repo.write_knowledge("target.md", "Available outside selection");
 
     // When
@@ -109,7 +112,10 @@ fn check_paths_filters_owners_after_full_graph_validation() {
 fn check_preserves_agent_layout_and_relation_names() {
     // Given
     let repo = ReadingRepo::new();
-    let knowledge = build_whole(42, "[case](case.md \"letopis:type=explains_case7\")");
+    let knowledge = build_whole(
+        42,
+        "[case](../../case.md \"letopis:type=explains_case7;path=case.md\")",
+    );
     repo.write("knowledge/deep/notes.markdown", knowledge.as_bytes());
     repo.write_knowledge("case.md", "Case");
     repo.write("ordinary.md", b"Ordinary unmarked Markdown\n");
@@ -184,7 +190,10 @@ fn check_snapshot_findings_are_current_and_safe() {
     let blob = git.write_blob(b"SECRET_SNAPSHOT_BODY").unwrap();
     let absent = "a".repeat(40);
     let foreign = "b".repeat(64);
-    repo.write_knowledge("missing.md", "[source](code.rs \"letopis:type=external\")");
+    repo.write_knowledge(
+        "missing.md",
+        "[source](code.rs \"letopis:type=external;path=code.rs\")",
+    );
     for (path, oid) in [
         ("valid.md", valid.as_str()),
         ("absent.md", absent.as_str()),
@@ -226,7 +235,7 @@ fn check_snapshot_findings_are_current_and_safe() {
         "repeat.md",
         "missing.md",
     ] {
-        repo.write(path, format!("<!-- letopis: {{\"created_at\":42,\"source_snapshot\":\"{}\"}} -->\n[source](code.rs \"letopis:type=external\")\n", repaired.as_str()).as_bytes());
+        repo.write(path, format!("<!-- letopis: {{\"created_at\":42,\"source_snapshot\":\"{}\"}} -->\n[source](code.rs \"letopis:type=external;path=code.rs\")\n", repaired.as_str()).as_bytes());
     }
     assert_eq!(
         check(&repo, b"{}"),
@@ -266,7 +275,7 @@ fn check_binary_reports_literal_single_dangling_target() {
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "owner.md",
-        "[missing](missing.md \"letopis:type=supports\")",
+        "[missing](missing.md \"letopis:type=supports;path=missing.md\")",
     );
 
     // When

@@ -17,7 +17,7 @@ fn publish_remote_without_file_capture_and_group_local_ranges() {
     // Given
     let repo = create_repo();
     fs::write(repo.path().join("source.txt"), b"one\ntwo\n").unwrap();
-    fs::write(repo.path().join("a.md"), "<!-- letopis: {\"created_at\":3} -->\n[source](source.txt#L1-L1 \"letopis:type=external\") [other](source.txt#L2-L2 \"letopis:type=external\") [remote](https://Host/a?x=1#section \"letopis:type=external\")\n").unwrap();
+    fs::write(repo.path().join("a.md"), "<!-- letopis: {\"created_at\":3} -->\n[source](source.txt#L1-L1 \"letopis:type=external;path=source.txt#L1-L1\") [other](source.txt#L2-L2 \"letopis:type=external;path=source.txt#L2-L2\") [remote](https://Host/a?x=1#section \"letopis:type=external;path=https://Host/a?x=1#section\")\n").unwrap();
     let recorded_reads = Rc::new(RefCell::new(Vec::new()));
     let filesystem = RecordedFiles::new(repo.path(), recorded_reads.clone());
     let storage = open_storage(repo.path());
@@ -187,7 +187,7 @@ impl FileSystem for RecordedFiles {
 fn prepare_sources() -> tempfile::TempDir {
     let repo = create_repo();
     fs::write(repo.path().join("source.txt"), b"abc").unwrap();
-    fs::write(repo.path().join("a.md"), "<!-- letopis: {\"created_at\":3} -->\n[local](source.txt \"letopis:type=external\") [remote](https://Host/a?x=1#section \"letopis:type=external\")\n").unwrap();
+    fs::write(repo.path().join("a.md"), "<!-- letopis: {\"created_at\":3} -->\n[local](source.txt \"letopis:type=external;path=source.txt\") [remote](https://Host/a?x=1#section \"letopis:type=external;path=https://Host/a?x=1#section\")\n").unwrap();
     crate::wire_document_refresher(repo.path())
         .unwrap()
         .refresh()

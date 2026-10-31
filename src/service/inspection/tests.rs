@@ -12,14 +12,14 @@ use crate::{
 use std::{cell::RefCell, rc::Rc};
 
 const MARKED_SOURCE: &[u8] =
-    b"<!-- letopis: {\"created_at\":1} -->\nBody\n[source](a.md#L2-L2 \"letopis:type=external\")\n";
+    b"<!-- letopis: {\"created_at\":1} -->\nBody\n[source](a.md#L2-L2 \"letopis:type=external;path=a.md#L2-L2\")\n";
 const MARKED_WITH_SOURCE: &[u8] =
-    b"<!-- letopis: {\"created_at\":1} -->\nBody\n[source](source.txt \"letopis:type=external\")\n";
+    b"<!-- letopis: {\"created_at\":1} -->\nBody\n[source](source.txt \"letopis:type=external;path=source.txt\")\n";
 const UNMARKED_SOURCE: &[u8] = b"PRIVATE_SOURCE_BYTES\n";
 const MARKED_REFERER: &[u8] =
-    b"<!-- letopis: {\"created_at\":1} -->\nReferer\n[source](a.md \"letopis:type=external\")\n";
+    b"<!-- letopis: {\"created_at\":1} -->\nReferer\n[source](a.md \"letopis:type=external;path=a.md\")\n";
 const CHANGED_MARKED_SOURCE: &[u8] =
-    b"<!-- letopis: {\"created_at\":1} -->\nKnowledge\n[more](second.txt \"letopis:type=external\")\n";
+    b"<!-- letopis: {\"created_at\":1} -->\nKnowledge\n[more](second.txt \"letopis:type=external;path=second.txt\")\n";
 type Events = Rc<RefCell<Vec<String>>>;
 struct RecordingDocuments(Events);
 struct RecordingGit(Events, Scenario);

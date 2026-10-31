@@ -1,6 +1,6 @@
-<!-- letopis: {"created_at":1793278392,"source_snapshot":"1fba9cfb01cddb4e763b1d33580f48000952ea74"} -->
+<!-- letopis: {"created_at":1793278392,"source_snapshot":"2f8c5badf7c901f677e7498ee5ea2fdab9b1287d"} -->
 # Git snapshot storage
 
-`GitCli` opens a Git work tree and implements snapshot operations for creating and reading trees and blobs and retaining snapshot trees. It rejects object stores configured with Git alternates and rechecks this condition at snapshot operation entry.
+`GitRepository` discovers a Git work tree in process through the pinned gix library and implements snapshot operations for creating and reading trees and blobs and retaining snapshot trees. It rejects object stores configured with Git alternates and rechecks this condition at snapshot operation entry.
 
-[Git snapshot implementation](src/git/cli.rs "letopis:type=external")
+[Git snapshot implementation](../../src/git/repository.rs "letopis:type=external;path=src/git/repository.rs")

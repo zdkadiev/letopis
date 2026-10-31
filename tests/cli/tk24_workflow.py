@@ -85,7 +85,7 @@ def write_knowledge(repo, basis, *, renamed=False):
     text = (f'{heading}\n'
             f'<!-- letopis: {{"created_at":1792800000,"source_snapshot":"{basis}"}} -->\n'
             'Checked cache source.\n'
-            '[source](src/cache.rs#L2-L4 "letopis:type=external")\n')
+            '[source](../src/cache.rs#L2-L4 "letopis:type=external;path=src/cache.rs#L2-L4")\n')
     path.parent.mkdir(exist_ok=True)
     path.write_text(''.join(text))
     return path
@@ -111,7 +111,7 @@ def prepare_repository(workflow):
     decision = write_knowledge(workflow.repo, initial_tree)
     referer = workflow.repo / 'knowledge/referer.md'
     referer.write_text('<!-- letopis: {"created_at":1792800000} -->\n'
-                       '[decision](knowledge/decision.md#cache "letopis:type=depends_on")\n')
+                       '[decision](decision.md#cache "letopis:type=depends_on;path=knowledge/decision.md#cache")\n')
     (workflow.repo / 'unrelated.txt').write_text('user staged change\n')
     git(workflow, 'add', 'unrelated.txt')
     index_before = (workflow.repo / '.git/index').read_bytes()
@@ -171,7 +171,7 @@ def verify_rename_and_repair(workflow, fixture, verified_tree):
     assert errors[0]['details']['element_id'] == 'knowledge/referer.md', dangling
     assert errors[0]['details']['target'] == KNOWLEDGE_ID, dangling
     fixture.referer.write_text('<!-- letopis: {"created_at":1792800000} -->\n'
-                               '[decision](knowledge/new.md#cache-new "letopis:type=depends_on")\n')
+                               '[decision](new.md#cache-new "letopis:type=depends_on;path=knowledge/new.md#cache-new")\n')
     check_empty(workflow)
     renamed = command(workflow, 'inspect', {'element_ids': [RENAMED_ID, SOURCE_ID]})
     assert set(renamed['result']['elements']) == {RENAMED_ID, SOURCE_ID}

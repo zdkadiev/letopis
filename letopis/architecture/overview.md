@@ -3,22 +3,22 @@
 
 These concepts describe key boundaries in the current implementation.
 
-[Command wiring](letopis/architecture/command-wiring.md "letopis:type=includes")
+[Command wiring](command-wiring.md "letopis:type=includes;path=letopis/architecture/command-wiring.md")
 
-[Source addresses](letopis/architecture/source-addresses.md "letopis:type=includes")
+[Source addresses](source-addresses.md "letopis:type=includes;path=letopis/architecture/source-addresses.md")
 
-[Git snapshots](letopis/architecture/git-snapshots.md "letopis:type=includes")
+[Git snapshots](git-snapshots.md "letopis:type=includes;path=letopis/architecture/git-snapshots.md")
 
-[Component boundaries](letopis/architecture/component-boundaries.md "letopis:type=includes")
+[Component boundaries](component-boundaries.md "letopis:type=includes;path=letopis/architecture/component-boundaries.md")
 
-[Markdown projection and publication](letopis/architecture/markdown-projection.md "letopis:type=includes")
+[Markdown projection and publication](markdown-projection.md "letopis:type=includes;path=letopis/architecture/markdown-projection.md")
 
-[Graph model and traversal](letopis/architecture/graph-model-and-traversal.md "letopis:type=includes")
+[Graph model and traversal](graph-model-and-traversal.md "letopis:type=includes;path=letopis/architecture/graph-model-and-traversal.md")
 
-[Search pipeline](letopis/architecture/search-pipeline.md "letopis:type=includes")
+[Search pipeline](search-pipeline.md "letopis:type=includes;path=letopis/architecture/search-pipeline.md")
 
-[Embedding execution](letopis/architecture/embedding-execution.md "letopis:type=includes")
+[Embedding execution](embedding-execution.md "letopis:type=includes;path=letopis/architecture/embedding-execution.md")
 
-[Check scope](letopis/architecture/cli-observation.md#check-scope "letopis:type=includes")
+[Check scope](cli-observation.md#check-scope "letopis:type=includes;path=letopis/architecture/cli-observation.md#check-scope")
 
-[Inspect results](letopis/architecture/cli-observation.md#inspect-results "letopis:type=includes")
+[Inspect results](cli-observation.md#inspect-results "letopis:type=includes;path=letopis/architecture/cli-observation.md#inspect-results")

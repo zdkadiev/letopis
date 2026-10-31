@@ -211,7 +211,7 @@ fn create_repository() -> TempRepo {
     let tree = repo.read_oid(&["rev-parse", "HEAD^{tree}"], None);
     fs::write(
         repo.get_root().join("knowledge.md"),
-        format!("<!-- letopis: {{\"created_at\":1,\"source_snapshot\":\"{tree}\"}} -->\n# Fixture\n[source](live.md \"letopis:type=external\")\n"),
+        format!("<!-- letopis: {{\"created_at\":1,\"source_snapshot\":\"{tree}\"}} -->\n# Fixture\n[source](live.md \"letopis:type=external;path=live.md\")\n"),
     )
     .unwrap();
     repo
