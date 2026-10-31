@@ -16,7 +16,7 @@ fn observe_live_source_without_referrer_edits() {
     // Given
     let repo = DocumentRepo::new();
     repo.write("source.txt", b"abc");
-    repo.write("a.md", "<!-- letopis: {\"created_at\":3,\"source_snapshot\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"} -->\nReferrerToken [source](source.txt \"letopis:type=external\")\n");
+    repo.write("a.md", "<!-- letopis: {\"created_at\":3,\"source_snapshot\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"} -->\nReferrerToken [source](source.txt \"letopis:type=external;path=source.txt\")\n");
     wire_document_refresher(repo.get_root())
         .unwrap()
         .refresh()

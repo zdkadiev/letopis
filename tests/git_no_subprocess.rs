@@ -20,7 +20,7 @@ use support::{
 };
 use tempfile::TempDir;
 
-const NOTE: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nNeedle\n[source](source.txt \"letopis:type=external\")\n";
+const NOTE: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nNeedle\n[source](source.txt \"letopis:type=external;path=source.txt\")\n";
 struct Denial {
     directory: TempDir,
 }

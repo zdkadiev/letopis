@@ -9,7 +9,7 @@ use letopis::{
 use std::{fs, process::Command};
 use support::reading::ReadingRepo;
 
-const MIXED_NOTE: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nKnowledgeToken\n[source](source.txt \"letopis:type=external\")\n[source](source.txt#L1-L1 \"letopis:type=external\")\n[source](https://Host/x?q=1#part \"letopis:type=external\")\n";
+const MIXED_NOTE: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nKnowledgeToken\n[source](source.txt \"letopis:type=external;path=source.txt\")\n[source](source.txt#L1-L1 \"letopis:type=external;path=source.txt#L1-L1\")\n[source](https://Host/x?q=1#part \"letopis:type=external;path=https://Host/x?q=1#part\")\n";
 
 #[test]
 fn inspect_mixed_batch_uses_current_tree_bytes() {
@@ -37,7 +37,7 @@ fn inspect_mixed_batch_uses_current_tree_bytes() {
     assert_eq!(
         knowledge.hash,
         Some(
-            Sha256::parse("e0e8e261083b8c8edbaefd4f06968f531205135e6b0d93f951fb635e3c71f5a8")
+            Sha256::parse("412f84834541f22ac7e2d67e92e308f8aba9f1cd42ade4b8bd1b6214ce29100b")
                 .unwrap()
         )
     );
@@ -276,7 +276,7 @@ fn inspect(repo: &ReadingRepo, ids: &[&str]) -> Inspection {
 fn write_references(repo: &ReadingRepo, sources: &[&str]) {
     let links = sources
         .iter()
-        .map(|source| format!("[source]({source} \"letopis:type=external\")\n"))
+        .map(|source| format!("[source]({source} \"letopis:type=external;path={source}\")\n"))
         .collect::<String>();
     repo.write(
         "note.md",

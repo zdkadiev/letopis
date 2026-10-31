@@ -19,7 +19,7 @@ fn search_refreshes_and_returns_only_knowledge_links() {
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "a.md",
-        "sqlite\n[source](src/sqlite.rs \"letopis:type=external\")",
+        "sqlite\n[source](src/sqlite.rs \"letopis:type=external;path=src/sqlite.rs\")",
     );
     repo.write("plain.md", b"sqlite");
     // When

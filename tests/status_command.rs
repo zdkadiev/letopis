@@ -108,7 +108,7 @@ fn status_reuses_published_check_findings_without_refreshing() {
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "owner.md",
-        "[missing](missing.md \"letopis:type=supports\")",
+        "[missing](missing.md \"letopis:type=supports;path=missing.md\")",
     );
     // When
     let checked = repo.invoke(&["check"], b"{}");
@@ -208,7 +208,10 @@ fn status_and_check_track_repairs_across_processes() {
 fn status_reports_rename_delete_and_restore_after_refresh() {
     // Given
     let repo = ReadingRepo::new();
-    repo.write_knowledge("owner.md", "[target](target.md \"letopis:type=supports\")");
+    repo.write_knowledge(
+        "owner.md",
+        "[target](target.md \"letopis:type=supports;path=target.md\")",
+    );
     repo.write_knowledge("target.md", "Target");
     // When
     let initial = repo.invoke(&["check"], b"{}");
@@ -431,15 +434,21 @@ fn prepare_failed_drain(repo: &ReadingRepo) -> (tempfile::TempDir, PathBuf, TcpL
 
 fn seed_diagnostic_files(repo: &ReadingRepo) {
     repo.write("bad.md", b"<!-- letopis: broken PRIVATE_BODY -->\n");
-    repo.write_knowledge("owner.md", "[file](missing.md \"letopis:type=supports\") [anchor](target.md#missing \"letopis:type=supports\")");
+    repo.write_knowledge("owner.md", "[file](missing.md \"letopis:type=supports;path=missing.md\") [anchor](target.md#missing \"letopis:type=supports;path=target.md#missing\")");
     repo.write(
         "target.md",
         b"# Other {#other}\n<!-- letopis: {\"created_at\":1} -->\nTarget\n",
     );
-    repo.write_knowledge("loop.md", "[self](loop.md \"letopis:type=includes\")");
-    repo.write_knowledge("a.md", "[b](b.md \"letopis:type=includes\")");
-    repo.write_knowledge("b.md", "[a](a.md \"letopis:type=includes\")");
-    repo.write_knowledge("sources.md", "[source](code.rs \"letopis:type=external\")");
+    repo.write_knowledge(
+        "loop.md",
+        "[self](loop.md \"letopis:type=includes;path=loop.md\")",
+    );
+    repo.write_knowledge("a.md", "[b](b.md \"letopis:type=includes;path=b.md\")");
+    repo.write_knowledge("b.md", "[a](a.md \"letopis:type=includes;path=a.md\")");
+    repo.write_knowledge(
+        "sources.md",
+        "[source](code.rs \"letopis:type=external;path=code.rs\")",
+    );
     repo.write("code.rs", b"source");
 }
 

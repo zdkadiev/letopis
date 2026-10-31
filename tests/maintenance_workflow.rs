@@ -99,8 +99,8 @@ impl Workflow {
             "## Cache choice {{#cache}}\n\
              <!-- letopis: {{\"created_at\":1792800000,\"source_snapshot\":\"{source_snapshot}\"}} -->\n\
              {CACHE_TOKEN} follows the checked code.\n\
-             [code]({SOURCE_ID} \"letopis:type=external\")\n\
-             [related]({RELATED_ID} \"letopis:type=depends_on\")\n"
+             [code](../src/cache.rs#L2-L4 \"letopis:type=external;path={SOURCE_ID}\")\n\
+             [related](other.md#decision \"letopis:type=depends_on;path={RELATED_ID}\")\n"
         );
         let related = format!(
             "## Decision {{#decision}}\n\

@@ -114,7 +114,10 @@ fn retain_invalid_projection_while_publishing_valid_peer_and_repair() {
     let repo = DocumentRepo::new();
     repo.write(
         "a.md",
-        build_whole(1, "RetainedToken [b](b.md \"letopis:type=includes\")"),
+        build_whole(
+            1,
+            "RetainedToken [b](b.md \"letopis:type=includes;path=b.md\")",
+        ),
     );
     repo.write("b.md", build_whole(2, "BeforeToken"));
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
@@ -163,12 +166,12 @@ fn keep_cycles_dangling_declarations_and_incoming_edges_on_target_deletion() {
         "a.md",
         build_whole(
             1,
-            "[b](b.md \"letopis:type=includes\") [missing](missing.md \"letopis:type=supports\")",
+            "[b](b.md \"letopis:type=includes;path=b.md\") [missing](missing.md \"letopis:type=supports;path=missing.md\")",
         ),
     );
     repo.write(
         "b.md",
-        build_whole(2, "[a](a.md \"letopis:type=includes\")"),
+        build_whole(2, "[a](a.md \"letopis:type=includes;path=a.md\")"),
     );
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();

@@ -94,7 +94,7 @@ fn inspect_rejects_invalid_current_file_instead_of_using_old_sql() {
 fn inspect_distinguishes_referenced_sources_from_unknown_ids() {
     // Given
     let repo = ReadingRepo::new();
-    repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\n[source](src/data.rs \"letopis:type=external\") [other](plain.md \"letopis:type=external\")\n");
+    repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\n[source](src/data.rs \"letopis:type=external;path=src/data.rs\") [other](plain.md \"letopis:type=external;path=plain.md\")\n");
     repo.write("plain.md", b"unmarked Markdown");
     let mut service = wire_inspector(repo.get_root()).unwrap();
     for id in ["src/data.rs", "plain.md"] {
@@ -165,7 +165,7 @@ fn inspect_rejects_removed_indexed_anchor_in_mixed_batch() {
     let repo = ReadingRepo::new();
     repo.write(
         "sections.md",
-        b"## Old {#old}\n<!-- letopis: {\"created_at\":1} -->\nOld.\n[source](source.txt \"letopis:type=external\")\n",
+        b"## Old {#old}\n<!-- letopis: {\"created_at\":1} -->\nOld.\n[source](source.txt \"letopis:type=external;path=source.txt\")\n",
     );
     repo.write("source.txt", b"available source");
     wire_document_refresher(repo.get_root())
@@ -174,7 +174,7 @@ fn inspect_rejects_removed_indexed_anchor_in_mixed_batch() {
         .unwrap();
     repo.write(
         "sections.md",
-        b"## Renamed {#renamed}\n<!-- letopis: {\"created_at\":1} -->\nCurrent.\n[source](source.txt \"letopis:type=external\")\n",
+        b"## Renamed {#renamed}\n<!-- letopis: {\"created_at\":1} -->\nCurrent.\n[source](source.txt \"letopis:type=external;path=source.txt\")\n",
     );
     let mut service = wire_inspector(repo.get_root()).unwrap();
     let current = service

@@ -31,7 +31,7 @@ fn derive_minimum_from_effective_references() {
     let duplicate = build_external(3, "./source.txt#L02-L03", "EarlyToken");
     repo.write(
         "early.md",
-        format!("{duplicate}[again]({RANGE} \"letopis:type=external\")\n"),
+        format!("{duplicate}[again]({RANGE} \"letopis:type=external;path={RANGE}\")\n"),
     );
     repo.write("late.md", build_external(8, RANGE, "LateToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();

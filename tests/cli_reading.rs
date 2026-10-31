@@ -187,7 +187,7 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
 fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
     // Given
     let repo = ReadingRepo::new();
-    let knowledge = b"<!-- letopis: {\"created_at\":1792800000,\"source_snapshot\":\"0000000000000000000000000000000000000000\"} -->\nCache decision.\n[range](src/cache.rs#L2-L2 \"letopis:type=external\")\n[missing](src/missing.rs \"letopis:type=external\")\n[remote](https://example.invalid/a?q=1#fragment \"letopis:type=external\")\n";
+    let knowledge = b"<!-- letopis: {\"created_at\":1792800000,\"source_snapshot\":\"0000000000000000000000000000000000000000\"} -->\nCache decision.\n[range](src/cache.rs#L2-L2 \"letopis:type=external;path=src/cache.rs#L2-L2\")\n[missing](src/missing.rs \"letopis:type=external;path=src/missing.rs\")\n[remote](https://example.invalid/a?q=1#fragment \"letopis:type=external;path=https://example.invalid/a?q=1#fragment\")\n";
     repo.write("knowledge.md", knowledge);
     repo.write("src/cache.rs", b"alpha\r\nbeta\n");
     let body = br#"{"element_ids":["knowledge.md","src/cache.rs#L2-L2","src/missing.rs","https://example.invalid/a?q=1#fragment","./knowledge.md"]}"#;
@@ -201,7 +201,7 @@ fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
     assert_eq!(
         response["result"]["elements"],
         json!({
-            "knowledge.md":{"path":"knowledge.md","lines":[1,5],"hash":"f2a2c9bdcb99213d0d3b8c6775c4899d80deaea9b4a723b9ac3269cec156a95a"},
+            "knowledge.md":{"path":"knowledge.md","lines":[1,5],"hash":"5e66872103f70b0974a295a78645f384c6f49c716cfbaa2131f451c617a947bb"},
             "src/cache.rs#L2-L2":{"path":"src/cache.rs","lines":[2,2],"hash":"f2c82decdd7181cf98945929a62598db7e6b477e11f6e0eb0ae97020eff151ad"},
             "src/missing.rs":{"path":"src/missing.rs","hash":null},
             "https://example.invalid/a?q=1#fragment":{"path":"https://example.invalid/a?q=1#fragment","hash":null}
@@ -231,7 +231,7 @@ fn binary_inspect_rejects_unknown_member_without_partial_result() {
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "knowledge.md",
-        "Private fixture secret.\n[source](src/cache.rs \"letopis:type=external\")",
+        "Private fixture secret.\n[source](src/cache.rs \"letopis:type=external;path=src/cache.rs\")",
     );
     repo.write("src/cache.rs", b"private source secret\n");
     let initial = br#"{"element_ids":["knowledge.md","src/cache.rs"]}"#;
@@ -312,7 +312,7 @@ fn binary_inspect_unknown_is_all_or_nothing_and_missing_source_has_null_hash() {
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "knowledge.md",
-        "sqlite\n[source](source.rs \"letopis:type=external\")",
+        "sqlite\n[source](source.rs \"letopis:type=external;path=source.rs\")",
     );
     for ids in [vec!["knowledge.md", "missing.md"], vec!["unknown.rs"]] {
         let body = json!({"element_ids":ids}).to_string();

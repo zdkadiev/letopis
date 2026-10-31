@@ -14,7 +14,7 @@ use support::reading::ReadingRepo;
 fn traverses_without_configuration_with_source_urls_and_ranges() {
     // Given
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "[child](b.md \"letopis:type=includes\") [code](code.rs#L2-L2 \"letopis:type=external\") [url](https://Host/x?q=1#part \"letopis:type=external\")");
+    repo.write_knowledge("a.md", "[child](b.md \"letopis:type=includes;path=b.md\") [code](code.rs#L2-L2 \"letopis:type=external;path=code.rs#L2-L2\") [url](https://Host/x?q=1#part \"letopis:type=external;path=https://Host/x?q=1#part\")");
     repo.write_knowledge("b.md", "child");
     repo.write("code.rs", b"one\ntwo\n");
     // When
@@ -55,7 +55,10 @@ fn traverses_without_configuration_with_source_urls_and_ranges() {
 fn distinguishes_missing_source_membership_from_removed_final_reference() {
     // Given
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "[code](missing.rs \"letopis:type=external\")");
+    repo.write_knowledge(
+        "a.md",
+        "[code](missing.rs \"letopis:type=external;path=missing.rs\")",
+    );
     let mut service = wire_traverser(repo.get_root()).unwrap();
     let mut request = make_request("missing.rs");
     request.direction = TraversalDirection::Incoming;
@@ -81,7 +84,7 @@ fn retains_last_valid_knowledge_as_stale_and_missing_source_flag() {
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "a.md",
-        "[child](b.md \"letopis:type=includes\") [code](code.rs#L2-L3 \"letopis:type=external\")",
+        "[child](b.md \"letopis:type=includes;path=b.md\") [code](code.rs#L2-L3 \"letopis:type=external;path=code.rs#L2-L3\")",
     );
     repo.write_knowledge("b.md", "valid child");
     repo.write("code.rs", b"one\n");
@@ -109,7 +112,10 @@ fn retains_last_valid_knowledge_as_stale_and_missing_source_flag() {
 fn propagates_unsafe_source_errors_without_private_paths_or_payloads() {
     // Given
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "[code](code.rs \"letopis:type=external\")");
+    repo.write_knowledge(
+        "a.md",
+        "[code](code.rs \"letopis:type=external;path=code.rs\")",
+    );
     repo.write("code.rs", b"SECRET");
     let mut service = wire_traverser(repo.get_root()).unwrap();
     service.traverse(&make_request("a.md")).unwrap();
@@ -127,11 +133,13 @@ fn propagates_unsafe_source_errors_without_private_paths_or_payloads() {
 fn observes_late_source_binding_even_when_traversing_only_containment() {
     // Given
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "[child](b.md \"letopis:type=includes\")");
+    repo.write_knowledge("a.md", "[child](b.md \"letopis:type=includes;path=b.md\")");
     let mut body = String::new();
     for index in 0..65 {
         let source = format!("s{index:02}.rs");
-        body.push_str(&format!("[code]({source} \"letopis:type=external\")\n"));
+        body.push_str(&format!(
+            "[code]({source} \"letopis:type=external;path={source}\")\n"
+        ));
         if index < 64 {
             repo.write(&source, b"live");
         }
@@ -162,7 +170,7 @@ fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "a.md",
-        "[b](b.md \"letopis:type=includes\") [c](c.md \"letopis:type=includes\")",
+        "[b](b.md \"letopis:type=includes;path=b.md\") [c](c.md \"letopis:type=includes;path=c.md\")",
     );
     repo.write_knowledge("b.md", "first");
     repo.write_knowledge("c.md", "second");
@@ -207,7 +215,10 @@ fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
 fn resolves_markdown_shaped_source_by_stored_membership() {
     // Given
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "[source](plain.md \"letopis:type=external\")");
+    repo.write_knowledge(
+        "a.md",
+        "[source](plain.md \"letopis:type=external;path=plain.md\")",
+    );
     repo.write("plain.md", b"unmarked Markdown source");
     // When
     let output = wire_traverser(repo.get_root())
@@ -225,7 +236,10 @@ fn resolves_markdown_shaped_source_by_stored_membership() {
 fn distinguishes_nonregular_sources_from_missing_local_flags() {
     // Given
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "[code](code.rs \"letopis:type=external\")");
+    repo.write_knowledge(
+        "a.md",
+        "[code](code.rs \"letopis:type=external;path=code.rs\")",
+    );
     let mut service = wire_traverser(repo.get_root()).unwrap();
     // When
     let output = service.traverse(&make_request("a.md")).unwrap();
@@ -247,7 +261,10 @@ fn distinguishes_nonregular_sources_from_missing_local_flags() {
     std::fs::remove_dir(repo.get_root().join("code.rs")).unwrap();
     // Given
     repo.write("code.rs", b"now available");
-    repo.write_knowledge("a.md", "[code](code.rs \"letopis:type=external\") changed");
+    repo.write_knowledge(
+        "a.md",
+        "[code](code.rs \"letopis:type=external;path=code.rs\") changed",
+    );
     // When / Then
     assert!(
         service.traverse(&make_request("a.md")).unwrap().elements[0]

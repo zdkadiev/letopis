@@ -185,18 +185,19 @@ def _write_knowledge(repository: Path, options: CorpusOptions, packing: list[int
 def _render_fragment(index: int, has_include: bool, inputs: _FragmentInputs) -> bytes:
     metadata = json.dumps({"created_at": CREATED_AT, "source_snapshot": inputs.source_tree},
                           separators=(",", ":"))
+    source = (f"sources/shard-{index // SOURCE_LINES:04d}.txt"
+              f"#L{index % SOURCE_LINES + 1}-L{index % SOURCE_LINES + 1}")
     lines = [f"## Synthetic knowledge {index:06d} {{#node-{index:06d}}}\n",
              f"<!-- letopis: {metadata} -->\n",
-             f"[source](sources/shard-{index // SOURCE_LINES:04d}.txt"
-             f"#L{index % SOURCE_LINES + 1}-L{index % SOURCE_LINES + 1} \"letopis:type=external\")\n"]
+             f'[source](../{source} "letopis:type=external;path={source}")\n']
     for offset in range(1, 5):
         target = (index + offset) % len(inputs.file_indices)
         relation = "depends_on"
         if offset == 4 and has_include:
             target, relation = index + 1, "includes"
         file_index = inputs.file_indices[target]
-        lines.append(f'[relation {offset}](knowledge/part-{file_index:04d}.md#node-{target:06d} '
-                     f'"letopis:type={relation}")\n')
+        lines.append(f'[relation {offset}](part-{file_index:04d}.md#node-{target:06d} '
+                     f'"letopis:type={relation};path=knowledge/part-{file_index:04d}.md#node-{target:06d}")\n')
     subject = inputs.randomizer.choice(("storage", "retrieval", "consistency", "recovery"))
     lines.append(f"\nSynthetic case {index:06d}: {subject}, sample {inputs.randomizer.randrange(1000000):06d}. "
                  "Данные проверяют воспроизводимость и связи.\n")

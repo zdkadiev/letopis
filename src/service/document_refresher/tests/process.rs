@@ -35,12 +35,12 @@ const TIME: i64 = 42;
 const WAIT: Duration = Duration::from_secs(20);
 const CHILD: &str = "service::document_refresher::tests::process::run_child";
 const SOURCE: &[u8] = b"external source\r\nexact bytes\n";
-const OLD: &str = "<!-- letopis: {\"created_at\":1} -->\nAlphaToken [source](source.txt \"letopis:type=external\")\n";
-const NEW: &str = "<!-- letopis: {\"created_at\":3} -->\nBravoToken [source](source.txt \"letopis:type=external\")\n";
-const LATEST: &str = "<!-- letopis: {\"created_at\":3} -->\nCharlieToken [source](source.txt \"letopis:type=external\")\n";
+const OLD: &str = "<!-- letopis: {\"created_at\":1} -->\nAlphaToken [source](source.txt \"letopis:type=external;path=source.txt\")\n";
+const NEW: &str = "<!-- letopis: {\"created_at\":3} -->\nBravoToken [source](source.txt \"letopis:type=external;path=source.txt\")\n";
+const LATEST: &str = "<!-- letopis: {\"created_at\":3} -->\nCharlieToken [source](source.txt \"letopis:type=external;path=source.txt\")\n";
 const DIAGNOSTIC_CANARY: &str = "TK28_DIAGNOSTIC_CANARY";
 const INVALID: &str = "<!-- letopis: invalid TK28_DIAGNOSTIC_CANARY -->\n";
-const RETAINED: &str = "<!-- letopis: {\"created_at\":2} -->\nRetainedToken [source](source.txt \"letopis:type=external\")\n";
+const RETAINED: &str = "<!-- letopis: {\"created_at\":2} -->\nRetainedToken [source](source.txt \"letopis:type=external;path=source.txt\")\n";
 const CUTS: [&str; 10] = [
     "detected",
     "locked",

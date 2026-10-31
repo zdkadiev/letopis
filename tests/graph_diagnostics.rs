@@ -21,10 +21,13 @@ const ANCHORED: &str = "# One {#one}\n<!-- letopis: {\"created_at\":42} -->\nAnc
 fn reports_current_file_and_graph_problems_until_each_cause_is_repaired() {
     // Given
     let repo = DocumentRepo::new();
-    let source = build_whole(7, "[target](missing.md \"letopis:type=supports\")");
+    let source = build_whole(
+        7,
+        "[target](missing.md \"letopis:type=supports;path=missing.md\")",
+    );
     let invalid = build_whole(
         8,
-        &format!("{RAW_BODY} [self](bad.md \"letopis:type=includes\")"),
+        &format!("{RAW_BODY} [self](bad.md \"letopis:type=includes;path=bad.md\")"),
     );
     repo.write("a.md", &source);
     repo.write("bad.md", &invalid);
@@ -116,7 +119,10 @@ fn isolates_duplicate_and_nested_anchor_errors_from_a_valid_file() {
     let duplicate =
         "# One {#one}\n<!-- letopis: {\"created_at\":1} -->\n# Again {#one}\nSECRET_RAW_BODY\n";
     let nested = "# Outer {#outer}\n<!-- letopis: {\"created_at\":2} -->\n## Inner {#inner}\n<!-- letopis: {\"created_at\":3} -->\nSECRET_RAW_BODY\n";
-    let valid = build_whole(4, "[missing](missing.md \"letopis:type=supports\")");
+    let valid = build_whole(
+        4,
+        "[missing](missing.md \"letopis:type=supports;path=missing.md\")",
+    );
     repo.write("duplicate.md", duplicate);
     repo.write("nested.md", nested);
     repo.write("valid.md", &valid);
@@ -151,7 +157,10 @@ fn isolates_duplicate_and_nested_anchor_errors_from_a_valid_file() {
 fn diagnoses_the_pinned_revision_after_another_connection_publishes_a_target() {
     // Given
     let repo = DocumentRepo::new();
-    let source = build_whole(1, "[target](missing.md \"letopis:type=includes\")");
+    let source = build_whole(
+        1,
+        "[target](missing.md \"letopis:type=includes;path=missing.md\")",
+    );
     repo.write("a.md", &source);
     // The refresher owns the writer connection before the separate reader pins.
     let mut writer = wire_document_refresher(repo.get_root()).unwrap();
@@ -199,7 +208,7 @@ fn propagates_corrupt_edge_reads_instead_of_returning_clean_or_partial_findings(
     let repo = DocumentRepo::new();
     let invalid = build_whole(
         1,
-        &format!("{RAW_BODY} [self](bad.md \"letopis:type=includes\")"),
+        &format!("{RAW_BODY} [self](bad.md \"letopis:type=includes;path=bad.md\")"),
     );
     repo.write("bad.md", &invalid);
     wire_document_refresher(repo.get_root())
