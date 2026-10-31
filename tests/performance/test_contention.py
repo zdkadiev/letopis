@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from measure import measure_process as actual_measure
 
+from contention import measure_contention_call as actual_contention_call
 from contention import (configure_provider, embed_lease, invoke_cli, observe_vectors, run_canary,
                         run_contention, run_drain_overlap, verify_coverage)
 from provider import start_provider
@@ -24,14 +25,16 @@ class ContentionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             binary, scenario = _prepare_interruptible_cli(root, slow_baseline=True)
+            def measure_ready_child(argv, repository, data, options):
+                return actual_measure(argv, repository, data, dict(
+                    options, on_spawn=lambda _: _interrupt_after_baseline_ready(root)))
             previous = signal.signal(signal.SIGALRM, _interrupt)
-            signal.setitimer(signal.ITIMER_REAL, 0.2)
             try:
-                # When: cancellation interrupts the baseline measurement.
-                with self.assertRaises(KeyboardInterrupt):
+                # When: the real baseline child records readiness before cancellation arrives.
+                with patch("contention.measure_process", side_effect=measure_ready_child), \
+                        self.assertRaises(KeyboardInterrupt):
                     run_contention(scenario, {"executable": str(binary)}, root / "evidence")
             finally:
-                signal.setitimer(signal.ITIMER_REAL, 0)
                 signal.signal(signal.SIGALRM, previous)
             # Then: the baseline and aborted schedule are durable; no writer starts.
             self.assertEqual((root / "events").read_text().splitlines(), ["check"])
@@ -44,14 +47,18 @@ class ContentionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             binary, scenario = _prepare_interruptible_cli(root)
+            def interrupt_after_reader(scenario, build, evidence, options):
+                record = actual_contention_call(scenario, build, evidence, options)
+                if options["role"] == "reader":
+                    signal.raise_signal(signal.SIGALRM)
+                return record
             previous = signal.signal(signal.SIGALRM, _interrupt)
-            signal.setitimer(signal.ITIMER_REAL, 0.3)
             try:
-                # When: cancellation interrupts the controller waiting for its writer.
-                with self.assertRaises(KeyboardInterrupt):
+                # When: the real reader's durable receipt precedes cancellation of its writer.
+                with patch("contention.measure_contention_call", side_effect=interrupt_after_reader), \
+                        self.assertRaises(KeyboardInterrupt):
                     run_contention(scenario, {"executable": str(binary)}, root / "evidence")
             finally:
-                signal.setitimer(signal.ITIMER_REAL, 0)
                 signal.signal(signal.SIGALRM, previous)
             # Then: completed and cancelled subcalls survive; the writer is gone.
             evidence = root / "evidence"
@@ -225,6 +232,16 @@ def _prepare_interruptible_cli(root, slow_baseline=False):
     binary.chmod(0o755)
     return binary, {"repository": root, "argv": ["check"], "stdin": b"{}",
                     "expected": {"command": "check"}, "timeout": 5}
+
+
+def _interrupt_after_baseline_ready(root):
+    deadline = time.monotonic() + 5
+    events = root / "events"
+    while not events.exists() or events.read_text() != "check\n":
+        if time.monotonic() >= deadline:
+            raise AssertionError("baseline child did not record readiness")
+        time.sleep(.005)
+    signal.raise_signal(signal.SIGALRM)
 
 
 def _interrupt(*_):
