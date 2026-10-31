@@ -209,4 +209,26 @@ mod tests {
             assert_eq!(result, Err(DiagnosticKind::LinkPathMismatch), "{raw:?}");
         }
     }
+
+    #[test]
+    fn rejects_malformed_navigation_percent_escapes() {
+        // Given: malformed escapes must fail independently of target comparison.
+        for raw in ["%", "%A", "%GG", "%G0", "%0G", "cache%20key%.rs"] {
+            // When: decode the navigation path directly.
+            let result = decode_navigation_path(raw);
+            // Then: preserving malformed percent bytes cannot masquerade as a path mismatch.
+            assert_eq!(result, Err(DiagnosticKind::LinkPathMismatch), "{raw:?}");
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_navigation_utf8() {
+        // Given: percent bytes encode invalid, truncated, overlong or surrogate UTF-8.
+        for raw in ["%FF", "%80", "%E2%82", "%C0%AF", "%ED%A0%80"] {
+            // When: decode the navigation path directly.
+            let result = decode_navigation_path(raw);
+            // Then: replacing invalid bytes with Unicode replacement characters must fail.
+            assert_eq!(result, Err(DiagnosticKind::LinkPathMismatch), "{raw:?}");
+        }
+    }
 }
