@@ -318,7 +318,7 @@ Reuse frozen manifests from `compare.freeze_build`, verification from
 cleanup from `ownership.FixtureProcesses`. Do not claim existing `FakeProvider`'s
 single-request barrier proves four active jobs; use a concurrent synthetic fixture.
 
-- [ ] **Step 1: Write red measurement/oracle tests.**
+- [x] **Step 1: Write red measurement/oracle tests.**
 
 In `test_drain_compare.py` add `test_refuses_existing_evidence`,
 `test_rejects_wrong_literal_vector_or_request_count`,
@@ -329,13 +329,13 @@ Assertions compare captured literal expected vectors/counts and explicit incompl
 outcomes, never derive expected output through product embedding/storage code.
 A fixture with five active document requests must fail the four-worker oracle.
 
-- [ ] **Step 2: Run the test file and confirm missing behavior is red.**
+- [x] **Step 2: Run the test file and confirm missing behavior is red.**
 
 Run `python3 -B -m unittest discover -s tests/performance -p test_drain_compare.py`.
 Use the prepared Python 3.12 executable if system Python is older. Keep output
 compact, expose full logs on failure.
 
-- [ ] **Step 3: Implement the narrow model-free runner and freeze variants.**
+- [x] **Step 3: Implement the narrow model-free runner and freeze variants.**
 
 Use 64 distinct synthetic texts plus shared-hash nodes, a concurrent provider with
 25 ms fixed response delay and independent literal vector mapping. Create new
@@ -354,7 +354,7 @@ Add a separate bounded query-overlap schedule using actual CLI query calls;
 identify query/document HTTP separately and check retrieval correctness. Do not
 sum per-process RSS peaks as a whole-stack peak or call fixture vectors model quality.
 
-- [ ] **Step 4: Run green oracle tests, negative controls and the bounded campaign.**
+- [x] **Step 4: Run green oracle tests, negative controls and the bounded campaign.**
 
 Run the new test file, then the runner on the three frozen manifests. Show
 complete/incomplete receipts, not timing alone. Mutate expected mapping, cap and
@@ -363,7 +363,7 @@ a table for A/B/C: vectors, time, throughput, actual concurrency, attempts/error
 latency median/range, RSS scope and overlapping query latency. A real-provider
 comparison is explicitly not assessed pending separate authorization.
 
-- [ ] **Step 5: Commit reusable runner/tests/instructions, not ignored raw artifacts.**
+- [x] **Step 5: Commit reusable runner/tests/instructions, not ignored raw artifacts.**
 
 Commit message: `perf: compare sequential and bounded parallel embedding drain`.
 
