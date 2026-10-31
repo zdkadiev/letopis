@@ -1,4 +1,4 @@
-use super::tree::read_entry;
+use super::tree::get_entry;
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use std::{cmp::Ordering, collections::BTreeSet};
 
@@ -25,7 +25,7 @@ pub(super) fn validate_tree_bytes(mut bytes: &[u8], oid_len: usize) -> Result<()
         if bytes.get(bytes.len().saturating_sub(oid_len / 2 + 1)) != Some(&0) || bytes[0] == b'0' {
             return Err(make_integrity_error());
         }
-        let (entry, remaining) = read_entry(bytes, oid_len)?;
+        let (entry, remaining) = get_entry(bytes, oid_len)?;
         if !VALID_MODES.contains(&entry.mode)
             || entry.oid.iter().all(|byte| *byte == 0)
             || !names.insert(entry.name)

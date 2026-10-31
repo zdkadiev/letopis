@@ -2,7 +2,7 @@ use super::{
     GitRepository,
     constants::{BLOB_KIND, GITLINK_KIND, TREE_KIND},
     durability::StagedObject,
-    tree::read_entry,
+    tree::get_entry,
     validation::validate_tree_bytes,
 };
 use crate::{
@@ -55,7 +55,7 @@ impl ObjectDb<'_> {
                 ));
             }
             if verified.insert(entry.oid.as_str()) {
-                self.git.reader.borrow_mut().read_object(
+                self.git.reader.borrow_mut().get_object(
                     entry.oid.as_str(),
                     BLOB_KIND,
                     SnapshotErrorKind::InvalidRequest,
@@ -70,7 +70,7 @@ impl ObjectDb<'_> {
         root.write(self)
     }
     /// Verify the root and addressed objects, without auditing unrelated descendants.
-    pub(super) fn read_blob(
+    pub(super) fn get_blob(
         &self,
         oid: &TreeOid,
         path: &RepoPath,
@@ -79,7 +79,7 @@ impl ObjectDb<'_> {
         let mut current = oid.as_str().to_owned();
         let mut parts = path.as_str().split('/').peekable();
         while let Some(part) = parts.next() {
-            let bytes = self.read_tree(
+            let bytes = self.get_tree(
                 &current,
                 SnapshotErrorKind::InternalError,
                 SnapshotErrorKind::InternalError,
@@ -92,7 +92,7 @@ impl ObjectDb<'_> {
                         "snapshot path is not a blob",
                     ));
                 }
-                return self.git.reader.borrow_mut().read_bytes(
+                return self.git.reader.borrow_mut().get_bytes(
                     &oid,
                     BLOB_KIND,
                     SnapshotErrorKind::InternalError,
@@ -114,7 +114,7 @@ impl ObjectDb<'_> {
                 FOREIGN_OID_FORMAT,
             ));
         }
-        self.read_tree(
+        self.get_tree(
             oid.as_str(),
             SnapshotErrorKind::NotFound,
             SnapshotErrorKind::InvalidRequest,
@@ -122,7 +122,7 @@ impl ObjectDb<'_> {
         .map(|_| ())
     }
     /// Read one verified tree body without traversing its children.
-    pub(super) fn read_tree(
+    pub(super) fn get_tree(
         &self,
         oid: &str,
         missing: SnapshotErrorKind,
@@ -132,7 +132,7 @@ impl ObjectDb<'_> {
             .git
             .reader
             .borrow_mut()
-            .read_bytes(oid, TREE_KIND, missing, wrong)?;
+            .get_bytes(oid, TREE_KIND, missing, wrong)?;
         validate_tree_bytes(&bytes, self.git.oid_len)?;
         Ok(bytes)
     }
@@ -142,7 +142,7 @@ impl ObjectDb<'_> {
         name: &[u8],
     ) -> Result<(&'static str, String), SnapshotError> {
         while !bytes.is_empty() {
-            let (entry, rest) = read_entry(bytes, self.git.oid_len)?;
+            let (entry, rest) = get_entry(bytes, self.git.oid_len)?;
             if entry.name == name {
                 let kind = match entry.mode & 0o170000 {
                     0o040000 => TREE_KIND,

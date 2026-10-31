@@ -16,12 +16,12 @@ impl<F: FileSystem> SourceService<F> {
 }
 
 impl<F: FileSystem> SourceReader for SourceService<F> {
-    fn read_source(
+    fn get_source(
         &self,
         view: &mut dyn StorageRead,
         uri: &SourceUri,
     ) -> DocumentResult<Option<SourceObservation>> {
-        let Some(row) = view.read_node(&EdgeTarget::Source(uri.clone()))? else {
+        let Some(row) = view.get_node_by_id(&EdgeTarget::Source(uri.clone()))? else {
             return Ok(None);
         };
         let NodeMetadata::Source(mut metadata) = row.metadata else {
@@ -35,7 +35,7 @@ impl<F: FileSystem> SourceReader for SourceService<F> {
                 availability: SourceAvailability::Unfetched,
             }));
         };
-        let captured = self.filesystem.read_file(local.get_path())?;
+        let captured = self.filesystem.get_file(local.get_path())?;
         metadata.hash = captured
             .as_ref()
             .and_then(|file| local.select_bytes(&file.bytes))

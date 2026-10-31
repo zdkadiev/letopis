@@ -80,8 +80,10 @@ fn verify_vectors(storage: &mut impl Storage, identity: &Sha256) -> Result<(), B
     let mut read = storage.begin_read()?;
     assert_eq!(read.get_revision(), 1);
     assert_eq!(read.get_config_identity(), Some(*identity));
-    let vector = require_current(read.read_vector(identity, &Sha256::digest(TEXT.as_bytes()))?)?
-        .ok_or("missing vector")?;
+    let vector = require_current(
+        read.get_vector_by_search_hash(identity, &Sha256::digest(TEXT.as_bytes()))?,
+    )?
+    .ok_or("missing vector")?;
     assert_eq!(
         vector
             .iter()

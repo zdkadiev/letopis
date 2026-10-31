@@ -28,7 +28,7 @@ fn publish_initial_empty_cache_once() {
         ),
         (0, 0, 0)
     );
-    assert!(repo.read_state().nodes.is_empty());
+    assert!(repo.get_state().nodes.is_empty());
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn replace_sections_and_preserve_stable_ids_and_corpus_bytes() {
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     // When
     let first = documents.refresh().unwrap();
-    let original = repo.read_state();
+    let original = repo.get_state();
     // Then
     assert_eq!(first.files_updated, 2);
     assert_eq!(original.nodes.len(), 3);
@@ -59,7 +59,7 @@ fn replace_sections_and_preserve_stable_ids_and_corpus_bytes() {
     );
     // When
     documents.refresh().unwrap();
-    let current = repo.read_state();
+    let current = repo.get_state();
     // Then
     assert_eq!(current.nodes.len(), 2);
     for id in ["whole.md", "under_% score.markdown#one"] {
@@ -97,14 +97,14 @@ fn handle_tracked_rename_deletion_and_unmarked_transitions() {
     assert!(!documents.refresh().unwrap().published);
     repo.write("new.md", "UnmarkedToken\n");
     documents.refresh().unwrap();
-    assert!(repo.read_state().nodes.is_empty());
-    assert!(repo.read_state().get_file("new.md").valid);
+    assert!(repo.get_state().nodes.is_empty());
+    assert!(repo.get_state().get_file("new.md").valid);
     repo.write("new.md", build_whole(1, "ReintroducedToken"));
     documents.refresh().unwrap();
     assert_eq!(repo.search("ReintroducedToken"), ["new.md"]);
     repo.remove("new.md");
     assert_eq!(documents.refresh().unwrap().files_removed, 1);
-    assert!(repo.read_state().files.is_empty());
+    assert!(repo.get_state().files.is_empty());
     assert!(!documents.refresh().unwrap().published);
 }
 
@@ -122,13 +122,13 @@ fn retain_invalid_projection_while_publishing_valid_peer_and_repair() {
     repo.write("b.md", build_whole(2, "BeforeToken"));
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
-    let before = repo.read_state();
+    let before = repo.get_state();
     repo.write("a.md", "<!-- letopis: SECRET_RAW_INVALID -->\nBadToken");
     repo.write("b.md", build_whole(2, "AfterToken"));
     repo.write("new-invalid.md", [0xff]);
     // When
     let result = documents.refresh().unwrap();
-    let invalid = repo.read_state();
+    let invalid = repo.get_state();
     // Then
     assert_eq!(result.invalid_files_updated, 2);
     assert_eq!(invalid.get_node("a.md"), before.get_node("a.md"));
@@ -147,13 +147,13 @@ fn retain_invalid_projection_while_publishing_valid_peer_and_repair() {
     assert_eq!(repo.search("AfterToken"), ["b.md"]);
     assert!(repo.search("BeforeToken OR BadToken").is_empty());
     assert!(!documents.refresh().unwrap().published);
-    assert_eq!(repo.read_state(), invalid);
+    assert_eq!(repo.get_state(), invalid);
     repo.write("a.md", build_whole(1, "RepairedToken"));
     repo.remove("new-invalid.md");
     let repaired = documents.refresh().unwrap();
     assert_eq!(repaired.files_removed, 1);
-    assert!(repo.read_state().get_file("a.md").valid);
-    assert!(repo.read_state().edges.is_empty());
+    assert!(repo.get_state().get_file("a.md").valid);
+    assert!(repo.get_state().edges.is_empty());
     assert!(repo.search("RetainedToken").is_empty());
     assert_eq!(repo.search("RepairedToken"), ["a.md"]);
 }
@@ -175,7 +175,7 @@ fn keep_cycles_dangling_declarations_and_incoming_edges_on_target_deletion() {
     );
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
-    let state = repo.read_state();
+    let state = repo.get_state();
     // When / Then
     assert_eq!(state.edges.len(), 3);
     let NodeMetadata::Knowledge(a) = &state.get_node("a.md").metadata else {
@@ -184,7 +184,7 @@ fn keep_cycles_dangling_declarations_and_incoming_edges_on_target_deletion() {
     assert_eq!(a.kind, ElementKind::Metavertex);
     repo.remove("b.md");
     documents.refresh().unwrap();
-    let state = repo.read_state();
+    let state = repo.get_state();
     assert_eq!(state.edges.len(), 2);
     assert!(
         state
@@ -194,7 +194,7 @@ fn keep_cycles_dangling_declarations_and_incoming_edges_on_target_deletion() {
     );
     repo.write("b.md", build_whole(2, "TargetReturns"));
     documents.refresh().unwrap();
-    assert_eq!(repo.read_state().edges, state.edges);
+    assert_eq!(repo.get_state().edges, state.edges);
 }
 
 #[test]
@@ -210,7 +210,7 @@ fn reconcile_shared_source_minimum_and_retain_invalid_references() {
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
     // When
-    let before = repo.read_state();
+    let before = repo.get_state();
     let NodeMetadata::Source(s) = &before.get_node("source.txt#L2-L3").metadata else {
         panic!()
     };
@@ -221,7 +221,7 @@ fn reconcile_shared_source_minimum_and_retain_invalid_references() {
     repo.write("b.md", "<!-- letopis: invalid -->");
     repo.remove("a.md");
     documents.refresh().unwrap();
-    let state = repo.read_state();
+    let state = repo.get_state();
     let NodeMetadata::Source(s) = &state.get_node("source.txt#L2-L3").metadata else {
         panic!()
     };
@@ -229,8 +229,8 @@ fn reconcile_shared_source_minimum_and_retain_invalid_references() {
     assert_eq!(state.edges.len(), 1);
     repo.remove("b.md");
     documents.refresh().unwrap();
-    assert!(repo.read_state().nodes.is_empty());
-    assert!(repo.read_state().edges.is_empty());
+    assert!(repo.get_state().nodes.is_empty());
+    assert!(repo.get_state().edges.is_empty());
 }
 
 #[test]
@@ -243,7 +243,7 @@ fn hash_exact_whole_source_and_represent_missing_or_out_of_range_sources() {
     repo.write("c.md", build_external(5, "absent.txt", "Missing"));
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
-    let state = repo.read_state();
+    let state = repo.get_state();
     for (id, hash) in [
         ("source.txt", Some(Sha256::digest(b"a\r\nb\nc"))),
         ("source.txt#L2-L9", None),
@@ -265,21 +265,21 @@ fn reject_source_over_existing_knowledge_atomically() {
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
     // When
-    let before = repo.read_state();
+    let before = repo.get_state();
     repo.write("b.md", build_external(2, "a.md", "NewSourceReference"));
     // Then
     assert_eq!(
         documents.refresh().unwrap_err().get_kind(),
         DocumentErrorKind::InvalidRequest
     );
-    assert_eq!(repo.read_state(), before);
+    assert_eq!(repo.get_state(), before);
     assert_eq!(repo.search("OriginalKnowledge"), ["a.md"]);
     assert!(repo.search("NewSourceReference").is_empty());
     // The inverse role becomes unambiguous after removing the knowledge projection.
     repo.write("a.md", "source bytes\n");
     documents.refresh().unwrap();
     assert!(matches!(
-        repo.read_state().get_node("a.md").metadata,
+        repo.get_state().get_node("a.md").metadata,
         NodeMetadata::Source(_)
     ));
     assert!(repo.search("OriginalKnowledge").is_empty());
@@ -294,18 +294,18 @@ fn reject_knowledge_over_referenced_source_and_allow_orphan_role_transition() {
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
     // When
-    let before = repo.read_state();
+    let before = repo.get_state();
     repo.write("a.md", build_whole(1, "NewKnowledge"));
     // Then
     assert_eq!(
         documents.refresh().unwrap_err().get_kind(),
         DocumentErrorKind::InvalidRequest
     );
-    assert_eq!(repo.read_state(), before);
+    assert_eq!(repo.get_state(), before);
     assert!(repo.search("NewKnowledge").is_empty());
     repo.write("z.md", build_whole(2, "NoReference"));
     documents.refresh().unwrap();
-    let state = repo.read_state();
+    let state = repo.get_state();
     assert!(matches!(
         state.get_node("a.md").metadata,
         NodeMetadata::Knowledge(_)
@@ -321,7 +321,7 @@ fn unsafe_source_read_rolls_back_all_cache_changes() {
     repo.write("a.md", build_whole(1, "PreviousToken"));
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
-    let before = repo.read_state();
+    let before = repo.get_state();
     let outside = tempfile::tempdir().unwrap();
     fs::write(outside.path().join("private.txt"), "SECRET_OUTSIDE").unwrap();
     symlink(outside.path(), repo.get_root().join("unsafe")).unwrap();
@@ -333,7 +333,7 @@ fn unsafe_source_read_rolls_back_all_cache_changes() {
     let error = documents.refresh().unwrap_err();
     // Then
     assert!(!format!("{error:?} {error}").contains("SECRET_OUTSIDE"));
-    assert_eq!(repo.read_state(), before);
+    assert_eq!(repo.get_state(), before);
     assert_eq!(repo.search("PreviousToken"), ["a.md"]);
     assert!(repo.search("ChangedToken").is_empty());
 }
@@ -349,12 +349,12 @@ fn recalculate_source_minimum_after_referrer_edit_and_preserve_unaffected_source
     repo.write("c.md", build_external(1, "other.txt", "Unchanged"));
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
-    let before = repo.read_state();
+    let before = repo.get_state();
     repo.write("a.md", build_external(10, "source.txt", "Revised"));
     repo.write("other.txt", "UnrelatedNewSourceBytes");
     documents.refresh().unwrap();
     // When
-    let after = repo.read_state();
+    let after = repo.get_state();
     let NodeMetadata::Source(source) = &after.get_node("source.txt").metadata else {
         panic!()
     };
@@ -373,11 +373,11 @@ fn remove_exact_path_without_treating_underscores_or_percent_as_patterns() {
     }
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
-    let before = repo.read_state();
+    let before = repo.get_state();
     repo.remove("a_%.md");
     let outcome = documents.refresh().unwrap();
     // When
-    let after = repo.read_state();
+    let after = repo.get_state();
     // Then
     assert_eq!(outcome.files_removed, 1);
     assert_eq!(after.nodes.len(), 2);
@@ -432,7 +432,7 @@ fn simultaneous_document_openers_initialize_and_publish_once() {
         1
     );
     assert!(outcomes.iter().all(|outcome| outcome.revision == 1));
-    assert_eq!(repo.read_state().revision, 1);
+    assert_eq!(repo.get_state().revision, 1);
 }
 
 #[test]
@@ -444,12 +444,12 @@ fn removes_an_orphan_source_while_preserving_unrelated_knowledge() {
     repo.write("unrelated.md", build_whole(3, "SurvivingKnowledge"));
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
-    let before = repo.read_state();
+    let before = repo.get_state();
     // When
     repo.remove("reference.md");
     documents.refresh().unwrap();
     // Then: an unrelated ID must not prevent orphan cleanup.
-    let after = repo.read_state();
+    let after = repo.get_state();
     assert_eq!(after.nodes.len(), 1);
     assert_eq!(
         after.get_node("unrelated.md"),

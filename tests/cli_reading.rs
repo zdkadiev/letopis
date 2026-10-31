@@ -44,7 +44,7 @@ fn effective_filters_initialize_repository_for_search() {
         let body = json!({"query":"x","limit":1,"filters":filters}).to_string();
 
         // When
-        let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 0);
+        let response = get_response(&repo.invoke(&["search"], body.as_bytes()), 0);
 
         // Then
         assert_eq!(response, json!({"ok":true,"result":[]}));
@@ -58,7 +58,7 @@ fn effective_filters_initialize_repository_for_search() {
     let body =
         json!({"query":"x","limit":1,"filters":{"source_revisions":[tree.as_str()]}}).to_string();
 
-    let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 0);
+    let response = get_response(&repo.invoke(&["search"], body.as_bytes()), 0);
 
     assert_eq!(response, json!({"ok":true,"result":[]}));
     assert!(repo.get_root().join(".letopis/cache.db").exists());
@@ -76,7 +76,7 @@ fn malformed_filters_fail_before_repository_initialization() {
         let repo = ReadingRepo::new();
         let body = json!({"query":"x","limit":1,"filters":filters}).to_string();
         // When
-        let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 1);
+        let response = get_response(&repo.invoke(&["search"], body.as_bytes()), 1);
         emit_reading("malformed_input", "search", 1, &response);
         // Then
         assert_eq!(response["error"]["code"], "invalid_request");
@@ -96,7 +96,7 @@ fn binary_search_refreshes_and_returns_links_with_empty_filter_equivalence() {
     ] {
         let body = format!(r#"{{"query":"SQLite OR блокировки café 42","limit":1{suffix}}}"#);
         // When
-        let response = read_response(&repo.invoke(&["search"], body.as_bytes()), 0);
+        let response = get_response(&repo.invoke(&["search"], body.as_bytes()), 0);
         emit_reading("search_success", "search", 0, &response);
         // Then
         assert_eq!(
@@ -129,12 +129,12 @@ fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
     let mut owner = drain::DetachedOwner::new(repo.get_root(), child.get_id());
     child.send_input(br#"{"query":"sqlite","limit":1}"#);
     // When
-    let response = read_response(&child.collect_output(Duration::from_secs(10)), 0);
+    let response = get_response(&child.collect_output(Duration::from_secs(10)), 0);
     // Then
     assert_eq!(response["result"][0]["element_id"], "knowledge.md");
     assert!(response.get("warnings").is_none());
     barrier.wait_until_entered();
-    assert!(owner.read_pid() > 0);
+    assert!(owner.get_pid() > 0);
     barrier.release();
     owner.wait_for_exit();
     assert_eq!(
@@ -143,12 +143,12 @@ fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
     );
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
-    let nodes = read.list_nodes().unwrap();
+    let nodes = read.get_nodes().unwrap();
     let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
         panic!("knowledge")
     };
     assert_eq!(
-        read.read_vector(&config.get_identity(), &node.search_hash)
+        read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
             .unwrap(),
         VectorOutcome::Current(Some(vec![1.0, 0.0]))
     );
@@ -160,7 +160,7 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
     let repo = ReadingRepo::new();
     repo.write("knowledge.md", include_bytes!("fixtures/markdown/crlf.md"));
     // When
-    let response = read_response(
+    let response = get_response(
         &repo.invoke(
             &["inspect"],
             br#"{"element_ids":["knowledge.md#a","./knowledge.md#a"]}"#,
@@ -177,7 +177,7 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
     repo.write("knowledge.md", b"later live edit");
     let git = open_git_snapshots(repo.get_root()).unwrap();
     assert_eq!(
-        git.read_blob(&tree, &RepoPath::parse("knowledge.md").unwrap())
+        git.get_blob(&tree, &RepoPath::parse("knowledge.md").unwrap())
             .unwrap(),
         include_bytes!("fixtures/markdown/crlf.md")
     );
@@ -193,7 +193,7 @@ fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
     let body = br#"{"element_ids":["knowledge.md","src/cache.rs#L2-L2","src/missing.rs","https://example.invalid/a?q=1#fragment","./knowledge.md"]}"#;
 
     // When
-    let response = read_response(&repo.invoke(&["inspect"], body), 0);
+    let response = get_response(&repo.invoke(&["inspect"], body), 0);
 
     emit_reading("inspect_mixed", "inspect", 0, &response);
     // Then
@@ -210,17 +210,17 @@ fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
     let tree = TreeOid::parse(response["result"]["snapshot"].as_str().unwrap()).unwrap();
     let git = open_git_snapshots(repo.get_root()).unwrap();
     assert_eq!(
-        git.read_blob(&tree, &RepoPath::parse("knowledge.md").unwrap())
+        git.get_blob(&tree, &RepoPath::parse("knowledge.md").unwrap())
             .unwrap(),
         knowledge
     );
     assert_eq!(
-        git.read_blob(&tree, &RepoPath::parse("src/cache.rs").unwrap())
+        git.get_blob(&tree, &RepoPath::parse("src/cache.rs").unwrap())
             .unwrap(),
         b"alpha\r\nbeta\n"
     );
     assert!(
-        git.read_blob(&tree, &RepoPath::parse("src/missing.rs").unwrap())
+        git.get_blob(&tree, &RepoPath::parse("src/missing.rs").unwrap())
             .is_err()
     );
 }
@@ -237,7 +237,7 @@ fn binary_inspect_rejects_unknown_member_without_partial_result() {
     let initial = br#"{"element_ids":["knowledge.md","src/cache.rs"]}"#;
     // When / Then
     assert_eq!(
-        read_response(&repo.invoke(&["inspect"], initial), 0)["ok"],
+        get_response(&repo.invoke(&["inspect"], initial), 0)["ok"],
         true
     );
     repo.write_knowledge("knowledge.md", "Private fixture secret after deletion.");
@@ -245,7 +245,7 @@ fn binary_inspect_rejects_unknown_member_without_partial_result() {
     for unknown in ["src/cache.rs", "knowledge.md#removed"] {
         let body = json!({"element_ids":["knowledge.md",unknown]}).to_string();
         let output = repo.invoke(&["inspect"], body.as_bytes());
-        let response = read_response(&output, 1);
+        let response = get_response(&output, 1);
         emit_reading("inspect_removed", "inspect", 1, &response);
         assert_eq!(response["error"]["code"], "not_found");
         assert!(response.get("result").is_none());
@@ -253,7 +253,7 @@ fn binary_inspect_rejects_unknown_member_without_partial_result() {
         assert!(!String::from_utf8_lossy(&output.stdout).contains("private source secret"));
     }
     fs::remove_file(repo.get_root().join("knowledge.md")).unwrap();
-    let response = read_response(&repo.invoke(&["inspect"], initial), 1);
+    let response = get_response(&repo.invoke(&["inspect"], initial), 1);
     assert_eq!(response["error"]["code"], "not_found");
     assert!(response.get("result").is_none());
 }
@@ -275,7 +275,7 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
             .unwrap();
         repo.seed_vectors(&config, &[("knowledge.md", &[1.0, 0.0])]);
         // When
-        let response = read_response(
+        let response = get_response(
             &repo.invoke(&["search"], br#"{"query":"sqlite","limit":1}"#),
             0,
         );
@@ -290,16 +290,16 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
         assert_eq!(requests[0]["input"], json!(["sqlite"]));
         let mut storage = repo.open_storage();
         let mut read = storage.begin_read().unwrap();
-        let error = read.read_query_error().unwrap().unwrap();
+        let error = read.get_query_error().unwrap().unwrap();
         assert!(!error.error.contains("PRIVATE_PROVIDER_BODY"));
         assert!(!error.error.contains("fixture-secret"));
         assert_eq!(error.error, "embedding provider rejected request");
-        let nodes = read.list_nodes().unwrap();
+        let nodes = read.get_nodes().unwrap();
         let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
             panic!("knowledge")
         };
         assert_eq!(
-            read.read_failure(&config.get_identity(), &node.search_hash)
+            read.get_failure_by_search_hash(&config.get_identity(), &node.search_hash)
                 .unwrap(),
             VectorOutcome::Current(None)
         );
@@ -317,14 +317,14 @@ fn binary_inspect_unknown_is_all_or_nothing_and_missing_source_has_null_hash() {
     for ids in [vec!["knowledge.md", "missing.md"], vec!["unknown.rs"]] {
         let body = json!({"element_ids":ids}).to_string();
         // When
-        let response = read_response(&repo.invoke(&["inspect"], body.as_bytes()), 1);
+        let response = get_response(&repo.invoke(&["inspect"], body.as_bytes()), 1);
         emit_reading("not_found", "inspect", 1, &response);
         // Then
         assert_eq!(response["error"]["code"], "not_found");
         assert!(response.get("result").is_none());
     }
     let body = json!({"element_ids":["knowledge.md", "source.rs"]}).to_string();
-    let response = read_response(&repo.invoke(&["inspect"], body.as_bytes()), 0);
+    let response = get_response(&repo.invoke(&["inspect"], body.as_bytes()), 0);
     assert_eq!(
         response["result"]["elements"]["source.rs"]["path"],
         "source.rs"
@@ -332,7 +332,7 @@ fn binary_inspect_unknown_is_all_or_nothing_and_missing_source_has_null_hash() {
     assert!(response["result"]["elements"]["source.rs"]["hash"].is_null());
     repo.write("knowledge.md", b"<!-- letopis: {broken} -->\ninvalid");
     assert_eq!(
-        read_response(
+        get_response(
             &repo.invoke(&["inspect"], br#"{"element_ids":["knowledge.md"]}"#),
             1
         )["error"]["code"],
@@ -357,7 +357,7 @@ fn lost_output_then_retry_preserves_corpus_user_state_and_revision() {
         assert_eq!(lost.status.code(), Some(0));
         assert!(lost.stderr.is_empty());
         for _ in 0..2 {
-            assert_eq!(read_response(&repo.invoke(&[args], body), 0)["ok"], true);
+            assert_eq!(get_response(&repo.invoke(&[args], body), 0)["ok"], true);
         }
         assert_eq!(repo.open_storage().begin_read().unwrap().get_revision(), 1);
         assert_eq!(capture_user_state(&repo), before);
@@ -396,7 +396,7 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
         // When: the nested cwd must not change the lock or service directory owner.
         let mut child = spawn_nested_reading(&repo, command);
         child.send_input(input);
-        let response = read_response(&child.collect_output(Duration::from_secs(10)), 0);
+        let response = get_response(&child.collect_output(Duration::from_secs(10)), 0);
         // Then: root exclusion avoids both provider calls and launch warnings.
         assert_eq!(response["ok"], true);
         warnings.push((command, response.get("warnings").cloned()));
@@ -435,11 +435,11 @@ fn nested_search_and_inspect_launch_the_existing_drain_only_at_repository_root()
         let mut owner = drain::DetachedOwner::new(repo.get_root(), child.get_id());
         child.send_input(input);
         // When
-        let response = read_response(&child.collect_output(Duration::from_secs(10)), 0);
+        let response = get_response(&child.collect_output(Duration::from_secs(10)), 0);
         // HTTP arrival establishes ownership before inspecting the root PID receipt.
         barrier.wait_until_entered();
         // Then
-        assert!(owner.read_pid() > 0);
+        assert!(owner.get_pid() > 0);
         barrier.release();
         owner.wait_for_exit();
         assert_eq!(response["ok"], true);
@@ -471,7 +471,7 @@ fn spawn_nested_reading(repo: &ReadingRepo, command: &str) -> cli::OwnedChild {
     cli::OwnedChild::spawn(&mut process)
 }
 
-fn read_response(output: &Output, exit: i32) -> Value {
+fn get_response(output: &Output, exit: i32) -> Value {
     assert_eq!(output.status.code(), Some(exit), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(

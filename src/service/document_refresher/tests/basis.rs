@@ -258,9 +258,9 @@ impl FileSystem for BoundaryFiles {
     fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
         self.inner.stat_file(path)
     }
-    fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+    fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
         self.events.borrow_mut().push("read");
-        self.inner.read_file(path)
+        self.inner.get_file(path)
     }
     fn get_time_ns(&self) -> DocumentResult<i64> {
         self.inner.get_time_ns()

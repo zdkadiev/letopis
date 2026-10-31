@@ -168,14 +168,14 @@ fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
     assert!(links[0].flags.is_empty());
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
-    let error = read.read_query_error().unwrap().unwrap();
+    let error = read.get_query_error().unwrap().unwrap();
     assert!(!error.error.contains("SECRET"));
-    let nodes = read.list_nodes().unwrap();
+    let nodes = read.get_nodes().unwrap();
     let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
         panic!("knowledge")
     };
     assert_eq!(
-        read.read_failure(&config.get_identity(), &node.search_hash)
+        read.get_failure_by_search_hash(&config.get_identity(), &node.search_hash)
             .unwrap(),
         VectorOutcome::Current(None)
     );
@@ -293,7 +293,7 @@ fn mismatched_persisted_knowledge_uri_fails_even_beyond_final_limit() {
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
         .execute(
-            "UPDATE nodes SET uri = ?1 WHERE id = ?2",
+            "update nodes set uri = ?1 where id = ?2",
             ["wrong.md", "b.md"],
         )
         .unwrap();
@@ -316,7 +316,7 @@ fn stale_coordinates_are_observed_without_replacing_pinned_lines() {
         .unwrap();
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
-        .execute("UPDATE nodes SET line_start = 2 WHERE id = ?1", ["a.md"])
+        .execute("update nodes set line_start = 2 where id = ?1", ["a.md"])
         .unwrap();
     // When
     let links = wire_searcher(repo.get_root())

@@ -18,8 +18,8 @@ fn a_failed_failure_update_poisons_the_entire_vector_unit() {
     let observer = Connection::open(&vector_path).unwrap();
     observer
         .execute_batch(
-            "CREATE TRIGGER deny_failure_update BEFORE UPDATE OF error ON embed_failures
-         BEGIN SELECT RAISE(ABORT, 'controlled update refusal'); END;",
+            "create trigger deny_failure_update before update of error on embed_failures
+         begin select raise(abort, 'controlled update refusal'); end;",
         )
         .unwrap();
     let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
@@ -34,7 +34,7 @@ fn a_failed_failure_update_poisons_the_entire_vector_unit() {
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(commit_error.get_kind(), StorageErrorKind::InvalidRequest);
     let count: i64 = observer
-        .query_row("SELECT count(*) FROM embed_failures", [], |row| row.get(0))
+        .query_row("select count(*) from embed_failures", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count, 0);
 }
@@ -51,9 +51,9 @@ fn a_failed_query_error_cleanup_poisons_the_entire_vector_unit() {
     let observer = Connection::open(&vector_path).unwrap();
     observer
         .execute_batch(
-            "INSERT INTO query_error VALUES(1, 17, 'existing diagnostic');
-         CREATE TRIGGER deny_query_cleanup BEFORE DELETE ON query_error
-         BEGIN SELECT RAISE(ABORT, 'controlled deletion refusal'); END;",
+            "insert into query_error values(1, 17, 'existing diagnostic');
+         create trigger deny_query_cleanup before delete on query_error
+         begin select raise(abort, 'controlled deletion refusal'); end;",
         )
         .unwrap();
     let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
@@ -68,11 +68,11 @@ fn a_failed_query_error_cleanup_poisons_the_entire_vector_unit() {
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(commit_error.get_kind(), StorageErrorKind::InvalidRequest);
     let count: i64 = observer
-        .query_row("SELECT count(*) FROM embed_failures", [], |row| row.get(0))
+        .query_row("select count(*) from embed_failures", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count, 0);
     let diagnostic: String = observer
-        .query_row("SELECT error FROM query_error", [], |row| row.get(0))
+        .query_row("select error from query_error", [], |row| row.get(0))
         .unwrap();
     assert_eq!(diagnostic, "existing diagnostic");
 }
@@ -89,8 +89,8 @@ fn a_failed_orphan_prune_poisons_the_entire_vector_unit() {
     let observer = Connection::open(&vector_path).unwrap();
     observer
         .execute_batch(
-            "CREATE TRIGGER deny_orphan_cleanup BEFORE DELETE ON embed_failures
-         BEGIN SELECT RAISE(ABORT, 'controlled orphan cleanup refusal'); END;",
+            "create trigger deny_orphan_cleanup before delete on embed_failures
+         begin select raise(abort, 'controlled orphan cleanup refusal'); end;",
         )
         .unwrap();
     let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
@@ -105,7 +105,7 @@ fn a_failed_orphan_prune_poisons_the_entire_vector_unit() {
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(commit_error.get_kind(), StorageErrorKind::InvalidRequest);
     let count: i64 = observer
-        .query_row("SELECT count(*) FROM embed_failures", [], |row| row.get(0))
+        .query_row("select count(*) from embed_failures", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count, 0);
 }

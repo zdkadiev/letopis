@@ -34,7 +34,7 @@ pub trait CorpusLister {
     ///
     /// # Errors
     /// Reports unsupported candidate paths or Git failures.
-    fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>>;
+    fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>>;
 }
 /// Confined synchronous file observations and publication exclusion.
 ///
@@ -52,7 +52,7 @@ pub trait FileSystem {
     ///
     /// # Errors
     /// Rejects unsafe paths, observed replacements or edits, clock and I/O failures.
-    fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>>;
+    fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>>;
     /// Observe wall-clock nanoseconds since the Unix epoch with checked conversion.
     ///
     /// # Errors

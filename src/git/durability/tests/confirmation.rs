@@ -18,7 +18,7 @@ fn retry_of_visible_ref_must_complete_sync_before_success() {
     // Then: neither visibility nor retry bypasses the failure; recovery can finish durability.
     assert!(first.is_err());
     assert!(retry.is_err());
-    assert_eq!(fixture.read_direct_ref(&oid.to_string()), oid.to_string());
+    assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
     retain_ref(&repo, oid).unwrap();
 }
 
@@ -49,7 +49,7 @@ fn concurrent_confirmation_cannot_bypass_sync_or_steal_a_lock() {
             fs::remove_file(path.with_extension("lock")).unwrap();
         }
         retain_ref(&repo, oid).unwrap();
-        assert_eq!(fixture.read_direct_ref(&oid.to_string()), oid.to_string());
+        assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
     }
 }
 
@@ -74,7 +74,7 @@ fn packed_confirmation_requires_backing_file_and_parent_sync() {
     }
     retain_ref(&repo, oid).unwrap();
     assert!(!loose.exists());
-    assert_eq!(fixture.read_direct_ref(&oid.to_string()), oid.to_string());
+    assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn loose_confirmation_syncs_the_existing_backing_without_renaming_it() {
     // When: durable confirmation owns the lock, syncs the backing and its parent chain.
     retain_ref(&repo, oid).unwrap();
     // Then: bytes remain exact and this isolated scenario also supplies the syscall oracle.
-    assert_eq!(fixture.read_direct_ref(&oid.to_string()), oid.to_string());
+    assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
     assert!(!path.with_extension("lock").exists());
 }
 
@@ -121,7 +121,7 @@ fn packed_confirmation_syncs_the_existing_backing_without_creating_a_loose_ref()
     retain_ref(&repo, oid).unwrap();
     // Then: its exact target remains packed; the syscall oracle observes the backing sync.
     assert!(!repo.common_dir().join(&name).exists());
-    assert_eq!(fixture.read_direct_ref(&oid.to_string()), oid.to_string());
+    assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn concurrent_confirmation_syncs_the_visible_winner_before_success() {
     // When: confirmation owns the newly released lock and completes the winner's sync.
     retain_ref(&repo, oid).unwrap();
     // Then: success has the exact value; the syscall oracle requires a post-rename backing sync.
-    assert_eq!(fixture.read_direct_ref(&oid.to_string()), oid.to_string());
+    assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
     assert!(!path.with_extension("lock").exists());
 }
 

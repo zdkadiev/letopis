@@ -44,7 +44,7 @@ fn incremental_blobs_reproduce_tree_without_touching_user_state() {
         assert_eq!(tree, expected);
         assert!(format!("{:?}", entries[0]).starts_with("SnapshotEntry {"));
         for (path, bytes) in paths.iter().zip(bytes) {
-            assert_eq!(git.read_blob(&tree, path).unwrap(), bytes);
+            assert_eq!(git.get_blob(&tree, path).unwrap(), bytes);
         }
         assert_eq!(repo.capture_fixture_state(), before);
         assert!(!repo.get_root().join("FILTER_RAN").exists());
@@ -152,7 +152,7 @@ fn create_external_tree(
     child: &str,
     name: &str,
 ) -> TreeOid {
-    parse_tree_oid(&repo.read_oid(
+    parse_tree_oid(&repo.get_oid(
         &["mktree", "-z", "--missing"],
         Some(format!("{mode} {kind} {child}\t{name}\0").as_bytes()),
     ))
@@ -211,7 +211,7 @@ fn exact_bytes_without_index_or_commit() {
         let first = git.create_tree(&files).unwrap();
         let captured: Vec<_> = paths
             .iter()
-            .map(|p| git.read_blob(&first, p).unwrap())
+            .map(|p| git.get_blob(&first, p).unwrap())
             .collect();
         files.reverse();
         let reordered = git.create_tree(&files).unwrap();
@@ -227,14 +227,14 @@ fn exact_bytes_without_index_or_commit() {
         // Given: mutate and remove live files after capturing their bytes.
         repo.change_and_delete_live_files("live.md");
         // When
-        let after_live_change = git.read_blob(&first, &paths[0]).unwrap();
+        let after_live_change = git.get_blob(&first, &paths[0]).unwrap();
         let second = git
             .create_tree(&[SnapshotFile {
                 path: &paths[0],
                 bytes: b"new",
             }])
             .unwrap();
-        let after_new_tree = git.read_blob(&first, &paths[0]).unwrap();
+        let after_new_tree = git.get_blob(&first, &paths[0]).unwrap();
         let listing =
             repo.run_git_successfully(&["ls-tree", "-rz", "--name-only", first.as_str()], None);
         // Then
@@ -273,7 +273,7 @@ fn paths_are_literal_and_never_shell_input() {
         let tree = git.create_tree(&files).unwrap();
         let captured: Vec<_> = paths
             .iter()
-            .map(|p| git.read_blob(&tree, p).unwrap())
+            .map(|p| git.get_blob(&tree, p).unwrap())
             .collect();
         // Then
         for bytes in captured {
@@ -325,7 +325,7 @@ fn empty_tree_and_invalid_paths() {
 }
 
 fn build_tree_error_cases(repo: &TempRepo, empty: &TreeOid) -> Vec<(TreeOid, SnapshotErrorKind)> {
-    let commit = repo.read_oid(&["rev-parse", "HEAD"], None);
+    let commit = repo.get_oid(&["rev-parse", "HEAD"], None);
     let wrong_length = match commit.len() {
         40 => 64,
         64 => 40,
@@ -334,7 +334,7 @@ fn build_tree_error_cases(repo: &TempRepo, empty: &TreeOid) -> Vec<(TreeOid, Sna
     let tag_body = format!(
         "object {commit}\ntype commit\ntag fixture\ntagger Fixture <fixture@example.invalid> 1 +0000\n\nfixture\n"
     );
-    let tag = repo.read_oid(
+    let tag = repo.get_oid(
         &["hash-object", "-w", "-t", TAG_KIND, "--stdin"],
         Some(tag_body.as_bytes()),
     );
@@ -363,8 +363,8 @@ fn build_tree_error_cases(repo: &TempRepo, empty: &TreeOid) -> Vec<(TreeOid, Sna
     ]
 }
 fn create_corrupted_blob_tree(repo: &TempRepo) -> TreeOid {
-    let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"valid expected"));
-    let other = repo.read_oid(
+    let blob = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"valid expected"));
+    let other = repo.get_oid(
         &["hash-object", "-w", "--stdin"],
         Some(b"different CORRUPT_CANARY bytes"),
     );
@@ -383,14 +383,14 @@ fn tree_types_and_missing_objects_are_distinct() {
         let empty = git.create_tree(&[]).unwrap();
         for (tree, expected) in build_tree_error_cases(&repo, &empty) {
             // When
-            let error = git.read_blob(&tree, &leaf).unwrap_err();
+            let error = git.get_blob(&tree, &leaf).unwrap_err();
             // Then
             assert_eq!(error.get_kind(), expected);
         }
         // Given
         let tree = create_corrupted_blob_tree(&repo);
         // When
-        let error = git.read_blob(&tree, &leaf).unwrap_err();
+        let error = git.get_blob(&tree, &leaf).unwrap_err();
         // Then
         assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
         assert!(!format!("{error} {error:?}").contains("CORRUPT_CANARY"));
@@ -418,7 +418,7 @@ fn replacement_refs_do_not_change_bytes() {
             .unwrap();
         repo.run_git_successfully(&["replace", original.as_str(), replacement.as_str()], None);
         // When
-        let bytes = git.read_blob(&original, &p).unwrap();
+        let bytes = git.get_blob(&original, &p).unwrap();
         // Then
         assert_eq!(bytes, b"original");
     }

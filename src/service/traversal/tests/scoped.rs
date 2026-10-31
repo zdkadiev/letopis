@@ -268,10 +268,10 @@ impl Fixture {
     fn assert_released(&self) {
         let connection = rusqlite::Connection::open(self.root.path().join("cache.db")).unwrap();
         connection
-            .execute("UPDATE project SET revision=revision+1", [])
+            .execute("update project set revision=revision+1", [])
             .unwrap();
         let busy: i64 = connection
-            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
+            .query_row("pragma wal_checkpoint(truncate)", [], |row| row.get(0))
             .unwrap();
         assert_eq!(busy, 0, "reader retained by live service");
     }
@@ -296,7 +296,7 @@ impl Refresher for Refresh {
     }
 }
 impl Embedder for Readiness {
-    fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
+    fn get_configuration(&mut self) -> EmbeddingResult<ConfigState> {
         self.events.borrow_mut().push("readiness".into());
         Ok(std::mem::replace(&mut self.state, ConfigState::Missing))
     }
@@ -314,7 +314,7 @@ impl Embedder for Readiness {
     }
 }
 impl SourceReader for Sources {
-    fn read_source(
+    fn get_source(
         &self,
         view: &mut dyn StorageRead,
         uri: &SourceUri,
@@ -325,7 +325,7 @@ impl SourceReader for Sources {
         if matches!(self.failure, Failure::Source) {
             return Err(build_private_error());
         }
-        self.inner.read_source(view, uri)
+        self.inner.get_source(view, uri)
     }
 }
 impl SourceProvenance for Provenance {

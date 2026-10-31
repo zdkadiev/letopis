@@ -144,7 +144,7 @@ mod tests {
         // Given
         let text = "mémoire '); DROP TABLE nodes; -- ?1";
         // When
-        let (sql, result) = read_values(vec![Value::from(text)]);
+        let (sql, result) = get_values(vec![Value::from(text)]);
         // Then
         assert!(!sql.contains(text));
         assert!(sql.contains('?'));
@@ -169,7 +169,7 @@ mod tests {
             Value::Enum(OptionEnum::None("kind".into())),
         ];
         // When
-        let (_, result) = read_values(values);
+        let (_, result) = get_values(values);
         // Then
         assert_eq!(
             result,
@@ -204,7 +204,7 @@ mod tests {
             Value::Double(Some(-2.5)),
         ];
         // When
-        let (_, result) = read_values(numbers);
+        let (_, result) = get_values(numbers);
         let error = build_query(Query::select().expr(Expr::val(u64::MAX))).unwrap_err();
         // Then
         assert_eq!(
@@ -248,12 +248,12 @@ mod tests {
         ];
         let count = values.len();
         // When
-        let (_, result) = read_values(values);
+        let (_, result) = get_values(values);
         // Then
         assert_eq!(result, vec![SqliteValue::Null; count]);
     }
 
-    fn read_values(values: Vec<Value>) -> (String, Vec<SqliteValue>) {
+    fn get_values(values: Vec<Value>) -> (String, Vec<SqliteValue>) {
         let db = Connection::open_in_memory().unwrap();
         let mut query = Query::select();
         for value in values {

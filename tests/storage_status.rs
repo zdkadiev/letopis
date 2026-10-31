@@ -45,9 +45,9 @@ fn counts_distinct_current_hashes() {
     let mut status = open_status_storage(&root.path().canonicalize().unwrap(), &pinned).unwrap();
     let mut read = status.begin_status_read().unwrap().unwrap();
     let unavailable = read
-        .read_embedding_status(&EmbeddingStatusPolicy::Unavailable)
+        .get_embedding_status(&EmbeddingStatusPolicy::Unavailable)
         .unwrap();
-    let ready = read.read_embedding_status(&ready_policy(identity)).unwrap();
+    let ready = read.get_embedding_status(&ready_policy(identity)).unwrap();
     // Then independent literal counts and one exhausted live hash.
     assert_eq!((unavailable.backlog, unavailable.failed), (3, 0));
     assert_eq!((ready.backlog, ready.failed), (1, 1));
@@ -74,7 +74,7 @@ fn respects_attempt_boundary() {
         .begin_status_read()
         .unwrap()
         .unwrap()
-        .read_embedding_status(&ready_policy(identity))
+        .get_embedding_status(&ready_policy(identity))
         .unwrap();
     // Then
     assert_eq!((result.backlog, result.failed), (1, 1));
@@ -97,14 +97,15 @@ fn ignores_vectors_for_mismatched_identity() {
     let mut read = status.begin_status_read().unwrap().unwrap();
     // When
     let result = read
-        .read_embedding_status(&ready_policy(Sha256::digest(b"new")))
+        .get_embedding_status(&ready_policy(Sha256::digest(b"new")))
         .unwrap();
     // Then
     assert_eq!((result.backlog, result.failed), (3, 0));
     assert!(result.exhausted.is_empty());
     assert_eq!(read.get_config_identity(), Some(identity));
     assert!(matches!(
-        read.read_vector(&identity, &Sha256::digest(b"A")).unwrap(),
+        read.get_vector_by_search_hash(&identity, &Sha256::digest(b"A"))
+            .unwrap(),
         VectorOutcome::Current(Some(_))
     ));
 }
@@ -137,7 +138,7 @@ fn opens_missing_files_without_creating_them() {
         .begin_status_read()
         .unwrap()
         .unwrap()
-        .read_embedding_status(&ready_policy(Sha256::digest(b"model")))
+        .get_embedding_status(&ready_policy(Sha256::digest(b"model")))
         .unwrap();
     // When / Then
     assert_eq!((summary.backlog, summary.failed), (2, 0));
@@ -158,7 +159,7 @@ fn pins_status_revision_and_counts() {
     publish(&mut writer, &[("a.md", "A"), ("b.md", "B")]);
     store(&mut writer, &identity, "A");
     // When
-    let summary = read.read_embedding_status(&ready_policy(identity)).unwrap();
+    let summary = read.get_embedding_status(&ready_policy(identity)).unwrap();
     // Then
     assert_eq!(read.get_revision(), 1);
     assert_eq!((summary.backlog, summary.failed), (1, 0));
@@ -175,11 +176,11 @@ fn rejects_malformed_persisted_counts_and_read_failure() {
         publish(&mut writer, &[("a.md", "A")]);
         let connection = Connection::open(root.path().join("vectors.db")).unwrap();
         connection
-            .execute_batch("PRAGMA ignore_check_constraints=ON")
+            .execute_batch("pragma ignore_check_constraints=on")
             .unwrap();
         connection
             .execute(
-                &format!("INSERT INTO embed_failures VALUES(?1,{attempts},NULL)"),
+                &format!("insert into embed_failures values(?1,{attempts},null)"),
                 [Sha256::digest(b"A").to_hex()],
             )
             .unwrap();
@@ -192,7 +193,7 @@ fn rejects_malformed_persisted_counts_and_read_failure() {
                 .begin_status_read()
                 .unwrap()
                 .unwrap()
-                .read_embedding_status(&ready_policy(identity))
+                .get_embedding_status(&ready_policy(identity))
                 .is_err(),
             "{attempts}"
         );
@@ -202,14 +203,14 @@ fn rejects_malformed_persisted_counts_and_read_failure() {
     publish(&mut writer, &[("a.md", "A")]);
     let connection = Connection::open(root.path().join("cache.db")).unwrap();
     connection
-        .execute_batch("UPDATE project SET revision=-1")
+        .execute_batch("update project set revision=-1")
         .unwrap();
     let pinned = File::open(root.path()).unwrap();
     let mut status = open_status_storage(&root.path().canonicalize().unwrap(), &pinned).unwrap();
     // When / Then
     assert!(status.begin_status_read().is_err());
     drop(status);
-    connection.execute_batch("DROP TABLE project").unwrap();
+    connection.execute_batch("drop table project").unwrap();
     assert!(open_status_storage(&root.path().canonicalize().unwrap(), &pinned).is_err());
 }
 
@@ -239,8 +240,8 @@ fn preserves_files_and_orders_only_uncovered_current_failures() {
     let pinned = File::open(root.path()).unwrap();
     let mut status = open_status_storage(&root.path().canonicalize().unwrap(), &pinned).unwrap();
     let mut read = status.begin_status_read().unwrap().unwrap();
-    let result = read.read_embedding_status(&ready_policy(identity)).unwrap();
-    let query_error = read.read_query_error().unwrap().unwrap();
+    let result = read.get_embedding_status(&ready_policy(identity)).unwrap();
+    let query_error = read.get_query_error().unwrap().unwrap();
     // Then hashes have known independent lexicographic order (A=559a..., B=df7e...).
     assert_eq!((result.backlog, result.failed), (0, 2));
     assert_eq!(
@@ -288,7 +289,7 @@ fn rejects_unsafe_paths_and_existing_invalid_schemas() {
         publish(&mut writer, &[("a.md", "A")]);
         drop(writer);
         let connection = Connection::open(root.path().join(leaf)).unwrap();
-        connection.execute_batch("PRAGMA user_version=99").unwrap();
+        connection.execute_batch("pragma user_version=99").unwrap();
         let pinned = File::open(root.path()).unwrap();
         // When / Then
         assert!(open_status_storage(&root.path().canonicalize().unwrap(), &pinned).is_err());
@@ -316,7 +317,7 @@ fn disabled_policy_returns_zero_without_touching_execution_state() {
     let connection = Connection::open(root.path().join("vectors.db")).unwrap();
     connection
         .execute(
-            "INSERT INTO vector_keys(search_hash) VALUES(?1)",
+            "insert into vector_keys(search_hash) values(?1)",
             [Sha256::digest(b"B").to_hex()],
         )
         .unwrap();
@@ -326,13 +327,13 @@ fn disabled_policy_returns_zero_without_touching_execution_state() {
 
     // When
     let disabled = read
-        .read_embedding_status(&EmbeddingStatusPolicy::Disabled)
+        .get_embedding_status(&EmbeddingStatusPolicy::Disabled)
         .unwrap();
 
     // Then: no coverage or stored-failure read can fail or leak into disabled counts.
     assert_eq!((disabled.backlog, disabled.failed), (0, 0));
     assert!(disabled.exhausted.is_empty());
-    assert!(read.read_query_error().unwrap().is_some());
+    assert!(read.get_query_error().unwrap().is_some());
 }
 
 #[test]
@@ -347,7 +348,7 @@ fn rejects_current_vector_key_without_native_row() {
     let connection = Connection::open(root.path().join("vectors.db")).unwrap();
     connection
         .execute(
-            "INSERT INTO vector_keys(search_hash) VALUES(?1)",
+            "insert into vector_keys(search_hash) values(?1)",
             [hash.to_hex()],
         )
         .unwrap();
@@ -356,12 +357,14 @@ fn rejects_current_vector_key_without_native_row() {
     let mut read = status.begin_status_read().unwrap().unwrap();
     // When.
     let unavailable = read
-        .read_embedding_status(&EmbeddingStatusPolicy::Unavailable)
+        .get_embedding_status(&EmbeddingStatusPolicy::Unavailable)
         .unwrap();
     let error = read
-        .read_embedding_status(&ready_policy(identity))
+        .get_embedding_status(&ready_policy(identity))
         .unwrap_err();
-    let vector_error = read.read_vector(&identity, &hash).unwrap_err();
+    let vector_error = read
+        .get_vector_by_search_hash(&identity, &hash)
+        .unwrap_err();
     // Then configuration-unavailable counting ignores old vectors, but ready coverage fails safely.
     assert_eq!((unavailable.backlog, unavailable.failed), (1, 0));
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);

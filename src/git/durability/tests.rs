@@ -18,7 +18,7 @@ fn stages_syncs_publishes_and_retains_git_compatible_objects() {
     for format in FORMATS {
         let fixture = TempRepo::new(format);
         let repo = gix::open(fixture.get_root()).unwrap();
-        let expected = fixture.read_oid(&["hash-object", "--stdin"], Some(b"durable bytes"));
+        let expected = fixture.get_oid(&["hash-object", "--stdin"], Some(b"durable bytes"));
         let object = StagedObject::new(&repo, Kind::Blob, b"durable bytes").unwrap();
         let oid = object.get_oid();
         assert_eq!(oid.to_string(), expected);
@@ -39,7 +39,7 @@ fn stages_syncs_publishes_and_retains_git_compatible_objects() {
             fixture.run_git_successfully(&["cat-file", "blob", &expected], None),
             b"durable bytes"
         );
-        assert_eq!(fixture.read_direct_ref(&expected), expected);
+        assert_eq!(fixture.get_direct_ref(&expected), expected);
         StagedObject::new(&repo, Kind::Blob, b"durable bytes")
             .unwrap()
             .publish()
@@ -54,7 +54,7 @@ fn writes_canonical_tree_objects_in_both_formats() {
     for format in FORMATS {
         let fixture = TempRepo::new(format);
         let repo = gix::open(fixture.get_root()).unwrap();
-        let expected = fixture.read_oid(&["hash-object", "-t", "tree", "--stdin"], Some(b""));
+        let expected = fixture.get_oid(&["hash-object", "-t", "tree", "--stdin"], Some(b""));
         let object = StagedObject::new(&repo, Kind::Tree, b"").unwrap();
         let oid = object.get_oid();
         // When: the library stages, syncs and publishes that tree with its actual kind header.
@@ -66,7 +66,7 @@ fn writes_canonical_tree_objects_in_both_formats() {
             fixture.run_git_successfully(&["cat-file", "tree", &expected], None),
             b""
         );
-        assert_eq!(fixture.read_direct_ref(&expected), expected);
+        assert_eq!(fixture.get_direct_ref(&expected), expected);
     }
 }
 
@@ -177,7 +177,7 @@ fn concurrent_creators_and_packed_refs_preserve_exact_target() {
     // Given: matching independent writers and an ordinary Git ref packer.
     let fixture = TempRepo::new(FORMATS[0]);
     let root = fixture.get_root().to_owned();
-    let expected = fixture.read_oid(&["hash-object", "--stdin"], Some(b"concurrent"));
+    let expected = fixture.get_oid(&["hash-object", "--stdin"], Some(b"concurrent"));
     // When: every writer stages/publishes independently and races the same create-only ref.
     std::thread::scope(|scope| {
         let writers: Vec<_> = (0..4)
@@ -201,7 +201,7 @@ fn concurrent_creators_and_packed_refs_preserve_exact_target() {
     let repo = gix::open(&root).unwrap();
     retain_ref(&repo, ObjectId::from_hex(expected.as_bytes()).unwrap()).unwrap();
     // Then: Git's packed-ref reader sees exactly the expected direct target.
-    assert_eq!(fixture.read_direct_ref(&expected), expected);
+    assert_eq!(fixture.get_direct_ref(&expected), expected);
 }
 
 #[test]
@@ -254,7 +254,7 @@ fn reports_directory_sync_failure_after_ref_publication() {
     FAILURE.with(|slot| slot.set(None));
     // Then: a visible correct ref can remain, but the operation must report failure.
     assert!(result.is_err());
-    assert_eq!(fixture.read_direct_ref(&oid.to_string()), oid.to_string());
+    assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
 }
 
 #[test]
@@ -274,7 +274,7 @@ fn linked_worktrees_publish_in_common_store_with_shared_permissions() {
         None,
     );
     let repo = gix::open(&linked).unwrap();
-    let oracle = fixture.read_oid(&["hash-object", "-w", "--stdin"], Some(b"Git mode oracle"));
+    let oracle = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"Git mode oracle"));
     let object = StagedObject::new(&repo, Kind::Blob, b"library mode probe").unwrap();
     let destination = object.destination.clone();
     let oid = object.get_oid();
@@ -282,7 +282,7 @@ fn linked_worktrees_publish_in_common_store_with_shared_permissions() {
     object.publish().unwrap();
     retain_ref(&repo, oid).unwrap();
     // Then: Git sees them in the common store, with its shared permissions policy preserved.
-    assert_eq!(fixture.read_direct_ref(&oid.to_string()), oid.to_string());
+    assert_eq!(fixture.get_direct_ref(&oid.to_string()), oid.to_string());
     assert_eq!(
         fs::metadata(&destination).unwrap().permissions().mode() & 0o7777,
         fs::metadata(fixture.build_object_path(&oracle))

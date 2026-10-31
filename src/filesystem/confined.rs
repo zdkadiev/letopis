@@ -26,7 +26,7 @@ impl ConfinedParent {
             links: Vec::new(),
         };
         for &name in components {
-            let Some(before) = read_stat(&parent.directory, name)? else {
+            let Some(before) = get_stat(&parent.directory, name)? else {
                 parent.verify_links()?;
                 return Ok(None);
             };
@@ -54,7 +54,7 @@ impl ConfinedParent {
     }
 }
 
-pub(super) fn read_stat(parent: &File, name: &str) -> EmbeddingResult<Option<Stat>> {
+pub(super) fn get_stat(parent: &File, name: &str) -> EmbeddingResult<Option<Stat>> {
     match statat(parent, name, AtFlags::SYMLINK_NOFOLLOW) {
         Ok(stat) => Ok(Some(stat)),
         Err(Errno::NOENT) => match statat(parent, name, AtFlags::SYMLINK_NOFOLLOW) {

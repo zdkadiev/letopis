@@ -25,7 +25,7 @@ CONTROLS = [
 READING_CONTROLS = [
     ('captured-config', 'src/service/embedding.rs',
      '        if self.provider.validate_config(request.config).is_err() {',
-     '        let _ = self.read_configuration()?;\n        if self.provider.validate_config(request.config).is_err() {',
+     '        let _ = self.get_configuration()?;\n        if self.provider.validate_config(request.config).is_err() {',
      ['--lib'], 'service::embedding::tests::captured_query_never_rereads_or_resets_configuration',
      'left: 1'),
     ('candidate-hash', 'src/service/search.rs',
@@ -40,7 +40,7 @@ READING_CONTROLS = [
      'CommandError { kind: InternalError, message: "invalid search index data", .. }'),
     ('live-inspect-reread', 'src/service/inspection.rs',
      '        captured.collect_metadata(&path, parsed, requested);',
-     '        drop(parsed);\n        let live = self.filesystem.read_file(&path).map_err(map_document_error)?.unwrap();\n        let parsed = self.markdown.parse_file(&path, &live.bytes).map_err(|_| CommandError::new(CommandErrorKind::ValidationFailed, "invalid control input"))?.unwrap();\n        captured.collect_metadata(&path, parsed, requested);',
+     '        drop(parsed);\n        let live = self.filesystem.get_file(&path).map_err(map_document_error)?.unwrap();\n        let parsed = self.markdown.parse_file(&path, &live.bytes).map_err(|_| CommandError::new(CommandErrorKind::ValidationFailed, "invalid control input"))?.unwrap();\n        captured.collect_metadata(&path, parsed, requested);',
      ['--lib'], 'service::inspection::tests::capture_writes_each_blob_before_reading_the_next_file',
      'assertion `left == right` failed'),
 ]

@@ -40,7 +40,7 @@ fn success_output_survives_late_sigint() {
     // When: the real listener receives SIGINT after output ownership is complete.
     child.send_sigint();
     let status = child.wait_exit();
-    let response = child.read_response();
+    let response = child.get_response();
     // Then: the success envelope survives unchanged and the handled exit is 1.
     assert_eq!(status.code(), Some(1), "{status:?}");
     assert_eq!(response, SUCCESS_ENVELOPE);
@@ -53,7 +53,7 @@ fn sigint_during_backpressure_finishes_one_response() {
     child.wait_marker(b"would-block");
     // When: SIGINT arrives while the original response is still incomplete.
     child.send_sigint();
-    let response = child.read_response();
+    let response = child.get_response();
     let status = child.wait_exit();
     // Then: the original response completes exactly once without a replacement.
     assert_eq!(status.code(), Some(1), "{status:?}");
@@ -76,7 +76,7 @@ fn repeated_sigint_keeps_one_response() {
     child.send_sigint();
     child.send_sigint();
     child.stream.write_all(b"x").unwrap();
-    let response = child.read_response();
+    let response = child.get_response();
     let status = child.wait_exit();
     // Then: only one complete cancellation envelope is emitted, with exit 1.
     assert_eq!(status.code(), Some(1), "{status:?}");
@@ -265,7 +265,7 @@ impl SignalChild {
         }
     }
 
-    fn read_response(&mut self) -> Vec<u8> {
+    fn get_response(&mut self) -> Vec<u8> {
         let mut bytes = Vec::new();
         self.stream.read_to_end(&mut bytes).unwrap();
         bytes

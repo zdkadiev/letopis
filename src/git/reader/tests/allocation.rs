@@ -24,7 +24,7 @@ pub(super) fn stop() -> (usize, usize) {
     )
 }
 
-pub(super) fn read_peak_rss() -> u64 {
+pub(super) fn get_peak_rss() -> u64 {
     let mut usage = std::mem::MaybeUninit::<libc::rusage>::uninit();
     // SAFETY: getrusage initializes this correctly sized output on success.
     assert_eq!(

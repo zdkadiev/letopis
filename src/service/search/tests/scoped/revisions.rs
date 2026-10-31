@@ -47,7 +47,7 @@ fn add_second_candidate(root: &Path, basis: char) {
     let mut storage = open_storage(root);
     let mut read = storage.begin_read().unwrap();
     let stored = read
-        .read_node(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
+        .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
         .unwrap()
         .unwrap();
     drop(read);

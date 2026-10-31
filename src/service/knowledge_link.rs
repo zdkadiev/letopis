@@ -8,7 +8,7 @@ pub(super) fn is_current_knowledge<F: FileSystem>(
     filesystem: &F,
     markdown: &dyn MarkdownCodec,
 ) -> DocumentResult<bool> {
-    let Some(file) = filesystem.read_file(path)? else {
+    let Some(file) = filesystem.get_file(path)? else {
         return Ok(false);
     };
     let Ok(Some(parsed)) = markdown.parse_file(path, &file.bytes) else {

@@ -20,9 +20,9 @@ const NATIVE_DIMENSION_MIN: usize = 2;
 const NATIVE_DIMENSION_MAX: usize = 4096;
 
 const RESET_INDEX: &str = r#"
-    DROP TABLE vector_index;
-    CREATE VIRTUAL TABLE vector_index USING vec1(vector);
-    INSERT INTO vector_index(cmd,arg) VALUES('rebuild','{index:"none",distance:"cos"}');
+    drop table vector_index;
+    create virtual table vector_index using vec1(vector);
+    insert into vector_index(cmd,arg) values('rebuild','{index:"none",distance:"cos"}');
 "#;
 
 pub(super) fn reset_vectors(
@@ -33,7 +33,7 @@ pub(super) fn reset_vectors(
     let tx = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(map_sqlite)?;
-    let current = read_config_identity(&tx, false)?;
+    let current = get_config_identity(&tx, false)?;
     if current.as_ref() == Some(identity) {
         return Ok(VectorOutcome::Current(false));
     }
@@ -65,7 +65,7 @@ pub(super) fn reset_vectors(
     Ok(VectorOutcome::Current(true))
 }
 
-pub(super) fn read_config_identity(
+pub(super) fn get_config_identity(
     connection: &Connection,
     attached: bool,
 ) -> StorageResult<Option<Sha256>> {
@@ -156,7 +156,7 @@ pub(super) fn store_vector(
 }
 
 fn validate_dimensions(connection: &Connection, dimensions: usize) -> StorageResult<()> {
-    let current = read_vector_dimensions(connection, false)?;
+    let current = get_vector_dimensions(connection, false)?;
     if !(NATIVE_DIMENSION_MIN..=NATIVE_DIMENSION_MAX).contains(&dimensions)
         || current.is_some_and(|size| size.get() != dimensions)
     {
@@ -168,15 +168,15 @@ fn validate_dimensions(connection: &Connection, dimensions: usize) -> StorageRes
     Ok(())
 }
 
-pub(super) fn read_vector_dimensions(
+pub(super) fn get_vector_dimensions(
     connection: &Connection,
     attached: bool,
 ) -> StorageResult<Option<NonZeroUsize>> {
     // Native shadow introspection is read-only, with private fixed schema names.
     let sql = if attached {
-        "SELECT val FROM vec.vector_index_config WHERE id = ?1"
+        "select val from vec.vector_index_config where id = ?1"
     } else {
-        "SELECT val FROM main.vector_index_config WHERE id = ?1"
+        "select val from main.vector_index_config where id = ?1"
     };
     let value: Option<i64> = connection
         .query_row(sql, [NATIVE_DIMENSION_FIELD], |row| row.get(0))
@@ -225,9 +225,9 @@ fn get_or_insert_vector_key(
     Ok(StoredVectorKey { row_id, inserted })
 }
 
-pub(super) fn read_vector(
+pub(super) fn get_vector_by_search_hash(
     connection: &Connection,
-    hash: &Sha256,
+    search_hash: &Sha256,
 ) -> StorageResult<Option<Vec<f32>>> {
     let (sql, values) = build_query(
         Query::select()
@@ -239,7 +239,9 @@ pub(super) fn read_vector(
                 Expr::col((VectorIndex::Table, VectorIndex::Rowid))
                     .equals((VectorKeys::Table, VectorKeys::RowId)),
             )
-            .and_where(Expr::col((VectorKeys::Table, VectorKeys::SearchHash)).eq(hash.to_hex())),
+            .and_where(
+                Expr::col((VectorKeys::Table, VectorKeys::SearchHash)).eq(search_hash.to_hex()),
+            ),
     )?;
     let value = connection
         .query_row(&sql, params_from_iter(values), |r| {
@@ -285,12 +287,12 @@ pub(super) fn find_nearest_vectors(
     }
     let mut statement = connection
         .prepare(
-            "SELECT n.id, k.search_hash, v.distance
-         FROM vec.vector_index(?1, ?2) v
-         JOIN vec.vector_keys k ON k.row_id = v.rowid
-         JOIN nodes n ON n.search_hash = k.search_hash
-         WHERE n.kind <> ?3
-         ORDER BY v.distance, n.id",
+            "select n.id, k.search_hash, v.distance
+         from vec.vector_index(?1, ?2) v
+         join vec.vector_keys k on k.row_id = v.rowid
+         join nodes n on n.search_hash = k.search_hash
+         where n.kind <> ?3
+         order by v.distance, n.id",
         )
         .map_err(map_sqlite)?;
     let rows = statement
@@ -428,15 +430,15 @@ pub(super) fn clear_query_error(connection: &Connection) -> StorageResult<()> {
     Ok(())
 }
 
-pub(super) fn read_failure(
+pub(super) fn get_failure_by_search_hash(
     connection: &Connection,
-    hash: &Sha256,
+    search_hash: &Sha256,
 ) -> StorageResult<Option<EmbeddingFailure>> {
     let (sql, values) = build_query(
         Query::select()
             .columns([EmbedFailures::Attempts, EmbedFailures::Error])
             .from((Schemas::Vec, EmbedFailures::Table))
-            .and_where(Expr::col(EmbedFailures::SearchHash).eq(hash.to_hex())),
+            .and_where(Expr::col(EmbedFailures::SearchHash).eq(search_hash.to_hex())),
     )?;
     let value = connection
         .query_row(&sql, params_from_iter(values), |row| {
@@ -451,7 +453,7 @@ pub(super) fn read_failure(
                 return Err(fail_invalid_diagnostic());
             }
             Ok(EmbeddingFailure {
-                search_hash: *hash,
+                search_hash: *search_hash,
                 attempts,
                 error,
             })
@@ -459,7 +461,7 @@ pub(super) fn read_failure(
         .transpose()
 }
 
-pub(super) fn read_query_error(connection: &Connection) -> StorageResult<Option<QueryError>> {
+pub(super) fn get_query_error(connection: &Connection) -> StorageResult<Option<QueryError>> {
     let (sql, values) = build_query(
         Query::select()
             .columns([QueryErrorRow::At, QueryErrorRow::Error])

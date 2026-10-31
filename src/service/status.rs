@@ -30,14 +30,14 @@ impl<S, G> fmt::Debug for StatusService<'_, S, G> {
 }
 
 impl<S: StatusStorage, G: GraphDiagnostics> StatusReader for StatusService<'_, S, G> {
-    fn read_status(&mut self) -> CommandResult<StatusReport> {
-        let (policy, config_problem) = read_config_policy(self.files, self.provider);
+    fn get_status(&mut self) -> CommandResult<StatusReport> {
+        let (policy, config_problem) = get_config_policy(self.files, self.provider);
         let observation = self
             .storage
             .begin_status_read()
             .map_err(map_storage_error)?;
         let mut report = if let Some(mut view) = observation {
-            read_published(&mut view, &policy, self.graph, self.provenance)?
+            get_published(&mut view, &policy, self.graph, self.provenance)?
         } else {
             StatusReport {
                 revision: None,
@@ -56,7 +56,7 @@ impl<S: StatusStorage, G: GraphDiagnostics> StatusReader for StatusService<'_, S
     }
 }
 
-fn read_published<R: StorageRead, G: GraphDiagnostics>(
+fn get_published<R: StorageRead, G: GraphDiagnostics>(
     view: &mut R,
     policy: &EmbeddingStatusPolicy,
     graph: &G,
@@ -65,15 +65,11 @@ fn read_published<R: StorageRead, G: GraphDiagnostics>(
     let revision = view.get_revision();
     let mut problems = collect_check_problems(view, &[], graph, provenance)?;
     let summary = view
-        .read_embedding_status(policy)
+        .get_embedding_status(policy)
         .map_err(map_storage_error)?;
     if !matches!(policy, EmbeddingStatusPolicy::Disabled) {
         problems.extend(collect_exhausted(&summary));
-        if view
-            .read_query_error()
-            .map_err(map_storage_error)?
-            .is_some()
-        {
+        if view.get_query_error().map_err(map_storage_error)?.is_some() {
             problems.push(build_problem(
                 CommandErrorKind::EmbeddingFailed,
                 "query embedding failed",
@@ -91,11 +87,11 @@ fn read_published<R: StorageRead, G: GraphDiagnostics>(
     })
 }
 
-fn read_config_policy(
+fn get_config_policy(
     files: &dyn StatusFiles,
     provider: &dyn EmbeddingProvider,
 ) -> (EmbeddingStatusPolicy, Option<CommandProblem>) {
-    let Ok(bytes) = files.read_config() else {
+    let Ok(bytes) = files.get_config() else {
         return (
             EmbeddingStatusPolicy::Unavailable,
             Some(invalid_config_problem()),

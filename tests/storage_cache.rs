@@ -36,7 +36,7 @@ fn cache_commit_preserves_node_row_id() {
     assert_eq!(read.match_text("alpha").unwrap().len(), 0);
     assert_eq!(read.match_text("beta").unwrap().len(), 1);
     assert_eq!(
-        read.read_node(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
+        read.get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
             .unwrap()
             .unwrap()
             .row_id,
@@ -70,10 +70,13 @@ fn source_missing_bytes_and_declared_targets_round_trip() {
     write.commit().unwrap();
     let mut read = db.begin_read().unwrap();
     // When / Then
-    assert_eq!(read.read_node(&id).unwrap().unwrap().metadata, source);
-    assert_eq!(read.list_edges(None).unwrap(), vec![external, dangling]);
+    assert_eq!(read.get_node_by_id(&id).unwrap().unwrap().metadata, source);
+    assert_eq!(
+        read.get_edges_by_source_id(None).unwrap(),
+        vec![external, dangling]
+    );
     assert!(
-        read.read_node(&build_target("missing.md"))
+        read.get_node_by_id(&build_target("missing.md"))
             .unwrap()
             .is_none()
     );
@@ -98,16 +101,27 @@ fn incoming_edges_survive_target_delete_and_reappear() {
     write.commit().unwrap();
     let mut read = db.begin_read().unwrap();
     // When / Then
-    assert_eq!(read.list_edges(None).unwrap(), vec![declared.clone()]);
-    assert!(read.read_node(&build_target("b.md")).unwrap().is_none());
+    assert_eq!(
+        read.get_edges_by_source_id(None).unwrap(),
+        vec![declared.clone()]
+    );
+    assert!(
+        read.get_node_by_id(&build_target("b.md"))
+            .unwrap()
+            .is_none()
+    );
     drop(read);
     let mut write = db.begin_cache_write().unwrap();
     write.upsert_node(&build_knowledge("b.md", "beta")).unwrap();
     write.commit().unwrap();
     let mut read = db.begin_read().unwrap();
-    assert!(read.read_node(&build_target("b.md")).unwrap().is_some());
+    assert!(
+        read.get_node_by_id(&build_target("b.md"))
+            .unwrap()
+            .is_some()
+    );
     assert_eq!(
-        read.list_edges(Some(&KnowledgeId::parse("a.md").unwrap()))
+        read.get_edges_by_source_id(Some(&KnowledgeId::parse("a.md").unwrap()))
             .unwrap(),
         vec![declared]
     );
@@ -145,9 +159,9 @@ fn source_projection_can_be_recomputed_and_removed() {
     write.commit().unwrap();
     let mut read = db.begin_read().unwrap();
     // Then
-    assert_eq!(read.read_node(&id).unwrap().unwrap().metadata, updated);
+    assert_eq!(read.get_node_by_id(&id).unwrap().unwrap().metadata, updated);
     assert_eq!(
-        read.list_edges(None).unwrap(),
+        read.get_edges_by_source_id(None).unwrap(),
         vec![build_edge("b.md", id.clone(), "external")]
     );
     drop(read);
@@ -160,8 +174,8 @@ fn source_projection_can_be_recomputed_and_removed() {
     write.commit().unwrap();
     let mut read = db.begin_read().unwrap();
     // Then
-    assert!(read.read_node(&id).unwrap().is_none());
-    assert!(read.list_edges(None).unwrap().is_empty());
+    assert!(read.get_node_by_id(&id).unwrap().is_none());
+    assert!(read.get_edges_by_source_id(None).unwrap().is_empty());
 }
 #[test]
 fn valid_invalid_and_unmarked_file_rows_round_trip() {
@@ -182,7 +196,10 @@ fn valid_invalid_and_unmarked_file_rows_round_trip() {
     // When / Then
     for row in [&valid, &invalid, &unmarked] {
         // When / Then
-        assert_eq!(read.read_file(&row.path).unwrap().as_ref(), Some(row));
+        assert_eq!(
+            read.get_file_by_path(&row.path).unwrap().as_ref(),
+            Some(row)
+        );
     }
     drop(read);
     let mut write = db.begin_cache_write().unwrap();
@@ -191,7 +208,7 @@ fn valid_invalid_and_unmarked_file_rows_round_trip() {
     assert!(
         db.begin_read()
             .unwrap()
-            .read_file(&valid.path)
+            .get_file_by_path(&valid.path)
             .unwrap()
             .is_none()
     );
@@ -293,7 +310,7 @@ fn revision_overflow_rolls_back() {
     let mut db = open_storage(&cache, &root.path().join("v")).unwrap();
     Connection::open(&cache)
         .unwrap()
-        .execute("UPDATE project SET revision=?1", [i64::MAX])
+        .execute("update project set revision=?1", [i64::MAX])
         .unwrap();
     let mut write = db.begin_cache_write().unwrap();
     write
@@ -303,7 +320,11 @@ fn revision_overflow_rolls_back() {
     assert!(write.commit().is_err());
     let mut read = db.begin_read().unwrap();
     assert_eq!(read.get_revision(), i64::MAX as u64);
-    assert!(read.read_node(&build_target("a.md")).unwrap().is_none());
+    assert!(
+        read.get_node_by_id(&build_target("a.md"))
+            .unwrap()
+            .is_none()
+    );
 }
 #[test]
 fn duplicate_edges_and_invalid_checks_are_rejected() {
@@ -325,15 +346,15 @@ fn duplicate_edges_and_invalid_checks_are_rejected() {
     assert!(write.commit().is_err());
     let sql = Connection::open(&cache).unwrap();
     for query in [
-        "INSERT INTO nodes(id,kind,uri,created_at) VALUES('bad','source','different',1)",
-        "INSERT INTO nodes(id,kind,uri,created_at,source_snapshot) VALUES('bad','source','bad',1,'snapshot')",
-        "INSERT INTO nodes(id,kind,uri,created_at,search_hash) VALUES('bad','source','bad',1,'hash')",
-        "INSERT INTO nodes(id,kind,uri,created_at,line_start) VALUES('bad','source','bad',1,1)",
-        "INSERT INTO nodes(id,kind,uri,created_at) VALUES('bad','vertex','bad',1)",
-        "INSERT INTO nodes(id,kind,uri,created_at,line_start,line_end) VALUES('bad','source','bad',1,0,1)",
-        "INSERT INTO files VALUES('x',1,2,3,'hash',4,1,'error')",
-        "INSERT INTO files VALUES('x',1,2,3,'hash',4,0,NULL)",
-        "INSERT INTO files VALUES('x',1,2,3,'hash',4,2,NULL)",
+        "insert into nodes(id,kind,uri,created_at) values('bad','source','different',1)",
+        "insert into nodes(id,kind,uri,created_at,source_snapshot) values('bad','source','bad',1,'snapshot')",
+        "insert into nodes(id,kind,uri,created_at,search_hash) values('bad','source','bad',1,'hash')",
+        "insert into nodes(id,kind,uri,created_at,line_start) values('bad','source','bad',1,1)",
+        "insert into nodes(id,kind,uri,created_at) values('bad','vertex','bad',1)",
+        "insert into nodes(id,kind,uri,created_at,line_start,line_end) values('bad','source','bad',1,0,1)",
+        "insert into files values('x',1,2,3,'hash',4,1,'error')",
+        "insert into files values('x',1,2,3,'hash',4,0,null)",
+        "insert into files values('x',1,2,3,'hash',4,2,null)",
     ] {
         // When / Then
         assert!(sql.execute(query, []).is_err());
@@ -356,12 +377,12 @@ fn contentless_fts_does_not_return_original_text() {
     let sql = Connection::open(&cache).unwrap();
     // When / Then
     assert_eq!(
-        sql.query_row("SELECT text FROM text_index", [], |r| r
+        sql.query_row("select text from text_index", [], |r| r
             .get::<_, Option<String>>(0))
             .unwrap(),
         None
     );
-    let columns: Vec<String>=sql.prepare("SELECT name FROM pragma_table_info('nodes') UNION ALL SELECT name FROM pragma_table_info('files')").unwrap().query_map([],|r|r.get(0)).unwrap().map(Result::unwrap).collect();
+    let columns: Vec<String>=sql.prepare("select name from pragma_table_info('nodes') union all select name from pragma_table_info('files')").unwrap().query_map([],|r|r.get(0)).unwrap().map(Result::unwrap).collect();
     assert!(
         !columns
             .iter()
@@ -388,10 +409,10 @@ fn empty_cache_publications_preserve_vector_identity_and_state() {
     let vectors = root.path().join("v");
     let mut db = open_storage(&cache, &vectors).unwrap();
     let sql = Connection::open(&vectors).unwrap();
-    sql.execute("INSERT INTO meta VALUES(1,?1)", ["a".repeat(64)])
+    sql.execute("insert into meta values(1,?1)", ["a".repeat(64)])
         .unwrap();
     sql.execute(
-        "INSERT INTO embed_failures VALUES(?1,2,'safe')",
+        "insert into embed_failures values(?1,2,'safe')",
         ["b".repeat(64)],
     )
     .unwrap();
@@ -406,7 +427,7 @@ fn empty_cache_publications_preserve_vector_identity_and_state() {
         Some(Sha256::parse(&"a".repeat(64)).unwrap())
     );
     assert_eq!(
-        sql.query_row("SELECT attempts FROM embed_failures", [], |r| r
+        sql.query_row("select attempts from embed_failures", [], |r| r
             .get::<_, i64>(0))
             .unwrap(),
         2
@@ -457,35 +478,35 @@ fn malformed_persisted_values_return_internal_errors() {
     let sql = Connection::open(&cache).unwrap();
     // When / Then
     for update in [
-        "UPDATE nodes SET hash='invalid'",
-        "UPDATE nodes SET hash='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',created_at=-1",
+        "update nodes set hash='invalid'",
+        "update nodes set hash='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',created_at=-1",
     ] {
         sql.execute(update, []).unwrap();
         // When / Then
         assert_eq!(
             db.begin_read()
                 .unwrap()
-                .read_node(&build_target("a.md"))
+                .get_node_by_id(&build_target("a.md"))
                 .unwrap_err()
                 .get_kind(),
             StorageErrorKind::InternalError
         );
     }
-    sql.execute("UPDATE files SET inode=-1", []).unwrap();
+    sql.execute("update files set inode=-1", []).unwrap();
     assert_eq!(
         db.begin_read()
             .unwrap()
-            .read_file(&RepoPath::parse("a.md").unwrap())
+            .get_file_by_path(&RepoPath::parse("a.md").unwrap())
             .unwrap_err()
             .get_kind(),
         StorageErrorKind::InternalError
     );
-    sql.execute("INSERT INTO edges VALUES('a.md','b.md','INVALID')", [])
+    sql.execute("insert into edges values('a.md','b.md','INVALID')", [])
         .unwrap();
     assert_eq!(
         db.begin_read()
             .unwrap()
-            .list_edges(None)
+            .get_edges_by_source_id(None)
             .unwrap_err()
             .get_kind(),
         StorageErrorKind::InternalError
@@ -522,14 +543,14 @@ fn knowledge_and_source_optional_fields_survive_reopen() {
     let mut read = reopened.begin_read().unwrap();
     // Then
     assert_eq!(
-        read.read_node(&build_target("a.md#Section"))
+        read.get_node_by_id(&build_target("a.md#Section"))
             .unwrap()
             .unwrap()
             .metadata,
         knowledge
     );
     assert_eq!(
-        read.read_node(&source_id).unwrap().unwrap().metadata,
+        read.get_node_by_id(&source_id).unwrap().unwrap().metadata,
         source
     );
 }
@@ -591,12 +612,16 @@ fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
     assert_eq!(write.commit().unwrap(), 2);
     let mut read = db.begin_read().unwrap();
     assert!(read.match_text("alpha").unwrap().is_empty());
-    assert!(read.list_edges(None).unwrap().is_empty());
-    assert!(read.read_node(&build_target("a.md")).unwrap().is_none());
+    assert!(read.get_edges_by_source_id(None).unwrap().is_empty());
+    assert!(
+        read.get_node_by_id(&build_target("a.md"))
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
-fn list_edges_keeps_optional_filter_and_order() {
+fn get_edges_keeps_optional_filter_and_order() {
     // Given
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
@@ -613,12 +638,12 @@ fn list_edges_keeps_optional_filter_and_order() {
     write.commit().unwrap();
     // When
     let mut read = db.begin_read().unwrap();
-    let all = read.list_edges(None).unwrap();
+    let all = read.get_edges_by_source_id(None).unwrap();
     let selected = read
-        .list_edges(Some(&KnowledgeId::parse("a.md").unwrap()))
+        .get_edges_by_source_id(Some(&KnowledgeId::parse("a.md").unwrap()))
         .unwrap();
     let absent = read
-        .list_edges(Some(&KnowledgeId::parse("absent.md").unwrap()))
+        .get_edges_by_source_id(Some(&KnowledgeId::parse("absent.md").unwrap()))
         .unwrap();
     // Then
     assert_eq!(all, vec![first.clone(), second.clone(), third]);
@@ -642,7 +667,10 @@ fn file_text_values_remain_literal() {
     // When: read the literal text.
     let mut read = db.begin_read().unwrap();
     // Then
-    assert_eq!(read.read_file(&file.path).unwrap(), Some(file.clone()));
+    assert_eq!(
+        read.get_file_by_path(&file.path).unwrap(),
+        Some(file.clone())
+    );
     drop(read);
     // Given: replace the existing row.
     file.error = None;
@@ -653,7 +681,10 @@ fn file_text_values_remain_literal() {
     // When
     let mut read = db.begin_read().unwrap();
     // Then
-    assert_eq!(read.read_file(&file.path).unwrap(), Some(file.clone()));
+    assert_eq!(
+        read.get_file_by_path(&file.path).unwrap(),
+        Some(file.clone())
+    );
     drop(read);
     // Given: delete only the selected row.
     let mut write = db.begin_cache_write().unwrap();
@@ -662,12 +693,15 @@ fn file_text_values_remain_literal() {
     // When
     let mut read = db.begin_read().unwrap();
     // Then
-    assert!(read.read_file(&file.path).unwrap().is_none());
-    assert_eq!(read.read_file(&untouched.path).unwrap(), Some(untouched));
+    assert!(read.get_file_by_path(&file.path).unwrap().is_none());
+    assert_eq!(
+        read.get_file_by_path(&untouched.path).unwrap(),
+        Some(untouched)
+    );
 }
 
 #[test]
-fn list_files_preserves_exact_paths_and_state() {
+fn get_files_preserves_exact_paths_and_state() {
     // Given: marked, invalid and unmarked files with literal SQL wildcards.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
@@ -690,7 +724,7 @@ fn list_files_preserves_exact_paths_and_state() {
     let expected_file_rows = vec![invalid, marked, unmarked];
 
     // When.
-    let rows = db.begin_read().unwrap().list_files().unwrap();
+    let rows = db.begin_read().unwrap().get_files().unwrap();
 
     // Then: every persisted field and exact deterministic path ordering.
     assert_eq!(
@@ -701,7 +735,7 @@ fn list_files_preserves_exact_paths_and_state() {
 }
 
 #[test]
-fn list_nodes_preserves_metadata_and_row_ids() {
+fn get_nodes_preserves_metadata_and_row_ids() {
     // Given: knowledge and sources are inserted out of identity order.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
@@ -723,7 +757,7 @@ fn list_nodes_preserves_metadata_and_row_ids() {
     let original = db
         .begin_read()
         .unwrap()
-        .read_node(&build_target("a%b.md"))
+        .get_node_by_id(&build_target("a%b.md"))
         .unwrap()
         .unwrap();
     let mut changed = build_knowledge("a%b.md", "updated");
@@ -746,7 +780,7 @@ fn list_nodes_preserves_metadata_and_row_ids() {
     );
 
     // When.
-    let rows = db.begin_read().unwrap().list_nodes().unwrap();
+    let rows = db.begin_read().unwrap().get_nodes().unwrap();
 
     // Then: complete metadata, identity order, and stable upsert row ID.
     let updated = &rows[0];
@@ -755,15 +789,15 @@ fn list_nodes_preserves_metadata_and_row_ids() {
 }
 
 #[test]
-fn list_empty_published_state_returns_no_rows() {
+fn get_empty_published_state_returns_no_rows() {
     // Given.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let mut read = db.begin_read().unwrap();
 
     // When.
-    let files = read.list_files().unwrap();
-    let nodes = read.list_nodes().unwrap();
+    let files = read.get_files().unwrap();
+    let nodes = read.get_nodes().unwrap();
 
     // Then.
     assert!(files.is_empty());
@@ -782,9 +816,13 @@ fn build_edge(source: &str, target: EdgeTarget, kind: &str) -> Edge {
 fn assert_empty(db: &mut impl Storage) {
     let mut read = db.begin_read().unwrap();
     assert_eq!(read.get_revision(), 0);
-    assert!(read.read_node(&build_target("a.md")).unwrap().is_none());
     assert!(
-        read.read_file(&RepoPath::parse("a.md").unwrap())
+        read.get_node_by_id(&build_target("a.md"))
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        read.get_file_by_path(&RepoPath::parse("a.md").unwrap())
             .unwrap()
             .is_none()
     );

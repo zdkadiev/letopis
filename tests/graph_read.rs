@@ -21,13 +21,13 @@ fn pages_neighbors_in_type_and_identity_order() {
     let mut storage = build_fixture(&root);
     let mut read = storage.begin_read().unwrap();
     let key = read
-        .resolve_node(&parse_address("./root.md"))
+        .resolve_node_by_id(&parse_address("./root.md"))
         .unwrap()
         .unwrap()
         .key;
     let mut request = build_request(key, NeighborDirection::Outgoing, 2);
     // When / Then each page independently across a type boundary.
-    let first = read.read_neighbor_page(&request).unwrap();
+    let first = read.get_neighbor_page(&request).unwrap();
     assert_eq!(
         summarize(&first),
         [
@@ -38,18 +38,18 @@ fn pages_neighbors_in_type_and_identity_order() {
     assert!(matches!(first[0].node.element, EdgeTarget::Source(_)));
     let cursor = build_cursor(first.last().unwrap());
     request.after = Some(&cursor);
-    let next = read.read_neighbor_page(&request).unwrap();
+    let next = read.get_neighbor_page(&request).unwrap();
     assert_eq!(
         summarize(&next),
         ["includes:root.md>b.md", "supports:root.md>a.md"]
     );
     let cursor = build_cursor(next.last().unwrap());
     request.after = Some(&cursor);
-    let last = read.read_neighbor_page(&request).unwrap();
+    let last = read.get_neighbor_page(&request).unwrap();
     assert_eq!(summarize(&last), ["supports:root.md>b.md"]);
     let cursor = build_cursor(last.last().unwrap());
     request.after = Some(&cursor);
-    assert!(read.read_neighbor_page(&request).unwrap().is_empty());
+    assert!(read.get_neighbor_page(&request).unwrap().is_empty());
     assert_eq!(first.len() + next.len() + last.len(), 5);
 }
 
@@ -60,7 +60,7 @@ fn intersects_modes_and_type_filters_before_the_page_bound() {
     let mut storage = build_fixture(&root);
     let mut read = storage.begin_read().unwrap();
     let key = read
-        .resolve_node(&parse_address("root.md"))
+        .resolve_node_by_id(&parse_address("root.md"))
         .unwrap()
         .unwrap()
         .key;
@@ -68,18 +68,18 @@ fn intersects_modes_and_type_filters_before_the_page_bound() {
     request.mode = TraversalMode::Containment;
     // When / Then
     assert_eq!(
-        summarize(&read.read_neighbor_page(&request).unwrap()),
+        summarize(&read.get_neighbor_page(&request).unwrap()),
         ["includes:root.md>b.md"]
     );
     request.mode = TraversalMode::Relations;
     let types = BTreeSet::from([EdgeType::parse("supports").unwrap()]);
     request.edge_types = &types;
     assert_eq!(
-        summarize(&read.read_neighbor_page(&request).unwrap()),
+        summarize(&read.get_neighbor_page(&request).unwrap()),
         ["supports:root.md>a.md"]
     );
     request.mode = TraversalMode::Containment;
-    assert!(read.read_neighbor_page(&request).unwrap().is_empty());
+    assert!(read.get_neighbor_page(&request).unwrap().is_empty());
 }
 
 #[test]
@@ -89,13 +89,13 @@ fn keeps_incoming_edges_in_original_orientation() {
     let mut storage = build_fixture(&root);
     let mut read = storage.begin_read().unwrap();
     let key = read
-        .resolve_node(&parse_address("b.md"))
+        .resolve_node_by_id(&parse_address("b.md"))
         .unwrap()
         .unwrap()
         .key;
     let mut request = build_request(key, NeighborDirection::Incoming, 2);
     // When
-    let first = read.read_neighbor_page(&request).unwrap();
+    let first = read.get_neighbor_page(&request).unwrap();
     // Then
     assert_eq!(
         summarize(&first),
@@ -105,7 +105,7 @@ fn keeps_incoming_edges_in_original_orientation() {
     assert_eq!(first[1].node.element.as_str(), "a.md");
     let cursor = build_cursor(first.last().unwrap());
     request.after = Some(&cursor);
-    let next = read.read_neighbor_page(&request).unwrap();
+    let next = read.get_neighbor_page(&request).unwrap();
     assert_eq!(summarize(&next), ["supports:root.md>b.md"]);
 }
 
@@ -116,7 +116,7 @@ fn filters_incoming_modes_and_types_before_limiting() {
     let mut storage = build_fixture(&root);
     let mut read = storage.begin_read().unwrap();
     let key = read
-        .resolve_node(&parse_address("b.md"))
+        .resolve_node_by_id(&parse_address("b.md"))
         .unwrap()
         .unwrap()
         .key;
@@ -124,17 +124,17 @@ fn filters_incoming_modes_and_types_before_limiting() {
     request.mode = TraversalMode::Containment;
     // When / Then
     assert_eq!(
-        summarize(&read.read_neighbor_page(&request).unwrap()),
+        summarize(&read.get_neighbor_page(&request).unwrap()),
         ["includes:root.md>b.md"]
     );
     request.mode = TraversalMode::Relations;
     assert_eq!(
-        summarize(&read.read_neighbor_page(&request).unwrap()),
+        summarize(&read.get_neighbor_page(&request).unwrap()),
         ["supports:a.md>b.md"]
     );
     let types = BTreeSet::from([EdgeType::parse("includes").unwrap()]);
     request.edge_types = &types;
-    assert!(read.read_neighbor_page(&request).unwrap().is_empty());
+    assert!(read.get_neighbor_page(&request).unwrap().is_empty());
 }
 
 #[test]
@@ -149,7 +149,7 @@ fn retains_one_snapshot_across_pages() {
     .unwrap();
     let mut read = storage.begin_read().unwrap();
     let key = read
-        .resolve_node(&parse_address("root.md"))
+        .resolve_node_by_id(&parse_address("root.md"))
         .unwrap()
         .unwrap()
         .key;
@@ -157,7 +157,7 @@ fn retains_one_snapshot_across_pages() {
     let mut request = build_request(key, NeighborDirection::Outgoing, 1);
     request.edge_types = &types;
     // When
-    let first = read.read_neighbor_page(&request).unwrap();
+    let first = read.get_neighbor_page(&request).unwrap();
     // Then
     assert_eq!(summarize(&first), ["supports:root.md>a.md"]);
     let cursor = build_cursor(first.last().unwrap());
@@ -171,19 +171,19 @@ fn retains_one_snapshot_across_pages() {
     write.commit().unwrap();
     request.after = Some(&cursor);
     assert_eq!(
-        summarize(&read.read_neighbor_page(&request).unwrap()),
+        summarize(&read.get_neighbor_page(&request).unwrap()),
         ["supports:root.md>b.md"]
     );
     drop(read);
     let mut read = storage.begin_read().unwrap();
     request.node = read
-        .resolve_node(&parse_address("root.md"))
+        .resolve_node_by_id(&parse_address("root.md"))
         .unwrap()
         .unwrap()
         .key;
     request.after = None;
     assert_eq!(
-        summarize(&read.read_neighbor_page(&request).unwrap()),
+        summarize(&read.get_neighbor_page(&request).unwrap()),
         ["supports:root.md>c.md"]
     );
 }
@@ -204,26 +204,26 @@ fn bounds_large_degrees_and_rejects_excessive_page_limits() {
     write.commit().unwrap();
     let mut read = storage.begin_read().unwrap();
     let key = read
-        .resolve_node(&parse_address("c.md"))
+        .resolve_node_by_id(&parse_address("c.md"))
         .unwrap()
         .unwrap()
         .key;
     let mut request = build_request(key, NeighborDirection::Outgoing, 32);
     // When
-    let first = read.read_neighbor_page(&request).unwrap();
+    let first = read.get_neighbor_page(&request).unwrap();
     // Then
     assert_eq!(first.len(), 32);
     assert_eq!(first.first().unwrap().node.element.as_str(), "n00.md");
     assert_eq!(first.last().unwrap().node.element.as_str(), "n31.md");
     let cursor = build_cursor(first.last().unwrap());
     request.after = Some(&cursor);
-    let last = read.read_neighbor_page(&request).unwrap();
+    let last = read.get_neighbor_page(&request).unwrap();
     assert_eq!(last.len(), 8);
     assert_eq!(last.first().unwrap().node.element.as_str(), "n32.md");
     assert_eq!(last.last().unwrap().node.element.as_str(), "n39.md");
     request.limit = NonZeroUsize::new(33).unwrap();
     assert_eq!(
-        read.read_neighbor_page(&request).unwrap_err().get_kind(),
+        read.get_neighbor_page(&request).unwrap_err().get_kind(),
         StorageErrorKind::InvalidRequest
     );
 }
@@ -241,13 +241,16 @@ fn resolves_local_range_and_opaque_url_identities_from_actual_node_kinds() {
         ("src.rs#L01-L02", "src.rs#L1-L2", true),
         ("https://Host/A?q=1#L0-L9", "https://Host/A?q=1#L0-L9", true),
     ] {
-        let node = read.resolve_node(&parse_address(raw)).unwrap().unwrap();
+        let node = read
+            .resolve_node_by_id(&parse_address(raw))
+            .unwrap()
+            .unwrap();
         // When / Then
         assert_eq!(node.element.as_str(), expected);
         assert_eq!(matches!(node.element, EdgeTarget::Source(_)), source);
     }
     assert!(
-        read.resolve_node(&parse_address("absent.md"))
+        read.resolve_node_by_id(&parse_address("absent.md"))
             .unwrap()
             .is_none()
     );
@@ -260,15 +263,19 @@ fn does_not_decode_unselected_node_metadata() {
     let mut storage = build_fixture(&root);
     let db = rusqlite::Connection::open(root.path().join("cache.db")).unwrap();
     db.execute(
-        "UPDATE nodes SET hash='invalid',source_snapshot='invalid' WHERE id='a.md'",
+        "update nodes set hash='invalid',source_snapshot='invalid' where id='a.md'",
         [],
     )
     .unwrap();
     let mut read = storage.begin_read().unwrap();
     // When / Then
-    assert!(read.resolve_node(&parse_address("a.md")).unwrap().is_some());
+    assert!(
+        read.resolve_node_by_id(&parse_address("a.md"))
+            .unwrap()
+            .is_some()
+    );
     let key = read
-        .resolve_node(&parse_address("root.md"))
+        .resolve_node_by_id(&parse_address("root.md"))
         .unwrap()
         .unwrap()
         .key;
@@ -276,7 +283,7 @@ fn does_not_decode_unselected_node_metadata() {
     let mut request = build_request(key, NeighborDirection::Outgoing, 1);
     request.edge_types = &types;
     assert_eq!(
-        summarize(&read.read_neighbor_page(&request).unwrap()),
+        summarize(&read.get_neighbor_page(&request).unwrap()),
         ["supports:root.md>a.md"]
     );
 }

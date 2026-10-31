@@ -4,7 +4,7 @@ use super::{
     durability::{is_ref_lock_busy, retain_ref},
     objects::ObjectDb,
     reader::VerifiedObject,
-    tree::read_children,
+    tree::get_children,
     validation::validate_tree_bytes,
 };
 use crate::{
@@ -65,7 +65,7 @@ fn verify_closure(db: &ObjectDb<'_>, root: &TreeOid) -> Result<(), SnapshotError
             }
             continue;
         }
-        let object = reader.read_object(
+        let object = reader.get_object(
             &oid,
             &kind,
             SnapshotErrorKind::InternalError,
@@ -73,7 +73,7 @@ fn verify_closure(db: &ObjectDb<'_>, root: &TreeOid) -> Result<(), SnapshotError
         )?;
         if let VerifiedObject::Tree(bytes) = object {
             validate_tree_bytes(&bytes, db.git.oid_len)?;
-            pending.extend(read_children(&bytes, db.git.oid_len)?);
+            pending.extend(get_children(&bytes, db.git.oid_len)?);
         }
     }
     Ok(())

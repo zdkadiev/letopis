@@ -66,8 +66,8 @@ fn skip_io_for_unknown_or_knowledge_address() {
     let knowledge = SourceUri::parse("a.md").unwrap();
 
     // When / Then
-    assert!(reader.read_source(&mut view, &unknown).unwrap().is_none());
-    assert!(reader.read_source(&mut view, &knowledge).unwrap().is_none());
+    assert!(reader.get_source(&mut view, &unknown).unwrap().is_none());
+    assert!(reader.get_source(&mut view, &knowledge).unwrap().is_none());
     // Then
     assert!(recorded_reads.borrow().is_empty());
 }
@@ -83,7 +83,7 @@ fn return_unfetched_remote_without_io() {
     let remote = SourceUri::parse("https://Host/a?x=1#section").unwrap();
 
     // When
-    let observed = reader.read_source(&mut view, &remote).unwrap().unwrap();
+    let observed = reader.get_source(&mut view, &remote).unwrap().unwrap();
 
     // Then
     assert_eq!(observed.availability, SourceAvailability::Unfetched);
@@ -104,7 +104,7 @@ fn observe_live_source_without_referrer_edits() {
     fs::write(repo.path().join("source.txt"), b"def").unwrap();
 
     // When
-    let observed = reader.read_source(&mut view, &uri).unwrap().unwrap();
+    let observed = reader.get_source(&mut view, &uri).unwrap().unwrap();
 
     // Then
     assert_eq!(observed.availability, SourceAvailability::Available);
@@ -131,7 +131,7 @@ fn propagate_private_source_failure() {
     let uri = SourceUri::parse("source.txt").unwrap();
 
     // When
-    let error = reader.read_source(&mut view, &uri).unwrap_err();
+    let error = reader.get_source(&mut view, &uri).unwrap_err();
 
     // Then
     assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
@@ -163,7 +163,7 @@ impl FileSystem for RecordedFiles {
         self.inner.stat_file(path)
     }
 
-    fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+    fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
         self.reads.borrow_mut().push(path.clone());
         if self.failure.as_ref() == Some(path) {
             return Err(DocumentError::new_with_cause(
@@ -172,7 +172,7 @@ impl FileSystem for RecordedFiles {
                 io::Error::other("PRIVATE_SOURCE_CAUSE"),
             ));
         }
-        self.inner.read_file(path)
+        self.inner.get_file(path)
     }
 
     fn get_time_ns(&self) -> DocumentResult<i64> {

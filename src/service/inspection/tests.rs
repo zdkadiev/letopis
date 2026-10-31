@@ -264,7 +264,7 @@ impl Refresher for RecordingDocuments {
     }
 }
 impl CorpusLister for RecordingGit {
-    fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+    fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
         self.0.borrow_mut().push("list".into());
         let paths = if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure) {
             &['a'][..]
@@ -337,7 +337,7 @@ impl GitSnapshots for RecordingGit {
         self.0.borrow_mut().push("assemble".into());
         Ok(TreeOid::parse(&"c".repeat(40)).unwrap())
     }
-    fn read_blob(&self, _: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
+    fn get_blob(&self, _: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
         assert_eq!(self.1, Scenario::Overlap);
         self.0
             .borrow_mut()
@@ -361,7 +361,7 @@ impl FileSystem for RecordingFiles {
     fn stat_file(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
         panic!("capture uses verified reads")
     }
-    fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+    fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
         if self.1 == Scenario::SourceIoFailure && path.as_str() == "source.txt" {
             self.0.borrow_mut().push("read source.txt".into());
             return Err(DocumentError::new_with_cause(

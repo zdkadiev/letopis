@@ -60,7 +60,7 @@ impl ReadingRepo {
             let node = storage
                 .begin_read()
                 .unwrap()
-                .read_node(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
+                .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
                 .unwrap()
                 .unwrap();
             let NodeMetadata::Knowledge(node) = node.metadata else {

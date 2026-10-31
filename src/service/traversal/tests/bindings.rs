@@ -166,7 +166,7 @@ struct BindingProvenance {
     observed: RefCell<Vec<String>>,
 }
 impl GraphRead for BindingRead {
-    fn resolve_node(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+    fn resolve_node_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
         assert_eq!(id.as_str(), "b.md");
         self.events.borrow_mut().push("resolve".into());
         Ok(Some(GraphNodeRef {
@@ -174,7 +174,7 @@ impl GraphRead for BindingRead {
             element: EdgeTarget::Knowledge(KnowledgeId::parse("b.md").unwrap()),
         }))
     }
-    fn read_neighbor_page(
+    fn get_neighbor_page(
         &mut self,
         request: &NeighborPageRequest<'_>,
     ) -> StorageResult<Vec<GraphNeighbor>> {

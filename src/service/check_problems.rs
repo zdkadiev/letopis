@@ -37,8 +37,8 @@ fn find_source_problems<R: StorageRead>(
     paths: &[RepoPath],
     provenance: &dyn SourceProvenance,
 ) -> CommandResult<Vec<CommandProblem>> {
-    let nodes = view.list_nodes().map_err(map_storage_error)?;
-    let sources = read_source_bindings(view)?;
+    let nodes = view.get_nodes().map_err(map_storage_error)?;
+    let sources = get_source_bindings(view)?;
     let selected: BTreeSet<&str> = paths.iter().map(RepoPath::as_str).collect();
     let empty = BTreeSet::new();
     let mut problems = Vec::new();
@@ -80,11 +80,14 @@ fn find_source_problems<R: StorageRead>(
     Ok(problems)
 }
 
-fn read_source_bindings<R: StorageRead>(
+fn get_source_bindings<R: StorageRead>(
     view: &mut R,
 ) -> CommandResult<BTreeMap<KnowledgeId, BTreeSet<SourceUri>>> {
     let mut sources: BTreeMap<KnowledgeId, BTreeSet<SourceUri>> = BTreeMap::new();
-    for edge in view.list_edges(None).map_err(map_storage_error)? {
+    for edge in view
+        .get_edges_by_source_id(None)
+        .map_err(map_storage_error)?
+    {
         if let EdgeTarget::Source(source) = edge.get_target() {
             sources
                 .entry(edge.get_source().clone())

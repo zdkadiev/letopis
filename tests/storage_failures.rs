@@ -21,7 +21,10 @@ fn reservation_is_durable_only_after_commit_and_survives_reopen() {
         // When / Then
         assert!(unit.reserve_attempt(&hash, budget).unwrap());
         drop(unit);
-        assert_eq!(read_failure(&mut storage, &identity, &hash), None);
+        assert_eq!(
+            get_failure_by_search_hash(&mut storage, &identity, &hash),
+            None
+        );
         for expected in 1..=budget {
             let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
             // When / Then
@@ -30,7 +33,7 @@ fn reservation_is_durable_only_after_commit_and_survives_reopen() {
             drop(storage);
             storage = open_storage(&cache, &vectors).unwrap();
             assert_eq!(
-                read_failure(&mut storage, &identity, &hash),
+                get_failure_by_search_hash(&mut storage, &identity, &hash),
                 Some(EmbeddingFailure {
                     search_hash: hash,
                     attempts: expected,
@@ -42,7 +45,7 @@ fn reservation_is_durable_only_after_commit_and_survives_reopen() {
         assert!(!unit.reserve_attempt(&hash, budget).unwrap());
         unit.commit().unwrap();
         assert_eq!(
-            read_failure(&mut storage, &identity, &hash)
+            get_failure_by_search_hash(&mut storage, &identity, &hash)
                 .unwrap()
                 .attempts,
             budget
@@ -62,7 +65,10 @@ fn absent_failure_is_not_created_by_error() {
     // When / Then
     assert!(!unit.record_failure(&identity, "safe failure").unwrap());
     unit.commit().unwrap();
-    assert_eq!(read_failure(&mut storage, &identity, &identity), None);
+    assert_eq!(
+        get_failure_by_search_hash(&mut storage, &identity, &identity),
+        None
+    );
 }
 #[test]
 fn success_clears_only_its_failure() {
@@ -86,7 +92,7 @@ fn success_clears_only_its_failure() {
     unit.store_vector(&identity, &[1.0, 0.0], 2).unwrap();
     drop(unit);
     assert_eq!(
-        read_failure(&mut storage, &identity, &identity)
+        get_failure_by_search_hash(&mut storage, &identity, &identity)
             .unwrap()
             .attempts,
         1
@@ -94,9 +100,12 @@ fn success_clears_only_its_failure() {
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     unit.store_vector(&identity, &[1.0, 0.0], 2).unwrap();
     unit.commit().unwrap();
-    assert_eq!(read_failure(&mut storage, &identity, &identity), None);
     assert_eq!(
-        read_failure(&mut storage, &identity, &other),
+        get_failure_by_search_hash(&mut storage, &identity, &identity),
+        None
+    );
+    assert_eq!(
+        get_failure_by_search_hash(&mut storage, &identity, &other),
         Some(EmbeddingFailure {
             search_hash: other,
             attempts: 1,
@@ -125,7 +134,7 @@ fn query_error_replaces_and_clears_without_history() {
     storage.reset_vectors(Some(&identity), &next).unwrap();
     // When / Then
     assert_eq!(
-        storage.begin_read().unwrap().read_query_error().unwrap(),
+        storage.begin_read().unwrap().get_query_error().unwrap(),
         Some(QueryError {
             at: 20,
             error: "latest safe message".into()
@@ -133,10 +142,10 @@ fn query_error_replaces_and_clears_without_history() {
     );
     let raw = rusqlite::Connection::open(&vectors).unwrap();
     let count: i64 = raw
-        .query_row("SELECT count(*) FROM query_error", [], |r| r.get(0))
+        .query_row("select count(*) from query_error", [], |r| r.get(0))
         .unwrap();
     assert_eq!(count, 1);
-    let mut tables = raw.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'vector_index%' ORDER BY name").unwrap();
+    let mut tables = raw.prepare("select name from sqlite_schema where type='table' and name not like 'vector_index%' order by name").unwrap();
     let names = tables
         .query_map([], |row| row.get::<_, String>(0))
         .unwrap()
@@ -150,7 +159,7 @@ fn query_error_replaces_and_clears_without_history() {
     unit.clear_query_error().unwrap();
     unit.commit().unwrap();
     assert_eq!(
-        storage.begin_read().unwrap().read_query_error().unwrap(),
+        storage.begin_read().unwrap().get_query_error().unwrap(),
         None
     );
     assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
@@ -178,11 +187,11 @@ fn stale_identity_cannot_reserve_or_record_or_store() {
     assert_eq!(read.get_revision(), 0);
     assert_eq!(read.get_config_identity(), Some(m2));
     assert!(matches!(
-        read.read_failure(&m1, &m2).unwrap(),
+        read.get_failure_by_search_hash(&m1, &m2).unwrap(),
         VectorOutcome::ConfigChanged
     ));
     assert_eq!(
-        unwrap_current(read.read_failure(&m2, &m2).unwrap()),
+        unwrap_current(read.get_failure_by_search_hash(&m2, &m2).unwrap()),
         Some(EmbeddingFailure {
             search_hash: m2,
             attempts: 1,
@@ -190,17 +199,20 @@ fn stale_identity_cannot_reserve_or_record_or_store() {
         })
     );
     assert_eq!(
-        read.read_query_error().unwrap(),
+        read.get_query_error().unwrap(),
         Some(QueryError {
             at: 42,
             error: "M2 query".into()
         })
     );
     assert_eq!(
-        unwrap_current(read.read_vector(&m2, &m1).unwrap()),
+        unwrap_current(read.get_vector_by_search_hash(&m2, &m1).unwrap()),
         Some(vec![1.0, 0.0])
     );
-    assert_eq!(unwrap_current(read.read_vector(&m2, &m2).unwrap()), None);
+    assert_eq!(
+        unwrap_current(read.get_vector_by_search_hash(&m2, &m2).unwrap()),
+        None
+    );
 }
 #[test]
 fn invalid_budget_and_timestamp_poison_units_without_partial_writes() {
@@ -217,13 +229,16 @@ fn invalid_budget_and_timestamp_poison_units_without_partial_writes() {
         assert!(unit.reserve_attempt(&identity, 3).unwrap());
         assert!(unit.reserve_attempt(&identity, invalid).is_err());
         assert!(unit.commit().is_err());
-        assert_eq!(read_failure(&mut storage, &identity, &identity), None);
+        assert_eq!(
+            get_failure_by_search_hash(&mut storage, &identity, &identity),
+            None
+        );
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         unit.set_query_error(10, "safe").unwrap();
         assert!(unit.set_query_error(u64::MAX, "overflow").is_err());
         assert!(unit.commit().is_err());
         assert_eq!(
-            storage.begin_read().unwrap().read_query_error().unwrap(),
+            storage.begin_read().unwrap().get_query_error().unwrap(),
             None
         );
     }
@@ -239,7 +254,7 @@ fn maximum_persisted_attempt_is_not_incremented_or_wrapped() {
     storage.reset_vectors(None, &identity).unwrap();
     let raw = rusqlite::Connection::open(&vectors).unwrap();
     raw.execute(
-        "INSERT INTO embed_failures(search_hash,attempts,error) VALUES(?1,?2,'safe')",
+        "insert into embed_failures(search_hash,attempts,error) values(?1,?2,'safe')",
         rusqlite::params![identity.to_hex(), i64::MAX],
     )
     .unwrap();
@@ -250,7 +265,7 @@ fn maximum_persisted_attempt_is_not_incremented_or_wrapped() {
         .unwrap();
     unit.commit().unwrap();
     assert_eq!(
-        read_failure(&mut storage, &identity, &identity),
+        get_failure_by_search_hash(&mut storage, &identity, &identity),
         Some(EmbeddingFailure {
             search_hash: identity,
             attempts: i64::MAX as u64,
@@ -258,7 +273,7 @@ fn maximum_persisted_attempt_is_not_incremented_or_wrapped() {
         })
     );
     assert_eq!(
-        storage.begin_read().unwrap().read_query_error().unwrap(),
+        storage.begin_read().unwrap().get_query_error().unwrap(),
         Some(QueryError {
             at: i64::MAX as u64,
             error: "maximum time".into()
@@ -295,14 +310,14 @@ fn reject_stale_actions(storage: &mut impl Storage, m1: &Sha256, m2: &Sha256) {
     }
 }
 
-fn read_failure(
+fn get_failure_by_search_hash(
     storage: &mut impl Storage,
     identity: &Sha256,
     hash: &Sha256,
 ) -> Option<EmbeddingFailure> {
     let mut read = storage.begin_read().unwrap();
     assert_eq!(read.get_revision(), 0);
-    unwrap_current(read.read_failure(identity, hash).unwrap())
+    unwrap_current(read.get_failure_by_search_hash(identity, hash).unwrap())
 }
 
 fn unwrap_current<T>(value: VectorOutcome<T>) -> T {

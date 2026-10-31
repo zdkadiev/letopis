@@ -40,7 +40,7 @@ impl<S: Storage, F: FileSystem> Traverser for TraversalService<S, F> {
     fn traverse(&mut self, request: &TraversalRequest) -> CommandResult<Traversal> {
         self.refresher.refresh().map_err(map_traversal_error)?;
         self.embeddings
-            .read_configuration()
+            .get_configuration()
             .map_err(map_traversal_error)?;
         let mut read = self.storage.begin_read().map_err(map_traversal_error)?;
         let graph = self.graph.traverse(&mut read, request)?;
@@ -50,11 +50,11 @@ impl<S: Storage, F: FileSystem> Traverser for TraversalService<S, F> {
             sources: self.sources.as_ref(),
             provenance: self.provenance.as_ref(),
         };
-        Self::read_links(&mut read, graph, &observations)
+        Self::get_links(&mut read, graph, &observations)
     }
 }
 impl<S: Storage, F: FileSystem> TraversalService<S, F> {
-    fn read_links(
+    fn get_links(
         read: &mut S::Read<'_>,
         graph: Graph,
         observations: &LinkObservations<'_, F>,
@@ -62,29 +62,29 @@ impl<S: Storage, F: FileSystem> TraversalService<S, F> {
         let (elements, edges) = graph.into_parts();
         let elements = elements
             .into_iter()
-            .map(|element| Self::read_link(read, element, observations))
+            .map(|element| Self::get_link(read, element, observations))
             .collect::<CommandResult<Vec<_>>>()?;
         Ok(Traversal { elements, edges })
     }
 
-    fn read_link(
+    fn get_link(
         read: &mut S::Read<'_>,
         element: EdgeTarget,
         observations: &LinkObservations<'_, F>,
     ) -> CommandResult<TraversalLink> {
         match element {
-            EdgeTarget::Knowledge(_) => Self::read_knowledge_link(read, &element, observations),
-            EdgeTarget::Source(uri) => Self::read_source_link(read, &uri, observations.sources),
+            EdgeTarget::Knowledge(_) => Self::get_knowledge_link(read, &element, observations),
+            EdgeTarget::Source(uri) => Self::get_source_link(read, &uri, observations.sources),
         }
     }
 
-    fn read_knowledge_link(
+    fn get_knowledge_link(
         read: &mut S::Read<'_>,
         element: &EdgeTarget,
         observations: &LinkObservations<'_, F>,
     ) -> CommandResult<TraversalLink> {
         let stored = read
-            .read_node(element)
+            .get_node_by_id(element)
             .map_err(map_traversal_error)?
             .ok_or_else(fail_invalid_traversal_data)?;
         let NodeMetadata::Knowledge(node) = stored.metadata else {
@@ -110,13 +110,13 @@ impl<S: Storage, F: FileSystem> TraversalService<S, F> {
         })
     }
 
-    fn read_source_link(
+    fn get_source_link(
         read: &mut S::Read<'_>,
         uri: &SourceUri,
         sources: &dyn SourceReader,
     ) -> CommandResult<TraversalLink> {
         let observation = sources
-            .read_source(read, uri)
+            .get_source(read, uri)
             .map_err(map_traversal_error)?
             .ok_or_else(fail_invalid_traversal_data)?;
         if observation.metadata.uri != *uri {
@@ -157,7 +157,7 @@ fn observe_bindings(
 ) -> CommandResult<BTreeSet<SearchFlag>> {
     let id = ElementAddress::parse(node.id.as_str())?;
     let handle = read
-        .resolve_node(&id)
+        .resolve_node_by_id(&id)
         .map_err(map_traversal_error)?
         .ok_or_else(fail_invalid_traversal_data)?;
     let types = BTreeSet::from([EdgeType::parse("external").map_err(map_traversal_error)?]);
@@ -165,7 +165,7 @@ fn observe_bindings(
     let mut flags = BTreeSet::new();
     loop {
         let page = read
-            .read_neighbor_page(&NeighborPageRequest {
+            .get_neighbor_page(&NeighborPageRequest {
                 node: handle.key,
                 direction: NeighborDirection::Outgoing,
                 mode: TraversalMode::Relations,

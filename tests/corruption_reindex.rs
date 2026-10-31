@@ -117,21 +117,21 @@ fn reindex_after_cache_loss_reports_invalid_file_and_publishes_valid_peer() {
 
     // Then: repair removes the current error and publishes both current texts.
     assert_repaired_projection(&repo);
-    let status = read_response(&repo.invoke(&["status"], b"{}"), 0);
+    let status = get_response(&repo.invoke(&["status"], b"{}"), 0);
     assert_eq!(status["result"]["revision"], 2);
     assert_eq!(status["result"]["problems"], json!([]));
     assert_eq!(capture_canonical_state(&repo), fixed_canonical);
 }
 
 fn invoke_reindex(repo: &ReadingRepo) -> Value {
-    let response = read_response(&repo.invoke(&["reindex"], b"{}"), 0);
+    let response = get_response(&repo.invoke(&["reindex"], b"{}"), 0);
     assert_eq!(response["ok"], true);
     response
 }
 
 fn assert_basis_projection(repo: &ReadingRepo, basis: &str) {
     let db = open_cache_read_only(repo);
-    let mut statement = db.prepare("SELECT id FROM nodes ORDER BY id").unwrap();
+    let mut statement = db.prepare("select id from nodes order by id").unwrap();
     let ids: Vec<String> = statement
         .query_map([], |row| row.get(0))
         .unwrap()
@@ -140,14 +140,14 @@ fn assert_basis_projection(repo: &ReadingRepo, basis: &str) {
     assert_eq!(ids, ["a.md", "source.txt"]);
     let declared: String = db
         .query_row(
-            "SELECT source_snapshot FROM nodes WHERE id='a.md'",
+            "select source_snapshot from nodes where id='a.md'",
             [],
             |row| row.get(0),
         )
         .unwrap();
     assert_eq!(declared, basis);
     let edge: (String, String, String) = db
-        .query_row("SELECT source_id, target_id, type FROM edges", [], |row| {
+        .query_row("select source_id, target_id, type from edges", [], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?))
         })
         .unwrap();
@@ -159,9 +159,9 @@ fn assert_basis_projection(repo: &ReadingRepo, basis: &str) {
             "external".to_owned()
         )
     );
-    assert_eq!(read_matching_ids(&db, "AlphaToken"), ["a.md"]);
+    assert_eq!(get_matching_ids(&db, "AlphaToken"), ["a.md"]);
     assert_eq!(
-        read_rows(&db, "SELECT path, valid, error FROM files ORDER BY path"),
+        get_rows(&db, "select path, valid, error from files order by path"),
         vec![
             vec![
                 SqlValue::Text("a.md".to_owned()),
@@ -181,23 +181,23 @@ fn assert_basis_projection(repo: &ReadingRepo, basis: &str) {
 fn capture_projection(repo: &ReadingRepo) -> Vec<Vec<Vec<SqlValue>>> {
     let db = open_cache_read_only(repo);
     db.execute_batch(
-        "CREATE VIRTUAL TABLE temp.tokens USING fts5vocab(main, text_index, instance);",
+        "create virtual table temp.tokens using fts5vocab(main, text_index, instance);",
     )
     .unwrap();
     [
-        "SELECT * FROM project ORDER BY id",
-        "SELECT * FROM nodes ORDER BY id",
-        "SELECT * FROM edges ORDER BY source_id, target_id, type",
-        "SELECT * FROM files ORDER BY path",
-        "SELECT term, doc, col, offset FROM temp.tokens ORDER BY term, doc, col, offset",
+        "select * from project order by id",
+        "select * from nodes order by id",
+        "select * from edges order by source_id, target_id, type",
+        "select * from files order by path",
+        "select term, doc, col, offset from temp.tokens order by term, doc, col, offset",
     ]
     .into_iter()
-    .map(|query| read_rows(&db, query))
+    .map(|query| get_rows(&db, query))
     .collect()
 }
 
 fn assert_safe_failure(output: &Output) {
-    let response = read_response(output, 1);
+    let response = get_response(output, 1);
     assert_eq!(response["ok"], false);
     assert_eq!(response["error"]["code"], "internal_error");
     assert!(response.get("result").is_none());
@@ -216,8 +216,8 @@ fn assert_invalid_projection(repo: &ReadingRepo) {
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     assert_eq!(read.get_revision(), 1);
-    assert_eq!(read.list_nodes().unwrap().len(), 1);
-    assert!(read.list_edges(None).unwrap().is_empty());
+    assert_eq!(read.get_nodes().unwrap().len(), 1);
+    assert!(read.get_edges_by_source_id(None).unwrap().is_empty());
     assert_eq!(
         read.match_text("CharlieToken").unwrap()[0].id.as_str(),
         "b.md"
@@ -225,11 +225,11 @@ fn assert_invalid_projection(repo: &ReadingRepo) {
     for token in ["AlphaToken", "BravoToken"] {
         assert!(read.match_text(token).unwrap().is_empty());
     }
-    let files = read.list_files().unwrap();
+    let files = read.get_files().unwrap();
     let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
     assert_eq!(paths, ["a.md", "b.md", "live.md"]);
     let invalid = read
-        .read_file(&RepoPath::parse("a.md").unwrap())
+        .get_file_by_path(&RepoPath::parse("a.md").unwrap())
         .unwrap()
         .unwrap();
     assert!(!invalid.valid);
@@ -239,7 +239,7 @@ fn assert_invalid_projection(repo: &ReadingRepo) {
 
 fn assert_invalid_status(repo: &ReadingRepo) {
     let output = repo.invoke(&["status"], b"{}");
-    let status = read_response(&output, 0);
+    let status = get_response(&output, 0);
     assert_eq!(status["ok"], true);
     assert_eq!(status["result"]["revision"], 1);
     assert_eq!(
@@ -258,8 +258,8 @@ fn assert_repaired_projection(repo: &ReadingRepo) {
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     assert_eq!(read.get_revision(), 2);
-    assert_eq!(read.list_nodes().unwrap().len(), 2);
-    assert!(read.list_edges(None).unwrap().is_empty());
+    assert_eq!(read.get_nodes().unwrap().len(), 2);
+    assert!(read.get_edges_by_source_id(None).unwrap().is_empty());
     for (token, id) in [("DeltaToken", "a.md"), ("CharlieToken", "b.md")] {
         let found = read.match_text(token).unwrap();
         assert_eq!(found.len(), 1);
@@ -268,7 +268,7 @@ fn assert_repaired_projection(repo: &ReadingRepo) {
     for token in ["AlphaToken", "BravoToken"] {
         assert!(read.match_text(token).unwrap().is_empty());
     }
-    let files = read.list_files().unwrap();
+    let files = read.get_files().unwrap();
     assert_eq!(files.len(), 3);
     for file in files {
         assert!(file.valid);
@@ -326,8 +326,8 @@ fn open_cache_read_only(repo: &ReadingRepo) -> Connection {
     .unwrap()
 }
 
-fn read_matching_ids(db: &Connection, token: &str) -> Vec<String> {
-    db.prepare("SELECT id FROM nodes JOIN text_index ON row_id=text_index.rowid WHERE text_index MATCH ? ORDER BY id")
+fn get_matching_ids(db: &Connection, token: &str) -> Vec<String> {
+    db.prepare("select id from nodes join text_index on row_id=text_index.rowid where text_index match ? order by id")
         .unwrap()
         .query_map([token], |row| row.get(0))
         .unwrap()
@@ -335,7 +335,7 @@ fn read_matching_ids(db: &Connection, token: &str) -> Vec<String> {
         .collect()
 }
 
-fn read_rows(db: &Connection, query: &str) -> Vec<Vec<SqlValue>> {
+fn get_rows(db: &Connection, query: &str) -> Vec<Vec<SqlValue>> {
     let mut statement = db.prepare(query).unwrap();
     let width = statement.column_count();
     statement
@@ -357,7 +357,7 @@ fn run_git(repo: &ReadingRepo, args: &[&str]) -> Vec<u8> {
     output.stdout
 }
 
-fn read_response(output: &Output, exit: i32) -> Value {
+fn get_response(output: &Output, exit: i32) -> Value {
     assert_eq!(output.status.code(), Some(exit), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(

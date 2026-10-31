@@ -27,7 +27,7 @@ fn reads_missing_config_without_creating_service_state() {
     };
 
     // When
-    let config = service.read_config().unwrap();
+    let config = service.get_config().unwrap();
 
     // Then
     assert!(config.is_none());
@@ -53,7 +53,7 @@ fn returns_preserved_config_values() {
     };
 
     // When
-    let configuration = service.read_config().unwrap().unwrap();
+    let configuration = service.get_config().unwrap().unwrap();
     let config = configuration.get_embedding_config().unwrap();
 
     // Then
@@ -92,7 +92,7 @@ fn accepts_unconfigured_without_provider_validation() {
     };
 
     // When
-    let configuration = service.read_config().unwrap().unwrap();
+    let configuration = service.get_config().unwrap().unwrap();
 
     // Then: no execution identity exists and the provider boundary is untouched.
     assert!(!configuration.get_enabled());
@@ -118,7 +118,7 @@ fn validates_configured_disabled_settings_locally() {
     };
 
     // When
-    let error = service.read_config().unwrap_err();
+    let error = service.get_config().unwrap_err();
 
     // Then: disabled settings still pass through local provider validation.
     assert_invalid_configuration_error(&error);
@@ -142,7 +142,7 @@ fn reports_legacy_flat_configuration_as_migration() {
     };
 
     // When
-    let error = service.read_config().unwrap_err();
+    let error = service.get_config().unwrap_err();
 
     // Then: the safe top-level message names the required migration.
     assert_eq!(error.get_kind(), CommandErrorKind::EmbeddingFailed);
@@ -170,7 +170,7 @@ fn rejects_invalid_config_without_exposing_bytes() {
     };
 
     // When
-    let error = service.read_config().unwrap_err();
+    let error = service.get_config().unwrap_err();
 
     // Then
     assert_invalid_configuration_error(&error);
@@ -193,7 +193,7 @@ fn rejects_invalid_config_without_exposing_bytes() {
     };
 
     // When
-    let error = service.read_config().unwrap_err();
+    let error = service.get_config().unwrap_err();
 
     // Then
     assert_invalid_configuration_error(&error);
@@ -217,7 +217,7 @@ fn maps_read_failure_without_exposing_causes() {
     };
 
     // When
-    let error = service.read_config().unwrap_err();
+    let error = service.get_config().unwrap_err();
 
     // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
@@ -257,7 +257,7 @@ struct Files {
 }
 
 impl StatusFiles for Files {
-    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
         self.reads.set(self.reads.get() + 1);
         if self.fail {
             return Err(EmbeddingError::new_with_cause(

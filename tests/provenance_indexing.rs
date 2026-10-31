@@ -28,13 +28,13 @@ fn retain_basis_before_publishing_and_keep_history_after_gc() {
         let user_state_before = capture_head_and_index(&repo);
         // When
         refresh(&repo);
-        let expected_metadata = repo.read_state().get_node("note.md").metadata.clone();
+        let expected_metadata = repo.get_state().get_node("note.md").metadata.clone();
         // Then
         assert!(has_exact_service_ref(&repo, &old_tree));
         repo.expire_reflogs_gc_prune_now_and_pack_refs();
-        assert_eq!(read_retained_bytes(&repo, &old_tree), b"old source\r\n");
+        assert_eq!(get_retained_bytes(&repo, &old_tree), b"old source\r\n");
         assert_eq!(
-            repo.read_state().get_node("note.md").metadata,
+            repo.get_state().get_node("note.md").metadata,
             expected_metadata
         );
         assert_eq!(
@@ -63,16 +63,16 @@ fn retain_newly_available_basis_without_markdown_change() {
         let first = refresh(&repo);
         // Then
         assert!(!has_exact_service_ref(&repo, &tree));
-        assert_eq!(get_basis(&repo.read_state()), Some(tree.clone()));
+        assert_eq!(get_basis(&repo.get_state()), Some(tree.clone()));
         // Given
-        let before = repo.read_state();
+        let before = repo.get_state();
         fs::write(object_path, object).unwrap();
         // When
         let second = refresh(&repo);
         // Then
         assert!(!second.published);
         assert_eq!(second.revision, first.revision);
-        assert_eq!(repo.read_state(), before);
+        assert_eq!(repo.get_state(), before);
         assert!(has_exact_service_ref(&repo, &tree));
     }
 }
@@ -84,7 +84,7 @@ fn reject_corrupt_closure_and_ref_failure_before_publication() {
         let repo = TempRepo::new(FORMATS[0]);
         repo.write("note.md", build_note(None, &[], "Original"));
         refresh(&repo);
-        let before = repo.read_state();
+        let before = repo.get_state();
         let tree = create_basis(repo.get_root(), &[("source.txt", b"basis\n")]);
         repo.write("source.txt", b"basis\n");
         repo.write(
@@ -92,7 +92,7 @@ fn reject_corrupt_closure_and_ref_failure_before_publication() {
             build_note(Some(&tree), &["source.txt"], "Rejected"),
         );
         if corrupt {
-            let blob = repo.read_oid(
+            let blob = repo.get_oid(
                 &["rev-parse", &format!("{}:source.txt", tree.as_str())],
                 None,
             );
@@ -108,7 +108,7 @@ fn reject_corrupt_closure_and_ref_failure_before_publication() {
         let refresh_result = wire_document_refresher(repo.get_root()).unwrap().refresh();
         // Then
         assert!(refresh_result.is_err());
-        assert_eq!(repo.read_state(), before);
+        assert_eq!(repo.get_state(), before);
         assert_eq!(capture_head_and_index(&repo), user_state_before);
     }
 }
@@ -130,10 +130,10 @@ fn preserve_declared_basis_on_edit_and_reproduce_it_after_cache_rebuild() {
     // When
     refresh(&repo);
     // Then
-    assert_eq!(get_basis(&repo.read_state()), Some(tree.clone()));
+    assert_eq!(get_basis(&repo.get_state()), Some(tree.clone()));
     remove_cache(&repo);
     refresh(&repo);
-    assert_eq!(get_basis(&repo.read_state()), Some(tree.clone()));
+    assert_eq!(get_basis(&repo.get_state()), Some(tree.clone()));
     assert!(has_exact_service_ref(&repo, &tree));
     assert_eq!(
         fs::read(repo.get_root().join("note.md")).unwrap(),
@@ -156,10 +156,10 @@ fn remove_basis_only_when_metadata_field_is_removed() {
     // When
     refresh(&repo);
     // Then
-    assert_eq!(get_basis(&repo.read_state()), None);
+    assert_eq!(get_basis(&repo.get_state()), None);
     remove_cache(&repo);
     refresh(&repo);
-    assert_eq!(get_basis(&repo.read_state()), None);
+    assert_eq!(get_basis(&repo.get_state()), None);
     assert!(has_exact_service_ref(&repo, &tree));
 }
 
@@ -186,8 +186,8 @@ fn retain_last_valid_basis_after_invalid_edit() {
     // When
     refresh(&repo);
     // Then
-    assert!(!repo.read_state().get_file("note.md").valid);
-    assert_eq!(get_basis(&repo.read_state()), Some(tree.clone()));
+    assert!(!repo.get_state().get_file("note.md").valid);
+    assert_eq!(get_basis(&repo.get_state()), Some(tree.clone()));
     assert!(has_exact_service_ref(&repo, &tree));
 }
 
@@ -246,10 +246,10 @@ fn has_exact_service_ref(repo: &TempRepo, tree: &TreeOid) -> bool {
 fn capture_head_and_index(repo: &TempRepo) -> FixtureState {
     repo.capture_fixture_state()
 }
-fn read_retained_bytes(repo: &TempRepo, tree: &TreeOid) -> Vec<u8> {
+fn get_retained_bytes(repo: &TempRepo, tree: &TreeOid) -> Vec<u8> {
     open_git_snapshots(repo.get_root())
         .unwrap()
-        .read_blob(tree, &RepoPath::parse("source.txt").unwrap())
+        .get_blob(tree, &RepoPath::parse("source.txt").unwrap())
         .unwrap()
 }
 fn get_basis(state: &State) -> Option<TreeOid> {
@@ -273,13 +273,13 @@ fn remove_cache(repo: &TempRepo) {
 }
 trait IndexFixture {
     fn write(&self, path: &str, bytes: impl AsRef<[u8]>);
-    fn read_state(&self) -> State;
+    fn get_state(&self) -> State;
 }
 impl IndexFixture for TempRepo {
     fn write(&self, path: &str, bytes: impl AsRef<[u8]>) {
         fs::write(self.get_root().join(path), bytes).unwrap();
     }
-    fn read_state(&self) -> State {
+    fn get_state(&self) -> State {
         let mut storage = open_storage(
             &self.get_root().join(".letopis/cache.db"),
             &self.get_root().join(".letopis/vectors.db"),
@@ -288,9 +288,9 @@ impl IndexFixture for TempRepo {
         let mut read = storage.begin_read().unwrap();
         State {
             revision: read.get_revision(),
-            nodes: read.list_nodes().unwrap(),
-            edges: read.list_edges(None).unwrap(),
-            files: read.list_files().unwrap(),
+            nodes: read.get_nodes().unwrap(),
+            edges: read.get_edges_by_source_id(None).unwrap(),
+            files: read.get_files().unwrap(),
         }
     }
 }

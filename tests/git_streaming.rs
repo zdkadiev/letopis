@@ -29,7 +29,7 @@ fn audit_loose_and_delta_packed_objects_with_scoped_buffers() {
         );
         run_git(root, &["config", "core.bigFileThreshold", "1g"], None);
         let oids = create_blobs(root);
-        let tree = read_git(root, &["mktree"], Some(b""));
+        let tree = get_git(root, &["mktree"], Some(b""));
         run_reader(&binary, root, &tree, ReadExpectation::EmptyTree);
         run_git(root, &["config", "remote.origin.promisor", "true"], None);
         run_git(
@@ -90,13 +90,13 @@ fn create_blobs(root: &Path) -> Vec<String> {
         let mut bytes: Vec<_> = (0..size)
             .map(|i| u8::try_from((i * 73 + i / 4096) % 251).unwrap())
             .collect();
-        oids.push(read_git(
+        oids.push(get_git(
             root,
             &["hash-object", "-w", "--stdin"],
             Some(&bytes),
         ));
         bytes[size / 2..size / 2 + 33].copy_from_slice(b"delta variant CANARY private data");
-        oids.push(read_git(
+        oids.push(get_git(
             root,
             &["hash-object", "-w", "--stdin"],
             Some(&bytes),
@@ -121,7 +121,7 @@ fn verify_pack(binary: &Path, root: &Path, oids: &[String]) {
     // Given: a pack independently inspected by Git, with no loose fallback copies.
     let prefix = root.join(".git/objects/pack/gate");
     let input = format!("{}\n", oids.join("\n"));
-    let hash = read_git(
+    let hash = get_git(
         root,
         &[
             "pack-objects",
@@ -134,7 +134,7 @@ fn verify_pack(binary: &Path, root: &Path, oids: &[String]) {
     );
     let index = prefix.with_file_name(format!("gate-{hash}.idx"));
     let pack = index.with_extension("pack");
-    let entries = read_git(root, &["verify-pack", "-v", index.to_str().unwrap()], None);
+    let entries = get_git(root, &["verify-pack", "-v", index.to_str().unwrap()], None);
     let rows: Vec<Vec<_>> = entries
         .lines()
         .map(|line| line.split_whitespace().collect())
@@ -220,7 +220,7 @@ fn loose_path(root: &Path, oid: &str) -> PathBuf {
     root.join(".git/objects").join(&oid[..2]).join(&oid[2..])
 }
 
-fn read_git(root: &Path, args: &[&str], input: Option<&[u8]>) -> String {
+fn get_git(root: &Path, args: &[&str], input: Option<&[u8]>) -> String {
     String::from_utf8(run_git(root, args, input))
         .unwrap()
         .trim()

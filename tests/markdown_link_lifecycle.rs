@@ -51,14 +51,14 @@ fn status_reports_published_path_mismatch_until_a_refresh_repairs_it() {
         build_whole(7, "Target").as_bytes(),
     );
     assert_eq!(invoke(&repo, "check")["result"]["errors"], json!([]));
-    let original = read_state(&repo);
+    let original = get_state(&repo);
     repo.write(NOTE_PATH, build_whole(42, INVALID_NOTE).as_bytes());
     repo.write("unrelated.md", build_whole(73, "UnrelatedToken").as_bytes());
     // When: status observes old publication, then check publishes the invalid file.
     assert_eq!(invoke(&repo, "status")["result"]["problems"], json!([]));
-    assert_eq!(read_state(&repo), original);
+    assert_eq!(get_state(&repo), original);
     let checked = invoke(&repo, "check");
-    let invalid = read_state(&repo);
+    let invalid = get_state(&repo);
     // Then: the exact safe finding persists, while old edges and unrelated data survive.
     let finding = json!({"code":"validation_failed","message":
         "Markdown link path does not match letopis path","details":{
@@ -71,21 +71,21 @@ fn status_reports_published_path_mismatch_until_a_refresh_repairs_it() {
     );
     assert_eq!(invalid.get_node(NOTE_PATH), original.get_node(NOTE_PATH));
     assert_eq!(invalid.edges, original.edges);
-    assert_eq!(read_knowledge(&repo, "unrelated.md").created_at, 73);
+    assert_eq!(get_knowledge(&repo, "unrelated.md").created_at, 73);
     let status = invoke(&repo, "status");
     assert_eq!(status["result"]["problems"], json!([finding]));
-    assert_eq!(read_state(&repo), invalid);
+    assert_eq!(get_state(&repo), invalid);
     // When: only author bytes are repaired, a new status process still reports the finding.
     repo.write(NOTE_PATH, build_whole(42, VALID_NOTE).as_bytes());
     let after_edit = invoke(&repo, "status");
     // Then: observation cannot clear the error or advance the revision.
     assert_eq!(after_edit["result"]["problems"], json!([finding]));
     assert_eq!(after_edit["result"]["revision"], invalid.revision);
-    assert_eq!(read_state(&repo), invalid);
+    assert_eq!(get_state(&repo), invalid);
     // When: successful refresh publishes the repaired file.
     assert_eq!(invoke(&repo, "check")["result"]["errors"], json!([]));
     // Then: its invalid state clears only with the new publication.
-    let repaired = read_state(&repo);
+    let repaired = get_state(&repo);
     assert!(repaired.revision > invalid.revision);
     assert!(repaired.get_file(NOTE_PATH).valid);
     assert_eq!(repaired.get_file(NOTE_PATH).error, None);
@@ -112,15 +112,15 @@ fn legacy_titles_never_publish_into_a_fresh_cache() {
         "details":{"path":"legacy.md","reason":"invalid_link_title"}}]);
     assert_eq!(checked["result"]["errors"], expected);
     assert_eq!(invoke(&repo, "status")["result"]["problems"], expected);
-    let state = read_state(&repo);
+    let state = get_state(&repo);
     assert!(!state.get_file("legacy.md").valid);
     assert_eq!(
         state.get_file("legacy.md").error.as_deref(),
         Some("invalid letopis link title")
     );
     assert_eq!(state.nodes.len(), 1);
-    assert_eq!(read_knowledge(&repo, "target.md").id.as_str(), "target.md");
-    assert_eq!(read_knowledge(&repo, "target.md").created_at, 7);
+    assert_eq!(get_knowledge(&repo, "target.md").id.as_str(), "target.md");
+    assert_eq!(get_knowledge(&repo, "target.md").created_at, 7);
     assert!(state.edges.is_empty());
     let mut storage = repo.open_storage();
     assert!(
@@ -149,13 +149,13 @@ fn reindex_reparses_unchanged_pre_upgrade_rows() {
             .iter()
             .all(|problem| problem["details"]["reason"] == "invalid_link_title")
     );
-    let incremental = read_state(&repo);
+    let incremental = get_state(&repo);
     assert_eq!(incremental.get_file("valid.md"), &valid);
     assert_eq!(incremental.get_file("mismatch.md"), &mismatch);
     assert!(incremental.nodes.is_empty());
     // When: explicit reindex reparses both candidates without any byte/stat change.
     let rebuilt = invoke(&repo, "reindex");
-    let state = read_state(&repo);
+    let state = get_state(&repo);
     // Then: valid syntax clears the old error; mismatch gets its new precise classification.
     assert!(state.get_file("valid.md").valid);
     assert!(rebuilt["result"]["revision"].as_u64().unwrap() > incremental.revision);
@@ -169,7 +169,7 @@ fn reindex_reparses_unchanged_pre_upgrade_rows() {
     assert_eq!(state.get_file("valid.md").mtime_ns, valid.mtime_ns);
     assert_eq!(state.get_file("mismatch.md").hash, mismatch.hash);
     assert_eq!(state.edges.len(), 1);
-    assert_eq!(read_knowledge(&repo, "valid.md").created_at, 42);
+    assert_eq!(get_knowledge(&repo, "valid.md").created_at, 42);
     assert_eq!(
         invoke(&repo, "status")["result"]["problems"],
         json!([
@@ -187,10 +187,10 @@ fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
     let repo = ReadingRepo::new();
     let basis = create_basis(repo.get_root(), &[("source.txt", SOURCE_BYTES)]);
     assert_eq!(basis.as_str(), BASIS);
-    assert_eq!(read_git_source(&repo, &basis), SOURCE_BYTES);
+    assert_eq!(get_git_source(&repo, &basis), SOURCE_BYTES);
     repo.write("source.txt", SOURCE_BYTES);
     seed_legacy_projection(&repo);
-    let original = read_knowledge(&repo, "note.md");
+    let original = get_knowledge(&repo, "note.md");
     assert_eq!(original.hash.to_hex(), OLD_HASH);
     assert_eq!(original.search_hash.to_hex(), SEARCH_HASH);
     let config = repo.write_config("ollama", "http://127.0.0.1:1", "fixture");
@@ -204,23 +204,24 @@ fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
     repo.write("note.md", NEW_NOTE.as_bytes());
     invoke(&repo, "reindex");
     // Then: independent literals pin the author time, hashes and honest source basis.
-    let migrated = read_knowledge(&repo, "note.md");
+    let migrated = get_knowledge(&repo, "note.md");
     assert_eq!(migrated.id.as_str(), "note.md");
     assert_eq!(migrated.created_at, 42);
     assert_eq!(migrated.source_snapshot.as_ref().unwrap().as_str(), BASIS);
     assert_eq!(migrated.search_hash.to_hex(), SEARCH_HASH);
     assert_eq!(migrated.hash.to_hex(), NEW_HASH);
     assert_ne!(migrated.hash, original.hash);
-    assert_eq!(read_git_source(&repo, &basis), SOURCE_BYTES);
+    assert_eq!(get_git_source(&repo, &basis), SOURCE_BYTES);
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     assert_eq!(read.get_config_identity(), Some(identity));
     assert_eq!(
-        read.read_vector(&identity, &migrated.search_hash).unwrap(),
+        read.get_vector_by_search_hash(&identity, &migrated.search_hash)
+            .unwrap(),
         VectorOutcome::Current(Some(vec![1.0, 0.0, 0.0]))
     );
     assert_eq!(
-        read.read_failure(&identity, &Sha256::parse(FAILURE_HASH).unwrap())
+        read.get_failure_by_search_hash(&identity, &Sha256::parse(FAILURE_HASH).unwrap())
             .unwrap(),
         VectorOutcome::Current(Some(EmbeddingFailure {
             search_hash: Sha256::parse(FAILURE_HASH).unwrap(),
@@ -246,7 +247,7 @@ fn syntax_migration_preserves_literal_search_text_and_updates_exact_bytes() {
     let repo = ReadingRepo::new();
     let basis = create_basis(repo.get_root(), &[("source.txt", SOURCE_BYTES)]);
     assert_eq!(basis.as_str(), BASIS);
-    assert_eq!(read_git_source(&repo, &basis), SOURCE_BYTES);
+    assert_eq!(get_git_source(&repo, &basis), SOURCE_BYTES);
     repo.write("source.txt", SOURCE_BYTES);
     seed_legacy_projection(&repo);
     // When: new syntax is published by the actual reindex command.
@@ -258,7 +259,7 @@ fn syntax_migration_preserves_literal_search_text_and_updates_exact_bytes() {
     // Then: exact authored bytes change while the visible text and fingerprint stay literal.
     assert_eq!(parsed.elements[0].search_text, "StableToken source");
     assert_eq!(parsed.elements[0].search_hash.to_hex(), SEARCH_HASH);
-    assert_eq!(read_knowledge(&repo, "note.md").hash.to_hex(), NEW_HASH);
+    assert_eq!(get_knowledge(&repo, "note.md").hash.to_hex(), NEW_HASH);
     assert_eq!(
         fs::read(repo.get_root().join("note.md")).unwrap(),
         NEW_NOTE.as_bytes()
@@ -292,7 +293,7 @@ fn matching_missing_targets_keep_existing_diagnostics() {
     ]);
     assert_eq!(checked["result"]["errors"], expected);
     assert_eq!(status["result"]["problems"], expected);
-    let state = read_state(&repo);
+    let state = get_state(&repo);
     assert!(state.get_file("missing-links.md").valid);
     assert_eq!(state.get_file("missing-links.md").error, None);
     assert_eq!(state.edges.len(), 2);
@@ -313,21 +314,21 @@ fn invoke(repo: &ReadingRepo, command: &str) -> Value {
     response
 }
 
-fn read_knowledge(repo: &ReadingRepo, id: &str) -> KnowledgeMetadata {
-    let NodeMetadata::Knowledge(metadata) = read_state(repo).get_node(id).metadata.clone() else {
+fn get_knowledge(repo: &ReadingRepo, id: &str) -> KnowledgeMetadata {
+    let NodeMetadata::Knowledge(metadata) = get_state(repo).get_node(id).metadata.clone() else {
         panic!("expected knowledge node")
     };
     metadata
 }
 
-fn read_state(repo: &ReadingRepo) -> State {
+fn get_state(repo: &ReadingRepo) -> State {
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     State {
         revision: read.get_revision(),
-        nodes: read.list_nodes().unwrap(),
-        edges: read.list_edges(None).unwrap(),
-        files: read.list_files().unwrap(),
+        nodes: read.get_nodes().unwrap(),
+        edges: read.get_edges_by_source_id(None).unwrap(),
+        files: read.get_files().unwrap(),
     }
 }
 
@@ -438,7 +439,7 @@ fn capture_seed_file(repo: &ReadingRepo, path: &str, valid: bool, error: Option<
     }
 }
 
-fn read_git_source(repo: &ReadingRepo, basis: &TreeOid) -> Vec<u8> {
+fn get_git_source(repo: &ReadingRepo, basis: &TreeOid) -> Vec<u8> {
     let mut command = Command::new("git");
     isolate_command(&mut command);
     let output = command

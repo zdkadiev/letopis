@@ -99,9 +99,9 @@ fn snapshots_work_without_git_executable() {
         git.verify_snapshot(&empty).unwrap(),
         SnapshotState::Available
     );
-    assert_eq!(git.read_blob(&captured, &path).unwrap(), b"raw\r\n\0bytes");
+    assert_eq!(git.get_blob(&captured, &path).unwrap(), b"raw\r\n\0bytes");
     assert!(
-        git.list_candidates()
+        git.get_candidates()
             .unwrap()
             .contains(&RepoPath::parse("live.md").unwrap())
     );
@@ -113,7 +113,7 @@ fn strong_pin_rejects_malformed_nested_trees_like_git() {
     for format in fixture::FORMATS {
         let repo = TempRepo::new(format);
         let git = GitRepository::open(repo.get_root()).unwrap();
-        let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b""));
+        let blob = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b""));
         let raw_oid: Vec<_> = (0..blob.len())
             .step_by(2)
             .map(|i| u8::from_str_radix(&blob[i..i + 2], 16).unwrap())
@@ -141,11 +141,11 @@ fn strong_pin_rejects_malformed_nested_trees_like_git() {
                     .status
                     .success()
             );
-            let nested = repo.read_oid(
+            let nested = repo.get_oid(
                 &["hash-object", "--literally", "-t", "tree", "-w", "--stdin"],
                 Some(&raw),
             );
-            let root = repo.read_oid(
+            let root = repo.get_oid(
                 &["mktree"],
                 Some(format!("040000 tree {nested}\tnested\n").as_bytes()),
             );
@@ -263,7 +263,7 @@ fn discovers_trailing_newline_repository_without_touching_sibling() {
             ],
             None,
         );
-        let bytes = git.read_blob(&tree, &path).unwrap();
+        let bytes = git.get_blob(&tree, &path).unwrap();
         let discovered_root = GitRepository::open(&target).unwrap().root;
         // Then
         assert_eq!(
@@ -303,14 +303,14 @@ fn root_verification_and_addressed_reads_reject_malformed_tree_structure() {
     // Given: a hash-correct tree with an invalid file mode, accepted only by --literally.
     for format in fixture::FORMATS {
         let repo = TempRepo::new(format);
-        let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+        let blob = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
         let mut bytes = b"100664 x\0".to_vec();
         bytes.extend_from_slice(
             gix::hash::ObjectId::from_hex(blob.as_bytes())
                 .unwrap()
                 .as_bytes(),
         );
-        let oid = repo.read_oid(
+        let oid = repo.get_oid(
             &["hash-object", "--literally", "-t", "tree", "-w", "--stdin"],
             Some(&bytes),
         );
@@ -320,7 +320,7 @@ fn root_verification_and_addressed_reads_reject_malformed_tree_structure() {
         let verified = git.verify_snapshot(&oid).unwrap_err();
         let retained = git.retain(&oid).unwrap_err();
         let addressed = git
-            .read_blob(&oid, &RepoPath::parse("x").unwrap())
+            .get_blob(&oid, &RepoPath::parse("x").unwrap())
             .unwrap_err();
         // Then: hash identity alone never makes malformed tree structure available.
         for error in [verified, retained, addressed] {
@@ -344,7 +344,7 @@ fn create_newline_repository_pair(parent: &TempRepo, format: ObjectFormat) -> (P
 fn supervise_snapshot_formats() {
     for format in fixture::FORMATS {
         let repo = TempRepo::new(format);
-        let tree = repo.read_oid(&["rev-parse", "HEAD^{tree}"], None);
+        let tree = repo.get_oid(&["rev-parse", "HEAD^{tree}"], None);
         repo.run_git_successfully(&["gc", "--prune=now"], None);
         let before = repo.capture_fixture_state();
         fixture::supervise_test(

@@ -59,7 +59,7 @@ pub(super) struct EffectiveGraph {
 impl EffectiveGraph {
     pub(super) fn read<R: StorageRead>(read: &mut R) -> DocumentResult<Self> {
         let knowledge = read
-            .list_nodes()?
+            .get_nodes()?
             .into_iter()
             .filter_map(|row| match row.metadata {
                 NodeMetadata::Knowledge(node) => Some((node.id.clone(), node)),
@@ -68,7 +68,7 @@ impl EffectiveGraph {
             .collect();
         Ok(Self {
             knowledge,
-            edges: read.list_edges(None)?.into_iter().collect(),
+            edges: read.get_edges_by_source_id(None)?.into_iter().collect(),
             touched_sources: BTreeSet::new(),
         })
     }
@@ -86,7 +86,7 @@ impl EffectiveGraph {
     }
 
     /// Return every declared root in the last effective knowledge projection.
-    pub(super) fn list_source_snapshots(&self, excluded: &BTreeSet<RepoPath>) -> BTreeSet<TreeOid> {
+    pub(super) fn get_source_snapshots(&self, excluded: &BTreeSet<RepoPath>) -> BTreeSet<TreeOid> {
         let paths: BTreeSet<_> = excluded.iter().map(RepoPath::as_str).collect();
         self.knowledge
             .values()
@@ -95,7 +95,7 @@ impl EffectiveGraph {
             .collect()
     }
 
-    fn list_file_ids(&self, path: &RepoPath) -> Vec<KnowledgeId> {
+    fn get_file_ids(&self, path: &RepoPath) -> Vec<KnowledgeId> {
         self.knowledge
             .keys()
             .filter(|id| id.as_str().split('#').next() == Some(path.as_str()))
@@ -197,7 +197,7 @@ pub(super) fn prepare_removal(
     path: RepoPath,
     graph: &EffectiveGraph,
 ) -> PreparedProjection {
-    let ids = graph.list_file_ids(&path);
+    let ids = graph.get_file_ids(&path);
     PreparedProjection {
         base_revision,
         cleared: ids.clone(),
@@ -220,7 +220,7 @@ pub(super) fn prepare_file<F: FileSystem, M: MarkdownCodec>(
         previous,
         graph,
     } = *request;
-    let captured = filesystem.read_file(path)?.ok_or_else(fail_changed)?;
+    let captured = filesystem.get_file(path)?.ok_or_else(fail_changed)?;
     if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
         return Err(fail_changed());
     }
@@ -238,7 +238,7 @@ pub(super) fn prepare_file<F: FileSystem, M: MarkdownCodec>(
         file.error.clone_from(&previous.error);
     } else {
         match markdown.parse_file(path, &captured.bytes) {
-            Ok(parsed) => prepared = prepare_valid(prepared, parsed, graph.list_file_ids(path)),
+            Ok(parsed) => prepared = prepare_valid(prepared, parsed, graph.get_file_ids(path)),
             Err(errors) => {
                 file.valid = false;
                 file.error = Some(
@@ -342,7 +342,7 @@ fn publish_source_group<F: FileSystem, W: CacheWrite>(
     sources: Vec<(SourceUri, u64)>,
 ) -> DocumentResult<()> {
     // One capture serves every affected address of this path and then is released.
-    let captured = filesystem.read_file(path)?;
+    let captured = filesystem.get_file(path)?;
     for (uri, created_at) in sources {
         let local = uri.get_local().ok_or_else(fail_changed)?;
         let lines = local.get_lines();

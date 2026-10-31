@@ -20,7 +20,7 @@ fn reindex_binary_rebuilds_unchanged_fts_and_returns_next_revision() {
     repo.write_knowledge("a.md", "AlphaToken");
     assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":1}}));
     let db = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
-    db.execute("DELETE FROM text_index", []).unwrap();
+    db.execute("delete from text_index", []).unwrap();
     // When.
     assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":2}}));
     // Then.
@@ -46,7 +46,7 @@ fn reindex_binary_rejects_selective_cancel_and_malformed_input_before_io() {
         (vec!["reindex"], r#"{"extra":1}"#),
     ] {
         // When.
-        let response = read_response(&repo.invoke(&args, input.as_bytes()), 1);
+        let response = get_response(&repo.invoke(&args, input.as_bytes()), 1);
         // Then.
         assert_eq!(response["error"]["code"], "invalid_request");
         assert!(!repo.get_root().join(".letopis").exists());
@@ -77,7 +77,7 @@ fn reindex_binary_preserves_invalid_owner_and_exposes_current_diagnostic() {
     );
     assert!(read.match_text("BravoToken").unwrap().is_empty());
     drop(read);
-    let status = read_response(&repo.invoke(&["status"], b"{}"), 0);
+    let status = get_response(&repo.invoke(&["status"], b"{}"), 0);
     assert_eq!(status["result"]["revision"], 2);
     assert_eq!(status["result"]["problems"][0]["details"]["path"], "a.md");
     assert!(!status.to_string().contains("SECRET_RAW"));
@@ -127,7 +127,7 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
     assert_eq!(reindex(&repo)["result"]["revision"], 2);
     fs::remove_file(repo.get_root().join(".letopis/cache.db")).unwrap();
     assert_eq!(
-        read_response(&repo.invoke(&["status"], b"{}"), 0)["result"]["revision"],
+        get_response(&repo.invoke(&["status"], b"{}"), 0)["result"]["revision"],
         Value::Null
     );
     assert!(!repo.get_root().join(".letopis/cache.db").exists());
@@ -136,14 +136,14 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     let node = read
-        .read_node(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
+        .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
         .unwrap()
         .unwrap();
     let NodeMetadata::Knowledge(node) = node.metadata else {
         panic!()
     };
     assert_eq!(
-        read.read_vector(&config.get_identity(), &node.search_hash)
+        read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
             .unwrap(),
         VectorOutcome::Current(Some(vec![1.0, 0.0]))
     );
@@ -174,7 +174,7 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
     assert!(http.take_requests().is_empty());
     drop(lock);
     assert_eq!(
-        read_response(&repo.invoke(&["embed", "--drain"], b""), 0),
+        get_response(&repo.invoke(&["embed", "--drain"], b""), 0),
         json!({"ok":true,"result":{}})
     );
     // Then: no recomputation of a.md; its exact seed and the new vector both survive.
@@ -188,14 +188,14 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
     let mut read = storage.begin_read().unwrap();
     for (id, vector) in [("a.md", vec![1., 0., 0.]), ("b.md", vec![0., 1., 0.])] {
         let node = read
-            .read_node(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
+            .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
             .unwrap()
             .unwrap();
         let NodeMetadata::Knowledge(node) = node.metadata else {
             panic!()
         };
         assert_eq!(
-            read.read_vector(&config.get_identity(), &node.search_hash)
+            read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
                 .unwrap(),
             VectorOutcome::Current(Some(vector)),
             "{id}"
@@ -220,7 +220,7 @@ fn reindex_preserves_author_basis_bytes_head_and_index() {
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     let node = read
-        .read_node(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
+        .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
         .unwrap()
         .unwrap();
     let NodeMetadata::Knowledge(node) = node.metadata else {
@@ -254,7 +254,7 @@ fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
     .unwrap();
     repo.write_knowledge("a.md", "UnpublishedToken");
     // When.
-    let response = read_response(&repo.invoke(&["reindex"], b"{}"), 1);
+    let response = get_response(&repo.invoke(&["reindex"], b"{}"), 1);
     // Then.
     assert_eq!(
         response,
@@ -271,13 +271,13 @@ fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
 }
 
 fn reindex(repo: &ReadingRepo) -> Value {
-    let response = read_response(&repo.invoke(&["reindex"], b"{}"), 0);
+    let response = get_response(&repo.invoke(&["reindex"], b"{}"), 0);
     println!("PRODUCT_REINDEX {}", response);
     response
 }
 fn search_ids(repo: &ReadingRepo, query: &str) -> Vec<String> {
     let input = json!({"query":query,"limit":10}).to_string();
-    let response = read_response(&repo.invoke(&["search"], input.as_bytes()), 0);
+    let response = get_response(&repo.invoke(&["search"], input.as_bytes()), 0);
     let mut ids: Vec<String> = response["result"]
         .as_array()
         .unwrap()
@@ -299,7 +299,7 @@ fn run_git(repo: &ReadingRepo, args: &[&str]) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
-fn read_response(output: &Output, exit: i32) -> Value {
+fn get_response(output: &Output, exit: i32) -> Value {
     assert_eq!(output.status.code(), Some(exit), "{output:?}");
     assert!(output.stderr.is_empty());
     assert_eq!(output.stdout.iter().filter(|b| **b == b'\n').count(), 1);

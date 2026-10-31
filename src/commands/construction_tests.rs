@@ -208,7 +208,7 @@ fn repository_open_public_constructors_are_independent() {
 fn create_repository() -> TempRepo {
     let repo = TempRepo::new(ObjectFormat::Sha1);
     run_init(repo.get_root()).unwrap();
-    let tree = repo.read_oid(&["rev-parse", "HEAD^{tree}"], None);
+    let tree = repo.get_oid(&["rev-parse", "HEAD^{tree}"], None);
     fs::write(
         repo.get_root().join("knowledge.md"),
         format!("<!-- letopis: {{\"created_at\":1,\"source_snapshot\":\"{tree}\"}} -->\n# Fixture\n[source](live.md \"letopis:type=external;path=live.md\")\n"),

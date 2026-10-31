@@ -28,18 +28,18 @@ fn cursor_orders_shared_hashes_and_excludes_sources_and_stored_hashes() {
     unit.commit().unwrap();
     store(&mut storage, &identity, "stored", 3);
     // When
-    let first = read_next_work(&mut storage, &identity, 4, None).unwrap();
-    let second = read_next_work(&mut storage, &identity, 4, Some(&first.id)).unwrap();
+    let first = get_next_work(&mut storage, &identity, 4, None).unwrap();
+    let second = get_next_work(&mut storage, &identity, 4, Some(&first.id)).unwrap();
     // Then: skipping a stale representative can advance to its valid sibling.
     assert_eq!(first.id.as_str(), "a.md");
     assert_eq!(second.id.as_str(), "b.md");
     assert_eq!(first.search_hash, second.search_hash);
     assert_eq!(
-        read_next_work(&mut storage, &identity, 4, Some(&second.id)),
+        get_next_work(&mut storage, &identity, 4, Some(&second.id)),
         None
     );
     store(&mut storage, &identity, "shared", 3);
-    assert_eq!(read_next_work(&mut storage, &identity, 4, None), None);
+    assert_eq!(get_next_work(&mut storage, &identity, 4, None), None);
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn absent_and_null_error_rows_remain_eligible_until_four_attempts() {
     publish(&mut storage, &[("a.md", "shared"), ("b.md", "shared")]);
     for attempts in 1..=4 {
         // When / Then
-        assert!(read_next_work(&mut storage, &identity, 4, None).is_some());
+        assert!(get_next_work(&mut storage, &identity, 4, None).is_some());
         // When: reserve without a failure message, including the crash window.
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         // Then
@@ -64,7 +64,7 @@ fn absent_and_null_error_rows_remain_eligible_until_four_attempts() {
             storage
                 .begin_read()
                 .unwrap()
-                .read_failure(&identity, &hash)
+                .get_failure_by_search_hash(&identity, &hash)
                 .unwrap(),
         )
         .unwrap();
@@ -72,7 +72,7 @@ fn absent_and_null_error_rows_remain_eligible_until_four_attempts() {
         assert_eq!(failure.error, None);
     }
     // When / Then
-    assert_eq!(read_next_work(&mut storage, &identity, 4, None), None);
+    assert_eq!(get_next_work(&mut storage, &identity, 4, None), None);
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     assert!(!unit.reserve_attempt(&hash, 4).unwrap());
     unit.commit().unwrap();
@@ -96,32 +96,38 @@ fn work_and_dimensions_use_the_pinned_identity_and_membership() {
     publish(&mut second, &[("a.md", "changed")]);
     // Then
     assert_eq!(
-        unwrap_current(pinned.read_vector_dimensions(&m1).unwrap())
+        unwrap_current(pinned.get_vector_dimensions(&m1).unwrap())
             .unwrap()
             .get(),
         3
     );
     assert_eq!(
-        unwrap_current(pinned.read_next_embedding_work(&m1, 4, None).unwrap())
-            .unwrap()
-            .search_hash,
+        unwrap_current(
+            pinned
+                .get_next_embedding_work_by_id_and_max_attempts(&m1, 4, None)
+                .unwrap()
+        )
+        .unwrap()
+        .search_hash,
         Sha256::digest(b"pending")
     );
     assert!(matches!(
-        pinned.read_vector_dimensions(&m2).unwrap(),
+        pinned.get_vector_dimensions(&m2).unwrap(),
         VectorOutcome::ConfigChanged
     ));
     let mut fresh = second.begin_read().unwrap();
     assert!(matches!(
-        fresh.read_next_embedding_work(&m1, 4, None).unwrap(),
+        fresh
+            .get_next_embedding_work_by_id_and_max_attempts(&m1, 4, None)
+            .unwrap(),
         VectorOutcome::ConfigChanged
     ));
     assert!(matches!(
-        fresh.read_vector_dimensions(&m1).unwrap(),
+        fresh.get_vector_dimensions(&m1).unwrap(),
         VectorOutcome::ConfigChanged
     ));
     assert_eq!(
-        unwrap_current(fresh.read_vector_dimensions(&m2).unwrap())
+        unwrap_current(fresh.get_vector_dimensions(&m2).unwrap())
             .unwrap()
             .get(),
         4
@@ -142,7 +148,7 @@ fn last_vector_cleanup_preserves_dimension_across_reopen() {
     let mut storage = open(&root);
     // Then
     assert_eq!(count_keys(&root), 0);
-    assert_eq!(read_size(&mut storage, &identity), Some(3));
+    assert_eq!(get_size(&mut storage, &identity), Some(3));
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     let error = unit
         .store_vector(&Sha256::digest(b"new"), &[1.0; 4], 4)
@@ -150,7 +156,7 @@ fn last_vector_cleanup_preserves_dimension_across_reopen() {
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
     assert!(unit.commit().is_err());
     assert_eq!(count_keys(&root), 0);
-    assert_eq!(read_size(&mut storage, &identity), Some(3));
+    assert_eq!(get_size(&mut storage, &identity), Some(3));
 }
 
 #[test]
@@ -162,15 +168,15 @@ fn first_committed_dimension_wins_between_competing_connections() {
     let identity = Sha256::digest(b"model");
     first.reset_vectors(None, &identity).unwrap();
     // When / Then
-    assert_eq!(read_size(&mut first, &identity), None);
-    assert_eq!(read_size(&mut second, &identity), None);
+    assert_eq!(get_size(&mut first, &identity), None);
+    assert_eq!(get_size(&mut second, &identity), None);
     // When: hold the first write while the other tries to enter.
     let mut winner = unwrap_current(first.begin_vector_write(&identity).unwrap());
     winner.store_vector(&identity, &[1.0; 3], 3).unwrap();
     // Then
     assert!(second.begin_vector_write(&identity).is_err());
     winner.commit().unwrap();
-    let before = read_native_state(&root);
+    let before = get_native_state(&root);
     let mut loser = unwrap_current(second.begin_vector_write(&identity).unwrap());
     let error = loser
         .store_vector(&Sha256::digest(b"loser"), &[1.0; 4], 4)
@@ -178,15 +184,15 @@ fn first_committed_dimension_wins_between_competing_connections() {
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
     assert!(loser.commit().is_err());
     // Then
-    assert_eq!(read_native_state(&root), before);
+    assert_eq!(get_native_state(&root), before);
     assert_eq!(count_keys(&root), 1);
-    assert_eq!(read_size(&mut second, &identity), Some(3));
+    assert_eq!(get_size(&mut second, &identity), Some(3));
     assert_eq!(
         unwrap_current(
             first
                 .begin_read()
                 .unwrap()
-                .read_vector(&identity, &identity)
+                .get_vector_by_search_hash(&identity, &identity)
                 .unwrap()
         ),
         Some(vec![1.0; 3])
@@ -206,9 +212,9 @@ fn rollback_of_first_insertion_does_not_pin_dimensions() {
     drop(unit);
     // Then, including reuse of the same native connection after rollback.
     assert_eq!(count_keys(&root), 0);
-    assert_eq!(read_size(&mut storage, &identity), None);
+    assert_eq!(get_size(&mut storage, &identity), None);
     store(&mut storage, &identity, "different", 4);
-    assert_eq!(read_size(&mut storage, &identity), Some(4));
+    assert_eq!(get_size(&mut storage, &identity), Some(4));
 }
 
 #[test]
@@ -242,16 +248,16 @@ fn cleanup_retains_referenced_hashes_and_diagnostics_without_cache_publication()
     let failed = Sha256::digest(b"failed");
     let unused = Sha256::digest(b"unused");
     assert_eq!(
-        unwrap_current(read.read_vector(&identity, &orphan).unwrap()),
+        unwrap_current(read.get_vector_by_search_hash(&identity, &orphan).unwrap()),
         None
     );
-    assert!(unwrap_current(read.read_failure(&identity, &failed).unwrap()).is_some());
+    assert!(unwrap_current(read.get_failure_by_search_hash(&identity, &failed).unwrap()).is_some());
     assert_eq!(
-        unwrap_current(read.read_failure(&identity, &unused).unwrap()),
+        unwrap_current(read.get_failure_by_search_hash(&identity, &unused).unwrap()),
         None
     );
     assert_eq!(
-        read.read_query_error().unwrap().unwrap().error,
+        read.get_query_error().unwrap().unwrap().error,
         "query failure"
     );
 }
@@ -276,7 +282,7 @@ fn cleanup_uses_a_pinned_cache_observation_and_new_publication_is_recomputable()
     cleanup.prune_unreferenced().unwrap();
     cleanup.commit().unwrap();
     // Then: only derived work is missing; the knowledge survives for recompute.
-    let work = read_next_work(&mut second, &identity, 4, None).unwrap();
+    let work = get_next_work(&mut second, &identity, 4, None).unwrap();
     assert_eq!(work.id.as_str(), "b.md");
     assert_eq!(work.search_hash, Sha256::digest(b"late"));
     assert_eq!(count_keys(&root), 1);
@@ -303,9 +309,9 @@ fn late_old_identity_cannot_cleanup_current_vectors_or_query_error() {
     ));
     // Then
     let mut read = storage.begin_read().unwrap();
-    assert!(unwrap_current(read.read_vector(&current, &current).unwrap()).is_some());
+    assert!(unwrap_current(read.get_vector_by_search_hash(&current, &current).unwrap()).is_some());
     assert_eq!(
-        read.read_query_error().unwrap().unwrap().error,
+        read.get_query_error().unwrap().unwrap().error,
         "current failure"
     );
 }
@@ -339,33 +345,33 @@ fn reset_rollback_restores_native_dimensions_and_commit_releases_them() {
     let new = Sha256::digest(b"new");
     storage.reset_vectors(None, &old).unwrap();
     store(&mut storage, &old, "retained", 3);
-    let before = read_native_state(&root);
+    let before = get_native_state(&root);
     let db = Connection::open(root.path().join("vectors")).unwrap();
     db.execute_batch(
-        "CREATE TRIGGER reject_reset BEFORE UPDATE ON meta
-        BEGIN SELECT RAISE(ABORT, 'test reset failure'); END;",
+        "create trigger reject_reset before update on meta
+        begin select raise(abort, 'test reset failure'); end;",
     )
     .unwrap();
     // When / Then
     assert!(storage.reset_vectors(Some(&old), &new).is_err());
-    db.execute_batch("DROP TRIGGER reject_reset;").unwrap();
+    db.execute_batch("drop trigger reject_reset;").unwrap();
     // Then: all key/data/metadata bytes and schema are restored.
-    assert_eq!(read_native_state(&root), before);
-    assert_eq!(read_size(&mut storage, &old), Some(3));
+    assert_eq!(get_native_state(&root), before);
+    assert_eq!(get_size(&mut storage, &old), Some(3));
     assert_eq!(
         storage.reset_vectors(None, &old).unwrap(),
         VectorOutcome::Current(false)
     );
-    assert_eq!(read_size(&mut storage, &old), Some(3));
+    assert_eq!(get_size(&mut storage, &old), Some(3));
     // When: commit the reset and establish a different first dimension.
     // Then
     assert_eq!(
         storage.reset_vectors(Some(&old), &new).unwrap(),
         VectorOutcome::Current(true)
     );
-    assert_eq!(read_size(&mut storage, &new), None);
+    assert_eq!(get_size(&mut storage, &new), None);
     store(&mut storage, &new, "new", 4);
-    assert_eq!(read_size(&mut storage, &new), Some(4));
+    assert_eq!(get_size(&mut storage, &new), Some(4));
 }
 
 #[test]
@@ -376,7 +382,7 @@ fn unsupported_native_dimensions_poison_the_unit_without_keys() {
         let mut storage = open(&root);
         let identity = Sha256::digest(b"model");
         storage.reset_vectors(None, &identity).unwrap();
-        let before = read_native_state(&root);
+        let before = get_native_state(&root);
         let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
         // When
         let error = unit
@@ -385,8 +391,8 @@ fn unsupported_native_dimensions_poison_the_unit_without_keys() {
         // Then
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
         assert!(unit.commit().is_err());
-        assert_eq!(read_native_state(&root), before);
-        assert_eq!(read_size(&mut storage, &identity), None);
+        assert_eq!(get_native_state(&root), before);
+        assert_eq!(get_size(&mut storage, &identity), None);
     }
 }
 
@@ -401,12 +407,12 @@ fn nullable_failure_hash_does_not_hide_unrelated_work() {
     let db = Connection::open(root.path().join("vectors")).unwrap();
     // This malformed legacy row cannot be created by the typed writer.
     db.execute(
-        "INSERT INTO embed_failures(search_hash, attempts) VALUES(NULL, 4)",
+        "insert into embed_failures(search_hash, attempts) values(null, 4)",
         [],
     )
     .unwrap();
     // When
-    let work = read_next_work(&mut storage, &identity, 4, None).unwrap();
+    let work = get_next_work(&mut storage, &identity, 4, None).unwrap();
     // Then: a NOT IN anti-join would wrongly suppress every candidate.
     assert_eq!(work.id.as_str(), "a.md");
 }
@@ -423,7 +429,7 @@ fn invalid_attempt_budgets_are_rejected_without_changing_storage() {
     for budget in [0, u64::MAX] {
         // When
         let error = read
-            .read_next_embedding_work(&identity, budget, None)
+            .get_next_embedding_work_by_id_and_max_attempts(&identity, budget, None)
             .unwrap_err();
         // Then
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
@@ -442,19 +448,22 @@ fn abandoned_cleanup_restores_vectors_failures_and_dimensions() {
     let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     unit.reserve_attempt(&identity, 4).unwrap();
     unit.commit().unwrap();
-    let before = read_native_state(&root);
+    let before = get_native_state(&root);
     // When
     let mut cleanup = unwrap_current(storage.begin_vector_write(&identity).unwrap());
     cleanup.prune_unreferenced().unwrap();
     drop(cleanup);
     // Then
-    assert_eq!(read_native_state(&root), before);
-    assert_eq!(read_size(&mut storage, &identity), Some(3));
+    assert_eq!(get_native_state(&root), before);
+    assert_eq!(get_size(&mut storage, &identity), Some(3));
     let mut read = storage.begin_read().unwrap();
     assert_eq!(
-        unwrap_current(read.read_failure(&identity, &identity).unwrap())
-            .unwrap()
-            .attempts,
+        unwrap_current(
+            read.get_failure_by_search_hash(&identity, &identity)
+                .unwrap()
+        )
+        .unwrap()
+        .attempts,
         1
     );
 }
@@ -481,7 +490,7 @@ fn store(storage: &mut impl Storage, identity: &Sha256, text: &str, size: usize)
     key.row_id
 }
 
-fn read_next_work(
+fn get_next_work(
     storage: &mut impl Storage,
     identity: &Sha256,
     budget: u64,
@@ -491,17 +500,17 @@ fn read_next_work(
         storage
             .begin_read()
             .unwrap()
-            .read_next_embedding_work(identity, budget, after)
+            .get_next_embedding_work_by_id_and_max_attempts(identity, budget, after)
             .unwrap(),
     )
 }
 
-fn read_size(storage: &mut impl Storage, identity: &Sha256) -> Option<usize> {
+fn get_size(storage: &mut impl Storage, identity: &Sha256) -> Option<usize> {
     unwrap_current(
         storage
             .begin_read()
             .unwrap()
-            .read_vector_dimensions(identity)
+            .get_vector_dimensions(identity)
             .unwrap(),
     )
     .map(Into::into)
@@ -523,18 +532,18 @@ fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
 fn count_keys(root: &TempDir) -> i64 {
     Connection::open(root.path().join("vectors"))
         .unwrap()
-        .query_row("SELECT count(*) FROM vector_keys", [], |row| row.get(0))
+        .query_row("select count(*) from vector_keys", [], |row| row.get(0))
         .unwrap()
 }
 
-fn read_native_state(root: &TempDir) -> Vec<Vec<Vec<Value>>> {
+fn get_native_state(root: &TempDir) -> Vec<Vec<Vec<Value>>> {
     let db = Connection::open(root.path().join("vectors")).unwrap();
     [
-        "SELECT row_id, search_hash FROM vector_keys ORDER BY row_id",
-        "SELECT id, vector FROM vector_index_base ORDER BY id",
-        "SELECT id, val FROM vector_index_config ORDER BY id",
-        "SELECT id, val FROM vector_index_model ORDER BY id",
-        "SELECT type, name, sql FROM sqlite_schema ORDER BY name",
+        "select row_id, search_hash from vector_keys order by row_id",
+        "select id, vector from vector_index_base order by id",
+        "select id, val from vector_index_config order by id",
+        "select id, val from vector_index_model order by id",
+        "select type, name, sql from sqlite_schema order by name",
     ]
     .into_iter()
     .map(|sql| {

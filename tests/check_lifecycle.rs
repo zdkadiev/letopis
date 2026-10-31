@@ -31,9 +31,9 @@ fn check_tracks_file_and_directory_rename_without_touching_sources() {
         check_preserving_source(&repo, &source),
         build_dangling("knowledge/old.md")
     );
-    let moved = read_knowledge(&repo, "knowledge/new.md").unwrap();
+    let moved = get_knowledge(&repo, "knowledge/new.md").unwrap();
     assert_eq!(moved.created_at, 42);
-    assert!(read_knowledge(&repo, "knowledge/old.md").is_none());
+    assert!(get_knowledge(&repo, "knowledge/old.md").is_none());
     rename_path(&repo, "knowledge/new.md", "knowledge/old.md");
     assert_eq!(check_preserving_source(&repo, &source), build_clean());
 
@@ -43,7 +43,7 @@ fn check_tracks_file_and_directory_rename_without_touching_sources() {
         check_preserving_source(&repo, &source),
         build_dangling("knowledge/old.md")
     );
-    assert!(read_knowledge(&repo, "knowledge/old.md").is_none());
+    assert!(get_knowledge(&repo, "knowledge/old.md").is_none());
     repo.write(
         "knowledge/old.md",
         build_whole(42, "Restored target").as_bytes(),
@@ -57,13 +57,13 @@ fn check_tracks_file_and_directory_rename_without_touching_sources() {
         build_dangling("knowledge/old.md")
     );
     assert_eq!(
-        read_knowledge(&repo, "renamed/old.md").unwrap().created_at,
+        get_knowledge(&repo, "renamed/old.md").unwrap().created_at,
         42
     );
-    assert!(read_knowledge(&repo, "knowledge/old.md").is_none());
+    assert!(get_knowledge(&repo, "knowledge/old.md").is_none());
     rename_path(&repo, "renamed", "knowledge");
     assert_eq!(check_preserving_source(&repo, &source), build_clean());
-    let restored = read_knowledge(&repo, "knowledge/old.md").unwrap();
+    let restored = get_knowledge(&repo, "knowledge/old.md").unwrap();
     assert_eq!(restored.created_at, 42);
 }
 
@@ -89,10 +89,10 @@ fn check_tracks_anchor_rename_removal_and_repair() {
         build_dangling("target.md#old")
     );
     assert_eq!(
-        read_knowledge(&repo, "target.md#new").unwrap().created_at,
+        get_knowledge(&repo, "target.md#new").unwrap().created_at,
         42
     );
-    assert!(read_knowledge(&repo, "target.md#old").is_none());
+    assert!(get_knowledge(&repo, "target.md#old").is_none());
     // Given
     repo.write("target.md", b"Ordinary Markdown without an element\n");
     // When / Then
@@ -100,13 +100,13 @@ fn check_tracks_anchor_rename_removal_and_repair() {
         check_preserving_source(&repo, &source),
         build_dangling("target.md#old")
     );
-    assert!(read_knowledge(&repo, "target.md#new").is_none());
+    assert!(get_knowledge(&repo, "target.md#new").is_none());
     // Given
     repo.write("target.md", build_section("old").as_bytes());
     // When / Then
     assert_eq!(check_preserving_source(&repo, &source), build_clean());
     assert_eq!(
-        read_knowledge(&repo, "target.md#old").unwrap().created_at,
+        get_knowledge(&repo, "target.md#old").unwrap().created_at,
         42
     );
 
@@ -126,7 +126,7 @@ fn check_tracks_anchor_rename_removal_and_repair() {
     // When / Then
     assert_eq!(check_preserving_source(&repo, &repaired), build_clean());
     assert_eq!(
-        read_knowledge(&repo, "target.md#new").unwrap().created_at,
+        get_knowledge(&repo, "target.md#new").unwrap().created_at,
         42
     );
 }
@@ -141,7 +141,7 @@ fn check_keeps_last_valid_projection_while_reporting_current_file_error() {
     );
     // When / Then
     assert_eq!(check(&repo), build_clean());
-    let original = read_knowledge(&repo, "retained.md").unwrap();
+    let original = get_knowledge(&repo, "retained.md").unwrap();
     repo.write("retained.md", b"<!-- letopis: broken PRIVATE_BODY -->\n");
 
     let response = check(&repo);
@@ -153,10 +153,10 @@ fn check_keeps_last_valid_projection_while_reporting_current_file_error() {
              "details":{"path":"retained.md","reason":"invalid_metadata"}}
         ]}})
     );
-    assert_eq!(read_knowledge(&repo, "retained.md").unwrap(), original);
+    assert_eq!(get_knowledge(&repo, "retained.md").unwrap(), original);
     repo.write("retained.md", build_whole(42, "RepairedCurrent").as_bytes());
     assert_eq!(check(&repo), build_clean());
-    let repaired = read_knowledge(&repo, "retained.md").unwrap();
+    let repaired = get_knowledge(&repo, "retained.md").unwrap();
     assert_eq!(repaired.created_at, 42);
     assert_ne!(repaired.hash, original.hash);
     let mut storage = repo.open_storage();
@@ -198,10 +198,10 @@ fn concurrent_check_publishes_edits_from_both_writers() {
     // One final pinned view independently observes both IDs, authored times and FTS texts.
     let mut storage = repo.open_storage();
     let mut view = storage.begin_read().unwrap();
-    let nodes = view.list_nodes().unwrap();
+    let nodes = view.get_nodes().unwrap();
     assert_eq!(nodes.len(), 2);
     for (id, created_at, text) in [("a.md", 42, "LarchEdited"), ("b.md", 73, "BirchEdited")] {
-        let node = view.read_node(&build_target(id)).unwrap().unwrap();
+        let node = view.get_node_by_id(&build_target(id)).unwrap().unwrap();
         let NodeMetadata::Knowledge(metadata) = node.metadata else {
             panic!("knowledge node expected")
         };
@@ -243,7 +243,7 @@ fn repeated_check_preserves_corpus_and_revision() {
         }
     }
     assert!(!repo.get_root().join("missing.md").exists());
-    assert_eq!(read_knowledge(&repo, "source.md").unwrap().created_at, 42);
+    assert_eq!(get_knowledge(&repo, "source.md").unwrap().created_at, 42);
 }
 
 fn rename_path(repo: &ReadingRepo, from: &str, to: &str) {
@@ -296,12 +296,12 @@ fn build_section(anchor: &str) -> String {
     format!("# Target {{#{anchor}}}\n<!-- letopis: {{\"created_at\":42}} -->\nSection content\n")
 }
 
-fn read_knowledge(repo: &ReadingRepo, id: &str) -> Option<KnowledgeMetadata> {
+fn get_knowledge(repo: &ReadingRepo, id: &str) -> Option<KnowledgeMetadata> {
     let mut storage = repo.open_storage();
     let row = storage
         .begin_read()
         .unwrap()
-        .read_node(&build_target(id))
+        .get_node_by_id(&build_target(id))
         .unwrap()?;
     let NodeMetadata::Knowledge(metadata) = row.metadata else {
         panic!("knowledge node expected")

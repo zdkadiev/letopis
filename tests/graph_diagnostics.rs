@@ -81,7 +81,7 @@ fn preserves_anchor_identity_and_author_time_when_prefix_lines_move_coordinates(
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
     documents.refresh().unwrap();
     // When
-    let before = repo.read_state();
+    let before = repo.get_state();
     let NodeMetadata::Knowledge(original) = &before.get_node("a.md#one").metadata else {
         panic!("expected anchored knowledge");
     };
@@ -95,7 +95,7 @@ fn preserves_anchor_identity_and_author_time_when_prefix_lines_move_coordinates(
     repo.write("a.md", &edited);
     documents.refresh().unwrap();
     let problems = diagnose(&repo);
-    let after = repo.read_state();
+    let after = repo.get_state();
 
     let NodeMetadata::Knowledge(moved) = &after.get_node("a.md#one").metadata else {
         panic!("expected anchored knowledge");
@@ -131,7 +131,7 @@ fn isolates_duplicate_and_nested_anchor_errors_from_a_valid_file() {
     let outcome = documents.refresh().unwrap();
     // When
     let problems = diagnose(&repo);
-    let state = repo.read_state();
+    let state = repo.get_state();
 
     // Then
     assert_eq!(outcome.invalid_files_updated, 2);
@@ -221,13 +221,13 @@ fn propagates_corrupt_edge_reads_instead_of_returning_clean_or_partial_findings(
         // When
         let mut before = storage.begin_read().unwrap();
         // Then
-        assert_eq!(before.list_files().unwrap().len(), 1);
-        assert!(!before.list_files().unwrap()[0].valid);
+        assert_eq!(before.get_files().unwrap().len(), 1);
+        assert!(!before.get_files().unwrap()[0].valid);
     }
     // Deliberately corrupt only this private temporary cache before opening a read.
     Connection::open(&cache)
         .unwrap()
-        .execute("DROP TABLE edges", [])
+        .execute("drop table edges", [])
         .unwrap();
     let mut view = storage.begin_read().unwrap();
 
@@ -241,7 +241,7 @@ fn propagates_corrupt_edge_reads_instead_of_returning_clean_or_partial_findings(
     let public = format!("{error} {error:?}");
     for private in [
         RAW_BODY,
-        "DROP TABLE",
+        "drop table",
         "no such table",
         "edges",
         cache.to_str().unwrap(),

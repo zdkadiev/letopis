@@ -17,7 +17,7 @@ The directory structure must reflect responsibilities and dependency boundaries:
 - `src/domain/`: pure entities, values, and rules; no filesystem, process, Git, SQL, HTTP, or CLI orchestration.
 - `src/service/`: application-owned traits and concrete application services. Define small interfaces in `service/mod.rs`; keep each concrete service struct and its implementations in a separate responsibility-named file. Services depend on domain types and their interfaces, not concrete technology implementations. Every concrete application service struct is named with the `Service` suffix (`CheckService`, `SearchService`); the traits it implements keep role names (`Checker`, `Searcher`).
 - `src/git/`, `src/storage/`, `src/embedding/`, `src/markdown/`, `src/filesystem/`, and `src/process/`: separate responsibility-named modules, introduced when their tasks implement them. Concrete structs implement the application-owned traits. These modules do not orchestrate one another.
-- `src/cli/`: argument parsing (`input.rs`), help text (`help.rs`), typed results and the shared background step (`response.rs`), and output formatting (`output.rs`). It never touches a service, adapter or the environment; business rules belong to services/domain.
+- `src/cli/`: argument parsing (`input.rs`), help text (`help.rs`), typed results and the shared background step (`response.rs`), and output formatting (`output.rs`). It does not construct services or adapters or access the environment; the shared background step may call the injected application interface. Business rules belong to services/domain.
 - `src/lib.rs`: composition root with actual constructor calls wiring adapters into services through interfaces, plus the public `wire_*`/`open_*` constructors. Module declarations and reexports alone are not composition.
 - `src/commands.rs`: per-command wiring. `run_request` selects the command from a typed `Request`, builds the services that command needs through the `lib.rs` constructors, calls the service, and finishes with `cli::finish_foreground` (or builds the response directly for status, drain and help).
 - `src/main.rs`, when introduced: thin CLI entry point using the assembly from `lib.rs`.
@@ -32,17 +32,21 @@ Keep the DDD boundary explicit: entities and value objects own domain data, loca
 
 - Follow the pinned toolchain in `rust-toolchain.toml` and lint policy in `Cargo.toml`; [development guide](docs/development.md) explains the checks.
 - Import types with `use` instead of repeating long `crate::...` paths at call sites. Write enum variants through the imported type, for example `SnapshotErrorKind::InternalError`. Prefer explicit imports over wildcard imports.
-- Name custom functions and methods with verbs or verb forms describing their action: `read_entries`, `build_command`, `verify_object`, `get_kind`, `is_empty`, `has_exact_ref`. Use `get_` for custom accessors rather than bare nouns. Keep established Rust constructor/conversion forms (`new`, `new_with_cause`, `as_str`, `to_hex`, `into_inner`) and names required by implemented traits (`fmt`, `source`, `drop`). Apply the rule to test helpers; test names describe the behavior being verified.
-- Name query methods as `<verb>_<entity>_by_<filter>`, joining multiple filters with `_and_`, for example `get_embedding_work_by_node_id_and_max_attempts(...)`.
-- Use database schema names for columns and corresponding parameters; do not invent synonyms.
+- Name custom functions and methods with verbs or verb forms describing their action: `get_entries`, `build_command`, `verify_object`, `get_kind`, `is_empty`, `has_exact_ref`. Use `get_` for custom accessors rather than bare nouns. Keep established Rust constructor/conversion forms (`new`, `new_with_cause`, `as_str`, `to_hex`, `into_inner`) and names required by implemented traits (`fmt`, `source`, `drop`). Apply the rule to test helpers; test names describe the behavior being verified.
+- Use `get_<entity>` for retrieving data from a database, filesystem, external service or in-memory value. Do not introduce synonyms such as `read_`, `fetch_`, `load_` or `list_` for the same retrieval operation. This applies to single values and collections; names required by external APIs or implemented traits remain unchanged.
+- Name filtered retrieval methods as `get_<entity>_by_<filter>`, joining multiple filters with `_and_`, for example `get_edge_by_source_id_and_target_id(...)`. Retrieval methods without filters do not need `_by_`.
+- Use database schema names for columns and corresponding parameters; do not invent synonyms. Parameters that are not columns, such as attempt limits, cursors and search expressions, should describe their actual role.
 - Replace meaningful repeated domain/protocol literals with clearly named constants near their owning module; use SCREAMING_SNAKE_CASE. Do not replace literals mechanically or collect unrelated constants in a global bag.
 - Keep functions and methods focused: aim for about 40 lines, with 60 lines as the upper limit. Split longer implementations into cohesive named helpers, not arbitrary wrappers or compressed formatting. Apply the same rule to tests and test helpers.
 - Use ownership and borrowing deliberately; add cloning, shared ownership, locks, or dynamic dispatch only for an actual need.
+- Prefer unique ownership and explicit borrows; use `Rc`/`Arc` only when shared ownership is required.
 - Keep dispatch simple and deliberate. Use concrete types for domain data and implementations; use traits for required component boundaries. Add generics only when type variation, reuse, or a scoped associated type requires them and they keep the API clear. Do not propagate generic parameter lists through services and public signatures solely for dependency injection. An object-safe `dyn Trait` dependency is appropriate when it makes composition simpler; choose borrowed or owned access according to the actual lifetime, without adding a Box, Arc, factory or wrapper unnecessarily. Retain necessary generics for existing scoped storage capabilities and non-object-safe traits rather than building extra layers solely to erase them. Do not mechanically replace existing generics or mandate static/dynamic dispatch everywhere.
 - Do not use `unwrap`/`expect` in production code; return a typed `Result`. `expect` is allowed only for an invariant guaranteed by construction; mark it `#[expect(clippy::expect_used, reason = "...")]` and state the invariant in the reason. Tests may use both. A detected programming bug is a panic, an expected failure is an error.
+- Use `match`, `if let` or `let ... else` instead of `is_some()`/`is_ok()` followed by `unwrap()`.
 - Every public type implements `Debug`.
 - Model finite alternatives with enums and expected failures with typed `Result`. Document public APIs as described in [readability and documentation](#readability-and-documentation). Preserve useful internal error causes while keeping public diagnostics free of secrets and raw knowledge/provider/subprocess payloads.
 - Compose ordinary storage queries with SeaQuery and typed table/column identifiers; execute through rusqlite using bound values from the private storage/query.rs helper. Keep builder types inside storage. Raw SQL is reserved for schemas, SQLite introspection/PRAGMAs/native probes, and specialized FTS5/vec1 search or native commands; format substantial SQL across readable lines. Never interpolate user values or render them into SQL with to_string.
+- Write handwritten SQL keywords in lowercase, including schemas, queries and test fixtures. Preserve string literals and bound values; keep ordinary queries composed with SeaQuery.
 - Keep I/O synchronous according to the design; do not add an async runtime without an agreed requirement. Product Git operations belong in `src/git/` and use the pinned local Rust library in process; no Git CLI fallback, executable helper, filter, lazy fetch, or shell substitute. Git CLI remains available for author workflows, fixtures, and independent test oracles.
 - Standard Clippy checks and the explicitly selected pedantic checks in `Cargo.toml` are enabled; see the development guide for each rule and its purpose. `dbg!`, `todo!`, and `unimplemented!` are denied. Do not enable all of `restriction`, `pedantic`, or `nursery` indiscriminately. Fix the underlying finding rather than adding a blanket allowance; any exception must be narrow and explain its reason, written as `#[expect(lint, reason = "...")]` rather than `#[allow]`, so the exception fails the build when it is no longer needed. Public fallible APIs document `# Errors`, and public APIs that can panic document `# Panics`.
 
@@ -50,7 +54,7 @@ Keep the DDD boundary explicit: entities and value objects own domain data, loca
 
 Code reads top to bottom, from abstract to concrete. Apply these rules to new and touched code only; do not reorder untouched code just to conform.
 
-- A caller is defined above everything it calls. A function or method must not call one defined above it. Type and constant definitions are not calls and may be referenced from above.
+- Within a file, define a caller above the functions and methods it calls. Type and constant definitions are not calls and may be referenced from above.
 - Group by level of abstraction: orchestration and abstract calls first, then intermediate steps, then low-level details. Keep methods of the same level adjacent.
 - Within an `impl`, public methods come first and private helpers last, in the order they are first called. A public method that calls another public method stays above it.
 - Within a file, order items as constants, types, `impl` blocks with the public API, trait implementations, then private free functions. Trait implementations such as `Display` stay next to their type. `#[cfg(test)]` modules go last, with test helpers after the tests.
@@ -61,14 +65,16 @@ Code reads top to bottom, from abstract to concrete. Apply these rules to new an
 Apply these rules to new and touched code only.
 
 - Prefer early exits: `let Some(x) = value else { return ... };` and `?` over nested `match` and `if let`. Keep nesting to two levels.
-- Use newtypes and enums instead of bare primitives: `SnapshotId(String)` rather than `String`, an enum rather than `bool` flags.
-- Group more than three or four parameters into a request struct.
+- Use newtypes and enums instead of bare primitives: `SnapshotId(String)` rather than `String`. Replace ambiguous boolean arguments with explicit enum variants so call sites show their intent.
+- Use newtypes for distinct domain types; aliases do not enforce type boundaries.
+- Prefer named structs over tuples; reserve tuple structs for single-field newtypes.
+- Group more than four use-case parameters into a request struct; consider one for four parameters when it improves clarity. Do not create a struct solely to bundle constructor arguments.
 - Do not use `&mut` parameters as output: a function returns its result instead of filling an argument (`fn count(..) -> Counts`, then merge at the caller). `&mut self` for state the type owns is fine. Allowed exceptions: signatures fixed by a trait or external API (`fmt`, `Read`/`Write` streams, `rusqlite::Connection` transactions) and handles that are the resource itself, not a result container. Apply to new and touched code only.
 - Use iterator chains while they read well (three or four steps); split longer chains into named steps instead of a manual loop or one long expression.
 - Write explicit types in signatures; do not use `impl Trait` where it hides meaning.
 - Keep files focused on one responsibility, roughly 300-500 lines; split a file that grows far beyond that.
-- Comments explain why, not what: required for `unsafe`, platform workarounds, and non-obvious invariants. Do not narrate the body line by line or repeat the method name.
-- Document every `pub` and interface method (traits in `service/mod.rs`, `mod.rs` re-exports) and every private method whose purpose is not clear from its name and signature. Trivial accessors and obvious one-liners need no comment.
+- Implementation comments explain why, not what: required for `unsafe`, platform workarounds, and non-obvious invariants. Do not narrate the body line by line or repeat the method name. API documentation and test phase markers follow their respective rules below.
+- Document every `pub` item and interface method (including traits reexported by `service/mod.rs`) and every private method whose purpose is not clear from its name and signature. Private trivial accessors and obvious one-liners need no comment.
 - A method comment starts with one sentence saying what it does, then states the contract: preconditions, what is returned, side effects, and guarantees such as atomicity or idempotence, plus `# Errors` and `# Panics` where they apply.
 - Document a trait's contract on the trait itself: what every implementation must guarantee, not only the current one. An `impl` comment covers only what is specific to that implementation, such as SQLite or Git behavior.
 - Update a comment in the same commit that changes the behavior it describes.
@@ -93,7 +99,7 @@ Run commands from the repository root; from elsewhere use `make -C <path> <targe
 - Before claiming completion, verify the actual changed tree. Report exact commands/results and any unrun checks or platform limits.
 - Review physical files, visibility, trait implementations, import direction, and `lib.rs` wiring; a passing linter alone does not establish architectural compliance.
 - Root checks do not execute historical proof harnesses with their own manifests. Run the relevant harness or platform runner when the change requires it; do not imply unrelated suites were rerun.
-- Preserve historical evidence against its captured revision. Store new evidence separately and update the relevant task/spec/plan with findings, decisions, and limits. For documentation-only edits, check affected links and consistency rather than rerunning unchanged product suites.
+- Preserve historical evidence against its captured revision. Store new evidence separately and update the relevant task/spec/plan with findings, decisions, and limits. For documentation-only edits, check affected links and consistency; run `make verify` when they change public documentation, as required above.
 
 ## Workspace and memory
 

@@ -147,11 +147,11 @@ fn observe_snapshot<R: StorageRead>(
     if snapshot.get_config_identity() != Some(identity) {
         return Err("configuration identity mismatch".into());
     }
-    let dimensions = read_current(snapshot.read_vector_dimensions(&identity)?)?.map(usize::from);
+    let dimensions = get_current(snapshot.get_vector_dimensions(&identity)?)?.map(usize::from);
     verify_dimensions(config, dimensions)?;
-    let (hashes, source_nodes) = read_hashes(snapshot)?;
+    let (hashes, source_nodes) = get_hashes(snapshot)?;
     let knowledge_nodes = hashes.iter().map(|(_, nodes)| nodes).sum();
-    let edges = snapshot.list_edges(None)?.len();
+    let edges = snapshot.get_edges_by_source_id(None)?.len();
     if (knowledge_nodes, source_nodes, edges)
         != (
             request.expected_knowledge,
@@ -162,11 +162,11 @@ fn observe_snapshot<R: StorageRead>(
         return Err("corpus counts mismatch".into());
     }
     let invalid_files = snapshot
-        .list_files()?
+        .get_files()?
         .iter()
         .filter(|file| !file.valid)
         .count();
-    let coverage = read_coverage(snapshot, config, dimensions, &hashes)?;
+    let coverage = get_coverage(snapshot, config, dimensions, &hashes)?;
     let verdict = if knowledge_nodes > 0
         && dimensions.is_some()
         && coverage.missing_nodes == 0
@@ -204,12 +204,12 @@ fn verify_dimensions(config: &EmbeddingConfig, dimensions: Option<usize>) -> Obs
     Ok(())
 }
 
-fn read_hashes<R: StorageRead>(
+fn get_hashes<R: StorageRead>(
     snapshot: &mut R,
 ) -> ObservationResult<(Vec<(Sha256, usize)>, usize)> {
     let mut hashes = BTreeMap::new();
     let mut sources = 0;
-    for node in snapshot.list_nodes()? {
+    for node in snapshot.get_nodes()? {
         match node.metadata {
             NodeMetadata::Knowledge(node) => {
                 hashes
@@ -223,7 +223,7 @@ fn read_hashes<R: StorageRead>(
     Ok((hashes.into_values().collect(), sources))
 }
 
-fn read_coverage<R: StorageRead>(
+fn get_coverage<R: StorageRead>(
     snapshot: &mut R,
     config: &EmbeddingConfig,
     dimensions: Option<usize>,
@@ -232,8 +232,8 @@ fn read_coverage<R: StorageRead>(
     let mut coverage = Coverage::default();
     let identity = config.get_identity();
     for (hash, nodes) in hashes {
-        let vector = read_current(snapshot.read_vector(&identity, hash)?)?;
-        let failure = read_current(snapshot.read_failure(&identity, hash)?)?;
+        let vector = get_current(snapshot.get_vector_by_search_hash(&identity, hash)?)?;
+        let failure = get_current(snapshot.get_failure_by_search_hash(&identity, hash)?)?;
         if let Some(vector) = vector {
             if Some(vector.len()) != dimensions || vector.iter().any(|value| !value.is_finite()) {
                 return Err("invalid current vector".into());
@@ -260,7 +260,7 @@ fn read_coverage<R: StorageRead>(
     Ok(coverage)
 }
 
-fn read_current<T>(outcome: VectorOutcome<T>) -> ObservationResult<T> {
+fn get_current<T>(outcome: VectorOutcome<T>) -> ObservationResult<T> {
     match outcome {
         VectorOutcome::Current(value) => Ok(value),
         VectorOutcome::ConfigChanged => Err("configuration identity mismatch".into()),

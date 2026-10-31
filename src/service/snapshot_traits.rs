@@ -71,7 +71,7 @@ pub trait GitSnapshots {
     /// [`SnapshotErrorKind::InvalidRequest`] for an incompatible OID format,
     /// non-tree root or non-blob path, and [`SnapshotErrorKind::InternalError`]
     /// for repository policy, Git I/O or integrity failures.
-    fn read_blob(&self, tree: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError>;
+    fn get_blob(&self, tree: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError>;
     /// Validate the exact root and retain its direct ref without auditing descendants.
     /// A retained ref protects healthy reachable objects from normal GC, not corruption.
     ///

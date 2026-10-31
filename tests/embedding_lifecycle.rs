@@ -43,7 +43,7 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0].id.as_str(), "long.md");
     let node = read
-        .read_node(&EdgeTarget::Knowledge(
+        .get_node_by_id(&EdgeTarget::Knowledge(
             KnowledgeId::parse("long.md").unwrap(),
         ))
         .unwrap()
@@ -52,7 +52,7 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
         panic!()
     };
     let VectorOutcome::Current(Some(failure)) = read
-        .read_failure(&config.get_identity(), &node.search_hash)
+        .get_failure_by_search_hash(&config.get_identity(), &node.search_hash)
         .unwrap()
     else {
         panic!("expected a durable current failure")
@@ -64,7 +64,7 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
     );
     assert!(!failure.error.unwrap().contains(PRIVATE_RESPONSE));
     assert_eq!(
-        read.read_vector(&config.get_identity(), &node.search_hash)
+        read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
             .unwrap(),
         VectorOutcome::Current(None)
     );

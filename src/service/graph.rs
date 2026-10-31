@@ -62,7 +62,7 @@ impl Discovery {
         };
         for id in &request.element_ids {
             let node = read
-                .resolve_node(id)
+                .resolve_node_by_id(id)
                 .map_err(map_graph_error)?
                 .ok_or_else(|| {
                     CommandError::new(CommandErrorKind::NotFound, "traversal start not found")
@@ -100,7 +100,7 @@ impl Discovery {
         request: &TraversalRequest,
     ) -> CommandResult<()> {
         let mut streams = NeighborStreams::new(request.direction);
-        while let Some(neighbor) = streams.read_next(read, node, request)? {
+        while let Some(neighbor) = streams.get_next(read, node, request)? {
             self.consider(neighbor, request);
             if self.elements.len() == request.limit.get() {
                 break;
@@ -143,7 +143,7 @@ impl NeighborStreams {
     }
 
     /// Merge at most two bounded pages by type, reached identity and original triple.
-    fn read_next(
+    fn get_next(
         &mut self,
         read: &mut dyn GraphRead,
         node: GraphNodeKey,
@@ -206,7 +206,7 @@ impl NeighborStream {
             )
         })?;
         let page = read
-            .read_neighbor_page(&NeighborPageRequest {
+            .get_neighbor_page(&NeighborPageRequest {
                 node,
                 direction: self.direction,
                 mode: request.mode,

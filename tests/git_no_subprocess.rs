@@ -217,16 +217,20 @@ fn nonempty_direct_drain_uses_owned_local_provider_without_git_helpers() {
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     let work = read
-        .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None)
+        .get_next_embedding_work_by_id_and_max_attempts(
+            &config.get_identity(),
+            config.get_max_attempts(),
+            None,
+        )
         .unwrap();
     assert_eq!(work, VectorOutcome::Current(None));
     let id = EdgeTarget::Knowledge(KnowledgeId::parse("note.md").unwrap());
-    let node = read.read_node(&id).unwrap().unwrap();
+    let node = read.get_node_by_id(&id).unwrap().unwrap();
     let NodeMetadata::Knowledge(node) = node.metadata else {
         panic!("knowledge node")
     };
     assert_eq!(
-        read.read_vector(&config.get_identity(), &node.search_hash)
+        read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
             .unwrap(),
         VectorOutcome::Current(Some(vec![1., 2., 3.]))
     );
@@ -373,7 +377,7 @@ fn assert_trace(directory: &Path, binary: &Path) {
 fn prepare_note(repo: &TempRepo) {
     fs::write(repo.get_root().join("source.txt"), b"abc").unwrap();
     repo.run_git_successfully(&["add", "source.txt"], None);
-    let tree = repo.read_oid(&["write-tree"], None);
+    let tree = repo.get_oid(&["write-tree"], None);
     let note = String::from_utf8(NOTE.to_vec()).unwrap().replace(
         "\"created_at\":1",
         &format!("\"created_at\":1,\"source_snapshot\":\"{tree}\""),

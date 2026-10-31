@@ -40,7 +40,7 @@ impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileSystem, M: MarkdownCod
             .map(ElementAddress::as_str)
             .collect::<BTreeSet<_>>();
         let mut captured = CapturedKnowledge::default();
-        for path in self.git.list_candidates().map_err(map_document_error)? {
+        for path in self.git.get_candidates().map_err(map_document_error)? {
             let file = self.capture_file(path, &requested)?;
             captured.entries.extend(file.entries);
             captured.elements.extend(file.elements);
@@ -69,7 +69,7 @@ impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G
         let mut captured = CapturedKnowledge::default();
         let Some(file) = self
             .filesystem
-            .read_file(&path)
+            .get_file(&path)
             .map_err(map_document_error)?
         else {
             captured.observations.insert(path, None);
@@ -140,13 +140,13 @@ impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G
         if captured.entries.contains_key(path) {
             return self
                 .git
-                .read_blob(corpus, path)
+                .get_blob(corpus, path)
                 .map(Some)
                 .map_err(map_snapshot_error);
         }
         let bytes = self
             .filesystem
-            .read_file(path)
+            .get_file(path)
             .map_err(map_document_error)?
             .map(|file| file.bytes);
         if let Some(observed) = captured.observations.get(path)

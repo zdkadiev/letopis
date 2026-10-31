@@ -114,7 +114,7 @@ pub trait StatusFiles {
     ///
     /// # Errors
     /// Reports unsafe paths or filesystem failures without exposing file contents.
-    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
+    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
 
     /// Return occupied index/embed locks and their best-effort recorded positive PIDs.
     ///
@@ -164,7 +164,7 @@ pub trait SourceReader {
     /// # Errors
     /// Returns a safe document error with a private cause when storage or confined
     /// filesystem access fails; such failures never become `SourceNotFound`.
-    fn read_source(
+    fn get_source(
         &self,
         view: &mut dyn StorageRead,
         uri: &SourceUri,
@@ -285,14 +285,14 @@ pub trait GraphRead {
     ///
     /// # Errors
     /// Reports database failures or invalid persisted identities/kinds.
-    fn resolve_node(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>>;
+    fn resolve_node_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>>;
     /// Read at most the requested number of eligible neighbors strictly after a cursor.
     ///
     /// The handle must originate in this view; the positive limit may not exceed 32.
     ///
     /// # Errors
     /// Rejects a limit above the internal quantum; reports database or decoding failures.
-    fn read_neighbor_page(
+    fn get_neighbor_page(
         &mut self,
         request: &NeighborPageRequest<'_>,
     ) -> StorageResult<Vec<GraphNeighbor>>;

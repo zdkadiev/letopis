@@ -21,7 +21,7 @@ fn observe_live_source_without_referrer_edits() {
         .unwrap()
         .refresh()
         .unwrap();
-    let before = repo.read_state();
+    let before = repo.get_state();
     let reader = wire_source_reader(repo.get_root()).unwrap();
     let mut storage = open_repo_storage(&repo);
     let vector_identity =
@@ -33,7 +33,7 @@ fn observe_live_source_without_referrer_edits() {
     let identity = view.get_config_identity();
 
     // When
-    let first = reader.read_source(&mut view, &uri).unwrap().unwrap();
+    let first = reader.get_source(&mut view, &uri).unwrap().unwrap();
     // Then
     assert_eq!(first.availability, SourceAvailability::Available);
     assert_eq!(
@@ -43,7 +43,7 @@ fn observe_live_source_without_referrer_edits() {
     // Given
     repo.write("source.txt", b"def");
     // When
-    let second = reader.read_source(&mut view, &uri).unwrap().unwrap();
+    let second = reader.get_source(&mut view, &uri).unwrap().unwrap();
     // Then
     assert_eq!(
         second.metadata.hash.unwrap().to_hex(),
@@ -52,19 +52,19 @@ fn observe_live_source_without_referrer_edits() {
     // Given
     repo.remove("source.txt");
     // When
-    let missing = reader.read_source(&mut view, &uri).unwrap().unwrap();
+    let missing = reader.get_source(&mut view, &uri).unwrap().unwrap();
     // Then
     assert_eq!(missing.availability, SourceAvailability::SourceNotFound);
     assert_eq!(missing.metadata.hash, None);
     // Given
     repo.write("source.txt", b"abc");
     // When / Then
-    assert_eq!(reader.read_source(&mut view, &uri).unwrap(), Some(first));
+    assert_eq!(reader.get_source(&mut view, &uri).unwrap(), Some(first));
     assert_eq!(view.get_revision(), revision);
     assert_eq!(view.get_config_identity(), identity);
-    assert_eq!(view.list_nodes().unwrap(), before.nodes);
+    assert_eq!(view.get_nodes().unwrap(), before.nodes);
     drop(view);
-    assert_eq!(repo.read_state(), before);
+    assert_eq!(repo.get_state(), before);
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn retain_pinned_membership_while_observing_current_bytes() {
     repo.write("source.txt", b"def");
 
     // When
-    let old = reader.read_source(&mut old_view, &uri).unwrap().unwrap();
+    let old = reader.get_source(&mut old_view, &uri).unwrap().unwrap();
     let mut current = open_repo_storage(&repo);
     let mut new_view = current.begin_read().unwrap();
 
@@ -97,7 +97,7 @@ fn retain_pinned_membership_while_observing_current_bytes() {
     );
     assert_eq!(old_view.get_revision(), revision);
     assert!(new_view.get_revision() > revision);
-    assert!(reader.read_source(&mut new_view, &uri).unwrap().is_none());
+    assert!(reader.get_source(&mut new_view, &uri).unwrap().is_none());
 }
 
 #[test]
@@ -127,7 +127,7 @@ fn distinguish_missing_file_and_incomplete_range_from_available_range() {
 
     // When
     let range = reader
-        .read_source(&mut view, &SourceUri::parse("source.txt#L2-L2").unwrap())
+        .get_source(&mut view, &SourceUri::parse("source.txt#L2-L2").unwrap())
         .unwrap()
         .unwrap();
     // Then
@@ -140,7 +140,7 @@ fn distinguish_missing_file_and_incomplete_range_from_available_range() {
     for address in ["source.txt#L2-L3", "missing.txt"] {
         // When
         let observed = reader
-            .read_source(&mut view, &SourceUri::parse(address).unwrap())
+            .get_source(&mut view, &SourceUri::parse(address).unwrap())
             .unwrap()
             .unwrap();
         // Then
@@ -168,7 +168,7 @@ fn reject_symlink_and_nonregular_sources_through_confined_filesystem() {
 
     // When / Then
     assert_eq!(
-        reader.read_source(&mut view, &uri).unwrap_err().get_kind(),
+        reader.get_source(&mut view, &uri).unwrap_err().get_kind(),
         DocumentErrorKind::InvalidRequest
     );
     // Given
@@ -176,7 +176,7 @@ fn reject_symlink_and_nonregular_sources_through_confined_filesystem() {
     fs::create_dir(repo.get_root().join("source.txt")).unwrap();
     // When / Then
     assert_eq!(
-        reader.read_source(&mut view, &uri).unwrap_err().get_kind(),
+        reader.get_source(&mut view, &uri).unwrap_err().get_kind(),
         DocumentErrorKind::InvalidRequest
     );
 }
@@ -196,19 +196,19 @@ fn propagate_failed_storage_read_before_source_capture() {
     connection
         .pragma_update(None, "foreign_keys", false)
         .unwrap();
-    connection.execute_batch("DROP TABLE nodes").unwrap();
+    connection.execute_batch("drop table nodes").unwrap();
     let mut view = storage.begin_read().unwrap();
     let reader = wire_source_reader(repo.get_root()).unwrap();
 
     // When
     let error = reader
-        .read_source(&mut view, &SourceUri::parse("source.txt").unwrap())
+        .get_source(&mut view, &SourceUri::parse("source.txt").unwrap())
         .unwrap_err();
 
     // Then
     assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
     assert!(!error.to_string().contains("nodes"));
-    assert!(!format!("{error:?}").contains("DROP TABLE"));
+    assert!(!format!("{error:?}").contains("drop table"));
 }
 
 #[test]

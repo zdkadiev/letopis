@@ -39,7 +39,7 @@ fn check_binary_reports_multiple_errors_and_repairs() {
         ]}})
     );
     let mut storage = repo.open_storage();
-    assert_eq!(storage.begin_read().unwrap().list_nodes().unwrap().len(), 3);
+    assert_eq!(storage.begin_read().unwrap().get_nodes().unwrap().len(), 3);
     // Given
     repo.write_knowledge("duplicate.md", "Repaired duplicate");
     // When / Then
@@ -105,7 +105,7 @@ fn check_paths_filters_owners_after_full_graph_validation() {
         json!({"ok":true,"result":{"errors":[]}})
     );
     let mut storage = repo.open_storage();
-    assert_eq!(storage.begin_read().unwrap().list_nodes().unwrap().len(), 3);
+    assert_eq!(storage.begin_read().unwrap().get_nodes().unwrap().len(), 3);
 }
 
 #[test]
@@ -137,11 +137,13 @@ fn check_preserves_agent_layout_and_relation_names() {
     }
     let mut storage = repo.open_storage();
     let mut view = storage.begin_read().unwrap();
-    let nodes = view.list_nodes().unwrap();
+    let nodes = view.get_nodes().unwrap();
     assert_eq!(nodes.len(), 2);
     assert!(nodes.iter().any(|node| matches!(&node.metadata, NodeMetadata::Knowledge(metadata) if metadata.id.as_str() == "knowledge/deep/notes.markdown" && metadata.created_at == 42)));
     assert_eq!(
-        view.list_edges(None).unwrap()[0].get_edge_type().as_str(),
+        view.get_edges_by_source_id(None).unwrap()[0]
+            .get_edge_type()
+            .as_str(),
         "explains_case7"
     );
 }

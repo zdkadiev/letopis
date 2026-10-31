@@ -1,4 +1,4 @@
-use super::{GitRepository, objects::ObjectDb, tree::read_entry};
+use super::{GitRepository, objects::ObjectDb, tree::get_entry};
 use crate::{
     domain::RepoPath,
     service::{DocumentError, DocumentErrorKind, DocumentResult, SnapshotErrorKind},
@@ -20,7 +20,7 @@ use gix_pathspec::Search;
 use std::{borrow::Cow, collections::BTreeSet, path::Path};
 
 /// List the actual worktree index plus non-ignored untracked files, without filters.
-pub(super) fn list_candidates(git: &GitRepository, root: &Path) -> DocumentResult<Vec<RepoPath>> {
+pub(super) fn get_candidates(git: &GitRepository, root: &Path) -> DocumentResult<Vec<RepoPath>> {
     let repo = &git.repo;
     let index = repo.index_or_empty().map_err(|_| fail_listing())?;
     let index = expand_sparse_index(git, &index)?;
@@ -91,7 +91,7 @@ fn expand_sparse_index<'a>(
     expanded.remove_entries(|_, _, entry| entry.mode.is_sparse());
     while let Some((path, id, mode)) = pending.pop() {
         if mode.is_sparse() {
-            pending.extend(read_sparse_children(git, &path, id)?);
+            pending.extend(get_sparse_children(git, &path, id)?);
             continue;
         }
         expanded.dangerously_push_entry(
@@ -106,13 +106,13 @@ fn expand_sparse_index<'a>(
     Ok(Cow::Owned(expanded))
 }
 /// Keep only child metadata between reads; verified tree payloads never accumulate.
-fn read_sparse_children(
+fn get_sparse_children(
     git: &GitRepository,
     prefix: &[u8],
     oid: ObjectId,
 ) -> DocumentResult<Vec<(Vec<u8>, ObjectId, Mode)>> {
     let bytes = ObjectDb { git }
-        .read_tree(
+        .get_tree(
             &oid.to_string(),
             SnapshotErrorKind::InternalError,
             SnapshotErrorKind::InternalError,
@@ -121,7 +121,7 @@ fn read_sparse_children(
     let mut remaining = bytes.as_slice();
     let mut children = Vec::new();
     while !remaining.is_empty() {
-        let (entry, rest) = read_entry(remaining, git.oid_len).map_err(|_| fail_listing())?;
+        let (entry, rest) = get_entry(remaining, git.oid_len).map_err(|_| fail_listing())?;
         let mut path = prefix.to_vec();
         path.extend_from_slice(entry.name);
         let id = ObjectId::try_from(entry.oid).map_err(|_| fail_listing())?;

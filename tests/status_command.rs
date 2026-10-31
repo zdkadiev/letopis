@@ -152,7 +152,7 @@ fn status_and_check_track_repairs_across_processes() {
     assert!(checked.status.success(), "{checked:?}");
     let checked: Value = serde_json::from_slice(&checked.stdout).unwrap();
     // When
-    let status = read_status(&repo);
+    let status = get_status(&repo);
     let problems = status["result"]["problems"].as_array().unwrap();
     // Then
     assert_eq!(Value::Array(problems.clone()), checked["result"]["errors"]);
@@ -191,7 +191,7 @@ fn status_and_check_track_repairs_across_processes() {
     repo.write_knowledge("bad.md", "Valid metadata");
     // When / Then
     assert_eq!(
-        read_status(&repo)["result"]["problems"],
+        get_status(&repo)["result"]["problems"],
         status["result"]["problems"]
     );
 
@@ -201,7 +201,7 @@ fn status_and_check_track_repairs_across_processes() {
     assert!(refreshed.status.success(), "{refreshed:?}");
     let refreshed: Value = serde_json::from_slice(&refreshed.stdout).unwrap();
     assert_eq!(refreshed["result"]["errors"], json!([]));
-    assert_eq!(read_status(&repo)["result"]["problems"], json!([]));
+    assert_eq!(get_status(&repo)["result"]["problems"], json!([]));
 }
 
 #[test]
@@ -217,7 +217,7 @@ fn status_reports_rename_delete_and_restore_after_refresh() {
     let initial = repo.invoke(&["check"], b"{}");
     // Then
     assert!(initial.status.success(), "{initial:?}");
-    assert_eq!(read_status(&repo)["result"]["problems"], json!([]));
+    assert_eq!(get_status(&repo)["result"]["problems"], json!([]));
 
     // Given
     fs::rename(
@@ -230,7 +230,7 @@ fn status_reports_rename_delete_and_restore_after_refresh() {
     // Then
     assert!(renamed.status.success(), "{renamed:?}");
     assert_eq!(
-        read_status(&repo)["result"]["problems"][0]["details"]["target"],
+        get_status(&repo)["result"]["problems"][0]["details"]["target"],
         "target.md"
     );
 
@@ -244,7 +244,7 @@ fn status_reports_rename_delete_and_restore_after_refresh() {
     let restored = repo.invoke(&["check"], b"{}");
     // Then
     assert!(restored.status.success(), "{restored:?}");
-    assert_eq!(read_status(&repo)["result"]["problems"], json!([]));
+    assert_eq!(get_status(&repo)["result"]["problems"], json!([]));
 
     // Given
     fs::remove_file(repo.get_root().join("target.md")).unwrap();
@@ -253,7 +253,7 @@ fn status_reports_rename_delete_and_restore_after_refresh() {
     // Then
     assert!(deleted.status.success(), "{deleted:?}");
     assert_eq!(
-        read_status(&repo)["result"]["problems"][0]["details"]["target"],
+        get_status(&repo)["result"]["problems"][0]["details"]["target"],
         "target.md"
     );
 }
@@ -277,7 +277,7 @@ fn status_reports_busy_index_lock_without_waiting_or_writing_pid() {
 
     let start = Instant::now();
     // When
-    let status = read_status(&repo);
+    let status = get_status(&repo);
 
     // Then
     assert!(start.elapsed().as_secs() < 2);
@@ -334,7 +334,7 @@ fn drain_start_failure_is_absent_from_status() {
 
     // When: the lock fault is removed and status is read afresh.
     fs::remove_file(repo.get_root().join(".letopis/embed.lock")).unwrap();
-    let status = read_status(&repo);
+    let status = get_status(&repo);
 
     // Then: no launch warning is persisted and the canary is untouched.
     assert_eq!(status["result"]["problems"], json!([]));
@@ -362,7 +362,7 @@ fn disabled_configuration_reports_zero_and_hides_then_reveals_stored_failures() 
     let node = storage
         .begin_read()
         .unwrap()
-        .list_nodes()
+        .get_nodes()
         .unwrap()
         .into_iter()
         .find_map(|node| match node.metadata {
@@ -390,7 +390,7 @@ fn disabled_configuration_reports_zero_and_hides_then_reveals_stored_failures() 
     );
 
     // When: status and a drain observe the disabled document.
-    let status = read_status(&repo);
+    let status = get_status(&repo);
     let drained = repo.invoke(&["embed", "--drain"], b"{}");
 
     // Then: execution counters and failures are hidden and no work starts.
@@ -412,7 +412,7 @@ fn disabled_configuration_reports_zero_and_hides_then_reveals_stored_failures() 
     );
 
     // When / Then: stored execution failures become visible under enabled semantics.
-    let enabled = read_status(&repo);
+    let enabled = get_status(&repo);
     assert_eq!(enabled["result"]["embedding_failed"], 1);
     assert!(enabled.to_string().contains("embedding_attempts_exhausted"));
     assert!(enabled.to_string().contains("query_embedding_failed"));
@@ -452,7 +452,7 @@ fn seed_diagnostic_files(repo: &ReadingRepo) {
     repo.write("code.rs", b"source");
 }
 
-fn read_status(repo: &ReadingRepo) -> Value {
+fn get_status(repo: &ReadingRepo) -> Value {
     let output = repo.invoke(&["status"], b"{}");
     assert!(output.status.success(), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");

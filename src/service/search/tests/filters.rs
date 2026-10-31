@@ -227,7 +227,7 @@ fn changing_observer_is_called_once_and_retained_flags_drive_rendering() {
 }
 
 impl Embedder for Query {
-    fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
+    fn get_configuration(&mut self) -> EmbeddingResult<ConfigState> {
         self.0.set(self.0.get() + 1);
         Ok(ConfigState::Ready(build_config(2)))
     }

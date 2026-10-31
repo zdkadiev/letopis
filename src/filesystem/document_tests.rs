@@ -23,7 +23,7 @@ use std::{
 use tempfile::tempdir;
 
 #[test]
-fn read_regular_file_preserves_bytes_and_stat() {
+fn get_regular_file_preserves_bytes_and_stat() {
     // Given
     let root = tempdir().unwrap();
     let path = RepoPath::parse("заметка with spaces.md").unwrap();
@@ -31,7 +31,7 @@ fn read_regular_file_preserves_bytes_and_stat() {
     let filesystem = LocalFileSystem::open(root.path()).unwrap();
     let before = filesystem.get_time_ns().unwrap();
     // When
-    let captured = filesystem.read_file(&path).unwrap().unwrap();
+    let captured = filesystem.get_file(&path).unwrap().unwrap();
     let stat = filesystem.stat_file(&path).unwrap().unwrap();
     // Then
     assert_eq!(captured.bytes, b"literal\0\xffbytes");
@@ -58,7 +58,7 @@ fn reject_final_and_parent_symlinks() {
     for raw in ["link.md", "parent/note.md", "directory.md"] {
         let path = RepoPath::parse(raw).unwrap();
         // When / Then
-        assert!(filesystem.read_file(&path).is_err());
+        assert!(filesystem.get_file(&path).is_err());
         assert!(filesystem.stat_file(&path).is_err());
     }
 }
@@ -71,7 +71,7 @@ fn reject_fifo_without_blocking() {
     let filesystem = LocalFileSystem::open(root.path()).unwrap();
     let path = RepoPath::parse("pipe.md").unwrap();
     // When / Then
-    assert!(filesystem.read_file(&path).is_err());
+    assert!(filesystem.get_file(&path).is_err());
     assert!(filesystem.stat_file(&path).is_err());
 }
 
@@ -83,7 +83,7 @@ fn missing_file_returns_none() {
     for raw in ["missing.md", "missing/child.md"] {
         let path = RepoPath::parse(raw).unwrap();
         // When / Then
-        assert!(filesystem.read_file(&path).unwrap().is_none());
+        assert!(filesystem.get_file(&path).unwrap().is_none());
         assert!(filesystem.stat_file(&path).unwrap().is_none());
     }
 }
@@ -118,7 +118,7 @@ fn replacement_during_read_fails() {
         // When / Then
         assert!(
             filesystem
-                .read_file(&RepoPath::parse("dir/note.md").unwrap())
+                .get_file(&RepoPath::parse("dir/note.md").unwrap())
                 .is_err()
         );
     }
@@ -139,7 +139,7 @@ fn fifo_replacement_before_open_is_rejected_without_blocking() {
     // When: timeout is a hang watchdog, not a scheduling mechanism.
     let worker = thread::spawn(move || {
         sender
-            .send(filesystem.read_file(&RepoPath::parse("note.md").unwrap()))
+            .send(filesystem.get_file(&RepoPath::parse("note.md").unwrap()))
             .unwrap();
     });
     let result = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -324,7 +324,7 @@ fn ordinary_hardlinked_document_reads_remain_supported() {
     for name in ["note.md", "alias.md"] {
         // When
         let captured = filesystem
-            .read_file(&RepoPath::parse(name).unwrap())
+            .get_file(&RepoPath::parse(name).unwrap())
             .unwrap()
             .unwrap();
         // Then lock-specific validation must not reject ordinary document hard links.
@@ -585,7 +585,7 @@ impl LockWorker {
         }
     }
 
-    fn read_event(&mut self) -> String {
+    fn get_event(&mut self) -> String {
         let mut line = String::new();
         assert!(self.stream.read_line(&mut line).unwrap() > 0);
         line.trim().to_owned()
@@ -593,7 +593,7 @@ impl LockWorker {
 
     fn release(&mut self) {
         self.stream.get_mut().write_all(b"r").unwrap();
-        assert_eq!(self.read_event(), "released");
+        assert_eq!(self.get_event(), "released");
         assert!(self.child.wait().unwrap().success());
     }
 }
@@ -612,7 +612,7 @@ fn process_owner_drop_or_death_releases_both_persistent_locks() {
             // Given
             let root = tempdir().unwrap();
             let mut owner = LockWorker::spawn(root.path(), mode);
-            assert_eq!(owner.read_event(), "owned");
+            assert_eq!(owner.get_event(), "owned");
             let path = root.path().join(format!(".letopis/{mode}.lock"));
             let inode = fs::metadata(&path).unwrap().ino();
             let bytes = format!("{}\n", owner.child.id()).into_bytes();
@@ -620,7 +620,7 @@ fn process_owner_drop_or_death_releases_both_persistent_locks() {
             let filesystem = LocalFileSystem::open(root.path()).unwrap();
             let mut waiter = LockWorker::spawn(root.path(), mode);
             assert_eq!(
-                waiter.read_event(),
+                waiter.get_event(),
                 if mode == "index" { "contended" } else { "busy" }
             );
             assert_eq!(fs::read(&path).unwrap(), bytes);
@@ -633,7 +633,7 @@ fn process_owner_drop_or_death_releases_both_persistent_locks() {
             }
             // Then the stale PID and persistent inode survive release/death.
             if mode == "index" {
-                assert_eq!(waiter.read_event(), "owned");
+                assert_eq!(waiter.get_event(), "owned");
                 assert_eq!(
                     fs::read(&path).unwrap(),
                     format!("{}\n", waiter.child.id()).as_bytes()

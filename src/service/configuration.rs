@@ -38,8 +38,8 @@ impl fmt::Debug for ConfigurationService<'_> {
 }
 
 impl ConfigReader for ConfigurationService<'_> {
-    fn read_config(&self) -> CommandResult<Option<Configuration>> {
-        let Some(bytes) = self.files.read_config().map_err(map_read_error)? else {
+    fn get_config(&self) -> CommandResult<Option<Configuration>> {
+        let Some(bytes) = self.files.get_config().map_err(map_read_error)? else {
             return Ok(None);
         };
         validate_configuration(&bytes, self.provider)

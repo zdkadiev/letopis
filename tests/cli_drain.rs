@@ -52,7 +52,10 @@ fn detached_product_drain_reaches_http_and_stores_the_matching_vector() {
     barrier.release();
     // Then: HTTP delivery and real hash-addressed storage, not a fixture success.
     owner.wait_for_exit();
-    assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
+    assert_eq!(
+        fixture.get_vector_by_search_hash(&config, &hash),
+        Some(vec![1., 2., 3.])
+    );
     fixture.assert_no_work(&config);
     assert_eq!(http.take_requests().len(), 1);
     assert_eq!(fixture.capture_corpus(), before);
@@ -80,7 +83,10 @@ fn direct_product_drain_accepts_eof_and_reuses_vectors_after_lost_response() {
     );
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
     // Then persisted vectors, no repeated inference and no corpus publication.
-    assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
+    assert_eq!(
+        fixture.get_vector_by_search_hash(&config, &hash),
+        Some(vec![1., 2., 3.])
+    );
     fixture.assert_no_work(&config);
     assert_eq!(http.take_requests().len(), 1);
     assert_eq!(fixture.capture_corpus(), before);
@@ -134,7 +140,7 @@ fn provider_failure_is_redacted_and_exhaustion_never_respawns() {
     let before = fixture.capture_corpus();
     // When: two durable attempts, then no eligible work under the same identity.
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
-    let failure = fixture.read_failure(&config, &hash).unwrap();
+    let failure = fixture.get_failure_by_search_hash(&config, &hash).unwrap();
     assert_eq!(failure.attempts, 2);
     assert_eq!(
         failure.error.as_deref(),
@@ -175,7 +181,10 @@ fn formatting_configuration_keeps_identity_and_does_not_spawn() {
     fixture.finish_foreground(&mut fixture.spawn_foreground());
     // Then the existing TK-13 JCS identity and vector are reused.
     assert_eq!(fs::read(lock).unwrap(), owner);
-    assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
+    assert_eq!(
+        fixture.get_vector_by_search_hash(&config, &hash),
+        Some(vec![1., 2., 3.])
+    );
     assert_eq!(http.take_requests().len(), 1);
 }
 
@@ -196,17 +205,20 @@ fn identity_reset_during_product_http_discards_the_late_result() {
     let current = fixture.write_config(&http.get_base_url(), 1);
     let mut next = wire_embedding_executor(fixture.repo.get_root()).unwrap();
     assert!(matches!(
-        next.read_configuration().unwrap(),
+        next.get_configuration().unwrap(),
         ConfigState::Ready(_)
     ));
     assert!(EmbeddingExecutor::has_work(&mut next).unwrap());
     barrier.release();
     assert_success(&child.collect_output(WAIT));
     // Then old work did not publish into the new identity; a fresh drain can finish.
-    assert_eq!(fixture.read_vector(&current, &hash), None);
-    assert_eq!(fixture.read_failure(&current, &hash), None);
+    assert_eq!(fixture.get_vector_by_search_hash(&current, &hash), None);
+    assert_eq!(fixture.get_failure_by_search_hash(&current, &hash), None);
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
-    assert_eq!(fixture.read_vector(&current, &hash), Some(vec![1., 2., 3.]));
+    assert_eq!(
+        fixture.get_vector_by_search_hash(&current, &hash),
+        Some(vec![1., 2., 3.])
+    );
     assert_eq!(http.take_requests().len(), 2);
 }
 
@@ -226,16 +238,16 @@ fn text_publication_during_http_never_reuses_a_late_vector_for_new_text() {
     // When: real publication succeeds while the model is blocked; no HTTP transaction.
     let new_hash = fixture.publish("new hash token");
     assert_ne!(new_hash, old_hash);
-    assert_eq!(fixture.read_vector(&config, &new_hash), None);
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &new_hash), None);
     barrier.release();
     assert_success(&child.collect_output(WAIT));
     // Then the new hash needed its own request; the old unreferenced vector is pruned.
     assert_eq!(http.take_requests().len(), 2);
     assert_eq!(
-        fixture.read_vector(&config, &new_hash),
+        fixture.get_vector_by_search_hash(&config, &new_hash),
         Some(vec![1., 2., 3.])
     );
-    assert_eq!(fixture.read_vector(&config, &old_hash), None);
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &old_hash), None);
     fixture.assert_no_work(&config);
 }
 
@@ -265,7 +277,10 @@ fn killed_foreground_does_not_cancel_detached_product_http() {
     barrier.release();
     owner.wait_for_exit();
     // Then detached work survived and reached actual publication and process exit.
-    assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
+    assert_eq!(
+        fixture.get_vector_by_search_hash(&config, &hash),
+        Some(vec![1., 2., 3.])
+    );
     assert_released(fixture.repo.get_root());
 }
 
@@ -290,9 +305,15 @@ fn killed_product_releases_lock_and_preserves_reserved_budget() {
     assert_released(fixture.repo.get_root());
     // Then kernel release, stable inode and no reset/retry of exhausted work.
     assert_eq!(fs::metadata(path).unwrap().ino(), inode);
-    assert_eq!(fixture.read_failure(&config, &hash).unwrap().attempts, 1);
+    assert_eq!(
+        fixture
+            .get_failure_by_search_hash(&config, &hash)
+            .unwrap()
+            .attempts,
+        1
+    );
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
-    assert_eq!(fixture.read_vector(&config, &hash), None);
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &hash), None);
     fixture.assert_no_work(&config);
     assert_eq!(http.take_requests().len(), 1);
 }
@@ -322,7 +343,7 @@ fn sigint_preserves_attempt_budget_across_product_restarts() {
     let before = fixture.capture_corpus();
     let mut child = fixture.spawn_drain();
     barrier.wait_until_entered();
-    let reserved = fixture.read_failure(&config, &hash).unwrap();
+    let reserved = fixture.get_failure_by_search_hash(&config, &hash).unwrap();
     assert_eq!(reserved.attempts, 1);
     assert_eq!(reserved.error, None);
     // When: SIGINT the owned drain, reap it, and then release the server response.
@@ -332,23 +353,32 @@ fn sigint_preserves_attempt_budget_across_product_restarts() {
     barrier.release();
     // Then: the interrupted request consumed its committed attempt.
     assert_released(fixture.repo.get_root());
-    assert_eq!(fixture.read_failure(&config, &hash).unwrap().attempts, 1);
-    assert_eq!(fixture.read_vector(&config, &hash), None);
+    assert_eq!(
+        fixture
+            .get_failure_by_search_hash(&config, &hash)
+            .unwrap()
+            .attempts,
+        1
+    );
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &hash), None);
     assert_eq!(http.take_requests().len(), 1);
     // When: a new process with unchanged configuration may consume only one more.
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
-    let failed = fixture.read_failure(&config, &hash).unwrap();
+    let failed = fixture.get_failure_by_search_hash(&config, &hash).unwrap();
     assert_eq!(failed.attempts, 2);
     assert_eq!(
         failed.error.as_deref(),
         Some("embedding provider rejected request")
     );
     assert_eq!(http.take_requests().len(), 1);
-    assert_eq!(fixture.read_vector(&config, &hash), None);
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &hash), None);
     // Then: a third process cannot renew the exhausted budget.
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
     assert!(http.take_requests().is_empty());
-    assert_eq!(fixture.read_failure(&config, &hash), Some(failed));
+    assert_eq!(
+        fixture.get_failure_by_search_hash(&config, &hash),
+        Some(failed)
+    );
     fixture.assert_no_work(&config);
     assert_released(fixture.repo.get_root());
     assert_eq!(fixture.capture_corpus(), before);
@@ -394,8 +424,8 @@ fn stale_live_text_is_skipped_before_any_product_http_or_reservation() {
     // When / Then: reuse the executor's live-text hash guard without consuming an attempt.
     assert_success(&fixture.spawn_drain().collect_output(WAIT));
     assert!(http.take_requests().is_empty());
-    assert_eq!(fixture.read_failure(&config, &old), None);
-    assert_eq!(fixture.read_vector(&config, &old), None);
+    assert_eq!(fixture.get_failure_by_search_hash(&config, &old), None);
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &old), None);
 }
 
 #[test]

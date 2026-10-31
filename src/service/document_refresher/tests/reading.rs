@@ -32,7 +32,7 @@ fn warm_refresh_reads_basis_roots_without_loading_nodes() {
         .storage
         .begin_read()
         .unwrap()
-        .list_nodes()
+        .get_nodes()
         .unwrap()
         .remove(0)
         .metadata;
@@ -93,67 +93,67 @@ impl Storage for ReadingStorage {
     }
 }
 impl<R: GraphRead> GraphRead for ReadingView<R> {
-    fn resolve_node(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
-        self.inner.resolve_node(id)
+    fn resolve_node_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+        self.inner.resolve_node_by_id(id)
     }
-    fn read_neighbor_page(
+    fn get_neighbor_page(
         &mut self,
         request: &NeighborPageRequest<'_>,
     ) -> StorageResult<Vec<GraphNeighbor>> {
-        self.inner.read_neighbor_page(request)
+        self.inner.get_neighbor_page(request)
     }
 }
 impl<R: StorageRead> StorageRead for ReadingView<R> {
-    fn read_embedding_status(
+    fn get_embedding_status(
         &mut self,
         policy: &EmbeddingStatusPolicy,
     ) -> StorageResult<EmbeddingStatusSummary> {
-        self.inner.read_embedding_status(policy)
+        self.inner.get_embedding_status(policy)
     }
 
-    fn list_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
+    fn get_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
         panic!("warm refresh loaded node metadata")
     }
-    fn list_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
+    fn get_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
         self.reads.set(self.reads.get() + 1);
-        self.inner.list_source_snapshots()
+        self.inner.get_source_snapshots()
     }
-    fn read_next_embedding_work(
+    fn get_next_embedding_work_by_id_and_max_attempts(
         &mut self,
         expected: &Sha256,
         max_attempts: u64,
         after: Option<&KnowledgeId>,
     ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>> {
         self.inner
-            .read_next_embedding_work(expected, max_attempts, after)
+            .get_next_embedding_work_by_id_and_max_attempts(expected, max_attempts, after)
     }
-    fn read_vector_dimensions(
+    fn get_vector_dimensions(
         &mut self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>> {
-        self.inner.read_vector_dimensions(expected)
+        self.inner.get_vector_dimensions(expected)
     }
-    fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
-        self.inner.read_node(id)
+    fn get_node_by_id(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
+        self.inner.get_node_by_id(id)
     }
-    fn list_edges(&mut self, source: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>> {
-        self.inner.list_edges(source)
+    fn get_edges_by_source_id(&mut self, source: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>> {
+        self.inner.get_edges_by_source_id(source)
     }
-    fn read_file(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
-        self.inner.read_file(path)
+    fn get_file_by_path(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
+        self.inner.get_file_by_path(path)
     }
-    fn list_files(&mut self) -> StorageResult<Vec<FileRow>> {
-        self.inner.list_files()
+    fn get_files(&mut self) -> StorageResult<Vec<FileRow>> {
+        self.inner.get_files()
     }
     fn match_text(&mut self, expression: &str) -> StorageResult<Vec<TextMatch>> {
         self.inner.match_text(expression)
     }
-    fn read_vector(
+    fn get_vector_by_search_hash(
         &mut self,
         expected: &Sha256,
         hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>> {
-        self.inner.read_vector(expected, hash)
+        self.inner.get_vector_by_search_hash(expected, hash)
     }
     fn find_nearest_vectors(
         &mut self,
@@ -163,15 +163,15 @@ impl<R: StorageRead> StorageRead for ReadingView<R> {
     ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
         self.inner.find_nearest_vectors(expected, query, dimensions)
     }
-    fn read_failure(
+    fn get_failure_by_search_hash(
         &mut self,
         expected: &Sha256,
         hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>> {
-        self.inner.read_failure(expected, hash)
+        self.inner.get_failure_by_search_hash(expected, hash)
     }
-    fn read_query_error(&mut self) -> StorageResult<Option<QueryError>> {
-        self.inner.read_query_error()
+    fn get_query_error(&mut self) -> StorageResult<Option<QueryError>> {
+        self.inner.get_query_error()
     }
     fn get_revision(&self) -> u64 {
         self.inner.get_revision()

@@ -156,7 +156,7 @@ fn returns_missing_locks_without_creating_files() {
 
     // When / Then
     assert!(files.observe_locks().unwrap().is_empty());
-    assert_eq!(files.read_config().unwrap(), None);
+    assert_eq!(files.get_config().unwrap(), None);
     assert!(!fixture.0.join(".letopis").exists());
 }
 
@@ -176,7 +176,7 @@ fn rejects_symlink_and_inode_replacement() {
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     // When / Then
     assert!(files.observe_locks().is_err());
-    assert!(files.read_config().is_err());
+    assert!(files.get_config().is_err());
 }
 
 #[test]
@@ -188,7 +188,7 @@ fn reads_existing_config_without_mutation() {
     let files = open_status_files(&fixture.0).unwrap();
 
     // When / Then
-    assert_eq!(files.read_config().unwrap(), Some(b"raw\xff".to_vec()));
+    assert_eq!(files.get_config().unwrap(), Some(b"raw\xff".to_vec()));
 }
 
 #[test]

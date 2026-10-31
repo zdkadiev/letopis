@@ -49,7 +49,7 @@ impl OwnedChild {
             output,
         )
     }
-    fn read_capture(&mut self) -> String {
+    fn get_capture(&mut self) -> String {
         self.1.seek(SeekFrom::Start(0)).unwrap();
         let mut bytes = Vec::new();
         (&mut self.1)
@@ -62,7 +62,7 @@ impl OwnedChild {
         let start = Instant::now();
         loop {
             if let Some(status) = self.0.try_wait().unwrap() {
-                assert!(status.success(), "child failed: {}", self.read_capture());
+                assert!(status.success(), "child failed: {}", self.get_capture());
                 return;
             }
             assert!(start.elapsed() < DEADLINE, "child exceeded deadline");
@@ -82,17 +82,14 @@ fn reads_exact_bytes_and_stable_absence_without_decoding_config() {
     let fixture = Fixture::new();
     let files = open_embedding_files(&fixture.0).unwrap();
     let path = RepoPath::parse("notes/a.md").unwrap();
-    assert_eq!(files.read_config().unwrap(), None);
-    assert_eq!(files.read_document(&path).unwrap(), None);
+    assert_eq!(files.get_config().unwrap(), None);
+    assert_eq!(files.get_document(&path).unwrap(), None);
     fs::create_dir(fixture.0.join("notes")).unwrap();
     fs::write(fixture.0.join("notes/a.md"), b"\xff\r\ntext").unwrap();
     fs::write(fixture.0.join(".letopis/config.json"), b"not JSON\xff").unwrap();
     // When / Then
-    assert_eq!(
-        files.read_document(&path).unwrap().unwrap(),
-        b"\xff\r\ntext"
-    );
-    assert_eq!(files.read_config().unwrap().unwrap(), b"not JSON\xff");
+    assert_eq!(files.get_document(&path).unwrap().unwrap(), b"\xff\r\ntext");
+    assert_eq!(files.get_config().unwrap().unwrap(), b"not JSON\xff");
     assert!(files.get_time_secs().unwrap() > 0);
     files.wait(Duration::ZERO).unwrap();
 }
@@ -110,7 +107,7 @@ fn rejects_final_and_ancestor_symlinks_and_nonregular_files() {
     // When / Then
     for path in ["link.md", "escape/secret.md", "directory.md"] {
         let error = files
-            .read_document(&RepoPath::parse(path).unwrap())
+            .get_document(&RepoPath::parse(path).unwrap())
             .unwrap_err();
         assert!(!format!("{error} {error:?}").contains("PRIVATE_PAYLOAD"));
     }
@@ -119,7 +116,7 @@ fn rejects_final_and_ancestor_symlinks_and_nonregular_files() {
         fixture.0.join(".letopis/config.json"),
     )
     .unwrap();
-    assert!(files.read_config().is_err());
+    assert!(files.get_config().is_err());
 }
 
 #[test]
@@ -131,7 +128,7 @@ fn rejects_replaced_service_directory_and_symlink_at_open() {
     fs::rename(fixture.0.join(".letopis"), fixture.0.join("old-service")).unwrap();
     symlink(&outside.0, fixture.0.join(".letopis")).unwrap();
     // When / Then
-    assert!(files.read_config().is_err());
+    assert!(files.get_config().is_err());
     assert!(files.try_lock_embed().is_err());
     assert!(open_embedding_files(&fixture.0).is_err());
 }
@@ -230,7 +227,7 @@ fn embedding_files_child() {
             // Then
             assert!(
                 files
-                    .read_document(&RepoPath::parse("fifo.md").unwrap())
+                    .get_document(&RepoPath::parse("fifo.md").unwrap())
                     .is_err()
             );
             assert!(files.try_lock_embed().is_err());

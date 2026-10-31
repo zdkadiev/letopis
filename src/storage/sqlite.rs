@@ -157,7 +157,7 @@ mod tests {
                 storage
                     .begin_read()
                     .unwrap()
-                    .read_vector(&identity, &identity)
+                    .get_vector_by_search_hash(&identity, &identity)
                     .unwrap()
             ),
             None
@@ -165,7 +165,7 @@ mod tests {
         assert!(
             storage
                 .vector_writer
-                .execute_batch("DELETE FROM cache.nodes")
+                .execute_batch("delete from cache.nodes")
                 .is_err()
         );
         drop(storage);
@@ -183,7 +183,7 @@ mod tests {
         let m1 = Sha256::digest(b"M1");
         let m2 = Sha256::digest(b"M2");
         let key = seed_vector(&mut storage, &m1);
-        storage.vector_writer.execute_batch("INSERT INTO embed_failures VALUES('failed-text',1,'safe failure'); INSERT INTO query_error VALUES(1,7,'safe failure'); CREATE TRIGGER deny_meta_update BEFORE UPDATE ON meta BEGIN SELECT RAISE(ABORT, 'blocked meta write'); END;").unwrap();
+        storage.vector_writer.execute_batch("insert into embed_failures values('failed-text',1,'safe failure'); insert into query_error values(1,7,'safe failure'); create trigger deny_meta_update before update on meta begin select raise(abort, 'blocked meta write'); end;").unwrap();
         // When: the metadata update fails after native schema changes.
         assert!(storage.reset_vectors(Some(&m1), &m2).is_err());
         assert_eq!(count_failures(&storage), 1);
@@ -191,27 +191,27 @@ mod tests {
         assert_eq!(
             storage
                 .vector_writer
-                .query_row("SELECT row_id FROM vector_keys", [], |r| r.get::<_, i64>(0))
+                .query_row("select row_id from vector_keys", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
             key
         );
         let mut read = storage.begin_read().unwrap();
         assert_eq!(read.get_config_identity(), Some(m1));
         assert_eq!(
-            unwrap_current(read.read_vector(&m1, &m1).unwrap()),
+            unwrap_current(read.get_vector_by_search_hash(&m1, &m1).unwrap()),
             Some(vec![1.0, 0.0, 0.0])
         );
         drop(read);
         storage
             .vector_writer
-            .execute_batch("DROP TRIGGER deny_meta_update")
+            .execute_batch("drop trigger deny_meta_update")
             .unwrap();
         drop(storage);
         let mut reopened = SqliteStorage::open(&cache, &vectors).unwrap();
         let mut read = reopened.begin_read().unwrap();
         assert_eq!(read.get_config_identity(), Some(m1));
         assert_eq!(
-            unwrap_current(read.read_vector(&m1, &m1).unwrap()),
+            unwrap_current(read.get_vector_by_search_hash(&m1, &m1).unwrap()),
             Some(vec![1.0, 0.0, 0.0])
         );
         drop(read);
@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(
             reopened
                 .vector_writer
-                .query_row("SELECT error FROM query_error", [], |r| r
+                .query_row("select error from query_error", [], |r| r
                     .get::<_, String>(0))
                 .unwrap(),
             "safe failure"
@@ -242,7 +242,7 @@ mod tests {
         storage
             .vector_writer
             .execute(
-                "INSERT INTO embed_failures VALUES(?1,1,'safe failure')",
+                "insert into embed_failures values(?1,1,'safe failure')",
                 [hash.to_hex()],
             )
             .unwrap();
@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(
             storage
                 .vector_writer
-                .query_row("SELECT count(*) FROM embed_failures", [], |r| r
+                .query_row("select count(*) from embed_failures", [], |r| r
                     .get::<_, i64>(0))
                 .unwrap(),
             1
@@ -267,7 +267,7 @@ mod tests {
         assert_eq!(
             storage
                 .vector_writer
-                .query_row("SELECT count(*) FROM embed_failures", [], |r| r
+                .query_row("select count(*) from embed_failures", [], |r| r
                     .get::<_, i64>(0))
                 .unwrap(),
             0
@@ -276,7 +276,7 @@ mod tests {
         storage
             .vector_writer
             .execute(
-                "INSERT INTO vector_keys(search_hash) VALUES(?1)",
+                "insert into vector_keys(search_hash) values(?1)",
                 [identity.to_hex()],
             )
             .unwrap();
@@ -307,7 +307,7 @@ mod tests {
     fn count_failures(storage: &SqliteStorage) -> i64 {
         storage
             .vector_writer
-            .query_row("SELECT count(*) FROM embed_failures", [], |r| r.get(0))
+            .query_row("select count(*) from embed_failures", [], |r| r.get(0))
             .unwrap()
     }
 }

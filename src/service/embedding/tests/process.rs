@@ -46,12 +46,12 @@ fn run_child() {
         assert!(!service.has_work().unwrap());
     } else if env::var("LETOPIS_PROCESS_ACTION").as_deref() == Ok("configuration") {
         assert!(matches!(
-            service.read_configuration().unwrap(),
+            service.get_configuration().unwrap(),
             ConfigState::Changed
         ));
     } else if env::var("LETOPIS_PROCESS_ACTION").as_deref() == Ok("observed") {
         assert!(matches!(
-            service.read_configuration().unwrap(),
+            service.get_configuration().unwrap(),
             ConfigState::Changed | ConfigState::Ready(_)
         ));
     } else {
@@ -118,7 +118,7 @@ impl Fixture {
                 Err(error) => panic!("HTTP accept: {error}"),
             }
         };
-        read_http_request(stream)
+        get_http_request(stream)
     }
     fn assert_state(
         &self,
@@ -129,12 +129,12 @@ impl Fixture {
         let mut storage = open_storage(&self.root);
         let mut read = storage.begin_read().unwrap();
         assert_eq!(
-            read.read_vector(&config.get_identity(), &self.hash)
+            read.get_vector_by_search_hash(&config.get_identity(), &self.hash)
                 .unwrap(),
             VectorOutcome::Current(vector)
         );
         let VectorOutcome::Current(failure) = read
-            .read_failure(&config.get_identity(), &self.hash)
+            .get_failure_by_search_hash(&config.get_identity(), &self.hash)
             .unwrap()
         else {
             panic!()
@@ -156,7 +156,7 @@ impl Fixture {
         .iter()
         .map(|table| {
             let mut statement = connection
-                .prepare(&format!("SELECT * FROM {table} ORDER BY 1"))
+                .prepare(&format!("select * from {table} order by 1"))
                 .unwrap();
             let columns = statement.column_count();
             statement
@@ -324,14 +324,14 @@ fn edit_before_send_skips_stale_hash_without_reservation() {
     while child.child.try_wait().unwrap().is_none() && start.elapsed() < LIMIT {
         if let Ok((stream, _)) = fixture.listener.accept() {
             requests += 1;
-            reply(read_http_request(stream), SUCCESS);
+            reply(get_http_request(stream), SUCCESS);
         }
         thread::sleep(Duration::from_millis(5));
     }
     child.finish();
     while let Ok((stream, _)) = fixture.listener.accept() {
         requests += 1;
-        reply(read_http_request(stream), SUCCESS);
+        reply(get_http_request(stream), SUCCESS);
     }
     // Then: check stored state first to retain the compiling mutation oracle.
     fixture.assert_state(&fixture.config, None, None);
@@ -397,7 +397,8 @@ fn assert_current_vector(fixture: &Fixture, config: &EmbeddingConfig) {
         .unwrap();
     let hash = parsed.elements[0].search_hash;
     assert_eq!(
-        read.read_vector(&config.get_identity(), &hash).unwrap(),
+        read.get_vector_by_search_hash(&config.get_identity(), &hash)
+            .unwrap(),
         VectorOutcome::Current(Some(vec![4., 5., 6.]))
     );
 }
@@ -415,7 +416,7 @@ pub(super) fn reach_checkpoint(stage: &str) {
     assert_eq!(signal, *b"C");
 }
 
-fn read_http_request(mut stream: TcpStream) -> TcpStream {
+fn get_http_request(mut stream: TcpStream) -> TcpStream {
     stream.set_nonblocking(false).unwrap();
     stream.set_read_timeout(Some(LIMIT)).unwrap();
     stream.set_write_timeout(Some(LIMIT)).unwrap();
@@ -452,7 +453,7 @@ fn reply(mut stream: TcpStream, body: &str) {
 fn reset_with_current_state(fixture: &Fixture) -> EmbeddingConfig {
     let next = Fixture::write_config(&fixture.root, &fixture.listener, 1);
     let mut service = wire_embedder(fixture.root.path(), open_storage(&fixture.root)).unwrap();
-    service.read_configuration().unwrap();
+    service.get_configuration().unwrap();
     let mut storage = open_storage(&fixture.root);
     let mut files = Files::new(0);
     let current = publish(&mut storage, &mut files, "b.md", "current knowledge");
@@ -481,7 +482,7 @@ fn assert_current_error(fixture: &Fixture) {
     let error = storage
         .begin_read()
         .unwrap()
-        .read_query_error()
+        .get_query_error()
         .unwrap()
         .unwrap();
     assert_eq!(error.at, 7);

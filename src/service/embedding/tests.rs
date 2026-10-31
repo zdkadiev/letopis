@@ -56,7 +56,7 @@ mod tasks {
         assert!(!service.has_work().unwrap());
         Connection::open(root.path().join("cache"))
             .unwrap()
-            .execute_batch("ALTER TABLE nodes RENAME TO private_missing_nodes")
+            .execute_batch("alter table nodes rename to private_missing_nodes")
             .unwrap();
         // When: durable-read failure must not look like successful no-work.
         let error = service.has_work().unwrap_err();
@@ -102,14 +102,14 @@ impl Files {
 }
 impl EmbeddingFiles for Files {
     type EmbedLock = ();
-    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
         self.config_reads.set(self.config_reads.get() + 1);
         if self.reject_config_reads {
             return Err(EmbeddingError::new(EmbeddingErrorKind::Input));
         }
         Ok(self.config.borrow().clone())
     }
-    fn read_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>> {
+    fn get_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>> {
         *self
             .reads
             .borrow_mut()
@@ -182,7 +182,7 @@ fn configuration_is_reread_and_provider_validation_precedes_identity_reset() {
     let mut service = EmbeddingService::new(storage, Files::new(0), MarkdownParser, provider);
     // When / Then
     assert!(matches!(
-        service.read_configuration().unwrap(),
+        service.get_configuration().unwrap(),
         ConfigState::Invalid(EmbeddingErrorKind::InvalidConfig)
     ));
     assert_eq!(
@@ -191,7 +191,7 @@ fn configuration_is_reread_and_provider_validation_precedes_identity_reset() {
     );
     *service.files.config.borrow_mut() = None;
     assert!(matches!(
-        service.read_configuration().unwrap(),
+        service.get_configuration().unwrap(),
         ConfigState::Missing
     ));
     assert_eq!(service.provider.calls.get(), 0);
@@ -233,14 +233,14 @@ fn credential_failures_use_four_durable_attempts_and_three_one_second_waits() {
     // Then
     assert_eq!(service.provider.calls.get(), 4);
     assert_eq!(*service.files.waits.borrow(), vec![RETRY_DELAY; 3]);
-    let ConfigState::Ready(config) = service.read_configuration().unwrap() else {
+    let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
         panic!()
     };
     let VectorOutcome::Current(Some(failure)) = service
         .storage
         .begin_read()
         .unwrap()
-        .read_failure(&config.get_identity(), &hash)
+        .get_failure_by_search_hash(&config.get_identity(), &hash)
         .unwrap()
     else {
         panic!()
@@ -275,7 +275,7 @@ fn service_defensively_rejects_provider_cardinality_and_nonfinite_vectors() {
                 .storage
                 .begin_read()
                 .unwrap()
-                .read_query_error()
+                .get_query_error()
                 .unwrap()
                 .unwrap()
                 .error,
@@ -302,7 +302,7 @@ fn unsupported_query_timestamp_is_an_internal_error_without_truncation() {
             .storage
             .begin_read()
             .unwrap()
-            .read_query_error()
+            .get_query_error()
             .unwrap(),
         None
     );
@@ -323,19 +323,21 @@ fn rejected_vector_input_drops_poisoned_unit_before_recording_failure() {
     // When
     assert_eq!(service.drain().unwrap(), DrainOutcome::Complete);
     // Then: storage rejection rolled back, then a fresh unit persisted the error.
-    let ConfigState::Ready(config) = service.read_configuration().unwrap() else {
+    let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
         panic!()
     };
     let mut read = service.storage.begin_read().unwrap();
-    let VectorOutcome::Current(Some(failure)) =
-        read.read_failure(&config.get_identity(), &hash).unwrap()
+    let VectorOutcome::Current(Some(failure)) = read
+        .get_failure_by_search_hash(&config.get_identity(), &hash)
+        .unwrap()
     else {
         panic!()
     };
     assert_eq!(failure.attempts, 1);
     assert_eq!(failure.error.unwrap(), "invalid embedding response");
     assert_eq!(
-        read.read_vector(&config.get_identity(), &hash).unwrap(),
+        read.get_vector_by_search_hash(&config.get_identity(), &hash)
+            .unwrap(),
         VectorOutcome::Current(None)
     );
     assert_eq!(read.get_revision(), revision);
@@ -367,7 +369,7 @@ fn rejects_a_provider_vector_that_violates_the_first_requested_dimension() {
         .storage
         .begin_read()
         .unwrap()
-        .read_query_error()
+        .get_query_error()
         .unwrap()
         .unwrap();
     assert_eq!(error.error, "invalid embedding response");
@@ -460,15 +462,17 @@ fn captured_query_preserves_readiness_policy_and_document_attempts() {
         assert_eq!(matches!(result, QueryEmbedding::Unavailable), failure);
         let mut read = service.storage.begin_read().unwrap();
         assert_eq!(
-            read.read_query_error().unwrap().map(|error| error.error),
+            read.get_query_error().unwrap().map(|error| error.error),
             failure.then(|| "embedding credentials unavailable".into())
         );
         assert_eq!(
-            read.read_vector(&captured.get_identity(), &hash).unwrap(),
+            read.get_vector_by_search_hash(&captured.get_identity(), &hash)
+                .unwrap(),
             VectorOutcome::Current(None)
         );
         assert_eq!(
-            read.read_failure(&captured.get_identity(), &hash).unwrap(),
+            read.get_failure_by_search_hash(&captured.get_identity(), &hash)
+                .unwrap(),
             VectorOutcome::Current(Some(EmbeddingFailure {
                 search_hash: hash,
                 attempts: 1,

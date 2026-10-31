@@ -27,7 +27,7 @@ pub trait StatusReader {
     ///
     /// # Errors
     /// Reports storage, provenance or unsafe lock failures without a partial report.
-    fn read_status(&mut self) -> CommandResult<StatusReport>;
+    fn get_status(&mut self) -> CommandResult<StatusReport>;
 }
 /// Filesystem capability required to initialize private service state.
 ///
@@ -86,7 +86,7 @@ pub trait ConfigReader {
     /// `EmbeddingFailed`; unreadable or unsafe files return `InternalError` with
     /// `cannot read embedding configuration`. Causes stay private and no partial
     /// configuration is returned.
-    fn read_config(&self) -> CommandResult<Option<Configuration>>;
+    fn get_config(&self) -> CommandResult<Option<Configuration>>;
 }
 /// Consistent metadata-only hybrid knowledge search.
 pub trait Searcher {

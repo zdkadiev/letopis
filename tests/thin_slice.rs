@@ -26,7 +26,7 @@ use support::{
     embedding::{FixtureReply, HttpFixture, ResponseBarrier},
     git::isolate_command,
 };
-use thin_slice::{ProjectionSnapshot, SliceFixture, emit_slice, read_response};
+use thin_slice::{ProjectionSnapshot, SliceFixture, emit_slice, get_response};
 
 const SUCCESS: &str = r#"{"model":"fixture","embeddings":[[1,0]]}"#;
 const CACHE_TEXT: &str = "CacheScope rebuilds derived state.\nsource";
@@ -41,7 +41,7 @@ fn binary_load_projects_sources_and_is_idempotent() {
     let before = fixture.capture_user_state();
     // When: only the product executable builds the projection.
     let response = fixture.load();
-    let state = fixture.read_projection();
+    let state = fixture.get_projection();
     // Then: independent identities, edge triples, timestamps and byte hashes.
     assert_eq!(
         (
@@ -84,7 +84,7 @@ fn binary_load_projects_sources_and_is_idempotent() {
             .any(|r| r["element_id"] == "knowledge/cache.md")
     );
     fixture.load();
-    assert_eq!(fixture.read_projection(), state);
+    assert_eq!(fixture.get_projection(), state);
     assert_eq!(fixture.capture_user_state(), before);
     emit_slice("load", "search", 0, &response);
 }
@@ -94,11 +94,11 @@ fn binary_inspect_retains_knowledge_bytes_separately_from_source_basis() {
     // Given: live bytes and unrelated user Git state are independent oracles.
     let fixture = SliceFixture::new();
     let before = fixture.capture_user_state();
-    let cache = fixture.read_bytes("knowledge/cache.md");
-    let flow = fixture.read_bytes("knowledge/flow.md");
+    let cache = fixture.get_bytes("knowledge/cache.md");
+    let flow = fixture.get_bytes("knowledge/flow.md");
     let body = json!({"element_ids":["knowledge/cache.md","knowledge/flow.md#reuse"]}).to_string();
     // When: actual CLI captures both files in one retained knowledge tree.
-    let response = read_response(&fixture.get_repo().invoke(&["inspect"], body.as_bytes()), 0);
+    let response = get_response(&fixture.get_repo().invoke(&["inspect"], body.as_bytes()), 0);
     let tree = response["result"]["snapshot"].as_str().unwrap();
     // Then: metadata identifies the exact bytes in the returned tree.
     assert_eq!(
@@ -113,10 +113,10 @@ fn binary_inspect_retains_knowledge_bytes_separately_from_source_basis() {
         response["result"]["elements"]["knowledge/flow.md#reuse"]["lines"],
         json!([1, 6])
     );
-    assert_eq!(fixture.read_tree_file(tree, "knowledge/cache.md"), cache);
-    assert_eq!(fixture.read_tree_file(tree, "knowledge/flow.md"), flow);
+    assert_eq!(fixture.get_tree_file(tree, "knowledge/cache.md"), cache);
+    assert_eq!(fixture.get_tree_file(tree, "knowledge/flow.md"), flow);
     assert_eq!(
-        fixture.read_tree_file(fixture.get_source_tree().as_str(), "src/cache.rs"),
+        fixture.get_tree_file(fixture.get_source_tree().as_str(), "src/cache.rs"),
         b"pub fn use_cache() -> bool {\n    true\n}\n"
     );
     assert_ne!(tree, fixture.get_source_tree().as_str());
@@ -132,7 +132,7 @@ fn binary_inspect_retains_knowledge_bytes_separately_from_source_basis() {
     // When
     fixture.load();
     // Then
-    assert_eq!(fixture.read_tree_file(tree, "knowledge/cache.md"), cache);
+    assert_eq!(fixture.get_tree_file(tree, "knowledge/cache.md"), cache);
     emit_slice("inspect", "inspect", 0, &response);
 }
 
@@ -142,7 +142,7 @@ fn binary_search_returns_before_background_embedding_and_reuses_vectors() {
     let fixture = SliceFixture::new();
     fixture.load();
     let before = fixture.capture_user_state();
-    let revision = fixture.read_projection().revision;
+    let revision = fixture.get_projection().revision;
     let barrier = ResponseBarrier::default();
     let http = HttpFixture::start(FixtureReply::Barrier {
         barrier: barrier.clone(),
@@ -158,7 +158,7 @@ fn binary_search_returns_before_background_embedding_and_reuses_vectors() {
     );
     let mut owner = drain::DetachedOwner::new(fixture.get_repo().get_root(), foreground.get_id());
     // When: foreground EOF arrives while document inference is still blocked.
-    let response = read_response(&foreground.collect_output(Duration::from_secs(10)), 0);
+    let response = get_response(&foreground.collect_output(Duration::from_secs(10)), 0);
     barrier.wait_until_entered();
     barrier.release();
     owner.wait_for_exit();
@@ -167,12 +167,12 @@ fn binary_search_returns_before_background_embedding_and_reuses_vectors() {
     assert_eq!(requests.len(), 3);
     assert_eq!(requests[0]["input"], json!([CACHE_TEXT]));
     assert_eq!(
-        read_vector(&fixture, &config, &Sha256::parse(CACHE_HASH).unwrap()),
+        get_vector_by_search_hash(&fixture, &config, &Sha256::parse(CACHE_HASH).unwrap()),
         Some(vec![1., 0.])
     );
-    read_response(&fixture.get_repo().invoke(&["embed", "--drain"], b""), 0);
+    get_response(&fixture.get_repo().invoke(&["embed", "--drain"], b""), 0);
     assert!(http.take_requests().is_empty());
-    assert_eq!(fixture.read_projection().revision, revision);
+    assert_eq!(fixture.get_projection().revision, revision);
     assert_eq!(fixture.capture_user_state(), before);
     emit_slice("background", "search", 0, &response);
 }
@@ -183,7 +183,7 @@ fn binary_provider_failure_preserves_fts_and_bounds_attempts() {
     let fixture = SliceFixture::new();
     fixture.load();
     let before = fixture.capture_user_state();
-    let state = fixture.read_projection();
+    let state = fixture.get_projection();
     let secret = "TK14_PROVIDER_BODY_SECRET";
     let http = HttpFixture::start(FixtureReply::Status {
         status: 503,
@@ -194,25 +194,28 @@ fn binary_provider_failure_preserves_fts_and_bounds_attempts() {
         .write_config("ollama", &http.get_base_url(), "fixture");
     // When: drain consumes bounded durable attempts; FTS remains available.
     let output = fixture.get_repo().invoke(&["embed", "--drain"], b"");
-    read_response(&output, 0);
+    get_response(&output, 0);
     let response = fixture.load();
     // Then: neither retrying drain nor searching creates fresh document work.
     for node in state.knowledge.values() {
-        let failure = read_failure(&fixture, &config, &node.search_hash);
+        let failure = get_failure_by_search_hash(&fixture, &config, &node.search_hash);
         // When / Then
         assert_eq!(failure.attempts, 1);
         assert_eq!(
             failure.error.as_deref(),
             Some("embedding provider rejected request")
         );
-        assert_eq!(read_vector(&fixture, &config, &node.search_hash), None);
+        assert_eq!(
+            get_vector_by_search_hash(&fixture, &config, &node.search_hash),
+            None
+        );
     }
     assert_eq!(http.take_requests().len(), 3);
-    read_response(&fixture.get_repo().invoke(&["embed", "--drain"], b""), 0);
+    get_response(&fixture.get_repo().invoke(&["embed", "--drain"], b""), 0);
     assert!(http.take_requests().is_empty());
     assert!(!String::from_utf8_lossy(&output.stdout).contains(secret));
     assert!(!response["result"].as_array().unwrap().is_empty());
-    assert_eq!(fixture.read_projection(), state);
+    assert_eq!(fixture.get_projection(), state);
     assert_eq!(fixture.capture_user_state(), before);
     emit_slice("provider_failure", "search", 0, &response);
 }
@@ -222,20 +225,20 @@ fn binary_invalid_file_keeps_last_projection_and_publishes_valid_neighbor() {
     // Given: two indexed files, a bad edit and a valid neighboring edit.
     let fixture = SliceFixture::new();
     fixture.load();
-    let state = fixture.read_projection();
-    let cache = fixture.read_bytes("knowledge/cache.md");
+    let state = fixture.get_projection();
+    let cache = fixture.get_bytes("knowledge/cache.md");
     fixture.get_repo().write(
         "knowledge/cache.md",
         b"<!-- letopis: {broken} -->\nInvalidToken\n",
     );
-    let flow = String::from_utf8(fixture.read_bytes("knowledge/flow.md"))
+    let flow = String::from_utf8(fixture.get_bytes("knowledge/flow.md"))
         .unwrap()
         .replace("CacheReuse", "FreshNeighbor");
     fixture
         .get_repo()
         .write("knowledge/flow.md", flow.as_bytes());
     // When: one real refresh must isolate file validity.
-    let response = read_response(
+    let response = get_response(
         &fixture
             .get_repo()
             .invoke(&["search"], br#"{"query":"FreshNeighbor","limit":10}"#),
@@ -247,12 +250,12 @@ fn binary_invalid_file_keeps_last_projection_and_publishes_valid_neighbor() {
         "knowledge/flow.md#reuse"
     );
     assert_eq!(
-        fixture.read_projection().knowledge["knowledge/cache.md"],
+        fixture.get_projection().knowledge["knowledge/cache.md"],
         state.knowledge["knowledge/cache.md"]
     );
     assert_invalid_row(&fixture);
     // When
-    let invalid = read_response(
+    let invalid = get_response(
         &fixture
             .get_repo()
             .invoke(&["inspect"], br#"{"element_ids":["knowledge/cache.md"]}"#),
@@ -270,7 +273,7 @@ fn binary_invalid_file_keeps_last_projection_and_publishes_valid_neighbor() {
             .open_storage()
             .begin_read()
             .unwrap()
-            .list_files()
+            .get_files()
             .unwrap()
             .iter()
             .all(|row| row.valid)
@@ -294,21 +297,24 @@ fn binary_text_edit_during_document_http_requires_its_own_vector() {
     let mut child = spawn_product(&fixture, &["embed", "--drain"], None);
     barrier.wait_until_entered();
     // When: publication uses CLI while HTTP owns no cache write transaction.
-    let cache = String::from_utf8(fixture.read_bytes("knowledge/cache.md"))
+    let cache = String::from_utf8(fixture.get_bytes("knowledge/cache.md"))
         .unwrap()
         .replace("rebuilds", "reconstructs");
     fixture
         .get_repo()
         .write("knowledge/cache.md", cache.as_bytes());
     let response = fixture.load();
-    let state = fixture.read_projection();
+    let state = fixture.get_projection();
     let new_hash = state.knowledge["knowledge/cache.md"].search_hash;
     let old_hash = Sha256::parse(CACHE_HASH).unwrap();
     // Then
     assert_ne!(new_hash, old_hash);
-    assert_eq!(read_vector(&fixture, &config, &new_hash), None);
+    assert_eq!(
+        get_vector_by_search_hash(&fixture, &config, &new_hash),
+        None
+    );
     barrier.release();
-    read_response(&child.collect_output(Duration::from_secs(15)), 0);
+    get_response(&child.collect_output(Duration::from_secs(15)), 0);
     // Then: both texts required inference; the obsolete result cannot stand in.
     let requests = http.take_requests();
     assert_eq!(requests.len(), 4);
@@ -318,11 +324,14 @@ fn binary_text_edit_during_document_http_requires_its_own_vector() {
         json!(["CacheScope reconstructs derived state.\nsource"])
     );
     assert_eq!(
-        read_vector(&fixture, &config, &new_hash),
+        get_vector_by_search_hash(&fixture, &config, &new_hash),
         Some(vec![1., 0.])
     );
-    assert_eq!(read_vector(&fixture, &config, &old_hash), None);
-    assert_eq!(fixture.read_bytes("knowledge/cache.md"), cache.as_bytes());
+    assert_eq!(
+        get_vector_by_search_hash(&fixture, &config, &old_hash),
+        None
+    );
+    assert_eq!(fixture.get_bytes("knowledge/cache.md"), cache.as_bytes());
     emit_slice("text_race", "search", 0, &response);
 }
 
@@ -380,7 +389,7 @@ fn spawn_product(fixture: &SliceFixture, args: &[&str], input: Option<&[u8]>) ->
     }
     child
 }
-fn read_vector(
+fn get_vector_by_search_hash(
     fixture: &SliceFixture,
     config: &EmbeddingConfig,
     hash: &Sha256,
@@ -389,14 +398,14 @@ fn read_vector(
     let result = storage
         .begin_read()
         .unwrap()
-        .read_vector(&config.get_identity(), hash)
+        .get_vector_by_search_hash(&config.get_identity(), hash)
         .unwrap();
     let VectorOutcome::Current(vector) = result else {
         panic!("configuration changed")
     };
     vector
 }
-fn read_failure(
+fn get_failure_by_search_hash(
     fixture: &SliceFixture,
     config: &EmbeddingConfig,
     hash: &Sha256,
@@ -405,7 +414,7 @@ fn read_failure(
     let result = storage
         .begin_read()
         .unwrap()
-        .read_failure(&config.get_identity(), hash)
+        .get_failure_by_search_hash(&config.get_identity(), hash)
         .unwrap();
     let VectorOutcome::Current(Some(failure)) = result else {
         panic!("expected failure")
@@ -414,7 +423,7 @@ fn read_failure(
 }
 fn assert_invalid_row(fixture: &SliceFixture) {
     let mut storage = fixture.get_repo().open_storage();
-    let files = storage.begin_read().unwrap().list_files().unwrap();
+    let files = storage.begin_read().unwrap().get_files().unwrap();
     let row = files
         .iter()
         .find(|row| row.path.as_str() == "knowledge/cache.md")

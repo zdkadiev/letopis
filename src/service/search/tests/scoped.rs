@@ -93,7 +93,7 @@ fn metadata_failure_after_query_releases_pinned_view() {
     let root = fixture.root.path();
     let connection = rusqlite::Connection::open(root.join("cache.db")).unwrap();
     connection
-        .execute("UPDATE nodes SET created_at = -1 WHERE id = ?1", ["a.md"])
+        .execute("update nodes set created_at = -1 where id = ?1", ["a.md"])
         .unwrap();
     let mut search = fixture.build_search(None, None);
 
@@ -111,7 +111,7 @@ fn metadata_failure_after_query_releases_pinned_view() {
     // Keep the service alive: returning the error itself must release its reader.
     assert_can_checkpoint(root);
     connection
-        .execute("UPDATE nodes SET created_at = 1 WHERE id = ?1", ["a.md"])
+        .execute("update nodes set created_at = 1 where id = ?1", ["a.md"])
         .unwrap();
     publish_candidate(&mut open_storage(root), "b", "new.rs");
     assert_eq!(open_storage(root).begin_read().unwrap().get_revision(), 2);
@@ -229,7 +229,7 @@ impl ScopedFixture {
 }
 
 impl Embedder for Query {
-    fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
+    fn get_configuration(&mut self) -> EmbeddingResult<ConfigState> {
         Ok(self
             .state
             .take()
@@ -392,7 +392,7 @@ fn assert_can_checkpoint(root: &Path) {
     for name in ["cache.db", "vectors.db"] {
         let connection = rusqlite::Connection::open(root.join(name)).unwrap();
         let busy: i64 = connection
-            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
+            .query_row("pragma wal_checkpoint(truncate)", [], |row| row.get(0))
             .unwrap();
         assert_eq!(busy, 0, "leaked read prevented checkpoint of {name}");
     }

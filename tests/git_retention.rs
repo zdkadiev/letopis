@@ -30,15 +30,12 @@ fn lightweight_retention_validates_roots_and_survives_gc() {
                 bytes: b"light retained bytes",
             }])
             .unwrap();
-        let blob = repo.read_oid(&["rev-parse", &format!("{}:file", tree.as_str())], None);
+        let blob = repo.get_oid(&["rev-parse", &format!("{}:file", tree.as_str())], None);
         // When: only lightweight retention protects the closure from ordinary GC.
         git.retain(&tree).unwrap();
         repo.expire_reflogs_gc_prune_now_and_pack_refs();
         // Then: bytes remain readable, while wrong-type/missing roots are rejected.
-        assert_eq!(
-            git.read_blob(&tree, &path).unwrap(),
-            b"light retained bytes"
-        );
+        assert_eq!(git.get_blob(&tree, &path).unwrap(), b"light retained bytes");
         assert_eq!(
             git.retain(&TreeOid::parse(&blob).unwrap())
                 .unwrap_err()
@@ -60,12 +57,12 @@ fn lightweight_retain_preserves_refs_without_claiming_complete_closure() {
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        let width = repo.read_oid(&["rev-parse", "HEAD"], None).len();
+        let width = repo.get_oid(&["rev-parse", "HEAD"], None).len();
         let tree = create_external_tree(&repo, &"1".repeat(width), "unrelated", BLOB_KIND);
         // When: routine retention checks the root/ref but does not inspect children.
         git.retain(&tree).unwrap();
         // Then: reachability is retained; a strong pin still rejects missing bytes.
-        assert_eq!(repo.read_direct_ref(tree.as_str()), tree.as_str());
+        assert_eq!(repo.get_direct_ref(tree.as_str()), tree.as_str());
         assert_eq!(
             git.pin(&tree).unwrap_err().get_kind(),
             SnapshotErrorKind::InternalError
@@ -86,7 +83,7 @@ fn retained_snapshots_survive_gc() {
                 bytes: b"inspect unique\0",
             }])
             .unwrap();
-        let blob = repo.read_oid(
+        let blob = repo.get_oid(
             &["hash-object", "-w", "--stdin"],
             Some(b"external basis\r\n"),
         );
@@ -96,7 +93,7 @@ fn retained_snapshots_survive_gc() {
         for tree in [&s1, &basis] {
             // When
             let first = git.pin(tree).unwrap();
-            let actual_ref = repo.read_direct_ref(tree.as_str());
+            let actual_ref = repo.get_direct_ref(tree.as_str());
             let second = git.pin(tree).unwrap();
             // Then
             assert_eq!(first.get_oid(), tree);
@@ -107,8 +104,8 @@ fn retained_snapshots_survive_gc() {
         // When: collect and repack, then reopen the retained trees.
         repo.expire_reflogs_gc_prune_now_and_pack_refs();
         let reopened = open_git_snapshots(repo.get_root()).unwrap();
-        let inspect_bytes = reopened.read_blob(&s1, &p).unwrap();
-        let basis_bytes = reopened.read_blob(&basis, &p).unwrap();
+        let inspect_bytes = reopened.get_blob(&s1, &p).unwrap();
+        let basis_bytes = reopened.get_blob(&basis, &p).unwrap();
         let retained = reopened.pin(&basis).unwrap();
         let integrity = repo.run_fsck_strict_no_reflogs();
         // Then
@@ -132,7 +129,7 @@ fn unretained_unique_tree_is_collectable() {
             }])
             .unwrap();
         // Fixture checks: the unique object exists and has no retention ref.
-        let bytes = git.read_blob(&s, &p).unwrap();
+        let bytes = git.get_blob(&s, &p).unwrap();
         assert_eq!(bytes, b"UNRETAINED unique object\0");
         assert_no_ref(&repo, &s);
         // When
@@ -152,7 +149,7 @@ fn incomplete_tree_and_ref_failure_do_not_pin() {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let p = parse_path("x");
-        let length = repo.read_oid(&["rev-parse", "HEAD"], None).len();
+        let length = repo.get_oid(&["rev-parse", "HEAD"], None).len();
         let missing = "1".repeat(length);
         let incomplete = create_external_tree(&repo, &missing, "x", BLOB_KIND);
         // When
@@ -161,8 +158,8 @@ fn incomplete_tree_and_ref_failure_do_not_pin() {
         assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
         assert_no_ref(&repo, &incomplete);
         // Given: replace an existing loose object with different bytes.
-        let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"expected"));
-        let other = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"CORRUPT_CANARY"));
+        let blob = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"expected"));
+        let other = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"CORRUPT_CANARY"));
         let corrupt = create_external_tree(&repo, &blob, "x", BLOB_KIND);
         repo.replace_loose_object(&blob, &other);
         // When
@@ -205,11 +202,11 @@ fn symbolic_and_conflicting_refs_are_rejected() {
                     repo.run_git_successfully(&["symbolic-ref", &name, "refs/heads/absent"], None);
                 }
                 "symbolic" => {
-                    let branch = repo.read_oid(&["symbolic-ref", "HEAD"], None);
+                    let branch = repo.get_oid(&["symbolic-ref", "HEAD"], None);
                     repo.run_git_successfully(&["symbolic-ref", &name, &branch], None);
                 }
                 "other" => {
-                    let head = repo.read_oid(&["rev-parse", "HEAD"], None);
+                    let head = repo.get_oid(&["rev-parse", "HEAD"], None);
                     repo.run_git_successfully(&["update-ref", &name, &head], None);
                 }
                 _ => {
@@ -267,7 +264,7 @@ fn concurrent_pin_is_idempotent() {
                 String::from_utf8_lossy(&out.stderr)
             );
         }
-        assert_eq!(repo.read_direct_ref(tree.as_str()), tree.as_str());
+        assert_eq!(repo.get_direct_ref(tree.as_str()), tree.as_str());
     }
 }
 #[test]
@@ -284,7 +281,7 @@ fn promisor_miss_never_fetches() {
     for format in FORMATS {
         let remote = TempRepo::new(format);
         let repo = TempRepo::new(format);
-        let blob = remote.read_oid(
+        let blob = remote.get_oid(
             &["hash-object", "-w", "--stdin"],
             Some(b"promised remote bytes"),
         );
@@ -314,7 +311,7 @@ fn promisor_miss_never_fetches() {
         }
         let git = open_git_snapshots(repo.get_root()).unwrap();
         // When
-        let read = git.read_blob(&tree, &parse_path("missing")).unwrap_err();
+        let read = git.get_blob(&tree, &parse_path("missing")).unwrap_err();
         let pin = git.pin(&tree).unwrap_err();
         // Then
         assert_eq!(read.get_kind(), SnapshotErrorKind::InternalError);
@@ -336,7 +333,7 @@ fn conflicting_descendant_types_do_not_pin() {
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        let blob = repo.read_oid(
+        let blob = repo.get_oid(
             &["hash-object", "-w", "--stdin"],
             Some(b"shared oid type confusion"),
         );
@@ -349,7 +346,7 @@ fn conflicting_descendant_types_do_not_pin() {
         raw.extend_from_slice(&binary);
         raw.extend_from_slice(b"100644 z\0");
         raw.extend_from_slice(&binary);
-        let tree = parse_tree_oid(&repo.read_oid(
+        let tree = parse_tree_oid(&repo.get_oid(
             &[
                 "hash-object",
                 "-w",
@@ -372,15 +369,15 @@ fn gitlinks_are_retained_without_dereferencing() {
     // Given
     for format in FORMATS {
         let repo = TempRepo::new(format);
-        let missing = "1".repeat(repo.read_oid(&["rev-parse", "HEAD"], None).len());
-        let tree = parse_tree_oid(&repo.read_oid(
+        let missing = "1".repeat(repo.get_oid(&["rev-parse", "HEAD"], None).len());
+        let tree = parse_tree_oid(&repo.get_oid(
             &["mktree", "--missing", "-z"],
             Some(format!("{GITLINK_MODE} {COMMIT_KIND} {missing}\tmodule\0").as_bytes()),
         ));
         let git = open_git_snapshots(repo.get_root()).unwrap();
         // When
         let retained = git.pin(&tree).unwrap();
-        let read = git.read_blob(&tree, &parse_path("module")).unwrap_err();
+        let read = git.get_blob(&tree, &parse_path("module")).unwrap_err();
         let integrity = repo.run_fsck_strict_no_reflogs();
         // Then
         assert_eq!(retained.get_oid(), &tree);
@@ -396,7 +393,7 @@ fn shared_clone_is_refused_before_donor_gc_can_break_retention() {
     for format in FORMATS {
         let donor = TempRepo::new(format);
         let bytes = b"ALTERNATE_PAYLOAD_CANARY unique unreferenced blob\0";
-        let blob = donor.read_oid(&["hash-object", "-w", "--stdin"], Some(bytes));
+        let blob = donor.get_oid(&["hash-object", "-w", "--stdin"], Some(bytes));
         let borrower = donor.create_shared_clone();
         let donor_before = donor.capture_fixture_state();
         let borrower_before = borrower.capture_fixture_state();
@@ -461,7 +458,7 @@ fn alternates_added_after_open_refuse_operations_without_writes() {
             bytes: b"new ALTERNATE_PAYLOAD_CANARY",
         }]);
         let pin = git.pin(&tree);
-        let read = git.read_blob(&tree, &p);
+        let read = git.get_blob(&tree, &p);
         // Then
         for error in [create.err(), pin.err(), read.err()] {
             assert_alternates_error(
@@ -495,7 +492,7 @@ fn linked_worktree_checks_common_object_store_and_refuses_inactive_alternates() 
             .unwrap();
         // Fixture checks: the linked checkout works before alternates are added.
         git.pin(&tree).unwrap();
-        assert_eq!(git.read_blob(&tree, &p).unwrap(), b"linked bytes");
+        assert_eq!(git.get_blob(&tree, &p).unwrap(), b"linked bytes");
         let alternates = repo.get_root().join(".git/objects/info/alternates");
         let before = repo.capture_fixture_state();
         let refs = repo.run_git_successfully(&["for-each-ref"], None);
@@ -523,7 +520,7 @@ fn linked_worktree_checks_common_object_store_and_refuses_inactive_alternates() 
         // When
         let bytes = open_git_snapshots(&linked)
             .unwrap()
-            .read_blob(&tree, &p)
+            .get_blob(&tree, &p)
             .unwrap();
         // Then
         assert_eq!(
@@ -540,7 +537,7 @@ fn parse_path(s: &str) -> RepoPath {
 
 fn create_external_tree(repo: &TempRepo, child: &str, name: &str, kind: &str) -> TreeOid {
     parse_tree_oid(
-        &repo.read_oid(
+        &repo.get_oid(
             &["mktree", "-z", "--missing"],
             Some(
                 format!(
@@ -623,7 +620,7 @@ fn try_borrowed_snapshot(
             // hash-object -w reuses the donor blob and pin appears successful.
             let tree = git.create_tree(&[SnapshotFile { path: p, bytes }]).unwrap();
             git.pin(&tree).unwrap();
-            assert_eq!(git.read_blob(&tree, p).unwrap(), bytes);
+            assert_eq!(git.get_blob(&tree, p).unwrap(), bytes);
             assert!(
                 !local_blob.exists(),
                 "hash-object -w must not be mistaken for materialization"
@@ -668,10 +665,10 @@ fn assert_shared_clone_gc_outcome(
     );
     if let Some((git, tree)) = accepted {
         assert_eq!(
-            git.read_blob(tree, p).unwrap_err().get_kind(),
+            git.get_blob(tree, p).unwrap_err().get_kind(),
             SnapshotErrorKind::InternalError
         );
-        assert_eq!(borrower.read_direct_ref(tree.as_str()), tree.as_str());
+        assert_eq!(borrower.get_direct_ref(tree.as_str()), tree.as_str());
         eprintln!(
             "{format:?}: accepted shared snapshot lost its donor blob after GC while its service ref remained exact"
         );

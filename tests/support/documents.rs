@@ -32,7 +32,7 @@ impl DocumentRepo {
             .unwrap();
         assert!(output.status.success(), "{output:?}");
     }
-    pub fn read_state(&self) -> State {
+    pub fn get_state(&self) -> State {
         let mut storage = open_storage(
             &self.get_root().join(".letopis/cache.db"),
             &self.get_root().join(".letopis/vectors.db"),
@@ -41,9 +41,9 @@ impl DocumentRepo {
         let mut read = storage.begin_read().unwrap();
         State {
             revision: read.get_revision(),
-            nodes: read.list_nodes().unwrap(),
-            edges: read.list_edges(None).unwrap(),
-            files: read.list_files().unwrap(),
+            nodes: read.get_nodes().unwrap(),
+            edges: read.get_edges_by_source_id(None).unwrap(),
+            files: read.get_files().unwrap(),
         }
     }
     pub fn search(&self, text: &str) -> Vec<String> {

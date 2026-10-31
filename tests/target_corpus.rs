@@ -53,7 +53,7 @@ fn reports_current_vectors_and_excludes_sources_from_coverage() {
     let request = write_request(fixture.get_repo().get_root(), (3, 2, 5));
     // When.
     observe_request(&request).unwrap();
-    let receipt = read_receipt(fixture.get_repo().get_root());
+    let receipt = get_receipt(fixture.get_repo().get_root());
     // Then: the two source nodes neither need nor receive vectors.
     assert_eq!(capture_databases(fixture.get_repo().get_root()), before);
     assert_eq!(
@@ -69,13 +69,13 @@ fn reports_current_vectors_and_excludes_sources_from_coverage() {
 #[test]
 fn partial_coverage_counts_current_and_missing_nodes_separately() {
     // Given
-    let repo = load_pair("alpha", "beta");
-    let config = read_config(&repo);
+    let repo = build_pair("alpha", "beta");
+    let config = get_config(&repo);
     repo.seed_vectors(&config, &[("a.md", &[1., 0.])]);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
     // When
-    let receipt = read_receipt(repo.get_root());
+    let receipt = get_receipt(repo.get_root());
     // Then
     assert_eq!(receipt["covered_nodes"], 1);
     assert_eq!(receipt["missing_nodes"], 1);
@@ -100,7 +100,7 @@ fn invalid_files_prevent_populated_even_when_current_nodes_are_covered() {
     repo.seed_vectors(&config, &[("a.md", &[1., 0.])]);
     let request = write_request(repo.get_root(), (1, 0, 0));
     observe_request(&request).unwrap();
-    let receipt = read_receipt(repo.get_root());
+    let receipt = get_receipt(repo.get_root());
     assert_eq!(receipt["covered_nodes"], 1);
     assert_eq!(receipt["invalid_files"], 1);
     assert_eq!(receipt["verdict"], "not_assessed");
@@ -109,7 +109,7 @@ fn invalid_files_prevent_populated_even_when_current_nodes_are_covered() {
 #[test]
 fn configured_dimension_mismatch_is_rejected() {
     // Given
-    let repo = load_pair("alpha", "beta");
+    let repo = build_pair("alpha", "beta");
     let configured = json!({"provider":"ollama","model":"fixture",
         "parameters":{"base_url":"http://127.0.0.1:1/api","dimensions":3},"max_retries":0});
     let bytes = json!({"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture",
@@ -131,11 +131,11 @@ fn configured_dimension_mismatch_is_rejected() {
 #[test]
 fn missing_vectors_remain_missing_with_null_dimensions() {
     // Given
-    let repo = load_pair("alpha", "beta");
+    let repo = build_pair("alpha", "beta");
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
     // When
-    let receipt = read_receipt(repo.get_root());
+    let receipt = get_receipt(repo.get_root());
     // Then
     assert_eq!(receipt["dimensions"], Value::Null);
     assert_eq!(receipt["unique_search_hashes"], 2);
@@ -148,13 +148,13 @@ fn missing_vectors_remain_missing_with_null_dimensions() {
 #[test]
 fn one_shared_hash_covers_two_nodes() {
     // Given
-    let repo = load_pair("same searchable text", "same searchable text");
-    let config = read_config(&repo);
+    let repo = build_pair("same searchable text", "same searchable text");
+    let config = get_config(&repo);
     repo.seed_vectors(&config, &[("a.md", &[1., 0.])]);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
     // When
-    let receipt = read_receipt(repo.get_root());
+    let receipt = get_receipt(repo.get_root());
     // Then
     assert_eq!(receipt["unique_search_hashes"], 1);
     assert_eq!(receipt["covered_nodes"], 2);
@@ -166,8 +166,8 @@ fn one_shared_hash_covers_two_nodes() {
 #[test]
 fn stale_hash_vector_does_not_cover_current_nodes() {
     // Given
-    let repo = load_pair("current alpha", "current beta");
-    let config = read_config(&repo);
+    let repo = build_pair("current alpha", "current beta");
+    let config = get_config(&repo);
     let mut storage = repo.open_storage();
     let mut write = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
     write
@@ -178,7 +178,7 @@ fn stale_hash_vector_does_not_cover_current_nodes() {
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
     // When
-    let receipt = read_receipt(repo.get_root());
+    let receipt = get_receipt(repo.get_root());
     // Then
     assert_eq!(receipt["dimensions"], 2);
     assert_eq!(receipt["covered_nodes"], 0);
@@ -190,12 +190,12 @@ fn stale_hash_vector_does_not_cover_current_nodes() {
 #[test]
 fn exhausted_failures_have_zero_eligible_work_but_stay_missing() {
     // Given
-    let repo = load_pair("alpha", "beta");
+    let repo = build_pair("alpha", "beta");
     seed_failures(&repo, 1);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
     // When
-    let receipt = read_receipt(repo.get_root());
+    let receipt = get_receipt(repo.get_root());
     // Then
     assert_eq!(receipt["covered_nodes"], 0);
     assert_eq!(receipt["missing_nodes"], 2);
@@ -208,13 +208,13 @@ fn exhausted_failures_have_zero_eligible_work_but_stay_missing() {
 #[test]
 fn failed_hashes_with_budget_remaining_are_still_eligible() {
     // Given
-    let repo = load_pair("alpha", "beta");
+    let repo = build_pair("alpha", "beta");
     configure_repo(&repo, 1);
     seed_failures(&repo, 2);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
     // When
-    let receipt = read_receipt(repo.get_root());
+    let receipt = get_receipt(repo.get_root());
     // Then
     assert_eq!(receipt["eligible_hashes"], 2);
     assert_eq!(receipt["failed_hashes"], 2);
@@ -224,10 +224,10 @@ fn failed_hashes_with_budget_remaining_are_still_eligible() {
 #[test]
 fn exhausted_reservations_without_error_are_missing_but_not_failed() {
     // Given
-    let repo = load_pair("alpha", "beta");
-    let config = read_config(&repo);
+    let repo = build_pair("alpha", "beta");
+    let config = get_config(&repo);
     let mut storage = repo.open_storage();
-    let nodes = storage.begin_read().unwrap().list_nodes().unwrap();
+    let nodes = storage.begin_read().unwrap().get_nodes().unwrap();
     let mut write = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
     // When / Then
     for node in nodes {
@@ -241,7 +241,7 @@ fn exhausted_reservations_without_error_are_missing_but_not_failed() {
     drop(storage);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
-    let receipt = read_receipt(repo.get_root());
+    let receipt = get_receipt(repo.get_root());
     assert_eq!(receipt["missing_nodes"], 2);
     assert_eq!(receipt["eligible_hashes"], 0);
     assert_eq!(receipt["failed_hashes"], 0);
@@ -252,8 +252,8 @@ fn exhausted_reservations_without_error_are_missing_but_not_failed() {
 #[test]
 fn mismatched_configuration_fails_without_resetting_vectors() {
     // Given
-    let repo = load_pair("alpha", "beta");
-    let original = read_config(&repo);
+    let repo = build_pair("alpha", "beta");
+    let original = get_config(&repo);
     repo.seed_vectors(&original, &[("a.md", &[1., 0.])]);
     repo.write_config("ollama", "http://127.0.0.1:1/api", "different-model");
     let before = capture_databases(repo.get_root());
@@ -287,7 +287,7 @@ fn empty_and_wrong_version_databases_are_unchanged() {
     // Given
     for (leaf, wrong_version) in [("cache.db", 3), ("vectors.db", 2)] {
         for version in [0, wrong_version] {
-            let repo = load_pair("alpha", "beta");
+            let repo = build_pair("alpha", "beta");
             let path = repo.get_root().join(".letopis").join(leaf);
             fs::remove_file(&path).unwrap();
             let raw = rusqlite::Connection::open(&path).unwrap();
@@ -312,7 +312,7 @@ fn empty_and_wrong_version_databases_are_unchanged() {
 fn missing_or_non_regular_or_symlink_database_is_rejected() {
     // Given
     for kind in ["missing", "directory", "symlink"] {
-        let repo = load_pair("alpha", "beta");
+        let repo = build_pair("alpha", "beta");
         let path = repo.get_root().join(".letopis/vectors.db");
         let original = fs::read(&path).unwrap();
         fs::remove_file(&path).unwrap();
@@ -346,7 +346,7 @@ fn missing_or_non_regular_or_symlink_database_is_rejected() {
 fn expected_versions_outside_wal_mode_are_rejected_without_header_changes() {
     // Given
     for leaf in ["cache.db", "vectors.db"] {
-        let repo = load_pair("alpha", "beta");
+        let repo = build_pair("alpha", "beta");
         let path = repo.get_root().join(".letopis").join(leaf);
         let raw = rusqlite::Connection::open(&path).unwrap();
         raw.pragma_update(None, "journal_mode", "delete").unwrap();
@@ -366,7 +366,7 @@ fn expected_versions_outside_wal_mode_are_rejected_without_header_changes() {
 fn missing_or_invalid_configuration_does_not_reset_databases() {
     // Given
     for bytes in [None, Some(b"{}".as_slice())] {
-        let repo = load_pair("alpha", "beta");
+        let repo = build_pair("alpha", "beta");
         fs::remove_file(repo.get_root().join(".letopis/config.json")).unwrap();
         if let Some(bytes) = bytes {
             repo.write(".letopis/config.json", bytes);
@@ -383,7 +383,7 @@ fn missing_or_invalid_configuration_does_not_reset_databases() {
 #[test]
 fn expected_cache_version_without_product_schema_is_rejected() {
     // Given
-    let repo = load_pair("alpha", "beta");
+    let repo = build_pair("alpha", "beta");
     let path = repo.get_root().join(".letopis/cache.db");
     fs::remove_file(&path).unwrap();
     let raw = rusqlite::Connection::open(&path).unwrap();
@@ -400,7 +400,7 @@ fn expected_cache_version_without_product_schema_is_rejected() {
 #[test]
 fn existing_receipt_is_never_overwritten() {
     // Given
-    let repo = load_pair("alpha", "beta");
+    let repo = build_pair("alpha", "beta");
     repo.write("observation.json", b"preserve this receipt");
     let request = write_request(repo.get_root(), (2, 0, 0));
     // When / Then
@@ -414,7 +414,7 @@ fn existing_receipt_is_never_overwritten() {
 #[test]
 fn count_mismatch_is_not_a_populated_observation() {
     // Given
-    let repo = load_pair("alpha", "beta");
+    let repo = build_pair("alpha", "beta");
     let before = capture_databases(repo.get_root());
     let request = write_request(repo.get_root(), (3, 0, 0));
     // When
@@ -450,7 +450,7 @@ fn malformed_request_is_rejected_without_opening_databases() {
 #[test]
 fn ignored_entry_consumes_request_from_its_process_environment() {
     // Given
-    let repo = load_pair("alpha", "beta");
+    let repo = build_pair("alpha", "beta");
     let request = write_request(repo.get_root(), (2, 0, 0));
     // When
     let output = Command::new(std::env::current_exe().unwrap())
@@ -469,10 +469,10 @@ fn ignored_entry_consumes_request_from_its_process_environment() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(read_receipt(repo.get_root())["knowledge_nodes"], 2);
+    assert_eq!(get_receipt(repo.get_root())["knowledge_nodes"], 2);
 }
 
-fn load_pair(first: &str, second: &str) -> ReadingRepo {
+fn build_pair(first: &str, second: &str) -> ReadingRepo {
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", first);
     repo.write_knowledge("b.md", second);
@@ -511,14 +511,14 @@ fn write_request(root: &Path, counts: (usize, usize, usize)) -> PathBuf {
     path
 }
 
-fn read_receipt(root: &Path) -> Value {
+fn get_receipt(root: &Path) -> Value {
     serde_json::from_slice(&fs::read(root.join("observation.json")).unwrap()).unwrap()
 }
 
 fn seed_failures(repo: &ReadingRepo, budget: u64) {
-    let config = read_config(repo);
+    let config = get_config(repo);
     let mut storage = repo.open_storage();
-    let nodes = storage.begin_read().unwrap().list_nodes().unwrap();
+    let nodes = storage.begin_read().unwrap().get_nodes().unwrap();
     let mut write = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
     for node in nodes {
         let NodeMetadata::Knowledge(node) = node.metadata else {
@@ -534,7 +534,7 @@ fn seed_failures(repo: &ReadingRepo, budget: u64) {
     write.commit().unwrap();
 }
 
-fn read_config(repo: &ReadingRepo) -> EmbeddingConfig {
+fn get_config(repo: &ReadingRepo) -> EmbeddingConfig {
     Configuration::parse(&fs::read(repo.get_root().join(".letopis/config.json")).unwrap())
         .unwrap()
         .get_embedding_config()

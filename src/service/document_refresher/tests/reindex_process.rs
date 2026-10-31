@@ -1,4 +1,4 @@
-use super::{Fixture, LATEST, NEW, Worker, build_service, read_state, read_tokens};
+use super::{Fixture, LATEST, NEW, Worker, build_service, get_state, get_tokens};
 use crate::service::{Refresher, Storage, StorageRead};
 use rusqlite::Connection;
 use std::{fs, os::unix::process::ExitStatusExt};
@@ -20,7 +20,7 @@ fn reindex_sigint_preserves_exact_old_or_complete_new_state() {
         // Then: signal death is distinct from TK-29 handled JSON cancellation.
         assert_eq!(status.signal(), Some(2));
         assert_eq!(
-            read_state(fixture.root.path()),
+            get_state(fixture.root.path()),
             if cut == "after_commit" {
                 expected
             } else {
@@ -43,21 +43,24 @@ fn reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view() {
     let mut storage = build_service(fixture.root.path()).storage;
     let mut pinned = storage.begin_read().unwrap();
     let fts = Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
-    fts.execute_batch("BEGIN").unwrap();
-    assert_eq!(read_tokens(&fts), fixture.old.tokens);
+    fts.execute_batch("begin").unwrap();
+    assert_eq!(get_tokens(&fts), fixture.old.tokens);
     let mut worker = Worker::spawn(fixture.root.path(), "reindex");
     worker.reach("before_commit");
-    assert_eq!(read_state(fixture.root.path()), fixture.old);
+    assert_eq!(get_state(fixture.root.path()), fixture.old);
     // When.
     worker.resume();
     worker.finish();
     // Then.
     assert_eq!(pinned.get_revision(), 1);
-    assert_eq!(pinned.list_nodes().unwrap(), fixture.old.nodes);
-    assert_eq!(pinned.list_edges(None).unwrap(), fixture.old.edges);
-    assert_eq!(pinned.list_files().unwrap(), fixture.old.files);
-    assert_eq!(read_tokens(&fts), fixture.old.tokens);
-    assert_eq!(read_state(fixture.root.path()), expected);
+    assert_eq!(pinned.get_nodes().unwrap(), fixture.old.nodes);
+    assert_eq!(
+        pinned.get_edges_by_source_id(None).unwrap(),
+        fixture.old.edges
+    );
+    assert_eq!(pinned.get_files().unwrap(), fixture.old.files);
+    assert_eq!(get_tokens(&fts), fixture.old.tokens);
+    assert_eq!(get_state(fixture.root.path()), expected);
 }
 
 #[test]
@@ -78,7 +81,7 @@ fn publisher_waits_for_reindex_and_redetects_latest_file_bytes() {
     waiter.resume();
     waiter.finish();
     // Then.
-    assert_eq!(read_state(fixture.root.path()), expected);
+    assert_eq!(get_state(fixture.root.path()), expected);
     fixture.assert_preserved(LATEST);
 }
 
@@ -90,11 +93,11 @@ fn reindex_late_sql_error_rolls_back_all_state_and_releases_lock() {
     // When.
     Worker::spawn(fixture.root.path(), "reindex-fail").finish();
     // Then.
-    assert_eq!(read_state(fixture.root.path()), fixture.old);
+    assert_eq!(get_state(fixture.root.path()), fixture.old);
     fixture.assert_preserved(NEW);
     Worker::spawn(fixture.root.path(), "reindex").finish();
     assert_eq!(
-        read_state(fixture.root.path()),
+        get_state(fixture.root.path()),
         fixture.build_expected(NEW, "BravoToken")
     );
 }

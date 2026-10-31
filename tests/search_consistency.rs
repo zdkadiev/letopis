@@ -88,7 +88,7 @@ fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates()
     let identity = config.get_identity();
     // When / Then
     assert_eq!(
-        old.read_vector_dimensions(&identity).unwrap(),
+        old.get_vector_dimensions(&identity).unwrap(),
         VectorOutcome::Current(NonZeroUsize::new(2))
     );
     let next = repo.write_config("ollama", "http://localhost/api", "next");
@@ -157,7 +157,7 @@ fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
         let mut read = storage.begin_read().unwrap();
         assert_eq!(read.get_config_identity(), Some(next.get_identity()));
         assert_eq!(
-            read.read_query_error().unwrap().unwrap().error,
+            read.get_query_error().unwrap().unwrap().error,
             "new model diagnostic"
         );
         assert_eq!(server.take_requests().len(), 1);
@@ -224,7 +224,7 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
         repo.open_storage()
             .begin_read()
             .unwrap()
-            .read_query_error()
+            .get_query_error()
             .unwrap()
             .is_some()
     );
@@ -296,7 +296,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
         .execute(
-            "UPDATE nodes SET source_snapshot = 'malformed' WHERE id = ?1",
+            "update nodes set source_snapshot = 'malformed' where id = ?1",
             ["a.md"],
         )
         .unwrap();
@@ -323,7 +323,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
     // Repair deliberately malformed persisted data before asking refresh to publish it.
     connection
         .execute(
-            "UPDATE nodes SET source_snapshot = NULL WHERE id = ?1",
+            "update nodes set source_snapshot = null where id = ?1",
             ["a.md"],
         )
         .unwrap();
@@ -388,7 +388,7 @@ fn assert_can_checkpoint(repo: &ReadingRepo) {
         let connection =
             rusqlite::Connection::open(repo.get_root().join(".letopis").join(file)).unwrap();
         let (busy, _, _): (i64, i64, i64) = connection
-            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+            .query_row("pragma wal_checkpoint(truncate)", [], |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get(2)?))
             })
             .unwrap();

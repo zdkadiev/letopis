@@ -331,7 +331,7 @@ fn logical_databases(root: &Path) -> Vec<String> {
     let mut snapshot = vec![format!("revision:{}", read.get_revision())];
     snapshot.push(format!("identity:{:?}", read.get_config_identity()));
     let mut nodes = read
-        .list_nodes()
+        .get_nodes()
         .unwrap()
         .into_iter()
         .map(|node| format!("{:?}", node.metadata))

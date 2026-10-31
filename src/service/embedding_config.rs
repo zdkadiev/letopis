@@ -61,7 +61,7 @@ impl EmbeddingConfig {
             .and_then(Value::as_object)
             .ok_or_else(reject_config)?;
         validate_parameters(parameters)?;
-        let dimensions = read_dimensions(parameters)?;
+        let dimensions = get_dimensions(parameters)?;
         let retries = root
             .get("max_retries")
             .and_then(Value::as_u64)
@@ -138,7 +138,7 @@ fn validate_parameters(parameters: &Map<String, Value>) -> EmbeddingResult<()> {
     Ok(())
 }
 
-fn read_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<NonZeroUsize>> {
+fn get_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<NonZeroUsize>> {
     parameters
         .get("dimensions")
         .map(|value| {

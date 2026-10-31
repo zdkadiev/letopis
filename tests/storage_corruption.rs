@@ -114,7 +114,11 @@ fn recreated_empty_cache_preserves_healthy_vectors() {
 
     assert_eq!(view.get_revision(), 0);
     assert_eq!(view.get_config_identity(), Some(identity));
-    let stored_vector = unwrap_current(view.read_vector(&identity, &search_hash).unwrap()).unwrap();
+    let stored_vector = unwrap_current(
+        view.get_vector_by_search_hash(&identity, &search_hash)
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(stored_vector, vec![0.25_f32, 0.75_f32]);
     assert_eq!(fs::read(canonical).unwrap(), CANONICAL_TEXT);
 }
@@ -191,7 +195,7 @@ fn damage_database(path: &Path, damage: DatabaseDamage) -> Vec<u8> {
             };
             let connection = Connection::open(path).unwrap();
             connection
-                .execute_batch(&format!("DROP TABLE {table}"))
+                .execute_batch(&format!("drop table {table}"))
                 .unwrap();
         }
     }
@@ -206,7 +210,11 @@ fn assert_healthy(cache: &Path, vectors: &Path, identity: &Sha256, search_hash: 
     let matches = view.match_text("searchable").unwrap();
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0].id.as_str(), NODE_ID);
-    let vector = unwrap_current(view.read_vector(identity, search_hash).unwrap()).unwrap();
+    let vector = unwrap_current(
+        view.get_vector_by_search_hash(identity, search_hash)
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(vector, vec![0.25_f32, 0.75_f32]);
 }
 

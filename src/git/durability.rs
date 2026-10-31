@@ -68,7 +68,7 @@ impl StagedObject {
         let oid = store.write_buf(kind, bytes).map_err(|_| fail_integrity())?;
         verify_identity(oid, kind, bytes)?;
         let staged = store.object_path(&oid);
-        let permissions = read_shared_permissions(repo)?;
+        let permissions = get_shared_permissions(repo)?;
         gix::fs::set_shared_repository_permissions(&staged, permissions).map_err(fail_io)?;
         #[cfg(test)]
         tests::inject_failure(tests::FailurePoint::ObjectSync)?;
@@ -154,7 +154,7 @@ pub(super) fn retain_ref(
     tests::publish_concurrent_ref();
     let path = repo.common_dir().join(&name);
     let (lock, mut file) =
-        cleanup.acquire_ref(&path, repo.common_dir(), read_shared_permissions(repo)?)?;
+        cleanup.acquire_ref(&path, repo.common_dir(), get_shared_permissions(repo)?)?;
     if confirm_durable_ref(repo, &name, oid, cleanup)? {
         return Ok(());
     }
@@ -180,7 +180,7 @@ fn confirm_published_ref(
     let _lock = cleanup.acquire_marker(
         &repo.common_dir().join(name),
         repo.common_dir(),
-        read_shared_permissions(repo)?,
+        get_shared_permissions(repo)?,
     )?;
     if !confirm_durable_ref(repo, name, oid, cleanup)? {
         return Err(fail_integrity());
@@ -203,7 +203,7 @@ fn confirm_durable_ref(
         Err(error) if error.kind() == io::ErrorKind::NotFound => Some(cleanup.acquire_marker(
             &repo.refs.packed_refs_path(),
             repo.common_dir(),
-            read_shared_permissions(repo)?,
+            get_shared_permissions(repo)?,
         )?),
         Err(error) => return Err(fail_io(error)),
     };
@@ -271,7 +271,7 @@ fn has_exact_ref(repo: &Repository, name: &str, oid: ObjectId) -> Result<bool, S
     Ok(true)
 }
 
-fn read_shared_permissions(repo: &Repository) -> Result<i32, SnapshotError> {
+fn get_shared_permissions(repo: &Repository) -> Result<i32, SnapshotError> {
     let config = repo.config_snapshot();
     let Some(value) = config.string("core.sharedRepository") else {
         return Ok(0);

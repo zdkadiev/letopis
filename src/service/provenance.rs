@@ -67,8 +67,8 @@ impl<G: GitSnapshots + SnapshotVerifier, F: FileSystem> SourceProvenance
         if request.source.get_local().is_none() {
             return Ok(SourceRevisionComparison::Unfetched);
         }
-        let historical = self.read_snapshot_hash(basis, request.source)?;
-        let requested = self.read_snapshot_hash(request.revision, request.source)?;
+        let historical = self.get_snapshot_hash(basis, request.source)?;
+        let requested = self.get_snapshot_hash(request.revision, request.source)?;
         Ok(match (historical, requested) {
             (Some(left), Some(right)) if left == right => SourceRevisionComparison::Equal,
             (Some(_), Some(_)) => SourceRevisionComparison::Different,
@@ -115,7 +115,7 @@ impl<G: GitSnapshots + SnapshotVerifier, F: FileSystem> ProvenanceService<G, F> 
         }
     }
 
-    fn read_snapshot_hash(
+    fn get_snapshot_hash(
         &self,
         tree: &TreeOid,
         source: &SourceUri,
@@ -123,7 +123,7 @@ impl<G: GitSnapshots + SnapshotVerifier, F: FileSystem> ProvenanceService<G, F> 
         let Some(local) = source.get_local() else {
             return Ok(None);
         };
-        let bytes = match self.git.read_blob(tree, local.get_path()) {
+        let bytes = match self.git.get_blob(tree, local.get_path()) {
             Ok(bytes) => bytes,
             Err(error) if error.get_kind() == SnapshotErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),
@@ -131,11 +131,11 @@ impl<G: GitSnapshots + SnapshotVerifier, F: FileSystem> ProvenanceService<G, F> 
         Ok(local.select_bytes(&bytes).map(Sha256::digest))
     }
 
-    fn read_current_hash(&self, source: &SourceUri) -> DocumentResult<Option<Sha256>> {
+    fn get_current_hash(&self, source: &SourceUri) -> DocumentResult<Option<Sha256>> {
         let Some(local) = source.get_local() else {
             return Ok(None);
         };
-        let captured = self.filesystem.read_file(local.get_path())?;
+        let captured = self.filesystem.get_file(local.get_path())?;
         Ok(captured
             .as_ref()
             .and_then(|file| local.select_bytes(&file.bytes))

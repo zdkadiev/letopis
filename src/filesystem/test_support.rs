@@ -136,12 +136,12 @@ impl OwnedProcess {
         loop {
             if let Some(status) = self.child.try_wait().unwrap() {
                 self.terminate_group();
-                assert!(status.success(), "child failed: {}", self.read_capture());
+                assert!(status.success(), "child failed: {}", self.get_capture());
                 return;
             }
             if start.elapsed() >= deadline {
                 self.terminate();
-                panic!("child exceeded deadline: {}", self.read_capture());
+                panic!("child exceeded deadline: {}", self.get_capture());
             }
             std::thread::sleep(Duration::from_millis(5));
         }
@@ -157,7 +157,7 @@ impl OwnedProcess {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
-    fn read_capture(&mut self) -> String {
+    fn get_capture(&mut self) -> String {
         self.output.seek(SeekFrom::Start(0)).unwrap();
         let mut bytes = Vec::new();
         (&mut self.output)

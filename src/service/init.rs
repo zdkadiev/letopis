@@ -44,7 +44,7 @@ impl fmt::Debug for InitService {
 
 impl Initializer for InitService {
     fn initialize(&mut self) -> CommandResult<()> {
-        if let Some(bytes) = self.files.read_config().map_err(map_read_error)? {
+        if let Some(bytes) = self.files.get_config().map_err(map_read_error)? {
             validate_configuration(&bytes, self.provider.as_ref())
                 .map_err(map_invalid_configuration)?;
         }
@@ -55,7 +55,7 @@ impl Initializer for InitService {
         self.files
             .install_config_if_absent(GENERATED_CONFIG)
             .map_err(map_files)?;
-        let Some(bytes) = self.files.read_config().map_err(map_read_error)? else {
+        let Some(bytes) = self.files.get_config().map_err(map_read_error)? else {
             return Err(CommandError::new(
                 CommandErrorKind::InternalError,
                 INIT_FAILURE,
@@ -274,7 +274,7 @@ mod tests {
         }
     }
     impl StatusFiles for Files {
-        fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+        fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
             self.trace.push("config");
             Ok(self.configs.borrow_mut().pop_front().flatten())
         }

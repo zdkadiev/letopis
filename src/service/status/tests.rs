@@ -59,7 +59,7 @@ fn reports_null_revision_without_publication() {
     );
 
     // When
-    let report = service.read_status().unwrap();
+    let report = service.get_status().unwrap();
 
     // Then
     assert_eq!(report.revision, None);
@@ -103,7 +103,7 @@ fn disabled_configuration_hides_execution_failures_and_reports_zero_counts() {
     );
 
     // When
-    let report = service.read_status().unwrap();
+    let report = service.get_status().unwrap();
 
     // Then: graph/file observations remain, execution failures do not.
     assert_eq!((report.embedding_backlog, report.embedding_failed), (0, 0));
@@ -141,7 +141,7 @@ fn invalid_disabled_configuration_remains_a_visible_problem() {
     );
 
     // When
-    let report = service.read_status().unwrap();
+    let report = service.get_status().unwrap();
 
     // Then: invalid configuration keeps unavailable-policy counting and a current problem.
     assert_eq!((report.embedding_backlog, report.embedding_failed), (1, 0));
@@ -175,7 +175,7 @@ fn matches_check_findings_in_one_view() {
     );
 
     // When
-    let report = service.read_status().unwrap();
+    let report = service.get_status().unwrap();
 
     // Then
     assert_eq!(report.revision, Some(7));
@@ -211,7 +211,7 @@ fn reports_invalid_config_with_unavailable_counts() {
     );
 
     // When
-    let report = service.read_status().unwrap();
+    let report = service.get_status().unwrap();
 
     // Then
     assert_eq!((report.embedding_backlog, report.embedding_failed), (1, 0));
@@ -254,7 +254,7 @@ fn keeps_query_error_without_mutation() {
     );
 
     // When
-    let report = service.read_status().unwrap();
+    let report = service.get_status().unwrap();
 
     // Then
     assert!(
@@ -288,7 +288,7 @@ fn reports_unreadable_and_unsupported_config_without_payloads() {
     );
 
     // When
-    let report = service.read_status().unwrap();
+    let report = service.get_status().unwrap();
 
     // Then
     assert_eq!((report.embedding_backlog, report.embedding_failed), (1, 0));
@@ -316,7 +316,7 @@ fn reports_unreadable_and_unsupported_config_without_payloads() {
         &Provenance { fail: false },
     );
     // When
-    let report = service.read_status().unwrap();
+    let report = service.get_status().unwrap();
     // Then
     assert!(
         report
@@ -348,7 +348,7 @@ fn returns_error_after_late_provenance_failure() {
     );
 
     // When
-    let error = service.read_status().unwrap_err();
+    let error = service.get_status().unwrap_err();
 
     // Then
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
@@ -382,7 +382,7 @@ impl StatusStorage for Reads {
     }
 }
 impl StatusFiles for Files {
-    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
         self.count.set(self.count.get() + 1);
         if self.fail {
             return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));

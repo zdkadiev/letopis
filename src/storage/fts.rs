@@ -47,11 +47,11 @@ pub(super) fn replace_text(db: &Connection, id: &KnowledgeId, text: &str) -> Sto
 pub(super) fn match_text(db: &Connection, expression: &str) -> StorageResult<Vec<TextMatch>> {
     let mut stmt = db
         .prepare(
-            "SELECT nodes.id, nodes.row_id, bm25(text_index) AS score
-             FROM text_index
-             JOIN nodes ON nodes.row_id = text_index.rowid
-             WHERE text_index MATCH ?1 AND nodes.kind <> ?2
-             ORDER BY score, nodes.id",
+            "select nodes.id, nodes.row_id, bm25(text_index) as score
+             from text_index
+             join nodes on nodes.row_id = text_index.rowid
+             where text_index match ?1 and nodes.kind <> ?2
+             order by score, nodes.id",
         )
         .map_err(map_sqlite)?;
     let mut rows = stmt

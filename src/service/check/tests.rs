@@ -319,7 +319,7 @@ fn check_propagates_metadata_read_failure_after_graph_findings() {
     let storage = open_storage(&directory);
     rusqlite::Connection::open(directory.path().join("cache.db"))
         .unwrap()
-        .execute("DROP TABLE nodes", [])
+        .execute("drop table nodes", [])
         .unwrap();
     let mut service = CheckService::new(
         Refresh(|| {

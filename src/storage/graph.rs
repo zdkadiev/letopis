@@ -99,7 +99,10 @@ pub(super) fn check_unsigned(value: u64) -> StorageResult<i64> {
     })
 }
 
-pub(super) fn read_node(db: &Connection, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
+pub(super) fn get_node_by_id(
+    db: &Connection,
+    id: &EdgeTarget,
+) -> StorageResult<Option<StoredNode>> {
     let (sql, values) = build_query(
         Query::select()
             .column(Nodes::RowId)
@@ -113,7 +116,7 @@ pub(super) fn read_node(db: &Connection, id: &EdgeTarget) -> StorageResult<Optio
         .transpose()
 }
 
-pub(super) fn list_nodes(db: &Connection) -> StorageResult<Vec<StoredNode>> {
+pub(super) fn get_nodes(db: &Connection) -> StorageResult<Vec<StoredNode>> {
     let (sql, values) = build_query(
         Query::select()
             .column(Nodes::RowId)
@@ -137,7 +140,7 @@ fn decode_node(row: &Row<'_>) -> StorageResult<StoredNode> {
     let kind: String = row.get(2).map_err(map_sqlite)?;
     let uri: String = row.get(3).map_err(map_sqlite)?;
     let hash: Option<String> = row.get(4).map_err(map_sqlite)?;
-    let created_at = read_unsigned(row.get(5).map_err(map_sqlite)?)?;
+    let created_at = get_unsigned(row.get(5).map_err(map_sqlite)?)?;
     let snapshot: Option<String> = row.get(6).map_err(map_sqlite)?;
     let lines = decode_lines(
         row.get(7).map_err(map_sqlite)?,
@@ -191,13 +194,13 @@ fn decode_lines(start: Option<i64>, end: Option<i64>) -> StorageResult<Option<Li
     match (start, end) {
         (None, None) => Ok(None),
         (Some(a), Some(b)) => Ok(Some(
-            LineRange::new(read_unsigned(a)?, read_unsigned(b)?).map_err(map_invalid_value)?,
+            LineRange::new(get_unsigned(a)?, get_unsigned(b)?).map_err(map_invalid_value)?,
         )),
         _ => Err(build_invalid_metadata_error()),
     }
 }
 
-pub(super) fn read_unsigned(value: i64) -> StorageResult<u64> {
+pub(super) fn get_unsigned(value: i64) -> StorageResult<u64> {
     u64::try_from(value).map_err(map_invalid_value)
 }
 
@@ -228,14 +231,14 @@ pub(super) fn insert_edge(db: &Connection, edge: &Edge) -> StorageResult<()> {
     Ok(())
 }
 
-pub(super) fn list_edges(
+pub(super) fn get_edges_by_source_id(
     db: &Connection,
-    source: Option<&KnowledgeId>,
+    source_id: Option<&KnowledgeId>,
 ) -> StorageResult<Vec<Edge>> {
     let mut query = Query::select();
     query.columns(EDGE_COLUMNS).from(Edges::Table);
-    if let Some(source) = source {
-        query.and_where(Expr::col(Edges::SourceId).eq(source.as_str()));
+    if let Some(source_id) = source_id {
+        query.and_where(Expr::col(Edges::SourceId).eq(source_id.as_str()));
     }
     for column in EDGE_COLUMNS {
         query.order_by(column, Order::Asc);
@@ -245,7 +248,7 @@ pub(super) fn list_edges(
     let mut rows = stmt.query(params_from_iter(values)).map_err(map_sqlite)?;
     let mut edges = Vec::new();
     while let Some(row) = rows.next().map_err(map_sqlite)? {
-        let source: String = row.get(0).map_err(map_sqlite)?;
+        let source_id: String = row.get(0).map_err(map_sqlite)?;
         let target: String = row.get(1).map_err(map_sqlite)?;
         let kind: String = row.get(2).map_err(map_sqlite)?;
         let target = if kind == "external" {
@@ -255,7 +258,7 @@ pub(super) fn list_edges(
         };
         edges.push(
             Edge::new(
-                KnowledgeId::parse(&source).map_err(map_invalid_value)?,
+                KnowledgeId::parse(&source_id).map_err(map_invalid_value)?,
                 target,
                 EdgeType::parse(&kind).map_err(map_invalid_value)?,
             )
@@ -338,7 +341,7 @@ mod tests {
         ] {
             // Given: each row violates exactly one source-specific invariant.
             let mut statement = connection
-                .prepare("SELECT 1, ?1, 'source', 'code.rs', NULL, 0, ?2, NULL, NULL, ?3")
+                .prepare("select 1, ?1, 'source', 'code.rs', null, 0, ?2, null, null, ?3")
                 .unwrap();
             let mut rows = statement.query(params![id, snapshot, search]).unwrap();
             let row = rows.next().unwrap().unwrap();

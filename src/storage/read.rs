@@ -1,16 +1,16 @@
 use super::{
     connection::map_sqlite,
-    files::{list_files, read_file},
+    files::{get_file_by_path, get_files},
     fts::match_text,
-    graph::{list_edges, list_nodes, read_node},
-    neighbors::{list_source_snapshots, read_neighbor_page, resolve_node},
+    graph::{get_edges_by_source_id, get_node_by_id, get_nodes},
+    neighbors::{get_neighbor_page, get_source_snapshots, resolve_node_by_id},
     query::{Project, build_query},
-    status_counts::read_embedding_status,
+    status_counts::get_embedding_status,
     vectors::{
-        find_nearest_vectors, read_config_identity, read_failure, read_query_error, read_vector,
-        read_vector_dimensions,
+        find_nearest_vectors, get_config_identity, get_failure_by_search_hash, get_query_error,
+        get_vector_by_search_hash, get_vector_dimensions,
     },
-    work::read_next_embedding_work,
+    work::get_next_embedding_work_by_id_and_max_attempts,
 };
 use crate::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
@@ -47,10 +47,10 @@ impl<'a> SqliteRead<'a> {
 
     fn begin_available(connection: &'a mut Connection) -> StorageResult<Option<Self>> {
         let transaction = connection.transaction().map_err(map_sqlite)?;
-        let Some(revision) = Self::read_revision(&transaction)? else {
+        let Some(revision) = Self::get_revision(&transaction)? else {
             return Ok(None);
         };
-        let config_identity = read_config_identity(&transaction, true)?;
+        let config_identity = get_config_identity(&transaction, true)?;
         Ok(Some(Self {
             transaction,
             revision,
@@ -58,7 +58,7 @@ impl<'a> SqliteRead<'a> {
         }))
     }
 
-    fn read_revision(connection: &Connection) -> StorageResult<Option<u64>> {
+    fn get_revision(connection: &Connection) -> StorageResult<Option<u64>> {
         let (sql, values) = build_query(
             Query::select()
                 .column(Project::Revision)
@@ -79,68 +79,69 @@ impl<'a> SqliteRead<'a> {
     }
 }
 impl GraphRead for SqliteRead<'_> {
-    fn resolve_node(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
-        resolve_node(&self.transaction, id)
+    fn resolve_node_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+        resolve_node_by_id(&self.transaction, id)
     }
-    fn read_neighbor_page(
+    fn get_neighbor_page(
         &mut self,
         request: &NeighborPageRequest<'_>,
     ) -> StorageResult<Vec<GraphNeighbor>> {
-        read_neighbor_page(&self.transaction, request)
+        get_neighbor_page(&self.transaction, request)
     }
 }
 impl StorageRead for SqliteRead<'_> {
-    fn read_embedding_status(
+    fn get_embedding_status(
         &mut self,
         policy: &EmbeddingStatusPolicy,
     ) -> StorageResult<EmbeddingStatusSummary> {
-        read_embedding_status(&self.transaction, self.config_identity, policy)
+        get_embedding_status(&self.transaction, self.config_identity, policy)
     }
-    fn list_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
-        list_source_snapshots(&self.transaction)
+    fn get_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
+        get_source_snapshots(&self.transaction)
     }
-    fn read_next_embedding_work(
+    fn get_next_embedding_work_by_id_and_max_attempts(
         &mut self,
         expected: &Sha256,
         max_attempts: u64,
-        after: Option<&KnowledgeId>,
+        id: Option<&KnowledgeId>,
     ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>> {
         if self.config_identity != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        read_next_embedding_work(&self.transaction, max_attempts, after).map(VectorOutcome::Current)
+        get_next_embedding_work_by_id_and_max_attempts(&self.transaction, max_attempts, id)
+            .map(VectorOutcome::Current)
     }
-    fn read_vector_dimensions(
+    fn get_vector_dimensions(
         &mut self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>> {
         if self.config_identity != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        read_vector_dimensions(&self.transaction, true).map(VectorOutcome::Current)
+        get_vector_dimensions(&self.transaction, true).map(VectorOutcome::Current)
     }
-    fn read_failure(
+    fn get_failure_by_search_hash(
         &mut self,
         expected: &Sha256,
-        hash: &Sha256,
+        search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>> {
         if self.config_identity != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        read_failure(&self.transaction, hash).map(VectorOutcome::Current)
+        get_failure_by_search_hash(&self.transaction, search_hash).map(VectorOutcome::Current)
     }
-    fn read_query_error(&mut self) -> StorageResult<Option<QueryError>> {
-        read_query_error(&self.transaction)
+    fn get_query_error(&mut self) -> StorageResult<Option<QueryError>> {
+        get_query_error(&self.transaction)
     }
-    fn read_vector(
+    fn get_vector_by_search_hash(
         &mut self,
         expected: &Sha256,
-        hash: &Sha256,
+        search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>> {
         if self.config_identity != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        read_vector(&self.transaction, hash).map(VectorOutcome::Current)
+        get_vector_by_search_hash(&self.transaction, search_hash).map(VectorOutcome::Current)
     }
     fn find_nearest_vectors(
         &mut self,
@@ -153,20 +154,23 @@ impl StorageRead for SqliteRead<'_> {
         }
         find_nearest_vectors(&self.transaction, query, dimensions).map(VectorOutcome::Current)
     }
-    fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
-        read_node(&self.transaction, id)
+    fn get_node_by_id(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
+        get_node_by_id(&self.transaction, id)
     }
-    fn list_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
-        list_nodes(&self.transaction)
+    fn get_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
+        get_nodes(&self.transaction)
     }
-    fn list_edges(&mut self, source: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>> {
-        list_edges(&self.transaction, source)
+    fn get_edges_by_source_id(
+        &mut self,
+        source_id: Option<&KnowledgeId>,
+    ) -> StorageResult<Vec<Edge>> {
+        get_edges_by_source_id(&self.transaction, source_id)
     }
-    fn read_file(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
-        read_file(&self.transaction, path)
+    fn get_file_by_path(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
+        get_file_by_path(&self.transaction, path)
     }
-    fn list_files(&mut self) -> StorageResult<Vec<FileRow>> {
-        list_files(&self.transaction)
+    fn get_files(&mut self) -> StorageResult<Vec<FileRow>> {
+        get_files(&self.transaction)
     }
     fn match_text(&mut self, expression: &str) -> StorageResult<Vec<TextMatch>> {
         match_text(&self.transaction, expression)

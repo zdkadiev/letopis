@@ -161,7 +161,7 @@ fn normal_open_waits_at_index_lock_during_cache_write_then_redetects() {
     waiter.resume();
     waiter.finish();
     // Then: the waiter redetects the committed publication and does not republish.
-    assert_eq!(read_state(fixture.root.path()), expected);
+    assert_eq!(get_state(fixture.root.path()), expected);
     fixture.assert_preserved(NEW);
 }
 
@@ -181,7 +181,7 @@ fn normal_open_redetects_after_active_cache_writer_is_killed() {
     waiter.resume();
     waiter.finish();
     // Then: only the newest complete publication becomes visible.
-    assert_eq!(read_state(fixture.root.path()), expected);
+    assert_eq!(get_state(fixture.root.path()), expected);
     fixture.assert_preserved(LATEST);
 }
 
@@ -200,8 +200,8 @@ fn normal_open_and_noop_finish_during_vector_write_and_held_index_lock() {
     // When: normal composition and a no-op must finish with both owners still active.
     Worker::spawn(fixture.root.path(), "normal-noop").finish();
     // Then: neither the cache nor the committed vector state was changed.
-    assert_eq!(read_state(fixture.root.path()), fixture.old);
-    assert_eq!(read_vectors(fixture.root.path()), fixture.vector_state);
+    assert_eq!(get_state(fixture.root.path()), fixture.old);
+    assert_eq!(get_vectors(fixture.root.path()), fixture.vector_state);
     drop(unit);
     owner.kill();
 }
@@ -257,11 +257,11 @@ impl Worker {
             receipt,
         };
         writeln!(worker.receipt, "mode={mode} pid={}", worker.child.id()).unwrap();
-        assert_eq!(worker.read_event(), "connected");
+        assert_eq!(worker.get_event(), "connected");
         worker.resume();
         worker
     }
-    fn read_event(&mut self) -> String {
+    fn get_event(&mut self) -> String {
         let mut line = String::new();
         assert!(
             self.stream.read_line(&mut line).unwrap() > 0,
@@ -275,7 +275,7 @@ impl Worker {
     }
     fn reach(&mut self, target: &str) {
         loop {
-            let event = self.read_event();
+            let event = self.get_event();
             if event == target {
                 return;
             }
@@ -366,15 +366,15 @@ impl Fixture {
             fs::write(root.path().join(name), bytes).unwrap();
         }
         fs::write(root.path().join("source.txt"), SOURCE).unwrap();
-        let git_objects = read_git_objects(root.path());
+        let git_objects = get_git_objects(root.path());
         let mut service = build_service(root.path());
         assert_eq!(service.refresh().unwrap().revision, 1);
-        assert_eq!(read_git_objects(root.path()), git_objects);
+        assert_eq!(get_git_objects(root.path()), git_objects);
         seed_vectors(&mut service.storage);
         drop(service);
-        let old = read_state(root.path());
+        let old = get_state(root.path());
         let vectors = fs::read(root.path().join(".letopis/vectors.db")).unwrap();
-        let vector_state = read_vectors(root.path());
+        let vector_state = get_vectors(root.path());
         Self {
             root,
             old,
@@ -412,8 +412,8 @@ impl Fixture {
             b"<!-- letopis: {\"created_at\":1} -->\nStableToken\n"
         );
         assert!(!self.root.path().join("b.md").exists());
-        assert_eq!(read_git_objects(self.root.path()), self.git_objects);
-        assert_eq!(read_vectors(self.root.path()), self.vector_state);
+        assert_eq!(get_git_objects(self.root.path()), self.git_objects);
+        assert_eq!(get_vectors(self.root.path()), self.vector_state);
         assert_eq!(
             fs::read(self.root.path().join(".letopis/vectors.db")).unwrap(),
             self.vectors
@@ -484,7 +484,7 @@ fn sigkill_keeps_exact_old_or_complete_new_publication() {
         // When: genuine process death at an acknowledged operation boundary.
         worker.kill();
         // Then: reopen, including SQLite recovery, before retrying refresh.
-        let actual = read_state(fixture.root.path());
+        let actual = get_state(fixture.root.path());
         assert_eq!(
             actual,
             if cut == "after_commit" {
@@ -509,7 +509,7 @@ fn sigkill_keeps_exact_old_or_complete_new_publication() {
         )
         .finish();
         assert_eq!(
-            read_state(fixture.root.path()),
+            get_state(fixture.root.path()),
             expected,
             "restart cut={cut}"
         );
@@ -533,7 +533,7 @@ fn duplicate_publishers_commit_once_after_real_contention() {
     waiter.resume();
     waiter.finish();
     // Then
-    assert_eq!(read_state(fixture.root.path()), expected);
+    assert_eq!(get_state(fixture.root.path()), expected);
     fixture.assert_preserved(NEW);
 }
 
@@ -560,7 +560,7 @@ fn waiting_publisher_redetects_newer_edit_after_owner_is_killed() {
             .ino(),
         lock_before.ino()
     );
-    assert_eq!(read_state(fixture.root.path()), expected);
+    assert_eq!(get_state(fixture.root.path()), expected);
     fixture.assert_preserved(LATEST);
 }
 
@@ -573,7 +573,7 @@ fn noop_finishes_while_another_process_holds_index_lock() {
     // When
     Worker::spawn(fixture.root.path(), "noop").finish();
     // Then
-    assert_eq!(read_state(fixture.root.path()), fixture.old);
+    assert_eq!(get_state(fixture.root.path()), fixture.old);
     owner.kill();
 }
 
@@ -586,17 +586,20 @@ fn pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit() {
     let mut storage = build_service(fixture.root.path()).storage;
     let mut pinned = storage.begin_read().unwrap();
     let fts = Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
-    fts.execute_batch("BEGIN;").unwrap();
-    assert_eq!(read_tokens(&fts), fixture.old.tokens);
+    fts.execute_batch("begin;").unwrap();
+    assert_eq!(get_tokens(&fts), fixture.old.tokens);
     // When
     Worker::spawn(fixture.root.path(), "publish").finish();
     // Then
     assert_eq!(pinned.get_revision(), fixture.old.revision);
-    assert_eq!(pinned.list_nodes().unwrap(), fixture.old.nodes);
-    assert_eq!(pinned.list_edges(None).unwrap(), fixture.old.edges);
-    assert_eq!(pinned.list_files().unwrap(), fixture.old.files);
-    assert_eq!(read_tokens(&fts), fixture.old.tokens);
-    assert_eq!(read_state(fixture.root.path()), expected);
+    assert_eq!(pinned.get_nodes().unwrap(), fixture.old.nodes);
+    assert_eq!(
+        pinned.get_edges_by_source_id(None).unwrap(),
+        fixture.old.edges
+    );
+    assert_eq!(pinned.get_files().unwrap(), fixture.old.files);
+    assert_eq!(get_tokens(&fts), fixture.old.tokens);
+    assert_eq!(get_state(fixture.root.path()), expected);
     fixture.assert_preserved(NEW);
 }
 
@@ -608,13 +611,13 @@ fn late_storage_error_rolls_back_every_cache_mutation() {
     // When
     Worker::spawn(fixture.root.path(), "fail").finish();
     // Then
-    assert_eq!(read_state(fixture.root.path()), fixture.old);
+    assert_eq!(get_state(fixture.root.path()), fixture.old);
     fixture.assert_preserved(NEW);
     // When
     Worker::spawn(fixture.root.path(), "publish").finish();
     // Then
     assert_eq!(
-        read_state(fixture.root.path()),
+        get_state(fixture.root.path()),
         fixture.build_expected(NEW, "BravoToken")
     );
 }
@@ -629,8 +632,8 @@ fn uncommitted_file_diagnostic_is_absent_from_status() {
     Worker::spawn(fixture.root.path(), "fail").finish();
 
     // Then: the old publication remains and a fresh status derives no file problem.
-    assert_eq!(read_state(fixture.root.path()), fixture.old);
-    let status = read_status(fixture.root.path());
+    assert_eq!(get_state(fixture.root.path()), fixture.old);
+    let status = get_status(fixture.root.path());
     assert_eq!(status.revision, Some(1));
     assert!(get_invalid_file_problems(&status).is_empty());
     assert!(!format!("{status:?}").contains(DIAGNOSTIC_CANARY));
@@ -647,7 +650,7 @@ fn failed_publication_retry_persists_the_file_diagnostic() {
     Worker::spawn(fixture.root.path(), "publish").finish();
 
     // Then: the real safe diagnostic is persisted and survives a fresh status.
-    let status = read_status(fixture.root.path());
+    let status = get_status(fixture.root.path());
     assert_eq!(status.revision, Some(2));
     assert_eq!(
         get_invalid_file_problems(&status),
@@ -663,7 +666,7 @@ fn repaired_file_problem_disappears_after_publication() {
     fixture.invalidate_retained_file();
     Worker::spawn(fixture.root.path(), "publish").finish();
     assert_eq!(
-        get_invalid_file_problems(&read_status(fixture.root.path())),
+        get_invalid_file_problems(&get_status(fixture.root.path())),
         vec![("i.md".to_owned(), "invalid_metadata".to_owned())]
     );
 
@@ -672,7 +675,7 @@ fn repaired_file_problem_disappears_after_publication() {
     Worker::spawn(fixture.root.path(), "publish").finish();
 
     // Then: the current problem disappears.
-    let status = read_status(fixture.root.path());
+    let status = get_status(fixture.root.path());
     assert_eq!(status.revision, Some(3));
     assert!(get_invalid_file_problems(&status).is_empty());
 }
@@ -685,23 +688,23 @@ fn run_normal_service(root: &Path, mode: &str) {
     assert_eq!(outcome.published, mode != "noop");
 }
 
-fn read_state(root: &Path) -> State {
+fn get_state(root: &Path) -> State {
     let mut storage = build_service(root).storage;
     let mut read = storage.begin_read().unwrap();
     let connection = Connection::open(root.join(".letopis/cache.db")).unwrap();
     State {
         revision: read.get_revision(),
-        nodes: read.list_nodes().unwrap(),
-        edges: read.list_edges(None).unwrap(),
-        files: read.list_files().unwrap(),
-        tokens: read_tokens(&connection),
+        nodes: read.get_nodes().unwrap(),
+        edges: read.get_edges_by_source_id(None).unwrap(),
+        files: read.get_files().unwrap(),
+        tokens: get_tokens(&connection),
     }
 }
 
-fn read_tokens(connection: &Connection) -> Tokens {
-    connection.execute_batch("CREATE VIRTUAL TABLE IF NOT EXISTS temp.tokens USING fts5vocab(main, text_index, instance);").unwrap();
+fn get_tokens(connection: &Connection) -> Tokens {
+    connection.execute_batch("create virtual table if not exists temp.tokens using fts5vocab(main, text_index, instance);").unwrap();
     connection
-        .prepare("SELECT term, doc, col, offset FROM temp.tokens ORDER BY term, doc, col, offset")
+        .prepare("select term, doc, col, offset from temp.tokens order by term, doc, col, offset")
         .unwrap()
         .query_map([], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
@@ -711,23 +714,23 @@ fn read_tokens(connection: &Connection) -> Tokens {
         .unwrap()
 }
 
-fn read_vectors(root: &Path) -> VectorState {
+fn get_vectors(root: &Path) -> VectorState {
     let mut storage = build_service(root).storage;
     let mut read = storage.begin_read().unwrap();
     let identity = Sha256::digest(b"model identity");
     VectorState {
         identity: read.get_config_identity(),
         vector: read
-            .read_vector(&identity, &Sha256::digest(b"retained vector"))
+            .get_vector_by_search_hash(&identity, &Sha256::digest(b"retained vector"))
             .unwrap(),
         failure: read
-            .read_failure(&identity, &Sha256::digest(b"failed vector"))
+            .get_failure_by_search_hash(&identity, &Sha256::digest(b"failed vector"))
             .unwrap(),
-        query_error: read.read_query_error().unwrap(),
+        query_error: read.get_query_error().unwrap(),
     }
 }
 
-fn read_status(root: &Path) -> StatusReport {
+fn get_status(root: &Path) -> StatusReport {
     let git = GitRepository::open(root).unwrap();
     let files = LocalFileSystem::open(git.get_root()).unwrap();
     let pinned = files.open_existing_service_directory().unwrap().unwrap();
@@ -746,7 +749,7 @@ fn read_status(root: &Path) -> StatusReport {
         provenance: &provenance,
         provider: &provider,
     };
-    status.read_status().unwrap()
+    status.get_status().unwrap()
 }
 
 fn get_invalid_file_problems(report: &StatusReport) -> Vec<(String, String)> {
@@ -781,7 +784,7 @@ fn build_service(root: &Path) -> Service {
     }
 }
 
-fn read_git_objects(root: &Path) -> Vec<u8> {
+fn get_git_objects(root: &Path) -> Vec<u8> {
     let output = Command::new("git")
         .arg("-C")
         .arg(root)

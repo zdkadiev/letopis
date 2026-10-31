@@ -91,8 +91,8 @@ fn parse_section(value: &Value) -> EmbeddingResult<Configuration> {
         .and_then(Value::as_u64)
         .ok_or_else(reject_config)?;
     validate_retries(max_retries)?;
-    let provider = read_optional_string(section, "provider")?;
-    let model = read_optional_string(section, "model")?;
+    let provider = get_optional_string(section, "provider")?;
+    let model = get_optional_string(section, "model")?;
     let parameters = section
         .get("parameters")
         .and_then(Value::as_object)
@@ -106,7 +106,7 @@ fn parse_section(value: &Value) -> EmbeddingResult<Configuration> {
     }
 }
 
-fn read_optional_string<'a>(
+fn get_optional_string<'a>(
     section: &'a Map<String, Value>,
     field: &str,
 ) -> EmbeddingResult<Option<&'a str>> {

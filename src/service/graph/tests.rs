@@ -383,7 +383,7 @@ impl GeneratedRead {
     }
 }
 impl GraphRead for GeneratedRead {
-    fn resolve_node(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+    fn resolve_node_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
         self.resolved.push(id.as_str().to_owned());
         let key = match id.as_str() {
             "a.md" => 1,
@@ -395,7 +395,7 @@ impl GraphRead for GeneratedRead {
         };
         Ok(Some(make_node(key, id.as_str())))
     }
-    fn read_neighbor_page(
+    fn get_neighbor_page(
         &mut self,
         request: &NeighborPageRequest<'_>,
     ) -> StorageResult<Vec<GraphNeighbor>> {

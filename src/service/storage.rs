@@ -85,7 +85,7 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Rejects invalid attempt budgets, malformed persisted values and database failures.
-    fn read_embedding_status(
+    fn get_embedding_status(
         &mut self,
         policy: &EmbeddingStatusPolicy,
     ) -> StorageResult<EmbeddingStatusSummary>;
@@ -93,17 +93,17 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Rejects zero or unrepresentable attempt budgets; reports I/O or invalid data.
-    fn read_next_embedding_work(
+    fn get_next_embedding_work_by_id_and_max_attempts(
         &mut self,
         expected: &Sha256,
         max_attempts: u64,
-        after: Option<&KnowledgeId>,
+        id: Option<&KnowledgeId>,
     ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>>;
     /// Observe the native vector dimension under the pinned configuration identity.
     ///
     /// # Errors
     /// Reports malformed native metadata or database failures.
-    fn read_vector_dimensions(
+    fn get_vector_dimensions(
         &mut self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>>;
@@ -111,32 +111,35 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
-    fn read_node(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>>;
+    fn get_node_by_id(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>>;
     /// List distinct non-null author-declared source roots without reading node metadata.
     ///
     /// # Errors
     /// Reports database failures or malformed persisted tree identities.
-    fn list_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>>;
+    fn get_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>>;
     /// List all published node metadata in ascending normalized identity order.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
-    fn list_nodes(&mut self) -> StorageResult<Vec<StoredNode>>;
+    fn get_nodes(&mut self) -> StorageResult<Vec<StoredNode>>;
     /// List all declared edges, optionally restricted to their source.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted edges.
-    fn list_edges(&mut self, source: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>>;
+    fn get_edges_by_source_id(
+        &mut self,
+        source_id: Option<&KnowledgeId>,
+    ) -> StorageResult<Vec<Edge>>;
     /// Read a candidate file's change-detection state.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
-    fn read_file(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>>;
+    fn get_file_by_path(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>>;
     /// List all candidate file states in ascending exact path order.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
-    fn list_files(&mut self) -> StorageResult<Vec<FileRow>>;
+    fn get_files(&mut self) -> StorageResult<Vec<FileRow>>;
     /// Execute an already-prepared FTS expression without a candidate limit.
     ///
     /// # Errors
@@ -146,10 +149,10 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Reports malformed stored vectors or database failures.
-    fn read_vector(
+    fn get_vector_by_search_hash(
         &mut self,
         expected: &Sha256,
-        hash: &Sha256,
+        search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>>;
     /// Find native cosine matches joined to current node search hashes.
     ///
@@ -165,16 +168,16 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Reports malformed persisted values or database failures.
-    fn read_failure(
+    fn get_failure_by_search_hash(
         &mut self,
         expected: &Sha256,
-        hash: &Sha256,
+        search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>>;
     /// Read the last query embedding failure, independent of model resets.
     ///
     /// # Errors
     /// Reports malformed persisted values or database failures.
-    fn read_query_error(&mut self) -> StorageResult<Option<QueryError>>;
+    fn get_query_error(&mut self) -> StorageResult<Option<QueryError>>;
     /// Publication revision observed by this read.
     fn get_revision(&self) -> u64;
     /// Vector configuration identity observed by this read.

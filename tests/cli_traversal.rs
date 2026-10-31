@@ -90,8 +90,8 @@ fn binary_covers_every_mode_and_direction_with_original_edges() {
         // When
         let response = invoke(&repo, &body, 0);
         // Then
-        assert_eq!(read_ids(&response), elements, "{mode}/{direction}");
-        assert_eq!(read_triples(&response), edges, "{mode}/{direction}");
+        assert_eq!(get_ids(&response), elements, "{mode}/{direction}");
+        assert_eq!(get_triples(&response), edges, "{mode}/{direction}");
         for link in response["result"]["elements"].as_array().unwrap() {
             let id = link["element_id"].as_str().unwrap();
             assert_eq!(
@@ -148,13 +148,13 @@ fn binary_applies_type_intersection_and_independent_caps() {
     // When
     let response = invoke(&repo, &body, 0);
     // Then
-    assert_eq!(read_ids(&response), json!(["c.md", "d.md"]));
+    assert_eq!(get_ids(&response), json!(["c.md", "d.md"]));
     assert_eq!(
-        read_triples(&response),
+        get_triples(&response),
         json!([["a.md", "c.md", "includes"]])
     );
     body["edge_types"] = json!(["supports", "supports", "custom_type9"]);
-    assert_eq!(read_ids(&invoke(&repo, &body, 0)), json!(["b.md"]));
+    assert_eq!(get_ids(&invoke(&repo, &body, 0)), json!(["b.md"]));
     body["mode"] = json!("containment");
     assert_eq!(
         invoke(&repo, &body, 0),
@@ -184,7 +184,7 @@ fn binary_returns_missing_ranged_and_opaque_sources_without_content() {
     let mut capped = body;
     capped["limit"] = json!(1);
     assert_eq!(
-        read_ids(&invoke(&repo, &capped, 0)),
+        get_ids(&invoke(&repo, &capped, 0)),
         json!(["https://Host/a?q=1#part"])
     );
     let incoming = invoke(
@@ -193,9 +193,9 @@ fn binary_returns_missing_ranged_and_opaque_sources_without_content() {
         "mode":"both","direction":"incoming","depth":1,"limit":1,"edge_limit":1}),
         0,
     );
-    assert_eq!(read_ids(&incoming), json!(["a.md"]));
+    assert_eq!(get_ids(&incoming), json!(["a.md"]));
     assert_eq!(
-        read_triples(&incoming),
+        get_triples(&incoming),
         json!([["a.md", "https://Host/a?q=1#part", "external"]])
     );
     repo.write_knowledge("a.md", "links removed");
@@ -245,7 +245,7 @@ fn binary_uses_no_inference_with_fully_seeded_backlog() {
         "direction":"outgoing","depth":1,"limit":1}),
         0,
     );
-    assert_eq!(read_ids(&response), json!(["c.md"]));
+    assert_eq!(get_ids(&response), json!(["c.md"]));
     assert!(http.take_requests().is_empty());
     assert!(
         !wire_embedding_executor(repo.get_root())
@@ -280,10 +280,10 @@ fn nested_binary_discovers_root_and_launches_existing_detached_drain() {
         br#"{"element_ids":["a.md"],"mode":"both","direction":"both","depth":0,"limit":1}"#,
     );
     // When
-    let response = read_response(&child.collect_output(Duration::from_secs(10)), 0);
+    let response = get_response(&child.collect_output(Duration::from_secs(10)), 0);
     barrier.wait_until_entered();
     // Then
-    assert!(owner.read_pid() > 0);
+    assert!(owner.get_pid() > 0);
     barrier.release();
     owner.wait_for_exit();
     assert_eq!(response, json!({"ok":true,"result":{"elements":[]}}));
@@ -311,12 +311,12 @@ fn build_graph() -> ReadingRepo {
     repo
 }
 fn invoke(repo: &ReadingRepo, body: &Value, exit: i32) -> Value {
-    read_response(
+    get_response(
         &repo.invoke(&["traverse"], body.to_string().as_bytes()),
         exit,
     )
 }
-fn read_response(output: &Output, exit: i32) -> Value {
+fn get_response(output: &Output, exit: i32) -> Value {
     assert_eq!(output.status.code(), Some(exit), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(
@@ -325,7 +325,7 @@ fn read_response(output: &Output, exit: i32) -> Value {
     );
     serde_json::from_slice(&output.stdout).unwrap()
 }
-fn read_ids(response: &Value) -> Value {
+fn get_ids(response: &Value) -> Value {
     Value::Array(
         response["result"]["elements"]
             .as_array()
@@ -335,7 +335,7 @@ fn read_ids(response: &Value) -> Value {
             .collect(),
     )
 }
-fn read_triples(response: &Value) -> Value {
+fn get_triples(response: &Value) -> Value {
     Value::Array(
         response["result"]["edges"]
             .as_array()

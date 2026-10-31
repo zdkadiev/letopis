@@ -187,7 +187,7 @@ fn diagnose_declared_unavailable_roots_even_without_external_sources() {
     let repo = TempRepo::new(FORMATS[0]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
     let sources = BTreeSet::new();
-    let commit = TreeOid::parse(&repo.read_oid(&["rev-parse", "HEAD"], None)).unwrap();
+    let commit = TreeOid::parse(&repo.get_oid(&["rev-parse", "HEAD"], None)).unwrap();
     let roots = [
         TreeOid::parse(&"a".repeat(40)).unwrap(),
         TreeOid::parse(&"a".repeat(64)).unwrap(),

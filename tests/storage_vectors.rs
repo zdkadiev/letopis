@@ -36,7 +36,7 @@ fn text_hash_shares_one_vector() {
     unit.commit().unwrap();
     let mut read = storage.begin_read().unwrap();
     assert_eq!(
-        unwrap_current(read.read_vector(&identity, &hash).unwrap()),
+        unwrap_current(read.get_vector_by_search_hash(&identity, &hash).unwrap()),
         Some(vec![1.0, 0.0, 0.0])
     );
     let matches = unwrap_current(
@@ -71,7 +71,7 @@ fn vectors_require_matching_identity() {
     ));
     let mut read = storage.begin_read().unwrap();
     assert!(matches!(
-        read.read_vector(&m2, &m1).unwrap(),
+        read.get_vector_by_search_hash(&m2, &m1).unwrap(),
         VectorOutcome::ConfigChanged
     ));
     assert!(matches!(
@@ -97,7 +97,7 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
     // When / Then
     assert_nearest(&mut old, &m1, &[1.0, 0.0, 0.0]);
     assert_eq!(
-        unwrap_current(old.read_vector(&m1, &m1).unwrap()),
+        unwrap_current(old.get_vector_by_search_hash(&m1, &m1).unwrap()),
         Some(vec![1.0, 0.0, 0.0])
     );
     assert_eq!(
@@ -112,20 +112,23 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
     );
     assert_nearest(&mut old, &m1, &[1.0, 0.0, 0.0]);
     assert_eq!(
-        unwrap_current(old.read_vector(&m1, &m1).unwrap()),
+        unwrap_current(old.get_vector_by_search_hash(&m1, &m1).unwrap()),
         Some(vec![1.0, 0.0, 0.0])
     );
     let mut fresh = second.begin_read().unwrap();
     assert_nearest(&mut fresh, &m2, &[0.0, 1.0, 0.0, 0.0]);
     assert!(matches!(
-        fresh.read_vector(&m1, &m1).unwrap(),
+        fresh.get_vector_by_search_hash(&m1, &m1).unwrap(),
         VectorOutcome::ConfigChanged
     ));
     assert_eq!(
-        unwrap_current(fresh.read_vector(&m2, &m2).unwrap()),
+        unwrap_current(fresh.get_vector_by_search_hash(&m2, &m2).unwrap()),
         Some(vec![0.0, 1.0, 0.0, 0.0])
     );
-    assert_eq!(unwrap_current(fresh.read_vector(&m2, &m1).unwrap()), None);
+    assert_eq!(
+        unwrap_current(fresh.get_vector_by_search_hash(&m2, &m1).unwrap()),
+        None
+    );
 }
 #[test]
 fn current_node_hash_excludes_old_vector() {
@@ -173,8 +176,14 @@ fn caught_vector_error_cannot_commit_key_or_prior_write() {
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
         assert!(unit.commit().is_err());
         let mut read = storage.begin_read().unwrap();
-        assert_eq!(unwrap_current(read.read_vector(&m1, &hash).unwrap()), None);
-        assert_eq!(unwrap_current(read.read_vector(&m1, &m1).unwrap()), None);
+        assert_eq!(
+            unwrap_current(read.get_vector_by_search_hash(&m1, &hash).unwrap()),
+            None
+        );
+        assert_eq!(
+            unwrap_current(read.get_vector_by_search_hash(&m1, &m1).unwrap()),
+            None
+        );
     }
 }
 #[test]
@@ -193,15 +202,18 @@ fn dimension_reset_and_rollback() {
     assert!(unit.commit().is_err());
     let raw = rusqlite::Connection::open(&vectors).unwrap();
     let keys: i64 = raw
-        .query_row("SELECT count(*) FROM vector_keys", [], |r| r.get(0))
+        .query_row("select count(*) from vector_keys", [], |r| r.get(0))
         .unwrap();
     assert_eq!(keys, 1);
     let mut read = storage.begin_read().unwrap();
     assert_eq!(
-        unwrap_current(read.read_vector(&m1, &m1).unwrap()),
+        unwrap_current(read.get_vector_by_search_hash(&m1, &m1).unwrap()),
         Some(vec![1.0, 0.0, 0.0])
     );
-    assert_eq!(unwrap_current(read.read_vector(&m1, &hash).unwrap()), None);
+    assert_eq!(
+        unwrap_current(read.get_vector_by_search_hash(&m1, &hash).unwrap()),
+        None
+    );
 }
 #[test]
 fn cache_and_vector_writers_are_independent() {

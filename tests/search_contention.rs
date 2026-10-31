@@ -61,7 +61,7 @@ fn assert_search_survives_writer(phase: WritePhase, response: &str) {
         .open_storage()
         .begin_read()
         .unwrap()
-        .read_query_error()
+        .get_query_error()
         .unwrap();
     if response == SUCCESS {
         assert_eq!(error, None);
@@ -119,16 +119,16 @@ fn run_during_write(
     });
     prepared.recv_timeout(RESULT_WAIT).unwrap();
     if matches!(phase, WritePhase::BeforeConfiguration) {
-        writer.execute_batch("BEGIN IMMEDIATE").unwrap();
+        writer.execute_batch("begin immediate").unwrap();
     }
     start.send(()).unwrap();
     if matches!(phase, WritePhase::AfterInference) {
         barrier.wait_until_entered();
-        writer.execute_batch("BEGIN IMMEDIATE").unwrap();
+        writer.execute_batch("begin immediate").unwrap();
         barrier.release();
     }
     let early = receiver.recv_timeout(BLOCKED_WINDOW);
-    writer.execute_batch("ROLLBACK").unwrap();
+    writer.execute_batch("rollback").unwrap();
     barrier.release();
     let was_blocked = matches!(early, Err(mpsc::RecvTimeoutError::Timeout));
     let result = early.unwrap_or_else(|_| receiver.recv_timeout(RESULT_WAIT).unwrap());

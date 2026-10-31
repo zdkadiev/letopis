@@ -18,7 +18,7 @@ fn run_owned_reader() {
     let mut reader = ObjectReader::new(&repo, oid.len()).unwrap();
     // When: the raw library reader verifies one object, measuring only that call's allocations.
     allocation::start();
-    let result = reader.read_object(
+    let result = reader.get_object(
         &oid,
         &kind,
         SnapshotErrorKind::NotFound,
@@ -50,7 +50,7 @@ fn run_owned_reader() {
         serde_json::json!({
             "oid": oid, "outcome": outcome, "retained_bytes": reader.buffer.capacity(),
             "largest_allocation_bytes": allocations.0, "total_allocation_bytes": allocations.1,
-            "rss_peak_bytes": allocation::read_peak_rss(),
+            "rss_peak_bytes": allocation::get_peak_rss(),
         })
     );
 }
@@ -60,11 +60,11 @@ fn raw_reads_ignore_configured_allocation_caps_replacements_and_payload_caches()
     // Given: valid raw objects, a one-byte gix cap and a Git replacement for the requested identity.
     let fixture =
         crate::process_test_support::TempRepo::new(crate::process_test_support::FORMATS[0]);
-    let original = fixture.read_oid(
+    let original = fixture.get_oid(
         &["hash-object", "-w", "--stdin"],
         Some(b"raw original bytes"),
     );
-    let replacement = fixture.read_oid(
+    let replacement = fixture.get_oid(
         &["hash-object", "-w", "--stdin"],
         Some(b"replacement bytes"),
     );
@@ -73,7 +73,7 @@ fn raw_reads_ignore_configured_allocation_caps_replacements_and_payload_caches()
     let repo = gix::open(fixture.get_root()).unwrap();
     let mut reader = ObjectReader::new(&repo, original.len()).unwrap();
     // When: the reader accesses raw local identity, without gix's optional cap or replacement.
-    let result = reader.read_object(
+    let result = reader.get_object(
         &original,
         "blob",
         SnapshotErrorKind::NotFound,
@@ -82,7 +82,7 @@ fn raw_reads_ignore_configured_allocation_caps_replacements_and_payload_caches()
     // Then: canonical bytes pass, and a later corrupt replacement cannot be hidden by a payload cache.
     assert!(result.is_ok(), "{result:?}");
     fixture.replace_loose_object(&original, &replacement);
-    let result = reader.read_object(
+    let result = reader.get_object(
         &original,
         "blob",
         SnapshotErrorKind::NotFound,

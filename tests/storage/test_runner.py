@@ -152,7 +152,7 @@ class SchemaParityTests(unittest.TestCase):
             # Then
             self.assertEqual(good.returncode, 0, good.stderr)
             path = root / 'src/storage/cache.sql'
-            path.write_text(path.read_text().replace('revision INTEGER', 'revision TEXT'))
+            path.write_text(path.read_text().replace('revision integer', 'revision text'))
             bad = subprocess.run([sys.executable, str(script), str(root)], capture_output=True)
             self.assertNotEqual(bad.returncode, 0)
             self.assertIn(b'canonical DDL differs', bad.stderr)

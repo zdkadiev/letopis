@@ -32,11 +32,15 @@ fn reset_commits_only_for_the_observed_identity_and_keeps_a_pinned_read() {
     let mut fresh = second.begin_read().unwrap();
     assert_eq!(fresh.get_config_identity(), Some(b));
     assert_eq!(
-        fresh.read_vector(&b, &Sha256::digest(b"vector")).unwrap(),
+        fresh
+            .get_vector_by_search_hash(&b, &Sha256::digest(b"vector"))
+            .unwrap(),
         VectorOutcome::Current(None)
     );
     assert_eq!(
-        fresh.read_failure(&b, &Sha256::digest(b"attempt")).unwrap(),
+        fresh
+            .get_failure_by_search_hash(&b, &Sha256::digest(b"attempt"))
+            .unwrap(),
         VectorOutcome::Current(None)
     );
 }
@@ -52,13 +56,13 @@ fn same_desired_identity_preserves_vectors_and_failure_bytes() {
     first.reset_vectors(None, &a).unwrap();
     second.reset_vectors(Some(&a), &b).unwrap();
     seed_state(&mut second, &b);
-    let before = read_failure_bytes(&root);
+    let before = get_failure_bytes(&root);
     for observed in [Some(&b), Some(&a), None] {
         // When: a late observer may have captured B, A or initial absence.
         let outcome = first.reset_vectors(observed, &b).unwrap();
         // Then
         assert_state(&mut first.begin_read().unwrap(), &b);
-        assert_eq!(read_failure_bytes(&root), before);
+        assert_eq!(get_failure_bytes(&root), before);
         assert_eq!(outcome, VectorOutcome::Current(false));
     }
 }
@@ -77,12 +81,12 @@ fn obsolete_and_absent_observations_preserve_the_winning_identity_and_work() {
         }
         second.reset_vectors(observed.as_ref(), &b).unwrap();
         seed_state(&mut second, &b);
-        let before = read_failure_bytes(&root);
+        let before = get_failure_bytes(&root);
         // When
         let outcome = first.reset_vectors(observed.as_ref(), &a).unwrap();
         // Then state before the result, so a compiling mutation fails on lost work.
         assert_state(&mut first.begin_read().unwrap(), &b);
-        assert_eq!(read_failure_bytes(&root), before);
+        assert_eq!(get_failure_bytes(&root), before);
         assert_eq!(outcome, VectorOutcome::ConfigChanged);
     }
 }
@@ -96,24 +100,24 @@ fn malformed_stored_identity_is_a_typed_error_without_resetting_work() {
     storage.reset_vectors(None, &b).unwrap();
     seed_state(&mut storage, &b);
     let db = Connection::open(root.path().join("vectors")).unwrap();
-    db.execute("UPDATE meta SET config_identity='malformed'", [])
+    db.execute("update meta set config_identity='malformed'", [])
         .unwrap();
-    let before = read_failure_bytes(&root);
+    let before = get_failure_bytes(&root);
     // When
     let error = storage
         .reset_vectors(None, &Sha256::digest(b"A"))
         .unwrap_err();
     // Then
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
-    assert_eq!(read_failure_bytes(&root), before);
+    assert_eq!(get_failure_bytes(&root), before);
     assert_eq!(
-        db.query_row("SELECT count(*) FROM vector_keys", [], |r| r
+        db.query_row("select count(*) from vector_keys", [], |r| r
             .get::<_, i64>(0))
             .unwrap(),
         1
     );
     assert_eq!(
-        db.query_row("SELECT config_identity FROM meta", [], |r| r
+        db.query_row("select config_identity from meta", [], |r| r
             .get::<_, String>(0))
             .unwrap(),
         "malformed"
@@ -141,12 +145,12 @@ fn seed_state(storage: &mut impl Storage, identity: &Sha256) {
 
 fn assert_state(read: &mut impl StorageRead, identity: &Sha256) {
     assert_eq!(
-        read.read_vector(identity, &Sha256::digest(b"vector"))
+        read.get_vector_by_search_hash(identity, &Sha256::digest(b"vector"))
             .unwrap(),
         VectorOutcome::Current(Some(vec![4.0, 5.0, 6.0]))
     );
     let VectorOutcome::Current(Some(failure)) = read
-        .read_failure(identity, &Sha256::digest(b"attempt"))
+        .get_failure_by_search_hash(identity, &Sha256::digest(b"attempt"))
         .unwrap()
     else {
         panic!()
@@ -156,10 +160,10 @@ fn assert_state(read: &mut impl StorageRead, identity: &Sha256) {
     assert_eq!(read.get_config_identity(), Some(*identity));
 }
 
-fn read_failure_bytes(root: &TempDir) -> Vec<Vec<Value>> {
+fn get_failure_bytes(root: &TempDir) -> Vec<Vec<Value>> {
     let db = Connection::open(root.path().join("vectors")).unwrap();
     let mut statement = db
-        .prepare("SELECT search_hash, attempts, error FROM embed_failures ORDER BY search_hash")
+        .prepare("select search_hash, attempts, error from embed_failures order by search_hash")
         .unwrap();
     statement
         .query_map([], |row| (0..3).map(|column| row.get(column)).collect())

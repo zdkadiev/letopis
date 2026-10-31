@@ -39,9 +39,9 @@ impl GraphDiagnostics for GraphDiagnosticsService {
         view: &mut R,
         paths: &[RepoPath],
     ) -> CommandResult<Vec<CommandProblem>> {
-        let nodes = view.list_nodes().map_err(map_read_error)?;
-        let edges = view.list_edges(None).map_err(map_read_error)?;
-        let files = view.list_files().map_err(map_read_error)?;
+        let nodes = view.get_nodes().map_err(map_read_error)?;
+        let edges = view.get_edges_by_source_id(None).map_err(map_read_error)?;
+        let files = view.get_files().map_err(map_read_error)?;
         let knowledge: BTreeSet<KnowledgeId> = nodes
             .into_iter()
             .filter_map(|node| match node.metadata {

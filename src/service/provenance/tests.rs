@@ -261,7 +261,7 @@ impl GitSnapshots for RecordedGit {
     fn create_tree_from_blobs(&self, _: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
         panic!("provenance must not create trees")
     }
-    fn read_blob(&self, tree: &TreeOid, _: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
+    fn get_blob(&self, tree: &TreeOid, _: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
         self.reads.set(self.reads.get() + 1);
         match self.fault {
             GitFault::Read => Err(create_git_failure()),
@@ -289,7 +289,7 @@ impl FileSystem for RecordedFiles {
     fn stat_file(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
         panic!("provenance must not stat sources")
     }
-    fn read_file(&self, _: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+    fn get_file(&self, _: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
         self.reads.set(self.reads.get() + 1);
         if self.fail {
             return Err(DocumentError::new_with_cause(

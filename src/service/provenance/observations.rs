@@ -48,9 +48,9 @@ impl HistoricalObservations {
                 continue;
             }
             let historical = basis
-                .map(|tree| self.read_hash(provenance, tree, source))
+                .map(|tree| self.get_hash(provenance, tree, source))
                 .transpose()?;
-            let current = provenance.read_current_hash(source)?;
+            let current = provenance.get_current_hash(source)?;
             if current.is_none() || historical == Some(None) {
                 observation.issues.insert(ProvenanceIssue::SourceNotFound {
                     source: source.clone(),
@@ -81,7 +81,7 @@ impl HistoricalObservations {
         Ok(state)
     }
 
-    fn read_hash<G: GitSnapshots + SnapshotVerifier, F: FileSystem>(
+    fn get_hash<G: GitSnapshots + SnapshotVerifier, F: FileSystem>(
         &mut self,
         provenance: &ProvenanceService<G, F>,
         tree: &TreeOid,
@@ -92,7 +92,7 @@ impl HistoricalObservations {
             return Ok(*hash);
         }
         let hash = provenance
-            .read_snapshot_hash(tree, source)
+            .get_snapshot_hash(tree, source)
             .map_err(map_snapshot_error)?;
         if self.has_capacity() {
             self.hashes.insert(key, hash);

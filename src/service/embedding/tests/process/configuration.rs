@@ -1,6 +1,6 @@
 use super::{
-    Fixture, LIMIT, Process, SUCCESS, assert_current_vector, open_storage, read_http_request,
-    reply, reset_with_current_state,
+    Fixture, LIMIT, Process, SUCCESS, assert_current_vector, get_http_request, open_storage, reply,
+    reset_with_current_state,
 };
 use crate::{
     service::{Embedder, Storage, VectorOutcome, VectorWrite},
@@ -60,7 +60,7 @@ fn assert_stale_observation(action: &str) {
     // Given: P validates A while its original storage observation is still current.
     let fixture = Fixture::new(0);
     let mut service = wire_embedder(fixture.root.path(), open_storage(&fixture.root)).unwrap();
-    service.read_configuration().unwrap();
+    service.get_configuration().unwrap();
     drop(service);
     let mut child = Process::spawn(
         &fixture,
@@ -98,13 +98,13 @@ fn finish_http_requests(fixture: &Fixture, child: &mut Process) -> usize {
         assert!(start.elapsed() < LIMIT, "child watchdog timeout");
         if let Ok((stream, _)) = fixture.listener.accept() {
             requests += 1;
-            reply(read_http_request(stream), SUCCESS);
+            reply(get_http_request(stream), SUCCESS);
         }
         thread::sleep(Duration::from_millis(5));
     }
     while let Ok((stream, _)) = fixture.listener.accept() {
         requests += 1;
-        reply(read_http_request(stream), SUCCESS);
+        reply(get_http_request(stream), SUCCESS);
     }
     requests
 }

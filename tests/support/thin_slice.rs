@@ -83,12 +83,12 @@ impl SliceFixture {
     /// # Panics
     /// Panics on process failure or invalid output.
     pub fn load(&self) -> Value {
-        read_response(&self.repo.invoke(&["search"], SEARCH), 0)
+        get_response(&self.repo.invoke(&["search"], SEARCH), 0)
     }
     /// Read an owned projection observation and release both storage/read handles.
     /// # Panics
     /// Panics on storage failures.
-    pub fn read_projection(&self) -> ProjectionSnapshot {
+    pub fn get_projection(&self) -> ProjectionSnapshot {
         let mut storage = self.repo.open_storage();
         let mut read = storage.begin_read().unwrap();
         let mut result = ProjectionSnapshot {
@@ -97,7 +97,7 @@ impl SliceFixture {
             sources: BTreeMap::new(),
             edges: BTreeSet::new(),
         };
-        for node in read.list_nodes().unwrap() {
+        for node in read.get_nodes().unwrap() {
             match node.metadata {
                 NodeMetadata::Knowledge(k) => {
                     result.knowledge.insert(k.id.as_str().to_owned(), k);
@@ -108,7 +108,7 @@ impl SliceFixture {
             }
         }
         result.edges = read
-            .list_edges(None)
+            .get_edges_by_source_id(None)
             .unwrap()
             .iter()
             .map(|edge| {
@@ -131,7 +131,7 @@ impl SliceFixture {
     pub fn capture_user_state(&self) -> UserState {
         let files = USER_FILES
             .into_iter()
-            .map(|path| (path.to_owned(), self.read_bytes(path)))
+            .map(|path| (path.to_owned(), self.get_bytes(path)))
             .collect();
         let refs = run_git(
             self.repo.get_root(),
@@ -148,13 +148,13 @@ impl SliceFixture {
     /// Read exact live bytes for an independent snapshot oracle.
     /// # Panics
     /// Panics if fixture input is missing.
-    pub fn read_bytes(&self, path: &str) -> Vec<u8> {
+    pub fn get_bytes(&self, path: &str) -> Vec<u8> {
         fs::read(self.repo.get_root().join(path)).unwrap()
     }
     /// Read immutable Git bytes independently of the Letopis snapshot implementation.
     /// # Panics
     /// Panics when the object does not contain the requested path.
-    pub fn read_tree_file(&self, tree: &str, path: &str) -> Vec<u8> {
+    pub fn get_tree_file(&self, tree: &str, path: &str) -> Vec<u8> {
         run_git(self.repo.get_root(), &["show", &format!("{tree}:{path}")])
     }
 }
@@ -176,7 +176,7 @@ pub fn emit_slice(case: &str, command: &str, exit: i32, response: &Value) {
 /// Check transport framing and parse the single product JSON response.
 /// # Panics
 /// Panics on the wrong exit, extra output, or nonempty stderr.
-pub fn read_response(output: &Output, exit: i32) -> Value {
+pub fn get_response(output: &Output, exit: i32) -> Value {
     assert_eq!(output.status.code(), Some(exit), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(

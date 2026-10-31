@@ -82,7 +82,7 @@ pub(super) fn prepare_basis<F: FileSystem, M: MarkdownCodec>(
         {
             continue;
         }
-        let captured = filesystem.read_file(path)?.ok_or_else(fail_changed)?;
+        let captured = filesystem.get_file(path)?.ok_or_else(fail_changed)?;
         if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
             return Err(fail_changed());
         }
@@ -114,6 +114,6 @@ pub(super) fn prepare_basis<F: FileSystem, M: MarkdownCodec>(
     }
     preflight
         .snapshots
-        .extend(graph.list_source_snapshots(&replaced));
+        .extend(graph.get_source_snapshots(&replaced));
     Ok(preflight)
 }

@@ -95,11 +95,11 @@ impl TempRepo {
         fs::write(self.root.join("omit/nested/.gitignore"), b"*.hidden.md\n").unwrap();
         self.run_git_successfully(&["add", "-f", "."], None);
         self.run_git_successfully(&["commit", "-qm", "sparse base"], None);
-        let head = self.read_oid(&["rev-parse", "HEAD"], None);
+        let head = self.get_oid(&["rev-parse", "HEAD"], None);
         fs::write(self.root.join("omit/staged.md"), note).unwrap();
         self.run_git_successfully(&["add", "-f", "omit/staged.md"], None);
         self.run_git_successfully(&["commit", "-qm", "index-only membership"], None);
-        let tree = self.read_oid(&["rev-parse", "HEAD:omit"], None);
+        let tree = self.get_oid(&["rev-parse", "HEAD:omit"], None);
         self.run_git_successfully(
             &["sparse-checkout", "init", "--cone", "--sparse-index"],
             None,
@@ -176,7 +176,7 @@ impl TempRepo {
         );
         out.stdout
     }
-    pub fn read_oid(&self, args: &[&str], input: Option<&[u8]>) -> String {
+    pub fn get_oid(&self, args: &[&str], input: Option<&[u8]>) -> String {
         String::from_utf8(self.run_git_successfully(args, input))
             .unwrap()
             .trim()
@@ -218,8 +218,8 @@ impl TempRepo {
             fs::remove_file(self.root.join(path)).unwrap();
         }
     }
-    pub fn read_direct_ref(&self, oid: &str) -> String {
-        self.read_oid(&["rev-parse", &format!("{SNAPSHOT_REF_PREFIX}{oid}")], None)
+    pub fn get_direct_ref(&self, oid: &str) -> String {
+        self.get_oid(&["rev-parse", &format!("{SNAPSHOT_REF_PREFIX}{oid}")], None)
     }
     pub fn build_object_path(&self, oid: &str) -> PathBuf {
         self.root

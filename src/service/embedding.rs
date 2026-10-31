@@ -36,7 +36,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     for EmbeddingService<S, F, M, P>
 {
     fn has_work(&mut self) -> CommandResult<bool> {
-        let ConfigState::Ready(config) = self.read_configuration().map_err(map_command)? else {
+        let ConfigState::Ready(config) = self.get_configuration().map_err(map_command)? else {
             return Ok(false);
         };
         let next = self
@@ -44,7 +44,11 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
             .begin_read()
             .map_err(map_storage)
             .map_err(map_command)?
-            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None)
+            .get_next_embedding_work_by_id_and_max_attempts(
+                &config.get_identity(),
+                config.get_max_attempts(),
+                None,
+            )
             .map_err(map_storage)
             .map_err(map_command)?;
         Ok(matches!(next, VectorOutcome::Current(Some(_))))
@@ -64,10 +68,10 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     for EmbeddingService<S, F, M, P>
 {
     fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding> {
-        let ConfigState::Ready(config) = self.read_configuration()? else {
+        let ConfigState::Ready(config) = self.get_configuration()? else {
             return Ok(QueryEmbedding::Unavailable);
         };
-        let VectorOutcome::Current(dimensions) = self.read_dimensions(&config)? else {
+        let VectorOutcome::Current(dimensions) = self.get_dimensions(&config)? else {
             return Ok(QueryEmbedding::Unavailable);
         };
         self.embed_query_with_config(QueryEmbeddingRequest {
@@ -84,11 +88,11 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
         if self.provider.validate_config(request.config).is_err() {
             return Ok(QueryEmbedding::Unavailable);
         }
-        let VectorOutcome::Current(_) = self.read_dimensions(request.config)? else {
+        let VectorOutcome::Current(_) = self.get_dimensions(request.config)? else {
             return Ok(QueryEmbedding::Unavailable);
         };
         let mut result = self.compute_vector(request.config, request.text, request.dimensions);
-        let VectorOutcome::Current(current) = self.read_dimensions(request.config)? else {
+        let VectorOutcome::Current(current) = self.get_dimensions(request.config)? else {
             return Ok(QueryEmbedding::Unavailable);
         };
         if let Ok(vector) = &result
@@ -100,7 +104,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     }
 
     fn drain(&mut self) -> EmbeddingResult<DrainOutcome> {
-        let config = match self.read_configuration()? {
+        let config = match self.get_configuration()? {
             ConfigState::Ready(config) => config,
             ConfigState::Changed => return Ok(DrainOutcome::ConfigChanged),
             ConfigState::Missing | ConfigState::Invalid(_) | ConfigState::Disabled => {
@@ -113,7 +117,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
         self.drain_ready(&config)
     }
 
-    fn read_configuration(&mut self) -> EmbeddingResult<ConfigState> {
+    fn get_configuration(&mut self) -> EmbeddingResult<ConfigState> {
         let observed = self
             .storage
             .begin_read()
@@ -121,7 +125,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
             .get_config_identity();
         #[cfg(test)]
         tests::reach_checkpoint("observed");
-        let config = match self.read_config_file() {
+        let config = match self.get_config_file() {
             Ok(None) => return Ok(ConfigState::Missing),
             Err(error) => return Ok(ConfigState::Invalid(error.get_kind())),
             Ok(Some(Configuration::Unconfigured { .. } | Configuration::Disabled(_))) => {
@@ -145,9 +149,9 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
 impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     EmbeddingService<S, F, M, P>
 {
-    fn read_config_file(&self) -> EmbeddingResult<Option<Configuration>> {
+    fn get_config_file(&self) -> EmbeddingResult<Option<Configuration>> {
         self.files
-            .read_config()?
+            .get_config()?
             .map(|bytes| validate_configuration(&bytes, &self.provider))
             .transpose()
     }
@@ -160,7 +164,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
                 .storage
                 .begin_read()
                 .map_err(map_storage)?
-                .read_next_embedding_work(
+                .get_next_embedding_work_by_id_and_max_attempts(
                     &config.get_identity(),
                     config.get_max_attempts(),
                     after.as_ref(),
@@ -211,7 +215,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
             .map_err(|cause| {
                 EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, cause)
             })?;
-        let Some(bytes) = self.files.read_document(&path)? else {
+        let Some(bytes) = self.files.get_document(&path)? else {
             return Ok(None);
         };
         let parsed = self
@@ -233,7 +237,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
         work: &EmbeddingWork,
         text: EmbeddingResult<String>,
     ) -> EmbeddingResult<DrainOutcome> {
-        let VectorOutcome::Current(dimensions) = self.read_dimensions(config)? else {
+        let VectorOutcome::Current(dimensions) = self.get_dimensions(config)? else {
             return Ok(DrainOutcome::ConfigChanged);
         };
         match self.reserve(config, &work.search_hash)? {
@@ -261,14 +265,14 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
         }
     }
 
-    fn read_dimensions(
+    fn get_dimensions(
         &mut self,
         config: &EmbeddingConfig,
     ) -> EmbeddingResult<VectorOutcome<Option<NonZeroUsize>>> {
         self.storage
             .begin_read()
             .map_err(map_storage)?
-            .read_vector_dimensions(&config.get_identity())
+            .get_vector_dimensions(&config.get_identity())
             .map_err(map_storage)
     }
 
@@ -307,7 +311,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
             .storage
             .begin_read()
             .map_err(map_storage)?
-            .read_failure(&config.get_identity(), hash)
+            .get_failure_by_search_hash(&config.get_identity(), hash)
             .map_err(map_storage)?;
         match failure {
             VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),

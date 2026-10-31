@@ -1,6 +1,6 @@
 use super::{
-    ConfinedDirectory, can_retry_initialization, configure_database, map_sqlite, prepare_paths,
-    read_journal, resolve_path, wait_for_initialization,
+    ConfinedDirectory, can_retry_initialization, configure_database, get_journal, map_sqlite,
+    prepare_paths, resolve_path, wait_for_initialization,
 };
 use crate::service::{StorageError, StorageErrorKind};
 use rusqlite::{Connection, ffi};
@@ -185,7 +185,7 @@ fn reads_the_existing_database_journal_mode() {
             .pragma_update(None, "journal_mode", expected)
             .unwrap();
         // When
-        let journal = read_journal(&connection, "main").unwrap();
+        let journal = get_journal(&connection, "main").unwrap();
         // Then: readiness checks must observe the mode before changing it.
         assert_eq!(journal, expected);
     }
@@ -205,7 +205,7 @@ fn rejects_each_policy_setting_that_sqlite_does_not_apply() {
         drop(ignored);
         // Then: WAL and the other setting work, but one bad setting must fail closed.
         assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
-        assert_eq!(read_journal(&connection, "main").unwrap(), "wal");
+        assert_eq!(get_journal(&connection, "main").unwrap(), "wal");
         for (setting, expected) in [("foreign_keys", 1), ("synchronous", 2)] {
             let observed: i64 = connection
                 .pragma_query_value(None, setting, |row| row.get(0))

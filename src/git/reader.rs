@@ -78,7 +78,7 @@ impl ObjectReader {
     ///
     /// # Errors
     /// Uses caller-selected missing/type errors; decoding and integrity failures are internal.
-    pub(super) fn read_object(
+    pub(super) fn get_object(
         &mut self,
         oid: &str,
         expected: &str,
@@ -118,7 +118,7 @@ impl ObjectReader {
     ///
     /// # Errors
     /// Uses caller-selected missing/type errors; decoding and checksum failures are internal.
-    pub(super) fn read_bytes(
+    pub(super) fn get_bytes(
         &mut self,
         oid: &str,
         expected: &str,

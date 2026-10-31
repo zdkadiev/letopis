@@ -1,5 +1,5 @@
 use super::confined::{
-    ConfinedParent, map_io, read_stat, reject_input, require_identity, require_type, verify_entry,
+    ConfinedParent, get_stat, map_io, reject_input, require_identity, require_type, verify_entry,
 };
 use crate::service::EmbeddingResult;
 use rustix::fs::{FileType, Mode, OFlags, Stat, fstat, openat};
@@ -12,7 +12,7 @@ pub(super) enum ReadStage {
     AfterRead,
 }
 
-pub(super) fn read_regular(
+pub(super) fn get_regular(
     root: &File,
     path: &str,
     mut observe: impl FnMut(ReadStage),
@@ -22,7 +22,7 @@ pub(super) fn read_regular(
     let Some(parent) = ConfinedParent::walk(root, ancestors)? else {
         return Ok(None);
     };
-    let Some(before) = read_stat(&parent.directory, name)? else {
+    let Some(before) = get_stat(&parent.directory, name)? else {
         parent.verify_links()?;
         return Ok(None);
     };

@@ -27,7 +27,7 @@ fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
     let refs = repo.run_git_successfully(&["show-ref"], None);
     let git = GitRepository::open(repo.get_root()).unwrap();
     // When
-    let candidates = git.list_candidates().unwrap();
+    let candidates = git.get_candidates().unwrap();
     // Then
     assert_eq!(
         candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -57,7 +57,7 @@ fn shared_repository_observes_index_and_ignore_edits_between_listings() {
         let git = GitRepository::open(repo.get_root()).unwrap();
         let shared = git.clone();
         assert_eq!(
-            git.list_candidates().unwrap(),
+            git.get_candidates().unwrap(),
             [RepoPath::parse("live.md").unwrap()]
         );
         // When: Git stages an ignored file and removes the previous index entry.
@@ -66,7 +66,7 @@ fn shared_repository_observes_index_and_ignore_edits_between_listings() {
         fs::write(repo.get_root().join(".gitignore"), b"ignored.md\nlive.md\n").unwrap();
         // Then: the clone sees the new index and fresh ignore bytes without reopening.
         assert_eq!(
-            shared.list_candidates().unwrap(),
+            shared.get_candidates().unwrap(),
             [RepoPath::parse("ignored.md").unwrap()]
         );
         // When: remove the tracked file and make the other live file eligible again.
@@ -74,7 +74,7 @@ fn shared_repository_observes_index_and_ignore_edits_between_listings() {
         fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
         // Then: the original handle also refreshes its index/exclude observation.
         assert_eq!(
-            git.list_candidates().unwrap(),
+            git.get_candidates().unwrap(),
             [RepoPath::parse("live.md").unwrap()]
         );
     }
@@ -91,14 +91,14 @@ fn candidates_reject_unsupported_raw_paths() {
         // Given
         let repo = TempRepo::new(ObjectFormat::Sha1);
         // Git's index supports raw paths even when the host filesystem rejects them.
-        let oid = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+        let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
         let mut entry = format!("100644 {oid}\t").into_bytes();
         entry.extend(raw);
         entry.push(0);
         repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
         let git = GitRepository::open(repo.get_root()).unwrap();
         // When
-        let error = git.list_candidates().unwrap_err();
+        let error = git.get_candidates().unwrap_err();
         // Then
         assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
         assert!(!error.to_string().contains("bad"));
@@ -110,7 +110,7 @@ fn candidates_deduplicate_unmerged_index_stages() {
     use crate::service::CorpusLister;
     // Given
     let repo = TempRepo::new(ObjectFormat::Sha1);
-    let oid = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"conflict"));
+    let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"conflict"));
     let entries = format!(
         "0 {}\tconflict.md\n100644 {oid} 1\tconflict.md\n100644 {oid} 2\tconflict.md\n100644 {oid} 3\tconflict.md\n",
         "0".repeat(40)
@@ -118,7 +118,7 @@ fn candidates_deduplicate_unmerged_index_stages() {
     repo.run_git_successfully(&["update-index", "--index-info"], Some(entries.as_bytes()));
     let git = GitRepository::open(repo.get_root()).unwrap();
     // When
-    let candidates = git.list_candidates().unwrap();
+    let candidates = git.get_candidates().unwrap();
     // Then
     assert_eq!(
         candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -137,14 +137,14 @@ fn candidates_exclude_metadata_before_validating_paths() {
         // Given: Git can list metadata names unsupported by the corpus model.
         let repo = TempRepo::new(ObjectFormat::Sha1);
         fs::write(repo.get_root().join(".letopis-notes.md"), b"candidate").unwrap();
-        let oid = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+        let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
         let mut entry = format!("100644 {oid}\t").into_bytes();
         entry.extend(raw);
         entry.push(0);
         repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
         let git = GitRepository::open(repo.get_root()).unwrap();
         // When
-        let candidates = git.list_candidates().unwrap();
+        let candidates = git.get_candidates().unwrap();
         // Then
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -212,7 +212,7 @@ fn corpus_matches_git_for_nested_excludes_staged_deletion_and_symlinks() {
     // When: the library lists the current worktree's real index and ignore stack.
     let actual = GitRepository::open(repo.get_root())
         .unwrap()
-        .list_candidates()
+        .get_candidates()
         .unwrap();
     // Then: each independent oracle path is present once and user state stays unchanged.
     assert_eq!(
@@ -260,7 +260,7 @@ fn linked_worktree_listing_uses_its_own_index() {
     // When: discovery begins in the linked worktree rather than the common gitdir.
     let actual = GitRepository::open(&linked)
         .unwrap()
-        .list_candidates()
+        .get_candidates()
         .unwrap();
     // Then: the deleted-but-staged linked path is retained and the other index is untouched.
     assert!(
@@ -272,7 +272,7 @@ fn linked_worktree_listing_uses_its_own_index() {
     assert!(
         !GitRepository::open(repo.get_root())
             .unwrap()
-            .list_candidates()
+            .get_candidates()
             .unwrap()
             .contains(&RepoPath::parse("linked-only.md").unwrap())
     );
@@ -286,15 +286,15 @@ fn corpus_ignores_replacements_for_index_backed_ignore_files() {
     fs::write(repo.get_root().join(".gitignore"), b"hidden.md\n").unwrap();
     fs::write(repo.get_root().join("hidden.md"), b"hidden").unwrap();
     repo.run_git_successfully(&["add", ".gitignore"], None);
-    let original = repo.read_oid(&["rev-parse", ":.gitignore"], None);
-    let replacement = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b""));
+    let original = repo.get_oid(&["rev-parse", ":.gitignore"], None);
+    let replacement = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b""));
     repo.run_git_successfully(&["replace", &original, &replacement], None);
     repo.run_git_successfully(&["update-index", "--skip-worktree", ".gitignore"], None);
     fs::remove_file(repo.get_root().join(".gitignore")).unwrap();
     // When: candidate enumeration falls back to the index's raw ignore blob.
     let actual = GitRepository::open(repo.get_root())
         .unwrap()
-        .list_candidates()
+        .get_candidates()
         .unwrap();
     // Then: replacement refs cannot change corpus membership.
     assert_eq!(
@@ -335,13 +335,13 @@ fn sparse_index_expands_index_tree_membership_without_changing_user_state() {
             .collect();
         oracle.sort_unstable();
         assert_eq!(oracle, expected);
-        let empty = repo.read_oid(&["mktree"], Some(b""));
+        let empty = repo.get_oid(&["mktree"], Some(b""));
         repo.run_git_successfully(&["replace", &tree, &empty], None);
         let before = repo.capture_fixture_state();
         // When: listing expands the actual index's tree, including deleted tracked paths.
         let actual = GitRepository::open(repo.get_root())
             .unwrap()
-            .list_candidates()
+            .get_candidates()
             .unwrap();
         // Then: tracked paths survive ignores, untracked ignored paths do not.
         assert_eq!(
@@ -364,7 +364,7 @@ fn sparse_index_rejects_missing_corrupt_trees_and_late_alternates_safely() {
             match failure {
                 "missing" => fs::remove_file(repo.build_object_path(&tree)).unwrap(),
                 "corrupt" => {
-                    let empty = repo.read_oid(&["mktree"], Some(b""));
+                    let empty = repo.get_oid(&["mktree"], Some(b""));
                     repo.replace_loose_object(&tree, &empty);
                 }
                 _ => fs::write(
@@ -375,7 +375,7 @@ fn sparse_index_rejects_missing_corrupt_trees_and_late_alternates_safely() {
             }
             let before = repo.capture_fixture_state();
             // When: listing needs the collapsed tree rather than trusting HEAD or prior policy.
-            let error = git.list_candidates().unwrap_err();
+            let error = git.get_candidates().unwrap_err();
             // Then: no incomplete successful listing or raw object/path payload escapes.
             assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
             assert_eq!(error.to_string(), "cannot list document candidates");
@@ -385,7 +385,7 @@ fn sparse_index_rejects_missing_corrupt_trees_and_late_alternates_safely() {
 }
 
 fn prepare_exclude_fixture(repo: &TempRepo) {
-    let commit = repo.read_oid(&["rev-parse", "HEAD"], None);
+    let commit = repo.get_oid(&["rev-parse", "HEAD"], None);
     repo.run_git_successfully(
         &[
             "update-index",

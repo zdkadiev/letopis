@@ -127,9 +127,9 @@ impl GitSnapshots for GitRepository {
         self.require_self_contained_objects()?;
         objects::ObjectDb { git: self }.create_tree_from_blobs(entries)
     }
-    fn read_blob(&self, tree: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
+    fn get_blob(&self, tree: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
         self.require_self_contained_objects()?;
-        objects::ObjectDb { git: self }.read_blob(tree, path)
+        objects::ObjectDb { git: self }.get_blob(tree, path)
     }
     fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
         self.require_self_contained_objects()?;
@@ -152,8 +152,8 @@ impl SnapshotVerifier for GitRepository {
 }
 
 impl CorpusLister for GitRepository {
-    fn list_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
-        corpus::list_candidates(self, &self.root)
+    fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+        corpus::get_candidates(self, &self.root)
     }
 }
 fn require_absent_alternates(path: &Path) -> Result<(), SnapshotError> {

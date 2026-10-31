@@ -32,7 +32,7 @@ fn keeps_captured_config_after_live_config_changes() {
     };
 
     // When
-    let report = service.read_status().unwrap();
+    let report = service.get_status().unwrap();
 
     // Then
     assert_eq!((report.embedding_backlog, report.embedding_failed), (0, 1));
@@ -71,7 +71,7 @@ fn mismatched_identity_keeps_exhausted_hash_in_backlog() {
     );
 
     // When
-    let report = service.read_status().unwrap();
+    let report = service.get_status().unwrap();
 
     // Then
     assert_eq!((report.embedding_backlog, report.embedding_failed), (1, 0));

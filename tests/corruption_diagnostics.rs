@@ -203,7 +203,7 @@ fn capture_user_state(repo: &ReadingRepo, canonical_paths: &[&str]) -> UserFixtu
         head: fs::read(repo.get_root().join(".git/HEAD")).unwrap(),
         index: fs::read(repo.get_root().join(".git/index")).unwrap(),
         git_config: fs::read(repo.get_root().join(".git/config")).unwrap(),
-        user_refs: read_user_refs(repo.get_root()),
+        user_refs: get_user_refs(repo.get_root()),
         canonical_files: canonical_paths
             .iter()
             .chain([&"live.md", &".letopis/config.json"])
@@ -217,7 +217,7 @@ fn capture_user_state(repo: &ReadingRepo, canonical_paths: &[&str]) -> UserFixtu
     }
 }
 
-fn read_user_refs(root: &Path) -> Vec<u8> {
+fn get_user_refs(root: &Path) -> Vec<u8> {
     let mut command = Command::new("git");
     isolate_command(&mut command);
     let output = command

@@ -60,7 +60,7 @@ impl FileSystem for TestFiles {
     fn stat_file(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
         Ok((!self.missing.get()).then(|| self.stat.get()))
     }
-    fn read_file(&self, _: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+    fn get_file(&self, _: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
         let reads = self.reads.get() + 1;
         self.reads.set(reads);
         if self.fail_on_read.get() == Some(reads) {
@@ -169,7 +169,7 @@ fn detect_same_tick_equal_stat_edit_and_do_not_publish_unchanged_racy_bytes() {
         stat
     });
     service.refresh().unwrap();
-    let before = service.storage.begin_read().unwrap().list_files().unwrap();
+    let before = service.storage.begin_read().unwrap().get_files().unwrap();
     service.filesystem.reset_counts();
     // When
     let unchanged = service.refresh().unwrap();
@@ -183,7 +183,7 @@ fn detect_same_tick_equal_stat_edit_and_do_not_publish_unchanged_racy_bytes() {
         (1, 0)
     );
     assert_eq!(
-        service.storage.begin_read().unwrap().list_files().unwrap(),
+        service.storage.begin_read().unwrap().get_files().unwrap(),
         before
     );
     // Given: exact same size, inode and mtime; only bytes differ.
@@ -192,8 +192,8 @@ fn detect_same_tick_equal_stat_edit_and_do_not_publish_unchanged_racy_bytes() {
     let changed = service.refresh().unwrap();
     // Then
     assert_eq!(changed.revision, 2);
-    assert_eq!(read_matches(&mut service, "BravoToken"), ["note.md"]);
-    assert!(read_matches(&mut service, "AlphaToken").is_empty());
+    assert_eq!(get_matches(&mut service, "BravoToken"), ["note.md"]);
+    assert!(get_matches(&mut service, "AlphaToken").is_empty());
 }
 
 #[test]
@@ -239,9 +239,9 @@ fn stat_only_change_preserves_projection_and_invalid_state_without_parsing() {
             stat
         });
         service.refresh().unwrap();
-        let before_nodes = service.storage.begin_read().unwrap().list_nodes().unwrap();
-        let before_files = service.storage.begin_read().unwrap().list_files().unwrap();
-        let before_fts = read_fts_blocks(dir.path());
+        let before_nodes = service.storage.begin_read().unwrap().get_nodes().unwrap();
+        let before_files = service.storage.begin_read().unwrap().get_files().unwrap();
+        let before_fts = get_fts_blocks(dir.path());
         let parses = service.markdown.0.get();
         service.filesystem.stat.update(|mut stat| {
             stat.inode += 1;
@@ -254,12 +254,12 @@ fn stat_only_change_preserves_projection_and_invalid_state_without_parsing() {
         assert!(outcome.published);
         assert_eq!(outcome.files_updated, 1);
         assert_eq!(service.markdown.0.get(), parses);
-        assert_eq!(read_fts_blocks(dir.path()), before_fts);
+        assert_eq!(get_fts_blocks(dir.path()), before_fts);
         assert_eq!(
-            service.storage.begin_read().unwrap().list_nodes().unwrap(),
+            service.storage.begin_read().unwrap().get_nodes().unwrap(),
             before_nodes
         );
-        let after_files = service.storage.begin_read().unwrap().list_files().unwrap();
+        let after_files = service.storage.begin_read().unwrap().get_files().unwrap();
         assert_eq!(after_files[0].inode, before_files[0].inode + 1);
         assert_eq!(after_files[0].valid, before_files[0].valid);
         assert_eq!(after_files[0].error, before_files[0].error);
@@ -280,8 +280,8 @@ fn changed_capture_between_locked_detection_and_preparation_aborts() {
     assert!(result.is_err());
     let mut read = service.storage.begin_read().unwrap();
     assert_eq!(read.get_revision(), 0);
-    assert!(read.list_files().unwrap().is_empty());
-    assert!(read.list_nodes().unwrap().is_empty());
+    assert!(read.get_files().unwrap().is_empty());
+    assert!(read.get_nodes().unwrap().is_empty());
 }
 
 #[test]
@@ -289,7 +289,7 @@ fn fatal_read_is_not_an_invalid_markdown_publication() {
     // Given
     let (_dir, mut service) = build_service();
     service.refresh().unwrap();
-    let before = service.storage.begin_read().unwrap().list_files().unwrap();
+    let before = service.storage.begin_read().unwrap().get_files().unwrap();
     service.filesystem.reset_counts();
     service.filesystem.stat.update(|mut stat| {
         stat.inode += 1;
@@ -301,7 +301,7 @@ fn fatal_read_is_not_an_invalid_markdown_publication() {
     let mut read = service.storage.begin_read().unwrap();
     // Then
     assert_eq!(read.get_revision(), 1);
-    assert_eq!(read.list_files().unwrap(), before);
+    assert_eq!(read.get_files().unwrap(), before);
     assert_eq!(read.match_text("AlphaToken").unwrap().len(), 1);
 }
 
@@ -344,15 +344,15 @@ fn discard_preliminary_capture_and_publish_the_locked_observation() {
     let outcome = service.refresh().unwrap();
     // Then
     assert_eq!(outcome.revision, 2);
-    assert_eq!(read_matches(&mut service, "BravoToken"), ["note.md"]);
-    assert!(read_matches(&mut service, "AlphaToken").is_empty());
+    assert_eq!(get_matches(&mut service, "BravoToken"), ["note.md"]);
+    assert!(get_matches(&mut service, "AlphaToken").is_empty());
 }
 
 // A same-text DELETE/INSERT changes FTS segment bytes even if search results agree.
-fn read_fts_blocks(root: &Path) -> Vec<(i64, Vec<u8>)> {
+fn get_fts_blocks(root: &Path) -> Vec<(i64, Vec<u8>)> {
     let connection = Connection::open(root.join("cache.db")).unwrap();
     connection
-        .prepare("SELECT id, block FROM text_index_data ORDER BY id")
+        .prepare("select id, block from text_index_data order by id")
         .unwrap()
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
         .unwrap()
@@ -376,7 +376,7 @@ fn build_service() -> (TempDir, TestService) {
     )
 }
 
-fn read_matches(service: &mut TestService, text: &str) -> Vec<String> {
+fn get_matches(service: &mut TestService, text: &str) -> Vec<String> {
     service
         .storage
         .begin_read()
@@ -398,7 +398,7 @@ mod reindex;
 fn build_candidates() -> Candidates {
     let mut candidates = Candidates::new();
     candidates
-        .expect_list_candidates()
+        .expect_get_candidates()
         .returning(|| Ok(vec![RepoPath::parse("note.md").unwrap()]));
     candidates
 }

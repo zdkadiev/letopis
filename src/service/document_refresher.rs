@@ -98,7 +98,7 @@ impl<
     }
 
     fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
-        let preliminary = self.read_file_state()?;
+        let preliminary = self.get_file_state()?;
         if preliminary.revision != 0
             && self
                 .detect_changes(&preliminary, PublicationMode::Incremental)?
@@ -129,7 +129,7 @@ impl<
         requested: PublicationMode,
         verification: SnapshotVerification,
     ) -> DocumentResult<RefreshOutcome> {
-        let state = self.read_file_state()?;
+        let state = self.get_file_state()?;
         let mode = if state.revision == 0 {
             PublicationMode::Full
         } else {
@@ -145,13 +145,13 @@ impl<
         self.publish_changes(&state, delta, mode, verification)
     }
 
-    fn read_file_state(&mut self) -> DocumentResult<FileState> {
+    fn get_file_state(&mut self) -> DocumentResult<FileState> {
         let mut read = self.storage.begin_read()?;
         Ok(FileState {
             revision: read.get_revision(),
-            source_snapshots: read.list_source_snapshots()?,
+            source_snapshots: read.get_source_snapshots()?,
             files: read
-                .list_files()?
+                .get_files()?
                 .into_iter()
                 .map(|row| (row.path.clone(), row))
                 .collect(),
@@ -159,7 +159,7 @@ impl<
     }
 
     fn detect_changes(&self, state: &FileState, mode: PublicationMode) -> DocumentResult<Delta> {
-        let candidates: BTreeSet<_> = self.git.list_candidates()?.into_iter().collect();
+        let candidates: BTreeSet<_> = self.git.get_candidates()?.into_iter().collect();
         let mut delta = Delta {
             updated: BTreeMap::new(),
             removed: BTreeMap::new(),
@@ -276,7 +276,7 @@ fn detect_file<F: FileSystem>(
     if same_stat && previous.is_some_and(|row| !is_racy(row, filesystem.get_time_ns().ok())) {
         return Ok(None);
     }
-    let captured = filesystem.read_file(path)?.ok_or_else(fail_changed)?;
+    let captured = filesystem.get_file(path)?.ok_or_else(fail_changed)?;
     if captured.stat != stat {
         return Err(fail_changed());
     }

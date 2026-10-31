@@ -1,4 +1,4 @@
-use super::{INITIAL, build_service, read_matches};
+use super::{INITIAL, build_service, get_matches};
 use crate::service::{Refresher, Storage, StorageRead};
 use rusqlite::Connection;
 
@@ -8,9 +8,9 @@ fn reindex_rebuilds_unchanged_fts_and_advances_once() {
     let (dir, mut service) = build_service();
     service.refresh().unwrap();
     let db = Connection::open(dir.path().join("cache.db")).unwrap();
-    db.execute("DELETE FROM text_index", []).unwrap();
+    db.execute("delete from text_index", []).unwrap();
     assert!(!service.refresh().unwrap().published);
-    assert!(read_matches(&mut service, "AlphaToken").is_empty());
+    assert!(get_matches(&mut service, "AlphaToken").is_empty());
     // When.
     let rebuilt = service.reindex().unwrap();
     // Then: this must not be an incremental no-op.
@@ -18,7 +18,7 @@ fn reindex_rebuilds_unchanged_fts_and_advances_once() {
         (rebuilt.revision, rebuilt.published, rebuilt.files_updated),
         (2, true, 1)
     );
-    assert_eq!(read_matches(&mut service, "AlphaToken"), ["note.md"]);
+    assert_eq!(get_matches(&mut service, "AlphaToken"), ["note.md"]);
     assert_eq!(service.reindex().unwrap().revision, 3);
 }
 
@@ -54,7 +54,7 @@ fn reindex_capture_failure_preserves_complete_publication() {
     // Given: fail the publication capture after detection and preflight.
     let (_dir, mut service) = build_service();
     service.refresh().unwrap();
-    let before = service.storage.begin_read().unwrap().list_files().unwrap();
+    let before = service.storage.begin_read().unwrap().get_files().unwrap();
     service.filesystem.reset_counts();
     service.filesystem.fail_on_read.set(Some(3));
     // When.
@@ -62,7 +62,7 @@ fn reindex_capture_failure_preserves_complete_publication() {
     // Then.
     let mut read = service.storage.begin_read().unwrap();
     assert_eq!(read.get_revision(), 1);
-    assert_eq!(read.list_files().unwrap(), before);
+    assert_eq!(read.get_files().unwrap(), before);
     assert_eq!(
         read.match_text("AlphaToken").unwrap()[0].id.as_str(),
         "note.md"

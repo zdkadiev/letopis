@@ -53,7 +53,7 @@ impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec, P: 
             .map_err(map_revision_error)?;
         let config = self
             .embeddings
-            .read_configuration()
+            .get_configuration()
             .map_err(map_search_error)?;
         let mut read = self.storage.begin_read().map_err(map_search_error)?;
         let captured = capture_vector_config(&mut read, &config)?;
@@ -64,13 +64,13 @@ impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec, P: 
             find_vector_candidates(&mut read, &mut self.embeddings, captured, &request.query)?;
         let fts = read.match_text(&expression).map_err(map_search_error)?;
         validate_metrics(&fts, &vectors)?;
-        let metadata = read_candidate_metadata(&mut read, &fts, &vectors)?;
+        let metadata = get_candidate_metadata(&mut read, &fts, &vectors)?;
         let eligibility = SearchEligibility {
             filesystem: &self.filesystem,
             markdown: &self.markdown,
             provenance: &self.provenance,
         };
-        let mut links = eligibility.read_eligible_links(&mut read, &metadata, &request.filters)?;
+        let mut links = eligibility.get_eligible_links(&mut read, &metadata, &request.filters)?;
         let eligible = links.keys().cloned().collect();
         let ranked = rank_candidates(&fts, &vectors, &eligible, request.limit)?;
         ranked
@@ -81,7 +81,7 @@ impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec, P: 
 }
 
 impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_, F, M, P> {
-    fn read_eligible_links<R: StorageRead>(
+    fn get_eligible_links<R: StorageRead>(
         &self,
         read: &mut R,
         metadata: &BTreeMap<KnowledgeId, KnowledgeMetadata>,
@@ -90,7 +90,7 @@ impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
         let mut comparisons = RevisionComparisons::new(self.provenance);
         let mut links = BTreeMap::new();
         for (id, node) in metadata {
-            let sources = read_source_bindings(read, id)?;
+            let sources = get_source_bindings(read, id)?;
             if !Self::matches_sources(&mut comparisons, node, &sources, filters)? {
                 continue;
             }
@@ -155,12 +155,12 @@ impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
     }
 }
 
-fn read_source_bindings<R: StorageRead>(
+fn get_source_bindings<R: StorageRead>(
     read: &mut R,
     id: &KnowledgeId,
 ) -> CommandResult<BTreeSet<SourceUri>> {
     Ok(read
-        .list_edges(Some(id))
+        .get_edges_by_source_id(Some(id))
         .map_err(map_search_error)?
         .into_iter()
         .filter_map(|edge| match edge.get_target() {
@@ -181,7 +181,7 @@ fn capture_vector_config<'a, R: StorageRead>(
         return Ok(None);
     }
     let VectorOutcome::Current(Some(dimensions)) = read
-        .read_vector_dimensions(&config.get_identity())
+        .get_vector_dimensions(&config.get_identity())
         .map_err(map_search_error)?
     else {
         return Ok(None);
@@ -242,21 +242,21 @@ fn find_vector_candidates<R: StorageRead, E: Embedder>(
     }
 }
 
-fn read_candidate_metadata<R: StorageRead>(
+fn get_candidate_metadata<R: StorageRead>(
     read: &mut R,
     fts: &[TextMatch],
     vectors: &[VectorMatch],
 ) -> CommandResult<BTreeMap<KnowledgeId, KnowledgeMetadata>> {
     let mut metadata = BTreeMap::new();
     for hit in fts {
-        let (row_id, node) = read_knowledge(read, &hit.id)?;
+        let (row_id, node) = get_knowledge(read, &hit.id)?;
         if row_id != hit.row_id {
             return Err(fail_invalid_search_data());
         }
         metadata.insert(hit.id.clone(), node);
     }
     for hit in vectors {
-        let (_, node) = read_knowledge(read, &hit.id)?;
+        let (_, node) = get_knowledge(read, &hit.id)?;
         if node.search_hash != hit.search_hash {
             return Err(fail_invalid_search_data());
         }
@@ -265,12 +265,12 @@ fn read_candidate_metadata<R: StorageRead>(
     Ok(metadata)
 }
 
-fn read_knowledge<R: StorageRead>(
+fn get_knowledge<R: StorageRead>(
     read: &mut R,
     id: &KnowledgeId,
 ) -> CommandResult<(i64, KnowledgeMetadata)> {
     let stored = read
-        .read_node(&EdgeTarget::Knowledge(id.clone()))
+        .get_node_by_id(&EdgeTarget::Knowledge(id.clone()))
         .map_err(map_search_error)?
         .ok_or_else(fail_invalid_search_data)?;
     let NodeMetadata::Knowledge(node) = stored.metadata else {

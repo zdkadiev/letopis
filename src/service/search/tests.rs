@@ -1,7 +1,6 @@
 use super::{
-    build_fts_expression, capture_vector_config, find_vector_candidates,
+    build_fts_expression, capture_vector_config, find_vector_candidates, get_candidate_metadata,
     ranking::{calculate_rank_weight, rank_candidates},
-    read_candidate_metadata,
 };
 use crate::{
     domain::{ElementKind, KnowledgeId, LineRange, Sha256},
@@ -17,7 +16,7 @@ use std::{collections::BTreeSet, num::NonZeroUsize};
 mockall::mock! {
     Query {}
     impl Embedder for Query {
-        fn read_configuration(&mut self) -> EmbeddingResult<ConfigState>;
+        fn get_configuration(&mut self) -> EmbeddingResult<ConfigState>;
         fn drain(&mut self) -> EmbeddingResult<DrainOutcome>;
         fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding>;
         fn embed_query_with_config<'a>(&mut self, request: QueryEmbeddingRequest<'a>) -> EmbeddingResult<QueryEmbedding>;
@@ -210,11 +209,9 @@ fn candidate_metadata_rejects_wrong_rows_and_search_hashes() {
     let mut bad_row = make_text_match("a.md", 0.0);
     bad_row.row_id = row + 1;
     // When / Then
-    assert!(read_candidate_metadata(&mut read, &[bad_row], &[]).is_err());
-    assert!(read_candidate_metadata(&mut read, &[], &[make_vector_match("a.md", 0.0)]).is_err());
-    assert!(
-        read_candidate_metadata(&mut read, &[make_text_match("missing.md", 0.0)], &[]).is_err()
-    );
+    assert!(get_candidate_metadata(&mut read, &[bad_row], &[]).is_err());
+    assert!(get_candidate_metadata(&mut read, &[], &[make_vector_match("a.md", 0.0)]).is_err());
+    assert!(get_candidate_metadata(&mut read, &[make_text_match("missing.md", 0.0)], &[]).is_err());
     assert_eq!(read.get_revision(), 1);
 }
 #[test]
@@ -372,7 +369,7 @@ fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
 
 fn build_query(result: Option<EmbeddingResult<QueryEmbedding>>) -> MockQuery {
     let mut query = MockQuery::new();
-    query.expect_read_configuration().times(0);
+    query.expect_get_configuration().times(0);
     query.expect_drain().times(0);
     query.expect_embed_query().times(0);
     if let Some(result) = result {

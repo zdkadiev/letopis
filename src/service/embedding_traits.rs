@@ -38,12 +38,12 @@ pub trait EmbeddingFiles {
     ///
     /// # Errors
     /// Reports unsafe paths, observed replacement or I/O failure.
-    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
+    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
     /// Read a current regular document beneath the pinned checkout.
     ///
     /// # Errors
     /// Reports unsafe paths, observed replacement or I/O failure.
-    fn read_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>>;
+    fn get_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>>;
     /// Try persistent kernel drain ownership without waiting; busy is `None`.
     ///
     /// # Errors
@@ -73,7 +73,7 @@ pub trait Embedder {
     ///
     /// # Errors
     /// Reports storage failures; unreadable or invalid configuration is a typed invalid state.
-    fn read_configuration(&mut self) -> EmbeddingResult<ConfigState>;
+    fn get_configuration(&mut self) -> EmbeddingResult<ConfigState>;
     /// Drain current eligible documents using durable bounded attempts.
     ///
     /// # Errors
