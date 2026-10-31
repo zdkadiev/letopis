@@ -217,7 +217,7 @@ fn nonempty_direct_drain_uses_owned_local_provider_without_git_helpers() {
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read().unwrap();
     let work = read
-        .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None)
+        .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None, &[])
         .unwrap();
     assert_eq!(work, VectorOutcome::Current(None));
     let id = EdgeTarget::Knowledge(KnowledgeId::parse("note.md").unwrap());

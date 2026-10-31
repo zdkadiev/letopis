@@ -123,9 +123,10 @@ impl<R: StorageRead> StorageRead for ReadingView<R> {
         expected: &Sha256,
         max_attempts: u64,
         after: Option<&KnowledgeId>,
+        excluded_hashes: &[Sha256],
     ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>> {
         self.inner
-            .read_next_embedding_work(expected, max_attempts, after)
+            .read_next_embedding_work(expected, max_attempts, after, excluded_hashes)
     }
     fn read_vector_dimensions(
         &mut self,

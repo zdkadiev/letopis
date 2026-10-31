@@ -605,7 +605,7 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
                 .open_storage()
                 .begin_read()
                 .unwrap()
-                .read_next_embedding_work(&config.get_identity(), 1, None)
+                .read_next_embedding_work(&config.get_identity(), 1, None, &[])
                 .unwrap()
         )
         .is_some()

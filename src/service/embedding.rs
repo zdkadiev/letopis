@@ -44,7 +44,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
             .begin_read()
             .map_err(map_storage)
             .map_err(map_command)?
-            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None)
+            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None, &[])
             .map_err(map_storage)
             .map_err(map_command)?;
         Ok(matches!(next, VectorOutcome::Current(Some(_))))
@@ -164,6 +164,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
                     &config.get_identity(),
                     config.get_max_attempts(),
                     after.as_ref(),
+                    &[],
                 )
                 .map_err(map_storage)?;
             let work = match next {

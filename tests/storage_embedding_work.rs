@@ -12,6 +12,104 @@ use rusqlite::{Connection, types::Value};
 use tempfile::TempDir;
 
 #[test]
+fn excludes_every_representative_of_an_outstanding_hash() {
+    // Given: two nodes share one in-flight hash and a third has distinct text.
+    let root = TempDir::new().unwrap();
+    let mut storage = open(&root);
+    let identity = Sha256::digest(b"model");
+    let shared = Sha256::digest(b"shared");
+    let distinct = Sha256::digest(b"distinct");
+    storage.reset_vectors(None, &identity).unwrap();
+    publish(
+        &mut storage,
+        &[("a.md", "shared"), ("b.md", "shared"), ("c.md", "distinct")],
+    );
+    // When: select beyond all representatives of the active hash.
+    let mut read = storage.begin_read().unwrap();
+    let selected = unwrap_current(
+        read.read_next_embedding_work(&identity, 1, None, &[shared])
+            .unwrap(),
+    );
+    let excluded = read
+        .read_next_embedding_work(&identity, 1, None, &[shared, distinct])
+        .unwrap();
+    // Then: distinct work progresses and excluding both leaves no eligible candidate.
+    assert_eq!(selected.unwrap().id.as_str(), "c.md");
+    assert_eq!(excluded, VectorOutcome::Current(None));
+}
+
+#[test]
+fn empty_exclusions_preserve_cursor_and_attempt_policy() {
+    // Given: the first hash is exhausted and another candidate follows the cursor.
+    let root = TempDir::new().unwrap();
+    let mut storage = open(&root);
+    let identity = Sha256::digest(b"model");
+    storage.reset_vectors(None, &identity).unwrap();
+    publish(
+        &mut storage,
+        &[("a.md", "exhausted"), ("b.md", "ready"), ("c.md", "later")],
+    );
+    let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+    unit.reserve_attempt(&Sha256::digest(b"exhausted"), 1)
+        .unwrap();
+    unit.commit().unwrap();
+    // When: the general caller has no outstanding hashes.
+    let mut read = storage.begin_read().unwrap();
+    let first = unwrap_current(
+        read.read_next_embedding_work(&identity, 1, None, &[])
+            .unwrap(),
+    )
+    .unwrap();
+    let next = unwrap_current(
+        read.read_next_embedding_work(&identity, 1, Some(&first.id), &[])
+            .unwrap(),
+    )
+    .unwrap();
+    // Then: exhausted work stays excluded and the original stable cursor still works.
+    assert_eq!(first.id.as_str(), "b.md");
+    assert_eq!(next.id.as_str(), "c.md");
+}
+
+#[test]
+fn exclusions_preserve_pinned_config_and_read_snapshot() {
+    // Given: a read pins old configuration and cache before a separate writer advances them.
+    let root = TempDir::new().unwrap();
+    let mut storage = open(&root);
+    let old = Sha256::digest(b"old model");
+    let new = Sha256::digest(b"new model");
+    let shared = Sha256::digest(b"shared");
+    storage.reset_vectors(None, &old).unwrap();
+    publish(&mut storage, &[("a.md", "shared"), ("c.md", "distinct")]);
+    let mut writer = open(&root);
+    let mut pinned = storage.begin_read().unwrap();
+    let first = unwrap_current(
+        pinned
+            .read_next_embedding_work(&old, 1, None, &[shared])
+            .unwrap(),
+    )
+    .unwrap();
+    writer.reset_vectors(Some(&old), &new).unwrap();
+    publish(&mut writer, &[("b.md", "new distinct")]);
+    // When: the old view selects again with the same exclusion.
+    let observed = unwrap_current(
+        pinned
+            .read_next_embedding_work(&old, 1, None, &[shared])
+            .unwrap(),
+    )
+    .unwrap();
+    drop(pinned);
+    let current = storage
+        .begin_read()
+        .unwrap()
+        .read_next_embedding_work(&old, 1, None, &[shared])
+        .unwrap();
+    // Then: the pinned row stays literal c.md; a fresh mismatched identity is rejected.
+    assert_eq!(first.id.as_str(), "c.md");
+    assert_eq!(observed.id.as_str(), "c.md");
+    assert_eq!(current, VectorOutcome::ConfigChanged);
+}
+
+#[test]
 fn cursor_orders_shared_hashes_and_excludes_sources_and_stored_hashes() {
     // Given: reverse insertion order and shared text with two representatives.
     let root = TempDir::new().unwrap();
@@ -102,7 +200,7 @@ fn work_and_dimensions_use_the_pinned_identity_and_membership() {
         3
     );
     assert_eq!(
-        unwrap_current(pinned.read_next_embedding_work(&m1, 4, None).unwrap())
+        unwrap_current(pinned.read_next_embedding_work(&m1, 4, None, &[]).unwrap())
             .unwrap()
             .search_hash,
         Sha256::digest(b"pending")
@@ -113,7 +211,7 @@ fn work_and_dimensions_use_the_pinned_identity_and_membership() {
     ));
     let mut fresh = second.begin_read().unwrap();
     assert!(matches!(
-        fresh.read_next_embedding_work(&m1, 4, None).unwrap(),
+        fresh.read_next_embedding_work(&m1, 4, None, &[]).unwrap(),
         VectorOutcome::ConfigChanged
     ));
     assert!(matches!(
@@ -423,7 +521,7 @@ fn invalid_attempt_budgets_are_rejected_without_changing_storage() {
     for budget in [0, u64::MAX] {
         // When
         let error = read
-            .read_next_embedding_work(&identity, budget, None)
+            .read_next_embedding_work(&identity, budget, None, &[])
             .unwrap_err();
         // Then
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
@@ -491,7 +589,7 @@ fn read_next_work(
         storage
             .begin_read()
             .unwrap()
-            .read_next_embedding_work(identity, budget, after)
+            .read_next_embedding_work(identity, budget, after, &[])
             .unwrap(),
     )
 }
