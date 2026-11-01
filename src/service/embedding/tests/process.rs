@@ -127,7 +127,7 @@ impl Fixture {
         attempts: Option<u64>,
     ) {
         let mut storage = open_storage(&self.root);
-        let mut read = storage.begin_read().unwrap();
+        let mut read = storage.begin_read_tx().unwrap();
         assert_eq!(
             read.get_vector_by_search_hash(&config.get_identity(), &self.hash)
                 .unwrap(),
@@ -390,7 +390,7 @@ fn reset_during_http_preserves_current_query_error() {
 
 fn assert_current_vector(fixture: &Fixture, config: &EmbeddingConfig) {
     let mut storage = open_storage(&fixture.root);
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let bytes = fs::read(fixture.root.path().join("b.md")).unwrap();
     let parsed = parse(&RepoPath::parse("b.md").unwrap(), &bytes)
         .unwrap()
@@ -459,7 +459,7 @@ fn reset_with_current_state(fixture: &Fixture) -> EmbeddingConfig {
     let current = publish(&mut storage, &mut files, "b.md", "current knowledge");
     fs::write(fixture.root.path().join("b.md"), &files.documents["b.md"]).unwrap();
     let VectorOutcome::Current(mut unit) =
-        storage.begin_vector_write(&next.get_identity()).unwrap()
+        storage.begin_vector_write_tx(&next.get_identity()).unwrap()
     else {
         panic!()
     };
@@ -480,7 +480,7 @@ fn wait_for_exit(child: &mut Process) {
 fn assert_current_error(fixture: &Fixture) {
     let mut storage = open_storage(&fixture.root);
     let error = storage
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
         .get_query_error()
         .unwrap()

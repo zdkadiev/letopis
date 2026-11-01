@@ -165,11 +165,15 @@ fn one_shared_hash_covers_two_nodes() {
 
 #[test]
 fn stale_hash_vector_does_not_cover_current_nodes() {
-    // Given
+    // Given: stored vectors whose hashes no longer match current text.
     let repo = build_pair("current alpha", "current beta");
     let config = get_config(&repo);
     let mut storage = repo.open_storage();
-    let mut write = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut write = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     write
         .store_vector(&Sha256::digest(b"obsolete text"), &[1., 0.], 2)
         .unwrap();
@@ -177,9 +181,9 @@ fn stale_hash_vector_does_not_cover_current_nodes() {
     drop(storage);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
-    // When
+    // When: the resource receipt measures coverage.
     let receipt = get_receipt(repo.get_root());
-    // Then
+    // Then: stale hashes cover no current knowledge nodes.
     assert_eq!(receipt["dimensions"], 2);
     assert_eq!(receipt["covered_nodes"], 0);
     assert_eq!(receipt["missing_nodes"], 2);
@@ -223,18 +227,22 @@ fn failed_hashes_with_budget_remaining_are_still_eligible() {
 
 #[test]
 fn exhausted_reservations_without_error_are_missing_but_not_failed() {
-    // Given
+    // Given: exhausted reservations without failure messages.
     let repo = build_pair("alpha", "beta");
     let config = get_config(&repo);
     let mut storage = repo.open_storage();
-    let nodes = storage.begin_read().unwrap().get_nodes().unwrap();
-    let mut write = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
-    // When / Then
+    let nodes = storage.begin_read_tx().unwrap().get_nodes().unwrap();
+    let mut write = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
+    // When / Then: each current knowledge hash receives its only allowed reservation.
     for node in nodes {
         let NodeMetadata::Knowledge(node) = node.metadata else {
             continue;
         };
-        // When / Then
+        // When / Then: each current knowledge hash receives its only allowed reservation.
         assert!(write.reserve_attempt(&node.search_hash, 1).unwrap());
     }
     write.commit().unwrap();
@@ -492,7 +500,7 @@ fn configure_repo(repo: &ReadingRepo, retries: u64) -> EmbeddingConfig {
     repo.write(".letopis/config.json", &bytes);
     let config = EmbeddingConfig::parse(configured.to_string().as_bytes()).unwrap();
     let mut storage = repo.open_storage();
-    let observed = storage.begin_read().unwrap().get_config_identity();
+    let observed = storage.begin_read_tx().unwrap().get_config_identity();
     storage
         .reset_vectors(observed.as_ref(), &config.get_identity())
         .unwrap();
@@ -518,8 +526,12 @@ fn get_receipt(root: &Path) -> Value {
 fn seed_failures(repo: &ReadingRepo, budget: u64) {
     let config = get_config(repo);
     let mut storage = repo.open_storage();
-    let nodes = storage.begin_read().unwrap().get_nodes().unwrap();
-    let mut write = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let nodes = storage.begin_read_tx().unwrap().get_nodes().unwrap();
+    let mut write = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     for node in nodes {
         let NodeMetadata::Knowledge(node) = node.metadata else {
             continue;

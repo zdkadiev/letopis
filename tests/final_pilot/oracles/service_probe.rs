@@ -92,7 +92,7 @@ fn read_hashes(root: &Path, paths: &[String]) -> ProbeResult {
 fn observe_hashes(root: &Path, hashes: &[String]) -> ProbeResult {
     let identity = read_identity(root)?;
     let mut storage = open_root_storage(root)?;
-    let mut read = storage.begin_read().map_err(describe)?;
+    let mut read = storage.begin_read_tx().map_err(describe)?;
     let mut observed = Map::new();
     for raw in hashes {
         let hash = Sha256::parse(raw).map_err(describe)?;
@@ -116,7 +116,7 @@ fn observe_hashes(root: &Path, hashes: &[String]) -> ProbeResult {
 fn write_short_unit(root: &Path) -> ProbeResult {
     let identity = read_identity(root)?;
     let mut storage = open_root_storage(root)?;
-    let VectorOutcome::Current(unit) = storage.begin_vector_write(&identity).map_err(describe)?
+    let VectorOutcome::Current(unit) = storage.begin_vector_write_tx(&identity).map_err(describe)?
     else {
         return Ok(json!({"committed": false}));
     };

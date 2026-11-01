@@ -21,7 +21,7 @@ enum Endpoint {
     Target,
 }
 
-pub(super) fn resolve_node_by_id(
+pub(super) fn get_node_ref_by_id(
     db: &Connection,
     id: &ElementAddress,
 ) -> StorageResult<Option<GraphNodeRef>> {

@@ -80,11 +80,11 @@ impl SqliteStorage {
 impl Storage for SqliteStorage {
     type Read<'a> = SqliteRead<'a>;
     type VectorWrite<'a> = SqliteVectorWrite<'a>;
-    fn begin_vector_write(
+    fn begin_vector_write_tx(
         &mut self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
-        SqliteVectorWrite::begin(&mut self.vector_writer, expected)
+        SqliteVectorWrite::begin_tx(&mut self.vector_writer, expected)
     }
     fn reset_vectors(
         &mut self,
@@ -94,11 +94,11 @@ impl Storage for SqliteStorage {
         vectors::reset_vectors(&mut self.vector_writer, observed, desired)
     }
     type CacheWrite<'a> = SqliteCacheWrite<'a>;
-    fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
-        SqliteCacheWrite::begin(&mut self.cache_writer)
+    fn begin_cache_write_tx(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
+        SqliteCacheWrite::begin_tx(&mut self.cache_writer)
     }
-    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>> {
-        SqliteRead::begin(&mut self.read)
+    fn begin_read_tx(&mut self) -> StorageResult<Self::Read<'_>> {
+        SqliteRead::begin_tx(&mut self.read)
     }
 }
 
@@ -148,14 +148,14 @@ mod tests {
         let identity = Sha256::digest(b"confined");
         seed_vector(&mut storage, &identity);
         // When: pruning requires the read-only cache attachment used for hash-reference checks.
-        let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        let mut unit = unwrap_current(storage.begin_vector_write_tx(&identity).unwrap());
         unit.prune_unreferenced().unwrap();
         unit.commit().unwrap();
-        // Then both native deletion and lifetime/permission policy.
+        // Then: both native deletion and lifetime/permission policy.
         assert_eq!(
             unwrap_current(
                 storage
-                    .begin_read()
+                    .begin_read_tx()
                     .unwrap()
                     .get_vector_by_search_hash(&identity, &identity)
                     .unwrap()
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn reset_late_meta_failure_preserves_identity_key_vector_and_query_error() {
-        // Given a populated native table, then fail after DROP/recreation/deletion.
+        // Given: a populated native table, then fail after DROP/recreation/deletion.
         let root = TempDir::new().unwrap();
         let cache = root.path().join("cache");
         let vectors = root.path().join("vectors");
@@ -187,7 +187,7 @@ mod tests {
         // When: the metadata update fails after native schema changes.
         assert!(storage.reset_vectors(Some(&m1), &m2).is_err());
         assert_eq!(count_failures(&storage), 1);
-        // Then the same and a newly opened read both retain exact M1 bytes.
+        // Then: the same and a newly opened read both retain exact M1 bytes.
         assert_eq!(
             storage
                 .vector_writer
@@ -195,7 +195,7 @@ mod tests {
                 .unwrap(),
             key
         );
-        let mut read = storage.begin_read().unwrap();
+        let mut read = storage.begin_read_tx().unwrap();
         assert_eq!(read.get_config_identity(), Some(m1));
         assert_eq!(
             unwrap_current(read.get_vector_by_search_hash(&m1, &m1).unwrap()),
@@ -208,7 +208,7 @@ mod tests {
             .unwrap();
         drop(storage);
         let mut reopened = SqliteStorage::open(&cache, &vectors).unwrap();
-        let mut read = reopened.begin_read().unwrap();
+        let mut read = reopened.begin_read_tx().unwrap();
         assert_eq!(read.get_config_identity(), Some(m1));
         assert_eq!(
             unwrap_current(read.get_vector_by_search_hash(&m1, &m1).unwrap()),
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn success_deletes_failure_atomically_and_corrupt_key_poisoning_rolls_back() {
         // Catches lost cleanup, uncommitted cleanup, and acceptance of orphan keys.
-        // Given
+        // Given: reserved failures and a vector key that can be corrupted.
         let root = TempDir::new().unwrap();
         let mut storage =
             SqliteStorage::open(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -246,11 +246,11 @@ mod tests {
                 [hash.to_hex()],
             )
             .unwrap();
-        // When
-        let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        // When: a successful vector write is abandoned before commit.
+        let mut unit = unwrap_current(storage.begin_vector_write_tx(&identity).unwrap());
         unit.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
         drop(unit);
-        // Then
+        // Then: rollback retains the previously recorded failure.
         assert_eq!(
             storage
                 .vector_writer
@@ -260,10 +260,10 @@ mod tests {
             1
         );
         // When: repeat the vector write and commit it.
-        let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        let mut unit = unwrap_current(storage.begin_vector_write_tx(&identity).unwrap());
         unit.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
         unit.commit().unwrap();
-        // Then
+        // Then: committing the successful vector write removes its failure.
         assert_eq!(
             storage
                 .vector_writer
@@ -280,15 +280,15 @@ mod tests {
                 [identity.to_hex()],
             )
             .unwrap();
-        let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
-        // When / Then
+        let mut unit = unwrap_current(storage.begin_vector_write_tx(&identity).unwrap());
+        // When / Then: a key without its native vector poisons the write and prevents commit.
         assert!(unit.store_vector(&identity, &[1.0, 0.0, 0.0], 3).is_err());
         assert!(unit.commit().is_err());
     }
 
     fn seed_vector(storage: &mut SqliteStorage, identity: &Sha256) -> i64 {
         storage.reset_vectors(None, identity).unwrap();
-        let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
+        let mut unit = unwrap_current(storage.begin_vector_write_tx(identity).unwrap());
         let row = unit
             .store_vector(identity, &[1.0, 0.0, 0.0], 3)
             .unwrap()

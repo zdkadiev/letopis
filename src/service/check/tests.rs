@@ -107,11 +107,11 @@ fn scoped_check_requests_routine_refresh() {
 
 #[test]
 fn check_reports_missing_address_from_selected_knowledge() {
-    // Given
+    // Given: selected knowledge whose source address is missing.
     let directory = tempfile::tempdir().unwrap();
     let mut storage = open_storage(&directory);
     publish_nodes(&mut storage, &[build_node("a.md#one", "a")]);
-    let mut unit = storage.begin_cache_write().unwrap();
+    let mut unit = storage.begin_cache_write_tx().unwrap();
     unit.insert_edge(
         &Edge::new(
             KnowledgeId::parse("a.md#one").unwrap(),
@@ -133,10 +133,10 @@ fn check_reports_missing_address_from_selected_knowledge() {
         },
     );
 
-    // When
+    // When: check runs for the selected file.
     let report = service.check(&[RepoPath::parse("a.md").unwrap()]).unwrap();
 
-    // Then
+    // Then: the report includes the missing source finding.
     assert_eq!(report.errors.len(), 2);
     assert_eq!(report.errors[1].details["reason"], "source_not_found");
     assert_eq!(report.errors[1].details["path"], "a.md");
@@ -145,7 +145,7 @@ fn check_reports_missing_address_from_selected_knowledge() {
 
 #[test]
 fn check_refreshes_before_opening_one_read() {
-    // Given
+    // Given: recorded refresh, read and diagnostic events.
     let directory = tempfile::tempdir().unwrap();
     let storage = open_storage(&directory);
     let mut writer = open_storage(&directory);
@@ -153,7 +153,7 @@ fn check_refreshes_before_opening_one_read() {
     let refresh_events = events.clone();
     let refresher = Refresh(move || {
         refresh_events.borrow_mut().push("refresh");
-        let mut unit = writer.begin_cache_write().unwrap();
+        let mut unit = writer.begin_cache_write_tx().unwrap();
         unit.upsert_node(&build_node("fresh.md", "a")).unwrap();
         unit.commit().unwrap();
         Ok(build_outcome())
@@ -176,10 +176,10 @@ fn check_refreshes_before_opening_one_read() {
         },
     );
 
-    // When
+    // When: check runs over the repository.
     let report = service.check(&[]).unwrap();
 
-    // Then
+    // Then: refresh precedes one pinned read and its diagnostics.
     assert_eq!(*events.borrow(), ["refresh", "read", "diagnostics"]);
     assert_eq!(*probes.borrow(), ["a".repeat(40)]);
     assert_eq!(
@@ -371,7 +371,7 @@ impl<S: Storage> Storage for RecordingStorage<S> {
         = S::VectorWrite<'a>
     where
         Self: 'a;
-    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>> {
+    fn begin_read_tx(&mut self) -> StorageResult<Self::Read<'_>> {
         self.events.borrow_mut().push("read");
         if self.fail_read {
             return Err(StorageError::new_with_cause(
@@ -380,16 +380,16 @@ impl<S: Storage> Storage for RecordingStorage<S> {
                 io::Error::other("SECRET_STORAGE"),
             ));
         }
-        self.inner.begin_read()
+        self.inner.begin_read_tx()
     }
-    fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
-        self.inner.begin_cache_write()
+    fn begin_cache_write_tx(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
+        self.inner.begin_cache_write_tx()
     }
-    fn begin_vector_write(
+    fn begin_vector_write_tx(
         &mut self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
-        self.inner.begin_vector_write(expected)
+        self.inner.begin_vector_write_tx(expected)
     }
     fn reset_vectors(
         &mut self,
@@ -552,7 +552,7 @@ fn open_storage(directory: &TempDir) -> SqliteStorage {
     .unwrap()
 }
 fn publish_nodes(storage: &mut SqliteStorage, nodes: &[NodeMetadata]) {
-    let mut unit = storage.begin_cache_write().unwrap();
+    let mut unit = storage.begin_cache_write_tx().unwrap();
     for node in nodes {
         unit.upsert_node(node).unwrap();
     }

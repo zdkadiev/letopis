@@ -231,9 +231,9 @@ fn late_drain_vector_does_not_represent_changed_text() {
     assert_eq!(second.len(), 1);
     assert_eq!(second[0]["input"], json!(["NewDrainTextToken"]));
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().expect("storage read");
+    let mut read = storage.begin_read_tx().expect("storage read");
     let matches = match read
-        .find_nearest_vectors(&config.get_identity(), &[0., 1.], 2)
+        .get_nearest_vectors(&config.get_identity(), &[0., 1.], 2)
         .expect("vector query")
     {
         VectorOutcome::Current(matches) => matches,
@@ -305,7 +305,7 @@ fn assert_search_result(repo: &ReadingRepo, query: &str, revision: u64) {
 
 fn get_search_hash(repo: &ReadingRepo) -> Sha256 {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().expect("storage read");
+    let mut read = storage.begin_read_tx().expect("storage read");
     let node = read
         .get_node_by_id(&EdgeTarget::Knowledge(
             KnowledgeId::parse("knowledge.md").expect("knowledge id"),
@@ -321,12 +321,12 @@ fn get_search_hash(repo: &ReadingRepo) -> Sha256 {
 fn get_vector_by_search_hash(
     repo: &ReadingRepo,
     config: &EmbeddingConfig,
-    hash: &Sha256,
+    search_hash: &Sha256,
 ) -> Option<Vec<f32>> {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().expect("storage read");
+    let mut read = storage.begin_read_tx().expect("storage read");
     match read
-        .get_vector_by_search_hash(&config.get_identity(), hash)
+        .get_vector_by_search_hash(&config.get_identity(), search_hash)
         .expect("read vector")
     {
         VectorOutcome::Current(vector) => vector,
@@ -337,12 +337,12 @@ fn get_vector_by_search_hash(
 fn get_failure_by_search_hash(
     repo: &ReadingRepo,
     config: &EmbeddingConfig,
-    hash: &Sha256,
+    search_hash: &Sha256,
 ) -> Option<EmbeddingFailure> {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().expect("storage read");
+    let mut read = storage.begin_read_tx().expect("storage read");
     match read
-        .get_failure_by_search_hash(&config.get_identity(), hash)
+        .get_failure_by_search_hash(&config.get_identity(), search_hash)
         .expect("read failure")
     {
         VectorOutcome::Current(failure) => failure,

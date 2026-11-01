@@ -25,12 +25,12 @@ struct RetainingProvenance;
 
 #[test]
 fn warm_refresh_reads_basis_roots_without_loading_nodes() {
-    // Given
+    // Given: a warm projection with declared basis roots.
     let (_root, mut initial) = build_service();
     initial.refresh().unwrap();
     let mut node = initial
         .storage
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
         .get_nodes()
         .unwrap()
@@ -40,7 +40,7 @@ fn warm_refresh_reads_basis_roots_without_loading_nodes() {
         panic!()
     };
     knowledge.source_snapshot = Some(TreeOid::parse(&"a".repeat(40)).unwrap());
-    let mut write = initial.storage.begin_cache_write().unwrap();
+    let mut write = initial.storage.begin_cache_write_tx().unwrap();
     write.upsert_node(&node).unwrap();
     write.commit().unwrap();
     let reads = Rc::new(Cell::new(0));
@@ -54,9 +54,9 @@ fn warm_refresh_reads_basis_roots_without_loading_nodes() {
         },
         provenance: RetainingProvenance,
     };
-    // When
+    // When: refresh checks the unchanged corpus.
     let result = service.refresh().unwrap();
-    // Then
+    // Then: basis roots are observed without loading node metadata.
     assert!(!result.published);
     assert_eq!(result.revision, 2);
     assert_eq!(reads.get(), 2);
@@ -69,14 +69,14 @@ impl Storage for ReadingStorage {
     type Read<'a> = ReadingView<<SqliteStorage as Storage>::Read<'a>>;
     type CacheWrite<'a> = <SqliteStorage as Storage>::CacheWrite<'a>;
     type VectorWrite<'a> = <SqliteStorage as Storage>::VectorWrite<'a>;
-    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>> {
+    fn begin_read_tx(&mut self) -> StorageResult<Self::Read<'_>> {
         Ok(ReadingView {
-            inner: self.inner.begin_read()?,
+            inner: self.inner.begin_read_tx()?,
             reads: Rc::clone(&self.reads),
         })
     }
-    fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
-        self.inner.begin_cache_write()
+    fn begin_cache_write_tx(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
+        self.inner.begin_cache_write_tx()
     }
     fn reset_vectors(
         &mut self,
@@ -85,16 +85,16 @@ impl Storage for ReadingStorage {
     ) -> StorageResult<VectorOutcome<bool>> {
         self.inner.reset_vectors(observed, identity)
     }
-    fn begin_vector_write(
+    fn begin_vector_write_tx(
         &mut self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
-        self.inner.begin_vector_write(expected)
+        self.inner.begin_vector_write_tx(expected)
     }
 }
 impl<R: GraphRead> GraphRead for ReadingView<R> {
-    fn resolve_node_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
-        self.inner.resolve_node_by_id(id)
+    fn get_node_ref_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+        self.inner.get_node_ref_by_id(id)
     }
     fn get_neighbor_page(
         &mut self,
@@ -145,30 +145,33 @@ impl<R: StorageRead> StorageRead for ReadingView<R> {
     fn get_files(&mut self) -> StorageResult<Vec<FileRow>> {
         self.inner.get_files()
     }
-    fn match_text(&mut self, expression: &str) -> StorageResult<Vec<TextMatch>> {
-        self.inner.match_text(expression)
+    fn get_text_matches_by_expression(
+        &mut self,
+        expression: &str,
+    ) -> StorageResult<Vec<TextMatch>> {
+        self.inner.get_text_matches_by_expression(expression)
     }
     fn get_vector_by_search_hash(
         &mut self,
         expected: &Sha256,
-        hash: &Sha256,
+        search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>> {
-        self.inner.get_vector_by_search_hash(expected, hash)
+        self.inner.get_vector_by_search_hash(expected, search_hash)
     }
-    fn find_nearest_vectors(
+    fn get_nearest_vectors(
         &mut self,
         expected: &Sha256,
         query: &[f32],
         dimensions: usize,
     ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
-        self.inner.find_nearest_vectors(expected, query, dimensions)
+        self.inner.get_nearest_vectors(expected, query, dimensions)
     }
     fn get_failure_by_search_hash(
         &mut self,
         expected: &Sha256,
-        hash: &Sha256,
+        search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>> {
-        self.inner.get_failure_by_search_hash(expected, hash)
+        self.inner.get_failure_by_search_hash(expected, search_hash)
     }
     fn get_query_error(&mut self) -> StorageResult<Option<QueryError>> {
         self.inner.get_query_error()

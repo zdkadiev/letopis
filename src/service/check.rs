@@ -36,7 +36,7 @@ impl<D: Refresher, S: Storage, G: GraphDiagnostics, P: SourceProvenance> Checker
             self.refresher.refresh()
         }
         .map_err(map_refresh_error)?;
-        let mut view = self.storage.begin_read().map_err(map_storage_error)?;
+        let mut view = self.storage.begin_read_tx().map_err(map_storage_error)?;
         if paths.is_empty() && view.get_revision() != outcome.revision {
             return Err(CommandError::new(
                 CommandErrorKind::InternalError,

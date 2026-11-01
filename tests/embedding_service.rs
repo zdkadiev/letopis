@@ -75,7 +75,7 @@ impl Fixture {
         let element = parsed.elements.into_iter().next().unwrap();
         let metadata = &element.element;
         let mut storage = self.open_storage();
-        let mut unit = storage.begin_cache_write().unwrap();
+        let mut unit = storage.begin_cache_write_tx().unwrap();
         unit.delete_outgoing(&metadata.id).unwrap();
         unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
             id: metadata.id.clone(),
@@ -116,32 +116,32 @@ impl Fixture {
     fn get_failure_by_search_hash(
         &self,
         config: &EmbeddingConfig,
-        hash: &Sha256,
+        search_hash: &Sha256,
     ) -> Option<EmbeddingFailure> {
         unwrap_current(
             self.open_storage()
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
-                .get_failure_by_search_hash(&config.get_identity(), hash)
+                .get_failure_by_search_hash(&config.get_identity(), search_hash)
                 .unwrap(),
         )
     }
     fn get_vector_by_search_hash(
         &self,
         config: &EmbeddingConfig,
-        hash: &Sha256,
+        search_hash: &Sha256,
     ) -> Option<Vec<f32>> {
         unwrap_current(
             self.open_storage()
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
-                .get_vector_by_search_hash(&config.get_identity(), hash)
+                .get_vector_by_search_hash(&config.get_identity(), search_hash)
                 .unwrap(),
         )
     }
     fn get_query_error(&self) -> Option<QueryError> {
         self.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
             .get_query_error()
             .unwrap()
@@ -181,8 +181,8 @@ impl Fixture {
             .collect();
         files.sort();
         let mut storage = self.open_storage();
-        let mut read = storage.begin_read().unwrap();
-        let matches = read.match_text("knowledge").unwrap();
+        let mut read = storage.begin_read_tx().unwrap();
+        let matches = read.get_text_matches_by_expression("knowledge").unwrap();
         Corpus {
             rows,
             files,
@@ -535,18 +535,22 @@ fn query_failure_is_single_attempt_without_document_reservation_or_vector() {
 
 #[test]
 fn query_success_clears_error_without_caching_or_document_attempts() {
-    // Given
+    // Given: a persisted query error and successful query provider.
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
     let hash = fixture.publish("a.md", "knowledge");
     let mut storage = fixture.open_storage();
     storage.reset_vectors(None, &config.get_identity()).unwrap();
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     unit.set_query_error(1, "old failure").unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
-    // When / Then
+    // When / Then: the query is embedded successfully; the error clears without caching or consuming document attempts.
     assert_eq!(
         fixture.open_service().embed_query("query").unwrap(),
         QueryEmbedding::Available {
@@ -614,7 +618,7 @@ fn reservation_precedes_http_and_new_work_is_found_after_compute() {
 
 #[test]
 fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
-    // Given
+    // Given: knowledge edited while its embedding request is in flight.
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -628,9 +632,9 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
     )
     .unwrap();
     let before = fixture.capture_corpus();
-    // When
+    // When: the captured embedding result returns.
     barrier.release();
-    // Then
+    // Then: only the captured hash is stored and new text stays pending.
     assert_eq!(worker.join().unwrap(), DrainOutcome::Complete);
     assert!(fixture.get_vector_by_search_hash(&config, &old).is_some());
     assert_eq!(server.take_requests().len(), 1);
@@ -641,7 +645,7 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
         unwrap_current(
             fixture
                 .open_storage()
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
                 .get_next_embedding_work_by_id_and_max_attempts(&config.get_identity(), 1, None)
                 .unwrap()
@@ -652,7 +656,7 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
 
 #[test]
 fn reset_during_http_discards_old_result_without_old_cleanup() {
-    // Given
+    // Given: a model reset while an embedding request is in flight.
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     fixture.write_config(&server.get_base_url(), 0);
@@ -663,14 +667,14 @@ fn reset_during_http_discards_old_result_without_old_cleanup() {
     let next = fixture.write_config(&server.get_base_url(), 1);
     fixture.open_service().get_configuration().unwrap();
     let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(storage.begin_vector_write(&next.get_identity()).unwrap());
+    let mut unit = unwrap_current(storage.begin_vector_write_tx(&next.get_identity()).unwrap());
     unit.store_vector(&hash, &[1., 2., 3.], 3).unwrap();
     unit.set_query_error(7, "current failure").unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
-    // When
+    // When: the obsolete response arrives.
     barrier.release();
-    // Then
+    // Then: the result is discarded without cleaning up current vectors.
     assert_eq!(worker.join().unwrap(), DrainOutcome::ConfigChanged);
     assert!(fixture.get_vector_by_search_hash(&next, &hash).is_some());
     assert_eq!(fixture.get_query_error().unwrap().error, "current failure");
@@ -718,7 +722,7 @@ fn late_old_query_success_or_error_cannot_replace_new_query_state() {
 
 #[test]
 fn query_rechecks_dimension_established_during_http() {
-    // Given
+    // Given: native dimensions established during a query request.
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -729,13 +733,17 @@ fn query_rechecks_dimension_established_during_http() {
     });
     barrier.wait_until_entered();
     let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
-    // When
+    // When: the query provider response returns.
     barrier.release();
-    // Then
+    // Then: the established dimensions are checked again.
     assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
     assert!(fixture.get_query_error().is_some());
     assert_eq!(
@@ -747,7 +755,7 @@ fn query_rechecks_dimension_established_during_http() {
 
 #[test]
 fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
-    // Given
+    // Given: referenced, skipped, exhausted and orphan embedding rows.
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 1);
@@ -758,7 +766,11 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     let mut storage = fixture.open_storage();
     storage.reset_vectors(None, &config.get_identity()).unwrap();
     let orphan = Sha256::digest(b"orphan");
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     unit.reserve_attempt(&exhausted, 2).unwrap();
     unit.reserve_attempt(&exhausted, 2).unwrap();
     unit.reserve_attempt(&skipped, 2).unwrap();
@@ -770,7 +782,7 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     unit.store_vector(&orphan, &[1., 2., 3.], 3).unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
-    // When / Then
+    // When / Then: the drain performs cleanup; referenced rows survive and orphans are removed.
     assert_eq!(
         fixture.open_service().drain().unwrap(),
         DrainOutcome::Complete
@@ -794,7 +806,7 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     assert!(fixture.get_vector_by_search_hash(&config, &known).is_some());
     assert!(
         storage
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
             .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
             .unwrap()
@@ -947,7 +959,7 @@ fn captured_query_validates_pinned_and_newly_established_dimensions() {
 
 #[test]
 fn captured_query_rejects_dimensions_established_during_http() {
-    // Given
+    // Given: captured query dimensions established while HTTP is pending.
     // First document vector can establish another size while inference is paused.
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
@@ -956,7 +968,7 @@ fn captured_query_rejects_dimensions_established_during_http() {
     fixture.open_service().get_configuration().unwrap();
     let config = captured.clone();
     let mut service = fixture.open_service();
-    // When
+    // When: the captured query response returns.
     let worker = Operation::spawn(barrier.clone(), move || {
         service
             .embed_query_with_config(QueryEmbeddingRequest {
@@ -968,11 +980,15 @@ fn captured_query_rejects_dimensions_established_during_http() {
     });
     barrier.wait_until_entered();
     let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
     unit.commit().unwrap();
     barrier.release();
-    // Then
+    // Then: the newly established native dimensions are enforced.
     assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
     assert_eq!(server.take_requests().len(), 1);
     assert_eq!(
@@ -1029,11 +1045,15 @@ fn captured_query_diagnostic_write_failure_remains_an_error() {
 
 fn seed_query_error(fixture: &Fixture, config: &EmbeddingConfig) {
     let mut storage = fixture.open_storage();
-    let observed = storage.begin_read().unwrap().get_config_identity();
+    let observed = storage.begin_read_tx().unwrap().get_config_identity();
     storage
         .reset_vectors(observed.as_ref(), &config.get_identity())
         .unwrap();
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     unit.set_query_error(7, "replacement diagnostic").unwrap();
     unit.commit().unwrap();
 }
@@ -1065,7 +1085,11 @@ fn start_paused(body: &str) -> (HttpFixture, ResponseBarrier) {
 
 fn exhaust_attempt(fixture: &Fixture, config: &EmbeddingConfig, search_hash: &Sha256) {
     let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     assert!(unit.reserve_attempt(search_hash, 1).unwrap());
     unit.record_failure(search_hash, "safe failure").unwrap();
     unit.commit().unwrap();

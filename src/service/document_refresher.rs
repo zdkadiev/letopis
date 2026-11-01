@@ -146,7 +146,7 @@ impl<
     }
 
     fn get_file_state(&mut self) -> DocumentResult<FileState> {
-        let mut read = self.storage.begin_read()?;
+        let mut read = self.storage.begin_read_tx()?;
         Ok(FileState {
             revision: read.get_revision(),
             source_snapshots: read.get_source_snapshots()?,
@@ -196,7 +196,7 @@ impl<
         verification: SnapshotVerification,
     ) -> DocumentResult<RefreshOutcome> {
         let mut graph = self.prepare_publication(state, &delta, mode, verification)?;
-        let mut unit = self.storage.begin_cache_write()?;
+        let mut unit = self.storage.begin_cache_write_tx()?;
         #[cfg(test)]
         reach_checkpoint("begun");
         let mut outcome = build_outcome(state.revision, true);
@@ -241,7 +241,7 @@ impl<
     ) -> DocumentResult<EffectiveGraph> {
         // Keep only metadata after releasing this pinned read, before BEGIN IMMEDIATE.
         let mut graph = {
-            let mut read = self.storage.begin_read()?;
+            let mut read = self.storage.begin_read_tx()?;
             if read.get_revision() != state.revision {
                 return Err(fail_changed());
             }

@@ -10,7 +10,7 @@ use support::{documents::build_whole, reading::ReadingRepo};
 
 #[test]
 fn check_binary_reports_multiple_errors_and_repairs() {
-    // Given
+    // Given: multiple invalid knowledge declarations.
     let repo = ReadingRepo::new();
     repo.write(
         "duplicate.md",
@@ -24,10 +24,10 @@ fn check_binary_reports_multiple_errors_and_repairs() {
     repo.write_knowledge("a.md", "[b](b.md \"letopis:type=includes;path=b.md\")");
     repo.write_knowledge("b.md", "[a](a.md \"letopis:type=includes;path=a.md\")");
 
-    // When
+    // When: the real check command runs.
     let response = check(&repo, b"{}");
 
-    // Then
+    // Then: safe ordered findings reflect the current declarations.
     assert_eq!(
         response,
         json!({"ok":true,"result":{"errors":[
@@ -39,10 +39,13 @@ fn check_binary_reports_multiple_errors_and_repairs() {
         ]}})
     );
     let mut storage = repo.open_storage();
-    assert_eq!(storage.begin_read().unwrap().get_nodes().unwrap().len(), 3);
-    // Given
+    assert_eq!(
+        storage.begin_read_tx().unwrap().get_nodes().unwrap().len(),
+        3
+    );
+    // Given: the declaration in duplicate.md is repaired.
     repo.write_knowledge("duplicate.md", "Repaired duplicate");
-    // When / Then
+    // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
     assert_eq!(
         check(&repo, b"{}")["result"]["errors"]
             .as_array()
@@ -50,9 +53,9 @@ fn check_binary_reports_multiple_errors_and_repairs() {
             .len(),
         4
     );
-    // Given
+    // Given: the declaration in nested.md is repaired.
     repo.write_knowledge("nested.md", "Repaired nesting");
-    // When / Then
+    // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
     assert_eq!(
         check(&repo, b"{}")["result"]["errors"]
             .as_array()
@@ -60,9 +63,9 @@ fn check_binary_reports_multiple_errors_and_repairs() {
             .len(),
         3
     );
-    // Given
+    // Given: the declaration in missing.md is repaired.
     repo.write_knowledge("missing.md", "Target restored");
-    // When / Then
+    // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
     assert_eq!(
         check(&repo, b"{}")["result"]["errors"]
             .as_array()
@@ -70,9 +73,9 @@ fn check_binary_reports_multiple_errors_and_repairs() {
             .len(),
         2
     );
-    // Given
+    // Given: the declaration in b.md is repaired.
     repo.write_knowledge("b.md", "Cycle repaired");
-    // When / Then
+    // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
     assert_eq!(
         check(&repo, b"{}"),
         json!({"ok":true,"result":{"errors":[]}})
@@ -81,19 +84,19 @@ fn check_binary_reports_multiple_errors_and_repairs() {
 
 #[test]
 fn check_paths_filters_owners_after_full_graph_validation() {
-    // Given
+    // Given: graph owners and a path-scoped check request.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a/item.md", "[target](../target.md \"letopis:type=supports;path=target.md\") [other](../b/item.md \"letopis:type=includes;path=b/item.md\")");
     repo.write_knowledge("b/item.md", "[other](../a/item.md \"letopis:type=includes;path=a/item.md\") [missing](../missing.md \"letopis:type=custom7;path=missing.md\")");
     repo.write_knowledge("target.md", "Available outside selection");
 
-    // When
+    // When: the check command filters selected owners.
     let response = check(
         &repo,
         br#"{"paths":["a/item.md","./a/item.md","unused/../a/item.md","absent.md"]}"#,
     );
 
-    // Then
+    // Then: full-graph validation still precedes owner filtering.
     assert_eq!(
         response,
         json!({"ok":true,"result":{"errors":[
@@ -105,12 +108,15 @@ fn check_paths_filters_owners_after_full_graph_validation() {
         json!({"ok":true,"result":{"errors":[]}})
     );
     let mut storage = repo.open_storage();
-    assert_eq!(storage.begin_read().unwrap().get_nodes().unwrap().len(), 3);
+    assert_eq!(
+        storage.begin_read_tx().unwrap().get_nodes().unwrap().len(),
+        3
+    );
 }
 
 #[test]
 fn check_preserves_agent_layout_and_relation_names() {
-    // Given
+    // Given: agent-authored layout and relation names.
     let repo = ReadingRepo::new();
     let knowledge = build_whole(
         42,
@@ -122,7 +128,7 @@ fn check_preserves_agent_layout_and_relation_names() {
     repo.write(".gitignore", b"ignored.md\n");
     repo.write("ignored.md", b"<!-- letopis: broken -->\n");
 
-    // When / Then
+    // When / Then: check publishes the repository corpus; authored layout and relation names remain intact.
     assert_eq!(
         check(&repo, b"{}"),
         json!({"ok":true,"result":{"errors":[]}})
@@ -136,7 +142,7 @@ fn check_preserves_agent_layout_and_relation_names() {
         assert_eq!(fs::read(repo.get_root().join(path)).unwrap(), expected);
     }
     let mut storage = repo.open_storage();
-    let mut view = storage.begin_read().unwrap();
+    let mut view = storage.begin_read_tx().unwrap();
     let nodes = view.get_nodes().unwrap();
     assert_eq!(nodes.len(), 2);
     assert!(nodes.iter().any(|node| matches!(&node.metadata, NodeMetadata::Knowledge(metadata) if metadata.id.as_str() == "knowledge/deep/notes.markdown" && metadata.created_at == 42)));

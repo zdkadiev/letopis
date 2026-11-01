@@ -54,17 +54,24 @@ fn reindex_capture_failure_preserves_complete_publication() {
     // Given: fail the publication capture after detection and preflight.
     let (_dir, mut service) = build_service();
     service.refresh().unwrap();
-    let before = service.storage.begin_read().unwrap().get_files().unwrap();
+    let before = service
+        .storage
+        .begin_read_tx()
+        .unwrap()
+        .get_files()
+        .unwrap();
     service.filesystem.reset_counts();
     service.filesystem.fail_on_read.set(Some(3));
-    // When.
+    // When: reindex fails during publication capture.
     assert!(service.reindex().is_err());
-    // Then.
-    let mut read = service.storage.begin_read().unwrap();
+    // Then: the prior revision, file state and FTS entry remain intact.
+    let mut read = service.storage.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), 1);
     assert_eq!(read.get_files().unwrap(), before);
     assert_eq!(
-        read.match_text("AlphaToken").unwrap()[0].id.as_str(),
+        read.get_text_matches_by_expression("AlphaToken").unwrap()[0]
+            .id
+            .as_str(),
         "note.md"
     );
 }

@@ -88,7 +88,7 @@ fn non_ready_configuration_preserves_fts_and_one_pinned_consumer_view() {
 
 #[test]
 fn metadata_failure_after_query_releases_pinned_view() {
-    // Given
+    // Given: a metadata failure after query embedding.
     let fixture = ScopedFixture::new();
     let root = fixture.root.path();
     let connection = rusqlite::Connection::open(root.join("cache.db")).unwrap();
@@ -97,10 +97,10 @@ fn metadata_failure_after_query_releases_pinned_view() {
         .unwrap();
     let mut search = fixture.build_search(None, None);
 
-    // When
+    // When: search executes the query.
     let error = search.search(&build_request()).unwrap_err();
 
-    // Then
+    // Then: the pinned view is released after failure.
     assert_eq!(fixture.calls.get(), 1);
     assert_eq!(fixture.reads.get(), 1);
     assert!(fixture.observed.borrow().is_empty());
@@ -114,14 +114,17 @@ fn metadata_failure_after_query_releases_pinned_view() {
         .execute("update nodes set created_at = 1 where id = ?1", ["a.md"])
         .unwrap();
     publish_candidate(&mut open_storage(root), "b", "new.rs");
-    assert_eq!(open_storage(root).begin_read().unwrap().get_revision(), 2);
+    assert_eq!(
+        open_storage(root).begin_read_tx().unwrap().get_revision(),
+        2
+    );
     assert_can_checkpoint(root);
     drop(search);
 }
 
 #[test]
 fn search_observes_metadata_and_bindings_from_original_pinned_view() {
-    // Given
+    // Given: an original publication and a writer changing metadata.
     let fixture = ScopedFixture::new();
     let root = fixture.root.path();
     let mut writer = open_storage(root);
@@ -132,10 +135,10 @@ fn search_observes_metadata_and_bindings_from_original_pinned_view() {
         None,
     );
 
-    // When
+    // When: filtered search observes the pinned view.
     let links = search.search(&build_filtered_request()).unwrap();
 
-    // Then
+    // Then: metadata and bindings retain the original revision.
     assert_eq!(fixture.calls.get(), 1);
     assert_eq!(fixture.reads.get(), 1);
     assert_eq!(links.len(), 1);
@@ -151,14 +154,17 @@ fn search_observes_metadata_and_bindings_from_original_pinned_view() {
             BTreeSet::from([SourceUri::parse("old.rs").unwrap()])
         )]
     );
-    assert_eq!(open_storage(root).begin_read().unwrap().get_revision(), 2);
+    assert_eq!(
+        open_storage(root).begin_read_tx().unwrap().get_revision(),
+        2
+    );
     assert_can_checkpoint(root);
     drop(search);
 }
 
 #[test]
 fn late_provenance_failure_releases_pinned_view_while_service_stays_alive() {
-    // Given
+    // Given: late source-observation or provenance failures.
     for failure in [
         ProvenanceFailure::Observation,
         ProvenanceFailure::Comparison,
@@ -167,10 +173,10 @@ fn late_provenance_failure_releases_pinned_view_while_service_stays_alive() {
         let root = fixture.root.path();
         let mut search = fixture.build_search(None, Some(failure));
 
-        // When
+        // When: filtered search reaches the failing observation.
         let error = search.search(&build_filtered_request()).unwrap_err();
 
-        // Then
+        // Then: the pinned view is released while the service remains alive.
         assert_eq!(fixture.calls.get(), 1);
         assert_eq!(fixture.reads.get(), 1);
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
@@ -178,7 +184,10 @@ fn late_provenance_failure_releases_pinned_view_while_service_stays_alive() {
         assert!(!format!("{error:?} {error}").contains("PRIVATE"));
         assert_can_checkpoint(root);
         publish_candidate(&mut open_storage(root), "b", "new.rs");
-        assert_eq!(open_storage(root).begin_read().unwrap().get_revision(), 2);
+        assert_eq!(
+            open_storage(root).begin_read_tx().unwrap().get_revision(),
+            2
+        );
         assert_can_checkpoint(root);
         // Ownership must release the read before the still-live service is dropped.
         drop(search);
@@ -316,15 +325,15 @@ impl Storage for ReadOnlyStorage {
         = <SqliteStorage as Storage>::VectorWrite<'a>
     where
         Self: 'a;
-    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>> {
+    fn begin_read_tx(&mut self) -> StorageResult<Self::Read<'_>> {
         self.reads.set(self.reads.get() + 1);
         assert_eq!(self.reads.get(), 1, "search opened a second view");
-        self.inner.begin_read()
+        self.inner.begin_read_tx()
     }
-    fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
+    fn begin_cache_write_tx(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
         panic!("search cannot publish")
     }
-    fn begin_vector_write(
+    fn begin_vector_write_tx(
         &mut self,
         _: &Sha256,
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
@@ -343,7 +352,7 @@ fn open_storage(root: &Path) -> SqliteStorage {
 }
 fn publish_candidate(storage: &mut SqliteStorage, oid: &str, source: &str) {
     let id = KnowledgeId::parse("a.md").unwrap();
-    let mut unit = storage.begin_cache_write().unwrap();
+    let mut unit = storage.begin_cache_write_tx().unwrap();
     unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
         id: id.clone(),
         uri: id.clone(),

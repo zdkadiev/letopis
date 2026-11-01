@@ -36,22 +36,22 @@ fn reindex_sigint_preserves_exact_old_or_complete_new_state() {
 
 #[test]
 fn reindex_keeps_pinned_wal_view_and_publishes_one_complete_new_view() {
-    // Given.
+    // Given: pinned graph and FTS views with a worker paused before commit.
     let fixture = Fixture::new();
     fixture.edit(NEW);
     let expected = fixture.build_expected(NEW, "BravoToken");
     let mut storage = build_service(fixture.root.path()).storage;
-    let mut pinned = storage.begin_read().unwrap();
+    let mut pinned = storage.begin_read_tx().unwrap();
     let fts = Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
     fts.execute_batch("begin").unwrap();
     assert_eq!(get_tokens(&fts), fixture.old.tokens);
     let mut worker = Worker::spawn(fixture.root.path(), "reindex");
     worker.reach("before_commit");
     assert_eq!(get_state(fixture.root.path()), fixture.old);
-    // When.
+    // When: the reindex worker is allowed to commit.
     worker.resume();
     worker.finish();
-    // Then.
+    // Then: old readers keep the old state and a fresh read sees the complete new state.
     assert_eq!(pinned.get_revision(), 1);
     assert_eq!(pinned.get_nodes().unwrap(), fixture.old.nodes);
     assert_eq!(

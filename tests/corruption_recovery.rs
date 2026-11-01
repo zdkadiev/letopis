@@ -199,7 +199,7 @@ fn assert_missing_cache_status(repo: &ReadingRepo) {
 
 fn assert_projection(repo: &ReadingRepo, revision: u64) {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), revision);
     let nodes = read.get_nodes().unwrap();
     let ids: Vec<&str> = nodes
@@ -211,7 +211,7 @@ fn assert_projection(repo: &ReadingRepo, revision: u64) {
         .collect();
     assert_eq!(ids, ["a.md", "b.md"]);
     for (token, id) in [("AlphaToken", "a.md"), ("BravoToken", "b.md")] {
-        let matches = read.match_text(token).unwrap();
+        let matches = read.get_text_matches_by_expression(token).unwrap();
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].id.as_str(), id);
     }
@@ -241,7 +241,7 @@ fn assert_projection(repo: &ReadingRepo, revision: u64) {
 
 fn assert_retained_vectors(repo: &ReadingRepo, config: &EmbeddingConfig, hashes: &[Sha256]) {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let identity = config.get_identity();
     assert_eq!(read.get_config_identity(), Some(identity));
     assert_eq!(
@@ -270,7 +270,7 @@ fn assert_retained_vectors(repo: &ReadingRepo, config: &EmbeddingConfig, hashes:
 
 fn get_search_hashes(repo: &ReadingRepo) -> Vec<Sha256> {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     ["a.md", "b.md"]
         .into_iter()
         .map(|id| {
@@ -288,7 +288,7 @@ fn get_search_hashes(repo: &ReadingRepo) -> Vec<Sha256> {
 
 fn assert_empty_vectors(repo: &ReadingRepo) {
     let mut storage = repo.open_storage();
-    assert_eq!(storage.begin_read().unwrap().get_config_identity(), None);
+    assert_eq!(storage.begin_read_tx().unwrap().get_config_identity(), None);
     drop(storage);
     let db = open_database(repo.get_root(), VECTORS);
     let count: i64 = db

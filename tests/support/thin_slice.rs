@@ -90,7 +90,7 @@ impl SliceFixture {
     /// Panics on storage failures.
     pub fn get_projection(&self) -> ProjectionSnapshot {
         let mut storage = self.repo.open_storage();
-        let mut read = storage.begin_read().unwrap();
+        let mut read = storage.begin_read_tx().unwrap();
         let mut result = ProjectionSnapshot {
             revision: read.get_revision(),
             knowledge: BTreeMap::new(),

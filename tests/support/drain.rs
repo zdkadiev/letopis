@@ -173,7 +173,7 @@ impl Fixture {
     ) -> Option<Vec<f32>> {
         unwrap_current(
             self.open_storage()
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
                 .get_vector_by_search_hash(&config.get_identity(), hash)
                 .unwrap(),
@@ -191,7 +191,7 @@ impl Fixture {
     ) -> Option<EmbeddingFailure> {
         unwrap_current(
             self.open_storage()
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
                 .get_failure_by_search_hash(&config.get_identity(), hash)
                 .unwrap(),
@@ -205,7 +205,7 @@ impl Fixture {
     pub fn assert_no_work(&self, config: &EmbeddingConfig) {
         let work = self
             .open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
             .get_next_embedding_work_by_id_and_max_attempts(
                 &config.get_identity(),

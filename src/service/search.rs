@@ -55,14 +55,16 @@ impl<D: Refresher, S: Storage, E: Embedder, F: FileSystem, M: MarkdownCodec, P: 
             .embeddings
             .get_configuration()
             .map_err(map_search_error)?;
-        let mut read = self.storage.begin_read().map_err(map_search_error)?;
+        let mut read = self.storage.begin_read_tx().map_err(map_search_error)?;
         let captured = capture_vector_config(&mut read, &config)?;
         let Some(expression) = build_fts_expression(&request.query) else {
             return Ok(Vec::new());
         };
         let vectors =
             find_vector_candidates(&mut read, &mut self.embeddings, captured, &request.query)?;
-        let fts = read.match_text(&expression).map_err(map_search_error)?;
+        let fts = read
+            .get_text_matches_by_expression(&expression)
+            .map_err(map_search_error)?;
         validate_metrics(&fts, &vectors)?;
         let metadata = get_candidate_metadata(&mut read, &fts, &vectors)?;
         let eligibility = SearchEligibility {
@@ -234,7 +236,7 @@ fn find_vector_candidates<R: StorageRead, E: Embedder>(
         return Err(fail_invalid_search_data());
     }
     match read
-        .find_nearest_vectors(&identity, &vector, dimensions.get())
+        .get_nearest_vectors(&identity, &vector, dimensions.get())
         .map_err(map_search_error)?
     {
         VectorOutcome::Current(matches) => Ok(matches),

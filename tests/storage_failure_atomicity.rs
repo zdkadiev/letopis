@@ -22,12 +22,12 @@ fn a_failed_failure_update_poisons_the_entire_vector_unit() {
          begin select raise(abort, 'controlled update refusal'); end;",
         )
         .unwrap();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(&identity).unwrap() else {
         panic!("configuration unexpectedly changed");
     };
-    // When / Then
+    // When / Then: an earlier valid reservation succeeds inside the same transaction.
     assert!(unit.reserve_attempt(&hash, 3).unwrap());
-    // When
+    // When: the failure update and commit are attempted.
     let error = unit.record_failure(&hash, "safe diagnostic").unwrap_err();
     let commit_error = unit.commit().unwrap_err();
     // Then: even the earlier valid reservation must roll back.
@@ -56,12 +56,12 @@ fn a_failed_query_error_cleanup_poisons_the_entire_vector_unit() {
          begin select raise(abort, 'controlled deletion refusal'); end;",
         )
         .unwrap();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(&identity).unwrap() else {
         panic!("configuration unexpectedly changed");
     };
-    // When / Then
+    // When / Then: an earlier valid reservation succeeds inside the same transaction.
     assert!(unit.reserve_attempt(&hash, 3).unwrap());
-    // When
+    // When: query-error cleanup and commit are attempted.
     let error = unit.clear_query_error().unwrap_err();
     let commit_error = unit.commit().unwrap_err();
     // Then: the diagnostic survives and the earlier reservation rolls back.
@@ -93,12 +93,12 @@ fn a_failed_orphan_prune_poisons_the_entire_vector_unit() {
          begin select raise(abort, 'controlled orphan cleanup refusal'); end;",
         )
         .unwrap();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(&identity).unwrap() else {
         panic!("configuration unexpectedly changed");
     };
-    // When / Then
+    // When / Then: an earlier valid reservation succeeds inside the same transaction.
     assert!(unit.reserve_attempt(&hash, 3).unwrap());
-    // When
+    // When: orphan pruning and commit are attempted.
     let error = unit.prune_unreferenced().unwrap_err();
     let commit_error = unit.commit().unwrap_err();
     // Then: a failed cleanup cannot commit the earlier reservation.

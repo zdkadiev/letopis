@@ -45,7 +45,7 @@ fn first_observation_failure_precedes_later_candidate_comparison() {
 
 fn add_second_candidate(root: &Path, basis: char) {
     let mut storage = open_storage(root);
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let stored = read
         .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
         .unwrap()
@@ -58,7 +58,7 @@ fn add_second_candidate(root: &Path, basis: char) {
     node.source_snapshot = Some(TreeOid::parse(&basis.to_string().repeat(40)).unwrap());
     node.id = id.clone();
     node.uri = id.clone();
-    let mut write = storage.begin_cache_write().unwrap();
+    let mut write = storage.begin_cache_write_tx().unwrap();
     write.upsert_node(&NodeMetadata::Knowledge(node)).unwrap();
     write.replace_text(&id, "query").unwrap();
     write

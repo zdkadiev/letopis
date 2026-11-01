@@ -16,7 +16,11 @@ pub(crate) struct SqliteCacheWrite<'a> {
     failed: bool,
 }
 impl<'a> SqliteCacheWrite<'a> {
-    pub(super) fn begin(db: &'a mut Connection) -> StorageResult<Self> {
+    /// Begin an atomic cache write; dropping it rolls back unpublished changes.
+    ///
+    /// # Errors
+    /// Reports writer contention or database failures.
+    pub(super) fn begin_tx(db: &'a mut Connection) -> StorageResult<Self> {
         Ok(Self {
             transaction: db
                 .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -125,7 +129,7 @@ mod tests {
             lines: LineRange::new(1, 1).unwrap(),
             search_hash: Sha256::digest(b"alpha"),
         });
-        let mut write = SqliteCacheWrite::begin(&mut db).unwrap();
+        let mut write = SqliteCacheWrite::begin_tx(&mut db).unwrap();
         write.upsert_node(&node).unwrap();
         write
             .transaction

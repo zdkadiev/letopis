@@ -31,15 +31,15 @@ fn invalid_database_paths_return_safe_readable_diagnostics_without_side_effects(
 
 #[test]
 fn fresh_storage_reopens_with_empty_identity() {
-    // Given
+    // Given: fresh cache and vector database paths.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
-    // When / Then
+    // When / Then: storage opens and reopens; the initial vector identity remains absent.
     for _ in 0..2 {
         let mut storage = open_storage(&cache, &vectors).unwrap();
-        let read = storage.begin_read().unwrap();
-        // When / Then
+        let read = storage.begin_read_tx().unwrap();
+        // When / Then: storage opens and reopens; the initial vector identity remains absent.
         assert_eq!(read.get_revision(), 0);
         assert_eq!(read.get_config_identity(), None);
     }
@@ -52,22 +52,22 @@ fn fresh_storage_reopens_with_empty_identity() {
         .execute("insert into meta values(1,?1)", ["a".repeat(64)])
         .unwrap();
     let mut storage = open_storage(&cache, &vectors).unwrap();
-    let read = storage.begin_read().unwrap();
+    let read = storage.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), 7);
     assert_eq!(read.get_config_identity().unwrap().to_hex(), "a".repeat(64));
 }
 
 #[test]
 fn owned_storage_outlives_path_arguments() {
-    // Given
+    // Given: owned storage created from temporary path arguments.
     let root = TempDir::new().unwrap();
     let mut storage = {
         let cache = root.path().join("cache.db");
         let vectors = root.path().join("vectors.db");
         open_storage(&cache, &vectors).unwrap()
     };
-    // When / Then
-    assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
+    // When / Then: the caller drops its path arguments; storage remains usable through owned handles.
+    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
 }
 
 #[test]
@@ -106,13 +106,13 @@ fn symlink_and_hardlink_aliases_are_rejected() {
 
 #[test]
 fn literal_unicode_quote_and_question_mark_paths_open() {
-    // Given
+    // Given: literal Unicode, quote and question-mark paths.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("кэш'?mode=memory.db");
     let vectors = root.path().join("векторы'?mode=ro.db");
     let mut storage = open_storage(&cache, &vectors).unwrap();
-    // When / Then
-    assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
+    // When / Then: storage opens those paths; path bytes retain their literal meaning.
+    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
     assert!(cache.is_file());
     assert!(vectors.is_file());
 }
@@ -194,12 +194,12 @@ fn unknown_or_partial_schema_is_not_recreated() {
 
 #[test]
 fn parallel_initializers_leave_a_complete_schema() {
-    // Given
+    // Given: parallel initializers for the same database paths.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
     let barrier = Arc::new(Barrier::new(2));
-    // When / Then
+    // When / Then: both initialization attempts finish; the resulting database schema is complete.
     let successes = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..2)
             .map(|_| {
@@ -235,13 +235,13 @@ fn parallel_initializers_leave_a_complete_schema() {
     });
     assert_eq!(successes, 2, "both initializers must open successfully");
     let mut storage = open_storage(&cache, &vectors).unwrap();
-    assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
+    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
 }
 
 #[test]
 fn independent_thread_connections_register_native_vec1() {
     // Given: each thread creates its own temporary databases.
-    // When / Then
+    // When / Then: each thread uses native vector storage; each connection has the native vec1 extension.
     let handles: Vec<_> = (0..8)
         .map(|_| {
             std::thread::spawn(|| {
@@ -249,7 +249,7 @@ fn independent_thread_connections_register_native_vec1() {
                 let cache = root.path().join("cache.db");
                 let vectors = root.path().join("vectors.db");
                 let mut storage = open_storage(&cache, &vectors).unwrap();
-                assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
+                assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
                 let connection = Connection::open(&vectors).unwrap();
                 let info: String = connection
                     .query_row("select vec1_info()", [], |r| r.get(0))
@@ -334,7 +334,7 @@ fn vector_schema_and_unversioned_user_data_are_not_recreated() {
 
 #[test]
 fn malformed_stored_observations_return_safe_typed_errors() {
-    // Given
+    // Given: malformed persisted storage observations.
     for (target, mutation) in [
         ("cache", "update project set revision=-1"),
         (
@@ -352,10 +352,10 @@ fn malformed_stored_observations_return_safe_typed_errors() {
             .execute_batch(mutation)
             .unwrap();
         let mut storage = open_storage(&cache, &vectors).unwrap();
-        let Err(error) = storage.begin_read() else {
+        let Err(error) = storage.begin_read_tx() else {
             panic!("invalid observation accepted");
         };
-        // When / Then
+        // When / Then: typed reads decode the stored values; safe typed errors preserve internal causes.
         assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
         assert!(!error.to_string().contains("private"));
         assert!(std::error::Error::source(&error).is_some());
@@ -364,7 +364,7 @@ fn malformed_stored_observations_return_safe_typed_errors() {
 
 #[test]
 fn initialized_open_succeeds_but_cache_write_still_returns_busy() {
-    // Given
+    // Given: initialized databases with a contending cache writer.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
@@ -372,9 +372,9 @@ fn initialized_open_succeeds_but_cache_write_still_returns_busy() {
     let connection = Connection::open(&cache).unwrap();
     connection.execute_batch("begin immediate").unwrap();
     let mut storage = open_storage(&cache, &vectors).unwrap();
-    // When / Then
-    assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
-    let Err(error) = storage.begin_cache_write() else {
+    // When / Then: storage opens and another write is attempted; opening succeeds while the contending write reports busy.
+    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
+    let Err(error) = storage.begin_cache_write_tx() else {
         panic!("competing cache writer was accepted");
     };
     let cause = std::error::Error::source(&error)

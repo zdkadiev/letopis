@@ -166,7 +166,7 @@ struct BindingProvenance {
     observed: RefCell<Vec<String>>,
 }
 impl GraphRead for BindingRead {
-    fn resolve_node_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+    fn get_node_ref_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
         assert_eq!(id.as_str(), "b.md");
         self.events.borrow_mut().push("resolve".into());
         Ok(Some(GraphNodeRef {

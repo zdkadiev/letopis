@@ -327,7 +327,7 @@ fn logical_databases(root: &Path) -> Vec<String> {
         &root.join(".letopis/vectors.db"),
     )
     .unwrap();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let mut snapshot = vec![format!("revision:{}", read.get_revision())];
     snapshot.push(format!("identity:{:?}", read.get_config_identity()));
     let mut nodes = read

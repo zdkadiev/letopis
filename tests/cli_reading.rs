@@ -86,7 +86,7 @@ fn malformed_filters_fail_before_repository_initialization() {
 
 #[test]
 fn binary_search_refreshes_and_returns_links_with_empty_filter_equivalence() {
-    // Given
+    // Given: published knowledge and equivalent empty filters.
     let repo = ReadingRepo::new();
     repo.write_knowledge("knowledge.md", "SQLite OR блокировки café 42");
     for suffix in [
@@ -95,21 +95,24 @@ fn binary_search_refreshes_and_returns_links_with_empty_filter_equivalence() {
         r#", "filters":{"sources":[],"source_revisions":[]}"#,
     ] {
         let body = format!(r#"{{"query":"SQLite OR блокировки café 42","limit":1{suffix}}}"#);
-        // When
+        // When: binary search refreshes the corpus.
         let response = get_response(&repo.invoke(&["search"], body.as_bytes()), 0);
         emit_reading("search_success", "search", 0, &response);
-        // Then
+        // Then: links are returned with equivalent empty-filter behavior.
         assert_eq!(
             response,
             json!({"ok":true,"result":[{"element_id":"knowledge.md","path":"knowledge.md","lines":[1,2],"revision":1,"flags":[]}]})
         );
     }
-    assert_eq!(repo.open_storage().begin_read().unwrap().get_revision(), 1);
+    assert_eq!(
+        repo.open_storage().begin_read_tx().unwrap().get_revision(),
+        1
+    );
 }
 
 #[test]
 fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
-    // Given
+    // Given: published knowledge and pending embedding work.
     let repo = ReadingRepo::new();
     repo.write_knowledge("knowledge.md", "sqlite");
     let barrier = ResponseBarrier::default();
@@ -128,9 +131,9 @@ fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
     );
     let mut owner = drain::DetachedOwner::new(repo.get_root(), child.get_id());
     child.send_input(br#"{"query":"sqlite","limit":1}"#);
-    // When
+    // When: binary search refreshes and searches.
     let response = get_response(&child.collect_output(Duration::from_secs(10)), 0);
-    // Then
+    // Then: links are returned and the existing drain starts.
     assert_eq!(response["result"][0]["element_id"], "knowledge.md");
     assert!(response.get("warnings").is_none());
     barrier.wait_until_entered();
@@ -142,7 +145,7 @@ fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
         vec![json!({"model":"fixture","input":["sqlite"],"truncate":false})]
     );
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let nodes = read.get_nodes().unwrap();
     let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
         panic!("knowledge")
@@ -260,7 +263,7 @@ fn binary_inspect_rejects_unknown_member_without_partial_result() {
 
 #[test]
 fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
-    // Given
+    // Given: a query provider that fails.
     for provider in ["ollama", "openai"] {
         let repo = ReadingRepo::new();
         repo.write_knowledge("knowledge.md", "sqlite");
@@ -274,12 +277,12 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
             .refresh()
             .unwrap();
         repo.seed_vectors(&config, &[("knowledge.md", &[1.0, 0.0])]);
-        // When
+        // When: binary search uses lexical fallback.
         let response = get_response(
             &repo.invoke(&["search"], br#"{"query":"sqlite","limit":1}"#),
             0,
         );
-        // Then
+        // Then: search succeeds and persists a safe query error.
         assert_eq!(
             response,
             json!({"ok":true,"result":[{"element_id":"knowledge.md","path":"knowledge.md","lines":[1,2],"revision":1,"flags":[]}]})
@@ -289,7 +292,7 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
         assert_eq!(requests.len(), 1);
         assert_eq!(requests[0]["input"], json!(["sqlite"]));
         let mut storage = repo.open_storage();
-        let mut read = storage.begin_read().unwrap();
+        let mut read = storage.begin_read_tx().unwrap();
         let error = read.get_query_error().unwrap().unwrap();
         assert!(!error.error.contains("PRIVATE_PROVIDER_BODY"));
         assert!(!error.error.contains("fixture-secret"));
@@ -342,24 +345,27 @@ fn binary_inspect_unknown_is_all_or_nothing_and_missing_source_has_null_hash() {
 
 #[test]
 fn lost_output_then_retry_preserves_corpus_user_state_and_revision() {
-    // Given
+    // Given: a command whose first output is lost.
     let repo = ReadingRepo::new();
     repo.write_knowledge("knowledge.md", "sqlite");
     run_git(&repo, &["update-ref", "refs/user/keep", "HEAD"]);
     let before = capture_user_state(&repo);
-    // When
+    // When: the client retries the command.
     for (args, body) in [
         ("search", br#"{"query":"sqlite","limit":1}"#.as_slice()),
         ("inspect", br#"{"element_ids":["knowledge.md"]}"#.as_slice()),
     ] {
         let lost = repo.invoke_lost(&[args], body);
-        // Then
+        // Then: corpus, user state and revision remain unchanged.
         assert_eq!(lost.status.code(), Some(0));
         assert!(lost.stderr.is_empty());
         for _ in 0..2 {
             assert_eq!(get_response(&repo.invoke(&[args], body), 0)["ok"], true);
         }
-        assert_eq!(repo.open_storage().begin_read().unwrap().get_revision(), 1);
+        assert_eq!(
+            repo.open_storage().begin_read_tx().unwrap().get_revision(),
+            1
+        );
         assert_eq!(capture_user_state(&repo), before);
     }
 }

@@ -320,7 +320,7 @@ fn publish_note(root: &Path, storage: &mut SqliteStorage) {
         .unwrap();
     let element = &parsed.elements[0].element;
     let id = KnowledgeId::parse("note.md").unwrap();
-    let mut unit = storage.begin_cache_write().unwrap();
+    let mut unit = storage.begin_cache_write_tx().unwrap();
     unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
         id: id.clone(),
         uri: id.clone(),

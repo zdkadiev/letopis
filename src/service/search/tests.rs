@@ -187,11 +187,11 @@ fn reciprocal_ranks_reward_overlap_before_applying_small_limit() {
 }
 #[test]
 fn candidate_metadata_rejects_wrong_rows_and_search_hashes() {
-    // Given
+    // Given: candidate rows with mismatched identities or search hashes.
     let root = tempfile::TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
-    let mut unit = storage.begin_cache_write().unwrap();
+    let mut unit = storage.begin_cache_write_tx().unwrap();
     let id = KnowledgeId::parse("a.md").unwrap();
     let node = NodeMetadata::Knowledge(KnowledgeMetadata {
         id: id.clone(),
@@ -205,10 +205,10 @@ fn candidate_metadata_rejects_wrong_rows_and_search_hashes() {
     });
     let row = unit.upsert_node(&node).unwrap();
     unit.commit().unwrap();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let mut bad_row = make_text_match("a.md", 0.0);
     bad_row.row_id = row + 1;
-    // When / Then
+    // When / Then: candidate metadata is retrieved; mismatched rows and hashes are rejected.
     assert!(get_candidate_metadata(&mut read, &[bad_row], &[]).is_err());
     assert!(get_candidate_metadata(&mut read, &[], &[make_vector_match("a.md", 0.0)]).is_err());
     assert!(get_candidate_metadata(&mut read, &[make_text_match("missing.md", 0.0)], &[]).is_err());
@@ -231,26 +231,26 @@ fn rank_weight_checks_integer_conversion_and_preserves_reciprocals() {
 }
 #[test]
 fn captured_vector_configuration_requires_matching_identity_and_native_dimensions() {
-    // Given
+    // Given: captured configuration and native vector dimensions.
     let root = tempfile::TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let config = build_config(2);
     let ready = ConfigState::Ready(config.clone());
-    // When / Then
+    // When / Then: the vector channel configuration is captured; identity and native dimensions must agree.
     assert!(
-        capture_vector_config(&mut storage.begin_read().unwrap(), &ready)
+        capture_vector_config(&mut storage.begin_read_tx().unwrap(), &ready)
             .unwrap()
             .is_none()
     );
     storage.reset_vectors(None, &config.get_identity()).unwrap();
     assert!(
-        capture_vector_config(&mut storage.begin_read().unwrap(), &ready)
+        capture_vector_config(&mut storage.begin_read_tx().unwrap(), &ready)
             .unwrap()
             .is_none()
     );
     seed_dimension(&mut storage, &config, 2);
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(
         capture_vector_config(&mut read, &ready)
             .unwrap()
@@ -271,7 +271,7 @@ fn captured_vector_configuration_requires_matching_identity_and_native_dimension
     seed_dimension(&mut storage, &incompatible, 2);
     assert!(
         capture_vector_config(
-            &mut storage.begin_read().unwrap(),
+            &mut storage.begin_read_tx().unwrap(),
             &ConfigState::Ready(incompatible)
         )
         .unwrap()
@@ -280,21 +280,21 @@ fn captured_vector_configuration_requires_matching_identity_and_native_dimension
 }
 #[test]
 fn malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed() {
-    // Given
+    // Given: malformed query vectors and embedding failures.
     let root = tempfile::TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let config = build_config(2);
     seed_dimension(&mut storage, &config, 2);
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     for (identity, vector) in [
         (Sha256::digest(b"wrong model"), vec![1.0, 0.0]),
         (config.get_identity(), vec![1.0]),
         (config.get_identity(), vec![f32::NAN, 0.0]),
     ] {
-        // Given
+        // Given: the query provider returns a mismatched identity or invalid vector.
         let mut embeddings = build_query(Some(Ok(QueryEmbedding::Available { identity, vector })));
-        // When
+        // When: vector candidates are requested.
         let error = find_vector_candidates(
             &mut read,
             &mut embeddings,
@@ -302,15 +302,15 @@ fn malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed() {
             "query",
         )
         .unwrap_err();
-        // Then
+        // Then: invalid index data and infrastructure failures propagate.
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
         assert_eq!(error.get_message(), "invalid search index data");
     }
-    // Given
+    // Given: the query provider returns an infrastructure error.
     let mut embeddings = build_query(Some(Err(EmbeddingError::new(
         EmbeddingErrorKind::InternalError,
     ))));
-    // When / Then
+    // When / Then: vector candidates are requested; invalid index data and infrastructure failures propagate.
     assert!(
         find_vector_candidates(
             &mut read,
@@ -323,17 +323,17 @@ fn malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed() {
 }
 #[test]
 fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
-    // Given
+    // Given: an unavailable or changed vector channel.
     let root = tempfile::TempDir::new().unwrap();
     let mut storage =
         open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
     let config = build_config(2);
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let mut embeddings = build_query(Some(Ok(QueryEmbedding::Available {
         identity: config.get_identity(),
         vector: vec![1.0, 0.0],
     })));
-    // When / Then
+    // When / Then: vector candidates are requested; the lexical fallback remains available.
     assert!(
         find_vector_candidates(
             &mut read,
@@ -344,9 +344,9 @@ fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
         .unwrap()
         .is_empty()
     );
-    // Given
+    // Given: the query provider reports unavailable embeddings.
     let mut unavailable = build_query(Some(Ok(QueryEmbedding::Unavailable)));
-    // When / Then
+    // When / Then: vector candidates are requested; the lexical fallback remains available.
     assert!(
         find_vector_candidates(
             &mut read,
@@ -357,9 +357,9 @@ fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
         .unwrap()
         .is_empty()
     );
-    // Given
+    // Given: no configured vector channel is available.
     let mut unused = build_query(None);
-    // When / Then
+    // When / Then: vector candidates are requested; the lexical fallback remains available.
     assert!(
         find_vector_candidates(&mut read, &mut unused, None, "query")
             .unwrap()
@@ -387,12 +387,13 @@ fn build_config(dimensions: usize) -> EmbeddingConfig {
     EmbeddingConfig::parse(format!(r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","dimensions":{dimensions}}},"max_retries":0}}"#).as_bytes()).unwrap()
 }
 fn seed_dimension<S: Storage>(storage: &mut S, config: &EmbeddingConfig, dimensions: usize) {
-    let observed = storage.begin_read().unwrap().get_config_identity();
+    let observed = storage.begin_read_tx().unwrap().get_config_identity();
     storage
         .reset_vectors(observed.as_ref(), &config.get_identity())
         .unwrap();
-    let VectorOutcome::Current(mut write) =
-        storage.begin_vector_write(&config.get_identity()).unwrap()
+    let VectorOutcome::Current(mut write) = storage
+        .begin_vector_write_tx(&config.get_identity())
+        .unwrap()
     else {
         panic!("identity")
     };

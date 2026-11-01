@@ -196,7 +196,7 @@ fn rebuild_source_identity_from_canonical_files() {
 
 #[test]
 fn repair_legacy_url_only_after_explicit_cache_rebuild() {
-    // Given
+    // Given: a legacy URL projection from the previous parser.
     let repo = DocumentRepo::new();
     repo.write(
         "remote.md",
@@ -216,7 +216,7 @@ fn repair_legacy_url_only_after_explicit_cache_rebuild() {
     // This explicit fixture-only upgrade is the compatibility boundary.
     let lock = get_index_lock(&repo);
     remove_fixture_cache(&repo);
-    // When / Then
+    // When / Then: the cache is explicitly rebuilt; the repaired URL appears only after rebuilding.
     assert_eq!(get_index_lock(&repo), lock);
     refresh_once(&repo);
     assert_eq!(get_index_lock(&repo).0, lock.0);
@@ -232,7 +232,7 @@ fn repair_legacy_url_only_after_explicit_cache_rebuild() {
         vectors
     );
     let mut storage = open_fixture_storage(&repo);
-    let mut view = storage.begin_read().unwrap();
+    let mut view = storage.begin_read_tx().unwrap();
     let preserved_vector =
         unwrap_current(view.get_vector_by_search_hash(&identity, &hash).unwrap());
     assert_eq!(preserved_vector, Some(vec![1.0, 0.0, 0.0]));
@@ -313,7 +313,7 @@ fn seed_vector_sentinels(
 ) {
     let mut storage = open_fixture_storage(repo);
     storage.reset_vectors(None, identity).unwrap();
-    let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
+    let mut unit = unwrap_current(storage.begin_vector_write_tx(identity).unwrap());
     unit.store_vector(hash, &[1.0, 0.0, 0.0], 3).unwrap();
     assert!(unit.reserve_attempt(failure_hash, 3).unwrap());
     assert!(

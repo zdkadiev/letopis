@@ -66,9 +66,9 @@ fn retains_original_graph_bindings_and_revision_across_pages() {
     let mut request = build_request();
     request.depth = 2;
     request.edge_limit = NonZeroUsize::new(10);
-    // When.
+    // When: traversal reads successive pages.
     let output = service.traverse(&request).unwrap();
-    // Then pinned graph/coordinates/basis separately from live observations.
+    // Then: pinned graph/coordinates/basis separately from live observations.
     assert_eq!(
         output
             .elements
@@ -112,7 +112,10 @@ fn retains_original_graph_bindings_and_revision_across_pages() {
             .any(|x| x.contains(S2) || x.contains("new.rs") || x.contains("c.md"))
     );
     assert_eq!(
-        events.iter().filter(|x| x.as_str() == "begin_read").count(),
+        events
+            .iter()
+            .filter(|x| x.as_str() == "begin_read_tx")
+            .count(),
         1
     );
     fixture.assert_released();
@@ -120,7 +123,7 @@ fn retains_original_graph_bindings_and_revision_across_pages() {
 
 #[test]
 fn synchronizes_readiness_before_one_pinned_read_without_query_inference() {
-    // Given
+    // Given: readiness states and recorded traversal events.
     for state in [
         ConfigState::Missing,
         ConfigState::Changed,
@@ -132,14 +135,17 @@ fn synchronizes_readiness_before_one_pinned_read_without_query_inference() {
             events: fixture.events.clone(),
             state,
         });
-        // When
+        // When: traversal runs under each readiness state.
         let output = service.traverse(&build_request()).unwrap();
-        // Then
+        // Then: readiness precedes one pinned read without query inference.
         assert_eq!(output.elements.len(), 1);
         let events = fixture.events.borrow();
-        assert_eq!(&events[..3], ["refresh", "readiness", "begin_read"]);
+        assert_eq!(&events[..3], ["refresh", "readiness", "begin_read_tx"]);
         assert_eq!(
-            events.iter().filter(|x| x.as_str() == "begin_read").count(),
+            events
+                .iter()
+                .filter(|x| x.as_str() == "begin_read_tx")
+                .count(),
             1
         );
     }
@@ -147,12 +153,12 @@ fn synchronizes_readiness_before_one_pinned_read_without_query_inference() {
 
 #[test]
 fn releases_read_after_late_failure_while_service_lives() {
-    // Given
+    // Given: late page, source and provenance failures.
     for failure in [Failure::Page, Failure::Source, Failure::Provenance] {
         let fixture = Fixture::new();
         if matches!(failure, Failure::Provenance) {
             let mut storage = open_storage(fixture.root.path());
-            let mut write = storage.begin_cache_write().unwrap();
+            let mut write = storage.begin_cache_write_tx().unwrap();
             write
                 .insert_edge(&build_edge("b.md", "c.md", "includes"))
                 .unwrap();
@@ -163,7 +169,7 @@ fn releases_read_after_late_failure_while_service_lives() {
         request.depth = 3;
         // When: each failure follows at least one successfully selected graph record.
         let error = service.traverse(&request).unwrap_err();
-        // Then no partial success, safe public context, retained private error chain.
+        // Then: no partial success, safe public context, retained private error chain.
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
         assert!(!error.to_string().contains("PRIVATE"));
         assert!(!format!("{error:?}").contains("PRIVATE"));
@@ -178,7 +184,12 @@ fn releases_read_after_late_failure_while_service_lives() {
         fixture.assert_released();
         publish_replacement(fixture.root.path());
         assert_eq!(
-            service.storage.inner.begin_read().unwrap().get_revision(),
+            service
+                .storage
+                .inner
+                .begin_read_tx()
+                .unwrap()
+                .get_revision(),
             if matches!(failure, Failure::Provenance) {
                 4
             } else {
@@ -191,20 +202,25 @@ fn releases_read_after_late_failure_while_service_lives() {
 
 #[test]
 fn releases_read_after_normal_and_depth_zero_empty_results() {
-    // Given
+    // Given: normal and depth-zero traversal requests.
     for depth in [0, 1] {
         let fixture = Fixture::new();
         let mut service = fixture.build_service(Failure::None, None);
         let mut request = build_request();
         request.depth = depth;
-        // When
+        // When: traversal returns its elements.
         let output = service.traverse(&request).unwrap();
-        // Then
+        // Then: the scoped read is released for both result shapes.
         assert_eq!(output.elements.len(), usize::try_from(depth).unwrap());
         fixture.assert_released();
         publish_replacement(fixture.root.path());
         assert_eq!(
-            service.storage.inner.begin_read().unwrap().get_revision(),
+            service
+                .storage
+                .inner
+                .begin_read_tx()
+                .unwrap()
+                .get_revision(),
             3
         );
     }
@@ -215,7 +231,7 @@ impl Fixture {
         let root = TempDir::new().unwrap();
         std::fs::write(root.path().join("old.rs"), b"live source").unwrap();
         let mut storage = open_storage(root.path());
-        let mut write = storage.begin_cache_write().unwrap();
+        let mut write = storage.begin_cache_write_tx().unwrap();
         for id in ["a.md", "b.md", "c.md"] {
             write.upsert_node(&build_knowledge(id, S1)).unwrap();
         }
@@ -363,7 +379,7 @@ impl SourceProvenance for Provenance {
 }
 fn publish_replacement(root: &Path) {
     let mut storage = open_storage(root);
-    let mut write = storage.begin_cache_write().unwrap();
+    let mut write = storage.begin_cache_write_tx().unwrap();
     write
         .delete_outgoing(&KnowledgeId::parse("a.md").unwrap())
         .unwrap();

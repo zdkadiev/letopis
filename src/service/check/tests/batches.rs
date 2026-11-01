@@ -31,7 +31,7 @@ fn check_batches_selected_owners_without_losing_diagnostic_order() {
         },
         sizes: RefCell::new(Vec::new()),
     };
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     // When: common check/status problem collection observes these owners.
     let problems =
         collect_check_problems(&mut read, &[], &GraphDiagnosticsService::new(), &provenance)

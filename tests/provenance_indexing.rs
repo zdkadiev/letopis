@@ -285,7 +285,7 @@ impl IndexFixture for TempRepo {
             &self.get_root().join(".letopis/vectors.db"),
         )
         .unwrap();
-        let mut read = storage.begin_read().unwrap();
+        let mut read = storage.begin_read_tx().unwrap();
         State {
             revision: read.get_revision(),
             nodes: read.get_nodes().unwrap(),

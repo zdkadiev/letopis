@@ -11,7 +11,12 @@ const USER_VERSION_PRAGMA: &str = "user_version";
 const CACHE_SCHEMA: &str = include_str!("cache.sql");
 const VECTOR_SCHEMA: &str = include_str!("vectors.sql");
 
-type Definition = (String, String, String);
+#[derive(Debug, PartialEq, Eq)]
+struct SchemaDefinition {
+    object_type: String,
+    name: String,
+    sql: String,
+}
 
 #[derive(Clone, Copy)]
 enum SqlText {
@@ -128,11 +133,14 @@ fn has_schema_in(
     }
 }
 
-fn get_definitions(connection: &Connection) -> StorageResult<Vec<Definition>> {
+fn get_definitions(connection: &Connection) -> StorageResult<Vec<SchemaDefinition>> {
     get_definitions_in(connection, "main")
 }
 
-fn get_definitions_in(connection: &Connection, schema: &str) -> StorageResult<Vec<Definition>> {
+fn get_definitions_in(
+    connection: &Connection,
+    schema: &str,
+) -> StorageResult<Vec<SchemaDefinition>> {
     // Schema names are private literals main/vec; values remain bound.
     let sql = format!(
         "select type,name,sql from {schema}.sqlite_schema
@@ -144,7 +152,11 @@ fn get_definitions_in(connection: &Connection, schema: &str) -> StorageResult<Ve
     statement
         .query_map([schema], |row| {
             let sql: String = row.get(2)?;
-            Ok((row.get(0)?, row.get(1)?, normalize_keyword_case(&sql)))
+            Ok(SchemaDefinition {
+                object_type: row.get(0)?,
+                name: row.get(1)?,
+                sql: normalize_keyword_case(&sql),
+            })
         })
         .map_err(map_sqlite)?
         .collect::<Result<Vec<_>, _>>()
@@ -459,7 +471,7 @@ mod tests {
     }
     #[test]
     fn old_cache_rejection_preserves_populated_vectors_config_and_locks() {
-        // Given closed populated databases and independent configuration/lock identities.
+        // Given: closed populated databases and independent configuration/lock identities.
         let root = TempDir::new().unwrap();
         let cache = root.path().join("cache.db");
         let vectors = root.path().join("vectors.db");
@@ -468,7 +480,8 @@ mod tests {
         {
             let mut storage = SqliteStorage::open(&cache, &vectors).unwrap();
             storage.reset_vectors(None, &identity).unwrap();
-            let VectorOutcome::Current(mut write) = storage.begin_vector_write(&identity).unwrap()
+            let VectorOutcome::Current(mut write) =
+                storage.begin_vector_write_tx(&identity).unwrap()
             else {
                 panic!()
             };
@@ -505,7 +518,7 @@ mod tests {
             .collect();
         // When: cache incompatibility is detected before the vector database is opened.
         let error = SqliteStorage::open(&cache, &vectors).unwrap_err();
-        // Then exact content and inode identity, including populated native vector state.
+        // Then: exact content and inode identity, including populated native vector state.
         assert_eq!(error.get_message(), "incompatible storage database schema");
         for (name, expected) in files.iter().zip(before) {
             assert_eq!(capture_file(&root.path().join(name)), expected, "{name}");

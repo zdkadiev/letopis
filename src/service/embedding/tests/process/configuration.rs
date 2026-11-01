@@ -38,7 +38,7 @@ fn configuration_change_after_storage_observation_never_resets_newer_state() {
     let next = reset_with_current_state(&fixture);
     let mut storage = open_storage(&fixture.root);
     let VectorOutcome::Current(mut unit) =
-        storage.begin_vector_write(&next.get_identity()).unwrap()
+        storage.begin_vector_write_tx(&next.get_identity()).unwrap()
     else {
         panic!()
     };
@@ -73,7 +73,7 @@ fn assert_stale_observation(action: &str) {
     let next = reset_with_current_state(&fixture);
     let mut storage = open_storage(&fixture.root);
     let VectorOutcome::Current(mut unit) =
-        storage.begin_vector_write(&next.get_identity()).unwrap()
+        storage.begin_vector_write_tx(&next.get_identity()).unwrap()
     else {
         panic!()
     };

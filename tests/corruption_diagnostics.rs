@@ -146,7 +146,7 @@ fn assert_successful_status(repo: &ReadingRepo, revision: u64) {
 
 fn assert_revision(repo: &ReadingRepo, expected: u64) {
     let mut storage = repo.open_storage();
-    assert_eq!(storage.begin_read().unwrap().get_revision(), expected);
+    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), expected);
 }
 
 fn capture_databases(repo: &ReadingRepo) -> (Vec<u8>, Vec<u8>) {

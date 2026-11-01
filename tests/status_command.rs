@@ -360,7 +360,7 @@ fn disabled_configuration_reports_zero_and_hides_then_reveals_stored_failures() 
     let mut storage = repo.open_storage();
     storage.reset_vectors(None, &config.get_identity()).unwrap();
     let node = storage
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
         .get_nodes()
         .unwrap()
@@ -370,8 +370,9 @@ fn disabled_configuration_reports_zero_and_hides_then_reveals_stored_failures() 
             NodeMetadata::Source(_) => None,
         })
         .unwrap();
-    let VectorOutcome::Current(mut unit) =
-        storage.begin_vector_write(&config.get_identity()).unwrap()
+    let VectorOutcome::Current(mut unit) = storage
+        .begin_vector_write_tx(&config.get_identity())
+        .unwrap()
     else {
         panic!("expected current identity")
     };

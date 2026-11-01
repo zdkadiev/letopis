@@ -162,18 +162,23 @@ fn skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files() {
 
 #[test]
 fn detect_same_tick_equal_stat_edit_and_do_not_publish_unchanged_racy_bytes() {
-    // Given
+    // Given: same-tick bytes with unchanged file statistics.
     let (_dir, mut service) = build_service();
     service.filesystem.stat.update(|mut stat| {
         stat.mtime_ns = NOW;
         stat
     });
     service.refresh().unwrap();
-    let before = service.storage.begin_read().unwrap().get_files().unwrap();
+    let before = service
+        .storage
+        .begin_read_tx()
+        .unwrap()
+        .get_files()
+        .unwrap();
     service.filesystem.reset_counts();
-    // When
+    // When: refresh checks the captured bytes.
     let unchanged = service.refresh().unwrap();
-    // Then
+    // Then: only changed stable bytes advance the publication.
     assert!(!unchanged.published);
     assert_eq!(
         (
@@ -183,14 +188,19 @@ fn detect_same_tick_equal_stat_edit_and_do_not_publish_unchanged_racy_bytes() {
         (1, 0)
     );
     assert_eq!(
-        service.storage.begin_read().unwrap().get_files().unwrap(),
+        service
+            .storage
+            .begin_read_tx()
+            .unwrap()
+            .get_files()
+            .unwrap(),
         before
     );
     // Given: exact same size, inode and mtime; only bytes differ.
     service.filesystem.bytes.replace(EDITED.to_vec());
-    // When
+    // When: refresh checks the captured bytes.
     let changed = service.refresh().unwrap();
-    // Then
+    // Then: only changed stable bytes advance the publication.
     assert_eq!(changed.revision, 2);
     assert_eq!(get_matches(&mut service, "BravoToken"), ["note.md"]);
     assert!(get_matches(&mut service, "AlphaToken").is_empty());
@@ -230,7 +240,7 @@ fn treat_racy_boundary_clock_regression_and_checked_arithmetic_conservatively() 
 
 #[test]
 fn stat_only_change_preserves_projection_and_invalid_state_without_parsing() {
-    // Given
+    // Given: valid and invalid publications with stat-only changes.
     for bytes in [INITIAL, &b"<!-- letopis: invalid -->"[..]] {
         let (dir, mut service) = build_service();
         service.filesystem.bytes.replace(bytes.to_vec());
@@ -239,8 +249,18 @@ fn stat_only_change_preserves_projection_and_invalid_state_without_parsing() {
             stat
         });
         service.refresh().unwrap();
-        let before_nodes = service.storage.begin_read().unwrap().get_nodes().unwrap();
-        let before_files = service.storage.begin_read().unwrap().get_files().unwrap();
+        let before_nodes = service
+            .storage
+            .begin_read_tx()
+            .unwrap()
+            .get_nodes()
+            .unwrap();
+        let before_files = service
+            .storage
+            .begin_read_tx()
+            .unwrap()
+            .get_files()
+            .unwrap();
         let before_fts = get_fts_blocks(dir.path());
         let parses = service.markdown.0.get();
         service.filesystem.stat.update(|mut stat| {
@@ -248,18 +268,28 @@ fn stat_only_change_preserves_projection_and_invalid_state_without_parsing() {
             stat
         });
         service.filesystem.now.set(NOW + 1);
-        // When
+        // When: refresh processes the changed file statistics.
         let outcome = service.refresh().unwrap();
-        // Then
+        // Then: file state updates without reparsing or replacing the projection.
         assert!(outcome.published);
         assert_eq!(outcome.files_updated, 1);
         assert_eq!(service.markdown.0.get(), parses);
         assert_eq!(get_fts_blocks(dir.path()), before_fts);
         assert_eq!(
-            service.storage.begin_read().unwrap().get_nodes().unwrap(),
+            service
+                .storage
+                .begin_read_tx()
+                .unwrap()
+                .get_nodes()
+                .unwrap(),
             before_nodes
         );
-        let after_files = service.storage.begin_read().unwrap().get_files().unwrap();
+        let after_files = service
+            .storage
+            .begin_read_tx()
+            .unwrap()
+            .get_files()
+            .unwrap();
         assert_eq!(after_files[0].inode, before_files[0].inode + 1);
         assert_eq!(after_files[0].valid, before_files[0].valid);
         assert_eq!(after_files[0].error, before_files[0].error);
@@ -270,15 +300,15 @@ fn stat_only_change_preserves_projection_and_invalid_state_without_parsing() {
 
 #[test]
 fn changed_capture_between_locked_detection_and_preparation_aborts() {
-    // Given
+    // Given: bytes that change between detection and preparation.
     let (_dir, mut service) = build_service();
     service.filesystem.replace_on_read.set(Some(3));
-    // When
+    // When: refresh captures the candidate.
     let result = service.refresh();
-    // Then
+    // Then: inconsistent captures abort publication.
     assert_eq!(service.filesystem.reads.get(), 3);
     assert!(result.is_err());
-    let mut read = service.storage.begin_read().unwrap();
+    let mut read = service.storage.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), 0);
     assert!(read.get_files().unwrap().is_empty());
     assert!(read.get_nodes().unwrap().is_empty());
@@ -286,23 +316,33 @@ fn changed_capture_between_locked_detection_and_preparation_aborts() {
 
 #[test]
 fn fatal_read_is_not_an_invalid_markdown_publication() {
-    // Given
+    // Given: a published projection and a filesystem failure on the next changed read.
     let (_dir, mut service) = build_service();
     service.refresh().unwrap();
-    let before = service.storage.begin_read().unwrap().get_files().unwrap();
+    let before = service
+        .storage
+        .begin_read_tx()
+        .unwrap()
+        .get_files()
+        .unwrap();
     service.filesystem.reset_counts();
     service.filesystem.stat.update(|mut stat| {
         stat.inode += 1;
         stat
     });
     service.filesystem.fail_on_read.set(Some(3));
-    // When / Then
+    // When / Then: refresh fails rather than publishing an invalid Markdown result.
     assert!(service.refresh().is_err());
-    let mut read = service.storage.begin_read().unwrap();
-    // Then
+    let mut read = service.storage.begin_read_tx().unwrap();
+    // Then: revision, file state and searchable text retain the prior publication.
     assert_eq!(read.get_revision(), 1);
     assert_eq!(read.get_files().unwrap(), before);
-    assert_eq!(read.match_text("AlphaToken").unwrap().len(), 1);
+    assert_eq!(
+        read.get_text_matches_by_expression("AlphaToken")
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -379,9 +419,9 @@ fn build_service() -> (TempDir, TestService) {
 fn get_matches(service: &mut TestService, text: &str) -> Vec<String> {
     service
         .storage
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
-        .match_text(text)
+        .get_text_matches_by_expression(text)
         .unwrap()
         .into_iter()
         .map(|row| row.id.as_str().to_owned())

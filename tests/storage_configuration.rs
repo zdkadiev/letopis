@@ -14,14 +14,14 @@ fn reset_commits_only_for_the_observed_identity_and_keeps_a_pinned_read() {
     let mut second = open(&root);
     let a = Sha256::digest(b"A");
     let b = Sha256::digest(b"B");
-    // When / Then
+    // When / Then: each conditional reset is attempted; only the observed identity changes and old reads remain pinned.
     assert_eq!(
         first.reset_vectors(None, &a).unwrap(),
         VectorOutcome::Current(true)
     );
     seed_state(&mut first, &a);
-    let mut pinned = first.begin_read().unwrap();
-    // When / Then
+    let mut pinned = first.begin_read_tx().unwrap();
+    // When / Then: each conditional reset is attempted; only the observed identity changes and old reads remain pinned.
     assert_eq!(
         second.reset_vectors(Some(&a), &b).unwrap(),
         VectorOutcome::Current(true)
@@ -29,7 +29,7 @@ fn reset_commits_only_for_the_observed_identity_and_keeps_a_pinned_read() {
     // Then: old view still sees the exact old vector and failure.
     assert_eq!(pinned.get_config_identity(), Some(a));
     assert_state(&mut pinned, &a);
-    let mut fresh = second.begin_read().unwrap();
+    let mut fresh = second.begin_read_tx().unwrap();
     assert_eq!(fresh.get_config_identity(), Some(b));
     assert_eq!(
         fresh
@@ -47,7 +47,7 @@ fn reset_commits_only_for_the_observed_identity_and_keeps_a_pinned_read() {
 
 #[test]
 fn same_desired_identity_preserves_vectors_and_failure_bytes() {
-    // Given
+    // Given: stored vectors and failure bytes under the desired identity.
     let root = TempDir::new().unwrap();
     let mut first = open(&root);
     let mut second = open(&root);
@@ -60,8 +60,8 @@ fn same_desired_identity_preserves_vectors_and_failure_bytes() {
     for observed in [Some(&b), Some(&a), None] {
         // When: a late observer may have captured B, A or initial absence.
         let outcome = first.reset_vectors(observed, &b).unwrap();
-        // Then
-        assert_state(&mut first.begin_read().unwrap(), &b);
+        // Then: vectors and failure bytes remain unchanged.
+        assert_state(&mut first.begin_read_tx().unwrap(), &b);
         assert_eq!(get_failure_bytes(&root), before);
         assert_eq!(outcome, VectorOutcome::Current(false));
     }
@@ -69,7 +69,7 @@ fn same_desired_identity_preserves_vectors_and_failure_bytes() {
 
 #[test]
 fn obsolete_and_absent_observations_preserve_the_winning_identity_and_work() {
-    // Given
+    // Given: obsolete or absent observations and a winning identity.
     for observed in [Some(Sha256::digest(b"A")), None] {
         let root = TempDir::new().unwrap();
         let mut first = open(&root);
@@ -82,10 +82,10 @@ fn obsolete_and_absent_observations_preserve_the_winning_identity_and_work() {
         second.reset_vectors(observed.as_ref(), &b).unwrap();
         seed_state(&mut second, &b);
         let before = get_failure_bytes(&root);
-        // When
+        // When: a stale reset is attempted.
         let outcome = first.reset_vectors(observed.as_ref(), &a).unwrap();
-        // Then state before the result, so a compiling mutation fails on lost work.
-        assert_state(&mut first.begin_read().unwrap(), &b);
+        // Then: state before the result, so a compiling mutation fails on lost work.
+        assert_state(&mut first.begin_read_tx().unwrap(), &b);
         assert_eq!(get_failure_bytes(&root), before);
         assert_eq!(outcome, VectorOutcome::ConfigChanged);
     }
@@ -129,7 +129,7 @@ fn open(root: &TempDir) -> impl Storage + use<> {
 }
 
 fn seed_state(storage: &mut impl Storage, identity: &Sha256) {
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(identity).unwrap() else {
         panic!()
     };
     unit.store_vector(&Sha256::digest(b"vector"), &[4.0, 5.0, 6.0], 3)

@@ -44,7 +44,10 @@ pub(super) fn replace_text(db: &Connection, id: &KnowledgeId, text: &str) -> Sto
     Ok(())
 }
 
-pub(super) fn match_text(db: &Connection, expression: &str) -> StorageResult<Vec<TextMatch>> {
+pub(super) fn get_text_matches_by_expression(
+    db: &Connection,
+    expression: &str,
+) -> StorageResult<Vec<TextMatch>> {
     let mut stmt = db
         .prepare(
             "select nodes.id, nodes.row_id, bm25(text_index) as score

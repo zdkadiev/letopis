@@ -285,7 +285,7 @@ pub trait GraphRead {
     ///
     /// # Errors
     /// Reports database failures or invalid persisted identities/kinds.
-    fn resolve_node_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>>;
+    fn get_node_ref_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>>;
     /// Read at most the requested number of eligible neighbors strictly after a cursor.
     ///
     /// The handle must originate in this view; the positive limit may not exceed 32.

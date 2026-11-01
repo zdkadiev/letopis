@@ -39,10 +39,10 @@ impl SqliteStatusStorage {
 }
 impl StatusStorage for SqliteStatusStorage {
     type Read<'a> = SqliteRead<'a>;
-    fn begin_status_read(&mut self) -> StorageResult<Option<Self::Read<'_>>> {
+    fn begin_status_read_tx(&mut self) -> StorageResult<Option<Self::Read<'_>>> {
         self.read
             .as_mut()
-            .map(SqliteRead::begin_optional)
+            .map(SqliteRead::begin_optional_tx)
             .transpose()
             .map(Option::flatten)
     }

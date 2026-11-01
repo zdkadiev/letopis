@@ -52,13 +52,13 @@ impl ReadingRepo {
     }
     pub fn seed_vectors(&self, config: &EmbeddingConfig, vectors: &[(&str, &[f32])]) {
         let mut storage = self.open_storage();
-        let observed = storage.begin_read().unwrap().get_config_identity();
+        let observed = storage.begin_read_tx().unwrap().get_config_identity();
         storage
             .reset_vectors(observed.as_ref(), &config.get_identity())
             .unwrap();
         for (id, vector) in vectors {
             let node = storage
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
                 .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
                 .unwrap()
@@ -66,8 +66,9 @@ impl ReadingRepo {
             let NodeMetadata::Knowledge(node) = node.metadata else {
                 panic!("expected knowledge")
             };
-            let VectorOutcome::Current(mut unit) =
-                storage.begin_vector_write(&config.get_identity()).unwrap()
+            let VectorOutcome::Current(mut unit) = storage
+                .begin_vector_write_tx(&config.get_identity())
+                .unwrap()
             else {
                 panic!("identity changed")
             };

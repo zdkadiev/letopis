@@ -254,14 +254,14 @@ fn binary_invalid_file_keeps_last_projection_and_publishes_valid_neighbor() {
         state.knowledge["knowledge/cache.md"]
     );
     assert_invalid_row(&fixture);
-    // When
+    // When: the real CLI processes the invalid edit.
     let invalid = get_response(
         &fixture
             .get_repo()
             .invoke(&["inspect"], br#"{"element_ids":["knowledge/cache.md"]}"#),
         1,
     );
-    // Then
+    // Then: the prior projection survives while valid neighbors publish.
     assert_eq!(invalid["error"]["code"], "validation_failed");
     assert!(invalid.get("result").is_none());
     emit_slice("invalid_inspect", "inspect", 1, &invalid);
@@ -271,7 +271,7 @@ fn binary_invalid_file_keeps_last_projection_and_publishes_valid_neighbor() {
         fixture
             .get_repo()
             .open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
             .get_files()
             .unwrap()
@@ -392,13 +392,13 @@ fn spawn_product(fixture: &SliceFixture, args: &[&str], input: Option<&[u8]>) ->
 fn get_vector_by_search_hash(
     fixture: &SliceFixture,
     config: &EmbeddingConfig,
-    hash: &Sha256,
+    search_hash: &Sha256,
 ) -> Option<Vec<f32>> {
     let mut storage = fixture.get_repo().open_storage();
     let result = storage
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
-        .get_vector_by_search_hash(&config.get_identity(), hash)
+        .get_vector_by_search_hash(&config.get_identity(), search_hash)
         .unwrap();
     let VectorOutcome::Current(vector) = result else {
         panic!("configuration changed")
@@ -408,13 +408,13 @@ fn get_vector_by_search_hash(
 fn get_failure_by_search_hash(
     fixture: &SliceFixture,
     config: &EmbeddingConfig,
-    hash: &Sha256,
+    search_hash: &Sha256,
 ) -> EmbeddingFailure {
     let mut storage = fixture.get_repo().open_storage();
     let result = storage
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
-        .get_failure_by_search_hash(&config.get_identity(), hash)
+        .get_failure_by_search_hash(&config.get_identity(), search_hash)
         .unwrap();
     let VectorOutcome::Current(Some(failure)) = result else {
         panic!("expected failure")
@@ -423,7 +423,7 @@ fn get_failure_by_search_hash(
 }
 fn assert_invalid_row(fixture: &SliceFixture) {
     let mut storage = fixture.get_repo().open_storage();
-    let files = storage.begin_read().unwrap().get_files().unwrap();
+    let files = storage.begin_read_tx().unwrap().get_files().unwrap();
     let row = files
         .iter()
         .find(|row| row.path.as_str() == "knowledge/cache.md")

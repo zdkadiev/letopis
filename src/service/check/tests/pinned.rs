@@ -25,7 +25,7 @@ struct OneRead {
 
 #[test]
 fn check_observes_metadata_and_bindings_from_original_pinned_view() {
-    // Given
+    // Given: an original publication and a concurrent writer.
     let directory = tempfile::tempdir().unwrap();
     let mut writer = open_storage(&directory);
     publish_bindings(&mut writer, "a", "old.rs");
@@ -46,10 +46,10 @@ fn check_observes_metadata_and_bindings_from_original_pinned_view() {
         Observations(observations.clone()),
     );
 
-    // When
+    // When: check observes metadata and bindings.
     let report = service.check(&[]).unwrap();
 
-    // Then
+    // Then: all observations come from the original pinned view.
     assert!(report.errors.is_empty());
     assert_eq!(count.get(), 1);
     assert_eq!(
@@ -61,7 +61,7 @@ fn check_observes_metadata_and_bindings_from_original_pinned_view() {
     );
     assert_eq!(
         open_storage(&directory)
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
             .get_revision(),
         4
@@ -115,15 +115,15 @@ impl Storage for OneRead {
         = <SqliteStorage as Storage>::VectorWrite<'a>
     where
         Self: 'a;
-    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>> {
+    fn begin_read_tx(&mut self) -> StorageResult<Self::Read<'_>> {
         self.count.set(self.count.get() + 1);
         assert_eq!(self.count.get(), 1, "check opened a second view");
-        self.inner.begin_read()
+        self.inner.begin_read_tx()
     }
-    fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
+    fn begin_cache_write_tx(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
         panic!("check cannot publish")
     }
-    fn begin_vector_write(
+    fn begin_vector_write_tx(
         &mut self,
         _: &Sha256,
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
@@ -139,7 +139,7 @@ impl Storage for OneRead {
 }
 fn publish_bindings(storage: &mut SqliteStorage, oid: &str, source: &str) {
     publish_nodes(storage, &[build_node("a.md", oid)]);
-    let mut unit = storage.begin_cache_write().unwrap();
+    let mut unit = storage.begin_cache_write_tx().unwrap();
     let id = KnowledgeId::parse("a.md").unwrap();
     unit.delete_outgoing(&id).unwrap();
     unit.insert_edge(

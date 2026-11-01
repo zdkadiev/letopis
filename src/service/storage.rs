@@ -28,7 +28,7 @@ pub trait Storage {
     ///
     /// # Errors
     /// Reports contention or database failures.
-    fn begin_vector_write(
+    fn begin_vector_write_tx(
         &mut self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>>;
@@ -49,12 +49,12 @@ pub trait Storage {
     ///
     /// # Errors
     /// Returns an internal error on contention or database failure.
-    fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>>;
+    fn begin_cache_write_tx(&mut self) -> StorageResult<Self::CacheWrite<'_>>;
     /// Begin and pin a read of cache revision and vector identity.
     ///
     /// # Errors
     /// Returns an internal error if the snapshot cannot be opened or decoded.
-    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>>;
+    fn begin_read_tx(&mut self) -> StorageResult<Self::Read<'_>>;
 }
 /// Observation-only access to an optional published cache.
 ///
@@ -71,7 +71,7 @@ pub trait StatusStorage {
     ///
     /// # Errors
     /// Reports inaccessible, malformed or incompatible persisted state.
-    fn begin_status_read(&mut self) -> StorageResult<Option<Self::Read<'_>>>;
+    fn begin_status_read_tx(&mut self) -> StorageResult<Option<Self::Read<'_>>>;
 }
 
 /// Observations pinned within one read transaction.
@@ -144,7 +144,8 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Returns an invalid request for malformed expressions, or an internal error for I/O.
-    fn match_text(&mut self, expression: &str) -> StorageResult<Vec<TextMatch>>;
+    fn get_text_matches_by_expression(&mut self, expression: &str)
+    -> StorageResult<Vec<TextMatch>>;
     /// Read a text-addressed vector under the expected pinned identity.
     ///
     /// # Errors
@@ -158,7 +159,7 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Rejects invalid query vectors or reports database/integrity failures.
-    fn find_nearest_vectors(
+    fn get_nearest_vectors(
         &mut self,
         expected: &Sha256,
         query: &[f32],
@@ -242,18 +243,18 @@ pub trait VectorWrite: Sized {
     ///
     /// # Errors
     /// Rejects zero or budgets above `i64::MAX` and reports database failures.
-    fn reserve_attempt(&mut self, hash: &Sha256, max_attempts: u64) -> StorageResult<bool>;
+    fn reserve_attempt(&mut self, search_hash: &Sha256, max_attempts: u64) -> StorageResult<bool>;
     /// Replace an existing reservation's error with the caller's safe message.
     /// Returns false when no reservation exists; never creates an attempt.
     ///
     /// # Errors
     /// Reports database failures.
-    fn record_failure(&mut self, hash: &Sha256, safe_error: &str) -> StorageResult<bool>;
+    fn record_failure(&mut self, search_hash: &Sha256, error: &str) -> StorageResult<bool>;
     /// Replace the singleton query failure with an already-safe message.
     ///
     /// # Errors
     /// Rejects timestamps above `i64::MAX` and reports database failures.
-    fn set_query_error(&mut self, at: u64, safe_error: &str) -> StorageResult<()>;
+    fn set_query_error(&mut self, at: u64, error: &str) -> StorageResult<()>;
     /// Clear the singleton error after a successful query embedding.
     ///
     /// # Errors
@@ -265,7 +266,7 @@ pub trait VectorWrite: Sized {
     /// Rejects empty, nonfinite or mismatched vectors and reports database corruption/I/O.
     fn store_vector(
         &mut self,
-        hash: &Sha256,
+        search_hash: &Sha256,
         vector: &[f32],
         dimensions: usize,
     ) -> StorageResult<StoredVectorKey>;

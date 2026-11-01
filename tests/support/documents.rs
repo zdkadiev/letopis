@@ -38,7 +38,7 @@ impl DocumentRepo {
             &self.get_root().join(".letopis/vectors.db"),
         )
         .unwrap();
-        let mut read = storage.begin_read().unwrap();
+        let mut read = storage.begin_read_tx().unwrap();
         State {
             revision: read.get_revision(),
             nodes: read.get_nodes().unwrap(),
@@ -53,9 +53,9 @@ impl DocumentRepo {
         )
         .unwrap();
         storage
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .match_text(text)
+            .get_text_matches_by_expression(text)
             .unwrap()
             .into_iter()
             .map(|row| row.id.as_str().to_owned())

@@ -13,7 +13,13 @@ pub(crate) struct SqliteVectorWrite<'a> {
     failed: bool,
 }
 impl<'a> SqliteVectorWrite<'a> {
-    pub(super) fn begin(
+    /// Begin an atomic vector write when the stored identity matches `expected`.
+    /// A different identity returns `ConfigChanged` without changing data.
+    /// Dropping an uncommitted write rolls back its changes.
+    ///
+    /// # Errors
+    /// Reports writer contention or database failures.
+    pub(super) fn begin_tx(
         connection: &'a mut Connection,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Self>> {
@@ -35,18 +41,18 @@ impl VectorWrite for SqliteVectorWrite<'_> {
         self.failed |= result.is_err();
         result
     }
-    fn reserve_attempt(&mut self, hash: &Sha256, max_attempts: u64) -> StorageResult<bool> {
-        let result = vectors::reserve_attempt(&self.transaction, hash, max_attempts);
+    fn reserve_attempt(&mut self, search_hash: &Sha256, max_attempts: u64) -> StorageResult<bool> {
+        let result = vectors::reserve_attempt(&self.transaction, search_hash, max_attempts);
         self.failed |= result.is_err();
         result
     }
-    fn record_failure(&mut self, hash: &Sha256, safe_error: &str) -> StorageResult<bool> {
-        let result = vectors::record_failure(&self.transaction, hash, safe_error);
+    fn record_failure(&mut self, search_hash: &Sha256, error: &str) -> StorageResult<bool> {
+        let result = vectors::record_failure(&self.transaction, search_hash, error);
         self.failed |= result.is_err();
         result
     }
-    fn set_query_error(&mut self, at: u64, safe_error: &str) -> StorageResult<()> {
-        let result = vectors::set_query_error(&self.transaction, at, safe_error);
+    fn set_query_error(&mut self, at: u64, error: &str) -> StorageResult<()> {
+        let result = vectors::set_query_error(&self.transaction, at, error);
         self.failed |= result.is_err();
         result
     }
@@ -57,11 +63,11 @@ impl VectorWrite for SqliteVectorWrite<'_> {
     }
     fn store_vector(
         &mut self,
-        hash: &Sha256,
+        search_hash: &Sha256,
         vector: &[f32],
         dimensions: usize,
     ) -> StorageResult<StoredVectorKey> {
-        let result = vectors::store_vector(&self.transaction, hash, vector, dimensions);
+        let result = vectors::store_vector(&self.transaction, search_hash, vector, dimensions);
         if result.is_err() {
             self.failed = true;
         }

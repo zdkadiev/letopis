@@ -78,7 +78,7 @@ fn disabled_configuration_hides_execution_failures_and_reports_zero_counts() {
     let identity = Sha256::digest(b"disabled fixture");
     storage.reset_vectors(None, &identity).unwrap();
     let hash = Sha256::digest(b"search");
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(&identity).unwrap() else {
         panic!("expected current vector writer")
     };
     assert!(unit.reserve_attempt(&hash, 1).unwrap());
@@ -102,7 +102,7 @@ fn disabled_configuration_hides_execution_failures_and_reports_zero_counts() {
         &Provenance { fail: false },
     );
 
-    // When
+    // When: status is requested.
     let report = service.get_status().unwrap();
 
     // Then: graph/file observations remain, execution failures do not.
@@ -227,13 +227,14 @@ fn reports_invalid_config_with_unavailable_counts() {
 
 #[test]
 fn keeps_query_error_without_mutation() {
-    // Given
+    // Given: a persisted query error.
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     publish_node(&mut storage, 1);
     let identity = Sha256::digest(b"query fixture");
     storage.reset_vectors(None, &identity).unwrap();
-    let VectorOutcome::Current(mut writer) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut writer) = storage.begin_vector_write_tx(&identity).unwrap()
+    else {
         panic!("expected current vector writer")
     };
     writer.set_query_error(7, "safe query failure").unwrap();
@@ -253,10 +254,10 @@ fn keeps_query_error_without_mutation() {
         &Provenance { fail: false },
     );
 
-    // When
+    // When: status is requested.
     let report = service.get_status().unwrap();
 
-    // Then
+    // Then: the error remains stored and is reported without mutation.
     assert!(
         report
             .problems
@@ -376,9 +377,9 @@ fn build_service<'a>(
 
 impl StatusStorage for Reads {
     type Read<'a> = <SqliteStorage as Storage>::Read<'a>;
-    fn begin_status_read(&mut self) -> StorageResult<Option<Self::Read<'_>>> {
+    fn begin_status_read_tx(&mut self) -> StorageResult<Option<Self::Read<'_>>> {
         self.count.set(self.count.get() + 1);
-        self.inner.as_mut().map(Storage::begin_read).transpose()
+        self.inner.as_mut().map(Storage::begin_read_tx).transpose()
     }
 }
 impl StatusFiles for Files {
@@ -459,7 +460,7 @@ fn open_storage(root: &TempDir) -> SqliteStorage {
 fn publish_node(storage: &mut SqliteStorage, revision: usize) {
     let id = KnowledgeId::parse("a.md#one").unwrap();
     for _ in 0..revision {
-        let mut writer = storage.begin_cache_write().unwrap();
+        let mut writer = storage.begin_cache_write_tx().unwrap();
         writer
             .upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
                 uri: id.clone(),

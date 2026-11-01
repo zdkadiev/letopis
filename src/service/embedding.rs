@@ -41,7 +41,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
         };
         let next = self
             .storage
-            .begin_read()
+            .begin_read_tx()
             .map_err(map_storage)
             .map_err(map_command)?
             .get_next_embedding_work_by_id_and_max_attempts(
@@ -120,7 +120,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     fn get_configuration(&mut self) -> EmbeddingResult<ConfigState> {
         let observed = self
             .storage
-            .begin_read()
+            .begin_read_tx()
             .map_err(map_storage)?
             .get_config_identity();
         #[cfg(test)]
@@ -162,7 +162,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
         loop {
             let next = self
                 .storage
-                .begin_read()
+                .begin_read_tx()
                 .map_err(map_storage)?
                 .get_next_embedding_work_by_id_and_max_attempts(
                     &config.get_identity(),
@@ -198,7 +198,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     fn prune(&mut self, config: &EmbeddingConfig) -> EmbeddingResult<DrainOutcome> {
         let VectorOutcome::Current(mut unit) = self
             .storage
-            .begin_vector_write(&config.get_identity())
+            .begin_vector_write_tx(&config.get_identity())
             .map_err(map_storage)?
         else {
             return Ok(DrainOutcome::ConfigChanged);
@@ -270,7 +270,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
         config: &EmbeddingConfig,
     ) -> EmbeddingResult<VectorOutcome<Option<NonZeroUsize>>> {
         self.storage
-            .begin_read()
+            .begin_read_tx()
             .map_err(map_storage)?
             .get_vector_dimensions(&config.get_identity())
             .map_err(map_storage)
@@ -283,7 +283,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     ) -> EmbeddingResult<VectorOutcome<bool>> {
         let VectorOutcome::Current(mut unit) = self
             .storage
-            .begin_vector_write(&config.get_identity())
+            .begin_vector_write_tx(&config.get_identity())
             .map_err(map_storage)?
         else {
             return Ok(VectorOutcome::ConfigChanged);
@@ -309,7 +309,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
         }
         let failure = self
             .storage
-            .begin_read()
+            .begin_read_tx()
             .map_err(map_storage)?
             .get_failure_by_search_hash(&config.get_identity(), hash)
             .map_err(map_storage)?;
@@ -328,17 +328,17 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     fn record_failure(
         &mut self,
         config: &EmbeddingConfig,
-        hash: &Sha256,
+        search_hash: &Sha256,
         error: &EmbeddingError,
     ) -> EmbeddingResult<VectorOutcome<()>> {
         let VectorOutcome::Current(mut unit) = self
             .storage
-            .begin_vector_write(&config.get_identity())
+            .begin_vector_write_tx(&config.get_identity())
             .map_err(map_storage)?
         else {
             return Ok(VectorOutcome::ConfigChanged);
         };
-        unit.record_failure(hash, &error.to_string())
+        unit.record_failure(search_hash, &error.to_string())
             .map_err(map_storage)?;
         unit.commit().map_err(map_storage)?;
         Ok(VectorOutcome::Current(()))
@@ -374,7 +374,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     ) -> EmbeddingResult<VectorOutcome<()>> {
         let VectorOutcome::Current(mut unit) = self
             .storage
-            .begin_vector_write(&config.get_identity())
+            .begin_vector_write_tx(&config.get_identity())
             .map_err(map_storage)?
         else {
             return Ok(VectorOutcome::ConfigChanged);
@@ -406,7 +406,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
         };
         let VectorOutcome::Current(mut unit) = self
             .storage
-            .begin_vector_write(&config.get_identity())
+            .begin_vector_write_tx(&config.get_identity())
             .map_err(map_storage)?
         else {
             return Ok(QueryEmbedding::Unavailable);

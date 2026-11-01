@@ -133,13 +133,13 @@ fn check_tracks_anchor_rename_removal_and_repair() {
 
 #[test]
 fn check_keeps_last_valid_projection_while_reporting_current_file_error() {
-    // Given
+    // Given: a valid knowledge file before invalid metadata and a later repair.
     let repo = ReadingRepo::new();
     repo.write(
         "retained.md",
         build_whole(42, "RetainedOriginal").as_bytes(),
     );
-    // When / Then
+    // When / Then: check publishes valid contents and retains them through invalid edits.
     assert_eq!(check(&repo), build_clean());
     let original = get_knowledge(&repo, "retained.md").unwrap();
     repo.write("retained.md", b"<!-- letopis: broken PRIVATE_BODY -->\n");
@@ -160,24 +160,32 @@ fn check_keeps_last_valid_projection_while_reporting_current_file_error() {
     assert_eq!(repaired.created_at, 42);
     assert_ne!(repaired.hash, original.hash);
     let mut storage = repo.open_storage();
-    let mut view = storage.begin_read().unwrap();
-    assert!(view.match_text("RetainedOriginal").unwrap().is_empty());
+    let mut view = storage.begin_read_tx().unwrap();
+    assert!(
+        view.get_text_matches_by_expression("RetainedOriginal")
+            .unwrap()
+            .is_empty()
+    );
     assert_eq!(
-        view.match_text("RepairedCurrent").unwrap()[0].id.as_str(),
+        view.get_text_matches_by_expression("RepairedCurrent")
+            .unwrap()[0]
+            .id
+            .as_str(),
         "retained.md"
     );
 }
 
 #[test]
 fn concurrent_check_publishes_edits_from_both_writers() {
-    // Given
+    // Given: two published files edited by separate synchronized checkers.
     let repo = ReadingRepo::new();
     repo.write("a.md", build_whole(42, "BeforeA").as_bytes());
     repo.write("b.md", build_whole(73, "BeforeB").as_bytes());
-    // When / Then
+    // When / Then: the initial check publishes both valid files.
     assert_eq!(check(&repo), build_clean());
     let barrier = Barrier::new(2);
 
+    // When: synchronized checkers publish independent edits.
     thread::scope(|scope| {
         let first = scope.spawn(|| {
             let mut checker = wire_checker(repo.get_root()).unwrap();
@@ -191,13 +199,14 @@ fn concurrent_check_publishes_edits_from_both_writers() {
             barrier.wait();
             checker.check(&[]).unwrap()
         });
+        // Then: both checkers complete without findings.
         assert!(first.join().unwrap().errors.is_empty());
         assert!(second.join().unwrap().errors.is_empty());
     });
 
-    // One final pinned view independently observes both IDs, authored times and FTS texts.
+    // Then: one pinned view observes both IDs, authored times and FTS texts.
     let mut storage = repo.open_storage();
-    let mut view = storage.begin_read().unwrap();
+    let mut view = storage.begin_read_tx().unwrap();
     let nodes = view.get_nodes().unwrap();
     assert_eq!(nodes.len(), 2);
     for (id, created_at, text) in [("a.md", 42, "LarchEdited"), ("b.md", 73, "BirchEdited")] {
@@ -207,7 +216,7 @@ fn concurrent_check_publishes_edits_from_both_writers() {
         };
         assert_eq!(metadata.id.as_str(), id);
         assert_eq!(metadata.created_at, created_at);
-        let matches = view.match_text(text).unwrap();
+        let matches = view.get_text_matches_by_expression(text).unwrap();
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].id.as_str(), id);
     }
@@ -215,7 +224,7 @@ fn concurrent_check_publishes_edits_from_both_writers() {
 
 #[test]
 fn repeated_check_preserves_corpus_and_revision() {
-    // Given
+    // Given: an unchanged published corpus.
     let repo = ReadingRepo::new();
     repo.write(
         "source.md",
@@ -228,16 +237,16 @@ fn repeated_check_preserves_corpus_and_revision() {
     repo.write("ordinary.md", b"Unmarked Markdown\n");
     let before =
         ["source.md", "ordinary.md"].map(|path| fs::read(repo.get_root().join(path)).unwrap());
-    // When
+    // When: check runs repeatedly.
     let first = check(&repo);
-    // Then
+    // Then: canonical bytes and revision remain unchanged.
     assert_eq!(first, build_dangling("missing.md"));
     let mut storage = repo.open_storage();
-    let revision = storage.begin_read().unwrap().get_revision();
+    let revision = storage.begin_read_tx().unwrap().get_revision();
 
     for _ in 0..3 {
         assert_eq!(check(&repo), first);
-        assert_eq!(storage.begin_read().unwrap().get_revision(), revision);
+        assert_eq!(storage.begin_read_tx().unwrap().get_revision(), revision);
         for (path, bytes) in ["source.md", "ordinary.md"].into_iter().zip(&before) {
             assert_eq!(fs::read(repo.get_root().join(path)).unwrap(), *bytes);
         }
@@ -299,7 +308,7 @@ fn build_section(anchor: &str) -> String {
 fn get_knowledge(repo: &ReadingRepo, id: &str) -> Option<KnowledgeMetadata> {
     let mut storage = repo.open_storage();
     let row = storage
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
         .get_node_by_id(&build_target(id))
         .unwrap()?;

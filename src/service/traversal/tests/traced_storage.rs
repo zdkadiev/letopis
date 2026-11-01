@@ -28,9 +28,9 @@ impl Storage for TracedStorage {
     type Read<'a> = TracedRead<<SqliteStorage as Storage>::Read<'a>>;
     type CacheWrite<'a> = <SqliteStorage as Storage>::CacheWrite<'a>;
     type VectorWrite<'a> = <SqliteStorage as Storage>::VectorWrite<'a>;
-    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>> {
-        self.events.borrow_mut().push("begin_read".into());
-        let read = self.inner.begin_read()?;
+    fn begin_read_tx(&mut self) -> StorageResult<Self::Read<'_>> {
+        self.events.borrow_mut().push("begin_read_tx".into());
+        let read = self.inner.begin_read_tx()?;
         Ok(TracedRead {
             inner: read,
             events: self.events.clone(),
@@ -39,14 +39,14 @@ impl Storage for TracedStorage {
             after_pin: self.after_pin.take(),
         })
     }
-    fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
-        self.inner.begin_cache_write()
+    fn begin_cache_write_tx(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
+        self.inner.begin_cache_write_tx()
     }
-    fn begin_vector_write(
+    fn begin_vector_write_tx(
         &mut self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
-        self.inner.begin_vector_write(expected)
+        self.inner.begin_vector_write_tx(expected)
     }
     fn reset_vectors(
         &mut self,
@@ -57,11 +57,11 @@ impl Storage for TracedStorage {
     }
 }
 impl<R: GraphRead> GraphRead for TracedRead<R> {
-    fn resolve_node_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+    fn get_node_ref_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
         self.events
             .borrow_mut()
             .push(format!("resolve:{}", id.as_str()));
-        self.inner.resolve_node_by_id(id)
+        self.inner.get_node_ref_by_id(id)
     }
     fn get_neighbor_page(
         &mut self,
@@ -121,7 +121,7 @@ impl<R: StorageRead> StorageRead for TracedRead<R> {
     fn get_files(&mut self) -> StorageResult<Vec<FileRow>> {
         self.inner.get_files()
     }
-    fn match_text(&mut self, _: &str) -> StorageResult<Vec<TextMatch>> {
+    fn get_text_matches_by_expression(&mut self, _: &str) -> StorageResult<Vec<TextMatch>> {
         panic!("query text")
     }
     fn get_next_embedding_work_by_id_and_max_attempts(
@@ -142,11 +142,11 @@ impl<R: StorageRead> StorageRead for TracedRead<R> {
     fn get_vector_by_search_hash(
         &mut self,
         expected: &Sha256,
-        hash: &Sha256,
+        search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>> {
-        self.inner.get_vector_by_search_hash(expected, hash)
+        self.inner.get_vector_by_search_hash(expected, search_hash)
     }
-    fn find_nearest_vectors(
+    fn get_nearest_vectors(
         &mut self,
         _: &Sha256,
         _: &[f32],
@@ -157,9 +157,9 @@ impl<R: StorageRead> StorageRead for TracedRead<R> {
     fn get_failure_by_search_hash(
         &mut self,
         expected: &Sha256,
-        hash: &Sha256,
+        search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>> {
-        self.inner.get_failure_by_search_hash(expected, hash)
+        self.inner.get_failure_by_search_hash(expected, search_hash)
     }
     fn get_query_error(&mut self) -> StorageResult<Option<QueryError>> {
         self.inner.get_query_error()

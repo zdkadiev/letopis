@@ -15,19 +15,21 @@ use support::{git::isolate_command, reading::ReadingRepo};
 
 #[test]
 fn reindex_binary_rebuilds_unchanged_fts_and_returns_next_revision() {
-    // Given.
+    // Given: an unchanged knowledge file whose FTS entry was removed.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
     assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":1}}));
     let db = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     db.execute("delete from text_index", []).unwrap();
-    // When.
+    // When: the reindex command rebuilds the cache.
     assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":2}}));
-    // Then.
+    // Then: the next revision restores the original searchable text.
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(
-        read.match_text("AlphaToken").unwrap()[0].id.as_str(),
+        read.get_text_matches_by_expression("AlphaToken").unwrap()[0]
+            .id
+            .as_str(),
         "a.md"
     );
     drop(read);
@@ -55,27 +57,35 @@ fn reindex_binary_rejects_selective_cancel_and_malformed_input_before_io() {
 
 #[test]
 fn reindex_binary_preserves_invalid_owner_and_exposes_current_diagnostic() {
-    // Given.
+    // Given: an invalid owner and an independently edited valid peer.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
     repo.write_knowledge("b.md", "BravoToken");
     reindex(&repo);
     repo.write("a.md", b"<!-- letopis: SECRET_RAW -->");
     repo.write_knowledge("b.md", "CharlieToken");
-    // When.
+    // When: the reindex command publishes the corpus.
     assert_eq!(reindex(&repo)["result"]["revision"], 2);
-    // Then.
+    // Then: the invalid owner retains its projection and exposes the current diagnostic.
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(
-        read.match_text("AlphaToken").unwrap()[0].id.as_str(),
+        read.get_text_matches_by_expression("AlphaToken").unwrap()[0]
+            .id
+            .as_str(),
         "a.md"
     );
     assert_eq!(
-        read.match_text("CharlieToken").unwrap()[0].id.as_str(),
+        read.get_text_matches_by_expression("CharlieToken").unwrap()[0]
+            .id
+            .as_str(),
         "b.md"
     );
-    assert!(read.match_text("BravoToken").unwrap().is_empty());
+    assert!(
+        read.get_text_matches_by_expression("BravoToken")
+            .unwrap()
+            .is_empty()
+    );
     drop(read);
     let status = get_response(&repo.invoke(&["status"], b"{}"), 0);
     assert_eq!(status["result"]["revision"], 2);
@@ -132,9 +142,9 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
     );
     assert!(!repo.get_root().join(".letopis/cache.db").exists());
     assert_eq!(reindex(&repo)["result"]["revision"], 1);
-    // Then.
+    // Then: vectors are reused while configuration and the held embedding lock survive.
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let node = read
         .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
         .unwrap()
@@ -185,7 +195,7 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
         })]
     );
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     for (id, vector) in [("a.md", vec![1., 0., 0.]), ("b.md", vec![0., 1., 0.])] {
         let node = read
             .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
@@ -205,7 +215,7 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
 
 #[test]
 fn reindex_preserves_author_basis_bytes_head_and_index() {
-    // Given.
+    // Given: an author basis, live source edit and captured Git state.
     let repo = ReadingRepo::new();
     let tree = create_basis(repo.get_root(), &[("source.txt", b"old source")]);
     repo.write("source.txt", b"new source");
@@ -213,12 +223,12 @@ fn reindex_preserves_author_basis_bytes_head_and_index() {
     repo.write("a.md", note.as_bytes());
     let head = run_git(&repo, &["rev-parse", "HEAD"]);
     let index = fs::read(repo.get_root().join(".git/index")).unwrap();
-    // When.
+    // When: reindex runs twice.
     reindex(&repo);
     reindex(&repo);
-    // Then.
+    // Then: author provenance, canonical bytes, HEAD and index remain intact.
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let node = read
         .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
         .unwrap()
@@ -241,7 +251,7 @@ fn reindex_preserves_author_basis_bytes_head_and_index() {
 
 #[test]
 fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
-    // Given.
+    // Given: a prior publication and an unsafe symlink candidate.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
     reindex(&repo);
@@ -253,21 +263,27 @@ fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
     )
     .unwrap();
     repo.write_knowledge("a.md", "UnpublishedToken");
-    // When.
+    // When: the reindex command encounters the unsafe candidate.
     let response = get_response(&repo.invoke(&["reindex"], b"{}"), 1);
-    // Then.
+    // Then: a safe error is returned and the prior revision survives.
     assert_eq!(
         response,
         json!({"ok":false,"error":{"code":"invalid_request","message":"cannot rebuild corpus index","details":{}}})
     );
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), 1);
     assert_eq!(
-        read.match_text("AlphaToken").unwrap()[0].id.as_str(),
+        read.get_text_matches_by_expression("AlphaToken").unwrap()[0]
+            .id
+            .as_str(),
         "a.md"
     );
-    assert!(read.match_text("UnpublishedToken").unwrap().is_empty());
+    assert!(
+        read.get_text_matches_by_expression("UnpublishedToken")
+            .unwrap()
+            .is_empty()
+    );
 }
 
 fn reindex(repo: &ReadingRepo) -> Value {

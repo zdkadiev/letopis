@@ -29,18 +29,18 @@ mod tasks {
 
     #[test]
     fn readiness_uses_durable_work_without_http_lock_or_retained_read() {
-        // Given
+        // Given: durable pending embedding work.
         let root = TempDir::new().unwrap();
         let mut storage = open_storage(&root);
         let mut files = Files::new(0);
         publish(&mut storage, &mut files, "a.md", "ready token");
         let mut service = EmbeddingService::new(storage, files, MarkdownParser, Provider::new());
-        // When
+        // When: readiness queries the scoped storage view.
         assert!(service.has_work().unwrap());
         // Then: no document/provider work; the read is gone before another unit starts.
         assert_eq!(service.provider.calls.get(), 0);
         assert!(service.files.reads.borrow().is_empty());
-        drop(service.storage.begin_cache_write().unwrap());
+        drop(service.storage.begin_cache_write_tx().unwrap());
     }
 
     #[test]
@@ -172,7 +172,7 @@ impl EmbeddingProvider for Provider {
 }
 #[test]
 fn configuration_is_reread_and_provider_validation_precedes_identity_reset() {
-    // Given
+    // Given: configuration changes and a provider requiring validation.
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     let old = Sha256::digest(b"old identity");
@@ -180,13 +180,17 @@ fn configuration_is_reread_and_provider_validation_precedes_identity_reset() {
     let mut provider = Provider::new();
     provider.invalid_config = true;
     let mut service = EmbeddingService::new(storage, Files::new(0), MarkdownParser, provider);
-    // When / Then
+    // When / Then: configuration is retrieved again; provider validation precedes resetting the vector identity.
     assert!(matches!(
         service.get_configuration().unwrap(),
         ConfigState::Invalid(EmbeddingErrorKind::InvalidConfig)
     ));
     assert_eq!(
-        service.storage.begin_read().unwrap().get_config_identity(),
+        service
+            .storage
+            .begin_read_tx()
+            .unwrap()
+            .get_config_identity(),
         Some(old)
     );
     *service.files.config.borrow_mut() = None;
@@ -220,7 +224,7 @@ fn skipped_ids_are_never_reread_when_processed_work_restarts_selection() {
 
 #[test]
 fn credential_failures_use_four_durable_attempts_and_three_one_second_waits() {
-    // Given
+    // Given: credential failures under a four-attempt budget.
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(&root);
     let mut files = Files::new(3);
@@ -228,9 +232,9 @@ fn credential_failures_use_four_durable_attempts_and_three_one_second_waits() {
     let mut provider = Provider::new();
     provider.failure = Some(EmbeddingErrorKind::Credentials);
     let mut service = EmbeddingService::new(storage, files, MarkdownParser, provider);
-    // When
+    // When: the embedding drain runs to completion.
     assert_eq!(service.drain().unwrap(), DrainOutcome::Complete);
-    // Then
+    // Then: four attempts and three retry waits are durable.
     assert_eq!(service.provider.calls.get(), 4);
     assert_eq!(*service.files.waits.borrow(), vec![RETRY_DELAY; 3]);
     let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
@@ -238,7 +242,7 @@ fn credential_failures_use_four_durable_attempts_and_three_one_second_waits() {
     };
     let VectorOutcome::Current(Some(failure)) = service
         .storage
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
         .get_failure_by_search_hash(&config.get_identity(), &hash)
         .unwrap()
@@ -257,23 +261,23 @@ fn service_defensively_rejects_provider_cardinality_and_nonfinite_vectors() {
         vec![vec![f32::NAN, 1.]],
         vec![vec![1., 2.]; 2],
     ] {
-        // Given
+        // Given: a provider returning invalid cardinality or nonfinite components.
         let root = TempDir::new().unwrap();
         let mut provider = Provider::new();
         provider.vectors = vectors;
         let mut service =
             EmbeddingService::new(open_storage(&root), Files::new(0), MarkdownParser, provider);
-        // When
+        // When: a query embedding is requested.
         assert_eq!(
             service.embed_query("query").unwrap(),
             QueryEmbedding::Unavailable
         );
-        // Then
+        // Then: the invalid provider result is rejected.
         assert_eq!(service.provider.calls.get(), 1);
         assert_eq!(
             service
                 .storage
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
                 .get_query_error()
                 .unwrap()
@@ -286,21 +290,21 @@ fn service_defensively_rejects_provider_cardinality_and_nonfinite_vectors() {
 
 #[test]
 fn unsupported_query_timestamp_is_an_internal_error_without_truncation() {
-    // Given
+    // Given: an unsupported query-error timestamp.
     let root = TempDir::new().unwrap();
     let mut files = Files::new(0);
     files.time = u64::MAX;
     let mut provider = Provider::new();
     provider.failure = Some(EmbeddingErrorKind::Connection);
     let mut service = EmbeddingService::new(open_storage(&root), files, MarkdownParser, provider);
-    // When
+    // When: a query embedding fails.
     let error = service.embed_query("query").unwrap_err();
-    // Then
+    // Then: the timestamp is rejected without truncation.
     assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
     assert_eq!(
         service
             .storage
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
             .get_query_error()
             .unwrap(),
@@ -316,17 +320,17 @@ fn rejected_vector_input_drops_poisoned_unit_before_recording_failure() {
     let mut files = Files::new(0);
     let hash = publish(&mut storage, &mut files, "a.md", "knowledge");
     let documents = files.documents.clone();
-    let revision = storage.begin_read().unwrap().get_revision();
+    let revision = storage.begin_read_tx().unwrap().get_revision();
     let mut provider = Provider::new();
     provider.vectors = vec![vec![1.]];
     let mut service = EmbeddingService::new(storage, files, MarkdownParser, provider);
-    // When
+    // When: the drain tries to store the provider result.
     assert_eq!(service.drain().unwrap(), DrainOutcome::Complete);
     // Then: storage rejection rolled back, then a fresh unit persisted the error.
     let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
         panic!()
     };
-    let mut read = service.storage.begin_read().unwrap();
+    let mut read = service.storage.begin_read_tx().unwrap();
     let VectorOutcome::Current(Some(failure)) = read
         .get_failure_by_search_hash(&config.get_identity(), &hash)
         .unwrap()
@@ -342,7 +346,12 @@ fn rejected_vector_input_drops_poisoned_unit_before_recording_failure() {
     );
     assert_eq!(read.get_revision(), revision);
     assert_eq!(service.files.documents, documents);
-    assert_eq!(read.match_text("knowledge").unwrap().len(), 1);
+    assert_eq!(
+        read.get_text_matches_by_expression("knowledge")
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 mod process;
@@ -367,7 +376,7 @@ fn rejects_a_provider_vector_that_violates_the_first_requested_dimension() {
     assert_eq!(result, QueryEmbedding::Unavailable);
     let error = service
         .storage
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
         .get_query_error()
         .unwrap()
@@ -389,7 +398,7 @@ fn captured_query_never_rereads_or_resets_configuration() {
     let mut service = EmbeddingService::new(storage, files, MarkdownParser, Provider::new());
     service.files.config.replace(Some(br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"new-model","parameters":{"base_url":"http://localhost/api"},"max_retries":0}}"#.to_vec()));
     service.files.reject_config_reads = true;
-    // When
+    // When: the query uses its captured configuration.
     let result = service
         .embed_query_with_config(QueryEmbeddingRequest {
             text: "captured query",
@@ -397,7 +406,7 @@ fn captured_query_never_rereads_or_resets_configuration() {
             dimensions: NonZeroUsize::new(3),
         })
         .unwrap();
-    // Then
+    // Then: configuration is neither reread nor reset.
     assert_eq!(
         result,
         QueryEmbedding::Available {
@@ -415,7 +424,11 @@ fn captured_query_never_rereads_or_resets_configuration() {
         )]
     );
     assert_eq!(
-        service.storage.begin_read().unwrap().get_config_identity(),
+        service
+            .storage
+            .begin_read_tx()
+            .unwrap()
+            .get_config_identity(),
         Some(captured.get_identity())
     );
 }
@@ -432,7 +445,7 @@ fn captured_query_preserves_readiness_policy_and_document_attempts() {
         .reset_vectors(None, &captured.get_identity())
         .unwrap();
     let VectorOutcome::Current(mut unit) = storage
-        .begin_vector_write(&captured.get_identity())
+        .begin_vector_write_tx(&captured.get_identity())
         .unwrap()
     else {
         panic!()
@@ -448,9 +461,9 @@ fn captured_query_preserves_readiness_policy_and_document_attempts() {
     );
     assert_eq!(service.provider.calls.get(), 0);
     for failure in [true, false] {
-        // Given
+        // Given: captured readiness policy and document attempts.
         service.provider.failure = failure.then_some(EmbeddingErrorKind::Credentials);
-        // When
+        // When: the captured query is embedded.
         let result = service
             .embed_query_with_config(QueryEmbeddingRequest {
                 text: "query",
@@ -458,9 +471,9 @@ fn captured_query_preserves_readiness_policy_and_document_attempts() {
                 dimensions: None,
             })
             .unwrap();
-        // Then
+        // Then: document attempts and readiness policy remain unchanged.
         assert_eq!(matches!(result, QueryEmbedding::Unavailable), failure);
-        let mut read = service.storage.begin_read().unwrap();
+        let mut read = service.storage.begin_read_tx().unwrap();
         assert_eq!(
             read.get_query_error().unwrap().map(|error| error.error),
             failure.then(|| "embedding credentials unavailable".into())
@@ -487,7 +500,7 @@ fn captured_query_preserves_readiness_policy_and_document_attempts() {
 
 #[test]
 fn captured_query_rejects_invalid_provider_policy_without_reset_or_http() {
-    // Given
+    // Given: an invalid provider policy with existing vector state.
     let root = TempDir::new().unwrap();
     let files = Files::new(0);
     let captured = files.get_configured();
@@ -498,7 +511,7 @@ fn captured_query_rejects_invalid_provider_policy_without_reset_or_http() {
     let mut provider = Provider::new();
     provider.invalid_config = true;
     let mut service = EmbeddingService::new(storage, files, MarkdownParser, provider);
-    // When
+    // When: a captured query is attempted.
     let result = service
         .embed_query_with_config(QueryEmbeddingRequest {
             text: "query",
@@ -506,12 +519,16 @@ fn captured_query_rejects_invalid_provider_policy_without_reset_or_http() {
             dimensions: None,
         })
         .unwrap();
-    // Then
+    // Then: no provider request or identity reset occurs.
     assert_eq!(result, QueryEmbedding::Unavailable);
     assert_eq!(service.files.config_reads.get(), 0);
     assert_eq!(service.provider.calls.get(), 0);
     assert_eq!(
-        service.storage.begin_read().unwrap().get_config_identity(),
+        service
+            .storage
+            .begin_read_tx()
+            .unwrap()
+            .get_config_identity(),
         Some(captured.get_identity())
     );
 }
@@ -526,7 +543,7 @@ fn publish(storage: &mut SqliteStorage, files: &mut Files, path: &str, body: &st
         .unwrap()
         .unwrap();
     let element = parsed.elements.remove(0);
-    let mut unit = storage.begin_cache_write().unwrap();
+    let mut unit = storage.begin_cache_write_tx().unwrap();
     unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
         id: element.element.id.clone(),
         uri: element.element.id,

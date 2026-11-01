@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         storage.reset_vectors(None, &identity)?,
         VectorOutcome::Current(true)
     );
-    let mut unit = require_current(storage.begin_vector_write(&identity)?)?;
+    let mut unit = require_current(storage.begin_vector_write_tx(&identity)?)?;
     assert!(unit.reserve_attempt(&Sha256::digest(TEXT.as_bytes()), 3)?);
     unit.store_vector(&Sha256::digest(TEXT.as_bytes()), &VECTOR, 3)?;
     unit.commit()?;
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn publish_nodes(storage: &mut impl Storage) -> Result<(), Box<dyn Error>> {
-    let mut unit = storage.begin_cache_write()?;
+    let mut unit = storage.begin_cache_write_tx()?;
     for name in ["a.md", "b.md"] {
         let id = KnowledgeId::parse(name)?;
         unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
@@ -63,9 +63,9 @@ fn publish_nodes(storage: &mut impl Storage) -> Result<(), Box<dyn Error>> {
 }
 
 fn verify_text(storage: &mut impl Storage) -> Result<(), Box<dyn Error>> {
-    let mut read = storage.begin_read()?;
+    let mut read = storage.begin_read_tx()?;
     assert_eq!(read.get_revision(), 1);
-    let matches = read.match_text("shared")?;
+    let matches = read.get_text_matches_by_expression("shared")?;
     assert_eq!(
         matches
             .iter()
@@ -77,7 +77,7 @@ fn verify_text(storage: &mut impl Storage) -> Result<(), Box<dyn Error>> {
 }
 
 fn verify_vectors(storage: &mut impl Storage, identity: &Sha256) -> Result<(), Box<dyn Error>> {
-    let mut read = storage.begin_read()?;
+    let mut read = storage.begin_read_tx()?;
     assert_eq!(read.get_revision(), 1);
     assert_eq!(read.get_config_identity(), Some(*identity));
     let vector = require_current(
@@ -94,7 +94,7 @@ fn verify_vectors(storage: &mut impl Storage, identity: &Sha256) -> Result<(), B
             .flat_map(|v| v.to_le_bytes())
             .collect::<Vec<_>>()
     );
-    let matches = require_current(read.find_nearest_vectors(identity, &VECTOR, 3)?)?;
+    let matches = require_current(read.get_nearest_vectors(identity, &VECTOR, 3)?)?;
     assert_eq!(
         matches
             .iter()

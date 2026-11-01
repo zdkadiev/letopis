@@ -59,7 +59,7 @@ fn assert_search_survives_writer(phase: WritePhase, response: &str) {
     assert_eq!(server.take_requests().len(), 1);
     let error = repo
         .open_storage()
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
         .get_query_error()
         .unwrap();
@@ -85,8 +85,9 @@ fn prepare_fixture(response: &str) -> (ReadingRepo, HttpFixture, ResponseBarrier
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let mut storage = repo.open_storage();
-    let VectorOutcome::Current(mut unit) =
-        storage.begin_vector_write(&config.get_identity()).unwrap()
+    let VectorOutcome::Current(mut unit) = storage
+        .begin_vector_write_tx(&config.get_identity())
+        .unwrap()
     else {
         panic!("expected matching identity");
     };

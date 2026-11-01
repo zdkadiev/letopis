@@ -214,16 +214,22 @@ fn assert_safe_failure(output: &Output) {
 
 fn assert_invalid_projection(repo: &ReadingRepo) {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), 1);
     assert_eq!(read.get_nodes().unwrap().len(), 1);
     assert!(read.get_edges_by_source_id(None).unwrap().is_empty());
     assert_eq!(
-        read.match_text("CharlieToken").unwrap()[0].id.as_str(),
+        read.get_text_matches_by_expression("CharlieToken").unwrap()[0]
+            .id
+            .as_str(),
         "b.md"
     );
     for token in ["AlphaToken", "BravoToken"] {
-        assert!(read.match_text(token).unwrap().is_empty());
+        assert!(
+            read.get_text_matches_by_expression(token)
+                .unwrap()
+                .is_empty()
+        );
     }
     let files = read.get_files().unwrap();
     let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
@@ -256,17 +262,21 @@ fn assert_invalid_status(repo: &ReadingRepo) {
 
 fn assert_repaired_projection(repo: &ReadingRepo) {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), 2);
     assert_eq!(read.get_nodes().unwrap().len(), 2);
     assert!(read.get_edges_by_source_id(None).unwrap().is_empty());
     for (token, id) in [("DeltaToken", "a.md"), ("CharlieToken", "b.md")] {
-        let found = read.match_text(token).unwrap();
+        let found = read.get_text_matches_by_expression(token).unwrap();
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].id.as_str(), id);
     }
     for token in ["AlphaToken", "BravoToken"] {
-        assert!(read.match_text(token).unwrap().is_empty());
+        assert!(
+            read.get_text_matches_by_expression(token)
+                .unwrap()
+                .is_empty()
+        );
     }
     let files = read.get_files().unwrap();
     assert_eq!(files.len(), 3);

@@ -104,7 +104,12 @@ fn verified_refresh_failure_preserves_previous_publication() {
         ["lock", "read", "read", "observe", "verify"]
     );
     assert_eq!(
-        service.storage.inner.begin_read().unwrap().get_revision(),
+        service
+            .storage
+            .inner
+            .begin_read_tx()
+            .unwrap()
+            .get_revision(),
         0
     );
 }
@@ -162,18 +167,23 @@ fn pin_failure_never_opens_sql_write() {
 
 #[test]
 fn changed_capture_after_preflight_rolls_back_without_commit() {
-    // Given
+    // Given: a capture that changes after preflight.
     let (_dir, mut service, events) = build_boundary_service(None);
     service.filesystem.inner.replace_on_read.set(Some(3));
-    // When / Then
+    // When / Then: refresh rejects the inconsistent capture; no cache commit occurs.
     assert!(service.refresh().is_err());
-    // Then
+    // Then: no cache commit occurs.
     assert_eq!(
         *events.borrow(),
         ["lock", "read", "read", "observe", "retain", "begin", "read"]
     );
     assert_eq!(
-        service.storage.inner.begin_read().unwrap().get_revision(),
+        service
+            .storage
+            .inner
+            .begin_read_tx()
+            .unwrap()
+            .get_revision(),
         0
     );
 }
@@ -321,13 +331,13 @@ impl Storage for BoundaryStorage {
     type Read<'a> = <SqliteStorage as Storage>::Read<'a>;
     type CacheWrite<'a> = BoundaryWrite<<SqliteStorage as Storage>::CacheWrite<'a>>;
     type VectorWrite<'a> = <SqliteStorage as Storage>::VectorWrite<'a>;
-    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>> {
-        self.inner.begin_read()
+    fn begin_read_tx(&mut self) -> StorageResult<Self::Read<'_>> {
+        self.inner.begin_read_tx()
     }
-    fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
+    fn begin_cache_write_tx(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
         self.events.borrow_mut().push("begin");
         Ok(BoundaryWrite {
-            inner: self.inner.begin_cache_write()?,
+            inner: self.inner.begin_cache_write_tx()?,
             events: Rc::clone(&self.events),
         })
     }
@@ -338,11 +348,11 @@ impl Storage for BoundaryStorage {
     ) -> StorageResult<VectorOutcome<bool>> {
         self.inner.reset_vectors(observed, identity)
     }
-    fn begin_vector_write(
+    fn begin_vector_write_tx(
         &mut self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
-        self.inner.begin_vector_write(expected)
+        self.inner.begin_vector_write_tx(expected)
     }
 }
 impl<W: CacheWrite> CacheWrite for BoundaryWrite<W> {

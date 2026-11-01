@@ -62,7 +62,7 @@ impl Discovery {
         };
         for id in &request.element_ids {
             let node = read
-                .resolve_node_by_id(id)
+                .get_node_ref_by_id(id)
                 .map_err(map_graph_error)?
                 .ok_or_else(|| {
                     CommandError::new(CommandErrorKind::NotFound, "traversal start not found")

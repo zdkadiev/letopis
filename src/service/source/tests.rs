@@ -56,36 +56,36 @@ fn publish_remote_without_file_capture_and_group_local_ranges() {
 
 #[test]
 fn skip_io_for_unknown_or_knowledge_address() {
-    // Given
+    // Given: unknown and knowledge addresses with recorded source reads.
     let repo = prepare_sources();
     let recorded_reads = Rc::new(RefCell::new(Vec::new()));
     let reader = SourceService::new(RecordedFiles::new(repo.path(), recorded_reads.clone()));
     let mut storage = open_storage(repo.path());
-    let mut view = storage.begin_read().unwrap();
+    let mut view = storage.begin_read_tx().unwrap();
     let unknown = SourceUri::parse("unknown.txt").unwrap();
     let knowledge = SourceUri::parse("a.md").unwrap();
 
-    // When / Then
+    // When / Then: the source reader resolves those addresses; no source filesystem read occurs.
     assert!(reader.get_source(&mut view, &unknown).unwrap().is_none());
     assert!(reader.get_source(&mut view, &knowledge).unwrap().is_none());
-    // Then
+    // Then: no source filesystem read occurs.
     assert!(recorded_reads.borrow().is_empty());
 }
 
 #[test]
 fn return_unfetched_remote_without_io() {
-    // Given
+    // Given: a declared remote source with recorded reads.
     let repo = prepare_sources();
     let recorded_reads = Rc::new(RefCell::new(Vec::new()));
     let reader = SourceService::new(RecordedFiles::new(repo.path(), recorded_reads.clone()));
     let mut storage = open_storage(repo.path());
-    let mut view = storage.begin_read().unwrap();
+    let mut view = storage.begin_read_tx().unwrap();
     let remote = SourceUri::parse("https://Host/a?x=1#section").unwrap();
 
-    // When
+    // When: the remote source is observed.
     let observed = reader.get_source(&mut view, &remote).unwrap().unwrap();
 
-    // Then
+    // Then: it remains unfetched without local I/O.
     assert_eq!(observed.availability, SourceAvailability::Unfetched);
     assert_eq!(observed.metadata.hash, None);
     assert_eq!(observed.metadata.lines, None);
@@ -94,19 +94,19 @@ fn return_unfetched_remote_without_io() {
 
 #[test]
 fn observe_live_source_without_referrer_edits() {
-    // Given
+    // Given: a declared local source and unchanged referrers.
     let repo = prepare_sources();
     let recorded_reads = Rc::new(RefCell::new(Vec::new()));
     let reader = SourceService::new(RecordedFiles::new(repo.path(), recorded_reads.clone()));
     let mut storage = open_storage(repo.path());
-    let mut view = storage.begin_read().unwrap();
+    let mut view = storage.begin_read_tx().unwrap();
     let uri = SourceUri::parse("source.txt").unwrap();
     fs::write(repo.path().join("source.txt"), b"def").unwrap();
 
-    // When
+    // When: the live source bytes are observed.
     let observed = reader.get_source(&mut view, &uri).unwrap().unwrap();
 
-    // Then
+    // Then: current bytes are returned without editing referrers.
     assert_eq!(observed.availability, SourceAvailability::Available);
     assert_eq!(
         observed.metadata.hash.unwrap().to_hex(),
@@ -120,20 +120,20 @@ fn observe_live_source_without_referrer_edits() {
 
 #[test]
 fn propagate_private_source_failure() {
-    // Given
+    // Given: a source read that fails with a private cause.
     let repo = prepare_sources();
     let recorded_reads = Rc::new(RefCell::new(Vec::new()));
     let mut files = RecordedFiles::new(repo.path(), recorded_reads);
     files.failure = Some(RepoPath::parse("source.txt").unwrap());
     let reader = SourceService::new(files);
     let mut storage = open_storage(repo.path());
-    let mut view = storage.begin_read().unwrap();
+    let mut view = storage.begin_read_tx().unwrap();
     let uri = SourceUri::parse("source.txt").unwrap();
 
-    // When
+    // When: the live source is requested.
     let error = reader.get_source(&mut view, &uri).unwrap_err();
 
-    // Then
+    // Then: a safe typed error preserves the private cause internally.
     assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
     assert!(!error.to_string().contains("PRIVATE_SOURCE_CAUSE"));
     assert!(!format!("{error:?}").contains("PRIVATE_SOURCE_CAUSE"));

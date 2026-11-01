@@ -85,7 +85,7 @@ pub(super) fn observe_request(path: &Path) -> ObservationResult<()> {
     verify_database(&cache, CACHE_SCHEMA_VERSION)?;
     verify_database(&vectors, VECTOR_SCHEMA_VERSION)?;
     let mut storage = open_storage(&cache, &vectors)?;
-    let mut snapshot = storage.begin_read()?;
+    let mut snapshot = storage.begin_read_tx()?;
     let receipt = observe_snapshot(&mut snapshot, &request, &config)?;
     let bytes = serde_json::to_vec_pretty(&receipt)?;
     let mut output = OpenOptions::new()

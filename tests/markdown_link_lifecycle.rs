@@ -125,9 +125,9 @@ fn legacy_titles_never_publish_into_a_fresh_cache() {
     let mut storage = repo.open_storage();
     assert!(
         storage
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .match_text("new OR old")
+            .get_text_matches_by_expression("new OR old")
             .unwrap()
             .is_empty()
     );
@@ -213,7 +213,7 @@ fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
     assert_ne!(migrated.hash, original.hash);
     assert_eq!(get_git_source(&repo, &basis), SOURCE_BYTES);
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(read.get_config_identity(), Some(identity));
     assert_eq!(
         read.get_vector_by_search_hash(&identity, &migrated.search_hash)
@@ -230,7 +230,9 @@ fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
         }))
     );
     assert_eq!(
-        read.match_text("StableToken").unwrap()[0].id.as_str(),
+        read.get_text_matches_by_expression("StableToken").unwrap()[0]
+            .id
+            .as_str(),
         "note.md"
     );
     drop(read);
@@ -323,7 +325,7 @@ fn get_knowledge(repo: &ReadingRepo, id: &str) -> KnowledgeMetadata {
 
 fn get_state(repo: &ReadingRepo) -> State {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     State {
         revision: read.get_revision(),
         nodes: read.get_nodes().unwrap(),
@@ -358,7 +360,7 @@ fn seed_pre_upgrade_errors(repo: &ReadingRepo) -> (FileRow, FileRow) {
         Some("invalid letopis link title"),
     );
     let mut storage = repo.open_storage();
-    let mut unit = storage.begin_cache_write().unwrap();
+    let mut unit = storage.begin_cache_write_tx().unwrap();
     unit.upsert_file(&valid).unwrap();
     unit.upsert_file(&mismatch).unwrap();
     unit.commit().unwrap();
@@ -374,7 +376,7 @@ fn seed_legacy_projection(repo: &ReadingRepo) {
     let id = KnowledgeId::parse("note.md").unwrap();
     let source = SourceUri::parse("source.txt#L2-L3").unwrap();
     let mut storage = repo.open_storage();
-    let mut unit = storage.begin_cache_write().unwrap();
+    let mut unit = storage.begin_cache_write_tx().unwrap();
     unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
         id: id.clone(),
         uri: id.clone(),
@@ -409,7 +411,7 @@ fn seed_legacy_projection(repo: &ReadingRepo) {
 
 fn seed_failure(repo: &ReadingRepo, identity: &Sha256) {
     let mut storage = repo.open_storage();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(identity).unwrap() else {
         panic!("unexpected vector identity")
     };
     let hash = Sha256::parse(FAILURE_HASH).unwrap();

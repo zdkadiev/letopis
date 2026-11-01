@@ -14,7 +14,7 @@ use support::{
 
 #[test]
 fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
-    // Given
+    // Given: filtered searches with a failure followed by success.
     let repo = ReadingRepo::new();
     let basis = prepare_notes(&repo);
     let server = HttpFixture::start_sequence(vec![
@@ -31,14 +31,14 @@ fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
     prepare_vectors(&repo, &config, 2);
     let input = build_input(&basis);
 
-    // When
+    // When: both searches run under one identity.
     let fallback = invoke_search(&repo, &input);
 
-    // Then
+    // Then: success clears the query error without resetting identity.
     assert_eq!(get_ids(&fallback), ["a.md", "b.md"]);
     let error = repo
         .open_storage()
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
         .get_query_error()
         .unwrap()
@@ -54,7 +54,7 @@ fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
     assert_eq!(get_ids(&recovered), ["a.md", "b.md", "semantic.md"]);
     assert!(
         repo.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
             .get_query_error()
             .unwrap()
@@ -72,7 +72,7 @@ fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
 
 #[test]
 fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests() {
-    // Given
+    // Given: missing or invalid embedding configuration.
     let repo = ReadingRepo::new();
     let basis = prepare_notes(&repo);
     let server = HttpFixture::start(FixtureReply::Status {
@@ -83,14 +83,14 @@ fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests
     prepare_vectors(&repo, &config, 2);
     std::fs::remove_file(repo.get_root().join(".letopis/config.json")).unwrap();
 
-    // When / Then
+    // When / Then: filtered lexical search runs; results remain available without provider requests.
     assert_eq!(
         get_ids(&invoke_search(&repo, &build_input(&basis))),
         ["a.md", "b.md"]
     );
-    // Given
+    // Given: missing or invalid embedding configuration.
     repo.write(".letopis/config.json", b"PRIVATE invalid configuration");
-    // When / Then
+    // When / Then: filtered lexical search runs; results remain available without provider requests.
     assert_eq!(
         get_ids(&invoke_search(&repo, &build_input(&basis))),
         ["a.md", "b.md"]
@@ -99,7 +99,7 @@ fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests
     assert!(server.take_requests().is_empty());
     assert!(
         repo.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
             .get_query_error()
             .unwrap()
@@ -132,7 +132,7 @@ fn disabled_configuration_keeps_filtered_fts_without_query_provider() {
         .as_bytes(),
     );
 
-    // When
+    // When: filtered search runs.
     let links = invoke_search(&repo, &build_input(&basis));
 
     // Then: filtered FTS remains and no query inference is attempted.
@@ -140,7 +140,7 @@ fn disabled_configuration_keeps_filtered_fts_without_query_provider() {
     assert!(server.take_requests().is_empty());
     assert!(
         repo.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
             .get_query_error()
             .unwrap()
@@ -150,7 +150,7 @@ fn disabled_configuration_keeps_filtered_fts_without_query_provider() {
 
 #[test]
 fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
-    // Given
+    // Given: incompatible vector configuration with a lexical filter.
     let repo = ReadingRepo::new();
     let basis = prepare_notes(&repo);
     let server = HttpFixture::start(FixtureReply::Status {
@@ -166,15 +166,15 @@ fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
     repo.write(".letopis/config.json", raw.as_bytes());
     prepare_vectors(&repo, &config, 2);
 
-    // When
+    // When: filtered search runs.
     let links = invoke_search(&repo, &build_input(&basis));
 
-    // Then
+    // Then: lexical results survive without misusing the provider.
     assert_eq!(get_ids(&links), ["a.md", "b.md"]);
     assert!(server.take_requests().is_empty());
     assert!(
         repo.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
             .get_query_error()
             .unwrap()
@@ -358,7 +358,7 @@ fn get_query_problems(status: &Value) -> Vec<Value> {
 
 fn assert_unchanged_vector_state(repo: &ReadingRepo, config: &EmbeddingConfig) {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(read.get_config_identity(), Some(config.get_identity()));
     assert_eq!(
         read.get_next_embedding_work_by_id_and_max_attempts(&config.get_identity(), 1, None)

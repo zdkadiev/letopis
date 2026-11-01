@@ -383,7 +383,7 @@ impl GeneratedRead {
     }
 }
 impl GraphRead for GeneratedRead {
-    fn resolve_node_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+    fn get_node_ref_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
         self.resolved.push(id.as_str().to_owned());
         let key = match id.as_str() {
             "a.md" => 1,

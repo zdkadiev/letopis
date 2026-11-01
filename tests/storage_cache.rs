@@ -9,32 +9,38 @@ use storage_support::{build_file, build_knowledge, build_source};
 use tempfile::TempDir;
 #[test]
 fn cache_commit_preserves_node_row_id() {
-    // Given
+    // Given: an inserted knowledge node with an initial FTS entry.
     let root = TempDir::new().unwrap();
     let mut storage = open_storage(
         &root.path().join("cache.db"),
         &root.path().join("vectors.db"),
     )
     .unwrap();
-    let mut write = storage.begin_cache_write().unwrap();
+    let mut write = storage.begin_cache_write_tx().unwrap();
     let first = write
         .upsert_node(&build_knowledge("a.md", "alpha"))
         .unwrap();
     write
         .replace_text(&KnowledgeId::parse("a.md").unwrap(), "alpha")
         .unwrap();
-    // When / Then
+    // When / Then: successive publications replace searchable text while preserving the node row ID.
     assert_eq!(write.commit().unwrap(), 1);
-    let mut write = storage.begin_cache_write().unwrap();
+    let mut write = storage.begin_cache_write_tx().unwrap();
     let second = write.upsert_node(&build_knowledge("a.md", "beta")).unwrap();
     write
         .replace_text(&KnowledgeId::parse("a.md").unwrap(), "beta")
         .unwrap();
     assert_eq!(write.commit().unwrap(), 2);
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(second, first);
-    assert_eq!(read.match_text("alpha").unwrap().len(), 0);
-    assert_eq!(read.match_text("beta").unwrap().len(), 1);
+    assert_eq!(
+        read.get_text_matches_by_expression("alpha").unwrap().len(),
+        0
+    );
+    assert_eq!(
+        read.get_text_matches_by_expression("beta").unwrap().len(),
+        1
+    );
     assert_eq!(
         read.get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
             .unwrap()
@@ -50,7 +56,7 @@ use rusqlite::Connection;
 use std::error::Error;
 #[test]
 fn source_missing_bytes_and_declared_targets_round_trip() {
-    // Given
+    // Given: source metadata with missing bytes and declared targets.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let source = build_source("code.rs#L2-L4", None, 3);
@@ -60,7 +66,7 @@ fn source_missing_bytes_and_declared_targets_round_trip() {
     let id = EdgeTarget::Source(meta.uri.clone());
     let external = build_edge("a.md", id.clone(), "external");
     let dangling = build_edge("a.md", build_target("missing.md"), "supports");
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .upsert_node(&build_knowledge("a.md", "alpha"))
         .unwrap();
@@ -68,8 +74,8 @@ fn source_missing_bytes_and_declared_targets_round_trip() {
     write.insert_edge(&external).unwrap();
     write.insert_edge(&dangling).unwrap();
     write.commit().unwrap();
-    let mut read = db.begin_read().unwrap();
-    // When / Then
+    let mut read = db.begin_read_tx().unwrap();
+    // When / Then: the metadata is published and retrieved; source identities and optional data round-trip unchanged.
     assert_eq!(read.get_node_by_id(&id).unwrap().unwrap().metadata, source);
     assert_eq!(
         read.get_edges_by_source_id(None).unwrap(),
@@ -83,24 +89,24 @@ fn source_missing_bytes_and_declared_targets_round_trip() {
 }
 #[test]
 fn incoming_edges_survive_target_delete_and_reappear() {
-    // Given
+    // Given: incoming edges whose target can be deleted.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let declared = build_edge("a.md", build_target("b.md"), "supports");
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     for id in ["a.md", "b.md"] {
         write.upsert_node(&build_knowledge(id, "alpha")).unwrap();
     }
     write.insert_edge(&declared).unwrap();
     write.commit().unwrap();
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .delete_outgoing(&KnowledgeId::parse("b.md").unwrap())
         .unwrap();
     write.delete_node(&build_target("b.md")).unwrap();
     write.commit().unwrap();
-    let mut read = db.begin_read().unwrap();
-    // When / Then
+    let mut read = db.begin_read_tx().unwrap();
+    // When / Then: the target is deleted and recreated; incoming declarations survive and become active again.
     assert_eq!(
         read.get_edges_by_source_id(None).unwrap(),
         vec![declared.clone()]
@@ -111,10 +117,10 @@ fn incoming_edges_survive_target_delete_and_reappear() {
             .is_none()
     );
     drop(read);
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write.upsert_node(&build_knowledge("b.md", "beta")).unwrap();
     write.commit().unwrap();
-    let mut read = db.begin_read().unwrap();
+    let mut read = db.begin_read_tx().unwrap();
     assert!(
         read.get_node_by_id(&build_target("b.md"))
             .unwrap()
@@ -137,7 +143,7 @@ fn source_projection_can_be_recomputed_and_removed() {
     }
     let updated = build_source("code.rs", Some(Sha256::digest(b"bytes")), 7);
     // Given: two referring nodes; caller supplies their minimum creation time.
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write.upsert_node(&first).unwrap();
     write.upsert_node(&build_knowledge("b.md", "beta")).unwrap();
     write
@@ -150,15 +156,15 @@ fn source_projection_can_be_recomputed_and_removed() {
     }
     write.commit().unwrap();
     // When: removing the oldest referrer recomputes the projection in the same unit.
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .delete_outgoing(&KnowledgeId::parse("a.md").unwrap())
         .unwrap();
     write.delete_node(&build_target("a.md")).unwrap();
     write.upsert_node(&updated).unwrap();
     write.commit().unwrap();
-    let mut read = db.begin_read().unwrap();
-    // Then
+    let mut read = db.begin_read_tx().unwrap();
+    // Then: stored source data follows the published projection.
     assert_eq!(read.get_node_by_id(&id).unwrap().unwrap().metadata, updated);
     assert_eq!(
         read.get_edges_by_source_id(None).unwrap(),
@@ -166,20 +172,20 @@ fn source_projection_can_be_recomputed_and_removed() {
     );
     drop(read);
     // When / Then: caller removes the last reference and source together.
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .delete_outgoing(&KnowledgeId::parse("b.md").unwrap())
         .unwrap();
     write.delete_node(&id).unwrap();
     write.commit().unwrap();
-    let mut read = db.begin_read().unwrap();
-    // Then
+    let mut read = db.begin_read_tx().unwrap();
+    // Then: stored source data follows the published projection.
     assert!(read.get_node_by_id(&id).unwrap().is_none());
     assert!(read.get_edges_by_source_id(None).unwrap().is_empty());
 }
 #[test]
 fn valid_invalid_and_unmarked_file_rows_round_trip() {
-    // Given
+    // Given: valid, invalid and unmarked file states.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let valid = build_file("a.md", "alpha");
@@ -187,26 +193,26 @@ fn valid_invalid_and_unmarked_file_rows_round_trip() {
     invalid.valid = false;
     invalid.error = Some("invalid metadata".into());
     let unmarked = build_file("unmarked.md", "plain");
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     for row in [&valid, &invalid, &unmarked] {
         write.upsert_file(row).unwrap();
     }
     write.commit().unwrap();
-    let mut read = db.begin_read().unwrap();
-    // When / Then
+    let mut read = db.begin_read_tx().unwrap();
+    // When / Then: file rows are published and retrieved; each file state round-trips without changing its meaning.
     for row in [&valid, &invalid, &unmarked] {
-        // When / Then
+        // When / Then: file rows are published and retrieved; each file state round-trips without changing its meaning.
         assert_eq!(
             read.get_file_by_path(&row.path).unwrap().as_ref(),
             Some(row)
         );
     }
     drop(read);
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write.delete_file(&valid.path).unwrap();
     write.commit().unwrap();
     assert!(
-        db.begin_read()
+        db.begin_read_tx()
             .unwrap()
             .get_file_by_path(&valid.path)
             .unwrap()
@@ -215,10 +221,10 @@ fn valid_invalid_and_unmarked_file_rows_round_trip() {
 }
 #[test]
 fn caught_mutation_error_poisoned_unit_cannot_commit() {
-    // Given
+    // Given: a cache write with a failing mutation.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .upsert_node(&build_knowledge("a.md", "alpha"))
         .unwrap();
@@ -226,7 +232,7 @@ fn caught_mutation_error_poisoned_unit_cannot_commit() {
         .replace_text(&KnowledgeId::parse("a.md").unwrap(), "alpha")
         .unwrap();
     write.upsert_file(&build_file("a.md", "alpha")).unwrap();
-    // When / Then
+    // When / Then: the caller catches the error and tries to commit; the poisoned unit cannot publish prior writes.
     assert_eq!(
         write
             .insert_edge(&build_edge("missing.md", build_target("a.md"), "supports"))
@@ -239,11 +245,11 @@ fn caught_mutation_error_poisoned_unit_cannot_commit() {
 }
 #[test]
 fn dropped_unit_rolls_back() {
-    // Given
+    // Given: an uncommitted cache publication.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     {
-        let mut write = db.begin_cache_write().unwrap();
+        let mut write = db.begin_cache_write_tx().unwrap();
         write
             .upsert_node(&build_knowledge("a.md", "alpha"))
             .unwrap();
@@ -252,20 +258,20 @@ fn dropped_unit_rolls_back() {
             .unwrap();
         write.upsert_file(&build_file("a.md", "alpha")).unwrap();
     }
-    // When / Then
+    // When / Then: the write capability is dropped; the transaction rolls back.
     assert_empty(&mut db);
 }
 #[test]
 fn late_fts_error_rolls_back_all_changes() {
-    // Given
+    // Given: a cache write with prior valid mutations.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .upsert_node(&build_knowledge("a.md", "alpha"))
         .unwrap();
     write.upsert_file(&build_file("a.md", "alpha")).unwrap();
-    // When / Then
+    // When / Then: a later FTS operation fails; the entire publication rolls back.
     assert!(
         write
             .replace_text(&KnowledgeId::parse("missing.md").unwrap(), "alpha")
@@ -276,7 +282,7 @@ fn late_fts_error_rolls_back_all_changes() {
 }
 #[test]
 fn unsigned_values_do_not_wrap() {
-    // Given
+    // Given: unsigned values beyond SQLite's supported range.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let mut node = build_knowledge("a.md", "alpha");
@@ -284,8 +290,8 @@ fn unsigned_values_do_not_wrap() {
         panic!()
     };
     meta.created_at = u64::MAX;
-    let mut write = db.begin_cache_write().unwrap();
-    // When / Then
+    let mut write = db.begin_cache_write_tx().unwrap();
+    // When / Then: the values are passed to storage; values are rejected without wrapping.
     assert!(write.upsert_node(&node).is_err());
     assert!(write.commit().is_err());
     for field in ["size", "inode"] {
@@ -295,8 +301,8 @@ fn unsigned_values_do_not_wrap() {
         } else {
             file.inode = u64::MAX;
         }
-        let mut write = db.begin_cache_write().unwrap();
-        // When / Then
+        let mut write = db.begin_cache_write_tx().unwrap();
+        // When / Then: the values are passed to storage; values are rejected without wrapping.
         assert!(write.upsert_file(&file).is_err());
         assert!(write.commit().is_err());
     }
@@ -304,7 +310,7 @@ fn unsigned_values_do_not_wrap() {
 }
 #[test]
 fn revision_overflow_rolls_back() {
-    // Given
+    // Given: a stored publication revision at its maximum.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let mut db = open_storage(&cache, &root.path().join("v")).unwrap();
@@ -312,13 +318,13 @@ fn revision_overflow_rolls_back() {
         .unwrap()
         .execute("update project set revision=?1", [i64::MAX])
         .unwrap();
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .upsert_node(&build_knowledge("a.md", "alpha"))
         .unwrap();
-    // When / Then
+    // When / Then: another publication is committed; revision overflow rolls back all mutations.
     assert!(write.commit().is_err());
-    let mut read = db.begin_read().unwrap();
+    let mut read = db.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), i64::MAX as u64);
     assert!(
         read.get_node_by_id(&build_target("a.md"))
@@ -328,17 +334,17 @@ fn revision_overflow_rolls_back() {
 }
 #[test]
 fn duplicate_edges_and_invalid_checks_are_rejected() {
-    // Given
+    // Given: duplicate edges and inconsistent node metadata.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let mut db = open_storage(&cache, &root.path().join("v")).unwrap();
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .upsert_node(&build_knowledge("a.md", "alpha"))
         .unwrap();
     let e = build_edge("a.md", build_target("b.md"), "supports");
     write.insert_edge(&e).unwrap();
-    // When / Then
+    // When / Then: the invalid mutations are attempted; storage rejects them without publishing partial state.
     assert_eq!(
         write.insert_edge(&e).unwrap_err().get_kind(),
         StorageErrorKind::InvalidRequest
@@ -356,17 +362,17 @@ fn duplicate_edges_and_invalid_checks_are_rejected() {
         "insert into files values('x',1,2,3,'hash',4,0,null)",
         "insert into files values('x',1,2,3,'hash',4,2,null)",
     ] {
-        // When / Then
+        // When / Then: the invalid mutations are attempted; storage rejects them without publishing partial state.
         assert!(sql.execute(query, []).is_err());
     }
 }
 #[test]
 fn contentless_fts_does_not_return_original_text() {
-    // Given
+    // Given: a published private search token in a contentless FTS index.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let mut db = open_storage(&cache, &root.path().join("v")).unwrap();
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .upsert_node(&build_knowledge("a.md", "privatepayload"))
         .unwrap();
@@ -375,7 +381,7 @@ fn contentless_fts_does_not_return_original_text() {
         .unwrap();
     write.commit().unwrap();
     let sql = Connection::open(&cache).unwrap();
-    // When / Then
+    // When / Then: direct SQL returns no original text while indexed matching remains available.
     assert_eq!(
         sql.query_row("select text from text_index", [], |r| r
             .get::<_, Option<String>>(0))
@@ -388,14 +394,19 @@ fn contentless_fts_does_not_return_original_text() {
             .iter()
             .any(|c| ["text", "body", "content"].contains(&c.as_str()))
     );
-    let mut read = db.begin_read().unwrap();
-    assert_eq!(read.match_text("privatepayload").unwrap().len(), 1);
+    let mut read = db.begin_read_tx().unwrap();
+    assert_eq!(
+        read.get_text_matches_by_expression("privatepayload")
+            .unwrap()
+            .len(),
+        1
+    );
     let expression = "privatepayload Authorization:Bearer-secret \"";
-    let error = read.match_text(expression).unwrap_err();
+    let error = read.get_text_matches_by_expression(expression).unwrap_err();
     assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
     assert!(error.source().is_some());
     for marker in ["privatepayload", "Authorization", expression] {
-        // When / Then
+        // When / Then: malformed-query diagnostics expose none of the private input markers.
         assert!(!error.to_string().contains(marker));
         assert!(!error.get_message().contains(marker));
     }
@@ -403,7 +414,7 @@ fn contentless_fts_does_not_return_original_text() {
 
 #[test]
 fn empty_cache_publications_preserve_vector_identity_and_state() {
-    // Given
+    // Given: vector identity and state before an empty cache write.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let vectors = root.path().join("v");
@@ -417,10 +428,10 @@ fn empty_cache_publications_preserve_vector_identity_and_state() {
     )
     .unwrap();
     // When: even an empty explicitly committed unit advances only the cache revision.
-    // Then
-    assert_eq!(db.begin_cache_write().unwrap().commit().unwrap(), 1);
-    assert_eq!(db.begin_cache_write().unwrap().commit().unwrap(), 2);
-    let read = db.begin_read().unwrap();
+    // Then: vector identity and state remain unchanged.
+    assert_eq!(db.begin_cache_write_tx().unwrap().commit().unwrap(), 1);
+    assert_eq!(db.begin_cache_write_tx().unwrap().commit().unwrap(), 2);
+    let read = db.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), 2);
     assert_eq!(
         read.get_config_identity(),
@@ -435,10 +446,10 @@ fn empty_cache_publications_preserve_vector_identity_and_state() {
 }
 #[test]
 fn fts_matches_use_native_score_then_id_without_candidate_limit() {
-    // Given
+    // Given: equal-score documents and one stronger lexical match.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     for id in ["z.md", "b.md", "a.md"] {
         write.upsert_node(&build_knowledge(id, "alpha")).unwrap();
         write
@@ -455,8 +466,13 @@ fn fts_matches_use_native_score_then_id_without_candidate_limit() {
         )
         .unwrap();
     write.commit().unwrap();
-    let results = db.begin_read().unwrap().match_text("alpha").unwrap();
-    // When / Then
+    // When: all lexical matches are retrieved without a candidate limit.
+    let results = db
+        .begin_read_tx()
+        .unwrap()
+        .get_text_matches_by_expression("alpha")
+        .unwrap();
+    // Then: all matches sort by native score and then normalized identity.
     assert_eq!(
         results.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
         vec!["strong.md", "a.md", "b.md", "z.md"]
@@ -465,26 +481,26 @@ fn fts_matches_use_native_score_then_id_without_candidate_limit() {
 }
 #[test]
 fn malformed_persisted_values_return_internal_errors() {
-    // Given
+    // Given: malformed persisted metadata values.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let mut db = open_storage(&cache, &root.path().join("v")).unwrap();
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .upsert_node(&build_knowledge("a.md", "alpha"))
         .unwrap();
     write.upsert_file(&build_file("a.md", "alpha")).unwrap();
     write.commit().unwrap();
     let sql = Connection::open(&cache).unwrap();
-    // When / Then
+    // When / Then: typed storage reads decode the rows; malformed values return internal errors.
     for update in [
         "update nodes set hash='invalid'",
         "update nodes set hash='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',created_at=-1",
     ] {
         sql.execute(update, []).unwrap();
-        // When / Then
+        // When / Then: typed storage reads decode the rows; malformed values return internal errors.
         assert_eq!(
-            db.begin_read()
+            db.begin_read_tx()
                 .unwrap()
                 .get_node_by_id(&build_target("a.md"))
                 .unwrap_err()
@@ -494,7 +510,7 @@ fn malformed_persisted_values_return_internal_errors() {
     }
     sql.execute("update files set inode=-1", []).unwrap();
     assert_eq!(
-        db.begin_read()
+        db.begin_read_tx()
             .unwrap()
             .get_file_by_path(&RepoPath::parse("a.md").unwrap())
             .unwrap_err()
@@ -504,7 +520,7 @@ fn malformed_persisted_values_return_internal_errors() {
     sql.execute("insert into edges values('a.md','b.md','INVALID')", [])
         .unwrap();
     assert_eq!(
-        db.begin_read()
+        db.begin_read_tx()
             .unwrap()
             .get_edges_by_source_id(None)
             .unwrap_err()
@@ -515,7 +531,7 @@ fn malformed_persisted_values_return_internal_errors() {
 
 #[test]
 fn knowledge_and_source_optional_fields_survive_reopen() {
-    // Given
+    // Given: knowledge and source metadata with optional fields.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("c");
     let vectors = root.path().join("v");
@@ -533,15 +549,15 @@ fn knowledge_and_source_optional_fields_survive_reopen() {
     }
     let source_id = EdgeTarget::Source(letopis::domain::SourceUri::parse("code.rs#L2-L4").unwrap());
     let mut db = open_storage(&cache, &vectors).unwrap();
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write.upsert_node(&knowledge).unwrap();
     write.upsert_node(&source).unwrap();
     write.commit().unwrap();
     drop(db);
     // When: decode every optional field through a newly opened store.
     let mut reopened = open_storage(&cache, &vectors).unwrap();
-    let mut read = reopened.begin_read().unwrap();
-    // Then
+    let mut read = reopened.begin_read_tx().unwrap();
+    // Then: optional metadata fields survive intact.
     assert_eq!(
         read.get_node_by_id(&build_target("a.md#Section"))
             .unwrap()
@@ -556,7 +572,7 @@ fn knowledge_and_source_optional_fields_survive_reopen() {
 }
 #[test]
 fn source_time_and_line_overflow_poison_the_unit() {
-    // Given
+    // Given: source timestamps or line bounds beyond the supported range.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let source = build_source("code.rs", None, u64::MAX);
@@ -564,10 +580,10 @@ fn source_time_and_line_overflow_poison_the_unit() {
     if let NodeMetadata::Knowledge(ref mut n) = knowledge {
         n.lines = letopis::domain::LineRange::new(1, u64::MAX).unwrap();
     }
-    // When / Then
+    // When / Then: the source metadata is written; the write unit is poisoned without partial data.
     for node in [&source, &knowledge] {
-        let mut write = db.begin_cache_write().unwrap();
-        // When / Then
+        let mut write = db.begin_cache_write_tx().unwrap();
+        // When / Then: the source metadata is written; the write unit is poisoned without partial data.
         assert_eq!(
             write.upsert_node(node).unwrap_err().get_kind(),
             StorageErrorKind::InvalidRequest
@@ -578,11 +594,11 @@ fn source_time_and_line_overflow_poison_the_unit() {
 }
 #[test]
 fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
-    // Given
+    // Given: knowledge with searchable text and an outgoing edge.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let id = KnowledgeId::parse("a.md").unwrap();
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write
         .upsert_node(&build_knowledge("a.md", "alpha"))
         .unwrap();
@@ -592,8 +608,8 @@ fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
         .unwrap();
     write.commit().unwrap();
     // When: missing caller cleanup fails and rolls back the preceding FTS deletion.
-    let mut write = db.begin_cache_write().unwrap();
-    // Then
+    let mut write = db.begin_cache_write_tx().unwrap();
+    // Then: failed deletion retains the node, edge and searchable text.
     assert_eq!(
         write
             .delete_node(&build_target("a.md"))
@@ -603,15 +619,23 @@ fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
     );
     assert!(write.commit().is_err());
     assert_eq!(
-        db.begin_read().unwrap().match_text("alpha").unwrap().len(),
+        db.begin_read_tx()
+            .unwrap()
+            .get_text_matches_by_expression("alpha")
+            .unwrap()
+            .len(),
         1
     );
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write.delete_outgoing(&id).unwrap();
     write.delete_node(&build_target("a.md")).unwrap();
     assert_eq!(write.commit().unwrap(), 2);
-    let mut read = db.begin_read().unwrap();
-    assert!(read.match_text("alpha").unwrap().is_empty());
+    let mut read = db.begin_read_tx().unwrap();
+    assert!(
+        read.get_text_matches_by_expression("alpha")
+            .unwrap()
+            .is_empty()
+    );
     assert!(read.get_edges_by_source_id(None).unwrap().is_empty());
     assert!(
         read.get_node_by_id(&build_target("a.md"))
@@ -622,13 +646,13 @@ fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
 
 #[test]
 fn get_edges_keeps_optional_filter_and_order() {
-    // Given
+    // Given: edges with distinct owners and deterministic ordering.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let first = build_edge("a.md", build_target("x.md"), "refutes");
     let second = build_edge("a.md", build_target("z.md"), "supports");
     let third = build_edge("b.md", build_target("a.md"), "supports");
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     for id in ["a.md", "b.md"] {
         write.upsert_node(&build_knowledge(id, "alpha")).unwrap();
     }
@@ -636,8 +660,8 @@ fn get_edges_keeps_optional_filter_and_order() {
         write.insert_edge(edge).unwrap();
     }
     write.commit().unwrap();
-    // When
-    let mut read = db.begin_read().unwrap();
+    // When: all edges and one owner's edges are retrieved.
+    let mut read = db.begin_read_tx().unwrap();
     let all = read.get_edges_by_source_id(None).unwrap();
     let selected = read
         .get_edges_by_source_id(Some(&KnowledgeId::parse("a.md").unwrap()))
@@ -645,7 +669,7 @@ fn get_edges_keeps_optional_filter_and_order() {
     let absent = read
         .get_edges_by_source_id(Some(&KnowledgeId::parse("absent.md").unwrap()))
         .unwrap();
-    // Then
+    // Then: the optional filter preserves deterministic order.
     assert_eq!(all, vec![first.clone(), second.clone(), third]);
     assert_eq!(selected, vec![first, second]);
     assert!(absent.is_empty());
@@ -653,20 +677,20 @@ fn get_edges_keeps_optional_filter_and_order() {
 
 #[test]
 fn file_text_values_remain_literal() {
-    // Given
+    // Given: file text containing punctuation and SQL-like bytes.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
     let mut file = build_file("notes/é'--.md", "alpha");
     file.valid = false;
     file.error = Some("safe 'quoted' ?1 -- mémoire".into());
     let untouched = build_file("other.md", "beta");
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write.upsert_file(&file).unwrap();
     write.upsert_file(&untouched).unwrap();
     write.commit().unwrap();
     // When: read the literal text.
-    let mut read = db.begin_read().unwrap();
-    // Then
+    let mut read = db.begin_read_tx().unwrap();
+    // Then: bound text stays literal and file state changes atomically.
     assert_eq!(
         read.get_file_by_path(&file.path).unwrap(),
         Some(file.clone())
@@ -675,24 +699,24 @@ fn file_text_values_remain_literal() {
     // Given: replace the existing row.
     file.error = None;
     file.valid = true;
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write.upsert_file(&file).unwrap();
     write.commit().unwrap();
-    // When
-    let mut read = db.begin_read().unwrap();
-    // Then
+    // When: file rows are retrieved after update or deletion.
+    let mut read = db.begin_read_tx().unwrap();
+    // Then: bound text stays literal and file state changes atomically.
     assert_eq!(
         read.get_file_by_path(&file.path).unwrap(),
         Some(file.clone())
     );
     drop(read);
     // Given: delete only the selected row.
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write.delete_file(&file.path).unwrap();
     write.commit().unwrap();
-    // When
-    let mut read = db.begin_read().unwrap();
-    // Then
+    // When: file rows are retrieved after update or deletion.
+    let mut read = db.begin_read_tx().unwrap();
+    // Then: bound text stays literal and file state changes atomically.
     assert!(read.get_file_by_path(&file.path).unwrap().is_none());
     assert_eq!(
         read.get_file_by_path(&untouched.path).unwrap(),
@@ -713,7 +737,7 @@ fn get_files_preserves_exact_paths_and_state() {
     invalid.valid = false;
     invalid.error = Some("invalid metadata".into());
     let unmarked = build_file("nested/a.markdown", "plain text");
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     for row in [&unmarked, &marked, &invalid] {
         write.upsert_file(row).unwrap();
     }
@@ -723,8 +747,8 @@ fn get_files_preserves_exact_paths_and_state() {
     write.commit().unwrap();
     let expected_file_rows = vec![invalid, marked, unmarked];
 
-    // When.
-    let rows = db.begin_read().unwrap().get_files().unwrap();
+    // When: all file rows are retrieved.
+    let rows = db.begin_read_tx().unwrap().get_files().unwrap();
 
     // Then: every persisted field and exact deterministic path ordering.
     assert_eq!(
@@ -742,7 +766,7 @@ fn get_nodes_preserves_metadata_and_row_ids() {
     let source = build_source("code.rs#L2-L4", Some(Sha256::digest(b"source")), 3);
     let missing = build_source("missing.rs", None, 11);
     let anchored = build_knowledge("a_b.md#part", "anchored");
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     let mut expected = Vec::new();
     for metadata in [&missing, &source, &anchored] {
         expected.push(StoredNode {
@@ -755,7 +779,7 @@ fn get_nodes_preserves_metadata_and_row_ids() {
         .unwrap();
     write.commit().unwrap();
     let original = db
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
         .get_node_by_id(&build_target("a%b.md"))
         .unwrap()
@@ -767,7 +791,7 @@ fn get_nodes_preserves_metadata_and_row_ids() {
         node.source_snapshot = Some(TreeOid::parse(&"a".repeat(40)).unwrap());
         node.lines = LineRange::new(2, 9).unwrap();
     }
-    let mut write = db.begin_cache_write().unwrap();
+    let mut write = db.begin_cache_write_tx().unwrap();
     write.upsert_node(&changed).unwrap();
     write.commit().unwrap();
     expected.reverse();
@@ -779,8 +803,8 @@ fn get_nodes_preserves_metadata_and_row_ids() {
         },
     );
 
-    // When.
-    let rows = db.begin_read().unwrap().get_nodes().unwrap();
+    // When: all nodes are retrieved.
+    let rows = db.begin_read_tx().unwrap().get_nodes().unwrap();
 
     // Then: complete metadata, identity order, and stable upsert row ID.
     let updated = &rows[0];
@@ -790,16 +814,16 @@ fn get_nodes_preserves_metadata_and_row_ids() {
 
 #[test]
 fn get_empty_published_state_returns_no_rows() {
-    // Given.
+    // Given: fresh storage with no published rows.
     let root = TempDir::new().unwrap();
     let mut db = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
-    let mut read = db.begin_read().unwrap();
+    let mut read = db.begin_read_tx().unwrap();
 
-    // When.
+    // When: all file and node rows are retrieved.
     let files = read.get_files().unwrap();
     let nodes = read.get_nodes().unwrap();
 
-    // Then.
+    // Then: both collections are empty.
     assert!(files.is_empty());
     assert!(nodes.is_empty());
 }
@@ -814,7 +838,7 @@ fn build_edge(source: &str, target: EdgeTarget, kind: &str) -> Edge {
 }
 
 fn assert_empty(db: &mut impl Storage) {
-    let mut read = db.begin_read().unwrap();
+    let mut read = db.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), 0);
     assert!(
         read.get_node_by_id(&build_target("a.md"))
@@ -826,7 +850,11 @@ fn assert_empty(db: &mut impl Storage) {
             .unwrap()
             .is_none()
     );
-    assert!(read.match_text("alpha").unwrap().is_empty());
+    assert!(
+        read.get_text_matches_by_expression("alpha")
+            .unwrap()
+            .is_empty()
+    );
 }
 
 fn build_target(id: &str) -> EdgeTarget {

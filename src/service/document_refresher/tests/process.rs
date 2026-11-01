@@ -187,13 +187,13 @@ fn normal_open_redetects_after_active_cache_writer_is_killed() {
 
 #[test]
 fn normal_open_and_noop_finish_during_vector_write_and_held_index_lock() {
-    // Given independent live vector and kernel-lock owners.
+    // Given: independent live vector and kernel-lock owners.
     let fixture = Fixture::new();
     let mut owner = Worker::spawn(fixture.root.path(), "hold");
     owner.reach("holding");
     let mut storage = build_service(fixture.root.path()).storage;
     let identity = Sha256::digest(b"model identity");
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(&identity).unwrap() else {
         panic!("identity changed");
     };
     unit.set_query_error(99, "uncommitted").unwrap();
@@ -579,18 +579,18 @@ fn noop_finishes_while_another_process_holds_index_lock() {
 
 #[test]
 fn pinned_wal_reader_keeps_old_snapshot_and_new_reader_sees_complete_commit() {
-    // Given
+    // Given: a WAL reader pinned before another publication.
     let fixture = Fixture::new();
     fixture.edit(NEW);
     let expected = fixture.build_expected(NEW, "BravoToken");
     let mut storage = build_service(fixture.root.path()).storage;
-    let mut pinned = storage.begin_read().unwrap();
+    let mut pinned = storage.begin_read_tx().unwrap();
     let fts = Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
     fts.execute_batch("begin;").unwrap();
     assert_eq!(get_tokens(&fts), fixture.old.tokens);
-    // When
+    // When: a separate worker publishes changed contents.
     Worker::spawn(fixture.root.path(), "publish").finish();
-    // Then
+    // Then: old and new readers see complete distinct revisions.
     assert_eq!(pinned.get_revision(), fixture.old.revision);
     assert_eq!(pinned.get_nodes().unwrap(), fixture.old.nodes);
     assert_eq!(
@@ -690,7 +690,7 @@ fn run_normal_service(root: &Path, mode: &str) {
 
 fn get_state(root: &Path) -> State {
     let mut storage = build_service(root).storage;
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let connection = Connection::open(root.join(".letopis/cache.db")).unwrap();
     State {
         revision: read.get_revision(),
@@ -716,7 +716,7 @@ fn get_tokens(connection: &Connection) -> Tokens {
 
 fn get_vectors(root: &Path) -> VectorState {
     let mut storage = build_service(root).storage;
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let identity = Sha256::digest(b"model identity");
     VectorState {
         identity: read.get_config_identity(),
@@ -798,7 +798,7 @@ fn get_git_objects(root: &Path) -> Vec<u8> {
 fn seed_vectors(storage: &mut SqliteStorage) {
     let identity = Sha256::digest(b"model identity");
     storage.reset_vectors(None, &identity).unwrap();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(&identity).unwrap() else {
         panic!("identity changed");
     };
     unit.store_vector(&Sha256::digest(b"retained vector"), &[1.0, 0.0], 2)

@@ -215,7 +215,7 @@ fn nonempty_direct_drain_uses_owned_local_provider_without_git_helpers() {
     );
     // Then: exactly one local request stores the independent literal vector.
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let work = read
         .get_next_embedding_work_by_id_and_max_attempts(
             &config.get_identity(),

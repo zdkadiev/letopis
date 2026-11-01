@@ -110,7 +110,8 @@ fn seed_exhausted(storage: &mut SqliteStorage) {
         .clone();
     let identity = config.get_identity();
     storage.reset_vectors(None, &identity).unwrap();
-    let VectorOutcome::Current(mut writer) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut writer) = storage.begin_vector_write_tx(&identity).unwrap()
+    else {
         panic!("current identity")
     };
     assert!(

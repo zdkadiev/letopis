@@ -38,8 +38,8 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
     assert!(http.take_requests().is_empty());
     // Then: the final token is independently retrievable despite provider rejection.
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
-    let matches = read.match_text(FINAL_MARKER).unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
+    let matches = read.get_text_matches_by_expression(FINAL_MARKER).unwrap();
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0].id.as_str(), "long.md");
     let node = read

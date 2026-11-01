@@ -34,7 +34,7 @@ impl<S: StatusStorage, G: GraphDiagnostics> StatusReader for StatusService<'_, S
         let (policy, config_problem) = get_config_policy(self.files, self.provider);
         let observation = self
             .storage
-            .begin_status_read()
+            .begin_status_read_tx()
             .map_err(map_storage_error)?;
         let mut report = if let Some(mut view) = observation {
             get_published(&mut view, &policy, self.graph, self.provenance)?

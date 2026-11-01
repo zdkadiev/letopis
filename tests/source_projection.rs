@@ -88,7 +88,7 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
 
         // When / Then: check refreshes the real cache and returns safe file diagnostics.
         for _ in 0..2 {
-            // When / Then
+            // When / Then: the invalid file contributes no partial nodes, edges or searchable text.
             assert_eq!(
                 run_check(&repo),
                 json!({"ok":true,"result":{"errors":[{
@@ -97,7 +97,7 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
                 }]}})
             );
             let mut storage = repo.open_storage();
-            let mut view = storage.begin_read().unwrap();
+            let mut view = storage.begin_read_tx().unwrap();
             assert!(view.get_nodes().unwrap().is_empty());
             assert!(view.get_edges_by_source_id(None).unwrap().is_empty());
             let files = view.get_files().unwrap();
@@ -111,15 +111,20 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
 
         // Given: editing away the bad link allows recovery without a cache rebuild.
         repo.write("bad.md", build_whole(3, "RepairedToken").as_bytes());
-        // When / Then
+        // When / Then: the repaired file publishes without rebuilding the cache.
         assert_eq!(run_check(&repo), json!({"ok":true,"result":{"errors":[]}}));
         let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
         assert!(!refresher.refresh().unwrap().published);
         let mut storage = repo.open_storage();
-        let mut view = storage.begin_read().unwrap();
+        let mut view = storage.begin_read_tx().unwrap();
         assert_eq!(view.get_nodes().unwrap().len(), 1);
         assert!(view.get_edges_by_source_id(None).unwrap().is_empty());
-        assert_eq!(view.match_text("RepairedToken").unwrap().len(), 1);
+        assert_eq!(
+            view.get_text_matches_by_expression("RepairedToken")
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }
 

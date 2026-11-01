@@ -64,7 +64,7 @@ fn fts_literals_work_on_native_tokenizer() {
 }
 #[test]
 fn empty_query_never_calls_match_or_provider() {
-    // Given
+    // Given: an empty search expression and recorded dependencies.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     let server = HttpFixture::start(FixtureReply::Status {
@@ -79,7 +79,7 @@ fn empty_query_never_calls_match_or_provider() {
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     repo.write_knowledge("b.md", "new");
     for query in ["", " * : () \" "] {
-        // When / Then
+        // When / Then: search processes the empty query; neither FTS matching nor the provider runs.
         assert!(
             wire_searcher(repo.get_root())
                 .unwrap()
@@ -89,7 +89,10 @@ fn empty_query_never_calls_match_or_provider() {
         );
     }
     assert!(server.take_requests().is_empty());
-    assert_eq!(repo.open_storage().begin_read().unwrap().get_revision(), 2);
+    assert_eq!(
+        repo.open_storage().begin_read_tx().unwrap().get_revision(),
+        2
+    );
 }
 #[test]
 fn search_uses_prepared_vectors_and_actual_query_client() {
@@ -141,7 +144,7 @@ fn search_uses_prepared_vectors_and_actual_query_client() {
 }
 #[test]
 fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
-    // Given
+    // Given: a failing query provider.
     if run_with_credentials("provider_failure_sets_query_error_without_search_warning_or_attempts")
     {
         return;
@@ -158,16 +161,16 @@ fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
         .refresh()
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
-    // When
+    // When: search falls back to lexical matches.
     let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap();
-    // Then
+    // Then: a query error is stored without warnings or document attempts.
     assert_eq!(links.len(), 1);
     assert!(links[0].flags.is_empty());
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let error = read.get_query_error().unwrap().unwrap();
     assert!(!error.error.contains("SECRET"));
     let nodes = read.get_nodes().unwrap();
@@ -332,7 +335,7 @@ fn stale_coordinates_are_observed_without_replacing_pinned_lines() {
 }
 #[test]
 fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
-    // Given
+    // Given: published vectors whose knowledge text has since changed.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "old sqlite");
     repo.write_knowledge("b.md", "old semantic");
@@ -348,12 +351,12 @@ fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
     repo.seed_vectors(&config, &[("a.md", &[0.0, 1.0]), ("b.md", &[1.0, 0.0])]);
     repo.write_knowledge("a.md", "current sqlite");
     repo.write_knowledge("b.md", "current unrelated");
-    // When
+    // When: search refreshes the text and embeds the query once.
     let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 10))
         .unwrap();
-    // Then
+    // Then: only current lexical results survive and stale vector hashes never join.
     assert_eq!(
         links
             .iter()
@@ -366,9 +369,9 @@ fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
     assert_eq!(server.take_requests().len(), 1);
     assert_eq!(
         repo.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .find_nearest_vectors(&config.get_identity(), &[1.0, 0.0], 2)
+            .get_nearest_vectors(&config.get_identity(), &[1.0, 0.0], 2)
             .unwrap(),
         VectorOutcome::Current(vec![])
     );

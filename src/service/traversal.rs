@@ -42,7 +42,7 @@ impl<S: Storage, F: FileSystem> Traverser for TraversalService<S, F> {
         self.embeddings
             .get_configuration()
             .map_err(map_traversal_error)?;
-        let mut read = self.storage.begin_read().map_err(map_traversal_error)?;
+        let mut read = self.storage.begin_read_tx().map_err(map_traversal_error)?;
         let graph = self.graph.traverse(&mut read, request)?;
         let observations = LinkObservations {
             filesystem: &self.filesystem,
@@ -157,7 +157,7 @@ fn observe_bindings(
 ) -> CommandResult<BTreeSet<SearchFlag>> {
     let id = ElementAddress::parse(node.id.as_str())?;
     let handle = read
-        .resolve_node_by_id(&id)
+        .get_node_ref_by_id(&id)
         .map_err(map_traversal_error)?
         .ok_or_else(fail_invalid_traversal_data)?;
     let types = BTreeSet::from([EdgeType::parse("external").map_err(map_traversal_error)?]);
