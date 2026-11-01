@@ -2,7 +2,7 @@ mod support;
 
 use letopis::{
     domain::TreeOid,
-    service::{EmbeddingConfig, NodeMetadata, Refresher, Storage, StorageRead, VectorOutcome},
+    service::{EmbeddingConfig, NodeMetadata, Refresher, Storage, VectorOutcome},
     wire_document_refresher,
 };
 use serde_json::{Value, json};
@@ -14,7 +14,7 @@ use support::{
 
 #[test]
 fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
-    // Given
+    // Given: filtered searches with a failure followed by success.
     let repo = ReadingRepo::new();
     let basis = prepare_notes(&repo);
     let server = HttpFixture::start_sequence(vec![
@@ -31,16 +31,16 @@ fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
     prepare_vectors(&repo, &config, 2);
     let input = build_input(&basis);
 
-    // When
+    // When: both searches run under one identity.
     let fallback = invoke_search(&repo, &input);
 
-    // Then
-    assert_eq!(read_ids(&fallback), ["a.md", "b.md"]);
+    // Then: success clears the query error without resetting identity.
+    assert_eq!(get_ids(&fallback), ["a.md", "b.md"]);
     let error = repo
         .open_storage()
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
-        .read_query_error()
+        .get_query_error()
         .unwrap()
         .unwrap();
     assert_eq!(error.error, "embedding provider rejected request");
@@ -51,12 +51,12 @@ fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
     let recovered = invoke_search(&repo, &input);
 
     // Successful query inference includes the eligible semantic-only note.
-    assert_eq!(read_ids(&recovered), ["a.md", "b.md", "semantic.md"]);
+    assert_eq!(get_ids(&recovered), ["a.md", "b.md", "semantic.md"]);
     assert!(
         repo.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .read_query_error()
+            .get_query_error()
             .unwrap()
             .is_none()
     );
@@ -72,7 +72,7 @@ fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
 
 #[test]
 fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests() {
-    // Given
+    // Given: missing or invalid embedding configuration.
     let repo = ReadingRepo::new();
     let basis = prepare_notes(&repo);
     let server = HttpFixture::start(FixtureReply::Status {
@@ -83,25 +83,25 @@ fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests
     prepare_vectors(&repo, &config, 2);
     std::fs::remove_file(repo.get_root().join(".letopis/config.json")).unwrap();
 
-    // When / Then
+    // When / Then: filtered lexical search runs; results remain available without provider requests.
     assert_eq!(
-        read_ids(&invoke_search(&repo, &build_input(&basis))),
+        get_ids(&invoke_search(&repo, &build_input(&basis))),
         ["a.md", "b.md"]
     );
-    // Given
+    // Given: missing or invalid embedding configuration.
     repo.write(".letopis/config.json", b"PRIVATE invalid configuration");
-    // When / Then
+    // When / Then: filtered lexical search runs; results remain available without provider requests.
     assert_eq!(
-        read_ids(&invoke_search(&repo, &build_input(&basis))),
+        get_ids(&invoke_search(&repo, &build_input(&basis))),
         ["a.md", "b.md"]
     );
 
     assert!(server.take_requests().is_empty());
     assert!(
         repo.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .read_query_error()
+            .get_query_error()
             .unwrap()
             .is_none()
     );
@@ -132,17 +132,17 @@ fn disabled_configuration_keeps_filtered_fts_without_query_provider() {
         .as_bytes(),
     );
 
-    // When
+    // When: filtered search runs.
     let links = invoke_search(&repo, &build_input(&basis));
 
     // Then: filtered FTS remains and no query inference is attempted.
-    assert_eq!(read_ids(&links), ["a.md", "b.md"]);
+    assert_eq!(get_ids(&links), ["a.md", "b.md"]);
     assert!(server.take_requests().is_empty());
     assert!(
         repo.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .read_query_error()
+            .get_query_error()
             .unwrap()
             .is_none()
     );
@@ -150,7 +150,7 @@ fn disabled_configuration_keeps_filtered_fts_without_query_provider() {
 
 #[test]
 fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
-    // Given
+    // Given: incompatible vector configuration with a lexical filter.
     let repo = ReadingRepo::new();
     let basis = prepare_notes(&repo);
     let server = HttpFixture::start(FixtureReply::Status {
@@ -166,17 +166,17 @@ fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
     repo.write(".letopis/config.json", raw.as_bytes());
     prepare_vectors(&repo, &config, 2);
 
-    // When
+    // When: filtered search runs.
     let links = invoke_search(&repo, &build_input(&basis));
 
-    // Then
-    assert_eq!(read_ids(&links), ["a.md", "b.md"]);
+    // Then: lexical results survive without misusing the provider.
+    assert_eq!(get_ids(&links), ["a.md", "b.md"]);
     assert!(server.take_requests().is_empty());
     assert!(
         repo.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .read_query_error()
+            .get_query_error()
             .unwrap()
             .is_none()
     );
@@ -195,9 +195,9 @@ fn query_failure_keeps_fts_and_appears_in_status() {
     let links = invoke_search(&repo, &input);
 
     // Then: FTS results remain and status reports one current problem.
-    assert_eq!(read_ids(&links), ["a.md", "b.md"]);
+    assert_eq!(get_ids(&links), ["a.md", "b.md"]);
     assert_eq!(
-        get_query_problems(&read_status(&repo)),
+        get_query_problems(&get_status(&repo)),
         vec![expected_query_problem()]
     );
     assert_eq!(server.take_requests().len(), 1);
@@ -218,12 +218,12 @@ fn repeated_query_failure_keeps_one_current_problem() {
     ]);
 
     // When: two query embeddings fail in separate processes.
-    assert_eq!(read_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
-    assert_eq!(read_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
+    assert_eq!(get_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
+    assert_eq!(get_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
 
     // Then: the one current record is replaced, not accumulated.
     assert_eq!(
-        get_query_problems(&read_status(&repo)),
+        get_query_problems(&get_status(&repo)),
         vec![expected_query_problem()]
     );
     assert_eq!(server.take_requests().len(), 2);
@@ -244,16 +244,16 @@ fn successful_query_clears_the_query_problem() {
     ]);
 
     // When: a failed query is followed by a successful one.
-    assert_eq!(read_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
+    assert_eq!(get_ids(&invoke_search(&repo, &input)), ["a.md", "b.md"]);
     assert_eq!(
-        get_query_problems(&read_status(&repo)),
+        get_query_problems(&get_status(&repo)),
         vec![expected_query_problem()]
     );
     let recovered = invoke_search(&repo, &input);
 
     // Then: semantic results appear and status no longer reports the problem.
-    assert_eq!(read_ids(&recovered), ["a.md", "b.md", "semantic.md"]);
-    assert!(get_query_problems(&read_status(&repo)).is_empty());
+    assert_eq!(get_ids(&recovered), ["a.md", "b.md", "semantic.md"]);
+    assert!(get_query_problems(&get_status(&repo)).is_empty());
     assert_eq!(server.take_requests().len(), 2);
 }
 
@@ -327,7 +327,7 @@ fn invoke_search(repo: &ReadingRepo, input: &Value) -> Value {
     assert!(value.get("warnings").is_none(), "{value}");
     value["result"].clone()
 }
-fn read_ids(links: &Value) -> Vec<String> {
+fn get_ids(links: &Value) -> Vec<String> {
     links
         .as_array()
         .unwrap()
@@ -335,7 +335,7 @@ fn read_ids(links: &Value) -> Vec<String> {
         .map(|link| link["element_id"].as_str().unwrap().to_owned())
         .collect()
 }
-fn read_status(repo: &ReadingRepo) -> Value {
+fn get_status(repo: &ReadingRepo) -> Value {
     let output = repo.invoke(&["status"], b"{}");
     assert!(output.status.success(), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
@@ -358,19 +358,19 @@ fn get_query_problems(status: &Value) -> Vec<Value> {
 
 fn assert_unchanged_vector_state(repo: &ReadingRepo, config: &EmbeddingConfig) {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(read.get_config_identity(), Some(config.get_identity()));
     assert_eq!(
-        read.read_next_embedding_work(&config.get_identity(), 1, None)
+        read.get_next_embedding_work_by_id_and_max_attempts(&config.get_identity(), 1, None)
             .unwrap(),
         VectorOutcome::Current(None)
     );
-    for node in read.list_nodes().unwrap() {
+    for node in read.get_nodes().unwrap() {
         let NodeMetadata::Knowledge(node) = node.metadata else {
             continue;
         };
         assert_eq!(
-            read.read_failure(&config.get_identity(), &node.search_hash)
+            read.get_failure_by_search_hash(&config.get_identity(), &node.search_hash)
                 .unwrap(),
             VectorOutcome::Current(None)
         );

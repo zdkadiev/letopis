@@ -6,10 +6,7 @@ use letopis::{
     domain::{RepoPath, Sha256},
     markdown::parse,
     open_filesystem, open_storage,
-    service::{
-        EmbedLocker, EmbeddingConfig, EmbeddingFailure, Refresher, Storage, StorageRead,
-        VectorOutcome,
-    },
+    service::{EmbedLocker, EmbeddingConfig, EmbeddingFailure, Refresher, Storage, VectorOutcome},
     wire_document_refresher,
 };
 use serde_json::{Value, json};
@@ -166,12 +163,16 @@ impl Fixture {
     ///
     /// # Panics
     /// Panics on storage failure or an unexpected configuration identity.
-    pub fn read_vector(&self, config: &EmbeddingConfig, hash: &Sha256) -> Option<Vec<f32>> {
+    pub fn get_vector_by_search_hash(
+        &self,
+        config: &EmbeddingConfig,
+        hash: &Sha256,
+    ) -> Option<Vec<f32>> {
         unwrap_current(
             self.open_storage()
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
-                .read_vector(&config.get_identity(), hash)
+                .get_vector_by_search_hash(&config.get_identity(), hash)
                 .unwrap(),
         )
     }
@@ -180,16 +181,16 @@ impl Fixture {
     ///
     /// # Panics
     /// Panics on storage failure or an unexpected configuration identity.
-    pub fn read_failure(
+    pub fn get_failure_by_search_hash(
         &self,
         config: &EmbeddingConfig,
         hash: &Sha256,
     ) -> Option<EmbeddingFailure> {
         unwrap_current(
             self.open_storage()
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
-                .read_failure(&config.get_identity(), hash)
+                .get_failure_by_search_hash(&config.get_identity(), hash)
                 .unwrap(),
         )
     }
@@ -201,9 +202,13 @@ impl Fixture {
     pub fn assert_no_work(&self, config: &EmbeddingConfig) {
         let work = self
             .open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .read_next_embedding_work(&config.get_identity(), config.get_max_attempts(), None)
+            .get_next_embedding_work_by_id_and_max_attempts(
+                &config.get_identity(),
+                config.get_max_attempts(),
+                None,
+            )
             .unwrap();
         assert_eq!(work, VectorOutcome::Current(None));
     }
@@ -224,7 +229,7 @@ impl Fixture {
             .output()
             .unwrap();
         assert!(refs.status.success());
-        (self.repo.read_state(), files, refs.stdout)
+        (self.repo.get_state(), files, refs.stdout)
     }
 
     fn open_storage(&self) -> impl Storage + use<> {
@@ -262,7 +267,7 @@ impl DetachedOwner {
     /// # Panics
     /// Panics if the ownership PID is invalid or the process exceeds the watchdog.
     pub fn wait_for_exit(&mut self) {
-        let pid = self.read_pid();
+        let pid = self.get_pid();
         let deadline = Instant::now() + WAIT;
         while !has_exited(pid) {
             assert!(Instant::now() < deadline, "detached product did not exit");
@@ -277,7 +282,7 @@ impl DetachedOwner {
     /// The caller must have observed actual HTTP arrival before trusting this record.
     /// # Panics
     /// Panics for absent/malformed PID text or an excluded process identity.
-    pub fn read_pid(&self) -> i32 {
+    pub fn get_pid(&self) -> i32 {
         let pid = fs::read_to_string(&self.path)
             .unwrap()
             .trim()

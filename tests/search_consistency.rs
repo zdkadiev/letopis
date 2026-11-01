@@ -3,7 +3,7 @@ use letopis::{
     domain::LineRange,
     service::{
         CommandErrorKind, CommandResult, Refresher, SearchFlag, SearchLink, SearchRequest,
-        Searcher, Storage, StorageRead, VectorOutcome, VectorWrite,
+        Searcher, Storage, VectorOutcome,
     },
     wire_document_refresher, wire_searcher,
 };
@@ -74,7 +74,7 @@ fn concurrent_publication_preserves_old_membership_coordinates_and_revision() {
 }
 #[test]
 fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates() {
-    // Given
+    // Given: a pinned reader under the original two-dimensional model.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     wire_document_refresher(repo.get_root())
@@ -84,16 +84,16 @@ fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates()
     let config = repo.write_config("ollama", "http://localhost/api", "fixture");
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let mut old_storage = repo.open_storage();
-    let mut old = old_storage.begin_read().unwrap();
+    let mut old = old_storage.begin_read_tx().unwrap();
     let identity = config.get_identity();
-    // When / Then
+    // When / Then: the old reader retains original dimensions and candidates across model reset.
     assert_eq!(
-        old.read_vector_dimensions(&identity).unwrap(),
+        old.get_vector_dimensions(&identity).unwrap(),
         VectorOutcome::Current(NonZeroUsize::new(2))
     );
     let next = repo.write_config("ollama", "http://localhost/api", "next");
     repo.seed_vectors(&next, &[("a.md", &[0.0, 0.0, 1.0])]);
-    let matches = old.find_nearest_vectors(&identity, &[1.0, 0.0], 2).unwrap();
+    let matches = old.get_nearest_vectors(&identity, &[1.0, 0.0], 2).unwrap();
     let VectorOutcome::Current(matches) = matches else {
         panic!("old identity must remain pinned")
     };
@@ -103,7 +103,7 @@ fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates()
     drop(old);
     let mut write_storage = repo.open_storage();
     let VectorOutcome::Current(mut unit) = write_storage
-        .begin_vector_write(&next.get_identity())
+        .begin_vector_write_tx(&next.get_identity())
         .unwrap()
     else {
         panic!("new identity")
@@ -114,11 +114,11 @@ fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates()
 
 #[test]
 fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
-    // Given
+    // Given: a configuration reset during query embedding.
     if run_with_credentials("reset_during_query_preserves_original_fts_and_new_model_diagnostic") {
         return;
     }
-    // When / Then
+    // When / Then: the old query completes; original lexical results and new-model diagnostics survive.
     for protocol in ["ollama", "openai"] {
         let repo = ReadingRepo::new();
         repo.write_knowledge("a.md", "sqlite");
@@ -137,7 +137,7 @@ fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
         repo.seed_vectors(&next, &[("b.md", &[0.0, 0.0, 1.0])]);
         let mut storage = repo.open_storage();
         let VectorOutcome::Current(mut unit) =
-            storage.begin_vector_write(&next.get_identity()).unwrap()
+            storage.begin_vector_write_tx(&next.get_identity()).unwrap()
         else {
             panic!("identity")
         };
@@ -145,7 +145,7 @@ fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
         unit.commit().unwrap();
         barrier.release();
         let links = worker.join().unwrap();
-        // When / Then
+        // When / Then: the old query completes; original lexical results and new-model diagnostics survive.
         assert_eq!(
             links
                 .iter()
@@ -154,10 +154,10 @@ fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
             ["a.md"]
         );
         assert_eq!(links[0].revision, revision);
-        let mut read = storage.begin_read().unwrap();
+        let mut read = storage.begin_read_tx().unwrap();
         assert_eq!(read.get_config_identity(), Some(next.get_identity()));
         assert_eq!(
-            read.read_query_error().unwrap().unwrap().error,
+            read.get_query_error().unwrap().unwrap().error,
             "new model diagnostic"
         );
         assert_eq!(server.take_requests().len(), 1);
@@ -199,7 +199,7 @@ fn concurrent_vector_insert_cannot_add_membership_to_pinned_channel() {
 }
 #[test]
 fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
-    // Given
+    // Given: an inference failure with a pinned search view.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     let barrier = ResponseBarrier::default();
@@ -216,15 +216,15 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
     let worker = PausedSearch::spawn(repo.get_root(), barrier.clone());
     barrier.wait_until_entered();
     barrier.release();
-    // When
+    // When: the failed query embedding completes with lexical fallback.
     let links = worker.join().unwrap();
-    // Then
+    // Then: search returns one lexical link, stores a query diagnostic and permits reset.
     assert_eq!(links.len(), 1);
     assert!(
         repo.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .read_query_error()
+            .get_query_error()
             .unwrap()
             .is_some()
     );
@@ -235,9 +235,9 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
             .unwrap(),
         VectorOutcome::Current(true)
     );
-    // Given
+    // Given: a new knowledge file is added after the failed query embedding.
     repo.write_knowledge("b.md", "sqlite");
-    // When / Then
+    // When / Then: refresh publishes the new file and a checkpoint confirms the read was released.
     assert!(
         wire_document_refresher(repo.get_root())
             .unwrap()
@@ -296,7 +296,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
         .execute(
-            "UPDATE nodes SET source_snapshot = 'malformed' WHERE id = ?1",
+            "update nodes set source_snapshot = 'malformed' where id = ?1",
             ["a.md"],
         )
         .unwrap();
@@ -323,7 +323,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
     // Repair deliberately malformed persisted data before asking refresh to publish it.
     connection
         .execute(
-            "UPDATE nodes SET source_snapshot = NULL WHERE id = ?1",
+            "update nodes set source_snapshot = null where id = ?1",
             ["a.md"],
         )
         .unwrap();
@@ -388,7 +388,7 @@ fn assert_can_checkpoint(repo: &ReadingRepo) {
         let connection =
             rusqlite::Connection::open(repo.get_root().join(".letopis").join(file)).unwrap();
         let (busy, _, _): (i64, i64, i64) = connection
-            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+            .query_row("pragma wal_checkpoint(truncate)", [], |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get(2)?))
             })
             .unwrap();

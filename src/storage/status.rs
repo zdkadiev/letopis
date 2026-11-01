@@ -3,6 +3,7 @@ use super::{
     read::SqliteRead,
     schema::{attach_empty_vectors, validate_cache, validate_vector_database, validate_vectors},
 };
+use crate::service::StorageRead;
 use crate::service::{StatusStorage, StorageResult};
 use rusqlite::Connection;
 use rustix::fd::AsFd;
@@ -38,12 +39,14 @@ impl SqliteStatusStorage {
     }
 }
 impl StatusStorage for SqliteStatusStorage {
-    type Read<'a> = SqliteRead<'a>;
-    fn begin_status_read(&mut self) -> StorageResult<Option<Self::Read<'_>>> {
+    fn begin_status_read_tx(&mut self) -> StorageResult<Option<Box<dyn StorageRead + '_>>> {
         self.read
             .as_mut()
-            .map(SqliteRead::begin_optional)
+            .map(SqliteRead::begin_optional_tx)
             .transpose()
-            .map(Option::flatten)
+            .map(|read| {
+                read.flatten()
+                    .map(|read| Box::new(read) as Box<dyn StorageRead>)
+            })
     }
 }

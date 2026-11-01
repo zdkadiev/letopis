@@ -27,7 +27,7 @@
 
 ### Task 1: Generate and exercise interface mocks
 
-**Files:** `Cargo.toml`, `Cargo.lock`, `src/service/command_traits.rs`, `src/service/background.rs`.
+**Files:** `Cargo.toml`, `Cargo.lock`, `src/service/command_traits.rs`, `../../../src/service/background_runner.rs`.
 
 **Interfaces:** `EmbeddingExecutor::{has_work,drain}`, `DrainLauncher::spawn_drain`; generated `MockEmbeddingExecutor`, `MockDrainLauncher` are test-only.
 

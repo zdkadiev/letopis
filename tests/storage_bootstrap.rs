@@ -1,5 +1,5 @@
 use letopis::open_storage;
-use letopis::service::{Storage, StorageErrorKind, StorageRead};
+use letopis::service::{Storage, StorageErrorKind};
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::{
@@ -31,43 +31,43 @@ fn invalid_database_paths_return_safe_readable_diagnostics_without_side_effects(
 
 #[test]
 fn fresh_storage_reopens_with_empty_identity() {
-    // Given
+    // Given: fresh cache and vector database paths.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
-    // When / Then
+    // When / Then: storage opens and reopens; the initial vector identity remains absent.
     for _ in 0..2 {
         let mut storage = open_storage(&cache, &vectors).unwrap();
-        let read = storage.begin_read().unwrap();
-        // When / Then
+        let read = storage.begin_read_tx().unwrap();
+        // When / Then: storage opens and reopens; the initial vector identity remains absent.
         assert_eq!(read.get_revision(), 0);
         assert_eq!(read.get_config_identity(), None);
     }
     let connection = Connection::open(&cache).unwrap();
     connection
-        .execute("UPDATE project SET revision=7", [])
+        .execute("update project set revision=7", [])
         .unwrap();
     let connection = Connection::open(&vectors).unwrap();
     connection
-        .execute("INSERT INTO meta VALUES(1,?1)", ["a".repeat(64)])
+        .execute("insert into meta values(1,?1)", ["a".repeat(64)])
         .unwrap();
     let mut storage = open_storage(&cache, &vectors).unwrap();
-    let read = storage.begin_read().unwrap();
+    let read = storage.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), 7);
     assert_eq!(read.get_config_identity().unwrap().to_hex(), "a".repeat(64));
 }
 
 #[test]
 fn owned_storage_outlives_path_arguments() {
-    // Given
+    // Given: owned storage created from temporary path arguments.
     let root = TempDir::new().unwrap();
     let mut storage = {
         let cache = root.path().join("cache.db");
         let vectors = root.path().join("vectors.db");
         open_storage(&cache, &vectors).unwrap()
     };
-    // When / Then
-    assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
+    // When / Then: the caller drops its path arguments; storage remains usable through owned handles.
+    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
 }
 
 #[test]
@@ -106,13 +106,13 @@ fn symlink_and_hardlink_aliases_are_rejected() {
 
 #[test]
 fn literal_unicode_quote_and_question_mark_paths_open() {
-    // Given
+    // Given: literal Unicode, quote and question-mark paths.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("кэш'?mode=memory.db");
     let vectors = root.path().join("векторы'?mode=ro.db");
     let mut storage = open_storage(&cache, &vectors).unwrap();
-    // When / Then
-    assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
+    // When / Then: storage opens those paths; path bytes retain their literal meaning.
+    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
     assert!(cache.is_file());
     assert!(vectors.is_file());
 }
@@ -153,14 +153,14 @@ fn non_utf8_attachment_path_is_rejected() {
 fn unknown_or_partial_schema_is_not_recreated() {
     // Given
     for mutation in [
-        "PRAGMA user_version=99",
-        "DROP TABLE files",
-        "DROP INDEX nodes_search_hash",
-        "DROP INDEX edges_outgoing; CREATE INDEX edges_outgoing ON edges(source_id,target_id,type)",
-        "DROP INDEX edges_incoming; CREATE INDEX edges_incoming ON edges(target_id,source_id,type)",
-        "DROP INDEX nodes_source_snapshot; CREATE INDEX nodes_source_snapshot ON nodes(source_snapshot)",
-        "DROP TABLE text_index; CREATE VIRTUAL TABLE text_index USING fts5(text,content='')",
-        "CREATE TABLE raw_text(body TEXT); INSERT INTO raw_text VALUES('private')",
+        "pragma user_version=99",
+        "drop table files",
+        "drop index nodes_search_hash",
+        "drop index edges_outgoing; create index edges_outgoing on edges(source_id,target_id,type)",
+        "drop index edges_incoming; create index edges_incoming on edges(target_id,source_id,type)",
+        "drop index nodes_source_snapshot; create index nodes_source_snapshot on nodes(source_snapshot)",
+        "drop table text_index; create virtual table text_index using fts5(text,content='')",
+        "create table raw_text(body text); insert into raw_text values('private')",
     ] {
         let root = TempDir::new().unwrap();
         let cache = root.path().join("cache.db");
@@ -168,7 +168,7 @@ fn unknown_or_partial_schema_is_not_recreated() {
         drop(open_storage(&cache, &vectors).unwrap());
         let connection = Connection::open(&cache).unwrap();
         connection
-            .execute("UPDATE project SET revision=9", [])
+            .execute("update project set revision=9", [])
             .unwrap();
         connection.execute_batch(mutation).unwrap();
         drop(connection);
@@ -177,14 +177,14 @@ fn unknown_or_partial_schema_is_not_recreated() {
         let connection = Connection::open(&cache).unwrap();
         assert_eq!(
             connection
-                .query_row("SELECT revision FROM project", [], |r| r.get::<_, i64>(0))
+                .query_row("select revision from project", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
             9
         );
         if mutation.contains("raw_text") {
             assert_eq!(
                 connection
-                    .query_row("SELECT body FROM raw_text", [], |r| r.get::<_, String>(0))
+                    .query_row("select body from raw_text", [], |r| r.get::<_, String>(0))
                     .unwrap(),
                 "private"
             );
@@ -194,12 +194,12 @@ fn unknown_or_partial_schema_is_not_recreated() {
 
 #[test]
 fn parallel_initializers_leave_a_complete_schema() {
-    // Given
+    // Given: parallel initializers for the same database paths.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
     let barrier = Arc::new(Barrier::new(2));
-    // When / Then
+    // When / Then: both initialization attempts finish; the resulting database schema is complete.
     let successes = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..2)
             .map(|_| {
@@ -235,13 +235,13 @@ fn parallel_initializers_leave_a_complete_schema() {
     });
     assert_eq!(successes, 2, "both initializers must open successfully");
     let mut storage = open_storage(&cache, &vectors).unwrap();
-    assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
+    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
 }
 
 #[test]
 fn independent_thread_connections_register_native_vec1() {
     // Given: each thread creates its own temporary databases.
-    // When / Then
+    // When / Then: each thread uses native vector storage; each connection has the native vec1 extension.
     let handles: Vec<_> = (0..8)
         .map(|_| {
             std::thread::spawn(|| {
@@ -249,10 +249,10 @@ fn independent_thread_connections_register_native_vec1() {
                 let cache = root.path().join("cache.db");
                 let vectors = root.path().join("vectors.db");
                 let mut storage = open_storage(&cache, &vectors).unwrap();
-                assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
+                assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
                 let connection = Connection::open(&vectors).unwrap();
                 let info: String = connection
-                    .query_row("SELECT vec1_info()", [], |r| r.get(0))
+                    .query_row("select vec1_info()", [], |r| r.get(0))
                     .unwrap();
                 assert!(info.starts_with("version 0.8"), "{info}");
             })
@@ -273,7 +273,7 @@ fn sqlite_like_prefix_does_not_hide_extra_user_tables() {
     let connection = Connection::open(&cache).unwrap();
     connection
         .execute_batch(
-            "CREATE TABLE sqliteXprivate(body TEXT); INSERT INTO sqliteXprivate VALUES('retain');",
+            "create table sqlitexprivate(body text); insert into sqlitexprivate values('retain');",
         )
         .unwrap();
     drop(connection);
@@ -285,9 +285,9 @@ fn sqlite_like_prefix_does_not_hide_extra_user_tables() {
 fn vector_schema_and_unversioned_user_data_are_not_recreated() {
     // Given
     for mutation in [
-        "PRAGMA user_version=2",
-        "DROP TABLE query_error",
-        "ALTER TABLE meta ADD COLUMN raw_text TEXT",
+        "pragma user_version=2",
+        "drop table query_error",
+        "alter table meta add column raw_text text",
     ] {
         let root = TempDir::new().unwrap();
         let cache = root.path().join("cache.db");
@@ -296,7 +296,7 @@ fn vector_schema_and_unversioned_user_data_are_not_recreated() {
         let connection = Connection::open(&vectors).unwrap();
         connection
             .execute(
-                "INSERT INTO embed_failures VALUES(?1,3,'safe')",
+                "insert into embed_failures values(?1,3,'safe')",
                 ["a".repeat(64)],
             )
             .unwrap();
@@ -307,7 +307,7 @@ fn vector_schema_and_unversioned_user_data_are_not_recreated() {
         let connection = Connection::open(&vectors).unwrap();
         assert_eq!(
             connection
-                .query_row("SELECT attempts FROM embed_failures", [], |r| r
+                .query_row("select attempts from embed_failures", [], |r| r
                     .get::<_, i64>(0))
                 .unwrap(),
             3
@@ -318,7 +318,7 @@ fn vector_schema_and_unversioned_user_data_are_not_recreated() {
     let vectors = root.path().join("vectors.db");
     let connection = Connection::open(&cache).unwrap();
     connection
-        .execute_batch("CREATE TABLE existing(value TEXT); INSERT INTO existing VALUES('retain');")
+        .execute_batch("create table existing(value text); insert into existing values('retain');")
         .unwrap();
     drop(connection);
     // When / Then
@@ -326,7 +326,7 @@ fn vector_schema_and_unversioned_user_data_are_not_recreated() {
     let connection = Connection::open(&cache).unwrap();
     assert_eq!(
         connection
-            .query_row("SELECT value FROM existing", [], |r| r.get::<_, String>(0))
+            .query_row("select value from existing", [], |r| r.get::<_, String>(0))
             .unwrap(),
         "retain"
     );
@@ -334,12 +334,12 @@ fn vector_schema_and_unversioned_user_data_are_not_recreated() {
 
 #[test]
 fn malformed_stored_observations_return_safe_typed_errors() {
-    // Given
+    // Given: malformed persisted storage observations.
     for (target, mutation) in [
-        ("cache", "UPDATE project SET revision=-1"),
+        ("cache", "update project set revision=-1"),
         (
             "vectors",
-            "INSERT INTO meta VALUES(1,'private-invalid-hash')",
+            "insert into meta values(1,'private-invalid-hash')",
         ),
     ] {
         let root = TempDir::new().unwrap();
@@ -352,10 +352,10 @@ fn malformed_stored_observations_return_safe_typed_errors() {
             .execute_batch(mutation)
             .unwrap();
         let mut storage = open_storage(&cache, &vectors).unwrap();
-        let Err(error) = storage.begin_read() else {
+        let Err(error) = storage.begin_read_tx() else {
             panic!("invalid observation accepted");
         };
-        // When / Then
+        // When / Then: typed reads decode the stored values; safe typed errors preserve internal causes.
         assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
         assert!(!error.to_string().contains("private"));
         assert!(std::error::Error::source(&error).is_some());
@@ -364,17 +364,17 @@ fn malformed_stored_observations_return_safe_typed_errors() {
 
 #[test]
 fn initialized_open_succeeds_but_cache_write_still_returns_busy() {
-    // Given
+    // Given: initialized databases with a contending cache writer.
     let root = TempDir::new().unwrap();
     let cache = root.path().join("cache.db");
     let vectors = root.path().join("vectors.db");
     drop(open_storage(&cache, &vectors).unwrap());
     let connection = Connection::open(&cache).unwrap();
-    connection.execute_batch("BEGIN IMMEDIATE").unwrap();
+    connection.execute_batch("begin immediate").unwrap();
     let mut storage = open_storage(&cache, &vectors).unwrap();
-    // When / Then
-    assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
-    let Err(error) = storage.begin_cache_write() else {
+    // When / Then: storage opens and another write is attempted; opening succeeds while the contending write reports busy.
+    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
+    let Err(error) = storage.begin_cache_write_tx() else {
         panic!("competing cache writer was accepted");
     };
     let cause = std::error::Error::source(&error)
@@ -385,6 +385,6 @@ fn initialized_open_succeeds_but_cache_write_still_returns_busy() {
         cause.sqlite_error_code(),
         Some(rusqlite::ErrorCode::DatabaseBusy)
     );
-    connection.execute_batch("ROLLBACK").unwrap();
+    connection.execute_batch("rollback").unwrap();
     assert!(open_storage(&cache, &vectors).is_ok());
 }

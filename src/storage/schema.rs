@@ -11,11 +11,25 @@ const USER_VERSION_PRAGMA: &str = "user_version";
 const CACHE_SCHEMA: &str = include_str!("cache.sql");
 const VECTOR_SCHEMA: &str = include_str!("vectors.sql");
 
-type Definition = (String, String, String);
+#[derive(Debug, PartialEq, Eq)]
+struct SchemaDefinition {
+    object_type: String,
+    name: String,
+    sql: String,
+}
+
+#[derive(Clone, Copy)]
+enum SqlText {
+    Syntax,
+    Quoted(char),
+    LineComment,
+    BlockComment,
+}
 
 pub(super) fn bootstrap_cache(connection: &mut Connection) -> StorageResult<()> {
     bootstrap_schema(connection, CACHE_SCHEMA, CACHE_SCHEMA_VERSION)
 }
+
 pub(super) fn bootstrap_vectors(connection: &mut Connection) -> StorageResult<()> {
     bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)
 }
@@ -43,13 +57,13 @@ pub(super) fn validate_vectors(connection: &Connection) -> StorageResult<()> {
 
 pub(super) fn attach_empty_vectors(connection: &Connection) -> StorageResult<()> {
     connection
-        .execute("ATTACH DATABASE ?1 AS vec", ["file::memory:?mode=memory"])
+        .execute("attach database ?1 as vec", ["file::memory:?mode=memory"])
         .map_err(map_sqlite)?;
     // Only the ephemeral attachment receives the unchanged vector schema.
     let schema = VECTOR_SCHEMA
-        .replace("CREATE TABLE ", "CREATE TABLE vec.")
-        .replace("CREATE VIRTUAL TABLE ", "CREATE VIRTUAL TABLE vec.")
-        .replace("INSERT INTO vector_index", "INSERT INTO vec.vector_index");
+        .replace("create table ", "create table vec.")
+        .replace("create virtual table ", "create virtual table vec.")
+        .replace("insert into vector_index", "insert into vec.vector_index");
     connection.execute_batch(&schema).map_err(map_sqlite)
 }
 
@@ -100,18 +114,18 @@ fn has_schema_in(
     expected_version: i64,
 ) -> StorageResult<bool> {
     let version: i64 = connection
-        .query_row(&format!("PRAGMA {schema}.user_version"), [], |row| {
+        .query_row(&format!("pragma {schema}.user_version"), [], |row| {
             row.get(0)
         })
         .map_err(map_sqlite)?;
-    let definitions = read_definitions_in(connection, schema)?;
+    let definitions = get_definitions_in(connection, schema)?;
     match version {
         0 if definitions.is_empty() => Ok(false),
         version if version == expected_version => {
             register_vec1()?;
             let reference = Connection::open_in_memory().map_err(map_sqlite)?;
             reference.execute_batch(sql).map_err(map_sqlite)?;
-            if definitions != read_definitions(&reference)? {
+            if definitions != get_definitions(&reference)? {
                 return Err(fail_incompatible_schema());
             }
             Ok(true)
@@ -120,24 +134,86 @@ fn has_schema_in(
     }
 }
 
-fn read_definitions(connection: &Connection) -> StorageResult<Vec<Definition>> {
-    read_definitions_in(connection, "main")
+fn get_definitions(connection: &Connection) -> StorageResult<Vec<SchemaDefinition>> {
+    get_definitions_in(connection, "main")
 }
 
-fn read_definitions_in(connection: &Connection, schema: &str) -> StorageResult<Vec<Definition>> {
+fn get_definitions_in(
+    connection: &Connection,
+    schema: &str,
+) -> StorageResult<Vec<SchemaDefinition>> {
     // Schema names are private literals main/vec; values remain bound.
     let sql = format!(
-        "SELECT type,name,sql FROM {schema}.sqlite_schema
-        WHERE sql IS NOT NULL AND name NOT GLOB 'sqlite_*'
-        AND name NOT IN (SELECT name FROM pragma_table_list WHERE schema=?1 AND type='shadow')
-        ORDER BY type,name"
+        "select type,name,sql from {schema}.sqlite_schema
+        where sql is not null and name not glob 'sqlite_*'
+        and name not in (select name from pragma_table_list where schema=?1 and type='shadow')
+        order by type,name"
     );
     let mut statement = connection.prepare(&sql).map_err(map_sqlite)?;
     statement
-        .query_map([schema], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .query_map([schema], |row| {
+            let sql: String = row.get(2)?;
+            Ok(SchemaDefinition {
+                object_type: row.get(0)?,
+                name: row.get(1)?,
+                sql: normalize_keyword_case(&sql),
+            })
+        })
         .map_err(map_sqlite)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(map_sqlite)
+}
+
+// SQLite preserves keyword spelling in sqlite_schema; literals must remain exact.
+fn normalize_keyword_case(sql: &str) -> String {
+    let mut state = SqlText::Syntax;
+    let mut chars = sql.chars().peekable();
+    let mut result = String::with_capacity(sql.len());
+    while let Some(ch) = chars.next() {
+        match state {
+            SqlText::Syntax => match ch {
+                '\'' | '"' | '`' | '[' => {
+                    state = SqlText::Quoted(if ch == '[' { ']' } else { ch });
+                    result.push(ch);
+                }
+                '-' if chars.peek() == Some(&'-') => {
+                    state = SqlText::LineComment;
+                    result.push_str("--");
+                    chars.next();
+                }
+                '/' if chars.peek() == Some(&'*') => {
+                    state = SqlText::BlockComment;
+                    result.push_str("/*");
+                    chars.next();
+                }
+                _ => result.push(ch.to_ascii_lowercase()),
+            },
+            SqlText::Quoted(end) => {
+                result.push(ch);
+                if ch == end && end != ']' && chars.peek() == Some(&end) {
+                    result.push(end);
+                    chars.next();
+                } else if ch == end {
+                    state = SqlText::Syntax;
+                }
+            }
+            SqlText::LineComment => {
+                result.push(ch);
+                if ch == '\n' {
+                    state = SqlText::Syntax;
+                }
+            }
+            SqlText::BlockComment => {
+                result.push(ch);
+                if ch == '*' && chars.peek() == Some(&'/') {
+                    result.push('/');
+                    chars.next();
+                    state = SqlText::Syntax;
+                }
+            }
+        }
+    }
+    result
 }
 
 fn fail_incompatible_schema() -> StorageError {
@@ -157,7 +233,7 @@ mod tests {
     use crate::{
         domain::Sha256,
         process_test_support::supervise_test,
-        service::{Storage, StorageResult, VectorOutcome, VectorWrite},
+        service::{Storage, StorageResult, VectorOutcome},
         storage::SqliteStorage,
     };
     use rusqlite::{Connection, TransactionBehavior};
@@ -170,6 +246,63 @@ mod tests {
         time::{Duration, Instant},
     };
     use tempfile::TempDir;
+
+    #[test]
+    fn keyword_normalization_preserves_quotes_and_comments() {
+        // Given: quoted names, escaped delimiters and quotes inside comments.
+        let cases = [
+            "select 'A''B', \"Case\", `Case``Name`, [Case]",
+            "-- 'Unclosed quote\nselect 'Exact'",
+            "/* 'Unclosed quote */ select 'Exact'",
+        ];
+        for sql in cases {
+            // When: existing lowercase SQL is normalized for comparison.
+            let actual = super::normalize_keyword_case(sql);
+            // Then: every quoted value, name and comment remains byte-exact.
+            assert_eq!(actual, sql);
+        }
+    }
+
+    #[test]
+    fn accepts_legacy_keyword_case_without_ignoring_literal_case() {
+        // Given: the previously published cache schema with uppercase keywords.
+        let mut connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(include_str!(
+                "../../tests/fixtures/storage/legacy-cache.sql"
+            ))
+            .unwrap();
+        connection.pragma_update(None, "user_version", 2).unwrap();
+        // When / Then: the lowercase source describes the same stored schema.
+        assert!(bootstrap_cache(&mut connection).is_ok());
+
+        // Given: an uppercase vector schema with its native extension registered.
+        super::register_vec1().unwrap();
+        let mut vectors = Connection::open_in_memory().unwrap();
+        vectors
+            .execute_batch(include_str!(
+                "../../tests/fixtures/storage/legacy-vectors.sql"
+            ))
+            .unwrap();
+        vectors.pragma_update(None, "user_version", 1).unwrap();
+        // When / Then: vector validation accepts the prior spelling too.
+        assert!(bootstrap_vectors(&mut vectors).is_ok());
+
+        // Given: two schemas whose string constraints differ in case.
+        let mut distinct = Connection::open_in_memory().unwrap();
+        distinct
+            .execute_batch("create table t(value text check(value='A')); pragma user_version=1")
+            .unwrap();
+        // When / Then: changing a literal remains an incompatible schema.
+        assert!(
+            super::bootstrap_schema(
+                &mut distinct,
+                "create table t(value text check(value='a')); pragma user_version=1",
+                1
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn cache_and_vector_versions_are_independent() {
@@ -204,6 +337,7 @@ mod tests {
             bootstrap(&mut connection).unwrap();
         }
     }
+
     #[test]
     fn waiting_initializer_rechecks_committed_schema_for_both_databases() {
         for (sql, version) in [
@@ -257,7 +391,7 @@ mod tests {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .unwrap();
         transaction
-            .execute_batch("CREATE TABLE incompatible(value TEXT)")
+            .execute_batch("create table incompatible(value text)")
             .unwrap();
         let (contended, observed) = mpsc::channel();
         let (release, released) = mpsc::channel();
@@ -283,7 +417,7 @@ mod tests {
         assert_eq!(
             owner
                 .query_row(
-                    "SELECT count(*) FROM sqlite_schema WHERE name='project'",
+                    "select count(*) from sqlite_schema where name='project'",
                     [],
                     |r| r.get::<_, i64>(0)
                 )
@@ -339,7 +473,7 @@ mod tests {
     }
     #[test]
     fn old_cache_rejection_preserves_populated_vectors_config_and_locks() {
-        // Given closed populated databases and independent configuration/lock identities.
+        // Given: closed populated databases and independent configuration/lock identities.
         let root = TempDir::new().unwrap();
         let cache = root.path().join("cache.db");
         let vectors = root.path().join("vectors.db");
@@ -348,7 +482,8 @@ mod tests {
         {
             let mut storage = SqliteStorage::open(&cache, &vectors).unwrap();
             storage.reset_vectors(None, &identity).unwrap();
-            let VectorOutcome::Current(mut write) = storage.begin_vector_write(&identity).unwrap()
+            let VectorOutcome::Current(mut write) =
+                storage.begin_vector_write_tx(&identity).unwrap()
             else {
                 panic!()
             };
@@ -361,11 +496,11 @@ mod tests {
             let connection = Connection::open(&cache).unwrap();
             connection
                 .execute_batch(
-                    "DROP INDEX edges_outgoing;
-                DROP INDEX edges_incoming;
-                DROP INDEX nodes_source_snapshot;
-                CREATE INDEX edges_target ON edges(target_id);
-                PRAGMA user_version=1;",
+                    "drop index edges_outgoing;
+                drop index edges_incoming;
+                drop index nodes_source_snapshot;
+                create index edges_target on edges(target_id);
+                pragma user_version=1;",
                 )
                 .unwrap();
         }
@@ -385,7 +520,7 @@ mod tests {
             .collect();
         // When: cache incompatibility is detected before the vector database is opened.
         let error = SqliteStorage::open(&cache, &vectors).unwrap_err();
-        // Then exact content and inode identity, including populated native vector state.
+        // Then: exact content and inode identity, including populated native vector state.
         assert_eq!(error.get_message(), "incompatible storage database schema");
         for (name, expected) in files.iter().zip(before) {
             assert_eq!(capture_file(&root.path().join(name)), expected, "{name}");

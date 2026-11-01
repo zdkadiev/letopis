@@ -2,7 +2,7 @@ mod support;
 
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
-    service::{NodeMetadata, Storage, StorageRead, VectorOutcome},
+    service::{NodeMetadata, Storage, VectorOutcome},
 };
 use serde_json::{Value, json};
 use std::process::Output;
@@ -38,12 +38,12 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
     assert!(http.take_requests().is_empty());
     // Then: the final token is independently retrievable despite provider rejection.
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
-    let matches = read.match_text(FINAL_MARKER).unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
+    let matches = read.get_text_matches_by_expression(FINAL_MARKER).unwrap();
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0].id.as_str(), "long.md");
     let node = read
-        .read_node(&EdgeTarget::Knowledge(
+        .get_node_by_id(&EdgeTarget::Knowledge(
             KnowledgeId::parse("long.md").unwrap(),
         ))
         .unwrap()
@@ -52,7 +52,7 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
         panic!()
     };
     let VectorOutcome::Current(Some(failure)) = read
-        .read_failure(&config.get_identity(), &node.search_hash)
+        .get_failure_by_search_hash(&config.get_identity(), &node.search_hash)
         .unwrap()
     else {
         panic!("expected a durable current failure")
@@ -64,7 +64,7 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
     );
     assert!(!failure.error.unwrap().contains(PRIVATE_RESPONSE));
     assert_eq!(
-        read.read_vector(&config.get_identity(), &node.search_hash)
+        read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
             .unwrap(),
         VectorOutcome::Current(None)
     );

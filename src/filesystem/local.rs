@@ -1,6 +1,6 @@
 use super::{
     confined::{map_io, require_identity, verify_entry},
-    read::read_regular,
+    read::get_regular,
 };
 use crate::{
     domain::RepoPath,
@@ -176,15 +176,15 @@ impl LocalFileSystem {
 impl EmbeddingFiles for LocalFileSystem {
     type EmbedLock = PersistentLock;
 
-    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
         let directory = self.get_service_directory().map_err(map_io)?;
-        let bytes = read_regular(directory, "config.json", |_| {})?;
+        let bytes = get_regular(directory, "config.json", |_| {})?;
         self.get_service_directory().map_err(map_io)?;
         Ok(bytes)
     }
 
-    fn read_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>> {
-        read_regular(&self.root, path.as_str(), |_| {})
+    fn get_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>> {
+        get_regular(&self.root, path.as_str(), |_| {})
     }
 
     fn try_lock_embed(&self) -> EmbeddingResult<Option<Self::EmbedLock>> {
@@ -221,7 +221,7 @@ impl EmbedLocker for LocalFileSystem {
 impl FileSystem for LocalFileSystem {
     type IndexLock = PersistentLock;
 
-    fn read_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+    fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
         let Some(stat) = self.stat_file(path)? else {
             return Ok(None);
         };

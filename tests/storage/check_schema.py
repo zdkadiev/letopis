@@ -3,7 +3,7 @@
 from pathlib import Path
 import sys
 
-PROJECT_SEED = 'INSERT INTO project(id,revision) VALUES(1,0);'
+PROJECT_SEED = 'insert into project(id,revision) values(1,0);'
 VECTOR_MARKER = '-- ===== .letopis/vectors.db'
 
 
@@ -18,7 +18,7 @@ def verify_schema(root):
     # The canonical document deliberately comments the attached-vector DDL.
     vectors = '\n'.join(line.removeprefix('-- ').replace('vec.', '')
                         for line in vectors.splitlines()
-                        if line.startswith(('-- CREATE ', '-- INSERT ')))
+                        if line.startswith(('-- create ', '-- insert ')))
     for name, expected in (('cache', cache), ('vectors', vectors)):
         actual = (root / f'src/storage/{name}.sql').read_text()
         if name == 'cache':

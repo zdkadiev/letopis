@@ -1,5 +1,5 @@
 mod support;
-use letopis::service::{Storage, StorageRead};
+use letopis::service::Storage;
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -199,7 +199,7 @@ fn assert_internal(output: &Output) {
     assert!(output.stderr.is_empty());
 }
 fn get_revision(repo: &ReadingRepo) -> u64 {
-    repo.open_storage().begin_read().unwrap().get_revision()
+    repo.open_storage().begin_read_tx().unwrap().get_revision()
 }
 fn damage_child(repo: &ReadingRepo, tree: &str, name: &str) {
     let raw = run_git(repo, &["rev-parse", &format!("{tree}:{name}")]);

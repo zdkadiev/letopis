@@ -13,13 +13,13 @@ use std::{cell::RefCell, fs, os::unix::fs::MetadataExt};
 fn detached_child_has_exact_context_null_fds_and_no_service_descriptors() {
     // Given: capture immutable content before launching through production composition.
     let fixture = Fixture::new();
-    let before = fixture.read_preserved_files();
+    let before = fixture.get_preserved_files();
     let mut foreground = fixture.spawn_foreground(None);
     let mut drain = fixture.accept_drain();
     // When: the foreground must exit and both pipes reach EOF while drain is blocked.
-    let facts = drain.read_event();
+    let facts = drain.get_event();
     drain.send_command("acquire");
-    assert_eq!(drain.read_event()["owned"], true);
+    assert_eq!(drain.get_event()["owned"], true);
     let parent = finish_foreground(&mut foreground);
     // Then: kernel/session/descriptor observations, not fixture claims of completion.
     assert_eq!(facts["argv"], serde_json::json!(["embed", "--drain"]));
@@ -41,9 +41,9 @@ fn detached_child_has_exact_context_null_fds_and_no_service_descriptors() {
     assert_ne!(facts["sid"], parent["sid"]);
     assert!(parent["warning"].is_null());
     drain.send_command("release");
-    assert_eq!(drain.read_event()["event"], "released");
+    assert_eq!(drain.get_event()["event"], "released");
     drain.expect_eof();
-    assert_eq!(fixture.read_preserved_files(), before);
+    assert_eq!(fixture.get_preserved_files(), before);
 }
 #[test]
 fn two_released_probes_yield_exactly_one_active_drain() {
@@ -52,21 +52,21 @@ fn two_released_probes_yield_exactly_one_active_drain() {
     let mut first_parent = fixture.spawn_foreground(None);
     // When
     let mut first = fixture.accept_drain();
-    first.read_event();
+    first.get_event();
     // Then
     assert!(finish_foreground(&mut first_parent)["warning"].is_null());
     let mut second_parent = fixture.spawn_foreground(None);
     let mut second = fixture.accept_drain();
-    second.read_event();
+    second.get_event();
     assert!(finish_foreground(&mut second_parent)["warning"].is_null());
     // Both production probes succeeded before either child may claim ownership.
     first.send_command("acquire");
-    assert_eq!(first.read_event()["owned"], true);
+    assert_eq!(first.get_event()["owned"], true);
     second.send_command("acquire");
-    assert_eq!(second.read_event()["owned"], false);
+    assert_eq!(second.get_event()["owned"], false);
     second.expect_eof();
     first.send_command("release");
-    assert_eq!(first.read_event()["event"], "released");
+    assert_eq!(first.get_event()["event"], "released");
     first.expect_eof();
 }
 #[test]
@@ -75,11 +75,11 @@ fn owned_sigkill_and_stale_pid_preserve_inode_and_release_lock() {
     let fixture = Fixture::new();
     let mut foreground = fixture.spawn_foreground(None);
     let mut drain = fixture.accept_drain();
-    drain.read_event();
+    drain.get_event();
     finish_foreground(&mut foreground);
     drain.send_command("acquire");
     // When / Then
-    assert_eq!(drain.read_event()["owned"], true);
+    assert_eq!(drain.get_event()["owned"], true);
     let lock = fixture.root.path().join(".letopis/embed.lock");
     let inode = fs::metadata(&lock).unwrap().ino();
     let files = open_filesystem(fixture.root.path()).unwrap();

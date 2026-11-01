@@ -8,22 +8,6 @@ const INVALID_CONFIG: &str = "invalid embedding configuration";
 const MIGRATION_REQUIRED: &str = "embedding configuration requires migration";
 const READ_FAILURE: &str = "cannot read embedding configuration";
 
-/// Parse one complete configuration document and validate retained provider
-/// settings locally, including when execution is disabled.
-///
-/// # Errors
-/// Returns the structural parser error, or the provider's local validation error.
-pub(crate) fn validate_configuration(
-    bytes: &[u8],
-    provider: &dyn EmbeddingProvider,
-) -> EmbeddingResult<Configuration> {
-    let configuration = Configuration::parse(bytes)?;
-    if let Some(config) = configuration.get_embedding_config() {
-        provider.validate_config(config)?;
-    }
-    Ok(configuration)
-}
-
 /// Observes the current validated embedding configuration without changing state.
 pub(crate) struct ConfigurationService<'a> {
     pub(crate) files: &'a dyn StatusFiles,
@@ -38,13 +22,23 @@ impl fmt::Debug for ConfigurationService<'_> {
 }
 
 impl ConfigReader for ConfigurationService<'_> {
-    fn read_config(&self) -> CommandResult<Option<Configuration>> {
-        let Some(bytes) = self.files.read_config().map_err(map_read_error)? else {
+    fn get_config(&self) -> CommandResult<Option<Configuration>> {
+        let Some(bytes) = self.files.get_config().map_err(map_read_error)? else {
             return Ok(None);
         };
-        validate_configuration(&bytes, self.provider)
+        self.validate_configuration(&bytes)
             .map(Some)
             .map_err(map_invalid_configuration)
+    }
+}
+
+impl ConfigurationService<'_> {
+    fn validate_configuration(&self, bytes: &[u8]) -> EmbeddingResult<Configuration> {
+        let configuration = Configuration::parse(bytes)?;
+        if let Some(config) = configuration.get_embedding_config() {
+            self.provider.validate_config(config)?;
+        }
+        Ok(configuration)
     }
 }
 
@@ -62,4 +56,325 @@ pub(crate) fn map_invalid_configuration(cause: EmbeddingError) -> CommandError {
 }
 
 #[cfg(test)]
-mod tests;
+mod tests {
+    use super::ConfigurationService;
+    use crate::service::{
+        CommandError, CommandErrorKind, CommandResult, ConfigReader, EmbeddingConfig,
+        EmbeddingError, EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult, HeldLock,
+        ProviderKind, StatusFiles,
+    };
+    use serde_json::json;
+    use std::{cell::Cell, error::Error, io, num::NonZeroUsize};
+
+    const CONFIG: &[u8] = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9","custom":{"enabled":true},"dimensions":3},"max_retries":2}}"#;
+    const DISABLED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":2}}"#;
+    const UNCONFIGURED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#;
+    const LEGACY: &[u8] = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":0}"#;
+
+    #[test]
+    fn reads_missing_config_without_creating_service_state() {
+        // Given
+        let files = Files {
+            config: None,
+            fail: false,
+            reads: Cell::new(0),
+            lock_observations: Cell::new(0),
+        };
+        let provider = Provider::accepting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+
+        // When
+        let config = service.get_config().unwrap();
+
+        // Then
+        assert!(config.is_none());
+        assert_eq!(files.reads.get(), 1);
+        assert_eq!(files.lock_observations.get(), 0);
+        assert_eq!(provider.validations.get(), 0);
+        assert_eq!(provider.embeddings.get(), 0);
+    }
+
+    #[test]
+    fn returns_preserved_config_values() {
+        // Given
+        let files = Files {
+            config: Some(CONFIG.to_vec()),
+            fail: false,
+            reads: Cell::new(0),
+            lock_observations: Cell::new(0),
+        };
+        let provider = Provider::accepting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+
+        // When
+        let configuration = service.get_config().unwrap().unwrap();
+        let config = configuration.get_embedding_config().unwrap();
+
+        // Then
+        assert!(configuration.get_enabled());
+        assert_eq!(config.get_provider(), ProviderKind::Ollama);
+        assert_eq!(config.get_model(), "fixture");
+        assert_eq!(
+            serde_json::Value::Object(config.get_parameters().clone()),
+            json!({
+                "base_url": "http://127.0.0.1:9",
+                "custom": {"enabled": true},
+                "dimensions": 3
+            })
+        );
+        assert_eq!(config.get_dimensions(), NonZeroUsize::new(3));
+        assert_eq!(config.get_max_attempts(), 3);
+        assert_eq!(files.reads.get(), 1);
+        assert_eq!(files.lock_observations.get(), 0);
+        assert_eq!(provider.validations.get(), 1);
+        assert_eq!(provider.embeddings.get(), 0);
+    }
+
+    #[test]
+    fn accepts_unconfigured_without_provider_validation() {
+        // Given: the generated unconfigured document.
+        let files = Files {
+            config: Some(UNCONFIGURED.to_vec()),
+            fail: false,
+            reads: Cell::new(0),
+            lock_observations: Cell::new(0),
+        };
+        let provider = Provider::rejecting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+
+        // When
+        let configuration = service.get_config().unwrap().unwrap();
+
+        // Then: no execution identity exists and the provider boundary is untouched.
+        assert!(!configuration.get_enabled());
+        assert_eq!(configuration.get_max_retries(), 0);
+        assert!(configuration.get_embedding_config().is_none());
+        assert_eq!(provider.validations.get(), 0);
+        assert_eq!(provider.embeddings.get(), 0);
+    }
+
+    #[test]
+    fn validates_configured_disabled_settings_locally() {
+        // Given: a disabled document with retained provider settings.
+        let files = Files {
+            config: Some(DISABLED.to_vec()),
+            fail: false,
+            reads: Cell::new(0),
+            lock_observations: Cell::new(0),
+        };
+        let provider = Provider::rejecting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+
+        // When
+        let error = service.get_config().unwrap_err();
+
+        // Then: disabled settings still pass through local provider validation.
+        assert_invalid_configuration_error(&error);
+        assert_eq!(provider.validations.get(), 1);
+        assert_eq!(provider.embeddings.get(), 0);
+    }
+
+    #[test]
+    fn reports_legacy_flat_configuration_as_migration() {
+        // Given: an old four-field file.
+        let files = Files {
+            config: Some(LEGACY.to_vec()),
+            fail: false,
+            reads: Cell::new(0),
+            lock_observations: Cell::new(0),
+        };
+        let provider = Provider::accepting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+
+        // When
+        let error = service.get_config().unwrap_err();
+
+        // Then: the safe top-level message names the required migration.
+        assert_eq!(error.get_kind(), CommandErrorKind::EmbeddingFailed);
+        assert_eq!(
+            error.get_message(),
+            "embedding configuration requires migration"
+        );
+        assert_eq!(provider.validations.get(), 0);
+    }
+
+    #[test]
+    fn rejects_invalid_config_without_exposing_bytes() {
+        // Given
+        let bytes = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","api_key":"CONFIG_CANARY"},"max_retries":0}}"#;
+        let files = Files {
+            config: Some(bytes.to_vec()),
+            fail: false,
+            reads: Cell::new(0),
+            lock_observations: Cell::new(0),
+        };
+        let provider = Provider::accepting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+
+        // When
+        let error = service.get_config().unwrap_err();
+
+        // Then
+        assert_invalid_configuration_error(&error);
+        assert_eq!(files.reads.get(), 1);
+        assert_eq!(files.lock_observations.get(), 0);
+        assert_eq!(provider.validations.get(), 0);
+        assert_eq!(provider.embeddings.get(), 0);
+
+        // Given: a syntactically valid configuration rejected by local provider validation.
+        let files = Files {
+            config: Some(CONFIG.to_vec()),
+            fail: false,
+            reads: Cell::new(0),
+            lock_observations: Cell::new(0),
+        };
+        let provider = Provider::rejecting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+
+        // When
+        let error = service.get_config().unwrap_err();
+
+        // Then
+        assert_invalid_configuration_error(&error);
+        assert_eq!(provider.validations.get(), 1);
+        assert_eq!(provider.embeddings.get(), 0);
+    }
+
+    #[test]
+    fn maps_read_failure_without_exposing_causes() {
+        // Given
+        let files = Files {
+            config: None,
+            fail: true,
+            reads: Cell::new(0),
+            lock_observations: Cell::new(0),
+        };
+        let provider = Provider::accepting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+
+        // When
+        let error = service.get_config().unwrap_err();
+
+        // Then
+        assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+        assert_eq!(error.get_message(), "cannot read embedding configuration");
+        assert!(!format!("{error:?}").contains("CONFIG_CANARY"));
+        assert!(!error.to_string().contains("CONFIG_CANARY"));
+        assert!(
+            !error
+                .source()
+                .unwrap()
+                .to_string()
+                .contains("CONFIG_CANARY")
+        );
+        assert_eq!(provider.validations.get(), 0);
+        assert_eq!(provider.embeddings.get(), 0);
+    }
+
+    fn assert_invalid_configuration_error(error: &CommandError) {
+        assert_eq!(error.get_kind(), CommandErrorKind::EmbeddingFailed);
+        assert_eq!(error.get_message(), "invalid embedding configuration");
+        assert!(!format!("{error:?}").contains("CONFIG_CANARY"));
+        assert!(!error.to_string().contains("CONFIG_CANARY"));
+        assert!(
+            !error
+                .source()
+                .unwrap()
+                .to_string()
+                .contains("CONFIG_CANARY")
+        );
+    }
+
+    struct Files {
+        config: Option<Vec<u8>>,
+        fail: bool,
+        reads: Cell<usize>,
+        lock_observations: Cell<usize>,
+    }
+
+    impl StatusFiles for Files {
+        fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+            self.reads.set(self.reads.get() + 1);
+            if self.fail {
+                return Err(EmbeddingError::new_with_cause(
+                    EmbeddingErrorKind::InternalError,
+                    io::Error::other("CONFIG_CANARY"),
+                ));
+            }
+            Ok(self.config.clone())
+        }
+
+        fn observe_locks(&self) -> CommandResult<Vec<HeldLock>> {
+            self.lock_observations.set(self.lock_observations.get() + 1);
+            Ok(Vec::new())
+        }
+    }
+
+    struct Provider {
+        reject: bool,
+        validations: Cell<usize>,
+        embeddings: Cell<usize>,
+    }
+
+    impl Provider {
+        fn accepting() -> Self {
+            Self {
+                reject: false,
+                validations: Cell::new(0),
+                embeddings: Cell::new(0),
+            }
+        }
+
+        fn rejecting() -> Self {
+            Self {
+                reject: true,
+                validations: Cell::new(0),
+                embeddings: Cell::new(0),
+            }
+        }
+    }
+
+    impl EmbeddingProvider for Provider {
+        fn validate_config(&self, _: &EmbeddingConfig) -> EmbeddingResult<()> {
+            self.validations.set(self.validations.get() + 1);
+            if self.reject {
+                return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
+            }
+            Ok(())
+        }
+
+        fn embed(
+            &self,
+            _: &EmbeddingConfig,
+            _: &[&str],
+            _: Option<NonZeroUsize>,
+        ) -> EmbeddingResult<Vec<Vec<f32>>> {
+            self.embeddings.set(self.embeddings.get() + 1);
+            Ok(Vec::new())
+        }
+    }
+}

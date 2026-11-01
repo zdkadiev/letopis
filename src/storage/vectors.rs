@@ -20,20 +20,29 @@ const NATIVE_DIMENSION_MIN: usize = 2;
 const NATIVE_DIMENSION_MAX: usize = 4096;
 
 const RESET_INDEX: &str = r#"
-    DROP TABLE vector_index;
-    CREATE VIRTUAL TABLE vector_index USING vec1(vector);
-    INSERT INTO vector_index(cmd,arg) VALUES('rebuild','{index:"none",distance:"cos"}');
+    drop table vector_index;
+    create virtual table vector_index using vec1(vector);
+    insert into vector_index(cmd,arg) values('rebuild','{index:"none",distance:"cos"}');
 "#;
 
+/// Select the vector database on a write connection or a cache read connection.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum VectorSchema {
+    /// The vector connection's primary database.
+    Main,
+    /// The vector database attached to the cache connection as `vec`.
+    Attached,
+}
+
 pub(super) fn reset_vectors(
-    connection: &mut Connection,
+    conn: &mut Connection,
     observed: Option<&Sha256>,
     identity: &Sha256,
 ) -> StorageResult<VectorOutcome<bool>> {
-    let tx = connection
+    let tx = conn
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(map_sqlite)?;
-    let current = read_config_identity(&tx, false)?;
+    let current = get_config_identity(&tx, VectorSchema::Main)?;
     if current.as_ref() == Some(identity) {
         return Ok(VectorOutcome::Current(false));
     }
@@ -65,19 +74,18 @@ pub(super) fn reset_vectors(
     Ok(VectorOutcome::Current(true))
 }
 
-pub(super) fn read_config_identity(
+pub(super) fn get_config_identity(
     connection: &Connection,
-    attached: bool,
+    schema: VectorSchema,
 ) -> StorageResult<Option<Sha256>> {
     let mut query = Query::select();
     query
         .column(Meta::ConfigIdentity)
         .and_where(Expr::col(Meta::Id).eq(1));
-    if attached {
-        query.from((Schemas::Vec, Meta::Table));
-    } else {
-        query.from(Meta::Table);
-    }
+    match schema {
+        VectorSchema::Main => query.from(Meta::Table),
+        VectorSchema::Attached => query.from((Schemas::Vec, Meta::Table)),
+    };
     let (sql, values) = build_query(&query)?;
     let identity: Option<String> = connection
         .query_row(&sql, params_from_iter(values), |row| row.get(0))
@@ -111,13 +119,13 @@ pub(super) fn matches_identity(connection: &Connection, expected: &Sha256) -> St
 
 pub(super) fn store_vector(
     connection: &Connection,
-    hash: &Sha256,
+    search_hash: &Sha256,
     vector: &[f32],
     dimensions: usize,
 ) -> StorageResult<StoredVectorKey> {
     let bytes = encode_vector(vector, dimensions)?;
     validate_dimensions(connection, dimensions)?;
-    let key = get_or_insert_vector_key(connection, hash)?;
+    let key = get_or_insert_vector_key(connection, search_hash)?;
     if key.inserted {
         let (sql, values) = build_query(
             Query::insert()
@@ -147,7 +155,7 @@ pub(super) fn store_vector(
     let (sql, values) = build_query(
         Query::delete()
             .from_table(EmbedFailures::Table)
-            .and_where(Expr::col(EmbedFailures::SearchHash).eq(hash.to_hex())),
+            .and_where(Expr::col(EmbedFailures::SearchHash).eq(search_hash.to_hex())),
     )?;
     connection
         .execute(&sql, params_from_iter(values))
@@ -156,7 +164,7 @@ pub(super) fn store_vector(
 }
 
 fn validate_dimensions(connection: &Connection, dimensions: usize) -> StorageResult<()> {
-    let current = read_vector_dimensions(connection, false)?;
+    let current = get_vector_dimensions(connection, VectorSchema::Main)?;
     if !(NATIVE_DIMENSION_MIN..=NATIVE_DIMENSION_MAX).contains(&dimensions)
         || current.is_some_and(|size| size.get() != dimensions)
     {
@@ -168,15 +176,14 @@ fn validate_dimensions(connection: &Connection, dimensions: usize) -> StorageRes
     Ok(())
 }
 
-pub(super) fn read_vector_dimensions(
+pub(super) fn get_vector_dimensions(
     connection: &Connection,
-    attached: bool,
+    schema: VectorSchema,
 ) -> StorageResult<Option<NonZeroUsize>> {
     // Native shadow introspection is read-only, with private fixed schema names.
-    let sql = if attached {
-        "SELECT val FROM vec.vector_index_config WHERE id = ?1"
-    } else {
-        "SELECT val FROM main.vector_index_config WHERE id = ?1"
+    let sql = match schema {
+        VectorSchema::Main => "select val from main.vector_index_config where id = ?1",
+        VectorSchema::Attached => "select val from vec.vector_index_config where id = ?1",
     };
     let value: Option<i64> = connection
         .query_row(sql, [NATIVE_DIMENSION_FIELD], |row| row.get(0))
@@ -195,13 +202,13 @@ pub(super) fn read_vector_dimensions(
 
 fn get_or_insert_vector_key(
     connection: &Connection,
-    hash: &Sha256,
+    search_hash: &Sha256,
 ) -> StorageResult<StoredVectorKey> {
     let (sql, values) = build_query(
         Query::insert()
             .into_table(VectorKeys::Table)
             .columns([VectorKeys::SearchHash])
-            .values([Expr::val(hash.to_hex())])
+            .values([Expr::val(search_hash.to_hex())])
             .map_err(map_invalid_value)?
             .on_conflict(
                 OnConflict::column(VectorKeys::SearchHash)
@@ -217,7 +224,7 @@ fn get_or_insert_vector_key(
         Query::select()
             .column(VectorKeys::RowId)
             .from(VectorKeys::Table)
-            .and_where(Expr::col(VectorKeys::SearchHash).eq(hash.to_hex())),
+            .and_where(Expr::col(VectorKeys::SearchHash).eq(search_hash.to_hex())),
     )?;
     let row_id = connection
         .query_row(&sql, params_from_iter(values), |r| r.get(0))
@@ -225,9 +232,9 @@ fn get_or_insert_vector_key(
     Ok(StoredVectorKey { row_id, inserted })
 }
 
-pub(super) fn read_vector(
+pub(super) fn get_vector_by_search_hash(
     connection: &Connection,
-    hash: &Sha256,
+    search_hash: &Sha256,
 ) -> StorageResult<Option<Vec<f32>>> {
     let (sql, values) = build_query(
         Query::select()
@@ -239,7 +246,9 @@ pub(super) fn read_vector(
                 Expr::col((VectorIndex::Table, VectorIndex::Rowid))
                     .equals((VectorKeys::Table, VectorKeys::RowId)),
             )
-            .and_where(Expr::col((VectorKeys::Table, VectorKeys::SearchHash)).eq(hash.to_hex())),
+            .and_where(
+                Expr::col((VectorKeys::Table, VectorKeys::SearchHash)).eq(search_hash.to_hex()),
+            ),
     )?;
     let value = connection
         .query_row(&sql, params_from_iter(values), |r| {
@@ -266,7 +275,7 @@ fn decode_vector(bytes: &[u8]) -> StorageResult<Vec<f32>> {
     Ok(values)
 }
 
-pub(super) fn find_nearest_vectors(
+pub(super) fn get_nearest_vectors(
     connection: &Connection,
     query: &[f32],
     dimensions: usize,
@@ -285,12 +294,12 @@ pub(super) fn find_nearest_vectors(
     }
     let mut statement = connection
         .prepare(
-            "SELECT n.id, k.search_hash, v.distance
-         FROM vec.vector_index(?1, ?2) v
-         JOIN vec.vector_keys k ON k.row_id = v.rowid
-         JOIN nodes n ON n.search_hash = k.search_hash
-         WHERE n.kind <> ?3
-         ORDER BY v.distance, n.id",
+            "select n.id, k.search_hash, v.distance
+         from vec.vector_index(?1, ?2) v
+         join vec.vector_keys k on k.row_id = v.rowid
+         join nodes n on n.search_hash = k.search_hash
+         where n.kind <> ?3
+         order by v.distance, n.id",
         )
         .map_err(map_sqlite)?;
     let rows = statement
@@ -303,10 +312,10 @@ pub(super) fn find_nearest_vectors(
         })
         .map_err(map_sqlite)?;
     rows.map(|row| {
-        let (id, hash, distance) = row.map_err(map_sqlite)?;
+        let (id, search_hash, distance) = row.map_err(map_sqlite)?;
         Ok(VectorMatch {
             id: KnowledgeId::parse(&id).map_err(|_| fail_invalid_stored_vector())?,
-            search_hash: Sha256::parse(&hash).map_err(|_| fail_invalid_stored_vector())?,
+            search_hash: Sha256::parse(&search_hash).map_err(|_| fail_invalid_stored_vector())?,
             distance,
         })
     })
@@ -333,7 +342,7 @@ pub(super) fn fail_invalid_stored_vector() -> StorageError {
 
 pub(super) fn reserve_attempt(
     connection: &Connection,
-    hash: &Sha256,
+    search_hash: &Sha256,
     max_attempts: u64,
 ) -> StorageResult<bool> {
     let budget = encode_unsigned(max_attempts)?;
@@ -347,7 +356,7 @@ pub(super) fn reserve_attempt(
         Query::insert()
             .into_table(EmbedFailures::Table)
             .columns([EmbedFailures::SearchHash, EmbedFailures::Attempts])
-            .values([Expr::val(hash.to_hex()), Expr::val(1)])
+            .values([Expr::val(search_hash.to_hex()), Expr::val(1)])
             .map_err(map_invalid_value)?
             .on_conflict(
                 OnConflict::column(EmbedFailures::SearchHash)
@@ -367,14 +376,14 @@ pub(super) fn reserve_attempt(
 
 pub(super) fn record_failure(
     connection: &Connection,
-    hash: &Sha256,
-    safe_error: &str,
+    search_hash: &Sha256,
+    error: &str,
 ) -> StorageResult<bool> {
     let (sql, values) = build_query(
         Query::update()
             .table(EmbedFailures::Table)
-            .value(EmbedFailures::Error, safe_error)
-            .and_where(Expr::col(EmbedFailures::SearchHash).eq(hash.to_hex())),
+            .value(EmbedFailures::Error, error)
+            .and_where(Expr::col(EmbedFailures::SearchHash).eq(search_hash.to_hex())),
     )?;
     connection
         .execute(&sql, params_from_iter(values))
@@ -382,17 +391,13 @@ pub(super) fn record_failure(
         .map_err(map_sqlite)
 }
 
-pub(super) fn set_query_error(
-    connection: &Connection,
-    at: u64,
-    safe_error: &str,
-) -> StorageResult<()> {
+pub(super) fn set_query_error(connection: &Connection, at: u64, error: &str) -> StorageResult<()> {
     let at = encode_unsigned(at)?;
     let (sql, values) = build_query(
         Query::insert()
             .into_table(QueryErrorRow::Table)
             .columns([QueryErrorRow::Id, QueryErrorRow::At, QueryErrorRow::Error])
-            .values([Expr::val(1), Expr::val(at), Expr::val(safe_error)])
+            .values([Expr::val(1), Expr::val(at), Expr::val(error)])
             .map_err(map_invalid_value)?
             .on_conflict(
                 OnConflict::column(QueryErrorRow::Id)
@@ -428,15 +433,15 @@ pub(super) fn clear_query_error(connection: &Connection) -> StorageResult<()> {
     Ok(())
 }
 
-pub(super) fn read_failure(
+pub(super) fn get_failure_by_search_hash(
     connection: &Connection,
-    hash: &Sha256,
+    search_hash: &Sha256,
 ) -> StorageResult<Option<EmbeddingFailure>> {
     let (sql, values) = build_query(
         Query::select()
             .columns([EmbedFailures::Attempts, EmbedFailures::Error])
             .from((Schemas::Vec, EmbedFailures::Table))
-            .and_where(Expr::col(EmbedFailures::SearchHash).eq(hash.to_hex())),
+            .and_where(Expr::col(EmbedFailures::SearchHash).eq(search_hash.to_hex())),
     )?;
     let value = connection
         .query_row(&sql, params_from_iter(values), |row| {
@@ -451,7 +456,7 @@ pub(super) fn read_failure(
                 return Err(fail_invalid_diagnostic());
             }
             Ok(EmbeddingFailure {
-                search_hash: *hash,
+                search_hash: *search_hash,
                 attempts,
                 error,
             })
@@ -459,7 +464,7 @@ pub(super) fn read_failure(
         .transpose()
 }
 
-pub(super) fn read_query_error(connection: &Connection) -> StorageResult<Option<QueryError>> {
+pub(super) fn get_query_error(connection: &Connection) -> StorageResult<Option<QueryError>> {
     let (sql, values) = build_query(
         Query::select()
             .columns([QueryErrorRow::At, QueryErrorRow::Error])
@@ -492,8 +497,51 @@ fn fail_invalid_diagnostic() -> StorageError {
 
 #[cfg(test)]
 mod tests {
-    use super::decode_vector;
-    use crate::service::StorageErrorKind;
+    use super::{
+        VectorSchema, decode_vector, get_config_identity, get_vector_dimensions, reset_vectors,
+        store_vector,
+    };
+    use crate::{
+        domain::Sha256,
+        service::StorageErrorKind,
+        storage::{native::register_vec1, schema::bootstrap_vectors},
+    };
+    use rusqlite::Connection;
+    use tempfile::TempDir;
+
+    #[test]
+    fn gets_identity_and_dimensions_from_selected_schema() {
+        // Given: independent main and attached databases have distinct vector metadata.
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("attached.db");
+        let main_identity = Sha256::digest(b"main");
+        let attached_identity = Sha256::digest(b"attached");
+        register_vec1().unwrap();
+        let mut main = Connection::open_in_memory().unwrap();
+        let mut attached = Connection::open(&path).unwrap();
+        for (connection, identity, vector) in [
+            (&mut main, &main_identity, vec![1.0, 0.0]),
+            (&mut attached, &attached_identity, vec![1.0, 0.0, 0.0]),
+        ] {
+            bootstrap_vectors(connection).unwrap();
+            reset_vectors(connection, None, identity).unwrap();
+            store_vector(connection, identity, &vector, vector.len()).unwrap();
+        }
+        main.execute("attach database ?1 as vec", [path.to_str().unwrap()])
+            .unwrap();
+
+        // When: metadata is retrieved through each explicit schema selector.
+        let main_id = get_config_identity(&main, VectorSchema::Main).unwrap();
+        let attached_id = get_config_identity(&main, VectorSchema::Attached).unwrap();
+        let main_dimensions = get_vector_dimensions(&main, VectorSchema::Main).unwrap();
+        let attached_dimensions = get_vector_dimensions(&main, VectorSchema::Attached).unwrap();
+
+        // Then: neither identity nor native dimensions leak across schema locations.
+        assert_eq!(main_id, Some(main_identity));
+        assert_eq!(attached_id, Some(attached_identity));
+        assert_eq!(main_dimensions.unwrap().get(), 2);
+        assert_eq!(attached_dimensions.unwrap().get(), 3);
+    }
 
     #[test]
     fn rejects_empty_or_partially_encoded_stored_vectors() {
@@ -501,7 +549,7 @@ mod tests {
         let mut truncated = 1.0_f32.to_ne_bytes().to_vec();
         truncated.push(0);
         for bytes in [Vec::new(), vec![0], truncated] {
-            // When
+            // When: malformed stored bytes are decoded.
             let error = decode_vector(&bytes).unwrap_err();
             // Then: incomplete bytes cannot silently become a shorter vector.
             assert_eq!(error.get_kind(), StorageErrorKind::InternalError);

@@ -110,7 +110,7 @@ fn reject_missing_or_invalid_requested_revision_first() {
             .get_kind(),
         SnapshotErrorKind::NotFound
     );
-    let commit = TreeOid::parse(&repo.read_oid(&["rev-parse", "HEAD"], None)).unwrap();
+    let commit = TreeOid::parse(&repo.get_oid(&["rev-parse", "HEAD"], None)).unwrap();
     assert_eq!(
         service
             .compare_revision(SourceRevisionRequest {
@@ -193,7 +193,7 @@ fn report_missing_or_invalid_basis_as_unavailable_for_valid_requested_revision()
     let revision = create_basis(repo.get_root(), &[("a", b"one\n")]);
     let service = wire_source_provenance(repo.get_root()).unwrap();
     let source = SourceUri::parse("a").unwrap();
-    let commit = TreeOid::parse(&repo.read_oid(&["rev-parse", "HEAD"], None)).unwrap();
+    let commit = TreeOid::parse(&repo.get_oid(&["rev-parse", "HEAD"], None)).unwrap();
     let roots = [TreeOid::parse(&"a".repeat(40)).unwrap(), commit];
     for basis in roots {
         // When
@@ -222,7 +222,7 @@ fn validate_all_requested_trees_without_a_source() {
         };
         let missing = TreeOid::parse(&"a".repeat(valid.as_str().len())).unwrap();
         let foreign = TreeOid::parse(&"a".repeat(foreign_length)).unwrap();
-        let commit = TreeOid::parse(&repo.read_oid(&["rev-parse", "HEAD"], None)).unwrap();
+        let commit = TreeOid::parse(&repo.get_oid(&["rev-parse", "HEAD"], None)).unwrap();
         // When / Then: empty input and a complete empty tree need no source.
         assert!(service.validate_revisions(&BTreeSet::new()).is_ok());
         assert!(

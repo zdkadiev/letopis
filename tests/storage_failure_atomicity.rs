@@ -1,7 +1,7 @@
 use letopis::{
     domain::Sha256,
     open_storage,
-    service::{Storage, StorageErrorKind, VectorOutcome, VectorWrite},
+    service::{Storage, StorageErrorKind, VectorOutcome},
 };
 use rusqlite::Connection;
 use tempfile::TempDir;
@@ -18,23 +18,23 @@ fn a_failed_failure_update_poisons_the_entire_vector_unit() {
     let observer = Connection::open(&vector_path).unwrap();
     observer
         .execute_batch(
-            "CREATE TRIGGER deny_failure_update BEFORE UPDATE OF error ON embed_failures
-         BEGIN SELECT RAISE(ABORT, 'controlled update refusal'); END;",
+            "create trigger deny_failure_update before update of error on embed_failures
+         begin select raise(abort, 'controlled update refusal'); end;",
         )
         .unwrap();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(&identity).unwrap() else {
         panic!("configuration unexpectedly changed");
     };
-    // When / Then
+    // When / Then: an earlier valid reservation succeeds inside the same transaction.
     assert!(unit.reserve_attempt(&hash, 3).unwrap());
-    // When
+    // When: the failure update and commit are attempted.
     let error = unit.record_failure(&hash, "safe diagnostic").unwrap_err();
     let commit_error = unit.commit().unwrap_err();
     // Then: even the earlier valid reservation must roll back.
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(commit_error.get_kind(), StorageErrorKind::InvalidRequest);
     let count: i64 = observer
-        .query_row("SELECT count(*) FROM embed_failures", [], |row| row.get(0))
+        .query_row("select count(*) from embed_failures", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count, 0);
 }
@@ -51,28 +51,28 @@ fn a_failed_query_error_cleanup_poisons_the_entire_vector_unit() {
     let observer = Connection::open(&vector_path).unwrap();
     observer
         .execute_batch(
-            "INSERT INTO query_error VALUES(1, 17, 'existing diagnostic');
-         CREATE TRIGGER deny_query_cleanup BEFORE DELETE ON query_error
-         BEGIN SELECT RAISE(ABORT, 'controlled deletion refusal'); END;",
+            "insert into query_error values(1, 17, 'existing diagnostic');
+         create trigger deny_query_cleanup before delete on query_error
+         begin select raise(abort, 'controlled deletion refusal'); end;",
         )
         .unwrap();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(&identity).unwrap() else {
         panic!("configuration unexpectedly changed");
     };
-    // When / Then
+    // When / Then: an earlier valid reservation succeeds inside the same transaction.
     assert!(unit.reserve_attempt(&hash, 3).unwrap());
-    // When
+    // When: query-error cleanup and commit are attempted.
     let error = unit.clear_query_error().unwrap_err();
     let commit_error = unit.commit().unwrap_err();
     // Then: the diagnostic survives and the earlier reservation rolls back.
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(commit_error.get_kind(), StorageErrorKind::InvalidRequest);
     let count: i64 = observer
-        .query_row("SELECT count(*) FROM embed_failures", [], |row| row.get(0))
+        .query_row("select count(*) from embed_failures", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count, 0);
     let diagnostic: String = observer
-        .query_row("SELECT error FROM query_error", [], |row| row.get(0))
+        .query_row("select error from query_error", [], |row| row.get(0))
         .unwrap();
     assert_eq!(diagnostic, "existing diagnostic");
 }
@@ -89,23 +89,23 @@ fn a_failed_orphan_prune_poisons_the_entire_vector_unit() {
     let observer = Connection::open(&vector_path).unwrap();
     observer
         .execute_batch(
-            "CREATE TRIGGER deny_orphan_cleanup BEFORE DELETE ON embed_failures
-         BEGIN SELECT RAISE(ABORT, 'controlled orphan cleanup refusal'); END;",
+            "create trigger deny_orphan_cleanup before delete on embed_failures
+         begin select raise(abort, 'controlled orphan cleanup refusal'); end;",
         )
         .unwrap();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write(&identity).unwrap() else {
+    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(&identity).unwrap() else {
         panic!("configuration unexpectedly changed");
     };
-    // When / Then
+    // When / Then: an earlier valid reservation succeeds inside the same transaction.
     assert!(unit.reserve_attempt(&hash, 3).unwrap());
-    // When
+    // When: orphan pruning and commit are attempted.
     let error = unit.prune_unreferenced().unwrap_err();
     let commit_error = unit.commit().unwrap_err();
     // Then: a failed cleanup cannot commit the earlier reservation.
     assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
     assert_eq!(commit_error.get_kind(), StorageErrorKind::InvalidRequest);
     let count: i64 = observer
-        .query_row("SELECT count(*) FROM embed_failures", [], |row| row.get(0))
+        .query_row("select count(*) from embed_failures", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count, 0);
 }

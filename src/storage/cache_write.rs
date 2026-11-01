@@ -16,7 +16,11 @@ pub(crate) struct SqliteCacheWrite<'a> {
     failed: bool,
 }
 impl<'a> SqliteCacheWrite<'a> {
-    pub(super) fn begin(db: &'a mut Connection) -> StorageResult<Self> {
+    /// Begin an atomic cache write; dropping it rolls back unpublished changes.
+    ///
+    /// # Errors
+    /// Reports writer contention or database failures.
+    pub(super) fn begin_tx(db: &'a mut Connection) -> StorageResult<Self> {
         Ok(Self {
             transaction: db
                 .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -60,7 +64,7 @@ impl CacheWrite for SqliteCacheWrite<'_> {
         let result = files::delete_file(&self.transaction, path);
         self.record(result)
     }
-    fn commit(self) -> StorageResult<u64> {
+    fn commit(self: Box<Self>) -> StorageResult<u64> {
         if self.failed {
             return Err(StorageError::new(
                 StorageErrorKind::InvalidRequest,
@@ -93,7 +97,7 @@ impl CacheWrite for SqliteCacheWrite<'_> {
             .execute(&sql, params_from_iter(values))
             .map_err(map_sqlite)?;
         self.transaction.commit().map_err(map_sqlite)?;
-        graph::read_unsigned(next)
+        graph::get_unsigned(next)
     }
 }
 
@@ -125,11 +129,11 @@ mod tests {
             lines: LineRange::new(1, 1).unwrap(),
             search_hash: Sha256::digest(b"alpha"),
         });
-        let mut write = SqliteCacheWrite::begin(&mut db).unwrap();
+        let mut write = Box::new(SqliteCacheWrite::begin_tx(&mut db).unwrap());
         write.upsert_node(&node).unwrap();
         write
             .transaction
-            .execute_batch("DROP TABLE text_index")
+            .execute_batch("drop table text_index")
             .unwrap();
         // When: catch an actual SQL failure rather than an input rejection.
         let error = write
@@ -144,18 +148,18 @@ mod tests {
             assert!(!error.get_message().contains(sentinel));
         }
         assert!(
-            graph::read_node(&db, &EdgeTarget::Knowledge(id))
+            graph::get_node_by_id(&db, &EdgeTarget::Knowledge(id))
                 .unwrap()
                 .is_none()
         );
         assert_eq!(
-            db.query_row("SELECT count(*) FROM text_index", [], |r| r
+            db.query_row("select count(*) from text_index", [], |r| r
                 .get::<_, i64>(0))
                 .unwrap(),
             0
         );
         assert_eq!(
-            db.query_row("SELECT revision FROM project", [], |r| r.get::<_, i64>(0))
+            db.query_row("select revision from project", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
             0
         );

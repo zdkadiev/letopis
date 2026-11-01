@@ -40,7 +40,7 @@
 | `src/service/mod.rs`, new `src/service/command.rs` | Application-owned command traits, typed addresses/results and safe command errors; mod.rs declares/reexports only |
 | New `src/cli/mod.rs`, `input.rs`, `output.rs`, `handlers.rs` | Small transport module: strict decoding, envelope rendering and concrete handlers; implementation bodies remain in responsibility files |
 | `src/filesystem/local.rs`, `mod.rs` | Existing LocalFileSystem, one shared persistent File-lock guard, index/embed capabilities and focused private tests |
-| New `src/service/background.rs` | Concrete BackgroundService: eligible-work decision, released probe, launch warning and drain delegation |
+| New `../../../src/service/background_runner.rs` | Concrete BackgroundService: eligible-work decision, released probe, launch warning and drain delegation |
 | New `src/process/mod.rs`, `detached.rs` | Concrete DetachedProcess implementation with exact argv, cwd, setsid and null standard descriptors |
 | `src/lib.rs`, new `src/main.rs` | Actual constructor wiring and thin process entry point |
 | New `tests/cli_runtime.rs`, `tests/cli_process.rs`, `tests/support/cli.rs` | Product executable checks and isolated process scheduling/support; helper module is not a separate test target |

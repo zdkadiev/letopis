@@ -14,7 +14,7 @@ letopis — локальная память AI-агентов. Агенты пр
 
 | Роль | Где в коде |
 | --- | --- |
-| Ядро: домен и прикладная логика | `domain`, `DocumentService`, `EmbeddingService`, `BackgroundService` в `service` |
+| Ядро: домен и прикладная логика | `domain`, `DocumentService`, `EmbeddingService`, `BackgroundRunnerService` в `service` |
 | Входной (driving) порт: что система предлагает снаружи | `Documents`, `Embeddings`, `EmbeddingTasks`, `Background`; CLI также определяет маршруты к `Checks`/`Inspections`, реализации которых ещё нет |
 | Выходные (driven) порты: что ядру нужно от внешнего мира | `CorpusFiles`, `GitSnapshots`, `FileSystem`, `Markdown`, `Storage`, `EmbeddingFiles`, `EmbeddingProvider`, `EmbedLocks`, `DrainProcess` |
 | Выходные адаптеры: технологии за портами | `git`, `filesystem`, `markdown`, `storage`, `embedding`, `process` |
@@ -65,7 +65,7 @@ flowchart TD
 | Модуль | Роль | Главные типы | Интерфейс (трейт в `service`) |
 | --- | --- | --- | --- |
 | `domain` | Чистые значения и правила, без I/O | `KnowledgeId`, `RepoPath`, `Sha256`, `TreeOid`, `Edge`, `Element` | — |
-| `service` | Контракты и прикладная логика | `DocumentService`, `EmbeddingService`, `BackgroundService`, типизированные результаты и ошибки | определяет все трейты |
+| `service` | Контракты и прикладная логика | `DocumentService`, `EmbeddingService`, `BackgroundRunnerService`, типизированные результаты и ошибки | определяет все трейты |
 | `git` | Список файлов корпуса, неизменяемые снимки деревьев | `GitCli` | `CorpusFiles`, `GitSnapshots` |
 | `filesystem` | Безопасное чтение файлов и config внутри корня, index/embed-блокировки | `LocalFileSystem` | `FileSystem`, `EmbeddingFiles`, `EmbedLocks` |
 | `markdown` | Разбор файла в элементы и рёбра, диагностика | `MarkdownParser` | `Markdown` |
@@ -103,11 +103,12 @@ flowchart TD
 | --- | --- |
 | Как собираются подсистемы | `src/lib.rs` (`run_cli`, `open_documents`, `open_embedding_tasks`, `open_background`) |
 | Вход CLI и JSON | `src/main.rs`, `src/cli/` |
-| Embedding и запуск drain | `src/service/embedding.rs`, `src/service/background.rs`, `src/embedding/`, `src/process/` |
+| Embedding и запуск drain | `src/service/embedding.rs`, `../src/service/background_runner.rs`, `src/embedding/`, `src/process/` |
 | Все интерфейсы и их контракты | `src/service/mod.rs` |
 | Оркестрация refresh | `src/service/document.rs` |
 | Превращение файла в записи кэша | `src/service/projection.rs` |
-| Типы данных между слоями | `src/service/model.rs`, `src/domain/` |
+| Типы данных между слоями | `src/service/types.rs`, `src/domain/` |
+| Ошибки и диагностика сервисов | `src/service/error.rs` |
 | SQL, схема, векторы | `src/storage/` (`schema.rs`, `vectors.rs`) |
 | Формат документа и ссылок | `docs/zkit/letopis/contracts/X-4-markdown.md` |
 | Как проверять работу агента | `AGENTS.md`, раздел Verification |

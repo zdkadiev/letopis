@@ -41,7 +41,7 @@ fn inspect_mixed_batch_uses_current_tree_bytes() {
                 .unwrap()
         )
     );
-    assert_eq!(read_blob(&repo, &result, "note.md"), MIXED_NOTE);
+    assert_eq!(get_blob(&repo, &result, "note.md"), MIXED_NOTE);
     assert_eq!(result.elements["source.txt"].path.as_str(), "source.txt");
     let hash = Some(
         Sha256::parse("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad").unwrap(),
@@ -55,11 +55,11 @@ fn inspect_mixed_batch_uses_current_tree_bytes() {
     let remote = &result.elements["https://Host/x?q=1#part"];
     assert_eq!(remote.path.as_str(), "https://Host/x?q=1#part");
     assert_eq!((remote.hash, remote.lines), (None, None));
-    assert_eq!(read_blob(&repo, &result, "source.txt"), b"abc");
+    assert_eq!(get_blob(&repo, &result, "source.txt"), b"abc");
     // Given
     repo.write("source.txt", b"later");
     // When / Then
-    assert_eq!(read_blob(&repo, &result, "source.txt"), b"abc");
+    assert_eq!(get_blob(&repo, &result, "source.txt"), b"abc");
 }
 
 #[test]
@@ -84,7 +84,7 @@ fn inspect_preserves_source_bytes_and_deduplicates_ranges() {
     );
     // Then
     assert_eq!(result.elements.len(), 3);
-    assert_eq!(read_blob(&repo, &result, "source.txt"), b"one\r\ntwo");
+    assert_eq!(get_blob(&repo, &result, "source.txt"), b"one\r\ntwo");
     assert_eq!(
         result.elements["source.txt#L1-L1"].hash,
         Some(
@@ -132,11 +132,11 @@ fn inspect_distinguishes_missing_bytes_from_missing_membership() {
     // Then: a missing range retains its existing whole file in the tree.
     assert_eq!(result.elements["missing.txt"].hash, None);
     assert_eq!(result.elements["short.txt#L1-L2"].hash, None);
-    assert_eq!(read_blob(&repo, &result, "short.txt"), b"abc");
+    assert_eq!(get_blob(&repo, &result, "short.txt"), b"abc");
     assert!(
         open_git_snapshots(repo.get_root())
             .unwrap()
-            .read_blob(&result.snapshot, &RepoPath::parse("missing.txt").unwrap())
+            .get_blob(&result.snapshot, &RepoPath::parse("missing.txt").unwrap())
             .is_err()
     );
     // Given: the last current declaration is removed.
@@ -167,17 +167,17 @@ fn inspect_includes_unrequested_declared_source_files() {
     let result = inspect(&repo, &["note.md"]);
     // Then
     assert_eq!(result.elements.len(), 1);
-    assert_eq!(read_blob(&repo, &result, "source.txt"), b"abc");
-    assert_eq!(read_blob(&repo, &result, "plain.md"), b"unmarked source");
+    assert_eq!(get_blob(&repo, &result, "source.txt"), b"abc");
+    assert_eq!(get_blob(&repo, &result, "plain.md"), b"unmarked source");
     assert_eq!(
-        read_blob(&repo, &result, "unrequested.md"),
+        get_blob(&repo, &result, "unrequested.md"),
         b"<!-- letopis: {\"created_at\":1} -->\nother knowledge\n"
     );
     let git = open_git_snapshots(repo.get_root()).unwrap();
     for path in ["unrelated.txt", ".letopis/cache.db"] {
         // When / Then
         assert!(
-            git.read_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
+            git.get_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
                 .is_err()
         );
     }
@@ -214,7 +214,7 @@ fn inspect_hashes_empty_binary_and_complete_line_bytes() {
             result.elements[address].hash,
             expected.map(|s| Sha256::parse(s).unwrap())
         );
-        assert_eq!(read_blob(&repo, &result, "source.txt"), bytes);
+        assert_eq!(get_blob(&repo, &result, "source.txt"), bytes);
     }
 }
 
@@ -237,7 +237,7 @@ fn inspect_retains_source_through_gc_without_changing_user_git_state() {
     // Then
     assert!(status.success());
     assert_eq!(
-        read_blob(&repo, &result, "source.txt"),
+        get_blob(&repo, &result, "source.txt"),
         b"source before later edit\n"
     );
     assert_eq!(fs::read(repo.get_root().join(".git/HEAD")).unwrap(), head);
@@ -284,9 +284,9 @@ fn write_references(repo: &ReadingRepo, sources: &[&str]) {
     );
 }
 
-fn read_blob(repo: &ReadingRepo, result: &Inspection, path: &str) -> Vec<u8> {
+fn get_blob(repo: &ReadingRepo, result: &Inspection, path: &str) -> Vec<u8> {
     open_git_snapshots(repo.get_root())
         .unwrap()
-        .read_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
+        .get_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
         .unwrap()
 }

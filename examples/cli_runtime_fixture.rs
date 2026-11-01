@@ -43,7 +43,7 @@ impl EmbeddingExecutor for FixtureTasks {
 impl FixtureTasks {
     fn run_owned_drain(&mut self) -> Result<(), Box<dyn Error>> {
         let control = self.control.as_mut().ok_or("missing control")?;
-        if read_command(control)? != "acquire" {
+        if get_command(control)? != "acquire" {
             return Err("missing acquire barrier".into());
         }
         let files = open_filesystem(&self.root)?;
@@ -55,7 +55,7 @@ impl FixtureTasks {
         if lease.is_none() {
             return Ok(());
         }
-        match read_command(control)?.as_str() {
+        match get_command(control)?.as_str() {
             "release" => {}
             "crash" => {
                 // SAFETY: raise targets this fixture's own process only, with a valid signal.
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
-fn read_command(control: &mut BufReader<UnixStream>) -> Result<String, Box<dyn Error>> {
+fn get_command(control: &mut BufReader<UnixStream>) -> Result<String, Box<dyn Error>> {
     let mut line = String::new();
     if control.read_line(&mut line)? == 0 {
         return Err("observer disconnected".into());
@@ -95,7 +95,7 @@ fn send_event(control: &mut UnixStream, value: &Value) -> Result<(), Box<dyn Err
     control.flush()?;
     Ok(())
 }
-fn read_descriptor(fd: i32) -> std::io::Result<libc::stat> {
+fn get_descriptor(fd: i32) -> std::io::Result<libc::stat> {
     let mut stat = std::mem::MaybeUninit::uninit();
     // SAFETY: fstat receives valid writable storage; an invalid fd returns an
     // error. The initialized result is read only after fstat succeeds.
@@ -107,10 +107,10 @@ fn read_descriptor(fd: i32) -> std::io::Result<libc::stat> {
 }
 fn inspect_descriptors(root: &Path) -> Result<(Vec<bool>, Vec<String>), Box<dyn Error>> {
     let null_file = fs::File::open("/dev/null")?;
-    let null = read_descriptor(null_file.as_raw_fd())?;
+    let null = get_descriptor(null_file.as_raw_fd())?;
     let standard = (0..3)
         .map(|fd| {
-            read_descriptor(fd)
+            get_descriptor(fd)
                 .is_ok_and(|stat| stat.st_rdev == null.st_rdev && stat.st_mode == null.st_mode)
         })
         .collect();
@@ -118,7 +118,7 @@ fn inspect_descriptors(root: &Path) -> Result<(Vec<bool>, Vec<String>), Box<dyn 
         .map(|entry| {
             let entry = entry?;
             let file = fs::File::open(entry.path())?;
-            Ok((entry.file_name(), read_descriptor(file.as_raw_fd())?))
+            Ok((entry.file_name(), get_descriptor(file.as_raw_fd())?))
         })
         .collect::<Result<Vec<_>, std::io::Error>>()?;
     let mut inherited = Vec::new();
@@ -132,7 +132,7 @@ fn inspect_descriptors(root: &Path) -> Result<(Vec<bool>, Vec<String>), Box<dyn 
         let Ok(fd) = entry.file_name().to_string_lossy().parse::<i32>() else {
             continue;
         };
-        let Ok(stat) = read_descriptor(fd) else {
+        let Ok(stat) = get_descriptor(fd) else {
             continue;
         };
         for (name, file_stat) in &service_files {

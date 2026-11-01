@@ -87,9 +87,9 @@ impl Workflow {
         repo.write(SOURCE_PATH, SOURCE);
         run_git(&repo, &["add", SOURCE_PATH]);
         run_git(&repo, &["commit", "-qm", "checked source"]);
-        let source_snapshot = read_git_text(&repo, &["rev-parse", "HEAD^{tree}"]);
+        let source_snapshot = get_git_text(&repo, &["rev-parse", "HEAD^{tree}"]);
         assert_eq!(
-            read_git_bytes(
+            get_git_bytes(
                 &repo,
                 &["show", &format!("{source_snapshot}:{SOURCE_PATH}")]
             ),
@@ -118,12 +118,12 @@ impl Workflow {
     /// Invoke the shipped executable and emit the raw envelope for host schema validation.
     fn invoke_command(&self, command: &str, input: &[u8], expected: i32) -> Value {
         let output = self.repo.invoke(&[command], input);
-        read_response(command, &output, expected)
+        get_response(command, &output, expected)
     }
 
     /// Read one captured tree path through Git without consulting live files.
-    fn read_snapshot(&self, snapshot: &str, path: &str) -> Vec<u8> {
-        read_git_bytes(&self.repo, &["show", &format!("{snapshot}:{path}")])
+    fn get_snapshot(&self, snapshot: &str, path: &str) -> Vec<u8> {
+        get_git_bytes(&self.repo, &["show", &format!("{snapshot}:{path}")])
     }
 
     /// Capture bytes the CLI must never edit: authored source, Markdown, index and HEAD.
@@ -242,15 +242,15 @@ fn assert_mixed_inspection(workflow: &Workflow) {
     let body = json!({"element_ids":[DECISION_ID, SOURCE_ID]});
     let inspected = workflow.invoke_command("inspect", body.to_string().as_bytes(), 0);
     let snapshot = inspected["result"]["snapshot"].as_str().unwrap();
-    let knowledge = workflow.read_snapshot(snapshot, DECISION_PATH);
-    let source = workflow.read_snapshot(snapshot, SOURCE_PATH);
+    let knowledge = workflow.get_snapshot(snapshot, DECISION_PATH);
+    let source = workflow.get_snapshot(snapshot, SOURCE_PATH);
     assert_eq!(
         knowledge,
         fs::read(workflow.repo.get_root().join(DECISION_PATH)).unwrap()
     );
     assert_eq!(source, SOURCE);
     assert_eq!(
-        workflow.read_snapshot(&workflow.source_snapshot, SOURCE_PATH),
+        workflow.get_snapshot(&workflow.source_snapshot, SOURCE_PATH),
         SOURCE
     );
     let elements = &inspected["result"]["elements"];
@@ -339,7 +339,7 @@ fn spawn_check_with_path(repo: &ReadingRepo, path: &OsStr) -> cli::OwnedChild {
     cli::OwnedChild::spawn(&mut process)
 }
 
-fn read_response(command: &str, output: &Output, expected: i32) -> Value {
+fn get_response(command: &str, output: &Output, expected: i32) -> Value {
     assert_eq!(output.status.code(), Some(expected), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(
@@ -398,14 +398,14 @@ fn run_git(repo: &ReadingRepo, args: &[&str]) {
     );
 }
 
-fn read_git_text(repo: &ReadingRepo, args: &[&str]) -> String {
-    String::from_utf8(read_git_bytes(repo, args))
+fn get_git_text(repo: &ReadingRepo, args: &[&str]) -> String {
+    String::from_utf8(get_git_bytes(repo, args))
         .unwrap()
         .trim()
         .to_owned()
 }
 
-fn read_git_bytes(repo: &ReadingRepo, args: &[&str]) -> Vec<u8> {
+fn get_git_bytes(repo: &ReadingRepo, args: &[&str]) -> Vec<u8> {
     let output = build_git_command(repo.get_root(), args).output().unwrap();
     assert!(
         output.status.success(),

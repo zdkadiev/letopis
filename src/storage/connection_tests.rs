@@ -107,11 +107,11 @@ fn both_database_connections_enforce_policy() {
         // Then
         assert_policy(&connection, "main");
         let info: String = connection
-            .query_row("SELECT vec1_info()", [], |r| r.get(0))
+            .query_row("select vec1_info()", [], |r| r.get(0))
             .unwrap();
         assert!(info.starts_with("version 0.8"));
         let error = connection
-            .query_row("SELECT load_extension('missing')", [], |r| {
+            .query_row("select load_extension('missing')", [], |r| {
                 r.get::<_, String>(0)
             })
             .unwrap_err();
@@ -134,10 +134,10 @@ fn attached_cache_is_read_only_with_encoded_path_delimiters() {
     // When
     attach_cache(&vectors, &cache).unwrap();
     let version: i64 = vectors
-        .query_row("PRAGMA cache.user_version", [], |r| r.get(0))
+        .query_row("pragma cache.user_version", [], |r| r.get(0))
         .unwrap();
     let error = vectors
-        .execute_batch("PRAGMA cache.user_version=8;")
+        .execute_batch("pragma cache.user_version=8;")
         .unwrap_err();
     // Then: the attached URI uses the intended database and rejects writes.
     assert_eq!(version, 7);
@@ -152,19 +152,19 @@ fn attached_cache_is_read_only_with_encoded_path_delimiters() {
 
 fn assert_policy(connection: &rusqlite::Connection, schema: &str) {
     let journal: String = connection
-        .query_row(&format!("PRAGMA {schema}.journal_mode"), [], |r| r.get(0))
+        .query_row(&format!("pragma {schema}.journal_mode"), [], |r| r.get(0))
         .unwrap();
     assert_eq!(journal, "wal");
     for (pragma, expected) in [("synchronous", 2), ("foreign_keys", 1), ("busy_timeout", 0)] {
         let actual: i64 = connection
-            .query_row(&format!("PRAGMA {schema}.{pragma}"), [], |r| r.get(0))
+            .query_row(&format!("pragma {schema}.{pragma}"), [], |r| r.get(0))
             .unwrap();
         assert_eq!(actual, expected, "{schema}.{pragma}");
     }
     #[cfg(target_os = "macos")]
     assert_eq!(
         connection
-            .query_row(&format!("PRAGMA {schema}.fullfsync"), [], |r| r
+            .query_row(&format!("pragma {schema}.fullfsync"), [], |r| r
                 .get::<_, i64>(0))
             .unwrap(),
         1

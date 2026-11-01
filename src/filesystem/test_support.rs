@@ -40,7 +40,7 @@ impl Fixture {
             .env(CHILD_TARGET, target)
             .env(CHILD_ACTION, action)
             .stdin(Stdio::null());
-        let child = OwnedProcess::spawn(&mut command, false);
+        let child = OwnedProcess::spawn(&mut command, ProcessGroup::Inherited);
         Mutator {
             child,
             root: self.0.clone(),
@@ -65,6 +65,116 @@ impl Mutator {
         self.child.wait_success(DEADLINE);
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+enum ProcessGroup {
+    Inherited,
+    Owned,
+}
+
+struct OwnedProcess {
+    child: Child,
+    output: fs::File,
+    group: Option<Pid>,
+}
+impl OwnedProcess {
+    fn spawn(command: &mut Command, mode: ProcessGroup) -> Self {
+        let output = tempfile::tempfile().unwrap();
+        if matches!(mode, ProcessGroup::Owned) {
+            command.process_group(0);
+        }
+        let child = command
+            .stdout(Stdio::from(output.try_clone().unwrap()))
+            .stderr(Stdio::from(output.try_clone().unwrap()))
+            .spawn()
+            .unwrap();
+        let group = matches!(mode, ProcessGroup::Owned)
+            .then(|| Pid::from_raw(i32::try_from(child.id()).unwrap()).unwrap());
+        Self {
+            child,
+            output,
+            group,
+        }
+    }
+    fn wait_success(&mut self, deadline: Duration) {
+        let start = Instant::now();
+        loop {
+            if let Some(status) = self.child.try_wait().unwrap() {
+                self.terminate_group();
+                assert!(status.success(), "child failed: {}", self.get_capture());
+                return;
+            }
+            if start.elapsed() >= deadline {
+                self.terminate();
+                panic!("child exceeded deadline: {}", self.get_capture());
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+    fn terminate_group(&mut self) {
+        if let Some(group) = self.group.take() {
+            let _ = kill_process_group(group, Signal::KILL);
+        }
+    }
+    fn terminate(&mut self) {
+        // Reexecuted parents own a group; mutators and external children inherit it.
+        self.terminate_group();
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+    fn get_capture(&mut self) -> String {
+        self.output.seek(SeekFrom::Start(0)).unwrap();
+        let mut bytes = Vec::new();
+        (&mut self.output)
+            .take(64 * 1024)
+            .read_to_end(&mut bytes)
+            .unwrap();
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
+}
+impl Drop for OwnedProcess {
+    fn drop(&mut self) {
+        self.terminate();
+    }
+}
+
+/// Reexecutes potentially blocking syscalls under a parent deadline and reap guard.
+pub(super) fn run_bounded(name: &str) -> bool {
+    const CASE: &str = "LETOPIS_FS_BOUNDED_CASE";
+    if std::env::var(CASE).ok().as_deref() == Some(name) {
+        return false;
+    }
+    let mut child = OwnedProcess::spawn(
+        Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", name, "--nocapture"])
+            .env(CASE, name)
+            .stdin(Stdio::null()),
+        ProcessGroup::Owned,
+    );
+    child.wait_success(DEADLINE);
+    true
+}
+
+fn hold_descendant_lease(root: &Path) {
+    let lease = fs::File::create(root.join("lease")).unwrap();
+    flock(&lease, FlockOperation::LockExclusive).unwrap();
+    let _descendant = OwnedProcess::spawn(
+        Command::new("sleep")
+            .arg("30")
+            .stdin(Stdio::from(lease.try_clone().unwrap())),
+        ProcessGroup::Inherited,
+    );
+    fs::write(root.join("nested-ready"), b"ready").unwrap();
+    std::thread::sleep(Duration::from_secs(30));
+}
+
+struct CleanupGroup(Pid);
+impl Drop for CleanupGroup {
+    fn drop(&mut self) {
+        let _ = kill_process_group(self.0, Signal::KILL);
+    }
+}
+
 fn wait_for(path: &Path) {
     let start = Instant::now();
     while !path.exists() {
@@ -96,7 +206,10 @@ fn run_mutation_child() {
             "regular" => fs::write(&target, b"new regular contents").unwrap(),
             "symlink" => symlink("/dev/null", &target).unwrap(),
             "fifo" => {
-                let mut child = OwnedProcess::spawn(Command::new("mkfifo").arg(&target), false);
+                let mut child = OwnedProcess::spawn(
+                    Command::new("mkfifo").arg(&target),
+                    ProcessGroup::Inherited,
+                );
                 child.wait_success(DEADLINE);
             }
             "directory" => fs::create_dir(&target).unwrap(),
@@ -106,108 +219,6 @@ fn run_mutation_child() {
     }
     // Then: signal completion; the parent asserts the observed result.
     fs::write(root.join("done"), b"done").unwrap();
-}
-
-struct OwnedProcess {
-    child: Child,
-    output: fs::File,
-    group: Option<Pid>,
-}
-impl OwnedProcess {
-    fn spawn(command: &mut Command, own_group: bool) -> Self {
-        let output = tempfile::tempfile().unwrap();
-        if own_group {
-            command.process_group(0);
-        }
-        let child = command
-            .stdout(Stdio::from(output.try_clone().unwrap()))
-            .stderr(Stdio::from(output.try_clone().unwrap()))
-            .spawn()
-            .unwrap();
-        let group = own_group.then(|| Pid::from_raw(i32::try_from(child.id()).unwrap()).unwrap());
-        Self {
-            child,
-            output,
-            group,
-        }
-    }
-    fn wait_success(&mut self, deadline: Duration) {
-        let start = Instant::now();
-        loop {
-            if let Some(status) = self.child.try_wait().unwrap() {
-                self.terminate_group();
-                assert!(status.success(), "child failed: {}", self.read_capture());
-                return;
-            }
-            if start.elapsed() >= deadline {
-                self.terminate();
-                panic!("child exceeded deadline: {}", self.read_capture());
-            }
-            std::thread::sleep(Duration::from_millis(5));
-        }
-    }
-    fn terminate_group(&mut self) {
-        if let Some(group) = self.group.take() {
-            let _ = kill_process_group(group, Signal::KILL);
-        }
-    }
-    fn terminate(&mut self) {
-        // Reexecuted parents own a group; mutators and external children inherit it.
-        self.terminate_group();
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
-    fn read_capture(&mut self) -> String {
-        self.output.seek(SeekFrom::Start(0)).unwrap();
-        let mut bytes = Vec::new();
-        (&mut self.output)
-            .take(64 * 1024)
-            .read_to_end(&mut bytes)
-            .unwrap();
-        String::from_utf8_lossy(&bytes).into_owned()
-    }
-}
-impl Drop for OwnedProcess {
-    fn drop(&mut self) {
-        self.terminate();
-    }
-}
-
-/// Reexecutes potentially blocking syscalls under a parent deadline and reap guard.
-pub(super) fn run_bounded(name: &str) -> bool {
-    const CASE: &str = "LETOPIS_FS_BOUNDED_CASE";
-    if std::env::var(CASE).ok().as_deref() == Some(name) {
-        return false;
-    }
-    let mut child = OwnedProcess::spawn(
-        Command::new(std::env::current_exe().unwrap())
-            .args(["--exact", name, "--nocapture"])
-            .env(CASE, name)
-            .stdin(Stdio::null()),
-        true,
-    );
-    child.wait_success(DEADLINE);
-    true
-}
-
-fn hold_descendant_lease(root: &Path) {
-    let lease = fs::File::create(root.join("lease")).unwrap();
-    flock(&lease, FlockOperation::LockExclusive).unwrap();
-    let _descendant = OwnedProcess::spawn(
-        Command::new("sleep")
-            .arg("30")
-            .stdin(Stdio::from(lease.try_clone().unwrap())),
-        false,
-    );
-    fs::write(root.join("nested-ready"), b"ready").unwrap();
-    std::thread::sleep(Duration::from_secs(30));
-}
-
-struct CleanupGroup(Pid);
-impl Drop for CleanupGroup {
-    fn drop(&mut self) {
-        let _ = kill_process_group(self.0, Signal::KILL);
-    }
 }
 
 #[test]
@@ -228,7 +239,7 @@ fn forced_watchdog_terminates_nested_descendants() {
                 "filesystem::test_support::forced_watchdog_terminates_nested_descendants",
             ])
             .env(CASE, &fixture.0),
-        true,
+        ProcessGroup::Owned,
     );
     let _cleanup = CleanupGroup(owned.group.unwrap());
     wait_for(&fixture.0.join("nested-ready"));
@@ -248,5 +259,32 @@ fn forced_watchdog_terminates_nested_descendants() {
             "descendant survived watchdog"
         );
         std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[test]
+fn selects_inherited_or_owned_process_group() {
+    // Given: a parent process group and a child for each explicit ownership mode.
+    let parent_group = rustix::process::getpgrp();
+    for mode in [ProcessGroup::Inherited, ProcessGroup::Owned] {
+        let mut command = Command::new("sleep");
+        command.arg("30");
+
+        // When: the guarded child is spawned with the requested process group.
+        let child = OwnedProcess::spawn(&mut command, mode);
+        let pid = Pid::from_raw(i32::try_from(child.child.id()).unwrap()).unwrap();
+        let actual = rustix::process::getpgid(Some(pid)).unwrap();
+
+        // Then: inherited children share the parent group; owned groups use the child PID.
+        match mode {
+            ProcessGroup::Inherited => {
+                assert_eq!(actual, parent_group);
+                assert!(child.group.is_none());
+            }
+            ProcessGroup::Owned => {
+                assert_eq!(actual, pid);
+                assert_eq!(child.group, Some(pid));
+            }
+        }
     }
 }

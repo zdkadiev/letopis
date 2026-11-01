@@ -34,7 +34,7 @@
 Проверено чтением исходников указанной базы; это ещё не приёмка TK-14:
 
 - `src/lib.rs` связывает `DocumentRefresher`, `SearchService`, `InspectionService`,
-  `EmbeddingService` и `BackgroundService` с реальными реализациями границ.
+  `EmbeddingService` и `BackgroundRunnerService` с реальными реализациями границ.
 - Search и knowledge inspect обнаруживают и публикуют изменения через refresher.
   Гибридный query embedding уже подключён в TK-12; провайдеры получены из TK-13.
 - `src/service/projection.rs` выводит source из external-ссылок, нормализует адреса,

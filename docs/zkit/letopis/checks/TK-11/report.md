@@ -22,7 +22,7 @@ support and markdown fixtures. `source-dirty.log` retains the working-tree statu
 
 - `src/main.rs`: thin args/stdin/stdout entry point returning `ExitCode`.
 - `src/lib.rs`: validates input before looking up cwd/current executable; constructs
-  real `LocalFileSystem`, `DetachedProcess`, `BackgroundService` through
+  real `LocalFileSystem`, `DetachedProcess`, `BackgroundRunnerService` through
   `open_background`, then borrows `Background` into the handlers. Composition
   errors pass through the same response writer exactly once.
 - CLI handlers use the existing application traits. No CLI adapter calls,

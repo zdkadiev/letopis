@@ -79,7 +79,7 @@ impl<'a> ConfinedDirectory<'a> {
     /// The path must retain the pinned directory and observed leaf identities.
     pub(super) fn open_observed_database(&self, name: &str) -> StorageResult<Option<Connection>> {
         self.verify()?;
-        let Some(before) = self.read_regular_stat(name)? else {
+        let Some(before) = self.get_regular_stat(name)? else {
             return Ok(None);
         };
         let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
@@ -97,12 +97,12 @@ impl<'a> ConfinedDirectory<'a> {
     /// Attach an existing confined vector file read-only; absence is not created.
     pub(super) fn attach_observed_vectors(&self, connection: &Connection) -> StorageResult<bool> {
         self.verify()?;
-        let Some(before) = self.read_regular_stat(VECTOR_DATABASE)? else {
+        let Some(before) = self.get_regular_stat(VECTOR_DATABASE)? else {
             return Ok(false);
         };
         let uri = encode_read_only_uri(&self.path.join(VECTOR_DATABASE))?;
         connection
-            .execute("ATTACH DATABASE ?1 AS vec", [uri])
+            .execute("attach database ?1 as vec", [uri])
             .map_err(map_sqlite)?;
         self.verify_observed_leaf(VECTOR_DATABASE, &before)?;
         Ok(true)
@@ -155,8 +155,8 @@ impl<'a> ConfinedDirectory<'a> {
         if !has_same_identity(&current, &pinned) {
             return Err(fail_unsafe_path());
         }
-        let cache = self.read_regular_stat(CACHE_DATABASE)?;
-        let vectors = self.read_regular_stat(VECTOR_DATABASE)?;
+        let cache = self.get_regular_stat(CACHE_DATABASE)?;
+        let vectors = self.get_regular_stat(VECTOR_DATABASE)?;
         if let (Some(cache), Some(vectors)) = (cache, vectors)
             && has_same_identity(&cache, &vectors)
         {
@@ -167,7 +167,7 @@ impl<'a> ConfinedDirectory<'a> {
 
     fn verify_observed_leaf(&self, name: &str, before: &Stat) -> StorageResult<()> {
         self.verify()?;
-        let Some(after) = self.read_regular_stat(name)? else {
+        let Some(after) = self.get_regular_stat(name)? else {
             return Err(fail_unsafe_path());
         };
         if !has_same_identity(before, &after) {
@@ -176,7 +176,7 @@ impl<'a> ConfinedDirectory<'a> {
         Ok(())
     }
 
-    fn read_regular_stat(&self, name: &str) -> StorageResult<Option<Stat>> {
+    fn get_regular_stat(&self, name: &str) -> StorageResult<Option<Stat>> {
         match statat(self.pinned, name, AtFlags::SYMLINK_NOFOLLOW) {
             Ok(stat) if FileType::from_raw_mode(stat.st_mode) == FileType::RegularFile => {
                 Ok(Some(stat))
@@ -357,7 +357,7 @@ fn attach_unconfigured_vectors(connection: &Connection, path: &Path) -> StorageR
         )
     })?;
     connection
-        .execute("ATTACH DATABASE ?1 AS vec", [filename])
+        .execute("attach database ?1 as vec", [filename])
         .map_err(map_sqlite)?;
     Ok(())
 }
@@ -365,7 +365,7 @@ fn attach_unconfigured_vectors(connection: &Connection, path: &Path) -> StorageR
 pub(super) fn attach_cache(connection: &Connection, path: &Path) -> StorageResult<()> {
     let uri = encode_read_only_uri(path)?;
     connection
-        .execute("ATTACH DATABASE ?1 AS cache", [uri])
+        .execute("attach database ?1 as cache", [uri])
         .map_err(map_sqlite)?;
     Ok(())
 }
@@ -403,14 +403,14 @@ fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()
         .map_err(map_sqlite)?;
     let journal = initialize_journal(connection, schema)?;
     connection
-        .execute_batch(&format!("PRAGMA {schema}.synchronous=FULL;"))
+        .execute_batch(&format!("pragma {schema}.synchronous=full;"))
         .map_err(map_sqlite)?;
     #[cfg(target_os = "macos")]
     connection
-        .execute_batch(&format!("PRAGMA {schema}.fullfsync=ON;"))
+        .execute_batch(&format!("pragma {schema}.fullfsync=on;"))
         .map_err(map_sqlite)?;
     let sync: i64 = connection
-        .query_row(&format!("PRAGMA {schema}.synchronous"), [], |row| {
+        .query_row(&format!("pragma {schema}.synchronous"), [], |row| {
             row.get(0)
         })
         .map_err(map_sqlite)?;
@@ -420,7 +420,7 @@ fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()
     #[cfg(target_os = "macos")]
     {
         let full: i64 = connection
-            .query_row(&format!("PRAGMA {schema}.fullfsync"), [], |row| row.get(0))
+            .query_row(&format!("pragma {schema}.fullfsync"), [], |row| row.get(0))
             .map_err(map_sqlite)?;
         if full != 1 {
             return Err(StorageError::new(
@@ -442,20 +442,20 @@ fn initialize_journal(connection: &Connection, schema: &str) -> StorageResult<St
     // The first read can encounter BUSY_RECOVERY during concurrent WAL startup.
     // Already-ready databases only read their mode; no writer lock is requested.
     wait_for_initialization(|| {
-        let journal = read_journal(connection, schema).map_err(map_sqlite)?;
+        let journal = get_journal(connection, schema).map_err(map_sqlite)?;
         if journal == WAL_MODE {
             return Ok(journal);
         }
         connection
-            .query_row(&format!("PRAGMA {schema}.journal_mode=WAL"), [], |row| {
+            .query_row(&format!("pragma {schema}.journal_mode=wal"), [], |row| {
                 row.get(0)
             })
             .map_err(map_sqlite)
     })
 }
 
-fn read_journal(connection: &Connection, schema: &str) -> rusqlite::Result<String> {
-    connection.query_row(&format!("PRAGMA {schema}.journal_mode"), [], |row| {
+fn get_journal(connection: &Connection, schema: &str) -> rusqlite::Result<String> {
+    connection.query_row(&format!("pragma {schema}.journal_mode"), [], |row| {
         row.get(0)
     })
 }
@@ -468,7 +468,7 @@ fn verify_capabilities(connection: &Connection) -> StorageResult<()> {
         ));
     }
     let version: String = connection
-        .query_row("SELECT vec1_info()", [], |row| row.get(0))
+        .query_row("select vec1_info()", [], |row| row.get(0))
         .map_err(map_sqlite)?;
     if !version.starts_with(VEC1_VERSION_PREFIX) {
         return Err(StorageError::new(
@@ -476,7 +476,7 @@ fn verify_capabilities(connection: &Connection) -> StorageResult<()> {
             "unsupported native vector version",
         ));
     }
-    connection.execute_batch("CREATE VIRTUAL TABLE temp.letopis_fts_probe USING fts5(text,content='',contentless_delete=1); DROP TABLE temp.letopis_fts_probe;").map_err(map_sqlite)
+    connection.execute_batch("create virtual table temp.letopis_fts_probe using fts5(text,content='',contentless_delete=1); drop table temp.letopis_fts_probe;").map_err(map_sqlite)
 }
 
 #[cfg(test)]

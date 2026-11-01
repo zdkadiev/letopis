@@ -46,7 +46,7 @@ mod tests {
         // When / Then: probe the native version and required capabilities.
         assert!(rusqlite::version_number() >= 3_051_003);
         let info: String = connection
-            .query_row("SELECT vec1_info()", [], |row| row.get(0))
+            .query_row("select vec1_info()", [], |row| row.get(0))
             .unwrap();
         assert!(info.starts_with("version 0.8"), "{info}");
         println!("SQLite={} vec1={info}", rusqlite::version());
@@ -57,7 +57,7 @@ mod tests {
         ] {
             let value: String = connection
                 .query_row(
-                    &format!("SELECT CAST({pragma} AS TEXT) FROM pragma_{pragma}"),
+                    &format!("select cast({pragma} as text) from pragma_{pragma}"),
                     [],
                     |row| row.get(0),
                 )
@@ -73,13 +73,13 @@ mod tests {
             assert_eq!(value, 1);
             println!("fullfsync={value}");
         }
-        connection.execute_batch("CREATE VIRTUAL TABLE f USING fts5(text, content='', contentless_delete=1); INSERT INTO f(rowid,text) VALUES(1,'secret'); DELETE FROM f WHERE rowid=1;").unwrap();
+        connection.execute_batch("create virtual table f using fts5(text, content='', contentless_delete=1); insert into f(rowid,text) values(1,'secret'); delete from f where rowid=1;").unwrap();
         let count: i64 = connection
-            .query_row("SELECT count(*) FROM f", [], |row| row.get(0))
+            .query_row("select count(*) from f", [], |row| row.get(0))
             .unwrap();
         assert_eq!(count, 0);
         let error = connection
-            .query_row("SELECT load_extension('missing')", [], |row| {
+            .query_row("select load_extension('missing')", [], |row| {
                 row.get::<_, String>(0)
             })
             .unwrap_err();

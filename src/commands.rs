@@ -96,13 +96,13 @@ fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let graph = GraphDiagnosticsService::new();
     let mut status = StatusService {
-        storage,
+        storage: Box::new(storage),
         files: &files,
         graph: &graph,
         provenance: &provenance,
         provider: &provider,
     };
-    let report = status.read_status()?;
+    let report = status.get_status()?;
     Ok(CommandResponse::new(ResponseResult::Status(report)))
 }
 
@@ -117,7 +117,7 @@ fn run_config(directory: &Path) -> CommandResult<CommandResponse> {
         files: &files,
         provider: &provider,
     };
-    let config = configuration.read_config()?;
+    let config = configuration.get_config()?;
     Ok(CommandResponse::new(ResponseResult::Config(config)))
 }
 

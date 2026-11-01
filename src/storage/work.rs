@@ -10,10 +10,10 @@ use crate::{
 use rusqlite::{Connection, OptionalExtension, params_from_iter};
 use sea_query::{Expr, ExprTrait, Order, Query, SelectStatement};
 
-pub(super) fn read_next_embedding_work(
+pub(super) fn get_next_embedding_work_by_id_and_max_attempts(
     connection: &Connection,
     max_attempts: u64,
-    after: Option<&KnowledgeId>,
+    id: Option<&KnowledgeId>,
 ) -> StorageResult<Option<EmbeddingWork>> {
     if max_attempts == 0 {
         return Err(StorageError::new(
@@ -30,8 +30,8 @@ pub(super) fn read_next_embedding_work(
         .and_where(Expr::exists(select_exhausted_hash(max_attempts)).not())
         .order_by(Nodes::Id, Order::Asc)
         .limit(1);
-    if let Some(after) = after {
-        query.and_where(Expr::col(Nodes::Id).gt(after.as_str()));
+    if let Some(id) = id {
+        query.and_where(Expr::col(Nodes::Id).gt(id.as_str()));
     }
     let (sql, values) = build_query(&query)?;
     let row = connection

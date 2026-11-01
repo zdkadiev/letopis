@@ -1,6 +1,6 @@
 mod support;
 
-use letopis::service::{Storage, StorageRead};
+use letopis::service::Storage;
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -327,11 +327,11 @@ fn logical_databases(root: &Path) -> Vec<String> {
         &root.join(".letopis/vectors.db"),
     )
     .unwrap();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let mut snapshot = vec![format!("revision:{}", read.get_revision())];
     snapshot.push(format!("identity:{:?}", read.get_config_identity()));
     let mut nodes = read
-        .list_nodes()
+        .get_nodes()
         .unwrap()
         .into_iter()
         .map(|node| format!("{:?}", node.metadata))

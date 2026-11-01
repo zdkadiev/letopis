@@ -13,15 +13,14 @@ mod cli;
 mod support;
 
 use cancellation::{
-    GitReadBarrier, WAIT, assert_cancelled_output, assert_index_lock_held,
-    observation::observe_index_flock, read_lock_identity, wait_until_index_lock_free,
+    GitReadBarrier, WAIT, assert_cancelled_output, assert_index_lock_held, get_lock_identity,
+    observation::observe_index_flock, wait_until_index_lock_free,
 };
 use letopis::{
     domain::{EdgeTarget, KnowledgeId, Sha256},
     open_filesystem,
     service::{
-        EmbeddingConfig, EmbeddingFailure, FileSystem, NodeMetadata, Storage, StorageRead,
-        VectorOutcome,
+        EmbeddingConfig, EmbeddingFailure, FileSystem, NodeMetadata, Storage, VectorOutcome,
     },
 };
 use serde_json::{Value, json};
@@ -47,7 +46,7 @@ fn cancelling_holder_releases_index_lock() {
     barrier_read.observe(child.get_id());
     let lock = repo.get_root().join(".letopis/index.lock");
     assert_index_lock_held(&lock);
-    let identity = read_lock_identity(&lock);
+    let identity = get_lock_identity(&lock);
     // When
     child.send_sigint();
     let output = child.collect_output(WAIT);
@@ -56,7 +55,7 @@ fn cancelling_holder_releases_index_lock() {
     barrier_read.assert_owned();
     barrier_read.release();
     wait_until_index_lock_free(&lock);
-    assert_eq!(read_lock_identity(&lock), identity);
+    assert_eq!(get_lock_identity(&lock), identity);
     assert_eq!(publish(&repo), 1);
     assert_search_result(&repo, "HolderToken", 1);
 }
@@ -69,7 +68,7 @@ fn cancelling_waiter_preserves_holder_and_lock_inode() {
     let files = open_filesystem(repo.get_root()).expect("filesystem");
     let holder = files.lock_index().expect("holder lock");
     let lock = repo.get_root().join(".letopis/index.lock");
-    let identity = read_lock_identity(&lock);
+    let identity = get_lock_identity(&lock);
     let mut child = spawn_product(&repo, &["reindex"], None);
     child.send_input(b"{}");
     let observation = observe_index_flock(child.get_id(), &lock);
@@ -80,7 +79,7 @@ fn cancelling_waiter_preserves_holder_and_lock_inode() {
     // Then: the foreign holder and its lock file survive the waiter's death.
     assert_cancelled_output(&output, "index waiter", &["WaiterToken"]);
     assert_index_lock_held(&lock);
-    assert_eq!(read_lock_identity(&lock), identity);
+    assert_eq!(get_lock_identity(&lock), identity);
     drop(holder);
     wait_until_index_lock_free(&lock);
     assert_eq!(publish(&repo), 1);
@@ -99,10 +98,10 @@ fn foreground_cancel_preserves_detached_drain() {
         body: r#"{"model":"fixture","embeddings":[[1,2,3]]}"#.into(),
     });
     let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
-    let hash = read_search_hash(&repo);
+    let hash = get_search_hash(&repo);
     let mut drain = spawn_drain(&repo);
     barrier.wait_until_entered();
-    let reserved = read_failure(&repo, &config, &hash).expect("durable reservation");
+    let reserved = get_failure_by_search_hash(&repo, &config, &hash).expect("durable reservation");
     assert_eq!(reserved.attempts, 1);
     let barrier_read = GitReadBarrier::new(repo.get_root());
     let mut search = spawn_product(&repo, &["search"], None);
@@ -121,7 +120,10 @@ fn foreground_cancel_preserves_detached_drain() {
     barrier_read.release();
     barrier.release();
     assert_drain_success(&drain.collect_output(WAIT));
-    assert_eq!(read_vector(&repo, &config, &hash), Some(vec![1., 2., 3.]));
+    assert_eq!(
+        get_vector_by_search_hash(&repo, &config, &hash),
+        Some(vec![1., 2., 3.])
+    );
     assert_search_result(&repo, "DrainSurvivesToken", 1);
 }
 
@@ -137,10 +139,10 @@ fn direct_drain_sigint_keeps_durable_attempt() {
         body: r#"{"model":"fixture","embeddings":[[1,2,3]]}"#.into(),
     });
     let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
-    let hash = read_search_hash(&repo);
+    let hash = get_search_hash(&repo);
     let mut drain = spawn_drain(&repo);
     barrier.wait_until_entered();
-    let reserved = read_failure(&repo, &config, &hash).expect("durable reservation");
+    let reserved = get_failure_by_search_hash(&repo, &config, &hash).expect("durable reservation");
     assert_eq!(reserved.attempts, 1);
     assert_eq!(reserved.error, None);
     // When: the drain receives SIGINT directly and has no handled response.
@@ -159,14 +161,14 @@ fn direct_drain_sigint_keeps_durable_attempt() {
     assert!(interrupted.stderr.is_empty(), "{interrupted:?}");
     barrier.release();
     assert_eq!(
-        read_failure(&repo, &config, &hash)
+        get_failure_by_search_hash(&repo, &config, &hash)
             .expect("durable attempt")
             .attempts,
         1
     );
-    assert_eq!(read_vector(&repo, &config, &hash), None);
+    assert_eq!(get_vector_by_search_hash(&repo, &config, &hash), None);
     assert_eq!(http.take_requests().len(), 1);
-    let status = read_success(&repo.invoke(&["status"], b"{}"));
+    let status = get_success(&repo.invoke(&["status"], b"{}"));
     assert_eq!(status["result"]["revision"], 1);
     assert_eq!(status["result"]["embedding_backlog"], 0);
     assert_eq!(status["result"]["embedding_failed"], 1);
@@ -199,7 +201,7 @@ fn late_drain_vector_does_not_represent_changed_text() {
         },
     ]);
     let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
-    let old_hash = read_search_hash(&repo);
+    let old_hash = get_search_hash(&repo);
     let mut drain = spawn_drain(&repo);
     barrier.wait_until_entered();
     let first = http.take_requests();
@@ -208,23 +210,29 @@ fn late_drain_vector_does_not_represent_changed_text() {
     // When: another real publication changes the text while the response is late.
     repo.write_knowledge("knowledge.md", "NewDrainTextToken");
     assert_eq!(publish(&repo), 2);
-    let new_hash = read_search_hash(&repo);
+    let new_hash = get_search_hash(&repo);
     assert_ne!(new_hash, old_hash);
-    assert_eq!(read_vector(&repo, &config, &new_hash), None);
+    assert_eq!(get_vector_by_search_hash(&repo, &config, &new_hash), None);
     barrier.release();
     assert_drain_success(&drain.collect_output(WAIT));
     // Then: the new hash is the later correct vector, never the late old response.
-    assert_eq!(read_vector(&repo, &config, &new_hash), Some(vec![0., 1.]));
-    assert_ne!(read_vector(&repo, &config, &new_hash), Some(vec![1., 0.]));
-    let old = read_vector(&repo, &config, &old_hash);
+    assert_eq!(
+        get_vector_by_search_hash(&repo, &config, &new_hash),
+        Some(vec![0., 1.])
+    );
+    assert_ne!(
+        get_vector_by_search_hash(&repo, &config, &new_hash),
+        Some(vec![1., 0.])
+    );
+    let old = get_vector_by_search_hash(&repo, &config, &old_hash);
     assert!(old.is_none() || old == Some(vec![1., 0.]), "{old:?}");
     let second = http.take_requests();
     assert_eq!(second.len(), 1);
     assert_eq!(second[0]["input"], json!(["NewDrainTextToken"]));
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().expect("storage read");
+    let mut read = storage.begin_read_tx().expect("storage read");
     let matches = match read
-        .find_nearest_vectors(&config.get_identity(), &[0., 1.], 2)
+        .get_nearest_vectors(&config.get_identity(), &[0., 1.], 2)
         .expect("vector query")
     {
         VectorOutcome::Current(matches) => matches,
@@ -264,14 +272,14 @@ fn spawn_drain(repo: &ReadingRepo) -> cli::OwnedChild {
     cli::OwnedChild::spawn(&mut process)
 }
 
-fn read_success(output: &Output) -> Value {
+fn get_success(output: &Output) -> Value {
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     serde_json::from_slice(&output.stdout).expect("one JSON response")
 }
 
 fn publish(repo: &ReadingRepo) -> u64 {
-    let response = read_success(&repo.invoke(&["reindex"], b"{}"));
+    let response = get_success(&repo.invoke(&["reindex"], b"{}"));
     assert_eq!(response["ok"], true);
     response["result"]["revision"]
         .as_u64()
@@ -280,7 +288,7 @@ fn publish(repo: &ReadingRepo) -> u64 {
 
 fn assert_search_result(repo: &ReadingRepo, query: &str, revision: u64) {
     let input = json!({"query": query, "limit": 1}).to_string();
-    let response = read_success(&repo.invoke(&["search"], input.as_bytes()));
+    let response = get_success(&repo.invoke(&["search"], input.as_bytes()));
     assert_eq!(response["ok"], true);
     assert_eq!(
         response["result"],
@@ -294,11 +302,11 @@ fn assert_search_result(repo: &ReadingRepo, query: &str, revision: u64) {
     );
 }
 
-fn read_search_hash(repo: &ReadingRepo) -> Sha256 {
+fn get_search_hash(repo: &ReadingRepo) -> Sha256 {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().expect("storage read");
+    let mut read = storage.begin_read_tx().expect("storage read");
     let node = read
-        .read_node(&EdgeTarget::Knowledge(
+        .get_node_by_id(&EdgeTarget::Knowledge(
             KnowledgeId::parse("knowledge.md").expect("knowledge id"),
         ))
         .expect("read node")
@@ -309,11 +317,15 @@ fn read_search_hash(repo: &ReadingRepo) -> Sha256 {
     node.search_hash
 }
 
-fn read_vector(repo: &ReadingRepo, config: &EmbeddingConfig, hash: &Sha256) -> Option<Vec<f32>> {
+fn get_vector_by_search_hash(
+    repo: &ReadingRepo,
+    config: &EmbeddingConfig,
+    search_hash: &Sha256,
+) -> Option<Vec<f32>> {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().expect("storage read");
+    let mut read = storage.begin_read_tx().expect("storage read");
     match read
-        .read_vector(&config.get_identity(), hash)
+        .get_vector_by_search_hash(&config.get_identity(), search_hash)
         .expect("read vector")
     {
         VectorOutcome::Current(vector) => vector,
@@ -321,15 +333,15 @@ fn read_vector(repo: &ReadingRepo, config: &EmbeddingConfig, hash: &Sha256) -> O
     }
 }
 
-fn read_failure(
+fn get_failure_by_search_hash(
     repo: &ReadingRepo,
     config: &EmbeddingConfig,
-    hash: &Sha256,
+    search_hash: &Sha256,
 ) -> Option<EmbeddingFailure> {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().expect("storage read");
+    let mut read = storage.begin_read_tx().expect("storage read");
     match read
-        .read_failure(&config.get_identity(), hash)
+        .get_failure_by_search_hash(&config.get_identity(), search_hash)
         .expect("read failure")
     {
         VectorOutcome::Current(failure) => failure,

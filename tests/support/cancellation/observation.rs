@@ -45,7 +45,7 @@ pub fn observe_stdin_wait(pid: u32, stdin: &Path) -> String {
             if number != libc::SYS_read || u64::from_str_radix(descriptor, 16).ok()? != 0 {
                 return None;
             }
-            let observed = fs::read_link(format!("/proc/{pid}/fd/0")).ok()?;
+            let observed = fs::get_link(format!("/proc/{pid}/fd/0")).ok()?;
             if observed.as_path() != stdin {
                 return None;
             }
@@ -173,10 +173,10 @@ pub fn observe_git_read(pid: u32, path: &Path) -> String {
 fn is_git_read_observed(trace: &str) -> bool {
     let main = get_main_thread_trace(trace).unwrap_or("");
     let corpus = main.lines().any(|line| {
-        line.contains("letopis::git::corpus::list_candidates")
+        line.contains("letopis::git::corpus::get_candidates")
             || (line.contains("letopis..git..repository..GitRepository")
                 && line.contains("..CorpusLister")
-                && line.contains("::list_candidates"))
+                && line.contains("::get_candidates"))
     });
     // Optimized builds may inline the free function into its trait caller.
     corpus
@@ -286,10 +286,11 @@ mod tests {
 
     #[test]
     fn git_read_observer_recognizes_debug_and_inlined_release_frames() {
-        // Given: independent abbreviated frames from the actual debug/release native stacks.
+        // Given: independent corpus frames before and after interface consolidation.
         for caller in [
-            "letopis::git::corpus::list_candidates::h123",
-            "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..document_traits..CorpusLister$GT$::list_candidates::h123",
+            "letopis::git::corpus::get_candidates::h123",
+            "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..CorpusLister$GT$::get_candidates::h123",
+            "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..document_traits..CorpusLister$GT$::get_candidates::h123",
         ] {
             let trace = format!(
                 "900 Thread_1 com.apple.main-thread\n+ 900 {caller} (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full_ignore_missing (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n900 Thread_2 letopis-sigint\n"
@@ -304,10 +305,10 @@ mod tests {
     #[test]
     fn git_read_observer_rejects_incomplete_or_wrong_thread_evidence() {
         // Given: counted native reads alone, another thread's Git stack, or no native read.
-        let other_thread = "900 Thread_1 com.apple.main-thread\n+ 900 read (in libsystem_kernel.dylib)\n900 Thread_2 worker\n+ 900 letopis::git::corpus::list_candidates (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
-        let no_native = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::corpus::list_candidates (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n";
+        let other_thread = "900 Thread_1 com.apple.main-thread\n+ 900 read (in libsystem_kernel.dylib)\n900 Thread_2 worker\n+ 900 letopis::git::corpus::get_candidates (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let no_native = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::corpus::get_candidates (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n";
         let no_corpus = "900 Thread_1 com.apple.main-thread\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
-        let no_git_reader = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::corpus::list_candidates (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let no_git_reader = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::corpus::get_candidates (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
         // When / Then: none authorizes signalling at the required product boundary.
         for trace in [other_thread, no_native, no_corpus, no_git_reader] {
             assert!(!is_git_read_observed(trace));

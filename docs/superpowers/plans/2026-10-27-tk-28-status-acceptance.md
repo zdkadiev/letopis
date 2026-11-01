@@ -4,7 +4,7 @@
 
 **Goal:** Demonstrate the two open TK-28 acceptance criteria — storage-failure reporting and query/drain/FTS status lifecycle — with reproducible tests, changing product code only if a test reproduces a real defect.
 
-**Architecture:** Acceptance-only work on branch `tk-28`. Reuse the existing `StatusService` (observation-only, single read view), `EmbeddingService` (`vec.query_error` is one row), and `BackgroundService` (safe nonfatal drain warning). New coverage is added at the boundaries that own each behavior: a real product CLI test for query failure → status → recovery, a real product CLI test for a transient drain-start warning, and the existing production-process driver for an uncommitted file diagnostic.
+**Architecture:** Acceptance-only work on branch `tk-28`. Reuse the existing `StatusService` (observation-only, single read view), `EmbeddingService` (`vec.query_error` is one row), and `BackgroundRunnerService` (safe nonfatal drain warning). New coverage is added at the boundaries that own each behavior: a real product CLI test for query failure → status → recovery, a real product CLI test for a transient drain-start warning, and the existing production-process driver for an uncommitted file diagnostic.
 
 **Tech Stack:** Rust 1.95.0, rusqlite/SQLite, Rust CLI subprocess tests, local `HttpFixture`, existing private `DocumentRefresher` process checkpoints.
 
@@ -77,7 +77,7 @@ git commit -m "test: accept query failure status lifecycle"
 
 **Files:**
 - Modify: `tests/status_command.rs`
-- Owner if a defect is reproduced: `src/service/background.rs` (warning construction) or `src/cli/handlers.rs` (response warnings).
+- Owner if a defect is reproduced: `../../../src/service/background_runner.rs` (warning construction) or `src/cli/handlers.rs` (response warnings).
 
 **Interfaces:**
 - Consumes: existing `read_status(repo: &ReadingRepo) -> Value` helper in `tests/status_command.rs`, `ReadingRepo`, `TcpListener`.
@@ -103,7 +103,7 @@ Expected: PASS (2 passed). If it FAILS, stop and fix only in the owner named abo
 
 - [ ] **Step 3: Mutation-check the test**
 
-In `src/service/background.rs`, change the lock-probe branch `Err(_) => return Ok(Some(build_warning()))` to `Err(_) => return Ok(None)`. Rerun Step 2. Expected: FAIL because `warnings` is absent. Restore exact bytes.
+In `../../../src/service/background_runner.rs`, change the lock-probe branch `Err(_) => return Ok(Some(build_warning()))` to `Err(_) => return Ok(None)`. Rerun Step 2. Expected: FAIL because `warnings` is absent. Restore exact bytes.
 
 - [ ] **Step 4: Commit**
 

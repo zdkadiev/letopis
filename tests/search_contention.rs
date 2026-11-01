@@ -2,8 +2,7 @@ mod support;
 
 use letopis::{
     service::{
-        CommandResult, Refresher, SearchLink, SearchRequest, Searcher, Storage, StorageRead,
-        VectorOutcome, VectorWrite,
+        CommandResult, Refresher, SearchLink, SearchRequest, Searcher, Storage, VectorOutcome,
     },
     wire_document_refresher, wire_searcher,
 };
@@ -59,9 +58,9 @@ fn assert_search_survives_writer(phase: WritePhase, response: &str) {
     assert_eq!(server.take_requests().len(), 1);
     let error = repo
         .open_storage()
-        .begin_read()
+        .begin_read_tx()
         .unwrap()
-        .read_query_error()
+        .get_query_error()
         .unwrap();
     if response == SUCCESS {
         assert_eq!(error, None);
@@ -85,8 +84,9 @@ fn prepare_fixture(response: &str) -> (ReadingRepo, HttpFixture, ResponseBarrier
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let mut storage = repo.open_storage();
-    let VectorOutcome::Current(mut unit) =
-        storage.begin_vector_write(&config.get_identity()).unwrap()
+    let VectorOutcome::Current(mut unit) = storage
+        .begin_vector_write_tx(&config.get_identity())
+        .unwrap()
     else {
         panic!("expected matching identity");
     };
@@ -119,16 +119,16 @@ fn run_during_write(
     });
     prepared.recv_timeout(RESULT_WAIT).unwrap();
     if matches!(phase, WritePhase::BeforeConfiguration) {
-        writer.execute_batch("BEGIN IMMEDIATE").unwrap();
+        writer.execute_batch("begin immediate").unwrap();
     }
     start.send(()).unwrap();
     if matches!(phase, WritePhase::AfterInference) {
         barrier.wait_until_entered();
-        writer.execute_batch("BEGIN IMMEDIATE").unwrap();
+        writer.execute_batch("begin immediate").unwrap();
         barrier.release();
     }
     let early = receiver.recv_timeout(BLOCKED_WINDOW);
-    writer.execute_batch("ROLLBACK").unwrap();
+    writer.execute_batch("rollback").unwrap();
     barrier.release();
     let was_blocked = matches!(early, Err(mpsc::RecvTimeoutError::Timeout));
     let result = early.unwrap_or_else(|_| receiver.recv_timeout(RESULT_WAIT).unwrap());

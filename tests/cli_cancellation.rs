@@ -12,7 +12,7 @@ mod cancellation;
 use cancellation::observation::{observe_index_flock, observe_stdin_wait};
 use cancellation::{
     CANCELLED_ENVELOPE, GitReadBarrier, WAIT, assert_cancelled_output, assert_index_lock_held,
-    create_stdin_fifo, read_lock_identity, wait_until_index_lock_free,
+    create_stdin_fifo, get_lock_identity, wait_until_index_lock_free,
 };
 use letopis::{open_filesystem, service::FileSystem};
 use serde_json::{Value, json};
@@ -90,7 +90,7 @@ fn cancels_waiting_index_lock_without_killing_holder() {
     let filesystem = open_filesystem(repo.get_root()).expect("filesystem");
     let holder = filesystem.lock_index().expect("holder lock");
     let lock = repo.get_root().join(".letopis/index.lock");
-    let identity = read_lock_identity(&lock);
+    let identity = get_lock_identity(&lock);
     let mut child = spawn_reading(&repo, "reindex");
     child.send_input(b"{}");
     // When: signal only after the product main thread is blocked in flock.
@@ -101,7 +101,7 @@ fn cancels_waiting_index_lock_without_killing_holder() {
     // Then: the holder is intact and its lock file is unchanged.
     assert_cancelled_output(&output, "lock waiter", &[CANCELLATION_CANARY]);
     assert_index_lock_held(&lock);
-    assert_eq!(read_lock_identity(&lock), identity);
+    assert_eq!(get_lock_identity(&lock), identity);
     drop(holder);
     let completed = repo.invoke(&["reindex"], b"{}");
     assert_eq!(completed.status.code(), Some(0), "{completed:?}");

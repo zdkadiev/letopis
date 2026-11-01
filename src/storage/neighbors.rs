@@ -21,7 +21,7 @@ enum Endpoint {
     Target,
 }
 
-pub(super) fn resolve_node(
+pub(super) fn get_node_ref_by_id(
     db: &Connection,
     id: &ElementAddress,
 ) -> StorageResult<Option<GraphNodeRef>> {
@@ -39,7 +39,7 @@ pub(super) fn resolve_node(
     .transpose()
 }
 
-pub(super) fn read_neighbor_page(
+pub(super) fn get_neighbor_page(
     db: &Connection,
     request: &NeighborPageRequest<'_>,
 ) -> StorageResult<Vec<GraphNeighbor>> {
@@ -61,7 +61,7 @@ pub(super) fn read_neighbor_page(
     Ok(neighbors)
 }
 
-pub(super) fn list_source_snapshots(db: &Connection) -> StorageResult<BTreeSet<TreeOid>> {
+pub(super) fn get_source_snapshots(db: &Connection) -> StorageResult<BTreeSet<TreeOid>> {
     let (sql, values) = build_query(&build_source_snapshots_query())?;
     let mut statement = db.prepare(&sql).map_err(map_sqlite)?;
     let mut rows = statement
@@ -186,7 +186,7 @@ fn decode_identity(id: &str, kind: &str) -> StorageResult<EdgeTarget> {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_neighbor_query, build_source_snapshots_query, list_source_snapshots};
+    use super::{build_neighbor_query, build_source_snapshots_query, get_source_snapshots};
     use crate::{
         domain::{EdgeType, TreeOid},
         service::{
@@ -229,13 +229,13 @@ mod tests {
         // Given
         let mut db = Connection::open_in_memory().unwrap();
         bootstrap_cache(&mut db).unwrap();
-        db.execute_batch("INSERT INTO nodes(id,kind,uri,hash,created_at,source_snapshot,line_start,line_end,search_hash) VALUES
+        db.execute_batch("insert into nodes(id,kind,uri,hash,created_at,source_snapshot,line_start,line_end,search_hash) values
             ('a.md','vertex','a.md','unused',1,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,1,'unused'),
-            ('b.md','vertex','b.md','unused',1,NULL,1,1,'unused'),
+            ('b.md','vertex','b.md','unused',1,null,1,1,'unused'),
             ('c.md','vertex','c.md','unused',1,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',1,1,'unused'),
             ('d.md','vertex','d.md','unused',1,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,1,'unused');").unwrap();
         // When
-        let roots = list_source_snapshots(&db).unwrap();
+        let roots = get_source_snapshots(&db).unwrap();
         // Then
         assert_eq!(
             roots,
@@ -257,13 +257,13 @@ mod tests {
         );
         // Given: introduce a malformed snapshot identity.
         db.execute(
-            "UPDATE nodes SET source_snapshot='malformed' WHERE id='b.md'",
+            "update nodes set source_snapshot='malformed' where id='b.md'",
             [],
         )
         .unwrap();
         // When / Then
         assert_eq!(
-            list_source_snapshots(&db).unwrap_err().get_kind(),
+            get_source_snapshots(&db).unwrap_err().get_kind(),
             StorageErrorKind::InternalError
         );
     }
@@ -314,7 +314,7 @@ mod tests {
         let (sql, values) = build_query(query).unwrap();
         assert!(!sql.contains("OFFSET"));
         assert!(!sql.contains("\"hash\""));
-        db.prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+        db.prepare(&format!("explain query plan {sql}"))
             .unwrap()
             .query_map(params_from_iter(values), |row| row.get(3))
             .unwrap()

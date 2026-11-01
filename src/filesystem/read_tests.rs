@@ -1,4 +1,4 @@
-use super::read::{ReadStage, read_regular};
+use super::read::{ReadStage, get_regular};
 use super::test_support::{Fixture, run_bounded};
 use crate::service::EmbeddingErrorKind;
 use std::{
@@ -18,7 +18,7 @@ fn rejects_observed_replacement_between_stat_and_open() {
         let root = File::open(&fixture.0).unwrap();
         let mut mutator = fixture.spawn_mutator("note.md", action);
         // When
-        let result = read_regular(&root, "note.md", |stage| {
+        let result = get_regular(&root, "note.md", |stage| {
             if stage == ReadStage::BeforeOpen {
                 mutator.resume();
             }
@@ -48,7 +48,7 @@ fn rejects_observed_changes_after_reading_bytes() {
         let root = File::open(&fixture.0).unwrap();
         let mut mutator = fixture.spawn_mutator("note.md", action);
         // When
-        let result = read_regular(&root, "note.md", |stage| {
+        let result = get_regular(&root, "note.md", |stage| {
             if stage == ReadStage::AfterRead {
                 mutator.resume();
             }
@@ -72,7 +72,7 @@ fn rejects_observed_ancestor_replacement() {
         let root = File::open(&fixture.0).unwrap();
         let mut mutator = fixture.spawn_mutator("notes", action);
         // When
-        let result = read_regular(&root, "notes/a.md", |stage| {
+        let result = get_regular(&root, "notes/a.md", |stage| {
             if stage == ReadStage::AfterRead {
                 mutator.resume();
             }
@@ -92,6 +92,6 @@ fn rejects_device_files_without_reading_them() {
     let root = File::open("/dev").unwrap();
     for name in ["null", "zero"] {
         // When / Then
-        assert!(read_regular(&root, name, |_| panic!("device reached open/read")).is_err());
+        assert!(get_regular(&root, name, |_| panic!("device reached open/read")).is_err());
     }
 }

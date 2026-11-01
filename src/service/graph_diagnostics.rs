@@ -34,14 +34,14 @@ impl GraphDiagnosticsService {
 }
 
 impl GraphDiagnostics for GraphDiagnosticsService {
-    fn find_problems<R: StorageRead>(
+    fn find_problems(
         &self,
-        view: &mut R,
+        view: &mut dyn StorageRead,
         paths: &[RepoPath],
     ) -> CommandResult<Vec<CommandProblem>> {
-        let nodes = view.list_nodes().map_err(map_read_error)?;
-        let edges = view.list_edges(None).map_err(map_read_error)?;
-        let files = view.list_files().map_err(map_read_error)?;
+        let nodes = view.get_nodes().map_err(map_read_error)?;
+        let edges = view.get_edges_by_source_id(None).map_err(map_read_error)?;
+        let files = view.get_files().map_err(map_read_error)?;
         let knowledge: BTreeSet<KnowledgeId> = nodes
             .into_iter()
             .filter_map(|node| match node.metadata {
@@ -160,8 +160,8 @@ mod tests {
         },
         open_storage,
         service::{
-            CacheWrite, CommandErrorKind, DiagnosticKind, FileRow, GraphDiagnostics,
-            KnowledgeMetadata, NodeMetadata, Storage, StorageError, StorageErrorKind,
+            CommandErrorKind, DiagnosticKind, FileRow, GraphDiagnostics, KnowledgeMetadata,
+            NodeMetadata, Storage, StorageError, StorageErrorKind,
         },
     };
     use serde_json::json;
@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     fn finds_cross_file_cycle_before_filtering_and_deduplicates_selectors() {
-        // Given
+        // Given: a cross-file cycle and repeated selectors.
         let root = TempDir::new().unwrap();
         let mut storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -301,15 +301,15 @@ mod tests {
             &["a.md", "b.md"],
             &[("a.md", "b.md"), ("b.md", "a.md")],
         );
-        let mut view = storage.begin_read().unwrap();
+        let mut view = storage.begin_read_tx().unwrap();
         let selected = RepoPath::parse("a.md").unwrap();
 
-        // When
+        // When: graph diagnostics run with the selected owners.
         let problems = GraphDiagnosticsService::new()
-            .find_problems(&mut view, &[selected.clone(), selected])
+            .find_problems(view.as_mut(), &[selected.clone(), selected])
             .unwrap();
 
-        // Then
+        // Then: the cycle is found once before owner filtering.
         assert_eq!(problems.len(), 1);
         assert_eq!(problems[0].code, CommandErrorKind::ValidationFailed);
         assert_eq!(
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn keeps_two_components_in_one_file_with_minimum_local_representatives() {
-        // Given
+        // Given: two graph components owned by one file.
         let root = TempDir::new().unwrap();
         let mut storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -341,11 +341,11 @@ mod tests {
                 ("b.md", "a.md#c"),
             ],
         );
-        let mut view = storage.begin_read().unwrap();
+        let mut view = storage.begin_read_tx().unwrap();
 
-        // When
+        // When: graph diagnostics inspect both components.
         let problems = GraphDiagnosticsService::new()
-            .find_problems(&mut view, &[])
+            .find_problems(view.as_mut(), &[])
             .unwrap();
 
         let details: Vec<_> = problems.iter().map(|problem| &problem.details).collect();
@@ -356,13 +356,13 @@ mod tests {
                 {"path":"b.md", "reason":"includes_cycle", "element_id":"b.md"}
             ]))
             .unwrap();
-        // Then
+        // Then: each component uses its minimum local representative.
         assert_eq!(details, expected.iter().collect::<Vec<_>>());
     }
 
     #[test]
     fn orders_file_graph_and_distinct_anchor_findings_by_safe_context() {
-        // Given
+        // Given: file, graph and distinct anchor problems.
         let root = TempDir::new().unwrap();
         let mut storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -371,7 +371,7 @@ mod tests {
             &["a.md#a", "a.md#b", "b.md"],
             &[("a.md#a", "z.md"), ("a.md#a", "x.md"), ("a.md#b", "x.md")],
         );
-        let mut write = storage.begin_cache_write().unwrap();
+        let mut write = storage.begin_cache_write_tx().unwrap();
         write
             .upsert_file(&build_invalid_file("a.md", Some("SECRET_RAW_BODY")))
             .unwrap();
@@ -379,11 +379,11 @@ mod tests {
             .upsert_file(&build_invalid_file("z.md", Some("invalid graph target")))
             .unwrap();
         write.commit().unwrap();
-        let mut view = storage.begin_read().unwrap();
+        let mut view = storage.begin_read_tx().unwrap();
 
-        // When
+        // When: graph diagnostics collect the findings.
         let problems = GraphDiagnosticsService::new()
-            .find_problems(&mut view, &[])
+            .find_problems(view.as_mut(), &[])
             .unwrap();
 
         let details: Vec<_> = problems.iter().map(|problem| &problem.details).collect();
@@ -396,7 +396,7 @@ mod tests {
                 {"path":"z.md", "reason":"invalid_target"}
             ]))
             .unwrap();
-        // Then
+        // Then: findings use safe contexts in deterministic order.
         assert_eq!(details, expected.iter().collect::<Vec<_>>());
         assert!(
             problems
@@ -408,7 +408,7 @@ mod tests {
     }
 
     fn seed_graph<S: Storage>(storage: &mut S, nodes: &[&str], edges: &[(&str, &str)]) {
-        let mut write = storage.begin_cache_write().unwrap();
+        let mut write = storage.begin_cache_write_tx().unwrap();
         for raw in nodes {
             let id = KnowledgeId::parse(raw).unwrap();
             write

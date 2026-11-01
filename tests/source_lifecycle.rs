@@ -5,7 +5,7 @@ use letopis::{
     open_storage,
     service::{
         DocumentErrorKind, EmbeddingFailure, NodeMetadata, Refresher, SourceMetadata, Storage,
-        StorageRead, VectorOutcome, VectorWrite,
+        VectorOutcome,
     },
     wire_document_refresher,
 };
@@ -37,7 +37,7 @@ fn derive_minimum_from_effective_references() {
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
     // When
     refresher.refresh().unwrap();
-    let first = repo.read_state();
+    let first = repo.get_state();
     // Then
     assert_eq!(get_source(&first, RANGE).uri.as_str(), "source.txt#L2-L3");
     assert_eq!(get_source(&first, RANGE).created_at, 3);
@@ -48,12 +48,12 @@ fn derive_minimum_from_effective_references() {
     // When
     refresher.refresh().unwrap();
     // Then
-    assert_eq!(get_source(&repo.read_state(), RANGE).created_at, 8);
+    assert_eq!(get_source(&repo.get_state(), RANGE).created_at, 8);
     // Given
     repo.write("late.md", "<!-- letopis: {broken} -->\ninvalid\n");
     // When
     refresher.refresh().unwrap();
-    let invalid = repo.read_state();
+    let invalid = repo.get_state();
     // Then
     assert!(!invalid.get_file("late.md").valid);
     assert_eq!(get_source(&invalid, RANGE).created_at, 8);
@@ -70,13 +70,13 @@ fn derive_minimum_from_effective_references() {
     // When
     refresher.refresh().unwrap();
     // Then
-    assert!(repo.read_state().nodes.is_empty());
+    assert!(repo.get_state().nodes.is_empty());
     // Given
     repo.write("new.md", build_external(11, RANGE, "NewToken"));
     // When
     refresher.refresh().unwrap();
     // Then
-    assert_eq!(get_source(&repo.read_state(), RANGE).created_at, 11);
+    assert_eq!(get_source(&repo.get_state(), RANGE).created_at, 11);
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn recompute_minimum_after_earliest_referrer_edit() {
     repo.write("early.md", build_whole(3, "EditedToken"));
     refresher.refresh().unwrap();
 
-    let state = repo.read_state();
+    let state = repo.get_state();
     // When / Then
     assert_eq!(get_source(&state, RANGE).created_at, 8);
     assert_eq!(state.edges.len(), 1);
@@ -107,7 +107,7 @@ fn preserve_whole_and_range_nodes_when_source_file_disappears() {
     repo.write("range.md", build_external(8, RANGE, "RangeToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
     refresher.refresh().unwrap();
-    let before = repo.read_state();
+    let before = repo.get_state();
     // When / Then
     assert_eq!(get_source(&before, "source.txt").created_at, 4);
     assert_eq!(get_source(&before, RANGE).created_at, 8);
@@ -123,7 +123,7 @@ fn preserve_whole_and_range_nodes_when_source_file_disappears() {
     repo.write("range.md", build_external(8, RANGE, "StillRangeToken"));
     refresher.refresh().unwrap();
 
-    let missing = repo.read_state();
+    let missing = repo.get_state();
     // When / Then
     assert_eq!(missing.nodes.len(), 4);
     assert_eq!(get_source(&missing, "source.txt").hash, None);
@@ -140,7 +140,7 @@ fn reject_source_knowledge_collision_without_publishing_or_changing_fts() {
     repo.write("knowledge.md", build_whole(1, "OriginalToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
     refresher.refresh().unwrap();
-    let before = repo.read_state();
+    let before = repo.get_state();
     repo.write(
         "referrer.md",
         build_external(2, "knowledge.md", "RejectedToken"),
@@ -151,7 +151,7 @@ fn reject_source_knowledge_collision_without_publishing_or_changing_fts() {
 
     // Then
     assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
-    assert_eq!(repo.read_state(), before);
+    assert_eq!(repo.get_state(), before);
     assert_eq!(repo.search("OriginalToken"), ["knowledge.md"]);
     assert!(repo.search("RejectedToken").is_empty());
 }
@@ -172,7 +172,7 @@ fn rebuild_source_identity_from_canonical_files() {
         build_external(7, "https://Host/a", "RemoteToken"),
     );
     refresh_once(&repo);
-    let before = collect_sources(&repo.read_state());
+    let before = collect_sources(&repo.get_state());
     let expected = vec![
         ("https://Host/a".to_owned(), 7),
         ("source.txt".to_owned(), 5),
@@ -186,7 +186,7 @@ fn rebuild_source_identity_from_canonical_files() {
     remove_fixture_cache(&repo);
     refresh_once(&repo);
 
-    assert_eq!(collect_sources(&repo.read_state()), expected);
+    assert_eq!(collect_sources(&repo.get_state()), expected);
     assert_eq!(
         fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap(),
         vectors
@@ -196,7 +196,7 @@ fn rebuild_source_identity_from_canonical_files() {
 
 #[test]
 fn repair_legacy_url_only_after_explicit_cache_rebuild() {
-    // Given
+    // Given: a legacy URL projection from the previous parser.
     let repo = DocumentRepo::new();
     repo.write(
         "remote.md",
@@ -205,7 +205,7 @@ fn repair_legacy_url_only_after_explicit_cache_rebuild() {
     repo.run_git(&["add", "remote.md"]);
     refresh_once(&repo);
     write_preserved_files(&repo);
-    let canonical = read_preserved_files(&repo);
+    let canonical = get_preserved_files(&repo);
     let identity = Sha256::digest(b"existing vector configuration");
     let hash = Sha256::digest(b"durable vector");
     let failure_hash = Sha256::digest(b"attempt sentinel");
@@ -214,29 +214,33 @@ fn repair_legacy_url_only_after_explicit_cache_rebuild() {
     let vectors = fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap();
 
     // This explicit fixture-only upgrade is the compatibility boundary.
-    let lock = read_index_lock(&repo);
+    let lock = get_index_lock(&repo);
     remove_fixture_cache(&repo);
-    // When / Then
-    assert_eq!(read_index_lock(&repo), lock);
+    // When / Then: the cache is explicitly rebuilt; the repaired URL appears only after rebuilding.
+    assert_eq!(get_index_lock(&repo), lock);
     refresh_once(&repo);
-    assert_eq!(read_index_lock(&repo).0, lock.0);
+    assert_eq!(get_index_lock(&repo).0, lock.0);
 
-    let state = repo.read_state();
+    let state = repo.get_state();
     let remote = get_source(&state, "https://Host/a");
     assert_eq!(remote.uri.as_str(), "https://Host/a");
     assert_eq!(remote.created_at, 7);
     assert_eq!(collect_sources(&state), [("https://Host/a".to_owned(), 7)]);
-    assert_eq!(read_preserved_files(&repo), canonical);
+    assert_eq!(get_preserved_files(&repo), canonical);
     assert_eq!(
         fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap(),
         vectors
     );
     let mut storage = open_fixture_storage(&repo);
-    let mut view = storage.begin_read().unwrap();
-    let preserved_vector = unwrap_current(view.read_vector(&identity, &hash).unwrap());
+    let mut view = storage.begin_read_tx().unwrap();
+    let preserved_vector =
+        unwrap_current(view.get_vector_by_search_hash(&identity, &hash).unwrap());
     assert_eq!(preserved_vector, Some(vec![1.0, 0.0, 0.0]));
     assert_eq!(
-        unwrap_current(view.read_failure(&identity, &failure_hash).unwrap()),
+        unwrap_current(
+            view.get_failure_by_search_hash(&identity, &failure_hash)
+                .unwrap()
+        ),
         Some(EmbeddingFailure {
             search_hash: failure_hash,
             attempts: 1,
@@ -294,7 +298,7 @@ fn write_preserved_files(repo: &DocumentRepo) {
     repo.write(".letopis/embed.lock", b"fixture-embed-lock\n");
 }
 
-fn read_preserved_files(repo: &DocumentRepo) -> Vec<Vec<u8>> {
+fn get_preserved_files(repo: &DocumentRepo) -> Vec<Vec<u8>> {
     PRESERVED_PATHS
         .iter()
         .map(|path| fs::read(repo.get_root().join(path)).unwrap())
@@ -309,7 +313,7 @@ fn seed_vector_sentinels(
 ) {
     let mut storage = open_fixture_storage(repo);
     storage.reset_vectors(None, identity).unwrap();
-    let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
+    let mut unit = unwrap_current(storage.begin_vector_write_tx(identity).unwrap());
     unit.store_vector(hash, &[1.0, 0.0, 0.0], 3).unwrap();
     assert!(unit.reserve_attempt(failure_hash, 3).unwrap());
     assert!(
@@ -339,26 +343,26 @@ fn seed_legacy_address(repo: &DocumentRepo) {
     let transaction = connection.transaction().unwrap();
     transaction
         .execute(
-            "UPDATE nodes SET id=?1, uri=?1 WHERE id=?2",
+            "update nodes set id=?1, uri=?1 where id=?2",
             params!["https:/Host/a", "https://Host/a"],
         )
         .unwrap();
     transaction
         .execute(
-            "UPDATE edges SET target_id=?1 WHERE target_id=?2",
+            "update edges set target_id=?1 where target_id=?2",
             params!["https:/Host/a", "https://Host/a"],
         )
         .unwrap();
     transaction.commit().unwrap();
     let cached: String = connection
-        .query_row("SELECT id FROM nodes WHERE kind=?1", ["source"], |row| {
+        .query_row("select id from nodes where kind=?1", ["source"], |row| {
             row.get(0)
         })
         .unwrap();
     assert_eq!(cached, "https:/Host/a");
 }
 
-fn read_index_lock(repo: &DocumentRepo) -> (u64, Vec<u8>) {
+fn get_index_lock(repo: &DocumentRepo) -> (u64, Vec<u8>) {
     let path = repo.get_root().join(".letopis/index.lock");
     (fs::metadata(&path).unwrap().ino(), fs::read(path).unwrap())
 }

@@ -47,8 +47,8 @@ fn cancels_inside_sqlite_step() {
     publish(&fixture.paths, "a.md", "OldToken");
     let mut child = fixture.spawn(SQL_CHILD);
     let mut control = fixture.accept();
-    assert_eq!(read_event(&mut control), "staged");
-    assert_eq!(read_event(&mut control), "inside-sql");
+    assert_eq!(get_event(&mut control), "staged");
+    assert_eq!(get_event(&mut control), "inside-sql");
     // When
     child.send_sigint();
     let status = child.wait_exit();
@@ -67,7 +67,7 @@ fn termination_before_commit_keeps_old_publication() {
     publish(&fixture.paths, "a.md", "OldToken");
     let mut child = fixture.spawn(BEFORE_CHILD);
     let mut control = fixture.accept();
-    assert_eq!(read_event(&mut control), "staged");
+    assert_eq!(get_event(&mut control), "staged");
     // When
     child.send_sigint();
     let status = child.wait_exit();
@@ -86,7 +86,7 @@ fn termination_after_commit_keeps_new_publication() {
     publish(&fixture.paths, "a.md", "OldToken");
     let mut child = fixture.spawn(AFTER_CHILD);
     let mut control = fixture.accept();
-    let acknowledgement = read_event(&mut control);
+    let acknowledgement = get_event(&mut control);
     assert_eq!(acknowledgement, "committed 2");
     // When
     child.send_sigint();
@@ -112,8 +112,8 @@ fn sqlite_step_child() {
     write_event(control.try_clone().expect("barrier clone"), "staged");
     let barrier = register_sql_barrier(&storage.cache_writer, control);
     // When: stage real changes at the selected cancellation boundary.
-    let mut unit = storage.begin_cache_write().expect("cache unit");
-    stage(&mut unit, "b.md", "NewToken");
+    let mut unit = storage.begin_cache_write_tx().expect("cache unit");
+    stage(unit.as_mut(), "b.md", "NewToken");
     // Then: the armed callback holds the SQL step until process termination.
     barrier.arm();
     let _ = unit.commit();
@@ -130,8 +130,8 @@ fn before_commit_child() {
     let _listener = install_listener(&paths.output);
     let mut control = UnixStream::connect(&paths.socket).expect("control connection");
     // When: stage real changes at the selected cancellation boundary.
-    let mut unit = storage.begin_cache_write().expect("cache unit");
-    stage(&mut unit, "b.md", "NewToken");
+    let mut unit = storage.begin_cache_write_tx().expect("cache unit");
+    stage(unit.as_mut(), "b.md", "NewToken");
     // Then: keep the transaction uncommitted until process termination.
     writeln!(control, "staged").expect("staged acknowledgement");
     hold_until_parent_closes(control);
@@ -148,8 +148,8 @@ fn after_commit_child() {
     let _listener = install_listener(&paths.output);
     let mut control = UnixStream::connect(&paths.socket).expect("control connection");
     // When: stage real changes at the selected cancellation boundary.
-    let mut unit = storage.begin_cache_write().expect("cache unit");
-    stage(&mut unit, "b.md", "NewToken");
+    let mut unit = storage.begin_cache_write_tx().expect("cache unit");
+    stage(unit.as_mut(), "b.md", "NewToken");
     let revision = unit.commit().expect("committed publication");
     // Then: acknowledge only the completed commit before awaiting cancellation.
     writeln!(control, "committed {revision}").expect("commit acknowledgement");
@@ -158,12 +158,12 @@ fn after_commit_child() {
 
 fn publish(paths: &Paths, id: &str, text: &str) -> u64 {
     let mut storage = open_storage(paths);
-    let mut unit = storage.begin_cache_write().expect("cache unit");
-    stage(&mut unit, id, text);
+    let mut unit = storage.begin_cache_write_tx().expect("cache unit");
+    stage(unit.as_mut(), id, text);
     unit.commit().expect("publication commit")
 }
 
-fn stage<W: CacheWrite>(unit: &mut W, id: &str, text: &str) {
+fn stage(unit: &mut dyn CacheWrite, id: &str, text: &str) {
     let knowledge = KnowledgeId::parse(id).expect("knowledge id");
     let hash = Sha256::digest(text.as_bytes());
     unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
@@ -277,7 +277,7 @@ struct Publication {
 }
 
 fn assert_old_publication(paths: &Paths) {
-    let published = read_publication(paths);
+    let published = get_publication(paths);
     assert_eq!(published.revision, 1);
     assert_eq!(published.nodes, ["a.md"]);
     assert_eq!(published.files, ["a.md"]);
@@ -287,7 +287,7 @@ fn assert_old_publication(paths: &Paths) {
 }
 
 fn assert_new_publication(paths: &Paths) {
-    let published = read_publication(paths);
+    let published = get_publication(paths);
     assert_eq!(published.revision, 2);
     assert_eq!(published.nodes, ["a.md", "b.md"]);
     assert_eq!(published.files, ["a.md", "b.md"]);
@@ -297,25 +297,25 @@ fn assert_new_publication(paths: &Paths) {
 }
 
 fn assert_later_publication(paths: &Paths, revision: u64) {
-    let published = read_publication(paths);
+    let published = get_publication(paths);
     assert_eq!(published.revision, revision);
     assert!(published.nodes.iter().any(|id| id == "later.md"));
     assert_eq!(published.later, ["later.md"]);
 }
 
-fn read_publication(paths: &Paths) -> Publication {
+fn get_publication(paths: &Paths) -> Publication {
     let mut storage = open_storage(paths);
     assert_integrity(&storage);
-    let mut read = storage.begin_read().expect("read transaction");
+    let mut read = storage.begin_read_tx().expect("read transaction");
     let revision = read.get_revision();
     let nodes = read
-        .list_nodes()
+        .get_nodes()
         .expect("nodes")
         .iter()
         .map(get_node_id)
         .collect();
     let files = read
-        .list_files()
+        .get_files()
         .expect("files")
         .iter()
         .map(|file| file.path.as_str().to_owned())
@@ -324,9 +324,9 @@ fn read_publication(paths: &Paths) -> Publication {
         revision,
         nodes,
         files,
-        old: match_text(&mut read, "OldToken"),
-        new: match_text(&mut read, "NewToken"),
-        later: match_text(&mut read, "LaterToken"),
+        old: get_text_matches_by_expression(read.as_mut(), "OldToken"),
+        new: get_text_matches_by_expression(read.as_mut(), "NewToken"),
+        later: get_text_matches_by_expression(read.as_mut(), "LaterToken"),
     }
 }
 
@@ -337,8 +337,8 @@ fn get_node_id(node: &StoredNode) -> String {
     }
 }
 
-fn match_text(read: &mut impl StorageRead, expression: &str) -> Vec<String> {
-    read.match_text(expression)
+fn get_text_matches_by_expression(read: &mut dyn StorageRead, expression: &str) -> Vec<String> {
+    read.get_text_matches_by_expression(expression)
         .expect("FTS expression")
         .into_iter()
         .map(|found| found.id.as_str().to_owned())
@@ -348,7 +348,7 @@ fn match_text(read: &mut impl StorageRead, expression: &str) -> Vec<String> {
 fn assert_integrity(storage: &SqliteStorage) {
     for connection in [&storage.cache_writer, &storage.vector_writer] {
         let result: String = connection
-            .query_row("PRAGMA quick_check", [], |row| row.get(0))
+            .query_row("pragma quick_check", [], |row| row.get(0))
             .expect("quick_check");
         assert_eq!(result, "ok");
     }
@@ -442,7 +442,7 @@ impl Fixture {
     }
 }
 
-fn read_event(control: &mut BufReader<UnixStream>) -> String {
+fn get_event(control: &mut BufReader<UnixStream>) -> String {
     let mut line = String::new();
     assert!(
         control.read_line(&mut line).expect("control event") > 0,

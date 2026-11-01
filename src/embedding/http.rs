@@ -135,8 +135,8 @@ pub(super) fn decode_vectors(
     let mut result = vec![None; count];
     let mut expected = dimensions;
     for (position, item) in items.iter().enumerate() {
-        let (index, vector) = read_index_vector(position, item, count, provider)?;
-        let vector = read_vector(vector, expected)?;
+        let (index, vector) = get_index_vector(position, item, count, provider)?;
+        let vector = get_vector(vector, expected)?;
         expected = NonZeroUsize::new(vector.len());
         if result[index].replace(vector).is_some() {
             return Err(reject_response());
@@ -147,7 +147,7 @@ pub(super) fn decode_vectors(
         .map(|vector| vector.ok_or_else(reject_response))
         .collect()
 }
-fn read_index_vector(
+fn get_index_vector(
     position: usize,
     item: &Value,
     count: usize,
@@ -166,16 +166,16 @@ fn read_index_vector(
         }
     }
 }
-fn read_vector(value: &Value, expected: Option<NonZeroUsize>) -> EmbeddingResult<Vec<f32>> {
+fn get_vector(value: &Value, expected: Option<NonZeroUsize>) -> EmbeddingResult<Vec<f32>> {
     let values = value.as_array().ok_or_else(reject_response)?;
     if !(MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(&values.len())
         || expected.is_some_and(|size| values.len() != size.get())
     {
         return Err(reject_response());
     }
-    values.iter().map(read_component).collect()
+    values.iter().map(get_component).collect()
 }
-fn read_component(value: &Value) -> EmbeddingResult<f32> {
+fn get_component(value: &Value) -> EmbeddingResult<f32> {
     let number = value
         .as_f64()
         .filter(|number| number.is_finite() && number.abs() <= f64::from(f32::MAX))

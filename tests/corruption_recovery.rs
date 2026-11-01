@@ -3,7 +3,7 @@ mod support;
 use letopis::{
     domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, RepoPath, Sha256},
     open_filesystem,
-    service::{EmbedLocker, EmbeddingConfig, NodeMetadata, Storage, StorageRead, VectorOutcome},
+    service::{EmbedLocker, EmbeddingConfig, NodeMetadata, Storage, VectorOutcome},
 };
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{Value, json};
@@ -70,7 +70,7 @@ fn reindex_preserves_healthy_vectors_after_corrupt_cache_removal() {
     });
     let config = repo.write_config("ollama", &provider.get_base_url(), "fixture");
     repo.seed_vectors(&config, &[("a.md", FIRST_VECTOR), ("b.md", SECOND_VECTOR)]);
-    let hashes = read_search_hashes(&repo);
+    let hashes = get_search_hashes(&repo);
     let canonical = capture_canonical_state(&repo);
     let files = open_filesystem(repo.get_root()).unwrap();
     let _embed_lock = files.try_lock_embed().unwrap().unwrap();
@@ -159,7 +159,7 @@ fn publish_fixture() -> ReadingRepo {
 fn assert_persistent_corruption(repo: &ReadingRepo, targets: &[&str], state: &CanonicalState) {
     for command in ["reindex", "reindex", "status", "status"] {
         let output = repo.invoke(&[command], b"{}");
-        let response = read_response(&output, 1);
+        let response = get_response(&output, 1);
         assert_eq!(response["ok"], false);
         assert_eq!(response["error"]["code"], "internal_error");
         assert!(response.get("result").is_none());
@@ -185,13 +185,13 @@ fn assert_persistent_corruption(repo: &ReadingRepo, targets: &[&str], state: &Ca
 }
 
 fn invoke_reindex(repo: &ReadingRepo) -> Value {
-    let response = read_response(&repo.invoke(&["reindex"], b"{}"), 0);
+    let response = get_response(&repo.invoke(&["reindex"], b"{}"), 0);
     assert_eq!(response["ok"], true);
     response
 }
 
 fn assert_missing_cache_status(repo: &ReadingRepo) {
-    let response = read_response(&repo.invoke(&["status"], b"{}"), 0);
+    let response = get_response(&repo.invoke(&["status"], b"{}"), 0);
     assert_eq!(response["ok"], true);
     assert_eq!(response["result"]["revision"], Value::Null);
     assert!(!repo.get_root().join(".letopis/cache.db").exists());
@@ -199,9 +199,9 @@ fn assert_missing_cache_status(repo: &ReadingRepo) {
 
 fn assert_projection(repo: &ReadingRepo, revision: u64) {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     assert_eq!(read.get_revision(), revision);
-    let nodes = read.list_nodes().unwrap();
+    let nodes = read.get_nodes().unwrap();
     let ids: Vec<&str> = nodes
         .iter()
         .map(|node| match &node.metadata {
@@ -211,7 +211,7 @@ fn assert_projection(repo: &ReadingRepo, revision: u64) {
         .collect();
     assert_eq!(ids, ["a.md", "b.md"]);
     for (token, id) in [("AlphaToken", "a.md"), ("BravoToken", "b.md")] {
-        let matches = read.match_text(token).unwrap();
+        let matches = read.get_text_matches_by_expression(token).unwrap();
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].id.as_str(), id);
     }
@@ -221,13 +221,13 @@ fn assert_projection(repo: &ReadingRepo, revision: u64) {
         EdgeType::parse("context").unwrap(),
     )
     .unwrap();
-    assert_eq!(read.list_edges(None).unwrap(), [edge]);
-    let files = read.list_files().unwrap();
+    assert_eq!(read.get_edges_by_source_id(None).unwrap(), [edge]);
+    let files = read.get_files().unwrap();
     let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
     assert_eq!(paths, ["a.md", "b.md", "live.md"]);
     for path in ["a.md", "b.md", "live.md"] {
         let file = read
-            .read_file(&RepoPath::parse(path).unwrap())
+            .get_file_by_path(&RepoPath::parse(path).unwrap())
             .unwrap()
             .unwrap();
         assert!(file.valid);
@@ -241,11 +241,11 @@ fn assert_projection(repo: &ReadingRepo, revision: u64) {
 
 fn assert_retained_vectors(repo: &ReadingRepo, config: &EmbeddingConfig, hashes: &[Sha256]) {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     let identity = config.get_identity();
     assert_eq!(read.get_config_identity(), Some(identity));
     assert_eq!(
-        read.read_vector_dimensions(&identity).unwrap(),
+        read.get_vector_dimensions(&identity).unwrap(),
         VectorOutcome::Current(NonZeroUsize::new(2))
     );
     for ((id, hash), expected) in ["a.md", "b.md"]
@@ -254,7 +254,7 @@ fn assert_retained_vectors(repo: &ReadingRepo, config: &EmbeddingConfig, hashes:
         .zip([FIRST_VECTOR, SECOND_VECTOR])
     {
         let node = read
-            .read_node(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
+            .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
             .unwrap()
             .unwrap();
         let NodeMetadata::Knowledge(node) = node.metadata else {
@@ -262,20 +262,20 @@ fn assert_retained_vectors(repo: &ReadingRepo, config: &EmbeddingConfig, hashes:
         };
         assert_eq!(&node.search_hash, hash);
         assert_eq!(
-            read.read_vector(&identity, hash).unwrap(),
+            read.get_vector_by_search_hash(&identity, hash).unwrap(),
             VectorOutcome::Current(Some(expected.to_vec()))
         );
     }
 }
 
-fn read_search_hashes(repo: &ReadingRepo) -> Vec<Sha256> {
+fn get_search_hashes(repo: &ReadingRepo) -> Vec<Sha256> {
     let mut storage = repo.open_storage();
-    let mut read = storage.begin_read().unwrap();
+    let mut read = storage.begin_read_tx().unwrap();
     ["a.md", "b.md"]
         .into_iter()
         .map(|id| {
             let node = read
-                .read_node(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
+                .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
                 .unwrap()
                 .unwrap();
             let NodeMetadata::Knowledge(node) = node.metadata else {
@@ -288,11 +288,11 @@ fn read_search_hashes(repo: &ReadingRepo) -> Vec<Sha256> {
 
 fn assert_empty_vectors(repo: &ReadingRepo) {
     let mut storage = repo.open_storage();
-    assert_eq!(storage.begin_read().unwrap().get_config_identity(), None);
+    assert_eq!(storage.begin_read_tx().unwrap().get_config_identity(), None);
     drop(storage);
     let db = open_database(repo.get_root(), VECTORS);
     let count: i64 = db
-        .query_row("SELECT count(*) FROM vector_keys", [], |row| row.get(0))
+        .query_row("select count(*) from vector_keys", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count, 0);
 }
@@ -301,12 +301,12 @@ fn assert_healthy_peer(repo: &ReadingRepo, damaged: &[&str]) {
     if !damaged.contains(&CACHE) {
         let db = open_database(repo.get_root(), CACHE);
         let revision: i64 = db
-            .query_row("SELECT revision FROM project WHERE id=1", [], |row| {
+            .query_row("select revision from project where id=1", [], |row| {
                 row.get(0)
             })
             .unwrap();
         assert_eq!(revision, 3);
-        let mut statement = db.prepare("SELECT id FROM nodes ORDER BY id").unwrap();
+        let mut statement = db.prepare("select id from nodes order by id").unwrap();
         let ids: Vec<String> = statement
             .query_map([], |row| row.get(0))
             .unwrap()
@@ -317,7 +317,7 @@ fn assert_healthy_peer(repo: &ReadingRepo, damaged: &[&str]) {
     if !damaged.contains(&VECTORS) {
         let db = open_database(repo.get_root(), VECTORS);
         let count: i64 = db
-            .query_row("SELECT count(*) FROM vector_keys", [], |row| row.get(0))
+            .query_row("select count(*) from vector_keys", [], |row| row.get(0))
             .unwrap();
         // The configured retention case seeds both hashes; other cases have no config.
         let expected = if repo.get_root().join(".letopis/config.json").exists() {
@@ -394,7 +394,7 @@ fn run_git(repo: &ReadingRepo, args: &[&str]) -> Vec<u8> {
     output.stdout
 }
 
-fn read_response(output: &Output, exit: i32) -> Value {
+fn get_response(output: &Output, exit: i32) -> Value {
     assert_eq!(output.status.code(), Some(exit), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(

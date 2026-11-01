@@ -9,6 +9,7 @@ use super::{
     vector_write::SqliteVectorWrite,
     vectors,
 };
+use crate::service::{CacheWrite, ReadTransaction, VectorWrite};
 use crate::{
     domain::Sha256,
     service::{Storage, StorageResult, VectorOutcome},
@@ -77,14 +78,16 @@ impl SqliteStorage {
         })
     }
 }
+
 impl Storage for SqliteStorage {
-    type Read<'a> = SqliteRead<'a>;
-    type VectorWrite<'a> = SqliteVectorWrite<'a>;
-    fn begin_vector_write(
+    fn begin_vector_write_tx(
         &mut self,
         expected: &Sha256,
-    ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
-        SqliteVectorWrite::begin(&mut self.vector_writer, expected)
+    ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>> {
+        match SqliteVectorWrite::begin_tx(&mut self.vector_writer, expected)? {
+            VectorOutcome::Current(writer) => Ok(VectorOutcome::Current(Box::new(writer))),
+            VectorOutcome::ConfigChanged => Ok(VectorOutcome::ConfigChanged),
+        }
     }
     fn reset_vectors(
         &mut self,
@@ -93,12 +96,13 @@ impl Storage for SqliteStorage {
     ) -> StorageResult<VectorOutcome<bool>> {
         vectors::reset_vectors(&mut self.vector_writer, observed, desired)
     }
-    type CacheWrite<'a> = SqliteCacheWrite<'a>;
-    fn begin_cache_write(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
-        SqliteCacheWrite::begin(&mut self.cache_writer)
+    fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>> {
+        Ok(Box::new(SqliteCacheWrite::begin_tx(
+            &mut self.cache_writer,
+        )?))
     }
-    fn begin_read(&mut self) -> StorageResult<Self::Read<'_>> {
-        SqliteRead::begin(&mut self.read)
+    fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
+        Ok(Box::new(SqliteRead::begin_tx(&mut self.read)?))
     }
 }
 
@@ -107,7 +111,7 @@ mod tests {
     use super::SqliteStorage;
     use crate::{
         domain::Sha256,
-        service::{Storage, StorageRead, VectorOutcome, VectorWrite},
+        service::{Storage, VectorOutcome},
     };
     use std::fs::File;
     use tempfile::TempDir;
@@ -148,16 +152,16 @@ mod tests {
         let identity = Sha256::digest(b"confined");
         seed_vector(&mut storage, &identity);
         // When: pruning requires the read-only cache attachment used for hash-reference checks.
-        let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        let mut unit = unwrap_current(storage.begin_vector_write_tx(&identity).unwrap());
         unit.prune_unreferenced().unwrap();
         unit.commit().unwrap();
-        // Then both native deletion and lifetime/permission policy.
+        // Then: both native deletion and lifetime/permission policy.
         assert_eq!(
             unwrap_current(
                 storage
-                    .begin_read()
+                    .begin_read_tx()
                     .unwrap()
-                    .read_vector(&identity, &identity)
+                    .get_vector_by_search_hash(&identity, &identity)
                     .unwrap()
             ),
             None
@@ -165,7 +169,7 @@ mod tests {
         assert!(
             storage
                 .vector_writer
-                .execute_batch("DELETE FROM cache.nodes")
+                .execute_batch("delete from cache.nodes")
                 .is_err()
         );
         drop(storage);
@@ -175,7 +179,7 @@ mod tests {
 
     #[test]
     fn reset_late_meta_failure_preserves_identity_key_vector_and_query_error() {
-        // Given a populated native table, then fail after DROP/recreation/deletion.
+        // Given: a populated native table, then fail after DROP/recreation/deletion.
         let root = TempDir::new().unwrap();
         let cache = root.path().join("cache");
         let vectors = root.path().join("vectors");
@@ -183,35 +187,35 @@ mod tests {
         let m1 = Sha256::digest(b"M1");
         let m2 = Sha256::digest(b"M2");
         let key = seed_vector(&mut storage, &m1);
-        storage.vector_writer.execute_batch("INSERT INTO embed_failures VALUES('failed-text',1,'safe failure'); INSERT INTO query_error VALUES(1,7,'safe failure'); CREATE TRIGGER deny_meta_update BEFORE UPDATE ON meta BEGIN SELECT RAISE(ABORT, 'blocked meta write'); END;").unwrap();
+        storage.vector_writer.execute_batch("insert into embed_failures values('failed-text',1,'safe failure'); insert into query_error values(1,7,'safe failure'); create trigger deny_meta_update before update on meta begin select raise(abort, 'blocked meta write'); end;").unwrap();
         // When: the metadata update fails after native schema changes.
         assert!(storage.reset_vectors(Some(&m1), &m2).is_err());
         assert_eq!(count_failures(&storage), 1);
-        // Then the same and a newly opened read both retain exact M1 bytes.
+        // Then: the same and a newly opened read both retain exact M1 bytes.
         assert_eq!(
             storage
                 .vector_writer
-                .query_row("SELECT row_id FROM vector_keys", [], |r| r.get::<_, i64>(0))
+                .query_row("select row_id from vector_keys", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
             key
         );
-        let mut read = storage.begin_read().unwrap();
+        let mut read = storage.begin_read_tx().unwrap();
         assert_eq!(read.get_config_identity(), Some(m1));
         assert_eq!(
-            unwrap_current(read.read_vector(&m1, &m1).unwrap()),
+            unwrap_current(read.get_vector_by_search_hash(&m1, &m1).unwrap()),
             Some(vec![1.0, 0.0, 0.0])
         );
         drop(read);
         storage
             .vector_writer
-            .execute_batch("DROP TRIGGER deny_meta_update")
+            .execute_batch("drop trigger deny_meta_update")
             .unwrap();
         drop(storage);
         let mut reopened = SqliteStorage::open(&cache, &vectors).unwrap();
-        let mut read = reopened.begin_read().unwrap();
+        let mut read = reopened.begin_read_tx().unwrap();
         assert_eq!(read.get_config_identity(), Some(m1));
         assert_eq!(
-            unwrap_current(read.read_vector(&m1, &m1).unwrap()),
+            unwrap_current(read.get_vector_by_search_hash(&m1, &m1).unwrap()),
             Some(vec![1.0, 0.0, 0.0])
         );
         drop(read);
@@ -223,7 +227,7 @@ mod tests {
         assert_eq!(
             reopened
                 .vector_writer
-                .query_row("SELECT error FROM query_error", [], |r| r
+                .query_row("select error from query_error", [], |r| r
                     .get::<_, String>(0))
                 .unwrap(),
             "safe failure"
@@ -232,7 +236,7 @@ mod tests {
     #[test]
     fn success_deletes_failure_atomically_and_corrupt_key_poisoning_rolls_back() {
         // Catches lost cleanup, uncommitted cleanup, and acceptance of orphan keys.
-        // Given
+        // Given: reserved failures and a vector key that can be corrupted.
         let root = TempDir::new().unwrap();
         let mut storage =
             SqliteStorage::open(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
@@ -242,32 +246,32 @@ mod tests {
         storage
             .vector_writer
             .execute(
-                "INSERT INTO embed_failures VALUES(?1,1,'safe failure')",
+                "insert into embed_failures values(?1,1,'safe failure')",
                 [hash.to_hex()],
             )
             .unwrap();
-        // When
-        let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        // When: a successful vector write is abandoned before commit.
+        let mut unit = unwrap_current(storage.begin_vector_write_tx(&identity).unwrap());
         unit.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
         drop(unit);
-        // Then
+        // Then: rollback retains the previously recorded failure.
         assert_eq!(
             storage
                 .vector_writer
-                .query_row("SELECT count(*) FROM embed_failures", [], |r| r
+                .query_row("select count(*) from embed_failures", [], |r| r
                     .get::<_, i64>(0))
                 .unwrap(),
             1
         );
         // When: repeat the vector write and commit it.
-        let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+        let mut unit = unwrap_current(storage.begin_vector_write_tx(&identity).unwrap());
         unit.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
         unit.commit().unwrap();
-        // Then
+        // Then: committing the successful vector write removes its failure.
         assert_eq!(
             storage
                 .vector_writer
-                .query_row("SELECT count(*) FROM embed_failures", [], |r| r
+                .query_row("select count(*) from embed_failures", [], |r| r
                     .get::<_, i64>(0))
                 .unwrap(),
             0
@@ -276,19 +280,19 @@ mod tests {
         storage
             .vector_writer
             .execute(
-                "INSERT INTO vector_keys(search_hash) VALUES(?1)",
+                "insert into vector_keys(search_hash) values(?1)",
                 [identity.to_hex()],
             )
             .unwrap();
-        let mut unit = unwrap_current(storage.begin_vector_write(&identity).unwrap());
-        // When / Then
+        let mut unit = unwrap_current(storage.begin_vector_write_tx(&identity).unwrap());
+        // When / Then: a key without its native vector poisons the write and prevents commit.
         assert!(unit.store_vector(&identity, &[1.0, 0.0, 0.0], 3).is_err());
         assert!(unit.commit().is_err());
     }
 
     fn seed_vector(storage: &mut SqliteStorage, identity: &Sha256) -> i64 {
         storage.reset_vectors(None, identity).unwrap();
-        let mut unit = unwrap_current(storage.begin_vector_write(identity).unwrap());
+        let mut unit = unwrap_current(storage.begin_vector_write_tx(identity).unwrap());
         let row = unit
             .store_vector(identity, &[1.0, 0.0, 0.0], 3)
             .unwrap()
@@ -307,7 +311,7 @@ mod tests {
     fn count_failures(storage: &SqliteStorage) -> i64 {
         storage
             .vector_writer
-            .query_row("SELECT count(*) FROM embed_failures", [], |r| r.get(0))
+            .query_row("select count(*) from embed_failures", [], |r| r.get(0))
             .unwrap()
     }
 }

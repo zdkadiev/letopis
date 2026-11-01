@@ -1,4 +1,4 @@
-use super::{local::LocalFileSystem, read::read_regular};
+use super::{local::LocalFileSystem, read::get_regular};
 use crate::service::{
     CommandError, CommandErrorKind, CommandResult, DocumentError, EmbeddingError,
     EmbeddingErrorKind, EmbeddingResult, HeldLock, LockName, StatusFiles,
@@ -10,14 +10,14 @@ const PID_READ_LIMIT: u64 = 12;
 const INVALID_LOCK_PID: &str = "cannot observe coordination lock owner";
 
 impl StatusFiles for LocalFileSystem {
-    fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
         let Some(directory) = self
             .open_existing_service_directory()
             .map_err(map_config_error)?
         else {
             return Ok(None);
         };
-        let bytes = read_regular(&File::from(directory), "config.json", |_| {})?;
+        let bytes = get_regular(&File::from(directory), "config.json", |_| {})?;
         self.open_existing_service_directory()
             .map_err(map_config_error)?;
         Ok(bytes)
@@ -47,14 +47,14 @@ impl LocalFileSystem {
             file.unlock().map_err(map_lock_error)?;
             return Ok(None);
         }
-        let pid = read_pid(&mut file)?;
+        let pid = get_pid(&mut file)?;
         self.verify_existing_lock(&file, path)
             .map_err(map_lock_error)?;
         Ok(Some(HeldLock { name, pid }))
     }
 }
 
-fn read_pid(file: &mut File) -> CommandResult<NonZeroU32> {
+fn get_pid(file: &mut File) -> CommandResult<NonZeroU32> {
     let mut bytes = Vec::new();
     file.take(PID_READ_LIMIT)
         .read_to_end(&mut bytes)

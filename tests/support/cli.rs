@@ -235,7 +235,7 @@ impl Fixture {
         stream.set_write_timeout(Some(WAIT)).unwrap();
         Drain(BufReader::new(stream))
     }
-    pub fn read_preserved_files(&self) -> Vec<Vec<u8>> {
+    pub fn get_preserved_files(&self) -> Vec<Vec<u8>> {
         ["knowledge.md", ".letopis/cache.db", ".letopis/vectors.db"]
             .iter()
             .map(|path| fs::read(self.root.path().join(path)).unwrap())
@@ -244,7 +244,7 @@ impl Fixture {
 }
 pub struct Drain(BufReader<UnixStream>);
 impl Drain {
-    pub fn read_event(&mut self) -> Value {
+    pub fn get_event(&mut self) -> Value {
         let mut line = String::new();
         assert_ne!(
             self.0.read_line(&mut line).unwrap(),

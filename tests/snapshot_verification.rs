@@ -17,7 +17,7 @@ fn verify_snapshot_accepts_exact_tree_without_writes() {
     for format in FORMATS {
         // Given: the index deliberately differs from both HEAD and live bytes.
         let repo = TempRepo::new(format);
-        let tree = parse_tree(&repo.read_oid(&["write-tree"], None));
+        let tree = parse_tree(&repo.get_oid(&["write-tree"], None));
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let before = repo.capture_fixture_state();
         let before_refs = repo.run_git_successfully(&["for-each-ref"], None);
@@ -45,13 +45,13 @@ fn verify_snapshot_classifies_absent_foreign_and_non_tree_objects() {
     for format in FORMATS {
         // Given: tags deliberately point directly to a valid tree.
         let repo = TempRepo::new(format);
-        let tree = repo.read_oid(&["write-tree"], None);
-        let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(b"blob bytes"));
-        let commit = repo.read_oid(&["rev-parse", "HEAD"], None);
+        let tree = repo.get_oid(&["write-tree"], None);
+        let blob = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"blob bytes"));
+        let commit = repo.get_oid(&["rev-parse", "HEAD"], None);
         let tag_bytes = format!(
             "object {tree}\ntype tree\ntag snapshot\ntagger Fixture <fixture@example.invalid> 0 +0000\n\ntag bytes\n"
         );
-        let tag = repo.read_oid(
+        let tag = repo.get_oid(
             &["hash-object", "-t", "tag", "-w", "--stdin"],
             Some(tag_bytes.as_bytes()),
         );
@@ -83,8 +83,8 @@ fn verify_snapshot_propagates_policy_and_integrity_failures() {
     for format in FORMATS {
         // Given: alternates appear only after opening the adapter.
         let repo = TempRepo::new(format);
-        let tree = parse_tree(&repo.read_oid(&["write-tree"], None));
-        let replacement = repo.read_oid(&["mktree"], Some(b""));
+        let tree = parse_tree(&repo.get_oid(&["write-tree"], None));
+        let replacement = repo.get_oid(&["mktree"], Some(b""));
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let before_refs = repo.run_git_successfully(&["for-each-ref"], None);
         let alternates = repo.get_root().join(".git/objects/info/alternates");
@@ -118,7 +118,7 @@ fn verify_snapshot_checks_root_integrity_without_requiring_child_closure() {
         let (missing, _) = get_absent_oids(format);
         let entry = format!("100644 blob {missing}\tabsent-child\0");
         let tree =
-            parse_tree(&repo.read_oid(&["mktree", "-z", "--missing"], Some(entry.as_bytes())));
+            parse_tree(&repo.get_oid(&["mktree", "-z", "--missing"], Some(entry.as_bytes())));
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let before_refs = repo.run_git_successfully(&["for-each-ref"], None);
 

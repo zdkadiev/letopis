@@ -181,7 +181,7 @@ fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
         .execute(
-            "UPDATE nodes SET created_at = 'PRIVATE_INVALID' WHERE id = ?1",
+            "update nodes set created_at = 'PRIVATE_INVALID' where id = ?1",
             ["c.md"],
         )
         .unwrap();
@@ -199,14 +199,14 @@ fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert!(!format!("{error:?}").contains("PRIVATE_INVALID"));
     let busy: i64 = connection
-        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
+        .query_row("pragma wal_checkpoint(truncate)", [], |row| row.get(0))
         .unwrap();
     assert_eq!(
         busy, 0,
         "failed traversal must release its read view while the service lives"
     );
     connection
-        .execute("UPDATE nodes SET created_at = 3 WHERE id = ?1", ["c.md"])
+        .execute("update nodes set created_at = 3 where id = ?1", ["c.md"])
         .unwrap();
     assert_eq!(service.traverse(&request).unwrap().elements.len(), 2);
 }
@@ -255,7 +255,7 @@ fn distinguishes_nonregular_sources_from_missing_local_flags() {
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     let busy: i64 = connection
-        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
+        .query_row("pragma wal_checkpoint(truncate)", [], |row| row.get(0))
         .unwrap();
     assert_eq!(busy, 0);
     std::fs::remove_dir(repo.get_root().join("code.rs")).unwrap();

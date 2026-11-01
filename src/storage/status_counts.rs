@@ -20,7 +20,7 @@ enum HashCoverage {
     Stored,
 }
 
-pub(super) fn read_embedding_status(
+pub(super) fn get_embedding_status(
     connection: &Connection,
     identity: Option<Sha256>,
     policy: &EmbeddingStatusPolicy,
@@ -59,7 +59,7 @@ pub(super) fn read_embedding_status(
     }
     verify_current_vectors(connection)?;
     let covered = count_hashes(connection, HashCoverage::Stored)?;
-    let exhausted = read_current_failures(connection, *max_attempts)?;
+    let exhausted = get_current_failures(connection, *max_attempts)?;
     let failed = u64::try_from(exhausted.len()).map_err(map_invalid_value)?;
     let backlog = total
         .checked_sub(covered)
@@ -128,7 +128,7 @@ fn count_hashes(connection: &Connection, coverage: HashCoverage) -> StorageResul
     u64::try_from(count).map_err(map_invalid_value)
 }
 
-fn read_current_failures(
+fn get_current_failures(
     connection: &Connection,
     max_attempts: u64,
 ) -> StorageResult<Vec<EmbeddingFailure>> {

@@ -34,7 +34,7 @@ fn inspect_reads_current_knowledge_from_one_retained_tree() {
         assert_eq!(result.elements[id].hash, Some(Sha256::parse(hash).unwrap()));
         repo.write(path, b"live edit");
         assert_eq!(
-            git.read_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
+            git.get_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
                 .unwrap(),
             bytes
         );
@@ -46,7 +46,7 @@ fn inspect_reads_current_knowledge_from_one_retained_tree() {
         .unwrap();
     assert!(status.success());
     assert_eq!(
-        git.read_blob(&result.snapshot, &RepoPath::parse("crlf.md").unwrap())
+        git.get_blob(&result.snapshot, &RepoPath::parse("crlf.md").unwrap())
             .unwrap(),
         fixtures[0].1
     );
@@ -154,7 +154,7 @@ fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
     assert!(
         open_git_snapshots(repo.get_root())
             .unwrap()
-            .read_blob(&current.snapshot, &RepoPath::parse("gone.md").unwrap())
+            .get_blob(&current.snapshot, &RepoPath::parse("gone.md").unwrap())
             .is_err()
     );
 }

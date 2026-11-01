@@ -4,9 +4,9 @@ use letopis::{
     markdown::parse,
     open_embedding_files, open_storage,
     service::{
-        CacheWrite, ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind,
-        EmbeddingFailure, EmbeddingFiles, FileRow, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
-        QueryEmbeddingRequest, QueryError, Storage, StorageRead, VectorOutcome, VectorWrite,
+        ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind, EmbeddingFailure,
+        EmbeddingFiles, FileRow, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
+        QueryEmbeddingRequest, QueryError, Storage, VectorOutcome,
     },
     wire_embedder,
 };
@@ -75,7 +75,7 @@ impl Fixture {
         let element = parsed.elements.into_iter().next().unwrap();
         let metadata = &element.element;
         let mut storage = self.open_storage();
-        let mut unit = storage.begin_cache_write().unwrap();
+        let mut unit = storage.begin_cache_write_tx().unwrap();
         unit.delete_outgoing(&metadata.id).unwrap();
         unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
             id: metadata.id.clone(),
@@ -113,29 +113,37 @@ impl Fixture {
         unit.commit().unwrap();
         element.search_hash
     }
-    fn read_failure(&self, config: &EmbeddingConfig, hash: &Sha256) -> Option<EmbeddingFailure> {
+    fn get_failure_by_search_hash(
+        &self,
+        config: &EmbeddingConfig,
+        search_hash: &Sha256,
+    ) -> Option<EmbeddingFailure> {
         unwrap_current(
             self.open_storage()
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
-                .read_failure(&config.get_identity(), hash)
+                .get_failure_by_search_hash(&config.get_identity(), search_hash)
                 .unwrap(),
         )
     }
-    fn read_vector(&self, config: &EmbeddingConfig, hash: &Sha256) -> Option<Vec<f32>> {
+    fn get_vector_by_search_hash(
+        &self,
+        config: &EmbeddingConfig,
+        search_hash: &Sha256,
+    ) -> Option<Vec<f32>> {
         unwrap_current(
             self.open_storage()
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
-                .read_vector(&config.get_identity(), hash)
+                .get_vector_by_search_hash(&config.get_identity(), search_hash)
                 .unwrap(),
         )
     }
-    fn read_query_error(&self) -> Option<QueryError> {
+    fn get_query_error(&self) -> Option<QueryError> {
         self.open_storage()
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .read_query_error()
+            .get_query_error()
             .unwrap()
     }
     fn capture_corpus(&self) -> Corpus {
@@ -154,7 +162,7 @@ impl Fixture {
             .into_iter()
             .map(|table| {
                 let mut query = db
-                    .prepare(&format!("SELECT * FROM {table} ORDER BY 1"))
+                    .prepare(&format!("select * from {table} order by 1"))
                     .unwrap();
                 let columns = query.column_count();
                 query
@@ -173,8 +181,8 @@ impl Fixture {
             .collect();
         files.sort();
         let mut storage = self.open_storage();
-        let mut read = storage.begin_read().unwrap();
-        let matches = read.match_text("knowledge").unwrap();
+        let mut read = storage.begin_read_tx().unwrap();
+        let matches = read.get_text_matches_by_expression("knowledge").unwrap();
         Corpus {
             rows,
             files,
@@ -237,7 +245,7 @@ fn missing_and_invalid_configuration_preserve_corpus_and_prior_vectors() {
         }
         let before = fixture.capture_corpus();
         assert!(matches!(
-            service.read_configuration().unwrap(),
+            service.get_configuration().unwrap(),
             ConfigState::Missing | ConfigState::Invalid(_)
         ));
         assert_eq!(service.drain().unwrap(), DrainOutcome::Unavailable);
@@ -245,7 +253,10 @@ fn missing_and_invalid_configuration_preserve_corpus_and_prior_vectors() {
             service.embed_query("query").unwrap(),
             QueryEmbedding::Unavailable
         );
-        assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
+        assert_eq!(
+            fixture.get_vector_by_search_hash(&config, &hash),
+            Some(vec![1., 2., 3.])
+        );
         assert_eq!(fixture.capture_corpus(), before);
         assert_eq!(server.take_requests().len(), 0);
     }
@@ -263,16 +274,7 @@ fn disabled_configuration_preserves_vectors_attempts_and_skips_execution() {
         fixture.open_service().drain().unwrap(),
         DrainOutcome::Complete
     );
-    let mut storage = fixture.open_storage();
-    let VectorOutcome::Current(mut unit) =
-        storage.begin_vector_write(&config.get_identity()).unwrap()
-    else {
-        panic!("expected current identity")
-    };
-    assert!(unit.reserve_attempt(&exhausted, 1).unwrap());
-    unit.record_failure(&exhausted, "safe failure").unwrap();
-    unit.commit().unwrap();
-    drop(storage);
+    exhaust_attempt(&fixture, &config, &exhausted);
     server.take_requests();
     fixture.write_disabled_config(&server.get_base_url(), 0);
     let before = fixture.capture_corpus();
@@ -280,7 +282,7 @@ fn disabled_configuration_preserves_vectors_attempts_and_skips_execution() {
     // When
     let mut service = fixture.open_service();
     assert!(matches!(
-        service.read_configuration().unwrap(),
+        service.get_configuration().unwrap(),
         ConfigState::Disabled
     ));
     assert_eq!(service.drain().unwrap(), DrainOutcome::Unavailable);
@@ -290,9 +292,15 @@ fn disabled_configuration_preserves_vectors_attempts_and_skips_execution() {
     );
 
     // Then: both the vector and retry state survive without inference or reset.
-    assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
     assert_eq!(
-        fixture.read_failure(&config, &exhausted).unwrap().attempts,
+        fixture.get_vector_by_search_hash(&config, &hash),
+        Some(vec![1., 2., 3.])
+    );
+    assert_eq!(
+        fixture
+            .get_failure_by_search_hash(&config, &exhausted)
+            .unwrap()
+            .attempts,
         1
     );
     assert_eq!(fixture.capture_corpus(), before);
@@ -302,14 +310,20 @@ fn disabled_configuration_preserves_vectors_attempts_and_skips_execution() {
     let enabled = fixture.write_config(&server.get_base_url(), 0);
     assert_eq!(enabled.get_identity(), config.get_identity());
     assert!(matches!(
-        fixture.open_service().read_configuration().unwrap(),
+        fixture.open_service().get_configuration().unwrap(),
         ConfigState::Ready(_)
     ));
 
     // Then: the exact stored execution state remains available.
-    assert_eq!(fixture.read_vector(&config, &hash), Some(vec![1., 2., 3.]));
     assert_eq!(
-        fixture.read_failure(&config, &exhausted).unwrap().attempts,
+        fixture.get_vector_by_search_hash(&config, &hash),
+        Some(vec![1., 2., 3.])
+    );
+    assert_eq!(
+        fixture
+            .get_failure_by_search_hash(&config, &exhausted)
+            .unwrap()
+            .attempts,
         1
     );
     assert!(server.take_requests().is_empty());
@@ -324,7 +338,7 @@ fn unreadable_configuration_returns_safe_invalid_state() {
     let before = fixture.capture_corpus();
     // When / Then
     assert!(matches!(
-        service.read_configuration().unwrap(),
+        service.get_configuration().unwrap(),
         ConfigState::Invalid(_)
     ));
     assert_eq!(fixture.capture_corpus(), before);
@@ -342,13 +356,13 @@ fn changed_configuration_resets_vectors_but_equal_identity_keeps_them() {
     let before = fixture.capture_corpus();
     // When / Then
     assert!(matches!(
-        service.read_configuration().unwrap(),
+        service.get_configuration().unwrap(),
         ConfigState::Ready(_)
     ));
-    assert!(fixture.read_vector(&config, &hash).is_some());
+    assert!(fixture.get_vector_by_search_hash(&config, &hash).is_some());
     let next = fixture.write_config(&server.get_base_url(), 1);
-    service.read_configuration().unwrap();
-    assert_eq!(fixture.read_vector(&next, &hash), None);
+    service.get_configuration().unwrap();
+    assert_eq!(fixture.get_vector_by_search_hash(&next, &hash), None);
     assert_eq!(fixture.capture_corpus(), before);
 }
 
@@ -372,7 +386,7 @@ fn stale_first_same_hash_does_not_starve_valid_second_representative() {
         DrainOutcome::Complete
     );
     assert_eq!(server.take_requests().len(), 1);
-    assert!(fixture.read_vector(&config, &hash).is_some());
+    assert!(fixture.get_vector_by_search_hash(&config, &hash).is_some());
     assert_eq!(fixture.capture_corpus(), before);
 }
 
@@ -393,8 +407,8 @@ fn stale_and_missing_elements_skip_without_reservations_or_requests() {
         DrainOutcome::Complete
     );
     assert_eq!(server.take_requests().len(), 0);
-    assert_eq!(fixture.read_failure(&config, &hash), None);
-    assert_eq!(fixture.read_failure(&config, &other), None);
+    assert_eq!(fixture.get_failure_by_search_hash(&config, &hash), None);
+    assert_eq!(fixture.get_failure_by_search_hash(&config, &other), None);
     assert_eq!(fixture.capture_corpus(), before);
 }
 
@@ -413,7 +427,7 @@ fn retries_are_additional_and_exhaustion_survives_restart() {
             DrainOutcome::Complete
         );
         assert_eq!(server.take_requests().len(), attempts);
-        let failed = fixture.read_failure(&config, &hash).unwrap();
+        let failed = fixture.get_failure_by_search_hash(&config, &hash).unwrap();
         assert_eq!(failed.attempts, u64::try_from(attempts).unwrap());
         assert!(!failed.error.unwrap().contains("private"));
         assert_eq!(fixture.capture_corpus(), before);
@@ -438,7 +452,13 @@ fn malformed_document_records_a_durable_failure_without_http() {
     // When
     fixture.open_service().drain().unwrap();
     // Then
-    assert!(fixture.read_failure(&config, &hash).unwrap().attempts >= 1);
+    assert!(
+        fixture
+            .get_failure_by_search_hash(&config, &hash)
+            .unwrap()
+            .attempts
+            >= 1
+    );
     assert_eq!(server.take_requests().len(), 0);
     assert_eq!(fixture.capture_corpus(), before);
 }
@@ -456,7 +476,13 @@ fn document_read_failure_uses_the_same_durable_budget() {
     // When
     fixture.open_service().drain().unwrap();
     // Then
-    assert!(fixture.read_failure(&config, &hash).unwrap().attempts >= 1);
+    assert!(
+        fixture
+            .get_failure_by_search_hash(&config, &hash)
+            .unwrap()
+            .attempts
+            >= 1
+    );
     assert_eq!(server.take_requests().len(), 0);
     assert_eq!(fixture.capture_corpus(), before);
 }
@@ -476,8 +502,14 @@ fn configured_dimensions_reject_wrong_size_without_graph_changes() {
     // When
     fixture.open_service().drain().unwrap();
     // Then
-    assert_eq!(fixture.read_vector(&config, &hash), None);
-    assert_eq!(fixture.read_failure(&config, &hash).unwrap().attempts, 1);
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &hash), None);
+    assert_eq!(
+        fixture
+            .get_failure_by_search_hash(&config, &hash)
+            .unwrap()
+            .attempts,
+        1
+    );
     assert_eq!(fixture.capture_corpus(), before);
 }
 
@@ -495,26 +527,30 @@ fn query_failure_is_single_attempt_without_document_reservation_or_vector() {
         QueryEmbedding::Unavailable
     );
     assert_eq!(server.take_requests().len(), 1);
-    assert_eq!(fixture.read_failure(&config, &hash), None);
-    assert_eq!(fixture.read_vector(&config, &hash), None);
-    assert!(fixture.read_query_error().is_some());
+    assert_eq!(fixture.get_failure_by_search_hash(&config, &hash), None);
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &hash), None);
+    assert!(fixture.get_query_error().is_some());
     assert_eq!(fixture.capture_corpus(), before);
 }
 
 #[test]
 fn query_success_clears_error_without_caching_or_document_attempts() {
-    // Given
+    // Given: a persisted query error and successful query provider.
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
     let hash = fixture.publish("a.md", "knowledge");
     let mut storage = fixture.open_storage();
     storage.reset_vectors(None, &config.get_identity()).unwrap();
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     unit.set_query_error(1, "old failure").unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
-    // When / Then
+    // When / Then: the query is embedded successfully; the error clears without caching or consuming document attempts.
     assert_eq!(
         fixture.open_service().embed_query("query").unwrap(),
         QueryEmbedding::Available {
@@ -522,9 +558,9 @@ fn query_success_clears_error_without_caching_or_document_attempts() {
             vector: vec![1., 2., 3.]
         }
     );
-    assert_eq!(fixture.read_query_error(), None);
-    assert_eq!(fixture.read_vector(&config, &hash), None);
-    assert_eq!(fixture.read_failure(&config, &hash), None);
+    assert_eq!(fixture.get_query_error(), None);
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &hash), None);
+    assert_eq!(fixture.get_failure_by_search_hash(&config, &hash), None);
     assert_eq!(fixture.capture_corpus(), before);
 }
 
@@ -562,21 +598,27 @@ fn reservation_precedes_http_and_new_work_is_found_after_compute() {
     let worker = Operation::spawn(barrier.clone(), move || service.drain().unwrap());
     barrier.wait_until_entered();
     // Then
-    assert_eq!(fixture.read_failure(&config, &old).unwrap().attempts, 1);
-    assert_eq!(fixture.read_vector(&config, &old), None);
+    assert_eq!(
+        fixture
+            .get_failure_by_search_hash(&config, &old)
+            .unwrap()
+            .attempts,
+        1
+    );
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &old), None);
     let new = fixture.publish("a.md", "new knowledge");
     let before = fixture.capture_corpus();
     barrier.release();
     assert_eq!(worker.join().unwrap(), DrainOutcome::Complete);
     assert_eq!(server.take_requests().len(), 2);
-    assert!(fixture.read_vector(&config, &old).is_some());
-    assert!(fixture.read_vector(&config, &new).is_some());
+    assert!(fixture.get_vector_by_search_hash(&config, &old).is_some());
+    assert!(fixture.get_vector_by_search_hash(&config, &new).is_some());
     assert_eq!(fixture.capture_corpus(), before);
 }
 
 #[test]
 fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
-    // Given
+    // Given: knowledge edited while its embedding request is in flight.
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -590,22 +632,22 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
     )
     .unwrap();
     let before = fixture.capture_corpus();
-    // When
+    // When: the captured embedding result returns.
     barrier.release();
-    // Then
+    // Then: only the captured hash is stored and new text stays pending.
     assert_eq!(worker.join().unwrap(), DrainOutcome::Complete);
-    assert!(fixture.read_vector(&config, &old).is_some());
+    assert!(fixture.get_vector_by_search_hash(&config, &old).is_some());
     assert_eq!(server.take_requests().len(), 1);
     assert_eq!(fixture.capture_corpus(), before);
     let new = fixture.publish("a.md", "new knowledge");
-    assert_eq!(fixture.read_vector(&config, &new), None);
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &new), None);
     assert!(
         unwrap_current(
             fixture
                 .open_storage()
-                .begin_read()
+                .begin_read_tx()
                 .unwrap()
-                .read_next_embedding_work(&config.get_identity(), 1, None)
+                .get_next_embedding_work_by_id_and_max_attempts(&config.get_identity(), 1, None)
                 .unwrap()
         )
         .is_some()
@@ -614,7 +656,7 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
 
 #[test]
 fn reset_during_http_discards_old_result_without_old_cleanup() {
-    // Given
+    // Given: a model reset while an embedding request is in flight.
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     fixture.write_config(&server.get_base_url(), 0);
@@ -623,19 +665,19 @@ fn reset_during_http_discards_old_result_without_old_cleanup() {
     let worker = Operation::spawn(barrier.clone(), move || service.drain().unwrap());
     barrier.wait_until_entered();
     let next = fixture.write_config(&server.get_base_url(), 1);
-    fixture.open_service().read_configuration().unwrap();
+    fixture.open_service().get_configuration().unwrap();
     let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(storage.begin_vector_write(&next.get_identity()).unwrap());
+    let mut unit = unwrap_current(storage.begin_vector_write_tx(&next.get_identity()).unwrap());
     unit.store_vector(&hash, &[1., 2., 3.], 3).unwrap();
     unit.set_query_error(7, "current failure").unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
-    // When
+    // When: the obsolete response arrives.
     barrier.release();
-    // Then
+    // Then: the result is discarded without cleaning up current vectors.
     assert_eq!(worker.join().unwrap(), DrainOutcome::ConfigChanged);
-    assert!(fixture.read_vector(&next, &hash).is_some());
-    assert_eq!(fixture.read_query_error().unwrap().error, "current failure");
+    assert!(fixture.get_vector_by_search_hash(&next, &hash).is_some());
+    assert_eq!(fixture.get_query_error().unwrap().error, "current failure");
     assert_eq!(fixture.capture_corpus(), before);
 }
 
@@ -669,18 +711,18 @@ fn late_old_query_success_or_error_cannot_replace_new_query_state() {
             matches!(outcome, QueryEmbedding::Available { .. }),
             new_success
         );
-        let error = fixture.read_query_error();
+        let error = fixture.get_query_error();
         let before = fixture.capture_corpus();
         barrier.release();
         assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
-        assert_eq!(fixture.read_query_error(), error);
+        assert_eq!(fixture.get_query_error(), error);
         assert_eq!(fixture.capture_corpus(), before);
     }
 }
 
 #[test]
 fn query_rechecks_dimension_established_during_http() {
-    // Given
+    // Given: native dimensions established during a query request.
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
@@ -691,17 +733,21 @@ fn query_rechecks_dimension_established_during_http() {
     });
     barrier.wait_until_entered();
     let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
-    // When
+    // When: the query provider response returns.
     barrier.release();
-    // Then
+    // Then: the established dimensions are checked again.
     assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
-    assert!(fixture.read_query_error().is_some());
+    assert!(fixture.get_query_error().is_some());
     assert_eq!(
-        fixture.read_vector(&config, &hash),
+        fixture.get_vector_by_search_hash(&config, &hash),
         Some(vec![1., 2., 3., 4.])
     );
     assert_eq!(fixture.capture_corpus(), before);
@@ -709,7 +755,7 @@ fn query_rechecks_dimension_established_during_http() {
 
 #[test]
 fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
-    // Given
+    // Given: referenced, skipped, exhausted and orphan embedding rows.
     let fixture = Fixture::new();
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 1);
@@ -720,7 +766,11 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     let mut storage = fixture.open_storage();
     storage.reset_vectors(None, &config.get_identity()).unwrap();
     let orphan = Sha256::digest(b"orphan");
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     unit.reserve_attempt(&exhausted, 2).unwrap();
     unit.reserve_attempt(&exhausted, 2).unwrap();
     unit.reserve_attempt(&skipped, 2).unwrap();
@@ -732,24 +782,33 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     unit.store_vector(&orphan, &[1., 2., 3.], 3).unwrap();
     unit.commit().unwrap();
     let before = fixture.capture_corpus();
-    // When / Then
+    // When / Then: the drain performs cleanup; referenced rows survive and orphans are removed.
     assert_eq!(
         fixture.open_service().drain().unwrap(),
         DrainOutcome::Complete
     );
-    assert_eq!(fixture.read_vector(&config, &orphan), None);
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &orphan), None);
     assert_eq!(
-        fixture.read_failure(&config, &exhausted).unwrap().attempts,
+        fixture
+            .get_failure_by_search_hash(&config, &exhausted)
+            .unwrap()
+            .attempts,
         2
     );
-    assert_eq!(fixture.read_failure(&config, &skipped).unwrap().attempts, 1);
-    assert_eq!(fixture.read_failure(&config, &orphan), None);
-    assert!(fixture.read_vector(&config, &known).is_some());
+    assert_eq!(
+        fixture
+            .get_failure_by_search_hash(&config, &skipped)
+            .unwrap()
+            .attempts,
+        1
+    );
+    assert_eq!(fixture.get_failure_by_search_hash(&config, &orphan), None);
+    assert!(fixture.get_vector_by_search_hash(&config, &known).is_some());
     assert!(
         storage
-            .begin_read()
+            .begin_read_tx()
             .unwrap()
-            .read_node(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
+            .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
             .unwrap()
             .is_some()
     );
@@ -767,18 +826,18 @@ fn vector_storage_failure_propagates_internal_error_without_false_provider_failu
     let mut service = fixture.open_service();
     let db = Connection::open(fixture.root.path().join("vectors")).unwrap();
     db.execute_batch(
-        "CREATE TRIGGER reject_key BEFORE INSERT ON vector_keys
-        BEGIN SELECT RAISE(ABORT, 'private storage payload'); END;",
+        "create trigger reject_key before insert on vector_keys
+        begin select raise(abort, 'private storage payload'); end;",
     )
     .unwrap();
     // When
     let error = service.drain().unwrap_err();
-    db.execute_batch("DROP TRIGGER reject_key;").unwrap();
+    db.execute_batch("drop trigger reject_key;").unwrap();
     // Then
     assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
     assert!(!format!("{error:?}").contains("private"));
-    assert_eq!(fixture.read_vector(&config, &hash), None);
-    let failed = fixture.read_failure(&config, &hash).unwrap();
+    assert_eq!(fixture.get_vector_by_search_hash(&config, &hash), None);
+    let failed = fixture.get_failure_by_search_hash(&config, &hash).unwrap();
     assert_eq!(failed.attempts, 1);
     assert_eq!(failed.error, None);
     assert_eq!(fixture.capture_corpus(), before);
@@ -797,10 +856,10 @@ fn valid_shape_with_invalid_endpoint_does_not_reset_or_compute() {
     let before = fixture.capture_corpus();
     // When / Then
     assert!(matches!(
-        fixture.open_service().read_configuration().unwrap(),
+        fixture.open_service().get_configuration().unwrap(),
         ConfigState::Invalid(_)
     ));
-    assert!(fixture.read_vector(&prior, &hash).is_some());
+    assert!(fixture.get_vector_by_search_hash(&prior, &hash).is_some());
     assert!(server.take_requests().is_empty());
     assert_eq!(fixture.capture_corpus(), before);
 }
@@ -817,7 +876,7 @@ fn captured_query_checks_identity_before_http_and_before_diagnostic_commit() {
             let next = fixture.write_config(&server.get_base_url(), 1);
             seed_query_error(&fixture, &next);
         }
-        let error = fixture.read_query_error();
+        let error = fixture.get_query_error();
         // When
         let result = fixture
             .open_service()
@@ -830,7 +889,7 @@ fn captured_query_checks_identity_before_http_and_before_diagnostic_commit() {
         // Then
         assert_eq!(result, QueryEmbedding::Unavailable);
         assert!(server.take_requests().is_empty());
-        assert_eq!(fixture.read_query_error(), error);
+        assert_eq!(fixture.get_query_error(), error);
     }
 }
 
@@ -845,7 +904,7 @@ fn captured_query_preserves_replacement_diagnostics_after_http() {
         let fixture = Fixture::new();
         let (server, barrier) = start_paused(body);
         let captured = fixture.write_config(&server.get_base_url(), 0);
-        fixture.open_service().read_configuration().unwrap();
+        fixture.open_service().get_configuration().unwrap();
         let mut service = fixture.open_service();
         let worker = Operation::spawn(barrier.clone(), move || {
             service
@@ -860,12 +919,12 @@ fn captured_query_preserves_replacement_diagnostics_after_http() {
         let next = fixture.write_config(&server.get_base_url(), 1);
         seed_query_error(&fixture, &next);
         // When
-        let error = fixture.read_query_error();
+        let error = fixture.get_query_error();
         barrier.release();
         // Then
         assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
         assert_eq!(server.take_requests().len(), 1);
-        assert_eq!(fixture.read_query_error(), error);
+        assert_eq!(fixture.get_query_error(), error);
     }
 }
 
@@ -879,7 +938,7 @@ fn captured_query_validates_pinned_and_newly_established_dimensions() {
         body: r#"{"model":"fixture-alias","embeddings":[[1,2]]}"#.into(),
     });
     let captured = fixture.write_config(&server.get_base_url(), 0);
-    fixture.open_service().read_configuration().unwrap();
+    fixture.open_service().get_configuration().unwrap();
     // When
     let result = fixture
         .open_service()
@@ -893,23 +952,23 @@ fn captured_query_validates_pinned_and_newly_established_dimensions() {
     assert_eq!(result, QueryEmbedding::Unavailable);
     assert_eq!(server.take_requests().len(), 1);
     assert_eq!(
-        fixture.read_query_error().unwrap().error,
+        fixture.get_query_error().unwrap().error,
         "invalid embedding response"
     );
 }
 
 #[test]
 fn captured_query_rejects_dimensions_established_during_http() {
-    // Given
+    // Given: captured query dimensions established while HTTP is pending.
     // First document vector can establish another size while inference is paused.
     let fixture = Fixture::new();
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let captured = fixture.write_config(&server.get_base_url(), 0);
     let hash = fixture.publish("a.md", "knowledge");
-    fixture.open_service().read_configuration().unwrap();
+    fixture.open_service().get_configuration().unwrap();
     let config = captured.clone();
     let mut service = fixture.open_service();
-    // When
+    // When: the captured query response returns.
     let worker = Operation::spawn(barrier.clone(), move || {
         service
             .embed_query_with_config(QueryEmbeddingRequest {
@@ -921,19 +980,23 @@ fn captured_query_rejects_dimensions_established_during_http() {
     });
     barrier.wait_until_entered();
     let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
     unit.commit().unwrap();
     barrier.release();
-    // Then
+    // Then: the newly established native dimensions are enforced.
     assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
     assert_eq!(server.take_requests().len(), 1);
     assert_eq!(
-        fixture.read_vector(&config, &hash),
+        fixture.get_vector_by_search_hash(&config, &hash),
         Some(vec![1., 2., 3., 4.])
     );
     assert_eq!(
-        fixture.read_query_error().unwrap().error,
+        fixture.get_query_error().unwrap().error,
         "invalid embedding response"
     );
 }
@@ -953,10 +1016,10 @@ fn captured_query_diagnostic_write_failure_remains_an_error() {
         let mut service = fixture.open_service();
         let db = Connection::open(fixture.root.path().join("vectors")).unwrap();
         db.execute_batch(
-            "CREATE TRIGGER reject_query_insert BEFORE INSERT ON query_error
-             BEGIN SELECT RAISE(ABORT, 'private diagnostic'); END;
-             CREATE TRIGGER reject_query_delete BEFORE DELETE ON query_error
-             BEGIN SELECT RAISE(ABORT, 'private diagnostic'); END;",
+            "create trigger reject_query_insert before insert on query_error
+             begin select raise(abort, 'private diagnostic'); end;
+             create trigger reject_query_delete before delete on query_error
+             begin select raise(abort, 'private diagnostic'); end;",
         )
         .unwrap();
         // When
@@ -967,13 +1030,13 @@ fn captured_query_diagnostic_write_failure_remains_an_error() {
                 dimensions: None,
             })
             .unwrap_err();
-        db.execute_batch("DROP TRIGGER reject_query_insert; DROP TRIGGER reject_query_delete;")
+        db.execute_batch("drop trigger reject_query_insert; drop trigger reject_query_delete;")
             .unwrap();
         // Then
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
         assert!(!format!("{error:?}").contains("private"));
         assert_eq!(
-            fixture.read_query_error().unwrap().error,
+            fixture.get_query_error().unwrap().error,
             "replacement diagnostic"
         );
         assert_eq!(server.take_requests().len(), 1);
@@ -982,11 +1045,15 @@ fn captured_query_diagnostic_write_failure_remains_an_error() {
 
 fn seed_query_error(fixture: &Fixture, config: &EmbeddingConfig) {
     let mut storage = fixture.open_storage();
-    let observed = storage.begin_read().unwrap().get_config_identity();
+    let observed = storage.begin_read_tx().unwrap().get_config_identity();
     storage
         .reset_vectors(observed.as_ref(), &config.get_identity())
         .unwrap();
-    let mut unit = unwrap_current(storage.begin_vector_write(&config.get_identity()).unwrap());
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
     unit.set_query_error(7, "replacement diagnostic").unwrap();
     unit.commit().unwrap();
 }
@@ -1014,6 +1081,18 @@ fn start_paused(body: &str) -> (HttpFixture, ResponseBarrier) {
         }),
         barrier,
     )
+}
+
+fn exhaust_attempt(fixture: &Fixture, config: &EmbeddingConfig, search_hash: &Sha256) {
+    let mut storage = fixture.open_storage();
+    let mut unit = unwrap_current(
+        storage
+            .begin_vector_write_tx(&config.get_identity())
+            .unwrap(),
+    );
+    assert!(unit.reserve_attempt(search_hash, 1).unwrap());
+    unit.record_failure(search_hash, "safe failure").unwrap();
+    unit.commit().unwrap();
 }
 
 fn unwrap_current<T>(value: VectorOutcome<T>) -> T {

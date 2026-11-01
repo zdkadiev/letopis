@@ -1,5 +1,5 @@
 use super::{
-    confined::{read_stat, require_type},
+    confined::{get_stat, require_type},
     local::{LocalFileSystem, fail_io, retry_io},
 };
 use crate::service::{DocumentError, DocumentErrorKind, DocumentResult, EmbeddingError, InitFiles};
@@ -51,7 +51,7 @@ impl LocalFileSystem {
     /// link or directory-sync failures. A failed call never removes existing state.
     pub(super) fn install_config_if_absent(&self, bytes: &[u8]) -> DocumentResult<()> {
         let directory = self.get_service_directory()?;
-        if let Some(before) = read_stat(directory, CONFIG_NAME).map_err(map_embedding)? {
+        if let Some(before) = get_stat(directory, CONFIG_NAME).map_err(map_embedding)? {
             require_type(&before, FileType::RegularFile).map_err(map_embedding)?;
             self.verify_service_directory(directory)?;
             sync_directory(directory, SyncTarget::ServiceDirectory)?;
@@ -77,7 +77,7 @@ impl LocalFileSystem {
             }
             Err(Errno::EXIST) => {
                 temporary.remove()?;
-                let Some(before) = read_stat(directory, CONFIG_NAME).map_err(map_embedding)? else {
+                let Some(before) = get_stat(directory, CONFIG_NAME).map_err(map_embedding)? else {
                     return Err(fail_io(
                         "cannot publish embedding configuration",
                         io::Error::other("winning configuration disappeared"),

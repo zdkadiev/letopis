@@ -4,7 +4,7 @@ mod support;
 use letopis::{
     domain::{KnowledgeId, Sha256},
     open_storage,
-    service::{CacheWrite, Storage, StorageErrorKind, StorageRead, VectorOutcome, VectorWrite},
+    service::{Storage, StorageErrorKind, VectorOutcome},
 };
 use rusqlite::Connection;
 use std::{
@@ -55,7 +55,7 @@ fn incompatible_existing_schemas_are_never_repaired_implicitly() {
 
 #[test]
 fn missing_and_zero_length_cache_are_unpublished() {
-    // Given
+    // Given: missing or zero-length cache databases.
     for create_empty_file in [false, true] {
         let root = create_private_directory();
         let cache = root.path().join(CACHE_DATABASE);
@@ -66,14 +66,14 @@ fn missing_and_zero_length_cache_are_unpublished() {
 
         let mut storage = open_storage(&cache, &vectors).unwrap();
 
-        // When / Then
-        assert_eq!(storage.begin_read().unwrap().get_revision(), 0);
+        // When / Then: storage opens a read transaction; the cache remains unpublished.
+        assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
     }
 }
 
 #[test]
 fn missing_and_zero_length_vectors_preserve_published_cache() {
-    // Given
+    // Given: a published cache whose vector database is absent or empty.
     for create_empty_file in [false, true] {
         let root = create_private_directory();
         let cache = root.path().join(CACHE_DATABASE);
@@ -85,12 +85,12 @@ fn missing_and_zero_length_vectors_preserve_published_cache() {
         }
 
         let mut storage = open_storage(&cache, &vectors).unwrap();
-        let mut view = storage.begin_read().unwrap();
+        let mut view = storage.begin_read_tx().unwrap();
 
-        // When / Then
+        // When / Then: cache revision and lexical results survive with no vector identity.
         assert_eq!(view.get_revision(), 1);
         assert_eq!(view.get_config_identity(), None);
-        let matches = view.match_text("searchable").unwrap();
+        let matches = view.get_text_matches_by_expression("searchable").unwrap();
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].id.as_str(), NODE_ID);
     }
@@ -98,23 +98,27 @@ fn missing_and_zero_length_vectors_preserve_published_cache() {
 
 #[test]
 fn recreated_empty_cache_preserves_healthy_vectors() {
-    // Given
+    // Given: healthy persisted vectors and a recreated empty cache.
     let root = create_private_directory();
     let cache = root.path().join(CACHE_DATABASE);
     let vectors = root.path().join(VECTOR_DATABASE);
     let canonical = root.path().join("known.md");
     fs::write(&canonical, CANONICAL_TEXT).unwrap();
     let (identity, search_hash) = seed_vector(&cache, &vectors);
-    // When / Then
+    // When / Then: the derived cache is removed and reopened; healthy vector bytes and identity survive.
     assert_healthy(&cache, &vectors, &identity, &search_hash);
     remove_database(&cache);
 
     let mut storage = open_storage(&cache, &vectors).unwrap();
-    let mut view = storage.begin_read().unwrap();
+    let mut view = storage.begin_read_tx().unwrap();
 
     assert_eq!(view.get_revision(), 0);
     assert_eq!(view.get_config_identity(), Some(identity));
-    let stored_vector = unwrap_current(view.read_vector(&identity, &search_hash).unwrap()).unwrap();
+    let stored_vector = unwrap_current(
+        view.get_vector_by_search_hash(&identity, &search_hash)
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(stored_vector, vec![0.25_f32, 0.75_f32]);
     assert_eq!(fs::read(canonical).unwrap(), CANONICAL_TEXT);
 }
@@ -151,7 +155,7 @@ fn seed_vector(cache: &Path, vectors: &Path) -> (Sha256, Sha256) {
         storage.reset_vectors(None, &identity).unwrap(),
         VectorOutcome::Current(true)
     );
-    let mut cache_write = storage.begin_cache_write().unwrap();
+    let mut cache_write = storage.begin_cache_write_tx().unwrap();
     cache_write
         .upsert_node(&support::build_knowledge(NODE_ID, NODE_TEXT))
         .unwrap();
@@ -159,7 +163,7 @@ fn seed_vector(cache: &Path, vectors: &Path) -> (Sha256, Sha256) {
         .replace_text(&KnowledgeId::parse(NODE_ID).unwrap(), NODE_TEXT)
         .unwrap();
     assert_eq!(cache_write.commit().unwrap(), 1);
-    let mut vector_write = unwrap_current(storage.begin_vector_write(&identity).unwrap());
+    let mut vector_write = unwrap_current(storage.begin_vector_write_tx(&identity).unwrap());
     vector_write
         .store_vector(&search_hash, &[0.25_f32, 0.75_f32], 2)
         .unwrap();
@@ -191,7 +195,7 @@ fn damage_database(path: &Path, damage: DatabaseDamage) -> Vec<u8> {
             };
             let connection = Connection::open(path).unwrap();
             connection
-                .execute_batch(&format!("DROP TABLE {table}"))
+                .execute_batch(&format!("drop table {table}"))
                 .unwrap();
         }
     }
@@ -200,13 +204,17 @@ fn damage_database(path: &Path, damage: DatabaseDamage) -> Vec<u8> {
 
 fn assert_healthy(cache: &Path, vectors: &Path, identity: &Sha256, search_hash: &Sha256) {
     let mut storage = open_storage(cache, vectors).unwrap();
-    let mut view = storage.begin_read().unwrap();
+    let mut view = storage.begin_read_tx().unwrap();
     assert_eq!(view.get_revision(), 1);
     assert_eq!(view.get_config_identity(), Some(*identity));
-    let matches = view.match_text("searchable").unwrap();
+    let matches = view.get_text_matches_by_expression("searchable").unwrap();
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0].id.as_str(), NODE_ID);
-    let vector = unwrap_current(view.read_vector(identity, search_hash).unwrap()).unwrap();
+    let vector = unwrap_current(
+        view.get_vector_by_search_hash(identity, search_hash)
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(vector, vec![0.25_f32, 0.75_f32]);
 }
 

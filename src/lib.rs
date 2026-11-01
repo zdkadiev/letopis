@@ -20,10 +20,10 @@ use crate::git::{GitRepository, GitWriteCleanup};
 use crate::markdown::MarkdownParser;
 use crate::process::{DetachedProcess, ProcessInput, SigintListener};
 use crate::service::{
-    BackgroundRunner, BackgroundService, CheckService, Checker, CommandError, CommandErrorKind,
-    CommandResult, DocumentError, DocumentErrorKind, DocumentRefreshService, DocumentResult,
-    EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles,
-    EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
+    BackgroundRunner, BackgroundRunnerService, CheckService, Checker, CommandError,
+    CommandErrorKind, CommandResult, DocumentError, DocumentErrorKind, DocumentRefreshService,
+    DocumentResult, EmbedLocker, Embedder, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
+    EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots,
     GraphDiagnostics, GraphDiagnosticsService, GraphService, InitService, Initializer,
     InspectionService, Inspector, ProvenanceService, Refresher, SearchService, Searcher,
     ServiceError, ServiceErrorKind, ServiceResult, SnapshotError, SnapshotErrorKind,
@@ -139,7 +139,7 @@ fn wire_traverser_with_repository(git: GitRepository) -> ServiceResult<impl Trav
     let storage = SqliteStorage::open_confined(&git.get_root().join(SERVICE_DIRECTORY), &directory)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     Ok(TraversalService {
-        storage,
+        storage: Box::new(storage),
         filesystem,
         refresher: Box::new(refresher),
         embeddings: Box::new(wire_embedding_executor_at_root(git.get_root())?),
@@ -209,8 +209,8 @@ fn wire_checker_with_repository(git: GitRepository) -> ServiceResult<impl Checke
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     Ok(CheckService::new(
         refresher,
-        storage,
-        GraphDiagnosticsService::new(),
+        Box::new(storage),
+        Box::new(GraphDiagnosticsService::new()),
         wire_source_provenance_with_repository(git)
             .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
     ))
@@ -240,7 +240,7 @@ fn wire_searcher_with_repository(git: GitRepository) -> ServiceResult<impl Searc
     let embeddings = wire_embedding_executor_at_root(git.get_root())?;
     Ok(SearchService {
         refresher,
-        storage,
+        storage: Box::new(storage),
         embeddings,
         filesystem,
         markdown: MarkdownParser::new(),
@@ -302,12 +302,15 @@ fn wire_document_refresher_with_repository(
                 cause,
             )
         })?;
-    let provenance = ProvenanceService::new(git.clone(), LocalFileSystem::open(git.get_root())?);
+    let provenance = ProvenanceService::new(
+        Box::new(git.clone()),
+        LocalFileSystem::open(git.get_root())?,
+    );
     Ok(DocumentRefreshService {
         git,
         filesystem,
         markdown: MarkdownParser::new(),
-        storage,
+        storage: Box::new(storage),
         provenance,
     })
 }
@@ -317,7 +320,7 @@ fn wire_source_provenance_with_repository(
     git: GitRepository,
 ) -> DocumentResult<impl SourceProvenance + use<>> {
     let filesystem = LocalFileSystem::open(git.get_root())?;
-    Ok(ProvenanceService::new(git, filesystem))
+    Ok(ProvenanceService::new(Box::new(git), filesystem))
 }
 
 /// Wire the existing embedding executor with confined automatic repository storage.
@@ -365,7 +368,7 @@ pub fn wire_background_runner<'a>(
 ) -> ServiceResult<impl BackgroundRunner + use<'a>> {
     let files = LocalFileSystem::open(root)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Background, cause))?;
-    Ok(BackgroundService::new(
+    Ok(BackgroundRunnerService::new(
         tasks,
         files,
         DetachedProcess::new(executable.to_path_buf(), root.to_path_buf()),

@@ -37,7 +37,7 @@ fn config_is_discoverable_and_describes_read_only_configuration() {
 
 #[test]
 fn find_help_recognizes_flags_and_every_command() {
-    // Given / When / Then
+    // When / Then: version and general help return their expected text.
     assert_eq!(
         find_help(&to_args(&["--version"])).as_deref(),
         Some("letopis 0.0.0\n")
@@ -48,9 +48,9 @@ fn find_help_recognizes_flags_and_every_command() {
             .starts_with("Usage")
     );
     for name in COMMAND_NAMES {
-        // When
+        // When: help is requested for a known command.
         let text = find_help(&to_args(&[name, "--help"])).unwrap();
-        // Then
+        // Then: the output identifies that command.
         assert!(text.contains(name), "{name}");
     }
 }

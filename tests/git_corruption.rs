@@ -28,7 +28,7 @@ fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
         let original_user_state = repo.capture_fixture_state();
         {
             let git = open_git_snapshots(repo.get_root()).unwrap();
-            assert_eq!(git.read_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
+            assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
             git.pin(&tree).unwrap();
         }
         let original = damage_object(&repo, tree.as_str(), ObjectDamage::Truncate);
@@ -48,7 +48,7 @@ fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
         // Given / When / Then: exact fixture restoration returns a fresh handle to health.
         restore_object(&repo, tree.as_str(), &original);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        assert_eq!(git.read_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
+        assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
         git.pin(&tree).unwrap();
         assert_eq!(repo.capture_fixture_state(), original_user_state);
     }
@@ -64,7 +64,7 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
         let original_user_state = repo.capture_fixture_state();
         {
             let git = open_git_snapshots(repo.get_root()).unwrap();
-            assert_eq!(git.read_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
+            assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
             git.pin(&tree).unwrap();
         }
         let original = damage_object(&repo, blob.as_str(), ObjectDamage::Truncate);
@@ -85,7 +85,7 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
         // Given / When / Then: exact fixture restoration returns a fresh handle to health.
         restore_object(&repo, blob.as_str(), &original);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        assert_eq!(git.read_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
+        assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
         git.pin(&tree).unwrap();
         assert_eq!(repo.capture_fixture_state(), original_user_state);
     }
@@ -101,7 +101,7 @@ fn missing_child_is_not_a_new_empty_snapshot() {
         let original_user_state = repo.capture_fixture_state();
         {
             let git = open_git_snapshots(repo.get_root()).unwrap();
-            assert_eq!(git.read_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
+            assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
             git.pin(&tree).unwrap();
         }
         let original = damage_object(&repo, blob.as_str(), ObjectDamage::Missing);
@@ -122,16 +122,16 @@ fn missing_child_is_not_a_new_empty_snapshot() {
         // Given / When / Then: exact fixture restoration returns a fresh handle to health.
         restore_object(&repo, blob.as_str(), &original);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        assert_eq!(git.read_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
+        assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
         git.pin(&tree).unwrap();
         assert_eq!(repo.capture_fixture_state(), original_user_state);
     }
 }
 
 fn create_tree_case(repo: &TempRepo) -> (TreeOid, BlobOid) {
-    let blob = repo.read_oid(&["hash-object", "-w", "--stdin"], Some(CANARY_BYTES));
+    let blob = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(CANARY_BYTES));
     let entry = format!("100644 blob {blob}\t{LEAF_NAME}\0");
-    let tree = repo.read_oid(&["mktree", "-z"], Some(entry.as_bytes()));
+    let tree = repo.get_oid(&["mktree", "-z"], Some(entry.as_bytes()));
     (
         TreeOid::parse(&tree).unwrap(),
         BlobOid::parse(&blob).unwrap(),

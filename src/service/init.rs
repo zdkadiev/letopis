@@ -1,7 +1,7 @@
 use super::{
-    CommandError, CommandErrorKind, CommandResult, EmbeddingProvider, GENERATED_CONFIG, InitFiles,
-    InitStorage, Initializer, StorageError, map_invalid_configuration, map_read_error,
-    validate_configuration,
+    CommandError, CommandErrorKind, CommandResult, Configuration, EmbeddingProvider,
+    EmbeddingResult, GENERATED_CONFIG, InitFiles, InitStorage, Initializer, StorageError,
+    map_invalid_configuration, map_read_error,
 };
 use crate::service::DocumentError;
 use std::{fmt, path::PathBuf};
@@ -44,8 +44,8 @@ impl fmt::Debug for InitService {
 
 impl Initializer for InitService {
     fn initialize(&mut self) -> CommandResult<()> {
-        if let Some(bytes) = self.files.read_config().map_err(map_read_error)? {
-            validate_configuration(&bytes, self.provider.as_ref())
+        if let Some(bytes) = self.files.get_config().map_err(map_read_error)? {
+            self.validate_configuration(&bytes)
                 .map_err(map_invalid_configuration)?;
         }
         let pinned = self.files.open_service_directory().map_err(map_files)?;
@@ -55,16 +55,26 @@ impl Initializer for InitService {
         self.files
             .install_config_if_absent(GENERATED_CONFIG)
             .map_err(map_files)?;
-        let Some(bytes) = self.files.read_config().map_err(map_read_error)? else {
+        let Some(bytes) = self.files.get_config().map_err(map_read_error)? else {
             return Err(CommandError::new(
                 CommandErrorKind::InternalError,
                 INIT_FAILURE,
             ));
         };
-        validate_configuration(&bytes, self.provider.as_ref())
+        self.validate_configuration(&bytes)
             .map_err(map_invalid_configuration)?;
         self.files.sync_service_state().map_err(map_files)?;
         Ok(())
+    }
+}
+
+impl InitService {
+    fn validate_configuration(&self, bytes: &[u8]) -> EmbeddingResult<Configuration> {
+        let configuration = Configuration::parse(bytes)?;
+        if let Some(config) = configuration.get_embedding_config() {
+            self.provider.validate_config(config)?;
+        }
+        Ok(configuration)
     }
 }
 
@@ -274,7 +284,7 @@ mod tests {
         }
     }
     impl StatusFiles for Files {
-        fn read_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+        fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
             self.trace.push("config");
             Ok(self.configs.borrow_mut().pop_front().flatten())
         }

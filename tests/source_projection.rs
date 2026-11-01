@@ -2,7 +2,7 @@ mod support;
 
 use letopis::{
     domain::{LineRange, Sha256},
-    service::{NodeMetadata, Refresher, Storage, StorageRead},
+    service::{NodeMetadata, Refresher, Storage},
     wire_document_refresher,
 };
 use serde_json::{Value, json};
@@ -21,7 +21,7 @@ fn publish_opaque_remote_without_local_interpretation() {
 
     refresher.refresh().unwrap();
 
-    let state = repo.read_state();
+    let state = repo.get_state();
     let NodeMetadata::Source(source) = &state.get_node(address).metadata else {
         panic!("expected remote source")
     };
@@ -51,7 +51,7 @@ fn merge_equivalent_local_ranges_with_minimum_reference_time() {
 
     refresher.refresh().unwrap();
 
-    let state = repo.read_state();
+    let state = repo.get_state();
     // When / Then
     assert_eq!(state.nodes.len(), 3);
     let NodeMetadata::Source(source) = &state.get_node("source.txt#L1-L1").metadata else {
@@ -88,7 +88,7 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
 
         // When / Then: check refreshes the real cache and returns safe file diagnostics.
         for _ in 0..2 {
-            // When / Then
+            // When / Then: the invalid file contributes no partial nodes, edges or searchable text.
             assert_eq!(
                 run_check(&repo),
                 json!({"ok":true,"result":{"errors":[{
@@ -97,10 +97,10 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
                 }]}})
             );
             let mut storage = repo.open_storage();
-            let mut view = storage.begin_read().unwrap();
-            assert!(view.list_nodes().unwrap().is_empty());
-            assert!(view.list_edges(None).unwrap().is_empty());
-            let files = view.list_files().unwrap();
+            let mut view = storage.begin_read_tx().unwrap();
+            assert!(view.get_nodes().unwrap().is_empty());
+            assert!(view.get_edges_by_source_id(None).unwrap().is_empty());
+            let files = view.get_files().unwrap();
             assert_eq!(files.len(), 2); // ReadingRepo also contains unmarked live.md.
             let bad = files
                 .iter()
@@ -111,15 +111,20 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
 
         // Given: editing away the bad link allows recovery without a cache rebuild.
         repo.write("bad.md", build_whole(3, "RepairedToken").as_bytes());
-        // When / Then
+        // When / Then: the repaired file publishes without rebuilding the cache.
         assert_eq!(run_check(&repo), json!({"ok":true,"result":{"errors":[]}}));
         let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
         assert!(!refresher.refresh().unwrap().published);
         let mut storage = repo.open_storage();
-        let mut view = storage.begin_read().unwrap();
-        assert_eq!(view.list_nodes().unwrap().len(), 1);
-        assert!(view.list_edges(None).unwrap().is_empty());
-        assert_eq!(view.match_text("RepairedToken").unwrap().len(), 1);
+        let mut view = storage.begin_read_tx().unwrap();
+        assert_eq!(view.get_nodes().unwrap().len(), 1);
+        assert!(view.get_edges_by_source_id(None).unwrap().is_empty());
+        assert_eq!(
+            view.get_text_matches_by_expression("RepairedToken")
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }
 
@@ -131,7 +136,7 @@ fn retain_last_valid_projection_after_ambiguous_source_edit() {
     repo.write("valid.md", build_external(3, "source.txt", "RetainedToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
     refresher.refresh().unwrap();
-    let before = repo.read_state();
+    let before = repo.get_state();
 
     // When
     repo.write(
@@ -142,7 +147,7 @@ fn retain_last_valid_projection_after_ambiguous_source_edit() {
 
     // Then: invalid-file policy preserves the readable effective graph and FTS.
     assert_eq!(result.invalid_files_updated, 1);
-    let invalid = repo.read_state();
+    let invalid = repo.get_state();
     assert!(!invalid.get_file("valid.md").valid);
     assert_eq!(invalid.nodes, before.nodes);
     assert_eq!(invalid.edges, before.edges);
@@ -153,7 +158,7 @@ fn retain_last_valid_projection_after_ambiguous_source_edit() {
     repo.remove("valid.md");
     // When
     refresher.refresh().unwrap();
-    let removed = repo.read_state();
+    let removed = repo.get_state();
     // Then
     assert!(removed.nodes.is_empty());
     assert!(removed.edges.is_empty());

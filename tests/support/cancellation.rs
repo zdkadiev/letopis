@@ -109,7 +109,7 @@ pub fn wait_until_index_lock_free(path: &Path) {
 }
 
 /// Capture the stable device/inode identity of the persistent lock file.
-pub fn read_lock_identity(path: &Path) -> (u64, u64) {
+pub fn get_lock_identity(path: &Path) -> (u64, u64) {
     let metadata = fs::metadata(path).expect("index lock metadata");
     (metadata.dev(), metadata.ino())
 }
