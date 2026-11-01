@@ -61,6 +61,7 @@ def build_package(binary: Path, output: Path, target: str) -> Path:
                 ('letopis', binary.read_bytes(), 0o755),
                 ('LICENSE', license_bytes, 0o644),
                 ('BUILD.json', receipt, 0o644),
+                ('THIRD_PARTY_NOTICES.txt', get_third_party_notices(), 0o644),
             ]:
                 entry = tarfile.TarInfo(name)
                 entry.size, entry.mode = len(data), mode
@@ -69,6 +70,39 @@ def build_package(binary: Path, output: Path, target: str) -> Path:
     with checksum.open('x') as destination:
         destination.write(f'{digest}  {archive.name}\n')
     return archive
+
+
+def get_third_party_notices() -> bytes:
+    metadata = json.loads(subprocess.check_output([
+        'cargo', 'metadata', '--locked', '--offline', '--format-version', '1',
+    ], cwd=ROOT, text=True))
+    notices = [b'Third-party dependencies distributed with Letopis.\n',
+               b'This bundle conservatively includes build, test and other-platform dependencies.\n']
+    for package in sorted(metadata['packages'], key=lambda item: (item['name'], item['version'])):
+        if package['name'] == 'letopis':
+            continue
+        package_root = Path(package['manifest_path']).parent
+        heading = (f"\n=== {package['name']} {package['version']} ===\n"
+                   f"License: {package.get('license')}\n"
+                   f"Authors: {', '.join(package.get('authors', []))}\n"
+                   f"Repository: {package.get('repository')}\n")
+        notices.append(heading.encode())
+        files = {path for path in package_root.rglob('*')
+                 if path.is_file() and path.name.lower().startswith(
+                     ('license', 'licence', 'copying', 'notice', 'copyright'))}
+        if package.get('license_file'):
+            files.add(package_root / package['license_file'])
+        for path in sorted(files):
+            notices.append(f"\n--- {path.relative_to(package_root)} ---\n".encode())
+            notices.append(path.read_bytes())
+            notices.append(b'\n')
+    rust_root = Path(subprocess.check_output(['rustc', '--print', 'sysroot'], text=True).strip())
+    notices.append(b'\n=== Rust standard library copyright and licenses ===\n')
+    notices.append((rust_root / 'share/doc/rust/COPYRIGHT-library.html').read_bytes())
+    notices.append(b'\n=== SQLite vec1 upstream notice ===\n')
+    source = (ROOT / 'vendor/vec1/vec1.c').read_bytes()
+    notices.append(source.split(b'*/', 1)[0] + b'*/\n')
+    return b''.join(notices)
 
 
 def run_smoke(binary: Path):

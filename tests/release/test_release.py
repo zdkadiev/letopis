@@ -23,14 +23,15 @@ class PackageTests(unittest.TestCase):
             root, binary, output = create_fixture(Path(directory))
             (root / 'unrelated.secret').write_text('must not be shipped')
             # When: an archive is built for a supported target.
-            with patch.object(release, 'ROOT', root):
+            with patch.object(release, 'ROOT', root), patch.object(release, 'get_third_party_notices', return_value=b'Dependency notices\n'):
                 archive = release.build_package(binary, output, 'aarch64-apple-darwin')
             # Then: only the executable, license and accurate receipt are shipped.
             self.assertEqual(archive.name, 'letopis-0.1.0-aarch64-apple-darwin.tar.gz')
             with tarfile.open(archive) as package:
-                self.assertEqual(package.getnames(), ['letopis', 'LICENSE', 'BUILD.json'])
+                self.assertEqual(package.getnames(), ['letopis', 'LICENSE', 'BUILD.json', 'THIRD_PARTY_NOTICES.txt'])
                 self.assertEqual(package.getmember('letopis').mode, 0o755)
                 self.assertEqual(package.extractfile('LICENSE').read(), b'MIT fixture\n')
+                self.assertEqual(package.extractfile('THIRD_PARTY_NOTICES.txt').read(), b'Dependency notices\n')
                 receipt = json.load(package.extractfile('BUILD.json'))
             self.assertEqual(receipt['version'], '0.1.0')
             self.assertEqual(receipt['target'], 'aarch64-apple-darwin')
@@ -44,7 +45,7 @@ class PackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root, binary, output = create_fixture(Path(directory))
             # When / Then: packaging fails instead of inventing a platform label.
-            with patch.object(release, 'ROOT', root):
+            with patch.object(release, 'ROOT', root), patch.object(release, 'get_third_party_notices', return_value=b'Dependency notices\n'):
                 with self.assertRaisesRegex(ValueError, 'unsupported target'):
                     release.build_package(binary, output, 'unknown-target')
 
@@ -53,7 +54,7 @@ class PackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root, binary, output = create_fixture(Path(directory), version='0.0.0')
             # When / Then: no archive is published with the wrong version inside.
-            with patch.object(release, 'ROOT', root):
+            with patch.object(release, 'ROOT', root), patch.object(release, 'get_third_party_notices', return_value=b'Dependency notices\n'):
                 with self.assertRaisesRegex(ValueError, 'binary version'):
                     release.build_package(binary, output, 'x86_64-unknown-linux-gnu')
             self.assertEqual(list(output.glob('*.tar.gz')), [])
@@ -66,7 +67,7 @@ class PackageTests(unittest.TestCase):
             existing = output / 'letopis-0.1.0-x86_64-apple-darwin.tar.gz'
             existing.write_bytes(b'previous release')
             # When / Then: a second packaging attempt fails and preserves it.
-            with patch.object(release, 'ROOT', root):
+            with patch.object(release, 'ROOT', root), patch.object(release, 'get_third_party_notices', return_value=b'Dependency notices\n'):
                 with self.assertRaises(FileExistsError):
                     release.build_package(binary, output, 'x86_64-apple-darwin')
             self.assertEqual(existing.read_bytes(), b'previous release')
@@ -77,9 +78,37 @@ class PackageTests(unittest.TestCase):
             root, binary, output = create_fixture(Path(directory))
             (root / 'LICENSE').unlink()
             # When / Then: packaging refuses an incomplete release.
-            with patch.object(release, 'ROOT', root):
+            with patch.object(release, 'ROOT', root), patch.object(release, 'get_third_party_notices', return_value=b'Dependency notices\n'):
                 with self.assertRaises(FileNotFoundError):
                     release.build_package(binary, output, 'aarch64-unknown-linux-gnu')
+
+
+    def test_notices_include_nested_dependency_and_standard_library_licenses(self):
+        # Given: a dependency with a nested notice and a Rust copyright file.
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root, _, _ = create_fixture(base)
+            dep = base / 'dependency'
+            (dep / 'nested').mkdir(parents=True)
+            (dep / 'Cargo.toml').touch()
+            (dep / 'LICENSE').write_text('Root permission text')
+            (dep / 'nested/NOTICE').write_text('Nested copyright notice')
+            rust = base / 'rust'
+            (rust / 'share/doc/rust').mkdir(parents=True)
+            (rust / 'share/doc/rust/COPYRIGHT-library.html').write_text('Rust license text')
+            (root / 'vendor/vec1').mkdir(parents=True)
+            (root / 'vendor/vec1/vec1.c').write_text('/* Vec1 blessing */\nsource bytes')
+            metadata = {'packages': [{'name': 'dependency', 'version': '1.0.0',
+                        'manifest_path': str(dep / 'Cargo.toml'), 'license': 'MIT',
+                        'authors': ['Example Author'], 'repository': 'https://example.invalid'}]}
+            # When: notices are collected from the locked dependency metadata.
+            with patch.object(release, 'ROOT', root), patch.object(
+                    release.subprocess, 'check_output', side_effect=[json.dumps(metadata), str(rust)]):
+                notices = release.get_third_party_notices()
+            # Then: all original notices, including nested files, are preserved.
+            for expected in [b'Root permission text', b'Nested copyright notice',
+                             b'Rust license text', b'Example Author', b'Vec1 blessing']:
+                self.assertIn(expected, notices)
 
 
 def create_fixture(directory, version='0.1.0'):

@@ -50,7 +50,7 @@ jobs:
           fi
           sudo env PATH="$PATH" sh tests/git/install-oracle.sh
           echo /opt/git-oracle/bin >> "$GITHUB_PATH"
-          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy --component rust-docs
           rustup default 1.95.0
           python3 --version
           test "$(rustc -vV | sed -n 's/^host: //p')" = '${{ matrix.target }}'

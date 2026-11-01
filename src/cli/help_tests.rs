@@ -37,10 +37,11 @@ fn config_is_discoverable_and_describes_read_only_configuration() {
 
 #[test]
 fn find_help_recognizes_flags_and_every_command() {
+    // Given: the supported CLI flags and known command names.
     // When / Then: version and general help return their expected text.
     assert_eq!(
         find_help(&to_args(&["--version"])).as_deref(),
-        Some("letopis 0.0.0\n")
+        Some("letopis 0.1.0\n")
     );
     assert!(
         find_help(&to_args(&["--help"]))
@@ -87,17 +88,17 @@ fn find_help_ignores_non_utf8_argv() {
 
 #[test]
 fn run_cli_prints_help_without_reading_stdin() {
-    // Given
+    // Given: output buffers and a reader that panics if stdin is read.
     let mut help = vec![];
     let mut version = vec![];
-    // When
+    // When: help and version are requested.
     let help_exit = run_cli(to_args(&["--help"]), PanicReader, &mut help);
     let version_exit = run_cli(to_args(&["--version"]), PanicReader, &mut version);
-    // Then
+    // Then: both succeed as plain text without reading stdin.
     assert_eq!(help_exit, 0);
     assert!(String::from_utf8(help).unwrap().starts_with("Usage"));
     assert_eq!(version_exit, 0);
-    assert_eq!(version, b"letopis 0.0.0\n");
+    assert_eq!(version, b"letopis 0.1.0\n");
 }
 
 #[test]
