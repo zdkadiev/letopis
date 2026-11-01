@@ -45,7 +45,7 @@ pub fn observe_stdin_wait(pid: u32, stdin: &Path) -> String {
             if number != libc::SYS_read || u64::from_str_radix(descriptor, 16).ok()? != 0 {
                 return None;
             }
-            let observed = fs::get_link(format!("/proc/{pid}/fd/0")).ok()?;
+            let observed = fs::read_link(format!("/proc/{pid}/fd/0")).ok()?;
             if observed.as_path() != stdin {
                 return None;
             }

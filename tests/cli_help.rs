@@ -84,20 +84,20 @@ fn terminal_input_uses_empty_request_without_waiting() {
 
 #[test]
 fn help_and_version_work_without_repository_stdin_or_files() {
-    // Given
+    // Given: a directory outside Git and every supported help invocation.
     let root = tempfile::tempdir().unwrap();
     let mut invocations = vec![vec!["--help"], vec!["--version"]];
     invocations.extend(COMMANDS.map(|name| vec![name, "--help"]));
     for args in invocations {
         // When: stdin stays open and is never written, so any read would hang.
         let output = spawn_without_input(&root, &args);
-        // Then
+        // Then: plain text is returned without reading stdin or creating files.
         assert_eq!(output.status.code(), Some(0), "{args:?}");
         assert!(output.stderr.is_empty(), "{args:?}");
         let stdout = String::from_utf8(output.stdout).unwrap();
         assert!(!stdout.is_empty() && !stdout.starts_with('{'), "{args:?}");
         if args == ["--version"] {
-            assert_eq!(stdout, "letopis 0.0.0\n");
+            assert_eq!(stdout, "letopis 0.1.0\n");
         }
         assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0, "{args:?}");
     }
