@@ -37,6 +37,17 @@ A new agent session often means rediscovering the same code, constraints, and de
 
 ## Installation
 
+Install with [Homebrew](https://brew.sh):
+
+```sh
+brew install zdkadiev/tap/letopis
+```
+
+Native packages are available for macOS and Linux on ARM64 and x86_64. No Rust toolchain or model provider is needed to use full-text search.
+
+<details>
+<summary><strong>Build from source</strong></summary>
+
 Build from source on macOS or Linux. You'll need rustup, a C compiler, platform build tools, and Make.
 
 ```sh
@@ -47,6 +58,8 @@ make release
 ```
 
 The pinned Rust toolchain is selected automatically. Put `target/dist/letopis` on your `PATH`.
+
+</details>
 
 ## Quick start
 
