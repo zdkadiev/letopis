@@ -3,7 +3,7 @@ mod support;
 use letopis::{
     domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, RepoPath, Sha256},
     open_filesystem,
-    service::{EmbedLocker, EmbeddingConfig, NodeMetadata, Storage, StorageRead, VectorOutcome},
+    service::{EmbedLocker, EmbeddingConfig, NodeMetadata, Storage, VectorOutcome},
 };
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{Value, json};

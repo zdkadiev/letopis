@@ -1,7 +1,7 @@
 use super::{
-    CommandError, CommandErrorKind, CommandResult, EmbeddingProvider, GENERATED_CONFIG, InitFiles,
-    InitStorage, Initializer, StorageError, map_invalid_configuration, map_read_error,
-    validate_configuration,
+    CommandError, CommandErrorKind, CommandResult, Configuration, EmbeddingProvider,
+    EmbeddingResult, GENERATED_CONFIG, InitFiles, InitStorage, Initializer, StorageError,
+    map_invalid_configuration, map_read_error,
 };
 use crate::service::DocumentError;
 use std::{fmt, path::PathBuf};
@@ -45,7 +45,7 @@ impl fmt::Debug for InitService {
 impl Initializer for InitService {
     fn initialize(&mut self) -> CommandResult<()> {
         if let Some(bytes) = self.files.get_config().map_err(map_read_error)? {
-            validate_configuration(&bytes, self.provider.as_ref())
+            self.validate_configuration(&bytes)
                 .map_err(map_invalid_configuration)?;
         }
         let pinned = self.files.open_service_directory().map_err(map_files)?;
@@ -61,10 +61,20 @@ impl Initializer for InitService {
                 INIT_FAILURE,
             ));
         };
-        validate_configuration(&bytes, self.provider.as_ref())
+        self.validate_configuration(&bytes)
             .map_err(map_invalid_configuration)?;
         self.files.sync_service_state().map_err(map_files)?;
         Ok(())
+    }
+}
+
+impl InitService {
+    fn validate_configuration(&self, bytes: &[u8]) -> EmbeddingResult<Configuration> {
+        let configuration = Configuration::parse(bytes)?;
+        if let Some(config) = configuration.get_embedding_config() {
+            self.provider.validate_config(config)?;
+        }
+        Ok(configuration)
     }
 }
 

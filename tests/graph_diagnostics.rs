@@ -5,7 +5,6 @@ use letopis::{
     open_storage,
     service::{
         CommandErrorKind, CommandProblem, GraphDiagnostics, NodeMetadata, Refresher, Storage,
-        StorageRead,
     },
     wire_document_refresher, wire_graph_diagnostics,
 };
@@ -174,11 +173,14 @@ fn diagnoses_the_pinned_revision_after_another_connection_publishes_a_target() {
     let mut old = reader.begin_read_tx().unwrap();
     assert_eq!(old.get_revision(), 1);
     let diagnostics = wire_graph_diagnostics();
-    assert_eq!(diagnostics.find_problems(&mut old, &[]).unwrap().len(), 1);
+    assert_eq!(
+        diagnostics.find_problems(old.as_mut(), &[]).unwrap().len(),
+        1
+    );
 
     repo.write("missing.md", build_whole(2, "Published target"));
     let publication = writer.refresh().unwrap();
-    let problems = diagnostics.find_problems(&mut old, &[]).unwrap();
+    let problems = diagnostics.find_problems(old.as_mut(), &[]).unwrap();
 
     assert_eq!(publication.revision, 2);
     assert!(publication.published);
@@ -195,7 +197,7 @@ fn diagnoses_the_pinned_revision_after_another_connection_publishes_a_target() {
     assert_eq!(fresh.get_revision(), 2);
     assert!(
         diagnostics
-            .find_problems(&mut fresh, &[])
+            .find_problems(fresh.as_mut(), &[])
             .unwrap()
             .is_empty()
     );
@@ -232,7 +234,7 @@ fn propagates_corrupt_edge_reads_instead_of_returning_clean_or_partial_findings(
     let mut view = storage.begin_read_tx().unwrap();
 
     let error = wire_graph_diagnostics()
-        .find_problems(&mut view, &[])
+        .find_problems(view.as_mut(), &[])
         .unwrap_err();
 
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
@@ -262,7 +264,7 @@ fn diagnose(repo: &DocumentRepo) -> Vec<CommandProblem> {
     .unwrap();
     let mut view = storage.begin_read_tx().unwrap();
     wire_graph_diagnostics()
-        .find_problems(&mut view, &[])
+        .find_problems(view.as_mut(), &[])
         .unwrap()
 }
 

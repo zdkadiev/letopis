@@ -5,7 +5,7 @@ use letopis::{
     open_storage,
     service::{
         DocumentErrorKind, EmbeddingFailure, NodeMetadata, Refresher, SourceMetadata, Storage,
-        StorageRead, VectorOutcome, VectorWrite,
+        VectorOutcome,
     },
     wire_document_refresher,
 };

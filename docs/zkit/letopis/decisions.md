@@ -2015,6 +2015,13 @@ refs не создают/не дописывают reflogs даже при `core
 
 **Уточняет:** D-24 (какие порты), D-96 (где живёт ureq).
 
+**Уточнение пользователя 2026-11-01:** storage transaction capabilities возвращаются
+через Box<dyn ReadTransaction/CacheWrite/VectorWrite + '_> вместо GAT. StatusStorage
+возвращает более узкий Box<dyn StorageRead + '_>. Заимствование привязано к &mut self,
+commit потребляет Box, rollback/drop/identity/pinned-revision правила сохраняются.
+Согласованная цена — allocation/dynamic dispatch; фактические замеры и ограничения
+фиксируются в плане упрощения. EmbeddingService сохраняет S для условного Send.
+
 <!-- links -->
 **Связи:** [architecture.md](architecture.md): 4. Parts; [mechanics.md](mechanics.md): Правка 2026-10-20, 4. Internal contracts
 <!-- /links -->
@@ -2033,11 +2040,20 @@ refs не создают/не дописывают reflogs даже при `core
 5. Hexagonal, принадлежность интерфейсов внутреннему слою, четыре внешние роли D-98, владение транзакциями и явная композиция в lib.rs сохраняются. main.rs остаётся тонким; CLI-обработчики вызывают сервисы.
 6. Перенос существующих Git/Markdown-модулей и обновление импортов планируются в TK-9; запись решения не означает, что код уже перенесён. Исторические спецификации, планы и evidence не переписываются; текущие инструкции и новые документы следуют этому решению.
 
+**Уточнение пользователя 2026-11-01:** все application-owned traits собраны непосредственно в `service/mod.rs`, включая Storage и scoped transaction interfaces. Прежняя возможность выделять их в приватные trait-файлы больше не применяется; для этого центрального файла допустим размер свыше обычного ориентира. Конкретные сервисы сохраняют отдельные файлы, публичные пути и контракты не меняются. Исторические записи выше сохраняют контекст решения на 2026-10-22.
+
 **Альтернативы:** названия Port/Adapter и дополнительные каталоги contracts/ports/adapters; конкретные реализации внутри mod.rs.
 
 **Почему:** ответственность видна по названию, интерфейсы сохраняют правильного владельца, а каждая реализация читается в собственном файле. Дополнительные слои каталогов не нужны для сохранения hexagonal.
 
 **Уточняет:** D-24 и D-98 (физические имена и раскладка; семантика интерфейсов не меняется).
+
+**Уточнение пользователя 2026-11-01 — shared types/errors:** публичные общие
+service values и pure validation собраны в `service/types.rs`, service errors,
+diagnostics, failure records и result aliases — в `service/error.rs`. Прежние
+`service::...` имена явно реэкспортируются. Большой размер центральных contract
+файлов допустим; implementations сервисов и другие слои остаются раздельными.
+Различия error classification, formatting и cause privacy не унифицируются.
 
 <!-- links -->
 **Связи:** [architecture.md](architecture.md#program-structure); [development.md](../../development.md); [TK-9 specification](../../superpowers/specs/2026-10-22-tk-9-storage-design.md)

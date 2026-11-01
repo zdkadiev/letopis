@@ -34,9 +34,9 @@ impl GraphDiagnosticsService {
 }
 
 impl GraphDiagnostics for GraphDiagnosticsService {
-    fn find_problems<R: StorageRead>(
+    fn find_problems(
         &self,
-        view: &mut R,
+        view: &mut dyn StorageRead,
         paths: &[RepoPath],
     ) -> CommandResult<Vec<CommandProblem>> {
         let nodes = view.get_nodes().map_err(map_read_error)?;
@@ -160,8 +160,8 @@ mod tests {
         },
         open_storage,
         service::{
-            CacheWrite, CommandErrorKind, DiagnosticKind, FileRow, GraphDiagnostics,
-            KnowledgeMetadata, NodeMetadata, Storage, StorageError, StorageErrorKind,
+            CommandErrorKind, DiagnosticKind, FileRow, GraphDiagnostics, KnowledgeMetadata,
+            NodeMetadata, Storage, StorageError, StorageErrorKind,
         },
     };
     use serde_json::json;
@@ -306,7 +306,7 @@ mod tests {
 
         // When: graph diagnostics run with the selected owners.
         let problems = GraphDiagnosticsService::new()
-            .find_problems(&mut view, &[selected.clone(), selected])
+            .find_problems(view.as_mut(), &[selected.clone(), selected])
             .unwrap();
 
         // Then: the cycle is found once before owner filtering.
@@ -345,7 +345,7 @@ mod tests {
 
         // When: graph diagnostics inspect both components.
         let problems = GraphDiagnosticsService::new()
-            .find_problems(&mut view, &[])
+            .find_problems(view.as_mut(), &[])
             .unwrap();
 
         let details: Vec<_> = problems.iter().map(|problem| &problem.details).collect();
@@ -383,7 +383,7 @@ mod tests {
 
         // When: graph diagnostics collect the findings.
         let problems = GraphDiagnosticsService::new()
-            .find_problems(&mut view, &[])
+            .find_problems(view.as_mut(), &[])
             .unwrap();
 
         let details: Vec<_> = problems.iter().map(|problem| &problem.details).collect();

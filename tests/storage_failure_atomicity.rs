@@ -1,7 +1,7 @@
 use letopis::{
     domain::Sha256,
     open_storage,
-    service::{Storage, StorageErrorKind, VectorOutcome, VectorWrite},
+    service::{Storage, StorageErrorKind, VectorOutcome},
 };
 use rusqlite::Connection;
 use tempfile::TempDir;

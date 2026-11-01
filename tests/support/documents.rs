@@ -1,7 +1,7 @@
 use letopis::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, SourceUri},
     open_storage,
-    service::{FileRow, NodeMetadata, Storage, StorageRead, StoredNode},
+    service::{FileRow, NodeMetadata, Storage, StoredNode},
 };
 use std::{fs, path::Path, process::Command};
 use tempfile::TempDir;

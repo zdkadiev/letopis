@@ -4,9 +4,9 @@ use letopis::{
     markdown::parse,
     open_embedding_files, open_storage,
     service::{
-        CacheWrite, ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind,
-        EmbeddingFailure, EmbeddingFiles, FileRow, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
-        QueryEmbeddingRequest, QueryError, Storage, StorageRead, VectorOutcome, VectorWrite,
+        ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind, EmbeddingFailure,
+        EmbeddingFiles, FileRow, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
+        QueryEmbeddingRequest, QueryError, Storage, VectorOutcome,
     },
     wire_embedder,
 };

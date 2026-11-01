@@ -1,5 +1,5 @@
 mod support;
-use letopis::service::{Storage, StorageRead};
+use letopis::service::Storage;
 use serde_json::{Value, json};
 use std::{
     fs,

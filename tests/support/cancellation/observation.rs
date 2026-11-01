@@ -286,9 +286,10 @@ mod tests {
 
     #[test]
     fn git_read_observer_recognizes_debug_and_inlined_release_frames() {
-        // Given: independent abbreviated frames from the actual debug/release native stacks.
+        // Given: independent corpus frames before and after interface consolidation.
         for caller in [
             "letopis::git::corpus::get_candidates::h123",
+            "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..CorpusLister$GT$::get_candidates::h123",
             "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..document_traits..CorpusLister$GT$::get_candidates::h123",
         ] {
             let trace = format!(

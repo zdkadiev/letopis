@@ -2,7 +2,7 @@ mod support;
 
 use letopis::{
     domain::TreeOid,
-    service::{EmbeddingConfig, NodeMetadata, Refresher, Storage, StorageRead, VectorOutcome},
+    service::{EmbeddingConfig, NodeMetadata, Refresher, Storage, VectorOutcome},
     wire_document_refresher,
 };
 use serde_json::{Value, json};

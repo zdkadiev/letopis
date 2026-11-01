@@ -2,8 +2,7 @@ mod support;
 
 use letopis::{
     service::{
-        CommandResult, Refresher, SearchLink, SearchRequest, Searcher, Storage, StorageRead,
-        VectorOutcome, VectorWrite,
+        CommandResult, Refresher, SearchLink, SearchRequest, Searcher, Storage, VectorOutcome,
     },
     wire_document_refresher, wire_searcher,
 };

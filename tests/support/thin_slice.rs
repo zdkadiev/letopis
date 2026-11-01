@@ -4,7 +4,7 @@ use crate::support::{
 };
 use letopis::{
     domain::{EdgeTarget, TreeOid},
-    service::{KnowledgeMetadata, NodeMetadata, SourceMetadata, Storage, StorageRead},
+    service::{KnowledgeMetadata, NodeMetadata, SourceMetadata, Storage},
 };
 use serde_json::{Value, json};
 use std::{

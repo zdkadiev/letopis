@@ -6,10 +6,7 @@ use letopis::{
     domain::{RepoPath, Sha256},
     markdown::parse,
     open_filesystem, open_storage,
-    service::{
-        EmbedLocker, EmbeddingConfig, EmbeddingFailure, Refresher, Storage, StorageRead,
-        VectorOutcome,
-    },
+    service::{EmbedLocker, EmbeddingConfig, EmbeddingFailure, Refresher, Storage, VectorOutcome},
     wire_document_refresher,
 };
 use serde_json::{Value, json};

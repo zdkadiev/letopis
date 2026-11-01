@@ -113,7 +113,7 @@ fn sqlite_step_child() {
     let barrier = register_sql_barrier(&storage.cache_writer, control);
     // When: stage real changes at the selected cancellation boundary.
     let mut unit = storage.begin_cache_write_tx().expect("cache unit");
-    stage(&mut unit, "b.md", "NewToken");
+    stage(unit.as_mut(), "b.md", "NewToken");
     // Then: the armed callback holds the SQL step until process termination.
     barrier.arm();
     let _ = unit.commit();
@@ -131,7 +131,7 @@ fn before_commit_child() {
     let mut control = UnixStream::connect(&paths.socket).expect("control connection");
     // When: stage real changes at the selected cancellation boundary.
     let mut unit = storage.begin_cache_write_tx().expect("cache unit");
-    stage(&mut unit, "b.md", "NewToken");
+    stage(unit.as_mut(), "b.md", "NewToken");
     // Then: keep the transaction uncommitted until process termination.
     writeln!(control, "staged").expect("staged acknowledgement");
     hold_until_parent_closes(control);
@@ -149,7 +149,7 @@ fn after_commit_child() {
     let mut control = UnixStream::connect(&paths.socket).expect("control connection");
     // When: stage real changes at the selected cancellation boundary.
     let mut unit = storage.begin_cache_write_tx().expect("cache unit");
-    stage(&mut unit, "b.md", "NewToken");
+    stage(unit.as_mut(), "b.md", "NewToken");
     let revision = unit.commit().expect("committed publication");
     // Then: acknowledge only the completed commit before awaiting cancellation.
     writeln!(control, "committed {revision}").expect("commit acknowledgement");
@@ -159,11 +159,11 @@ fn after_commit_child() {
 fn publish(paths: &Paths, id: &str, text: &str) -> u64 {
     let mut storage = open_storage(paths);
     let mut unit = storage.begin_cache_write_tx().expect("cache unit");
-    stage(&mut unit, id, text);
+    stage(unit.as_mut(), id, text);
     unit.commit().expect("publication commit")
 }
 
-fn stage<W: CacheWrite>(unit: &mut W, id: &str, text: &str) {
+fn stage(unit: &mut dyn CacheWrite, id: &str, text: &str) {
     let knowledge = KnowledgeId::parse(id).expect("knowledge id");
     let hash = Sha256::digest(text.as_bytes());
     unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
@@ -324,9 +324,9 @@ fn get_publication(paths: &Paths) -> Publication {
         revision,
         nodes,
         files,
-        old: get_text_matches_by_expression(&mut read, "OldToken"),
-        new: get_text_matches_by_expression(&mut read, "NewToken"),
-        later: get_text_matches_by_expression(&mut read, "LaterToken"),
+        old: get_text_matches_by_expression(read.as_mut(), "OldToken"),
+        new: get_text_matches_by_expression(read.as_mut(), "NewToken"),
+        later: get_text_matches_by_expression(read.as_mut(), "LaterToken"),
     }
 }
 
@@ -337,7 +337,7 @@ fn get_node_id(node: &StoredNode) -> String {
     }
 }
 
-fn get_text_matches_by_expression(read: &mut impl StorageRead, expression: &str) -> Vec<String> {
+fn get_text_matches_by_expression(read: &mut dyn StorageRead, expression: &str) -> Vec<String> {
     read.get_text_matches_by_expression(expression)
         .expect("FTS expression")
         .into_iter()

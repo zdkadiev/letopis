@@ -1,5 +1,5 @@
 use letopis::open_storage;
-use letopis::service::{Storage, StorageErrorKind, StorageRead};
+use letopis::service::{Storage, StorageErrorKind};
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::{

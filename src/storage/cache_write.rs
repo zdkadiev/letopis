@@ -64,7 +64,7 @@ impl CacheWrite for SqliteCacheWrite<'_> {
         let result = files::delete_file(&self.transaction, path);
         self.record(result)
     }
-    fn commit(self) -> StorageResult<u64> {
+    fn commit(self: Box<Self>) -> StorageResult<u64> {
         if self.failed {
             return Err(StorageError::new(
                 StorageErrorKind::InvalidRequest,
@@ -129,7 +129,7 @@ mod tests {
             lines: LineRange::new(1, 1).unwrap(),
             search_hash: Sha256::digest(b"alpha"),
         });
-        let mut write = SqliteCacheWrite::begin_tx(&mut db).unwrap();
+        let mut write = Box::new(SqliteCacheWrite::begin_tx(&mut db).unwrap());
         write.upsert_node(&node).unwrap();
         write
             .transaction

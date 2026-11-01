@@ -3,10 +3,78 @@ mod storage_support;
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
     open_storage,
-    service::{CacheWrite, Storage, StorageRead},
+    service::{ElementAddress, ReadTransaction, Storage, VectorOutcome},
 };
 use storage_support::{build_file, build_knowledge, build_source};
 use tempfile::TempDir;
+#[test]
+fn boxed_read_keeps_graph_and_storage_contracts() {
+    // Given: one knowledge node published at revision one.
+    let root = TempDir::new().unwrap();
+    let mut storage = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
+    let mut write = storage.begin_cache_write_tx().unwrap();
+    write
+        .upsert_node(&build_knowledge("a.md", "alpha"))
+        .unwrap();
+    write.commit().unwrap();
+    // When: the reader is used through the combined transaction interface.
+    let mut read: Box<dyn ReadTransaction + '_> = storage.begin_read_tx().unwrap();
+    let nodes = read.get_nodes().unwrap();
+    let reference = read
+        .get_node_ref_by_id(&ElementAddress::parse("a.md").unwrap())
+        .unwrap()
+        .unwrap();
+    // Then: storage metadata and graph identity share the same pinned publication.
+    assert_eq!(read.get_revision(), 1);
+    assert_eq!(nodes.len(), 1);
+    assert!(
+        matches!(&nodes[0].metadata, NodeMetadata::Knowledge(node) if node.id.as_str() == "a.md")
+    );
+    assert_eq!(reference.element.as_str(), "a.md");
+}
+
+#[test]
+fn boxed_storage_commit_drop_and_identity_guards() {
+    // Given: storage accessed through an object-safe application interface.
+    let root = TempDir::new().unwrap();
+    let mut concrete = open_storage(&root.path().join("c"), &root.path().join("v")).unwrap();
+    let storage: &mut dyn Storage = &mut concrete;
+    let mut committed = storage.begin_cache_write_tx().unwrap();
+    committed
+        .upsert_node(&build_knowledge("a.md", "alpha"))
+        .unwrap();
+    // When / Then: commit publishes exactly revision one.
+    assert_eq!(committed.commit().unwrap(), 1);
+    let mut abandoned = storage.begin_cache_write_tx().unwrap();
+    abandoned
+        .upsert_node(&build_knowledge("b.md", "beta"))
+        .unwrap();
+    drop(abandoned);
+    // Then: dropping a writer leaves only the committed node and revision.
+    let mut read = storage.begin_read_tx().unwrap();
+    assert_eq!(read.get_revision(), 1);
+    let nodes = read.get_nodes().unwrap();
+    assert_eq!(nodes.len(), 1);
+    assert!(
+        matches!(&nodes[0].metadata, NodeMetadata::Knowledge(node) if node.id.as_str() == "a.md")
+    );
+    assert!(
+        read.get_node_by_id(&build_target("b.md"))
+            .unwrap()
+            .is_none()
+    );
+    drop(read);
+    // Given: a current vector configuration and a different requested identity.
+    let current = Sha256::digest(b"model-a");
+    let other = Sha256::digest(b"model-b");
+    storage.reset_vectors(None, &current).unwrap();
+    // When / Then: an obsolete caller receives no writer.
+    assert!(matches!(
+        storage.begin_vector_write_tx(&other).unwrap(),
+        VectorOutcome::ConfigChanged
+    ));
+}
+
 #[test]
 fn cache_commit_preserves_node_row_id() {
     // Given: an inserted knowledge node with an initial FTS entry.

@@ -1,7 +1,7 @@
 use super::git::{ObjectFormat, OwnedChild, TempRepo, isolate_command};
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
-    service::{EmbeddingConfig, NodeMetadata, Storage, StorageRead, VectorOutcome, VectorWrite},
+    service::{EmbeddingConfig, NodeMetadata, Storage, VectorOutcome},
 };
 use std::{
     fs,

@@ -2,7 +2,7 @@ mod support;
 
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
-    service::{Checker, KnowledgeMetadata, NodeMetadata, Storage, StorageRead},
+    service::{Checker, KnowledgeMetadata, NodeMetadata, Storage},
     wire_checker,
 };
 use serde_json::{Value, json};

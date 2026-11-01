@@ -3,7 +3,7 @@ mod support;
 use letopis::{
     domain::{RepoPath, TreeOid},
     open_git_snapshots, open_storage,
-    service::{GitSnapshots, NodeMetadata, RefreshOutcome, Refresher, Storage, StorageRead},
+    service::{GitSnapshots, NodeMetadata, RefreshOutcome, Refresher, Storage},
     wire_document_refresher,
 };
 use std::fs;

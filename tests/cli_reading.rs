@@ -16,7 +16,7 @@ use letopis::{
     open_filesystem, open_git_snapshots,
     service::{
         EmbedLocker, EmbeddingExecutor, GitSnapshots, NodeMetadata, Refresher, Storage,
-        StorageRead, VectorOutcome,
+        VectorOutcome,
     },
     wire_document_refresher, wire_embedding_executor,
 };

@@ -3,10 +3,7 @@ mod support;
 use letopis::{
     domain::{EdgeTarget, KnowledgeId, Sha256},
     open_storage,
-    service::{
-        CacheWrite, EmbeddingWork, Storage, StorageErrorKind, StorageRead, VectorOutcome,
-        VectorWrite,
-    },
+    service::{EmbeddingWork, Storage, StorageErrorKind, VectorOutcome},
 };
 use rusqlite::{Connection, types::Value};
 use tempfile::TempDir;

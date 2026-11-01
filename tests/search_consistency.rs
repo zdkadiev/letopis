@@ -3,7 +3,7 @@ use letopis::{
     domain::LineRange,
     service::{
         CommandErrorKind, CommandResult, Refresher, SearchFlag, SearchLink, SearchRequest,
-        Searcher, Storage, StorageRead, VectorOutcome, VectorWrite,
+        Searcher, Storage, VectorOutcome,
     },
     wire_document_refresher, wire_searcher,
 };

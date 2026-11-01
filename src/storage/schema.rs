@@ -29,6 +29,7 @@ enum SqlText {
 pub(super) fn bootstrap_cache(connection: &mut Connection) -> StorageResult<()> {
     bootstrap_schema(connection, CACHE_SCHEMA, CACHE_SCHEMA_VERSION)
 }
+
 pub(super) fn bootstrap_vectors(connection: &mut Connection) -> StorageResult<()> {
     bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)
 }
@@ -232,7 +233,7 @@ mod tests {
     use crate::{
         domain::Sha256,
         process_test_support::supervise_test,
-        service::{Storage, StorageResult, VectorOutcome, VectorWrite},
+        service::{Storage, StorageResult, VectorOutcome},
         storage::SqliteStorage,
     };
     use rusqlite::{Connection, TransactionBehavior};
@@ -336,6 +337,7 @@ mod tests {
             bootstrap(&mut connection).unwrap();
         }
     }
+
     #[test]
     fn waiting_initializer_rechecks_committed_schema_for_both_databases() {
         for (sql, version) in [

@@ -86,7 +86,7 @@ pub(super) fn observe_request(path: &Path) -> ObservationResult<()> {
     verify_database(&vectors, VECTOR_SCHEMA_VERSION)?;
     let mut storage = open_storage(&cache, &vectors)?;
     let mut snapshot = storage.begin_read_tx()?;
-    let receipt = observe_snapshot(&mut snapshot, &request, &config)?;
+    let receipt = observe_snapshot(snapshot.as_mut(), &request, &config)?;
     let bytes = serde_json::to_vec_pretty(&receipt)?;
     let mut output = OpenOptions::new()
         .write(true)
@@ -138,8 +138,8 @@ fn verify_regular_file(path: &Path) -> ObservationResult<()> {
     Ok(())
 }
 
-fn observe_snapshot<R: StorageRead>(
-    snapshot: &mut R,
+fn observe_snapshot(
+    snapshot: &mut dyn StorageRead,
     request: &Request,
     config: &EmbeddingConfig,
 ) -> ObservationResult<Receipt> {
@@ -204,9 +204,7 @@ fn verify_dimensions(config: &EmbeddingConfig, dimensions: Option<usize>) -> Obs
     Ok(())
 }
 
-fn get_hashes<R: StorageRead>(
-    snapshot: &mut R,
-) -> ObservationResult<(Vec<(Sha256, usize)>, usize)> {
+fn get_hashes(snapshot: &mut dyn StorageRead) -> ObservationResult<(Vec<(Sha256, usize)>, usize)> {
     let mut hashes = BTreeMap::new();
     let mut sources = 0;
     for node in snapshot.get_nodes()? {
@@ -223,8 +221,8 @@ fn get_hashes<R: StorageRead>(
     Ok((hashes.into_values().collect(), sources))
 }
 
-fn get_coverage<R: StorageRead>(
-    snapshot: &mut R,
+fn get_coverage(
+    snapshot: &mut dyn StorageRead,
     config: &EmbeddingConfig,
     dimensions: Option<usize>,
     hashes: &[(Sha256, usize)],

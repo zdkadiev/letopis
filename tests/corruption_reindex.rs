@@ -1,9 +1,6 @@
 mod support;
 
-use letopis::{
-    domain::RepoPath,
-    service::{Storage, StorageRead},
-};
+use letopis::{domain::RepoPath, service::Storage};
 use rusqlite::{Connection, OpenFlags, types::Value as SqlValue};
 use serde_json::{Value, json};
 use std::{

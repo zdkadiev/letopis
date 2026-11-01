@@ -4,8 +4,7 @@ use letopis::{
     domain::Sha256,
     open_status_storage, open_storage,
     service::{
-        CacheWrite, EmbeddingStatusPolicy, StatusStorage, Storage, StorageErrorKind, StorageRead,
-        VectorOutcome, VectorWrite,
+        EmbeddingStatusPolicy, StatusStorage, Storage, StorageErrorKind, StorageRead, VectorOutcome,
     },
 };
 use rusqlite::Connection;
@@ -14,6 +13,21 @@ use std::{
     path::Path,
 };
 use tempfile::TempDir;
+
+#[test]
+fn boxed_status_read_does_not_create_missing_publication() {
+    // Given: a pinned root with no service databases.
+    let root = TempDir::new().unwrap();
+    let path = root.path().canonicalize().unwrap();
+    let pinned = File::open(&path).unwrap();
+    let mut storage = open_status_storage(&path, &pinned).unwrap();
+    // When: status requests its narrow boxed read interface.
+    let view: Option<Box<dyn StorageRead + '_>> = storage.begin_status_read_tx().unwrap();
+    // Then: no publication or durable database is created.
+    assert!(view.is_none());
+    assert!(!path.join("cache.db").exists());
+    assert!(!path.join("vectors.db").exists());
+}
 
 #[test]
 fn counts_distinct_current_hashes() {

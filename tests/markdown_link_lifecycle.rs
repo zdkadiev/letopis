@@ -8,8 +8,8 @@ use letopis::{
     markdown::parse,
     open_filesystem,
     service::{
-        CacheWrite, EmbedLocker, EmbeddingFailure, FileRow, KnowledgeMetadata, NodeMetadata,
-        SourceMetadata, Storage, StorageRead, VectorOutcome, VectorWrite,
+        EmbedLocker, EmbeddingFailure, FileRow, KnowledgeMetadata, NodeMetadata, SourceMetadata,
+        Storage, VectorOutcome,
     },
 };
 use serde_json::{Value, json};

@@ -4,8 +4,8 @@ use letopis::{
     domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, SourceUri},
     open_storage,
     service::{
-        CacheWrite, ElementAddress, GraphNeighbor, GraphNodeKey, GraphRead, NeighborCursor,
-        NeighborDirection, NeighborPageRequest, Storage, StorageErrorKind, TraversalMode,
+        ElementAddress, GraphNeighbor, GraphNodeKey, NeighborCursor, NeighborDirection,
+        NeighborPageRequest, Storage, StorageErrorKind, TraversalMode,
     },
 };
 use std::{collections::BTreeSet, num::NonZeroUsize};

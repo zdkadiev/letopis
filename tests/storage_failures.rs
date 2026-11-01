@@ -1,7 +1,7 @@
 use letopis::{
     domain::Sha256,
     open_storage,
-    service::{EmbeddingFailure, QueryError, Storage, StorageRead, VectorOutcome, VectorWrite},
+    service::{EmbeddingFailure, QueryError, Storage, VectorOutcome},
 };
 use tempfile::TempDir;
 

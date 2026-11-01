@@ -96,7 +96,7 @@ fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let graph = GraphDiagnosticsService::new();
     let mut status = StatusService {
-        storage,
+        storage: Box::new(storage),
         files: &files,
         graph: &graph,
         provenance: &provenance,

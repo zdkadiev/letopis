@@ -2,7 +2,7 @@ mod support;
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
     open_filesystem,
-    service::{EmbedLocker, NodeMetadata, Storage, StorageRead, VectorOutcome},
+    service::{EmbedLocker, NodeMetadata, Storage, VectorOutcome},
 };
 use serde_json::{Value, json};
 use std::process::Output;

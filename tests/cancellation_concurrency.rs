@@ -20,8 +20,7 @@ use letopis::{
     domain::{EdgeTarget, KnowledgeId, Sha256},
     open_filesystem,
     service::{
-        EmbeddingConfig, EmbeddingFailure, FileSystem, NodeMetadata, Storage, StorageRead,
-        VectorOutcome,
+        EmbeddingConfig, EmbeddingFailure, FileSystem, NodeMetadata, Storage, VectorOutcome,
     },
 };
 use serde_json::{Value, json};

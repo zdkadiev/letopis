@@ -3,9 +3,7 @@ mod support;
 use letopis::{
     domain::{LineRange, Sha256, SourceUri},
     open_storage,
-    service::{
-        DocumentErrorKind, Refresher, SourceAvailability, SourceReader, Storage, StorageRead,
-    },
+    service::{DocumentErrorKind, Refresher, SourceAvailability, SourceReader, Storage},
     wire_document_refresher, wire_source_reader,
 };
 use std::{fs, os::unix::fs::symlink};
@@ -33,7 +31,7 @@ fn observe_live_source_without_referrer_edits() {
     let identity = view.get_config_identity();
 
     // When: the source is observed.
-    let first = reader.get_source(&mut view, &uri).unwrap().unwrap();
+    let first = reader.get_source(view.as_mut(), &uri).unwrap().unwrap();
     // Then: current bytes are visible without referrer edits.
     assert_eq!(first.availability, SourceAvailability::Available);
     assert_eq!(
@@ -43,7 +41,7 @@ fn observe_live_source_without_referrer_edits() {
     // Given: the live source bytes change while referrers remain untouched.
     repo.write("source.txt", b"def");
     // When: the source is observed.
-    let second = reader.get_source(&mut view, &uri).unwrap().unwrap();
+    let second = reader.get_source(view.as_mut(), &uri).unwrap().unwrap();
     // Then: current bytes are visible without referrer edits.
     assert_eq!(
         second.metadata.hash.unwrap().to_hex(),
@@ -52,14 +50,14 @@ fn observe_live_source_without_referrer_edits() {
     // Given: the declared source file is removed.
     repo.remove("source.txt");
     // When: the source is observed.
-    let missing = reader.get_source(&mut view, &uri).unwrap().unwrap();
+    let missing = reader.get_source(view.as_mut(), &uri).unwrap().unwrap();
     // Then: the missing source has no observed content hash.
     assert_eq!(missing.availability, SourceAvailability::SourceNotFound);
     assert_eq!(missing.metadata.hash, None);
     // Given: the original source bytes are restored.
     repo.write("source.txt", b"abc");
     // When / Then: the source is observed; current bytes are visible without referrer edits.
-    assert_eq!(reader.get_source(&mut view, &uri).unwrap(), Some(first));
+    assert_eq!(reader.get_source(view.as_mut(), &uri).unwrap(), Some(first));
     assert_eq!(view.get_revision(), revision);
     assert_eq!(view.get_config_identity(), identity);
     assert_eq!(view.get_nodes().unwrap(), before.nodes);
@@ -85,7 +83,7 @@ fn retain_pinned_membership_while_observing_current_bytes() {
     repo.write("source.txt", b"def");
 
     // When: source bytes change after pinning.
-    let old = reader.get_source(&mut old_view, &uri).unwrap().unwrap();
+    let old = reader.get_source(old_view.as_mut(), &uri).unwrap().unwrap();
     let mut current = open_repo_storage(&repo);
     let mut new_view = current.begin_read_tx().unwrap();
 
@@ -97,7 +95,12 @@ fn retain_pinned_membership_while_observing_current_bytes() {
     );
     assert_eq!(old_view.get_revision(), revision);
     assert!(new_view.get_revision() > revision);
-    assert!(reader.get_source(&mut new_view, &uri).unwrap().is_none());
+    assert!(
+        reader
+            .get_source(new_view.as_mut(), &uri)
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -127,7 +130,10 @@ fn distinguish_missing_file_and_incomplete_range_from_available_range() {
 
     // When: each declared source range is observed.
     let range = reader
-        .get_source(&mut view, &SourceUri::parse("source.txt#L2-L2").unwrap())
+        .get_source(
+            view.as_mut(),
+            &SourceUri::parse("source.txt#L2-L2").unwrap(),
+        )
         .unwrap()
         .unwrap();
     // Then: missing, incomplete and available ranges remain distinct.
@@ -140,7 +146,7 @@ fn distinguish_missing_file_and_incomplete_range_from_available_range() {
     for address in ["source.txt#L2-L3", "missing.txt"] {
         // When: each declared source range is observed.
         let observed = reader
-            .get_source(&mut view, &SourceUri::parse(address).unwrap())
+            .get_source(view.as_mut(), &SourceUri::parse(address).unwrap())
             .unwrap()
             .unwrap();
         // Then: missing, incomplete and available ranges remain distinct.
@@ -168,7 +174,10 @@ fn reject_symlink_and_nonregular_sources_through_confined_filesystem() {
 
     // When / Then: the confined source reader observes them; unsafe entries are rejected.
     assert_eq!(
-        reader.get_source(&mut view, &uri).unwrap_err().get_kind(),
+        reader
+            .get_source(view.as_mut(), &uri)
+            .unwrap_err()
+            .get_kind(),
         DocumentErrorKind::InvalidRequest
     );
     // Given: symlink and nonregular source entries.
@@ -176,7 +185,10 @@ fn reject_symlink_and_nonregular_sources_through_confined_filesystem() {
     fs::create_dir(repo.get_root().join("source.txt")).unwrap();
     // When / Then: the confined source reader observes them; unsafe entries are rejected.
     assert_eq!(
-        reader.get_source(&mut view, &uri).unwrap_err().get_kind(),
+        reader
+            .get_source(view.as_mut(), &uri)
+            .unwrap_err()
+            .get_kind(),
         DocumentErrorKind::InvalidRequest
     );
 }
@@ -202,7 +214,7 @@ fn propagate_failed_storage_read_before_source_capture() {
 
     // When: the source reader requests stored metadata.
     let error = reader
-        .get_source(&mut view, &SourceUri::parse("source.txt").unwrap())
+        .get_source(view.as_mut(), &SourceUri::parse("source.txt").unwrap())
         .unwrap_err();
 
     // Then: the storage error propagates before filesystem capture.

@@ -3,7 +3,7 @@ mod support;
 use letopis::{
     domain::Sha256,
     open_storage,
-    service::{CacheWrite, Storage, StorageErrorKind, StorageRead, VectorOutcome, VectorWrite},
+    service::{Storage, StorageErrorKind, StorageRead, VectorOutcome},
 };
 use tempfile::TempDir;
 
@@ -95,7 +95,7 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
     publish_hash(&mut first, m1);
     let mut old = first.begin_read_tx().unwrap();
     // When / Then: old and new readers query vector state; the old view survives and late readers reject the old identity.
-    assert_nearest(&mut old, &m1, &[1.0, 0.0, 0.0]);
+    assert_nearest(old.as_mut(), &m1, &[1.0, 0.0, 0.0]);
     assert_eq!(
         unwrap_current(old.get_vector_by_search_hash(&m1, &m1).unwrap()),
         Some(vec![1.0, 0.0, 0.0])
@@ -110,13 +110,13 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
         second.reset_vectors(Some(&m1), &m2).unwrap(),
         VectorOutcome::Current(false)
     );
-    assert_nearest(&mut old, &m1, &[1.0, 0.0, 0.0]);
+    assert_nearest(old.as_mut(), &m1, &[1.0, 0.0, 0.0]);
     assert_eq!(
         unwrap_current(old.get_vector_by_search_hash(&m1, &m1).unwrap()),
         Some(vec![1.0, 0.0, 0.0])
     );
     let mut fresh = second.begin_read_tx().unwrap();
-    assert_nearest(&mut fresh, &m2, &[0.0, 1.0, 0.0, 0.0]);
+    assert_nearest(fresh.as_mut(), &m2, &[0.0, 1.0, 0.0, 0.0]);
     assert!(matches!(
         fresh.get_vector_by_search_hash(&m1, &m1).unwrap(),
         VectorOutcome::ConfigChanged
@@ -327,7 +327,7 @@ fn publish_hash(storage: &mut impl Storage, hash: Sha256) {
     unit.commit().unwrap();
 }
 
-fn assert_nearest(read: &mut impl StorageRead, identity: &Sha256, query: &[f32]) {
+fn assert_nearest(read: &mut dyn StorageRead, identity: &Sha256, query: &[f32]) {
     let matches = unwrap_current(
         read.get_nearest_vectors(identity, query, query.len())
             .unwrap(),

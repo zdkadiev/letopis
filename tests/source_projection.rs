@@ -2,7 +2,7 @@ mod support;
 
 use letopis::{
     domain::{LineRange, Sha256},
-    service::{NodeMetadata, Refresher, Storage, StorageRead},
+    service::{NodeMetadata, Refresher, Storage},
     wire_document_refresher,
 };
 use serde_json::{Value, json};

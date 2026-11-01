@@ -1,6 +1,6 @@
 mod support;
 
-use letopis::service::{NodeMetadata, Storage, StorageRead, VectorOutcome, VectorWrite};
+use letopis::service::{NodeMetadata, Storage, VectorOutcome};
 use rustix::fs::{FlockOperation, flock};
 use serde_json::{Value, json};
 use std::{

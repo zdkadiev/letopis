@@ -3,12 +3,13 @@ use super::{
     EmbedLocker, EmbeddingExecutor,
 };
 
-pub(crate) struct BackgroundService<'a, F, P> {
+pub(crate) struct BackgroundRunnerService<'a, F, P> {
     tasks: Option<&'a mut dyn EmbeddingExecutor>,
     files: F,
     process: P,
 }
-impl<'a, F: EmbedLocker, P: DrainLauncher> BackgroundService<'a, F, P> {
+
+impl<'a, F: EmbedLocker, P: DrainLauncher> BackgroundRunnerService<'a, F, P> {
     pub(crate) fn new(tasks: Option<&'a mut dyn EmbeddingExecutor>, files: F, process: P) -> Self {
         Self {
             tasks,
@@ -17,7 +18,8 @@ impl<'a, F: EmbedLocker, P: DrainLauncher> BackgroundService<'a, F, P> {
         }
     }
 }
-impl<F: EmbedLocker, P: DrainLauncher> BackgroundRunner for BackgroundService<'_, F, P> {
+
+impl<F: EmbedLocker, P: DrainLauncher> BackgroundRunner for BackgroundRunnerService<'_, F, P> {
     fn start_if_needed(&mut self) -> CommandResult<Option<CommandProblem>> {
         let Some(tasks) = self.tasks.as_deref_mut() else {
             return Ok(None);
@@ -54,7 +56,7 @@ fn build_warning() -> CommandProblem {
 
 #[cfg(test)]
 mod tests {
-    use super::BackgroundService;
+    use super::BackgroundRunnerService;
     use crate::service::{
         BackgroundRunner, CommandError, CommandErrorKind, CommandResult, DocumentError,
         DocumentErrorKind, DocumentResult, DrainLauncher, EmbedLocker, EmbeddingExecutor,
@@ -123,13 +125,14 @@ mod tests {
     #[test]
     fn generated_mocks_do_not_launch_without_work() {
         // Given
-        use crate::service::command_traits::{MockDrainLauncher, MockEmbeddingExecutor};
+        use crate::service::{MockDrainLauncher, MockEmbeddingExecutor};
         let calls = Calls::default();
         let mut tasks = MockEmbeddingExecutor::new();
         tasks.expect_has_work().times(1).returning(|| Ok(false));
         let mut process = MockDrainLauncher::new();
         process.expect_spawn_drain().times(0);
-        let mut service = BackgroundService::new(Some(&mut tasks), build_locks(&calls), process);
+        let mut service =
+            BackgroundRunnerService::new(Some(&mut tasks), build_locks(&calls), process);
 
         // When
         let result = service.start_if_needed().unwrap();
@@ -143,7 +146,8 @@ mod tests {
     fn absent_capability_does_not_probe_or_spawn() {
         // Given
         let calls = Calls::default();
-        let mut service = BackgroundService::new(None, build_locks(&calls), build_process(&calls));
+        let mut service =
+            BackgroundRunnerService::new(None, build_locks(&calls), build_process(&calls));
         // When / Then
         assert!(service.start_if_needed().unwrap().is_none());
         // Then
@@ -160,8 +164,11 @@ mod tests {
         // Given
         let calls = Calls::default();
         let mut tasks = build_tasks(&calls, Ok(true));
-        let mut service =
-            BackgroundService::new(Some(&mut tasks), build_locks(&calls), build_process(&calls));
+        let mut service = BackgroundRunnerService::new(
+            Some(&mut tasks),
+            build_locks(&calls),
+            build_process(&calls),
+        );
         // When / Then
         assert!(service.start_if_needed().unwrap().is_none());
         // Then
@@ -176,7 +183,8 @@ mod tests {
             busy: true,
             ..build_locks(&calls)
         };
-        let mut service = BackgroundService::new(Some(&mut tasks), locks, build_process(&calls));
+        let mut service =
+            BackgroundRunnerService::new(Some(&mut tasks), locks, build_process(&calls));
         // When / Then
         assert!(service.start_if_needed().unwrap().is_none());
         // Then
@@ -188,8 +196,11 @@ mod tests {
         let calls = Calls::default();
         let error = CommandError::new(CommandErrorKind::EmbeddingFailed, "cannot inspect work");
         let mut tasks = build_tasks(&calls, Err(error));
-        let mut service =
-            BackgroundService::new(Some(&mut tasks), build_locks(&calls), build_process(&calls));
+        let mut service = BackgroundRunnerService::new(
+            Some(&mut tasks),
+            build_locks(&calls),
+            build_process(&calls),
+        );
         // When / Then
         assert_eq!(
             service.start_if_needed().unwrap_err().get_kind(),
@@ -213,7 +224,7 @@ mod tests {
                 fails: !probe_fails,
                 ..build_process(&calls)
             };
-            let mut service = BackgroundService::new(Some(&mut tasks), locks, process);
+            let mut service = BackgroundRunnerService::new(Some(&mut tasks), locks, process);
             // When
             let warning = service.start_if_needed().unwrap().unwrap();
             // Then
@@ -231,14 +242,15 @@ mod tests {
     #[test]
     fn direct_drain_calls_executor_once_without_second_lock() {
         // Given
-        use crate::service::command_traits::{MockDrainLauncher, MockEmbeddingExecutor};
+        use crate::service::{MockDrainLauncher, MockEmbeddingExecutor};
         let calls = Calls::default();
         let mut tasks = MockEmbeddingExecutor::new();
         tasks.expect_drain().times(1).returning(|| Ok(()));
         tasks.expect_has_work().times(0);
         let mut process = MockDrainLauncher::new();
         process.expect_spawn_drain().times(0);
-        let mut service = BackgroundService::new(Some(&mut tasks), build_locks(&calls), process);
+        let mut service =
+            BackgroundRunnerService::new(Some(&mut tasks), build_locks(&calls), process);
 
         // When
         service.drain().unwrap();
@@ -250,7 +262,7 @@ mod tests {
     #[test]
     fn direct_drain_preserves_executor_failure() {
         // Given
-        use crate::service::command_traits::{MockDrainLauncher, MockEmbeddingExecutor};
+        use crate::service::{MockDrainLauncher, MockEmbeddingExecutor};
         let calls = Calls::default();
         let mut tasks = MockEmbeddingExecutor::new();
         tasks.expect_drain().times(1).returning(|| {
@@ -261,7 +273,8 @@ mod tests {
         });
         let mut process = MockDrainLauncher::new();
         process.expect_spawn_drain().times(0);
-        let mut service = BackgroundService::new(Some(&mut tasks), build_locks(&calls), process);
+        let mut service =
+            BackgroundRunnerService::new(Some(&mut tasks), build_locks(&calls), process);
 
         // When
         let error = service.drain().unwrap_err();

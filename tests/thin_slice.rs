@@ -15,7 +15,7 @@ mod support;
 mod thin_slice;
 
 use letopis::domain::{LineRange, Sha256};
-use letopis::service::{EmbeddingConfig, EmbeddingFailure, Storage, StorageRead, VectorOutcome};
+use letopis::service::{EmbeddingConfig, EmbeddingFailure, Storage, VectorOutcome};
 use serde_json::json;
 use std::collections::BTreeSet;
 use std::{

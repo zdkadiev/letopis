@@ -4,7 +4,7 @@ mod support;
 use letopis::{
     domain::{KnowledgeId, Sha256},
     open_storage,
-    service::{CacheWrite, Storage, StorageErrorKind, StorageRead, VectorOutcome, VectorWrite},
+    service::{Storage, StorageErrorKind, VectorOutcome},
 };
 use rusqlite::Connection;
 use std::{

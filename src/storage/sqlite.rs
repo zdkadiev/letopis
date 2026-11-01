@@ -9,6 +9,7 @@ use super::{
     vector_write::SqliteVectorWrite,
     vectors,
 };
+use crate::service::{CacheWrite, ReadTransaction, VectorWrite};
 use crate::{
     domain::Sha256,
     service::{Storage, StorageResult, VectorOutcome},
@@ -77,14 +78,16 @@ impl SqliteStorage {
         })
     }
 }
+
 impl Storage for SqliteStorage {
-    type Read<'a> = SqliteRead<'a>;
-    type VectorWrite<'a> = SqliteVectorWrite<'a>;
     fn begin_vector_write_tx(
         &mut self,
         expected: &Sha256,
-    ) -> StorageResult<VectorOutcome<Self::VectorWrite<'_>>> {
-        SqliteVectorWrite::begin_tx(&mut self.vector_writer, expected)
+    ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>> {
+        match SqliteVectorWrite::begin_tx(&mut self.vector_writer, expected)? {
+            VectorOutcome::Current(writer) => Ok(VectorOutcome::Current(Box::new(writer))),
+            VectorOutcome::ConfigChanged => Ok(VectorOutcome::ConfigChanged),
+        }
     }
     fn reset_vectors(
         &mut self,
@@ -93,12 +96,13 @@ impl Storage for SqliteStorage {
     ) -> StorageResult<VectorOutcome<bool>> {
         vectors::reset_vectors(&mut self.vector_writer, observed, desired)
     }
-    type CacheWrite<'a> = SqliteCacheWrite<'a>;
-    fn begin_cache_write_tx(&mut self) -> StorageResult<Self::CacheWrite<'_>> {
-        SqliteCacheWrite::begin_tx(&mut self.cache_writer)
+    fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>> {
+        Ok(Box::new(SqliteCacheWrite::begin_tx(
+            &mut self.cache_writer,
+        )?))
     }
-    fn begin_read_tx(&mut self) -> StorageResult<Self::Read<'_>> {
-        SqliteRead::begin_tx(&mut self.read)
+    fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
+        Ok(Box::new(SqliteRead::begin_tx(&mut self.read)?))
     }
 }
 
@@ -107,7 +111,7 @@ mod tests {
     use super::SqliteStorage;
     use crate::{
         domain::Sha256,
-        service::{Storage, StorageRead, VectorOutcome, VectorWrite},
+        service::{Storage, VectorOutcome},
     };
     use std::fs::File;
     use tempfile::TempDir;

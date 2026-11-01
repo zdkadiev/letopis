@@ -2,10 +2,7 @@
 use letopis::{
     domain::{ElementKind, KnowledgeId, LineRange, Sha256},
     open_storage,
-    service::{
-        CacheWrite, KnowledgeMetadata, NodeMetadata, Storage, StorageRead, VectorOutcome,
-        VectorWrite,
-    },
+    service::{KnowledgeMetadata, NodeMetadata, Storage, VectorOutcome},
 };
 use std::{error::Error, fs, path::Path};
 

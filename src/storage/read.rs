@@ -31,6 +31,7 @@ pub(crate) struct SqliteRead<'a> {
     revision: u64,
     config_identity: Option<Sha256>,
 }
+
 impl<'a> SqliteRead<'a> {
     /// Begin a read pinned to one cache revision and vector identity.
     ///
@@ -87,6 +88,7 @@ impl<'a> SqliteRead<'a> {
         })
     }
 }
+
 impl GraphRead for SqliteRead<'_> {
     fn get_node_ref_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
         get_node_ref_by_id(&self.transaction, id)
@@ -98,15 +100,13 @@ impl GraphRead for SqliteRead<'_> {
         get_neighbor_page(&self.transaction, request)
     }
 }
+
 impl StorageRead for SqliteRead<'_> {
     fn get_embedding_status(
         &mut self,
         policy: &EmbeddingStatusPolicy,
     ) -> StorageResult<EmbeddingStatusSummary> {
         get_embedding_status(&self.transaction, self.config_identity, policy)
-    }
-    fn get_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
-        get_source_snapshots(&self.transaction)
     }
     fn get_next_embedding_work_by_id_and_max_attempts(
         &mut self,
@@ -129,18 +129,32 @@ impl StorageRead for SqliteRead<'_> {
         }
         get_vector_dimensions(&self.transaction, VectorSchema::Attached).map(VectorOutcome::Current)
     }
-    fn get_failure_by_search_hash(
-        &mut self,
-        expected: &Sha256,
-        search_hash: &Sha256,
-    ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>> {
-        if self.config_identity != Some(*expected) {
-            return Ok(VectorOutcome::ConfigChanged);
-        }
-        get_failure_by_search_hash(&self.transaction, search_hash).map(VectorOutcome::Current)
+    fn get_node_by_id(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
+        get_node_by_id(&self.transaction, id)
     }
-    fn get_query_error(&mut self) -> StorageResult<Option<QueryError>> {
-        get_query_error(&self.transaction)
+    fn get_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
+        get_source_snapshots(&self.transaction)
+    }
+    fn get_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
+        get_nodes(&self.transaction)
+    }
+    fn get_edges_by_source_id(
+        &mut self,
+        source_id: Option<&KnowledgeId>,
+    ) -> StorageResult<Vec<Edge>> {
+        get_edges_by_source_id(&self.transaction, source_id)
+    }
+    fn get_file_by_path(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
+        get_file_by_path(&self.transaction, path)
+    }
+    fn get_files(&mut self) -> StorageResult<Vec<FileRow>> {
+        get_files(&self.transaction)
+    }
+    fn get_text_matches_by_expression(
+        &mut self,
+        expression: &str,
+    ) -> StorageResult<Vec<TextMatch>> {
+        get_text_matches_by_expression(&self.transaction, expression)
     }
     fn get_vector_by_search_hash(
         &mut self,
@@ -163,29 +177,18 @@ impl StorageRead for SqliteRead<'_> {
         }
         get_nearest_vectors(&self.transaction, query, dimensions).map(VectorOutcome::Current)
     }
-    fn get_node_by_id(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
-        get_node_by_id(&self.transaction, id)
-    }
-    fn get_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
-        get_nodes(&self.transaction)
-    }
-    fn get_edges_by_source_id(
+    fn get_failure_by_search_hash(
         &mut self,
-        source_id: Option<&KnowledgeId>,
-    ) -> StorageResult<Vec<Edge>> {
-        get_edges_by_source_id(&self.transaction, source_id)
+        expected: &Sha256,
+        search_hash: &Sha256,
+    ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>> {
+        if self.config_identity != Some(*expected) {
+            return Ok(VectorOutcome::ConfigChanged);
+        }
+        get_failure_by_search_hash(&self.transaction, search_hash).map(VectorOutcome::Current)
     }
-    fn get_file_by_path(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
-        get_file_by_path(&self.transaction, path)
-    }
-    fn get_files(&mut self) -> StorageResult<Vec<FileRow>> {
-        get_files(&self.transaction)
-    }
-    fn get_text_matches_by_expression(
-        &mut self,
-        expression: &str,
-    ) -> StorageResult<Vec<TextMatch>> {
-        get_text_matches_by_expression(&self.transaction, expression)
+    fn get_query_error(&mut self) -> StorageResult<Option<QueryError>> {
+        get_query_error(&self.transaction)
     }
     fn get_revision(&self) -> u64 {
         self.revision

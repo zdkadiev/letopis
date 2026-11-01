@@ -73,7 +73,7 @@ impl VectorWrite for SqliteVectorWrite<'_> {
         }
         result
     }
-    fn commit(self) -> StorageResult<()> {
+    fn commit(self: Box<Self>) -> StorageResult<()> {
         if self.failed {
             return Err(StorageError::new(
                 StorageErrorKind::InvalidRequest,

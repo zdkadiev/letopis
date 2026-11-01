@@ -71,7 +71,7 @@ TK-10/TK-26 process-тестам, и он не выдаётся за product-bin
 | Мутация | Ожидание | Факт |
 | --- | --- | --- |
 | `src/service/status.rs`: инверсия условия проекции `read_query_error` (`.is_some()` → `.is_none()`) | FAIL | FAILED в `query_failure_keeps_fts_and_appears_in_status` (assertion проблем status, left=`[]`); байты восстановлены, PASS |
-| `src/service/background.rs`: `Err(_) => return Ok(None)` вместо warning в lock-probe ветви | FAIL | FAILED в `drain_start_failure_warns_and_keeps_fts` (warnings assertion, `Null` ≠ массив); второй сценарий `drain_start_failure_is_absent_from_status` остаётся PASS; восстановлено, PASS |
+| `../../../../../src/service/background_runner.rs`: `Err(_) => return Ok(None)` вместо warning в lock-probe ветви | FAIL | FAILED в `drain_start_failure_warns_and_keeps_fts` (warnings assertion, `Null` ≠ массив); второй сценарий `drain_start_failure_is_absent_from_status` остаётся PASS; восстановлено, PASS |
 | `src/storage/cache_write.rs`: отключение `failed`-guard в `commit` (плановая мутация) | FAIL | **PASS** — плановое ожидание неверно: ошибку оператора уже возвращает `record`, транзакция откатывается без guard; guard — defense-in-depth |
 | `src/storage/cache_write.rs`: проглатывание ошибки `upsert_file` при рабочем guard | PASS (guard отклоняет commit) | **PASS** — guard единолично предотвращает публикацию при проглоченной ошибке |
 | Обе предыдущие одновременно | FAIL | FAILED в `uncommitted_file_diagnostic_is_absent_from_status`: child-процесс падает на собственном утверждении «refresh обязан вернуть ошибку» (committed-несмотря-на-отказ детектирован); восстановлено, PASS |

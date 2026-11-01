@@ -10,10 +10,7 @@ mod thin_slice;
 
 use letopis::{
     domain::Sha256,
-    service::{
-        Configuration, EmbeddingConfig, NodeMetadata, Storage, StorageRead, VectorOutcome,
-        VectorWrite,
-    },
+    service::{Configuration, EmbeddingConfig, NodeMetadata, Storage, VectorOutcome},
 };
 use serde_json::{Value, json};
 use std::{

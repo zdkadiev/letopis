@@ -2,7 +2,7 @@ mod support;
 
 use letopis::{
     open_git_snapshots,
-    service::{GitSnapshots, NodeMetadata, Storage, StorageRead},
+    service::{GitSnapshots, NodeMetadata, Storage},
 };
 use serde_json::{Value, json};
 use std::fs;

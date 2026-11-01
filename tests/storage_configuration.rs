@@ -1,7 +1,7 @@
 use letopis::{
     domain::Sha256,
     open_storage,
-    service::{Storage, StorageErrorKind, StorageRead, VectorOutcome, VectorWrite},
+    service::{Storage, StorageErrorKind, StorageRead, VectorOutcome},
 };
 use rusqlite::{Connection, types::Value};
 use tempfile::TempDir;
@@ -28,7 +28,7 @@ fn reset_commits_only_for_the_observed_identity_and_keeps_a_pinned_read() {
     );
     // Then: old view still sees the exact old vector and failure.
     assert_eq!(pinned.get_config_identity(), Some(a));
-    assert_state(&mut pinned, &a);
+    assert_state(pinned.as_mut(), &a);
     let mut fresh = second.begin_read_tx().unwrap();
     assert_eq!(fresh.get_config_identity(), Some(b));
     assert_eq!(
@@ -61,7 +61,7 @@ fn same_desired_identity_preserves_vectors_and_failure_bytes() {
         // When: a late observer may have captured B, A or initial absence.
         let outcome = first.reset_vectors(observed, &b).unwrap();
         // Then: vectors and failure bytes remain unchanged.
-        assert_state(&mut first.begin_read_tx().unwrap(), &b);
+        assert_state(first.begin_read_tx().unwrap().as_mut(), &b);
         assert_eq!(get_failure_bytes(&root), before);
         assert_eq!(outcome, VectorOutcome::Current(false));
     }
@@ -85,7 +85,7 @@ fn obsolete_and_absent_observations_preserve_the_winning_identity_and_work() {
         // When: a stale reset is attempted.
         let outcome = first.reset_vectors(observed.as_ref(), &a).unwrap();
         // Then: state before the result, so a compiling mutation fails on lost work.
-        assert_state(&mut first.begin_read_tx().unwrap(), &b);
+        assert_state(first.begin_read_tx().unwrap().as_mut(), &b);
         assert_eq!(get_failure_bytes(&root), before);
         assert_eq!(outcome, VectorOutcome::ConfigChanged);
     }
@@ -143,7 +143,7 @@ fn seed_state(storage: &mut impl Storage, identity: &Sha256) {
     unit.commit().unwrap();
 }
 
-fn assert_state(read: &mut impl StorageRead, identity: &Sha256) {
+fn assert_state(read: &mut dyn StorageRead, identity: &Sha256) {
     assert_eq!(
         read.get_vector_by_search_hash(identity, &Sha256::digest(b"vector"))
             .unwrap(),
