@@ -1,9 +1,9 @@
 <h1 align="center">Letopis</h1>
 
-<p align="center"><strong>Project memory your coding agents can read, share, and verify.</strong></p>
+<p align="center"><strong>Shared project memory for coding agents, built on a Markdown knowledge graph.</strong></p>
 
 <p align="center">
-  Decisions, context, and source links in Markdown. Searchable across sessions. Stored beside your code.
+  Full-text and optional semantic search across the graph, files anywhere in your repo, and knowledge grounded in individual Git snapshots.
 </p>
 
 <p align="center">
