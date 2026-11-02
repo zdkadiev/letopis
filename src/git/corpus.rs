@@ -79,10 +79,11 @@ pub(super) fn get_candidates(git: &GitRepository, root: &Path) -> DocumentResult
             raw.push(0);
         }
     }
-    filter_candidates(root, &raw)
+    let filtered = filter_candidates(root, &raw)?;
+    parse_candidates(&filtered)
 }
 
-fn filter_candidates(root: &Path, raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
+fn filter_candidates(root: &Path, raw: &[u8]) -> DocumentResult<Vec<u8>> {
     let root = open(root, DIRECTORY_FLAGS, FileMode::empty()).map_err(|_| fail_listing())?;
     let mut filtered = Vec::new();
     for entry in raw
@@ -99,7 +100,7 @@ fn filter_candidates(root: &Path, raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
         filtered.extend_from_slice(entry);
         filtered.push(0);
     }
-    parse_candidates(&filtered)
+    Ok(filtered)
 }
 
 /// Check the live entry without following any component; absent tracked paths remain candidates.
