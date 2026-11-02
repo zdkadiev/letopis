@@ -30,7 +30,7 @@
 
 ## Why Letopis?
 
-- **Markdown anywhere in your repository.** Keep knowledge close to the code it describes, and edit, review, and version it with Git.
+- **Markdown anywhere in your repository.** Keep knowledge close to the code it describes, and version it with Git.
 - **A connected knowledge graph.** Follow relationships between decisions, concepts, and source code to understand the reasoning behind a change.
 - **Full-text and optional semantic search.** Find relevant knowledge by exact terms or meaning.
 - **A separate Git source snapshot for each concept.** Keep knowledge grounded in the version of code it was verified against, including earlier revisions.
@@ -68,7 +68,7 @@ The pinned Rust toolchain is selected automatically. Put `target/dist/letopis` o
 **1. Initialize your project.** Start at the root of the Git working tree where you want to keep knowledge:
 
 ```sh
-printf '%s\n' '{}' | letopis init
+letopis init # Creates the .letopis folder inside your Git repository.
 mkdir -p letopis
 ```
 
