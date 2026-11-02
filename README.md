@@ -22,7 +22,9 @@ Install with [Homebrew](https://brew.sh):
 brew install zdkadiev/tap/letopis
 ```
 
-![How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context.](assets/How-Letopis-Works-Knowledge-Flow.png)
+<p align="center">
+  <img src="assets/How-Letopis-Works-Knowledge-Flow.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="760">
+</p>
 
 ## Why Letopis?
 
