@@ -1,5 +1,7 @@
 # TK-30: чек-лист готовности (state: unready)
 
+> Tooling retired on 2026-11-02: the pilot scripts referenced below are no longer shipped in `tests/`. This readiness record is retained as historical context; it does not describe an executable current workflow.
+
 Состояние подготовки: **unready**. Ни одна платная сессия не выполнялась
 (`model_executions = 0`). `python3.12 tests/final_pilot/run.py audit --root DIR` выводит
 состояние только из явно заполненных значений manifest; отсутствие ошибок, успешный

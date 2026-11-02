@@ -78,3 +78,5 @@
 [Полный отчёт, границы и evidence](../../../../checks/TK-2/report.md), [независимое ревью](../../../../checks/TK-2/review.md), [финальная сверка](../../../../checks/TK-2/final-verification.json). Первичные Linux network/tooling неуспехи сохранены и отделены от финального PASS. Проверки не являются physical power-loss drill, production implementation, общим X-4/JCS validator или TK-3 vector lifecycle proof. G-0 остаётся открытым до остальных задач PH-0.
 
 Исходный checkout и copied design baseline сохранены. Результат изначально оставлен в отдельной ветке `TK-2` незакоммиченным по утверждённому плану. По последующему запросу пользователя TK-2 коммитится и интегрируется в `main` отдельно от design baseline; push не запрошен.
+
+2026-11-02: standalone-стенд удалён из отслеживаемого `tests/`; [архивная версия](https://github.com/zdkadiev/letopis/blob/v0.1.0/tests/publication/README.md) доступна в Git. Локальная копия с build caches сохранена в игнорируемом архиве; см. [исторические исходники](../../../../../../development.md#historical-proof-harnesses). Ранее записанные результаты относятся к своим source revisions.
