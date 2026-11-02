@@ -1,9 +1,4 @@
-<table>
-<tr>
-<td width="160" align="center" valign="middle">
-  <img src="assets/2.png" alt="Letopis logo" width="140">
-</td>
-<td valign="middle">
+<img align="left" src="assets/2.png" alt="Letopis logo" width="180">
 
 <h1 align="left">Letopis</h1>
 
@@ -25,9 +20,7 @@
   <a href="#semantic-search">Semantic search</a>
 </p>
 
-</td>
-</tr>
-</table>
+<br clear="left">
 
 <br>
 
