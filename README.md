@@ -16,12 +16,6 @@
   <a href="#semantic-search">Semantic search</a>
 </p>
 
-Install with [Homebrew](https://brew.sh):
-
-```sh
-brew install zdkadiev/tap/letopis
-```
-
 <p align="center">
   <img src="assets/How-Letopis-Works-Knowledge-Flow.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="680">
 </p>
@@ -36,6 +30,12 @@ brew install zdkadiev/tap/letopis
 - **See what needs another look.** Detect changes to linked source code and identify knowledge that needs review.
 
 ## Installation
+
+Install with [Homebrew](https://brew.sh):
+
+```sh
+brew install zdkadiev/tap/letopis
+```
 
 Native packages are available for macOS and Linux on ARM64 and x86_64. No Rust toolchain or model provider is needed to use full-text search.
 
