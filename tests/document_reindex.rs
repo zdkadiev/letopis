@@ -130,24 +130,21 @@ fn reindex_removes_deleted_unmarked_and_orphaned_projections() {
 fn reindex_source_capture_error_rolls_back_every_file() {
     // Given: retain a source binding, then replace its source with an unsafe path.
     let repo = DocumentRepo::new();
-    repo.write("source.txt", "Source");
-    repo.write("a.md", build_external(1, "source.txt", "AlphaToken"));
+    fs::create_dir(repo.get_root().join("source")).unwrap();
+    repo.write("source/source.txt", "Source");
+    repo.write("a.md", build_external(1, "source/source.txt", "AlphaToken"));
     repo.write("b.md", build_whole(2, "BravoToken"));
     let mut service = wire_document_refresher(repo.get_root()).unwrap();
     service.refresh().unwrap();
     let before = repo.get_state();
-    repo.remove("source.txt");
+    fs::remove_dir_all(repo.get_root().join("source")).unwrap();
     let outside = tempfile::tempdir().unwrap();
     fs::write(outside.path().join("private.txt"), "SECRET_OUTSIDE").unwrap();
-    symlink(
-        outside.path().join("private.txt"),
-        repo.get_root().join("source.txt"),
-    )
-    .unwrap();
+    symlink(outside.path(), repo.get_root().join("source")).unwrap();
     repo.write("b.md", build_whole(2, "ChangedToken"));
-    // When.
+    // When: reindex observes the unsafe parent.
     let error = service.reindex().unwrap_err();
-    // Then.
+    // Then: the operation fails without changing the published state.
     assert!(!format!("{error:?}").contains("SECRET_OUTSIDE"));
     assert_eq!(repo.get_state(), before);
     assert_eq!(repo.search("AlphaToken"), ["a.md"]);

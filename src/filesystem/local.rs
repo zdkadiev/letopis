@@ -63,6 +63,8 @@ pub(crate) struct LocalFileSystem {
     #[cfg(test)]
     before_open: RefCell<Option<Box<dyn FnOnce() + Send>>>,
     #[cfg(test)]
+    between_stats: RefCell<Option<Box<dyn FnOnce() + Send>>>,
+    #[cfg(test)]
     on_contention: RefCell<Option<Box<dyn FnOnce() + Send>>>,
 }
 /// Owns the kernel lock and explicitly unlocks before closing its descriptor.
@@ -94,6 +96,8 @@ impl LocalFileSystem {
             after_read: RefCell::new(None),
             #[cfg(test)]
             before_open: RefCell::new(None),
+            #[cfg(test)]
+            between_stats: RefCell::new(None),
             #[cfg(test)]
             on_contention: RefCell::new(None),
         };
@@ -250,11 +254,16 @@ impl FileSystem for LocalFileSystem {
     }
 
     fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
-        let before = self.observe_file(path.as_str())?;
-        if self.observe_file(path.as_str())? != before {
+        let before = self.observe_entry(path.as_str())?;
+        #[cfg(test)]
+        if let Some(hook) = self.between_stats.take() {
+            hook();
+        }
+        let after = self.observe_entry(path.as_str())?;
+        if !same_entry(before.as_ref(), after.as_ref()) {
             return Err(fail_changed());
         }
-        Ok(before)
+        classify_entry(before.as_ref())
     }
 
     fn get_time_ns(&self) -> DocumentResult<i64> {
@@ -500,11 +509,15 @@ impl LocalFileSystem {
     }
 
     fn observe_file(&self, path: &str) -> DocumentResult<Option<FileStat>> {
+        classify_entry(self.observe_entry(path)?.as_ref())
+    }
+
+    fn observe_entry(&self, path: &str) -> DocumentResult<Option<Stat>> {
         let observation = self
             .open_parent(path)
             .and_then(|(parent, name)| statat(parent, name, AtFlags::SYMLINK_NOFOLLOW));
         match observation {
-            Ok(stat) => build_file_stat(&stat).map(Some),
+            Ok(stat) => Ok(Some(stat)),
             Err(Errno::NOENT) => Ok(None),
             Err(cause) => Err(fail_io("cannot observe document file", cause)),
         }
@@ -563,6 +576,33 @@ fn observe_lock_descriptor(file: &File) -> DocumentResult<FileStat> {
 fn observe_descriptor(file: &impl AsFd) -> DocumentResult<FileStat> {
     let stat = fstat(file).map_err(|cause| fail_io("cannot observe open document file", cause))?;
     build_file_stat(&stat)
+}
+
+fn same_entry(before: Option<&Stat>, after: Option<&Stat>) -> bool {
+    match (before, after) {
+        (None, None) => true,
+        (Some(before), Some(after)) => {
+            before.st_dev == after.st_dev
+                && before.st_ino == after.st_ino
+                && before.st_mode == after.st_mode
+                && before.st_size == after.st_size
+                && before.st_mtime == after.st_mtime
+                && before.st_mtime_nsec == after.st_mtime_nsec
+                && before.st_ctime == after.st_ctime
+                && before.st_ctime_nsec == after.st_ctime_nsec
+        }
+        _ => false,
+    }
+}
+
+fn classify_entry(stat: Option<&Stat>) -> DocumentResult<Option<FileStat>> {
+    let Some(stat) = stat else {
+        return Ok(None);
+    };
+    if FileType::from_raw_mode(stat.st_mode) != FileType::RegularFile {
+        return Ok(None);
+    }
+    build_file_stat(stat).map(Some)
 }
 
 fn build_file_stat(stat: &Stat) -> DocumentResult<FileStat> {

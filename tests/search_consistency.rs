@@ -249,24 +249,24 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
 }
 #[test]
 fn live_confinement_error_releases_read_before_subsequent_reset() {
-    // Given
+    // Given: an in-flight search and a document parent replaced by a symlink.
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "sqlite");
+    repo.write_knowledge("dir/a.md", "sqlite");
     let (server, barrier) = start_paused("ollama");
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     wire_document_refresher(repo.get_root())
         .unwrap()
         .refresh()
         .unwrap();
-    repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
+    repo.seed_vectors(&config, &[("dir/a.md", &[1.0, 0.0])]);
     let worker = PausedSearch::spawn(repo.get_root(), barrier.clone());
     barrier.wait_until_entered();
-    std::fs::remove_file(repo.get_root().join("a.md")).unwrap();
-    std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("a.md")).unwrap();
+    std::fs::remove_dir_all(repo.get_root().join("dir")).unwrap();
+    std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("dir")).unwrap();
     barrier.release();
-    // When
+    // When: the paused search resumes.
     let error = worker.join().unwrap_err();
-    // Then
+    // Then: confinement fails and the read lock is released.
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
     assert_eq!(

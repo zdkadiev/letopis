@@ -46,33 +46,73 @@ fn get_regular_file_preserves_bytes_and_stat() {
 }
 
 #[test]
-fn reject_final_and_parent_symlinks() {
-    // Given
+fn nonregular_final_entries_are_absent_without_following_symlinks() {
+    // Given: a symlink to an external file, a directory, and a FIFO.
     let root = tempdir().unwrap();
     let outside = tempdir().unwrap();
     fs::write(outside.path().join("note.md"), b"secret").unwrap();
     symlink(outside.path().join("note.md"), root.path().join("link.md")).unwrap();
-    symlink(outside.path(), root.path().join("parent")).unwrap();
     fs::create_dir(root.path().join("directory.md")).unwrap();
+    create_fifo(&root.path().join("pipe.md"));
     let filesystem = LocalFileSystem::open(root.path()).unwrap();
-    for raw in ["link.md", "parent/note.md", "directory.md"] {
+    for raw in ["link.md", "directory.md", "pipe.md"] {
         let path = RepoPath::parse(raw).unwrap();
-        // When / Then
-        assert!(filesystem.get_file(&path).is_err());
-        assert!(filesystem.stat_file(&path).is_err());
+        // When / Then: observation and capture treat the entry as absent.
+        assert!(filesystem.stat_file(&path).unwrap().is_none());
+        assert!(filesystem.get_file(&path).unwrap().is_none());
     }
 }
 
 #[test]
-fn reject_fifo_without_blocking() {
-    // Given
+fn nonregular_entry_changes_between_observations_fail() {
+    for initial in ["missing", "symlink"] {
+        // Given: a missing path or symlink that changes into a FIFO after observation.
+        let root = tempdir().unwrap();
+        let path = root.path().join("note.md");
+        if initial == "symlink" {
+            symlink("target", &path).unwrap();
+        }
+        let filesystem = LocalFileSystem::open(root.path()).unwrap();
+        filesystem.between_stats.replace(Some(Box::new(move || {
+            if initial == "symlink" {
+                fs::remove_file(&path).unwrap();
+            }
+            create_fifo(&path);
+        })));
+        // When / Then: the changed entry is rejected instead of treated as stable absence.
+        assert!(
+            filesystem
+                .stat_file(&RepoPath::parse("note.md").unwrap())
+                .is_err()
+        );
+    }
+}
+
+#[test]
+fn reject_final_and_parent_symlinks() {
+    // Given: a symlink in a parent and a regular file replaced before opening.
     let root = tempdir().unwrap();
-    create_fifo(&root.path().join("pipe.md"));
+    let outside = tempdir().unwrap();
+    fs::write(outside.path().join("note.md"), b"secret").unwrap();
+    symlink(outside.path(), root.path().join("parent")).unwrap();
+    let path = RepoPath::parse("parent/note.md").unwrap();
     let filesystem = LocalFileSystem::open(root.path()).unwrap();
-    let path = RepoPath::parse("pipe.md").unwrap();
-    // When / Then
+    // When / Then: traversal through the parent symlink fails.
     assert!(filesystem.get_file(&path).is_err());
     assert!(filesystem.stat_file(&path).is_err());
+    let target = root.path().join("note.md");
+    fs::write(&target, b"regular").unwrap();
+    let external = outside.path().join("note.md");
+    filesystem.before_open.replace(Some(Box::new(move || {
+        fs::remove_file(&target).unwrap();
+        symlink(external, target).unwrap();
+    })));
+    // When / Then: replacement after stat fails without reading the target.
+    assert!(
+        filesystem
+            .get_file(&RepoPath::parse("note.md").unwrap())
+            .is_err()
+    );
 }
 
 #[test]

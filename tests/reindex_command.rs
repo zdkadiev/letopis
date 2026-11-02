@@ -251,24 +251,23 @@ fn reindex_preserves_author_basis_bytes_head_and_index() {
 
 #[test]
 fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
-    // Given: a prior publication and an unsafe symlink candidate.
+    // Given: a prior publication and a tracked candidate with an unsafe parent.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
+    repo.write("unsafe/note.md", b"ordinary");
+    run_git(&repo, &["add", "unsafe/note.md"]);
     reindex(&repo);
+    fs::remove_dir_all(repo.get_root().join("unsafe")).unwrap();
     let outside = tempfile::tempdir().unwrap();
     fs::write(outside.path().join("private.md"), "SECRET_OUTSIDE").unwrap();
-    std::os::unix::fs::symlink(
-        outside.path().join("private.md"),
-        repo.get_root().join("unsafe.md"),
-    )
-    .unwrap();
+    std::os::unix::fs::symlink(outside.path(), repo.get_root().join("unsafe")).unwrap();
     repo.write_knowledge("a.md", "UnpublishedToken");
     // When: the reindex command encounters the unsafe candidate.
     let response = get_response(&repo.invoke(&["reindex"], b"{}"), 1);
     // Then: a safe error is returned and the prior revision survives.
     assert_eq!(
         response,
-        json!({"ok":false,"error":{"code":"invalid_request","message":"cannot rebuild corpus index","details":{}}})
+        json!({"ok":false,"error":{"code":"internal_error","message":"cannot rebuild corpus index","details":{}}})
     );
     let mut storage = repo.open_storage();
     let mut read = storage.begin_read_tx().unwrap();

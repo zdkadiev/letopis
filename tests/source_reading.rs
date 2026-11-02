@@ -156,7 +156,7 @@ fn distinguish_missing_file_and_incomplete_range_from_available_range() {
 }
 
 #[test]
-fn reject_symlink_and_nonregular_sources_through_confined_filesystem() {
+fn nonregular_sources_are_reported_as_missing() {
     // Given: symlink and nonregular source entries.
     let repo = DocumentRepo::new();
     repo.write("source.txt", b"abc");
@@ -172,24 +172,26 @@ fn reject_symlink_and_nonregular_sources_through_confined_filesystem() {
     repo.remove("source.txt");
     symlink("a.md", repo.get_root().join("source.txt")).unwrap();
 
-    // When / Then: the confined source reader observes them; unsafe entries are rejected.
+    // When / Then: the source reader reports the nonregular entry as absent.
     assert_eq!(
         reader
             .get_source(view.as_mut(), &uri)
-            .unwrap_err()
-            .get_kind(),
-        DocumentErrorKind::InvalidRequest
+            .unwrap()
+            .unwrap()
+            .availability,
+        SourceAvailability::SourceNotFound
     );
     // Given: symlink and nonregular source entries.
     repo.remove("source.txt");
     fs::create_dir(repo.get_root().join("source.txt")).unwrap();
-    // When / Then: the confined source reader observes them; unsafe entries are rejected.
+    // When / Then: the source reader reports the nonregular entry as absent.
     assert_eq!(
         reader
             .get_source(view.as_mut(), &uri)
-            .unwrap_err()
-            .get_kind(),
-        DocumentErrorKind::InvalidRequest
+            .unwrap()
+            .unwrap()
+            .availability,
+        SourceAvailability::SourceNotFound
     );
 }
 

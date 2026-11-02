@@ -246,20 +246,19 @@ fn inspect_retains_source_through_gc_without_changing_user_git_state() {
 
 #[cfg(unix)]
 #[test]
-fn inspect_rejects_symlinked_declared_source_without_retaining_success() {
-    // Given
+fn inspect_reports_symlinked_source_as_missing() {
+    // Given: a declared source whose final entry is a symlink.
     let repo = ReadingRepo::new();
     write_references(&repo, &["source.txt"]);
     std::os::unix::fs::symlink("live.md", repo.get_root().join("source.txt")).unwrap();
     let ids = [ElementAddress::parse("source.txt").unwrap()];
-    // When
-    let error = wire_inspector(repo.get_root())
+    // When: the source is inspected.
+    let result = wire_inspector(repo.get_root())
         .unwrap()
         .inspect(&ids)
-        .unwrap_err();
-    // Then
-    assert_eq!(error.get_kind(), CommandErrorKind::InvalidRequest);
-    assert!(!error.to_string().contains("unstaged live"));
+        .unwrap();
+    // Then: it has no captured hash.
+    assert_eq!(result.elements["source.txt"].hash, None);
 }
 
 fn inspect(repo: &ReadingRepo, ids: &[&str]) -> Inspection {

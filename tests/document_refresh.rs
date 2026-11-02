@@ -8,6 +8,23 @@ use std::{fs, os::unix::fs::symlink, sync::Barrier, thread};
 use support::documents::{DocumentRepo, build_external, build_whole, get_target};
 
 #[test]
+fn refresh_publishes_regular_file_and_skips_symlink() {
+    // Given: a Markdown file and a corpus candidate symlink to it.
+    let repo = DocumentRepo::new();
+    repo.write("AGENTS.md", "# a\n");
+    symlink("AGENTS.md", repo.get_root().join("CLAUDE.md")).unwrap();
+    let mut documents = wire_document_refresher(repo.get_root()).unwrap();
+    // When: the corpus is refreshed.
+    let outcome = documents.refresh().unwrap();
+    // Then: the regular file is published and the symlink is absent from files.
+    assert!(outcome.published);
+    assert_eq!(outcome.files_updated, 1);
+    let state = repo.get_state();
+    assert_eq!(state.files.len(), 1);
+    assert_eq!(state.files[0].path.as_str(), "AGENTS.md");
+}
+
+#[test]
 fn publish_initial_empty_cache_once() {
     // Given: a fresh repository has no service directory.
     let repo = DocumentRepo::new();

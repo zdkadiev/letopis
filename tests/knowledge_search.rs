@@ -209,21 +209,29 @@ fn invalid_live_knowledge_retains_pinned_link_as_stale() {
 }
 #[test]
 fn search_propagates_non_config_io_failures() {
-    // Given
+    // Given: a tracked document whose parent becomes a symlink.
     let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "sqlite");
+    repo.write_knowledge("dir/a.md", "sqlite");
+    assert!(
+        std::process::Command::new("git")
+            .current_dir(repo.get_root())
+            .args(["add", "dir/a.md"])
+            .status()
+            .unwrap()
+            .success()
+    );
     wire_document_refresher(repo.get_root())
         .unwrap()
         .refresh()
         .unwrap();
-    std::fs::remove_file(repo.get_root().join("a.md")).unwrap();
-    std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("a.md")).unwrap();
-    // When
+    std::fs::remove_dir_all(repo.get_root().join("dir")).unwrap();
+    std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("dir")).unwrap();
+    // When: search refreshes the tracked path.
     let error = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap_err();
-    // Then
+    // Then: the unsafe parent causes an infrastructure error.
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
 }
 #[test]
