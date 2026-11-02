@@ -1,16 +1,14 @@
-<img align="left" src="assets/2.png" alt="Letopis logo" width="20%" hspace="20">
+<p align="center">
+  <img src="assets/3.png" alt="Letopis — Shared project memory for coding agents, built on a Markdown knowledge graph." width="100%">
+</p>
 
-<h2 align="left">Letopis</h2>
-
-<p align="left"><strong>Shared project memory for coding agents, built on a Markdown knowledge graph.</strong></p>
-
-<p align="left">
+<p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT">
   <img src="https://img.shields.io/badge/storage-Markdown-222222" alt="Knowledge stored in Markdown">
   <img src="https://img.shields.io/badge/interface-JSON-4c8c51" alt="JSON command-line interface">
 </p>
 
-<p align="left">
+<p align="center">
   <a href="#why-letopis">Why Letopis</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#knowledge-format">Knowledge format</a> ·
@@ -18,9 +16,6 @@
   <a href="#semantic-search">Semantic search</a>
 </p>
 
-<br clear="left">
-
-<hr>
 
 <p align="left">
   <img src="assets/1.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="780">
