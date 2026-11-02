@@ -557,6 +557,7 @@ pub trait Refresher {
 #[cfg_attr(test, mockall::automock)]
 pub trait CorpusLister {
     /// List normalized, deduplicated candidates including deleted tracked files.
+    /// Exclude final symlinks observed in the working tree; consumers must recheck paths.
     ///
     /// # Errors
     /// Reports unsupported candidate paths or Git failures.
@@ -569,15 +570,16 @@ pub trait CorpusLister {
 pub trait FileSystem {
     /// Exclusive kernel lock released when its guard is dropped.
     type IndexLock;
-    /// Observe a regular file without reading its body; stable absence is `None`.
+    /// Observe a regular file without reading its body; stable absence or a nonregular final entry is `None`.
     ///
     /// # Errors
-    /// Rejects symlinks, nonregular paths, observed changes and I/O failures.
+    /// Reports unsafe parent paths, observed changes and I/O failures.
     fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>>;
     /// Capture exact regular-file bytes, checking identity and stat around the read.
+    /// Stable absence or a nonregular final entry is `None`; symlinks are never followed.
     ///
     /// # Errors
-    /// Rejects unsafe paths, observed replacements or edits, clock and I/O failures.
+    /// Reports unsafe parent paths, observed replacements or edits, clock and I/O failures.
     fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>>;
     /// Observe wall-clock nanoseconds since the Unix epoch with checked conversion.
     ///

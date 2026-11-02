@@ -9,6 +9,20 @@ use std::fs;
 use support::{documents::build_whole, reading::ReadingRepo};
 
 #[test]
+fn check_succeeds_with_markdown_symlink() {
+    // Given: an ordinary Markdown file and a symlink candidate.
+    let repo = ReadingRepo::new();
+    repo.write("AGENTS.md", b"# a\n");
+    std::os::unix::fs::symlink("AGENTS.md", repo.get_root().join("CLAUDE.md")).unwrap();
+    // When: the real CLI checks the corpus.
+    let output = repo.invoke(&["check"], b"{}");
+    // Then: the corpus is accepted without validation errors.
+    assert!(output.status.success());
+    let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(response, json!({"ok":true,"result":{"errors":[]}}));
+}
+
+#[test]
 fn check_binary_reports_multiple_errors_and_repairs() {
     // Given: multiple invalid knowledge declarations.
     let repo = ReadingRepo::new();

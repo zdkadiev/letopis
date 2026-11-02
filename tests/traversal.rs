@@ -110,20 +110,20 @@ fn retains_last_valid_knowledge_as_stale_and_missing_source_flag() {
 
 #[test]
 fn propagates_unsafe_source_errors_without_private_paths_or_payloads() {
-    // Given
+    // Given: a declared source whose parent becomes a symlink.
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "a.md",
-        "[code](code.rs \"letopis:type=external;path=code.rs\")",
+        "[code](dir/code.rs \"letopis:type=external;path=dir/code.rs\")",
     );
-    repo.write("code.rs", b"SECRET");
+    repo.write("dir/code.rs", b"SECRET");
     let mut service = wire_traverser(repo.get_root()).unwrap();
     service.traverse(&make_request("a.md")).unwrap();
-    std::fs::remove_file(repo.get_root().join("code.rs")).unwrap();
-    std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("code.rs")).unwrap();
-    // When
+    std::fs::remove_dir_all(repo.get_root().join("dir")).unwrap();
+    std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("dir")).unwrap();
+    // When: traversal observes the source.
     let error = service.traverse(&make_request("a.md")).unwrap_err();
-    // Then
+    // Then: it reports a safe error without exposing the target.
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert!(!format!("{error:?}").contains("SECRET"));
     assert!(!error.to_string().contains("/private/tmp"));
@@ -233,39 +233,42 @@ fn resolves_markdown_shaped_source_by_stored_membership() {
 }
 
 #[test]
-fn distinguishes_nonregular_sources_from_missing_local_flags() {
-    // Given
+fn nonregular_sources_use_missing_local_flags() {
+    // Given: a missing declared local source.
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "a.md",
         "[code](code.rs \"letopis:type=external;path=code.rs\")",
     );
     let mut service = wire_traverser(repo.get_root()).unwrap();
-    // When
+    // When: traversal observes the source.
     let output = service.traverse(&make_request("a.md")).unwrap();
-    // Then
+    // Then: it reports the source as missing.
     assert_eq!(
         output.elements[0].flags,
         BTreeSet::from([SearchFlag::SourceNotFound])
     );
     std::fs::create_dir(repo.get_root().join("code.rs")).unwrap();
-    // When
-    let error = service.traverse(&make_request("a.md")).unwrap_err();
-    // Then
-    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+    // When: the source path becomes a directory.
+    let output = service.traverse(&make_request("a.md")).unwrap();
+    // Then: it remains absent and releases its read lock.
+    assert_eq!(
+        output.elements[0].flags,
+        BTreeSet::from([SearchFlag::SourceNotFound])
+    );
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     let busy: i64 = connection
         .query_row("pragma wal_checkpoint(truncate)", [], |row| row.get(0))
         .unwrap();
     assert_eq!(busy, 0);
     std::fs::remove_dir(repo.get_root().join("code.rs")).unwrap();
-    // Given
+    // Given: the source is restored as a regular file.
     repo.write("code.rs", b"now available");
     repo.write_knowledge(
         "a.md",
         "[code](code.rs \"letopis:type=external;path=code.rs\") changed",
     );
-    // When / Then
+    // When / Then: traversal observes the restored source without a missing flag.
     assert!(
         service.traverse(&make_request("a.md")).unwrap().elements[0]
             .flags
