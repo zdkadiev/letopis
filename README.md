@@ -22,18 +22,12 @@
 
 ## Why Letopis?
 
-A new agent session often means rediscovering the same code, constraints, and decisions. Letopis gives agents working in one repository a shared memory they can maintain as they work and revisit on the next task.
-
-| What you need | What Letopis gives you |
-| --- | --- |
-| Keep the reasoning behind a decision | Readable Markdown you edit, review, and version with Git. |
-| Find context for the next task | Local full-text search, with optional semantic search. |
-| Follow an idea back to its evidence | Explicit links between concepts, source files, and line ranges. |
-| Keep knowledge grounded in different code versions | Each knowledge element can record its own Git source snapshot. |
-| Notice when evidence changes | Source-change flags that tell an agent what needs review. |
-| Use knowledge from scripts and agents | JSON requests and responses, with paths and hashes for reading the original content. |
-
-**Write → check → search → follow links → verify sources.** Your files remain the source of truth; Letopis builds the search and connections around them.
+- **Carry context across agent sessions.** Keep decisions, constraints, and reasoning available for the next task.
+- **Find the context you need.** Search the knowledge graph with full-text or optional semantic search, and follow connections between concepts.
+- **Keep knowledge where it belongs.** Store Markdown anywhere in your repository; read, edit, review, and version it with Git.
+- **Trace decisions back to code.** Connect knowledge to source files and line ranges so agents can check the evidence behind a claim.
+- **Work with different code versions.** Ground each concept in its own Git source snapshot, including earlier versions of the code.
+- **See what needs another look.** Detect changes to linked source code and identify knowledge that needs review.
 
 ## Installation
 
