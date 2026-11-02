@@ -10,8 +10,6 @@
   <img src="https://img.shields.io/badge/interface-JSON-4c8c51" alt="JSON command-line interface">
 </p>
 
-<br>
-
 <p align="left">
   <a href="#why-letopis">Why Letopis</a> ·
   <a href="#quick-start">Quick start</a> ·
@@ -24,8 +22,8 @@
 
 <br>
 
-<p align="center">
-  <img src="assets/How-Letopis-Works-Knowledge-Flow.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="680">
+<p align="left">
+  <img src="assets/1.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="780">
 </p>
 
 ## Why Letopis?
@@ -94,10 +92,10 @@ Record the attempt limit and deadline when choosing a retry policy.
 
 The agent sets `created_at` to the current Unix timestamp when creating a concept and preserves it on later edits. The timestamp above is illustrative.
 
-**3. Let your agent check and search.** These pipelines send JSON requests to Letopis and receive JSON responses:
+**3. Let your agent check and search.** The agent can run `check` with its default empty request and pipe a JSON object into `search`. Both return JSON responses:
 
 ```sh
-printf '%s\n' '{}' | letopis check
+letopis check
 printf '%s\n' '{"query":"retry","limit":10}' | letopis search
 ```
 
