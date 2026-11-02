@@ -11,7 +11,6 @@
   <img src="https://img.shields.io/badge/storage-Markdown-222222" alt="Knowledge stored in Markdown">
   <img src="https://img.shields.io/badge/interface-JSON-4c8c51" alt="JSON command-line interface">
 </p>
-
 <p align="center">
   <a href="#why-letopis">Why Letopis</a> ·
   <a href="#quick-start">Quick start</a> ·
@@ -19,10 +18,14 @@
   <a href="#cli">CLI</a> ·
   <a href="#semantic-search">Semantic search</a>
 </p>
+<br>
 
-
-<p align="left">
-  <img src="assets/1.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="780">
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/2-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/2-light.png">
+    <img src="assets/3-light.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="100%">
+  </picture>
 </p>
 
 ## Why Letopis?
