@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="assets/3.png" alt="Letopis — Shared project memory for coding agents, built on a Markdown knowledge graph." width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/3-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/3-light.png">
+    <img src="assets/3-light.png" alt="Letopis — Shared project memory for coding agents, built on a Markdown knowledge graph." width="100%">
+  </picture>
 </p>
 
 <p align="center">
