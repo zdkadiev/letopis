@@ -17,18 +17,19 @@ Do not hard-code a previously observed release version or commit.
   or the user's explicit version. If Cargo already contains an unreleased version,
   offer that version rather than bumping it blindly.
 - Validate an ASCII stable SemVer triplet (no leading zeroes, each component
-  within Cargo's u64 range), newer than the last published stable version. The
-  exact `vN.N.N` must be unused remotely. Prereleases, signed/annotated tags or
-  changed destinations need a compatible agreed publication route: the current
-  workflow does not supply those controls automatically.
+  within Cargo's u64 range). A new release must be newer than the last published
+  stable version and its exact `vN.N.N` tag must be unused remotely. When resuming,
+  inspect existing release state; an existing tag is acceptable only if its SHA
+  and build match the agreed source. Prereleases, signed/annotated
+  tags or changed destinations need a compatible agreed publication route.
 - Ask the user to select/confirm the version. Explain any unassessed product
   acceptance limits before treating a major version as a maturity claim.
 
 ## 2. Prepare an isolated candidate
 
 Reuse an appropriate clean task worktree or create one through the available
-native worktree facility. The candidate branch should match `release/**` so the
-existing workflow builds it without publishing.
+native worktree facility. Use an ordinary work branch; the release workflow runs
+only for version tags, not branch pushes.
 
 Change the root package version and its matching root lock entry only. Inspect
 `src/cli/help_tests.rs` and `tests/cli_help.rs` for independent literal version
@@ -36,18 +37,23 @@ assertions. Do not mechanically replace versions in packaging fixtures, dependen
 pins, archived sources or historical documentation. Validate Cargo metadata and
 compare all non-root dependency entries with the baseline.
 
-Commit/push only approved release paths. A release invocation authorizes its
-necessary preparation, not unrelated merges, visibility changes or system setup.
-Read merge policy before choosing the final tagged commit. A merge commit can
-preserve the tested candidate SHA as an ancestor of `main`; a squash/rebase may
-change the SHA and require building the resulting commit before final review.
-Never substitute an untested newer `main` HEAD for the approved source.
+Commit/push only approved release paths. Show the proposed source scope and
+integration operation, including any existing `main` changes. Obtain approval
+for integration if it is not already authorized in the session. Merge the agreed
+scope into `main` using the repository's merge policy; preserve unrelated work.
+A squash or rebase changes the commit identity, so use the actual merged SHA.
+
+Recheck remote `main`, the package and lock versions, latest published version,
+and the exact tag/release collision. Verify the merged SHA and the agreed scope.
+Create and push the version tag on that SHA; this tag is public before artifact
+review. Never move an existing tag. If the tag already exists, resume only when
+its resolved SHA matches the agreed source and its build can be verified; otherwise
+stop for a decision.
 
 ## 3. Build once, collect exact artifacts
 
-Read `.github/workflows/release.yml`. Currently release branches produce four
-packages; `v*` tags additionally run automatic publication with generated notes.
-Watch the run whose `headSha` equals the candidate's full SHA. Require every
+The `v*` tag push starts the four-platform build without publishing a release.
+Watch the run whose tag and `headSha` match the exact merged SHA. Require every
 matrix job to succeed; do not interpret queued, skipped or cancelled builds as
 passes. The build phase includes the storage runner's `make verify`, strict docs,
 debug/release root tests, native capabilities/linkage/deadline probes, Python
@@ -58,12 +64,18 @@ Download to a fresh ignored `.artifacts/` directory. Independently verify:
 - Exactly one archive for each of `aarch64-apple-darwin`,
   `x86_64-apple-darwin`, `aarch64-unknown-linux-gnu`, and
   `x86_64-unknown-linux-gnu`.
-- Each `BUILD.json` has the approved version, target and candidate commit;
+- Each `BUILD.json` has the selected version, target and tagged merged commit;
   executable format/architecture, executable permissions, `LICENSE` and
   `THIRD_PARTY_NOTICES.txt` agree with the package.
-- Each actual archive digest agrees with its per-archive receipt and combined
-  `SHA256SUMS`. Retain these exact bytes; another build can produce different
-  gzip timestamps or builder metadata and therefore different hashes.
+- Each actual archive digest agrees with its per-archive receipt. Retain these
+  exact bytes; another build can produce different gzip timestamps or builder
+  metadata and therefore different hashes.
+
+After verifying that the four receipt filenames and hashes match the downloaded
+archives, concatenate those four receipts in a fixed target order to create
+`SHA256SUMS` in the package directory. Run `shasum -a 256 -c SHA256SUMS`
+there and save the exact manifest bytes for the approval card and
+publication. Do not include unrelated files or overwrite existing evidence.
 
 Generate release notes as a draft, inspect/edit them against the actual changes,
 and freeze them in a file. Prepare the Homebrew diff using these four filenames,
@@ -79,7 +91,7 @@ Present all user-controlled and derived published content, not just a version:
 | Scope | GitHub repository/visibility and whether Homebrew is included |
 | Version | Selected bump, old/new package versions, matching lock entry |
 | Source | Full tested SHA, source branch, integration operation and affected paths |
-| Tag/status | Exact tag, target SHA, stable/latest or other explicitly supported status |
+| Tag/status | Existing public tag, target SHA, stable/latest or other explicitly supported status |
 | Text | Exact title and complete release notes; avoid truncated summaries |
 | Assets | All filenames, byte sizes, SHA-256 values and combined checksum manifest |
 | Checks | Matching run URL/SHA and results for every platform |
@@ -93,35 +105,23 @@ against the approved content after creation.
 
 ## 5. Publish the approved bytes and text
 
-The current workflow's `--generate-notes` is incompatible with publishing exact
-user-approved notes merely by pushing a tag. Do not push a bare tag first.
-Use the passing release-branch artifacts and explicit publication parameters;
-no workflow redesign is required for this route.
-
-After approved source integration, verify that the exact tested candidate is
-reachable from remote `main`. If integration changed the intended source, return
-to build/review. Verify that the integration operation still matches approval;
-an unchanged candidate SHA alone does not authorize a different merge scope.
-Immediately before publication recheck the latest published stable version,
-collisions, approval, artifact hashes and candidate identity. A concurrent release
-that changes version ordering or the approved latest status requires review.
+Immediately before publication recheck that the existing tag resolves to the
+reviewed merged SHA and that SHA is reachable from remote `main`. Recheck the
+latest published stable version, collisions, approval, artifact hashes and
+candidate identity. A concurrent release that changes version ordering or the
+approved latest status requires review. Do not create another tag or rerun the
+sole successful build merely to publish.
 
 With validated, approved shell variables and a frozen notes file, set
 `approved_latest` to the reviewed boolean `true` or `false`. This route publishes
-a stable, non-draft release:
+a stable, non-draft release using the existing tag:
 
 ```sh
-gh release create "$tag" --repo "$repo" --target "$candidate_sha" \
+gh release create "$tag" --repo "$repo" --verify-tag \
   --title "$title" --notes-file "$notes_path" \
   --draft=false --prerelease=false --latest="$approved_latest" \
   "$packages_dir"/*.tar.gz "$packages_dir/SHA256SUMS"
 ```
-
-GitHub creates the tag on that SHA. This may also trigger the existing tag build.
-If it is an exact redundant run caused by this publication, the same SHA already
-has all four passing receipts, and the approved release/assets exist, cancel only
-that duplicate run and record why. Do not cancel unrelated runs or suppress a
-required check. If an approval-aware workflow is introduced later, prefer it.
 
 Check the tag's resolved SHA, release title/body/status, complete asset list and
 anonymous download hashes. Uploading/creation errors may leave partial state:

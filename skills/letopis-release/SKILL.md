@@ -30,34 +30,38 @@ Ask one question at a time. Version selection authorizes preparation, not unseen
 release content. Resolve any ambiguous inclusion of dirty/staged work first;
 preserve unrelated work and prepare only approved changes in isolation.
 
-## Prepare and build
+## Prepare, merge and tag
 
 Update only the root package/lock version and relevant independent CLI version
 assertions; preserve dependency versions, historical pins and test fixture data.
-Reuse the existing scripts and release-branch CI. Wait for all four native jobs,
-including lint, debug/release tests, native acceptance and extracted-binary smoke.
-Download the exact passing archives and validate their source commit, version,
-target, filenames, permissions, licenses and SHA-256. Freeze those bytes.
+Prepare the change in an isolated ordinary branch and merge the agreed scope into
+`main`. Verify the actual merged commit and tag availability before creating and
+pushing the version tag on that commit. The public tag starts the only release
+build; ordinary `main` merges do not start it. Follow the operational reference
+for the source integration review and collision checks.
+
+Wait for all four native tag-build jobs, including lint, debug/release tests,
+native acceptance and extracted-binary smoke. Download the exact passing archives
+and validate their source commit, version, target, filenames, permissions,
+licenses and SHA-256. Freeze those bytes.
 
 ## Required user review
 
-Before creating/pushing a public tag, publishing a release, or changing the tap,
-present the actual release card from the reference: version/bump, exact source
-commit and main integration, tag, destinations, title, complete release notes,
-release status, all assets/hashes, CI evidence, and exact Homebrew diff.
-**Wait for explicit approval of that card.** A version choice or “do a release”
-is insufficient. Never invent approval. Any changed content invalidates the card;
-rebuild/review the changed data. GitHub-generated IDs/timestamps are verified and
-reported after creation; do not promise their prior approval.
+Before publishing a release or changing the tap, present the actual release card
+from the reference: version/bump, merged commit, existing tag, destinations,
+title, complete release notes, release status, all assets/hashes, CI evidence,
+and exact Homebrew diff. **Wait for explicit approval of that card.** A version
+choice or tag creation is insufficient. Never invent approval. Any changed
+content invalidates the card; rebuild/review the changed data. GitHub-generated
+IDs/timestamps are verified and reported after creation.
 
 ## Publish and finish
 
-After approval, perform the approved integration/publication/tap operations without
-repeated permission questions. The current tag workflow auto-publishes generated
-notes: use the reviewed-artifact promotion route in the reference so approved
-notes and checksums are preserved. Verify downloads and all four Homebrew install
-jobs; report URLs, version, commit and results. Resume matching existing state;
-never move tags, overwrite assets, or force-push to repair a collision.
+After approval, publish the reviewed bytes and text against the existing verified
+tag and perform the approved tap operations without repeated permission questions.
+Verify downloads and all four Homebrew install jobs; report URLs, version, commit
+and results. Resume matching existing state; never move tags, overwrite assets,
+or force-push to repair a collision.
 
 Prefer CI for tools and installation tests. Preserve the user's machine settings;
 machine setup requires separate authorization; never bootstrap/upgrade Homebrew,
