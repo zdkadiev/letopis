@@ -67,8 +67,10 @@
 
 Выполнено 2026-10-21 в отдельном worktree, ветка `TK-1`.
 
-- Создан сохраняемый [пакет интеграционных проверок](../../../../../../../tests/storage-build/README.md) с зафиксированными Rust/Cargo/vec1 inputs и проверкой SHA-256 источника.
+- Создан сохраняемый [пакет интеграционных проверок](https://github.com/zdkadiev/letopis/blob/v0.1.0/tests/storage-build/README.md) с зафиксированными Rust/Cargo/vec1 inputs и проверкой SHA-256 источника.
 - На macOS ARM64 и Linux ARM64 (Docker) прошли 10 Rust и 4 Python теста, fmt и Clippy. Проверены read/write/search/reopen и explicit/RAII rollback FTS5/vec1, необходимые PRAGMA, запрет загрузки расширений после регистрации и отклонение неподдерживаемых сборок.
 - Полные команды, версии, hashes, негативные проверки, mutation evidence, независимое ревью и ограничения: [отчёт TK-1](../../../../checks/TK-1/report.md).
 - Приёмочные критерии выполнены в согласованной ARM64-матрице; открытых блокеров нет. x86-64, ATTACH/read-view reset, production storage, нагрузка и power-loss не проверялись и остаются в соответствующих следующих задачах.
 - G-0 не закрыт: остальные задачи фазы ещё planned. Оценки и зависимости не менялись.
+
+2026-11-02: standalone-стенд удалён из отслеживаемого `tests/`; [архивная версия](https://github.com/zdkadiev/letopis/blob/v0.1.0/tests/storage-build/README.md) доступна в Git. Локальная копия с build caches сохранена в игнорируемом архиве; см. [исторические исходники](../../../../../../development.md#historical-proof-harnesses). Ранее записанные результаты относятся к своим source revisions.

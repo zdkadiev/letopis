@@ -64,7 +64,7 @@
 
 ## 9. Отчёт о выполнении
 
-Выполнена 2026-10-21 в worktree `TK-4` от main `c8f414b6e0f739015728b62cccbecbfc54deafd8`. Добавлен воспроизводимый стенд [tests/runtime](../../../../../../../tests/runtime/README.md), использующий неизменённые TK-2/TK-3.
+Выполнена 2026-10-21 в worktree `TK-4` от main `c8f414b6e0f739015728b62cccbecbfc54deafd8`. Добавлен воспроизводимый стенд [tests/runtime](https://github.com/zdkadiev/letopis/blob/v0.1.0/tests/runtime/README.md), использующий неизменённые TK-2/TK-3.
 
 На macOS ARM64 и Linux ARM64: **10 Rust integration tests + 1 Python interruption test**, семь компилируемых негативных контролей на каждой ОС, fmt/Clippy `-D warnings`, полные регрессии TK-3/TK-2/TK-1 и проверка roadmap — PASS. Все 60 входных файлов совпадают с финальными receipts. Проверены десять конкурирующих publisher/launcher, child-side exclusion drain, persistent flock после SIGKILL, stale/live PID, setsid/null streams, восемь SIGINT cuts до commit и два после, изоляция отмены и восстановление потерянного spawn.
 
@@ -75,3 +75,5 @@
 Перед коммитом свежий macOS run выявил ещё одну проблему проверки: unlink-контроль правильно обнаружил второй active drain, но runner принимал только сообщение о свободном lock. Контроль принимает оба точных нарушения exclusion; сохранён [реальный RED и follow-up](../../../../checks/TK-4/report.md#pre-integration-oracle-follow-up), обе платформы прошли полный runner на финальном коде. Это дополнительная находка автора, исходные три замечания reviewer остаются закрытыми.
 
 Production runtime/cancellation и системные drills остаются TK-11/TK-29/TK-42; новых гарантий fairness, physical power loss, x86-64, provider transport или ресурсов нет. G-0 открыт до TK-6. Результаты фиксируются в общем Engram проекта. После завершения отчёта пользователь запросил commit и локальное слияние TK-4 в main; push и закрытие issue в этот запрос не входят.
+
+2026-11-02: standalone-стенд удалён из отслеживаемого `tests/`; [архивная версия](https://github.com/zdkadiev/letopis/blob/v0.1.0/tests/runtime/README.md) доступна в Git. Локальная копия с build caches сохранена в игнорируемом архиве; см. [исторические исходники](../../../../../../development.md#historical-proof-harnesses). Ранее записанные результаты относятся к своим source revisions.

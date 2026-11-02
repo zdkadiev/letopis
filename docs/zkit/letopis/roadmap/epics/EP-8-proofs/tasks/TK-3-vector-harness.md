@@ -66,7 +66,7 @@
 
 ## 9. Отчёт о выполнении
 
-Выполнена 2026-10-21 в отдельном worktree `TK-3` от main `2ea7e581bff5388f8199bd996669aff5d939426f`. Добавлен воспроизводимый Rust/Python-стенд [tests/embedding](../../../../../../../tests/embedding/README.md), использующий закреплённые сборку TK-1 и примитивы публикации/reset TK-2.
+Выполнена 2026-10-21 в отдельном worktree `TK-3` от main `2ea7e581bff5388f8199bd996669aff5d939426f`. Добавлен воспроизводимый Rust/Python-стенд [tests/embedding](https://github.com/zdkadiev/letopis/blob/v0.1.0/tests/embedding/README.md), использующий закреплённые сборку TK-1 и примитивы публикации/reset TK-2.
 
 На macOS ARM64 и Linux ARM64: **11 Rust integration tests + 2 Python lifecycle tests**, 30 реальных SIGKILL cuts на каждой платформе; fmt/Clippy `-D warnings`, полные регрессии TK-2/TK-1 и проверка roadmap — PASS. Шесть компилируемых мутаций обнаружены assertion-проверками, исходники восстановлены. Хеши всех 46 входных файлов совпадают с финальными receipts.
 
@@ -75,3 +75,5 @@
 [Отчёт и границы доказательства](../../../../checks/TK-3/report.md), [ревью и исправления](../../../../checks/TK-3/review.md), [финальная сверка](../../../../checks/TK-3/final-verification.json), [план выполнения](../../../../../../superpowers/plans/2026-10-21-tk-3-vectors.md). Команда: `python3 -B tests/embedding/run.py`.
 
 Production executor/config, реальные provider transport/retry timing, гонки запуска/flock, concurrent production cleanup, physical power loss и x86-64 остаются за границей этой задачи. Блокеров TK-3 нет; G-0 остаётся открытым до TK-6. Результаты и решения сохранены в локальном Engram этого worktree. Поставка: изменения TK-3 интегрируются в main отдельным коммитом.
+
+2026-11-02: standalone-стенд удалён из отслеживаемого `tests/`; [архивная версия](https://github.com/zdkadiev/letopis/blob/v0.1.0/tests/embedding/README.md) доступна в Git. Локальная копия с build caches сохранена в игнорируемом архиве; см. [исторические исходники](../../../../../../development.md#historical-proof-harnesses). Ранее записанные результаты относятся к своим source revisions.

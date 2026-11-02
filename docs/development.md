@@ -34,7 +34,22 @@ Markdown-only изменения требуют проверки затрону�
 `python3 -B tests/storage/run.py --platform host|linux --evidence <new-directory>`.
 Runner проверяет schema parity, свой lifecycle, bundled SQLite/vec1 и копию
 самостоятельного executable с проверкой linkage; каждый evidence path новый.
-Исторические harnesses с отдельными manifest не входят в корневой gate автоматически.
+Текущие acceptance runners работают с продуктовым crate. Прежние standalone-прототипы сохранены как [исторические исходники](#historical-proof-harnesses).
+
+## Historical proof harnesses
+
+Standalone-прототипы TK-1…TK-4/TK-6 (`tests/storage-build/`, `publication/`,
+`embedding/`, `runtime/`, `transport/`) и прежний `tests/markdown/Dockerfile`
+удалены из отслеживаемого дерева 2026-11-02. Они проверяли ранние реализации;
+текущие продуктовые тесты, fixtures и acceptance runners сохранены.
+
+Локальная копия исходников, незакоммиченных правок и build caches находится в
+игнорируемом `.artifacts/retired-tests/2026-11-02/`; там же сохранены ранее удалённые pilot tools,
+`manifest.json` с хешами и `RESTORE.txt`. Этот каталог не поставляется через Git.
+Коммитные версии доступны в истории Git, в том числе в [v0.1.0](https://github.com/zdkadiev/letopis/tree/v0.1.0/tests).
+Для воспроизведения старого evidence нужен именно указанный в нём source revision,
+а не текущий checkout или произвольно выбранный tag. Отчёты и receipts в
+`docs/zkit/letopis/checks/` сохранены без изменений.
 
 ## Обработка SIGINT
 
@@ -58,7 +73,7 @@ Runner проверяет schema parity, свой lifecycle, bundled SQLite/vec1
 
 `clippy.toml` предназначен для параметров отдельных правил (например, порогов сложности). Сейчас в нём задан `too-many-lines-threshold = 60`; соответствующий `too_many_lines` включён отдельно в Cargo.toml. Остальные уровни правил также задаются в Cargo.toml. Тестовые assert/unwrap не запрещаются общей группой restriction.
 
-Область команды — root crate и его tests; исторические изолированные proof harnesses с собственными Cargo.toml запускаются своими runners. Новая lint-политика не означает повторного выполнения старых TK evidence.
+Область команды — root crate и его tests. Новая lint-политика не означает повторного выполнения старых TK evidence; порядок доступа к прежним прототипам описан в [исторических исходниках](#historical-proof-harnesses).
 
 Источники: [группы правил Clippy](https://doc.rust-lang.org/clippy/lints.html), [настройка Clippy](https://doc.rust-lang.org/clippy/configuration.html), [Cargo lints](https://doc.rust-lang.org/cargo/reference/manifest.html#the-lints-section).
 

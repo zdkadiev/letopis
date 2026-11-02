@@ -1,5 +1,7 @@
 # P-1 — воспроизводимый протокол сравнительного пилота
 
+> Tooling retired on 2026-11-02: `tests/pilot_protocol/` and `tests/final_pilot/` were removed from the current tree. Commands below describe historical tooling; use the source revision recorded by its evidence. The protocol and captured reports are retained.
+
 Версия формата: **1**. Подготовлен в TK-5 на основании [NFR-8/FR-36](../requirements.md), [D-25](../decisions.md#D-25), [D-26](../decisions.md#D-26), [D-27](../decisions.md#D-27), [D-28](../decisions.md#D-28), [D-33](../decisions.md#D-33). Это методика и проверяемые формы, **не результат эксперимента и не доказательство пользы памяти**.
 
 ## 1. Вопрос, условия и границы
@@ -82,7 +84,7 @@ python3 -B tests/pilot_protocol/run.py --evidence NEW_DIRECTORY
 
 Зависимости: Python 3.11+, standard library. CLI читает study и все session JSON, проверяет evidence и печатает JSON в stdout; exit 0 — supplied records валидны, exit 2 — ошибка с field locator. CLI ничего не исправляет и не запускает агента. Дубликаты JSON keys и nonfinite числа отвергаются. Время операции — неотрицательное конечное число или null: целые проверяются без преобразования в float, верхняя граница времени форматом не вводится. Валидность не равна полноте: неизвестные usage/annotations остаются видимыми, outcome задачи не меняется ради красивого отчёта. Демонстрация всегда выдаёт status `demonstration_only`; реальные записи — `incomplete_data`, `correctness_not_preserved` или `descriptive_only`. Ни один status не равен «пилот выигран».
 
-Локаторы с arbitrary text, quarantine/allowlist, agent identity и семантические оценки требуют операторской проверки. Checker не защищает от оператора, сфальсифицировавшего source logs/hash/attestation; не является ОС sandbox, model runner или доказательством correctness beyond supplied acceptance evidence. JSON/profile счётчики — выбранные форматы эксперимента, не публичный API Letopis. [README checker](../../../../tests/pilot_protocol/README.md) содержит точные примеры и ограничения.
+Локаторы с arbitrary text, quarantine/allowlist, agent identity и семантические оценки требуют операторской проверки. Checker не защищает от оператора, сфальсифицировавшего source logs/hash/attestation; не является ОС sandbox, model runner или доказательством correctness beyond supplied acceptance evidence. JSON/profile счётчики — выбранные форматы эксперимента, не публичный API Letopis. [README checker](https://github.com/zdkadiev/letopis/blob/v0.1.0/tests/pilot_protocol/README.md) содержит точные примеры и ограничения.
 
 ## 8. Traceability и передача
 

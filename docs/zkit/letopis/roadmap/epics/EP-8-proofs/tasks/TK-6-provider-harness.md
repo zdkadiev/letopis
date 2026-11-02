@@ -83,3 +83,5 @@ PASS manifests. G-0: continue → TK-7.
 Deferred minors: none. Полная inference/utility/x86_64/production cancellation
 не объявляется выполненной. Ollama client 0.40.7 установлен, embedding-вызов
 не выполнялся; минимум версии не доказан. Интеграция Git и закрытие issue #6 разрешены последующим отдельным запросом пользователя; фактический результат проверяется после push.
+
+2026-11-02: standalone-стенд удалён из отслеживаемого `tests/`; [архивная версия](https://github.com/zdkadiev/letopis/blob/v0.1.0/tests/transport/README.md) доступна в Git. Локальная копия с build caches сохранена в игнорируемом архиве; см. [исторические исходники](../../../../../../development.md#historical-proof-harnesses). Ранее записанные результаты относятся к своим source revisions.

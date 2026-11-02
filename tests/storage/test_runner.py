@@ -161,7 +161,7 @@ class SchemaParityTests(unittest.TestCase):
 class InputInventoryTests(unittest.TestCase):
     def test_inventory_excludes_nested_build_caches_and_keeps_source_hashes(self):
         # Catches inventories bloated by ignored historical Cargo/build output.
-        # Given
+        # Given: source files and nested generated caches in a temporary repository.
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             sources = (
@@ -175,8 +175,8 @@ class InputInventoryTests(unittest.TestCase):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('abc')
-            caches = ('tests/runtime/target/debug/build.o',
-                      'tests/storage-build/.build/sqlite3.c',
+            caches = ('tests/storage/target/debug/build.o',
+                      'tests/storage/.build/sqlite3.c',
                       'tests/storage/__pycache__/run.pyc',
                       'src/nested/target/ignored.rs')
             for name in caches:
@@ -184,11 +184,10 @@ class InputInventoryTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b'generated build output')
 
-            # When.
+            # When: the runner inventories reproducible source inputs.
             actual = hash_inputs(root)
 
             # Then: legitimate source names survive; generated trees do not.
-            # When / Then
             self.assertEqual(set(actual), set(sources))
             self.assertEqual(actual['src/lib.rs'],
                              'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')

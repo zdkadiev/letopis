@@ -73,7 +73,7 @@
 
 Сделано на ветке `tk-30` (operator-only, без изменений `src/`, Cargo, schema, skill и
 P-1): prospective [selection, instructions и readiness](../../../../pilot/final/readiness.md),
-[operator tooling](../../../../../../../tests/final_pilot/README.md) (парные seeds,
+[operator tooling](https://github.com/zdkadiev/letopis/blob/v0.1.0/tests/final_pilot/README.md) (парные seeds,
 одноразовая оценка, 9 private oracles, credential-free preflight, telemetry/templates).
 Проверки и evidence — [отчёт TK-30](../../../../checks/TK-30/report.md) и
 [receipt](../../../../checks/TK-30/verification.json): на `74e0f82` 142 focused tests (2 opt-in
@@ -111,3 +111,5 @@ preflight (auth не читался, модель не вызывалась). Me
 исправила binding финальной base, telemetry, lifecycle/annotation integrity и
 пропуски oracle; итог — 168 model-free tests (3 skips; Docker proofs запущены
 отдельно) и 31 P-1 test. Это не снимает перечисленные выше freeze/gate блокеры.
+
+2026-11-02: operator tooling was removed from the current `tests/` tree. The preparation record above is historical; this removal does not complete pilot execution or its acceptance criteria.

@@ -17,8 +17,6 @@
 !tests/fixtures/
 !tests/fixtures/markdown/
 !tests/fixtures/markdown/**
-!tests/markdown/
-!tests/markdown/Dockerfile
 !tests/git_*.rs
 !tests/git/
 !tests/git/Dockerfile
