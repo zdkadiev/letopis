@@ -20,6 +20,8 @@
   <a href="#semantic-search">Semantic search</a>
 </p>
 
+![How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context.](assets/How-Letopis-Works-Knowledge-Flow.png)
+
 ## Why Letopis?
 
 - **Carry context across agent sessions.** Keep decisions, constraints, and reasoning available for the next task.
@@ -28,8 +30,6 @@
 - **Trace decisions back to code.** Connect knowledge to source files and line ranges so agents can check the evidence behind a claim.
 - **Work with different code versions.** Ground each concept in its own Git source snapshot, including earlier versions of the code.
 - **See what needs another look.** Detect changes to linked source code and identify knowledge that needs review.
-
-![How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context.](assets/How-Letopis-Works-Knowledge-Flow.png)
 
 ## Installation
 
