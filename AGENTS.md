@@ -111,3 +111,4 @@ Run commands from the repository root; from elsewhere use `make -C <path> <targe
 - Inspect the current branch/worktree and dirty files first. Preserve user edits and unrelated work; do not stash, reset, overwrite, or clean them away.
 - Keep changes in the intended task worktree. Commit only the intended paths. Merge, push, publish, and update GitHub issues when authorized by the user; preserve authorization already given in the conversation.
 - Use the Letopis skill in `skills/letopis/` for repository knowledge.
+- For preparing or publishing a Letopis release, use [letopis-release](skills/letopis-release/SKILL.md); its release content requires explicit user approval before publication.

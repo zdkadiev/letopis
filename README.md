@@ -1,18 +1,16 @@
-<h1 align="center">Letopis</h1>
+<img align="left" src="assets/2.png" alt="Letopis logo" width="20%" hspace="20">
 
-<p align="center"><strong>Project memory your coding agents can read, share, and verify.</strong></p>
+<h2 align="left">Letopis</h2>
 
-<p align="center">
-  Decisions, context, and source links in Markdown. Searchable across sessions. Stored beside your code.
-</p>
+<p align="left"><strong>Shared project memory for coding agents, built on a Markdown knowledge graph.</strong></p>
 
-<p align="center">
+<p align="left">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT">
   <img src="https://img.shields.io/badge/storage-Markdown-222222" alt="Knowledge stored in Markdown">
   <img src="https://img.shields.io/badge/interface-JSON-4c8c51" alt="JSON command-line interface">
 </p>
 
-<p align="center">
+<p align="left">
   <a href="#why-letopis">Why Letopis</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#knowledge-format">Knowledge format</a> ·
@@ -20,20 +18,21 @@
   <a href="#semantic-search">Semantic search</a>
 </p>
 
+<br clear="left">
+
+<hr>
+
+<p align="left">
+  <img src="assets/1.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="780">
+</p>
+
 ## Why Letopis?
 
-A new agent session often means rediscovering the same code, constraints, and decisions. Letopis gives agents working in one repository a shared memory they can maintain as they work and revisit on the next task.
-
-| What you need | What Letopis gives you |
-| --- | --- |
-| Keep the reasoning behind a decision | Readable Markdown you edit, review, and version with Git. |
-| Find context for the next task | Local full-text search, with optional semantic search. |
-| Follow an idea back to its evidence | Explicit links between concepts, source files, and line ranges. |
-| Keep knowledge grounded in different code versions | Each knowledge element can record its own Git source snapshot. |
-| Notice when evidence changes | Source-change flags that tell an agent what needs review. |
-| Use knowledge from scripts and agents | JSON requests and responses, with paths and hashes for reading the original content. |
-
-**Write → check → search → follow links → verify sources.** Your files remain the source of truth; Letopis builds the search and connections around them.
+- **A separate Git source snapshot for each concept.** Keep knowledge grounded in the version of code it was verified against, including earlier revisions.
+- **Source-change tracking.** See which knowledge needs review when the linked code changes.
+- **A searchable knowledge graph.** Find relevant knowledge with full-text or optional semantic search, and follow links between concepts and source code.
+- **Lightweight local memory.** Keep Markdown anywhere in your repository, version it with Git, and search a local index.
+- **Shared memory across agent sessions.** Let agents reuse accumulated project knowledge on the next task.
 
 ## Installation
 
@@ -63,14 +62,25 @@ The pinned Rust toolchain is selected automatically. Put `target/dist/letopis` o
 
 ## Quick start
 
-**1. Initialize your project.** Start at the root of the Git working tree where you want to keep knowledge:
+Letopis is designed for coding agents and automation. Your agent writes knowledge as Markdown and reads relevant passages back into its context. It calls Letopis through a JSON protocol: requests go to **stdin**, responses come from **stdout**, so commands fit into Unix shell pipelines. The [Letopis skill](skills/letopis/SKILL.md) describes the agent workflow.
+
+**1. Initialize the repository.** From the root of an existing Git working tree:
 
 ```sh
-printf '%s\n' '{}' | letopis init
+letopis init
+```
+
+This creates the private `.letopis/` service directory, initializes the local index databases, and creates `.letopis/config.json` with embeddings disabled. Repeating `init` preserves existing valid configuration and data. Full-text search needs no model provider.
+
+**2. Let your agent save a concept.** For this example, the agent creates a folder for knowledge:
+
+```sh
 mkdir -p letopis
 ```
 
-**2. Save a concept.** Create `letopis/retry-budget.md`:
+The `letopis/` folder is optional: marked Markdown knowledge files can live anywhere in the repository, including alongside the code they describe. The `.letopis/` directory holds Letopis's private state; `letopis/` holds your documents.
+
+The agent writes `letopis/retry-budget.md`:
 
 ```markdown
 <!-- letopis: {"created_at":1793491200} -->
@@ -80,16 +90,16 @@ Keep retries bounded so a failing dependency cannot hold a request indefinitely.
 Record the attempt limit and deadline when choosing a retry policy.
 ```
 
-Use the current Unix timestamp for `created_at`, then preserve it on later edits.
+The agent sets `created_at` to the current Unix timestamp when creating a concept and preserves it on later edits. The timestamp above is illustrative.
 
-**3. Check and find it.**
+**3. Let your agent check and search.** The agent can run `check` with its default empty request and pipe a JSON object into `search`. Both return JSON responses:
 
 ```sh
-printf '%s\n' '{}' | letopis check
+letopis check
 printf '%s\n' '{"query":"retry","limit":10}' | letopis search
 ```
 
-Search returns links to knowledge, ready for the agent to read:
+Search returns references to knowledge files and sections:
 
 ```json
 {
@@ -104,7 +114,7 @@ Search returns links to knowledge, ready for the agent to read:
 }
 ```
 
-The line range and revision above are illustrative. Edit Markdown directly; the next search, check, traverse, or inspect refreshes the index automatically. No model provider is needed to get started.
+The agent uses the returned paths and line ranges to read selected Markdown passages into its context. The line range and revision above are illustrative. As the agent edits Markdown, the next search, check, traverse, or inspect refreshes the index automatically.
 
 ## Knowledge format
 
@@ -151,9 +161,11 @@ Run `check` after editing. Fix invalid markup, missing knowledge targets, and co
 
 ## CLI
 
+The agent selects an operation by command name and supplies its request fields as JSON on stdin. JSON responses on stdout can be consumed by the agent or piped into other tools.
+
 Commands work from the repository root **or any subdirectory**. Paths and element IDs in requests always remain relative to the Git root.
 
-| Command | What you use it for |
+| Command | What the agent uses it for |
 | --- | --- |
 | `init` | Set up Letopis in a project. |
 | `check` | Find invalid knowledge, broken links, and source-basis problems. |

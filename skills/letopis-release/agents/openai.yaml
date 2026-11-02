@@ -1,0 +1,4 @@
+interface:
+  display_name: "Релиз Letopis"
+  short_description: "Подготовка и публикация проверенного релиза Letopis"
+  default_prompt: "Используй $letopis-release: предложи версию и подготовь релиз Letopis. Перед публикацией покажи мне все данные для подтверждения."
