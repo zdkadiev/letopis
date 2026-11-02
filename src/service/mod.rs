@@ -557,6 +557,7 @@ pub trait Refresher {
 #[cfg_attr(test, mockall::automock)]
 pub trait CorpusLister {
     /// List normalized, deduplicated candidates including deleted tracked files.
+    /// Exclude final symlinks observed in the working tree; consumers must recheck paths.
     ///
     /// # Errors
     /// Reports unsupported candidate paths or Git failures.

@@ -219,6 +219,12 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         #[cfg(test)]
         reach_checkpoint("begun");
         let mut outcome = build_outcome(state.revision, true);
+        let excluded: BTreeSet<_> = delta
+            .removed
+            .iter()
+            .filter(|(_, check_missing)| !**check_missing)
+            .map(|(path, _)| path.clone())
+            .collect();
         for (path, check_missing) in delta.removed {
             if check_missing && self.filesystem.stat_file(&path)?.is_some() {
                 return Err(fail_changed());
@@ -239,6 +245,15 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
             outcome = apply_projection(unit.as_mut(), prepared, outcome)?;
         }
         publication.reconcile_sources(&graph, unit.as_mut())?;
+        if !excluded.is_empty()
+            && self
+                .git
+                .get_candidates()?
+                .iter()
+                .any(|path| excluded.contains(path))
+        {
+            return Err(fail_changed());
+        }
         #[cfg(test)]
         reach_checkpoint("before_commit");
         #[cfg(test)]
@@ -1176,6 +1191,38 @@ mod tests {
         assert_eq!(read.get_revision(), 0);
         assert!(read.get_files().unwrap().is_empty());
         assert!(read.get_nodes().unwrap().is_empty());
+    }
+
+    #[test]
+    fn reject_candidate_reappearing_before_publication() {
+        // Given: an indexed document disappears from enumeration and then reappears.
+        let (_dir, mut service) = build_service();
+        service.refresh().unwrap();
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = std::sync::Arc::clone(&calls);
+        let mut candidates = Candidates::new();
+        candidates.expect_get_candidates().returning(move || {
+            let count = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+            if count < 3 {
+                Ok(Vec::new())
+            } else {
+                Ok(vec![RepoPath::parse("note.md").unwrap()])
+            }
+        });
+        service.git = candidates;
+        // When: refresh tries to publish the removal.
+        let result = service.refresh();
+        // Then: the race aborts publication and preserves the old projection.
+        assert!(result.is_err());
+        let mut read = service.storage.begin_read_tx().unwrap();
+        assert_eq!(read.get_revision(), 1);
+        assert_eq!(read.get_files().unwrap().len(), 1);
+        assert_eq!(
+            read.get_text_matches_by_expression("AlphaToken")
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[test]

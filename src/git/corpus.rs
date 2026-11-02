@@ -17,9 +17,19 @@ use gix_dir::{
     walk::{Context, Options, delegate::Collect},
 };
 use gix_pathspec::Search;
-use std::{borrow::Cow, collections::BTreeSet, path::Path};
+use rustix::{
+    fd::OwnedFd,
+    fs::{AtFlags, FileType, Mode as FileMode, OFlags, open, openat, statat},
+    io::Errno,
+};
+use std::{borrow::Cow, collections::BTreeSet, ffi::OsStr, os::unix::ffi::OsStrExt, path::Path};
 
-/// List the actual worktree index plus non-ignored untracked files, without filters.
+const DIRECTORY_FLAGS: OFlags = OFlags::RDONLY
+    .union(OFlags::DIRECTORY)
+    .union(OFlags::NOFOLLOW)
+    .union(OFlags::CLOEXEC);
+
+/// List Markdown candidates from the index and non-ignored untracked files.
 pub(super) fn get_candidates(git: &GitRepository, root: &Path) -> DocumentResult<Vec<RepoPath>> {
     let repo = &git.repo;
     let index = repo.index_or_empty().map_err(|_| fail_listing())?;
@@ -69,8 +79,51 @@ pub(super) fn get_candidates(git: &GitRepository, root: &Path) -> DocumentResult
             raw.push(0);
         }
     }
-    parse_candidates(&raw)
+    filter_candidates(root, &raw)
 }
+
+fn filter_candidates(root: &Path, raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
+    let root = open(root, DIRECTORY_FLAGS, FileMode::empty()).map_err(|_| fail_listing())?;
+    let mut filtered = Vec::new();
+    for entry in raw
+        .split(|byte| *byte == 0)
+        .filter(|entry| !entry.is_empty())
+    {
+        let eligible = is_corpus_entry(entry);
+        let safe_components = entry
+            .split(|byte| *byte == b'/')
+            .all(|part| !part.is_empty() && part != b"." && part != b"..");
+        if eligible && safe_components && is_symlink(&root, entry).map_err(|_| fail_listing())? {
+            continue;
+        }
+        filtered.extend_from_slice(entry);
+        filtered.push(0);
+    }
+    parse_candidates(&filtered)
+}
+
+/// Check the live entry without following any component; absent tracked paths remain candidates.
+fn is_symlink(root: &OwnedFd, path: &[u8]) -> Result<bool, Errno> {
+    let mut parent = openat(root, ".", DIRECTORY_FLAGS, FileMode::empty())?;
+    let mut components = path.split(|byte| *byte == b'/').peekable();
+    while let Some(component) = components.next() {
+        let name = OsStr::from_bytes(component);
+        if components.peek().is_none() {
+            return match statat(&parent, name, AtFlags::SYMLINK_NOFOLLOW) {
+                Ok(stat) => Ok(FileType::from_raw_mode(stat.st_mode) == FileType::Symlink),
+                Err(Errno::NOENT) => Ok(false),
+                Err(error) => Err(error),
+            };
+        }
+        parent = match openat(&parent, name, DIRECTORY_FLAGS, FileMode::empty()) {
+            Ok(directory) => directory,
+            Err(Errno::NOENT) => return Ok(false),
+            Err(error) => return Err(error),
+        };
+    }
+    Err(Errno::INVAL)
+}
+
 /// Expand only metadata in a private copy: excludes and walk need the same tracked view.
 fn expand_sparse_index<'a>(
     git: &GitRepository,
@@ -152,13 +205,7 @@ pub(super) fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
         .split(|byte| *byte == 0)
         .filter(|entry| !entry.is_empty())
     {
-        if !entry.ends_with(b".md") && !entry.ends_with(b".markdown") {
-            continue;
-        }
-        if entry
-            .split(|byte| *byte == b'/')
-            .any(|part| part == b".git" || part == SERVICE_DIRECTORY.as_bytes())
-        {
+        if !is_corpus_entry(entry) {
             continue;
         }
         let text = std::str::from_utf8(entry).map_err(|cause| {
@@ -178,4 +225,11 @@ pub(super) fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
         candidates.insert(path);
     }
     Ok(candidates.into_iter().collect())
+}
+
+fn is_corpus_entry(entry: &[u8]) -> bool {
+    (entry.ends_with(b".md") || entry.ends_with(b".markdown"))
+        && !entry
+            .split(|byte| *byte == b'/')
+            .any(|part| part == b".git" || part == SERVICE_DIRECTORY.as_bytes())
 }

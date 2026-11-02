@@ -228,6 +228,57 @@ mod tests {
         use std::fs;
 
         #[test]
+        fn candidates_ignore_symlinks_with_unsupported_names() {
+            use crate::service::CorpusLister;
+            // Given: a tracked symlink with a name invalid as a document path.
+            let repo = TempRepo::new(ObjectFormat::Sha1);
+            let root = repo.get_root();
+            std::os::unix::fs::symlink("target", root.join("bad#anchor.md")).unwrap();
+            repo.run_git_successfully(&["add", "bad#anchor.md"], None);
+            // When: the Git adapter lists the candidates.
+            let candidates = GitRepository::open(root).unwrap().get_candidates().unwrap();
+            // Then: the symlink is not validated as a document path.
+            assert_eq!(
+                candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+                ["live.md"]
+            );
+        }
+
+        #[test]
+        fn candidates_exclude_live_symlinks_independently_of_index_mode() {
+            use crate::service::CorpusLister;
+            // Given: tracked and untracked paths whose live types differ from the index.
+            let repo = TempRepo::new(ObjectFormat::Sha1);
+            let root = repo.get_root();
+            fs::write(root.join("regular.md"), b"regular").unwrap();
+            fs::write(root.join("changed-to-link.md"), b"regular").unwrap();
+            std::os::unix::fs::symlink("regular.md", root.join("changed-to-file.md")).unwrap();
+            std::os::unix::fs::symlink("regular.md", root.join("tracked-link.md")).unwrap();
+            repo.run_git_successfully(
+                &[
+                    "add",
+                    "regular.md",
+                    "changed-to-link.md",
+                    "changed-to-file.md",
+                    "tracked-link.md",
+                ],
+                None,
+            );
+            fs::remove_file(root.join("changed-to-link.md")).unwrap();
+            std::os::unix::fs::symlink("regular.md", root.join("changed-to-link.md")).unwrap();
+            fs::remove_file(root.join("changed-to-file.md")).unwrap();
+            fs::write(root.join("changed-to-file.md"), b"now regular").unwrap();
+            std::os::unix::fs::symlink("regular.md", root.join("untracked-link.md")).unwrap();
+            // When: the Git adapter enumerates the current corpus candidates.
+            let candidates = GitRepository::open(root).unwrap().get_candidates().unwrap();
+            // Then: only live regular files and the fixture's ordinary Markdown are returned.
+            assert_eq!(
+                candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+                ["changed-to-file.md", "live.md", "regular.md"]
+            );
+        }
+
+        #[test]
         fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
             use crate::service::CorpusLister;
             // Given
@@ -438,10 +489,17 @@ mod tests {
                 .unwrap()
                 .get_candidates()
                 .unwrap();
-            // Then: each independent oracle path is present once and user state stays unchanged.
+            // Then: all eligible oracle paths except the live symlink are returned.
             assert_eq!(
                 actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
-                expected
+                [
+                    "dir.md/inside.md",
+                    "live.md",
+                    "module.md",
+                    "nested/keep.md",
+                    "staged-delete.md",
+                    "tracked-ignore.md"
+                ]
             );
             assert_eq!(repo.capture_fixture_state(), before);
         }
