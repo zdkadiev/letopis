@@ -1,6 +1,7 @@
-<img align="left" src="assets/2.png" alt="Letopis logo" width="180" hspace="20">
-
-<h1 align="left">Letopis</h1>
+<h1 align="left">
+  <img src="assets/2.png" alt="" width="72" align="middle">
+  Letopis
+</h1>
 
 <p align="left"><strong>Shared project memory for coding agents, built on a Markdown knowledge graph.</strong></p>
 
@@ -17,8 +18,6 @@
   <a href="#cli">CLI</a> ·
   <a href="#semantic-search">Semantic search</a>
 </p>
-
-<br clear="left">
 
 <br>
 
