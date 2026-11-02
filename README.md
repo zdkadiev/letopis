@@ -1,6 +1,6 @@
 <img align="left" src="assets/2.png" alt="Letopis logo" width="20%" hspace="20">
 
-<h1 align="left">Letopis</h1>
+<h3 align="left">Letopis</h3>
 
 <p align="left"><strong>Shared project memory for coding agents, built on a Markdown knowledge graph.</strong></p>
 
