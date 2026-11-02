@@ -33,7 +33,7 @@
 - **A separate Git source snapshot for each concept.** Keep knowledge grounded in the version of code it was verified against, including earlier revisions.
 - **Source-change tracking.** See which knowledge needs review when the linked code changes.
 - **A searchable knowledge graph.** Find relevant knowledge with full-text or optional semantic search, and follow links between concepts and source code.
-- **Lightweight local memory.** Keep Markdown anywhere in your repository, version it with Git, and search a local index without a separate database server.
+- **Lightweight local memory.** Keep Markdown anywhere in your repository, version it with Git, and search a local index.
 - **Shared memory across agent sessions.** Let agents reuse accumulated project knowledge on the next task.
 
 ## Installation
