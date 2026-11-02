@@ -7,9 +7,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT">
-  <img src="https://img.shields.io/badge/storage-Markdown-222222" alt="Knowledge stored in Markdown">
-  <img src="https://img.shields.io/badge/interface-JSON-4c8c51" alt="JSON command-line interface">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
+  <a href="#knowledge-format"><img src="https://img.shields.io/badge/storage-Markdown-222222" alt="Knowledge stored in Markdown"></a>
+  <a href="#input--output"><img src="https://img.shields.io/badge/interface-JSON-4c8c51" alt="JSON command-line interface"></a>
 </p>
 <p align="center">
   <a href="#why-letopis">Why Letopis</a> ·
