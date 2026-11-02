@@ -1,12 +1,15 @@
-<p align="center">
-  <img src="assets/2.png" alt="Letopis logo" width="120">
-</p>
+<table>
+<tr>
+<td width="160" align="center" valign="middle">
+  <img src="assets/2.png" alt="Letopis logo" width="140">
+</td>
+<td valign="middle">
 
-<h1 align="center">Letopis</h1>
+<h1 align="left">Letopis</h1>
 
-<p align="center"><strong>Shared project memory for coding agents, built on a Markdown knowledge graph.</strong></p>
+<p align="left"><strong>Shared project memory for coding agents, built on a Markdown knowledge graph.</strong></p>
 
-<p align="center">
+<p align="left">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT">
   <img src="https://img.shields.io/badge/storage-Markdown-222222" alt="Knowledge stored in Markdown">
   <img src="https://img.shields.io/badge/interface-JSON-4c8c51" alt="JSON command-line interface">
@@ -14,13 +17,17 @@
 
 <br>
 
-<p align="center">
+<p align="left">
   <a href="#why-letopis">Why Letopis</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#knowledge-format">Knowledge format</a> ·
   <a href="#cli">CLI</a> ·
   <a href="#semantic-search">Semantic search</a>
 </p>
+
+</td>
+</tr>
+</table>
 
 <br>
 
