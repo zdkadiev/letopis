@@ -8,6 +8,8 @@
   <img src="https://img.shields.io/badge/interface-JSON-4c8c51" alt="JSON command-line interface">
 </p>
 
+<br>
+
 <p align="center">
   <a href="#why-letopis">Why Letopis</a> ·
   <a href="#quick-start">Quick start</a> ·
@@ -15,6 +17,8 @@
   <a href="#cli">CLI</a> ·
   <a href="#semantic-search">Semantic search</a>
 </p>
+
+<br>
 
 <p align="center">
   <img src="assets/How-Letopis-Works-Knowledge-Flow.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="680">
