@@ -23,7 +23,7 @@ brew install zdkadiev/tap/letopis
 ```
 
 <p align="center">
-  <img src="assets/How-Letopis-Works-Knowledge-Flow.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="760">
+  <img src="assets/How-Letopis-Works-Knowledge-Flow.png" alt="How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context." width="680">
 </p>
 
 ## Why Letopis?
