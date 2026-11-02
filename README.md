@@ -2,23 +2,11 @@
 
 <p align="center"><strong>Shared project memory for coding agents, built on a Markdown knowledge graph.</strong></p>
 
-<p align="center">
-  Full-text and optional semantic search across the graph, files anywhere in your repo, and knowledge grounded in individual Git snapshots.
-</p>
+Install with [Homebrew](https://brew.sh):
 
-<p align="center">
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT">
-  <img src="https://img.shields.io/badge/storage-Markdown-222222" alt="Knowledge stored in Markdown">
-  <img src="https://img.shields.io/badge/interface-JSON-4c8c51" alt="JSON command-line interface">
-</p>
-
-<p align="center">
-  <a href="#why-letopis">Why Letopis</a> ·
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#knowledge-format">Knowledge format</a> ·
-  <a href="#cli">CLI</a> ·
-  <a href="#semantic-search">Semantic search</a>
-</p>
+```sh
+brew install zdkadiev/tap/letopis
+```
 
 ![How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context.](assets/How-Letopis-Works-Knowledge-Flow.png)
 
@@ -32,12 +20,6 @@
 - **See what needs another look.** Detect changes to linked source code and identify knowledge that needs review.
 
 ## Installation
-
-Install with [Homebrew](https://brew.sh):
-
-```sh
-brew install zdkadiev/tap/letopis
-```
 
 Native packages are available for macOS and Linux on ARM64 and x86_64. No Rust toolchain or model provider is needed to use full-text search.
 
