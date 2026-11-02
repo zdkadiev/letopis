@@ -1,5 +1,5 @@
 <h1 align="left">
-  <img src="assets/2.png" alt="" width="72" align="middle">
+  <img src="assets/2.png" alt="" width="20%" align="middle">
   Letopis
 </h1>
 
