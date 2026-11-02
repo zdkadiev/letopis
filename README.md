@@ -1,4 +1,4 @@
-<img align="left" src="assets/2.png" alt="Letopis logo" width="180" hspace="12">
+<img align="left" src="assets/2.png" alt="Letopis logo" width="180" hspace="20">
 
 <h1 align="left">Letopis</h1>
 
