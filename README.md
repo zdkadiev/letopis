@@ -29,6 +29,8 @@
 - **Work with different code versions.** Ground each concept in its own Git source snapshot, including earlier versions of the code.
 - **See what needs another look.** Detect changes to linked source code and identify knowledge that needs review.
 
+![How Letopis works: agents write Markdown, Letopis indexes it, and agents find and read relevant knowledge into their context.](assets/How-Letopis-Works-Knowledge-Flow.png)
+
 ## Installation
 
 Install with [Homebrew](https://brew.sh):
