@@ -3,13 +3,13 @@
 .agents
 .vscode/
 .codex
+.cargo
 /.artifacts/
 skills-lock.json
 /.superpowers/
 /.idea/
 /.letopis/
 /.claude
-/.cargo
 .DS_Store
 __pycache__/
 .claude/settings.local.json
