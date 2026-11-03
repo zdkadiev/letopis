@@ -27,12 +27,44 @@ code blocks declares knowledge; ordinary Markdown alone creates no elements.
 A clean `check` does not prove an ignored file was indexed. If a new concept is
 missing, check its eligibility before changing its content or rebuilding the cache.
 
-Each knowledge file represents one concept. Keep its explanation, rationale,
-limits and sources together; give independently useful concepts separate files.
-Search first and update an existing concept rather than creating a duplicate.
+Group closely related knowledge in a file named after its common concept. A
+file may hold one whole-file element or several section elements about that
+concept. Keep each element's explanation, rationale, limits, examples, pitfalls
+and sources together rather than creating an element for each fact. Search
+first and update a suitable existing concept rather than creating a duplicate
+or a narrowly fragmented file.
 
-Name the file after its concept so its purpose is clear from the path. Follow
-the repository's naming convention; otherwise use descriptive lowercase
+Organize knowledge by the subject it explains, rather than by its origin or
+form. Keep a concept's domain explanation, implementation details, external
+integrations and pitfalls together as separate marked sections when they serve
+the same purpose. Before creating a file, search across these perspectives for
+an existing concept that should contain the knowledge.
+
+During consolidation, group files by their shared subject before considering
+their size. Keep independently useful concepts separate even when they share
+packages or sources. File-size targets guide organization; they do not
+determine conceptual boundaries.
+
+Aim for roughly 30–40 readable lines per knowledge element. Shorter elements
+are fine when the concept needs less space; do not add filler. Avoid hiding a
+large amount of text in very long lines. If a concept grows beyond this range,
+split it along meaningful subtopics into separate knowledge elements. Prefer
+marked sections in the same concept file when the subtopics belong together;
+use separate concept-named files when that makes the organization clearer.
+Link related elements with `related_to`, or use `includes` when an overview
+contains them. Keep each element's claims, qualifications and sources together.
+
+Aim for concept files of roughly 200–800 lines when enough related knowledge
+exists. Consider merging subconcept files shorter than 200 lines into their
+shared concept file, keeping their knowledge as separate marked elements.
+When a concept file grows beyond 1,000 lines, consider splitting it into two
+files named for meaningful subconcepts. These file-size guidelines do not
+override conceptual cohesion: a file may be shorter, and unrelated material
+should not be added to reach a target. Update element IDs and incoming links
+after moving them; these file sizes are separate from element-size guidance.
+
+Name the file after its common concept so its purpose is clear from the path.
+Follow the repository's naming convention; otherwise use descriptive lowercase
 hyphenated names with `.md`, such as `cache-key.md` or `http-retry-budget.md`.
 Keep names stable as the explanation grows. Avoid generic buckets such as
 `notes.md` or `decisions.md` for unrelated concepts.
@@ -110,9 +142,9 @@ snapshot. Search/traverse results likewise do not lock later filesystem reads.
 ## Write marked Markdown
 
 IDs derive from Git-root-relative path and optional anchor; do not write a UUID.
-Keep `created_at` when editing or renaming an existing element. For new concept
-files, use a whole-file element with metadata on line one. Both examples below
-are authored in `letopis/cache/cache-key.md`:
+Keep `created_at` when editing or renaming an existing element. For a file with
+one element, use whole-file metadata on line one. Both examples below are
+authored in `letopis/cache/cache-key.md`:
 
 ```markdown
 <!-- letopis: {"created_at":1792800000,"source_snapshot":"<verified-tree-oid>"} -->
@@ -122,16 +154,20 @@ Cache keys use the source hash.
 [code](../../src/cache.rs#L2-L4 "letopis:type=external;path=src/cache.rs#L2-L4")
 ```
 
-Existing documents may use section elements. When maintaining one, place metadata
-immediately after its explicit heading; use separate files for new independent
-concepts:
+For multiple elements in a concept file, give each section an explicit unique
+anchor and place its metadata immediately after the heading. Link section
+elements using their Git-root-relative file path and anchor:
 
 ```markdown
 ## Cache key {#cache-key}
 <!-- letopis: {"created_at":1792800000,"source_snapshot":"<verified-tree-oid>"} -->
 Cache keys use the source hash.
 [code](../../src/cache.rs#L2-L4 "letopis:type=external;path=src/cache.rs#L2-L4")
-[invalidation](cache-invalidation.md "letopis:type=related_to;path=letopis/cache/cache-invalidation.md")
+[invalidation](cache-key.md#invalidation "letopis:type=related_to;path=letopis/cache/cache-key.md#invalidation")
+
+## Cache invalidation {#invalidation}
+<!-- letopis: {"created_at":1792800000} -->
+Invalidate cached entries when their source changes.
 ```
 
 Do not mix a whole-file element with marked sections or nest marked elements.
