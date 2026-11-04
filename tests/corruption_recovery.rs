@@ -268,16 +268,18 @@ fn assert_retained_vectors(repo: &ReadingRepo, config: &EmbeddingConfig, hashes:
                 .zip(hashes)
                 .zip([FIRST_VECTOR, SECOND_VECTOR])
             {
-                let node = read
-                    .nodes_get_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
-                    .unwrap()
-                    .unwrap();
+                let node = StorageRead::nodes_get_by_id(
+                    read,
+                    &EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()),
+                )
+                .unwrap()
+                .unwrap();
                 let NodeMetadata::Knowledge(node) = node.metadata else {
                     panic!("expected knowledge")
                 };
                 assert_eq!(&node.search_hash, hash);
                 assert_eq!(
-                    read.vector_keys_get_vector_by_search_hash(&identity, hash)
+                    read.vector_keys_get_by_search_hash(&identity, hash)
                         .unwrap(),
                     VectorOutcome::Current(Some(expected.to_vec()))
                 );
@@ -298,12 +300,12 @@ fn get_search_hashes(repo: &ReadingRepo) -> Vec<Sha256> {
                 ["a.md", "b.md"]
                     .into_iter()
                     .map(|id| {
-                        let node = read
-                            .nodes_get_by_id(&EdgeTarget::Knowledge(
-                                KnowledgeId::parse(id).unwrap(),
-                            ))
-                            .unwrap()
-                            .unwrap();
+                        let node = StorageRead::nodes_get_by_id(
+                            read,
+                            &EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()),
+                        )
+                        .unwrap()
+                        .unwrap();
                         let NodeMetadata::Knowledge(node) = node.metadata else {
                             panic!("expected knowledge")
                         };

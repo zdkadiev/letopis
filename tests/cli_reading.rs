@@ -162,11 +162,8 @@ fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
                 panic!("knowledge")
             };
             assert_eq!(
-                read.vector_keys_get_vector_by_search_hash(
-                    &config.get_identity(),
-                    &node.search_hash
-                )
-                .unwrap(),
+                read.vector_keys_get_by_search_hash(&config.get_identity(), &node.search_hash)
+                    .unwrap(),
                 VectorOutcome::Current(Some(vec![1.0, 0.0]))
             );
 

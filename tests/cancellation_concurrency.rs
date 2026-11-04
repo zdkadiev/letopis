@@ -318,12 +318,14 @@ fn get_search_hash(repo: &ReadingRepo) -> Sha256 {
         .with_read_tx(|| {
             Ok::<_, StorageError>({
                 let read = &storage.cache;
-                let node = read
-                    .nodes_get_by_id(&EdgeTarget::Knowledge(
+                let node = StorageRead::nodes_get_by_id(
+                    read,
+                    &EdgeTarget::Knowledge(
                         KnowledgeId::parse("knowledge.md").expect("knowledge id"),
-                    ))
-                    .expect("read node")
-                    .expect("published knowledge");
+                    ),
+                )
+                .expect("read node")
+                .expect("published knowledge");
                 let NodeMetadata::Knowledge(node) = node.metadata else {
                     panic!("expected knowledge metadata");
                 };
@@ -346,7 +348,7 @@ fn get_vector_by_search_hash(
             Ok::<_, StorageError>({
                 let read = &storage.cache;
                 match read
-                    .vector_keys_get_vector_by_search_hash(&config.get_identity(), search_hash)
+                    .vector_keys_get_by_search_hash(&config.get_identity(), search_hash)
                     .expect("read vector")
                 {
                     VectorOutcome::Current(vector) => vector,

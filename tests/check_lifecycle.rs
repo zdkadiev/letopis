@@ -222,7 +222,9 @@ fn concurrent_check_publishes_edits_from_both_writers() {
             assert_eq!(nodes.len(), 2);
             for (id, created_at, text) in [("a.md", 42, "LarchEdited"), ("b.md", 73, "BirchEdited")]
             {
-                let node = view.nodes_get_by_id(&build_target(id)).unwrap().unwrap();
+                let node = StorageRead::nodes_get_by_id(view, &build_target(id))
+                    .unwrap()
+                    .unwrap();
                 let NodeMetadata::Knowledge(metadata) = node.metadata else {
                     panic!("knowledge node expected")
                 };
@@ -333,7 +335,12 @@ fn get_knowledge(repo: &ReadingRepo, id: &str) -> Option<KnowledgeMetadata> {
     let storage = repo.open_storage();
     let row = storage
         .cache
-        .with_read_tx(|| Ok::<_, StorageError>(storage.cache.nodes_get_by_id(&build_target(id))))
+        .with_read_tx(|| {
+            Ok::<_, StorageError>(StorageRead::nodes_get_by_id(
+                &storage.cache,
+                &build_target(id),
+            ))
+        })
         .unwrap()
         .unwrap()?;
     let NodeMetadata::Knowledge(metadata) = row.metadata else {

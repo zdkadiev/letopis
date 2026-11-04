@@ -178,10 +178,9 @@ impl Fixture {
                     .cache
                     .with_read_tx(|| {
                         Ok::<_, StorageError>(
-                            scope_databases.cache.vector_keys_get_vector_by_search_hash(
-                                &config.get_identity(),
-                                hash,
-                            ),
+                            scope_databases
+                                .cache
+                                .vector_keys_get_by_search_hash(&config.get_identity(), hash),
                         )
                     })
                     .unwrap()

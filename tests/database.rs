@@ -158,7 +158,7 @@ fn assert_original_vector<C: CacheDatabase, V: VectorDatabase>(
                 get_current(
                     storage
                         .cache
-                        .vector_keys_get_vector_by_search_hash(identity, identity)
+                        .vector_keys_get_by_search_hash(identity, identity)
                         .unwrap()
                 ),
                 Some(vec![1.0, 0.0, 0.0])
