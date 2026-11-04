@@ -2,10 +2,10 @@ use super::{
     cache_write::SqliteCacheWrite,
     connection::{
         CACHE_DATABASE, ConfinedDirectory, VECTOR_DATABASE, attach_cache, attach_vectors,
-        map_sqlite, open_database, prepare_paths,
+        map_sqlite, open_database, open_observed_database, prepare_paths,
     },
     read::SqliteRead,
-    schema::{bootstrap_cache, bootstrap_vectors},
+    schema::{bootstrap_cache, bootstrap_vectors, recognize_cache},
     vector_write::SqliteVectorWrite,
     vectors,
 };
@@ -40,6 +40,10 @@ impl SqliteStorage {
     /// writes and read connections retain their zero busy timeout.
     pub(crate) fn open(cache: &Path, vectors: &Path) -> StorageResult<Self> {
         let (cache, vectors) = prepare_paths(cache, vectors)?;
+        // Even an unconfigured writable close can checkpoint an incompatible WAL.
+        if let Some(mut observed) = open_observed_database(&cache)? {
+            recognize_cache(&mut observed)?;
+        }
         let mut cache_writer = open_database(&cache)?;
         bootstrap_cache(&mut cache_writer)?;
         let mut vector_writer = open_database(&vectors)?;
@@ -59,6 +63,9 @@ impl SqliteStorage {
     }
     pub(crate) fn open_confined(directory: &Path, pinned: &impl AsFd) -> StorageResult<Self> {
         let paths = ConfinedDirectory::new(directory, pinned);
+        if let Some(mut observed) = paths.open_observed_database(CACHE_DATABASE)? {
+            recognize_cache(&mut observed)?;
+        }
         let mut cache_writer = paths.open_database(CACHE_DATABASE)?;
         paths.verify()?;
         bootstrap_cache(&mut cache_writer)?;

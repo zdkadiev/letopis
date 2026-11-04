@@ -1,6 +1,6 @@
 use super::{
     connection::map_sqlite,
-    files, fts, graph,
+    edges, files, fts, graph,
     query::{Project, build_query},
 };
 use crate::{
@@ -41,11 +41,11 @@ impl CacheWrite for SqliteCacheWrite<'_> {
         self.record(result)
     }
     fn insert_edge(&mut self, edge: &Edge) -> StorageResult<()> {
-        let result = graph::insert_edge(&self.transaction, edge);
+        let result = edges::insert_edge(&self.transaction, edge);
         self.record(result)
     }
     fn delete_outgoing(&mut self, source: &KnowledgeId) -> StorageResult<()> {
-        let result = graph::delete_outgoing(&self.transaction, source);
+        let result = edges::delete_outgoing(&self.transaction, source);
         self.record(result)
     }
     fn delete_node(&mut self, id: &EdgeTarget) -> StorageResult<()> {
@@ -71,6 +71,7 @@ impl CacheWrite for SqliteCacheWrite<'_> {
                 "cache unit has failed",
             ));
         }
+        edges::resolve_edges(&self.transaction)?;
         let (sql, values) = build_query(
             Query::select()
                 .column(Project::Revision)

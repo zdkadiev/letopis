@@ -13,7 +13,6 @@ pub(super) enum Project {
 #[derive(Clone, Copy, Iden)]
 pub(super) enum Nodes {
     Table,
-    RowId,
     Id,
     Kind,
     Uri,
@@ -29,6 +28,13 @@ pub(super) enum Edges {
     Table,
     SourceId,
     TargetId,
+    Type,
+}
+#[derive(Clone, Copy, Iden)]
+pub(super) enum UnresolvedEdges {
+    Table,
+    SourceId,
+    TargetUri,
     Type,
 }
 #[derive(Clone, Copy, Iden)]

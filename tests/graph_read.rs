@@ -264,7 +264,7 @@ fn does_not_decode_unselected_node_metadata() {
     let mut storage = build_fixture(&root);
     let db = rusqlite::Connection::open(root.path().join("cache.db")).unwrap();
     db.execute(
-        "update nodes set hash='invalid',source_snapshot='invalid' where id='a.md'",
+        "update nodes set hash='invalid',source_snapshot='invalid' where uri='a.md'",
         [],
     )
     .unwrap();

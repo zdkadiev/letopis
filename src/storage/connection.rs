@@ -325,6 +325,33 @@ fn has_same_file(cache: &Path, vectors: &Path) -> StorageResult<bool> {
     Ok(false)
 }
 
+/// Observe an existing database without enabling writable journal or close effects.
+/// Returns none for an absent path; readers may create WAL/SHM or update SHM marks.
+///
+/// # Errors
+/// Reports failed filesystem observations or native database opening.
+pub(super) fn open_observed_database(path: &Path) -> StorageResult<Option<Connection>> {
+    match fs::metadata(path) {
+        Ok(_) => (),
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(StorageError::new_with_cause(
+                StorageErrorKind::InternalError,
+                "cannot observe storage database",
+                error,
+            ));
+        }
+    }
+    let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
+        | OpenFlags::SQLITE_OPEN_NO_MUTEX
+        | OpenFlags::SQLITE_OPEN_URI;
+    let connection = open_raw_database(path, flags)?;
+    connection
+        .busy_timeout(Duration::ZERO)
+        .map_err(map_sqlite)?;
+    Ok(Some(connection))
+}
+
 pub(super) fn open_database(path: &Path) -> StorageResult<Connection> {
     let connection = open_raw_database(path, DATABASE_OPEN_FLAGS)?;
     configure_connection(&connection)?;

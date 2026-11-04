@@ -2221,3 +2221,47 @@ operation; переполнение пересчитывает, не откло�
 **Уточняет:** D-93 (authoring), D-95 (diagnostic publication), D-105 (full audit).
 **Связи:** [X-4](contracts/X-4-markdown.md), [MC-1/MC-7](mechanics.md),
 [upgrade](../../development.md#issue-69-обязательный-path-и-явный-reindex).
+
+
+<a id="D-108"></a>
+### D-108: Issue 90 — integer node key и единственный URI
+> **Статус:** принято пользователем · **Дата:** 2026-11-04
+
+**Основание:** приняты [спецификация issue 90](../../superpowers/specs/2026-11-04-issue-90-node-identifiers-design.md)
+и отдельный [план integer endpoints](../../superpowers/plans/2026-11-04-issue-90-integer-edges.md).
+
+1. Cache schema 4 хранит `nodes.id integer primary key autoincrement` и один
+   `nodes.uri text not null unique`. Integer — внутренний FTS/graph key; URI —
+   публичная идентичность, lookup и порядок. Оба resolved endpoint references —
+   integer FK к `nodes(id)` с restrictive deletion. Missing targets сохраняются
+   в `unresolved_edges` с numeric source FK и target URI, без placeholder nodes.
+   Logical union даёт прежние diagnostics, traversal читает только resolved edges.
+2. Publication: nodes/FTS/files и derived sources сначала, декларации только
+   changed owners — вторым проходом той же unit. Incoming declarations demote
+   перед удалением target, promote при commit после появления target; unchanged
+   owners не перепарсиваются/не перевставляются. Duplicate/source ошибки poison
+   unit; оба прохода, demotion/promotion и revision откатываются вместе.
+3. Rust поля `KnowledgeMetadata.id`/`uri` остаются: unequal input — typed
+   `InvalidRequest` с прежней rollback/poisoning policy; decode заполняет оба из URI.
+   UPSERT по URI сохраняет id только пока строка существует. Cache rebuild не
+   обещает прежних ключей или revision. Другие metadata constraints сохранены.
+4. URI neighbor cursors сохраняются; SQLite native VM доказывает bounded top-K
+   с LIMIT 1..32, без OFFSET/degree-sized materialization. Возможен adjacency scan
+   на каждой странице; прежняя index-only latency не обещается.
+5. Старый/неверный cache отвергается до vectors; automatic migration, repair,
+   deduplication/reset нет. Direct open/reindex распознают точную схему read-only
+   до writable cache open; status остаётся read-only. Main/WAL bytes и identities,
+   committed state, vectors/config/locks сохраняются, включая DELETE/uncheckpointed WAL.
+   Все три пути могут создать пустой cache WAL и SHM reader index; существующий
+   SHM может менять reader bookkeeping, сохраняя identity и безопасное время жизни.
+   SHM byte stability не обещана; live WAL читается, sidecars не удаляются.
+   Явное quiescent cache-only обновление выполняет оператор, затем supported
+   reindex из canonical Markdown. Last-valid invalid/missing projections старого
+   cache после удаления не восстановить.
+6. Vector schema 1 неизменна; joins по `search_hash`, не node id. Сохраняются
+   vectors/config/failures/attempts/query diagnostics. Сам upgrade не prune/reset;
+   будущие обычные prune/config reset сохраняют свои правила. Historical layouts,
+   models и evidence не переписываются. Новых API/layers/dependencies нет.
+
+**Уточняет:** D-91/D-92 (cache/vector isolation), D-93 (textual identity), D-95
+(publication), MC-2 и I-8. [Upgrade](../../development.md#issue-90-версия-кэша-4).

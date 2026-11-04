@@ -245,6 +245,7 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
             outcome = apply_projection(unit.as_mut(), prepared, outcome)?;
         }
         publication.reconcile_sources(&graph, unit.as_mut())?;
+        publication.publish_edges(&graph, unit.as_mut())?;
         if !excluded.is_empty()
             && self
                 .git
@@ -550,6 +551,7 @@ mod projection {
         knowledge: BTreeMap<KnowledgeId, KnowledgeMetadata>,
         edges: BTreeSet<Edge>,
         touched_sources: BTreeSet<SourceUri>,
+        changed_owners: BTreeSet<KnowledgeId>,
     }
     impl<F: FileSystem, M: MarkdownCodec, P> DocumentPublication<'_, F, M, P> {
         /// Captures and parses one changed file against its effective previous projection.
@@ -643,6 +645,24 @@ mod projection {
             Ok(())
         }
 
+        /// Inserts changed owners' final declarations after all nodes and sources exist.
+        /// Unchanged owners keep their declarations for storage's commit-time reconciliation.
+        ///
+        /// # Errors
+        /// Reports declaration failures, leaving the caller's transaction unpublished.
+        pub(super) fn publish_edges(
+            &self,
+            graph: &EffectiveGraph,
+            unit: &mut dyn CacheWrite,
+        ) -> DocumentResult<()> {
+            for edge in &graph.edges {
+                if graph.changed_owners.contains(edge.get_source()) {
+                    unit.insert_edge(edge)?;
+                }
+            }
+            Ok(())
+        }
+
         fn publish_source_group(
             &self,
             unit: &mut dyn CacheWrite,
@@ -682,6 +702,7 @@ mod projection {
                 knowledge,
                 edges: read.get_edges_by_source_id(None)?.into_iter().collect(),
                 touched_sources: BTreeSet::new(),
+                changed_owners: BTreeSet::new(),
             })
         }
 
@@ -711,6 +732,7 @@ mod projection {
         }
 
         pub(super) fn apply(&mut self, prepared: &PreparedProjection) {
+            self.changed_owners.extend(prepared.cleared.iter().cloned());
             self.edges.retain(|edge| {
                 if prepared.cleared.contains(edge.get_source()) {
                     if let EdgeTarget::Source(uri) = edge.get_target() {
@@ -725,6 +747,7 @@ mod projection {
                 self.knowledge.remove(id);
             }
             for text in &prepared.search {
+                self.changed_owners.insert(text.metadata.id.clone());
                 self.knowledge
                     .insert(text.metadata.id.clone(), text.metadata.clone());
             }
@@ -801,9 +824,6 @@ mod projection {
         reach_checkpoint("cleared");
         for text in &prepared.search {
             unit.upsert_node(&NodeMetadata::Knowledge(text.metadata.clone()))?;
-        }
-        for edge in &prepared.edges {
-            unit.insert_edge(edge)?;
         }
         #[cfg(test)]
         reach_checkpoint("projections");
@@ -1341,10 +1361,11 @@ mod tests {
     }
 
     mod basis {
-        use super::{Candidates, CountingMarkdown, TestFiles, build_service};
-        use crate::service::{ReadTransaction, VectorWrite};
+        use super::{Candidates, CountingMarkdown, TestFiles, TestProvenance, build_service};
+        use crate::service::{GraphDiagnostics, ReadTransaction, VectorWrite};
         use crate::{
             domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
+            filesystem::LocalFileSystem,
             service::{
                 BasisRetainer, CacheWrite, CapturedFile, DocumentError, DocumentErrorKind,
                 DocumentRefreshService, DocumentResult, FileRow, FileStat, FileSystem,
@@ -1352,13 +1373,23 @@ mod tests {
                 SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage,
                 StorageResult, VectorOutcome,
             },
+            storage::SqliteStorage,
+            wire_graph_diagnostics,
         };
-        use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
+        use std::{
+            cell::{Cell, RefCell},
+            collections::BTreeSet,
+            fs,
+            path::Path,
+            rc::Rc,
+        };
         use tempfile::TempDir;
 
         type Events = Rc<RefCell<Vec<&'static str>>>;
         type Service =
             DocumentRefreshService<Candidates, BoundaryFiles, CountingMarkdown, BoundaryProvenance>;
+        type OrderingService =
+            DocumentRefreshService<Candidates, LocalFileSystem, CountingMarkdown, TestProvenance>;
         struct BoundaryFiles {
             inner: TestFiles,
             events: Events,
@@ -1371,10 +1402,50 @@ mod tests {
         struct BoundaryStorage {
             inner: Box<dyn Storage>,
             events: Events,
+            operations: Option<Events>,
         }
         struct BoundaryWrite<'a> {
             inner: Box<dyn CacheWrite + 'a>,
             events: Events,
+            operations: Option<Events>,
+        }
+
+        #[test]
+        fn publishes_all_nodes_and_sources_before_declared_edges() {
+            // Given: a forward anchor reference, two source kinds, and a truly absent target.
+            let (_dir, mut service, operations) = build_ordering_service();
+            // When: one reindex publishes the final node set and declarations together.
+            assert_eq!(service.reindex().unwrap().revision, 1);
+            // Then: all four real endpoints precede every edge, and absence remains diagnostic.
+            assert_eq!(
+                *operations.borrow(),
+                [
+                    "node", "node", "node", "node", "edge", "edge", "edge", "edge"
+                ]
+            );
+            let mut read = service.storage.begin_read_tx().unwrap();
+            let problems = wire_graph_diagnostics()
+                .find_problems(read.as_mut(), &[])
+                .unwrap();
+            assert_eq!(problems.len(), 1);
+            assert_eq!(problems[0].details["target"], "missing.md");
+        }
+
+        #[test]
+        fn target_only_refresh_does_not_reparse_or_reinsert_unchanged_owner() {
+            // Given: the owner stays unchanged while its target is removed and restored.
+            let (dir, mut service, operations) = build_ordering_service();
+            service.reindex().unwrap();
+            fs::remove_file(dir.path().join("z.md")).unwrap();
+            service.refresh().unwrap();
+            operations.borrow_mut().clear();
+            let parses = service.markdown.0.get();
+            write_ordering_target(dir.path());
+            // When: a target-only refresh resolves the surviving declaration at commit.
+            assert_eq!(service.refresh().unwrap().files_updated, 1);
+            // Then: only the target is reparsed and upserted; unchanged declarations are not reinserted.
+            assert_eq!(service.markdown.0.get() - parses, 2);
+            assert_eq!(*operations.borrow(), ["node"]);
         }
 
         #[test]
@@ -1565,6 +1636,53 @@ mod tests {
             assert!(service.markdown.0.get() > parses);
         }
 
+        fn build_ordering_service() -> (TempDir, OrderingService, Events) {
+            let dir = TempDir::new().unwrap();
+            fs::write(dir.path().join("a.md"), concat!(
+                "<!-- letopis: {\"created_at\":1} -->\n",
+                "[anchor](z.md#target \"letopis:type=supports;path=z.md#target\") ",
+                "[local](code.rs \"letopis:type=external;path=code.rs\") ",
+                "[remote](https://Host/x?q=1#part \"letopis:type=external;path=https://Host/x?q=1#part\") ",
+                "[absent](missing.md \"letopis:type=related_to;path=missing.md\")\n",
+            )).unwrap();
+            write_ordering_target(dir.path());
+            fs::write(dir.path().join("code.rs"), "source bytes\n").unwrap();
+            let mut candidates = Candidates::new();
+            candidates.expect_get_candidates().returning(|| {
+                Ok(vec![
+                    RepoPath::parse("a.md").unwrap(),
+                    RepoPath::parse("z.md").unwrap(),
+                ])
+            });
+            let operations = Rc::new(RefCell::new(Vec::new()));
+            let service = DocumentRefreshService {
+                git: candidates,
+                filesystem: LocalFileSystem::open(dir.path()).unwrap(),
+                markdown: CountingMarkdown(Cell::new(0)),
+                storage: Box::new(BoundaryStorage {
+                    inner: Box::new(
+                        SqliteStorage::open(
+                            &dir.path().join("cache.db"),
+                            &dir.path().join("vectors.db"),
+                        )
+                        .unwrap(),
+                    ),
+                    events: Rc::new(RefCell::new(Vec::new())),
+                    operations: Some(Rc::clone(&operations)),
+                }),
+                provenance: TestProvenance,
+            };
+            (dir, service, operations)
+        }
+
+        fn write_ordering_target(root: &Path) {
+            fs::write(
+                root.join("z.md"),
+                "# Target {#target}\n<!-- letopis: {\"created_at\":2} -->\nTarget\n",
+            )
+            .unwrap();
+        }
+
         fn build_boundary_service(failure: Option<&'static str>) -> (TempDir, Service, Events) {
             let (dir, service) = build_service();
             let events = Rc::new(RefCell::new(Vec::new()));
@@ -1578,6 +1696,7 @@ mod tests {
                 storage: Box::new(BoundaryStorage {
                     inner: service.storage,
                     events: Rc::clone(&events),
+                    operations: None,
                 }),
                 provenance: BoundaryProvenance {
                     batches: RefCell::new(Vec::new()),
@@ -1673,6 +1792,7 @@ mod tests {
                 Ok(Box::new(BoundaryWrite {
                     inner: self.inner.begin_cache_write_tx()?,
                     events: Rc::clone(&self.events),
+                    operations: self.operations.clone(),
                 }))
             }
             fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
@@ -1681,9 +1801,15 @@ mod tests {
         }
         impl<'a> CacheWrite for BoundaryWrite<'a> {
             fn upsert_node(&mut self, node: &NodeMetadata) -> StorageResult<i64> {
+                if let Some(operations) = &self.operations {
+                    operations.borrow_mut().push("node");
+                }
                 self.inner.upsert_node(node)
             }
             fn insert_edge(&mut self, edge: &Edge) -> StorageResult<()> {
+                if let Some(operations) = &self.operations {
+                    operations.borrow_mut().push("edge");
+                }
                 self.inner.insert_edge(edge)
             }
             fn delete_outgoing(&mut self, id: &KnowledgeId) -> StorageResult<()> {

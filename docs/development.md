@@ -240,13 +240,13 @@ upgrade применяется отдельный порядок issue 69 ниж
 своих временных fixtures после закрытия всех handles. Тест upgrade сохраняет
 vector `[1.0, 0.0, 0.0]`, счётчик попыток и failure sentinel через публичный Storage.
 
-## TK-23: версия схемы кэша 2
+## TK-23: историческая версия схемы кэша 2
 
 Утверждённые [ограниченные чтения графа](superpowers/specs/2026-10-25-tk-23-traversal-design.md#storage-access-indexes-and-compatibility)
 добавляют индексы `edges_outgoing(source_id,type,target_id)`,
 `edges_incoming(target_id,type,source_id)` вместо `edges_target` и частичный
 `nodes_source_snapshot(source_snapshot)` для непустых корней. Поэтому точная
-распознаваемая схема `cache.db` имеет версию **2**; схема `vectors.db` остаётся
+распознаваемая на ревизии TK-23 схема `cache.db` имела версию **2**; схема `vectors.db` остаётся
 версии **1**. Старый кэш безопасно отклоняется до открытия векторов; автоматической
 миграции, удаления или изменения данных при несовместимости нет.
 
@@ -326,3 +326,57 @@ Status read-only: до публикации новой ошибки её не в
 сохранённая ошибка исчезнет только после успешного refresh/reindex. SQL failure
 не заменяет опубликованное состояние. Свежий кэш не публикует часть invalid файла.
 Исторические спецификации/receipts сохраняют синтаксис своей ревизии.
+
+
+## Историческая приёмка issue 90: версия кэша 3
+
+<a id="issue-90-версия-кэша-3"></a>
+Старая ссылка сохраняется для [исходного schema-3 отчёта](superpowers/plans/2026-11-04-issue-90-node-identifiers-report.md).
+Он проверял integer node key с текстовыми edges; текущая схема и процедура ниже.
+
+## Issue 90: версия кэша 4
+
+[D-108](zkit/letopis/decisions.md#D-108): текущая точная схема `cache.db` — **4**,
+`vectors.db` — **1**. `nodes.id` — внутренний autoincrement integer key;
+`nodes.uri` — единственный уникальный текстовый адрес. Внешние IDs и endpoints
+не меняются. UPSERT по URI сохраняет ключ пока существует строка; после удаления
+или cache rebuild прежние integer keys и revision не гарантируются.
+
+Схемы 1/2/3 (включая schema-2 unequal ID/URI и duplicate URI) и malformed cache отвергаются
+обычными open/status/reindex до vector access. Нет automatic migration, repair,
+deduplication или vector reset. Оба resolved endpoint references — integer FK к
+`nodes(id)`; missing targets остаются в `unresolved_edges`, сохраняя diagnostics.
+Direct open/reindex проверяют точную схему read-only до writable cache open;
+status остаётся read-only. Rejection сохраняет cache main/WAL bytes и identities,
+committed logical state, vectors/config/locks, включая DELETE и uncheckpointed WAL.
+Каждый из трёх путей может создать пустой `cache.db-wal` и `cache.db-shm`
+(32768 bytes в проверенном native stack). Существующий SHM может менять reader
+marks/index bookkeeping, сохраняя identity и безопасное время жизни. Live WAL
+читается; reader sidecars не удаляются. Vector files при rejection не открываются.
+Нулевые filesystem effects и неизменность SHM bytes не гарантируются.
+
+Обновление — явная операторская процедура:
+
+1. Завершить все foreground calls и detached drain для репозитория, закрыть все
+   SQLite handles и дождаться освобождения locks. Установить новый бинарник;
+   смешанные версии одновременно не использовать.
+2. При необходимости сохранить резервную копию закрытого старого cache: только
+   он может содержать last-valid проекцию ныне invalid/missing Markdown.
+   После quiescence удалить только `.letopis/cache.db` и его существующие
+   `cache.db-wal`, `cache.db-shm`, `cache.db-journal`.
+3. Сохранить `vectors.db` и все его sidecars, `config.json`, `index.lock`,
+   `embed.lock`, Markdown и Git. Не unlink lock files: сохраняется их inode
+   identity, хотя supported calls обновляют содержимое lease владельца.
+4. Из Git-корня передать `{}` на stdin в `letopis reindex`, затем `letopis check`.
+   Reindex создаёт schema 4 из текущего canonical Markdown; разобрать validation
+   и provenance findings. Invalid файлы в свежем cache не получают старую
+   last-valid проекцию, missing файлы не восстанавливаются.
+
+Процедура не разрешает разработчику удалять живой пользовательский cache.
+Upgrade tests работают только с закрытыми временными fixtures. Векторы, identity,
+retry/failure state и query diagnostics сохраняются; membership использует
+`search_hash`, поэтому прежний текст переиспользует векторы без reinference даже
+при другой нумерации cache keys. Сам schema upgrade не prune/reset векторы;
+обычные последующие config changes/drain pruning могут удалить orphan vectors
+по прежним правилам. Сохранность файла не обещает вечное хранение таких векторов.
+Исторические schemas, proof harnesses и receipts сохраняют исходные semantics.

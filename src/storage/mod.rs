@@ -14,6 +14,7 @@ mod sqlite;
 pub(crate) use sqlite::SqliteStorage;
 
 mod cache_write;
+mod edges;
 mod files;
 mod fts;
 mod graph;

@@ -306,7 +306,7 @@ fn assert_healthy_peer(repo: &ReadingRepo, damaged: &[&str]) {
             })
             .unwrap();
         assert_eq!(revision, 3);
-        let mut statement = db.prepare("select id from nodes order by id").unwrap();
+        let mut statement = db.prepare("select uri from nodes order by uri").unwrap();
         let ids: Vec<String> = statement
             .query_map([], |row| row.get(0))
             .unwrap()

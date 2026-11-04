@@ -13,9 +13,9 @@ use sea_query::{Expr, ExprTrait, Query};
 pub(super) fn replace_text(db: &Connection, id: &KnowledgeId, text: &str) -> StorageResult<()> {
     let (sql, values) = build_query(
         Query::select()
-            .column(Nodes::RowId)
+            .column(Nodes::Id)
             .from(Nodes::Table)
-            .and_where(Expr::col(Nodes::Id).eq(id.as_str()))
+            .and_where(Expr::col(Nodes::Uri).eq(id.as_str()))
             .and_where(Expr::col(Nodes::Kind).ne(SOURCE_KIND)),
     )?;
     let row: Option<i64> = db
@@ -50,11 +50,11 @@ pub(super) fn get_text_matches_by_expression(
 ) -> StorageResult<Vec<TextMatch>> {
     let mut stmt = db
         .prepare(
-            "select nodes.id, nodes.row_id, bm25(text_index) as score
+            "select nodes.uri, nodes.id, bm25(text_index) as score
              from text_index
-             join nodes on nodes.row_id = text_index.rowid
+             join nodes on nodes.id = text_index.rowid
              where text_index match ?1 and nodes.kind <> ?2
-             order by score, nodes.id",
+             order by score, nodes.uri",
         )
         .map_err(map_sqlite)?;
     let mut rows = stmt

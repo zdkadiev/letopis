@@ -13,7 +13,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const CACHE_SCHEMA_VERSION: i64 = 2;
+const CACHE_SCHEMA_VERSION: i64 = 4;
 const VECTOR_SCHEMA_VERSION: i64 = 1;
 const RECEIPT_VERSION: u32 = 1;
 type ObservationResult<T> = Result<T, Box<dyn Error>>;

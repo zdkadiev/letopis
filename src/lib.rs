@@ -450,6 +450,10 @@ pub fn open_status_files(root: &Path) -> DocumentResult<impl StatusFiles + use<>
 
 /// Open the disk cache and independent vector database.
 ///
+/// Existing incompatible caches are recognized read-only before writable open.
+/// Rejection preserves main/WAL bytes and identities and never opens vectors;
+/// `SQLite` may create reader sidecars or update existing SHM reader bookkeeping.
+///
 /// # Errors
 /// Returns an invalid request for aliased or invalid paths, or an internal error
 /// for unsupported capabilities, incompatible schemas, contention or I/O errors.

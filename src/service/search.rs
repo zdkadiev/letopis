@@ -1315,9 +1315,12 @@ mod tests {
             let fixture = ScopedFixture::new();
             let root = fixture.root.path();
             let connection = rusqlite::Connection::open(root.join("cache.db")).unwrap();
-            connection
-                .execute("update nodes set created_at = -1 where id = ?1", ["a.md"])
-                .unwrap();
+            assert_eq!(
+                connection
+                    .execute("update nodes set created_at = -1 where uri = ?1", ["a.md"])
+                    .unwrap(),
+                1
+            );
             let mut search = fixture.build_search(None, None);
 
             // When: search executes the query.
@@ -1333,9 +1336,12 @@ mod tests {
             assert!(!format!("{error:?} {error}").contains("created_at"));
             // Keep the service alive: returning the error itself must release its reader.
             assert_can_checkpoint(root);
-            connection
-                .execute("update nodes set created_at = 1 where id = ?1", ["a.md"])
-                .unwrap();
+            assert_eq!(
+                connection
+                    .execute("update nodes set created_at = 1 where uri = ?1", ["a.md"])
+                    .unwrap(),
+                1
+            );
             publish_candidate(&mut open_storage(root), "b", "new.rs");
             assert_eq!(
                 open_storage(root).begin_read_tx().unwrap().get_revision(),
