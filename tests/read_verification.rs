@@ -32,7 +32,7 @@ fn all_commands_and_freshness_preserve_canonical_bytes() {
     let found = assert_ok(&repo.invoke(&["search"], br#"{"query":"AlphaToken","limit":10}"#));
     let walk = assert_ok(&repo.invoke(&["traverse"], br#"{"element_ids":["a.md"],"mode":"both","direction":"both","depth":1,"limit":10,"edge_limit":20}"#));
     let inspected = assert_ok(&repo.invoke(&["inspect"], br#"{"element_ids":["a.md"]}"#));
-    assert_ok(&repo.invoke(&["reindex"], b"{}"));
+    assert_ok(&repo.invoke(&["index", "--full"], b"{}"));
     assert_ok(&repo.invoke(&["status"], b"{}"));
     assert_ok(&repo.invoke(&["config"], b"{}"));
     // Then: results and inspection hash describe the untouched canonical file.
@@ -101,8 +101,8 @@ fn unrelated_damage_is_deferred_but_full_audits_prevent_publication() {
         build_note(Some(&basis), &["used.rs"], "PendingToken").as_bytes(),
     );
     // When / Then: both whole-corpus audits fail before advancing SQL publication.
-    for command in ["check", "reindex"] {
-        assert_internal(&repo.invoke(&[command], b"{}"));
+    for args in [&["check"][..], &["index", "--full"][..]] {
+        assert_internal(&repo.invoke(args, b"{}"));
         assert_eq!(get_revision(&repo), revision);
     }
     // Given: an invalid edit must keep the last-valid basis, including its damage.
@@ -183,7 +183,7 @@ fn removing_last_owner_drops_obsolete_damaged_root() {
     fs::remove_file(repo.get_root().join("a.md")).unwrap();
     // Then: no surviving claim requires the old damaged root.
     assert_ok(&repo.invoke(&["check"], b"{}"));
-    assert_ok(&repo.invoke(&["reindex"], b"{}"));
+    assert_ok(&repo.invoke(&["index", "--full"], b"{}"));
 }
 
 fn assert_ok(output: &Output) -> Value {

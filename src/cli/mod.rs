@@ -4,7 +4,7 @@ mod input;
 mod output;
 mod response;
 
-pub(crate) use input::{Request, request_parse};
+pub(crate) use input::{IndexMode, IndexRequest, Request, get_index_mode_by_args, request_parse};
 pub(crate) use output::response_write;
 /// Owns response serialization and write/flush arbitration for one process.
 pub(crate) use response::{CommandResponse, ResponseResult, ResponseWriter, finish_foreground};
@@ -22,7 +22,7 @@ mod search_tests;
 mod traversal_tests;
 
 #[cfg(test)]
-mod reindex_tests;
+mod help_tests;
 
 #[cfg(test)]
-mod help_tests;
+mod index_tests;

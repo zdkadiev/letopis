@@ -1,5 +1,5 @@
 use super::utils::map_document_lock_error;
-use super::utils::{CandidateSelection, map_document_file};
+use super::utils::{CandidateSelection, is_selected_path, map_document_file};
 use super::{
     BasisRetainer, CacheDatabase, DocumentError, DocumentErrorKind, DocumentResult, FileReader,
     FileRow, FileStat, GitWorktreePaths, MarkdownCodec, RefreshOutcome, Refresher,
@@ -89,31 +89,35 @@ impl<
     C: CacheDatabase,
 > Refresher for DocumentRefreshService<G, F, M, P, C>
 {
-    fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
+    fn refresh_verified(&mut self, paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
         let _lock = self
             .filesystem
             .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
             .map_err(map_document_lock_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
-        self.publish_current(PublicationMode::Incremental, SnapshotVerification::Closure)
+        self.publish_current(
+            PublicationMode::Incremental,
+            SnapshotVerification::Closure,
+            paths,
+        )
     }
 
-    fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
+    fn reindex(&mut self, paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
         let _lock = self
             .filesystem
             .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
             .map_err(map_document_lock_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
-        self.publish_current(PublicationMode::Full, SnapshotVerification::Closure)
+        self.publish_current(PublicationMode::Full, SnapshotVerification::Closure, paths)
     }
 
-    fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
+    fn refresh(&mut self, paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
         let preliminary = self.get_file_state()?;
         if preliminary.revision != 0
             && self
-                .detect_changes(&preliminary, PublicationMode::Incremental)?
+                .detect_changes(&preliminary, PublicationMode::Incremental, paths)?
                 .is_empty()
             && preliminary.source_snapshots.is_empty()
         {
@@ -131,7 +135,11 @@ impl<
             .map_err(map_document_lock_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
-        self.publish_current(PublicationMode::Incremental, SnapshotVerification::Root)
+        self.publish_current(
+            PublicationMode::Incremental,
+            SnapshotVerification::Root,
+            paths,
+        )
     }
 }
 
@@ -147,6 +155,7 @@ impl<
         &mut self,
         requested: PublicationMode,
         verification: SnapshotVerification,
+        paths: &[RepoPath],
     ) -> DocumentResult<RefreshOutcome> {
         let state = self.get_file_state()?;
         let mode = if state.revision == 0 {
@@ -154,7 +163,7 @@ impl<
         } else {
             requested
         };
-        let delta = self.detect_changes(&state, mode)?;
+        let delta = self.detect_changes(&state, mode, paths)?;
         #[cfg(test)]
         reach_checkpoint("redetected");
         if delta.is_empty() && mode == PublicationMode::Incremental {
@@ -167,7 +176,7 @@ impl<
             .validate_snapshots(verification, &state.source_snapshots)?;
             return Ok(build_outcome(state.revision, PublicationState::Unchanged));
         }
-        self.publish_changes(&state, delta, mode, verification)
+        self.publish_changes(&state, delta, mode, verification, paths)
     }
 
     fn get_file_state(&self) -> DocumentResult<FileState> {
@@ -190,17 +199,20 @@ impl<
             })
     }
 
-    fn detect_changes(&self, state: &FileState, mode: PublicationMode) -> DocumentResult<Delta> {
-        let candidates: BTreeSet<_> = self.get_candidates()?.into_iter().collect();
+    fn detect_changes(
+        &self,
+        state: &FileState,
+        mode: PublicationMode,
+        paths: &[RepoPath],
+    ) -> DocumentResult<Delta> {
+        let candidates: BTreeSet<_> = self.get_candidates(paths)?.into_iter().collect();
         let mut delta = Delta {
             updated: BTreeMap::new(),
             removed: BTreeMap::new(),
         };
-        for path in state
-            .files
-            .keys()
-            .filter(|path| !candidates.contains(*path))
-        {
+        for path in state.files.keys().filter(|path| {
+            is_selected_path(path.as_str().as_bytes(), paths) && !candidates.contains(*path)
+        }) {
             delta.removed.insert(path.clone(), false);
         }
         for path in candidates {
@@ -258,8 +270,9 @@ impl<
         delta: Delta,
         mode: PublicationMode,
         verification: SnapshotVerification,
+        paths: &[RepoPath],
     ) -> DocumentResult<RefreshOutcome> {
-        let mut graph = self.prepare_publication(state, &delta, mode, verification)?;
+        let mut graph = self.prepare_publication(state, &delta, mode, verification, paths)?;
         let publication = DocumentPublication {
             storage: self.storage.as_ref(),
             filesystem: &self.filesystem,
@@ -298,7 +311,7 @@ impl<
                     outcome = publication.publish_projection(prepared, outcome)?;
                 }
                 publication.reconcile_sources(&graph)?;
-                self.verify_excluded_candidates(&excluded)?;
+                self.verify_excluded_candidates(&excluded, paths)?;
                 #[cfg(test)]
                 reach_checkpoint("before_commit");
                 #[cfg(test)]
@@ -335,6 +348,7 @@ impl<
         delta: &Delta,
         mode: PublicationMode,
         verification: SnapshotVerification,
+        paths: &[RepoPath],
     ) -> DocumentResult<EffectiveGraph> {
         // Keep only metadata after releasing this pinned read, before BEGIN IMMEDIATE.
         let mut graph = self
@@ -353,7 +367,7 @@ impl<
                 super::TransactionError::Storage(error) => DocumentError::from(error),
             })?;
         if mode == PublicationMode::Full {
-            graph.mark_all_sources();
+            graph.mark_sources_by_paths(paths);
         }
         let publication = DocumentPublication {
             storage: self.storage.as_ref(),
@@ -372,10 +386,14 @@ impl<
         Ok(graph)
     }
     /// Reject candidates that reappear after their removal projection was prepared.
-    fn verify_excluded_candidates(&self, excluded: &BTreeSet<RepoPath>) -> DocumentResult<()> {
+    fn verify_excluded_candidates(
+        &self,
+        excluded: &BTreeSet<RepoPath>,
+        paths: &[RepoPath],
+    ) -> DocumentResult<()> {
         if !excluded.is_empty()
             && self
-                .get_candidates()?
+                .get_candidates(paths)?
                 .iter()
                 .any(|path| excluded.contains(path))
         {
@@ -389,12 +407,12 @@ impl<
 }
 
 impl<G: GitWorktreePaths, F: FileReader, M, P, C> DocumentRefreshService<G, F, M, P, C> {
-    fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+    fn get_candidates(&self, paths: &[RepoPath]) -> DocumentResult<Vec<RepoPath>> {
         CandidateSelection {
             git: &self.git,
             filesystem: &self.filesystem,
         }
-        .get_candidates()
+        .get_candidates(paths)
     }
 }
 
@@ -595,7 +613,7 @@ mod basis {
 mod projection {
     #[cfg(test)]
     use super::reach_checkpoint;
-    use super::{DOCUMENTS_CHANGED_MESSAGE, DocumentPublication, Observation};
+    use super::{DOCUMENTS_CHANGED_MESSAGE, DocumentPublication, Observation, is_selected_path};
     use super::{FileLocker, Path, map_document_file};
     use crate::domain::{
         Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid, derive_element_kind,
@@ -847,13 +865,26 @@ mod projection {
         }
 
         /// Reobserve every declared source during a full rebuild, including invalid owners.
-        pub(super) fn mark_all_sources(&mut self) {
-            self.touched_sources.extend(self.edges.iter().filter_map(
-                |edge| match edge.get_target() {
-                    EdgeTarget::Source(uri) => Some(uri.clone()),
-                    EdgeTarget::Knowledge(_) => None,
-                },
-            ));
+        pub(super) fn mark_sources_by_paths(&mut self, paths: &[RepoPath]) {
+            self.touched_sources
+                .extend(self.edges.iter().filter_map(|edge| {
+                    match edge.get_target() {
+                        EdgeTarget::Source(uri)
+                            if is_selected_path(
+                                edge.get_source()
+                                    .as_str()
+                                    .split('#')
+                                    .next()
+                                    .unwrap_or_default()
+                                    .as_bytes(),
+                                paths,
+                            ) =>
+                        {
+                            Some(uri.clone())
+                        }
+                        EdgeTarget::Source(_) | EdgeTarget::Knowledge(_) => None,
+                    }
+                }));
         }
 
         /// Return every declared root in the last effective knowledge projection.
@@ -1223,7 +1254,7 @@ mod tests {
         let observer = Connection::open(directory.path().join("cache.db")).unwrap();
         // When: a nested refresh succeeds but its parent rejects the operation.
         let result = cache.with_write_tx(|| -> DocumentResult<()> {
-            assert_eq!(service.refresh()?.revision, 1);
+            assert_eq!(service.refresh(&[])?.revision, 1);
             assert_eq!(
                 observer
                     .query_row("select revision from project", [], |row| row
@@ -1254,7 +1285,7 @@ mod tests {
                 .unwrap(),
             0
         );
-        assert_eq!(service.refresh().unwrap().revision, 1);
+        assert_eq!(service.refresh(&[]).unwrap().revision, 1);
     }
 
     #[test]
@@ -1267,8 +1298,8 @@ mod tests {
         // When: the parent joins two successful publication operations.
         cache
             .with_write_tx(|| -> DocumentResult<()> {
-                assert_eq!(service.refresh()?.revision, 1);
-                assert_eq!(service.refresh()?.revision, 1);
+                assert_eq!(service.refresh(&[])?.revision, 1);
+                assert_eq!(service.refresh(&[])?.revision, 1);
                 Ok(())
             })
             .unwrap();
@@ -1300,7 +1331,7 @@ mod tests {
                 .unwrap();
         })));
         // When: refresh finishes after the second publisher advances the database.
-        let outcome = service.refresh().unwrap();
+        let outcome = service.refresh(&[]).unwrap();
         // Then: it returns revision 1 even though revision 2 is already durable.
         assert_eq!(outcome.revision, 1);
         assert_eq!(
@@ -1326,11 +1357,11 @@ mod tests {
                 stat.size = u64::try_from(bytes.len()).unwrap();
                 stat
             });
-            service.refresh().unwrap();
+            service.refresh(&[]).unwrap();
             service.filesystem.reset_counts();
             let parses = service.markdown.0.get();
             // When
-            let result = service.refresh().unwrap();
+            let result = service.refresh(&[]).unwrap();
             // Then
             assert!(!result.published);
             assert_eq!(result.revision, 1);
@@ -1353,14 +1384,14 @@ mod tests {
             stat.mtime_ns = NOW;
             stat
         });
-        service.refresh().unwrap();
+        service.refresh(&[]).unwrap();
         let before = service
             .storage
             .with_read_tx(|| service.storage.files_get())
             .unwrap();
         service.filesystem.reset_counts();
         // When: refresh checks the captured bytes.
-        let unchanged = service.refresh().unwrap();
+        let unchanged = service.refresh(&[]).unwrap();
         // Then: only changed stable bytes advance the publication.
         assert!(!unchanged.published);
         assert_eq!(
@@ -1380,7 +1411,7 @@ mod tests {
         // Given: exact same size, inode and mtime; only bytes differ.
         service.filesystem.bytes.replace(EDITED.to_vec());
         // When: refresh checks the captured bytes.
-        let changed = service.refresh().unwrap();
+        let changed = service.refresh(&[]).unwrap();
         // Then: only changed stable bytes advance the publication.
         assert_eq!(changed.revision, 2);
         assert_eq!(get_matches(&mut service, "BravoToken"), ["note.md"]);
@@ -1391,11 +1422,11 @@ mod tests {
     fn clock_failure_falls_back_to_bytes_without_publishing_unchanged_content() {
         // Given: an unchanged non-racy publication and an unavailable application clock.
         let (_dir, mut service) = build_service();
-        service.refresh().unwrap();
+        service.refresh(&[]).unwrap();
         service.filesystem.reset_counts();
         service.clock = Box::new(FailedClock);
         // When: refresh cannot establish a safe age for the cached observation.
-        let outcome = service.refresh().unwrap();
+        let outcome = service.refresh(&[]).unwrap();
         // Then: verified bytes are read once, while publication and lock acquisition are skipped.
         assert!(!outcome.published);
         assert_eq!(service.filesystem.reads.get(), 1);
@@ -1418,11 +1449,11 @@ mod tests {
                 stat
             });
             service.filesystem.now.set(checked);
-            service.refresh().unwrap();
+            service.refresh(&[]).unwrap();
             service.filesystem.reset_counts();
             service.filesystem.now.set(now);
             // When
-            let result = service.refresh().unwrap();
+            let result = service.refresh(&[]).unwrap();
             // Then
             assert!(!result.published);
             assert_eq!(
@@ -1444,7 +1475,7 @@ mod tests {
                 stat.size = u64::try_from(bytes.len()).unwrap();
                 stat
             });
-            service.refresh().unwrap();
+            service.refresh(&[]).unwrap();
             let before_nodes = service
                 .storage
                 .with_read_tx(|| service.storage.nodes_get())
@@ -1461,7 +1492,7 @@ mod tests {
             });
             service.filesystem.now.set(NOW + 1);
             // When: refresh processes the changed file statistics.
-            let outcome = service.refresh().unwrap();
+            let outcome = service.refresh(&[]).unwrap();
             // Then: file state updates without reparsing or replacing the projection.
             assert!(outcome.published);
             assert_eq!(outcome.files_updated, 1);
@@ -1492,7 +1523,7 @@ mod tests {
         let (_dir, mut service) = build_service();
         service.filesystem.replace_on_read.set(Some(3));
         // When: refresh captures the candidate.
-        let result = service.refresh();
+        let result = service.refresh(&[]);
         // Then: inconsistent captures abort publication.
         assert_eq!(service.filesystem.reads.get(), 3);
         assert!(result.is_err());
@@ -1513,7 +1544,7 @@ mod tests {
     fn reject_candidate_reappearing_before_publication() {
         // Given: an indexed document disappears from enumeration and then reappears.
         let (_dir, mut service) = build_service();
-        service.refresh().unwrap();
+        service.refresh(&[]).unwrap();
         let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let observed = std::sync::Arc::clone(&calls);
         let mut candidates = Candidates::new();
@@ -1527,7 +1558,7 @@ mod tests {
         });
         service.git = candidates;
         // When: refresh tries to publish the removal.
-        let result = service.refresh();
+        let result = service.refresh(&[]);
         // Then: the race aborts publication and preserves the old projection.
         assert!(result.is_err());
         let cache = std::rc::Rc::clone(&service.storage);
@@ -1552,7 +1583,7 @@ mod tests {
     fn fatal_read_is_not_an_invalid_markdown_publication() {
         // Given: a published projection and a filesystem failure on the next changed read.
         let (_dir, mut service) = build_service();
-        service.refresh().unwrap();
+        service.refresh(&[]).unwrap();
         let before = service
             .storage
             .with_read_tx(|| service.storage.files_get())
@@ -1564,7 +1595,7 @@ mod tests {
         });
         service.filesystem.fail_on_read.set(Some(3));
         // When / Then: refresh fails rather than publishing an invalid Markdown result.
-        assert!(service.refresh().is_err());
+        assert!(service.refresh(&[]).is_err());
         let cache = std::rc::Rc::clone(&service.storage);
         cache
             .with_read_tx(|| -> crate::service::StorageResult<()> {
@@ -1589,10 +1620,10 @@ mod tests {
         // Given
         let (_dir, mut service) = build_service();
         service.filesystem.missing.set(true);
-        assert_eq!(service.refresh().unwrap().revision, 1);
+        assert_eq!(service.refresh(&[]).unwrap().revision, 1);
         service.filesystem.reset_counts();
         // When
-        let result = service.refresh().unwrap();
+        let result = service.refresh(&[]).unwrap();
         // Then
         assert!(!result.published);
         assert_eq!(
@@ -1605,14 +1636,14 @@ mod tests {
         // Given
         service.filesystem.missing.set(false);
         // When / Then
-        assert_eq!(service.refresh().unwrap().files_updated, 1);
+        assert_eq!(service.refresh(&[]).unwrap().files_updated, 1);
     }
 
     #[test]
     fn discard_preliminary_capture_and_publish_the_locked_observation() {
         // Given
         let (_dir, mut service) = build_service();
-        service.refresh().unwrap();
+        service.refresh(&[]).unwrap();
         service.filesystem.reset_counts();
         service.filesystem.stat.update(|mut stat| {
             stat.inode += 1;
@@ -1620,7 +1651,7 @@ mod tests {
         });
         service.filesystem.replace_on_read.set(Some(2));
         // When
-        let outcome = service.refresh().unwrap();
+        let outcome = service.refresh(&[]).unwrap();
         // Then
         assert_eq!(outcome.revision, 2);
         assert_eq!(get_matches(&mut service, "BravoToken"), ["note.md"]);
@@ -1731,7 +1762,7 @@ mod tests {
             });
             service.filesystem.inner.bytes.replace(bytes.into_bytes());
             // When: preflight validates the prepared projection before publishing it.
-            let outcome = service.refresh().unwrap();
+            let outcome = service.refresh(&[]).unwrap();
             // Then: each binding is observed in bounded batches, before retention and SQL write.
             assert!(outcome.published);
             assert_eq!(*service.provenance.batches.borrow(), [256, 1]);
@@ -1758,11 +1789,11 @@ mod tests {
         fn verified_unchanged_refresh_audits_without_sql_write() {
             // Given: an already published document and no file delta.
             let (_dir, mut service, events) = build_boundary_service(None);
-            service.refresh().unwrap();
+            service.refresh(&[]).unwrap();
             events.borrow_mut().clear();
             let parses = service.markdown.0.get();
             // When: full-corpus check requests a verified incremental refresh.
-            let outcome = service.refresh_verified().unwrap();
+            let outcome = service.refresh_verified(&[]).unwrap();
             // Then: audit runs under lock, with no SQL write or body parse.
             assert_eq!(*events.borrow(), ["lock", "verify"]);
             assert!(!outcome.published);
@@ -1774,7 +1805,7 @@ mod tests {
             // Given: a new projection whose source audit fails.
             let (_dir, mut service, events) = build_boundary_service(Some("verify"));
             // When: verification fails before any SQL write begins.
-            assert!(service.refresh_verified().is_err());
+            assert!(service.refresh_verified(&[]).is_err());
             // Then: no partial graph is published.
             assert_eq!(
                 *events.borrow(),
@@ -1794,7 +1825,7 @@ mod tests {
             // Given
             let (_dir, mut service, events) = build_boundary_service(None);
             // When
-            let outcome = service.refresh().unwrap();
+            let outcome = service.refresh(&[]).unwrap();
             // Then
             assert!(outcome.published);
             assert_eq!(outcome.revision, 1);
@@ -1812,7 +1843,7 @@ mod tests {
             let (_dir, mut service, events) = build_boundary_service(None);
             service.filesystem.inner.fail_on_read.set(Some(2));
             // When / Then
-            assert!(service.refresh().is_err());
+            assert!(service.refresh(&[]).is_err());
             // Then
             assert_eq!(*events.borrow(), ["lock", "read", "read"]);
         }
@@ -1822,7 +1853,7 @@ mod tests {
             // Given
             let (_dir, mut service, events) = build_boundary_service(Some("observe"));
             // When / Then
-            assert!(service.refresh().is_err());
+            assert!(service.refresh(&[]).is_err());
             // Then
             assert_eq!(*events.borrow(), ["lock", "read", "read", "observe"]);
         }
@@ -1832,7 +1863,7 @@ mod tests {
             // Given
             let (_dir, mut service, events) = build_boundary_service(Some("retain"));
             // When / Then
-            assert!(service.refresh().is_err());
+            assert!(service.refresh(&[]).is_err());
             // Then
             assert_eq!(
                 *events.borrow(),
@@ -1846,7 +1877,7 @@ mod tests {
             let (_dir, mut service, events) = build_boundary_service(None);
             service.filesystem.inner.replace_on_read.set(Some(3));
             // When / Then: refresh rejects the inconsistent capture; no cache commit occurs.
-            assert!(service.refresh().is_err());
+            assert!(service.refresh(&[]).is_err());
             // Then: no cache commit occurs.
             assert_eq!(
                 *events.borrow(),
@@ -1879,11 +1910,11 @@ mod tests {
                 stat.size = note.len() as u64;
                 stat
             });
-            service.refresh().unwrap();
+            service.refresh(&[]).unwrap();
             events.borrow_mut().clear();
             let parses = service.markdown.0.get();
             // When
-            let outcome = service.refresh().unwrap();
+            let outcome = service.refresh(&[]).unwrap();
             // Then
             assert!(!outcome.published);
             assert_eq!(outcome.revision, 1);
@@ -1896,14 +1927,14 @@ mod tests {
             // Given.
             let (_dir, mut service, events) = build_boundary_service(None);
             // When: the first build follows the full path, not preliminary file capture.
-            service.refresh().unwrap();
+            service.refresh(&[]).unwrap();
             // Then.
             assert_eq!(events.borrow().first(), Some(&"lock"));
             // Given
             events.borrow_mut().clear();
             let parses = service.markdown.0.get();
             // When
-            service.reindex().unwrap();
+            service.reindex(&[]).unwrap();
             // Then
             assert_eq!(
                 *events.borrow(),
@@ -2238,9 +2269,9 @@ mod tests {
             } else {
                 FAIL_LATE.with_borrow_mut(|enabled| *enabled = mode.ends_with("fail"));
                 let result = if mode.starts_with("reindex") {
-                    service.reindex()
+                    service.reindex(&[])
                 } else {
-                    service.refresh()
+                    service.refresh(&[])
                 };
                 eprintln!("refresh result: {result:?}");
                 if mode.ends_with("fail") {
@@ -2496,7 +2527,7 @@ mod tests {
                 fs::write(root.path().join("source.txt"), SOURCE).unwrap();
                 let git_objects = get_git_objects(root.path());
                 let mut service = build_service(root.path());
-                assert_eq!(service.refresh().unwrap().revision, 1);
+                assert_eq!(service.refresh(&[]).unwrap().revision, 1);
                 assert_eq!(get_git_objects(root.path()), git_objects);
                 seed_vectors(
                     &crate::storage::open_test_storage(
@@ -2832,7 +2863,7 @@ mod tests {
             );
             let mut service = wire_document_refresher(root).unwrap();
             reach_checkpoint("opened");
-            let outcome = service.refresh().unwrap();
+            let outcome = service.refresh(&[]).unwrap();
             assert_eq!(outcome.published, mode != "noop");
         }
 
@@ -3027,7 +3058,7 @@ mod tests {
                     fixture.assert_preserved(NEW);
                     // The process's kernel lease has been released; a fresh call can publish.
                     let mut service = build_service(fixture.root.path());
-                    assert!(service.reindex().unwrap().published);
+                    assert!(service.reindex(&[]).unwrap().published);
                 }
             }
 
@@ -3136,7 +3167,7 @@ mod tests {
         fn warm_refresh_reads_basis_roots_without_loading_nodes() {
             // Given: a warm projection with declared basis roots.
             let (_root, mut initial) = build_service();
-            initial.refresh().unwrap();
+            initial.refresh(&[]).unwrap();
             let mut node = initial
                 .storage
                 .with_read_tx(|| initial.storage.nodes_get())
@@ -3167,7 +3198,7 @@ mod tests {
                 provenance: RetainingProvenance,
             };
             // When: refresh checks the unchanged corpus.
-            let result = service.refresh().unwrap();
+            let result = service.refresh(&[]).unwrap();
             // Then: basis roots are observed without loading node metadata.
             assert!(!result.published);
             assert_eq!(result.revision, 2);
@@ -3364,20 +3395,20 @@ mod tests {
         fn reindex_rebuilds_unchanged_fts_and_advances_once() {
             // Given: FTS is deliberately missing while file fingerprints are unchanged.
             let (dir, mut service) = build_service();
-            service.refresh().unwrap();
+            service.refresh(&[]).unwrap();
             let db = Connection::open(dir.path().join("cache.db")).unwrap();
             db.execute("delete from text_index", []).unwrap();
-            assert!(!service.refresh().unwrap().published);
+            assert!(!service.refresh(&[]).unwrap().published);
             assert!(get_matches(&mut service, "AlphaToken").is_empty());
             // When.
-            let rebuilt = service.reindex().unwrap();
+            let rebuilt = service.reindex(&[]).unwrap();
             // Then: this must not be an incremental no-op.
             assert_eq!(
                 (rebuilt.revision, rebuilt.published, rebuilt.files_updated),
                 (2, true, 1)
             );
             assert_eq!(get_matches(&mut service, "AlphaToken"), ["note.md"]);
-            assert_eq!(service.reindex().unwrap().revision, 3);
+            assert_eq!(service.reindex(&[]).unwrap().revision, 3);
         }
 
         #[test]
@@ -3394,11 +3425,11 @@ mod tests {
                     stat.size = bytes.len() as u64;
                     stat
                 });
-                service.refresh().unwrap();
+                service.refresh(&[]).unwrap();
                 let parses = service.markdown.0.get();
                 service.filesystem.reset_counts();
                 // When.
-                let outcome = service.reindex().unwrap();
+                let outcome = service.reindex(&[]).unwrap();
                 // Then.
                 assert_eq!(outcome.revision, 2);
                 assert!(service.markdown.0.get() > parses);
@@ -3411,7 +3442,7 @@ mod tests {
         fn reindex_capture_failure_preserves_complete_publication() {
             // Given: fail the publication capture after detection and preflight.
             let (_dir, mut service) = build_service();
-            service.refresh().unwrap();
+            service.refresh(&[]).unwrap();
             let before = service
                 .storage
                 .with_read_tx(|| service.storage.files_get())
@@ -3419,7 +3450,7 @@ mod tests {
             service.filesystem.reset_counts();
             service.filesystem.fail_on_read.set(Some(3));
             // When: reindex fails during publication capture.
-            assert!(service.reindex().is_err());
+            assert!(service.reindex(&[]).is_err());
             // Then: the prior revision, file state and FTS entry remain intact.
             let cache = std::rc::Rc::clone(&service.storage);
             cache
@@ -3468,7 +3499,7 @@ mod corpus {
         std::os::unix::fs::symlink("target", root.join("bad#anchor.md")).unwrap();
         repo.run_git_successfully(&["add", "bad#anchor.md"], None);
         // When: the application selects document candidates from raw Git paths.
-        let candidates = build_selector(root).unwrap().get_candidates().unwrap();
+        let candidates = build_selector(root).unwrap().get_candidates(&[]).unwrap();
         // Then: the symlink is not validated as a document path.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3501,7 +3532,7 @@ mod corpus {
         fs::write(root.join("changed-to-file.md"), b"now regular").unwrap();
         std::os::unix::fs::symlink("regular.md", root.join("untracked-link.md")).unwrap();
         // When: application selection observes current filesystem types for raw Git paths.
-        let candidates = build_selector(root).unwrap().get_candidates().unwrap();
+        let candidates = build_selector(root).unwrap().get_candidates(&[]).unwrap();
         // Then: only live regular files and the fixture's ordinary Markdown are returned.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3532,7 +3563,7 @@ mod corpus {
         let refs = repo.run_git_successfully(&["show-ref"], None);
         let git = build_selector(repo.get_root()).unwrap();
         // When: the application selects current document candidates.
-        let candidates = git.get_candidates().unwrap();
+        let candidates = git.get_candidates(&[]).unwrap();
         // Then: deleted and ignored tracked paths remain; ignored untracked and private paths do not. User state is unchanged.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3568,7 +3599,7 @@ mod corpus {
                 provenance: (),
             };
             assert_eq!(
-                git.get_candidates().unwrap(),
+                git.get_candidates(&[]).unwrap(),
                 [RepoPath::parse("live.md").unwrap()]
             );
             // When: Git stages an ignored file and removes the previous index entry.
@@ -3577,7 +3608,7 @@ mod corpus {
             fs::write(repo.get_root().join(".gitignore"), b"ignored.md\nlive.md\n").unwrap();
             // Then: the clone sees the new index and fresh ignore bytes without reopening.
             assert_eq!(
-                shared.get_candidates().unwrap(),
+                shared.get_candidates(&[]).unwrap(),
                 [RepoPath::parse("ignored.md").unwrap()]
             );
             // When: remove the tracked file and make the other live file eligible again.
@@ -3585,7 +3616,7 @@ mod corpus {
             fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
             // Then: the original handle also refreshes its index/exclude observation.
             assert_eq!(
-                git.get_candidates().unwrap(),
+                git.get_candidates(&[]).unwrap(),
                 [RepoPath::parse("live.md").unwrap()]
             );
         }
@@ -3609,7 +3640,7 @@ mod corpus {
             repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
             let git = build_selector(repo.get_root()).unwrap();
             // When: the application selects current document candidates.
-            let error = git.get_candidates().unwrap_err();
+            let error = git.get_candidates(&[]).unwrap_err();
             // Then: unsupported names produce InvalidRequest without exposing the filename.
             assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
             assert!(!error.to_string().contains("bad"));
@@ -3628,7 +3659,7 @@ mod corpus {
         repo.run_git_successfully(&["update-index", "--index-info"], Some(entries.as_bytes()));
         let git = build_selector(repo.get_root()).unwrap();
         // When: the application selects current document candidates.
-        let candidates = git.get_candidates().unwrap();
+        let candidates = git.get_candidates(&[]).unwrap();
         // Then: conflict.md appears once beside live.md.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3653,7 +3684,7 @@ mod corpus {
             repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
             let git = build_selector(repo.get_root()).unwrap();
             // When: the application selects current document candidates.
-            let candidates = git.get_candidates().unwrap();
+            let candidates = git.get_candidates(&[]).unwrap();
             // Then: .letopis components are excluded before decoding; .letopis-notes.md and live.md remain.
             assert_eq!(
                 candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3721,7 +3752,7 @@ mod corpus {
         // When: the library lists the current worktree's real index and ignore stack.
         let actual = build_selector(repo.get_root())
             .unwrap()
-            .get_candidates()
+            .get_candidates(&[])
             .unwrap();
         // Then: all eligible oracle paths except the live symlink are returned.
         assert_eq!(
@@ -3773,7 +3804,10 @@ mod corpus {
             None,
         );
         // When: discovery begins in the linked worktree rather than the common gitdir.
-        let actual = build_selector(&linked).unwrap().get_candidates().unwrap();
+        let actual = build_selector(&linked)
+            .unwrap()
+            .get_candidates(&[])
+            .unwrap();
         // Then: the deleted-but-staged linked path is retained and the other index is untouched.
         assert!(
             expected
@@ -3784,7 +3818,7 @@ mod corpus {
         assert!(
             !build_selector(repo.get_root())
                 .unwrap()
-                .get_candidates()
+                .get_candidates(&[])
                 .unwrap()
                 .contains(&RepoPath::parse("linked-only.md").unwrap())
         );
@@ -3805,7 +3839,7 @@ mod corpus {
         // When: candidate enumeration falls back to the index's raw ignore blob.
         let actual = build_selector(repo.get_root())
             .unwrap()
-            .get_candidates()
+            .get_candidates(&[])
             .unwrap();
         // Then: replacement refs cannot change corpus membership.
         assert_eq!(
@@ -3851,7 +3885,7 @@ mod corpus {
             // When: listing expands the actual index's tree, including deleted tracked paths.
             let actual = build_selector(repo.get_root())
                 .unwrap()
-                .get_candidates()
+                .get_candidates(&[])
                 .unwrap();
             // Then: tracked paths survive ignores, untracked ignored paths do not.
             assert_eq!(
@@ -3884,7 +3918,7 @@ mod corpus {
                 }
                 let before = repo.capture_fixture_state();
                 // When: listing needs the collapsed tree rather than trusting HEAD or prior policy.
-                let error = git.get_candidates().unwrap_err();
+                let error = git.get_candidates(&[]).unwrap_err();
                 // Then: no incomplete successful listing or raw object/path payload escapes.
                 assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
                 assert_eq!(error.to_string(), "cannot list document candidates");
@@ -3900,7 +3934,7 @@ mod corpus {
         stage_raw_path(&repo, b"irrelevant\xff.txt", "100644");
         let service = build_selector(repo.get_root()).unwrap();
         // When: the application selects documents from raw Git bytes.
-        let candidates = service.get_candidates().unwrap();
+        let candidates = service.get_candidates(&[]).unwrap();
         // Then: only the ordinary fixture document remains.
         assert_eq!(candidates, [RepoPath::parse("live.md").unwrap()]);
     }
@@ -3916,14 +3950,14 @@ mod corpus {
         stage_raw_path(&repo, b"raw\xff.md", "120000");
         let service = build_selector(repo.get_root()).unwrap();
         // When: the final symlink is observed before UTF-8 decoding.
-        let candidates = service.get_candidates().unwrap();
+        let candidates = service.get_candidates(&[]).unwrap();
         // Then: the invalid-byte symlink never becomes an unsupported document.
         assert_eq!(candidates, [RepoPath::parse("live.md").unwrap()]);
         // Given: the same tracked raw name is now an ordinary file.
         fs::remove_file(repo.get_root().join(name)).unwrap();
         fs::write(repo.get_root().join(name), b"ordinary").unwrap();
         // When: selection observes the changed type.
-        let error = service.get_candidates().unwrap_err();
+        let error = service.get_candidates(&[]).unwrap_err();
         // Then: relevant ordinary file encoding remains an invalid request.
         assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
         assert_eq!(error.to_string(), "unsupported document path");
@@ -3944,7 +3978,7 @@ mod corpus {
         stage_raw_path(&repo, b"linked/note.md", "100644");
         let service = build_selector(repo.get_root()).unwrap();
         // When: candidate selection observes the path without following parents.
-        let error = service.get_candidates().unwrap_err();
+        let error = service.get_candidates(&[]).unwrap_err();
         // Then: unsafe traversal is fatal with the preserved public listing diagnostic.
         assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
         assert_eq!(error.to_string(), "cannot list document candidates");
@@ -3967,13 +4001,51 @@ mod corpus {
             provenance: (),
         };
         // When: the service selects and normalizes paths without probing raw file paths.
-        let candidates = service.get_candidates().unwrap();
+        let candidates = service.get_candidates(&[]).unwrap();
         // Then: normalization and deduplication remain owned by RepoPath.
         assert_eq!(
             candidates,
             [
                 RepoPath::parse("a/b.md").unwrap(),
                 RepoPath::parse("note.md").unwrap()
+            ]
+        );
+    }
+
+    #[test]
+    fn scoped_candidates_match_normalized_names_without_probing_raw_dot_paths() {
+        use crate::service::MockGitWorktreePaths;
+        // Given: a raw name escaping the selected directory and another dot path resolving into it.
+        let mut git = MockGitWorktreePaths::new();
+        git.expect_worktree_paths_get()
+            .returning(|| Ok(b"notes/../outside.md\0notes/./a.md\0notes/ab.md\0".to_vec()));
+        let mut filesystem = build_root_only_files();
+        filesystem
+            .expect_symlink_is_exist()
+            .withf(|path| path == Path::new("notes/ab.md"))
+            .returning(|_| Ok(false));
+        let service = DocumentRefreshService {
+            git,
+            filesystem,
+            clock: Box::new(crate::process::SystemClock::new()),
+            markdown: (),
+            storage: Rc::new(()),
+            provenance: (),
+        };
+        let exact = [RepoPath::parse("notes/a.md").unwrap()];
+        let directory = [RepoPath::parse("notes").unwrap()];
+
+        // When: scopes select by normalized owner identity.
+        let selected = service.get_candidates(&exact).unwrap();
+        let descendants = service.get_candidates(&directory).unwrap();
+
+        // Then: an outside owner is excluded and the selected dot path is retained.
+        assert_eq!(selected, exact);
+        assert_eq!(
+            descendants,
+            [
+                RepoPath::parse("notes/a.md").unwrap(),
+                RepoPath::parse("notes/ab.md").unwrap()
             ]
         );
     }
@@ -3994,7 +4066,7 @@ mod corpus {
             provenance: (),
         };
         // When: lexical path validation sees the escaping candidate.
-        let error = service.get_candidates().unwrap_err();
+        let error = service.get_candidates(&[]).unwrap_err();
         // Then: it retains the old unsupported-document classification and cause.
         assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
         assert_eq!(error.to_string(), "unsupported document path");
@@ -4023,7 +4095,7 @@ mod corpus {
             provenance: (),
         };
         // When: selection has no eligible leaf to probe.
-        let error = service.get_candidates().unwrap_err();
+        let error = service.get_candidates(&[]).unwrap_err();
         // Then: the original root safety check still fails with the existing diagnostic.
         assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
         assert_eq!(error.to_string(), "cannot list document candidates");

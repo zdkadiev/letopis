@@ -1,7 +1,7 @@
 use super::output::response_encode;
 use crate::service::{
     BackgroundRunner, CheckReport, CommandProblem, CommandResult, Configuration, Inspection,
-    SearchLink, StatusReport, Traversal,
+    RefreshOutcome, SearchLink, StatusReport, Traversal,
 };
 use std::{io::Write, sync::Mutex};
 
@@ -11,7 +11,7 @@ pub(crate) enum ResponseResult {
     Initialized,
     Status(StatusReport),
     Config(Option<Configuration>),
-    Reindex(u64),
+    Index(RefreshOutcome),
     Check(CheckReport),
     Inspect(Inspection),
     Search(Vec<SearchLink>),

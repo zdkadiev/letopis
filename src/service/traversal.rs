@@ -41,7 +41,7 @@ struct LinkObservations<'a, F, C> {
 }
 impl<F: FileReader, C: CacheDatabase> Traverser for TraversalService<F, C> {
     fn traverse(&mut self, request: &TraversalRequest) -> CommandResult<Traversal> {
-        self.refresher.refresh().map_err(map_traversal_error)?;
+        self.refresher.refresh(&[]).map_err(map_traversal_error)?;
         self.embeddings
             .get_configuration()
             .map_err(map_traversal_error)?;
@@ -601,6 +601,7 @@ mod tests {
         }
     }
     mod scoped {
+        use crate::domain::RepoPath;
         use crate::service::TransactionError;
 
         use super::{
@@ -917,14 +918,14 @@ mod tests {
             }
         }
         impl Refresher for Refresh {
-            fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
+            fn refresh_verified(&mut self, _paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
                 panic!("routine reads must not request a full audit")
             }
-            fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
+            fn reindex(&mut self, _paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
                 panic!("this scenario must not trigger a full reindex")
             }
 
-            fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
+            fn refresh(&mut self, _paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
                 self.events.borrow_mut().push("refresh".into());
                 Ok(RefreshOutcome {
                     revision: 1,

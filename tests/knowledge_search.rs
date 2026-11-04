@@ -76,7 +76,7 @@ fn empty_query_never_calls_match_or_provider() {
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     repo.write_knowledge("b.md", "new");
@@ -117,7 +117,7 @@ fn search_uses_prepared_vectors_and_actual_query_client() {
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     let revision = wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap()
         .revision;
     repo.seed_vectors(
@@ -167,7 +167,7 @@ fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
     let config = repo.write_config("openai", &server.get_base_url(), "fixture");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     // When: search falls back to lexical matches.
@@ -206,7 +206,7 @@ fn invalid_live_knowledge_retains_pinned_link_as_stale() {
     repo.write_knowledge("a.md", "sqlite");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.write("a.md", b"<!-- letopis: {invalid} -->\ncurrent");
     // When
@@ -237,7 +237,7 @@ fn search_propagates_non_config_io_failures() {
     );
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     std::fs::remove_dir_all(repo.get_root().join("dir")).unwrap();
     std::os::unix::fs::symlink("/private/tmp", repo.get_root().join("dir")).unwrap();
@@ -314,7 +314,7 @@ fn mismatched_persisted_knowledge_uri_fails_even_beyond_final_limit() {
     repo.write_knowledge("b.md", "sqlite plus extra words");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
@@ -338,7 +338,7 @@ fn stale_coordinates_are_observed_without_replacing_pinned_lines() {
     repo.write_knowledge("a.md", "sqlite");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection
@@ -369,7 +369,7 @@ fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[0.0, 1.0]), ("b.md", &[1.0, 0.0])]);
     repo.write_knowledge("a.md", "current sqlite");

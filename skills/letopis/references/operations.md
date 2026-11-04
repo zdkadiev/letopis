@@ -8,7 +8,7 @@ Search/traverse/inspect automatically refresh the database from Markdown without
 editing Markdown. Routine refresh retains source roots/refs and verifies addressed
 objects; it does not audit unrelated descendants. Run `check` with omitted or empty
 `paths` for a full source-snapshot audit. Any nonempty `paths` selects scoped findings
-without that audit. `reindex` reparses the corpus and fully audits effective source
+without that audit. `index --verify` audits complete closures incrementally; `index --full` reparses the selected corpus and fully audits effective source
 snapshots before publication. A full audit failure preserves the previous cache.
 A successful routine read or an existing retention ref is not proof that every
 source object is intact. Inspect fully verifies its own newly captured reading tree.
@@ -76,16 +76,16 @@ with a changed configuration identity or a vector reset, not merely on the next
 publication. `status` does not rebuild a missing or stale cache and does not make a
 subsequent live-file read atomic.
 
-`reindex` is explicit maintenance, not the normal edit path:
+`index --full` is explicit maintenance, not the normal edit path:
 
 ```sh
-printf '%s\n' '{}' | letopis reindex
+printf '%s\n' '{}' | letopis index --full
 ```
 
 It rebuilds graph and FTS from the corpus under `index.lock` and returns
 `{"ok":true,"result":{"revision":N}}`. It does not wait for vectors, does not
 confirm changed sources, and preserves author-declared `source_snapshot`. Ordinary
-edits need only the next refreshing command; use `reindex` after cache loss or
+edits need only the next refreshing command; use `index --full` after cache loss or
 a deliberate full rebuild. A physically corrupt cache is a separate recovery
 decision, not something this command silently repairs.
 
@@ -100,7 +100,7 @@ rewrite or parser-version migration. For this breaking binary upgrade:
 3. Add the intended canonical root-relative `path` to every marked title. Repair
    local destinations relative to their containing document; fragments remain
    independent. Preserve created_at and checked source_snapshot bases.
-4. Run `printf '%s\n' '{}' | letopis reindex`, then the same empty request to
+4. Run `printf '%s\n' '{}' | letopis index --full`, then the same empty request to
    `letopis check`. Ordinary incremental refresh can skip unchanged files.
 5. Resolve markup findings and review other provenance findings before trusting
    the migration. Reindex retains last-valid projections of invalid files, so its
@@ -120,7 +120,7 @@ from local-file comparison. This does not replace independent graph/provenance c
 ## Cancel your own foreground call
 
 SIGINT is handled for your own `search`, `traverse`, `inspect`, `check` and
-`reindex` invocation. The process writes exactly one response and exits 1:
+`index --full` invocation. The process writes exactly one response and exits 1:
 
 ```json
 {"ok":false,"error":{"code":"cancelled","message":"command cancelled","details":{}}}
@@ -144,7 +144,7 @@ work.
 ## Current boundaries
 
 The CLI has `init`, `check`, `config`, `search`, `status`, `traverse`, mixed
-`inspect`, and `reindex`. Cancellation is a signal to your own foreground
+`inspect`, and `index --full`. Cancellation is a signal to your own foreground
 process, not a command. Invalid files retain their previous valid projections
 with current diagnostics; a fresh cache cannot recover a previous projection of
 currently invalid Markdown. Reindex preserves author-declared `source_snapshot`
@@ -153,3 +153,7 @@ vectors keyed by unchanged search hashes when rebuilding a deleted cache. It doe
 not repair physical cache corruption or provide selective paths.
 Embeddings are optional; FTS remains usable without a configured provider.
 Packaging, installation and operational procedures remain TK-43/TK-44 work.
+
+## Explicit index publication
+
+`letopis index` publishes changed documents without returning validation findings. `--verify` audits all effective snapshot closures; `--full` always reparses and publishes, including unchanged files, and implies the audit. Provide optional JSON `paths` to limit owner-file observations and removals; omitted/empty means all. Out-of-scope rows remain untouched, and source closure audits stay global. Use `check` for diagnostics; its `paths` filter findings, not the refresh.

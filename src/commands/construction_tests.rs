@@ -1,5 +1,5 @@
 use super::{
-    run_check, run_config, run_drain, run_init, run_inspect, run_reindex, run_search, run_status,
+    run_check, run_config, run_drain, run_index, run_init, run_inspect, run_search, run_status,
     run_traverse,
 };
 use crate::{
@@ -94,16 +94,16 @@ fn repository_open_traverse() {
 }
 
 #[test]
-fn repository_open_reindex() {
+fn repository_open_index_full() {
     // Given: an initialized repository with one knowledge file and disabled embeddings.
     let repo = create_repository();
     let before = GitRepository::repository_get_open_count();
     // When: a command executes from a subdirectory.
-    run_command("reindex", r#"{}"#, repo.get_subdir());
+    run_command("index", r#"{}"#, repo.get_subdir());
     // Then: all collaborators share exactly one library discovery.
     assert_eq!(GitRepository::repository_get_open_count() - before, 1);
     // When: an independent invocation executes the same command.
-    run_command("reindex", r#"{}"#, repo.get_subdir());
+    run_command("index", r#"{}"#, repo.get_subdir());
     // Then: the new command opens fresh state instead of sharing a global cache.
     assert_eq!(GitRepository::repository_get_open_count() - before, 2);
 }
@@ -221,6 +221,8 @@ fn run_command(command: &str, input: &str, directory: &Path) {
     let mut args = vec![OsString::from(command)];
     if command == "embed" {
         args.push(OsString::from("--drain"));
+    } else if command == "index" {
+        args.push(OsString::from("--full"));
     }
     let request = request_parse(&args, input.as_bytes()).unwrap();
     let cleanup = Arc::new(GitWriteCleanup::new());
@@ -229,7 +231,7 @@ fn run_command(command: &str, input: &str, directory: &Path) {
         Request::Init => run_init(directory),
         Request::Status => run_status(directory),
         Request::Config => run_config(directory),
-        Request::Reindex => run_reindex(directory, executable, cleanup),
+        Request::Index(request) => run_index(&request, directory, executable, cleanup),
         Request::Check(paths) => run_check(&paths, directory, executable, cleanup),
         Request::Inspect(ids) => run_inspect(&ids, directory, executable, cleanup),
         Request::Search(request) => run_search(&request, directory, executable, cleanup),

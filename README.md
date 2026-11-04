@@ -176,7 +176,7 @@ Commands work from the repository root **or any subdirectory**. Paths and elemen
 | `inspect` | Get hashes and a captured version for consistent reading. |
 | `status` | See the current revision, problems, and embedding progress. |
 | `config` | View your embedding configuration. |
-| `reindex` | Explicitly rebuild the knowledge index. |
+| `index` | Publish changed knowledge; `--verify` audits snapshots, `--full` forces a rebuild. |
 
 ### Input → output
 
@@ -186,7 +186,7 @@ Supply **one JSON object on stdin**:
 printf '%s\n' '{"query":"retry","limit":10}' | letopis search
 ```
 
-Fields belong in JSON, not command-line options. Unknown fields are rejected. A terminal or empty input supplies `{}`; a pipe that sends no data within 250 ms also supplies `{}`. Once data arrives, Letopis reads until EOF.
+Request fields belong in JSON; command names and mode flags belong in argv. Unknown fields are rejected. A terminal or empty input supplies `{}`; a pipe that sends no data within 250 ms also supplies `{}`. Once data arrives, Letopis reads until EOF.
 
 Commands write **one JSON line to stdout**. Successful responses contain `ok:true` and a command-specific `result`, and may include a `warnings` array. Failed responses contain `ok:false` and an `error` with `code`, `message`, and `details`:
 
@@ -309,12 +309,12 @@ Input: `{}`. Reports current state without refreshing knowledge. Example before 
 
 `revision` is the last published index revision. The counters describe pending and failed embeddings. Held locks contain `name` (`index` or `embed`) and `pid`; problems contain `code`, `message`, and `details`. After fixing Markdown, run a refreshing command to update its validation findings.
 
-### Rebuild: `reindex`
+### Rebuild: `index --full`
 
 Input: `{}`. Reparses the corpus, audits effective source snapshots, and rebuilds the knowledge and full-text index. Example output:
 
 ```json
-{"ok":true,"result":{"revision":2}}
+{"ok":true,"result":{"revision":2,"published":true,"files_updated":3,"files_removed":0,"invalid_files_updated":0}}
 ```
 
 Use it for a deliberate rebuild; routine edits only need the next refreshing command. It preserves declared source bases and does not wait for embeddings or confirm claims against changed sources. Run `check` afterward to review findings.
@@ -332,7 +332,7 @@ Input: `{}`. Returns the current configuration without changing it, or `{"ok":tr
 <details>
 <summary><strong>Cancel a running command</strong></summary>
 
-Send Ctrl-C (SIGINT) to your own running `search`, `traverse`, `inspect`, `check`, or `reindex` command. Cancellation returns the `cancelled` error shown above and exit status `1`. Work already published may remain; inspect status or retry. Background embedding work may finish independently.
+Send Ctrl-C (SIGINT) to your own running `search`, `traverse`, `inspect`, `check`, or `index` command. Cancellation returns the `cancelled` error shown above and exit status `1`. Work already published may remain; inspect status or retry. Background embedding work may finish independently.
 
 </details>
 
@@ -357,3 +357,7 @@ Replace the model name with one available in your Ollama instance. OpenAI-compat
 ## License
 
 [MIT](LICENSE).
+
+### Explicit indexing
+
+`letopis index` publishes the current Markdown changes and returns a revision, publication flag, and updated/removed/invalid file counts. `--verify` checks all effective source snapshot closures. `--full` forces a costly reparse and publication, even without changes, and includes that verification. The flags may be combined. Provide `{"paths":["letopis/cache"]}` on stdin to publish only owner files under a directory; rows and removals outside it stay untouched. An empty or omitted `paths` list covers all candidates. `check` reports findings; its paths filter findings rather than the refresh.

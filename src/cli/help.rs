@@ -46,9 +46,9 @@ pub(super) const COMMANDS: [CommandHelp; 8] = [
         example: r#"{"element_ids":["knowledge/decisions.md#cache"],"mode":"both","direction":"both","depth":2,"limit":20,"edge_limit":40}"#,
     },
     CommandHelp {
-        name: "reindex",
-        summary: "rebuild the graph and full-text index",
-        details: REINDEX_DETAILS,
+        name: "index",
+        summary: "publish current Markdown into the index",
+        details: INDEX_DETAILS,
         example: "{}",
     },
     CommandHelp {
@@ -125,12 +125,23 @@ Result:
   The starting ids are excluded from the result.
 "#;
 
-const REINDEX_DETAILS: &str = r#"Input (JSON object): {} (no fields)
+const INDEX_DETAILS: &str = r#"Usage: letopis index [--verify] [--full]
+Input (JSON object):
+  paths  optional array of repository-relative file or directory paths;
+         omitted or empty selects the entire corpus. Example:
+         {"paths":["letopis/architecture","letopis/development"]}
 
 Result:
-  {"revision": <integer>}
-  Rebuilds the graph and full-text index from Git. Audits complete effective
-  source snapshots before publication. Safe to repeat.
+  {"revision", "published", "files_updated", "files_removed",
+   "invalid_files_updated"}
+  Default mode publishes changed files incrementally and retains source roots.
+  --verify audits complete source snapshot closures without reparsing unchanged
+  files.
+  --full forces a costly reparse and publication, including unchanged files;
+  it also audits closures. Combining the flags is equivalent to --full.
+  A scoped run leaves outside file projections and removals untouched; source
+  closure auditing remains global. Use check for findings: check paths filter
+  findings only and never scope its refresh.
 "#;
 
 const STATUS_DETAILS: &str = r#"Input (JSON object): {} (no fields)

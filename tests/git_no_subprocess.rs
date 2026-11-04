@@ -102,8 +102,8 @@ fn model_free_commands_use_only_local_library_git() {
         let traversed = denial.run_successful_command(repo.get_root(), &["traverse"], r#"{"element_ids":["note.md"],"mode":"relations","direction":"outgoing","depth":1,"limit":5}"#);
         assert_eq!(traversed["elements"][0]["element_id"], "source.txt");
         assert_eq!(
-            denial.run_successful_command(repo.get_root(), &["reindex"], "{}"),
-            json!({"revision":2})
+            denial.run_successful_command(repo.get_root(), &["index", "--full"], "{}"),
+            json!({"revision":2,"published":true,"files_updated":2,"files_removed":0,"invalid_files_updated":0})
         );
         assert_eq!(
             denial.run_successful_command(repo.get_root(), &["embed", "--drain"], ""),

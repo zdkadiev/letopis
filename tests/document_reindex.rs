@@ -15,12 +15,12 @@ fn reindex_preserves_invalid_owner_and_publishes_other_file() {
     repo.write("a.md", build_external(1, "source.txt", "AlphaToken"));
     repo.write("b.md", build_whole(2, "BravoToken"));
     let mut service = wire_document_refresher(repo.get_root()).unwrap();
-    service.refresh().unwrap();
+    service.refresh(&[]).unwrap();
     let before = repo.get_state();
     repo.write("a.md", "<!-- letopis: SECRET_INVALID -->\nBadToken");
     repo.write("b.md", build_whole(2, "CharlieToken"));
     // When.
-    let outcome = service.reindex().unwrap();
+    let outcome = service.reindex(&[]).unwrap();
     // Then.
     assert_eq!((outcome.revision, outcome.invalid_files_updated), (2, 1));
     let after = repo.get_state();
@@ -40,7 +40,7 @@ fn reindex_preserves_invalid_owner_and_publishes_other_file() {
     assert!(repo.search("BravoToken OR BadToken").is_empty());
     // A subsequent valid change must not be hidden by the invalid owner's fingerprint.
     repo.write("b.md", build_whole(2, "DeltaToken"));
-    assert_eq!(service.refresh().unwrap().revision, 3);
+    assert_eq!(service.refresh(&[]).unwrap().revision, 3);
     assert_eq!(repo.search("DeltaToken"), ["b.md"]);
 }
 
@@ -55,7 +55,7 @@ fn reindex_initializes_empty_and_invalid_corpus_without_inventing_history() {
         }
         let mut service = wire_document_refresher(repo.get_root()).unwrap();
         // When.
-        let result = service.reindex().unwrap();
+        let result = service.reindex(&[]).unwrap();
         // Then.
         assert_eq!(result.revision, 1);
         let state = repo.get_state();
@@ -65,8 +65,8 @@ fn reindex_initializes_empty_and_invalid_corpus_without_inventing_history() {
             assert!(!state.get_file("a.md").valid);
             assert_eq!(repo.search("BravoToken"), ["b.md"]);
         }
-        assert!(!service.refresh().unwrap().published);
-        assert_eq!(service.reindex().unwrap().revision, 2);
+        assert!(!service.refresh(&[]).unwrap().published);
+        assert_eq!(service.reindex(&[]).unwrap().revision, 2);
     }
 }
 
@@ -78,14 +78,14 @@ fn reindex_reconciles_unchanged_and_invalid_source_references() {
     repo.write("a.md", build_external(3, "source.txt", "AlphaToken"));
     repo.write("b.md", build_external(8, "source.txt", "BravoToken"));
     let mut service = wire_document_refresher(repo.get_root()).unwrap();
-    service.refresh().unwrap();
+    service.refresh(&[]).unwrap();
     repo.write("a.md", "<!-- letopis: invalid -->");
-    service.refresh().unwrap();
+    service.refresh(&[]).unwrap();
     repo.write("b.md", "<!-- letopis: invalid -->");
-    service.refresh().unwrap();
+    service.refresh(&[]).unwrap();
     repo.write("source.txt", "NewSource");
     // When.
-    service.reindex().unwrap();
+    service.reindex(&[]).unwrap();
     // Then: even an invalid referrer contributes its old valid declaration.
     let state = repo.get_state();
     let NodeMetadata::Source(source) = &state.get_node("source.txt").metadata else {
@@ -94,7 +94,7 @@ fn reindex_reconciles_unchanged_and_invalid_source_references() {
     assert_eq!(source.hash, Some(Sha256::digest(b"NewSource")));
     assert_eq!(source.created_at, 3);
     repo.remove("source.txt");
-    service.reindex().unwrap();
+    service.reindex(&[]).unwrap();
     let missing = repo.get_state();
     let NodeMetadata::Source(source) = &missing.get_node("source.txt").metadata else {
         panic!()
@@ -111,11 +111,11 @@ fn reindex_removes_deleted_unmarked_and_orphaned_projections() {
     repo.write("b.md", build_whole(2, "BravoToken"));
     repo.write("c.md", build_whole(3, "CharlieToken"));
     let mut service = wire_document_refresher(repo.get_root()).unwrap();
-    service.refresh().unwrap();
+    service.refresh(&[]).unwrap();
     repo.remove("a.md");
     repo.write("b.md", "ordinary Markdown");
     // When.
-    let result = service.reindex().unwrap();
+    let result = service.reindex(&[]).unwrap();
     // Then.
     assert_eq!((result.files_updated, result.files_removed), (2, 1));
     let state = repo.get_state();
@@ -135,7 +135,7 @@ fn reindex_source_capture_error_rolls_back_every_file() {
     repo.write("a.md", build_external(1, "source/source.txt", "AlphaToken"));
     repo.write("b.md", build_whole(2, "BravoToken"));
     let mut service = wire_document_refresher(repo.get_root()).unwrap();
-    service.refresh().unwrap();
+    service.refresh(&[]).unwrap();
     let before = repo.get_state();
     fs::remove_dir_all(repo.get_root().join("source")).unwrap();
     let outside = tempfile::tempdir().unwrap();
@@ -143,7 +143,7 @@ fn reindex_source_capture_error_rolls_back_every_file() {
     symlink(outside.path(), repo.get_root().join("source")).unwrap();
     repo.write("b.md", build_whole(2, "ChangedToken"));
     // When: reindex observes the unsafe parent.
-    let error = service.reindex().unwrap_err();
+    let error = service.reindex(&[]).unwrap_err();
     // Then: the operation fails without changing the published state.
     assert!(!format!("{error:?}").contains("SECRET_OUTSIDE"));
     assert_eq!(repo.get_state(), before);

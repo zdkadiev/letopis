@@ -294,7 +294,7 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
         let config = repo.write_config(provider, &server.get_base_url(), "fixture");
         wire_document_refresher(repo.get_root())
             .unwrap()
-            .refresh()
+            .refresh(&[])
             .unwrap();
         repo.seed_vectors(&config, &[("knowledge.md", &[1.0, 0.0])]);
         // When: binary search uses lexical fallback.
@@ -426,7 +426,7 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
         repo.write_config("ollama", &http.get_base_url(), "fixture");
         wire_document_refresher(repo.get_root())
             .unwrap()
-            .refresh()
+            .refresh(&[])
             .unwrap();
         assert!(
             wire_embedding_executor(repo.get_root())

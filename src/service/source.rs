@@ -112,7 +112,7 @@ mod tests {
         };
 
         // When: document refresh publishes the source projection through boxed Git provenance.
-        refresher.refresh().unwrap();
+        refresher.refresh(&[]).unwrap();
 
         let reads = recorded_reads.borrow();
         // Then: local ranges share their final capture and the remote binding causes no file I/O.
@@ -347,7 +347,7 @@ mod tests {
         fs::write(repo.path().join("a.md"), "<!-- letopis: {\"created_at\":3} -->\n[local](source.txt \"letopis:type=external;path=source.txt\") [remote](https://Host/a?x=1#section \"letopis:type=external;path=https://Host/a?x=1#section\")\n").unwrap();
         crate::wire_document_refresher(repo.path())
             .unwrap()
-            .refresh()
+            .refresh(&[])
             .unwrap();
         repo
     }

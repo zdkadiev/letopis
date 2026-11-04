@@ -38,7 +38,7 @@ fn derive_minimum_from_effective_references() {
     repo.write("late.md", build_external(8, RANGE, "LateToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
     // When
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
     let first = repo.get_state();
     // Then
     assert_eq!(get_source(&first, RANGE).uri.as_str(), "source.txt#L2-L3");
@@ -48,13 +48,13 @@ fn derive_minimum_from_effective_references() {
     // Given: the earliest referrer is removed.
     repo.remove("early.md");
     // When
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
     // Then
     assert_eq!(get_source(&repo.get_state(), RANGE).created_at, 8);
     // Given
     repo.write("late.md", "<!-- letopis: {broken} -->\ninvalid\n");
     // When
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
     let invalid = repo.get_state();
     // Then
     assert!(!invalid.get_file("late.md").valid);
@@ -70,13 +70,13 @@ fn derive_minimum_from_effective_references() {
     // Given
     repo.remove("late.md");
     // When
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
     // Then
     assert!(repo.get_state().nodes.is_empty());
     // Given
     repo.write("new.md", build_external(11, RANGE, "NewToken"));
     // When
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
     // Then
     assert_eq!(get_source(&repo.get_state(), RANGE).created_at, 11);
 }
@@ -88,10 +88,10 @@ fn recompute_minimum_after_earliest_referrer_edit() {
     repo.write("early.md", build_external(3, RANGE, "EarlyToken"));
     repo.write("late.md", build_external(8, RANGE, "LateToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
 
     repo.write("early.md", build_whole(3, "EditedToken"));
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
 
     let state = repo.get_state();
     // When / Then
@@ -108,7 +108,7 @@ fn preserve_whole_and_range_nodes_when_source_file_disappears() {
     repo.write("whole.md", build_external(4, "source.txt", "WholeToken"));
     repo.write("range.md", build_external(8, RANGE, "RangeToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
     let before = repo.get_state();
     // When / Then
     assert_eq!(get_source(&before, "source.txt").created_at, 4);
@@ -123,7 +123,7 @@ fn preserve_whole_and_range_nodes_when_source_file_disappears() {
         build_external(4, "source.txt", "StillWholeToken"),
     );
     repo.write("range.md", build_external(8, RANGE, "StillRangeToken"));
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
 
     let missing = repo.get_state();
     // When / Then
@@ -141,7 +141,7 @@ fn reject_source_knowledge_collision_without_publishing_or_changing_fts() {
     let repo = DocumentRepo::new();
     repo.write("knowledge.md", build_whole(1, "OriginalToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
     let before = repo.get_state();
     repo.write(
         "referrer.md",
@@ -149,7 +149,7 @@ fn reject_source_knowledge_collision_without_publishing_or_changing_fts() {
     );
 
     // When
-    let error = refresher.refresh().unwrap_err();
+    let error = refresher.refresh(&[]).unwrap_err();
 
     // Then
     assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
@@ -285,7 +285,7 @@ fn collect_sources(state: &State) -> Vec<(String, u64)> {
 fn refresh_once(repo: &DocumentRepo) {
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
 }
 

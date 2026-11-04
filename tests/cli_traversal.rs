@@ -221,7 +221,7 @@ fn binary_uses_no_inference_with_fully_seeded_backlog() {
     let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.seed_vectors(
         &config,
