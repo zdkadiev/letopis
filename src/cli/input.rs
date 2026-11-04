@@ -1,4 +1,4 @@
-use super::help::find_help;
+use super::help::help_get_by_args;
 use crate::domain::{EdgeType, RepoPath, SourceUri, TreeOid};
 use crate::service::{
     CommandError, CommandErrorKind, CommandResult, ElementAddress, RecheckFilter, SearchFilters,
@@ -10,6 +10,8 @@ use serde::{
 };
 use serde_json::value::RawValue;
 use std::{collections::BTreeSet, ffi::OsString, io::Read, num::NonZeroUsize};
+
+const INVALID_COMMAND_INPUT_MESSAGE: &str = "invalid command input";
 
 /// Typed command input after transport validation.
 #[derive(Debug)]
@@ -42,13 +44,13 @@ struct InspectInput {
 struct SearchInput {
     query: String,
     limit: u64,
-    #[serde(default, deserialize_with = "get_non_null_option")]
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
     filters: Option<SearchFiltersInput>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SearchFiltersInput {
-    #[serde(default, deserialize_with = "get_non_null_option")]
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
     needs_recheck: Option<bool>,
     #[serde(default)]
     sources: Vec<String>,
@@ -65,60 +67,90 @@ struct TraversalInput {
     limit: u64,
     #[serde(default)]
     edge_types: Vec<String>,
-    #[serde(default, deserialize_with = "get_non_null_option")]
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
     edge_limit: Option<u64>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct EmptyInput {}
 
-pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResult<Request> {
-    if let Some(text) = find_help(args) {
+/// Parse one command request after validating argv and before any service is used.
+///
+/// Help and version requests return their text without reading input. Other
+/// requests consume input to EOF, treating whitespace-only input as an empty object.
+///
+/// # Errors
+/// Returns a redacted invalid-request error for unsupported argv, invalid JSON,
+/// invalid field values or input I/O failure.
+pub(crate) fn request_parse(args: &[OsString], input: impl Read) -> CommandResult<Request> {
+    if let Some(text) = help_get_by_args(args) {
         return Ok(Request::Help(text));
     }
     let args = args
         .iter()
-        .map(|arg| arg.to_str().ok_or_else(fail_invalid_request))
+        .map(|arg| {
+            arg.to_str().ok_or_else(|| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+        })
         .collect::<CommandResult<Vec<_>>>()?;
     // Validate all argv before reading stdin or constructing any service.
     match args.as_slice() {
         ["init"] => {
-            let _: EmptyInput = get_object(input)?;
+            let _: EmptyInput = object_parse(input)?;
             Ok(Request::Init)
         }
         ["status"] => {
-            let _: EmptyInput = get_object(input)?;
+            let _: EmptyInput = object_parse(input)?;
             Ok(Request::Status)
         }
         ["config"] => {
-            let _: EmptyInput = get_object(input)?;
+            let _: EmptyInput = object_parse(input)?;
             Ok(Request::Config)
         }
         ["reindex"] => {
-            let _: EmptyInput = get_object(input)?;
+            let _: EmptyInput = object_parse(input)?;
             Ok(Request::Reindex)
         }
-        ["check"] => get_check(input),
-        ["inspect"] => get_inspection(input),
-        ["search"] => get_search(input).map(Request::Search),
-        ["traverse"] => get_traversal(input).map(Request::Traverse),
-        ["embed", "--drain"] => get_drain(input),
-        _ => Err(fail_invalid_request()),
+        ["check"] => check_request_parse(input),
+        ["inspect"] => inspection_request_parse(input),
+        ["search"] => search_request_parse(input).map(Request::Search),
+        ["traverse"] => traversal_request_parse(input).map(Request::Traverse),
+        ["embed", "--drain"] => drain_request_parse(input),
+        _ => Err(CommandError::new(
+            CommandErrorKind::InvalidRequest,
+            INVALID_COMMAND_INPUT_MESSAGE,
+        )),
     }
 }
-fn get_check(input: impl Read) -> CommandResult<Request> {
-    let dto: CheckInput = get_object(input)?;
+
+fn check_request_parse(input: impl Read) -> CommandResult<Request> {
+    let dto: CheckInput = object_parse(input)?;
     let paths = dto
         .paths
         .iter()
-        .map(|raw| RepoPath::parse(raw).map_err(|_| fail_invalid_request()))
+        .map(|raw| {
+            RepoPath::parse(raw).map_err(|_| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+        })
         .collect::<CommandResult<BTreeSet<_>>>()?;
     Ok(Request::Check(paths.into_iter().collect()))
 }
-fn get_inspection(input: impl Read) -> CommandResult<Request> {
-    let dto: InspectInput = get_object(input)?;
+
+fn inspection_request_parse(input: impl Read) -> CommandResult<Request> {
+    let dto: InspectInput = object_parse(input)?;
     if dto.element_ids.is_empty() {
-        return Err(fail_invalid_request());
+        return Err(CommandError::new(
+            CommandErrorKind::InvalidRequest,
+            INVALID_COMMAND_INPUT_MESSAGE,
+        ));
     }
     let ids = dto
         .element_ids
@@ -127,10 +159,14 @@ fn get_inspection(input: impl Read) -> CommandResult<Request> {
         .collect::<CommandResult<BTreeSet<_>>>()?;
     Ok(Request::Inspect(ids.into_iter().collect()))
 }
-fn get_traversal(input: impl Read) -> CommandResult<TraversalRequest> {
-    let dto: TraversalInput = get_object(input)?;
+
+fn traversal_request_parse(input: impl Read) -> CommandResult<TraversalRequest> {
+    let dto: TraversalInput = object_parse(input)?;
     if dto.element_ids.is_empty() {
-        return Err(fail_invalid_request());
+        return Err(CommandError::new(
+            CommandErrorKind::InvalidRequest,
+            INVALID_COMMAND_INPUT_MESSAGE,
+        ));
     }
     let element_ids = dto
         .element_ids
@@ -140,7 +176,14 @@ fn get_traversal(input: impl Read) -> CommandResult<TraversalRequest> {
     let edge_types = dto
         .edge_types
         .iter()
-        .map(|raw| EdgeType::parse(raw).map_err(|_| fail_invalid_request()))
+        .map(|raw| {
+            EdgeType::parse(raw).map_err(|_| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+        })
         .collect::<CommandResult<BTreeSet<_>>>()?;
     Ok(TraversalRequest {
         element_ids,
@@ -148,27 +191,38 @@ fn get_traversal(input: impl Read) -> CommandResult<TraversalRequest> {
             "relations" => TraversalMode::Relations,
             "containment" => TraversalMode::Containment,
             "both" => TraversalMode::Both,
-            _ => return Err(fail_invalid_request()),
+            _ => {
+                return Err(CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                ));
+            }
         },
         direction: match dto.direction.as_str() {
             "outgoing" => TraversalDirection::Outgoing,
             "incoming" => TraversalDirection::Incoming,
             "both" => TraversalDirection::Both,
-            _ => return Err(fail_invalid_request()),
+            _ => {
+                return Err(CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                ));
+            }
         },
         depth: dto.depth,
-        limit: parse_positive_limit(dto.limit)?,
+        limit: positive_limit_parse(dto.limit)?,
         edge_types,
-        edge_limit: dto.edge_limit.map(parse_positive_limit).transpose()?,
+        edge_limit: dto.edge_limit.map(positive_limit_parse).transpose()?,
     })
 }
-fn get_search(input: impl Read) -> CommandResult<SearchRequest> {
-    let dto: SearchInput = get_object(input)?;
-    let limit = parse_positive_limit(dto.limit)?;
+
+fn search_request_parse(input: impl Read) -> CommandResult<SearchRequest> {
+    let dto: SearchInput = object_parse(input)?;
+    let limit = positive_limit_parse(dto.limit)?;
     let filters = dto
         .filters
         .as_ref()
-        .map(parse_filters)
+        .map(search_filters_parse)
         .transpose()?
         .unwrap_or_default();
     Ok(SearchRequest {
@@ -177,13 +231,20 @@ fn get_search(input: impl Read) -> CommandResult<SearchRequest> {
         limit,
     })
 }
-fn parse_positive_limit(value: u64) -> CommandResult<NonZeroUsize> {
+
+fn positive_limit_parse(value: u64) -> CommandResult<NonZeroUsize> {
     usize::try_from(value)
         .ok()
         .and_then(NonZeroUsize::new)
-        .ok_or_else(fail_invalid_request)
+        .ok_or_else(|| {
+            CommandError::new(
+                CommandErrorKind::InvalidRequest,
+                INVALID_COMMAND_INPUT_MESSAGE,
+            )
+        })
 }
-fn parse_filters(input: &SearchFiltersInput) -> CommandResult<SearchFilters> {
+
+fn search_filters_parse(input: &SearchFiltersInput) -> CommandResult<SearchFilters> {
     let needs_recheck = match input.needs_recheck {
         None => RecheckFilter::Any,
         Some(true) => RecheckFilter::Required,
@@ -192,12 +253,26 @@ fn parse_filters(input: &SearchFiltersInput) -> CommandResult<SearchFilters> {
     let sources = input
         .sources
         .iter()
-        .map(|source| SourceUri::parse(source).map_err(|_| fail_invalid_request()))
+        .map(|source| {
+            SourceUri::parse(source).map_err(|_| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+        })
         .collect::<CommandResult<BTreeSet<_>>>()?;
     let source_revisions = input
         .source_revisions
         .iter()
-        .map(|revision| TreeOid::parse(revision).map_err(|_| fail_invalid_request()))
+        .map(|revision| {
+            TreeOid::parse(revision).map_err(|_| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+        })
         .collect::<CommandResult<BTreeSet<_>>>()?;
     Ok(SearchFilters {
         needs_recheck,
@@ -206,7 +281,7 @@ fn parse_filters(input: &SearchFiltersInput) -> CommandResult<SearchFilters> {
     })
 }
 
-fn get_non_null_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+fn non_null_option_deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
     D: Deserializer<'de>,
     T: Deserialize<'de>,
@@ -222,7 +297,8 @@ where
         .map(Some)
         .map_err(D::Error::custom)
 }
-fn get_drain(mut input: impl Read) -> CommandResult<Request> {
+
+fn drain_request_parse(mut input: impl Read) -> CommandResult<Request> {
     let mut bytes = Vec::new();
     input.read_to_end(&mut bytes).map_err(|cause| {
         CommandError::new_with_cause(
@@ -235,11 +311,12 @@ fn get_drain(mut input: impl Read) -> CommandResult<Request> {
         .iter()
         .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
     {
-        let _: EmptyInput = get_object(&mut bytes.as_slice())?;
+        let _: EmptyInput = object_parse(&mut bytes.as_slice())?;
     }
     Ok(Request::Drain)
 }
-fn get_object<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
+
+fn object_parse<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
     let mut bytes = Vec::new();
     input.read_to_end(&mut bytes).map_err(|cause| {
         CommandError::new_with_cause(
@@ -255,17 +332,16 @@ fn get_object<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
         bytes = b"{}".to_vec();
     }
     if bytes.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'{') {
-        return Err(fail_invalid_request());
+        return Err(CommandError::new(
+            CommandErrorKind::InvalidRequest,
+            INVALID_COMMAND_INPUT_MESSAGE,
+        ));
     }
     serde_json::from_slice(&bytes).map_err(|cause| {
         CommandError::new_with_cause(
             CommandErrorKind::InvalidRequest,
-            "invalid command input",
+            INVALID_COMMAND_INPUT_MESSAGE,
             cause,
         )
     })
-}
-
-fn fail_invalid_request() -> CommandError {
-    CommandError::new(CommandErrorKind::InvalidRequest, "invalid command input")
 }

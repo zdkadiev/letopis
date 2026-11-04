@@ -26,36 +26,45 @@ enum SqlText {
     BlockComment,
 }
 
-pub(super) fn bootstrap_cache(connection: &mut Connection) -> StorageResult<()> {
+pub(crate) fn bootstrap_cache(connection: &mut Connection) -> StorageResult<()> {
     bootstrap_schema(connection, CACHE_SCHEMA, CACHE_SCHEMA_VERSION)
 }
 
-pub(super) fn bootstrap_vectors(connection: &mut Connection) -> StorageResult<()> {
+pub(crate) fn bootstrap_vectors(connection: &mut Connection) -> StorageResult<()> {
     bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)
 }
 
-pub(super) fn validate_cache(connection: &Connection) -> StorageResult<()> {
+pub(crate) fn validate_cache(connection: &Connection) -> StorageResult<()> {
     if !has_schema_in(connection, "main", CACHE_SCHEMA, CACHE_SCHEMA_VERSION)? {
-        return Err(fail_incompatible_schema());
+        return Err(StorageError::new(
+            StorageErrorKind::InternalError,
+            "incompatible storage database schema",
+        ));
     }
     Ok(())
 }
 
-pub(super) fn validate_vector_database(connection: &Connection) -> StorageResult<()> {
+pub(crate) fn validate_vector_database(connection: &Connection) -> StorageResult<()> {
     if !has_schema_in(connection, "main", VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)? {
-        return Err(fail_incompatible_schema());
+        return Err(StorageError::new(
+            StorageErrorKind::InternalError,
+            "incompatible storage database schema",
+        ));
     }
     Ok(())
 }
 
-pub(super) fn validate_vectors(connection: &Connection) -> StorageResult<()> {
+pub(crate) fn validate_vectors(connection: &Connection) -> StorageResult<()> {
     if !has_schema_in(connection, "vec", VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)? {
-        return Err(fail_incompatible_schema());
+        return Err(StorageError::new(
+            StorageErrorKind::InternalError,
+            "incompatible storage database schema",
+        ));
     }
     Ok(())
 }
 
-pub(super) fn attach_empty_vectors(connection: &Connection) -> StorageResult<()> {
+pub(crate) fn attach_empty_vectors(connection: &Connection) -> StorageResult<()> {
     connection
         .execute("attach database ?1 as vec", ["file::memory:?mode=memory"])
         .map_err(map_sqlite)?;
@@ -75,7 +84,7 @@ fn bootstrap_schema(
     // Pin version and definitions to one read view without requesting a writer.
     let initialized = wait_for_initialization(|| {
         let read = connection.transaction().map_err(map_sqlite)?;
-        let initialized = has_schema(&read, sql, expected_version)?;
+        let initialized = has_schema_in(&read, "main", sql, expected_version)?;
         read.commit().map_err(map_sqlite)?;
         Ok(initialized)
     })?;
@@ -94,17 +103,13 @@ fn initialize_schema(
         Transaction::new_unchecked(connection, TransactionBehavior::Immediate).map_err(map_sqlite)
     })?;
     // A competing initializer may have committed while this connection waited.
-    if !has_schema(&transaction, sql, expected_version)? {
+    if !has_schema_in(&transaction, "main", sql, expected_version)? {
         transaction.execute_batch(sql).map_err(map_sqlite)?;
         transaction
             .pragma_update(None, USER_VERSION_PRAGMA, expected_version)
             .map_err(map_sqlite)?;
     }
     transaction.commit().map_err(map_sqlite)
-}
-
-fn has_schema(connection: &Connection, sql: &str, expected_version: i64) -> StorageResult<bool> {
-    has_schema_in(connection, "main", sql, expected_version)
 }
 
 fn has_schema_in(
@@ -118,27 +123,31 @@ fn has_schema_in(
             row.get(0)
         })
         .map_err(map_sqlite)?;
-    let definitions = get_definitions_in(connection, schema)?;
+    let definitions = sqlite_schema_get_by_schema_and_sql_and_name_and_type(connection, schema)?;
     match version {
         0 if definitions.is_empty() => Ok(false),
         version if version == expected_version => {
             register_vec1()?;
             let reference = Connection::open_in_memory().map_err(map_sqlite)?;
             reference.execute_batch(sql).map_err(map_sqlite)?;
-            if definitions != get_definitions(&reference)? {
-                return Err(fail_incompatible_schema());
+            if definitions
+                != sqlite_schema_get_by_schema_and_sql_and_name_and_type(&reference, "main")?
+            {
+                return Err(StorageError::new(
+                    StorageErrorKind::InternalError,
+                    "incompatible storage database schema",
+                ));
             }
             Ok(true)
         }
-        _ => Err(fail_incompatible_schema()),
+        _ => Err(StorageError::new(
+            StorageErrorKind::InternalError,
+            "incompatible storage database schema",
+        )),
     }
 }
 
-fn get_definitions(connection: &Connection) -> StorageResult<Vec<SchemaDefinition>> {
-    get_definitions_in(connection, "main")
-}
-
-fn get_definitions_in(
+fn sqlite_schema_get_by_schema_and_sql_and_name_and_type(
     connection: &Connection,
     schema: &str,
 ) -> StorageResult<Vec<SchemaDefinition>> {
@@ -216,15 +225,12 @@ fn normalize_keyword_case(sql: &str) -> String {
     result
 }
 
-fn fail_incompatible_schema() -> StorageError {
-    StorageError::new(
-        StorageErrorKind::InternalError,
-        "incompatible storage database schema",
-    )
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::service::StorageError;
+
+    use crate::storage::get_current;
+
     use super::{
         CACHE_SCHEMA, CACHE_SCHEMA_VERSION, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION, bootstrap_cache,
         bootstrap_schema, bootstrap_vectors,
@@ -233,8 +239,7 @@ mod tests {
     use crate::{
         domain::Sha256,
         process_test_support::supervise_test,
-        service::{Storage, StorageResult, VectorOutcome},
-        storage::SqliteStorage,
+        service::{StorageResult, VectorDatabase},
     };
     use rusqlite::{Connection, TransactionBehavior};
     use std::{
@@ -480,17 +485,24 @@ mod tests {
         let identity = Sha256::digest(b"model");
         let hash = Sha256::digest(b"text");
         {
-            let mut storage = SqliteStorage::open(&cache, &vectors).unwrap();
-            storage.reset_vectors(None, &identity).unwrap();
-            let VectorOutcome::Current(mut write) =
-                storage.begin_vector_write_tx(&identity).unwrap()
-            else {
-                panic!()
-            };
-            write.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
-            write.reserve_attempt(&hash, 3).unwrap();
-            write.record_failure(&hash, "failure sentinel").unwrap();
-            write.commit().unwrap();
+            let storage = crate::storage::open_test_storage(&cache, &vectors).unwrap();
+            storage.vectors.reset_vectors(None, &identity).unwrap();
+            storage
+                .vectors
+                .with_write_tx(&identity, || {
+                    let write = &storage.vectors;
+                    write.store_vector(&hash, &[1.0, 0.0, 0.0], 3).unwrap();
+                    write
+                        .embed_failures_upsert_by_search_hash_and_attempts(&hash, 3)
+                        .unwrap();
+                    write
+                        .embed_failures_update_by_search_hash(&hash, "failure sentinel")
+                        .unwrap();
+
+                    Ok::<_, StorageError>(())
+                })
+                .map(get_current)
+                .unwrap();
         }
         {
             let connection = Connection::open(&cache).unwrap();
@@ -519,7 +531,7 @@ mod tests {
             .map(|name| capture_file(&root.path().join(name)))
             .collect();
         // When: cache incompatibility is detected before the vector database is opened.
-        let error = SqliteStorage::open(&cache, &vectors).unwrap_err();
+        let error = crate::storage::open_test_storage(&cache, &vectors).unwrap_err();
         // Then: exact content and inode identity, including populated native vector state.
         assert_eq!(error.get_message(), "incompatible storage database schema");
         for (name, expected) in files.iter().zip(before) {

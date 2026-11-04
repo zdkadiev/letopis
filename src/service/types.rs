@@ -1,7 +1,7 @@
 //! Shared application data, requests, results and pure value rules.
 use super::error::{
     CommandError, CommandErrorKind, CommandProblem, CommandResult, EmbeddingError,
-    EmbeddingErrorKind, EmbeddingFailure, EmbeddingResult,
+    EmbeddingErrorKind, EmbeddingResult,
 };
 use crate::{
     domain::{
@@ -29,6 +29,15 @@ const ROOT_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retries"
 const ROOT_SECTION: &str = "embedding_model";
 const SECTION_FIELDS: [&str; 5] = ["enabled", "provider", "model", "parameters", "max_retries"];
 const LEGACY_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retries"];
+
+/// Transaction contexts in which a use case may begin.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TransactionRequirement {
+    /// Require no inherited read or write scope.
+    Inactive,
+    /// Permit an inherited read, while rejecting an inherited write.
+    ReadOnly,
+}
 
 /// Complete generated configuration written by initialization.
 pub(crate) const GENERATED_CONFIG: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  }\n}\n";
@@ -175,6 +184,15 @@ pub struct ParsedElement {
     pub search_hash: Sha256,
 }
 
+/// Stable file identity; mutable content and timestamps are deliberately excluded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileIdentity {
+    /// Device number.
+    pub device: u64,
+    /// Inode number.
+    pub inode: u64,
+}
+
 /// Root-relative regular-file observation used by change detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FileStat {
@@ -186,6 +204,16 @@ pub struct FileStat {
     pub inode: u64,
     /// Device number.
     pub device: u64,
+}
+
+impl FileStat {
+    /// Return the stable identity without mutable content observations.
+    pub fn get_identity(&self) -> FileIdentity {
+        FileIdentity {
+            device: self.device,
+            inode: self.inode,
+        }
+    }
 }
 
 /// Exact file bytes with a verified observation and pre-read clock sample.
@@ -618,33 +646,6 @@ pub struct HeldLock {
     pub pid: NonZeroU32,
 }
 
-/// Captured configuration policy; observing it never resets stored identity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EmbeddingStatusPolicy {
-    /// Every current hash is backlog and none has current exhausted attempts.
-    Unavailable,
-    /// Valid disabled configuration: report no embedding work or execution failures.
-    Disabled,
-    /// Use stored coverage and attempts only when the pinned identity matches.
-    Ready {
-        /// Captured valid configuration identity.
-        identity: Sha256,
-        /// Positive total durable attempt budget, including the initial attempt.
-        max_attempts: u64,
-    },
-}
-
-/// Distinct current knowledge hash counts and their exhausted reservations.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EmbeddingStatusSummary {
-    /// Current hashes without usable vectors or exhausted reservations.
-    pub backlog: u64,
-    /// Current hashes with exhausted reservations and no usable vectors.
-    pub failed: u64,
-    /// Exhausted current hashes, once each in ascending hash order.
-    pub exhausted: Vec<EmbeddingFailure>,
-}
-
 /// Select knowledge by whether its current X-1 flags require rechecking.
 /// An empty flag set does not certify truth or remote availability.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -754,7 +755,9 @@ impl Configuration {
     pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
         let JsonValue(value) =
             serde_json::from_slice::<JsonValue<true>>(bytes).map_err(map_config_error)?;
-        let root = value.as_object().ok_or_else(reject_config)?;
+        let root = value
+            .as_object()
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         if root.len() == 1
             && let Some(section) = root.get(ROOT_SECTION)
         {
@@ -763,7 +766,7 @@ impl Configuration {
         if root.keys().any(|key| LEGACY_FIELDS.contains(&key.as_str())) {
             return Err(EmbeddingError::new(EmbeddingErrorKind::MigrationRequired));
         }
-        Err(reject_config())
+        Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
     }
 
     /// Return whether configured embedding execution is enabled.
@@ -840,35 +843,37 @@ pub struct SnapshotEntry {
 }
 
 fn parse_section(value: &Value) -> EmbeddingResult<Configuration> {
-    let section = value.as_object().ok_or_else(reject_config)?;
+    let section = value
+        .as_object()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     if section.len() != SECTION_FIELDS.len()
         || section
             .keys()
             .any(|key| !SECTION_FIELDS.contains(&key.as_str()))
     {
-        return Err(reject_config());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     let enabled = section
         .get("enabled")
         .and_then(Value::as_bool)
-        .ok_or_else(reject_config)?;
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     let max_retries = section
         .get("max_retries")
         .and_then(Value::as_u64)
-        .ok_or_else(reject_config)?;
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     validate_retries(max_retries)?;
     let provider = get_optional_string(section, "provider")?;
     let model = get_optional_string(section, "model")?;
     let parameters = section
         .get("parameters")
         .and_then(Value::as_object)
-        .ok_or_else(reject_config)?;
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     match (provider, model) {
         (None, None) => parse_unconfigured(enabled, parameters, max_retries),
         (Some(provider), Some(model)) => {
             parse_configured(enabled, provider, model, parameters, max_retries)
         }
-        _ => Err(reject_config()),
+        _ => Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)),
     }
 }
 
@@ -879,7 +884,7 @@ fn get_optional_string<'a>(
     match section.get(field) {
         Some(Value::Null) => Ok(None),
         Some(Value::String(value)) => Ok(Some(value)),
-        _ => Err(reject_config()),
+        _ => Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)),
     }
 }
 
@@ -889,7 +894,7 @@ fn parse_unconfigured(
     max_retries: u64,
 ) -> EmbeddingResult<Configuration> {
     if enabled || !parameters.is_empty() {
-        return Err(reject_config());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     Ok(Configuration::Unconfigured { max_retries })
 }
@@ -921,7 +926,7 @@ fn validate_retries(retries: u64) -> EmbeddingResult<()> {
         .checked_add(1)
         .filter(|attempts| i64::try_from(*attempts).is_ok())
         .map(|_| ())
-        .ok_or_else(reject_config)
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
 }
 
 impl EmbeddingConfig {
@@ -936,36 +941,38 @@ impl EmbeddingConfig {
     pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
         let JsonValue(value) =
             serde_json::from_slice::<JsonValue<true>>(bytes).map_err(map_config_error)?;
-        let root = value.as_object().ok_or_else(reject_config)?;
+        let root = value
+            .as_object()
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         if root.len() != ROOT_FIELDS.len()
             || root.keys().any(|key| !ROOT_FIELDS.contains(&key.as_str()))
         {
-            return Err(reject_config());
+            return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
         }
         let provider = match root.get("provider").and_then(Value::as_str) {
             Some("ollama") => ProviderKind::Ollama,
             Some("openai") => ProviderKind::Openai,
-            _ => return Err(reject_config()),
+            _ => return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)),
         };
         let model = root
             .get("model")
             .and_then(Value::as_str)
             .filter(|model| !model.is_empty())
-            .ok_or_else(reject_config)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         let parameters = root
             .get("parameters")
             .and_then(Value::as_object)
-            .ok_or_else(reject_config)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         validate_parameters(parameters)?;
         let dimensions = get_dimensions(parameters)?;
         let retries = root
             .get("max_retries")
             .and_then(Value::as_u64)
-            .ok_or_else(reject_config)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         let max_attempts = retries
             .checked_add(1)
             .filter(|count| i64::try_from(*count).is_ok())
-            .ok_or_else(reject_config)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         let canonical = serde_json_canonicalizer::to_vec(&value).map_err(map_config_error)?;
         verify_execution_identity(&value, &canonical)?;
         Ok(Self {
@@ -1021,7 +1028,7 @@ fn validate_parameters(parameters: &Map<String, Value>) -> EmbeddingResult<()> {
             .get("encoding_format")
             .is_some_and(|v| v.as_str() != Some("float"))
     {
-        return Err(reject_config());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     Ok(())
 }
@@ -1034,8 +1041,9 @@ fn get_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<Non
                 .as_u64()
                 .and_then(|size| usize::try_from(size).ok())
                 .filter(|size| (MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(size))
-                .ok_or_else(reject_config)?;
-            NonZeroUsize::new(size).ok_or_else(reject_config)
+                .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+            NonZeroUsize::new(size)
+                .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
         })
         .transpose()
 }
@@ -1044,7 +1052,7 @@ fn verify_execution_identity(original: &Value, bytes: &[u8]) -> EmbeddingResult<
     let JsonValue(canonical) =
         serde_json::from_slice::<JsonValue<false>>(bytes).map_err(map_config_error)?;
     if !has_exact_integers(original, &canonical) {
-        return Err(reject_config());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     Ok(())
 }
@@ -1073,10 +1081,6 @@ fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
 
 fn map_config_error(cause: impl std::error::Error + Send + Sync + 'static) -> EmbeddingError {
     EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
-}
-
-fn reject_config() -> EmbeddingError {
-    EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)
 }
 
 #[cfg(test)]
@@ -1311,13 +1315,15 @@ mod embedding_config_tests {
 
 #[cfg(test)]
 mod configuration_value_tests {
+    use crate::service::{CapturedFile, FileIdentity, FileReader, FileResult, FileStat};
+
     use super::{Configuration, GENERATED_CONFIG};
     use crate::{
         domain::Sha256,
         service::configuration::ConfigurationService,
         service::{
-            CommandResult, ConfigReader, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind,
-            EmbeddingProvider, EmbeddingResult, HeldLock, StatusFiles,
+            ConfigReader, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingProvider,
+            EmbeddingResult,
         },
     };
     use serde::Deserialize;
@@ -1419,18 +1425,59 @@ mod configuration_value_tests {
         }
     }
 
-    impl StatusFiles for Files {
-        fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+    impl FileReader for Files {
+        fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            Ok(false)
+        }
+        fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            panic!("unexpected file_get_by_path")
+        }
+        fn file_get_bytes_by_path(&self, path: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+            assert_eq!(path, std::path::Path::new(".letopis/config.json"));
             Ok(Some(self.config.clone()))
         }
-
-        fn observe_locks(&self) -> CommandResult<Vec<HeldLock>> {
-            Ok(Vec::new())
+        fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
+            panic!("unexpected file_get_stat_by_path")
+        }
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unexpected file_get_identity_by_path")
+        }
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unexpected file_is_exist")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_identity_by_path")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_distinct_by_paths")
+        }
+        fn directory_get_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            Ok(None)
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            Ok(None)
         }
     }
 
     impl EmbeddingProvider for Provider {
-        fn validate_config(&self, config: &EmbeddingConfig) -> EmbeddingResult<()> {
+        fn config_validate(&self, config: &EmbeddingConfig) -> EmbeddingResult<()> {
             let url = config
                 .get_parameters()
                 .get("base_url")
@@ -1443,7 +1490,7 @@ mod configuration_value_tests {
             }
         }
 
-        fn embed(
+        fn vectors_compute_by_texts(
             &self,
             _: &EmbeddingConfig,
             _: &[&str],

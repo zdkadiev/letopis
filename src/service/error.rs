@@ -1,7 +1,57 @@
 //! Shared application failures, diagnostics and typed result aliases.
 use crate::domain::{ByteSpan, Sha256};
 use serde_json::Value;
-use std::{collections::BTreeMap, error::Error, fmt};
+use std::{collections::BTreeMap, error::Error, fmt, io};
+
+/// Failure in a transaction boundary or its caller's operation.
+#[derive(Debug)]
+pub enum TransactionError<E> {
+    /// The operation returned an error.
+    Operation(E),
+    /// The storage transaction failed.
+    Storage(StorageError),
+}
+
+impl TransactionError<StorageError> {
+    /// Consume a storage-only scope error while retaining its original classification and cause.
+    pub fn into_inner(self) -> StorageError {
+        match self {
+            Self::Operation(error) | Self::Storage(error) => error,
+        }
+    }
+}
+
+impl<E: fmt::Display> fmt::Display for TransactionError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Operation(error) => error.fmt(formatter),
+            Self::Storage(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl<E: Error + 'static> Error for TransactionError<E> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Operation(error) => Some(error),
+            Self::Storage(error) => Some(error),
+        }
+    }
+}
+
+impl<E> TransactionError<TransactionError<E>> {
+    /// Remove an internal transaction-error layer while preserving its source.
+    pub fn flatten(self) -> TransactionError<E> {
+        match self {
+            Self::Storage(error) | Self::Operation(TransactionError::Storage(error)) => {
+                TransactionError::Storage(error)
+            }
+            Self::Operation(TransactionError::Operation(error)) => {
+                TransactionError::Operation(error)
+            }
+        }
+    }
+}
 
 /// Durable reservation count and the latest safe failure for one search hash.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -418,6 +468,86 @@ impl Error for StorageError {
 /// A storage operation's typed outcome.
 pub type StorageResult<T> = Result<T, StorageError>;
 
+/// Stable classification for confined file operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileErrorKind {
+    /// A path is absolute, escapes its root, contains a NUL, or has an unsafe parent.
+    UnsafePath,
+    /// A stable final entry is not a regular file.
+    NonRegular,
+    /// A previously observed entry or pinned directory changed or disappeared.
+    Changed,
+    /// Two paths identify the same file, or a lock has another hardlink.
+    Aliased,
+    /// A required parent or directory is absent.
+    NotFound,
+    /// An observed locked file contains no valid bounded process identifier.
+    InvalidOwner,
+    /// An operating-system, clock, representation or durability operation failed.
+    Io,
+}
+
+/// File failure with a safe classification and a privately retained cause.
+pub struct FileError {
+    kind: FileErrorKind,
+    cause: Option<Box<dyn Error + Send + Sync>>,
+}
+
+impl FileError {
+    pub(crate) fn new(kind: FileErrorKind) -> Self {
+        Self { kind, cause: None }
+    }
+
+    pub(crate) fn new_with_cause(
+        kind: FileErrorKind,
+        cause: impl Error + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            kind,
+            cause: Some(Box::new(cause)),
+        }
+    }
+
+    /// Return the classification without exposing paths or file bytes.
+    pub fn get_kind(&self) -> FileErrorKind {
+        self.kind
+    }
+}
+
+impl fmt::Display for FileError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self.kind {
+            FileErrorKind::UnsafePath => "unsafe file path",
+            FileErrorKind::NonRegular => "regular file required",
+            FileErrorKind::Changed => "file identity or observation changed",
+            FileErrorKind::Aliased => "distinct file identities required",
+            FileErrorKind::NotFound => "file directory missing",
+            FileErrorKind::InvalidOwner => "invalid file lock owner",
+            FileErrorKind::Io => "file operation failed",
+        })
+    }
+}
+
+impl fmt::Debug for FileError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("FileError")
+            .field("kind", &self.kind)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Error for FileError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.cause
+            .as_deref()
+            .map(|cause| cause as &(dyn Error + 'static))
+    }
+}
+
+/// Typed result of a confined file operation.
+pub type FileResult<T> = Result<T, FileError>;
+
 /// Stable application classification for document refresh failures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocumentErrorKind {
@@ -576,10 +706,90 @@ impl Error for ServiceError {
 /// Result of constructing an application service.
 pub type ServiceResult<T> = Result<T, ServiceError>;
 
+/// Failure while observing Git worktree/index paths, retaining its internal cause.
+pub struct GitError {
+    cause: Box<dyn Error + Send + Sync>,
+}
+impl fmt::Debug for GitError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("GitError").finish_non_exhaustive()
+    }
+}
+impl GitError {
+    /// Preserve a Git/library cause without exposing raw paths in public diagnostics.
+    pub(crate) fn new(cause: impl Error + Send + Sync + 'static) -> Self {
+        Self {
+            cause: Box::new(cause),
+        }
+    }
+}
+impl fmt::Display for GitError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("cannot enumerate Git worktree paths")
+    }
+}
+impl Error for GitError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.cause.as_ref())
+    }
+}
+/// Result of Git worktree/index observations.
+pub type GitResult<T> = Result<T, GitError>;
+
+/// Process setup or launch failure with a private I/O cause.
+pub struct ProcessError {
+    cause: io::Error,
+}
+
+impl ProcessError {
+    /// Preserve the I/O cause without exposing it in Display or Debug.
+    pub fn new(cause: io::Error) -> Self {
+        Self { cause }
+    }
+}
+
+impl fmt::Debug for ProcessError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProcessError")
+            .finish_non_exhaustive()
+    }
+}
+
+impl fmt::Display for ProcessError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("cannot spawn process")
+    }
+}
+
+impl Error for ProcessError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.cause)
+    }
+}
+
+/// Result of configuring or launching a detached process.
+pub type ProcessResult<T> = Result<T, ProcessError>;
+
 #[cfg(test)]
 mod error_tests {
-    use super::{DocumentError, DocumentErrorKind, ServiceError, ServiceErrorKind};
+    use super::{DocumentError, DocumentErrorKind, ProcessError, ServiceError, ServiceErrorKind};
     use std::{error::Error, io};
+
+    #[test]
+    fn process_error_preserves_its_io_cause_without_exposing_private_payload() {
+        // Given: process creation reports an I/O failure containing private details.
+        let error = ProcessError::new(io::Error::other("PRIVATE_PROCESS_CAUSE"));
+        // When: callers format the public failure.
+        let display = error.to_string();
+        let debug = format!("{error:?}");
+        // Then: public diagnostics are fixed, while the original cause remains inspectable.
+        assert_eq!(display, "cannot spawn process");
+        assert!(!debug.contains("PRIVATE_PROCESS_CAUSE"));
+        let cause = error.source().unwrap().downcast_ref::<io::Error>().unwrap();
+        assert_eq!(cause.kind(), io::ErrorKind::Other);
+        assert_eq!(cause.to_string(), "PRIVATE_PROCESS_CAUSE");
+    }
 
     #[test]
     fn preserves_document_context_without_exposing_its_private_cause() {

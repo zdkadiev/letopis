@@ -1,13 +1,13 @@
 mod support;
 use letopis::{
     domain::RepoPath,
-    markdown::{DiagnosticKind, ParsedElement, parse},
+    markdown::{self, DiagnosticKind, ParsedElement},
 };
 use support::{assert_error, build_whole_file, parse_file};
 
 #[test]
 fn golden_elements_have_exact_bytes_and_metadata() {
-    // Given
+    // Given: literal golden metadata and spans accompany each fixture.
     let golden: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/markdown/expected.json")).unwrap();
     for (name, expected) in golden.as_object().unwrap() {
@@ -17,9 +17,9 @@ fn golden_elements_have_exact_bytes_and_metadata() {
         ))
         .unwrap();
         let path = RepoPath::parse(&format!("knowledge/{name}")).unwrap();
-        // When
-        let result = parse(&path, &bytes).unwrap().unwrap();
-        // Then
+        // When: parse the exact fixture bytes.
+        let result = markdown::file_parse(&path, &bytes).unwrap().unwrap();
+        // Then: every projected element matches the independent literals.
         assert_eq!(
             result.elements.len(),
             expected.as_array().unwrap().len(),
@@ -33,42 +33,42 @@ fn golden_elements_have_exact_bytes_and_metadata() {
 
 #[test]
 fn unicode_crlf_and_eof_have_exact_spans() {
-    // Given
+    // Given: CRLF and missing-final-newline fixtures retain exact byte boundaries.
     let path = RepoPath::parse("a.md").unwrap();
     for bytes in [
         include_bytes!("fixtures/markdown/crlf.md").as_slice(),
         include_bytes!("fixtures/markdown/no-final-newline.md").as_slice(),
     ] {
-        // When
-        let got = parse(&path, bytes).unwrap().unwrap();
-        // Then
+        // When: parse each raw fixture.
+        let got = markdown::file_parse(&path, bytes).unwrap().unwrap();
+        // Then: the element ends at the exact byte and line offsets.
         assert_eq!(got.elements[0].element.bytes.get_end(), bytes.len());
         assert_eq!(got.elements[0].element.lines.get_end(), 3);
     }
-    // Given
+    // Given: a Unicode section starts after an unmarked prefix.
     let text = std::str::from_utf8(include_bytes!("fixtures/markdown/unicode.md")).unwrap();
-    // When
+    // When: parse the section with its original UTF-8 bytes.
     let got = parse_file("a.md", text);
-    // Then
+    // Then: the independently counted byte and line starts are preserved.
     assert_eq!(got.elements[0].element.bytes.get_start(), 11);
     assert_eq!(got.elements[0].element.lines.get_start(), 3);
 }
 
 #[test]
 fn unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected() {
-    // Given
+    // Given: one path receives either plain Markdown or invalid UTF-8.
     let path = RepoPath::parse("a.md").unwrap();
-    // When
-    let plain = parse(&path, b"# plain\nText.\n");
-    let invalid_utf8 = parse(&path, b"\xff");
-    // Then
+    // When: parse both byte sequences.
+    let plain = markdown::file_parse(&path, b"# plain\nText.\n");
+    let invalid_utf8 = markdown::file_parse(&path, b"\xff");
+    // Then: plain content has no projection and invalid bytes have a typed diagnostic.
     assert!(plain.unwrap().is_none());
     assert_error(invalid_utf8, DiagnosticKind::InvalidUtf8);
 }
 
 #[test]
 fn code_examples_do_not_declare_elements() {
-    // Given
+    // Given: code examples contain text resembling element declarations.
     let path = RepoPath::parse("a.md").unwrap();
     for text in [
         "```md\n## A {#a}\n<!-- letopis: {} -->\n```\n",
@@ -76,16 +76,16 @@ fn code_examples_do_not_declare_elements() {
         "`<!-- letopis: {} -->`\n",
         "```md\n## A {#a}\n<!-- letopis: {} -->\n",
     ] {
-        // When
-        let result = parse(&path, text.as_bytes());
-        // Then
+        // When: parse each code-only document.
+        let result = markdown::file_parse(&path, text.as_bytes());
+        // Then: none of the examples becomes corpus data.
         assert!(result.unwrap().is_none(), "{text}");
     }
-    // Given
+    // Given: a marked fixture contains fenced declaration examples.
     let text = std::str::from_utf8(include_bytes!("fixtures/markdown/code.md")).unwrap();
-    // When
+    // When: parse the real element and its examples together.
     let got = parse_file("a.md", text);
-    // Then
+    // Then: only the real element is projected and no example creates an edge.
     assert_eq!(got.elements.len(), 1);
     assert!(got.edges.is_empty());
 }
@@ -108,7 +108,7 @@ fn file_errors_never_return_partial_elements() {
     ] {
         let text = format!("{prefix}## Bad {{#bad}}\n<!-- letopis: {json} -->\nOops.\n");
         // When: parse all declarations in the file.
-        let result = parse(&path, text.as_bytes());
+        let result = markdown::file_parse(&path, text.as_bytes());
         // Then: reject the whole file without a partial projection.
         assert_error(result, DiagnosticKind::InvalidMetadata);
     }
@@ -117,14 +117,14 @@ fn file_errors_never_return_partial_elements() {
         "{prefix}## A {{#a}}\n<!-- letopis: {{\"created_at\":2}} -->\n[self](./a.md#a \"letopis:type=depends_on;path=knowledge/a.md#a\")\n"
     );
     // When: parse all declarations in the file.
-    let result = parse(&path, text.as_bytes());
+    let result = markdown::file_parse(&path, text.as_bytes());
     // Then: reject the whole file without a partial projection.
     assert_error(result, DiagnosticKind::SelfLoop);
 }
 
 #[test]
 fn nested_elements_and_orphan_metadata_are_rejected() {
-    // Given
+    // Given: each document contains nested elements or metadata without an owning heading.
     let path = RepoPath::parse("knowledge/a.md").unwrap();
     for (text, kind) in [
         (
@@ -148,29 +148,29 @@ fn nested_elements_and_orphan_metadata_are_rejected() {
             DiagnosticKind::OrphanMetadata,
         ),
     ] {
-        // When
-        let result = parse(&path, text.as_bytes());
-        // Then
+        // When: parse the complete invalid document.
+        let result = markdown::file_parse(&path, text.as_bytes());
+        // Then: the independently specified layout diagnostic rejects the file.
         assert_error(result, kind);
     }
 }
 
 #[test]
 fn anchors_are_unique_across_real_headings() {
-    // Given
+    // Given: two actual headings repeat the same anchor.
     let path = RepoPath::parse("knowledge/a.md").unwrap();
     let duplicate = b"## A {#a}\n<!-- letopis: {\"created_at\":1} -->\n## B {#a}\n";
-    // When
-    let result = parse(&path, duplicate);
-    // Then
+    // When: parse the duplicate headings.
+    let result = markdown::file_parse(&path, duplicate);
+    // Then: the duplicate anchor is rejected.
     assert_error(result, DiagnosticKind::DuplicateAnchor);
 
-    // Given
+    // Given: each malformed anchor violates the declared anchor grammar.
     for anchor in ["L1-L2", "1bad", ""] {
         let text = format!("## A {{#{anchor}}}\n<!-- letopis: {{\"created_at\":1}} -->\n");
-        // When
-        let result = parse(&path, text.as_bytes());
-        // Then
+        // When: parse the marked section.
+        let result = markdown::file_parse(&path, text.as_bytes());
+        // Then: the file reports the invalid-anchor diagnostic.
         assert_error(result, DiagnosticKind::InvalidAnchor);
     }
 }
@@ -201,23 +201,23 @@ fn snapshot_metadata_preserves_full_oid_and_zero_created_at() {
 
 #[test]
 fn metadata_must_fit_exactly_one_standalone_line() {
-    // Given
+    // Given: metadata is multiline or shares its line with other content.
     let path = RepoPath::parse("a.md").unwrap();
     for text in [
         "<!-- letopis: {\n\"created_at\":1} -->\n",
         "<!-- letopis: {\"created_at\":1} --> trailing\n",
         "<!-- letopis: {\"created_at\":1} --> <!-- letopis: {\"created_at\":2} -->\n",
     ] {
-        // When
-        let result = parse(&path, text.as_bytes());
-        // Then
+        // When: parse each malformed comment layout.
+        let result = markdown::file_parse(&path, text.as_bytes());
+        // Then: every malformed layout rejects the complete file.
         assert!(result.is_err(), "{text}");
     }
 }
 
 #[test]
 fn raw_html_content_does_not_declare_metadata() {
-    // Given
+    // Given: raw HTML examples contain apparent metadata alongside one real marked element.
     let path = RepoPath::parse("a.md").unwrap();
     for (open, close) in [
         ("<script>", "</script>"),
@@ -230,10 +230,10 @@ fn raw_html_content_does_not_declare_metadata() {
             "{open}\nconst example = `\n<!-- letopis: {{\"created_at\":2}} -->\n`;\n{close}\n"
         );
         let marked = build_whole_file(&format!("\n{raw}"));
-        // When
+        // When: parse marked and unmarked versions of each HTML example.
         let got = parse_file("a.md", &marked);
-        let unmarked = parse(&path, raw.as_bytes());
-        // Then
+        let unmarked = markdown::file_parse(&path, raw.as_bytes());
+        // Then: only the real element is projected while raw content remains searchable.
         assert_eq!(got.elements.len(), 1, "{open}");
         assert!(
             got.elements[0].search_text.contains("created_at\":2"),
@@ -252,9 +252,9 @@ fn locates_the_complete_invalid_comment_without_unrelated_prefix_text() {
         ("", "<!-- letopis: {\n\"created_at\":1} -->"),
     ] {
         let text = format!("{prefix}{comment}\n");
-        // When
-        let diagnostics = parse(&path, text.as_bytes()).unwrap_err();
-        // Then
+        // When: parse the invalid standalone or prefixed comment.
+        let diagnostics = markdown::file_parse(&path, text.as_bytes()).unwrap_err();
+        // Then: the diagnostic span highlights only the complete comment.
         let diagnostic = diagnostics
             .iter()
             .find(|diagnostic| diagnostic.kind == DiagnosticKind::InvalidMetadata)

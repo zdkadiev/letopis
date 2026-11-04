@@ -20,10 +20,10 @@ fn inspect_reads_current_knowledge_from_one_retained_tree() {
         .iter()
         .map(|(_, _, id, ..)| ElementAddress::parse(id).unwrap())
         .collect::<Vec<_>>();
-    // When
+    // When: inspect all fixture IDs and read their retained snapshot.
     let result = service.inspect(&addresses).unwrap();
     let git = open_git_snapshots(repo.get_root()).unwrap();
-    // Then
+    // Then: metadata is exact and live edits do not change captured bytes.
     assert_eq!(result.elements.len(), 4);
     for (path, bytes, id, start, end, hash) in fixtures {
         assert_eq!(result.elements[id].path.as_str(), path);
@@ -32,13 +32,16 @@ fn inspect_reads_current_knowledge_from_one_retained_tree() {
             Some(LineRange::new(start, end).unwrap())
         );
         assert_eq!(result.elements[id].hash, Some(Sha256::parse(hash).unwrap()));
+        // Given: replace this live file after its bytes were captured.
         repo.write(path, b"live edit");
+        // When / Then: the retained tree still returns the exact original bytes.
         assert_eq!(
-            git.get_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
+            git.blob_get_by_tree_oid_and_path(&result.snapshot, &RepoPath::parse(path).unwrap())
                 .unwrap(),
             bytes
         );
     }
+    // When / Then: captured CRLF bytes remain available after garbage collection.
     let status = std::process::Command::new("git")
         .current_dir(repo.get_root())
         .args(["gc", "--prune=now"])
@@ -46,7 +49,7 @@ fn inspect_reads_current_knowledge_from_one_retained_tree() {
         .unwrap();
     assert!(status.success());
     assert_eq!(
-        git.get_blob(&result.snapshot, &RepoPath::parse("crlf.md").unwrap())
+        git.blob_get_by_tree_oid_and_path(&result.snapshot, &RepoPath::parse("crlf.md").unwrap())
             .unwrap(),
         fixtures[0].1
     );
@@ -141,20 +144,20 @@ fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
         .unwrap();
     std::fs::remove_file(repo.get_root().join("gone.md")).unwrap();
     let mut service = wire_inspector(repo.get_root()).unwrap();
-    // When
+    // When: inspect the surviving and deleted knowledge IDs.
     let current = service
         .inspect(&[ElementAddress::parse("kept.md").unwrap()])
         .unwrap();
     let removed = service
         .inspect(&[ElementAddress::parse("gone.md").unwrap()])
         .unwrap_err();
-    // Then
+    // Then: surviving knowledge resolves, deleted knowledge is NotFound, and its file is absent from the captured tree.
     assert_eq!(current.elements.len(), 1);
     assert_eq!(removed.get_kind(), CommandErrorKind::NotFound);
     assert!(
         open_git_snapshots(repo.get_root())
             .unwrap()
-            .get_blob(&current.snapshot, &RepoPath::parse("gone.md").unwrap())
+            .blob_get_by_tree_oid_and_path(&current.snapshot, &RepoPath::parse("gone.md").unwrap())
             .is_err()
     );
 }

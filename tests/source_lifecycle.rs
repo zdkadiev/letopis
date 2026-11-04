@@ -1,11 +1,13 @@
+use crate::support::storage::get_current;
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
+use support::storage::{Databases, open_storage};
 mod support;
 
 use letopis::{
     domain::{EdgeTarget, Sha256, SourceUri},
-    open_storage,
     service::{
-        DocumentErrorKind, EmbeddingFailure, NodeMetadata, Refresher, SourceMetadata, Storage,
-        VectorOutcome,
+        DocumentErrorKind, EmbeddingFailure, NodeMetadata, Refresher, SourceMetadata, VectorOutcome,
     },
     wire_document_refresher,
 };
@@ -231,22 +233,31 @@ fn repair_legacy_url_only_after_explicit_cache_rebuild() {
         fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap(),
         vectors
     );
-    let mut storage = open_fixture_storage(&repo);
-    let mut view = storage.begin_read_tx().unwrap();
-    let preserved_vector =
-        unwrap_current(view.get_vector_by_search_hash(&identity, &hash).unwrap());
-    assert_eq!(preserved_vector, Some(vec![1.0, 0.0, 0.0]));
-    assert_eq!(
-        unwrap_current(
-            view.get_failure_by_search_hash(&identity, &failure_hash)
-                .unwrap()
-        ),
-        Some(EmbeddingFailure {
-            search_hash: failure_hash,
-            attempts: 1,
-            error: Some("preserved failure sentinel".to_owned()),
+    let storage = open_fixture_storage(&repo);
+    storage
+        .cache
+        .with_read_tx(|| {
+            let view = &storage.cache;
+            let preserved_vector = unwrap_current(
+                view.vector_keys_get_by_search_hash(&identity, &hash)
+                    .unwrap(),
+            );
+            assert_eq!(preserved_vector, Some(vec![1.0, 0.0, 0.0]));
+            assert_eq!(
+                unwrap_current(
+                    view.embed_failures_get_by_search_hash(&identity, &failure_hash)
+                        .unwrap()
+                ),
+                Some(EmbeddingFailure {
+                    search_hash: failure_hash,
+                    attempts: 1,
+                    error: Some("preserved failure sentinel".to_owned()),
+                })
+            );
+
+            Ok::<_, StorageError>(())
         })
-    );
+        .unwrap();
 }
 
 fn get_source<'a>(state: &'a State, address: &str) -> &'a SourceMetadata {
@@ -311,19 +322,34 @@ fn seed_vector_sentinels(
     hash: &Sha256,
     failure_hash: &Sha256,
 ) {
-    let mut storage = open_fixture_storage(repo);
-    storage.reset_vectors(None, identity).unwrap();
-    let mut unit = unwrap_current(storage.begin_vector_write_tx(identity).unwrap());
-    unit.store_vector(hash, &[1.0, 0.0, 0.0], 3).unwrap();
-    assert!(unit.reserve_attempt(failure_hash, 3).unwrap());
-    assert!(
-        unit.record_failure(failure_hash, "preserved failure sentinel")
-            .unwrap()
-    );
-    unit.commit().unwrap();
+    let storage = open_fixture_storage(repo);
+    storage.vectors.reset_vectors(None, identity).unwrap();
+    storage
+        .vectors
+        .with_write_tx(identity, || {
+            let unit = &storage.vectors;
+            unit.store_vector(hash, &[1.0, 0.0, 0.0], 3).unwrap();
+            assert!(
+                unit.embed_failures_upsert_by_search_hash_and_attempts(failure_hash, 3)
+                    .unwrap()
+            );
+            assert!(
+                unit.embed_failures_update_by_search_hash(
+                    failure_hash,
+                    "preserved failure sentinel"
+                )
+                .unwrap()
+            );
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
 }
 
-fn open_fixture_storage(repo: &DocumentRepo) -> impl Storage + use<> {
+fn open_fixture_storage(
+    repo: &DocumentRepo,
+) -> Databases<impl CacheDatabase + use<>, impl VectorDatabase + use<>> {
     open_storage(
         &repo.get_root().join(".letopis/cache.db"),
         &repo.get_root().join(".letopis/vectors.db"),

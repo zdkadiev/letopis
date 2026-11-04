@@ -1,6 +1,7 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 
-use letopis::service::Storage;
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -322,21 +323,28 @@ fn run_git(directory: &Path, args: &[&str]) {
 }
 
 fn logical_databases(root: &Path) -> Vec<String> {
-    let mut storage = letopis::open_storage(
+    let storage = support::storage::open_storage(
         &root.join(".letopis/cache.db"),
         &root.join(".letopis/vectors.db"),
     )
     .unwrap();
-    let mut read = storage.begin_read_tx().unwrap();
-    let mut snapshot = vec![format!("revision:{}", read.get_revision())];
-    snapshot.push(format!("identity:{:?}", read.get_config_identity()));
-    let mut nodes = read
-        .get_nodes()
+    storage
+        .cache
+        .with_read_tx(|| {
+            Ok::<_, StorageError>({
+                let read = &storage.cache;
+                let mut snapshot = vec![format!("revision:{}", read.project_get_by_id().unwrap())];
+                snapshot.push(format!("identity:{:?}", read.meta_get_by_id().unwrap()));
+                let mut nodes = read
+                    .nodes_get()
+                    .unwrap()
+                    .into_iter()
+                    .map(|node| format!("{:?}", node.metadata))
+                    .collect::<Vec<_>>();
+                nodes.sort();
+                snapshot.extend(nodes);
+                snapshot
+            })
+        })
         .unwrap()
-        .into_iter()
-        .map(|node| format!("{:?}", node.metadata))
-        .collect::<Vec<_>>();
-    nodes.sort();
-    snapshot.extend(nodes);
-    snapshot
 }

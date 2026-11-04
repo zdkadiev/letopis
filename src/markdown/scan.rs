@@ -14,22 +14,26 @@ struct Heading {
     anchor: Option<Anchor>,
 }
 
-pub(super) fn scan(
+/// Build the complete file layout from X-4 declarations; unmarked files return `None`.
+///
+/// # Errors
+/// Returns a local diagnostic for invalid identifiers, anchors or element layout.
+pub(super) fn layout_scan(
     path: &RepoPath,
     text: &str,
     events: &Events<'_>,
 ) -> Result<Option<Layout>, Diagnostic> {
-    let comments = collect_metadata_comments(text, events);
+    let comments = metadata_comments_collect(text, events);
     if comments.is_empty() {
         return Ok(None);
     }
     KnowledgeId::new(path.clone(), None)
         .map_err(|_| Diagnostic::new_at(DiagnosticKind::InvalidTarget, 0..text.len()))?;
-    let headings = collect_headings(text, events)?;
-    build_layout(path, text, &headings, comments).map(Some)
+    let headings = headings_collect(text, events)?;
+    layout_build(path, text, &headings, comments).map(Some)
 }
 
-fn collect_metadata_comments(text: &str, events: &Events<'_>) -> Vec<Range<usize>> {
+fn metadata_comments_collect(text: &str, events: &Events<'_>) -> Vec<Range<usize>> {
     events
         .iter()
         .filter_map(|(event, range)| match event {
@@ -50,12 +54,12 @@ fn collect_metadata_comments(text: &str, events: &Events<'_>) -> Vec<Range<usize
         .collect()
 }
 
-fn collect_headings(text: &str, events: &Events<'_>) -> Result<Vec<Heading>, Diagnostic> {
+fn headings_collect(text: &str, events: &Events<'_>) -> Result<Vec<Heading>, Diagnostic> {
     let mut headings = Vec::new();
     let mut anchors = BTreeSet::new();
     for (event, range) in events {
         if let Event::Start(Tag::Heading { level, id, .. }) = event {
-            let start = find_line_start(text, range.start);
+            let start = line_start_calculate(text, range.start);
             let raw = &text[start..range.end];
             let anchor = match id {
                 Some(id) => Some(Anchor::parse(id).map_err(|_| {
@@ -69,8 +73,8 @@ fn collect_headings(text: &str, events: &Events<'_>) -> Result<Vec<Heading>, Dia
                 }
                 None => None,
             };
-            if let Some(a) = &anchor
-                && !anchors.insert(a.clone())
+            if let Some(anchor) = &anchor
+                && !anchors.insert(anchor.clone())
             {
                 return Err(Diagnostic::new_at(
                     DiagnosticKind::DuplicateAnchor,
@@ -80,7 +84,7 @@ fn collect_headings(text: &str, events: &Events<'_>) -> Result<Vec<Heading>, Dia
             let after = if text.as_bytes().get(range.end.wrapping_sub(1)) == Some(&b'\n') {
                 range.end
             } else {
-                find_line_end(text, range.end)
+                line_end_calculate(text, range.end)
             };
             headings.push(Heading {
                 start,
@@ -93,7 +97,7 @@ fn collect_headings(text: &str, events: &Events<'_>) -> Result<Vec<Heading>, Dia
     Ok(headings)
 }
 
-fn build_layout(
+fn layout_build(
     path: &RepoPath,
     text: &str,
     headings: &[Heading],
@@ -102,16 +106,16 @@ fn build_layout(
     let mut elements: Vec<Element> = Vec::new();
     let mut metadata_ranges = Vec::new();
     for range in comments {
-        let start = find_line_start(text, range.start);
-        let after = find_line_end(text, start);
+        let start = line_start_calculate(text, range.start);
+        let after = line_end_calculate(text, start);
         let line = text[start..after].trim_end_matches(['\r', '\n']);
         // A service comment must occupy the complete, standalone raw line.
         if range.start != start || range.end > after {
             return Err(Diagnostic::new_at(DiagnosticKind::InvalidMetadata, range));
         }
-        let metadata = metadata::parse(line, start..after)?;
+        let metadata = metadata::metadata_parse(line, start..after)?;
         metadata_ranges.push(start..after);
-        let (begin, end, anchor) = find_element_bounds(text, headings, start, after)?;
+        let (begin, end, anchor) = element_bounds_calculate(text, headings, start, after)?;
         if elements.last().is_some_and(|e| e.bytes.get_end() > begin) {
             return Err(Diagnostic::new_at(
                 DiagnosticKind::NestedElement,
@@ -122,13 +126,13 @@ fn build_layout(
             .map_err(|_| Diagnostic::new_at(DiagnosticKind::InvalidTarget, begin..end))?;
         #[expect(
             clippy::expect_used,
-            reason = "find_element_bounds returns ordered ranges"
+            reason = "element_bounds_calculate returns ordered ranges"
         )]
         let bytes = ByteSpan::new(begin, end).expect("heading ranges are ordered");
         #[expect(clippy::expect_used, reason = "a nonempty element spans ordered lines")]
         let lines = LineRange::new(
-            calculate_line_number(text, begin),
-            calculate_line_number(text, end.saturating_sub(1)),
+            line_number_calculate(text, begin),
+            line_number_calculate(text, end.saturating_sub(1)),
         )
         .expect("nonempty element lines are ordered");
         elements.push(Element {
@@ -144,7 +148,8 @@ fn build_layout(
         metadata_ranges,
     })
 }
-fn find_element_bounds(
+
+fn element_bounds_calculate(
     text: &str,
     headings: &[Heading],
     start: usize,
@@ -164,19 +169,21 @@ fn find_element_bounds(
     Ok((heading.start, end, heading.anchor.clone()))
 }
 
-fn find_line_start(text: &str, at: usize) -> usize {
-    text.as_bytes()[..at]
+fn line_start_calculate(text: &str, offset: usize) -> usize {
+    text.as_bytes()[..offset]
         .iter()
         .rposition(|&c| c == b'\n')
-        .map_or(0, |p| p + 1)
+        .map_or(0, |position| position + 1)
 }
-fn find_line_end(text: &str, at: usize) -> usize {
-    text.as_bytes()[at..]
+
+fn line_end_calculate(text: &str, offset: usize) -> usize {
+    text.as_bytes()[offset..]
         .iter()
         .position(|&c| c == b'\n')
-        .map_or(text.len(), |p| at + p + 1)
+        .map_or(text.len(), |position| offset + position + 1)
 }
-fn calculate_line_number(text: &str, at: usize) -> u64 {
+
+fn line_number_calculate(text: &str, at: usize) -> u64 {
     text.as_bytes()[..at]
         .iter()
         .filter(|&&c| c == b'\n')

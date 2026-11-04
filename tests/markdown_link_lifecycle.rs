@@ -1,3 +1,6 @@
+use crate::support::storage::get_current;
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
 mod support;
 
 use letopis::{
@@ -5,11 +8,11 @@ use letopis::{
         Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256,
         SourceUri, TreeOid,
     },
-    markdown::parse,
+    markdown::file_parse,
     open_filesystem,
     service::{
-        EmbedLocker, EmbeddingFailure, FileRow, KnowledgeMetadata, NodeMetadata, SourceMetadata,
-        Storage, VectorOutcome,
+        EmbeddingFailure, FileLocker, FileRow, KnowledgeMetadata, NodeMetadata, SourceMetadata,
+        VectorOutcome,
     },
 };
 use serde_json::{Value, json};
@@ -122,12 +125,11 @@ fn legacy_titles_never_publish_into_a_fresh_cache() {
     assert_eq!(get_knowledge(&repo, "target.md").id.as_str(), "target.md");
     assert_eq!(get_knowledge(&repo, "target.md").created_at, 7);
     assert!(state.edges.is_empty());
-    let mut storage = repo.open_storage();
+    let storage = repo.open_storage();
     assert!(
         storage
-            .begin_read_tx()
-            .unwrap()
-            .get_text_matches_by_expression("new OR old")
+            .cache
+            .with_read_tx(|| storage.cache.text_index_get_by_expression("new OR old"))
             .unwrap()
             .is_empty()
     );
@@ -182,6 +184,10 @@ fn reindex_reparses_unchanged_pre_upgrade_rows() {
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Keep the sequential transaction scenario and its assertions together"
+)]
 fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
     // Given: literal old cache data and a real verified source tree, without an old parser.
     let repo = ReadingRepo::new();
@@ -198,7 +204,10 @@ fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
     repo.seed_vectors(&config, &[("note.md", &[1.0, 0.0, 0.0])]);
     seed_failure(&repo, &identity);
     let files = open_filesystem(repo.get_root()).unwrap();
-    let _lock = files.try_lock_embed().unwrap().unwrap();
+    let _lock = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     let vectors = fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap();
     // When: only destination/title syntax changes and the actual CLI rebuilds.
     repo.write("note.md", NEW_NOTE.as_bytes());
@@ -212,30 +221,40 @@ fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
     assert_eq!(migrated.hash.to_hex(), NEW_HASH);
     assert_ne!(migrated.hash, original.hash);
     assert_eq!(get_git_source(&repo, &basis), SOURCE_BYTES);
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    assert_eq!(read.get_config_identity(), Some(identity));
-    assert_eq!(
-        read.get_vector_by_search_hash(&identity, &migrated.search_hash)
-            .unwrap(),
-        VectorOutcome::Current(Some(vec![1.0, 0.0, 0.0]))
-    );
-    assert_eq!(
-        read.get_failure_by_search_hash(&identity, &Sha256::parse(FAILURE_HASH).unwrap())
-            .unwrap(),
-        VectorOutcome::Current(Some(EmbeddingFailure {
-            search_hash: Sha256::parse(FAILURE_HASH).unwrap(),
-            attempts: 1,
-            error: Some("preserved failure sentinel".into())
-        }))
-    );
-    assert_eq!(
-        read.get_text_matches_by_expression("StableToken").unwrap()[0]
-            .id
-            .as_str(),
-        "note.md"
-    );
-    drop(read);
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            assert_eq!(read.meta_get_by_id().unwrap(), Some(identity));
+            assert_eq!(
+                read.vector_keys_get_by_search_hash(&identity, &migrated.search_hash)
+                    .unwrap(),
+                VectorOutcome::Current(Some(vec![1.0, 0.0, 0.0]))
+            );
+            assert_eq!(
+                read.embed_failures_get_by_search_hash(
+                    &identity,
+                    &Sha256::parse(FAILURE_HASH).unwrap()
+                )
+                .unwrap(),
+                VectorOutcome::Current(Some(EmbeddingFailure {
+                    search_hash: Sha256::parse(FAILURE_HASH).unwrap(),
+                    attempts: 1,
+                    error: Some("preserved failure sentinel".into())
+                }))
+            );
+            assert_eq!(
+                read.text_index_get_by_expression("StableToken").unwrap()[0]
+                    .id
+                    .as_str(),
+                "note.md"
+            );
+
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
+
     assert_eq!(
         fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap(),
         vectors
@@ -255,7 +274,7 @@ fn syntax_migration_preserves_literal_search_text_and_updates_exact_bytes() {
     // When: new syntax is published by the actual reindex command.
     repo.write("note.md", NEW_NOTE.as_bytes());
     invoke(&repo, "reindex");
-    let parsed = parse(&RepoPath::parse("note.md").unwrap(), NEW_NOTE.as_bytes())
+    let parsed = file_parse(&RepoPath::parse("note.md").unwrap(), NEW_NOTE.as_bytes())
         .unwrap()
         .unwrap();
     // Then: exact authored bytes change while the visible text and fingerprint stay literal.
@@ -324,14 +343,21 @@ fn get_knowledge(repo: &ReadingRepo, id: &str) -> KnowledgeMetadata {
 }
 
 fn get_state(repo: &ReadingRepo) -> State {
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    State {
-        revision: read.get_revision(),
-        nodes: read.get_nodes().unwrap(),
-        edges: read.get_edges_by_source_id(None).unwrap(),
-        files: read.get_files().unwrap(),
-    }
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            Ok::<_, StorageError>({
+                let read = &storage.cache;
+                State {
+                    revision: read.project_get_by_id().unwrap(),
+                    nodes: read.nodes_get().unwrap(),
+                    edges: read.edges_get_by_source_id(None).unwrap(),
+                    files: read.files_get().unwrap(),
+                }
+            })
+        })
+        .unwrap()
 }
 
 fn seed_pre_upgrade_errors(repo: &ReadingRepo) -> (FileRow, FileRow) {
@@ -359,11 +385,17 @@ fn seed_pre_upgrade_errors(repo: &ReadingRepo) -> (FileRow, FileRow) {
         false,
         Some("invalid letopis link title"),
     );
-    let mut storage = repo.open_storage();
-    let mut unit = storage.begin_cache_write_tx().unwrap();
-    unit.upsert_file(&valid).unwrap();
-    unit.upsert_file(&mismatch).unwrap();
-    unit.commit().unwrap();
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_write_tx(|| {
+            let unit = &storage.cache;
+            unit.files_upsert_by_path(&valid).unwrap();
+            unit.files_upsert_by_path(&mismatch).unwrap();
+
+            unit.get_publication_revision()
+        })
+        .unwrap();
     drop(storage);
     (valid, mismatch)
 }
@@ -375,52 +407,66 @@ fn seed_legacy_projection(repo: &ReadingRepo) {
     let file = capture_seed_file(repo, "note.md", true, None);
     let id = KnowledgeId::parse("note.md").unwrap();
     let source = SourceUri::parse("source.txt#L2-L3").unwrap();
-    let mut storage = repo.open_storage();
-    let mut unit = storage.begin_cache_write_tx().unwrap();
-    unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
-        id: id.clone(),
-        uri: id.clone(),
-        kind: ElementKind::Vertex,
-        hash: Sha256::parse(OLD_HASH).unwrap(),
-        created_at: 42,
-        source_snapshot: Some(TreeOid::parse(BASIS).unwrap()),
-        lines: LineRange::new(1, 2).unwrap(),
-        search_hash: Sha256::parse(SEARCH_HASH).unwrap(),
-    }))
-    .unwrap();
-    unit.upsert_node(&NodeMetadata::Source(SourceMetadata {
-        uri: source.clone(),
-        hash: Some(Sha256::digest(b"two\nthree\n")),
-        created_at: 42,
-        lines: Some(LineRange::new(2, 3).unwrap()),
-    }))
-    .unwrap();
-    unit.insert_edge(
-        &Edge::new(
-            id.clone(),
-            EdgeTarget::Source(source),
-            EdgeType::parse("external").unwrap(),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    unit.replace_text(&id, "StableToken source").unwrap();
-    unit.upsert_file(&file).unwrap();
-    unit.commit().unwrap();
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_write_tx(|| {
+            let unit = &storage.cache;
+            unit.nodes_upsert_by_id(&NodeMetadata::Knowledge(KnowledgeMetadata {
+                id: id.clone(),
+                uri: id.clone(),
+                kind: ElementKind::Vertex,
+                hash: Sha256::parse(OLD_HASH).unwrap(),
+                created_at: 42,
+                source_snapshot: Some(TreeOid::parse(BASIS).unwrap()),
+                lines: LineRange::new(1, 2).unwrap(),
+                search_hash: Sha256::parse(SEARCH_HASH).unwrap(),
+            }))
+            .unwrap();
+            unit.nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
+                uri: source.clone(),
+                hash: Some(Sha256::digest(b"two\nthree\n")),
+                created_at: 42,
+                lines: Some(LineRange::new(2, 3).unwrap()),
+            }))
+            .unwrap();
+            unit.edges_save_by_source_id_and_target_id_and_type(
+                &Edge::new(
+                    id.clone(),
+                    EdgeTarget::Source(source),
+                    EdgeType::parse("external").unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            unit.replace_text(&id, "StableToken source").unwrap();
+            unit.files_upsert_by_path(&file).unwrap();
+
+            unit.get_publication_revision()
+        })
+        .unwrap();
 }
 
 fn seed_failure(repo: &ReadingRepo, identity: &Sha256) {
-    let mut storage = repo.open_storage();
-    let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(identity).unwrap() else {
-        panic!("unexpected vector identity")
-    };
-    let hash = Sha256::parse(FAILURE_HASH).unwrap();
-    assert!(unit.reserve_attempt(&hash, 3).unwrap());
-    assert!(
-        unit.record_failure(&hash, "preserved failure sentinel")
-            .unwrap()
-    );
-    unit.commit().unwrap();
+    let storage = repo.open_storage();
+    storage
+        .vectors
+        .with_write_tx(identity, || {
+            let unit = &storage.vectors;
+            let hash = Sha256::parse(FAILURE_HASH).unwrap();
+            assert!(
+                unit.embed_failures_upsert_by_search_hash_and_attempts(&hash, 3)
+                    .unwrap()
+            );
+            assert!(
+                unit.embed_failures_update_by_search_hash(&hash, "preserved failure sentinel")
+                    .unwrap()
+            );
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
 }
 /// Capture explicit fixture cache fields with old, non-racy modification/check times.
 fn capture_seed_file(repo: &ReadingRepo, path: &str, valid: bool, error: Option<&str>) -> FileRow {

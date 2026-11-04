@@ -22,23 +22,11 @@ impl Http {
     pub(super) fn new() -> Self {
         Self::new_with_deadline(ATTEMPT_DEADLINE)
     }
-    fn new_with_deadline(deadline: Duration) -> Self {
-        let agent = Agent::config_builder()
-            .proxy(None)
-            .max_redirects(0)
-            .max_redirects_will_error(false)
-            .http_status_as_error(false)
-            .timeout_global(Some(deadline))
-            .tls_config(
-                TlsConfig::builder()
-                    .root_certs(RootCerts::PlatformVerifier)
-                    .build(),
-            )
-            .build()
-            .new_agent();
-        Self { agent }
-    }
-    pub(super) fn post(
+    /// Send one JSON POST without redirects or proxies under the agent's shared deadline.
+    ///
+    /// # Errors
+    /// Reports transport failures, non-200 statuses, oversized bodies or malformed JSON responses.
+    pub(super) fn request_send_by_endpoint(
         &self,
         endpoint: &str,
         body: &Value,
@@ -64,9 +52,25 @@ impl Http {
                 EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidResponse, cause)
             })?;
         if value.get("error").is_some() {
-            return Err(reject_response());
+            return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
         }
         Ok(value)
+    }
+    fn new_with_deadline(deadline: Duration) -> Self {
+        let agent = Agent::config_builder()
+            .proxy(None)
+            .max_redirects(0)
+            .max_redirects_will_error(false)
+            .http_status_as_error(false)
+            .timeout_global(Some(deadline))
+            .tls_config(
+                TlsConfig::builder()
+                    .root_certs(RootCerts::PlatformVerifier)
+                    .build(),
+            )
+            .build()
+            .new_agent();
+        Self { agent }
     }
 }
 pub(super) fn build_endpoint(
@@ -74,34 +78,63 @@ pub(super) fn build_endpoint(
     provider: ProviderKind,
     suffix: &str,
 ) -> EmbeddingResult<String> {
-    let invalid = || EmbeddingError::new(EmbeddingErrorKind::InvalidConfig);
-    if config.get_provider() != provider {
-        return Err(invalid());
-    }
+    config_validate(config, provider)?;
     let base = config
         .get_parameters()
         .get("base_url")
         .and_then(Value::as_str)
-        .ok_or_else(invalid)?;
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     let base = base.split('#').next().unwrap_or_default();
     let uri: Uri = base.parse().map_err(|cause| {
         EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
     })?;
-    let authority = uri.authority().ok_or_else(invalid)?;
-    let scheme = uri.scheme_str().ok_or_else(invalid)?;
-    if !matches!(scheme, "http" | "https")
-        || authority.as_str().contains('@')
-        || authority.host().is_empty()
-        || (authority.as_str() != authority.host() && authority.port_u16().is_none())
-    {
-        return Err(invalid());
-    }
+    let authority = uri
+        .authority()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+    let scheme = uri
+        .scheme_str()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     let prefix = uri.path().trim_end_matches('/');
     let query = uri
         .query()
         .map(|query| format!("?{query}"))
         .unwrap_or_default();
     Ok(format!("{scheme}://{authority}{prefix}/{suffix}{query}"))
+}
+/// Validate the selected protocol and complete HTTP(S) endpoint without network I/O.
+///
+/// # Errors
+/// Reports unsupported protocols or unsafe, incomplete or malformed endpoints.
+pub(super) fn config_validate(
+    config: &EmbeddingConfig,
+    provider: ProviderKind,
+) -> EmbeddingResult<()> {
+    if config.get_provider() != provider {
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
+    }
+    let base = config
+        .get_parameters()
+        .get("base_url")
+        .and_then(Value::as_str)
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+    let base = base.split('#').next().unwrap_or_default();
+    let uri: Uri = base.parse().map_err(|cause| {
+        EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
+    })?;
+    let authority = uri
+        .authority()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+    let scheme = uri
+        .scheme_str()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+    if !matches!(scheme, "http" | "https")
+        || authority.as_str().contains('@')
+        || authority.host().is_empty()
+        || (authority.as_str() != authority.host() && authority.port_u16().is_none())
+    {
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
+    }
+    Ok(())
 }
 pub(super) fn prepare_body(
     config: &EmbeddingConfig,
@@ -130,7 +163,7 @@ pub(super) fn decode_vectors(
     provider: ProviderKind,
 ) -> EmbeddingResult<Vec<Vec<f32>>> {
     if items.len() != count {
-        return Err(reject_response());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
     }
     let mut result = vec![None; count];
     let mut expected = dimensions;
@@ -139,14 +172,17 @@ pub(super) fn decode_vectors(
         let vector = get_vector(vector, expected)?;
         expected = NonZeroUsize::new(vector.len());
         if result[index].replace(vector).is_some() {
-            return Err(reject_response());
+            return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
         }
     }
     result
         .into_iter()
-        .map(|vector| vector.ok_or_else(reject_response))
+        .map(|vector| {
+            vector.ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidResponse))
+        })
         .collect()
 }
+
 fn get_index_vector(
     position: usize,
     item: &Value,
@@ -161,25 +197,33 @@ fn get_index_vector(
                 .and_then(Value::as_u64)
                 .and_then(|index| usize::try_from(index).ok())
                 .filter(|index| *index < count)
-                .ok_or_else(reject_response)?;
-            Ok((index, item.get("embedding").ok_or_else(reject_response)?))
+                .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidResponse))?;
+            Ok((
+                index,
+                item.get("embedding")
+                    .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidResponse))?,
+            ))
         }
     }
 }
+
 fn get_vector(value: &Value, expected: Option<NonZeroUsize>) -> EmbeddingResult<Vec<f32>> {
-    let values = value.as_array().ok_or_else(reject_response)?;
+    let values = value
+        .as_array()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidResponse))?;
     if !(MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(&values.len())
         || expected.is_some_and(|size| values.len() != size.get())
     {
-        return Err(reject_response());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
     }
     values.iter().map(get_component).collect()
 }
+
 fn get_component(value: &Value) -> EmbeddingResult<f32> {
     let number = value
         .as_f64()
         .filter(|number| number.is_finite() && number.abs() <= f64::from(f32::MAX))
-        .ok_or_else(reject_response)?;
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidResponse))?;
     // Conversion is deliberately rounded to float32 after checking its finite range.
     #[expect(
         clippy::cast_possible_truncation,
@@ -188,9 +232,7 @@ fn get_component(value: &Value) -> EmbeddingResult<f32> {
     let component = number as f32;
     Ok(component)
 }
-pub(super) fn reject_response() -> EmbeddingError {
-    EmbeddingError::new(EmbeddingErrorKind::InvalidResponse)
-}
+
 fn classify(error: ureq::Error) -> EmbeddingError {
     let kind = match &error {
         ureq::Error::BodyExceedsLimit(_) => EmbeddingErrorKind::InvalidResponse,
@@ -247,7 +289,7 @@ mod tests {
     }
 
     fn run_deadline_case(header_delay: Duration, body_delay: Duration) {
-        // Given
+        // Given: one local response delays its headers, body or both beyond a short shared deadline.
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let endpoint = format!("http://{}/embed", listener.local_addr().unwrap());
         let worker = thread::spawn(move || {
@@ -272,11 +314,11 @@ mod tests {
         });
         let http = Http::new_with_deadline(Duration::from_millis(120));
         let start = Instant::now();
-        // When
-        let result = http.post(&endpoint, &json!({"input":["fixture"]}), None);
+        // When: the real HTTP transport sends one request and waits for its response.
+        let result = http.request_send_by_endpoint(&endpoint, &json!({"input":["fixture"]}), None);
         let elapsed = start.elapsed();
         worker.join().unwrap();
-        // Then
+        // Then: the request times out within the independent two-second outer bound.
         assert_eq!(result.unwrap_err().get_kind(), EmbeddingErrorKind::Timeout);
         assert!(elapsed < Duration::from_secs(2));
     }

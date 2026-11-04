@@ -1,11 +1,14 @@
-use letopis::open_storage;
-use letopis::service::{Storage, StorageErrorKind};
+use letopis::service::StorageError;
+use letopis::service::StorageErrorKind;
+use letopis::service::TransactionError;
+use letopis::service::{CacheDatabase, StorageRead};
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::{
     path::Path,
     sync::{Arc, Barrier},
 };
+use storage_support::open_storage;
 use tempfile::TempDir;
 
 #[path = "support/storage.rs"]
@@ -37,11 +40,18 @@ fn fresh_storage_reopens_with_empty_identity() {
     let vectors = root.path().join("vectors.db");
     // When / Then: storage opens and reopens; the initial vector identity remains absent.
     for _ in 0..2 {
-        let mut storage = open_storage(&cache, &vectors).unwrap();
-        let read = storage.begin_read_tx().unwrap();
-        // When / Then: storage opens and reopens; the initial vector identity remains absent.
-        assert_eq!(read.get_revision(), 0);
-        assert_eq!(read.get_config_identity(), None);
+        let storage = open_storage(&cache, &vectors).unwrap();
+        storage
+            .cache
+            .with_read_tx(|| {
+                let read = &storage.cache;
+                // When / Then: storage opens and reopens; the initial vector identity remains absent.
+                assert_eq!(read.project_get_by_id().unwrap(), 0);
+                assert_eq!(read.meta_get_by_id().unwrap(), None);
+
+                Ok::<_, StorageError>(())
+            })
+            .unwrap();
     }
     let connection = Connection::open(&cache).unwrap();
     connection
@@ -51,23 +61,39 @@ fn fresh_storage_reopens_with_empty_identity() {
     connection
         .execute("insert into meta values(1,?1)", ["a".repeat(64)])
         .unwrap();
-    let mut storage = open_storage(&cache, &vectors).unwrap();
-    let read = storage.begin_read_tx().unwrap();
-    assert_eq!(read.get_revision(), 7);
-    assert_eq!(read.get_config_identity().unwrap().to_hex(), "a".repeat(64));
+    let storage = open_storage(&cache, &vectors).unwrap();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            assert_eq!(read.project_get_by_id().unwrap(), 7);
+            assert_eq!(
+                read.meta_get_by_id().unwrap().unwrap().to_hex(),
+                "a".repeat(64)
+            );
+
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 #[test]
 fn owned_storage_outlives_path_arguments() {
     // Given: owned storage created from temporary path arguments.
     let root = TempDir::new().unwrap();
-    let mut storage = {
+    let storage = {
         let cache = root.path().join("cache.db");
         let vectors = root.path().join("vectors.db");
         open_storage(&cache, &vectors).unwrap()
     };
     // When / Then: the caller drops its path arguments; storage remains usable through owned handles.
-    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
+    assert_eq!(
+        storage
+            .cache
+            .with_read_tx(|| storage.cache.project_get_by_id())
+            .unwrap(),
+        0
+    );
 }
 
 #[test]
@@ -110,9 +136,15 @@ fn literal_unicode_quote_and_question_mark_paths_open() {
     let root = TempDir::new().unwrap();
     let cache = root.path().join("кэш'?mode=memory.db");
     let vectors = root.path().join("векторы'?mode=ro.db");
-    let mut storage = open_storage(&cache, &vectors).unwrap();
+    let storage = open_storage(&cache, &vectors).unwrap();
     // When / Then: storage opens those paths; path bytes retain their literal meaning.
-    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
+    assert_eq!(
+        storage
+            .cache
+            .with_read_tx(|| storage.cache.project_get_by_id())
+            .unwrap(),
+        0
+    );
     assert!(cache.is_file());
     assert!(vectors.is_file());
 }
@@ -234,8 +266,14 @@ fn parallel_initializers_leave_a_complete_schema() {
             .sum::<usize>()
     });
     assert_eq!(successes, 2, "both initializers must open successfully");
-    let mut storage = open_storage(&cache, &vectors).unwrap();
-    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
+    let storage = open_storage(&cache, &vectors).unwrap();
+    assert_eq!(
+        storage
+            .cache
+            .with_read_tx(|| storage.cache.project_get_by_id())
+            .unwrap(),
+        0
+    );
 }
 
 #[test]
@@ -248,8 +286,14 @@ fn independent_thread_connections_register_native_vec1() {
                 let root = TempDir::new().unwrap();
                 let cache = root.path().join("cache.db");
                 let vectors = root.path().join("vectors.db");
-                let mut storage = open_storage(&cache, &vectors).unwrap();
-                assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
+                let storage = open_storage(&cache, &vectors).unwrap();
+                assert_eq!(
+                    storage
+                        .cache
+                        .with_read_tx(|| storage.cache.project_get_by_id())
+                        .unwrap(),
+                    0
+                );
                 let connection = Connection::open(&vectors).unwrap();
                 let info: String = connection
                     .query_row("select vec1_info()", [], |r| r.get(0))
@@ -351,8 +395,12 @@ fn malformed_stored_observations_return_safe_typed_errors() {
             .unwrap()
             .execute_batch(mutation)
             .unwrap();
-        let mut storage = open_storage(&cache, &vectors).unwrap();
-        let Err(error) = storage.begin_read_tx() else {
+        let storage = open_storage(&cache, &vectors).unwrap();
+        let Err(error) = storage
+            .cache
+            .with_read_tx(|| Ok::<_, StorageError>(()))
+            .map_err(TransactionError::into_inner)
+        else {
             panic!("invalid observation accepted");
         };
         // When / Then: typed reads decode the stored values; safe typed errors preserve internal causes.
@@ -371,10 +419,20 @@ fn initialized_open_succeeds_but_cache_write_still_returns_busy() {
     drop(open_storage(&cache, &vectors).unwrap());
     let connection = Connection::open(&cache).unwrap();
     connection.execute_batch("begin immediate").unwrap();
-    let mut storage = open_storage(&cache, &vectors).unwrap();
+    let storage = open_storage(&cache, &vectors).unwrap();
     // When / Then: storage opens and another write is attempted; opening succeeds while the contending write reports busy.
-    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
-    let Err(error) = storage.begin_cache_write_tx() else {
+    assert_eq!(
+        storage
+            .cache
+            .with_read_tx(|| storage.cache.project_get_by_id())
+            .unwrap(),
+        0
+    );
+    let Err(error) = storage
+        .cache
+        .with_write_tx(|| storage.cache.get_publication_revision())
+        .map_err(TransactionError::into_inner)
+    else {
         panic!("competing cache writer was accepted");
     };
     let cause = std::error::Error::source(&error)

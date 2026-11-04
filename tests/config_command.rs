@@ -88,10 +88,10 @@ fn config_never_connects_to_the_configured_provider() {
         .to_string();
         repo.write(".letopis/config.json", config.as_bytes());
 
-        // When
+        // When: the configuration command validates the configured provider.
         let output = repo.invoke(&["config"], b"{}");
 
-        // Then
+        // Then: it reports the configuration without connecting or starting other work.
         assert_eq!(output.status.code(), Some(0), "{output:?}");
         assert_eq!(
             serde_json::from_slice::<Value>(&output.stdout).unwrap()["result"]["embedding_model"]["parameters"]
@@ -100,7 +100,7 @@ fn config_never_connects_to_the_configured_provider() {
         );
         assert!(matches!(listener.accept(), Err(error) if error.kind() == ErrorKind::WouldBlock));
         assert_eq!(
-            service_entry_names(&repo),
+            get_service_entry_names(&repo),
             ["config.json"],
             "config must not start a drain or other service state"
         );
@@ -289,7 +289,7 @@ struct FileState {
 }
 
 fn capture_service_files(repo: &ReadingRepo) -> BTreeMap<String, FileState> {
-    service_entries(repo)
+    get_service_entries(repo)
         .into_iter()
         .map(|(name, path)| {
             let metadata = fs::metadata(&path).unwrap();
@@ -307,11 +307,11 @@ fn capture_service_files(repo: &ReadingRepo) -> BTreeMap<String, FileState> {
         .collect()
 }
 
-fn service_entry_names(repo: &ReadingRepo) -> Vec<String> {
-    service_entries(repo).into_keys().collect()
+fn get_service_entry_names(repo: &ReadingRepo) -> Vec<String> {
+    get_service_entries(repo).into_keys().collect()
 }
 
-fn service_entries(repo: &ReadingRepo) -> BTreeMap<String, PathBuf> {
+fn get_service_entries(repo: &ReadingRepo) -> BTreeMap<String, PathBuf> {
     let directory = repo.get_root().join(".letopis");
     fs::read_dir(&directory)
         .unwrap()

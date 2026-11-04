@@ -48,3 +48,33 @@ Storage/Git failures propagate as Result error using the existing X-1 code/messa
 Refresh → configuration readiness/reset → один scoped read view: GraphService читает компактные identities и bounded neighbor pages, TraversalService гидратирует выбранные metadata и наблюдает outgoing external bindings из того же view. Источники передаются provenance по одной странице до получения следующей, независимо от traversal filters. Нет query inference, повторного pin или записи через read handle; Missing/Invalid config не мешают обходу.
 
 [Регрессии TK-23](../checks/TK-23/report.md) проверяют публикацию другим SQLite writer после первой страницы, сохранение исходных membership/coordinates/basis/revision и удалённого последнего source reference. Late page/source/provenance errors, успех и depth-zero empty result освобождают reader, пока сервис жив: настоящий WAL TRUNCATE checkpoint и последующая публикация проходят. Live files сохраняют прежнее отсутствие межфайловой атомарности. Host runner PASS; новый Linux arm64 native/standalone runner PASS на741930e, исходный read-only Docker FAIL сохранён исторически. Task4 independent review и I1 rereview пройдены; final whole-branch review завершён: Critical/Important product findings нет, code quality approved with M1/M2 documentation corrections; M1/M2 documentation corrections approved by scoped re-review; no open code or documentation finding.
+
+## Rust scope representation (2026-11-03)
+
+**Representation clarification, 2026-11-03 (supersedes the 2026-11-01 boxed API):**
+`CacheStorage` (`storage/cache.rs`) and `VectorStorage` (`storage/vector.rs`) are
+exactly two production storage components implementing `CacheDatabase` and
+`VectorDatabase`. All application-owned traits remain directly in `service/mod.rs`.
+Services share the same `Rc<C>` / `Rc<V>` when their scopes must join. Zero-argument
+`with_read_tx` / `with_write_tx` callbacks access the injected owner; only the outer
+scope finalizes. Caught nested errors or failed writes make it rollback-only.
+Read inside write sees uncommitted changes; write inside read is rejected and
+poisons that scope. Separate instances and the two database owners do not join.
+Cache reads retain one attached snapshot; query diagnostics use the separate
+vector writer. Provider HTTP stays outside service-owned write scopes. Status
+uses observation-only CacheStorage: absent storage opens no connection or durable
+file and skips the callback. Filesystem owns path policy; composition brackets
+opening/attaching with its checks. SQL and connection lifecycle remain in storage.
+Schemas, CLI/JSON, synchronous I/O and cross-database atomicity are unchanged.
+
+A failed cleanup that leaves SQLite in a transaction disables later scopes on that owner. Callback errors and panic roll back; the original callback error is preserved. `with_status_read_tx` returns None for absent or unpublished cache.
+
+### Embedding entry preconditions
+
+`verify_transaction_scope` checks `TransactionRequirement::Inactive` or `ReadOnly`
+without opening a transaction. An incompatible active scope becomes rollback-only;
+a caught entry rejection cannot make the parent commit. Query inference permits
+an inherited cache read and requires an inactive vector owner, since completion
+publishes query diagnostics. Drain requires both owners inactive before config,
+reservation or provider calls: each work-selection iteration must see completed
+vector publication rather than repeatedly joining an older caller snapshot.

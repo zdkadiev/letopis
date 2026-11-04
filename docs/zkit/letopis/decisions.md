@@ -2024,6 +2024,15 @@ commit потребляет Box, rollback/drop/identity/pinned-revision прав
 Согласованная цена — allocation/dynamic dispatch; фактические замеры и ограничения
 фиксируются в плане упрощения. EmbeddingService сохраняет S для условного Send.
 
+
+**Physical representation clarification, 2026-11-03:** the production storage
+components are `CacheStorage` in `storage/cache.rs` and `VectorStorage` in
+`storage/vector.rs`. All application-owned traits remain directly in
+`service/mod.rs`. Filesystem owns path policy; composition brackets database
+opening and attachment with its checks. No transaction or connection wrapper
+component replaces the removed components. Historical names above describe their
+captured revisions; the current API decision is recorded in [D-98](#D-98).
+
 <!-- links -->
 **Связи:** [architecture.md](architecture.md): 4. Parts; [mechanics.md](mechanics.md): Правка 2026-10-20, 4. Internal contracts
 <!-- /links -->
@@ -2056,6 +2065,49 @@ diagnostics, failure records и result aliases — в `service/error.rs`. Пре
 `service::...` имена явно реэкспортируются. Большой размер центральных contract
 файлов допустим; implementations сервисов и другие слои остаются раздельными.
 Различия error classification, formatting и cause privacy не унифицируются.
+
+
+**Representation clarification, 2026-11-03 (supersedes the 2026-11-01 boxed API):**
+`CacheStorage` (`storage/cache.rs`) and `VectorStorage` (`storage/vector.rs`) are
+exactly two production storage components implementing `CacheDatabase` and
+`VectorDatabase`. All application-owned traits remain directly in `service/mod.rs`.
+Services share the same `Rc<C>` / `Rc<V>` when their scopes must join. Zero-argument
+`with_read_tx` / `with_write_tx` callbacks access the injected owner; only the outer
+scope finalizes. Caught nested errors or failed writes make it rollback-only.
+Read inside write sees uncommitted changes; write inside read is rejected and
+poisons that scope. Separate instances and the two database owners do not join.
+Cache reads retain one attached snapshot; query diagnostics use the separate
+vector writer. Provider HTTP stays outside service-owned write scopes. Status
+uses observation-only CacheStorage: absent storage opens no connection or durable
+file and skips the callback. Filesystem owns path policy; composition brackets
+opening/attaching with its checks. SQL and connection lifecycle remain in storage.
+Schemas, CLI/JSON, synchronous I/O and cross-database atomicity are unchanged.
+
+**Уточнение пользователя 2026-11-04 — component ownership и имена операций:**
+текущий преемник исторических concrete names выше — `GitRepository`,
+`CacheStorage` и `VectorStorage`; один `MarkdownParser`, один `LocalFileSystem`
+и один `HttpProviders` владеют своими cohesive responsibilities. Отдельные structs
+сохраняются для независимых ресурсов, guards, values и состояния алгоритмов,
+а не ради forwarding или упаковки constructor arguments. Infrastructure operations
+и их application-owned traits используют entity–action–filter names из контекста
+компонента (`tree_verify_by_oid`, `file_parse`, `process_spawn`); application use
+cases и согласованные transaction/multi-statement operations сохраняют имена по
+ответственности. Trait implementation может вызвать одноимённую private free
+function с прямым resource handle, сохраняя владельца и impl вместе.
+
+Git перечисляет raw index/untracked paths; application `CandidateSelection`
+владеет Markdown/private-root filtering и порядком symlink/decode validation.
+Composition передаёт generic excluded roots в direct snapshot API. Filesystem
+оперирует только файлами, путями, bytes, identities, symlinks и locks; роли файлов
+и database filenames выбирает потребитель/composition, SQLite остаётся в storage.
+Process исполняет generic executable/argv/cwd; `embed --drain` выбирает composition.
+`HttpProviders` хранит два независимых HTTP pools и приватный credential, протоколы
+реализованы private functions. `StatusService` владеет Disabled/Unavailable/Ready,
+identity interpretation и backlog/failed policy; storage — observations, SQL,
+decoding и integrity checks. Это уточнение не меняет CLI/JSON, synchronous I/O,
+схемы и transaction semantics. [Спецификация](../../superpowers/specs/2026-11-04-infrastructure-component-boundaries-design.md)
+и [AGENTS.md](../../../AGENTS.md) фиксируют точные границы; прежние записи/evidence
+сохраняют свои captured revisions.
 
 <!-- links -->
 **Связи:** [architecture.md](architecture.md#program-structure); [development.md](../../development.md); [TK-9 specification](../../superpowers/specs/2026-10-22-tk-9-storage-design.md)
@@ -2109,6 +2161,16 @@ runtime/движка), D-99 (внутренняя организация storage
 2. Кандидат-symlink, symlink в родительских компонентах, нерегулярный файл и неподдерживаемый путь дают безопасную ошибку без замены прежней публикации. Наблюдаемая подмена во время чтения — ошибка; живые файлы по-прежнему не дают атомарного снимка корпуса (D-77). Конкретные Unix-примитивы и зависимость выбираются в плане, не настоящим решением.
 3. I-2 явно передаёт временный search_text одного файла до синхронного publish в caller-owned unit. Текст нужен contentless FTS и после записи освобождается; SQL-копия Markdown и накопление текста полного корпуса не вводятся. prepare/publish не делают вложенный commit; DocumentService фиксирует полную публикацию один раз.
 4. Команда Git из D-97 сохраняется точно: ignore-правила исключают untracked-файлы, но не уже tracked-файлы. Удалённый с диска tracked-файл может остаться в выводе ls-files; подтверждённый stat NotFound учитывается как удаление.
+
+**Уточнение реализации 2026-11-04:** прежнее утверждение пункта 2 о любой
+symlink/nonregular ошибке заменено более точной политикой. Application candidate
+selection пропускает final symlinks до UTF-8 decoding/`RepoPath` validation для
+структурно безопасных raw-путей; stable nonregular final document entries также
+исключаются. Unsafe parents, replacement и I/O остаются ошибками. Git возвращает
+raw paths, включая удалённые tracked, без Markdown-policy. Подробный порядок и
+границы — [MC-2](mechanics.md#mc-2--обнаружение-публикация-по-файлу-и-reindex)
+и [спецификация](../../superpowers/specs/2026-11-04-infrastructure-component-boundaries-design.md).
+Исторические TK-10 proof receipts остаются привязаны к своим captured revisions.
 
 **Уточняет:** [D-97](#D-97), [MC-2](mechanics.md), [I-2](contracts/I-2-projections.md). Остальные границы D-95/D-98/D-99/D-100 сохраняются. CLI, embedding/drain, проверка оснований source_snapshot, полная corruption recovery и физическое power-loss доказательство этой задачей не вводятся.
 

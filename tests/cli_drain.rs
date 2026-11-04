@@ -9,7 +9,7 @@ mod support;
 use drain::{DetachedOwner, Fixture, SECRET, SUCCESS, WAIT, assert_released, assert_success};
 use letopis::{
     open_filesystem,
-    service::{ConfigState, EmbedLocker, Embedder, EmbeddingExecutor, Refresher},
+    service::{ConfigState, Embedder, EmbeddingExecutor, FileLocker, Refresher},
     wire_document_refresher, wire_embedding_executor,
 };
 use serde_json::Value;
@@ -43,7 +43,7 @@ fn detached_product_drain_reaches_http_and_stores_the_matching_vector() {
     assert!(
         open_filesystem(fixture.repo.get_root())
             .unwrap()
-            .try_lock_embed()
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
             .unwrap()
             .is_none()
     );
@@ -253,7 +253,7 @@ fn text_publication_during_http_never_reuses_a_late_vector_for_new_text() {
 
 #[test]
 fn killed_foreground_does_not_cancel_detached_product_http() {
-    // Given
+    // Given: a detached product drain performing a controlled HTTP request.
     let fixture = Fixture::new();
     let hash = fixture.publish("surviving drain token");
     let barrier = ResponseBarrier::default();
@@ -270,13 +270,13 @@ fn killed_foreground_does_not_cancel_detached_product_http() {
     assert!(
         open_filesystem(fixture.repo.get_root())
             .unwrap()
-            .try_lock_embed()
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
             .unwrap()
             .is_none()
     );
     barrier.release();
     owner.wait_for_exit();
-    // Then detached work survived and reached actual publication and process exit.
+    // Then: detached work survived and reached actual publication and process exit.
     assert_eq!(
         fixture.get_vector_by_search_hash(&config, &hash),
         Some(vec![1., 2., 3.])

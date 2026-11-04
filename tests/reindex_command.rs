@@ -1,8 +1,10 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
     open_filesystem,
-    service::{EmbedLocker, NodeMetadata, Storage, VectorOutcome},
+    service::{FileLocker, NodeMetadata, VectorOutcome},
 };
 use serde_json::{Value, json};
 use std::process::Output;
@@ -24,15 +26,22 @@ fn reindex_binary_rebuilds_unchanged_fts_and_returns_next_revision() {
     // When: the reindex command rebuilds the cache.
     assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":2}}));
     // Then: the next revision restores the original searchable text.
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    assert_eq!(
-        read.get_text_matches_by_expression("AlphaToken").unwrap()[0]
-            .id
-            .as_str(),
-        "a.md"
-    );
-    drop(read);
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            assert_eq!(
+                read.text_index_get_by_expression("AlphaToken").unwrap()[0]
+                    .id
+                    .as_str(),
+                "a.md"
+            );
+
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
+
     assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":3}}));
 }
 
@@ -67,26 +76,33 @@ fn reindex_binary_preserves_invalid_owner_and_exposes_current_diagnostic() {
     // When: the reindex command publishes the corpus.
     assert_eq!(reindex(&repo)["result"]["revision"], 2);
     // Then: the invalid owner retains its projection and exposes the current diagnostic.
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    assert_eq!(
-        read.get_text_matches_by_expression("AlphaToken").unwrap()[0]
-            .id
-            .as_str(),
-        "a.md"
-    );
-    assert_eq!(
-        read.get_text_matches_by_expression("CharlieToken").unwrap()[0]
-            .id
-            .as_str(),
-        "b.md"
-    );
-    assert!(
-        read.get_text_matches_by_expression("BravoToken")
-            .unwrap()
-            .is_empty()
-    );
-    drop(read);
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            assert_eq!(
+                read.text_index_get_by_expression("AlphaToken").unwrap()[0]
+                    .id
+                    .as_str(),
+                "a.md"
+            );
+            assert_eq!(
+                read.text_index_get_by_expression("CharlieToken").unwrap()[0]
+                    .id
+                    .as_str(),
+                "b.md"
+            );
+            assert!(
+                read.text_index_get_by_expression("BravoToken")
+                    .unwrap()
+                    .is_empty()
+            );
+
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
+
     let status = get_response(&repo.invoke(&["status"], b"{}"), 0);
     assert_eq!(status["result"]["revision"], 2);
     assert_eq!(status["result"]["problems"][0]["details"]["path"], "a.md");
@@ -132,7 +148,10 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let bytes = fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap();
     let files = open_filesystem(repo.get_root()).unwrap();
-    let _lock = files.try_lock_embed().unwrap().unwrap();
+    let _lock = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     // When: cache deletion must leave vector data and configuration alone.
     assert_eq!(reindex(&repo)["result"]["revision"], 2);
     fs::remove_file(repo.get_root().join(".letopis/cache.db")).unwrap();
@@ -143,24 +162,32 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
     assert!(!repo.get_root().join(".letopis/cache.db").exists());
     assert_eq!(reindex(&repo)["result"]["revision"], 1);
     // Then: vectors are reused while configuration and the held embedding lock survive.
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    let node = read
-        .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
-        .unwrap()
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            let node = StorageRead::nodes_get_by_id(
+                read,
+                &EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()),
+            )
+            .unwrap()
+            .unwrap();
+            let NodeMetadata::Knowledge(node) = node.metadata else {
+                panic!()
+            };
+            assert_eq!(
+                read.vector_keys_get_by_search_hash(&config.get_identity(), &node.search_hash)
+                    .unwrap(),
+                VectorOutcome::Current(Some(vec![1.0, 0.0]))
+            );
+            assert_eq!(
+                fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap(),
+                bytes
+            );
+            Ok::<_, StorageError>(())
+        })
         .unwrap();
-    let NodeMetadata::Knowledge(node) = node.metadata else {
-        panic!()
-    };
-    assert_eq!(
-        read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
-            .unwrap(),
-        VectorOutcome::Current(Some(vec![1.0, 0.0]))
-    );
-    assert_eq!(
-        fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap(),
-        bytes
-    );
 }
 
 #[test]
@@ -177,7 +204,10 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
     let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0, 0.0])]);
     let files = open_filesystem(repo.get_root()).unwrap();
-    let lock = files.try_lock_embed().unwrap().unwrap();
+    let lock = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     // When: rebuild only the disposable cache while automatic embedding is excluded.
     fs::remove_file(repo.get_root().join(".letopis/cache.db")).unwrap();
     assert_eq!(reindex(&repo)["result"]["revision"], 1);
@@ -194,23 +224,31 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
             "model":"fixture", "input":["BravoToken"], "truncate":false
         })]
     );
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    for (id, vector) in [("a.md", vec![1., 0., 0.]), ("b.md", vec![0., 1., 0.])] {
-        let node = read
-            .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
-            .unwrap()
-            .unwrap();
-        let NodeMetadata::Knowledge(node) = node.metadata else {
-            panic!()
-        };
-        assert_eq!(
-            read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
-                .unwrap(),
-            VectorOutcome::Current(Some(vector)),
-            "{id}"
-        );
-    }
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            for (id, vector) in [("a.md", vec![1., 0., 0.]), ("b.md", vec![0., 1., 0.])] {
+                let node = StorageRead::nodes_get_by_id(
+                    read,
+                    &EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()),
+                )
+                .unwrap()
+                .unwrap();
+                let NodeMetadata::Knowledge(node) = node.metadata else {
+                    panic!()
+                };
+                assert_eq!(
+                    read.vector_keys_get_by_search_hash(&config.get_identity(), &node.search_hash)
+                        .unwrap(),
+                    VectorOutcome::Current(Some(vector)),
+                    "{id}"
+                );
+            }
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 #[test]
@@ -227,26 +265,34 @@ fn reindex_preserves_author_basis_bytes_head_and_index() {
     reindex(&repo);
     reindex(&repo);
     // Then: author provenance, canonical bytes, HEAD and index remain intact.
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    let node = read
-        .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
-        .unwrap()
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            let node = StorageRead::nodes_get_by_id(
+                read,
+                &EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()),
+            )
+            .unwrap()
+            .unwrap();
+            let NodeMetadata::Knowledge(node) = node.metadata else {
+                panic!()
+            };
+            assert_eq!(node.source_snapshot.as_ref(), Some(&tree));
+            assert_eq!(
+                fs::read(repo.get_root().join("a.md")).unwrap(),
+                note.as_bytes()
+            );
+            assert_eq!(
+                fs::read(repo.get_root().join("source.txt")).unwrap(),
+                b"new source"
+            );
+            assert_eq!(fs::read(repo.get_root().join(".git/index")).unwrap(), index);
+            assert_eq!(run_git(&repo, &["rev-parse", "HEAD"]), head);
+            Ok::<_, StorageError>(())
+        })
         .unwrap();
-    let NodeMetadata::Knowledge(node) = node.metadata else {
-        panic!()
-    };
-    assert_eq!(node.source_snapshot.as_ref(), Some(&tree));
-    assert_eq!(
-        fs::read(repo.get_root().join("a.md")).unwrap(),
-        note.as_bytes()
-    );
-    assert_eq!(
-        fs::read(repo.get_root().join("source.txt")).unwrap(),
-        b"new source"
-    );
-    assert_eq!(fs::read(repo.get_root().join(".git/index")).unwrap(), index);
-    assert_eq!(run_git(&repo, &["rev-parse", "HEAD"]), head);
 }
 
 #[test]
@@ -269,20 +315,26 @@ fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
         response,
         json!({"ok":false,"error":{"code":"internal_error","message":"cannot rebuild corpus index","details":{}}})
     );
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    assert_eq!(read.get_revision(), 1);
-    assert_eq!(
-        read.get_text_matches_by_expression("AlphaToken").unwrap()[0]
-            .id
-            .as_str(),
-        "a.md"
-    );
-    assert!(
-        read.get_text_matches_by_expression("UnpublishedToken")
-            .unwrap()
-            .is_empty()
-    );
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            assert_eq!(read.project_get_by_id().unwrap(), 1);
+            assert_eq!(
+                read.text_index_get_by_expression("AlphaToken").unwrap()[0]
+                    .id
+                    .as_str(),
+                "a.md"
+            );
+            assert!(
+                read.text_index_get_by_expression("UnpublishedToken")
+                    .unwrap()
+                    .is_empty()
+            );
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 fn reindex(repo: &ReadingRepo) -> Value {

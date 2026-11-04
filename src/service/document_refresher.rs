@@ -1,32 +1,39 @@
+use super::utils::map_document_lock_error;
+use super::utils::{CandidateSelection, map_document_file};
 use super::{
-    BasisRetainer, CacheWrite, CorpusLister, DocumentError, DocumentErrorKind, DocumentResult,
-    FileRow, FileStat, FileSystem, MarkdownCodec, RefreshOutcome, Refresher, SourceProvenance,
-    Storage,
+    BasisRetainer, CacheDatabase, DocumentError, DocumentErrorKind, DocumentResult, FileReader,
+    FileRow, FileStat, GitWorktreePaths, MarkdownCodec, RefreshOutcome, Refresher,
+    SourceProvenance,
 };
+use super::{Clock, FileLocker};
 use crate::domain::{RepoPath, Sha256, TreeOid};
+use crate::utils::INDEX_LOCK_PATH;
 use basis::BasisPreparation;
-use projection::{EffectiveGraph, FileProjection, PreparedProjection, prepare_removal, publish};
-use std::fmt;
+use projection::{EffectiveGraph, FileProjection, prepare_removal};
+use std::path::Path;
+use std::{fmt, rc::Rc};
 
 use std::collections::{BTreeMap, BTreeSet};
 
+const DOCUMENTS_CHANGED_MESSAGE: &str = "documents changed during refresh";
 const RACY_WINDOW_NS: i64 = 1_000_000_000;
 
 /// Refreshes and retains the effective document projection from independently owned collaborators.
-pub(crate) struct DocumentRefreshService<G, F, M, P> {
+pub(crate) struct DocumentRefreshService<G, F, M, P, C> {
     /// Lists the current corpus candidates.
     pub(crate) git: G,
     /// Captures documents and owns the index exclusion lock.
     pub(crate) filesystem: F,
+    pub(crate) clock: Box<dyn Clock>,
     /// Parses canonical document metadata and source bindings.
     pub(crate) markdown: M,
     /// Reads the current projection and publishes cache changes atomically.
-    pub(crate) storage: Box<dyn Storage>,
+    pub(crate) storage: Rc<C>,
     /// Observes source bindings and retains author-declared roots.
     pub(crate) provenance: P,
 }
 
-impl<G, F, M, P> fmt::Debug for DocumentRefreshService<G, F, M, P> {
+impl<G, F, M, P, C> fmt::Debug for DocumentRefreshService<G, F, M, P, C> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("DocumentRefreshService")
@@ -49,7 +56,8 @@ pub(super) enum SnapshotVerification {
     Closure,
 }
 /// Borrows publication collaborators independently of the storage transaction.
-struct DocumentPublication<'a, F, M, P> {
+struct DocumentPublication<'a, F, M, P, C> {
+    storage: &'a C,
     filesystem: &'a F,
     markdown: &'a M,
     provenance: &'a P,
@@ -73,18 +81,29 @@ impl Delta {
         self.updated.is_empty() && self.removed.is_empty()
     }
 }
-impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + BasisRetainer>
-    Refresher for DocumentRefreshService<G, F, M, P>
+impl<
+    G: GitWorktreePaths,
+    F: FileReader + FileLocker,
+    M: MarkdownCodec,
+    P: SourceProvenance + BasisRetainer,
+    C: CacheDatabase,
+> Refresher for DocumentRefreshService<G, F, M, P, C>
 {
     fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
-        let _lock = self.filesystem.lock_index()?;
+        let _lock = self
+            .filesystem
+            .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
+            .map_err(map_document_lock_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
         self.publish_current(PublicationMode::Incremental, SnapshotVerification::Closure)
     }
 
     fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
-        let _lock = self.filesystem.lock_index()?;
+        let _lock = self
+            .filesystem
+            .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
+            .map_err(map_document_lock_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
         self.publish_current(PublicationMode::Full, SnapshotVerification::Closure)
@@ -98,19 +117,31 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
                 .is_empty()
             && preliminary.source_snapshots.is_empty()
         {
-            return Ok(build_outcome(preliminary.revision, false));
+            return Ok(build_outcome(
+                preliminary.revision,
+                PublicationState::Unchanged,
+            ));
         }
         #[cfg(test)]
         reach_checkpoint("detected");
         drop(preliminary);
-        let _lock = self.filesystem.lock_index()?;
+        let _lock = self
+            .filesystem
+            .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
+            .map_err(map_document_lock_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
         self.publish_current(PublicationMode::Incremental, SnapshotVerification::Root)
     }
 }
-impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + BasisRetainer>
-    DocumentRefreshService<G, F, M, P>
+
+impl<
+    G: GitWorktreePaths,
+    F: FileReader + FileLocker,
+    M: MarkdownCodec,
+    P: SourceProvenance + BasisRetainer,
+    C: CacheDatabase,
+> DocumentRefreshService<G, F, M, P, C>
 {
     fn publish_current(
         &mut self,
@@ -128,31 +159,39 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         reach_checkpoint("redetected");
         if delta.is_empty() && mode == PublicationMode::Incremental {
             DocumentPublication {
+                storage: self.storage.as_ref(),
                 filesystem: &self.filesystem,
                 markdown: &self.markdown,
                 provenance: &self.provenance,
             }
             .validate_snapshots(verification, &state.source_snapshots)?;
-            return Ok(build_outcome(state.revision, false));
+            return Ok(build_outcome(state.revision, PublicationState::Unchanged));
         }
         self.publish_changes(&state, delta, mode, verification)
     }
 
-    fn get_file_state(&mut self) -> DocumentResult<FileState> {
-        let mut read = self.storage.begin_read_tx()?;
-        Ok(FileState {
-            revision: read.get_revision(),
-            source_snapshots: read.get_source_snapshots()?,
-            files: read
-                .get_files()?
-                .into_iter()
-                .map(|row| (row.path.clone(), row))
-                .collect(),
-        })
+    fn get_file_state(&self) -> DocumentResult<FileState> {
+        self.storage
+            .with_read_tx(|| {
+                Ok(FileState {
+                    revision: self.storage.project_get_by_id()?,
+                    source_snapshots: self.storage.nodes_get_by_source_snapshot()?,
+                    files: self
+                        .storage
+                        .files_get()?
+                        .into_iter()
+                        .map(|row| (row.path.clone(), row))
+                        .collect(),
+                })
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => DocumentError::from(error),
+            })
     }
 
     fn detect_changes(&self, state: &FileState, mode: PublicationMode) -> DocumentResult<Delta> {
-        let candidates: BTreeSet<_> = self.git.get_candidates()?.into_iter().collect();
+        let candidates: BTreeSet<_> = self.get_candidates()?.into_iter().collect();
         let mut delta = Delta {
             updated: BTreeMap::new(),
             removed: BTreeMap::new(),
@@ -166,7 +205,11 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         }
         for path in candidates {
             let previous = state.files.get(&path);
-            let Some(stat) = self.filesystem.stat_file(&path)? else {
+            let Some(stat) = map_document_file(
+                self.filesystem
+                    .file_get_stat_by_path(Path::new(path.as_str())),
+            )?
+            else {
                 if previous.is_some() {
                     delta.removed.insert(path, true);
                 }
@@ -187,13 +230,20 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
     ) -> DocumentResult<Option<Observation>> {
         let same_stat = previous.is_some_and(|row| matches_stat(row, stat));
         if same_stat
-            && previous.is_some_and(|row| !is_racy(row, self.filesystem.get_time_ns().ok()))
+            && previous.is_some_and(|row| !is_racy(row, self.clock.clock_get_time_ns().ok()))
         {
             return Ok(None);
         }
-        let captured = self.filesystem.get_file(path)?.ok_or_else(fail_changed)?;
+        let captured =
+            map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
+                .ok_or_else(|| {
+                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+                })?;
         if captured.stat != stat {
-            return Err(fail_changed());
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENTS_CHANGED_MESSAGE,
+            ));
         }
         let hash = Sha256::digest(&captured.bytes);
         if same_stat && previous.is_some_and(|row| row.hash == hash) {
@@ -211,57 +261,72 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
     ) -> DocumentResult<RefreshOutcome> {
         let mut graph = self.prepare_publication(state, &delta, mode, verification)?;
         let publication = DocumentPublication {
+            storage: self.storage.as_ref(),
             filesystem: &self.filesystem,
             markdown: &self.markdown,
             provenance: &self.provenance,
         };
-        let mut unit = self.storage.begin_cache_write_tx()?;
-        #[cfg(test)]
-        reach_checkpoint("begun");
-        let mut outcome = build_outcome(state.revision, true);
-        let excluded: BTreeSet<_> = delta
-            .removed
-            .iter()
-            .filter(|(_, check_missing)| !**check_missing)
-            .map(|(path, _)| path.clone())
-            .collect();
-        for (path, check_missing) in delta.removed {
-            if check_missing && self.filesystem.stat_file(&path)?.is_some() {
-                return Err(fail_changed());
-            }
-            let prepared = prepare_removal(state.revision, path, &graph);
-            graph.apply(&prepared);
-            outcome = apply_projection(unit.as_mut(), prepared, outcome)?;
-        }
-        for (path, observation) in delta.updated {
-            let prepared = publication.prepare_file(&FileProjection {
-                base_revision: state.revision,
-                path: &path,
-                observed: &observation,
-                previous: mode.get_previous(state.files.get(&path)),
-                graph: &graph,
+        let outcome = self
+            .storage
+            .with_write_tx(|| -> DocumentResult<RefreshOutcome> {
+                #[cfg(test)]
+                reach_checkpoint("begun");
+                let mut outcome = build_outcome(state.revision, PublicationState::Published);
+                let excluded: BTreeSet<_> = delta
+                    .removed
+                    .iter()
+                    .filter(|(_, check_missing)| !**check_missing)
+                    .map(|(path, _)| path.clone())
+                    .collect();
+                for (path, check_missing) in delta.removed {
+                    if check_missing {
+                        self.verify_removed_candidate(&path)?;
+                    }
+                    let prepared = prepare_removal(state.revision, path, &graph);
+                    graph.apply(&prepared);
+                    outcome = publication.publish_projection(prepared, outcome)?;
+                }
+                for (path, observation) in delta.updated {
+                    let prepared = publication.prepare_file(&FileProjection {
+                        base_revision: state.revision,
+                        path: &path,
+                        observed: &observation,
+                        previous: mode.get_previous(state.files.get(&path)),
+                        graph: &graph,
+                    })?;
+                    graph.apply(&prepared);
+                    outcome = publication.publish_projection(prepared, outcome)?;
+                }
+                publication.reconcile_sources(&graph)?;
+                self.verify_excluded_candidates(&excluded)?;
+                #[cfg(test)]
+                reach_checkpoint("before_commit");
+                #[cfg(test)]
+                tests::process::fail_late(self.storage.as_ref())?;
+                outcome.revision = self.storage.get_publication_revision()?;
+                Ok(outcome)
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => DocumentError::from(error),
             })?;
-            graph.apply(&prepared);
-            outcome = apply_projection(unit.as_mut(), prepared, outcome)?;
-        }
-        publication.reconcile_sources(&graph, unit.as_mut())?;
-        if !excluded.is_empty()
-            && self
-                .git
-                .get_candidates()?
-                .iter()
-                .any(|path| excluded.contains(path))
-        {
-            return Err(fail_changed());
-        }
-        #[cfg(test)]
-        reach_checkpoint("before_commit");
-        #[cfg(test)]
-        tests::process::fail_late(unit.as_mut())?;
-        outcome.revision = unit.commit()?;
         #[cfg(test)]
         reach_checkpoint("after_commit");
         Ok(outcome)
+    }
+
+    fn verify_removed_candidate(&self, path: &RepoPath) -> DocumentResult<()> {
+        let stat = map_document_file(
+            self.filesystem
+                .file_get_stat_by_path(Path::new(path.as_str())),
+        )?;
+        if stat.is_some() {
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENTS_CHANGED_MESSAGE,
+            ));
+        }
+        Ok(())
     }
 
     fn prepare_publication(
@@ -272,17 +337,26 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         verification: SnapshotVerification,
     ) -> DocumentResult<EffectiveGraph> {
         // Keep only metadata after releasing this pinned read, before BEGIN IMMEDIATE.
-        let mut graph = {
-            let mut read = self.storage.begin_read_tx()?;
-            if read.get_revision() != state.revision {
-                return Err(fail_changed());
-            }
-            EffectiveGraph::read(read.as_mut())?
-        };
+        let mut graph = self
+            .storage
+            .with_read_tx(|| -> DocumentResult<EffectiveGraph> {
+                if self.storage.project_get_by_id()? != state.revision {
+                    return Err(DocumentError::new(
+                        DocumentErrorKind::InternalError,
+                        DOCUMENTS_CHANGED_MESSAGE,
+                    ));
+                }
+                EffectiveGraph::read(self.storage.as_ref())
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => DocumentError::from(error),
+            })?;
         if mode == PublicationMode::Full {
             graph.mark_all_sources();
         }
         let publication = DocumentPublication {
+            storage: self.storage.as_ref(),
             filesystem: &self.filesystem,
             markdown: &self.markdown,
             provenance: &self.provenance,
@@ -296,6 +370,31 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         })?;
         publication.validate_basis(&basis, verification)?;
         Ok(graph)
+    }
+    /// Reject candidates that reappear after their removal projection was prepared.
+    fn verify_excluded_candidates(&self, excluded: &BTreeSet<RepoPath>) -> DocumentResult<()> {
+        if !excluded.is_empty()
+            && self
+                .get_candidates()?
+                .iter()
+                .any(|path| excluded.contains(path))
+        {
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENTS_CHANGED_MESSAGE,
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl<G: GitWorktreePaths, F: FileReader, M, P, C> DocumentRefreshService<G, F, M, P, C> {
+    fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+        CandidateSelection {
+            git: &self.git,
+            filesystem: &self.filesystem,
+        }
+        .get_candidates()
     }
 }
 
@@ -316,49 +415,38 @@ fn is_racy(previous: &FileRow, now: Option<i64>) -> bool {
         .is_none_or(|boundary| previous.mtime_ns >= boundary)
 }
 
-fn apply_projection(
-    unit: &mut dyn CacheWrite,
-    prepared: PreparedProjection,
-    outcome: RefreshOutcome,
-) -> DocumentResult<RefreshOutcome> {
-    if prepared.base_revision != outcome.revision {
-        return Err(fail_changed());
-    }
-    let outcome = prepared.add_counts(outcome);
-    publish(unit, prepared)?;
-    Ok(outcome)
+#[derive(Clone, Copy)]
+enum PublicationState {
+    Unchanged,
+    Published,
 }
 
-fn build_outcome(revision: u64, published: bool) -> RefreshOutcome {
+fn build_outcome(revision: u64, publication: PublicationState) -> RefreshOutcome {
     RefreshOutcome {
         revision,
-        published,
+        published: matches!(publication, PublicationState::Published),
         files_updated: 0,
         files_removed: 0,
         invalid_files_updated: 0,
     }
 }
 
-pub(super) fn fail_changed() -> DocumentError {
-    DocumentError::new(
-        DocumentErrorKind::InternalError,
-        "documents changed during refresh",
-    )
-}
-
 mod basis {
     use super::{
-        DocumentPublication, Observation, PublicationMode, SnapshotVerification, fail_changed,
-        projection::EffectiveGraph,
+        DOCUMENTS_CHANGED_MESSAGE, DocumentPublication, Observation, PublicationMode,
+        SnapshotVerification, projection::EffectiveGraph,
     };
+    use crate::service::FileLocker;
+    use crate::service::utils::map_document_file;
     use crate::{
         domain::{EdgeTarget, RepoPath, Sha256, SourceUri, TreeOid},
         service::{
-            BasisRetainer, DocumentResult, FileRow, FileSystem, MarkdownCodec,
-            PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceRequest, SourceProvenance,
+            BasisRetainer, DocumentError, DocumentErrorKind, DocumentResult, FileReader, FileRow,
+            MarkdownCodec, PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceRequest, SourceProvenance,
         },
     };
     use std::collections::{BTreeMap, BTreeSet};
+    use std::path::Path;
 
     /// Metadata captured before the SQL write, never document or search text.
     #[derive(Debug)]
@@ -380,8 +468,8 @@ mod basis {
         pub(super) previous: &'a BTreeMap<RepoPath, FileRow>,
         pub(super) mode: PublicationMode,
     }
-    impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance + BasisRetainer>
-        DocumentPublication<'_, F, M, P>
+    impl<F: FileReader + FileLocker, M: MarkdownCodec, P: SourceProvenance + BasisRetainer, C>
+        DocumentPublication<'_, F, M, P, C>
     {
         /// Prepare only changed-content metadata, releasing each parsed file before the next.
         ///
@@ -411,13 +499,23 @@ mod basis {
                 {
                     continue;
                 }
-                let captured = self.filesystem.get_file(path)?.ok_or_else(fail_changed)?;
+                let captured =
+                    map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
+                        .ok_or_else(|| {
+                            DocumentError::new(
+                                DocumentErrorKind::InternalError,
+                                DOCUMENTS_CHANGED_MESSAGE,
+                            )
+                        })?;
                 if captured.stat != observed.stat
                     || Sha256::digest(&captured.bytes) != observed.hash
                 {
-                    return Err(fail_changed());
+                    return Err(DocumentError::new(
+                        DocumentErrorKind::InternalError,
+                        DOCUMENTS_CHANGED_MESSAGE,
+                    ));
                 }
-                let Ok(parsed) = self.markdown.parse_file(path, &captured.bytes) else {
+                let Ok(parsed) = self.markdown.file_parse(path, &captured.bytes) else {
                     continue;
                 };
                 replaced.insert(path.clone());
@@ -497,13 +595,14 @@ mod basis {
 mod projection {
     #[cfg(test)]
     use super::reach_checkpoint;
-    use super::{DocumentPublication, Observation, fail_changed};
+    use super::{DOCUMENTS_CHANGED_MESSAGE, DocumentPublication, Observation};
+    use super::{FileLocker, Path, map_document_file};
     use crate::domain::{
         Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid, derive_element_kind,
     };
     use crate::service::{
-        CacheWrite, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileRow,
-        FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile, RefreshOutcome,
+        CacheDatabase, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileReader,
+        FileRow, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile, RefreshOutcome,
         SourceMetadata, StorageRead,
     };
     use std::collections::{BTreeMap, BTreeSet};
@@ -551,7 +650,9 @@ mod projection {
         edges: BTreeSet<Edge>,
         touched_sources: BTreeSet<SourceUri>,
     }
-    impl<F: FileSystem, M: MarkdownCodec, P> DocumentPublication<'_, F, M, P> {
+    impl<F: FileReader + FileLocker, M: MarkdownCodec, P, C: CacheDatabase>
+        DocumentPublication<'_, F, M, P, C>
+    {
         /// Captures and parses one changed file against its effective previous projection.
         ///
         /// # Errors
@@ -567,9 +668,19 @@ mod projection {
                 previous,
                 graph,
             } = *request;
-            let captured = self.filesystem.get_file(path)?.ok_or_else(fail_changed)?;
+            let captured =
+                map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
+                    .ok_or_else(|| {
+                        DocumentError::new(
+                            DocumentErrorKind::InternalError,
+                            DOCUMENTS_CHANGED_MESSAGE,
+                        )
+                    })?;
             if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
-                return Err(fail_changed());
+                return Err(DocumentError::new(
+                    DocumentErrorKind::InternalError,
+                    DOCUMENTS_CHANGED_MESSAGE,
+                ));
             }
             let mut file = build_file_row(path, &captured, observed.hash);
             let mut prepared = PreparedProjection {
@@ -584,7 +695,7 @@ mod projection {
                 file.valid = previous.valid;
                 file.error.clone_from(&previous.error);
             } else {
-                match self.markdown.parse_file(path, &captured.bytes) {
+                match self.markdown.file_parse(path, &captured.bytes) {
                     Ok(parsed) => {
                         prepared = prepare_valid(prepared, parsed, graph.get_file_ids(path));
                     }
@@ -607,29 +718,26 @@ mod projection {
         ///
         /// # Errors
         /// Reports conflicting source addresses, unsafe captures, and transaction write failures.
-        pub(super) fn reconcile_sources(
-            &self,
-            graph: &EffectiveGraph,
-            unit: &mut dyn CacheWrite,
-        ) -> DocumentResult<()> {
+        pub(super) fn reconcile_sources(&self, graph: &EffectiveGraph) -> DocumentResult<()> {
             let references = graph.collect_source_references()?;
             let mut paths: BTreeMap<RepoPath, Vec<(SourceUri, u64)>> = BTreeMap::new();
             for uri in &graph.touched_sources {
                 if !references.contains_key(uri)
                     && !graph.knowledge.keys().any(|id| id.as_str() == uri.as_str())
                 {
-                    unit.delete_node(&EdgeTarget::Source(uri.clone()))?;
+                    self.storage.delete_node(&EdgeTarget::Source(uri.clone()))?;
                 }
                 let Some(&created_at) = references.get(uri) else {
                     continue;
                 };
                 let Some(local) = uri.get_local() else {
-                    unit.upsert_node(&NodeMetadata::Source(SourceMetadata {
-                        uri: uri.clone(),
-                        hash: None,
-                        created_at,
-                        lines: None,
-                    }))?;
+                    self.storage
+                        .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
+                            uri: uri.clone(),
+                            hash: None,
+                            created_at,
+                            lines: None,
+                        }))?;
                     continue;
                 };
                 paths
@@ -638,40 +746,93 @@ mod projection {
                     .push((uri.clone(), created_at));
             }
             for (path, sources) in paths {
-                self.publish_source_group(unit, &path, sources)?;
+                self.publish_source_group(&path, sources)?;
             }
             Ok(())
         }
 
         fn publish_source_group(
             &self,
-            unit: &mut dyn CacheWrite,
             path: &RepoPath,
             sources: Vec<(SourceUri, u64)>,
         ) -> DocumentResult<()> {
             // One capture serves every affected address of this path and then is released.
-            let captured = self.filesystem.get_file(path)?;
+            let captured =
+                map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?;
             for (uri, created_at) in sources {
-                let local = uri.get_local().ok_or_else(fail_changed)?;
+                let local = uri.get_local().ok_or_else(|| {
+                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+                })?;
                 let lines = local.get_lines();
                 let hash = captured
                     .as_ref()
                     .and_then(|file| local.select_bytes(&file.bytes))
                     .map(Sha256::digest);
-                unit.upsert_node(&NodeMetadata::Source(SourceMetadata {
-                    uri,
-                    hash,
-                    created_at,
-                    lines,
-                }))?;
+                self.storage
+                    .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
+                        uri,
+                        hash,
+                        created_at,
+                        lines,
+                    }))?;
             }
             Ok(())
         }
     }
+    impl<F, M, P, C: CacheDatabase> DocumentPublication<'_, F, M, P, C> {
+        /// Apply a prepared projection to the active cache write scope.
+        ///
+        /// # Errors
+        /// Rejects a changed base revision and propagates atomic mutation failures.
+        pub(super) fn publish_projection(
+            &self,
+            prepared: PreparedProjection,
+            outcome: RefreshOutcome,
+        ) -> DocumentResult<RefreshOutcome> {
+            if prepared.base_revision != outcome.revision {
+                return Err(DocumentError::new(
+                    DocumentErrorKind::InternalError,
+                    DOCUMENTS_CHANGED_MESSAGE,
+                ));
+            }
+            let outcome = prepared.add_counts(outcome);
+            for id in &prepared.cleared {
+                self.storage.edges_delete_by_source_id(id)?;
+            }
+            for id in prepared.removed {
+                self.storage.delete_node(&EdgeTarget::Knowledge(id))?;
+            }
+            #[cfg(test)]
+            reach_checkpoint("cleared");
+            for text in &prepared.search {
+                self.storage
+                    .nodes_upsert_by_id(&NodeMetadata::Knowledge(text.metadata.clone()))?;
+            }
+            for edge in &prepared.edges {
+                self.storage
+                    .edges_save_by_source_id_and_target_id_and_type(edge)?;
+            }
+            #[cfg(test)]
+            reach_checkpoint("projections");
+            for text in prepared.search {
+                self.storage
+                    .replace_text(&text.metadata.id, &text.search_text)?;
+            }
+            #[cfg(test)]
+            reach_checkpoint("fts");
+            match prepared.file {
+                FileChange::Upsert(row) => self.storage.files_upsert_by_path(&row)?,
+                FileChange::Remove(path) => self.storage.files_delete_by_path(&path)?,
+            }
+            #[cfg(test)]
+            reach_checkpoint("fingerprints");
+            Ok(outcome)
+        }
+    }
     impl EffectiveGraph {
-        pub(super) fn read(read: &mut dyn StorageRead) -> DocumentResult<Self> {
+        pub(super) fn read(read: &dyn StorageRead) -> DocumentResult<Self> {
             let knowledge = read
-                .get_nodes()?
+                .nodes_get()?
                 .into_iter()
                 .filter_map(|row| match row.metadata {
                     NodeMetadata::Knowledge(node) => Some((node.id.clone(), node)),
@@ -680,7 +841,7 @@ mod projection {
                 .collect();
             Ok(Self {
                 knowledge,
-                edges: read.get_edges_by_source_id(None)?.into_iter().collect(),
+                edges: read.edges_get_by_source_id(None)?.into_iter().collect(),
                 touched_sources: BTreeSet::new(),
             })
         }
@@ -756,10 +917,9 @@ mod projection {
                         "source address conflicts with a knowledge element",
                     ));
                 }
-                let knowledge = self
-                    .knowledge
-                    .get(edge.get_source())
-                    .ok_or_else(fail_changed)?;
+                let knowledge = self.knowledge.get(edge.get_source()).ok_or_else(|| {
+                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+                })?;
                 references
                     .entry(uri.clone())
                     .and_modify(|created: &mut u64| {
@@ -785,40 +945,6 @@ mod projection {
             search: Vec::new(),
             file: FileChange::Remove(path),
         }
-    }
-
-    pub(super) fn publish(
-        unit: &mut dyn CacheWrite,
-        prepared: PreparedProjection,
-    ) -> DocumentResult<()> {
-        for id in &prepared.cleared {
-            unit.delete_outgoing(id)?;
-        }
-        for id in prepared.removed {
-            unit.delete_node(&EdgeTarget::Knowledge(id))?;
-        }
-        #[cfg(test)]
-        reach_checkpoint("cleared");
-        for text in &prepared.search {
-            unit.upsert_node(&NodeMetadata::Knowledge(text.metadata.clone()))?;
-        }
-        for edge in &prepared.edges {
-            unit.insert_edge(edge)?;
-        }
-        #[cfg(test)]
-        reach_checkpoint("projections");
-        for text in prepared.search {
-            unit.replace_text(&text.metadata.id, &text.search_text)?;
-        }
-        #[cfg(test)]
-        reach_checkpoint("fts");
-        match prepared.file {
-            FileChange::Upsert(row) => unit.upsert_file(&row)?,
-            FileChange::Remove(path) => unit.delete_file(&path)?,
-        }
-        #[cfg(test)]
-        reach_checkpoint("fingerprints");
-        Ok(())
     }
 
     fn build_file_row(path: &RepoPath, captured: &CapturedFile, hash: Sha256) -> FileRow {
@@ -874,17 +1000,23 @@ pub(super) use tests::process::reach_checkpoint;
 
 #[cfg(test)]
 mod tests {
+    use crate::service::{
+        Clock, FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult,
+    };
+
+    use std::rc::Rc;
+
     use super::DocumentRefreshService;
+    use crate::service::TransactionError;
     use crate::{
         domain::{RepoPath, TreeOid},
         markdown::MarkdownParser,
         service::{
-            BasisRetainer, CapturedFile, Diagnostic, DocumentError, DocumentErrorKind,
-            DocumentResult, FileStat, FileSystem, MarkdownCodec, MockCorpusLister, ParsedFile,
-            ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError, SourceProvenance,
-            SourceRevisionComparison, SourceRevisionRequest,
+            BasisRetainer, CacheDatabase, CapturedFile, Diagnostic, DocumentError,
+            DocumentErrorKind, DocumentResult, FileStat, MarkdownCodec, MockGitWorktreePaths,
+            ParsedFile, ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError,
+            SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, StorageRead,
         },
-        storage::SqliteStorage,
     };
     use rusqlite::Connection;
     use std::{
@@ -897,16 +1029,42 @@ mod tests {
     const INITIAL: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nAlphaToken\n";
     const EDITED: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nBravoToken\n";
     const NOW: i64 = 5_000_000_000;
-    type Candidates = MockCorpusLister;
+    type Candidates = MockGitWorktreePaths;
     struct TestFiles {
         bytes: RefCell<Vec<u8>>,
         stat: Cell<FileStat>,
-        now: Cell<i64>,
+        now: Rc<Cell<i64>>,
         reads: Cell<usize>,
         locks: Cell<usize>,
         replace_on_read: Cell<Option<usize>>,
         fail_on_read: Cell<Option<usize>>,
         missing: Cell<bool>,
+    }
+    #[derive(Debug)]
+    struct TestClock(Rc<Cell<i64>>);
+    impl Clock for TestClock {
+        fn clock_get_time_ns(&self) -> std::io::Result<i64> {
+            Ok(self.0.get())
+        }
+        fn clock_get_time_secs(&self) -> std::io::Result<u64> {
+            panic!("unused seconds")
+        }
+        fn clock_wait(&self, _: std::time::Duration) -> std::io::Result<()> {
+            panic!("unused wait")
+        }
+    }
+    #[derive(Debug)]
+    struct FailedClock;
+    impl Clock for FailedClock {
+        fn clock_get_time_ns(&self) -> std::io::Result<i64> {
+            Err(std::io::Error::other("clock unavailable"))
+        }
+        fn clock_get_time_secs(&self) -> std::io::Result<u64> {
+            panic!("refresh does not request seconds")
+        }
+        fn clock_wait(&self, _: std::time::Duration) -> std::io::Result<()> {
+            panic!("refresh does not wait")
+        }
     }
     impl TestFiles {
         fn new() -> Self {
@@ -918,7 +1076,7 @@ mod tests {
                     inode: 2,
                     device: 3,
                 }),
-                now: Cell::new(NOW),
+                now: Rc::new(Cell::new(NOW)),
                 reads: Cell::new(0),
                 locks: Cell::new(0),
                 replace_on_read: Cell::new(None),
@@ -931,19 +1089,21 @@ mod tests {
             self.locks.set(0);
         }
     }
-    impl FileSystem for TestFiles {
-        type IndexLock = ();
-        fn stat_file(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
+    impl FileReader for TestFiles {
+        fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            Ok(false)
+        }
+        fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             Ok((!self.missing.get()).then(|| self.stat.get()))
         }
-        fn get_file(&self, _: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+        fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+            panic!("unexpected file_get_bytes_by_path")
+        }
+        fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             let reads = self.reads.get() + 1;
             self.reads.set(reads);
             if self.fail_on_read.get() == Some(reads) {
-                return Err(DocumentError::new(
-                    DocumentErrorKind::InternalError,
-                    "cannot read document file",
-                ));
+                return Err(FileError::new(FileErrorKind::Io));
             }
             if self.replace_on_read.get() == Some(reads) {
                 self.bytes.replace(EDITED.to_vec());
@@ -954,23 +1114,61 @@ mod tests {
                 checked_at_ns: self.now.get(),
             }))
         }
-        fn get_time_ns(&self) -> DocumentResult<i64> {
-            Ok(self.now.get())
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unexpected file_get_identity_by_path")
         }
-        fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unexpected file_is_exist")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_identity_by_path")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_distinct_by_paths")
+        }
+        fn directory_get_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            Ok(Some(std::fs::File::open(".").unwrap().into()))
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            panic!("unexpected lock_get_owner_by_path")
+        }
+    }
+    impl FileLocker for TestFiles {
+        type Lock = ();
+        fn lock_acquire_by_path(&self, _path: &std::path::Path) -> FileResult<Self::Lock> {
             self.locks.set(self.locks.get() + 1);
             Ok(())
+        }
+        fn lock_try_acquire_by_path(&self, _: &std::path::Path) -> FileResult<Option<Self::Lock>> {
+            panic!("unexpected lock probe")
         }
     }
     struct CountingMarkdown(Cell<usize>);
     impl MarkdownCodec for CountingMarkdown {
-        fn parse_file(
+        fn file_parse(
             &self,
             path: &RepoPath,
             bytes: &[u8],
         ) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
             self.0.set(self.0.get() + 1);
-            MarkdownParser::new().parse_file(path, bytes)
+            MarkdownParser::new().file_parse(path, bytes)
         }
     }
     struct TestProvenance;
@@ -1004,8 +1202,116 @@ mod tests {
             Ok(())
         }
     }
-    type TestService =
-        DocumentRefreshService<Candidates, TestFiles, CountingMarkdown, TestProvenance>;
+    type TestService = DocumentRefreshService<
+        Candidates,
+        TestFiles,
+        CountingMarkdown,
+        TestProvenance,
+        crate::storage::CacheStorage,
+    >;
+
+    thread_local! {
+        static ON_COMMIT: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
+    }
+
+    #[test]
+    fn nested_publication_rolls_back_with_its_parent() {
+        use crate::service::CacheDatabase;
+        // Given: a document service shares the parent's cache and an independent observer.
+        let (directory, mut service) = build_service();
+        let cache = std::rc::Rc::clone(&service.storage);
+        let observer = Connection::open(directory.path().join("cache.db")).unwrap();
+        // When: a nested refresh succeeds but its parent rejects the operation.
+        let result = cache.with_write_tx(|| -> DocumentResult<()> {
+            assert_eq!(service.refresh()?.revision, 1);
+            assert_eq!(
+                observer
+                    .query_row("select revision from project", [], |row| row
+                        .get::<_, i64>(0))
+                    .unwrap(),
+                0
+            );
+            Err(DocumentError::new(
+                DocumentErrorKind::InvalidRequest,
+                "parent rejected publication",
+            ))
+        });
+        // Then: neither the document nor its provisional revision is published.
+        assert!(matches!(
+            result,
+            Err(TransactionError::Operation(error)) if error.get_kind() == DocumentErrorKind::InvalidRequest && error.get_message() == "parent rejected publication"
+        ));
+        assert_eq!(
+            observer
+                .query_row("select count(*) from nodes", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            observer
+                .query_row("select revision from project", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        assert_eq!(service.refresh().unwrap().revision, 1);
+    }
+
+    #[test]
+    fn joined_publications_advance_the_revision_once() {
+        use crate::service::CacheDatabase;
+        // Given: both refreshes share the same owning cache write.
+        let (directory, mut service) = build_service();
+        let cache = std::rc::Rc::clone(&service.storage);
+        let observer = Connection::open(directory.path().join("cache.db")).unwrap();
+        // When: the parent joins two successful publication operations.
+        cache
+            .with_write_tx(|| -> DocumentResult<()> {
+                assert_eq!(service.refresh()?.revision, 1);
+                assert_eq!(service.refresh()?.revision, 1);
+                Ok(())
+            })
+            .unwrap();
+        // Then: one node and one revision are published at the outer commit.
+        assert_eq!(
+            observer
+                .query_row("select count(*) from nodes", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            observer
+                .query_row("select revision from project", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn publication_returns_its_own_revision_after_a_later_commit() {
+        // Given: an independent publisher runs immediately after the first commit.
+        let (directory, mut service) = build_service();
+        let path = directory.path().join("cache.db");
+        ON_COMMIT.set(Some(Box::new(move || {
+            Connection::open(path)
+                .unwrap()
+                .execute("update project set revision=2", [])
+                .unwrap();
+        })));
+        // When: refresh finishes after the second publisher advances the database.
+        let outcome = service.refresh().unwrap();
+        // Then: it returns revision 1 even though revision 2 is already durable.
+        assert_eq!(outcome.revision, 1);
+        assert_eq!(
+            Connection::open(directory.path().join("cache.db"))
+                .unwrap()
+                .query_row("select revision from project", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+    }
     #[test]
     fn skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files() {
         // Given
@@ -1050,9 +1356,7 @@ mod tests {
         service.refresh().unwrap();
         let before = service
             .storage
-            .begin_read_tx()
-            .unwrap()
-            .get_files()
+            .with_read_tx(|| service.storage.files_get())
             .unwrap();
         service.filesystem.reset_counts();
         // When: refresh checks the captured bytes.
@@ -1069,9 +1373,7 @@ mod tests {
         assert_eq!(
             service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_files()
+                .with_read_tx(|| service.storage.files_get())
                 .unwrap(),
             before
         );
@@ -1083,6 +1385,21 @@ mod tests {
         assert_eq!(changed.revision, 2);
         assert_eq!(get_matches(&mut service, "BravoToken"), ["note.md"]);
         assert!(get_matches(&mut service, "AlphaToken").is_empty());
+    }
+
+    #[test]
+    fn clock_failure_falls_back_to_bytes_without_publishing_unchanged_content() {
+        // Given: an unchanged non-racy publication and an unavailable application clock.
+        let (_dir, mut service) = build_service();
+        service.refresh().unwrap();
+        service.filesystem.reset_counts();
+        service.clock = Box::new(FailedClock);
+        // When: refresh cannot establish a safe age for the cached observation.
+        let outcome = service.refresh().unwrap();
+        // Then: verified bytes are read once, while publication and lock acquisition are skipped.
+        assert!(!outcome.published);
+        assert_eq!(service.filesystem.reads.get(), 1);
+        assert_eq!(service.filesystem.locks.get(), 0);
     }
 
     #[test]
@@ -1130,15 +1447,11 @@ mod tests {
             service.refresh().unwrap();
             let before_nodes = service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_nodes()
+                .with_read_tx(|| service.storage.nodes_get())
                 .unwrap();
             let before_files = service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_files()
+                .with_read_tx(|| service.storage.files_get())
                 .unwrap();
             let before_fts = get_fts_blocks(dir.path());
             let parses = service.markdown.0.get();
@@ -1157,17 +1470,13 @@ mod tests {
             assert_eq!(
                 service
                     .storage
-                    .begin_read_tx()
-                    .unwrap()
-                    .get_nodes()
+                    .with_read_tx(|| service.storage.nodes_get())
                     .unwrap(),
                 before_nodes
             );
             let after_files = service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_files()
+                .with_read_tx(|| service.storage.files_get())
                 .unwrap();
             assert_eq!(after_files[0].inode, before_files[0].inode + 1);
             assert_eq!(after_files[0].valid, before_files[0].valid);
@@ -1187,10 +1496,17 @@ mod tests {
         // Then: inconsistent captures abort publication.
         assert_eq!(service.filesystem.reads.get(), 3);
         assert!(result.is_err());
-        let mut read = service.storage.begin_read_tx().unwrap();
-        assert_eq!(read.get_revision(), 0);
-        assert!(read.get_files().unwrap().is_empty());
-        assert!(read.get_nodes().unwrap().is_empty());
+        let cache = std::rc::Rc::clone(&service.storage);
+        cache
+            .with_read_tx(|| -> crate::service::StorageResult<()> {
+                let read = cache.as_ref();
+                assert_eq!(read.project_get_by_id().unwrap(), 0);
+                assert!(read.files_get().unwrap().is_empty());
+                assert!(read.nodes_get().unwrap().is_empty());
+
+                Ok(())
+            })
+            .unwrap();
     }
 
     #[test]
@@ -1201,12 +1517,12 @@ mod tests {
         let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let observed = std::sync::Arc::clone(&calls);
         let mut candidates = Candidates::new();
-        candidates.expect_get_candidates().returning(move || {
+        candidates.expect_worktree_paths_get().returning(move || {
             let count = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
             if count < 3 {
                 Ok(Vec::new())
             } else {
-                Ok(vec![RepoPath::parse("note.md").unwrap()])
+                Ok(b"note.md\0".to_vec())
             }
         });
         service.git = candidates;
@@ -1214,15 +1530,22 @@ mod tests {
         let result = service.refresh();
         // Then: the race aborts publication and preserves the old projection.
         assert!(result.is_err());
-        let mut read = service.storage.begin_read_tx().unwrap();
-        assert_eq!(read.get_revision(), 1);
-        assert_eq!(read.get_files().unwrap().len(), 1);
-        assert_eq!(
-            read.get_text_matches_by_expression("AlphaToken")
-                .unwrap()
-                .len(),
-            1
-        );
+        let cache = std::rc::Rc::clone(&service.storage);
+        cache
+            .with_read_tx(|| -> crate::service::StorageResult<()> {
+                let read = cache.as_ref();
+                assert_eq!(read.project_get_by_id().unwrap(), 1);
+                assert_eq!(read.files_get().unwrap().len(), 1);
+                assert_eq!(
+                    read.text_index_get_by_expression("AlphaToken")
+                        .unwrap()
+                        .len(),
+                    1
+                );
+
+                Ok(())
+            })
+            .unwrap();
     }
 
     #[test]
@@ -1232,9 +1555,7 @@ mod tests {
         service.refresh().unwrap();
         let before = service
             .storage
-            .begin_read_tx()
-            .unwrap()
-            .get_files()
+            .with_read_tx(|| service.storage.files_get())
             .unwrap();
         service.filesystem.reset_counts();
         service.filesystem.stat.update(|mut stat| {
@@ -1244,16 +1565,23 @@ mod tests {
         service.filesystem.fail_on_read.set(Some(3));
         // When / Then: refresh fails rather than publishing an invalid Markdown result.
         assert!(service.refresh().is_err());
-        let mut read = service.storage.begin_read_tx().unwrap();
-        // Then: revision, file state and searchable text retain the prior publication.
-        assert_eq!(read.get_revision(), 1);
-        assert_eq!(read.get_files().unwrap(), before);
-        assert_eq!(
-            read.get_text_matches_by_expression("AlphaToken")
-                .unwrap()
-                .len(),
-            1
-        );
+        let cache = std::rc::Rc::clone(&service.storage);
+        cache
+            .with_read_tx(|| -> crate::service::StorageResult<()> {
+                let read = cache.as_ref();
+                // Then: revision, file state and searchable text retain the prior publication.
+                assert_eq!(read.project_get_by_id().unwrap(), 1);
+                assert_eq!(read.files_get().unwrap(), before);
+                assert_eq!(
+                    read.text_index_get_by_expression("AlphaToken")
+                        .unwrap()
+                        .len(),
+                    1
+                );
+
+                Ok(())
+            })
+            .unwrap();
     }
 
     #[test]
@@ -1313,16 +1641,22 @@ mod tests {
 
     fn build_service() -> (TempDir, TestService) {
         let dir = tempfile::tempdir().unwrap();
-        let storage =
-            SqliteStorage::open(&dir.path().join("cache.db"), &dir.path().join("vectors.db"))
-                .unwrap();
+        let storage = crate::storage::open_test_storage(
+            &dir.path().join("cache.db"),
+            &dir.path().join("vectors.db"),
+        )
+        .unwrap();
+        let files = TestFiles::new();
         (
             dir,
             DocumentRefreshService {
                 git: build_candidates(),
-                filesystem: TestFiles::new(),
+                clock: Box::new(crate::service::document_refresher::tests::TestClock(
+                    Rc::clone(&files.now),
+                )),
+                filesystem: files,
                 markdown: CountingMarkdown(Cell::new(0)),
-                storage: Box::new(storage),
+                storage: std::rc::Rc::new(storage.cache),
                 provenance: TestProvenance,
             },
         )
@@ -1331,9 +1665,7 @@ mod tests {
     fn get_matches(service: &mut TestService, text: &str) -> Vec<String> {
         service
             .storage
-            .begin_read_tx()
-            .unwrap()
-            .get_text_matches_by_expression(text)
+            .with_read_tx(|| service.storage.text_index_get_by_expression(text))
             .unwrap()
             .into_iter()
             .map(|row| row.id.as_str().to_owned())
@@ -1341,24 +1673,33 @@ mod tests {
     }
 
     mod basis {
+        use crate::service::{FileIdentity, FileLocker, FileReader, FileResult};
+
         use super::{Candidates, CountingMarkdown, TestFiles, build_service};
-        use crate::service::{ReadTransaction, VectorWrite};
+        use crate::service::TransactionError;
+        use crate::service::{CacheDatabase, StorageRead};
         use crate::{
-            domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
+            domain::TreeOid,
             service::{
-                BasisRetainer, CacheWrite, CapturedFile, DocumentError, DocumentErrorKind,
-                DocumentRefreshService, DocumentResult, FileRow, FileStat, FileSystem,
-                NodeMetadata, ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError,
-                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage,
-                StorageResult, VectorOutcome,
+                BasisRetainer, CapturedFile, DocumentError, DocumentErrorKind,
+                DocumentRefreshService, DocumentResult, FileStat, ProvenanceObservation,
+                ProvenanceRequest, Refresher, SnapshotError, SourceProvenance,
+                SourceRevisionComparison, SourceRevisionRequest,
             },
         };
         use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
         use tempfile::TempDir;
 
+        const INJECTED_PROVENANCE_FAILURE: &str = "injected provenance failure";
+
         type Events = Rc<RefCell<Vec<&'static str>>>;
-        type Service =
-            DocumentRefreshService<Candidates, BoundaryFiles, CountingMarkdown, BoundaryProvenance>;
+        type Service = DocumentRefreshService<
+            Candidates,
+            BoundaryFiles,
+            CountingMarkdown,
+            BoundaryProvenance,
+            BoundaryStorage,
+        >;
         struct BoundaryFiles {
             inner: TestFiles,
             events: Events,
@@ -1369,11 +1710,7 @@ mod tests {
             failure: Option<&'static str>,
         }
         struct BoundaryStorage {
-            inner: Box<dyn Storage>,
-            events: Events,
-        }
-        struct BoundaryWrite<'a> {
-            inner: Box<dyn CacheWrite + 'a>,
+            inner: Rc<crate::storage::CacheStorage>,
             events: Events,
         }
 
@@ -1443,7 +1780,13 @@ mod tests {
                 *events.borrow(),
                 ["lock", "read", "read", "observe", "verify"]
             );
-            assert_eq!(service.storage.begin_read_tx().unwrap().get_revision(), 0);
+            assert_eq!(
+                service
+                    .storage
+                    .with_read_tx(|| service.storage.project_get_by_id())
+                    .unwrap(),
+                0
+            );
         }
 
         #[test]
@@ -1509,7 +1852,13 @@ mod tests {
                 *events.borrow(),
                 ["lock", "read", "read", "observe", "retain", "begin", "read"]
             );
-            assert_eq!(service.storage.begin_read_tx().unwrap().get_revision(), 0);
+            assert_eq!(
+                service
+                    .storage
+                    .with_read_tx(|| service.storage.project_get_by_id())
+                    .unwrap(),
+                0
+            );
         }
 
         #[test]
@@ -1570,12 +1919,13 @@ mod tests {
             let events = Rc::new(RefCell::new(Vec::new()));
             let service = DocumentRefreshService {
                 git: service.git,
+                clock: service.clock,
                 filesystem: BoundaryFiles {
                     inner: service.filesystem,
                     events: Rc::clone(&events),
                 },
                 markdown: service.markdown,
-                storage: Box::new(BoundaryStorage {
+                storage: Rc::new(BoundaryStorage {
                     inner: service.storage,
                     events: Rc::clone(&events),
                 }),
@@ -1587,21 +1937,70 @@ mod tests {
             };
             (dir, service, events)
         }
-        impl FileSystem for BoundaryFiles {
-            type IndexLock = ();
-            fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
-                self.inner.stat_file(path)
+        impl FileReader for BoundaryFiles {
+            fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+                Ok(false)
             }
-            fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+            fn file_get_stat_by_path(
+                &self,
+                path: &std::path::Path,
+            ) -> FileResult<Option<FileStat>> {
+                self.inner.file_get_stat_by_path(path)
+            }
+            fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+                panic!("unexpected file_get_bytes_by_path")
+            }
+            fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
                 self.events.borrow_mut().push("read");
-                self.inner.get_file(path)
+                self.inner.file_get_by_path(path)
             }
-            fn get_time_ns(&self) -> DocumentResult<i64> {
-                self.inner.get_time_ns()
+            fn file_get_identity_by_path(
+                &self,
+                _: &std::path::Path,
+            ) -> FileResult<Option<FileIdentity>> {
+                panic!("unexpected file_get_identity_by_path")
             }
-            fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
+            fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+                panic!("unexpected file_is_exist")
+            }
+            fn file_verify_identity_by_path(
+                &self,
+                _: &std::path::Path,
+                _: Option<FileIdentity>,
+            ) -> FileResult<()> {
+                panic!("unexpected file_verify_identity_by_path")
+            }
+            fn file_verify_distinct_by_paths(
+                &self,
+                _: &std::path::Path,
+                _: &std::path::Path,
+            ) -> FileResult<()> {
+                panic!("unexpected file_verify_distinct_by_paths")
+            }
+            fn directory_get_by_path(
+                &self,
+                _: &std::path::Path,
+            ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+                Ok(Some(std::fs::File::open(".").unwrap().into()))
+            }
+            fn lock_get_owner_by_path(
+                &self,
+                _: &std::path::Path,
+            ) -> FileResult<Option<std::num::NonZeroU32>> {
+                panic!("unexpected lock_get_owner_by_path")
+            }
+        }
+        impl FileLocker for BoundaryFiles {
+            type Lock = ();
+            fn lock_acquire_by_path(&self, path: &std::path::Path) -> FileResult<Self::Lock> {
                 self.events.borrow_mut().push("lock");
-                self.inner.lock_index()
+                self.inner.lock_acquire_by_path(path)
+            }
+            fn lock_try_acquire_by_path(
+                &self,
+                _: &std::path::Path,
+            ) -> FileResult<Option<Self::Lock>> {
+                panic!("unexpected lock probe")
             }
         }
         impl SourceProvenance for BoundaryProvenance {
@@ -1614,7 +2013,10 @@ mod tests {
             ) -> DocumentResult<ProvenanceObservation> {
                 self.events.borrow_mut().push("observe");
                 if self.failure == Some("observe") {
-                    return Err(build_failure());
+                    return Err(DocumentError::new(
+                        DocumentErrorKind::InternalError,
+                        INJECTED_PROVENANCE_FAILURE,
+                    ));
                 }
                 Ok(ProvenanceObservation {
                     flags: BTreeSet::new(),
@@ -1642,91 +2044,82 @@ mod tests {
             fn verify_snapshots(&self, _: &BTreeSet<TreeOid>) -> DocumentResult<()> {
                 self.events.borrow_mut().push("verify");
                 if self.failure == Some("verify") {
-                    return Err(build_failure());
+                    return Err(DocumentError::new(
+                        DocumentErrorKind::InternalError,
+                        INJECTED_PROVENANCE_FAILURE,
+                    ));
                 }
                 Ok(())
             }
             fn retain_snapshots(&self, _: &BTreeSet<TreeOid>) -> DocumentResult<()> {
                 self.events.borrow_mut().push("retain");
                 if self.failure == Some("retain") {
-                    return Err(build_failure());
+                    return Err(DocumentError::new(
+                        DocumentErrorKind::InternalError,
+                        INJECTED_PROVENANCE_FAILURE,
+                    ));
                 }
                 Ok(())
             }
         }
-        impl Storage for BoundaryStorage {
-            fn begin_vector_write_tx(
-                &mut self,
-                expected: &Sha256,
-            ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>> {
-                self.inner.begin_vector_write_tx(expected)
+        use crate::service::utils::cache_test_support::{
+            delegate_cache_reads, delegate_cache_writes, delegate_graph_reads,
+        };
+        impl crate::service::StorageRead for BoundaryStorage {
+            delegate_cache_reads!(self => self.inner.as_ref());
+        }
+        impl crate::service::GraphRead for BoundaryStorage {
+            delegate_graph_reads!(self => self.inner.as_ref());
+        }
+        impl crate::service::CacheDatabase for BoundaryStorage {
+            delegate_cache_writes!(self => self.inner.as_ref());
+
+            fn with_read_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_read_tx(operation)
             }
-            fn reset_vectors(
-                &mut self,
-                observed: Option<&Sha256>,
-                identity: &Sha256,
-            ) -> StorageResult<VectorOutcome<bool>> {
-                self.inner.reset_vectors(observed, identity)
+            fn with_status_read_tx<T, E, F>(
+                &self,
+                operation: F,
+            ) -> Result<Option<T>, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_status_read_tx(operation)
             }
-            fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>> {
+
+            fn with_write_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
                 self.events.borrow_mut().push("begin");
-                Ok(Box::new(BoundaryWrite {
-                    inner: self.inner.begin_cache_write_tx()?,
-                    events: Rc::clone(&self.events),
-                }))
+                let result = self.inner.with_write_tx(operation);
+                if result.is_ok() {
+                    self.events.borrow_mut().push("commit");
+                }
+                result
             }
-            fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
-                self.inner.begin_read_tx()
-            }
-        }
-        impl<'a> CacheWrite for BoundaryWrite<'a> {
-            fn upsert_node(&mut self, node: &NodeMetadata) -> StorageResult<i64> {
-                self.inner.upsert_node(node)
-            }
-            fn insert_edge(&mut self, edge: &Edge) -> StorageResult<()> {
-                self.inner.insert_edge(edge)
-            }
-            fn delete_outgoing(&mut self, id: &KnowledgeId) -> StorageResult<()> {
-                self.inner.delete_outgoing(id)
-            }
-            fn delete_node(&mut self, id: &EdgeTarget) -> StorageResult<()> {
-                self.inner.delete_node(id)
-            }
-            fn replace_text(&mut self, id: &KnowledgeId, text: &str) -> StorageResult<()> {
-                self.inner.replace_text(id, text)
-            }
-            fn upsert_file(&mut self, file: &FileRow) -> StorageResult<()> {
-                self.inner.upsert_file(file)
-            }
-            fn delete_file(&mut self, path: &RepoPath) -> StorageResult<()> {
-                self.inner.delete_file(path)
-            }
-            fn commit(self: Box<Self>) -> StorageResult<u64> {
-                self.events.borrow_mut().push("commit");
-                self.inner.commit()
-            }
-        }
-        fn build_failure() -> DocumentError {
-            DocumentError::new(
-                DocumentErrorKind::InternalError,
-                "injected provenance failure",
-            )
         }
     }
     pub(super) mod process {
         //! Production-process schedules. Only this private test driver reads control variables.
         use super::super::DocumentRefreshService;
+        use crate::service::TransactionError;
+        use crate::service::{CacheDatabase, StorageRead};
+        use crate::storage::get_current;
         use crate::{
             domain::{Edge, RepoPath, Sha256},
             filesystem::LocalFileSystem,
             git::GitRepository,
             markdown::MarkdownParser,
             service::{
-                CacheWrite, EmbeddingFailure, FileRow, FileSystem, GraphDiagnosticsService,
-                NodeMetadata, ProvenanceService, QueryError, Refresher, StatusReader, StatusReport,
-                StatusService, Storage, StorageError, StorageResult, StoredNode, VectorOutcome,
+                EmbeddingFailure, FileLocker, FileReader, FileRow, FileWriter,
+                GraphDiagnosticsService, NodeMetadata, ProvenanceService, QueryError, Refresher,
+                StatusReader, StatusReport, StatusService, StorageError, StorageResult, StoredNode,
+                VectorDatabase, VectorOutcome,
             },
-            storage::{SqliteStatusStorage, SqliteStorage},
             wire_document_refresher,
         };
         use rusqlite::Connection;
@@ -1774,6 +2167,7 @@ mod tests {
             LocalFileSystem,
             MarkdownParser,
             ProvenanceService<LocalFileSystem>,
+            crate::storage::CacheStorage,
         >;
         type Tokens = Vec<(String, i64, String, i64)>;
         thread_local! {
@@ -1782,6 +2176,11 @@ mod tests {
         }
 
         pub(in crate::service) fn reach_checkpoint(name: &str) {
+            if name == "after_commit"
+                && let Some(hook) = super::ON_COMMIT.take()
+            {
+                hook();
+            }
             CONTROL.with_borrow_mut(|control| {
                 if let Some(stream) = control {
                     writeln!(stream, "{name}").unwrap();
@@ -1793,9 +2192,11 @@ mod tests {
             });
         }
 
-        pub(in crate::service) fn fail_late(unit: &mut dyn CacheWrite) -> StorageResult<()> {
+        pub(in crate::service) fn fail_late<C: crate::service::CacheDatabase>(
+            unit: &C,
+        ) -> StorageResult<()> {
             if FAIL_LATE.with_borrow(|enabled| *enabled) {
-                return unit.upsert_file(&FileRow {
+                return unit.files_upsert_by_path(&FileRow {
                     path: RepoPath::parse("invalid-size.md").unwrap(),
                     size: u64::MAX,
                     mtime_ns: 0,
@@ -1829,7 +2230,10 @@ mod tests {
             }
             let mut service = build_service(&root);
             if mode == "hold" {
-                let _guard = service.filesystem.lock_index().unwrap();
+                let _guard = service
+                    .filesystem
+                    .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                    .unwrap();
                 reach_checkpoint("holding");
             } else {
                 FAIL_LATE.with_borrow_mut(|enabled| *enabled = mode.ends_with("fail"));
@@ -1906,20 +2310,27 @@ mod tests {
             let fixture = Fixture::new();
             let mut owner = Worker::spawn(fixture.root.path(), "hold");
             owner.reach("holding");
-            let mut storage = build_service(fixture.root.path()).storage;
+            let storage = crate::storage::open_test_storage(
+                &fixture.root.path().join(".letopis/cache.db"),
+                &fixture.root.path().join(".letopis/vectors.db"),
+            )
+            .unwrap();
             let identity = Sha256::digest(b"model identity");
-            let VectorOutcome::Current(mut unit) =
-                storage.begin_vector_write_tx(&identity).unwrap()
-            else {
-                panic!("identity changed");
-            };
-            unit.set_query_error(99, "uncommitted").unwrap();
-            // When: normal composition and a no-op must finish with both owners still active.
-            Worker::spawn(fixture.root.path(), "normal-noop").finish();
-            // Then: neither the cache nor the committed vector state was changed.
-            assert_eq!(get_state(fixture.root.path()), fixture.old);
-            assert_eq!(get_vectors(fixture.root.path()), fixture.vector_state);
-            drop(unit);
+            assert!(matches!(
+                storage.vectors.with_write_tx(&identity, || {
+                    let unit = &storage.vectors;
+                    unit.query_error_upsert_by_id(99, "uncommitted").unwrap();
+                    // When: normal composition and a no-op must finish with both owners still active.
+                    Worker::spawn(fixture.root.path(), "normal-noop").finish();
+                    // Then: neither the cache nor the committed vector state was changed.
+                    assert_eq!(get_state(fixture.root.path()), fixture.old);
+                    assert_eq!(get_vectors(fixture.root.path()), fixture.vector_state);
+
+                    Err::<(), _>(())
+                }),
+                Err(TransactionError::Operation(()))
+            ));
+
             owner.kill();
         }
 
@@ -2087,7 +2498,13 @@ mod tests {
                 let mut service = build_service(root.path());
                 assert_eq!(service.refresh().unwrap().revision, 1);
                 assert_eq!(get_git_objects(root.path()), git_objects);
-                seed_vectors(service.storage.as_mut());
+                seed_vectors(
+                    &crate::storage::open_test_storage(
+                        &root.path().join(".letopis/cache.db"),
+                        &root.path().join(".letopis/vectors.db"),
+                    )
+                    .unwrap(),
+                );
                 drop(service);
                 let old = get_state(root.path());
                 let vectors = fs::read(root.path().join(".letopis/vectors.db")).unwrap();
@@ -2212,8 +2629,10 @@ mod tests {
                     .clone(),
                     "cut={cut}"
                 );
-                let filesystem = LocalFileSystem::open(fixture.root.path()).unwrap();
-                let guard = filesystem.lock_index().unwrap();
+                let filesystem = LocalFileSystem::new(fixture.root.path()).unwrap();
+                let guard = filesystem
+                    .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                    .unwrap();
                 drop(guard);
                 fixture.assert_preserved(NEW);
                 Worker::spawn(
@@ -2301,24 +2720,31 @@ mod tests {
             let fixture = Fixture::new();
             fixture.edit(NEW);
             let expected = fixture.build_expected(NEW, "BravoToken");
-            let mut storage = build_service(fixture.root.path()).storage;
-            let mut pinned = storage.begin_read_tx().unwrap();
-            let fts = Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
-            fts.execute_batch("begin;").unwrap();
-            assert_eq!(get_tokens(&fts), fixture.old.tokens);
-            // When: a separate worker publishes changed contents.
-            Worker::spawn(fixture.root.path(), "publish").finish();
-            // Then: old and new readers see complete distinct revisions.
-            assert_eq!(pinned.get_revision(), fixture.old.revision);
-            assert_eq!(pinned.get_nodes().unwrap(), fixture.old.nodes);
-            assert_eq!(
-                pinned.get_edges_by_source_id(None).unwrap(),
-                fixture.old.edges
-            );
-            assert_eq!(pinned.get_files().unwrap(), fixture.old.files);
-            assert_eq!(get_tokens(&fts), fixture.old.tokens);
-            assert_eq!(get_state(fixture.root.path()), expected);
-            fixture.assert_preserved(NEW);
+            let storage = build_service(fixture.root.path()).storage;
+            storage
+                .with_read_tx(|| -> crate::service::StorageResult<()> {
+                    let pinned = storage.as_ref();
+                    let fts =
+                        Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
+                    fts.execute_batch("begin;").unwrap();
+                    assert_eq!(get_tokens(&fts), fixture.old.tokens);
+                    // When: a separate worker publishes changed contents.
+                    Worker::spawn(fixture.root.path(), "publish").finish();
+                    // Then: old and new readers see complete distinct revisions.
+                    assert_eq!(pinned.project_get_by_id().unwrap(), fixture.old.revision);
+                    assert_eq!(pinned.nodes_get().unwrap(), fixture.old.nodes);
+                    assert_eq!(
+                        pinned.edges_get_by_source_id(None).unwrap(),
+                        fixture.old.edges
+                    );
+                    assert_eq!(pinned.files_get().unwrap(), fixture.old.files);
+                    assert_eq!(get_tokens(&fts), fixture.old.tokens);
+                    assert_eq!(get_state(fixture.root.path()), expected);
+                    fixture.assert_preserved(NEW);
+
+                    Ok(())
+                })
+                .unwrap();
         }
 
         #[test]
@@ -2399,7 +2825,8 @@ mod tests {
         }
 
         fn run_normal_service(root: &Path, mode: &str) {
-            LocalFileSystem::configure_next_process_test(
+            crate::process::SystemClock::configure_next(TIME);
+            LocalFileSystem::configure_next_file_test(
                 TIME,
                 Box::new(|| reach_checkpoint("contended")),
             );
@@ -2410,16 +2837,20 @@ mod tests {
         }
 
         fn get_state(root: &Path) -> State {
-            let mut storage = build_service(root).storage;
-            let mut read = storage.begin_read_tx().unwrap();
-            let connection = Connection::open(root.join(".letopis/cache.db")).unwrap();
-            State {
-                revision: read.get_revision(),
-                nodes: read.get_nodes().unwrap(),
-                edges: read.get_edges_by_source_id(None).unwrap(),
-                files: read.get_files().unwrap(),
-                tokens: get_tokens(&connection),
-            }
+            let storage = build_service(root).storage;
+            storage
+                .with_read_tx(|| {
+                    let read = storage.as_ref();
+                    let connection = Connection::open(root.join(".letopis/cache.db")).unwrap();
+                    Ok::<_, StorageError>(State {
+                        revision: read.project_get_by_id().unwrap(),
+                        nodes: read.nodes_get().unwrap(),
+                        edges: read.edges_get_by_source_id(None).unwrap(),
+                        files: read.files_get().unwrap(),
+                        tokens: get_tokens(&connection),
+                    })
+                })
+                .unwrap()
         }
 
         fn get_tokens(connection: &Connection) -> Tokens {
@@ -2436,36 +2867,50 @@ mod tests {
         }
 
         fn get_vectors(root: &Path) -> VectorState {
-            let mut storage = build_service(root).storage;
-            let mut read = storage.begin_read_tx().unwrap();
-            let identity = Sha256::digest(b"model identity");
-            VectorState {
-                identity: read.get_config_identity(),
-                vector: read
-                    .get_vector_by_search_hash(&identity, &Sha256::digest(b"retained vector"))
-                    .unwrap(),
-                failure: read
-                    .get_failure_by_search_hash(&identity, &Sha256::digest(b"failed vector"))
-                    .unwrap(),
-                query_error: read.get_query_error().unwrap(),
-            }
+            let storage = build_service(root).storage;
+            storage
+                .with_read_tx(|| {
+                    let read = storage.as_ref();
+                    let identity = Sha256::digest(b"model identity");
+                    Ok::<_, StorageError>(VectorState {
+                        identity: read.meta_get_by_id().unwrap(),
+                        vector: read
+                            .vector_keys_get_by_search_hash(
+                                &identity,
+                                &Sha256::digest(b"retained vector"),
+                            )
+                            .unwrap(),
+                        failure: read
+                            .embed_failures_get_by_search_hash(
+                                &identity,
+                                &Sha256::digest(b"failed vector"),
+                            )
+                            .unwrap(),
+                        query_error: read.query_error_get_by_id().unwrap(),
+                    })
+                })
+                .unwrap()
         }
 
         fn get_status(root: &Path) -> StatusReport {
-            let git = GitRepository::open(root).unwrap();
-            let files = LocalFileSystem::open(git.get_root()).unwrap();
-            let pinned = files.open_existing_service_directory().unwrap().unwrap();
+            let git = GitRepository::open(root, &[crate::utils::SERVICE_DIRECTORY]).unwrap();
+            let files = LocalFileSystem::new(git.worktree_root_get()).unwrap();
+            let pinned = files
+                .directory_get_by_path(std::path::Path::new(".letopis"))
+                .unwrap()
+                .unwrap();
             let storage =
-                SqliteStatusStorage::open_confined(&git.get_root().join(".letopis"), &pinned)
+                crate::open_observed_cache(&git.worktree_root_get().join(".letopis"), &pinned)
                     .unwrap();
             let provenance = ProvenanceService::new(
-                Box::new(GitRepository::open(root).unwrap()),
-                LocalFileSystem::open(root).unwrap(),
+                Box::new(GitRepository::open(root, &[crate::utils::SERVICE_DIRECTORY]).unwrap()),
+                LocalFileSystem::new(root).unwrap(),
             );
             let provider = crate::build_embedding_provider().unwrap();
-            let graph = GraphDiagnosticsService::new();
+            let storage = std::rc::Rc::new(storage);
+            let graph = GraphDiagnosticsService::new(std::rc::Rc::clone(&storage));
             let mut status = StatusService {
-                storage: Box::new(storage),
+                storage,
                 files: &files,
                 graph: &graph,
                 provenance: &provenance,
@@ -2487,21 +2932,27 @@ mod tests {
         }
 
         fn build_service(root: &Path) -> Service {
-            let git = GitRepository::open(root).unwrap();
-            let mut filesystem = LocalFileSystem::open(git.get_root()).unwrap();
-            filesystem.configure_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
-            let directory = filesystem.open_service_directory().unwrap();
-            let storage =
-                SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory).unwrap();
+            let git = GitRepository::open(root, &[crate::utils::SERVICE_DIRECTORY]).unwrap();
+            let mut filesystem = LocalFileSystem::new(git.worktree_root_get()).unwrap();
+            filesystem.configure_file_test(TIME, Box::new(|| reach_checkpoint("contended")));
+            let directory = filesystem
+                .directory_create_by_path(std::path::Path::new(".letopis"))
+                .unwrap();
+            let storage = crate::storage::open_confined_test_storage(
+                &git.worktree_root_get().join(".letopis"),
+                &directory,
+            )
+            .unwrap();
             let provenance = ProvenanceService::new(
-                Box::new(GitRepository::open(root).unwrap()),
-                LocalFileSystem::open(root).unwrap(),
+                Box::new(GitRepository::open(root, &[crate::utils::SERVICE_DIRECTORY]).unwrap()),
+                LocalFileSystem::new(root).unwrap(),
             );
             DocumentRefreshService {
                 git,
+                clock: Box::new(crate::process::SystemClock::at(TIME)),
                 filesystem,
                 markdown: MarkdownParser::new(),
-                storage: Box::new(storage),
+                storage: std::rc::Rc::new(storage.cache),
                 provenance,
             }
         }
@@ -2517,26 +2968,34 @@ mod tests {
             output.stdout
         }
 
-        fn seed_vectors(storage: &mut dyn Storage) {
+        fn seed_vectors(storage: &crate::storage::TestDatabases) {
             let identity = Sha256::digest(b"model identity");
-            storage.reset_vectors(None, &identity).unwrap();
-            let VectorOutcome::Current(mut unit) =
-                storage.begin_vector_write_tx(&identity).unwrap()
-            else {
-                panic!("identity changed");
-            };
-            unit.store_vector(&Sha256::digest(b"retained vector"), &[1.0, 0.0], 2)
+            storage.vectors.reset_vectors(None, &identity).unwrap();
+            storage
+                .vectors
+                .with_write_tx(&identity, || {
+                    let unit = &storage.vectors;
+                    unit.store_vector(&Sha256::digest(b"retained vector"), &[1.0, 0.0], 2)
+                        .unwrap();
+                    let failure = Sha256::digest(b"failed vector");
+                    assert!(
+                        unit.embed_failures_upsert_by_search_hash_and_attempts(&failure, 3)
+                            .unwrap()
+                    );
+                    unit.embed_failures_update_by_search_hash(&failure, "safe failure")
+                        .unwrap();
+                    unit.query_error_upsert_by_id(7, "safe query error")
+                        .unwrap();
+
+                    Ok::<_, StorageError>(())
+                })
+                .map(get_current)
                 .unwrap();
-            let failure = Sha256::digest(b"failed vector");
-            assert!(unit.reserve_attempt(&failure, 3).unwrap());
-            unit.record_failure(&failure, "safe failure").unwrap();
-            unit.set_query_error(7, "safe query error").unwrap();
-            unit.commit().unwrap();
         }
 
         mod reindex {
             use super::{Fixture, LATEST, NEW, Worker, build_service, get_state, get_tokens};
-            use crate::service::Refresher;
+            use crate::service::{CacheDatabase, Refresher, StorageRead};
             use rusqlite::Connection;
             use std::{fs, os::unix::process::ExitStatusExt};
 
@@ -2578,27 +3037,34 @@ mod tests {
                 let fixture = Fixture::new();
                 fixture.edit(NEW);
                 let expected = fixture.build_expected(NEW, "BravoToken");
-                let mut storage = build_service(fixture.root.path()).storage;
-                let mut pinned = storage.begin_read_tx().unwrap();
-                let fts = Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
-                fts.execute_batch("begin").unwrap();
-                assert_eq!(get_tokens(&fts), fixture.old.tokens);
-                let mut worker = Worker::spawn(fixture.root.path(), "reindex");
-                worker.reach("before_commit");
-                assert_eq!(get_state(fixture.root.path()), fixture.old);
-                // When: the reindex worker is allowed to commit.
-                worker.resume();
-                worker.finish();
-                // Then: old readers keep the old state and a fresh read sees the complete new state.
-                assert_eq!(pinned.get_revision(), 1);
-                assert_eq!(pinned.get_nodes().unwrap(), fixture.old.nodes);
-                assert_eq!(
-                    pinned.get_edges_by_source_id(None).unwrap(),
-                    fixture.old.edges
-                );
-                assert_eq!(pinned.get_files().unwrap(), fixture.old.files);
-                assert_eq!(get_tokens(&fts), fixture.old.tokens);
-                assert_eq!(get_state(fixture.root.path()), expected);
+                let storage = build_service(fixture.root.path()).storage;
+                storage
+                    .with_read_tx(|| -> crate::service::StorageResult<()> {
+                        let pinned = storage.as_ref();
+                        let fts = Connection::open(fixture.root.path().join(".letopis/cache.db"))
+                            .unwrap();
+                        fts.execute_batch("begin").unwrap();
+                        assert_eq!(get_tokens(&fts), fixture.old.tokens);
+                        let mut worker = Worker::spawn(fixture.root.path(), "reindex");
+                        worker.reach("before_commit");
+                        assert_eq!(get_state(fixture.root.path()), fixture.old);
+                        // When: the reindex worker is allowed to commit.
+                        worker.resume();
+                        worker.finish();
+                        // Then: old readers keep the old state and a fresh read sees the complete new state.
+                        assert_eq!(pinned.project_get_by_id().unwrap(), 1);
+                        assert_eq!(pinned.nodes_get().unwrap(), fixture.old.nodes);
+                        assert_eq!(
+                            pinned.edges_get_by_source_id(None).unwrap(),
+                            fixture.old.edges
+                        );
+                        assert_eq!(pinned.files_get().unwrap(), fixture.old.files);
+                        assert_eq!(get_tokens(&fts), fixture.old.tokens);
+                        assert_eq!(get_state(fixture.root.path()), expected);
+
+                        Ok(())
+                    })
+                    .unwrap();
             }
 
             #[test]
@@ -2644,28 +3110,26 @@ mod tests {
 
     mod reading {
         use super::{CountingMarkdown, TestFiles, TestProvenance, build_candidates, build_service};
-        use crate::service::{ReadTransaction, VectorWrite};
+        use crate::service::CacheDatabase;
+        use crate::service::TransactionError;
         use crate::{
             domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
             service::{
-                BasisRetainer, CacheWrite, DocumentRefreshService, DocumentResult, ElementAddress,
-                EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary, EmbeddingWork,
-                FileRow, GraphNeighbor, GraphNodeRef, GraphRead, NeighborPageRequest, NodeMetadata,
-                ProvenanceObservation, ProvenanceRequest, QueryError, Refresher, SnapshotError,
-                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage,
-                StorageRead, StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
+                BasisRetainer, DocumentRefreshService, DocumentResult, ElementAddress,
+                EmbeddingFailure, EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef, GraphRead,
+                NeighborPageRequest, NodeMetadata, ProvenanceObservation, ProvenanceRequest,
+                QueryError, Refresher, SnapshotError, SourceProvenance, SourceRevisionComparison,
+                SourceRevisionRequest, StorageRead, StorageResult, StoredNode, TextMatch,
+                VectorMatch, VectorOutcome,
             },
         };
         use std::{cell::Cell, collections::BTreeSet, num::NonZeroUsize, rc::Rc};
 
         struct ReadingStorage {
-            inner: Box<dyn Storage>,
+            inner: Rc<crate::storage::CacheStorage>,
             reads: Rc<Cell<usize>>,
         }
-        struct ReadingView<'a> {
-            inner: Box<dyn ReadTransaction + 'a>,
-            reads: Rc<Cell<usize>>,
-        }
+
         struct RetainingProvenance;
 
         #[test]
@@ -2675,9 +3139,7 @@ mod tests {
             initial.refresh().unwrap();
             let mut node = initial
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_nodes()
+                .with_read_tx(|| initial.storage.nodes_get())
                 .unwrap()
                 .remove(0)
                 .metadata;
@@ -2685,15 +3147,20 @@ mod tests {
                 panic!()
             };
             knowledge.source_snapshot = Some(TreeOid::parse(&"a".repeat(40)).unwrap());
-            let mut write = initial.storage.begin_cache_write_tx().unwrap();
-            write.upsert_node(&node).unwrap();
-            write.commit().unwrap();
+            initial
+                .storage
+                .with_write_tx(|| initial.storage.nodes_upsert_by_id(&node))
+                .unwrap();
             let reads = Rc::new(Cell::new(0));
+            let files = TestFiles::new();
             let mut service = DocumentRefreshService {
                 git: build_candidates(),
-                filesystem: TestFiles::new(),
+                clock: Box::new(crate::service::document_refresher::tests::TestClock(
+                    Rc::clone(&files.now),
+                )),
+                filesystem: files,
                 markdown: CountingMarkdown(Cell::new(0)),
-                storage: Box::new(ReadingStorage {
+                storage: Rc::new(ReadingStorage {
                     inner: initial.storage,
                     reads: Rc::clone(&reads),
                 }),
@@ -2710,128 +3177,140 @@ mod tests {
             assert_eq!(service.markdown.0.get(), 0);
         }
 
-        impl Storage for ReadingStorage {
-            fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
-                Ok(Box::new(ReadingView {
-                    inner: self.inner.begin_read_tx()?,
-                    reads: Rc::clone(&self.reads),
-                }))
+        use crate::service::utils::cache_test_support::delegate_cache_writes;
+        impl crate::service::CacheDatabase for ReadingStorage {
+            delegate_cache_writes!(self => self.inner.as_ref());
+
+            fn with_read_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_read_tx(operation)
             }
-            fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>> {
-                self.inner.begin_cache_write_tx()
-            }
-            fn reset_vectors(
-                &mut self,
-                observed: Option<&Sha256>,
-                identity: &Sha256,
-            ) -> StorageResult<VectorOutcome<bool>> {
-                self.inner.reset_vectors(observed, identity)
-            }
-            fn begin_vector_write_tx(
-                &mut self,
-                expected: &Sha256,
-            ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>> {
-                self.inner.begin_vector_write_tx(expected)
-            }
-        }
-        impl<'a> GraphRead for ReadingView<'a> {
-            fn get_node_ref_by_id(
-                &mut self,
-                id: &ElementAddress,
-            ) -> StorageResult<Option<GraphNodeRef>> {
-                self.inner.get_node_ref_by_id(id)
-            }
-            fn get_neighbor_page(
-                &mut self,
-                request: &NeighborPageRequest<'_>,
-            ) -> StorageResult<Vec<GraphNeighbor>> {
-                self.inner.get_neighbor_page(request)
-            }
-        }
-        impl<'a> StorageRead for ReadingView<'a> {
-            fn get_embedding_status(
-                &mut self,
-                policy: &EmbeddingStatusPolicy,
-            ) -> StorageResult<EmbeddingStatusSummary> {
-                self.inner.get_embedding_status(policy)
+            fn with_status_read_tx<T, E, F>(
+                &self,
+                operation: F,
+            ) -> Result<Option<T>, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_status_read_tx(operation)
             }
 
-            fn get_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
+            fn with_write_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_write_tx(operation)
+            }
+        }
+
+        impl GraphRead for ReadingStorage {
+            fn nodes_get_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+                GraphRead::nodes_get_by_id(self.inner.as_ref(), id)
+            }
+            fn edges_get_by_row_id_and_type(
+                &self,
+                request: &NeighborPageRequest<'_>,
+            ) -> StorageResult<Vec<GraphNeighbor>> {
+                self.inner.edges_get_by_row_id_and_type(request)
+            }
+        }
+        impl StorageRead for ReadingStorage {
+            fn nodes_get_by_kind(&self) -> StorageResult<u64> {
+                self.inner.nodes_get_by_kind()
+            }
+            fn get_vector_coverage(&self) -> StorageResult<u64> {
+                self.inner.get_vector_coverage()
+            }
+            fn embed_failures_get_by_kind_and_search_hash_and_attempts(
+                &self,
+                max_attempts: u64,
+            ) -> StorageResult<Vec<EmbeddingFailure>> {
+                self.inner
+                    .embed_failures_get_by_kind_and_search_hash_and_attempts(max_attempts)
+            }
+
+            fn nodes_get(&self) -> StorageResult<Vec<StoredNode>> {
                 panic!("warm refresh loaded node metadata")
             }
-            fn get_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
+            fn nodes_get_by_source_snapshot(&self) -> StorageResult<BTreeSet<TreeOid>> {
                 self.reads.set(self.reads.get() + 1);
-                self.inner.get_source_snapshots()
+                self.inner.nodes_get_by_source_snapshot()
             }
-            fn get_next_embedding_work_by_id_and_max_attempts(
-                &mut self,
+            fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                &self,
                 expected: &Sha256,
                 max_attempts: u64,
                 after: Option<&KnowledgeId>,
             ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>> {
-                self.inner.get_next_embedding_work_by_id_and_max_attempts(
-                    expected,
-                    max_attempts,
-                    after,
-                )
+                self.inner
+                    .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                        expected,
+                        max_attempts,
+                        after,
+                    )
             }
-            fn get_vector_dimensions(
-                &mut self,
+            fn vector_index_config_get_by_id(
+                &self,
                 expected: &Sha256,
             ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>> {
-                self.inner.get_vector_dimensions(expected)
+                self.inner.vector_index_config_get_by_id(expected)
             }
-            fn get_node_by_id(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
-                self.inner.get_node_by_id(id)
+            fn nodes_get_by_id(&self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
+                StorageRead::nodes_get_by_id(self.inner.as_ref(), id)
             }
-            fn get_edges_by_source_id(
-                &mut self,
+            fn edges_get_by_source_id(
+                &self,
                 source: Option<&KnowledgeId>,
             ) -> StorageResult<Vec<Edge>> {
-                self.inner.get_edges_by_source_id(source)
+                self.inner.edges_get_by_source_id(source)
             }
-            fn get_file_by_path(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
-                self.inner.get_file_by_path(path)
+            fn files_get_by_path(&self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
+                self.inner.files_get_by_path(path)
             }
-            fn get_files(&mut self) -> StorageResult<Vec<FileRow>> {
-                self.inner.get_files()
+            fn files_get(&self) -> StorageResult<Vec<FileRow>> {
+                self.inner.files_get()
             }
-            fn get_text_matches_by_expression(
-                &mut self,
+            fn text_index_get_by_expression(
+                &self,
                 expression: &str,
             ) -> StorageResult<Vec<TextMatch>> {
-                self.inner.get_text_matches_by_expression(expression)
+                self.inner.text_index_get_by_expression(expression)
             }
-            fn get_vector_by_search_hash(
-                &mut self,
+            fn vector_keys_get_by_search_hash(
+                &self,
                 expected: &Sha256,
                 search_hash: &Sha256,
             ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>> {
-                self.inner.get_vector_by_search_hash(expected, search_hash)
+                self.inner
+                    .vector_keys_get_by_search_hash(expected, search_hash)
             }
-            fn get_nearest_vectors(
-                &mut self,
+            fn vector_index_get_by_vector(
+                &self,
                 expected: &Sha256,
                 query: &[f32],
                 dimensions: usize,
             ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
-                self.inner.get_nearest_vectors(expected, query, dimensions)
+                self.inner
+                    .vector_index_get_by_vector(expected, query, dimensions)
             }
-            fn get_failure_by_search_hash(
-                &mut self,
+            fn embed_failures_get_by_search_hash(
+                &self,
                 expected: &Sha256,
                 search_hash: &Sha256,
             ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>> {
-                self.inner.get_failure_by_search_hash(expected, search_hash)
+                self.inner
+                    .embed_failures_get_by_search_hash(expected, search_hash)
             }
-            fn get_query_error(&mut self) -> StorageResult<Option<QueryError>> {
-                self.inner.get_query_error()
+            fn query_error_get_by_id(&self) -> StorageResult<Option<QueryError>> {
+                self.inner.query_error_get_by_id()
             }
-            fn get_revision(&self) -> u64 {
-                self.inner.get_revision()
+            fn project_get_by_id(&self) -> StorageResult<u64> {
+                self.inner.project_get_by_id()
             }
-            fn get_config_identity(&self) -> Option<Sha256> {
-                self.inner.get_config_identity()
+            fn meta_get_by_id(&self) -> StorageResult<Option<Sha256>> {
+                self.inner.meta_get_by_id()
             }
         }
         impl SourceProvenance for RetainingProvenance {
@@ -2878,7 +3357,7 @@ mod tests {
 
     mod reindex {
         use super::{INITIAL, build_service, get_matches};
-        use crate::service::Refresher;
+        use crate::service::{CacheDatabase, Refresher, StorageRead};
         use rusqlite::Connection;
 
         #[test]
@@ -2935,32 +3414,701 @@ mod tests {
             service.refresh().unwrap();
             let before = service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_files()
+                .with_read_tx(|| service.storage.files_get())
                 .unwrap();
             service.filesystem.reset_counts();
             service.filesystem.fail_on_read.set(Some(3));
             // When: reindex fails during publication capture.
             assert!(service.reindex().is_err());
             // Then: the prior revision, file state and FTS entry remain intact.
-            let mut read = service.storage.begin_read_tx().unwrap();
-            assert_eq!(read.get_revision(), 1);
-            assert_eq!(read.get_files().unwrap(), before);
-            assert_eq!(
-                read.get_text_matches_by_expression("AlphaToken").unwrap()[0]
-                    .id
-                    .as_str(),
-                "note.md"
-            );
+            let cache = std::rc::Rc::clone(&service.storage);
+            cache
+                .with_read_tx(|| -> crate::service::StorageResult<()> {
+                    let read = cache.as_ref();
+                    assert_eq!(read.project_get_by_id().unwrap(), 1);
+                    assert_eq!(read.files_get().unwrap(), before);
+                    assert_eq!(
+                        read.text_index_get_by_expression("AlphaToken").unwrap()[0]
+                            .id
+                            .as_str(),
+                        "note.md"
+                    );
+
+                    Ok(())
+                })
+                .unwrap();
         }
     }
 
     fn build_candidates() -> Candidates {
         let mut candidates = Candidates::new();
         candidates
-            .expect_get_candidates()
-            .returning(|| Ok(vec![RepoPath::parse("note.md").unwrap()]));
+            .expect_worktree_paths_get()
+            .returning(|| Ok(b"note.md\0".to_vec()));
         candidates
+    }
+}
+
+#[cfg(test)]
+mod corpus {
+    use crate::filesystem::LocalFileSystem;
+    use crate::git::GitRepository;
+    use crate::process_test_support::{ObjectFormat, TempRepo};
+    use crate::service::document_refresher::DocumentRefreshService;
+    use crate::service::utils::parse_candidates;
+    use crate::{domain::RepoPath, service::DocumentErrorKind};
+    use std::fs;
+    use std::{path::Path, rc::Rc};
+
+    #[test]
+    fn candidates_ignore_symlinks_with_unsupported_names() {
+        // Given: a tracked symlink with a name invalid as a document path.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let root = repo.get_root();
+        std::os::unix::fs::symlink("target", root.join("bad#anchor.md")).unwrap();
+        repo.run_git_successfully(&["add", "bad#anchor.md"], None);
+        // When: the application selects document candidates from raw Git paths.
+        let candidates = build_selector(root).unwrap().get_candidates().unwrap();
+        // Then: the symlink is not validated as a document path.
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            ["live.md"]
+        );
+    }
+
+    #[test]
+    fn candidates_exclude_live_symlinks_independently_of_index_mode() {
+        // Given: tracked and untracked paths whose live types differ from the index.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let root = repo.get_root();
+        fs::write(root.join("regular.md"), b"regular").unwrap();
+        fs::write(root.join("changed-to-link.md"), b"regular").unwrap();
+        std::os::unix::fs::symlink("regular.md", root.join("changed-to-file.md")).unwrap();
+        std::os::unix::fs::symlink("regular.md", root.join("tracked-link.md")).unwrap();
+        repo.run_git_successfully(
+            &[
+                "add",
+                "regular.md",
+                "changed-to-link.md",
+                "changed-to-file.md",
+                "tracked-link.md",
+            ],
+            None,
+        );
+        fs::remove_file(root.join("changed-to-link.md")).unwrap();
+        std::os::unix::fs::symlink("regular.md", root.join("changed-to-link.md")).unwrap();
+        fs::remove_file(root.join("changed-to-file.md")).unwrap();
+        fs::write(root.join("changed-to-file.md"), b"now regular").unwrap();
+        std::os::unix::fs::symlink("regular.md", root.join("untracked-link.md")).unwrap();
+        // When: application selection observes current filesystem types for raw Git paths.
+        let candidates = build_selector(root).unwrap().get_candidates().unwrap();
+        // Then: only live regular files and the fixture's ordinary Markdown are returned.
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            ["changed-to-file.md", "live.md", "regular.md"]
+        );
+    }
+
+    #[test]
+    fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
+        // Given: deleted tracked, tracked ignored, untracked ignored, and private paths coexist.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        for path in [
+            "deleted.md",
+            "tracked-ignored.md",
+            "space name.markdown",
+            "ignored.md",
+            "plain.txt",
+        ] {
+            fs::write(repo.get_root().join(path), b"bytes").unwrap();
+        }
+        repo.run_git_successfully(&["add", "deleted.md", "tracked-ignored.md"], None);
+        fs::remove_file(repo.get_root().join("deleted.md")).unwrap();
+        fs::write(repo.get_root().join(".gitignore"), b"*ignored.md\n").unwrap();
+        fs::create_dir(repo.get_root().join(".letopis")).unwrap();
+        fs::write(repo.get_root().join(".letopis/private.md"), b"private").unwrap();
+        let before = repo.capture_fixture_state();
+        let objects = repo.run_git_successfully(&["count-objects", "-v"], None);
+        let refs = repo.run_git_successfully(&["show-ref"], None);
+        let git = build_selector(repo.get_root()).unwrap();
+        // When: the application selects current document candidates.
+        let candidates = git.get_candidates().unwrap();
+        // Then: deleted and ignored tracked paths remain; ignored untracked and private paths do not. User state is unchanged.
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            [
+                "deleted.md",
+                "live.md",
+                "space name.markdown",
+                "tracked-ignored.md"
+            ]
+        );
+        assert_eq!(repo.capture_fixture_state(), before);
+        assert_eq!(
+            repo.run_git_successfully(&["count-objects", "-v"], None),
+            objects
+        );
+        assert_eq!(repo.run_git_successfully(&["show-ref"], None), refs);
+    }
+
+    #[test]
+    fn shared_repository_observes_index_and_ignore_edits_between_listings() {
+        for format in crate::process_test_support::FORMATS {
+            // Given: one shared repository whose index and ignore stack have already been read.
+            let repo = TempRepo::new(format);
+            fs::write(repo.get_root().join("ignored.md"), b"ignored").unwrap();
+            fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
+            let git = build_selector(repo.get_root()).unwrap();
+            let shared = DocumentRefreshService {
+                git: git.git.clone(),
+                filesystem: LocalFileSystem::new(repo.get_root()).unwrap(),
+                clock: Box::new(crate::process::SystemClock::new()),
+                markdown: (),
+                storage: Rc::new(()),
+                provenance: (),
+            };
+            assert_eq!(
+                git.get_candidates().unwrap(),
+                [RepoPath::parse("live.md").unwrap()]
+            );
+            // When: Git stages an ignored file and removes the previous index entry.
+            repo.run_git_successfully(&["add", "-f", "ignored.md"], None);
+            repo.run_git_successfully(&["rm", "--cached", "-f", "live.md"], None);
+            fs::write(repo.get_root().join(".gitignore"), b"ignored.md\nlive.md\n").unwrap();
+            // Then: the clone sees the new index and fresh ignore bytes without reopening.
+            assert_eq!(
+                shared.get_candidates().unwrap(),
+                [RepoPath::parse("ignored.md").unwrap()]
+            );
+            // When: remove the tracked file and make the other live file eligible again.
+            repo.run_git_successfully(&["rm", "--cached", "-f", "ignored.md"], None);
+            fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
+            // Then: the original handle also refreshes its index/exclude observation.
+            assert_eq!(
+                git.get_candidates().unwrap(),
+                [RepoPath::parse("live.md").unwrap()]
+            );
+        }
+    }
+
+    #[test]
+    fn candidates_reject_unsupported_raw_paths() {
+        use crate::service::DocumentErrorKind;
+        for raw in [
+            b"bad\xff.md".to_vec(),
+            b"bad#anchor.md".to_vec(),
+            b"bad\nline.md".to_vec(),
+        ] {
+            // Given: indexed Markdown names contain invalid UTF-8, a hash, or a newline.
+            let repo = TempRepo::new(ObjectFormat::Sha1);
+            // Git's index supports raw paths even when the host filesystem rejects them.
+            let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+            let mut entry = format!("100644 {oid}\t").into_bytes();
+            entry.extend(raw);
+            entry.push(0);
+            repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
+            let git = build_selector(repo.get_root()).unwrap();
+            // When: the application selects current document candidates.
+            let error = git.get_candidates().unwrap_err();
+            // Then: unsupported names produce InvalidRequest without exposing the filename.
+            assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+            assert!(!error.to_string().contains("bad"));
+        }
+    }
+
+    #[test]
+    fn candidates_deduplicate_unmerged_index_stages() {
+        // Given: three conflict stages address the same conflict.md alongside live.md.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"conflict"));
+        let entries = format!(
+            "0 {}\tconflict.md\n100644 {oid} 1\tconflict.md\n100644 {oid} 2\tconflict.md\n100644 {oid} 3\tconflict.md\n",
+            "0".repeat(40)
+        );
+        repo.run_git_successfully(&["update-index", "--index-info"], Some(entries.as_bytes()));
+        let git = build_selector(repo.get_root()).unwrap();
+        // When: the application selects current document candidates.
+        let candidates = git.get_candidates().unwrap();
+        // Then: conflict.md appears once beside live.md.
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            ["conflict.md", "live.md"]
+        );
+    }
+
+    #[test]
+    fn candidates_exclude_metadata_before_validating_paths() {
+        for raw in [
+            b".letopis/bad#anchor.md".as_slice(),
+            b".letopis/bad\xff.md",
+            b"nested/.letopis/bad\xff.markdown",
+        ] {
+            // Given: Git can list metadata names unsupported by the corpus model.
+            let repo = TempRepo::new(ObjectFormat::Sha1);
+            fs::write(repo.get_root().join(".letopis-notes.md"), b"candidate").unwrap();
+            let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+            let mut entry = format!("100644 {oid}\t").into_bytes();
+            entry.extend(raw);
+            entry.push(0);
+            repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
+            let git = build_selector(repo.get_root()).unwrap();
+            // When: the application selects current document candidates.
+            let candidates = git.get_candidates().unwrap();
+            // Then: .letopis components are excluded before decoding; .letopis-notes.md and live.md remain.
+            assert_eq!(
+                candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+                [".letopis-notes.md", "live.md"]
+            );
+        }
+    }
+
+    #[test]
+    fn candidates_exclude_raw_git_metadata_components() {
+        // Given: a raw response contains .git components and the ordinary .git-notes.md name.
+        let raw = b".git/bad#anchor.md\0nested/.git/bad\xff.markdown\0.git-notes.md\0";
+        // When: the application parses the raw response.
+        let candidates = parse_candidates(raw).unwrap();
+        // Then: only .git-notes.md remains.
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            [".git-notes.md"]
+        );
+    }
+
+    #[test]
+    fn rejects_unterminated_candidates_and_accepts_empty_output() {
+        // Given: an unterminated candidate response and an empty response.
+        // When: parse each response independently.
+        let malformed = parse_candidates(b"note.md").unwrap_err();
+        let empty = parse_candidates(b"").unwrap();
+        // Then: the unterminated response is InternalError and the empty response has no candidates.
+        assert_eq!(malformed.get_kind(), DocumentErrorKind::InternalError);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn corpus_matches_git_for_nested_excludes_staged_deletion_and_symlinks() {
+        // Given: index membership and three exclude sources disagree with live files.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        prepare_exclude_fixture(&repo);
+        let before = repo.capture_fixture_state();
+        let expected = [
+            "dir.md/inside.md",
+            "live.md",
+            "module.md",
+            "nested/keep.md",
+            "staged-delete.md",
+            "symlink.md",
+            "tracked-ignore.md",
+        ];
+        let oracle = repo.run_git_successfully(
+            &[
+                "ls-files",
+                "-z",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+            ],
+            None,
+        );
+        let mut oracle: Vec<_> = oracle
+            .split(|byte| *byte == 0)
+            .filter(|path| path.ends_with(b".md"))
+            .map(|path| std::str::from_utf8(path).unwrap())
+            .collect();
+        oracle.sort_unstable();
+        assert_eq!(oracle, expected);
+        // When: the library lists the current worktree's real index and ignore stack.
+        let actual = build_selector(repo.get_root())
+            .unwrap()
+            .get_candidates()
+            .unwrap();
+        // Then: all eligible oracle paths except the live symlink are returned.
+        assert_eq!(
+            actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            [
+                "dir.md/inside.md",
+                "live.md",
+                "module.md",
+                "nested/keep.md",
+                "staged-delete.md",
+                "tracked-ignore.md"
+            ]
+        );
+        assert_eq!(repo.capture_fixture_state(), before);
+    }
+
+    #[test]
+    fn linked_worktree_listing_uses_its_own_index() {
+        // Given: two worktrees share objects but have distinct staged paths.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let parent = tempfile::tempdir().unwrap();
+        let linked = parent.path().join("linked");
+        repo.run_git_successfully(
+            &[
+                "worktree",
+                "add",
+                "--detach",
+                linked.to_str().unwrap(),
+                "HEAD",
+            ],
+            None,
+        );
+        fs::write(linked.join("linked-only.md"), b"linked").unwrap();
+        repo.run_git_successfully(
+            &["-C", linked.to_str().unwrap(), "add", "linked-only.md"],
+            None,
+        );
+        fs::remove_file(linked.join("linked-only.md")).unwrap();
+        let expected = repo.run_git_successfully(
+            &[
+                "-C",
+                linked.to_str().unwrap(),
+                "ls-files",
+                "-z",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+            ],
+            None,
+        );
+        // When: discovery begins in the linked worktree rather than the common gitdir.
+        let actual = build_selector(&linked).unwrap().get_candidates().unwrap();
+        // Then: the deleted-but-staged linked path is retained and the other index is untouched.
+        assert!(
+            expected
+                .split(|byte| *byte == 0)
+                .any(|path| path == b"linked-only.md")
+        );
+        assert!(actual.contains(&RepoPath::parse("linked-only.md").unwrap()));
+        assert!(
+            !build_selector(repo.get_root())
+                .unwrap()
+                .get_candidates()
+                .unwrap()
+                .contains(&RepoPath::parse("linked-only.md").unwrap())
+        );
+    }
+
+    #[test]
+    fn corpus_ignores_replacements_for_index_backed_ignore_files() {
+        // Given: a sparse ignore file has a replacement that would expose a hidden document.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        fs::write(repo.get_root().join(".gitignore"), b"hidden.md\n").unwrap();
+        fs::write(repo.get_root().join("hidden.md"), b"hidden").unwrap();
+        repo.run_git_successfully(&["add", ".gitignore"], None);
+        let original = repo.get_oid(&["rev-parse", ":.gitignore"], None);
+        let replacement = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b""));
+        repo.run_git_successfully(&["replace", &original, &replacement], None);
+        repo.run_git_successfully(&["update-index", "--skip-worktree", ".gitignore"], None);
+        fs::remove_file(repo.get_root().join(".gitignore")).unwrap();
+        // When: candidate enumeration falls back to the index's raw ignore blob.
+        let actual = build_selector(repo.get_root())
+            .unwrap()
+            .get_candidates()
+            .unwrap();
+        // Then: replacement refs cannot change corpus membership.
+        assert_eq!(
+            actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            ["live.md"]
+        );
+    }
+
+    #[test]
+    fn sparse_index_expands_index_tree_membership_without_changing_user_state() {
+        for format in crate::process_test_support::FORMATS {
+            // Given: a collapsed staged tree differs from HEAD and restored files match ignores.
+            let repo = TempRepo::new(format);
+            let tree = repo.prepare_sparse_index();
+            let expected = [
+                "keep/a.md",
+                "live.md",
+                "omit/b.md",
+                "omit/deleted.md",
+                "omit/nested/c.markdown",
+                "omit/staged.md",
+            ];
+            let oracle = repo.run_git_successfully(
+                &[
+                    "ls-files",
+                    "-z",
+                    "--cached",
+                    "--others",
+                    "--exclude-standard",
+                ],
+                None,
+            );
+            let mut oracle: Vec<_> = oracle
+                .split(|byte| *byte == 0)
+                .filter(|path| path.ends_with(b".md") || path.ends_with(b".markdown"))
+                .map(|path| std::str::from_utf8(path).unwrap())
+                .collect();
+            oracle.sort_unstable();
+            assert_eq!(oracle, expected);
+            let empty = repo.get_oid(&["mktree"], Some(b""));
+            repo.run_git_successfully(&["replace", &tree, &empty], None);
+            let before = repo.capture_fixture_state();
+            // When: listing expands the actual index's tree, including deleted tracked paths.
+            let actual = build_selector(repo.get_root())
+                .unwrap()
+                .get_candidates()
+                .unwrap();
+            // Then: tracked paths survive ignores, untracked ignored paths do not.
+            assert_eq!(
+                actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+                expected
+            );
+            assert_eq!(repo.capture_fixture_state(), before);
+        }
+    }
+
+    #[test]
+    fn sparse_index_rejects_missing_corrupt_trees_and_late_alternates_safely() {
+        for format in crate::process_test_support::FORMATS {
+            for failure in ["missing", "corrupt", "alternates"] {
+                // Given: a valid collapsed index was opened before its object store changed.
+                let repo = TempRepo::new(format);
+                let tree = repo.prepare_sparse_index();
+                let git = build_selector(repo.get_root()).unwrap();
+                match failure {
+                    "missing" => fs::remove_file(repo.build_object_path(&tree)).unwrap(),
+                    "corrupt" => {
+                        let empty = repo.get_oid(&["mktree"], Some(b""));
+                        repo.replace_loose_object(&tree, &empty);
+                    }
+                    _ => fs::write(
+                        repo.get_root().join(".git/objects/info/alternates"),
+                        b"PRIVATE_DONOR_PATH\n",
+                    )
+                    .unwrap(),
+                }
+                let before = repo.capture_fixture_state();
+                // When: listing needs the collapsed tree rather than trusting HEAD or prior policy.
+                let error = git.get_candidates().unwrap_err();
+                // Then: no incomplete successful listing or raw object/path payload escapes.
+                assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
+                assert_eq!(error.to_string(), "cannot list document candidates");
+                assert_eq!(repo.capture_fixture_state(), before);
+            }
+        }
+    }
+
+    #[test]
+    fn irrelevant_non_utf8_paths_are_filtered_before_decoding() {
+        // Given: a raw irrelevant indexed name that the host need not create.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        stage_raw_path(&repo, b"irrelevant\xff.txt", "100644");
+        let service = build_selector(repo.get_root()).unwrap();
+        // When: the application selects documents from raw Git bytes.
+        let candidates = service.get_candidates().unwrap();
+        // Then: only the ordinary fixture document remains.
+        assert_eq!(candidates, [RepoPath::parse("live.md").unwrap()]);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn non_utf8_symlink_is_skipped_before_decoding_but_regular_markdown_fails() {
+        use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+        // Given: an actual non-UTF-8 Markdown symlink and its tracked name.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let name = OsStr::from_bytes(b"raw\xff.md");
+        std::os::unix::fs::symlink("missing", repo.get_root().join(name)).unwrap();
+        stage_raw_path(&repo, b"raw\xff.md", "120000");
+        let service = build_selector(repo.get_root()).unwrap();
+        // When: the final symlink is observed before UTF-8 decoding.
+        let candidates = service.get_candidates().unwrap();
+        // Then: the invalid-byte symlink never becomes an unsupported document.
+        assert_eq!(candidates, [RepoPath::parse("live.md").unwrap()]);
+        // Given: the same tracked raw name is now an ordinary file.
+        fs::remove_file(repo.get_root().join(name)).unwrap();
+        fs::write(repo.get_root().join(name), b"ordinary").unwrap();
+        // When: selection observes the changed type.
+        let error = service.get_candidates().unwrap_err();
+        // Then: relevant ordinary file encoding remains an invalid request.
+        assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+        assert_eq!(error.to_string(), "unsupported document path");
+        assert!(
+            std::error::Error::source(&error)
+                .unwrap()
+                .is::<std::str::Utf8Error>()
+        );
+    }
+
+    #[test]
+    fn candidate_parent_symlink_is_a_listing_failure() {
+        // Given: a tracked path beneath a live symlink to an outside directory.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let outside = tempfile::tempdir().unwrap();
+        fs::write(outside.path().join("note.md"), b"outside").unwrap();
+        std::os::unix::fs::symlink(outside.path(), repo.get_root().join("linked")).unwrap();
+        stage_raw_path(&repo, b"linked/note.md", "100644");
+        let service = build_selector(repo.get_root()).unwrap();
+        // When: candidate selection observes the path without following parents.
+        let error = service.get_candidates().unwrap_err();
+        // Then: unsafe traversal is fatal with the preserved public listing diagnostic.
+        assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
+        assert_eq!(error.to_string(), "cannot list document candidates");
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
+    #[test]
+    fn unsafe_raw_components_skip_probes_and_keep_lexical_normalization() {
+        use crate::service::MockGitWorktreePaths;
+        // Given: relevant raw paths whose structural form is unsafe to probe.
+        let mut git = MockGitWorktreePaths::new();
+        git.expect_worktree_paths_get()
+            .returning(|| Ok(b"a/../note.md\0./note.md\0a//b.md\0".to_vec()));
+        let service = DocumentRefreshService {
+            git,
+            filesystem: build_root_only_files(),
+            clock: Box::new(crate::process::SystemClock::new()),
+            markdown: (),
+            storage: Rc::new(()),
+            provenance: (),
+        };
+        // When: the service selects and normalizes paths without probing raw file paths.
+        let candidates = service.get_candidates().unwrap();
+        // Then: normalization and deduplication remain owned by RepoPath.
+        assert_eq!(
+            candidates,
+            [
+                RepoPath::parse("a/b.md").unwrap(),
+                RepoPath::parse("note.md").unwrap()
+            ]
+        );
+    }
+
+    #[test]
+    fn root_escape_still_fails_after_skipping_unsafe_raw_probe() {
+        use crate::service::MockGitWorktreePaths;
+        // Given: an escaping path and a filesystem mock that permits only the root observation.
+        let mut git = MockGitWorktreePaths::new();
+        git.expect_worktree_paths_get()
+            .returning(|| Ok(b"../note.md\0".to_vec()));
+        let service = DocumentRefreshService {
+            git,
+            filesystem: build_root_only_files(),
+            clock: Box::new(crate::process::SystemClock::new()),
+            markdown: (),
+            storage: Rc::new(()),
+            provenance: (),
+        };
+        // When: lexical path validation sees the escaping candidate.
+        let error = service.get_candidates().unwrap_err();
+        // Then: it retains the old unsupported-document classification and cause.
+        assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+        assert_eq!(error.to_string(), "unsupported document path");
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
+    #[test]
+    fn replaced_root_is_rejected_even_when_all_raw_paths_are_irrelevant() {
+        use crate::service::MockGitWorktreePaths;
+        // Given: the filesystem root is replaced after its descriptor was pinned.
+        let parent = tempfile::tempdir().unwrap();
+        let root = parent.path().join("root");
+        fs::create_dir(&root).unwrap();
+        let filesystem = LocalFileSystem::new(&root).unwrap();
+        fs::rename(&root, parent.path().join("detached")).unwrap();
+        fs::create_dir(&root).unwrap();
+        let mut git = MockGitWorktreePaths::new();
+        git.expect_worktree_paths_get()
+            .returning(|| Ok(b"irrelevant.txt\0".to_vec()));
+        let service = DocumentRefreshService {
+            git,
+            filesystem,
+            clock: Box::new(crate::process::SystemClock::new()),
+            markdown: (),
+            storage: Rc::new(()),
+            provenance: (),
+        };
+        // When: selection has no eligible leaf to probe.
+        let error = service.get_candidates().unwrap_err();
+        // Then: the original root safety check still fails with the existing diagnostic.
+        assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
+        assert_eq!(error.to_string(), "cannot list document candidates");
+    }
+
+    fn build_root_only_files() -> crate::service::MockFileReader {
+        let mut files = crate::service::MockFileReader::new();
+        files
+            .expect_directory_get_by_path()
+            .withf(|path| path == Path::new("."))
+            .returning(|_| Ok(Some(std::fs::File::open(".").unwrap().into())));
+        files
+    }
+
+    fn stage_raw_path(repo: &TempRepo, path: &[u8], mode: &str) {
+        let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+        let mut entry = format!("{mode} {oid}\t").into_bytes();
+        entry.extend_from_slice(path);
+        entry.push(0);
+        repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
+    }
+
+    fn prepare_exclude_fixture(repo: &TempRepo) {
+        let commit = repo.get_oid(&["rev-parse", "HEAD"], None);
+        repo.run_git_successfully(
+            &[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                &format!("160000,{commit},module.md"),
+            ],
+            None,
+        );
+        fs::create_dir(repo.get_root().join("module.md")).unwrap();
+        fs::write(repo.get_root().join("module.md/hidden.md"), b"submodule").unwrap();
+        for path in ["tracked-ignore.md", "staged-delete.md"] {
+            fs::write(repo.get_root().join(path), b"tracked").unwrap();
+        }
+        repo.run_git_successfully(&["add", "tracked-ignore.md", "staged-delete.md"], None);
+        repo.run_git_successfully(&["rm", "--cached", "staged-delete.md"], None);
+        for directory in ["nested", "dir.md"] {
+            fs::create_dir(repo.get_root().join(directory)).unwrap();
+        }
+        for path in [
+            "nested/keep.md",
+            "nested/drop.md",
+            "dir.md/inside.md",
+            "info-hidden.md",
+            "global-hidden.md",
+        ] {
+            fs::write(repo.get_root().join(path), b"bytes").unwrap();
+        }
+        fs::write(repo.get_root().join(".gitignore"), b"tracked-ignore.md\n").unwrap();
+        fs::write(
+            repo.get_root().join("nested/.gitignore"),
+            b"*.md\n!keep.md\n",
+        )
+        .unwrap();
+        fs::write(
+            repo.get_root().join(".git/info/exclude"),
+            b"info-hidden.md\n",
+        )
+        .unwrap();
+        let global = repo.get_root().join("global-excludes");
+        fs::write(&global, b"global-hidden.md\n").unwrap();
+        repo.run_git_successfully(
+            &["config", "core.excludesFile", global.to_str().unwrap()],
+            None,
+        );
+        std::os::unix::fs::symlink("missing-target", repo.get_root().join("symlink.md")).unwrap();
+    }
+
+    fn build_selector(
+        root: &Path,
+    ) -> Result<
+        DocumentRefreshService<GitRepository, LocalFileSystem, (), (), ()>,
+        crate::service::SnapshotError,
+    > {
+        Ok(DocumentRefreshService {
+            git: GitRepository::open(root, &[crate::utils::SERVICE_DIRECTORY])?,
+            filesystem: LocalFileSystem::new(root).unwrap(),
+            clock: Box::new(crate::process::SystemClock::new()),
+            markdown: (),
+            storage: Rc::new(()),
+            provenance: (),
+        })
     }
 }

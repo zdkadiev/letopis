@@ -33,12 +33,12 @@ fn accepts_valid_responses_between_one_and_ten_mebibytes() {
         "parameters":{"base_url":server.get_base_url()},"max_retries":3}))
     .unwrap();
     let config = EmbeddingConfig::parse(&bytes).unwrap();
-    // When
+    // When: one vector is computed within the ten-mebibyte response limit.
     let vectors = build_embedding_provider()
         .unwrap()
-        .embed(&config, &["input"], None)
+        .vectors_compute_by_texts(&config, &["input"], None)
         .unwrap();
-    // Then
+    // Then: the literal vector is returned after exactly one request.
     assert_eq!(vectors, vec![vec![1.0, 2.0, 3.0]]);
     assert_eq!(server.take_requests().len(), 1);
 }

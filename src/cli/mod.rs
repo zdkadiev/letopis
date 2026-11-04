@@ -4,8 +4,8 @@ mod input;
 mod output;
 mod response;
 
-pub(crate) use input::{Request, parse_request};
-pub(crate) use output::write_response;
+pub(crate) use input::{Request, request_parse};
+pub(crate) use output::response_write;
 /// Owns response serialization and write/flush arbitration for one process.
 pub(crate) use response::{CommandResponse, ResponseResult, ResponseWriter, finish_foreground};
 

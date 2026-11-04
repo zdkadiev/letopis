@@ -1,4 +1,4 @@
-use super::{CommandResponse, Request, ResponseResult, parse_request, write_response};
+use super::{CommandResponse, Request, ResponseResult, request_parse, response_write};
 use crate::service::{CommandErrorKind, Configuration};
 use serde_json::{Value, json};
 use std::{ffi::OsString, io::Read};
@@ -10,17 +10,17 @@ fn rejects_nonempty_config_request_before_io() {
     // Given: invalid argv must fail before stdin or any service is read.
     let mut unread = UnreadInput;
 
-    // When
-    let error = parse_request(
+    // When: the config argv includes an unsupported positional argument.
+    let error = request_parse(
         [OsString::from("config"), OsString::from("extra")].as_slice(),
         &mut unread,
     )
     .unwrap_err();
 
-    // Then
+    // Then: validation fails before the unreadable input is touched.
     assert_eq!(error.get_kind(), CommandErrorKind::InvalidRequest);
 
-    // Given
+    // Given: malformed or nonempty configuration request bodies.
     for body in [
         "null",
         "[]",
@@ -29,32 +29,32 @@ fn rejects_nonempty_config_request_before_io() {
         r#"{"extra":1,"extra":2}"#,
         "{} {}",
     ] {
-        // When
+        // When: each body is parsed as a config request.
         let error =
-            parse_request([OsString::from("config")].as_slice(), body.as_bytes()).unwrap_err();
+            request_parse([OsString::from("config")].as_slice(), body.as_bytes()).unwrap_err();
 
-        // Then
+        // Then: each unsupported body returns invalid_request.
         assert_eq!(error.get_kind(), CommandErrorKind::InvalidRequest, "{body}");
     }
 
-    // Given / When / Then
+    // Given / When / Then: an empty JSON object parses as the config request.
     assert!(matches!(
-        parse_request([OsString::from("config")].as_slice(), b"{}".as_slice()).unwrap(),
+        request_parse([OsString::from("config")].as_slice(), b"{}".as_slice()).unwrap(),
         Request::Config
     ));
 }
 
 #[test]
 fn renders_exact_contract_object_without_warnings() {
-    // Given
+    // Given: a configuration with literal public fields and no warnings.
     let config = Configuration::parse(LITERAL_CONFIG).unwrap();
     let response = Ok(CommandResponse::new(ResponseResult::Config(Some(config))));
 
-    // When
+    // When: the configuration response is written to a buffer.
     let mut output = Vec::new();
-    let exit = write_response(&mut output, response);
+    let exit = response_write(&mut output, response);
 
-    // Then
+    // Then: one successful JSON envelope contains exactly the public configuration.
     assert_eq!(exit, 0);
     let value: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(

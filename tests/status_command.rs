@@ -1,6 +1,9 @@
+use crate::support::storage::get_current;
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
 mod support;
 
-use letopis::service::{NodeMetadata, Storage, VectorOutcome};
+use letopis::service::NodeMetadata;
 use rustix::fs::{FlockOperation, flock};
 use serde_json::{Value, json};
 use std::{
@@ -357,31 +360,7 @@ fn disabled_configuration_reports_zero_and_hides_then_reveals_stored_failures() 
     listener.set_nonblocking(true).unwrap();
     let url = format!("http://{}/api", listener.local_addr().unwrap());
     let config = repo.write_config("ollama", &url, "fixture");
-    let mut storage = repo.open_storage();
-    storage.reset_vectors(None, &config.get_identity()).unwrap();
-    let node = storage
-        .begin_read_tx()
-        .unwrap()
-        .get_nodes()
-        .unwrap()
-        .into_iter()
-        .find_map(|node| match node.metadata {
-            NodeMetadata::Knowledge(node) => Some(node),
-            NodeMetadata::Source(_) => None,
-        })
-        .unwrap();
-    let VectorOutcome::Current(mut unit) = storage
-        .begin_vector_write_tx(&config.get_identity())
-        .unwrap()
-    else {
-        panic!("expected current identity")
-    };
-    assert!(unit.reserve_attempt(&node.search_hash, 1).unwrap());
-    unit.record_failure(&node.search_hash, "safe failure")
-        .unwrap();
-    unit.set_query_error(7, "safe query failure").unwrap();
-    unit.commit().unwrap();
-    drop(storage);
+    seed_execution_failures(&repo, &config);
     repo.write(
         ".letopis/config.json",
         format!(
@@ -458,4 +437,40 @@ fn get_status(repo: &ReadingRepo) -> Value {
     assert!(output.status.success(), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     serde_json::from_slice(&output.stdout).unwrap()
+}
+
+fn seed_execution_failures(repo: &ReadingRepo, config: &letopis::service::EmbeddingConfig) {
+    let storage = repo.open_storage();
+    storage
+        .vectors
+        .reset_vectors(None, &config.get_identity())
+        .unwrap();
+    let node = storage
+        .cache
+        .with_read_tx(|| storage.cache.nodes_get())
+        .unwrap()
+        .into_iter()
+        .find_map(|node| match node.metadata {
+            NodeMetadata::Knowledge(node) => Some(node),
+            NodeMetadata::Source(_) => None,
+        })
+        .unwrap();
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let unit = &storage.vectors;
+            assert!(
+                unit.embed_failures_upsert_by_search_hash_and_attempts(&node.search_hash, 1)
+                    .unwrap()
+            );
+            unit.embed_failures_update_by_search_hash(&node.search_hash, "safe failure")
+                .unwrap();
+            unit.query_error_upsert_by_id(7, "safe query failure")
+                .unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
+    drop(storage);
 }

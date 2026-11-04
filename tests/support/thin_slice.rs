@@ -2,9 +2,11 @@ use crate::support::{
     git::{OwnedChild, isolate_command},
     reading::ReadingRepo,
 };
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 use letopis::{
     domain::{EdgeTarget, TreeOid},
-    service::{KnowledgeMetadata, NodeMetadata, SourceMetadata, Storage},
+    service::{KnowledgeMetadata, NodeMetadata, SourceMetadata},
 };
 use serde_json::{Value, json};
 use std::{
@@ -89,41 +91,48 @@ impl SliceFixture {
     /// # Panics
     /// Panics on storage failures.
     pub fn get_projection(&self) -> ProjectionSnapshot {
-        let mut storage = self.repo.open_storage();
-        let mut read = storage.begin_read_tx().unwrap();
-        let mut result = ProjectionSnapshot {
-            revision: read.get_revision(),
-            knowledge: BTreeMap::new(),
-            sources: BTreeMap::new(),
-            edges: BTreeSet::new(),
-        };
-        for node in read.get_nodes().unwrap() {
-            match node.metadata {
-                NodeMetadata::Knowledge(k) => {
-                    result.knowledge.insert(k.id.as_str().to_owned(), k);
-                }
-                NodeMetadata::Source(s) => {
-                    result.sources.insert(s.uri.as_str().to_owned(), s);
-                }
-            }
-        }
-        result.edges = read
-            .get_edges_by_source_id(None)
-            .unwrap()
-            .iter()
-            .map(|edge| {
-                let target = match edge.get_target() {
-                    EdgeTarget::Knowledge(id) => id.as_str(),
-                    EdgeTarget::Source(id) => id.as_str(),
-                };
-                (
-                    edge.get_source().as_str().to_owned(),
-                    target.to_owned(),
-                    edge.get_edge_type().as_str().to_owned(),
-                )
+        let storage = self.repo.open_storage();
+        storage
+            .cache
+            .with_read_tx(|| {
+                Ok::<_, StorageError>({
+                    let read = &storage.cache;
+                    let mut result = ProjectionSnapshot {
+                        revision: read.project_get_by_id().unwrap(),
+                        knowledge: BTreeMap::new(),
+                        sources: BTreeMap::new(),
+                        edges: BTreeSet::new(),
+                    };
+                    for node in read.nodes_get().unwrap() {
+                        match node.metadata {
+                            NodeMetadata::Knowledge(k) => {
+                                result.knowledge.insert(k.id.as_str().to_owned(), k);
+                            }
+                            NodeMetadata::Source(s) => {
+                                result.sources.insert(s.uri.as_str().to_owned(), s);
+                            }
+                        }
+                    }
+                    result.edges = read
+                        .edges_get_by_source_id(None)
+                        .unwrap()
+                        .iter()
+                        .map(|edge| {
+                            let target = match edge.get_target() {
+                                EdgeTarget::Knowledge(id) => id.as_str(),
+                                EdgeTarget::Source(id) => id.as_str(),
+                            };
+                            (
+                                edge.get_source().as_str().to_owned(),
+                                target.to_owned(),
+                                edge.get_edge_type().as_str().to_owned(),
+                            )
+                        })
+                        .collect();
+                    result
+                })
             })
-            .collect();
-        result
+            .unwrap()
     }
     /// Capture original user bytes and refs for a read-only product assertion.
     /// # Panics

@@ -1,8 +1,10 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 
 use letopis::{
     domain::TreeOid,
-    service::{EmbeddingConfig, NodeMetadata, Refresher, Storage, VectorOutcome},
+    service::{EmbeddingConfig, NodeMetadata, Refresher, VectorOutcome},
     wire_document_refresher,
 };
 use serde_json::{Value, json};
@@ -36,13 +38,15 @@ fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
 
     // Then: success clears the query error without resetting identity.
     assert_eq!(get_ids(&fallback), ["a.md", "b.md"]);
-    let error = repo
-        .open_storage()
-        .begin_read_tx()
-        .unwrap()
-        .get_query_error()
-        .unwrap()
-        .unwrap();
+    let error = {
+        let scope_databases = repo.open_storage();
+        scope_databases
+            .cache
+            .with_read_tx(|| Ok::<_, StorageError>(scope_databases.cache.query_error_get_by_id()))
+            .unwrap()
+    }
+    .unwrap()
+    .unwrap();
     assert_eq!(error.error, "embedding provider rejected request");
     assert!(!error.error.contains("PRIVATE"));
     assert!(!error.error.contains("fixture-secret"));
@@ -53,12 +57,17 @@ fn filtered_failure_then_success_clears_query_error_without_identity_reset() {
     // Successful query inference includes the eligible semantic-only note.
     assert_eq!(get_ids(&recovered), ["a.md", "b.md", "semantic.md"]);
     assert!(
-        repo.open_storage()
-            .begin_read_tx()
-            .unwrap()
-            .get_query_error()
-            .unwrap()
-            .is_none()
+        {
+            let scope_databases = repo.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| {
+                    Ok::<_, StorageError>(scope_databases.cache.query_error_get_by_id())
+                })
+                .unwrap()
+        }
+        .unwrap()
+        .is_none()
     );
     assert_unchanged_vector_state(&repo, &config);
     assert_eq!(
@@ -98,12 +107,17 @@ fn missing_and_invalid_configuration_keep_filtered_fts_without_provider_requests
 
     assert!(server.take_requests().is_empty());
     assert!(
-        repo.open_storage()
-            .begin_read_tx()
-            .unwrap()
-            .get_query_error()
-            .unwrap()
-            .is_none()
+        {
+            let scope_databases = repo.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| {
+                    Ok::<_, StorageError>(scope_databases.cache.query_error_get_by_id())
+                })
+                .unwrap()
+        }
+        .unwrap()
+        .is_none()
     );
     assert_unchanged_vector_state(&repo, &config);
 }
@@ -139,12 +153,17 @@ fn disabled_configuration_keeps_filtered_fts_without_query_provider() {
     assert_eq!(get_ids(&links), ["a.md", "b.md"]);
     assert!(server.take_requests().is_empty());
     assert!(
-        repo.open_storage()
-            .begin_read_tx()
-            .unwrap()
-            .get_query_error()
-            .unwrap()
-            .is_none()
+        {
+            let scope_databases = repo.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| {
+                    Ok::<_, StorageError>(scope_databases.cache.query_error_get_by_id())
+                })
+                .unwrap()
+        }
+        .unwrap()
+        .is_none()
     );
 }
 
@@ -173,12 +192,17 @@ fn incompatible_vectors_keep_filtered_fts_without_query_provider_misuse() {
     assert_eq!(get_ids(&links), ["a.md", "b.md"]);
     assert!(server.take_requests().is_empty());
     assert!(
-        repo.open_storage()
-            .begin_read_tx()
-            .unwrap()
-            .get_query_error()
-            .unwrap()
-            .is_none()
+        {
+            let scope_databases = repo.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| {
+                    Ok::<_, StorageError>(scope_databases.cache.query_error_get_by_id())
+                })
+                .unwrap()
+        }
+        .unwrap()
+        .is_none()
     );
     assert_unchanged_vector_state(&repo, &config);
 }
@@ -357,22 +381,35 @@ fn get_query_problems(status: &Value) -> Vec<Value> {
 }
 
 fn assert_unchanged_vector_state(repo: &ReadingRepo, config: &EmbeddingConfig) {
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    assert_eq!(read.get_config_identity(), Some(config.get_identity()));
-    assert_eq!(
-        read.get_next_embedding_work_by_id_and_max_attempts(&config.get_identity(), 1, None)
-            .unwrap(),
-        VectorOutcome::Current(None)
-    );
-    for node in read.get_nodes().unwrap() {
-        let NodeMetadata::Knowledge(node) = node.metadata else {
-            continue;
-        };
-        assert_eq!(
-            read.get_failure_by_search_hash(&config.get_identity(), &node.search_hash)
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            assert_eq!(read.meta_get_by_id().unwrap(), Some(config.get_identity()));
+            assert_eq!(
+                read.nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                    &config.get_identity(),
+                    1,
+                    None
+                )
                 .unwrap(),
-            VectorOutcome::Current(None)
-        );
-    }
+                VectorOutcome::Current(None)
+            );
+            for node in read.nodes_get().unwrap() {
+                let NodeMetadata::Knowledge(node) = node.metadata else {
+                    continue;
+                };
+                assert_eq!(
+                    read.embed_failures_get_by_search_hash(
+                        &config.get_identity(),
+                        &node.search_hash
+                    )
+                    .unwrap(),
+                    VectorOutcome::Current(None)
+                );
+            }
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }

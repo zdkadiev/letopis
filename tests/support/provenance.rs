@@ -19,7 +19,7 @@ pub fn create_basis(root: &Path, files: &[(&str, &[u8])]) -> TreeOid {
         .zip(files)
         .map(|(path, (_, bytes))| SnapshotFile { path, bytes })
         .collect();
-    git.create_tree(&entries).unwrap()
+    git.tree_create(&entries).unwrap()
 }
 /// Parse explicit source addresses without computing provenance expectations.
 ///

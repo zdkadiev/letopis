@@ -15,8 +15,8 @@ CONTROLS = [
      '.stdout(Stdio::inherit())\n            .stderr(Stdio::inherit())',
      'detached_child_has_exact_context_null_fds_and_no_service_descriptors',
      'stdout EOF before child release'),
-    ('kernel-exclusion', 'src/filesystem/local.rs', 'retry_lock(|| file.try_lock())',
-     'retry_lock(|| { let _ = file; Ok::<(), TryLockError>(()) })',
+    ('kernel-exclusion', 'src/filesystem/lock.rs', 'lock_retry_acquisition(|| file.try_lock())',
+     'lock_retry_acquisition(|| { let _ = file; Ok::<(), TryLockError>(()) })',
      'two_released_probes_yield_exactly_one_active_drain',
      'left: Bool(true)\n right: false'),
 ]
@@ -24,23 +24,25 @@ CONTROLS = [
 
 READING_CONTROLS = [
     ('captured-config', 'src/service/embedding.rs',
-     '        if self.provider.validate_config(request.config).is_err() {',
-     '        let _ = self.get_configuration()?;\n        if self.provider.validate_config(request.config).is_err() {',
+     '        if self.provider.config_validate(request.config).is_err() {',
+     '        let _ = self.get_configuration()?;\n        if self.provider.config_validate(request.config).is_err() {',
      ['--lib'], 'service::embedding::tests::captured_query_never_rereads_or_resets_configuration',
      'left: 1'),
     ('candidate-hash', 'src/service/search.rs',
-     'if node.search_hash != hit.search_hash {',
+     'if candidate.metadata.search_hash != hit.search_hash {',
      'if false {',
      ['--lib'], 'service::search::tests::candidate_metadata_rejects_wrong_rows_and_search_hashes',
      'assertion failed:'),
-    ('reopen-cache', 'src/service/search.rs',
-     '        let fts = read.match_text(&expression).map_err(map_search_error)?;',
-     '        drop(read);\n        let mut read = self.storage.begin_read().map_err(map_search_error)?;\n        let fts = read.match_text(&expression).map_err(map_search_error)?;',
+    # Nested owner scopes join; restart the actual SQLite snapshot before FTS instead.
+    ('reopen-cache', 'src/storage/cache.rs',
+     '    fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>> {\n        let db = self.get_connection()?;',
+     '    fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>> {\n        let db = self.get_connection()?;\n        db.execute_batch("commit; begin deferred").map_err(map_sqlite)?;',
      ['--test', 'search_consistency'], 'concurrent_publication_preserves_old_membership_coordinates_and_revision',
      'CommandError { kind: InternalError, message: "invalid search index data", .. }'),
+    # Keep captured metadata: reparsing this fixture's unmarked second read would panic first.
     ('live-inspect-reread', 'src/service/inspection.rs',
      '        captured.collect_metadata(&path, parsed, requested);',
-     '        drop(parsed);\n        let live = self.filesystem.get_file(&path).map_err(map_document_error)?.unwrap();\n        let parsed = self.markdown.parse_file(&path, &live.bytes).map_err(|_| CommandError::new(CommandErrorKind::ValidationFailed, "invalid control input"))?.unwrap();\n        captured.collect_metadata(&path, parsed, requested);',
+     '        let _ = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str()))).map_err(map_document_error)?;\n        captured.collect_metadata(&path, parsed, requested);',
      ['--lib'], 'service::inspection::tests::capture_writes_each_blob_before_reading_the_next_file',
      'assertion `left == right` failed'),
 ]
@@ -89,6 +91,7 @@ def run_control(copy, evidence, control, manifest):
     fixture = build_fixture('restore-fixture')
     record['restored_fixture_sha256'] = hash_file(fixture)
     execute(command, 'green')
+    assert 'test result: ok. 1 passed; 0 failed;' in (evidence / f'{name}-green.log').read_text()
     record['status'] = 'PASS'
 
 
@@ -122,6 +125,7 @@ def run_reading_control(copy, evidence, control, manifest):
         assert path.read_bytes() == original
         record['restored_sha256'] = hash_file(path)
     run_command(command, cwd=copy, env=env, log=evidence / f'{name}-green.log')
+    assert 'test result: ok. 1 passed; 0 failed;' in (evidence / f'{name}-green.log').read_text()
     record['status'] = 'PASS'
 
 

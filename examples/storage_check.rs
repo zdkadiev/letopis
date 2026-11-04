@@ -2,7 +2,9 @@
 use letopis::{
     domain::{ElementKind, KnowledgeId, LineRange, Sha256},
     open_storage,
-    service::{KnowledgeMetadata, NodeMetadata, Storage, VectorOutcome},
+    service::{
+        CacheDatabase, KnowledgeMetadata, NodeMetadata, StorageError, VectorDatabase, VectorOutcome,
+    },
 };
 use std::{error::Error, fs, path::Path};
 
@@ -16,71 +18,91 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let root = Path::new(&arguments[0]);
     fs::create_dir(root)?;
-    let cache = root.join("cache.db");
-    let vectors = root.join("vectors.db");
-    let mut storage = open_storage(&cache, &vectors)?;
-    publish_nodes(&mut storage)?;
-    verify_text(&mut storage)?;
+    let cache_path = root.join("cache.db");
+    let vectors_path = root.join("vectors.db");
+    let (vectors, cache) = open_storage(&cache_path, &vectors_path)?;
+    publish_nodes(&cache)?;
+    verify_text(&cache)?;
     let identity = Sha256::digest(b"M1");
     assert_eq!(
-        storage.reset_vectors(None, &identity)?,
+        vectors.reset_vectors(None, &identity)?,
         VectorOutcome::Current(true)
     );
-    let mut unit = require_current(storage.begin_vector_write_tx(&identity)?)?;
-    assert!(unit.reserve_attempt(&Sha256::digest(TEXT.as_bytes()), 3)?);
-    unit.store_vector(&Sha256::digest(TEXT.as_bytes()), &VECTOR, 3)?;
-    unit.commit()?;
-    verify_vectors(&mut storage, &identity)?;
-    drop(storage);
-    let mut reopened = open_storage(&cache, &vectors)?;
-    verify_text(&mut reopened)?;
-    verify_vectors(&mut reopened, &identity)?;
+    require_current(vectors.with_write_tx(&identity, || {
+        assert!(vectors.embed_failures_upsert_by_search_hash_and_attempts(
+            &Sha256::digest(TEXT.as_bytes()),
+            3
+        )?);
+        vectors.store_vector(&Sha256::digest(TEXT.as_bytes()), &VECTOR, 3)?;
+        Ok::<_, StorageError>(())
+    })?)?;
+    verify_vectors(&cache, &identity)?;
+    drop(vectors);
+    drop(cache);
+    let (vectors, cache) = open_storage(&cache_path, &vectors_path)?;
+    verify_text(&cache)?;
+    verify_vectors(&cache, &identity)?;
+    drop(vectors);
+    drop(cache);
     println!("PASS: copied executable, FTS, shared native vector, exact bytes, reopen, revision=1");
     Ok(())
 }
 
-fn publish_nodes(storage: &mut impl Storage) -> Result<(), Box<dyn Error>> {
-    let mut unit = storage.begin_cache_write_tx()?;
-    for name in ["a.md", "b.md"] {
+fn publish_nodes(cache: &impl CacheDatabase) -> Result<(), Box<dyn Error>> {
+    let nodes = ["a.md", "b.md"].map(|name| {
         let id = KnowledgeId::parse(name)?;
-        unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
+        Ok::<_, Box<dyn Error>>(NodeMetadata::Knowledge(KnowledgeMetadata {
             id: id.clone(),
-            uri: id.clone(),
+            uri: id,
             kind: ElementKind::Vertex,
             hash: Sha256::digest(TEXT.as_bytes()),
             created_at: 1,
             source_snapshot: None,
             lines: LineRange::new(1, 1)?,
             search_hash: Sha256::digest(TEXT.as_bytes()),
-        }))?;
-        unit.replace_text(&id, TEXT)?;
-    }
-    assert_eq!(unit.commit()?, 1);
+        }))
+    });
+    let nodes = nodes.into_iter().collect::<Result<Vec<_>, _>>()?;
+    let revision = cache.with_write_tx(|| {
+        for node in &nodes {
+            cache.nodes_upsert_by_id(node)?;
+            let NodeMetadata::Knowledge(metadata) = node else {
+                unreachable!()
+            };
+            cache.replace_text(&metadata.id, TEXT)?;
+        }
+        cache.get_publication_revision()
+    })?;
+    assert_eq!(revision, 1);
     Ok(())
 }
 
-fn verify_text(storage: &mut impl Storage) -> Result<(), Box<dyn Error>> {
-    let mut read = storage.begin_read_tx()?;
-    assert_eq!(read.get_revision(), 1);
-    let matches = read.get_text_matches_by_expression("shared")?;
-    assert_eq!(
-        matches
-            .iter()
-            .map(|item| item.id.as_str())
-            .collect::<Vec<_>>(),
-        ["a.md", "b.md"]
-    );
+fn verify_text(cache: &impl CacheDatabase) -> Result<(), Box<dyn Error>> {
+    cache.with_read_tx(|| {
+        assert_eq!(cache.project_get_by_id()?, 1);
+        let matches = cache.text_index_get_by_expression("shared")?;
+        assert_eq!(
+            matches
+                .iter()
+                .map(|item| item.id.as_str())
+                .collect::<Vec<_>>(),
+            ["a.md", "b.md"]
+        );
+        Ok::<_, StorageError>(())
+    })?;
     Ok(())
 }
 
-fn verify_vectors(storage: &mut impl Storage, identity: &Sha256) -> Result<(), Box<dyn Error>> {
-    let mut read = storage.begin_read_tx()?;
-    assert_eq!(read.get_revision(), 1);
-    assert_eq!(read.get_config_identity(), Some(*identity));
-    let vector = require_current(
-        read.get_vector_by_search_hash(identity, &Sha256::digest(TEXT.as_bytes()))?,
-    )?
-    .ok_or("missing vector")?;
+fn verify_vectors(cache: &impl CacheDatabase, identity: &Sha256) -> Result<(), Box<dyn Error>> {
+    let (vector, matches) = cache.with_read_tx(|| {
+        assert_eq!(cache.project_get_by_id()?, 1);
+        assert_eq!(cache.meta_get_by_id()?, Some(*identity));
+        Ok::<_, StorageError>((
+            cache.vector_keys_get_by_search_hash(identity, &Sha256::digest(TEXT.as_bytes()))?,
+            cache.vector_index_get_by_vector(identity, &VECTOR, 3)?,
+        ))
+    })?;
+    let vector = require_current(vector)?.ok_or("missing vector")?;
     assert_eq!(
         vector
             .iter()
@@ -91,7 +113,7 @@ fn verify_vectors(storage: &mut impl Storage, identity: &Sha256) -> Result<(), B
             .flat_map(|v| v.to_le_bytes())
             .collect::<Vec<_>>()
     );
-    let matches = require_current(read.get_nearest_vectors(identity, &VECTOR, 3)?)?;
+    let matches = require_current(matches)?;
     assert_eq!(
         matches
             .iter()

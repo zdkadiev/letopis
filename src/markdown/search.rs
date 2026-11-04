@@ -4,7 +4,7 @@ use pulldown_cmark::{Event, TagEnd};
 use std::ops::Range;
 
 /// Render the element's own visible text from the already parsed full document.
-pub(super) fn render(
+pub(super) fn search_text_render(
     events: &Events<'_>,
     span: ByteSpan,
     metadata_ranges: &[Range<usize>],

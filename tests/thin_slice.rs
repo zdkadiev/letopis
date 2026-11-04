@@ -1,3 +1,5 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 #[expect(
     dead_code,
     reason = "Shared child supervision also offers unrelated runtime fixture helpers"
@@ -15,7 +17,7 @@ mod support;
 mod thin_slice;
 
 use letopis::domain::{LineRange, Sha256};
-use letopis::service::{EmbeddingConfig, EmbeddingFailure, Storage, VectorOutcome};
+use letopis::service::{EmbeddingConfig, EmbeddingFailure, VectorOutcome};
 use serde_json::json;
 use std::collections::BTreeSet;
 use std::{
@@ -268,15 +270,16 @@ fn binary_invalid_file_keeps_last_projection_and_publishes_valid_neighbor() {
     fixture.get_repo().write("knowledge/cache.md", &cache);
     fixture.load();
     assert!(
-        fixture
-            .get_repo()
-            .open_storage()
-            .begin_read_tx()
-            .unwrap()
-            .get_files()
-            .unwrap()
-            .iter()
-            .all(|row| row.valid)
+        {
+            let scope_databases = fixture.get_repo().open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| Ok::<_, StorageError>(scope_databases.cache.files_get()))
+                .unwrap()
+        }
+        .unwrap()
+        .iter()
+        .all(|row| row.valid)
     );
     emit_slice("invalid_neighbor", "search", 0, &response);
 }
@@ -394,11 +397,17 @@ fn get_vector_by_search_hash(
     config: &EmbeddingConfig,
     search_hash: &Sha256,
 ) -> Option<Vec<f32>> {
-    let mut storage = fixture.get_repo().open_storage();
+    let storage = fixture.get_repo().open_storage();
     let result = storage
-        .begin_read_tx()
+        .cache
+        .with_read_tx(|| {
+            Ok::<_, StorageError>(
+                storage
+                    .cache
+                    .vector_keys_get_by_search_hash(&config.get_identity(), search_hash),
+            )
+        })
         .unwrap()
-        .get_vector_by_search_hash(&config.get_identity(), search_hash)
         .unwrap();
     let VectorOutcome::Current(vector) = result else {
         panic!("configuration changed")
@@ -410,11 +419,17 @@ fn get_failure_by_search_hash(
     config: &EmbeddingConfig,
     search_hash: &Sha256,
 ) -> EmbeddingFailure {
-    let mut storage = fixture.get_repo().open_storage();
+    let storage = fixture.get_repo().open_storage();
     let result = storage
-        .begin_read_tx()
+        .cache
+        .with_read_tx(|| {
+            Ok::<_, StorageError>(
+                storage
+                    .cache
+                    .embed_failures_get_by_search_hash(&config.get_identity(), search_hash),
+            )
+        })
         .unwrap()
-        .get_failure_by_search_hash(&config.get_identity(), search_hash)
         .unwrap();
     let VectorOutcome::Current(Some(failure)) = result else {
         panic!("expected failure")
@@ -422,8 +437,11 @@ fn get_failure_by_search_hash(
     failure
 }
 fn assert_invalid_row(fixture: &SliceFixture) {
-    let mut storage = fixture.get_repo().open_storage();
-    let files = storage.begin_read_tx().unwrap().get_files().unwrap();
+    let storage = fixture.get_repo().open_storage();
+    let files = storage
+        .cache
+        .with_read_tx(|| storage.cache.files_get())
+        .unwrap();
     let row = files
         .iter()
         .find(|row| row.path.as_str() == "knowledge/cache.md")

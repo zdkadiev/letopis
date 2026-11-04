@@ -1,3 +1,4 @@
+use super::constants::OBJECT_INTEGRITY_MESSAGE;
 use crate::{
     domain::{SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN},
     service::{SnapshotError, SnapshotErrorKind},
@@ -14,7 +15,12 @@ impl ObjectHasher {
         let mut hash = match oid_len {
             SHA1_OID_HEX_LEN => Self::Sha1(Box::new(Sha1::new())),
             SHA256_OID_HEX_LEN => Self::Sha256(Sha256::new()),
-            _ => return Err(fail_integrity()),
+            _ => {
+                return Err(SnapshotError::new(
+                    SnapshotErrorKind::InternalError,
+                    OBJECT_INTEGRITY_MESSAGE,
+                ));
+            }
         };
         hash.update(format!("{kind} {size}\0").as_bytes());
         Ok(hash)
@@ -30,20 +36,16 @@ impl ObjectHasher {
             Self::Sha1(hash) => {
                 let result = hash.try_finalize();
                 if result.has_collision() {
-                    return Err(fail_integrity());
+                    return Err(SnapshotError::new(
+                        SnapshotErrorKind::InternalError,
+                        OBJECT_INTEGRITY_MESSAGE,
+                    ));
                 }
                 Ok(format!("{:x}", result.hash()))
             }
             Self::Sha256(hash) => Ok(format!("{:x}", hash.finalize())),
         }
     }
-}
-
-fn fail_integrity() -> SnapshotError {
-    SnapshotError::new(
-        SnapshotErrorKind::InternalError,
-        "Git object integrity failed",
-    )
 }
 
 #[cfg(test)]

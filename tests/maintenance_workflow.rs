@@ -171,9 +171,13 @@ fn configure_and_publish(workflow: &Workflow, endpoint: &str) {
     assert_eq!(status["result"]["revision"], Value::Null);
     assert_eq!(status["result"]["problems"], json!([]));
     // The fixture seeds vectors itself; exclude the detached drain while owning that setup.
-    use letopis::service::EmbeddingFiles;
-    let files = letopis::open_embedding_files(workflow.repo.get_root()).unwrap();
-    let _embedding_setup = files.try_lock_embed().unwrap().unwrap();
+
+    use letopis::service::FileLocker;
+    let files = letopis::open_filesystem(workflow.repo.get_root()).unwrap();
+    let _embedding_setup = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     assert_eq!(
         workflow.invoke_command("reindex", b"{}", 0),
         json!({"ok":true,"result":{"revision":1}})

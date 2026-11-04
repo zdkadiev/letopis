@@ -1,7 +1,7 @@
 mod support;
 use letopis::{
     domain::{EdgeTarget, ElementKind, RepoPath, derive_element_kind},
-    markdown::{DiagnosticKind, parse},
+    markdown::{self, DiagnosticKind},
 };
 use support::{assert_error, build_whole_file, parse_file};
 
@@ -69,7 +69,7 @@ fn invalid_graph_titles_and_targets_fail_file() {
     ] {
         let text = build_whole_file(&format!("[x](b.md \"{title}\")"));
         // When: parse the complete Markdown file.
-        let result = parse(&path, text.as_bytes());
+        let result = markdown::file_parse(&path, text.as_bytes());
         // Then: graph targets and diagnostics follow the declaration contract.
         assert_error(result, DiagnosticKind::InvalidLinkTitle);
     }
@@ -86,14 +86,14 @@ fn invalid_graph_titles_and_targets_fail_file() {
             "[x]({target} \"letopis:type={kind};path={target}\")"
         ));
         // When: parse the complete Markdown file.
-        let result = parse(&path, text.as_bytes());
+        let result = markdown::file_parse(&path, text.as_bytes());
         // Then: graph targets and diagnostics follow the declaration contract.
         assert_error(result, DiagnosticKind::InvalidTarget);
     }
     // Given: marked Markdown exercises the declared link behavior.
     let text = build_whole_file("[x](./a.md \"letopis:type=depends_on;path=./knowledge/a.md\")");
     // When: parse the complete Markdown file.
-    let result = parse(&path, text.as_bytes());
+    let result = markdown::file_parse(&path, text.as_bytes());
     // Then: graph targets and diagnostics follow the declaration contract.
     assert_error(result, DiagnosticKind::SelfLoop);
 }

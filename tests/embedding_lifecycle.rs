@@ -1,8 +1,10 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
-    service::{NodeMetadata, Storage, VectorOutcome},
+    service::{NodeMetadata, VectorOutcome},
 };
 use serde_json::{Value, json};
 use std::process::Output;
@@ -37,37 +39,43 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
     assert_success(&repo.invoke(&["embed", "--drain"], b""));
     assert!(http.take_requests().is_empty());
     // Then: the final token is independently retrievable despite provider rejection.
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    let matches = read.get_text_matches_by_expression(FINAL_MARKER).unwrap();
-    assert_eq!(matches.len(), 1);
-    assert_eq!(matches[0].id.as_str(), "long.md");
-    let node = read
-        .get_node_by_id(&EdgeTarget::Knowledge(
-            KnowledgeId::parse("long.md").unwrap(),
-        ))
-        .unwrap()
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            let matches = read.text_index_get_by_expression(FINAL_MARKER).unwrap();
+            assert_eq!(matches.len(), 1);
+            assert_eq!(matches[0].id.as_str(), "long.md");
+            let node = StorageRead::nodes_get_by_id(
+                read,
+                &EdgeTarget::Knowledge(KnowledgeId::parse("long.md").unwrap()),
+            )
+            .unwrap()
+            .unwrap();
+            let NodeMetadata::Knowledge(node) = node.metadata else {
+                panic!()
+            };
+            let VectorOutcome::Current(Some(failure)) = read
+                .embed_failures_get_by_search_hash(&config.get_identity(), &node.search_hash)
+                .unwrap()
+            else {
+                panic!("expected a durable current failure")
+            };
+            assert_eq!(failure.attempts, 1);
+            assert_eq!(
+                failure.error.as_deref(),
+                Some("embedding provider rejected request")
+            );
+            assert!(!failure.error.unwrap().contains(PRIVATE_RESPONSE));
+            assert_eq!(
+                read.vector_keys_get_by_search_hash(&config.get_identity(), &node.search_hash)
+                    .unwrap(),
+                VectorOutcome::Current(None)
+            );
+            Ok::<_, StorageError>(())
+        })
         .unwrap();
-    let NodeMetadata::Knowledge(node) = node.metadata else {
-        panic!()
-    };
-    let VectorOutcome::Current(Some(failure)) = read
-        .get_failure_by_search_hash(&config.get_identity(), &node.search_hash)
-        .unwrap()
-    else {
-        panic!("expected a durable current failure")
-    };
-    assert_eq!(failure.attempts, 1);
-    assert_eq!(
-        failure.error.as_deref(),
-        Some("embedding provider rejected request")
-    );
-    assert!(!failure.error.unwrap().contains(PRIVATE_RESPONSE));
-    assert_eq!(
-        read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
-            .unwrap(),
-        VectorOutcome::Current(None)
-    );
 }
 
 fn assert_success(output: &Output) {

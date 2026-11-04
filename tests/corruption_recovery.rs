@@ -1,9 +1,11 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 
 use letopis::{
     domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, RepoPath, Sha256},
     open_filesystem,
-    service::{EmbedLocker, EmbeddingConfig, NodeMetadata, Storage, VectorOutcome},
+    service::{EmbeddingConfig, FileLocker, NodeMetadata, VectorOutcome},
 };
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{Value, json};
@@ -73,7 +75,10 @@ fn reindex_preserves_healthy_vectors_after_corrupt_cache_removal() {
     let hashes = get_search_hashes(&repo);
     let canonical = capture_canonical_state(&repo);
     let files = open_filesystem(repo.get_root()).unwrap();
-    let _embed_lock = files.try_lock_embed().unwrap().unwrap();
+    let _embed_lock = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     corrupt_owned_database(repo.get_root(), CACHE);
 
     // When / Then: damage persists until the operator explicitly removes cache only.
@@ -198,97 +203,129 @@ fn assert_missing_cache_status(repo: &ReadingRepo) {
 }
 
 fn assert_projection(repo: &ReadingRepo, revision: u64) {
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    assert_eq!(read.get_revision(), revision);
-    let nodes = read.get_nodes().unwrap();
-    let ids: Vec<&str> = nodes
-        .iter()
-        .map(|node| match &node.metadata {
-            NodeMetadata::Knowledge(node) => node.id.as_str(),
-            NodeMetadata::Source(_) => panic!("unexpected source node"),
-        })
-        .collect();
-    assert_eq!(ids, ["a.md", "b.md"]);
-    for (token, id) in [("AlphaToken", "a.md"), ("BravoToken", "b.md")] {
-        let matches = read.get_text_matches_by_expression(token).unwrap();
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].id.as_str(), id);
-    }
-    let edge = Edge::new(
-        KnowledgeId::parse("a.md").unwrap(),
-        EdgeTarget::Knowledge(KnowledgeId::parse("b.md").unwrap()),
-        EdgeType::parse("context").unwrap(),
-    )
-    .unwrap();
-    assert_eq!(read.get_edges_by_source_id(None).unwrap(), [edge]);
-    let files = read.get_files().unwrap();
-    let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
-    assert_eq!(paths, ["a.md", "b.md", "live.md"]);
-    for path in ["a.md", "b.md", "live.md"] {
-        let file = read
-            .get_file_by_path(&RepoPath::parse(path).unwrap())
-            .unwrap()
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            assert_eq!(read.project_get_by_id().unwrap(), revision);
+            let nodes = read.nodes_get().unwrap();
+            let ids: Vec<&str> = nodes
+                .iter()
+                .map(|node| match &node.metadata {
+                    NodeMetadata::Knowledge(node) => node.id.as_str(),
+                    NodeMetadata::Source(_) => panic!("unexpected source node"),
+                })
+                .collect();
+            assert_eq!(ids, ["a.md", "b.md"]);
+            for (token, id) in [("AlphaToken", "a.md"), ("BravoToken", "b.md")] {
+                let matches = read.text_index_get_by_expression(token).unwrap();
+                assert_eq!(matches.len(), 1);
+                assert_eq!(matches[0].id.as_str(), id);
+            }
+            let edge = Edge::new(
+                KnowledgeId::parse("a.md").unwrap(),
+                EdgeTarget::Knowledge(KnowledgeId::parse("b.md").unwrap()),
+                EdgeType::parse("context").unwrap(),
+            )
             .unwrap();
-        assert!(file.valid);
-        assert_eq!(file.error, None);
-        assert_eq!(
-            file.size,
-            fs::metadata(repo.get_root().join(path)).unwrap().len()
-        );
-    }
+            assert_eq!(read.edges_get_by_source_id(None).unwrap(), [edge]);
+            let files = read.files_get().unwrap();
+            let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
+            assert_eq!(paths, ["a.md", "b.md", "live.md"]);
+            for path in ["a.md", "b.md", "live.md"] {
+                let file = read
+                    .files_get_by_path(&RepoPath::parse(path).unwrap())
+                    .unwrap()
+                    .unwrap();
+                assert!(file.valid);
+                assert_eq!(file.error, None);
+                assert_eq!(
+                    file.size,
+                    fs::metadata(repo.get_root().join(path)).unwrap().len()
+                );
+            }
+
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 fn assert_retained_vectors(repo: &ReadingRepo, config: &EmbeddingConfig, hashes: &[Sha256]) {
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    let identity = config.get_identity();
-    assert_eq!(read.get_config_identity(), Some(identity));
-    assert_eq!(
-        read.get_vector_dimensions(&identity).unwrap(),
-        VectorOutcome::Current(NonZeroUsize::new(2))
-    );
-    for ((id, hash), expected) in ["a.md", "b.md"]
-        .into_iter()
-        .zip(hashes)
-        .zip([FIRST_VECTOR, SECOND_VECTOR])
-    {
-        let node = read
-            .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
-            .unwrap()
-            .unwrap();
-        let NodeMetadata::Knowledge(node) = node.metadata else {
-            panic!("expected knowledge")
-        };
-        assert_eq!(&node.search_hash, hash);
-        assert_eq!(
-            read.get_vector_by_search_hash(&identity, hash).unwrap(),
-            VectorOutcome::Current(Some(expected.to_vec()))
-        );
-    }
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            let identity = config.get_identity();
+            assert_eq!(read.meta_get_by_id().unwrap(), Some(identity));
+            assert_eq!(
+                read.vector_index_config_get_by_id(&identity).unwrap(),
+                VectorOutcome::Current(NonZeroUsize::new(2))
+            );
+            for ((id, hash), expected) in ["a.md", "b.md"]
+                .into_iter()
+                .zip(hashes)
+                .zip([FIRST_VECTOR, SECOND_VECTOR])
+            {
+                let node = StorageRead::nodes_get_by_id(
+                    read,
+                    &EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()),
+                )
+                .unwrap()
+                .unwrap();
+                let NodeMetadata::Knowledge(node) = node.metadata else {
+                    panic!("expected knowledge")
+                };
+                assert_eq!(&node.search_hash, hash);
+                assert_eq!(
+                    read.vector_keys_get_by_search_hash(&identity, hash)
+                        .unwrap(),
+                    VectorOutcome::Current(Some(expected.to_vec()))
+                );
+            }
+
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 fn get_search_hashes(repo: &ReadingRepo) -> Vec<Sha256> {
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    ["a.md", "b.md"]
-        .into_iter()
-        .map(|id| {
-            let node = read
-                .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
-                .unwrap()
-                .unwrap();
-            let NodeMetadata::Knowledge(node) = node.metadata else {
-                panic!("expected knowledge")
-            };
-            node.search_hash
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            Ok::<_, StorageError>({
+                let read = &storage.cache;
+                ["a.md", "b.md"]
+                    .into_iter()
+                    .map(|id| {
+                        let node = StorageRead::nodes_get_by_id(
+                            read,
+                            &EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()),
+                        )
+                        .unwrap()
+                        .unwrap();
+                        let NodeMetadata::Knowledge(node) = node.metadata else {
+                            panic!("expected knowledge")
+                        };
+                        node.search_hash
+                    })
+                    .collect()
+            })
         })
-        .collect()
+        .unwrap()
 }
 
 fn assert_empty_vectors(repo: &ReadingRepo) {
-    let mut storage = repo.open_storage();
-    assert_eq!(storage.begin_read_tx().unwrap().get_config_identity(), None);
+    let storage = repo.open_storage();
+    assert_eq!(
+        storage
+            .cache
+            .with_read_tx(|| storage.cache.meta_get_by_id())
+            .unwrap(),
+        None
+    );
     drop(storage);
     let db = open_database(repo.get_root(), VECTORS);
     let count: i64 = db

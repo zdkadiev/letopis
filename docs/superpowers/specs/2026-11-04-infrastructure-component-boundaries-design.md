@@ -1,0 +1,41 @@
+# Infrastructure component boundaries
+
+Status: requested by the user on 2026-11-04 as a continuation of the approved `rafactor` work; implementation and parallel investigation authorized. The user chose entity–action–filter names for infrastructure components and their interfaces; application services keep use-case names. [AGENTS.md](../../../AGENTS.md) is the canonical statement of the cross-project rules. The separately approved [filesystem specification](2026-11-04-filesystem-boundary-design.md) remains binding.
+
+## Goal
+
+Apply the same clear ownership, component-specific vocabulary and naming used in storage and filesystem to Git, Markdown and the other infrastructure components, without changing product behavior. One main concrete implementation owns each cohesive responsibility. Separate owners remain where they own genuinely different resources or lifetimes; data values, algorithm state and RAII guards are not unnecessary components. A trait implementation may call a same-named private function outside the `impl` to keep the trait body readable. Keep the concrete struct and its trait implementations together; do not introduce forwarding structs or layers for this purpose.
+
+Keep domain objects dependency-free and services responsible for their use cases. Follow KISS, DRY and YAGNI; do not turn simple operations into frameworks. Constructors, conversions, external trait names, service use cases and already-agreed storage transaction/multi-statement operations retain their existing conventions. Preserve the strict table/column naming rule for individual SQL actions. Rename infrastructure trait methods and their implementations/callers together. Preserve observable command/JSON behavior and the current public snapshot integrity guarantees.
+
+## Ownership and behavior
+
+### Git and documents
+
+`GitRepository` remains the main Git implementation. The borrowed-only `ObjectDb` and `Retainer` helpers do not own independent resources; replace them with cohesive private functions using the repository directly. Keep actual readers, staged-object state, lock and cleanup guards. Git owns repositories, worktrees, indexes, ignore rules, object/tree/ref storage, Git path safety and integrity, not Markdown selection or document errors. The retained `refs/letopis/snapshots/` namespace is a persistence contract and stays unchanged.
+
+Expose Git worktree path enumeration through an application-owned Git-specific interface, returning packed NUL-delimited raw bytes and a Git-specific error. Include tracked paths even if deleted and non-ignored untracked files/symlinks; preserve sparse-index expansion without modifying the index. Do not validate UTF-8 or interpret document extensions in Git. This preserves the current allocation class, not a fixed global memory bound.
+
+The application performs the same candidate filtering for refresh and inspection. Exclude irrelevant extensions and `.git`/`.letopis` components as raw bytes; for structurally safe candidate paths, observe final symlinks without following any component and skip them **before** UTF-8 and `RepoPath` validation. Deleted paths remain candidates. For raw path components unsafe to probe without normalization, skip that filesystem probe and retain the existing UTF-8/`RepoPath` validation, including its lexical normalization and rejection of root escapes. Parent-symlink traversal, replacement and I/O failures must remain errors. A generic filesystem symlink observation is appropriate if the existing generic file interface cannot distinguish final symlinks from other nonregular entries. It must handle non-UTF-8 path components and must not weaken confinement or race checks. Preserve the second document observation before snapshot publication.
+
+The public `open_git_snapshots()` return value is callable directly and currently rejects `.letopis` snapshot paths before writing Git objects. Preserve this behavior for both tree creation operations: composition supplies generic excluded root names to the existing Git implementation, which enforces the supplied path constraints without knowing their application meaning. Keep `.git` protection intrinsic to Git. Do not introduce another active snapshot wrapper. Preserve addressed reads, full-closure verification only where required, no Git subprocesses, ref durability, cancellation and existing safe diagnostics.
+
+### Markdown
+
+Retain the single `MarkdownParser` and the project's existing X-4 codec contract. It is appropriate for the codec to return parsed knowledge, source/edge values, spans and the text/hash projections required by that contract. It performs no filesystem or storage orchestration. Rename its trait/free operation to `file_parse` and apply the naming convention to its implementation helpers; change all callers and test doubles together. Do not invent a generic Markdown AST, change the grammar, or move parsing into a forwarding service.
+
+### Process, embedding and CLI
+
+A process launcher accepts generic executable, argument and working-directory information and exposes a process-specific failure; the application chooses the embedding drain command and maps errors to the existing warning. Keep the single `DetachedProcess`, session/descriptor/env behavior, fire-and-forget behavior and signal ownership. `ProcessInput` and the signal listener are real resource owners and may remain separate.
+
+Embedding owns provider, model, vector and HTTP protocol concerns. Keep one provider implementation; if the current protocol dispatcher and clients can be flattened without losing meaningful state, move protocol functions into private helpers on the same owner. Retain independent HTTP client pools where they exist today, credential secrecy, TLS and transport time/body limits, exact request/response validation and provider behavior. Do not add an async runtime, network library or live paid-provider call.
+
+CLI owns request/command/output representation and calls injected services. Apply component naming without moving construction or environment access into CLI; the existing shared foreground/background orchestration retains its use-case name. Keep signal, cancellation and output guarantees.
+
+### Storage, domain and composition
+
+`CacheStorage` and `VectorStorage` own independent transaction resources and remain separate. Their transaction scopes, join/rollback-only semantics and SQL/schema behavior do not change. The user's later request for component-specific boundaries across all components refines the earlier architecture: `StatusService` owns Disabled/Unavailable/Ready policy, identity interpretation and backlog/failed calculations; storage exposes the necessary database observations and retains SQL aggregation, decoding and integrity validation. Preserve the same captured config, status transaction and its initial metadata validation, mode short-circuits, error reporting and no-extra-loading guarantees. Disabled suppresses execution and query-error diagnostics; Unavailable/mismatched identity skip coverage and exhausted-failure observations but still expose a stored query error. Validate all current uncovered failure attempts before applying the attempt threshold, as today. Correct individual SQL naming gaps while preserving the existing table/action/filter grammar; avoid adding a proxy component or changing behavior to avoid a method-name collision. Domain entities stay pure. `lib.rs` remains the real composition root, and command handlers call services.
+
+## Verification
+
+Add independent regression tests before changing behavior at each boundary. In particular cover raw non-UTF-8 names and symlinks, deleted tracked paths and unsafe parents; the direct snapshot API's no-write private-path rejection; generic process argv/cwd and safe errors; provider protocol/credential behavior; and preservation of storage counts, identity-error classification and transaction behavior. Restore and record effective manual test mutations. Existing Markdown, Git snapshot/corruption/retention, embedding, CLI, status and filesystem suites remain relevant. Perform `make verify` and host/Linux storage acceptance once against the final combined source, plus an independent final review. Report exact results and any platform limits. No merge, push, PR update or live provider access is authorized by this task.

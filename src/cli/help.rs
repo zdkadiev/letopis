@@ -175,27 +175,27 @@ Examples:
 /// Only these exact argv forms match, so every other invocation, including
 /// non-UTF-8 arguments, keeps its existing request handling. Pure: reads no
 /// input and touches no repository or service.
-pub(crate) fn find_help(args: &[OsString]) -> Option<String> {
+pub(crate) fn help_get_by_args(args: &[OsString]) -> Option<String> {
     let args = args
         .iter()
         .map(|arg| arg.to_str())
         .collect::<Option<Vec<_>>>()?;
     match args.as_slice() {
-        [VERSION_FLAG] => Some(format_version()),
-        [HELP_FLAG] => Some(format_general_help()),
+        [VERSION_FLAG] => Some(version_format()),
+        [HELP_FLAG] => Some(general_help_format()),
         [name, HELP_FLAG] => COMMANDS
             .iter()
             .find(|command| command.name == *name)
-            .map(format_command_help),
+            .map(command_help_format),
         _ => None,
     }
 }
 
-fn format_version() -> String {
+fn version_format() -> String {
     format!("{} {}\n", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
 }
 
-fn format_general_help() -> String {
+fn general_help_format() -> String {
     let commands = COMMANDS
         .iter()
         .map(|command| format!("  {:<9}{}\n", command.name, command.summary))
@@ -206,7 +206,7 @@ fn format_general_help() -> String {
     )
 }
 
-fn format_command_help(command: &CommandHelp) -> String {
+fn command_help_format(command: &CommandHelp) -> String {
     let CommandHelp {
         name,
         summary,

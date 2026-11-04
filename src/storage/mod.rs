@@ -1,26 +1,29 @@
 //! `SQLite` storage implementation; SQL and native handles remain private.
-mod bootstrap;
+mod cache;
 mod connection;
 mod native;
 mod query;
-mod read;
 mod schema;
-mod status;
-mod status_counts;
-/// Observation-only `SQLite` storage with optional publication.
-pub(crate) use bootstrap::SqliteBootstrap;
-pub(crate) use status::SqliteStatusStorage;
-mod sqlite;
-pub(crate) use sqlite::SqliteStorage;
+mod transaction;
+mod vector;
 
-mod cache_write;
-mod files;
-mod fts;
-mod graph;
+pub(crate) use cache::CacheStorage;
+pub(crate) use connection::{
+    attach_cache, attach_read_only_vectors, attach_unconfigured_vectors, attach_vectors,
+    configure_connection, map_sqlite, open_database,
+};
+pub(crate) use schema::{
+    attach_empty_vectors, bootstrap_cache, bootstrap_vectors, validate_cache,
+    validate_vector_database, validate_vectors,
+};
+pub(crate) use vector::VectorStorage;
 
-mod vector_write;
-mod vectors;
+#[cfg(test)]
+mod utils;
 
-mod work;
+pub(crate) use connection::{configure_vectors, open_confined_database, open_observed_database};
+#[cfg(test)]
+pub(crate) use utils::{TestDatabases, open_confined_test_storage, open_test_storage};
 
-mod neighbors;
+#[cfg(test)]
+pub(crate) use utils::get_current;

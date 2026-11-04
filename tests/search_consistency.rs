@@ -1,9 +1,12 @@
+use crate::support::storage::get_current;
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
 mod support;
 use letopis::{
     domain::LineRange,
     service::{
         CommandErrorKind, CommandResult, Refresher, SearchFlag, SearchLink, SearchRequest,
-        Searcher, Storage, VectorOutcome,
+        Searcher, VectorOutcome,
     },
     wire_document_refresher, wire_searcher,
 };
@@ -83,33 +86,44 @@ fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates()
         .unwrap();
     let config = repo.write_config("ollama", "http://localhost/api", "fixture");
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
-    let mut old_storage = repo.open_storage();
-    let mut old = old_storage.begin_read_tx().unwrap();
-    let identity = config.get_identity();
-    // When / Then: the old reader retains original dimensions and candidates across model reset.
-    assert_eq!(
-        old.get_vector_dimensions(&identity).unwrap(),
-        VectorOutcome::Current(NonZeroUsize::new(2))
-    );
-    let next = repo.write_config("ollama", "http://localhost/api", "next");
-    repo.seed_vectors(&next, &[("a.md", &[0.0, 0.0, 1.0])]);
-    let matches = old.get_nearest_vectors(&identity, &[1.0, 0.0], 2).unwrap();
-    let VectorOutcome::Current(matches) = matches else {
-        panic!("old identity must remain pinned")
-    };
-    assert_eq!(matches.len(), 1);
-    assert_eq!(matches[0].id.as_str(), "a.md");
-    assert!(matches[0].distance.abs() < 1e-6);
-    drop(old);
-    let mut write_storage = repo.open_storage();
-    let VectorOutcome::Current(mut unit) = write_storage
-        .begin_vector_write_tx(&next.get_identity())
-        .unwrap()
-    else {
-        panic!("new identity")
-    };
-    unit.set_query_error(1, "new diagnostic").unwrap();
-    unit.commit().unwrap();
+    let old_storage = repo.open_storage();
+    let next = old_storage
+        .cache
+        .with_read_tx(|| {
+            let old = &old_storage.cache;
+            let identity = config.get_identity();
+            // When / Then: the old reader retains original dimensions and candidates across model reset.
+            assert_eq!(
+                old.vector_index_config_get_by_id(&identity).unwrap(),
+                VectorOutcome::Current(NonZeroUsize::new(2))
+            );
+            let next = repo.write_config("ollama", "http://localhost/api", "next");
+            repo.seed_vectors(&next, &[("a.md", &[0.0, 0.0, 1.0])]);
+            let matches = old
+                .vector_index_get_by_vector(&identity, &[1.0, 0.0], 2)
+                .unwrap();
+            let VectorOutcome::Current(matches) = matches else {
+                panic!("old identity must remain pinned")
+            };
+            assert_eq!(matches.len(), 1);
+            assert_eq!(matches[0].id.as_str(), "a.md");
+            assert!(matches[0].distance.abs() < 1e-6);
+
+            Ok::<_, StorageError>(next)
+        })
+        .unwrap();
+
+    let write_storage = repo.open_storage();
+    write_storage
+        .vectors
+        .with_write_tx(&next.get_identity(), || {
+            let unit = &write_storage.vectors;
+            unit.query_error_upsert_by_id(1, "new diagnostic").unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
 }
 
 #[test]
@@ -135,14 +149,18 @@ fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
         barrier.wait_until_entered();
         let next = repo.write_config(protocol, &server.get_base_url(), "next");
         repo.seed_vectors(&next, &[("b.md", &[0.0, 0.0, 1.0])]);
-        let mut storage = repo.open_storage();
-        let VectorOutcome::Current(mut unit) =
-            storage.begin_vector_write_tx(&next.get_identity()).unwrap()
-        else {
-            panic!("identity")
-        };
-        unit.set_query_error(9, "new model diagnostic").unwrap();
-        unit.commit().unwrap();
+        let storage = repo.open_storage();
+        storage
+            .vectors
+            .with_write_tx(&next.get_identity(), || {
+                let unit = &storage.vectors;
+                unit.query_error_upsert_by_id(9, "new model diagnostic")
+                    .unwrap();
+
+                Ok::<_, StorageError>(())
+            })
+            .map(get_current)
+            .unwrap();
         barrier.release();
         let links = worker.join().unwrap();
         // When / Then: the old query completes; original lexical results and new-model diagnostics survive.
@@ -154,13 +172,19 @@ fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
             ["a.md"]
         );
         assert_eq!(links[0].revision, revision);
-        let mut read = storage.begin_read_tx().unwrap();
-        assert_eq!(read.get_config_identity(), Some(next.get_identity()));
-        assert_eq!(
-            read.get_query_error().unwrap().unwrap().error,
-            "new model diagnostic"
-        );
-        assert_eq!(server.take_requests().len(), 1);
+        storage
+            .cache
+            .with_read_tx(|| {
+                let read = &storage.cache;
+                assert_eq!(read.meta_get_by_id().unwrap(), Some(next.get_identity()));
+                assert_eq!(
+                    read.query_error_get_by_id().unwrap().unwrap().error,
+                    "new model diagnostic"
+                );
+                assert_eq!(server.take_requests().len(), 1);
+                Ok::<_, StorageError>(())
+            })
+            .unwrap();
     }
 }
 #[test]
@@ -221,16 +245,22 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
     // Then: search returns one lexical link, stores a query diagnostic and permits reset.
     assert_eq!(links.len(), 1);
     assert!(
-        repo.open_storage()
-            .begin_read_tx()
-            .unwrap()
-            .get_query_error()
-            .unwrap()
-            .is_some()
+        {
+            let scope_databases = repo.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| {
+                    Ok::<_, StorageError>(scope_databases.cache.query_error_get_by_id())
+                })
+                .unwrap()
+        }
+        .unwrap()
+        .is_some()
     );
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
     assert_eq!(
         repo.open_storage()
+            .vectors
             .reset_vectors(Some(&config.get_identity()), &next.get_identity())
             .unwrap(),
         VectorOutcome::Current(true)
@@ -271,6 +301,7 @@ fn live_confinement_error_releases_read_before_subsequent_reset() {
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
     assert_eq!(
         repo.open_storage()
+            .vectors
             .reset_vectors(Some(&config.get_identity()), &next.get_identity())
             .unwrap(),
         VectorOutcome::Current(true)
@@ -316,6 +347,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
     assert_eq!(
         repo.open_storage()
+            .vectors
             .reset_vectors(Some(&config.get_identity()), &next.get_identity())
             .unwrap(),
         VectorOutcome::Current(true)
