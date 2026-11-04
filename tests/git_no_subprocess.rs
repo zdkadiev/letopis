@@ -234,16 +234,13 @@ fn nonempty_direct_drain_uses_owned_local_provider_without_git_helpers() {
                 .unwrap();
             assert_eq!(work, VectorOutcome::Current(None));
             let id = EdgeTarget::Knowledge(KnowledgeId::parse("note.md").unwrap());
-            let node = read.nodes_get_by_id(&id).unwrap().unwrap();
+            let node = StorageRead::nodes_get_by_id(read, &id).unwrap().unwrap();
             let NodeMetadata::Knowledge(node) = node.metadata else {
                 panic!("knowledge node")
             };
             assert_eq!(
-                read.vector_keys_get_vector_by_search_hash(
-                    &config.get_identity(),
-                    &node.search_hash
-                )
-                .unwrap(),
+                read.vector_keys_get_by_search_hash(&config.get_identity(), &node.search_hash)
+                    .unwrap(),
                 VectorOutcome::Current(Some(vec![1., 2., 3.]))
             );
             assert_eq!(http.take_requests().len(), 1);
