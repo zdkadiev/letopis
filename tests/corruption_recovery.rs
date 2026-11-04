@@ -8,7 +8,7 @@ use letopis::{
     service::{EmbeddingConfig, FileLocker, NodeMetadata, VectorOutcome},
 };
 use rusqlite::{Connection, OpenFlags};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::{
     fs,
     io::ErrorKind,
@@ -85,19 +85,13 @@ fn reindex_preserves_healthy_vectors_after_corrupt_cache_removal() {
     assert_persistent_corruption(&repo, &[CACHE], &canonical);
     remove_owned_database(repo.get_root(), CACHE);
     assert_missing_cache_status(&repo);
-    assert_eq!(
-        invoke_reindex(&repo),
-        json!({"ok":true,"result":{"revision":1}})
-    );
+    assert_eq!(invoke_reindex(&repo)["result"]["revision"], 1);
     assert_projection(&repo, 1);
     assert_retained_vectors(&repo, &config, &hashes);
     assert_eq!(capture_canonical_state(&repo), canonical);
 
     // When / Then: reopen storage and use another CLI process to prove stability.
-    assert_eq!(
-        invoke_reindex(&repo),
-        json!({"ok":true,"result":{"revision":2}})
-    );
+    assert_eq!(invoke_reindex(&repo)["result"]["revision"], 2);
     assert_projection(&repo, 2);
     assert_retained_vectors(&repo, &config, &hashes);
     assert_eq!(capture_canonical_state(&repo), canonical);
@@ -126,10 +120,7 @@ fn verify_removed_databases_recover(targets: &[&str], damage: Damage) {
         assert_missing_cache_status(&repo);
     }
     let revision = if targets.contains(&CACHE) { 1 } else { 4 };
-    assert_eq!(
-        invoke_reindex(&repo),
-        json!({"ok":true,"result":{"revision":revision}})
-    );
+    assert_eq!(invoke_reindex(&repo)["result"]["revision"], revision);
 
     // Then: only text projections recover without a configured inference provider.
     assert_projection(&repo, revision);
@@ -162,8 +153,13 @@ fn publish_fixture() -> ReadingRepo {
 }
 
 fn assert_persistent_corruption(repo: &ReadingRepo, targets: &[&str], state: &CanonicalState) {
-    for command in ["reindex", "reindex", "status", "status"] {
-        let output = repo.invoke(&[command], b"{}");
+    for args in [
+        &["index", "--full"][..],
+        &["index", "--full"][..],
+        &["status"][..],
+        &["status"][..],
+    ] {
+        let output = repo.invoke(args, b"{}");
         let response = get_response(&output, 1);
         assert_eq!(response["ok"], false);
         assert_eq!(response["error"]["code"], "internal_error");
@@ -190,7 +186,7 @@ fn assert_persistent_corruption(repo: &ReadingRepo, targets: &[&str], state: &Ca
 }
 
 fn invoke_reindex(repo: &ReadingRepo) -> Value {
-    let response = get_response(&repo.invoke(&["reindex"], b"{}"), 0);
+    let response = get_response(&repo.invoke(&["index", "--full"], b"{}"), 0);
     assert_eq!(response["ok"], true);
     response
 }

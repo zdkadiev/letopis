@@ -315,7 +315,7 @@ fn prepare_notes(repo: &ReadingRepo) -> TreeOid {
 fn prepare_vectors(repo: &ReadingRepo, config: &EmbeddingConfig, dimensions: usize) {
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     let vector = vec![1.0; dimensions];
     repo.seed_vectors(

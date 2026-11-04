@@ -108,7 +108,7 @@ fn missing_invalid_or_empty_work_never_launches_a_product() {
                 fixture.repo.remove("knowledge.md");
                 wire_document_refresher(fixture.repo.get_root())
                     .unwrap()
-                    .refresh()
+                    .refresh(&[])
                     .unwrap();
             }
             _ => {}

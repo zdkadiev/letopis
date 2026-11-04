@@ -20,11 +20,11 @@ fn reindex_binary_rebuilds_unchanged_fts_and_returns_next_revision() {
     // Given: an unchanged knowledge file whose FTS entry was removed.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "AlphaToken");
-    assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":1}}));
+    assert_eq!(reindex(&repo)["result"]["revision"], 1);
     let db = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     db.execute("delete from text_index", []).unwrap();
     // When: the reindex command rebuilds the cache.
-    assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":2}}));
+    assert_eq!(reindex(&repo)["result"]["revision"], 2);
     // Then: the next revision restores the original searchable text.
     let storage = repo.open_storage();
     storage
@@ -42,7 +42,7 @@ fn reindex_binary_rebuilds_unchanged_fts_and_returns_next_revision() {
         })
         .unwrap();
 
-    assert_eq!(reindex(&repo), json!({"ok":true,"result":{"revision":3}}));
+    assert_eq!(reindex(&repo)["result"]["revision"], 3);
 }
 
 #[test]
@@ -50,11 +50,10 @@ fn reindex_binary_rejects_selective_cancel_and_malformed_input_before_io() {
     // Given.
     let repo = ReadingRepo::new();
     for (args, input) in [
-        (vec!["reindex"], r#"{"paths":["a.md"]}"#),
-        (vec!["reindex", "--cancel"], "{}"),
-        (vec!["reindex"], "null"),
-        (vec!["reindex"], "{} {}"),
-        (vec!["reindex"], r#"{"extra":1}"#),
+        (vec!["index", "--full", "--cancel"], "{}"),
+        (vec!["index", "--full"], "null"),
+        (vec!["index", "--full"], "{} {}"),
+        (vec!["index", "--full"], r#"{"extra":1}"#),
     ] {
         // When.
         let response = get_response(&repo.invoke(&args, input.as_bytes()), 1);
@@ -309,7 +308,7 @@ fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
     std::os::unix::fs::symlink(outside.path(), repo.get_root().join("unsafe")).unwrap();
     repo.write_knowledge("a.md", "UnpublishedToken");
     // When: the reindex command encounters the unsafe candidate.
-    let response = get_response(&repo.invoke(&["reindex"], b"{}"), 1);
+    let response = get_response(&repo.invoke(&["index", "--full"], b"{}"), 1);
     // Then: a safe error is returned and the prior revision survives.
     assert_eq!(
         response,
@@ -338,7 +337,7 @@ fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
 }
 
 fn reindex(repo: &ReadingRepo) -> Value {
-    let response = get_response(&repo.invoke(&["reindex"], b"{}"), 0);
+    let response = get_response(&repo.invoke(&["index", "--full"], b"{}"), 0);
     println!("PRODUCT_REINDEX {}", response);
     response
 }

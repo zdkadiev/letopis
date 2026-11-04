@@ -67,7 +67,7 @@ impl Fixture {
         self.repo.write("knowledge.md", &bytes);
         wire_document_refresher(self.repo.get_root())
             .unwrap()
-            .refresh()
+            .refresh(&[])
             .unwrap();
         file_parse(&RepoPath::parse("knowledge.md").unwrap(), bytes.as_bytes())
             .unwrap()

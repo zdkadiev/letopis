@@ -81,7 +81,7 @@ fn inspect_rejects_invalid_current_file_instead_of_using_old_sql() {
     repo.write("a.md", b"<!-- letopis: {\"created_at\":1} -->\nold\n");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.write("a.md", b"<!-- letopis: {invalid} -->\ncurrent\n");
     // When
@@ -140,7 +140,7 @@ fn inspect_skips_removed_tracked_candidates_and_rejects_removed_knowledge() {
     assert!(status.success());
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     std::fs::remove_file(repo.get_root().join("gone.md")).unwrap();
     let mut service = wire_inspector(repo.get_root()).unwrap();
@@ -173,7 +173,7 @@ fn inspect_rejects_removed_indexed_anchor_in_mixed_batch() {
     repo.write("source.txt", b"available source");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.write(
         "sections.md",

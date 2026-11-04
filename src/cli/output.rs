@@ -30,8 +30,12 @@ struct Failure<'a> {
 #[serde(untagged)]
 enum ResultBody<'a> {
     Initialized {},
-    Reindex {
+    Index {
         revision: u64,
+        published: bool,
+        files_updated: usize,
+        files_removed: usize,
+        invalid_files_updated: usize,
     },
     Status {
         revision: Option<u64>,
@@ -166,8 +170,12 @@ fn result_build(result: &ResponseResult) -> ResultBody<'_> {
     match result {
         ResponseResult::Help(text) => ResultBody::Help(text),
         ResponseResult::Initialized => ResultBody::Initialized {},
-        ResponseResult::Reindex(revision) => ResultBody::Reindex {
-            revision: *revision,
+        ResponseResult::Index(outcome) => ResultBody::Index {
+            revision: outcome.revision,
+            published: outcome.published,
+            files_updated: outcome.files_updated,
+            files_removed: outcome.files_removed,
+            invalid_files_updated: outcome.invalid_files_updated,
         },
         ResponseResult::Status(report) => ResultBody::Status {
             revision: report.revision,

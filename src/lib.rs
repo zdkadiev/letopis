@@ -12,7 +12,9 @@
     )
 )]
 
-use crate::cli::{CommandResponse, ResponseWriter, request_parse, response_write};
+use crate::cli::{
+    CommandResponse, ResponseWriter, get_index_mode_by_args, request_parse, response_write,
+};
 use crate::commands::run_request;
 use crate::embedding::HttpProviders;
 use crate::filesystem::LocalFileSystem;
@@ -58,14 +60,14 @@ pub mod service;
 
 const VECTOR_WRITE_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
 
-const FOREGROUND_COMMANDS: [&str; 5] = ["search", "traverse", "inspect", "check", "reindex"];
+const FOREGROUND_COMMANDS: [&str; 4] = ["search", "traverse", "inspect", "check"];
 
 /// Parse and run one CLI request, emitting one complete JSON envelope.
 /// The exact forms `--help`, `<command> --help` and `--version` are ordinary
 /// requests that print plain text without reading `input` or touching any service.
 /// Returns 0 only for successfully written success output, otherwise 1.
 /// Check, search, traverse and inspect refresh through their application services.
-/// Reindex forces a complete atomic publication through the same document service.
+/// Index provides incremental, verified and full publication.
 /// Successful foreground operations may launch the existing detached embedding drain.
 pub fn run_cli(
     args: impl IntoIterator<Item = OsString>,
@@ -82,7 +84,7 @@ pub fn run_cli(
 /// Run the executable entry path with scoped foreground SIGINT handling.
 ///
 /// Registers one listener for the exact `search`, `traverse`, `inspect`, `check`
-/// and `reindex` argv shapes before stdin or services are used. Other commands
+/// and supported `index` argv shapes before stdin or services are used. Other commands
 /// keep their default signal behavior. Terminal stdin and a pipe that sends no
 /// bytes within 250 ms are treated as empty requests; after the first byte,
 /// non-terminal input is read to EOF. A handled SIGINT writes one cancellation
@@ -942,6 +944,9 @@ where
 }
 
 fn requires_cancellation_handler(args: &[OsString]) -> bool {
+    if get_index_mode_by_args(args).is_some() {
+        return true;
+    }
     match args {
         [command] => command
             .to_str()

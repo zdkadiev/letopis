@@ -176,7 +176,7 @@ fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
     repo.write_knowledge("c.md", "second");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
     connection

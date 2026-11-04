@@ -73,7 +73,7 @@ fn reindex_rejects_corrupt_required_basis_without_advancing() {
 
         // When / Then: each command starts a fresh process and must fail closed.
         for _ in 0..2 {
-            assert_safe_failure(&repo.invoke(&["reindex"], b"{}"));
+            assert_safe_failure(&repo.invoke(&["index", "--full"], b"{}"));
             assert_eq!(capture_projection(&repo), projection);
             assert_eq!(capture_canonical_state(&repo), canonical);
             assert_eq!(fs::read(&path).unwrap(), damaged);
@@ -123,7 +123,7 @@ fn reindex_after_cache_loss_reports_invalid_file_and_publishes_valid_peer() {
 }
 
 fn invoke_reindex(repo: &ReadingRepo) -> Value {
-    let response = get_response(&repo.invoke(&["reindex"], b"{}"), 0);
+    let response = get_response(&repo.invoke(&["index", "--full"], b"{}"), 0);
     assert_eq!(response["ok"], true);
     response
 }

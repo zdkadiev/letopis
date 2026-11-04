@@ -42,7 +42,7 @@ fn cancelling_holder_releases_index_lock() {
     let repo = ReadingRepo::new();
     repo.write_knowledge("knowledge.md", "HolderToken");
     let barrier_read = GitReadBarrier::new(repo.get_root());
-    let mut child = spawn_product(&repo, &["reindex"], None);
+    let mut child = spawn_product(&repo, &["index", "--full"], None);
     child.send_input(b"{}");
     barrier_read.observe(child.get_id());
     let lock = repo.get_root().join(".letopis/index.lock");
@@ -72,7 +72,7 @@ fn cancelling_waiter_preserves_holder_and_lock_inode() {
         .expect("holder lock");
     let lock = repo.get_root().join(".letopis/index.lock");
     let identity = get_lock_identity(&lock);
-    let mut child = spawn_product(&repo, &["reindex"], None);
+    let mut child = spawn_product(&repo, &["index", "--full"], None);
     child.send_input(b"{}");
     let observation = observe_index_flock(child.get_id(), &lock);
     assert!(observation.starts_with("inside=flock"), "{observation}");
@@ -288,7 +288,7 @@ fn get_success(output: &Output) -> Value {
 }
 
 fn publish(repo: &ReadingRepo) -> u64 {
-    let response = get_success(&repo.invoke(&["reindex"], b"{}"));
+    let response = get_success(&repo.invoke(&["index", "--full"], b"{}"));
     assert_eq!(response["ok"], true);
     response["result"]["revision"]
         .as_u64()

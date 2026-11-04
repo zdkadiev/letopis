@@ -195,44 +195,6 @@
       }
     },
     {
-      "command": "reindex",
-      "kind": "input",
-      "valid": true,
-      "value": {}
-    },
-    {
-      "command": "reindex",
-      "kind": "input",
-      "valid": false,
-      "value": {
-        "paths": []
-      }
-    },
-    {
-      "command": "reindex",
-      "kind": "success",
-      "valid": true,
-      "value": {
-        "ok": true,
-        "result": {
-          "revision": 7
-        }
-      }
-    },
-    {
-      "command": "reindex",
-      "kind": "error",
-      "valid": true,
-      "value": {
-        "ok": false,
-        "error": {
-          "code": "internal_error",
-          "message": "Ошибка операции",
-          "details": {}
-        }
-      }
-    },
-    {
       "command": "config",
       "kind": "input",
       "valid": true,
@@ -1100,6 +1062,56 @@
               }
             }
           ]
+        }
+      }
+    },
+    {
+      "command": "index",
+      "kind": "input",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "command": "index",
+      "kind": "input",
+      "valid": true,
+      "value": {
+        "paths": [
+          "letopis/architecture"
+        ]
+      }
+    },
+    {
+      "command": "index",
+      "kind": "input",
+      "valid": false,
+      "value": {
+        "command": "index"
+      }
+    },
+    {
+      "command": "index",
+      "kind": "success",
+      "valid": true,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": 42,
+          "published": true,
+          "files_updated": 3,
+          "files_removed": 0,
+          "invalid_files_updated": 1
+        }
+      }
+    },
+    {
+      "command": "index",
+      "kind": "success",
+      "valid": false,
+      "value": {
+        "ok": true,
+        "result": {
+          "revision": 42
         }
       }
     }

@@ -117,7 +117,12 @@ impl Workflow {
 
     /// Invoke the shipped executable and emit the raw envelope for host schema validation.
     fn invoke_command(&self, command: &str, input: &[u8], expected: i32) -> Value {
-        let output = self.repo.invoke(&[command], input);
+        let args: &[&str] = if command == "reindex" {
+            &["index", "--full"]
+        } else {
+            &[command]
+        };
+        let output = self.repo.invoke(args, input);
         get_response(command, &output, expected)
     }
 
@@ -179,8 +184,8 @@ fn configure_and_publish(workflow: &Workflow, endpoint: &str) {
         .unwrap()
         .unwrap();
     assert_eq!(
-        workflow.invoke_command("reindex", b"{}", 0),
-        json!({"ok":true,"result":{"revision":1}})
+        workflow.invoke_command("reindex", b"{}", 0)["result"]["revision"],
+        1
     );
     workflow.repo.seed_vectors(
         &config,

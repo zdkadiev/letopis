@@ -455,3 +455,7 @@ Current-file bytes не кэшируются между наблюдениями
 preflight observation завершается перед retention, retention перед SQL write.
 Current-object/delta buffers масштабируются с объектом; caches payload выключены,
 между объектами сохраняется не более 4 MiB decode allocation, hash chunk 64 KiB.
+
+## Index CLI — issue #94 (2026-11-05)
+
+The explicit `index` command uses the existing synchronous Refresher publication pipeline. Default incremental publication retains roots, `--verify` audits effective snapshot closures, and `--full` reparses the selected owners and forces a revision bump while auditing closures. Optional JSON `paths` scope candidate observations and cached-owner removals at path-component boundaries; unselected owners remain untouched. Full graph/source-reference accounting and snapshot closure verification remain global. `check.paths` filters findings only. The former `reindex` CLI command is removed; use `index --full`. The index lock and background drain behavior are unchanged.

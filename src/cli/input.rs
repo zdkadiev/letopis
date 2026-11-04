@@ -19,7 +19,7 @@ pub(crate) enum Request {
     Init,
     Status,
     Config,
-    Reindex,
+    Index(IndexRequest),
     Check(Vec<RepoPath>),
     Inspect(Vec<ElementAddress>),
     Search(SearchRequest),
@@ -28,6 +28,37 @@ pub(crate) enum Request {
     /// Plain-text help or version output, produced before any input is read.
     Help(String),
 }
+/// Mode selected by explicit index argv flags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IndexMode {
+    Incremental,
+    Verified,
+    Full,
+}
+
+/// Parsed index request; path selectors are independent from mode flags.
+#[derive(Debug)]
+pub(crate) struct IndexRequest {
+    pub(crate) mode: IndexMode,
+    pub(crate) paths: Vec<RepoPath>,
+}
+
+/// Recognize only supported index argv forms before reading stdin.
+pub(crate) fn get_index_mode_by_args(args: &[OsString]) -> Option<IndexMode> {
+    let args = args
+        .iter()
+        .map(|arg| arg.to_str())
+        .collect::<Option<Vec<_>>>()?;
+    match args.as_slice() {
+        ["index"] => Some(IndexMode::Incremental),
+        ["index", "--verify"] => Some(IndexMode::Verified),
+        ["index", "--full"] | ["index", "--full", "--verify"] | ["index", "--verify", "--full"] => {
+            Some(IndexMode::Full)
+        }
+        _ => None,
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CheckInput {
@@ -86,6 +117,7 @@ pub(crate) fn request_parse(args: &[OsString], input: impl Read) -> CommandResul
     if let Some(text) = help_get_by_args(args) {
         return Ok(Request::Help(text));
     }
+    let index_mode = get_index_mode_by_args(args);
     let args = args
         .iter()
         .map(|arg| {
@@ -111,10 +143,14 @@ pub(crate) fn request_parse(args: &[OsString], input: impl Read) -> CommandResul
             let _: EmptyInput = object_parse(input)?;
             Ok(Request::Config)
         }
-        ["reindex"] => {
-            let _: EmptyInput = object_parse(input)?;
-            Ok(Request::Reindex)
-        }
+        ["index", ..] => index_mode
+            .ok_or_else(|| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+            .and_then(|mode| index_request_parse(mode, input)),
         ["check"] => check_request_parse(input),
         ["inspect"] => inspection_request_parse(input),
         ["search"] => search_request_parse(input).map(Request::Search),
@@ -127,10 +163,21 @@ pub(crate) fn request_parse(args: &[OsString], input: impl Read) -> CommandResul
     }
 }
 
+fn index_request_parse(mode: IndexMode, input: impl Read) -> CommandResult<Request> {
+    let dto: CheckInput = object_parse(input)?;
+    Ok(Request::Index(IndexRequest {
+        mode,
+        paths: paths_parse(&dto.paths)?,
+    }))
+}
+
 fn check_request_parse(input: impl Read) -> CommandResult<Request> {
     let dto: CheckInput = object_parse(input)?;
-    let paths = dto
-        .paths
+    Ok(Request::Check(paths_parse(&dto.paths)?))
+}
+
+fn paths_parse(paths: &[String]) -> CommandResult<Vec<RepoPath>> {
+    let paths = paths
         .iter()
         .map(|raw| {
             RepoPath::parse(raw).map_err(|_| {
@@ -141,7 +188,7 @@ fn check_request_parse(input: impl Read) -> CommandResult<Request> {
             })
         })
         .collect::<CommandResult<BTreeSet<_>>>()?;
-    Ok(Request::Check(paths.into_iter().collect()))
+    Ok(paths.into_iter().collect())
 }
 
 fn inspection_request_parse(input: impl Read) -> CommandResult<Request> {

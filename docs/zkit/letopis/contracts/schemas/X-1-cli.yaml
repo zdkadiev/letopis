@@ -505,39 +505,6 @@
       "additionalProperties": false,
       "description": "Successful repository initialization; no partial all-or-nothing claim."
     },
-    "ReindexOutput": {
-      "type": "object",
-      "properties": {
-        "ok": {
-          "const": true
-        },
-        "result": {
-          "type": "object",
-          "properties": {
-            "revision": {
-              "$ref": "#/$defs/Revision"
-            }
-          },
-          "required": [
-            "revision"
-          ],
-          "additionalProperties": false
-        },
-        "warnings": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Diagnostic"
-          },
-          "minItems": 1,
-          "description": "D-95: non-fatal warnings of this call (drain not started); not stored. The last query-embedding error is a status problem (D-62)."
-        }
-      },
-      "required": [
-        "ok",
-        "result"
-      ],
-      "additionalProperties": false
-    },
     "Lock": {
       "type": "object",
       "properties": {
@@ -833,6 +800,73 @@
         "result"
       ],
       "additionalProperties": false
+    },
+    "IndexInput": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Path"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "description": "Index owner scope; empty or omitted paths selects all candidates. Mode flags are argv."
+    },
+    "IndexOutput": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "revision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "published": {
+              "type": "boolean"
+            },
+            "files_updated": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "files_removed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "invalid_files_updated": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "revision",
+            "published",
+            "files_updated",
+            "files_removed",
+            "invalid_files_updated"
+          ],
+          "additionalProperties": false
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "minItems": 1,
+          "description": "D-95: non-fatal warnings of this call (drain not started); not stored. The last query-embedding error is a status problem (D-62)."
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
     }
   },
   "anyOf": [
@@ -850,9 +884,6 @@
     },
     {
       "$ref": "#/$defs/InspectInput"
-    },
-    {
-      "$ref": "#/$defs/ReindexOutput"
     },
     {
       "$ref": "#/$defs/CheckOutput"
@@ -880,6 +911,12 @@
     },
     {
       "$ref": "#/$defs/EmptyOutput"
+    },
+    {
+      "$ref": "#/$defs/IndexInput"
+    },
+    {
+      "$ref": "#/$defs/IndexOutput"
     }
   ],
   "x-commands": {
@@ -973,24 +1010,6 @@
         "error": 1
       }
     },
-    "reindex": {
-      "input": {
-        "$ref": "#/$defs/Empty"
-      },
-      "success": {
-        "$ref": "#/$defs/ReindexOutput"
-      },
-      "error": {
-        "$ref": "#/$defs/Failure"
-      },
-      "x-idempotency": "none",
-      "description": "Full rebuild under index.lock (D-95); waits graph/FTS publication, not vectors; SIGINT cancels, the previous cache stays.",
-      "stdout": "one JSON",
-      "exit": {
-        "success": 0,
-        "error": 1
-      }
-    },
     "status": {
       "input": {
         "$ref": "#/$defs/Empty"
@@ -1040,6 +1059,24 @@
       "x-idempotency": "safe-retry",
       "x-internal": true,
       "description": "Internal, not for agents (D-94/D-95): detached drain under embed.lock of texts without a vector; exits 0 with an empty result when no work is left or another drain holds the lock.",
+      "stdout": "one JSON",
+      "exit": {
+        "success": 0,
+        "error": 1
+      }
+    },
+    "index": {
+      "input": {
+        "$ref": "#/$defs/IndexInput"
+      },
+      "success": {
+        "$ref": "#/$defs/IndexOutput"
+      },
+      "error": {
+        "$ref": "#/$defs/Failure"
+      },
+      "x-idempotency": "incremental no-op on unchanged corpus; full always publishes",
+      "description": "Incremental, --verify closure audit, or --full forced reparse and closure audit; optional owner paths scope publication, not closure verification.",
       "stdout": "one JSON",
       "exit": {
         "success": 0,

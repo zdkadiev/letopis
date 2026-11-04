@@ -115,7 +115,7 @@ Treat a recheck flag as a prompt to examine current source bytes and provenance.
 
 Search/traverse/inspect automatically refresh the database without editing Markdown.
 Routine reads verify addressed source objects; a full source-snapshot audit needs
-unscoped `check` or `reindex`. For audit guarantees and rebuild behavior, read
+unscoped `check` or `index --full`. For audit guarantees and rebuild behavior, read
 [operations](references/operations.md#source-snapshot-audits).
 
 One `inspect` call returns `result.snapshot` (a retained Git tree OID) and
@@ -245,5 +245,9 @@ for unchanged files; status alone cannot perform it. Before cancelling a command
 read [foreground cancellation](references/operations.md#cancel-your-own-foreground-call).
 
 The public CLI has `init`, `check`, `config`, `search`, `status`, `traverse`,
-`inspect`, and `reindex`. Use Git to read captured bytes and edit Markdown to
+`inspect`, and `index`. Use Git to read captured bytes and edit Markdown to
 change knowledge; there are no `read`, `snapshot`, `apply`, or `cancel` commands.
+
+## Publish the index explicitly
+
+Use `letopis index` to publish changed Markdown without collecting validation findings. `letopis index --verify` additionally verifies complete source snapshot closures; `letopis index --full` forces an expensive reparse and the same audit. Both flags together mean full mode. Pipe `{"paths":["letopis/cache"]}` to restrict observed owner files and removals to that directory; `{}` or empty paths selects the whole corpus. Scoped indexing leaves outside file rows and knowledge projections untouched, while snapshot closure verification remains global. `check` paths filter findings only and do not scope its refresh. The result contains revision, published, files_updated, files_removed, and invalid_files_updated. Use `check` to see findings.

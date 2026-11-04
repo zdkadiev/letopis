@@ -15,7 +15,6 @@ mod input_tests {
             assert!(matches!(parse(&["config"], body), Ok(Request::Config)));
             assert!(matches!(parse(&["status"], body), Ok(Request::Status)));
             assert!(matches!(parse(&["check"], body), Ok(Request::Check(_))));
-            assert!(matches!(parse(&["reindex"], body), Ok(Request::Reindex)));
             for command in ["search", "inspect", "traverse"] {
                 assert_eq!(
                     parse(&[command], body).unwrap_err().get_kind(),
