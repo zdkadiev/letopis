@@ -28,18 +28,21 @@ fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
         let original_user_state = repo.capture_fixture_state();
         {
             let git = open_git_snapshots(repo.get_root()).unwrap();
-            assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
-            git.pin(&tree).unwrap();
+            assert_eq!(
+                git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap(),
+                CANARY_BYTES
+            );
+            git.tree_pin_by_oid(&tree).unwrap();
         }
         let original = damage_object(&repo, tree.as_str(), ObjectDamage::Truncate);
 
         // When / Then
         for _ in 0..2 {
             let git = open_git_snapshots(repo.get_root()).unwrap();
-            let verify_error = git.verify_snapshot(&tree).unwrap_err();
+            let verify_error = git.tree_verify_by_oid(&tree).unwrap_err();
             assert_eq!(verify_error.get_kind(), SnapshotErrorKind::InternalError);
             assert!(!format!("{verify_error} {verify_error:?}").contains("CORRUPTION_CANARY"));
-            let pin_error = git.pin(&tree).unwrap_err();
+            let pin_error = git.tree_pin_by_oid(&tree).unwrap_err();
             assert_eq!(pin_error.get_kind(), SnapshotErrorKind::InternalError);
             assert!(!format!("{pin_error} {pin_error:?}").contains("CORRUPTION_CANARY"));
             assert_eq!(repo.capture_fixture_state(), original_user_state);
@@ -48,8 +51,11 @@ fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
         // Given / When / Then: exact fixture restoration returns a fresh handle to health.
         restore_object(&repo, tree.as_str(), &original);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
-        git.pin(&tree).unwrap();
+        assert_eq!(
+            git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap(),
+            CANARY_BYTES
+        );
+        git.tree_pin_by_oid(&tree).unwrap();
         assert_eq!(repo.capture_fixture_state(), original_user_state);
     }
 }
@@ -64,8 +70,11 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
         let original_user_state = repo.capture_fixture_state();
         {
             let git = open_git_snapshots(repo.get_root()).unwrap();
-            assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
-            git.pin(&tree).unwrap();
+            assert_eq!(
+                git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap(),
+                CANARY_BYTES
+            );
+            git.tree_pin_by_oid(&tree).unwrap();
         }
         let original = damage_object(&repo, blob.as_str(), ObjectDamage::Truncate);
 
@@ -73,10 +82,10 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
         for _ in 0..2 {
             let git = open_git_snapshots(repo.get_root()).unwrap();
             assert_eq!(
-                git.verify_snapshot(&tree).unwrap(),
+                git.tree_verify_by_oid(&tree).unwrap(),
                 SnapshotState::Available
             );
-            let error = git.pin(&tree).unwrap_err();
+            let error = git.tree_pin_by_oid(&tree).unwrap_err();
             assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
             assert_eq!(repo.capture_fixture_state(), original_user_state);
             assert!(!format!("{error} {error:?}").contains("CORRUPTION_CANARY"));
@@ -85,8 +94,11 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
         // Given / When / Then: exact fixture restoration returns a fresh handle to health.
         restore_object(&repo, blob.as_str(), &original);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
-        git.pin(&tree).unwrap();
+        assert_eq!(
+            git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap(),
+            CANARY_BYTES
+        );
+        git.tree_pin_by_oid(&tree).unwrap();
         assert_eq!(repo.capture_fixture_state(), original_user_state);
     }
 }
@@ -101,8 +113,11 @@ fn missing_child_is_not_a_new_empty_snapshot() {
         let original_user_state = repo.capture_fixture_state();
         {
             let git = open_git_snapshots(repo.get_root()).unwrap();
-            assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
-            git.pin(&tree).unwrap();
+            assert_eq!(
+                git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap(),
+                CANARY_BYTES
+            );
+            git.tree_pin_by_oid(&tree).unwrap();
         }
         let original = damage_object(&repo, blob.as_str(), ObjectDamage::Missing);
 
@@ -110,10 +125,10 @@ fn missing_child_is_not_a_new_empty_snapshot() {
         for _ in 0..2 {
             let git = open_git_snapshots(repo.get_root()).unwrap();
             assert_eq!(
-                git.verify_snapshot(&tree).unwrap(),
+                git.tree_verify_by_oid(&tree).unwrap(),
                 SnapshotState::Available
             );
-            let error = git.pin(&tree).unwrap_err();
+            let error = git.tree_pin_by_oid(&tree).unwrap_err();
             assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
             assert_eq!(repo.capture_fixture_state(), original_user_state);
             assert!(!format!("{error} {error:?}").contains("CORRUPTION_CANARY"));
@@ -122,8 +137,11 @@ fn missing_child_is_not_a_new_empty_snapshot() {
         // Given / When / Then: exact fixture restoration returns a fresh handle to health.
         restore_object(&repo, blob.as_str(), &original);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        assert_eq!(git.get_blob(&tree, &leaf).unwrap(), CANARY_BYTES);
-        git.pin(&tree).unwrap();
+        assert_eq!(
+            git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap(),
+            CANARY_BYTES
+        );
+        git.tree_pin_by_oid(&tree).unwrap();
         assert_eq!(repo.capture_fixture_state(), original_user_state);
     }
 }

@@ -9,8 +9,8 @@ use pulldown_cmark::{Options, Parser};
 /// # Errors
 /// Returns local diagnostics for invalid UTF-8 or invalid knowledge metadata,
 /// anchors, element layout or declared graph links.
-pub fn parse(path: &RepoPath, bytes: &[u8]) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
-    MarkdownParser::new().parse_file(path, bytes)
+pub fn file_parse(path: &RepoPath, bytes: &[u8]) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
+    MarkdownParser::new().file_parse(path, bytes)
 }
 
 /// The shared pure X-4 Markdown codec used by application services.
@@ -22,7 +22,7 @@ impl MarkdownParser {
     }
 }
 impl MarkdownCodec for MarkdownParser {
-    fn parse_file(
+    fn file_parse(
         &self,
         path: &RepoPath,
         bytes: &[u8],
@@ -36,17 +36,17 @@ impl MarkdownCodec for MarkdownParser {
         let events: Events<'_> = Parser::new_ext(text, Options::ENABLE_HEADING_ATTRIBUTES)
             .into_offset_iter()
             .collect();
-        let Some(layout) = scan::scan(path, text, &events).map_err(|e| vec![e])? else {
+        let Some(layout) = scan::layout_scan(path, text, &events).map_err(|e| vec![e])? else {
             return Ok(None);
         };
-        let edges = links::collect(&events, &layout.elements).map_err(|e| vec![e])?;
+        let edges = links::edges_collect(&events, &layout.elements).map_err(|e| vec![e])?;
         Ok(Some(ParsedFile {
             elements: layout
                 .elements
                 .into_iter()
                 .map(|element| {
                     let search_text =
-                        search::render(&events, element.bytes, &layout.metadata_ranges);
+                        search::search_text_render(&events, element.bytes, &layout.metadata_ranges);
                     let search_hash = Sha256::digest(search_text.as_bytes());
                     ParsedElement {
                         element,
@@ -62,12 +62,12 @@ impl MarkdownCodec for MarkdownParser {
 
 #[cfg(test)]
 mod tests {
-    use super::{MarkdownParser, parse};
+    use super::{MarkdownParser, file_parse};
     use crate::{domain::RepoPath, service::MarkdownCodec};
 
     #[test]
     fn parser_interface_preserves_all_free_function_outcomes() {
-        // Given
+        // Given: valid, unmarked and invalid byte sequences exercise every parser outcome.
         let path = RepoPath::parse("note.md").unwrap();
         let parser = MarkdownParser::new();
         let cases: &[&[u8]] = &[
@@ -78,9 +78,9 @@ mod tests {
             b"<!-- letopis: {} -->\ntext",
         ];
         for bytes in cases {
-            // When
-            let actual = parser.parse_file(&path, bytes);
-            let existing = parse(&path, bytes);
+            // When: parse each sequence through the trait and public free operation.
+            let actual = parser.file_parse(&path, bytes);
+            let existing = file_parse(&path, bytes);
             // Then: parity only; existing X-4 tests carry independent behavior expectations.
             assert_eq!(format!("{actual:?}"), format!("{existing:?}"));
         }

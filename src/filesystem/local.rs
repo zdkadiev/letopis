@@ -140,6 +140,10 @@ impl LocalFileSystem {
 }
 
 impl FileReader for LocalFileSystem {
+    fn symlink_is_exist(&self, path: &Path) -> FileResult<bool> {
+        super::file::symlink_is_exist(self, path)
+    }
+
     fn file_get_by_path(&self, path: &Path) -> FileResult<Option<CapturedFile>> {
         super::file::file_get_by_path(self, path)
     }

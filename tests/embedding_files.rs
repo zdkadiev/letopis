@@ -1,5 +1,5 @@
 use letopis::domain::RepoPath;
-use letopis::markdown::{MarkdownParser, parse};
+use letopis::markdown::{MarkdownParser, file_parse};
 use letopis::open_filesystem;
 use letopis::service::{FileLocker, FileReader, FileWriter, MarkdownCodec, ParsedFile};
 use std::fs;
@@ -259,7 +259,7 @@ fn fifo_reads_and_lock_attempts_finish_promptly() {
 
 #[test]
 fn markdown_capability_preserves_existing_parser_projection() {
-    // Given
+    // Given: marked-looking legacy bytes and unmarked Markdown exercise both parser entry points.
     let path = RepoPath::parse("knowledge/note.md").unwrap();
     for bytes in [
         b"<!-- letopis {\"kind\":\"fact\",\"created_at\":1} -->\nHello.\n".as_slice(),
@@ -267,10 +267,10 @@ fn markdown_capability_preserves_existing_parser_projection() {
             .as_slice(),
         b"# Unmarked\nhello\n".as_slice(),
     ] {
-        // When
-        let old = parse(&path, bytes).unwrap();
-        let new = MarkdownParser.parse_file(&path, bytes).unwrap();
-        // Then
+        // When: parse the same path and bytes through both entry points.
+        let old = file_parse(&path, bytes).unwrap();
+        let new = MarkdownParser.file_parse(&path, bytes).unwrap();
+        // Then: the complete projections remain equal.
         assert_parsed_equal(old, new);
     }
 }

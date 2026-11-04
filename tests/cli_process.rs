@@ -102,14 +102,17 @@ fn owned_sigkill_and_stale_pid_preserve_inode_and_release_lock() {
 }
 #[test]
 fn exec_failure_returns_safe_warning() {
-    // Given
+    // Given: the configured executable is absent and its path contains a secret marker.
     let fixture = Fixture::new();
     let executable = fixture.root.path().join("secret-missing-executable");
     let mut foreground = fixture.spawn_foreground(Some(&executable));
-    // When
+    // When: the foreground handles the failed launch.
     let response = finish_foreground(&mut foreground);
-    // Then
-    assert!(response["warning"]["message"].is_string());
+    // Then: the existing public warning is exact and contains no private launch details.
+    assert_eq!(
+        response["warning"]["message"],
+        "cannot start background embedding drain"
+    );
     assert_eq!(response["warning"]["details"], serde_json::json!({}));
     assert!(!response.to_string().contains("secret"));
 }

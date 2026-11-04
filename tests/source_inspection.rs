@@ -136,7 +136,10 @@ fn inspect_distinguishes_missing_bytes_from_missing_membership() {
     assert!(
         open_git_snapshots(repo.get_root())
             .unwrap()
-            .get_blob(&result.snapshot, &RepoPath::parse("missing.txt").unwrap())
+            .blob_get_by_tree_oid_and_path(
+                &result.snapshot,
+                &RepoPath::parse("missing.txt").unwrap()
+            )
             .is_err()
     );
     // Given: the last current declaration is removed.
@@ -177,7 +180,7 @@ fn inspect_includes_unrequested_declared_source_files() {
     for path in ["unrelated.txt", ".letopis/cache.db"] {
         // When / Then
         assert!(
-            git.get_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
+            git.blob_get_by_tree_oid_and_path(&result.snapshot, &RepoPath::parse(path).unwrap())
                 .is_err()
         );
     }
@@ -286,6 +289,6 @@ fn write_references(repo: &ReadingRepo, sources: &[&str]) {
 fn get_blob(repo: &ReadingRepo, result: &Inspection, path: &str) -> Vec<u8> {
     open_git_snapshots(repo.get_root())
         .unwrap()
-        .get_blob(&result.snapshot, &RepoPath::parse(path).unwrap())
+        .blob_get_by_tree_oid_and_path(&result.snapshot, &RepoPath::parse(path).unwrap())
         .unwrap()
 }

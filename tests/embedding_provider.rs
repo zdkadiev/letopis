@@ -26,12 +26,12 @@ fn rejects_duplicate_nested_keys() {
 
 #[test]
 fn validates_endpoint_without_inference() {
-    // Given
+    // Given: an unsupported file URL and the synchronous provider owner.
     let config = parse_config(br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"file:///tmp/fixture"},"max_retries":3}"#);
     let provider = build_embedding_provider().unwrap();
-    // When
-    let result = provider.validate_config(&config);
-    // Then
+    // When: configuration is validated without inference.
+    let result = provider.config_validate(&config);
+    // Then: the endpoint is rejected locally.
     assert!(result.is_err());
 }
 
@@ -43,7 +43,7 @@ use support::embedding::{FixtureReply, HttpFixture};
 
 #[test]
 fn sends_native_request_without_silent_truncation_or_unknown_parameters() {
-    // Given
+    // Given: a native fixture and supported plus unrecognized request parameters.
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3],[4,5,6]]}));
     let config = build_config(
         "ollama",
@@ -51,11 +51,11 @@ fn sends_native_request_without_silent_truncation_or_unknown_parameters() {
         &json!({"dimensions":3,"keep_alive":"5m","options":{"seed":7},"unknown":42,"input":"override","model":"override"}),
     );
     let provider = build_embedding_provider().unwrap();
-    // When
+    // When: two native vectors are requested with explicit dimensions.
     let vectors = provider
-        .embed(&config, &["first", "second"], NonZeroUsize::new(3))
+        .vectors_compute_by_texts(&config, &["first", "second"], NonZeroUsize::new(3))
         .unwrap();
-    // Then
+    // Then: the literal vectors, request body and unauthenticated endpoint match the contract.
     assert_eq!(vectors, vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]]);
     assert_eq!(
         server.take_requests(),
@@ -92,9 +92,11 @@ fn reorders_compatible_response_and_sends_only_supported_parameters() {
         &json!({"dimensions":3,"options":{},"unknown":99}),
     );
     let provider = build_embedding_provider().unwrap();
-    // When
-    let vectors = provider.embed(&config, &["first", "second"], None).unwrap();
-    // Then
+    // When: two compatible vectors are computed.
+    let vectors = provider
+        .vectors_compute_by_texts(&config, &["first", "second"], None)
+        .unwrap();
+    // Then: vectors follow input order and the literal request carries only supported parameters.
     assert_eq!(vectors, vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]]);
     assert_eq!(
         server.take_requests(),
@@ -108,7 +110,7 @@ fn reorders_compatible_response_and_sends_only_supported_parameters() {
 }
 #[test]
 fn rejects_malformed_native_vectors() {
-    // Given
+    // Given: malformed native vector payloads and a three-dimensional configuration.
     let bodies = [
         json!({"model":"fixture-alias","embeddings":[]}),
         json!({"model":"fixture-alias","embeddings":[[]]}),
@@ -122,12 +124,12 @@ fn rejects_malformed_native_vectors() {
     for body in bodies {
         let server = start_fixture(&body);
         let config = build_config("ollama", &server.get_base_url(), &json!({"dimensions":3}));
-        // When
+        // When: one vector is requested for a synthetic secret input.
         let error = build_embedding_provider()
             .unwrap()
-            .embed(&config, &["input-secret"], None)
+            .vectors_compute_by_texts(&config, &["input-secret"], None)
             .unwrap_err();
-        // Then
+        // Then: each response is rejected without exposing input or provider payloads.
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
         assert!(!format!("{error:?} {error}").contains("secret"));
     }
@@ -145,36 +147,36 @@ fn rejects_non_json_and_non_success_without_retrying() {
             EmbeddingErrorKind::InvalidResponse,
         ),
     ] {
-        // Given
+        // Given: a fixture returning each malformed body or unsuccessful status.
         let server = HttpFixture::start(FixtureReply::Status {
             status,
             body: body.to_owned(),
         });
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
-        // When
+        // When: one native attempt is made.
         let error = build_embedding_provider()
             .unwrap()
-            .embed(&config, &["input"], None)
+            .vectors_compute_by_texts(&config, &["input"], None)
             .unwrap_err();
-        // Then
+        // Then: the independently specified error kind is returned after exactly one request.
         assert_eq!(error.get_kind(), kind);
         assert_eq!(server.take_requests().len(), 1);
     }
 }
 #[test]
 fn refuses_redirects() {
-    // Given
+    // Given: a redirecting source and a valid destination fixture.
     let destination = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let source = HttpFixture::start(FixtureReply::Redirect {
         location: destination.get_base_url(),
     });
     let config = build_config("ollama", &source.get_base_url(), &json!({}));
-    // When
+    // When: the provider calls the source endpoint.
     let error = build_embedding_provider()
         .unwrap()
-        .embed(&config, &["input"], None)
+        .vectors_compute_by_texts(&config, &["input"], None)
         .unwrap_err();
-    // Then
+    // Then: the redirect is rejected and the destination receives no request.
     assert_eq!(error.get_kind(), EmbeddingErrorKind::HttpStatus(302));
     assert!(destination.take_requests().is_empty());
 }
@@ -304,11 +306,11 @@ fn rejects_invalid_endpoint_schemes_userinfo_and_incomplete_hosts() {
         "http://:123/api",
         "http://localhost:invalid/api",
     ] {
-        // Given
+        // Given: each unsupported scheme, credential-bearing URI or incomplete host.
         let config = build_config("ollama", endpoint, &json!({}));
-        // When
-        let result = provider.validate_config(&config);
-        // Then
+        // When: local configuration validation runs.
+        let result = provider.config_validate(&config);
+        // Then: every unsafe endpoint is rejected.
         assert!(result.is_err(), "{endpoint}");
     }
 }
@@ -341,15 +343,15 @@ fn rejects_compatible_index_and_vector_failures() {
         json!([entry(0, json!([1, 2, 3e99])), entry(1, json!([1, 2, 3]))]),
         json!([entry(0, json!([1, 2])), entry(1, json!([1, 2, 3]))]),
     ] {
-        // Given
+        // Given: compatible payloads with invalid indices, counts or vector components.
         let server = start_fixture(&json!({"data":data}));
         let config = build_config("openai", &server.get_base_url(), &json!({"dimensions":3}));
-        // When
+        // When: two three-dimensional vectors are requested.
         let error = build_embedding_provider()
             .unwrap()
-            .embed(&config, &["first", "second"], None)
+            .vectors_compute_by_texts(&config, &["first", "second"], None)
             .unwrap_err();
-        // Then
+        // Then: each response is rejected as malformed.
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
     }
 }
@@ -362,16 +364,20 @@ fn keeps_ollama_available_without_compatible_credentials() {
     ) {
         return;
     }
-    // Given
+    // Given: native and compatible configurations with no compatible credential.
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let compatible = build_config("openai", &server.get_base_url(), &json!({}));
     let native = build_config("ollama", &server.get_base_url(), &json!({}));
     let provider = build_embedding_provider().unwrap();
-    // When
-    provider.validate_config(&compatible).unwrap();
-    let error = provider.embed(&compatible, &["input"], None).unwrap_err();
-    let vectors = provider.embed(&native, &["input"], None).unwrap();
-    // Then
+    // When: compatible validation and both inference protocols are attempted.
+    provider.config_validate(&compatible).unwrap();
+    let error = provider
+        .vectors_compute_by_texts(&compatible, &["input"], None)
+        .unwrap_err();
+    let vectors = provider
+        .vectors_compute_by_texts(&native, &["input"], None)
+        .unwrap();
+    // Then: only native inference succeeds and reaches the fixture.
     assert_eq!(error.get_kind(), EmbeddingErrorKind::Credentials);
     assert_eq!(vectors, vec![vec![1.0, 2.0, 3.0]]);
     assert_eq!(server.take_requests().len(), 1);
@@ -385,15 +391,15 @@ fn rejects_invalid_compatible_credentials_before_network_io() {
     ) {
         return;
     }
-    // Given
+    // Given: a compatible fixture and an isolated credential containing a newline.
     let server = start_fixture(&json!({"data":[{"index":0,"embedding":[1,2,3]}]}));
     let config = build_config("openai", &server.get_base_url(), &json!({}));
-    // When
+    // When: compatible inference is attempted.
     let error = build_embedding_provider()
         .unwrap()
-        .embed(&config, &["input"], None)
+        .vectors_compute_by_texts(&config, &["input"], None)
         .unwrap_err();
-    // Then
+    // Then: credentials are rejected before any HTTP request.
     assert_eq!(error.get_kind(), EmbeddingErrorKind::Credentials);
     assert!(server.take_requests().is_empty());
 }
@@ -415,15 +421,15 @@ fn disables_environment_proxies_and_native_authorization() {
     ) {
         return;
     }
-    // Given
+    // Given: a native fixture with synthetic credentials and unusable environment proxies.
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
-    // When
+    // When: the provider computes one native vector.
     let vectors = build_embedding_provider()
         .unwrap()
-        .embed(&config, &["input"], None)
+        .vectors_compute_by_texts(&config, &["input"], None)
         .unwrap();
-    // Then
+    // Then: the direct request succeeds without an authorization header.
     assert_eq!(vectors.len(), 1);
     assert!(
         !server.take_headers()[0]
@@ -459,35 +465,37 @@ fn redacts_cause_bearing_errors_and_config_debug() {
 }
 #[test]
 fn rejects_empty_inputs_and_incompatible_requested_dimensions_without_io() {
-    // Given
+    // Given: a valid three-dimensional native configuration and an idle fixture.
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let config = build_config("ollama", &server.get_base_url(), &json!({"dimensions":3}));
     let provider = build_embedding_provider().unwrap();
-    // When / Then
+    // When / Then: each empty input or incompatible dimension request is attempted; each request fails locally with Input and no HTTP traffic.
     for (texts, dimensions) in [
         (vec![], None),
         (vec![""], None),
         (vec!["input"], NonZeroUsize::new(2)),
         (vec!["input"], NonZeroUsize::new(4097)),
     ] {
-        let error = provider.embed(&config, &texts, dimensions).unwrap_err();
+        let error = provider
+            .vectors_compute_by_texts(&config, &texts, dimensions)
+            .unwrap_err();
         assert_eq!(error.get_kind(), EmbeddingErrorKind::Input);
     }
     assert!(server.take_requests().is_empty());
 }
 #[test]
 fn rejects_connection_failures_without_exposing_endpoint_or_input() {
-    // Given
+    // Given: a closed local endpoint and input containing synthetic secrets.
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("http://{}/secret", listener.local_addr().unwrap());
     drop(listener);
     let config = build_config("ollama", &url, &json!({}));
-    // When
+    // When: native inference reaches the unavailable endpoint.
     let error = build_embedding_provider()
         .unwrap()
-        .embed(&config, &["knowledge-secret"], None)
+        .vectors_compute_by_texts(&config, &["knowledge-secret"], None)
         .unwrap_err();
-    // Then
+    // Then: the connection failure exposes neither endpoint nor input payload.
     assert_eq!(error.get_kind(), EmbeddingErrorKind::Connection);
     assert!(!format!("{error} {error:?}").contains("secret"));
 }
@@ -495,19 +503,19 @@ fn rejects_connection_failures_without_exposing_endpoint_or_input() {
 #[ignore = "Task 5 executes the real 60-second acceptance deadline once per platform"]
 fn attempt_obeys_real_sixty_second_deadline() {
     use std::time::{Duration, Instant};
-    // Given
+    // Given: a native response whose body is delayed for sixty-five seconds.
     let server = HttpFixture::start(FixtureReply::DelayedBody {
         delay: Duration::from_secs(65),
         body: json!({"model":"fixture-alias","embeddings":[[1,2,3]]}).to_string(),
     });
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
     let start = Instant::now();
-    // When
+    // When: the production sixty-second inference deadline is exercised.
     let error = build_embedding_provider()
         .unwrap()
-        .embed(&config, &["input"], None)
+        .vectors_compute_by_texts(&config, &["input"], None)
         .unwrap_err();
-    // Then
+    // Then: one attempt times out within the independently specified acceptance interval.
     assert_eq!(error.get_kind(), EmbeddingErrorKind::Timeout);
     assert!((Duration::from_secs(59)..Duration::from_secs(64)).contains(&start.elapsed()));
     assert_eq!(server.take_requests().len(), 1);
@@ -536,18 +544,18 @@ fn rejects_compatible_error_payload_status_and_non_json() {
         ),
         (401, "provider-secret", EmbeddingErrorKind::HttpStatus(401)),
     ] {
-        // Given
+        // Given: each compatible error, malformed payload or unsuccessful status.
         let server = HttpFixture::start(FixtureReply::Status {
             status,
             body: body.to_owned(),
         });
         let config = build_config("openai", &server.get_base_url(), &json!({}));
-        // When
+        // When: one compatible inference attempt is made with a synthetic secret input.
         let error = build_embedding_provider()
             .unwrap()
-            .embed(&config, &["knowledge-secret"], None)
+            .vectors_compute_by_texts(&config, &["knowledge-secret"], None)
             .unwrap_err();
-        // Then
+        // Then: the literal expected kind is returned once without exposing secrets.
         assert_eq!(error.get_kind(), kind);
         assert!(!format!("{error} {error:?}").contains("secret"));
         assert_eq!(server.take_requests().len(), 1);
@@ -556,16 +564,16 @@ fn rejects_compatible_error_payload_status_and_non_json() {
 #[test]
 fn validates_unconfigured_dimensions_without_sending_an_implicit_request_dimension() {
     for size in [2, 4096] {
-        // Given
+        // Given: valid vectors at each supported dimension boundary without a configured dimension.
         let vector = vec![0.5; size];
         let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[vector]}));
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
-        // When
+        // When: inference is requested with the expected response dimension.
         let vectors = build_embedding_provider()
             .unwrap()
-            .embed(&config, &["input"], NonZeroUsize::new(size))
+            .vectors_compute_by_texts(&config, &["input"], NonZeroUsize::new(size))
             .unwrap();
-        // Then
+        // Then: vectors match the literal fixture and no implicit dimensions parameter is sent.
         assert_eq!(vectors[0], vector);
         assert!(server.take_requests()[0].get("dimensions").is_none());
     }
@@ -576,36 +584,36 @@ fn rejects_inconsistent_unconfigured_and_unsupported_response_dimensions() {
         json!([[1, 2], [1, 2, 3]]),
         json!([vec![0.0; 4097], vec![0.0; 4097]]),
     ] {
-        // Given
+        // Given: native vectors with inconsistent or unsupported lengths.
         let server = start_fixture(&json!({"model":"fixture-alias","embeddings":embeddings}));
         let config = build_config("ollama", &server.get_base_url(), &json!({}));
-        // When
+        // When: two vectors are requested without a configured dimension.
         let error = build_embedding_provider()
             .unwrap()
-            .embed(&config, &["first", "second"], None)
+            .vectors_compute_by_texts(&config, &["first", "second"], None)
             .unwrap_err();
-        // Then
+        // Then: each malformed response is rejected.
         assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
     }
 }
 #[test]
 fn appends_endpoint_before_query_and_ignores_fragment() {
-    // Given
+    // Given: a native base URL containing a query and fragment.
     let server = start_fixture(&json!({"model":"fixture-alias","embeddings":[[1,2,3]]}));
     let endpoint = format!("{}/?fixture=1#ignored", server.get_base_url());
     let config = build_config("ollama", &endpoint, &json!({}));
-    // When
+    // When: one native inference request is sent.
     build_embedding_provider()
         .unwrap()
-        .embed(&config, &["input"], None)
+        .vectors_compute_by_texts(&config, &["input"], None)
         .unwrap();
-    // Then
+    // Then: the literal request target appends embed before the query and omits the fragment.
     assert!(server.take_headers()[0].starts_with("POST /api/embed?fixture=1 "));
 }
 #[test]
 fn controlled_barrier_releases_an_owned_request() {
     use support::embedding::ResponseBarrier;
-    // Given
+    // Given: a native fixture blocked at a response barrier.
     let barrier = ResponseBarrier::default();
     let server = HttpFixture::start(FixtureReply::Barrier {
         barrier: barrier.clone(),
@@ -613,13 +621,14 @@ fn controlled_barrier_releases_an_owned_request() {
     });
     let config = build_config("ollama", &server.get_base_url(), &json!({}));
     let provider = build_embedding_provider().unwrap();
-    // When
-    let worker = std::thread::spawn(move || provider.embed(&config, &["input"], None));
+    // When: inference reaches the barrier and the test releases its owned response.
+    let worker =
+        std::thread::spawn(move || provider.vectors_compute_by_texts(&config, &["input"], None));
     barrier.wait_until_entered();
     let requests = server.take_requests();
     barrier.release();
     let vectors = worker.join().unwrap().unwrap();
-    // Then
+    // Then: exactly one request returns the literal vector.
     assert_eq!(requests.len(), 1);
     assert_eq!(vectors, vec![vec![1.0, 2.0, 3.0]]);
 }
@@ -827,9 +836,9 @@ fn bounds_both_protocol_bodies_with_and_without_content_length() {
         let config = build_config(protocol, &server.get_base_url(), &json!({}));
         let vectors = build_embedding_provider()
             .unwrap()
-            .embed(&config, &["input"], None)
+            .vectors_compute_by_texts(&config, &["input"], None)
             .unwrap();
-        // Then
+        // Then: the literal vector is returned from exactly one bounded request.
         assert_eq!(vectors, vec![vec![1., 2., 3.]]);
         assert_eq!(server.take_requests().len(), 1);
     }
@@ -910,15 +919,15 @@ fn build_response(protocol: &str) -> Value {
 }
 
 fn assert_rejected_response(protocol: &str, reply: FixtureReply) {
-    // Given
+    // Given: a fixture carrying the supplied malformed protocol response.
     let server = HttpFixture::start(reply);
     let config = build_config(protocol, &server.get_base_url(), &json!({}));
-    // When
+    // When: one protocol inference attempt is made.
     let error = build_embedding_provider()
         .unwrap()
-        .embed(&config, &["knowledge-secret"], None)
+        .vectors_compute_by_texts(&config, &["knowledge-secret"], None)
         .unwrap_err();
-    // Then
+    // Then: the malformed response is safely rejected after exactly one request.
     assert_eq!(error.get_kind(), EmbeddingErrorKind::InvalidResponse);
     assert!(!format!("{error} {error:?}").contains("secret"));
     assert_eq!(server.take_requests().len(), 1);

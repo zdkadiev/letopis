@@ -63,7 +63,7 @@ fn run_reindex(
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
     let git = open_repository_with_cleanup(directory, cleanup)?;
-    let root = git.get_root().to_path_buf();
+    let root = git.worktree_root_get().to_path_buf();
     let mut tasks = wire_embedding_executor_at_root(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut documents = wire_document_refresher_with_repository(git)
@@ -115,7 +115,7 @@ fn run_check(
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
     let git = open_repository_with_cleanup(directory, cleanup)?;
-    let root = git.get_root().to_path_buf();
+    let root = git.worktree_root_get().to_path_buf();
     let mut tasks = wire_embedding_executor_at_root(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut checks = wire_checker_with_repository(git)?;
@@ -130,7 +130,7 @@ fn run_search(
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
     let git = open_repository_with_cleanup(directory, cleanup)?;
-    let root = git.get_root().to_path_buf();
+    let root = git.worktree_root_get().to_path_buf();
     let mut tasks = wire_embedding_executor_at_root(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut searches = wire_searcher_with_repository(git)?;
@@ -145,7 +145,7 @@ fn run_traverse(
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
     let git = open_repository_with_cleanup(directory, cleanup)?;
-    let root = git.get_root().to_path_buf();
+    let root = git.worktree_root_get().to_path_buf();
     let mut tasks = wire_embedding_executor_at_root(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut traversals = wire_traverser_with_repository(git)?;
@@ -160,7 +160,7 @@ fn run_inspect(
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
     let git = open_repository_with_cleanup(directory, cleanup)?;
-    let root = git.get_root().to_path_buf();
+    let root = git.worktree_root_get().to_path_buf();
     let mut tasks = wire_embedding_executor_at_root(&root)?;
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut inspections = wire_inspector_with_repository(git)?;

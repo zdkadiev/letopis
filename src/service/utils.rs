@@ -1,14 +1,22 @@
 use super::{
     CommandError, CommandErrorKind, CommandProblem, CommandResult, DocumentError,
-    DocumentErrorKind, DocumentResult, GraphDiagnostics, KnowledgeMetadata, NodeMetadata,
-    PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceIssue, ProvenanceRequest, SourceProvenance,
-    StorageError, StorageRead,
+    DocumentErrorKind, DocumentResult, FileReader, GitWorktreePaths, GraphDiagnostics,
+    KnowledgeMetadata, NodeMetadata, PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceIssue,
+    ProvenanceRequest, SourceProvenance, StorageError, StorageRead,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
 use crate::service::{FileError, FileErrorKind, FileResult};
 use serde_json::Value;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ffi::OsStr,
+    os::unix::ffi::OsStrExt,
+    path::Path,
+};
 
+/// Public context shared by document candidate observations.
+const CANDIDATE_LIST_MESSAGE: &str = "cannot list document candidates";
+const UNSUPPORTED_DOCUMENT_PATH: &str = "unsupported document path";
 const PATH: &str = "path";
 const REASON: &str = "reason";
 const ELEMENT_ID: &str = "element_id";
@@ -17,6 +25,12 @@ const MISSING_SNAPSHOT: &str = "missing_source_snapshot";
 const UNAVAILABLE_SNAPSHOT: &str = "source_snapshot_unavailable";
 const SOURCE_NOT_FOUND: &str = "source_not_found";
 
+/// Selects document candidates for one operation using borrowed infrastructure capabilities.
+pub(super) struct CandidateSelection<'a> {
+    pub(super) git: &'a dyn GitWorktreePaths,
+    pub(super) filesystem: &'a dyn FileReader,
+}
+
 /// Borrows graph and provenance observers for one pinned check/status operation.
 pub(super) struct CheckObservations<'a> {
     pub(super) storage: &'a dyn StorageRead,
@@ -24,6 +38,47 @@ pub(super) struct CheckObservations<'a> {
     pub(super) graph: &'a dyn GraphDiagnostics,
     /// Source observations with bounded batching for the selected owners.
     pub(super) provenance: &'a dyn SourceProvenance,
+}
+
+impl std::fmt::Debug for CandidateSelection<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CandidateSelection")
+            .finish_non_exhaustive()
+    }
+}
+
+impl CandidateSelection<'_> {
+    /// Selects normalized document paths after root and no-follow symlink observations.
+    /// Filters irrelevant raw names and final symlinks before decoding. Structurally
+    /// unsafe raw paths skip leaf probes and retain `RepoPath` lexical validation.
+    ///
+    /// # Errors
+    /// Preserves document diagnostics for Git/file observation, framing or path failures.
+    pub(super) fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+        let raw = self.git.worktree_paths_get().map_err(map_candidate_error)?;
+        let entries = get_candidate_entries(&raw)?;
+        self.filesystem
+            .directory_get_by_path(Path::new("."))
+            .map_err(map_candidate_error)?
+            .ok_or_else(|| {
+                DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+            })?;
+        let mut filtered = Vec::new();
+        for entry in entries {
+            if is_safe_candidate_probe(entry)
+                && self
+                    .filesystem
+                    .symlink_is_exist(Path::new(OsStr::from_bytes(entry)))
+                    .map_err(map_candidate_error)?
+            {
+                continue;
+            }
+            filtered.extend_from_slice(entry);
+            filtered.push(0);
+        }
+        parse_candidates(&filtered)
+    }
 }
 
 impl std::fmt::Debug for CheckObservations<'_> {
@@ -225,6 +280,66 @@ pub(super) fn map_document_lock_error(cause: FileError) -> DocumentError {
         ),
     };
     DocumentError::new_with_cause(kind, message, cause)
+}
+
+/// Decode, normalize and deduplicate selected paths, retaining safe path-error causes.
+pub(super) fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
+    let mut candidates = BTreeSet::new();
+    for entry in get_candidate_entries(raw)? {
+        let text = std::str::from_utf8(entry).map_err(|cause| {
+            DocumentError::new_with_cause(
+                DocumentErrorKind::InvalidRequest,
+                UNSUPPORTED_DOCUMENT_PATH,
+                cause,
+            )
+        })?;
+        let path = RepoPath::parse(text).map_err(|cause| {
+            DocumentError::new_with_cause(
+                DocumentErrorKind::InvalidRequest,
+                UNSUPPORTED_DOCUMENT_PATH,
+                cause,
+            )
+        })?;
+        candidates.insert(path);
+    }
+    Ok(candidates.into_iter().collect())
+}
+
+/// Only structurally safe raw paths may be observed before lexical `RepoPath` normalization.
+fn is_safe_candidate_probe(entry: &[u8]) -> bool {
+    entry
+        .split(|byte| *byte == b'/')
+        .all(|part| !part.is_empty() && part != b"." && part != b"..")
+}
+
+/// Validate NUL framing and filter relevant raw names without decoding them.
+fn get_candidate_entries(raw: &[u8]) -> DocumentResult<Vec<&[u8]>> {
+    if !raw.is_empty() && !raw.ends_with(&[0]) {
+        return Err(DocumentError::new(
+            DocumentErrorKind::InternalError,
+            "invalid Git candidate response",
+        ));
+    }
+    Ok(raw
+        .split(|byte| *byte == 0)
+        .filter(|entry| !entry.is_empty() && is_corpus_entry(entry))
+        .collect())
+}
+
+fn is_corpus_entry(entry: &[u8]) -> bool {
+    (entry.ends_with(b".md") || entry.ends_with(b".markdown"))
+        && !entry
+            .split(|byte| *byte == b'/')
+            .any(|part| part == b".git" || part == crate::utils::SERVICE_DIRECTORY.as_bytes())
+}
+
+/// Preserve an infrastructure failure behind the document listing diagnostic.
+fn map_candidate_error(cause: impl std::error::Error + Send + Sync + 'static) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InternalError,
+        CANDIDATE_LIST_MESSAGE,
+        cause,
+    )
 }
 
 #[cfg(test)]

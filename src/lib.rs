@@ -12,9 +12,9 @@
     )
 )]
 
-use crate::cli::{CommandResponse, ResponseWriter, parse_request, write_response};
+use crate::cli::{CommandResponse, ResponseWriter, request_parse, response_write};
 use crate::commands::run_request;
-use crate::embedding::{HttpProviders, Ollama, Openai};
+use crate::embedding::HttpProviders;
 use crate::filesystem::LocalFileSystem;
 use crate::git::{GitRepository, GitWriteCleanup};
 use crate::markdown::MarkdownParser;
@@ -73,7 +73,7 @@ pub fn run_cli(
     output: impl Write,
 ) -> u8 {
     let args = args.into_iter().collect::<Vec<_>>();
-    write_response(
+    response_write(
         output,
         execute_request(&args, input, Arc::new(GitWriteCleanup::new())),
     )
@@ -92,7 +92,12 @@ pub fn run_process_cli() -> u8 {
     let args = env::args_os().skip(1).collect::<Vec<_>>();
     let mut output = io::stdout();
     let input = ProcessInput::new(io::stdin());
-    run_process_cli_with(&args, input, &mut output, SigintListener::install)
+    run_process_cli_with(
+        &args,
+        input,
+        &mut output,
+        SigintListener::signal_listener_install,
+    )
 }
 
 /// Construct diagnostics using the supplied shared cache without performing I/O.
@@ -109,8 +114,8 @@ where
     F: FnOnce(&mut dyn StatusReader) -> CommandResult<T>,
 {
     let git = open_repository_with_cleanup(directory, Arc::new(GitWriteCleanup::new()))?;
-    let root = git.get_root().to_path_buf();
-    let files = LocalFileSystem::new(git.get_root())
+    let root = git.worktree_root_get().to_path_buf();
+    let files = LocalFileSystem::new(git.worktree_root_get())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let service_directory = files
         .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
@@ -139,7 +144,7 @@ where
     F: FnOnce(&dyn ConfigReader) -> CommandResult<T>,
 {
     let git = open_repository_with_cleanup(directory, Arc::new(GitWriteCleanup::new()))?;
-    let files = LocalFileSystem::new(git.get_root())
+    let files = LocalFileSystem::new(git.worktree_root_get())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Configuration, cause))?;
     let provider = build_embedding_provider()
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Configuration, cause))?;
@@ -155,7 +160,7 @@ fn open_repository_with_cleanup(
     directory: &Path,
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<GitRepository> {
-    GitRepository::open_with_cleanup(directory, cleanup)
+    GitRepository::open_with_cleanup(directory, cleanup, &[SERVICE_DIRECTORY])
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Repository, cause).into())
 }
 
@@ -165,8 +170,9 @@ fn open_repository_with_cleanup(
 /// Returns `invalid_request` outside a non-bare Git work tree, and a safe internal
 /// error for repository, filesystem or provider setup failures.
 pub fn wire_initializer(start: &Path) -> ServiceResult<impl Initializer + use<>> {
-    let git = GitRepository::open(start).map_err(map_snapshot_2_service_error)?;
-    let root = git.get_root().to_path_buf();
+    let git =
+        GitRepository::open(start, &[SERVICE_DIRECTORY]).map_err(map_snapshot_2_service_error)?;
+    let root = git.worktree_root_get().to_path_buf();
     let files = LocalFileSystem::new(&root)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Initialization, cause))?;
     let provider = build_embedding_provider()
@@ -184,32 +190,34 @@ pub fn wire_initializer(start: &Path) -> ServiceResult<impl Initializer + use<>>
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
 pub fn wire_traverser(start: &Path) -> ServiceResult<impl Traverser + use<>> {
-    let git = GitRepository::open(start)
+    let git = GitRepository::open(start, &[SERVICE_DIRECTORY])
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     wire_traverser_with_repository(git)
 }
 
 /// Compose collaborators from the command's shared repository and cleanup owner.
 fn wire_traverser_with_repository(git: GitRepository) -> ServiceResult<impl Traverser + use<>> {
-    let filesystem = LocalFileSystem::new(git.get_root())
+    let filesystem = LocalFileSystem::new(git.worktree_root_get())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     let directory = filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
-    let storage =
-        crate::open_confined_databases(&git.get_root().join(SERVICE_DIRECTORY), &directory)
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
+    let storage = crate::open_confined_databases(
+        &git.worktree_root_get().join(SERVICE_DIRECTORY),
+        &directory,
+    )
+    .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     let (vectors, cache) = storage;
     let storage = Rc::new(cache);
     let vectors = Rc::new(vectors);
     let refresher = wire_document_refresher_with_storage(
         git.clone(),
-        LocalFileSystem::new(git.get_root())
+        LocalFileSystem::new(git.worktree_root_get())
             .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?,
         Rc::clone(&storage),
     )
     .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
-    let embeddings = wire_embedder(git.get_root(), Rc::clone(&storage), vectors)
+    let embeddings = wire_embedder(git.worktree_root_get(), Rc::clone(&storage), vectors)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
     Ok(TraversalService {
         storage: Rc::clone(&storage),
@@ -218,7 +226,7 @@ fn wire_traverser_with_repository(git: GitRepository) -> ServiceResult<impl Trav
         embeddings: Box::new(embeddings),
         markdown: Box::new(MarkdownParser::new()),
         sources: Box::new(
-            wire_source_reader(git.get_root(), Rc::clone(&storage)).map_err(|cause| {
+            wire_source_reader(git.worktree_root_get(), Rc::clone(&storage)).map_err(|cause| {
                 ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause)
             })?,
         ),
@@ -255,7 +263,7 @@ pub fn wire_source_reader<C: service::CacheDatabase>(
 /// # Errors
 /// Reports unsupported repositories or unsafe filesystem roots.
 pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenance + use<>> {
-    let git = GitRepository::open(root).map_err(|cause| {
+    let git = GitRepository::open(root, &[SERVICE_DIRECTORY]).map_err(|cause| {
         DocumentError::new_with_cause(
             DocumentErrorKind::InternalError,
             "cannot open provenance repository",
@@ -270,25 +278,27 @@ pub fn wire_source_provenance(root: &Path) -> DocumentResult<impl SourceProvenan
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or storage setup failures.
 pub fn wire_checker(start: &Path) -> ServiceResult<impl Checker + use<>> {
-    let git = GitRepository::open(start)
+    let git = GitRepository::open(start, &[SERVICE_DIRECTORY])
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     wire_checker_with_repository(git)
 }
 
 /// Compose collaborators from the command's shared repository and cleanup owner.
 fn wire_checker_with_repository(git: GitRepository) -> ServiceResult<impl Checker + use<>> {
-    let filesystem = LocalFileSystem::new(git.get_root())
+    let filesystem = LocalFileSystem::new(git.worktree_root_get())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     let directory = filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
-    let storage =
-        crate::open_confined_databases(&git.get_root().join(SERVICE_DIRECTORY), &directory)
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
+    let storage = crate::open_confined_databases(
+        &git.worktree_root_get().join(SERVICE_DIRECTORY),
+        &directory,
+    )
+    .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     let storage = Rc::new(storage.1);
     let refresher = wire_document_refresher_with_storage(
         git.clone(),
-        LocalFileSystem::new(git.get_root())
+        LocalFileSystem::new(git.worktree_root_get())
             .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
         Rc::clone(&storage),
     )
@@ -307,32 +317,34 @@ fn wire_checker_with_repository(git: GitRepository) -> ServiceResult<impl Checke
 /// # Errors
 /// Reports unsupported repositories, unsafe paths or storage/provider setup failures.
 pub fn wire_searcher(start: &Path) -> ServiceResult<impl Searcher + use<>> {
-    let git = GitRepository::open(start)
+    let git = GitRepository::open(start, &[SERVICE_DIRECTORY])
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     wire_searcher_with_repository(git)
 }
 
 /// Compose collaborators from the command's shared repository and cleanup owner.
 fn wire_searcher_with_repository(git: GitRepository) -> ServiceResult<impl Searcher + use<>> {
-    let filesystem = LocalFileSystem::new(git.get_root())
+    let filesystem = LocalFileSystem::new(git.worktree_root_get())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     let directory = filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
-    let storage =
-        crate::open_confined_databases(&git.get_root().join(SERVICE_DIRECTORY), &directory)
-            .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
+    let storage = crate::open_confined_databases(
+        &git.worktree_root_get().join(SERVICE_DIRECTORY),
+        &directory,
+    )
+    .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     let (vectors, cache) = storage;
     let storage = Rc::new(cache);
     let vectors = Rc::new(vectors);
     let refresher = wire_document_refresher_with_storage(
         git.clone(),
-        LocalFileSystem::new(git.get_root())
+        LocalFileSystem::new(git.worktree_root_get())
             .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
         Rc::clone(&storage),
     )
     .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
-    let embeddings = wire_embedder(git.get_root(), Rc::clone(&storage), vectors)
+    let embeddings = wire_embedder(git.worktree_root_get(), Rc::clone(&storage), vectors)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
     Ok(SearchService {
         refresher,
@@ -350,7 +362,7 @@ fn wire_searcher_with_repository(git: GitRepository) -> ServiceResult<impl Searc
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths or setup failures.
 pub fn wire_inspector(start: &Path) -> ServiceResult<impl Inspector + use<>> {
-    let git = GitRepository::open(start)
+    let git = GitRepository::open(start, &[SERVICE_DIRECTORY])
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
     wire_inspector_with_repository(git)
 }
@@ -359,7 +371,7 @@ pub fn wire_inspector(start: &Path) -> ServiceResult<impl Inspector + use<>> {
 fn wire_inspector_with_repository(git: GitRepository) -> ServiceResult<impl Inspector + use<>> {
     let refresher = wire_document_refresher_with_repository(git.clone())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
-    let files = LocalFileSystem::new(git.get_root())
+    let files = LocalFileSystem::new(git.worktree_root_get())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
     Ok(InspectionService::new(
         refresher,
@@ -374,7 +386,7 @@ fn wire_inspector_with_repository(git: GitRepository) -> ServiceResult<impl Insp
 /// # Errors
 /// Reports unsupported repositories, unsafe service paths, or storage/I/O failures.
 pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + use<>> {
-    let git = GitRepository::open(start).map_err(|cause| {
+    let git = GitRepository::open(start, &[SERVICE_DIRECTORY]).map_err(|cause| {
         DocumentError::new_with_cause(
             DocumentErrorKind::InternalError,
             "cannot open document repository",
@@ -389,19 +401,21 @@ fn wire_document_refresher_with_repository(
     git: GitRepository,
 ) -> DocumentResult<impl Refresher + use<>> {
     let filesystem =
-        LocalFileSystem::new(git.get_root()).map_err(service::map_document_file_error)?;
+        LocalFileSystem::new(git.worktree_root_get()).map_err(service::map_document_file_error)?;
     let directory = filesystem
         .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
         .map_err(service::map_document_file_error)?;
-    let storage =
-        crate::open_confined_databases(&git.get_root().join(SERVICE_DIRECTORY), &directory)
-            .map_err(|cause| {
-                DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    "cannot open document storage",
-                    cause,
-                )
-            })?;
+    let storage = crate::open_confined_databases(
+        &git.worktree_root_get().join(SERVICE_DIRECTORY),
+        &directory,
+    )
+    .map_err(|cause| {
+        DocumentError::new_with_cause(
+            DocumentErrorKind::InternalError,
+            "cannot open document storage",
+            cause,
+        )
+    })?;
     wire_document_refresher_with_storage(git, filesystem, Rc::new(storage.1))
 }
 
@@ -415,7 +429,7 @@ fn wire_document_refresher_with_storage(
         .map_err(service::map_document_file_error)?;
     let provenance = ProvenanceService::new(
         Box::new(git.clone()),
-        LocalFileSystem::new(git.get_root()).map_err(service::map_document_file_error)?,
+        LocalFileSystem::new(git.worktree_root_get()).map_err(service::map_document_file_error)?,
     );
     Ok(DocumentRefreshService {
         git,
@@ -432,7 +446,7 @@ fn wire_source_provenance_with_repository(
     git: GitRepository,
 ) -> DocumentResult<impl SourceProvenance + use<>> {
     let filesystem =
-        LocalFileSystem::new(git.get_root()).map_err(service::map_document_file_error)?;
+        LocalFileSystem::new(git.worktree_root_get()).map_err(service::map_document_file_error)?;
     Ok(ProvenanceService::new(Box::new(git), filesystem))
 }
 
@@ -445,9 +459,9 @@ fn wire_source_provenance_with_repository(
 pub fn wire_embedding_executor(
     start: &Path,
 ) -> ServiceResult<impl EmbeddingExecutor + Embedder + use<>> {
-    let git = GitRepository::open(start)
+    let git = GitRepository::open(start, &[SERVICE_DIRECTORY])
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
-    wire_embedding_executor_at_root(git.get_root())
+    wire_embedding_executor_at_root(git.worktree_root_get())
 }
 
 /// Wire embedding collaborators beneath an already discovered repository root.
@@ -487,7 +501,11 @@ pub fn wire_background_runner<'a>(
     Ok(BackgroundRunnerService::new(
         tasks,
         files,
-        DetachedProcess::new(executable.to_path_buf(), root.to_path_buf()),
+        DetachedProcess::new(
+            executable.to_path_buf(),
+            vec!["embed".into(), "--drain".into()],
+            root.to_path_buf(),
+        ),
     ))
 }
 
@@ -521,13 +539,15 @@ pub fn wire_embedder<C: service::CacheDatabase, V: service::VectorDatabase>(
 /// Reserved for failures constructing the provider boundary.
 pub fn build_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + use<>> {
     let key = env::var("OPENAI_API_KEY").ok();
-    Ok(HttpProviders::new(Ollama::new(), Openai::new(key)))
+    Ok(HttpProviders::new(key))
 }
 
 /// Open immutable Git snapshot operations and read-only root verification at `start`.
 /// Requires a UTF-8 checkout root and a SHA-1 or SHA-256
 /// working repository without an object alternates path (even empty/inactive).
 /// Alternates are checked again before each operation; use a self-contained clone.
+/// Tree creation rejects `.letopis` as the first path component before writing any
+/// object; addressed historical reads and retention do not apply that creation policy.
 ///
 /// # Errors
 /// Returns a snapshot error when the working repository is unsupported,
@@ -535,7 +555,7 @@ pub fn build_embedding_provider() -> EmbeddingResult<impl EmbeddingProvider + us
 pub fn open_git_snapshots(
     start: &Path,
 ) -> Result<impl GitSnapshots + SnapshotVerifier, SnapshotError> {
-    GitRepository::open(start)
+    GitRepository::open(start, &[SERVICE_DIRECTORY])
 }
 
 /// Open existing published storage beneath an already pinned service directory.
@@ -889,9 +909,9 @@ where
             CommandErrorKind::InternalError,
             "cannot install command cancellation",
         );
-        return writer.write_response(output, Err(error));
+        return writer.response_write(output, Err(error));
     };
-    let exit = writer.write_response(output, execute_request(args, input, cleanup));
+    let exit = writer.response_write(output, execute_request(args, input, cleanup));
     drop(listener);
     exit
 }
@@ -915,8 +935,8 @@ where
             "command cancelled",
         ));
         let mut output = io::stdout();
-        let _ = writer.write_response(&mut output, response);
-        let _ = cleanup.cancel_and_cleanup();
+        let _ = writer.response_write(&mut output, response);
+        let _ = cleanup.writes_cancel_and_cleanup();
     });
     install(on_interrupt).map(Some)
 }
@@ -935,7 +955,7 @@ fn execute_request(
     input: impl Read,
     cleanup: Arc<GitWriteCleanup>,
 ) -> CommandResult<CommandResponse> {
-    parse_request(args, input).and_then(|request| run_request(request, cleanup))
+    request_parse(args, input).and_then(|request| run_request(request, cleanup))
 }
 
 fn map_snapshot_2_service_error(cause: SnapshotError) -> ServiceError {

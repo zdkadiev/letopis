@@ -110,7 +110,7 @@ impl<F: FileReader, C: StorageRead + GraphRead> LinkObservations<'_, F, C> {
             .map_err(map_traversal_error)?;
         let parsed = file
             .as_ref()
-            .and_then(|file| self.markdown.parse_file(&path, &file.bytes).ok().flatten());
+            .and_then(|file| self.markdown.file_parse(&path, &file.bytes).ok().flatten());
         if !is_current_knowledge(&node, parsed.as_ref()) {
             flags.insert(SearchFlag::Stale);
         }

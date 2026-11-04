@@ -27,12 +27,12 @@ fn incremental_blobs_reproduce_tree_without_touching_user_state() {
             .zip(bytes)
             .map(|(path, bytes)| SnapshotEntry {
                 path: path.clone(),
-                oid: git.write_blob(bytes).unwrap(),
+                oid: git.blob_write(bytes).unwrap(),
             })
             .collect();
-        let tree = git.create_tree_from_blobs(&entries).unwrap();
+        let tree = git.tree_assemble(&entries).unwrap();
         let expected = git
-            .create_tree(
+            .tree_create(
                 &paths
                     .iter()
                     .zip(bytes)
@@ -44,7 +44,10 @@ fn incremental_blobs_reproduce_tree_without_touching_user_state() {
         assert_eq!(tree, expected);
         assert!(format!("{:?}", entries[0]).starts_with("SnapshotEntry {"));
         for (path, bytes) in paths.iter().zip(bytes) {
-            assert_eq!(git.get_blob(&tree, path).unwrap(), bytes);
+            assert_eq!(
+                git.blob_get_by_tree_oid_and_path(&tree, path).unwrap(),
+                bytes
+            );
         }
         assert_eq!(repo.capture_fixture_state(), before);
         assert!(!repo.get_root().join("FILTER_RAN").exists());
@@ -57,8 +60,8 @@ fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format()
         // Given
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        let blob = git.write_blob(b"expected").unwrap();
-        let tree = git.create_tree(&[]).unwrap();
+        let blob = git.blob_write(b"expected").unwrap();
+        let tree = git.tree_create(&[]).unwrap();
         let missing = BlobOid::parse(&"1".repeat(blob.as_str().len())).unwrap();
         let foreign =
             BlobOid::parse(&"0".repeat(if blob.as_str().len() == 40 { 64 } else { 40 })).unwrap();
@@ -79,7 +82,7 @@ fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format()
             let before = repo.run_git_successfully(&["count-objects", "-v"], None);
             // When / Then
             assert_eq!(
-                git.create_tree_from_blobs(&entries).unwrap_err().get_kind(),
+                git.tree_assemble(&entries).unwrap_err().get_kind(),
                 SnapshotErrorKind::InvalidRequest
             );
             assert_eq!(
@@ -93,18 +96,18 @@ fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format()
                 oid,
             }];
             assert_eq!(
-                git.create_tree_from_blobs(&entries).unwrap_err().get_kind(),
+                git.tree_assemble(&entries).unwrap_err().get_kind(),
                 SnapshotErrorKind::InvalidRequest
             );
         }
-        let replacement = git.write_blob(b"corrupt replacement").unwrap();
+        let replacement = git.blob_write(b"corrupt replacement").unwrap();
         repo.replace_loose_object(blob.as_str(), replacement.as_str());
         let entries = [SnapshotEntry {
             path: parse_path("a"),
             oid: blob,
         }];
         assert_eq!(
-            git.create_tree_from_blobs(&entries).unwrap_err().get_kind(),
+            git.tree_assemble(&entries).unwrap_err().get_kind(),
             SnapshotErrorKind::InternalError
         );
         assert!(
@@ -120,12 +123,12 @@ fn incremental_operations_recheck_self_contained_object_policy() {
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        let oid = git.write_blob(b"captured").unwrap();
+        let oid = git.blob_write(b"captured").unwrap();
         fs::create_dir_all(repo.get_root().join(".git/objects/info")).unwrap();
         fs::write(repo.get_root().join(".git/objects/info/alternates"), b"").unwrap();
         // When / Then
         assert_eq!(
-            git.write_blob(b"later").unwrap_err().get_kind(),
+            git.blob_write(b"later").unwrap_err().get_kind(),
             SnapshotErrorKind::InternalError
         );
         let entries = [SnapshotEntry {
@@ -133,9 +136,115 @@ fn incremental_operations_recheck_self_contained_object_policy() {
             oid,
         }];
         assert_eq!(
-            git.create_tree_from_blobs(&entries).unwrap_err().get_kind(),
+            git.tree_assemble(&entries).unwrap_err().get_kind(),
             SnapshotErrorKind::InternalError
         );
+    }
+}
+
+#[test]
+fn public_tree_creation_preflights_private_roots_before_writing_objects() {
+    for format in FORMATS {
+        // Given: a public snapshot handle and independently created blob.
+        let repo = TempRepo::new(format);
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        let blob = BlobOid::parse(
+            &repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"supplied blob")),
+        )
+        .unwrap();
+        for name in [".letopis", ".letopis/private.md"] {
+            let safe = parse_path("ordinary.md");
+            let private = parse_path(name);
+            let before = repo.run_git_successfully(&["count-objects", "-v"], None);
+            // When: a later entry is excluded after a valid novel blob request.
+            let files = [
+                SnapshotFile {
+                    path: &safe,
+                    bytes: b"never write this blob",
+                },
+                SnapshotFile {
+                    path: &private,
+                    bytes: b"private",
+                },
+            ];
+            let error = git.tree_create(&files).unwrap_err();
+            // Then: the entire request fails before even the first blob write.
+            assert_eq!(error.get_kind(), SnapshotErrorKind::InvalidRequest);
+            assert_eq!(
+                repo.run_git_successfully(&["count-objects", "-v"], None),
+                before
+            );
+            // When: the same private root is supplied through the blob assembly API.
+            let error = git
+                .tree_assemble(&[SnapshotEntry {
+                    path: private,
+                    oid: blob.clone(),
+                }])
+                .unwrap_err();
+            // Then: no tree is written through the second public creation path.
+            assert_eq!(error.get_kind(), SnapshotErrorKind::InvalidRequest);
+            assert_eq!(
+                repo.run_git_successfully(&["count-objects", "-v"], None),
+                before
+            );
+        }
+    }
+}
+
+#[test]
+fn public_blob_assembly_rejects_private_roots_before_blob_validation() {
+    for format in FORMATS {
+        // Given: an excluded root paired with an independently known missing object.
+        let repo = TempRepo::new(format);
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        let width = repo.get_oid(&["rev-parse", "HEAD"], None).len();
+        let entry = SnapshotEntry {
+            path: parse_path(".letopis/private.md"),
+            oid: BlobOid::parse(&"1".repeat(width)).unwrap(),
+        };
+        let before = repo.run_git_successfully(&["count-objects", "-v"], None);
+        // When: the public blob-assembly operation receives the invalid path.
+        let error = git.tree_assemble(&[entry]).unwrap_err();
+        // Then: path policy, rather than object absence, determines the failure before writes.
+        assert_eq!(error.get_kind(), SnapshotErrorKind::InvalidRequest);
+        assert_eq!(error.get_message(), "invalid snapshot paths");
+        assert_eq!(
+            repo.run_git_successfully(&["count-objects", "-v"], None),
+            before
+        );
+    }
+}
+
+#[test]
+fn nested_private_name_remains_valid_and_historical_private_trees_remain_readable() {
+    for format in FORMATS {
+        // Given: a historical tree containing a private-root file, created by independent Git.
+        let repo = TempRepo::new(format);
+        let blob = repo.get_oid(
+            &["hash-object", "-w", "--stdin"],
+            Some(b"historical private bytes"),
+        );
+        let historical =
+            create_external_tree(&repo, REGULAR_FILE_MODE, BLOB_KIND, &blob, ".letopis");
+        let git = open_git_snapshots(repo.get_root()).unwrap();
+        let nested = parse_path("a/.letopis/note.md");
+        // When: the public API creates a nested name and reads an existing private-root tree.
+        let tree = git
+            .tree_create(&[SnapshotFile {
+                path: &nested,
+                bytes: b"nested",
+            }])
+            .unwrap();
+        let bytes = git
+            .blob_get_by_tree_oid_and_path(&historical, &parse_path(".letopis"))
+            .unwrap();
+        // Then: only tree creation's first path component is restricted.
+        assert_eq!(bytes, b"historical private bytes");
+        assert_eq!(
+            git.blob_get_by_tree_oid_and_path(&tree, &nested).unwrap(),
+            b"nested"
+        );
+        git.tree_pin_by_oid(&historical).unwrap();
     }
 }
 
@@ -212,13 +321,13 @@ fn exact_bytes_without_index_or_commit() {
             .map(|(path, bytes)| SnapshotFile { path, bytes })
             .collect();
         // When
-        let first = git.create_tree(&files).unwrap();
+        let first = git.tree_create(&files).unwrap();
         let captured: Vec<_> = paths
             .iter()
-            .map(|p| git.get_blob(&first, p).unwrap())
+            .map(|p| git.blob_get_by_tree_oid_and_path(&first, p).unwrap())
             .collect();
         files.reverse();
-        let reordered = git.create_tree(&files).unwrap();
+        let reordered = git.tree_create(&files).unwrap();
         let after = repo.capture_fixture_state();
         // Then
         for (actual, expected) in captured.iter().zip(bytes) {
@@ -231,14 +340,18 @@ fn exact_bytes_without_index_or_commit() {
         // Given: mutate and remove live files after capturing their bytes.
         repo.change_and_delete_live_files("live.md");
         // When
-        let after_live_change = git.get_blob(&first, &paths[0]).unwrap();
+        let after_live_change = git
+            .blob_get_by_tree_oid_and_path(&first, &paths[0])
+            .unwrap();
         let second = git
-            .create_tree(&[SnapshotFile {
+            .tree_create(&[SnapshotFile {
                 path: &paths[0],
                 bytes: b"new",
             }])
             .unwrap();
-        let after_new_tree = git.get_blob(&first, &paths[0]).unwrap();
+        let after_new_tree = git
+            .blob_get_by_tree_oid_and_path(&first, &paths[0])
+            .unwrap();
         let listing =
             repo.run_git_successfully(&["ls-tree", "-rz", "--name-only", first.as_str()], None);
         // Then
@@ -274,10 +387,10 @@ fn paths_are_literal_and_never_shell_input() {
             })
             .collect();
         // When
-        let tree = git.create_tree(&files).unwrap();
+        let tree = git.tree_create(&files).unwrap();
         let captured: Vec<_> = paths
             .iter()
-            .map(|p| git.get_blob(&tree, p).unwrap())
+            .map(|p| git.blob_get_by_tree_oid_and_path(&tree, p).unwrap())
             .collect();
         // Then
         for bytes in captured {
@@ -295,7 +408,7 @@ fn empty_tree_and_invalid_paths() {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         // When
-        let empty = git.create_tree(&[]).unwrap();
+        let empty = git.tree_create(&[]).unwrap();
         let listing = repo.run_git_successfully(&["ls-tree", empty.as_str()], None);
         // Then
         assert!(listing.is_empty());
@@ -318,7 +431,7 @@ fn empty_tree_and_invalid_paths() {
                 .collect();
             let before = repo.run_git_successfully(&["count-objects", "-v"], None);
             // When
-            let error = git.create_tree(&files).unwrap_err();
+            let error = git.tree_create(&files).unwrap_err();
             let after = repo.run_git_successfully(&["count-objects", "-v"], None);
             // Then
             assert_eq!(error.get_kind(), SnapshotErrorKind::InvalidRequest);
@@ -385,17 +498,17 @@ fn tree_types_and_missing_objects_are_distinct() {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let leaf = parse_path("leaf");
-        let empty = git.create_tree(&[]).unwrap();
+        let empty = git.tree_create(&[]).unwrap();
         for (tree, expected) in build_tree_error_cases(&repo, &empty) {
             // When
-            let error = git.get_blob(&tree, &leaf).unwrap_err();
+            let error = git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap_err();
             // Then
             assert_eq!(error.get_kind(), expected);
         }
         // Given
         let tree = create_corrupted_blob_tree(&repo);
         // When
-        let error = git.get_blob(&tree, &leaf).unwrap_err();
+        let error = git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap_err();
         // Then
         assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
         assert!(!format!("{error} {error:?}").contains("CORRUPT_CANARY"));
@@ -410,20 +523,20 @@ fn replacement_refs_do_not_change_bytes() {
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let p = parse_path("x");
         let original = git
-            .create_tree(&[SnapshotFile {
+            .tree_create(&[SnapshotFile {
                 path: &p,
                 bytes: b"original",
             }])
             .unwrap();
         let replacement = git
-            .create_tree(&[SnapshotFile {
+            .tree_create(&[SnapshotFile {
                 path: &p,
                 bytes: b"replacement",
             }])
             .unwrap();
         repo.run_git_successfully(&["replace", original.as_str(), replacement.as_str()], None);
         // When
-        let bytes = git.get_blob(&original, &p).unwrap();
+        let bytes = git.blob_get_by_tree_oid_and_path(&original, &p).unwrap();
         // Then
         assert_eq!(bytes, b"original");
     }

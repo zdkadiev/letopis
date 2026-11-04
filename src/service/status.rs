@@ -115,7 +115,7 @@ impl<C: CacheDatabase> StatusService<'_, C> {
             );
         };
         if let Some(config) = configuration.get_embedding_config()
-            && self.provider.validate_config(config).is_err()
+            && self.provider.config_validate(config).is_err()
         {
             return (
                 EmbeddingStatusPolicy::Unavailable,
@@ -418,8 +418,8 @@ mod tests {
     mockall::mock! {
         Provider {}
         impl EmbeddingProvider for Provider {
-            fn validate_config(&self, config: &EmbeddingConfig) -> EmbeddingResult<()>;
-            fn embed<'a, 'b>(&self, config: &EmbeddingConfig, texts: &'a [&'b str], dimensions: Option<NonZeroUsize>) -> EmbeddingResult<Vec<Vec<f32>>>;
+            fn config_validate(&self, config: &EmbeddingConfig) -> EmbeddingResult<()>;
+            fn vectors_compute_by_texts<'a, 'b>(&self, config: &EmbeddingConfig, texts: &'a [&'b str], dimensions: Option<NonZeroUsize>) -> EmbeddingResult<Vec<Vec<f32>>>;
         }
     }
     struct Diagnostics;
@@ -883,6 +883,9 @@ mod tests {
     }
 
     impl FileReader for Files {
+        fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            Ok(false)
+        }
         fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             assert_eq!(path, std::path::Path::new(".letopis/config.json"));
             self.count.set(self.count.get() + 1);
@@ -932,15 +935,15 @@ mod tests {
     }
     fn build_provider() -> MockProvider {
         let mut provider = MockProvider::new();
-        provider.expect_embed().times(0);
-        provider.expect_validate_config().returning(|_| Ok(()));
+        provider.expect_vectors_compute_by_texts().times(0);
+        provider.expect_config_validate().returning(|_| Ok(()));
         provider
     }
     fn build_rejecting_provider() -> MockProvider {
         let mut provider = MockProvider::new();
-        provider.expect_embed().times(0);
+        provider.expect_vectors_compute_by_texts().times(0);
         provider
-            .expect_validate_config()
+            .expect_config_validate()
             .returning(|_| Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)));
         provider
     }

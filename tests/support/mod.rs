@@ -2,10 +2,10 @@
 pub mod documents;
 use letopis::{
     domain::RepoPath,
-    markdown::{Diagnostic, DiagnosticKind, ParsedFile, parse},
+    markdown::{self, Diagnostic, DiagnosticKind, ParsedFile},
 };
 pub fn parse_file(path: &str, text: &str) -> ParsedFile {
-    parse(&RepoPath::parse(path).unwrap(), text.as_bytes())
+    markdown::file_parse(&RepoPath::parse(path).unwrap(), text.as_bytes())
         .unwrap()
         .unwrap()
 }

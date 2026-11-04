@@ -203,8 +203,8 @@ fn check_snapshot_findings_are_current_and_safe() {
     // Given
     let repo = ReadingRepo::new();
     let git = open_git_snapshots(repo.get_root()).unwrap();
-    let valid = git.create_tree(&[]).unwrap();
-    let blob = git.write_blob(b"SECRET_SNAPSHOT_BODY").unwrap();
+    let valid = git.tree_create(&[]).unwrap();
+    let blob = git.blob_write(b"SECRET_SNAPSHOT_BODY").unwrap();
     let absent = "a".repeat(40);
     let foreign = "b".repeat(64);
     repo.write_knowledge(

@@ -8,7 +8,7 @@ use letopis::{
         Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256,
         SourceUri, TreeOid,
     },
-    markdown::parse,
+    markdown::file_parse,
     open_filesystem,
     service::{
         EmbeddingFailure, FileLocker, FileRow, KnowledgeMetadata, NodeMetadata, SourceMetadata,
@@ -274,7 +274,7 @@ fn syntax_migration_preserves_literal_search_text_and_updates_exact_bytes() {
     // When: new syntax is published by the actual reindex command.
     repo.write("note.md", NEW_NOTE.as_bytes());
     invoke(&repo, "reindex");
-    let parsed = parse(&RepoPath::parse("note.md").unwrap(), NEW_NOTE.as_bytes())
+    let parsed = file_parse(&RepoPath::parse("note.md").unwrap(), NEW_NOTE.as_bytes())
         .unwrap()
         .unwrap();
     // Then: exact authored bytes change while the visible text and fingerprint stay literal.

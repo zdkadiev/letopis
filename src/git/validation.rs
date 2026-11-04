@@ -1,4 +1,4 @@
-use super::tree::get_entry;
+use super::tree::tree_entry_get;
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use std::{cmp::Ordering, collections::BTreeSet};
 
@@ -15,7 +15,7 @@ const MAX_NAME_BYTES: usize = 4096;
 ///
 /// # Errors
 /// Returns `InternalError` when the body fails Git's structural checks.
-pub(super) fn validate_tree_bytes(mut bytes: &[u8], oid_len: usize) -> Result<(), SnapshotError> {
+pub(super) fn tree_bytes_validate(mut bytes: &[u8], oid_len: usize) -> Result<(), SnapshotError> {
     if !matches!(oid_len, 40 | 64) {
         return Err(SnapshotError::new(
             SnapshotErrorKind::InternalError,
@@ -32,7 +32,7 @@ pub(super) fn validate_tree_bytes(mut bytes: &[u8], oid_len: usize) -> Result<()
                 TREE_INTEGRITY_MESSAGE,
             ));
         }
-        let (entry, remaining) = get_entry(bytes, oid_len)?;
+        let (entry, remaining) = tree_entry_get(bytes, oid_len)?;
         if !VALID_MODES.contains(&entry.mode)
             || entry.oid.iter().all(|byte| *byte == 0)
             || !names.insert(entry.name)
@@ -192,7 +192,7 @@ fn has_ntfs_suffix(suffix: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_tree_bytes;
+    use super::tree_bytes_validate;
     use crate::{
         process_test_support::{FORMATS, ObjectFormat, TempRepo},
         service::SnapshotErrorKind,
@@ -474,7 +474,7 @@ mod tests {
             "Git fixture {bytes:?}: {}",
             String::from_utf8_lossy(&oracle.stderr)
         );
-        let result = validate_tree_bytes(bytes, width);
+        let result = tree_bytes_validate(bytes, width);
         assert_eq!(result.is_ok(), oracle.status.success(), "fixture {bytes:?}");
         if let Err(error) = result {
             assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);

@@ -171,7 +171,7 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
             .map_err(map_search_error)?;
         let parsed = file
             .as_ref()
-            .and_then(|file| self.markdown.parse_file(&path, &file.bytes).ok().flatten());
+            .and_then(|file| self.markdown.file_parse(&path, &file.bytes).ok().flatten());
         let flags = if is_current_knowledge(node, parsed.as_ref()) {
             BTreeSet::new()
         } else {
@@ -2124,7 +2124,7 @@ mod tests {
             let bytes = b"<!-- letopis: {\"created_at\":1} -->\nquery\n";
             std::fs::write(root.join("note.md"), bytes).unwrap();
             let parsed = MarkdownParser::new()
-                .parse_file(&RepoPath::parse("note.md").unwrap(), bytes)
+                .file_parse(&RepoPath::parse("note.md").unwrap(), bytes)
                 .unwrap()
                 .unwrap();
             let element = &parsed.elements[0].element;

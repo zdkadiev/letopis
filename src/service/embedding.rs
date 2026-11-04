@@ -119,7 +119,7 @@ impl<
         request: QueryEmbeddingRequest<'_>,
     ) -> EmbeddingResult<QueryEmbedding> {
         self.verify_query_scope()?;
-        if self.provider.validate_config(request.config).is_err() {
+        if self.provider.config_validate(request.config).is_err() {
             return Ok(QueryEmbedding::Unavailable);
         }
         let VectorOutcome::Current(_) = self.get_dimensions(request.config)? else {
@@ -228,7 +228,7 @@ impl<
     fn validate_configuration(&self, bytes: &[u8]) -> EmbeddingResult<Configuration> {
         let configuration = Configuration::parse(bytes)?;
         if let Some(config) = configuration.get_embedding_config() {
-            self.provider.validate_config(config)?;
+            self.provider.config_validate(config)?;
         }
         Ok(configuration)
     }
@@ -301,7 +301,7 @@ impl<
         };
         let parsed = self
             .markdown
-            .parse_file(&path, &bytes)
+            .file_parse(&path, &bytes)
             .map_err(|_| EmbeddingError::new(EmbeddingErrorKind::Input))?;
         Ok(parsed
             .and_then(|file| {
@@ -427,7 +427,9 @@ impl<
         dimensions: Option<NonZeroUsize>,
     ) -> EmbeddingResult<Vec<f32>> {
         let requested = config.get_dimensions().or(dimensions);
-        let mut vectors = self.provider.embed(config, &[text], requested)?;
+        let mut vectors = self
+            .provider
+            .vectors_compute_by_texts(config, &[text], requested)?;
         if vectors.len() != 1 {
             return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidResponse));
         }
@@ -573,7 +575,7 @@ mod tests {
     use super::EmbeddingService;
     use crate::{
         domain::{ElementKind, KnowledgeId, RepoPath, Sha256},
-        markdown::{MarkdownParser, parse},
+        markdown::{MarkdownParser, file_parse},
         service::{
             CacheDatabase, ConfigState, Configuration, DrainOutcome, Embedder, EmbeddingConfig,
             EmbeddingError, EmbeddingErrorKind, EmbeddingFailure, EmbeddingProvider,
@@ -923,6 +925,9 @@ mod tests {
         }
     }
     impl FileReader for Files {
+        fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            Ok(false)
+        }
         fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             let bytes = if path == std::path::Path::new(".letopis/config.json") {
                 self.config_reads.set(self.config_reads.get() + 1);
@@ -1037,14 +1042,14 @@ mod tests {
         }
     }
     impl EmbeddingProvider for Provider {
-        fn validate_config(&self, _: &EmbeddingConfig) -> EmbeddingResult<()> {
+        fn config_validate(&self, _: &EmbeddingConfig) -> EmbeddingResult<()> {
             if self.invalid_config {
                 Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
             } else {
                 Ok(())
             }
         }
-        fn embed(
+        fn vectors_compute_by_texts(
             &self,
             config: &EmbeddingConfig,
             texts: &[&str],
@@ -1295,7 +1300,7 @@ mod tests {
         use super::{Files, open_storage, publish};
         use crate::{
             domain::{RepoPath, Sha256},
-            markdown::parse,
+            markdown::file_parse,
             service::{
                 CacheDatabase, ConfigState, DrainOutcome, Embedder, EmbeddingConfig,
                 EmbeddingExecutor, QueryEmbedding, StorageRead, VectorDatabase, VectorOutcome,
@@ -1712,7 +1717,7 @@ mod tests {
                 .with_read_tx(|| {
                     let read = &storage.cache;
                     let bytes = fs::read(fixture.root.path().join("b.md")).unwrap();
-                    let parsed = parse(&RepoPath::parse("b.md").unwrap(), &bytes)
+                    let parsed = file_parse(&RepoPath::parse("b.md").unwrap(), &bytes)
                         .unwrap()
                         .unwrap();
                     let hash = parsed.elements[0].search_hash;
@@ -2150,7 +2155,7 @@ mod tests {
 
     fn publish(storage: &mut TestDatabases, files: &mut Files, path: &str, body: &str) -> Sha256 {
         let bytes = format!("<!-- letopis: {{\"created_at\":1}} -->\n{body}").into_bytes();
-        let mut parsed = parse(&RepoPath::parse(path).unwrap(), &bytes)
+        let mut parsed = file_parse(&RepoPath::parse(path).unwrap(), &bytes)
             .unwrap()
             .unwrap();
         let element = parsed.elements.remove(0);

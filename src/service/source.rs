@@ -98,12 +98,12 @@ mod tests {
         let filesystem = RecordedFiles::new(repo.path(), recorded_reads.clone());
         let storage = open_storage(repo.path());
         let provenance = ProvenanceService::new(
-            Box::new(GitRepository::open(repo.path()).unwrap()),
+            Box::new(GitRepository::open(repo.path(), &[crate::utils::SERVICE_DIRECTORY]).unwrap()),
             RecordedFiles::new(repo.path(), recorded_reads.clone()),
         );
         let mut refresher = DocumentRefreshService {
             clock: Box::new(crate::process::SystemClock::new()),
-            git: GitRepository::open(repo.path()).unwrap(),
+            git: GitRepository::open(repo.path(), &[crate::utils::SERVICE_DIRECTORY]).unwrap(),
             filesystem,
             markdown: MarkdownParser::new(),
             storage: std::rc::Rc::new(storage.cache),
@@ -272,6 +272,9 @@ mod tests {
     }
 
     impl FileReader for RecordedFiles {
+        fn symlink_is_exist(&self, path: &Path) -> FileResult<bool> {
+            self.inner.symlink_is_exist(path)
+        }
         fn file_get_stat_by_path(&self, path: &std::path::Path) -> FileResult<Option<FileStat>> {
             self.inner.file_get_stat_by_path(path)
         }
@@ -314,11 +317,8 @@ mod tests {
         ) -> FileResult<()> {
             panic!("unexpected file_verify_distinct_by_paths")
         }
-        fn directory_get_by_path(
-            &self,
-            _: &std::path::Path,
-        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
-            panic!("unexpected directory_get_by_path")
+        fn directory_get_by_path(&self, path: &Path) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            self.inner.directory_get_by_path(path)
         }
         fn lock_get_owner_by_path(
             &self,

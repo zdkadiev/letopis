@@ -1,4 +1,4 @@
-use super::help::find_help;
+use super::help::help_get_by_args;
 use crate::domain::{EdgeType, RepoPath, SourceUri, TreeOid};
 use crate::service::{
     CommandError, CommandErrorKind, CommandResult, ElementAddress, RecheckFilter, SearchFilters,
@@ -44,13 +44,13 @@ struct InspectInput {
 struct SearchInput {
     query: String,
     limit: u64,
-    #[serde(default, deserialize_with = "get_non_null_option")]
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
     filters: Option<SearchFiltersInput>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SearchFiltersInput {
-    #[serde(default, deserialize_with = "get_non_null_option")]
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
     needs_recheck: Option<bool>,
     #[serde(default)]
     sources: Vec<String>,
@@ -67,15 +67,23 @@ struct TraversalInput {
     limit: u64,
     #[serde(default)]
     edge_types: Vec<String>,
-    #[serde(default, deserialize_with = "get_non_null_option")]
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
     edge_limit: Option<u64>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct EmptyInput {}
 
-pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResult<Request> {
-    if let Some(text) = find_help(args) {
+/// Parse one command request after validating argv and before any service is used.
+///
+/// Help and version requests return their text without reading input. Other
+/// requests consume input to EOF, treating whitespace-only input as an empty object.
+///
+/// # Errors
+/// Returns a redacted invalid-request error for unsupported argv, invalid JSON,
+/// invalid field values or input I/O failure.
+pub(crate) fn request_parse(args: &[OsString], input: impl Read) -> CommandResult<Request> {
+    if let Some(text) = help_get_by_args(args) {
         return Ok(Request::Help(text));
     }
     let args = args
@@ -92,26 +100,26 @@ pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResul
     // Validate all argv before reading stdin or constructing any service.
     match args.as_slice() {
         ["init"] => {
-            let _: EmptyInput = get_object(input)?;
+            let _: EmptyInput = object_parse(input)?;
             Ok(Request::Init)
         }
         ["status"] => {
-            let _: EmptyInput = get_object(input)?;
+            let _: EmptyInput = object_parse(input)?;
             Ok(Request::Status)
         }
         ["config"] => {
-            let _: EmptyInput = get_object(input)?;
+            let _: EmptyInput = object_parse(input)?;
             Ok(Request::Config)
         }
         ["reindex"] => {
-            let _: EmptyInput = get_object(input)?;
+            let _: EmptyInput = object_parse(input)?;
             Ok(Request::Reindex)
         }
-        ["check"] => get_check(input),
-        ["inspect"] => get_inspection(input),
-        ["search"] => get_search(input).map(Request::Search),
-        ["traverse"] => get_traversal(input).map(Request::Traverse),
-        ["embed", "--drain"] => get_drain(input),
+        ["check"] => check_request_parse(input),
+        ["inspect"] => inspection_request_parse(input),
+        ["search"] => search_request_parse(input).map(Request::Search),
+        ["traverse"] => traversal_request_parse(input).map(Request::Traverse),
+        ["embed", "--drain"] => drain_request_parse(input),
         _ => Err(CommandError::new(
             CommandErrorKind::InvalidRequest,
             INVALID_COMMAND_INPUT_MESSAGE,
@@ -119,8 +127,8 @@ pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResul
     }
 }
 
-fn get_check(input: impl Read) -> CommandResult<Request> {
-    let dto: CheckInput = get_object(input)?;
+fn check_request_parse(input: impl Read) -> CommandResult<Request> {
+    let dto: CheckInput = object_parse(input)?;
     let paths = dto
         .paths
         .iter()
@@ -136,8 +144,8 @@ fn get_check(input: impl Read) -> CommandResult<Request> {
     Ok(Request::Check(paths.into_iter().collect()))
 }
 
-fn get_inspection(input: impl Read) -> CommandResult<Request> {
-    let dto: InspectInput = get_object(input)?;
+fn inspection_request_parse(input: impl Read) -> CommandResult<Request> {
+    let dto: InspectInput = object_parse(input)?;
     if dto.element_ids.is_empty() {
         return Err(CommandError::new(
             CommandErrorKind::InvalidRequest,
@@ -152,8 +160,8 @@ fn get_inspection(input: impl Read) -> CommandResult<Request> {
     Ok(Request::Inspect(ids.into_iter().collect()))
 }
 
-fn get_traversal(input: impl Read) -> CommandResult<TraversalRequest> {
-    let dto: TraversalInput = get_object(input)?;
+fn traversal_request_parse(input: impl Read) -> CommandResult<TraversalRequest> {
+    let dto: TraversalInput = object_parse(input)?;
     if dto.element_ids.is_empty() {
         return Err(CommandError::new(
             CommandErrorKind::InvalidRequest,
@@ -202,19 +210,19 @@ fn get_traversal(input: impl Read) -> CommandResult<TraversalRequest> {
             }
         },
         depth: dto.depth,
-        limit: parse_positive_limit(dto.limit)?,
+        limit: positive_limit_parse(dto.limit)?,
         edge_types,
-        edge_limit: dto.edge_limit.map(parse_positive_limit).transpose()?,
+        edge_limit: dto.edge_limit.map(positive_limit_parse).transpose()?,
     })
 }
 
-fn get_search(input: impl Read) -> CommandResult<SearchRequest> {
-    let dto: SearchInput = get_object(input)?;
-    let limit = parse_positive_limit(dto.limit)?;
+fn search_request_parse(input: impl Read) -> CommandResult<SearchRequest> {
+    let dto: SearchInput = object_parse(input)?;
+    let limit = positive_limit_parse(dto.limit)?;
     let filters = dto
         .filters
         .as_ref()
-        .map(parse_filters)
+        .map(search_filters_parse)
         .transpose()?
         .unwrap_or_default();
     Ok(SearchRequest {
@@ -224,7 +232,7 @@ fn get_search(input: impl Read) -> CommandResult<SearchRequest> {
     })
 }
 
-fn parse_positive_limit(value: u64) -> CommandResult<NonZeroUsize> {
+fn positive_limit_parse(value: u64) -> CommandResult<NonZeroUsize> {
     usize::try_from(value)
         .ok()
         .and_then(NonZeroUsize::new)
@@ -236,7 +244,7 @@ fn parse_positive_limit(value: u64) -> CommandResult<NonZeroUsize> {
         })
 }
 
-fn parse_filters(input: &SearchFiltersInput) -> CommandResult<SearchFilters> {
+fn search_filters_parse(input: &SearchFiltersInput) -> CommandResult<SearchFilters> {
     let needs_recheck = match input.needs_recheck {
         None => RecheckFilter::Any,
         Some(true) => RecheckFilter::Required,
@@ -273,7 +281,7 @@ fn parse_filters(input: &SearchFiltersInput) -> CommandResult<SearchFilters> {
     })
 }
 
-fn get_non_null_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+fn non_null_option_deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
     D: Deserializer<'de>,
     T: Deserialize<'de>,
@@ -290,7 +298,7 @@ where
         .map_err(D::Error::custom)
 }
 
-fn get_drain(mut input: impl Read) -> CommandResult<Request> {
+fn drain_request_parse(mut input: impl Read) -> CommandResult<Request> {
     let mut bytes = Vec::new();
     input.read_to_end(&mut bytes).map_err(|cause| {
         CommandError::new_with_cause(
@@ -303,12 +311,12 @@ fn get_drain(mut input: impl Read) -> CommandResult<Request> {
         .iter()
         .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
     {
-        let _: EmptyInput = get_object(&mut bytes.as_slice())?;
+        let _: EmptyInput = object_parse(&mut bytes.as_slice())?;
     }
     Ok(Request::Drain)
 }
 
-fn get_object<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
+fn object_parse<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
     let mut bytes = Vec::new();
     input.read_to_end(&mut bytes).map_err(|cause| {
         CommandError::new_with_cause(

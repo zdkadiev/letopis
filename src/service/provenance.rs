@@ -67,7 +67,8 @@ impl<F: FileReader> SourceProvenance for ProvenanceService<F> {
         let Some(basis) = request.source_snapshot else {
             return Ok(SourceRevisionComparison::BasisUnavailable);
         };
-        if basis != request.revision && self.git.verify_snapshot(basis)? != SnapshotState::Available
+        if basis != request.revision
+            && self.git.tree_verify_by_oid(basis)? != SnapshotState::Available
         {
             return Ok(SourceRevisionComparison::BasisUnavailable);
         }
@@ -87,20 +88,28 @@ impl<F: FileReader> SourceProvenance for ProvenanceService<F> {
 impl<F> BasisRetainer for ProvenanceService<F> {
     fn retain_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
         for tree in snapshots {
-            if self.git.verify_snapshot(tree).map_err(map_snapshot_error)?
+            if self
+                .git
+                .tree_verify_by_oid(tree)
+                .map_err(map_snapshot_error)?
                 == SnapshotState::Available
             {
-                self.git.retain(tree).map_err(map_snapshot_error)?;
+                self.git
+                    .tree_retain_by_oid(tree)
+                    .map_err(map_snapshot_error)?;
             }
         }
         Ok(())
     }
     fn verify_snapshots(&self, snapshots: &BTreeSet<TreeOid>) -> DocumentResult<()> {
         for tree in snapshots {
-            if self.git.verify_snapshot(tree).map_err(map_snapshot_error)?
+            if self
+                .git
+                .tree_verify_by_oid(tree)
+                .map_err(map_snapshot_error)?
                 == SnapshotState::Available
             {
-                self.git.pin(tree).map_err(map_snapshot_error)?;
+                self.git.tree_pin_by_oid(tree).map_err(map_snapshot_error)?;
             }
         }
         Ok(())
@@ -109,7 +118,7 @@ impl<F> BasisRetainer for ProvenanceService<F> {
 
 impl<F: FileReader> ProvenanceService<F> {
     fn verify_requested_revision(&self, revision: &TreeOid) -> Result<(), SnapshotError> {
-        match self.git.verify_snapshot(revision)? {
+        match self.git.tree_verify_by_oid(revision)? {
             SnapshotState::Available => Ok(()),
             SnapshotState::Missing => Err(SnapshotError::new(
                 SnapshotErrorKind::NotFound,
@@ -130,7 +139,10 @@ impl<F: FileReader> ProvenanceService<F> {
         let Some(local) = source.get_local() else {
             return Ok(None);
         };
-        let bytes = match self.git.get_blob(tree, local.get_path()) {
+        let bytes = match self
+            .git
+            .blob_get_by_tree_oid_and_path(tree, local.get_path())
+        {
             Ok(bytes) => bytes,
             Err(error) if error.get_kind() == SnapshotErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),
@@ -256,7 +268,7 @@ mod observations {
             let state = self
                 .provenance
                 .git
-                .verify_snapshot(tree)
+                .tree_verify_by_oid(tree)
                 .map_err(map_snapshot_error)?;
             if state == SnapshotState::Available && self.has_capacity() {
                 self.available.insert(tree.clone());
@@ -853,7 +865,7 @@ mod tests {
     }
 
     impl SnapshotVerifier for Rc<RecordedGit> {
-        fn verify_snapshot(&self, tree: &TreeOid) -> Result<SnapshotState, SnapshotError> {
+        fn tree_verify_by_oid(&self, tree: &TreeOid) -> Result<SnapshotState, SnapshotError> {
             self.verified.borrow_mut().push(tree.clone());
             if matches!(self.fault.get(), GitFault::Verify) {
                 return Err(create_git_failure());
@@ -870,23 +882,27 @@ mod tests {
         }
     }
     impl GitSnapshots for Rc<RecordedGit> {
-        fn retain(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
+        fn tree_retain_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError> {
             self.pins.borrow_mut().push(tree.clone());
             if matches!(self.fault.get(), GitFault::Pin) {
                 return Err(create_git_failure());
             }
             Ok(())
         }
-        fn create_tree(&self, _: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
+        fn tree_create(&self, _: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
             panic!("provenance must not create trees")
         }
-        fn write_blob(&self, _: &[u8]) -> Result<BlobOid, SnapshotError> {
+        fn blob_write(&self, _: &[u8]) -> Result<BlobOid, SnapshotError> {
             panic!("provenance must not write blobs")
         }
-        fn create_tree_from_blobs(&self, _: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
+        fn tree_assemble(&self, _: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
             panic!("provenance must not create trees")
         }
-        fn get_blob(&self, tree: &TreeOid, _: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
+        fn blob_get_by_tree_oid_and_path(
+            &self,
+            tree: &TreeOid,
+            _: &RepoPath,
+        ) -> Result<Vec<u8>, SnapshotError> {
             self.reads.set(self.reads.get() + 1);
             match self.fault.get() {
                 GitFault::Read => Err(create_git_failure()),
@@ -902,7 +918,7 @@ mod tests {
                     .unwrap_or_else(|| b"basis\n".to_vec())),
             }
         }
-        fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
+        fn tree_pin_by_oid(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
             self.strong_pins.borrow_mut().push(tree.clone());
             if matches!(self.fault.get(), GitFault::Pin) {
                 return Err(create_git_failure());
@@ -911,6 +927,9 @@ mod tests {
         }
     }
     impl FileReader for RecordedFiles {
+        fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            Ok(false)
+        }
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("provenance must not stat sources")
         }

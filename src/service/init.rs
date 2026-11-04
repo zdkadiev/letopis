@@ -96,7 +96,7 @@ impl InitService {
     fn validate_configuration(&self, bytes: &[u8]) -> EmbeddingResult<Configuration> {
         let configuration = Configuration::parse(bytes)?;
         if let Some(config) = configuration.get_embedding_config() {
-            self.provider.validate_config(config)?;
+            self.provider.config_validate(config)?;
         }
         Ok(configuration)
     }
@@ -444,6 +444,9 @@ mod tests {
         }
     }
     impl FileReader for Files {
+        fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            Ok(false)
+        }
         fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             assert_eq!(path, std::path::Path::new(".letopis/config.json"));
             self.trace.push("config");
@@ -551,14 +554,14 @@ mod tests {
         }
     }
     impl EmbeddingProvider for Provider {
-        fn validate_config(&self, _: &EmbeddingConfig) -> EmbeddingResult<()> {
+        fn config_validate(&self, _: &EmbeddingConfig) -> EmbeddingResult<()> {
             self.trace.push("validate");
             if self.reject {
                 return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
             }
             Ok(())
         }
-        fn embed(
+        fn vectors_compute_by_texts(
             &self,
             _: &EmbeddingConfig,
             _: &[&str],

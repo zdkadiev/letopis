@@ -3,7 +3,7 @@ use super::{
     run_traverse,
 };
 use crate::{
-    cli::{Request, parse_request},
+    cli::{Request, request_parse},
     git::{GitRepository, GitWriteCleanup},
     process_test_support::{ObjectFormat, TempRepo},
 };
@@ -13,22 +13,22 @@ use std::{ffi::OsString, fs, path::Path, sync::Arc};
 fn repository_open_check() {
     // Given: an initialized repository with one knowledge file and disabled embeddings.
     let repo = create_repository();
-    let before = GitRepository::get_repository_open_count();
+    let before = GitRepository::repository_get_open_count();
     // When: a command executes from a subdirectory.
     run_command("check", r#"{}"#, repo.get_subdir());
     // Then: all collaborators share exactly one library discovery.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 1);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 1);
     // When: an independent invocation executes the same command.
     run_command("check", r#"{}"#, repo.get_subdir());
     // Then: the new command opens fresh state instead of sharing a global cache.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 2);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 2);
 }
 
 #[test]
 fn repository_open_search() {
     // Given: an initialized repository with one knowledge file and disabled embeddings.
     let repo = create_repository();
-    let before = GitRepository::get_repository_open_count();
+    let before = GitRepository::repository_get_open_count();
     // When: a command executes from a subdirectory.
     run_command(
         "search",
@@ -36,7 +36,7 @@ fn repository_open_search() {
         repo.get_subdir(),
     );
     // Then: all collaborators share exactly one library discovery.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 1);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 1);
     // When: an independent invocation executes the same command.
     run_command(
         "search",
@@ -44,14 +44,14 @@ fn repository_open_search() {
         repo.get_subdir(),
     );
     // Then: the new command opens fresh state instead of sharing a global cache.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 2);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 2);
 }
 
 #[test]
 fn repository_open_inspect() {
     // Given: an initialized repository with one knowledge file and disabled embeddings.
     let repo = create_repository();
-    let before = GitRepository::get_repository_open_count();
+    let before = GitRepository::repository_get_open_count();
     // When: a command executes from a subdirectory.
     run_command(
         "inspect",
@@ -59,7 +59,7 @@ fn repository_open_inspect() {
         repo.get_subdir(),
     );
     // Then: all collaborators share exactly one library discovery.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 1);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 1);
     // When: an independent invocation executes the same command.
     run_command(
         "inspect",
@@ -67,14 +67,14 @@ fn repository_open_inspect() {
         repo.get_subdir(),
     );
     // Then: the new command opens fresh state instead of sharing a global cache.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 2);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 2);
 }
 
 #[test]
 fn repository_open_traverse() {
     // Given: an initialized repository with one knowledge file and disabled embeddings.
     let repo = create_repository();
-    let before = GitRepository::get_repository_open_count();
+    let before = GitRepository::repository_get_open_count();
     // When: a command executes from a subdirectory.
     run_command(
         "traverse",
@@ -82,7 +82,7 @@ fn repository_open_traverse() {
         repo.get_subdir(),
     );
     // Then: all collaborators share exactly one library discovery.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 1);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 1);
     // When: an independent invocation executes the same command.
     run_command(
         "traverse",
@@ -90,82 +90,82 @@ fn repository_open_traverse() {
         repo.get_subdir(),
     );
     // Then: the new command opens fresh state instead of sharing a global cache.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 2);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 2);
 }
 
 #[test]
 fn repository_open_reindex() {
     // Given: an initialized repository with one knowledge file and disabled embeddings.
     let repo = create_repository();
-    let before = GitRepository::get_repository_open_count();
+    let before = GitRepository::repository_get_open_count();
     // When: a command executes from a subdirectory.
     run_command("reindex", r#"{}"#, repo.get_subdir());
     // Then: all collaborators share exactly one library discovery.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 1);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 1);
     // When: an independent invocation executes the same command.
     run_command("reindex", r#"{}"#, repo.get_subdir());
     // Then: the new command opens fresh state instead of sharing a global cache.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 2);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 2);
 }
 
 #[test]
 fn repository_open_config() {
     // Given: an initialized repository with one knowledge file and disabled embeddings.
     let repo = create_repository();
-    let before = GitRepository::get_repository_open_count();
+    let before = GitRepository::repository_get_open_count();
     // When: a command executes from a subdirectory.
     run_command("config", r#"{}"#, repo.get_subdir());
     // Then: all collaborators share exactly one library discovery.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 1);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 1);
     // When: an independent invocation executes the same command.
     run_command("config", r#"{}"#, repo.get_subdir());
     // Then: the new command opens fresh state instead of sharing a global cache.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 2);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 2);
 }
 
 #[test]
 fn repository_open_status() {
     // Given: an initialized repository with one knowledge file and disabled embeddings.
     let repo = create_repository();
-    let before = GitRepository::get_repository_open_count();
+    let before = GitRepository::repository_get_open_count();
     // When: a command executes from a subdirectory.
     run_command("status", r#"{}"#, repo.get_subdir());
     // Then: all collaborators share exactly one library discovery.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 1);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 1);
     // When: an independent invocation executes the same command.
     run_command("status", r#"{}"#, repo.get_subdir());
     // Then: the new command opens fresh state instead of sharing a global cache.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 2);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 2);
 }
 
 #[test]
 fn repository_open_init() {
     // Given: an initialized repository with one knowledge file and disabled embeddings.
     let repo = create_repository();
-    let before = GitRepository::get_repository_open_count();
+    let before = GitRepository::repository_get_open_count();
     // When: a command executes from a subdirectory.
     run_command("init", r#"{}"#, repo.get_subdir());
     // Then: all collaborators share exactly one library discovery.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 1);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 1);
     // When: an independent invocation executes the same command.
     run_command("init", r#"{}"#, repo.get_subdir());
     // Then: the new command opens fresh state instead of sharing a global cache.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 2);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 2);
 }
 
 #[test]
 fn repository_open_direct_drain() {
     // Given: an initialized repository with one knowledge file and disabled embeddings.
     let repo = create_repository();
-    let before = GitRepository::get_repository_open_count();
+    let before = GitRepository::repository_get_open_count();
     // When: a command executes from a subdirectory.
     run_command("embed", r#"{}"#, repo.get_subdir());
     // Then: all collaborators share exactly one library discovery.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 1);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 1);
     // When: an independent invocation executes the same command.
     run_command("embed", r#"{}"#, repo.get_subdir());
     // Then: the new command opens fresh state instead of sharing a global cache.
-    assert_eq!(GitRepository::get_repository_open_count() - before, 2);
+    assert_eq!(GitRepository::repository_get_open_count() - before, 2);
 }
 
 #[test]
@@ -185,7 +185,7 @@ fn repository_open_public_constructors_are_independent() {
             "provenance",
             "embed",
         ] {
-            let before = GitRepository::get_repository_open_count();
+            let before = GitRepository::repository_get_open_count();
             match constructor {
                 "check" => drop(crate::wire_checker(root).unwrap()),
                 "search" => drop(crate::wire_searcher(root).unwrap()),
@@ -197,7 +197,7 @@ fn repository_open_public_constructors_are_independent() {
                 _ => unreachable!(),
             }
             assert_eq!(
-                GitRepository::get_repository_open_count() - before,
+                GitRepository::repository_get_open_count() - before,
                 1,
                 "{constructor}"
             );
@@ -222,7 +222,7 @@ fn run_command(command: &str, input: &str, directory: &Path) {
     if command == "embed" {
         args.push(OsString::from("--drain"));
     }
-    let request = parse_request(&args, input.as_bytes()).unwrap();
+    let request = request_parse(&args, input.as_bytes()).unwrap();
     let cleanup = Arc::new(GitWriteCleanup::new());
     let executable = Path::new("/nonexistent-letopis-disabled-drain");
     match request {

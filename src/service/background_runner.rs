@@ -1,7 +1,9 @@
 use super::{
-    BackgroundRunner, CommandError, CommandErrorKind, CommandProblem, CommandResult, DrainLauncher,
-    EmbeddingExecutor, FileLocker,
+    BackgroundRunner, CommandError, CommandErrorKind, CommandProblem, CommandResult,
+    EmbeddingExecutor, FileLocker, ProcessLauncher,
 };
+
+const BACKGROUND_WARNING: &str = "cannot start background embedding drain";
 
 pub(crate) struct BackgroundRunnerService<'a, F, P> {
     tasks: Option<&'a mut dyn EmbeddingExecutor>,
@@ -9,7 +11,7 @@ pub(crate) struct BackgroundRunnerService<'a, F, P> {
     process: P,
 }
 
-impl<'a, F: FileLocker, P: DrainLauncher> BackgroundRunnerService<'a, F, P> {
+impl<'a, F: FileLocker, P: ProcessLauncher> BackgroundRunnerService<'a, F, P> {
     pub(crate) fn new(tasks: Option<&'a mut dyn EmbeddingExecutor>, files: F, process: P) -> Self {
         Self {
             tasks,
@@ -19,7 +21,7 @@ impl<'a, F: FileLocker, P: DrainLauncher> BackgroundRunnerService<'a, F, P> {
     }
 }
 
-impl<F: FileLocker, P: DrainLauncher> BackgroundRunner for BackgroundRunnerService<'_, F, P> {
+impl<F: FileLocker, P: ProcessLauncher> BackgroundRunner for BackgroundRunnerService<'_, F, P> {
     fn start_if_needed(&mut self) -> CommandResult<Option<CommandProblem>> {
         let Some(tasks) = self.tasks.as_deref_mut() else {
             return Ok(None);
@@ -33,9 +35,19 @@ impl<F: FileLocker, P: DrainLauncher> BackgroundRunner for BackgroundRunnerServi
         {
             Ok(Some(lease)) => drop(lease),
             Ok(None) => return Ok(None),
-            Err(_) => return Ok(Some(build_warning())),
+            Err(_) => {
+                return Ok(Some(CommandProblem {
+                    code: CommandErrorKind::InternalError,
+                    message: BACKGROUND_WARNING,
+                    details: Default::default(),
+                }));
+            }
         }
-        Ok(self.process.spawn_drain().err().map(|_| build_warning()))
+        Ok(self.process.process_spawn().err().map(|_| CommandProblem {
+            code: CommandErrorKind::InternalError,
+            message: BACKGROUND_WARNING,
+            details: Default::default(),
+        }))
     }
     fn drain(&mut self) -> CommandResult<()> {
         self.tasks
@@ -49,20 +61,13 @@ impl<F: FileLocker, P: DrainLauncher> BackgroundRunner for BackgroundRunnerServi
             .drain()
     }
 }
-fn build_warning() -> CommandProblem {
-    CommandProblem {
-        code: CommandErrorKind::InternalError,
-        message: "cannot start background embedding drain",
-        details: Default::default(),
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use super::BackgroundRunnerService;
     use crate::service::{
-        BackgroundRunner, CommandError, CommandErrorKind, CommandResult, DrainLauncher,
-        EmbeddingExecutor, FileLocker,
+        BackgroundRunner, CommandError, CommandErrorKind, CommandResult, EmbeddingExecutor,
+        FileLocker, ProcessError, ProcessLauncher, ProcessResult,
     };
     use std::{cell::RefCell, io};
 
@@ -121,50 +126,48 @@ mod tests {
         calls: &'a Calls,
         fails: bool,
     }
-    impl DrainLauncher for Process<'_> {
-        fn spawn_drain(&self) -> CommandResult<()> {
+    impl ProcessLauncher for Process<'_> {
+        fn process_spawn(&self) -> ProcessResult<()> {
             self.calls.0.borrow_mut().push("spawn");
             if self.fails {
-                return Err(CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "spawn failed",
-                    io::Error::other("secret executable payload"),
-                ));
+                return Err(ProcessError::new(io::Error::other(
+                    "secret executable payload",
+                )));
             }
             Ok(())
         }
     }
     #[test]
     fn generated_mocks_do_not_launch_without_work() {
-        // Given
-        use crate::service::{MockDrainLauncher, MockEmbeddingExecutor};
+        // Given: an executor reports that no work is ready.
+        use crate::service::{MockEmbeddingExecutor, MockProcessLauncher};
         let calls = Calls::default();
         let mut tasks = MockEmbeddingExecutor::new();
         tasks.expect_has_work().times(1).returning(|| Ok(false));
-        let mut process = MockDrainLauncher::new();
-        process.expect_spawn_drain().times(0);
+        let mut process = MockProcessLauncher::new();
+        process.expect_process_spawn().times(0);
         let mut service =
             BackgroundRunnerService::new(Some(&mut tasks), build_locks(&calls), process);
 
-        // When
+        // When: the background runner checks readiness.
         let result = service.start_if_needed().unwrap();
 
-        // Then
+        // Then: the runner neither probes a lock nor launches a process.
         assert!(result.is_none());
         assert!(calls.0.borrow().is_empty());
     }
 
     #[test]
     fn absent_capability_does_not_probe_or_spawn() {
-        // Given
+        // Given: no embedding executor is configured.
         let calls = Calls::default();
         let mut service =
             BackgroundRunnerService::new(None, build_locks(&calls), build_process(&calls));
-        // When / Then
+        // When / Then: checking readiness produces no warning or background action.
         assert!(service.start_if_needed().unwrap().is_none());
-        // Then
+        // Then: no collaborator has been called.
         assert!(calls.0.borrow().is_empty());
-        // When / Then
+        // When / Then: direct drain reports unavailability without calling collaborators.
         assert_eq!(
             service.drain().unwrap_err().get_kind(),
             CommandErrorKind::InternalError
@@ -173,7 +176,7 @@ mod tests {
     }
     #[test]
     fn ready_work_releases_probe_before_spawn() {
-        // Given
+        // Given: work is ready and the lock probe can acquire ownership.
         let calls = Calls::default();
         let mut tasks = build_tasks(&calls, Ok(true));
         let mut service = BackgroundRunnerService::new(
@@ -181,14 +184,14 @@ mod tests {
             build_locks(&calls),
             build_process(&calls),
         );
-        // When / Then
+        // When / Then: the runner starts background work without a warning.
         assert!(service.start_if_needed().unwrap().is_none());
-        // Then
+        // Then: the probe lease is released before process launch.
         assert_eq!(*calls.0.borrow(), ["ready", "probe", "release", "spawn"]);
     }
     #[test]
     fn busy_probe_does_not_spawn() {
-        // Given
+        // Given: work is ready but another caller owns the lock.
         let calls = Calls::default();
         let mut tasks = build_tasks(&calls, Ok(true));
         let locks = Locks {
@@ -197,14 +200,14 @@ mod tests {
         };
         let mut service =
             BackgroundRunnerService::new(Some(&mut tasks), locks, build_process(&calls));
-        // When / Then
+        // When / Then: the runner leaves background execution to the existing owner.
         assert!(service.start_if_needed().unwrap().is_none());
-        // Then
+        // Then: only readiness and the nonblocking probe are called.
         assert_eq!(*calls.0.borrow(), ["ready", "probe"]);
     }
     #[test]
     fn readiness_error_remains_an_error() {
-        // Given
+        // Given: the executor cannot determine readiness.
         let calls = Calls::default();
         let error = CommandError::new(CommandErrorKind::EmbeddingFailed, "cannot inspect work");
         let mut tasks = build_tasks(&calls, Err(error));
@@ -213,19 +216,19 @@ mod tests {
             build_locks(&calls),
             build_process(&calls),
         );
-        // When / Then
+        // When / Then: the runner preserves the executor failure classification.
         assert_eq!(
             service.start_if_needed().unwrap_err().get_kind(),
             CommandErrorKind::EmbeddingFailed
         );
-        // Then
+        // Then: no lock or launch is attempted after the readiness error.
         assert_eq!(*calls.0.borrow(), ["ready"]);
     }
     #[test]
     fn probe_and_spawn_failures_return_one_safe_warning() {
-        // Given
+        // Given: either the lock probe or the subsequent process launch fails.
         for probe_fails in [true, false] {
-            // Given
+            // Given: ready work encounters this independent failure case.
             let calls = Calls::default();
             let mut tasks = build_tasks(&calls, Ok(true));
             let locks = Locks {
@@ -237,10 +240,11 @@ mod tests {
                 ..build_process(&calls)
             };
             let mut service = BackgroundRunnerService::new(Some(&mut tasks), locks, process);
-            // When
+            // When: the runner attempts to start background work.
             let warning = service.start_if_needed().unwrap().unwrap();
-            // Then
+            // Then: the exact public warning is safe and later actions stop at the failure.
             assert_eq!(warning.code, CommandErrorKind::InternalError);
+            assert_eq!(warning.message, "cannot start background embedding drain");
             assert!(warning.details.is_empty());
             assert!(!format!("{warning:?}").contains("secret"));
             let expected = if probe_fails {
@@ -253,28 +257,28 @@ mod tests {
     }
     #[test]
     fn direct_drain_calls_executor_once_without_second_lock() {
-        // Given
-        use crate::service::{MockDrainLauncher, MockEmbeddingExecutor};
+        // Given: an executor is configured for direct drain.
+        use crate::service::{MockEmbeddingExecutor, MockProcessLauncher};
         let calls = Calls::default();
         let mut tasks = MockEmbeddingExecutor::new();
         tasks.expect_drain().times(1).returning(|| Ok(()));
         tasks.expect_has_work().times(0);
-        let mut process = MockDrainLauncher::new();
-        process.expect_spawn_drain().times(0);
+        let mut process = MockProcessLauncher::new();
+        process.expect_process_spawn().times(0);
         let mut service =
             BackgroundRunnerService::new(Some(&mut tasks), build_locks(&calls), process);
 
-        // When
+        // When: the runner drains background work directly.
         service.drain().unwrap();
 
-        // Then
+        // Then: only the executor runs, without lock probing or launching.
         assert!(calls.0.borrow().is_empty());
     }
 
     #[test]
     fn direct_drain_preserves_executor_failure() {
-        // Given
-        use crate::service::{MockDrainLauncher, MockEmbeddingExecutor};
+        // Given: the configured executor fails during direct drain.
+        use crate::service::{MockEmbeddingExecutor, MockProcessLauncher};
         let calls = Calls::default();
         let mut tasks = MockEmbeddingExecutor::new();
         tasks.expect_drain().times(1).returning(|| {
@@ -283,15 +287,15 @@ mod tests {
                 "drain failed",
             ))
         });
-        let mut process = MockDrainLauncher::new();
-        process.expect_spawn_drain().times(0);
+        let mut process = MockProcessLauncher::new();
+        process.expect_process_spawn().times(0);
         let mut service =
             BackgroundRunnerService::new(Some(&mut tasks), build_locks(&calls), process);
 
-        // When
+        // When: the runner drains background work directly.
         let error = service.drain().unwrap_err();
 
-        // Then
+        // Then: the executor failure remains typed and no process or probe is used.
         assert_eq!(error.get_kind(), CommandErrorKind::EmbeddingFailed);
         assert!(calls.0.borrow().is_empty());
     }

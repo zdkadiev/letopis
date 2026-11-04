@@ -1,9 +1,9 @@
-use super::utils::map_document_file;
+use super::utils::{CandidateSelection, map_document_file};
 use super::{
-    CommandError, CommandErrorKind, CommandResult, CorpusLister, DocumentError, DocumentErrorKind,
-    ElementAddress, ElementLocation, FileReader, GitSnapshots, InspectedElement, Inspection,
-    Inspector, MarkdownCodec, ParsedFile, Refresher, SnapshotEntry, SnapshotError,
-    SnapshotErrorKind,
+    CommandError, CommandErrorKind, CommandResult, DocumentError, DocumentErrorKind,
+    DocumentResult, ElementAddress, ElementLocation, FileReader, GitSnapshots, GitWorktreePaths,
+    InspectedElement, Inspection, Inspector, MarkdownCodec, ParsedFile, Refresher, SnapshotEntry,
+    SnapshotError, SnapshotErrorKind,
 };
 use crate::domain::{BlobOid, EdgeTarget, RepoPath, Sha256, SourceUri, TreeOid};
 use std::collections::{BTreeMap, BTreeSet};
@@ -32,7 +32,7 @@ impl<D, G, F, M> InspectionService<D, G, F, M> {
         }
     }
 }
-impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileReader, M: MarkdownCodec> Inspector
+impl<D: Refresher, G: GitWorktreePaths + GitSnapshots, F: FileReader, M: MarkdownCodec> Inspector
     for InspectionService<D, G, F, M>
 {
     fn inspect(&mut self, ids: &[ElementAddress]) -> CommandResult<Inspection> {
@@ -42,7 +42,7 @@ impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileReader, M: MarkdownCod
             .map(ElementAddress::as_str)
             .collect::<BTreeSet<_>>();
         let mut captured = CapturedKnowledge::default();
-        for path in self.git.get_candidates().map_err(map_document_error)? {
+        for path in self.get_candidates().map_err(map_document_error)? {
             let file = self.capture_file(path, &requested)?;
             captured.entries.extend(file.entries);
             captured.elements.extend(file.elements);
@@ -54,13 +54,26 @@ impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileReader, M: MarkdownCod
             captured = self.capture_sources(captured, &requested)?;
         }
         let tree = self.assemble_tree(&captured)?;
-        let retained = self.git.pin(&tree).map_err(map_snapshot_error)?;
+        let retained = self
+            .git
+            .tree_pin_by_oid(&tree)
+            .map_err(map_snapshot_error)?;
         Ok(Inspection {
             snapshot: retained.get_oid().clone(),
             elements: captured.elements,
         })
     }
 }
+impl<D, G: GitWorktreePaths, F: FileReader, M> InspectionService<D, G, F, M> {
+    fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+        CandidateSelection {
+            git: &self.git,
+            filesystem: &self.filesystem,
+        }
+        .get_candidates()
+    }
+}
+
 impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G, F, M> {
     // Each call drops the file's bytes and parsed search text before the next read.
     fn capture_file(
@@ -76,7 +89,7 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
             captured.observations.insert(path, None);
             return Ok(captured);
         };
-        let parsed = self.markdown.parse_file(&path, &file.bytes).map_err(|_| {
+        let parsed = self.markdown.file_parse(&path, &file.bytes).map_err(|_| {
             CommandError::new(
                 CommandErrorKind::ValidationFailed,
                 "current knowledge is invalid",
@@ -90,7 +103,7 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
         };
         let oid = self
             .git
-            .write_blob(&file.bytes)
+            .blob_write(&file.bytes)
             .map_err(map_snapshot_error)?;
         captured.collect_metadata(&path, parsed, requested);
         captured.entries.insert(path, oid);
@@ -109,7 +122,7 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
             if let Some(bytes) = &bytes
                 && !captured.entries.contains_key(&path)
             {
-                let oid = self.git.write_blob(bytes).map_err(map_snapshot_error)?;
+                let oid = self.git.blob_write(bytes).map_err(map_snapshot_error)?;
                 captured.entries.insert(path.clone(), oid);
             }
             captured.collect_source_metadata(&sources, bytes.as_deref(), requested);
@@ -126,9 +139,7 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
                 oid: oid.clone(),
             })
             .collect::<Vec<_>>();
-        self.git
-            .create_tree_from_blobs(&entries)
-            .map_err(map_snapshot_error)
+        self.git.tree_assemble(&entries).map_err(map_snapshot_error)
     }
 
     fn capture_source_bytes(
@@ -141,7 +152,7 @@ impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G
         if captured.entries.contains_key(path) {
             return self
                 .git
-                .get_blob(corpus, path)
+                .blob_get_by_tree_oid_and_path(corpus, path)
                 .map(Some)
                 .map_err(map_snapshot_error);
         }
@@ -284,8 +295,8 @@ mod tests {
         domain::{BlobOid, RepoPath, Sha256, TreeOid},
         markdown::MarkdownParser,
         service::{
-            CapturedFile, CommandErrorKind, CorpusLister, DocumentResult, ElementAddress, FileStat,
-            GitSnapshots, Inspector, RefreshOutcome, Refresher, RetainedTree, SnapshotEntry,
+            CapturedFile, CommandErrorKind, DocumentResult, ElementAddress, FileStat, GitSnapshots,
+            GitWorktreePaths, Inspector, RefreshOutcome, Refresher, RetainedTree, SnapshotEntry,
             SnapshotError, SnapshotErrorKind, SnapshotFile,
         },
     };
@@ -316,6 +327,49 @@ mod tests {
         AbsentToMarked,
         AbsentUnchanged,
     }
+    #[test]
+    fn inspection_filters_raw_symlinks_before_decoding_and_normalizes_safe_results() {
+        use crate::service::{MockFileReader, MockGitWorktreePaths};
+        // Given: raw irrelevant/private names, a symlink and a normalized duplicate.
+        let mut git = MockGitWorktreePaths::new();
+        git.expect_worktree_paths_get().returning(|| {
+            Ok(b"bad\xff.txt\0.letopis/bad\xff.md\0link\xff.md\0./note.md\0note.md\0".to_vec())
+        });
+        let mut files = MockFileReader::new();
+        files
+            .expect_directory_get_by_path()
+            .returning(|_| Ok(Some(std::fs::File::open(".").unwrap().into())));
+        files.expect_symlink_is_exist().returning(|path| {
+            use std::os::unix::ffi::OsStrExt;
+            match path.as_os_str().as_bytes() {
+                b"link\xff.md" => Ok(true),
+                b"note.md" => Ok(false),
+                other => panic!("unexpected raw probe: {other:?}"),
+            }
+        });
+        let service = InspectionService::new((), git, files, ());
+        // When: inspection selects candidates before capture.
+        let paths = service.get_candidates().unwrap();
+        // Then: invalid-byte symlinks and irrelevant names are excluded before decoding.
+        assert_eq!(paths, [RepoPath::parse("note.md").unwrap()]);
+    }
+
+    #[test]
+    fn inspection_preserves_listing_error_context_and_cause() {
+        use crate::service::{GitError, MockFileReader, MockGitWorktreePaths};
+        // Given: an independent Git enumeration failure and no permitted filesystem calls.
+        let mut git = MockGitWorktreePaths::new();
+        git.expect_worktree_paths_get()
+            .returning(|| Err(GitError::new(std::io::Error::other("private cause"))));
+        let service = InspectionService::new((), git, MockFileReader::new(), ());
+        // When: the selection error takes inspection's document-error mapping.
+        let error = super::map_document_error(service.get_candidates().unwrap_err());
+        // Then: the public capture diagnostic and internal cause remain distinct.
+        assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+        assert_eq!(error.to_string(), "cannot capture current elements");
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
     #[test]
     fn inspect_rejects_unmarked_candidate_changed_to_marked_source() {
         // Given / When / Then: the helper prepares, exercises, and checks this scenario.
@@ -543,8 +597,8 @@ mod tests {
             })
         }
     }
-    impl CorpusLister for RecordingGit {
-        fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+    impl GitWorktreePaths for RecordingGit {
+        fn worktree_paths_get(&self) -> crate::service::GitResult<Vec<u8>> {
             self.0.borrow_mut().push("list".into());
             let paths = if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure) {
                 &['a'][..]
@@ -561,18 +615,18 @@ mod tests {
             Ok(paths
                 .iter()
                 .map(|letter| format!("{letter}.md"))
-                .map(|path| RepoPath::parse(&path).unwrap())
+                .flat_map(|path| path.bytes().chain(std::iter::once(0)).collect::<Vec<_>>())
                 .collect())
         }
     }
     impl GitSnapshots for RecordingGit {
-        fn retain(&self, _: &TreeOid) -> Result<(), SnapshotError> {
+        fn tree_retain_by_oid(&self, _: &TreeOid) -> Result<(), SnapshotError> {
             panic!("inspection must not retain author roots")
         }
-        fn create_tree(&self, _: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
-            panic!("capture must not retain bytes for create_tree")
+        fn tree_create(&self, _: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError> {
+            panic!("capture must not retain bytes for tree_create")
         }
-        fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
+        fn blob_write(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
             let name = if self.1.uses_candidate_source() {
                 if bytes == MARKED_REFERER { "d" } else { "a" }
             } else if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure)
@@ -585,10 +639,7 @@ mod tests {
             self.0.borrow_mut().push(format!("write {name}"));
             Ok(BlobOid::parse(&name.repeat(40)).unwrap())
         }
-        fn create_tree_from_blobs(
-            &self,
-            entries: &[SnapshotEntry],
-        ) -> Result<TreeOid, SnapshotError> {
+        fn tree_assemble(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError> {
             if self.1.uses_candidate_source() {
                 assert_eq!(
                     entries.last().map(|entry| entry.path.as_str()),
@@ -620,14 +671,18 @@ mod tests {
             self.0.borrow_mut().push("assemble".into());
             Ok(TreeOid::parse(&"c".repeat(40)).unwrap())
         }
-        fn get_blob(&self, _: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError> {
+        fn blob_get_by_tree_oid_and_path(
+            &self,
+            _: &TreeOid,
+            path: &RepoPath,
+        ) -> Result<Vec<u8>, SnapshotError> {
             assert_eq!(self.1, Scenario::Overlap);
             self.0
                 .borrow_mut()
                 .push(format!("read blob {}", path.as_str()));
             Ok(MARKED_SOURCE.to_vec())
         }
-        fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
+        fn tree_pin_by_oid(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError> {
             assert_eq!(tree.as_str(), "c".repeat(40));
             self.0.borrow_mut().push("pin".into());
             if self.1 == Scenario::PinFailure {
@@ -640,6 +695,9 @@ mod tests {
         }
     }
     impl FileReader for RecordingFiles {
+        fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            Ok(false)
+        }
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("capture uses verified reads")
         }
@@ -726,7 +784,7 @@ mod tests {
             &self,
             _: &std::path::Path,
         ) -> FileResult<Option<std::os::fd::OwnedFd>> {
-            panic!("unexpected directory_get_by_path")
+            Ok(Some(std::fs::File::open(".").unwrap().into()))
         }
         fn lock_get_owner_by_path(
             &self,

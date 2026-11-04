@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod input_tests {
-    use crate::cli::input::{Request, parse_request};
+    use crate::cli::input::{Request, request_parse};
     use crate::service::{CommandErrorKind, CommandResult, ElementAddress};
     use std::{
         ffi::OsString,
@@ -9,7 +9,7 @@ mod input_tests {
 
     fn parse(command: &[&str], body: &str) -> CommandResult<Request> {
         let args = command.iter().map(OsString::from).collect::<Vec<_>>();
-        parse_request(&args, &mut body.as_bytes())
+        request_parse(&args, &mut body.as_bytes())
     }
 
     #[test]
@@ -164,7 +164,7 @@ mod input_tests {
 
     #[test]
     fn parse_argv_rejects_non_utf8_flags_and_surplus() {
-        // Given
+        // Given: unsupported argv forms and input that must remain unread.
         use std::os::unix::ffi::OsStringExt;
         struct Unread;
         impl Read for Unread {
@@ -183,16 +183,16 @@ mod input_tests {
         cases.push(vec![OsString::from_vec(vec![255])]);
         cases.push(vec!["embed".into(), OsString::from_vec(vec![255])]);
         for args in cases {
-            // When / Then
+            // When / Then: each argv is rejected before reading input.
             assert_eq!(
-                parse_request(&args, &mut Unread).unwrap_err().get_kind(),
+                request_parse(&args, &mut Unread).unwrap_err().get_kind(),
                 CommandErrorKind::InvalidRequest
             );
         }
     }
     #[test]
     fn input_io_failure_is_redacted_invalid_request() {
-        // Given
+        // Given: an input reader whose I/O error contains a secret sentinel.
         struct BrokenInput;
         impl Read for BrokenInput {
             fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
@@ -204,9 +204,9 @@ mod input_tests {
             vec!["inspect".into()],
             vec!["embed".into(), "--drain".into()],
         ] {
-            // When
-            let error = parse_request(&args, &mut BrokenInput).unwrap_err();
-            // Then
+            // When: each supported request attempts to read that input.
+            let error = request_parse(&args, &mut BrokenInput).unwrap_err();
+            // Then: invalid_request is returned without exposing the private cause.
             assert_eq!(error.get_kind(), CommandErrorKind::InvalidRequest);
             assert!(!error.to_string().contains("SECRET_SENTINEL"));
         }
@@ -215,7 +215,7 @@ mod input_tests {
 
 #[cfg(test)]
 mod transport_tests {
-    use crate::cli::output::write_response;
+    use crate::cli::output::response_write;
     use crate::cli::response::{CommandResponse, ResponseResult, finish_foreground};
     use crate::domain::{LineRange, RepoPath, Sha256, TreeOid};
     use crate::run_cli;
@@ -371,9 +371,9 @@ mod transport_tests {
     }
     #[test]
     fn output_failures_do_not_attempt_a_second_envelope() {
-        // Given
+        // Given: outputs that fail immediately or after a partial envelope.
         for (remaining, expected_calls) in [(0, 1), (5, 2)] {
-            // Given
+            // Given: a writer with the selected byte limit and a safe command failure.
             let mut writer = FailingWriter {
                 remaining,
                 calls: 0,
@@ -382,9 +382,9 @@ mod transport_tests {
                 fail_flush: false,
             };
             let error = CommandError::new(CommandErrorKind::InternalError, "safe failure");
-            // When / Then
-            assert_eq!(write_response(&mut writer, Err(error)), 1);
-            // Then
+            // When / Then: writing the failure response returns exit one.
+            assert_eq!(response_write(&mut writer, Err(error)), 1);
+            // Then: only the partial first envelope is attempted and no flush occurs.
             assert_eq!(writer.calls, expected_calls);
             assert_eq!(writer.bytes.len(), remaining);
             assert_eq!(writer.flushes, 0);
@@ -392,7 +392,7 @@ mod transport_tests {
     }
     #[test]
     fn flush_failure_returns_one_after_one_complete_envelope() {
-        // Given
+        // Given: an output that accepts bytes but fails on its first flush.
         let mut writer = FailingWriter {
             remaining: usize::MAX,
             calls: 0,
@@ -401,18 +401,18 @@ mod transport_tests {
             fail_flush: true,
         };
         let error = CommandError::new(CommandErrorKind::InternalError, "safe failure");
-        // When / Then
-        assert_eq!(write_response(&mut writer, Err(error)), 1);
-        // Then
+        // When / Then: writing the failure response returns exit one.
+        assert_eq!(response_write(&mut writer, Err(error)), 1);
+        // Then: exactly one complete envelope was written and flushed once.
         assert_eq!((writer.calls, writer.flushes), (1, 1));
         assert_eq!(writer.bytes.last(), Some(&b'\n'));
         assert!(serde_json::from_slice::<Value>(&writer.bytes).is_ok());
     }
     #[test]
     fn success_writes_one_complete_envelope_and_flushes_once() {
-        // Given
+        // Given: a successful drain response with an empty result.
         let response = Ok(CommandResponse::new(ResponseResult::Drained));
-        // Given
+        // Given: an output that accepts every byte and its final flush.
         let mut writer = FailingWriter {
             remaining: usize::MAX,
             calls: 0,
@@ -420,9 +420,9 @@ mod transport_tests {
             bytes: vec![],
             fail_flush: false,
         };
-        // When / Then
-        assert_eq!(write_response(&mut writer, response), 0);
-        // Then
+        // When / Then: writing the response returns exit zero.
+        assert_eq!(response_write(&mut writer, response), 0);
+        // Then: one exact success envelope is written and flushed once.
         assert_eq!((writer.calls, writer.flushes), (1, 1));
         assert_eq!(writer.bytes, b"{\"ok\":true,\"result\":{}}\n");
     }
@@ -522,7 +522,7 @@ mod transport_tests {
     }
     fn render(response: CommandResult<CommandResponse>) -> (u8, Value) {
         let mut output = Vec::new();
-        let exit = write_response(&mut output, response);
+        let exit = response_write(&mut output, response);
         assert_eq!(output.last(), Some(&b'\n'));
         let mut values = serde_json::Deserializer::from_slice(&output).into_iter::<Value>();
         let value = values.next().unwrap().unwrap();

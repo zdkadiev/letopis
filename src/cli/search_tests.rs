@@ -1,5 +1,5 @@
 //! Injected transport doubles only; real service behavior lives in binary tests.
-use super::{Request, ResponseResult, finish_foreground, parse_request, write_response};
+use super::{Request, ResponseResult, finish_foreground, request_parse, response_write};
 use crate::{
     domain::{KnowledgeId, LineRange, RepoPath},
     service::{
@@ -12,7 +12,7 @@ use std::{collections::BTreeSet, ffi::OsString};
 
 #[test]
 fn parse_search_rejects_null_duplicate_unknown_numeric_and_trailing_inputs() {
-    // Given
+    // Given: search bodies with invalid shapes, fields, numbers or trailing input.
     for body in [
         "{}",
         r#"{"query":"x"}"#,
@@ -51,9 +51,9 @@ fn parse_search_rejects_null_duplicate_unknown_numeric_and_trailing_inputs() {
         r#"["x",1,{}]"#,
         "",
     ] {
-        // When
+        // When: each body is parsed as a search request.
         let result = parse(body);
-        // Then
+        // Then: each malformed body returns invalid_request.
         assert!(result.is_err(), "unexpected success: {body}");
         assert_eq!(
             result.unwrap_err().get_kind(),
@@ -61,8 +61,8 @@ fn parse_search_rejects_null_duplicate_unknown_numeric_and_trailing_inputs() {
             "{body}"
         );
     }
-    // Given / When / Then
-    assert!(parse_request(&["search".into(), "extra".into()], &mut b"{}".as_slice()).is_err());
+    // Given / When / Then: a search argv with an extra argument is rejected.
+    assert!(request_parse(&["search".into(), "extra".into()], &mut b"{}".as_slice()).is_err());
 }
 
 #[test]
@@ -164,9 +164,9 @@ fn search_response_renders_links() {
     // When: the foreground command finishes.
     let response = finish_foreground(ResponseResult::Search(links), &mut background);
     let mut output = Vec::new();
-    let exit = write_response(&mut output, response);
+    let exit = response_write(&mut output, response);
     let value: Value = serde_json::from_slice(&output).unwrap();
-    // Then
+    // Then: one success envelope preserves the link metadata and freshness flag.
     assert_eq!(exit, 0);
     assert_eq!(
         value,
@@ -176,5 +176,5 @@ fn search_response_renders_links() {
 }
 
 fn parse(body: &str) -> CommandResult<Request> {
-    parse_request(&[OsString::from("search")], &mut body.as_bytes())
+    request_parse(&[OsString::from("search")], &mut body.as_bytes())
 }

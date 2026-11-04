@@ -54,7 +54,7 @@ fn effective_filters_initialize_repository_for_search() {
     let repo = ReadingRepo::new();
     let tree = open_git_snapshots(repo.get_root())
         .unwrap()
-        .create_tree(&[])
+        .tree_create(&[])
         .unwrap();
     let body =
         json!({"query":"x","limit":1,"filters":{"source_revisions":[tree.as_str()]}}).to_string();
@@ -198,7 +198,7 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
     repo.write("knowledge.md", b"later live edit");
     let git = open_git_snapshots(repo.get_root()).unwrap();
     assert_eq!(
-        git.get_blob(&tree, &RepoPath::parse("knowledge.md").unwrap())
+        git.blob_get_by_tree_oid_and_path(&tree, &RepoPath::parse("knowledge.md").unwrap())
             .unwrap(),
         include_bytes!("fixtures/markdown/crlf.md")
     );
@@ -231,17 +231,17 @@ fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
     let tree = TreeOid::parse(response["result"]["snapshot"].as_str().unwrap()).unwrap();
     let git = open_git_snapshots(repo.get_root()).unwrap();
     assert_eq!(
-        git.get_blob(&tree, &RepoPath::parse("knowledge.md").unwrap())
+        git.blob_get_by_tree_oid_and_path(&tree, &RepoPath::parse("knowledge.md").unwrap())
             .unwrap(),
         knowledge
     );
     assert_eq!(
-        git.get_blob(&tree, &RepoPath::parse("src/cache.rs").unwrap())
+        git.blob_get_by_tree_oid_and_path(&tree, &RepoPath::parse("src/cache.rs").unwrap())
             .unwrap(),
         b"alpha\r\nbeta\n"
     );
     assert!(
-        git.get_blob(&tree, &RepoPath::parse("src/missing.rs").unwrap())
+        git.blob_get_by_tree_oid_and_path(&tree, &RepoPath::parse("src/missing.rs").unwrap())
             .is_err()
     );
 }

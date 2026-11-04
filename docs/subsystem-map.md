@@ -16,7 +16,7 @@ letopis — локальная память AI-агентов. Агенты пр
 | --- | --- |
 | Ядро: домен и прикладная логика | `domain`, `DocumentService`, `EmbeddingService`, `BackgroundRunnerService` в `service` |
 | Входной (driving) порт: что система предлагает снаружи | `Documents`, `Embeddings`, `EmbeddingTasks`, `Background`; CLI также определяет маршруты к `Checks`/`Inspections`, реализации которых ещё нет |
-| Выходные (driven) порты: что ядру нужно от внешнего мира | `CorpusFiles`, `GitSnapshots`, `FileReader`, `FileWriter`, `FileLocker`, `Clock`, `Markdown`, `Storage`, `EmbeddingProvider`, `EmbedLocks`, `DrainProcess` |
+| Выходные (driven) порты: что ядру нужно от внешнего мира | `CorpusFiles`, `GitSnapshots`, `FileReader`, `FileWriter`, `FileLocker`, `Clock`, `Markdown`, `Storage`, `EmbeddingProvider`, `EmbedLocks`, `ProcessLauncher` |
 | Выходные адаптеры: технологии за портами | `git`, `filesystem`, `markdown`, `storage`, `embedding`, `process` |
 | Входной адаптер | `cli`: argv/stdin, обработчики и JSON; `main.rs` — тонкая точка входа |
 | Сборка | `lib.rs`: единственное место, где адаптеры подставляются в сервисы |
@@ -57,7 +57,7 @@ flowchart TD
     EMB -->|EmbeddingProvider| HTTP
     BG -->|EmbeddingTasks| EMB
     BG -->|FileLocker| FS
-    BG -->|DrainProcess| PROC
+    BG -->|ProcessLauncher| PROC
 ```
 
 Правило: `service` знает только трейты, адаптеры друг друга не вызывают, всю связку делает `lib.rs`.
@@ -73,7 +73,7 @@ flowchart TD
 | `markdown` | Разбор файла в элементы и рёбра, диагностика | `MarkdownParser` | `Markdown` |
 | `storage` | SQLite-кэш: узлы, рёбра, FTS, векторы, состояние файлов | `SqliteStorage` | `Storage`, `StorageRead`, `CacheWrite`, `VectorWrite` |
 | `embedding` | Синхронные HTTP-клиенты embedding API | `HttpProviders`, `Ollama`, `Openai` | `EmbeddingProvider` |
-| `process` | Отсоединённый запуск того же executable | `DetachedProcess` | `DrainProcess` |
+| `process` | Отсоединённый запуск настроенного executable, аргументов и рабочего каталога | `DetachedProcess` | `ProcessLauncher` |
 | `cli` | Разбор ввода, вызов сервисов, форматирование ответа | обработчики команд и JSON DTO | потребляет прикладные трейты |
 
 ## Трейты service
@@ -82,11 +82,11 @@ flowchart TD
 - **`Embeddings` / `EmbeddingTasks`**: config, общий texts→vectors и drain; CLI получает capability готовности и запуска drain.
 - **`Background`**: проверить готовность работы и embed-lock, освободить probe и запросить отсоединённый процесс. Прямой drain делегируется executor без повторного захвата блокировки.
 - **`EmbeddingProvider`**: HTTP-векторы. Сервисы самостоятельно выбирают пути config/корпуса и читают их через `FileReader`.
-- **`FileLocker` / `DrainProcess`**: владение kernel-lock по переданному пути и запуск отдельного процесса. `Clock` даёт время и синхронное ожидание повторов через `process::SystemClock`.
+- **`FileLocker` / `ProcessLauncher`**: владение kernel-lock по переданному пути и `process_spawn()` настроенного процесса. Composition в `lib.rs` выбирает `embed --drain`; ошибка `ProcessError` содержит приватную I/O-причину, а `BackgroundRunnerService` отображает её в безопасное предупреждение. `Clock` даёт время и синхронное ожидание повторов через `process::SystemClock`.
 - **`Checks` / `Inspections`**: интерфейсы CLI-маршрутов; бизнес-реализации ещё отсутствуют (TK-12/TK-19).
 - **`CorpusFiles`**: какие Markdown-файлы входят в корпус (из Git, включая удалённые).
 - **`FileReader` / `FileWriter`**: `file_get_by_path`, метаданные и identity без чтения тела, проверка различности файлов, наблюдение/создание каталогов и долговечная публикация без замены победителя. FileError интерпретируется потребителем; только стабильный не-файл исключается документным сервисом.
-- **`Markdown`**: `parse_file`, чистый разбор без публикации.
+- **`MarkdownCodec`**: `file_parse`, чистый разбор без публикации.
 - **`GitSnapshots`**: `create_tree`, `read_blob`, `pin`: неизменяемые снимки, защищённые от Git GC.
 - **`Storage`** выдаёт три ограниченные «возможности»: `StorageRead` (чтение на зафиксированной ревизии), `CacheWrite` (атомарная публикация) и `VectorWrite` (запись векторов). Любая ошибка внутри записи блокирует `commit`.
 
@@ -96,7 +96,7 @@ flowchart TD
 2. Определить изменения: кандидаты из `CorpusFiles`, затем `stat` каждого. Если размер, mtime и inode те же и запись не «свежая» (racy window 1 с), файл не читается. Иначе читается и сравнивается хеш.
 3. Нет изменений → вернуть `published: false` без блокировок.
 4. Взять блокировку индекса (`lock_acquire_by_path(".letopis/index.lock")`) и повторить шаги 1–3, чтобы исключить гонку с другим процессом.
-5. Для каждого изменённого файла: прочитать байты, разобрать `Markdown::parse_file`, подготовить проекцию (узлы, рёбра, текст для FTS). Невалидный файл фиксируется как невалидный, а не роняет весь запуск.
+5. Для каждого изменённого файла: прочитать байты, разобрать `MarkdownCodec::file_parse`, подготовить проекцию (узлы, рёбра, текст для FTS). Невалидный файл фиксируется как невалидный, а не роняет весь запуск.
 6. Применить всё в одной транзакции `CacheWrite` и сделать `commit`: ревизия кэша растёт ровно на единицу. Если документы изменились во время работы, возвращается ошибка «documents changed during refresh».
 
 ## Где что искать

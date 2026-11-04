@@ -7,7 +7,7 @@ use letopis::service::StorageError;
 use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
 use letopis::{
     domain::{RepoPath, Sha256},
-    markdown::parse,
+    markdown::file_parse,
     open_filesystem,
     service::{EmbeddingConfig, EmbeddingFailure, FileLocker, Refresher, VectorOutcome},
     wire_document_refresher,
@@ -69,7 +69,7 @@ impl Fixture {
             .unwrap()
             .refresh()
             .unwrap();
-        parse(&RepoPath::parse("knowledge.md").unwrap(), bytes.as_bytes())
+        file_parse(&RepoPath::parse("knowledge.md").unwrap(), bytes.as_bytes())
             .unwrap()
             .unwrap()
             .elements[0]

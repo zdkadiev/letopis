@@ -5,7 +5,7 @@ use support::storage::{Databases, open_storage};
 mod support;
 use letopis::{
     domain::{Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, RepoPath, Sha256},
-    markdown::parse,
+    markdown::file_parse,
     open_filesystem,
     service::{
         ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind, EmbeddingFailure,
@@ -73,7 +73,7 @@ impl Fixture {
     fn publish(&self, path: &str, body: &str) -> Sha256 {
         let text = support::build_whole_file(body);
         fs::write(self.root.path().join(path), &text).unwrap();
-        let parsed = parse(&RepoPath::parse(path).unwrap(), text.as_bytes())
+        let parsed = file_parse(&RepoPath::parse(path).unwrap(), text.as_bytes())
             .unwrap()
             .unwrap();
         let element = parsed.elements.into_iter().next().unwrap();

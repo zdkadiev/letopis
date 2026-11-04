@@ -252,7 +252,7 @@ fn capture_head_and_index(repo: &TempRepo) -> FixtureState {
 fn get_retained_bytes(repo: &TempRepo, tree: &TreeOid) -> Vec<u8> {
     open_git_snapshots(repo.get_root())
         .unwrap()
-        .get_blob(tree, &RepoPath::parse("source.txt").unwrap())
+        .blob_get_by_tree_oid_and_path(tree, &RepoPath::parse("source.txt").unwrap())
         .unwrap()
 }
 fn get_basis(state: &State) -> Option<TreeOid> {

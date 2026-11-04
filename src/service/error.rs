@@ -1,7 +1,7 @@
 //! Shared application failures, diagnostics and typed result aliases.
 use crate::domain::{ByteSpan, Sha256};
 use serde_json::Value;
-use std::{collections::BTreeMap, error::Error, fmt};
+use std::{collections::BTreeMap, error::Error, fmt, io};
 
 /// Failure in a transaction boundary or its caller's operation.
 #[derive(Debug)]
@@ -706,10 +706,90 @@ impl Error for ServiceError {
 /// Result of constructing an application service.
 pub type ServiceResult<T> = Result<T, ServiceError>;
 
+/// Failure while observing Git worktree/index paths, retaining its internal cause.
+pub struct GitError {
+    cause: Box<dyn Error + Send + Sync>,
+}
+impl fmt::Debug for GitError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("GitError").finish_non_exhaustive()
+    }
+}
+impl GitError {
+    /// Preserve a Git/library cause without exposing raw paths in public diagnostics.
+    pub(crate) fn new(cause: impl Error + Send + Sync + 'static) -> Self {
+        Self {
+            cause: Box::new(cause),
+        }
+    }
+}
+impl fmt::Display for GitError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("cannot enumerate Git worktree paths")
+    }
+}
+impl Error for GitError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.cause.as_ref())
+    }
+}
+/// Result of Git worktree/index observations.
+pub type GitResult<T> = Result<T, GitError>;
+
+/// Process setup or launch failure with a private I/O cause.
+pub struct ProcessError {
+    cause: io::Error,
+}
+
+impl ProcessError {
+    /// Preserve the I/O cause without exposing it in Display or Debug.
+    pub fn new(cause: io::Error) -> Self {
+        Self { cause }
+    }
+}
+
+impl fmt::Debug for ProcessError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProcessError")
+            .finish_non_exhaustive()
+    }
+}
+
+impl fmt::Display for ProcessError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("cannot spawn process")
+    }
+}
+
+impl Error for ProcessError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.cause)
+    }
+}
+
+/// Result of configuring or launching a detached process.
+pub type ProcessResult<T> = Result<T, ProcessError>;
+
 #[cfg(test)]
 mod error_tests {
-    use super::{DocumentError, DocumentErrorKind, ServiceError, ServiceErrorKind};
+    use super::{DocumentError, DocumentErrorKind, ProcessError, ServiceError, ServiceErrorKind};
     use std::{error::Error, io};
+
+    #[test]
+    fn process_error_preserves_its_io_cause_without_exposing_private_payload() {
+        // Given: process creation reports an I/O failure containing private details.
+        let error = ProcessError::new(io::Error::other("PRIVATE_PROCESS_CAUSE"));
+        // When: callers format the public failure.
+        let display = error.to_string();
+        let debug = format!("{error:?}");
+        // Then: public diagnostics are fixed, while the original cause remains inspectable.
+        assert_eq!(display, "cannot spawn process");
+        assert!(!debug.contains("PRIVATE_PROCESS_CAUSE"));
+        let cause = error.source().unwrap().downcast_ref::<io::Error>().unwrap();
+        assert_eq!(cause.kind(), io::ErrorKind::Other);
+        assert_eq!(cause.to_string(), "PRIVATE_PROCESS_CAUSE");
+    }
 
     #[test]
     fn preserves_document_context_without_exposing_its_private_cause() {

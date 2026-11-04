@@ -22,6 +22,22 @@ use std::{
     time::SystemTime,
 };
 
+pub(super) fn symlink_is_exist(files: &LocalFileSystem, path: &Path) -> FileResult<bool> {
+    let (components, name) = path_get_file_components(path)?;
+    let Some(parent) = FileParent::directory_get_by_components(files, &components)? else {
+        return Ok(false);
+    };
+    let observed = file_get_entry(&parent.directory, &name)?;
+    let is_symlink = if let Some(before) = observed {
+        file_verify_entry(&parent.directory, &name, &before)?;
+        FileType::from_raw_mode(before.st_mode) == FileType::Symlink
+    } else {
+        false
+    };
+    parent.directory_verify_links(files)?;
+    Ok(is_symlink)
+}
+
 pub(super) fn file_get_by_path(
     files: &LocalFileSystem,
     path: &Path,

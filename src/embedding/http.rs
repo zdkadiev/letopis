@@ -38,7 +38,11 @@ impl Http {
             .new_agent();
         Self { agent }
     }
-    pub(super) fn post(
+    /// Send one JSON POST without redirects or proxies under the agent's shared deadline.
+    ///
+    /// # Errors
+    /// Reports transport failures, non-200 statuses, oversized bodies or malformed JSON responses.
+    pub(super) fn request_send_by_endpoint(
         &self,
         endpoint: &str,
         body: &Value,
@@ -69,7 +73,11 @@ impl Http {
         Ok(value)
     }
 }
-pub(super) fn validate_config(
+/// Validate the selected protocol and complete HTTP(S) endpoint without network I/O.
+///
+/// # Errors
+/// Reports unsupported protocols or unsafe, incomplete or malformed endpoints.
+pub(super) fn config_validate(
     config: &EmbeddingConfig,
     provider: ProviderKind,
 ) -> EmbeddingResult<()> {
@@ -105,7 +113,7 @@ pub(super) fn build_endpoint(
     provider: ProviderKind,
     suffix: &str,
 ) -> EmbeddingResult<String> {
-    validate_config(config, provider)?;
+    config_validate(config, provider)?;
     let base = config
         .get_parameters()
         .get("base_url")
@@ -281,7 +289,7 @@ mod tests {
     }
 
     fn run_deadline_case(header_delay: Duration, body_delay: Duration) {
-        // Given
+        // Given: one local response delays its headers, body or both beyond a short shared deadline.
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let endpoint = format!("http://{}/embed", listener.local_addr().unwrap());
         let worker = thread::spawn(move || {
@@ -306,11 +314,11 @@ mod tests {
         });
         let http = Http::new_with_deadline(Duration::from_millis(120));
         let start = Instant::now();
-        // When
-        let result = http.post(&endpoint, &json!({"input":["fixture"]}), None);
+        // When: the real HTTP transport sends one request and waits for its response.
+        let result = http.request_send_by_endpoint(&endpoint, &json!({"input":["fixture"]}), None);
         let elapsed = start.elapsed();
         worker.join().unwrap();
-        // Then
+        // Then: the request times out within the independent two-second outer bound.
         assert_eq!(result.unwrap_err().get_kind(), EmbeddingErrorKind::Timeout);
         assert!(elapsed < Duration::from_secs(2));
     }

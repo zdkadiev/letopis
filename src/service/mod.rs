@@ -8,9 +8,9 @@ pub use error::TransactionError;
 pub use error::{
     CommandError, CommandErrorKind, CommandProblem, CommandResult, Diagnostic, DiagnosticKind,
     DocumentError, DocumentErrorKind, DocumentResult, EmbeddingError, EmbeddingErrorKind,
-    EmbeddingFailure, EmbeddingResult, FileError, FileErrorKind, FileResult, QueryError,
-    ServiceError, ServiceErrorKind, ServiceResult, SnapshotError, SnapshotErrorKind, StorageError,
-    StorageErrorKind, StorageResult,
+    EmbeddingFailure, EmbeddingResult, FileError, FileErrorKind, FileResult, GitError, GitResult,
+    ProcessError, ProcessResult, QueryError, ServiceError, ServiceErrorKind, ServiceResult,
+    SnapshotError, SnapshotErrorKind, StorageError, StorageErrorKind, StorageResult,
 };
 use std::{
     collections::BTreeSet,
@@ -46,6 +46,14 @@ pub trait Clock: std::fmt::Debug {
 /// ordinary per-file traversal retains descriptors only for that operation.
 #[cfg_attr(test, mockall::automock)]
 pub trait FileReader {
+    /// Observe final symlink presence without following any component or reading bytes.
+    /// Missing entries return false; directories and other nonsymlinks return false.
+    /// Verify the leaf identity and ancestry before returning, including absent entries.
+    ///
+    /// # Errors
+    /// Reports unsafe parents, replacements, invalid relative paths or I/O failures.
+    fn symlink_is_exist(&self, path: &Path) -> FileResult<bool>;
+
     /// Capture regular bytes, verifying identity and content observations around I/O.
     /// Verify leaf stability and ancestry before classifying nonregular exclusions;
     /// replacing an observed regular leaf always remains an integrity failure.
@@ -685,28 +693,30 @@ pub trait Refresher {
     /// Reports capture, provenance or storage failures without a partial publication.
     fn reindex(&mut self) -> DocumentResult<RefreshOutcome>;
 }
-/// Repository-owned discovery of Markdown candidate paths.
+/// Raw Git index and non-ignored untracked worktree path observations.
 ///
-/// Every implementation reports only normalized root-relative paths and never reads file bodies.
+/// Return nonempty NUL-terminated paths without UTF-8 or document-policy filtering.
+/// Include deleted tracked paths and expand sparse index membership; duplicate stages
+/// are permitted. Read only Git index, ignore and sparse-tree metadata; never
+/// modify the index or repository.
 #[cfg_attr(test, mockall::automock)]
-pub trait CorpusLister {
-    /// List normalized, deduplicated candidates including deleted tracked files.
-    /// Exclude final symlinks observed in the working tree; consumers must recheck paths.
+pub trait GitWorktreePaths {
+    /// Enumerate root-relative Git paths as raw NUL-delimited bytes.
     ///
     /// # Errors
-    /// Reports unsupported candidate paths or Git failures.
-    fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>>;
+    /// Reports index, ignore, sparse-object, worktree traversal or repository-policy failures.
+    fn worktree_paths_get(&self) -> GitResult<Vec<u8>>;
 }
 
 /// Pure shared Markdown projection and search-text codec.
 ///
-/// Every implementation is deterministic and performs no I/O: equal bytes give equal results.
+/// Every implementation is deterministic and performs no I/O: equal paths and bytes give equal results.
 pub trait MarkdownCodec {
     /// Parse a whole file atomically; unmarked Markdown produces `None`.
     ///
     /// # Errors
     /// Returns safe local diagnostics for invalid UTF-8, metadata or graph markup.
-    fn parse_file(
+    fn file_parse(
         &self,
         path: &RepoPath,
         bytes: &[u8],
@@ -724,7 +734,7 @@ pub trait SnapshotVerifier {
     /// # Errors
     /// Returns [`SnapshotErrorKind::InternalError`] for repository policy, Git I/O
     /// or object integrity failures; these failures must not become a state.
-    fn verify_snapshot(&self, tree: &TreeOid) -> Result<SnapshotState, SnapshotError>;
+    fn tree_verify_by_oid(&self, tree: &TreeOid) -> Result<SnapshotState, SnapshotError>;
 }
 /// Synchronous immutable snapshot operations. Creation alone does not retain.
 pub trait GitSnapshots {
@@ -734,18 +744,18 @@ pub trait GitSnapshots {
     /// Returns [`SnapshotErrorKind::InvalidRequest`] for invalid, duplicate or
     /// colliding paths, and [`SnapshotErrorKind::InternalError`] when repository
     /// policy, Git I/O or object integrity checks fail.
-    fn create_tree(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError>;
+    fn tree_create(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError>;
     /// Write exact captured bytes without filters or normalization; does not retain.
     ///
     /// # Errors
     /// Reports repository policy, Git I/O or object integrity failures.
-    fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError>;
+    fn blob_write(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError>;
     /// Assemble exactly these paths after validating all blobs; does not retain.
     ///
     /// # Errors
     /// Invalid paths, collisions, missing/wrong-type blobs or foreign formats are
     /// invalid requests; policy, I/O and corruption failures are internal errors.
-    fn create_tree_from_blobs(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError>;
+    fn tree_assemble(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError>;
     /// Read a complete blob from an exact tree, without live-file fallback.
     ///
     /// # Errors
@@ -753,14 +763,18 @@ pub trait GitSnapshots {
     /// [`SnapshotErrorKind::InvalidRequest`] for an incompatible OID format,
     /// non-tree root or non-blob path, and [`SnapshotErrorKind::InternalError`]
     /// for repository policy, Git I/O or integrity failures.
-    fn get_blob(&self, tree: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError>;
+    fn blob_get_by_tree_oid_and_path(
+        &self,
+        tree: &TreeOid,
+        path: &RepoPath,
+    ) -> Result<Vec<u8>, SnapshotError>;
     /// Validate the exact root and retain its direct ref without auditing descendants.
     /// A retained ref protects healthy reachable objects from normal GC, not corruption.
     ///
     /// # Errors
     /// Missing roots are not found; wrong types/formats are invalid requests.
     /// Root corruption, policy, Git I/O and ref conflicts are internal errors.
-    fn retain(&self, tree: &TreeOid) -> Result<(), SnapshotError>;
+    fn tree_retain_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError>;
     /// Validate the complete local closure and retain it through Git GC.
     ///
     /// # Errors
@@ -768,7 +782,7 @@ pub trait GitSnapshots {
     /// [`SnapshotErrorKind::InvalidRequest`] for an incompatible OID format or
     /// non-tree root, and [`SnapshotErrorKind::InternalError`] for an incomplete
     /// or corrupt closure, repository policy, Git I/O or ref publication failure.
-    fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError>;
+    fn tree_pin_by_oid(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError>;
 }
 
 /// Snapshot operations and root verification for the same repository.
@@ -789,12 +803,12 @@ pub trait EmbeddingProvider {
     ///
     /// # Errors
     /// Returns invalid configuration when the endpoint or protocol is unsupported.
-    fn validate_config(&self, config: &EmbeddingConfig) -> EmbeddingResult<()>;
+    fn config_validate(&self, config: &EmbeddingConfig) -> EmbeddingResult<()>;
     /// Compute one attempt and validate every vector before returning it.
     ///
     /// # Errors
     /// Reports invalid config/input, credentials, transport or malformed output.
-    fn embed(
+    fn vectors_compute_by_texts(
         &self,
         config: &EmbeddingConfig,
         texts: &[&str],
@@ -941,16 +955,18 @@ pub trait EmbeddingExecutor {
     /// Reports unexpected storage, coordination or embedding infrastructure failures.
     fn drain(&mut self) -> CommandResult<()>;
 }
-/// Detached drain process launch capability.
+/// Detached launch of a configured executable, argument vector and working directory.
 ///
-/// Every implementation returns without waiting for the launched process to finish.
+/// Implementations preserve literal executable/arguments and working directory, inherit the
+/// environment, redirect standard I/O to null and create a separate session. They return
+/// without waiting for the launched process to finish.
 #[cfg_attr(test, mockall::automock)]
-pub trait DrainLauncher {
-    /// Start the internal drain command without waiting for inference.
+pub trait ProcessLauncher {
+    /// Start the configured process without interpreting arguments or waiting for completion.
     ///
     /// # Errors
-    /// Reports process setup or launch failures.
-    fn spawn_drain(&self) -> CommandResult<()>;
+    /// Reports process setup or launch failures while preserving the private I/O cause.
+    fn process_spawn(&self) -> ProcessResult<()>;
 }
 /// Foreground triggering and direct execution of background work.
 ///

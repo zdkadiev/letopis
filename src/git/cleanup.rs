@@ -1,4 +1,4 @@
-use super::{durability::make_lock_error, error::make_io_error};
+use super::{durability::lock_map_error, error::object_map_io_error};
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use std::{
     collections::BTreeMap,
@@ -54,22 +54,22 @@ impl GitWriteCleanup {
     ///
     /// # Errors
     /// Reports failed stage detachment/removal; arbitrary filesystem failures can leave residue.
-    pub(crate) fn cancel_and_cleanup(&self) -> Result<(), SnapshotError> {
+    pub(crate) fn writes_cancel_and_cleanup(&self) -> Result<(), SnapshotError> {
         self.cancelled.store(true, Ordering::SeqCst);
-        let resources = std::mem::take(&mut self.lock_state().resources);
+        let resources = std::mem::take(&mut self.state_lock().resources);
         #[cfg(test)]
-        let mut checkpoint = self.lock_state().after_stage_detach.take();
+        let mut checkpoint = self.state_lock().after_stage_detach.take();
         let mut failure = None;
         for (id, resource) in resources {
             if let WriteResource::Stage(mut directory) = resource
-                && let Err(error) = detach_and_remove(
+                && let Err(error) = stage_detach_and_remove(
                     &mut directory,
                     #[cfg(test)]
                     checkpoint.take(),
                 )
             {
                 failure = Some(error);
-                self.lock_state()
+                self.state_lock()
                     .resources
                     .insert(id, WriteResource::Stage(directory));
             }
@@ -78,16 +78,16 @@ impl GitWriteCleanup {
     }
 
     /// Observe terminal cancellation without acquiring a repository or write lock.
-    pub(crate) fn is_cancelled(&self) -> bool {
+    pub(crate) fn writes_is_cancelled(&self) -> bool {
         self.cancelled.load(Ordering::SeqCst)
     }
 
     /// Create/register an outer stage atomically with respect to cancellation.
-    pub(super) fn create_stage(
+    pub(super) fn stage_create(
         self: &Arc<Self>,
         root: &Path,
     ) -> Result<(WriteLease, PathBuf), SnapshotError> {
-        let mut state = self.admit()?;
+        let mut state = self.write_admit()?;
         let directory = create_directory(root)?;
         let path = directory.path().to_owned();
         let lease = WriteLease {
@@ -98,20 +98,20 @@ impl GitWriteCleanup {
     }
 
     /// Acquire/register the actual writable lock and clone its descriptor under the gate.
-    pub(super) fn acquire_ref(
+    pub(super) fn ref_acquire_by_path(
         self: &Arc<Self>,
         path: &Path,
         boundary: &Path,
         permissions: i32,
     ) -> Result<(WriteLease, File), SnapshotError> {
-        let mut state = self.admit()?;
+        let mut state = self.write_admit()?;
         let mut lock = gix::lock::File::acquire_to_update_resource(
             path,
             gix::lock::acquire::Fail::Immediately,
             Some(boundary.to_owned()),
             permissions,
         )
-        .map_err(|error| make_lock_error(&error))?;
+        .map_err(|error| lock_map_error(&error))?;
         let file = lock
             .with_mut(|file| file.try_clone())
             .map_err(fail_cleanup)?;
@@ -123,29 +123,29 @@ impl GitWriteCleanup {
     }
 
     /// Register either exact-ref or packed-ref confirmation ownership under the gate.
-    pub(super) fn acquire_marker(
+    pub(super) fn marker_acquire_by_path(
         self: &Arc<Self>,
         path: &Path,
         boundary: &Path,
         permissions: i32,
     ) -> Result<WriteLease, SnapshotError> {
-        let mut state = self.admit()?;
+        let mut state = self.write_admit()?;
         let lock = gix::lock::Marker::acquire_to_hold_resource(
             path,
             gix::lock::acquire::Fail::Immediately,
             Some(boundary.to_owned()),
             permissions,
         )
-        .map_err(|error| make_lock_error(&error))?;
+        .map_err(|error| lock_map_error(&error))?;
         Ok(WriteLease {
             cleanup: Arc::clone(self),
             id: state.register(WriteResource::Marker(lock)),
         })
     }
 
-    fn admit(&self) -> Result<MutexGuard<'_, WriteState>, SnapshotError> {
-        let state = self.lock_state();
-        if self.is_cancelled() {
+    fn write_admit(&self) -> Result<MutexGuard<'_, WriteState>, SnapshotError> {
+        let state = self.state_lock();
+        if self.writes_is_cancelled() {
             return Err(SnapshotError::new(
                 SnapshotErrorKind::InternalError,
                 WRITE_CANCELLED_MESSAGE,
@@ -154,7 +154,7 @@ impl GitWriteCleanup {
         Ok(state)
     }
 
-    fn lock_state(&self) -> MutexGuard<'_, WriteState> {
+    fn state_lock(&self) -> MutexGuard<'_, WriteState> {
         // A panic must not strand ownership; cleanup remains possible during unwinding.
         self.state_mutex
             .lock()
@@ -164,8 +164,8 @@ impl GitWriteCleanup {
 
 impl WriteLease {
     /// Remove a completed stage, reporting cleanup errors before returning write success.
-    pub(super) fn close_stage(self) -> Result<(), SnapshotError> {
-        let mut state = self.cleanup.admit()?;
+    pub(super) fn stage_close(self) -> Result<(), SnapshotError> {
+        let mut state = self.cleanup.write_admit()?;
         let Some(WriteResource::Stage(directory)) = state.resources.remove(&self.id) else {
             return Err(SnapshotError::new(
                 SnapshotErrorKind::InternalError,
@@ -176,13 +176,13 @@ impl WriteLease {
     }
 
     /// Atomically publish an admitted complete object; false means a racing object already exists.
-    pub(super) fn publish_object(
+    pub(super) fn object_publish(
         &self,
         staged: &Path,
         destination: &Path,
         permissions: i32,
     ) -> Result<bool, SnapshotError> {
-        let state = self.cleanup.admit()?;
+        let state = self.cleanup.write_admit()?;
         if !matches!(state.resources.get(&self.id), Some(WriteResource::Stage(_))) {
             return Err(SnapshotError::new(
                 SnapshotErrorKind::InternalError,
@@ -201,8 +201,8 @@ impl WriteLease {
     }
 
     /// Commit and unregister one actual ref lock without exposing a stale lock pathname.
-    pub(super) fn commit_ref(self) -> Result<(), SnapshotError> {
-        let mut state = self.cleanup.admit()?;
+    pub(super) fn ref_commit(self) -> Result<(), SnapshotError> {
+        let mut state = self.cleanup.write_admit()?;
         let Some(WriteResource::Ref(lock)) = state.resources.remove(&self.id) else {
             return Err(SnapshotError::new(
                 SnapshotErrorKind::InternalError,
@@ -225,7 +225,7 @@ impl WriteState {
 
 impl Drop for WriteLease {
     fn drop(&mut self) {
-        let mut state = self.cleanup.lock_state();
+        let mut state = self.cleanup.state_lock();
         if let Some(resource) = state.resources.remove(&self.id) {
             // Keep the actual marker owner alive until removal, never unlink a remembered name.
             match resource {
@@ -237,7 +237,7 @@ impl Drop for WriteLease {
     }
 }
 
-fn detach_and_remove(
+fn stage_detach_and_remove(
     directory: &mut TempDir,
     #[cfg(test)] checkpoint: Option<tests::NamespaceCheckpoint>,
 ) -> Result<(), SnapshotError> {
@@ -274,7 +274,7 @@ fn create_directory(root: &Path) -> Result<TempDir, SnapshotError> {
         .map_err(fail_cleanup)
 }
 fn fail_cleanup(error: io::Error) -> SnapshotError {
-    make_io_error("Git write cleanup failed", error)
+    object_map_io_error("Git write cleanup failed", error)
 }
 
 #[cfg(test)]
@@ -348,35 +348,35 @@ mod tests {
         let moved = root.join("moved");
         fs::create_dir(&stages).unwrap();
         let cleanup = Arc::new(GitWriteCleanup::new());
-        let (_stage, path) = cleanup.create_stage(&stages).unwrap();
+        let (_stage, path) = cleanup.stage_create(&stages).unwrap();
         fs::write(path.join("payload"), b"owned bytes").unwrap();
         let (_reference, _writer) = cleanup
-            .acquire_ref(&root.join("snapshot"), root, 0)
+            .ref_acquire_by_path(&root.join("snapshot"), root, 0)
             .unwrap();
         let _marker = cleanup
-            .acquire_marker(&root.join("packed-refs"), root, 0)
+            .marker_acquire_by_path(&root.join("packed-refs"), root, 0)
             .unwrap();
         let foreign = root.join("foreign.lock");
         fs::write(&foreign, b"foreign bytes").unwrap();
         let inode = fs::metadata(&foreign).unwrap().ino();
         fs::rename(&stages, &moved).unwrap();
         // When: the first stage fails cleanup, without skipping later lock owners.
-        assert!(cleanup.cancel_and_cleanup().is_err());
+        assert!(cleanup.writes_cancel_and_cleanup().is_err());
         // Then: residual ownership is retained, other owned locks are gone, foreign ownership survives.
-        assert_eq!(cleanup.lock_state().resources.len(), 1);
+        assert_eq!(cleanup.state_lock().resources.len(), 1);
         assert!(!root.join("snapshot.lock").exists());
         assert!(!root.join("packed-refs.lock").exists());
         assert_eq!(fs::read(&foreign).unwrap(), b"foreign bytes");
         assert_eq!(fs::metadata(&foreign).unwrap().ino(), inode);
-        assert!(cleanup.create_stage(root).is_err());
+        assert!(cleanup.stage_create(root).is_err());
         // Given: restore availability of the original parent without replacing the owner.
         fs::rename(&moved, &stages).unwrap();
         assert_eq!(fs::read(path.join("payload")).unwrap(), b"owned bytes");
         // When: retry cleanup, then repeat it after all resources have gone.
-        cleanup.cancel_and_cleanup().unwrap();
-        cleanup.cancel_and_cleanup().unwrap();
+        cleanup.writes_cancel_and_cleanup().unwrap();
+        cleanup.writes_cancel_and_cleanup().unwrap();
         // Then: the terminal owner is empty and no spool or foreign-lock damage remains.
-        assert!(cleanup.lock_state().resources.is_empty());
+        assert!(cleanup.state_lock().resources.is_empty());
         assert_eq!(fs::read_dir(&stages).unwrap().count(), 0);
         assert_eq!(fs::read(&foreign).unwrap(), b"foreign bytes");
         assert_eq!(fs::metadata(&foreign).unwrap().ino(), inode);
@@ -391,16 +391,18 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let cleanup = Arc::new(GitWriteCleanup::new());
         let path = directory.path().join("snapshot");
-        let (lease, mut writer) = cleanup.acquire_ref(&path, directory.path(), 0).unwrap();
+        let (lease, mut writer) = cleanup
+            .ref_acquire_by_path(&path, directory.path(), 0)
+            .unwrap();
         let (resume, wait) = mpsc::channel();
         let active = thread::spawn(move || {
             wait.recv().unwrap();
             writer.write_all(b"late original bytes\n").unwrap();
             writer.sync_all().unwrap();
-            lease.commit_ref().is_err()
+            lease.ref_commit().is_err()
         });
         // When: cleanup runs before the active writer resumes; another owner acquires the name.
-        cleanup.cancel_and_cleanup().unwrap();
+        cleanup.writes_cancel_and_cleanup().unwrap();
         fs::write(path.with_extension("lock"), b"successor").unwrap();
         let successor_inode = fs::metadata(path.with_extension("lock")).unwrap().ino();
         resume.send(()).unwrap();
@@ -424,7 +426,7 @@ mod tests {
         // Given: an owned outer stage and an already-open payload descriptor.
         let directory = tempfile::tempdir().unwrap();
         let cleanup = Arc::new(GitWriteCleanup::new());
-        let (lease, stage) = cleanup.create_stage(directory.path()).unwrap();
+        let (lease, stage) = cleanup.stage_create(directory.path()).unwrap();
         let store = gix::odb::loose::Store::at(&stage, gix::hash::Kind::Sha1);
         let (entered, ready) = mpsc::channel();
         let (resume, wait) = mpsc::channel();
@@ -439,10 +441,10 @@ mod tests {
         ready.recv().unwrap();
         assert_eq!(fs::read_dir(&stage).unwrap().count(), 1);
         // When: cleanup detaches/removes while the writer remains live, then writing resumes.
-        cleanup.cancel_and_cleanup().unwrap();
+        cleanup.writes_cancel_and_cleanup().unwrap();
         resume.send(()).unwrap();
         let rejected = active.join().unwrap();
-        let published = lease.publish_object(
+        let published = lease.object_publish(
             &stage.join("active"),
             &directory.path().join("aa/object"),
             0,
@@ -463,14 +465,14 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path();
         let cleanup = Arc::new(GitWriteCleanup::new());
-        let (_lease, stage) = cleanup.create_stage(root).unwrap();
+        let (_lease, stage) = cleanup.stage_create(root).unwrap();
         fs::write(stage.join("payload"), b"pending object").unwrap();
         let parent = fs::File::open(&stage).unwrap();
         let reference = root.join("snapshot");
-        let (ref_lease, mut old_writer) = cleanup.acquire_ref(&reference, root, 0).unwrap();
+        let (ref_lease, mut old_writer) = cleanup.ref_acquire_by_path(&reference, root, 0).unwrap();
         let (detached, resume) = register_namespace_checkpoint(&cleanup);
         let cancelling = Arc::clone(&cleanup);
-        let worker = thread::spawn(move || cancelling.cancel_and_cleanup());
+        let worker = thread::spawn(move || cancelling.writes_cancel_and_cleanup());
         // When: cancellation detaches the parent inode, then the pending mkdir/persist operations finish.
         let detached = detached.recv_timeout(Duration::from_secs(5)).unwrap();
         assert!(!stage.exists(), "active pathname is not isolated");
@@ -498,7 +500,7 @@ mod tests {
         old_writer.write_all(b"late old writer").unwrap();
         old_writer.sync_all().unwrap();
         // Then: neither the old publication lease nor late inode writes touch the successor.
-        assert!(ref_lease.commit_ref().is_err());
+        assert!(ref_lease.ref_commit().is_err());
         assert_eq!(fs::read(&lock).unwrap(), b"successor");
         assert_eq!(fs::metadata(&lock).unwrap().ino(), inode);
         assert!(!reference.exists());
@@ -514,18 +516,20 @@ mod tests {
         let cleanup = Arc::new(GitWriteCleanup::new());
         let loose = directory.path().join("snapshot");
         let packed = directory.path().join("packed-refs");
-        let _loose = cleanup.acquire_marker(&loose, directory.path(), 0).unwrap();
+        let _loose = cleanup
+            .marker_acquire_by_path(&loose, directory.path(), 0)
+            .unwrap();
         let _packed = cleanup
-            .acquire_marker(&packed, directory.path(), 0)
+            .marker_acquire_by_path(&packed, directory.path(), 0)
             .unwrap();
         fs::write(directory.path().join("foreign.lock"), b"foreign").unwrap();
         // When: cancellation closes every actual owned marker.
-        cleanup.cancel_and_cleanup().unwrap();
+        cleanup.writes_cancel_and_cleanup().unwrap();
         // Then: new admission fails, owned markers disappear and foreign bytes survive.
-        assert!(cleanup.is_cancelled());
+        assert!(cleanup.writes_is_cancelled());
         assert!(!loose.with_extension("lock").exists());
         assert!(!packed.with_extension("lock").exists());
-        assert!(cleanup.create_stage(directory.path()).is_err());
+        assert!(cleanup.stage_create(directory.path()).is_err());
         assert_eq!(
             fs::read(directory.path().join("foreign.lock")).unwrap(),
             b"foreign"
@@ -556,7 +560,7 @@ mod tests {
     ) -> (mpsc::Receiver<PathBuf>, mpsc::Sender<()>) {
         let (detached, observed) = mpsc::channel();
         let (resume, admitted) = mpsc::channel();
-        cleanup.lock_state().after_stage_detach = Some(NamespaceCheckpoint {
+        cleanup.state_lock().after_stage_detach = Some(NamespaceCheckpoint {
             detached,
             resume: admitted,
         });
@@ -570,19 +574,19 @@ mod tests {
             &["check".into()],
             &writer,
             Arc::clone(&cleanup),
-            crate::process::SigintListener::install,
+            crate::process::SigintListener::signal_listener_install,
         )
         .unwrap();
-        let (_stage, path) = cleanup.create_stage(root).unwrap();
+        let (_stage, path) = cleanup.stage_create(root).unwrap();
         let _active = fs::File::create(path.join("active")).unwrap();
         let (_reference, _writer) = cleanup
-            .acquire_ref(&root.join("snapshot"), root, 0)
+            .ref_acquire_by_path(&root.join("snapshot"), root, 0)
             .unwrap();
         let _confirmed = cleanup
-            .acquire_marker(&root.join("confirmed"), root, 0)
+            .marker_acquire_by_path(&root.join("confirmed"), root, 0)
             .unwrap();
         let _packed = cleanup
-            .acquire_marker(&root.join("packed-refs"), root, 0)
+            .marker_acquire_by_path(&root.join("packed-refs"), root, 0)
             .unwrap();
         let (detached, resume) = register_namespace_checkpoint(&cleanup);
         thread::spawn(move || {

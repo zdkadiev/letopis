@@ -1465,6 +1465,9 @@ mod configuration_value_tests {
     }
 
     impl FileReader for Files {
+        fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            Ok(false)
+        }
         fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             assert_eq!(path, std::path::Path::new(".letopis/config.json"));
             Ok(Some(capture(self.config.clone())))
@@ -1510,7 +1513,7 @@ mod configuration_value_tests {
     }
 
     impl EmbeddingProvider for Provider {
-        fn validate_config(&self, config: &EmbeddingConfig) -> EmbeddingResult<()> {
+        fn config_validate(&self, config: &EmbeddingConfig) -> EmbeddingResult<()> {
             let url = config
                 .get_parameters()
                 .get("base_url")
@@ -1523,7 +1526,7 @@ mod configuration_value_tests {
             }
         }
 
-        fn embed(
+        fn vectors_compute_by_texts(
             &self,
             _: &EmbeddingConfig,
             _: &[&str],

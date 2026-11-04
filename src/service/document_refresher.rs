@@ -1,8 +1,9 @@
-use super::utils::map_document_file;
 use super::utils::map_document_lock_error;
+use super::utils::{CandidateSelection, map_document_file};
 use super::{
-    BasisRetainer, CacheDatabase, CorpusLister, DocumentError, DocumentErrorKind, DocumentResult,
-    FileReader, FileRow, FileStat, MarkdownCodec, RefreshOutcome, Refresher, SourceProvenance,
+    BasisRetainer, CacheDatabase, DocumentError, DocumentErrorKind, DocumentResult, FileReader,
+    FileRow, FileStat, GitWorktreePaths, MarkdownCodec, RefreshOutcome, Refresher,
+    SourceProvenance,
 };
 use super::{Clock, FileLocker};
 use crate::domain::{RepoPath, Sha256, TreeOid};
@@ -81,7 +82,7 @@ impl Delta {
     }
 }
 impl<
-    G: CorpusLister,
+    G: GitWorktreePaths,
     F: FileReader + FileLocker,
     M: MarkdownCodec,
     P: SourceProvenance + BasisRetainer,
@@ -133,8 +134,9 @@ impl<
         self.publish_current(PublicationMode::Incremental, SnapshotVerification::Root)
     }
 }
+
 impl<
-    G: CorpusLister,
+    G: GitWorktreePaths,
     F: FileReader + FileLocker,
     M: MarkdownCodec,
     P: SourceProvenance + BasisRetainer,
@@ -189,7 +191,7 @@ impl<
     }
 
     fn detect_changes(&self, state: &FileState, mode: PublicationMode) -> DocumentResult<Delta> {
-        let candidates: BTreeSet<_> = self.git.get_candidates()?.into_iter().collect();
+        let candidates: BTreeSet<_> = self.get_candidates()?.into_iter().collect();
         let mut delta = Delta {
             updated: BTreeMap::new(),
             removed: BTreeMap::new(),
@@ -373,7 +375,6 @@ impl<
     fn verify_excluded_candidates(&self, excluded: &BTreeSet<RepoPath>) -> DocumentResult<()> {
         if !excluded.is_empty()
             && self
-                .git
                 .get_candidates()?
                 .iter()
                 .any(|path| excluded.contains(path))
@@ -384,6 +385,16 @@ impl<
             ));
         }
         Ok(())
+    }
+}
+
+impl<G: GitWorktreePaths, F: FileReader, M, P, C> DocumentRefreshService<G, F, M, P, C> {
+    fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+        CandidateSelection {
+            git: &self.git,
+            filesystem: &self.filesystem,
+        }
+        .get_candidates()
     }
 }
 
@@ -504,7 +515,7 @@ mod basis {
                         DOCUMENTS_CHANGED_MESSAGE,
                     ));
                 }
-                let Ok(parsed) = self.markdown.parse_file(path, &captured.bytes) else {
+                let Ok(parsed) = self.markdown.file_parse(path, &captured.bytes) else {
                     continue;
                 };
                 replaced.insert(path.clone());
@@ -684,7 +695,7 @@ mod projection {
                 file.valid = previous.valid;
                 file.error.clone_from(&previous.error);
             } else {
-                match self.markdown.parse_file(path, &captured.bytes) {
+                match self.markdown.file_parse(path, &captured.bytes) {
                     Ok(parsed) => {
                         prepared = prepare_valid(prepared, parsed, graph.get_file_ids(path));
                     }
@@ -1002,7 +1013,7 @@ mod tests {
         markdown::MarkdownParser,
         service::{
             BasisRetainer, CacheDatabase, CapturedFile, Diagnostic, DocumentError,
-            DocumentErrorKind, DocumentResult, FileStat, MarkdownCodec, MockCorpusLister,
+            DocumentErrorKind, DocumentResult, FileStat, MarkdownCodec, MockGitWorktreePaths,
             ParsedFile, ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError,
             SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, StorageRead,
         },
@@ -1018,7 +1029,7 @@ mod tests {
     const INITIAL: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nAlphaToken\n";
     const EDITED: &[u8] = b"<!-- letopis: {\"created_at\":1} -->\nBravoToken\n";
     const NOW: i64 = 5_000_000_000;
-    type Candidates = MockCorpusLister;
+    type Candidates = MockGitWorktreePaths;
     struct TestFiles {
         bytes: RefCell<Vec<u8>>,
         stat: Cell<FileStat>,
@@ -1079,6 +1090,9 @@ mod tests {
         }
     }
     impl FileReader for TestFiles {
+        fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            Ok(false)
+        }
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             Ok((!self.missing.get()).then(|| self.stat.get()))
         }
@@ -1124,7 +1138,7 @@ mod tests {
             &self,
             _: &std::path::Path,
         ) -> FileResult<Option<std::os::fd::OwnedFd>> {
-            panic!("unexpected directory_get_by_path")
+            Ok(Some(std::fs::File::open(".").unwrap().into()))
         }
         fn lock_get_owner_by_path(
             &self,
@@ -1145,13 +1159,13 @@ mod tests {
     }
     struct CountingMarkdown(Cell<usize>);
     impl MarkdownCodec for CountingMarkdown {
-        fn parse_file(
+        fn file_parse(
             &self,
             path: &RepoPath,
             bytes: &[u8],
         ) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
             self.0.set(self.0.get() + 1);
-            MarkdownParser::new().parse_file(path, bytes)
+            MarkdownParser::new().file_parse(path, bytes)
         }
     }
     struct TestProvenance;
@@ -1500,12 +1514,12 @@ mod tests {
         let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let observed = std::sync::Arc::clone(&calls);
         let mut candidates = Candidates::new();
-        candidates.expect_get_candidates().returning(move || {
+        candidates.expect_worktree_paths_get().returning(move || {
             let count = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
             if count < 3 {
                 Ok(Vec::new())
             } else {
-                Ok(vec![RepoPath::parse("note.md").unwrap()])
+                Ok(b"note.md\0".to_vec())
             }
         });
         service.git = candidates;
@@ -1921,6 +1935,9 @@ mod tests {
             (dir, service, events)
         }
         impl FileReader for BoundaryFiles {
+            fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+                Ok(false)
+            }
             fn file_get_stat_by_path(
                 &self,
                 path: &std::path::Path,
@@ -1958,7 +1975,7 @@ mod tests {
                 &self,
                 _: &std::path::Path,
             ) -> FileResult<Option<std::os::fd::OwnedFd>> {
-                panic!("unexpected directory_get_by_path")
+                Ok(Some(std::fs::File::open(".").unwrap().into()))
             }
             fn lock_get_owner_by_path(
                 &self,
@@ -2870,16 +2887,17 @@ mod tests {
         }
 
         fn get_status(root: &Path) -> StatusReport {
-            let git = GitRepository::open(root).unwrap();
-            let files = LocalFileSystem::new(git.get_root()).unwrap();
+            let git = GitRepository::open(root, &[crate::utils::SERVICE_DIRECTORY]).unwrap();
+            let files = LocalFileSystem::new(git.worktree_root_get()).unwrap();
             let pinned = files
                 .directory_get_by_path(std::path::Path::new(".letopis"))
                 .unwrap()
                 .unwrap();
             let storage =
-                crate::open_observed_cache(&git.get_root().join(".letopis"), &pinned).unwrap();
+                crate::open_observed_cache(&git.worktree_root_get().join(".letopis"), &pinned)
+                    .unwrap();
             let provenance = ProvenanceService::new(
-                Box::new(GitRepository::open(root).unwrap()),
+                Box::new(GitRepository::open(root, &[crate::utils::SERVICE_DIRECTORY]).unwrap()),
                 LocalFileSystem::new(root).unwrap(),
             );
             let provider = crate::build_embedding_provider().unwrap();
@@ -2908,19 +2926,19 @@ mod tests {
         }
 
         fn build_service(root: &Path) -> Service {
-            let git = GitRepository::open(root).unwrap();
-            let mut filesystem = LocalFileSystem::new(git.get_root()).unwrap();
+            let git = GitRepository::open(root, &[crate::utils::SERVICE_DIRECTORY]).unwrap();
+            let mut filesystem = LocalFileSystem::new(git.worktree_root_get()).unwrap();
             filesystem.configure_file_test(TIME, Box::new(|| reach_checkpoint("contended")));
             let directory = filesystem
                 .directory_create_by_path(std::path::Path::new(".letopis"))
                 .unwrap();
             let storage = crate::storage::open_confined_test_storage(
-                &git.get_root().join(".letopis"),
+                &git.worktree_root_get().join(".letopis"),
                 &directory,
             )
             .unwrap();
             let provenance = ProvenanceService::new(
-                Box::new(GitRepository::open(root).unwrap()),
+                Box::new(GitRepository::open(root, &[crate::utils::SERVICE_DIRECTORY]).unwrap()),
                 LocalFileSystem::new(root).unwrap(),
             );
             DocumentRefreshService {
@@ -3415,8 +3433,671 @@ mod tests {
     fn build_candidates() -> Candidates {
         let mut candidates = Candidates::new();
         candidates
-            .expect_get_candidates()
-            .returning(|| Ok(vec![RepoPath::parse("note.md").unwrap()]));
+            .expect_worktree_paths_get()
+            .returning(|| Ok(b"note.md\0".to_vec()));
         candidates
+    }
+}
+
+#[cfg(test)]
+mod corpus {
+    use crate::filesystem::LocalFileSystem;
+    use crate::git::GitRepository;
+    use crate::process_test_support::{ObjectFormat, TempRepo};
+    use crate::service::document_refresher::DocumentRefreshService;
+    use crate::service::utils::parse_candidates;
+    use crate::{domain::RepoPath, service::DocumentErrorKind};
+    use std::fs;
+    use std::{path::Path, rc::Rc};
+
+    #[test]
+    fn candidates_ignore_symlinks_with_unsupported_names() {
+        // Given: a tracked symlink with a name invalid as a document path.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let root = repo.get_root();
+        std::os::unix::fs::symlink("target", root.join("bad#anchor.md")).unwrap();
+        repo.run_git_successfully(&["add", "bad#anchor.md"], None);
+        // When: the Git adapter lists the candidates.
+        let candidates = build_selector(root).unwrap().get_candidates().unwrap();
+        // Then: the symlink is not validated as a document path.
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            ["live.md"]
+        );
+    }
+
+    #[test]
+    fn candidates_exclude_live_symlinks_independently_of_index_mode() {
+        // Given: tracked and untracked paths whose live types differ from the index.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let root = repo.get_root();
+        fs::write(root.join("regular.md"), b"regular").unwrap();
+        fs::write(root.join("changed-to-link.md"), b"regular").unwrap();
+        std::os::unix::fs::symlink("regular.md", root.join("changed-to-file.md")).unwrap();
+        std::os::unix::fs::symlink("regular.md", root.join("tracked-link.md")).unwrap();
+        repo.run_git_successfully(
+            &[
+                "add",
+                "regular.md",
+                "changed-to-link.md",
+                "changed-to-file.md",
+                "tracked-link.md",
+            ],
+            None,
+        );
+        fs::remove_file(root.join("changed-to-link.md")).unwrap();
+        std::os::unix::fs::symlink("regular.md", root.join("changed-to-link.md")).unwrap();
+        fs::remove_file(root.join("changed-to-file.md")).unwrap();
+        fs::write(root.join("changed-to-file.md"), b"now regular").unwrap();
+        std::os::unix::fs::symlink("regular.md", root.join("untracked-link.md")).unwrap();
+        // When: the Git adapter enumerates the current corpus candidates.
+        let candidates = build_selector(root).unwrap().get_candidates().unwrap();
+        // Then: only live regular files and the fixture's ordinary Markdown are returned.
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            ["changed-to-file.md", "live.md", "regular.md"]
+        );
+    }
+
+    #[test]
+    fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
+        // Given: an independent repository/index fixture with the paths under test.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        for path in [
+            "deleted.md",
+            "tracked-ignored.md",
+            "space name.markdown",
+            "ignored.md",
+            "plain.txt",
+        ] {
+            fs::write(repo.get_root().join(path), b"bytes").unwrap();
+        }
+        repo.run_git_successfully(&["add", "deleted.md", "tracked-ignored.md"], None);
+        fs::remove_file(repo.get_root().join("deleted.md")).unwrap();
+        fs::write(repo.get_root().join(".gitignore"), b"*ignored.md\n").unwrap();
+        fs::create_dir(repo.get_root().join(".letopis")).unwrap();
+        fs::write(repo.get_root().join(".letopis/private.md"), b"private").unwrap();
+        let before = repo.capture_fixture_state();
+        let objects = repo.run_git_successfully(&["count-objects", "-v"], None);
+        let refs = repo.run_git_successfully(&["show-ref"], None);
+        let git = build_selector(repo.get_root()).unwrap();
+        // When: the application selects current document candidates.
+        let candidates = git.get_candidates().unwrap();
+        // Then: the exact paths or failure classification match the independent expectation.
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            [
+                "deleted.md",
+                "live.md",
+                "space name.markdown",
+                "tracked-ignored.md"
+            ]
+        );
+        assert_eq!(repo.capture_fixture_state(), before);
+        assert_eq!(
+            repo.run_git_successfully(&["count-objects", "-v"], None),
+            objects
+        );
+        assert_eq!(repo.run_git_successfully(&["show-ref"], None), refs);
+    }
+
+    #[test]
+    fn shared_repository_observes_index_and_ignore_edits_between_listings() {
+        for format in crate::process_test_support::FORMATS {
+            // Given: one shared repository whose index and ignore stack have already been read.
+            let repo = TempRepo::new(format);
+            fs::write(repo.get_root().join("ignored.md"), b"ignored").unwrap();
+            fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
+            let git = build_selector(repo.get_root()).unwrap();
+            let shared = DocumentRefreshService {
+                git: git.git.clone(),
+                filesystem: LocalFileSystem::new(repo.get_root()).unwrap(),
+                clock: Box::new(crate::process::SystemClock::new()),
+                markdown: (),
+                storage: Rc::new(()),
+                provenance: (),
+            };
+            assert_eq!(
+                git.get_candidates().unwrap(),
+                [RepoPath::parse("live.md").unwrap()]
+            );
+            // When: Git stages an ignored file and removes the previous index entry.
+            repo.run_git_successfully(&["add", "-f", "ignored.md"], None);
+            repo.run_git_successfully(&["rm", "--cached", "-f", "live.md"], None);
+            fs::write(repo.get_root().join(".gitignore"), b"ignored.md\nlive.md\n").unwrap();
+            // Then: the clone sees the new index and fresh ignore bytes without reopening.
+            assert_eq!(
+                shared.get_candidates().unwrap(),
+                [RepoPath::parse("ignored.md").unwrap()]
+            );
+            // When: remove the tracked file and make the other live file eligible again.
+            repo.run_git_successfully(&["rm", "--cached", "-f", "ignored.md"], None);
+            fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
+            // Then: the original handle also refreshes its index/exclude observation.
+            assert_eq!(
+                git.get_candidates().unwrap(),
+                [RepoPath::parse("live.md").unwrap()]
+            );
+        }
+    }
+
+    #[test]
+    fn candidates_reject_unsupported_raw_paths() {
+        use crate::service::DocumentErrorKind;
+        for raw in [
+            b"bad\xff.md".to_vec(),
+            b"bad#anchor.md".to_vec(),
+            b"bad\nline.md".to_vec(),
+        ] {
+            // Given: an independent repository/index fixture with the paths under test.
+            let repo = TempRepo::new(ObjectFormat::Sha1);
+            // Git's index supports raw paths even when the host filesystem rejects them.
+            let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+            let mut entry = format!("100644 {oid}\t").into_bytes();
+            entry.extend(raw);
+            entry.push(0);
+            repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
+            let git = build_selector(repo.get_root()).unwrap();
+            // When: the application selects current document candidates.
+            let error = git.get_candidates().unwrap_err();
+            // Then: the exact paths or failure classification match the independent expectation.
+            assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+            assert!(!error.to_string().contains("bad"));
+        }
+    }
+
+    #[test]
+    fn candidates_deduplicate_unmerged_index_stages() {
+        // Given: an independent repository/index fixture with the paths under test.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"conflict"));
+        let entries = format!(
+            "0 {}\tconflict.md\n100644 {oid} 1\tconflict.md\n100644 {oid} 2\tconflict.md\n100644 {oid} 3\tconflict.md\n",
+            "0".repeat(40)
+        );
+        repo.run_git_successfully(&["update-index", "--index-info"], Some(entries.as_bytes()));
+        let git = build_selector(repo.get_root()).unwrap();
+        // When: the application selects current document candidates.
+        let candidates = git.get_candidates().unwrap();
+        // Then: the exact paths or failure classification match the independent expectation.
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            ["conflict.md", "live.md"]
+        );
+    }
+
+    #[test]
+    fn candidates_exclude_metadata_before_validating_paths() {
+        for raw in [
+            b".letopis/bad#anchor.md".as_slice(),
+            b".letopis/bad\xff.md",
+            b"nested/.letopis/bad\xff.markdown",
+        ] {
+            // Given: Git can list metadata names unsupported by the corpus model.
+            let repo = TempRepo::new(ObjectFormat::Sha1);
+            fs::write(repo.get_root().join(".letopis-notes.md"), b"candidate").unwrap();
+            let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+            let mut entry = format!("100644 {oid}\t").into_bytes();
+            entry.extend(raw);
+            entry.push(0);
+            repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
+            let git = build_selector(repo.get_root()).unwrap();
+            // When: the application selects current document candidates.
+            let candidates = git.get_candidates().unwrap();
+            // Then: the exact paths or failure classification match the independent expectation.
+            assert_eq!(
+                candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+                [".letopis-notes.md", "live.md"]
+            );
+        }
+    }
+
+    #[test]
+    fn candidates_exclude_raw_git_metadata_components() {
+        // Given: Git itself forbids adding .git paths to its real index.
+        let raw = b".git/bad#anchor.md\0nested/.git/bad\xff.markdown\0.git-notes.md\0";
+        // When: the application selects current document candidates.
+        let candidates = parse_candidates(raw).unwrap();
+        // Then: the exact paths or failure classification match the independent expectation.
+        assert_eq!(
+            candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            [".git-notes.md"]
+        );
+    }
+
+    #[test]
+    fn rejects_unterminated_candidates_and_accepts_empty_output() {
+        // Given / When: malformed framing and empty raw input are parsed independently.
+        let malformed = parse_candidates(b"note.md").unwrap_err();
+        let empty = parse_candidates(b"").unwrap();
+        // Then: the exact paths or failure classification match the independent expectation.
+        assert_eq!(malformed.get_kind(), DocumentErrorKind::InternalError);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn corpus_matches_git_for_nested_excludes_staged_deletion_and_symlinks() {
+        // Given: index membership and three exclude sources disagree with live files.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        prepare_exclude_fixture(&repo);
+        let before = repo.capture_fixture_state();
+        let expected = [
+            "dir.md/inside.md",
+            "live.md",
+            "module.md",
+            "nested/keep.md",
+            "staged-delete.md",
+            "symlink.md",
+            "tracked-ignore.md",
+        ];
+        let oracle = repo.run_git_successfully(
+            &[
+                "ls-files",
+                "-z",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+            ],
+            None,
+        );
+        let mut oracle: Vec<_> = oracle
+            .split(|byte| *byte == 0)
+            .filter(|path| path.ends_with(b".md"))
+            .map(|path| std::str::from_utf8(path).unwrap())
+            .collect();
+        oracle.sort_unstable();
+        assert_eq!(oracle, expected);
+        // When: the library lists the current worktree's real index and ignore stack.
+        let actual = build_selector(repo.get_root())
+            .unwrap()
+            .get_candidates()
+            .unwrap();
+        // Then: all eligible oracle paths except the live symlink are returned.
+        assert_eq!(
+            actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            [
+                "dir.md/inside.md",
+                "live.md",
+                "module.md",
+                "nested/keep.md",
+                "staged-delete.md",
+                "tracked-ignore.md"
+            ]
+        );
+        assert_eq!(repo.capture_fixture_state(), before);
+    }
+
+    #[test]
+    fn linked_worktree_listing_uses_its_own_index() {
+        // Given: two worktrees share objects but have distinct staged paths.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let parent = tempfile::tempdir().unwrap();
+        let linked = parent.path().join("linked");
+        repo.run_git_successfully(
+            &[
+                "worktree",
+                "add",
+                "--detach",
+                linked.to_str().unwrap(),
+                "HEAD",
+            ],
+            None,
+        );
+        fs::write(linked.join("linked-only.md"), b"linked").unwrap();
+        repo.run_git_successfully(
+            &["-C", linked.to_str().unwrap(), "add", "linked-only.md"],
+            None,
+        );
+        fs::remove_file(linked.join("linked-only.md")).unwrap();
+        let expected = repo.run_git_successfully(
+            &[
+                "-C",
+                linked.to_str().unwrap(),
+                "ls-files",
+                "-z",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+            ],
+            None,
+        );
+        // When: discovery begins in the linked worktree rather than the common gitdir.
+        let actual = build_selector(&linked).unwrap().get_candidates().unwrap();
+        // Then: the deleted-but-staged linked path is retained and the other index is untouched.
+        assert!(
+            expected
+                .split(|byte| *byte == 0)
+                .any(|path| path == b"linked-only.md")
+        );
+        assert!(actual.contains(&RepoPath::parse("linked-only.md").unwrap()));
+        assert!(
+            !build_selector(repo.get_root())
+                .unwrap()
+                .get_candidates()
+                .unwrap()
+                .contains(&RepoPath::parse("linked-only.md").unwrap())
+        );
+    }
+
+    #[test]
+    fn corpus_ignores_replacements_for_index_backed_ignore_files() {
+        // Given: a sparse ignore file has a replacement that would expose a hidden document.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        fs::write(repo.get_root().join(".gitignore"), b"hidden.md\n").unwrap();
+        fs::write(repo.get_root().join("hidden.md"), b"hidden").unwrap();
+        repo.run_git_successfully(&["add", ".gitignore"], None);
+        let original = repo.get_oid(&["rev-parse", ":.gitignore"], None);
+        let replacement = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b""));
+        repo.run_git_successfully(&["replace", &original, &replacement], None);
+        repo.run_git_successfully(&["update-index", "--skip-worktree", ".gitignore"], None);
+        fs::remove_file(repo.get_root().join(".gitignore")).unwrap();
+        // When: candidate enumeration falls back to the index's raw ignore blob.
+        let actual = build_selector(repo.get_root())
+            .unwrap()
+            .get_candidates()
+            .unwrap();
+        // Then: replacement refs cannot change corpus membership.
+        assert_eq!(
+            actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+            ["live.md"]
+        );
+    }
+
+    #[test]
+    fn sparse_index_expands_index_tree_membership_without_changing_user_state() {
+        for format in crate::process_test_support::FORMATS {
+            // Given: a collapsed staged tree differs from HEAD and restored files match ignores.
+            let repo = TempRepo::new(format);
+            let tree = repo.prepare_sparse_index();
+            let expected = [
+                "keep/a.md",
+                "live.md",
+                "omit/b.md",
+                "omit/deleted.md",
+                "omit/nested/c.markdown",
+                "omit/staged.md",
+            ];
+            let oracle = repo.run_git_successfully(
+                &[
+                    "ls-files",
+                    "-z",
+                    "--cached",
+                    "--others",
+                    "--exclude-standard",
+                ],
+                None,
+            );
+            let mut oracle: Vec<_> = oracle
+                .split(|byte| *byte == 0)
+                .filter(|path| path.ends_with(b".md") || path.ends_with(b".markdown"))
+                .map(|path| std::str::from_utf8(path).unwrap())
+                .collect();
+            oracle.sort_unstable();
+            assert_eq!(oracle, expected);
+            let empty = repo.get_oid(&["mktree"], Some(b""));
+            repo.run_git_successfully(&["replace", &tree, &empty], None);
+            let before = repo.capture_fixture_state();
+            // When: listing expands the actual index's tree, including deleted tracked paths.
+            let actual = build_selector(repo.get_root())
+                .unwrap()
+                .get_candidates()
+                .unwrap();
+            // Then: tracked paths survive ignores, untracked ignored paths do not.
+            assert_eq!(
+                actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
+                expected
+            );
+            assert_eq!(repo.capture_fixture_state(), before);
+        }
+    }
+
+    #[test]
+    fn sparse_index_rejects_missing_corrupt_trees_and_late_alternates_safely() {
+        for format in crate::process_test_support::FORMATS {
+            for failure in ["missing", "corrupt", "alternates"] {
+                // Given: a valid collapsed index was opened before its object store changed.
+                let repo = TempRepo::new(format);
+                let tree = repo.prepare_sparse_index();
+                let git = build_selector(repo.get_root()).unwrap();
+                match failure {
+                    "missing" => fs::remove_file(repo.build_object_path(&tree)).unwrap(),
+                    "corrupt" => {
+                        let empty = repo.get_oid(&["mktree"], Some(b""));
+                        repo.replace_loose_object(&tree, &empty);
+                    }
+                    _ => fs::write(
+                        repo.get_root().join(".git/objects/info/alternates"),
+                        b"PRIVATE_DONOR_PATH\n",
+                    )
+                    .unwrap(),
+                }
+                let before = repo.capture_fixture_state();
+                // When: listing needs the collapsed tree rather than trusting HEAD or prior policy.
+                let error = git.get_candidates().unwrap_err();
+                // Then: no incomplete successful listing or raw object/path payload escapes.
+                assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
+                assert_eq!(error.to_string(), "cannot list document candidates");
+                assert_eq!(repo.capture_fixture_state(), before);
+            }
+        }
+    }
+
+    #[test]
+    fn irrelevant_non_utf8_paths_are_filtered_before_decoding() {
+        // Given: a raw irrelevant indexed name that the host need not create.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        stage_raw_path(&repo, b"irrelevant\xff.txt", "100644");
+        let service = build_selector(repo.get_root()).unwrap();
+        // When: the application selects documents from raw Git bytes.
+        let candidates = service.get_candidates().unwrap();
+        // Then: only the ordinary fixture document remains.
+        assert_eq!(candidates, [RepoPath::parse("live.md").unwrap()]);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn non_utf8_symlink_is_skipped_before_decoding_but_regular_markdown_fails() {
+        use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+        // Given: an actual non-UTF-8 Markdown symlink and its tracked name.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let name = OsStr::from_bytes(b"raw\xff.md");
+        std::os::unix::fs::symlink("missing", repo.get_root().join(name)).unwrap();
+        stage_raw_path(&repo, b"raw\xff.md", "120000");
+        let service = build_selector(repo.get_root()).unwrap();
+        // When: the final symlink is observed before UTF-8 decoding.
+        let candidates = service.get_candidates().unwrap();
+        // Then: the invalid-byte symlink never becomes an unsupported document.
+        assert_eq!(candidates, [RepoPath::parse("live.md").unwrap()]);
+        // Given: the same tracked raw name is now an ordinary file.
+        fs::remove_file(repo.get_root().join(name)).unwrap();
+        fs::write(repo.get_root().join(name), b"ordinary").unwrap();
+        // When: selection observes the changed type.
+        let error = service.get_candidates().unwrap_err();
+        // Then: relevant ordinary file encoding remains an invalid request.
+        assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+        assert_eq!(error.to_string(), "unsupported document path");
+        assert!(
+            std::error::Error::source(&error)
+                .unwrap()
+                .is::<std::str::Utf8Error>()
+        );
+    }
+
+    #[test]
+    fn candidate_parent_symlink_is_a_listing_failure() {
+        // Given: a tracked path beneath a live symlink to an outside directory.
+        let repo = TempRepo::new(ObjectFormat::Sha1);
+        let outside = tempfile::tempdir().unwrap();
+        fs::write(outside.path().join("note.md"), b"outside").unwrap();
+        std::os::unix::fs::symlink(outside.path(), repo.get_root().join("linked")).unwrap();
+        stage_raw_path(&repo, b"linked/note.md", "100644");
+        let service = build_selector(repo.get_root()).unwrap();
+        // When: candidate selection observes the path without following parents.
+        let error = service.get_candidates().unwrap_err();
+        // Then: unsafe traversal is fatal with the preserved public listing diagnostic.
+        assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
+        assert_eq!(error.to_string(), "cannot list document candidates");
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
+    #[test]
+    fn unsafe_raw_components_skip_probes_and_keep_lexical_normalization() {
+        use crate::service::MockGitWorktreePaths;
+        // Given: relevant raw paths whose structural form is unsafe to probe.
+        let mut git = MockGitWorktreePaths::new();
+        git.expect_worktree_paths_get()
+            .returning(|| Ok(b"a/../note.md\0./note.md\0a//b.md\0".to_vec()));
+        let service = DocumentRefreshService {
+            git,
+            filesystem: build_root_only_files(),
+            clock: Box::new(crate::process::SystemClock::new()),
+            markdown: (),
+            storage: Rc::new(()),
+            provenance: (),
+        };
+        // When: the service selects and normalizes paths without probing raw file paths.
+        let candidates = service.get_candidates().unwrap();
+        // Then: normalization and deduplication remain owned by RepoPath.
+        assert_eq!(
+            candidates,
+            [
+                RepoPath::parse("a/b.md").unwrap(),
+                RepoPath::parse("note.md").unwrap()
+            ]
+        );
+    }
+
+    #[test]
+    fn root_escape_still_fails_after_skipping_unsafe_raw_probe() {
+        use crate::service::MockGitWorktreePaths;
+        // Given: an escaping path and a filesystem mock that permits only the root observation.
+        let mut git = MockGitWorktreePaths::new();
+        git.expect_worktree_paths_get()
+            .returning(|| Ok(b"../note.md\0".to_vec()));
+        let service = DocumentRefreshService {
+            git,
+            filesystem: build_root_only_files(),
+            clock: Box::new(crate::process::SystemClock::new()),
+            markdown: (),
+            storage: Rc::new(()),
+            provenance: (),
+        };
+        // When: lexical path validation sees the escaping candidate.
+        let error = service.get_candidates().unwrap_err();
+        // Then: it retains the old unsupported-document classification and cause.
+        assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+        assert_eq!(error.to_string(), "unsupported document path");
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
+    #[test]
+    fn replaced_root_is_rejected_even_when_all_raw_paths_are_irrelevant() {
+        use crate::service::MockGitWorktreePaths;
+        // Given: the filesystem root is replaced after its descriptor was pinned.
+        let parent = tempfile::tempdir().unwrap();
+        let root = parent.path().join("root");
+        fs::create_dir(&root).unwrap();
+        let filesystem = LocalFileSystem::new(&root).unwrap();
+        fs::rename(&root, parent.path().join("detached")).unwrap();
+        fs::create_dir(&root).unwrap();
+        let mut git = MockGitWorktreePaths::new();
+        git.expect_worktree_paths_get()
+            .returning(|| Ok(b"irrelevant.txt\0".to_vec()));
+        let service = DocumentRefreshService {
+            git,
+            filesystem,
+            clock: Box::new(crate::process::SystemClock::new()),
+            markdown: (),
+            storage: Rc::new(()),
+            provenance: (),
+        };
+        // When: selection has no eligible leaf to probe.
+        let error = service.get_candidates().unwrap_err();
+        // Then: the original root safety check still fails with the existing diagnostic.
+        assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
+        assert_eq!(error.to_string(), "cannot list document candidates");
+    }
+
+    fn build_root_only_files() -> crate::service::MockFileReader {
+        let mut files = crate::service::MockFileReader::new();
+        files
+            .expect_directory_get_by_path()
+            .withf(|path| path == Path::new("."))
+            .returning(|_| Ok(Some(std::fs::File::open(".").unwrap().into())));
+        files
+    }
+
+    fn stage_raw_path(repo: &TempRepo, path: &[u8], mode: &str) {
+        let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
+        let mut entry = format!("{mode} {oid}\t").into_bytes();
+        entry.extend_from_slice(path);
+        entry.push(0);
+        repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
+    }
+
+    fn prepare_exclude_fixture(repo: &TempRepo) {
+        let commit = repo.get_oid(&["rev-parse", "HEAD"], None);
+        repo.run_git_successfully(
+            &[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                &format!("160000,{commit},module.md"),
+            ],
+            None,
+        );
+        fs::create_dir(repo.get_root().join("module.md")).unwrap();
+        fs::write(repo.get_root().join("module.md/hidden.md"), b"submodule").unwrap();
+        for path in ["tracked-ignore.md", "staged-delete.md"] {
+            fs::write(repo.get_root().join(path), b"tracked").unwrap();
+        }
+        repo.run_git_successfully(&["add", "tracked-ignore.md", "staged-delete.md"], None);
+        repo.run_git_successfully(&["rm", "--cached", "staged-delete.md"], None);
+        for directory in ["nested", "dir.md"] {
+            fs::create_dir(repo.get_root().join(directory)).unwrap();
+        }
+        for path in [
+            "nested/keep.md",
+            "nested/drop.md",
+            "dir.md/inside.md",
+            "info-hidden.md",
+            "global-hidden.md",
+        ] {
+            fs::write(repo.get_root().join(path), b"bytes").unwrap();
+        }
+        fs::write(repo.get_root().join(".gitignore"), b"tracked-ignore.md\n").unwrap();
+        fs::write(
+            repo.get_root().join("nested/.gitignore"),
+            b"*.md\n!keep.md\n",
+        )
+        .unwrap();
+        fs::write(
+            repo.get_root().join(".git/info/exclude"),
+            b"info-hidden.md\n",
+        )
+        .unwrap();
+        let global = repo.get_root().join("global-excludes");
+        fs::write(&global, b"global-hidden.md\n").unwrap();
+        repo.run_git_successfully(
+            &["config", "core.excludesFile", global.to_str().unwrap()],
+            None,
+        );
+        std::os::unix::fs::symlink("missing-target", repo.get_root().join("symlink.md")).unwrap();
+    }
+
+    fn build_selector(
+        root: &Path,
+    ) -> Result<
+        DocumentRefreshService<GitRepository, LocalFileSystem, (), (), ()>,
+        crate::service::SnapshotError,
+    > {
+        Ok(DocumentRefreshService {
+            git: GitRepository::open(root, &[crate::utils::SERVICE_DIRECTORY])?,
+            filesystem: LocalFileSystem::new(root).unwrap(),
+            clock: Box::new(crate::process::SystemClock::new()),
+            markdown: (),
+            storage: Rc::new(()),
+            provenance: (),
+        })
     }
 }

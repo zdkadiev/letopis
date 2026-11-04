@@ -13,13 +13,13 @@ pub(super) struct TreeEntry<'a> {
 ///
 /// # Errors
 /// Returns `InternalError` for malformed entry boundaries or octal modes.
-pub(super) fn get_children(
+pub(super) fn tree_children_get(
     mut bytes: &[u8],
     oid_len: usize,
 ) -> Result<Vec<(String, String)>, SnapshotError> {
     let mut children = Vec::new();
     while !bytes.is_empty() {
-        let (entry, remaining) = get_entry(bytes, oid_len)?;
+        let (entry, remaining) = tree_entry_get(bytes, oid_len)?;
         let kind = match entry.mode & 0o170000 {
             0o100000 | 0o120000 => Some(BLOB_KIND),
             0o040000 => Some(TREE_KIND),
@@ -38,7 +38,7 @@ pub(super) fn get_children(
 ///
 /// # Errors
 /// Returns `InternalError` for malformed entry boundaries or octal modes.
-pub(super) fn get_entry(
+pub(super) fn tree_entry_get(
     bytes: &[u8],
     oid_len: usize,
 ) -> Result<(TreeEntry<'_>, &[u8]), SnapshotError> {

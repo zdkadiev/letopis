@@ -571,7 +571,7 @@ mod tests {
         ) -> DocumentResult<ProvenanceObservation> {
             let mut issues = BTreeSet::new();
             if let Some(snapshot) = request.source_snapshot {
-                let state = self.verify_snapshot(snapshot).map_err(|cause| {
+                let state = self.tree_verify_by_oid(snapshot).map_err(|cause| {
                     DocumentError::new_with_cause(
                         DocumentErrorKind::InternalError,
                         "safe provenance",
@@ -603,7 +603,7 @@ mod tests {
     }
 
     impl SnapshotVerifier for Verifier {
-        fn verify_snapshot(&self, oid: &TreeOid) -> Result<SnapshotState, SnapshotError> {
+        fn tree_verify_by_oid(&self, oid: &TreeOid) -> Result<SnapshotState, SnapshotError> {
             self.probes.borrow_mut().push(oid.as_str().into());
             if self.fail {
                 return Err(SnapshotError::new_with_cause(

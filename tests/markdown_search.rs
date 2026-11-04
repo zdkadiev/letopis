@@ -1,10 +1,10 @@
 mod support;
-use letopis::{domain::RepoPath, markdown::parse};
+use letopis::{domain::RepoPath, markdown};
 use support::{build_whole_file, parse_file};
 
 #[test]
 fn golden_search_representations() {
-    // Given
+    // Given: each fixture has independent literal search text and SHA-256 expectations.
     let expected: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/markdown/expected.json")).unwrap();
     for (name, rows) in expected.as_object().unwrap() {
@@ -14,9 +14,9 @@ fn golden_search_representations() {
         ))
         .unwrap();
         let path = RepoPath::parse(&format!("knowledge/{name}")).unwrap();
-        // When
-        let got = parse(&path, &bytes).unwrap().unwrap();
-        // Then
+        // When: parse the fixture bytes.
+        let got = markdown::file_parse(&path, &bytes).unwrap().unwrap();
+        // Then: rendered search text and its fingerprint match the literals.
         for (element, want) in got.elements.iter().zip(rows.as_array().unwrap()) {
             assert_eq!(
                 element.search_text,

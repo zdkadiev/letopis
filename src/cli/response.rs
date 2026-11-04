@@ -1,4 +1,4 @@
-use super::output::encode_response;
+use super::output::response_encode;
 use crate::service::{
     BackgroundRunner, CheckReport, CommandProblem, CommandResult, Configuration, Inspection,
     SearchLink, StatusReport, Traversal,
@@ -65,12 +65,12 @@ impl ResponseWriter {
     /// writing and flushing. Returns the winning response exit code, or 1 for a
     /// poisoned state, encoding failure or failed output. An encoding failure
     /// still claims the response, so a later caller never emits a second one.
-    pub(crate) fn write_response(
+    pub(crate) fn response_write(
         &self,
         output: &mut dyn Write,
         response: CommandResult<CommandResponse>,
     ) -> u8 {
-        let encoded = encode_response(response);
+        let encoded = response_encode(response);
         let Ok(mut completion) = self.completion_mutex.lock() else {
             return 1;
         };
@@ -208,12 +208,12 @@ mod tests {
             let writer = ResponseWriter::default();
             let callback_marker = marker.clone();
             // When: the actual listener handles OS signals through the product writer.
-            let _listener = SigintListener::install(Box::new(move || {
+            let _listener = SigintListener::signal_listener_install(Box::new(move || {
                 let mut output = GatedOutput {
                     stream,
                     marker: Some(callback_marker),
                 };
-                let _ = writer.write_response(
+                let _ = writer.response_write(
                     &mut output,
                     Err(CommandError::new(
                         CommandErrorKind::Cancelled,
@@ -242,9 +242,9 @@ mod tests {
             let writer = Arc::new(ResponseWriter::default());
             let signal_writer = Arc::clone(&writer);
             // When: the actual listener handles OS signals through the product writer.
-            let _listener = SigintListener::install(Box::new(move || {
+            let _listener = SigintListener::signal_listener_install(Box::new(move || {
                 let mut output = signal_output;
-                let _ = signal_writer.write_response(
+                let _ = signal_writer.response_write(
                     &mut output,
                     Err(CommandError::new(
                         CommandErrorKind::Cancelled,
@@ -255,7 +255,7 @@ mod tests {
             .unwrap();
             let mut output = output;
             assert_eq!(
-                writer.write_response(
+                writer.response_write(
                     &mut output,
                     Ok(CommandResponse {
                         result: ResponseResult::Drained,
@@ -284,9 +284,9 @@ mod tests {
             let writer = Arc::new(ResponseWriter::default());
             let signal_writer = Arc::clone(&writer);
             // When: the actual listener handles OS signals through the product writer.
-            let _listener = SigintListener::install(Box::new(move || {
+            let _listener = SigintListener::signal_listener_install(Box::new(move || {
                 let mut output = signal_output;
-                let _ = signal_writer.write_response(
+                let _ = signal_writer.response_write(
                     &mut output,
                     Err(CommandError::new(
                         CommandErrorKind::Cancelled,
@@ -299,7 +299,7 @@ mod tests {
                 stream: output,
                 marker,
             };
-            let exit = writer.write_response(&mut output, Ok(large_successful_response()));
+            let exit = writer.response_write(&mut output, Ok(large_successful_response()));
             assert_eq!(exit, 0);
             // Then: remain alive for the parent to observe the handled exit.
             loop {
@@ -522,7 +522,7 @@ mod tests {
             resume,
         } = PausedOutput::new(Pause::Write);
         let cancellation = thread::spawn(move || {
-            cancellation_writer.write_response(
+            cancellation_writer.response_write(
                 &mut output,
                 Err(CommandError::new(
                     CommandErrorKind::Cancelled,
@@ -536,7 +536,7 @@ mod tests {
         let (done, completed) = mpsc::channel();
         let normal = thread::spawn(move || {
             let mut output = Vec::new();
-            let exit = success_writer.write_response(
+            let exit = success_writer.response_write(
                 &mut output,
                 Ok(CommandResponse {
                     result: ResponseResult::Drained,
@@ -563,7 +563,7 @@ mod tests {
         let writer = ResponseWriter::default();
         let mut first_output = Vec::new();
         // When: a normal response completes, then cancellation uses the same owner.
-        let first_exit = writer.write_response(
+        let first_exit = writer.response_write(
             &mut first_output,
             Ok(CommandResponse {
                 result: ResponseResult::Drained,
@@ -571,7 +571,7 @@ mod tests {
             }),
         );
         let mut second_output = Vec::new();
-        let second_exit = writer.write_response(
+        let second_exit = writer.response_write(
             &mut second_output,
             Err(CommandError::new(
                 CommandErrorKind::Cancelled,
@@ -594,7 +594,7 @@ mod tests {
             attempts_mutex: Arc::clone(&attempts_mutex),
         };
         // When: the first write fails, then cancellation uses the same owner.
-        let first_exit = writer.write_response(
+        let first_exit = writer.response_write(
             &mut failing,
             Ok(CommandResponse {
                 result: ResponseResult::Drained,
@@ -602,7 +602,7 @@ mod tests {
             }),
         );
         let mut second_output = Vec::new();
-        let second_exit = writer.write_response(
+        let second_exit = writer.response_write(
             &mut second_output,
             Err(CommandError::new(
                 CommandErrorKind::Cancelled,
@@ -628,7 +628,7 @@ mod tests {
             resume,
         } = PausedOutput::new(Pause::Flush);
         let first = thread::spawn(move || {
-            first_writer.write_response(
+            first_writer.response_write(
                 &mut first_output,
                 Ok(CommandResponse {
                     result: ResponseResult::Drained,
@@ -642,7 +642,7 @@ mod tests {
         let (done, completed) = mpsc::channel();
         let second = thread::spawn(move || {
             let mut output = Vec::new();
-            let exit = second_writer.write_response(
+            let exit = second_writer.response_write(
                 &mut output,
                 Err(CommandError::new(
                     CommandErrorKind::Cancelled,
@@ -674,7 +674,7 @@ mod tests {
             entered.send(()).unwrap();
             released.recv().unwrap();
             let mut output = Vec::new();
-            let exit = main_writer.write_response(
+            let exit = main_writer.response_write(
                 &mut output,
                 Ok(CommandResponse {
                     result: ResponseResult::Drained,
@@ -686,7 +686,7 @@ mod tests {
         main_entered.recv_timeout(WAIT).unwrap();
         // When: cancellation completes and flushes before main is released.
         let mut output = Vec::new();
-        let cancellation_exit = writer.write_response(
+        let cancellation_exit = writer.response_write(
             &mut output,
             Err(CommandError::new(
                 CommandErrorKind::Cancelled,
@@ -707,7 +707,7 @@ mod tests {
         // Given: the first cancellation response owns the output.
         let writer = ResponseWriter::default();
         let mut output = Vec::new();
-        let first_exit = writer.write_response(
+        let first_exit = writer.response_write(
             &mut output,
             Err(CommandError::new(
                 CommandErrorKind::Cancelled,
@@ -717,7 +717,7 @@ mod tests {
         // When: later callers offer the same cancellation response again.
         for _ in 0..2 {
             let mut repeated = Vec::new();
-            let exit = writer.write_response(
+            let exit = writer.response_write(
                 &mut repeated,
                 Err(CommandError::new(
                     CommandErrorKind::Cancelled,

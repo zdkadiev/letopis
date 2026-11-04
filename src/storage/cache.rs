@@ -1824,12 +1824,12 @@ mod cancellation_tests {
     fn install_listener(output: &Path) -> SigintListener {
         let mut output = File::create(output).expect("cancellation output");
         let writer = ResponseWriter::default();
-        SigintListener::install(Box::new(move || {
+        SigintListener::signal_listener_install(Box::new(move || {
             let response = Err(CommandError::new(
                 CommandErrorKind::Cancelled,
                 "command cancelled",
             ));
-            let _ = writer.write_response(&mut output, response);
+            let _ = writer.response_write(&mut output, response);
         }))
         .expect("listener")
     }

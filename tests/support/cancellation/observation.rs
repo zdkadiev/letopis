@@ -173,10 +173,13 @@ pub fn observe_git_read(pid: u32, path: &Path) -> String {
 fn is_git_read_observed(trace: &str) -> bool {
     let main = get_main_thread_trace(trace).unwrap_or("");
     let corpus = main.lines().any(|line| {
-        line.contains("letopis::git::corpus::get_candidates")
+        line.contains("letopis::git::worktree::worktree_paths_get")
             || (line.contains("letopis..git..repository..GitRepository")
-                && line.contains("..CorpusLister")
+                && line.contains("..document_traits..CorpusLister")
                 && line.contains("::get_candidates"))
+            || (line.contains("letopis..git..repository..GitRepository")
+                && line.contains("..GitWorktreePaths")
+                && line.contains("::worktree_paths_get"))
     });
     // Optimized builds may inline the free function into its trait caller.
     corpus
@@ -220,7 +223,7 @@ fn is_stdin_read_observed(trace: &str) -> bool {
     };
     let Some(parse) = main
         .lines()
-        .position(|line| line.contains("letopis::cli::input::parse_request"))
+        .position(|line| line.contains("letopis::cli::input::request_parse"))
     else {
         return false;
     };
@@ -282,14 +285,46 @@ fn wait_for_trace(mut observe: impl FnMut() -> Option<String>, waiting: &str) ->
 
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
-    use super::is_git_read_observed;
+    use super::{is_git_read_observed, is_stdin_read_observed};
+
+    #[test]
+    fn stdin_read_observer_recognizes_the_request_parser_on_the_main_thread() {
+        // Given: a real parser frame enclosing stdin and its counted native read.
+        let trace = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::cli::input::request_parse::h123 (in letopis)\n+ 900 std::io::stdio::Stdin::read (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n900 Thread_2 letopis-sigint\n";
+        // When: the observer classifies the stack of the current request parser.
+        let observed = is_stdin_read_observed(trace);
+        // Then: that main-thread input boundary authorizes cancellation.
+        assert!(observed);
+    }
+
+    #[test]
+    fn stdin_read_observer_rejects_incomplete_or_wrong_owner_evidence() {
+        // Given: stacks missing ownership, native-read, stdin, ordering or main-thread evidence.
+        let wrong_thread = "900 Thread_1 com.apple.main-thread\n+ 900 thread_wait (in libsystem_kernel.dylib)\n900 Thread_2 worker\n+ 900 letopis::cli::input::request_parse (in letopis)\n+ 900 std::io::stdio::Stdin::read (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let wrong_owner = "900 Thread_1 com.apple.main-thread\n+ 900 unrelated::cli::input::request_parse (in letopis)\n+ 900 std::io::stdio::Stdin::read (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let no_native = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::cli::input::request_parse (in letopis)\n+ 900 std::io::stdio::Stdin::read (in letopis)\nread (in libsystem_kernel.dylib)\n";
+        let wrong_image = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::cli::input::request_parse (in letopis)\n+ 900 std::io::stdio::Stdin::read (in letopis)\n+ 900 read (in unrelated.dylib)\n";
+        let no_stdin = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::cli::input::request_parse (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let wrong_order = "900 Thread_1 com.apple.main-thread\n+ 900 read (in libsystem_kernel.dylib)\n+ 900 letopis::cli::input::request_parse (in letopis)\n+ 900 std::io::stdio::Stdin::read (in letopis)\n";
+        // When / Then: incomplete or unrelated evidence never authorizes cancellation.
+        for trace in [
+            wrong_thread,
+            wrong_owner,
+            no_native,
+            wrong_image,
+            no_stdin,
+            wrong_order,
+        ] {
+            assert!(!is_stdin_read_observed(trace));
+        }
+    }
 
     #[test]
     fn git_read_observer_recognizes_debug_and_inlined_release_frames() {
         // Given: independent corpus frames before and after interface consolidation.
         for caller in [
-            "letopis::git::corpus::get_candidates::h123",
-            "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..CorpusLister$GT$::get_candidates::h123",
+            "letopis::git::worktree::worktree_paths_get::h123",
+            "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..GitWorktreePaths$GT$::worktree_paths_get::h123",
             "_$LT$letopis..git..repository..GitRepository$u20$as$u20$letopis..service..document_traits..CorpusLister$GT$::get_candidates::h123",
         ] {
             let trace = format!(
@@ -305,12 +340,19 @@ mod tests {
     #[test]
     fn git_read_observer_rejects_incomplete_or_wrong_thread_evidence() {
         // Given: counted native reads alone, another thread's Git stack, or no native read.
-        let other_thread = "900 Thread_1 com.apple.main-thread\n+ 900 read (in libsystem_kernel.dylib)\n900 Thread_2 worker\n+ 900 letopis::git::corpus::get_candidates (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
-        let no_native = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::corpus::get_candidates (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n";
+        let other_thread = "900 Thread_1 com.apple.main-thread\n+ 900 read (in libsystem_kernel.dylib)\n900 Thread_2 worker\n+ 900 letopis::git::worktree::worktree_paths_get (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let no_native = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::worktree::worktree_paths_get (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n";
         let no_corpus = "900 Thread_1 com.apple.main-thread\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
-        let no_git_reader = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::corpus::get_candidates (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let no_git_reader = "900 Thread_1 com.apple.main-thread\n+ 900 letopis::git::worktree::worktree_paths_get (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
+        let other_owner = "900 Thread_1 com.apple.main-thread\n+ 900 _$LT$unrelated..Repository$u20$as$u20$letopis..service..document_traits..CorpusLister$GT$::get_candidates (in letopis)\n+ 900 gix_glob::search::pattern::read_in_full (in letopis)\n+ 900 read (in libsystem_kernel.dylib)\n";
         // When / Then: none authorizes signalling at the required product boundary.
-        for trace in [other_thread, no_native, no_corpus, no_git_reader] {
+        for trace in [
+            other_thread,
+            no_native,
+            no_corpus,
+            no_git_reader,
+            other_owner,
+        ] {
             assert!(!is_git_read_observed(trace));
         }
     }

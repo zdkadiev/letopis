@@ -6,6 +6,43 @@ use std::path::Path;
 use std::{error::Error, fs};
 
 #[test]
+fn symlink_observation_distinguishes_missing_and_nonregular_leaves() {
+    // Given: ordinary, directory, FIFO, dangling symlink and absent entries.
+    let fixture = Fixture::new();
+    fs::write(fixture.0.join("file"), b"bytes").unwrap();
+    fs::create_dir(fixture.0.join("directory")).unwrap();
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(fixture.0.join("fifo"))
+            .status()
+            .unwrap()
+            .success()
+    );
+    std::os::unix::fs::symlink("missing", fixture.0.join("link")).unwrap();
+    let files = LocalFileSystem::new(&fixture.0).unwrap();
+    // When / Then: only the final symlink is true and no entry body is opened.
+    assert!(files.symlink_is_exist(Path::new("link")).unwrap());
+    for name in ["file", "directory", "fifo", "missing", "missing/child"] {
+        assert!(!files.symlink_is_exist(Path::new(name)).unwrap(), "{name}");
+    }
+}
+
+#[test]
+fn raw_symlink_probe_never_follows_a_parent() {
+    use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+    // Given: a raw filename beneath an outside-pointing symlink parent.
+    let fixture = Fixture::new();
+    let outside = tempfile::tempdir().unwrap();
+    std::os::unix::fs::symlink(outside.path(), fixture.0.join("parent")).unwrap();
+    let files = LocalFileSystem::new(&fixture.0).unwrap();
+    let path = Path::new(OsStr::from_bytes(b"parent/raw\xff.md"));
+    // When: a generic symlink observation resolves the raw path.
+    let error = files.symlink_is_exist(path).unwrap_err();
+    // Then: the parent is rejected before the invalid-byte leaf is touched.
+    assert_eq!(error.get_kind(), FileErrorKind::UnsafePath);
+}
+
+#[test]
 fn rejects_observed_replacement_between_stat_and_open() {
     if run_bounded("filesystem::read_tests::rejects_observed_replacement_between_stat_and_open") {
         return;

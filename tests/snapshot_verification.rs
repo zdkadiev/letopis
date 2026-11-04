@@ -24,7 +24,7 @@ fn verify_snapshot_accepts_exact_tree_without_writes() {
         let before_objects = repo.run_git_successfully(&["count-objects", "-v"], None);
 
         // When
-        let state = git.verify_snapshot(&tree).unwrap();
+        let state = git.tree_verify_by_oid(&tree).unwrap();
 
         // Then
         assert_eq!(state, SnapshotState::Available);
@@ -68,7 +68,7 @@ fn verify_snapshot_classifies_absent_foreign_and_non_tree_objects() {
             (foreign, SnapshotState::Invalid),
         ] {
             // When / Then
-            assert_eq!(git.verify_snapshot(&parse_tree(oid)).unwrap(), expected);
+            assert_eq!(git.tree_verify_by_oid(&parse_tree(oid)).unwrap(), expected);
         }
         // Then
         assert_eq!(
@@ -91,7 +91,7 @@ fn verify_snapshot_propagates_policy_and_integrity_failures() {
         fs::write(&alternates, b"/DONOR_PATH_CANARY/objects\n").unwrap();
 
         // When / Then
-        assert_safe_internal_error(&git.verify_snapshot(&tree).unwrap_err(), &repo, &tree);
+        assert_safe_internal_error(&git.tree_verify_by_oid(&tree).unwrap_err(), &repo, &tree);
         assert_eq!(
             repo.run_git_successfully(&["for-each-ref"], None),
             before_refs
@@ -102,7 +102,7 @@ fn verify_snapshot_propagates_policy_and_integrity_failures() {
         repo.replace_loose_object(tree.as_str(), &replacement);
 
         // When / Then
-        assert_safe_internal_error(&git.verify_snapshot(&tree).unwrap_err(), &repo, &tree);
+        assert_safe_internal_error(&git.tree_verify_by_oid(&tree).unwrap_err(), &repo, &tree);
         assert_eq!(
             repo.run_git_successfully(&["for-each-ref"], None),
             before_refs
@@ -123,7 +123,7 @@ fn verify_snapshot_checks_root_integrity_without_requiring_child_closure() {
         let before_refs = repo.run_git_successfully(&["for-each-ref"], None);
 
         // When
-        let state = git.verify_snapshot(&tree).unwrap();
+        let state = git.tree_verify_by_oid(&tree).unwrap();
 
         // Then
         assert_eq!(state, SnapshotState::Available);

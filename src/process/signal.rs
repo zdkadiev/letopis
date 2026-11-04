@@ -26,21 +26,23 @@ impl SigintListener {
     /// # Errors
     /// Returns an I/O error when signal registration or thread creation fails.
     /// No partially started listener is retained.
-    pub(crate) fn install(on_interrupt: Box<dyn FnOnce() + Send>) -> io::Result<Self> {
+    pub(crate) fn signal_listener_install(
+        on_interrupt: Box<dyn FnOnce() + Send>,
+    ) -> io::Result<Self> {
         let signals = Signals::new([SIGINT])?;
-        Self::start_with(signals, spawn_listener, on_interrupt)
+        Self::signal_listener_start_with(signals, signal_listener_spawn, on_interrupt)
     }
 
     #[cfg(test)]
-    fn install_with(
+    fn signal_listener_install_with(
         register: impl FnOnce() -> io::Result<Signals>,
         spawn: impl FnOnce(Box<dyn FnOnce() + Send + 'static>) -> io::Result<JoinHandle<()>>,
         on_interrupt: Box<dyn FnOnce() + Send>,
     ) -> io::Result<Self> {
-        Self::start_with(register()?, spawn, on_interrupt)
+        Self::signal_listener_start_with(register()?, spawn, on_interrupt)
     }
 
-    fn start_with(
+    fn signal_listener_start_with(
         mut signals: Signals,
         spawn: impl FnOnce(Box<dyn FnOnce() + Send + 'static>) -> io::Result<JoinHandle<()>>,
         on_interrupt: Box<dyn FnOnce() + Send>,
@@ -69,7 +71,9 @@ impl Drop for SigintListener {
     }
 }
 
-fn spawn_listener(listener: Box<dyn FnOnce() + Send + 'static>) -> io::Result<JoinHandle<()>> {
+fn signal_listener_spawn(
+    listener: Box<dyn FnOnce() + Send + 'static>,
+) -> io::Result<JoinHandle<()>> {
     thread::Builder::new()
         .name(LISTENER_THREAD_NAME.to_owned())
         .spawn(listener)
@@ -111,15 +115,15 @@ mod tests {
 
     #[test]
     fn ordinary_shutdown_closes_and_joins_without_signal() {
-        // Given
-        let listener = SigintListener::install(Box::new(|| {})).unwrap();
+        // Given: an installed listener and a channel observing its teardown.
+        let listener = SigintListener::signal_listener_install(Box::new(|| {})).unwrap();
         let (done, completed) = mpsc::channel();
-        // When
+        // When: the listener is dropped on another thread without receiving SIGINT.
         let dropper = thread::spawn(move || {
             drop(listener);
             let _ = done.send(());
         });
-        // Then
+        // Then: closing the subscription wakes and joins its thread before the deadline.
         assert!(
             completed.recv_timeout(WAIT).is_ok(),
             "listener teardown blocked"
@@ -137,7 +141,8 @@ mod tests {
                 let _ = released.recv();
             }))
         };
-        let listener = SigintListener::start_with(signals, spawn, Box::new(|| {})).unwrap();
+        let listener =
+            SigintListener::signal_listener_start_with(signals, spawn, Box::new(|| {})).unwrap();
         let (done, completed) = mpsc::channel();
         // When: teardown starts while the spawned thread is still running.
         let dropper = thread::spawn(move || {
@@ -153,7 +158,7 @@ mod tests {
 
     #[test]
     fn registration_or_spawn_failure_returns_error_without_listener() {
-        // Given
+        // Given: a failing registration and an instrumented thread spawner.
         let spawns = Arc::new(AtomicUsize::new(0));
         let failed_registration = {
             let spawns = Arc::clone(&spawns);
@@ -162,23 +167,23 @@ mod tests {
                 Err(io::Error::other("unexpected spawn"))
             }
         };
-        // When
-        let registration = SigintListener::install_with(
+        // When: listener installation encounters the registration error.
+        let registration = SigintListener::signal_listener_install_with(
             || Err(io::Error::other("registration failure")),
             failed_registration,
             Box::new(|| {}),
         );
-        // Then
+        // Then: the error is returned without attempting to spawn a thread.
         assert!(registration.is_err());
         assert_eq!(spawns.load(Ordering::SeqCst), 0);
 
-        // Given / When
-        let failed_spawn = SigintListener::install_with(
+        // Given / When: registration succeeds but the injected thread spawner fails.
+        let failed_spawn = SigintListener::signal_listener_install_with(
             || Signals::new([SIGINT]),
             |_listener| Err(io::Error::other("spawn failure")),
             Box::new(|| {}),
         );
-        // Then
+        // Then: installation returns the spawn error without retaining a listener.
         assert!(failed_spawn.is_err());
     }
 
@@ -276,17 +281,17 @@ mod tests {
         let Some(marker) = env::var_os(CHILD_MARKER_ENV) else {
             return;
         };
-        // Given
+        // Given: the owned child response writer shared with its signal callback.
         let writer = Arc::new(ResponseWriter::default());
         let callback_writer = Arc::clone(&writer);
         // When: install the actual process listener.
-        let _listener = SigintListener::install(Box::new(move || {
+        let _listener = SigintListener::signal_listener_install(Box::new(move || {
             let response = Err(CommandError::new(
                 CommandErrorKind::Cancelled,
                 "command cancelled",
             ));
             let mut output = io::stdout();
-            let _ = callback_writer.write_response(&mut output, response);
+            let _ = callback_writer.response_write(&mut output, response);
         }))
         .unwrap();
         // Then: advertise registration and remain alive for the owned signal.
