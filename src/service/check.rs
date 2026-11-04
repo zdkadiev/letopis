@@ -1,19 +1,20 @@
 use super::{
-    CheckReport, Checker, CommandError, CommandErrorKind, CommandResult, DocumentError,
-    GraphDiagnostics, Refresher, SourceProvenance, Storage, StorageError, utils::CheckObservations,
+    CacheDatabase, CheckReport, Checker, CommandError, CommandErrorKind, CommandResult,
+    DocumentError, GraphDiagnostics, Refresher, SourceProvenance, StorageError,
+    utils::CheckObservations,
 };
 use crate::domain::RepoPath;
-use std::fmt;
+use std::{fmt, rc::Rc};
 
 /// Refreshes and validates current knowledge through one pinned cache view.
-pub(crate) struct CheckService<D, P> {
+pub(crate) struct CheckService<D, P, C> {
     refresher: D,
-    storage: Box<dyn Storage>,
+    storage: Rc<C>,
     diagnostics: Box<dyn GraphDiagnostics>,
     provenance: P,
 }
 
-impl<D, P> fmt::Debug for CheckService<D, P> {
+impl<D, P, C> fmt::Debug for CheckService<D, P, C> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("CheckService")
@@ -21,11 +22,11 @@ impl<D, P> fmt::Debug for CheckService<D, P> {
     }
 }
 
-impl<D, P> CheckService<D, P> {
+impl<D, P, C> CheckService<D, P, C> {
     /// Assemble validation collaborators without refreshing or opening a read view.
     pub(crate) fn new(
         refresher: D,
-        storage: Box<dyn Storage>,
+        storage: Rc<C>,
         diagnostics: Box<dyn GraphDiagnostics>,
         provenance: P,
     ) -> Self {
@@ -38,7 +39,7 @@ impl<D, P> CheckService<D, P> {
     }
 }
 
-impl<D: Refresher, P: SourceProvenance> Checker for CheckService<D, P> {
+impl<D: Refresher, P: SourceProvenance, C: CacheDatabase> Checker for CheckService<D, P, C> {
     fn check(&mut self, paths: &[RepoPath]) -> CommandResult<CheckReport> {
         let outcome = if paths.is_empty() {
             self.refresher.refresh_verified()
@@ -46,19 +47,29 @@ impl<D: Refresher, P: SourceProvenance> Checker for CheckService<D, P> {
             self.refresher.refresh()
         }
         .map_err(map_refresh_error)?;
-        let mut view = self.storage.begin_read_tx().map_err(map_storage_error)?;
-        if paths.is_empty() && view.get_revision() != outcome.revision {
-            return Err(CommandError::new(
-                CommandErrorKind::InternalError,
-                "corpus changed during check; retry",
-            ));
-        }
-        let observations = CheckObservations {
-            graph: self.diagnostics.as_ref(),
-            provenance: &self.provenance,
-        };
-        let errors = observations.collect_check_problems(view.as_mut(), paths)?;
-        Ok(CheckReport { errors })
+        self.storage
+            .with_read_tx(|| {
+                let view: &dyn super::StorageRead = self.storage.as_ref();
+                if paths.is_empty()
+                    && view.project_get_by_id().map_err(map_storage_error)? != outcome.revision
+                {
+                    return Err(CommandError::new(
+                        CommandErrorKind::InternalError,
+                        "corpus changed during check; retry",
+                    ));
+                }
+                let observations = CheckObservations {
+                    storage: self.storage.as_ref(),
+                    graph: self.diagnostics.as_ref(),
+                    provenance: &self.provenance,
+                };
+                let errors = observations.collect_check_problems(paths)?;
+                Ok(CheckReport { errors })
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => map_storage_error(error),
+            })
     }
 }
 
@@ -78,23 +89,24 @@ fn map_storage_error(cause: StorageError) -> CommandError {
 }
 #[cfg(test)]
 mod tests {
+    use crate::service::TransactionError;
+
     use super::CheckService;
-    use crate::service::{ReadTransaction, VectorWrite};
     use crate::{
         domain::{
             Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256,
             SourceUri, TreeOid,
         },
         service::{
-            CacheWrite, Checker, CommandError, CommandErrorKind, CommandProblem, CommandResult,
+            CacheDatabase, Checker, CommandError, CommandErrorKind, CommandProblem, CommandResult,
             DocumentError, DocumentErrorKind, DocumentResult, GraphDiagnostics,
             GraphDiagnosticsService, KnowledgeMetadata, NodeMetadata, ProvenanceIssue,
             ProvenanceObservation, ProvenanceRequest, RefreshOutcome, Refresher, SearchFlag,
             SnapshotError, SnapshotState, SnapshotVerifier, SourceProvenance,
-            SourceRevisionComparison, SourceRevisionRequest, Storage, StorageError,
-            StorageErrorKind, StorageRead, StorageResult, VectorOutcome,
+            SourceRevisionComparison, SourceRevisionRequest, StorageError, StorageErrorKind,
+            StorageRead,
         },
-        storage::SqliteStorage,
+        storage::TestDatabases,
     };
     use serde_json::{Value, json};
     use std::{cell::RefCell, collections::BTreeSet, error::Error, io, rc::Rc};
@@ -109,14 +121,19 @@ mod tests {
         inner: S,
         events: Events,
         fail_read: bool,
+        active: std::cell::Cell<bool>,
     }
 
     struct RecordingDiagnostics {
+        storage: Rc<dyn StorageRead>,
+        inner: Box<dyn GraphDiagnostics>,
         events: Events,
     }
 
     struct PublishingDiagnostics {
-        writer: RefCell<SqliteStorage>,
+        storage: Rc<dyn StorageRead>,
+        inner: Box<dyn GraphDiagnostics>,
+        writer: RefCell<TestDatabases>,
     }
 
     struct FindingDiagnostics;
@@ -142,7 +159,7 @@ mod tests {
         });
         let mut service = CheckService::new(
             refresher,
-            Box::new(storage),
+            Rc::new(storage.cache),
             Box::new(FindingDiagnostics),
             Verifier {
                 probes: Probes::default(),
@@ -170,7 +187,7 @@ mod tests {
             .returning(|| Ok(build_outcome()));
         let mut service = CheckService::new(
             refresher,
-            Box::new(storage),
+            Rc::new(storage.cache),
             Box::new(FindingDiagnostics),
             Verifier {
                 probes: Probes::default(),
@@ -192,20 +209,26 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let mut storage = open_storage(&directory);
         publish_nodes(&mut storage, &[build_node("a.md#one", "a")]);
-        let mut unit = storage.begin_cache_write_tx().unwrap();
-        unit.insert_edge(
-            &Edge::new(
-                KnowledgeId::parse("a.md#one").unwrap(),
-                EdgeTarget::Source(SourceUri::parse("gone.rs").unwrap()),
-                EdgeType::parse("external").unwrap(),
-            )
-            .unwrap(),
-        )
-        .unwrap();
-        unit.commit().unwrap();
+        storage
+            .cache
+            .with_write_tx(|| {
+                let unit = &storage.cache;
+                unit.edges_save_by_source_id_and_target_id_and_type(
+                    &Edge::new(
+                        KnowledgeId::parse("a.md#one").unwrap(),
+                        EdgeTarget::Source(SourceUri::parse("gone.rs").unwrap()),
+                        EdgeType::parse("external").unwrap(),
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+
+                unit.get_publication_revision()
+            })
+            .unwrap();
         let mut service = CheckService::new(
             Refresh(|| Ok(build_outcome())),
-            Box::new(storage),
+            Rc::new(storage.cache),
             Box::new(FindingDiagnostics),
             Verifier {
                 probes: Probes::default(),
@@ -229,27 +252,34 @@ mod tests {
         // Given: recorded refresh, read and diagnostic events.
         let directory = tempfile::tempdir().unwrap();
         let storage = open_storage(&directory);
-        let mut writer = open_storage(&directory);
+        let writer = open_storage(&directory);
         let events = Events::default();
         let refresh_events = events.clone();
         let refresher = Refresh(move || {
             refresh_events.borrow_mut().push("refresh");
-            let mut unit = writer.begin_cache_write_tx().unwrap();
-            unit.upsert_node(&build_node("fresh.md", "a")).unwrap();
-            unit.commit().unwrap();
+            writer
+                .cache
+                .with_write_tx(|| {
+                    let unit = &writer.cache;
+                    unit.nodes_upsert_by_id(&build_node("fresh.md", "a"))
+                        .unwrap();
+
+                    unit.get_publication_revision()
+                })
+                .unwrap();
             Ok(build_outcome())
         });
         let probes = Probes::default();
+        let cache = Rc::new(RecordingStorage {
+            active: std::cell::Cell::new(false),
+            inner: storage.cache,
+            events: events.clone(),
+            fail_read: false,
+        });
         let mut service = CheckService::new(
             refresher,
-            Box::new(RecordingStorage {
-                inner: storage,
-                events: events.clone(),
-                fail_read: false,
-            }),
-            Box::new(RecordingDiagnostics {
-                events: events.clone(),
-            }),
+            Rc::clone(&cache),
+            Box::new(RecordingDiagnostics::new(Rc::clone(&cache), events.clone())),
             Verifier {
                 probes: probes.clone(),
                 result: SnapshotState::Missing,
@@ -281,7 +311,10 @@ mod tests {
             &[build_node("a.md", "a"), build_node("b.md", "a")],
         );
         let probes = Probes::default();
+        let cache = Rc::new(open_storage(&directory).cache);
         let diagnostics = PublishingDiagnostics {
+            storage: cache.clone(),
+            inner: Box::new(GraphDiagnosticsService::new(Rc::clone(&cache))),
             writer: RefCell::new(writer),
         };
         let mut revision = 0;
@@ -293,7 +326,7 @@ mod tests {
                     ..build_outcome()
                 })
             }),
-            Box::new(open_storage(&directory)),
+            Rc::clone(&cache),
             Box::new(diagnostics),
             Verifier {
                 probes: probes.clone(),
@@ -344,7 +377,7 @@ mod tests {
         publish_nodes(&mut storage, &[build_node("a.md", "a")]);
         let mut git_failure = CheckService::new(
             Refresh(|| Ok(build_outcome())),
-            Box::new(storage),
+            Rc::new(storage.cache),
             Box::new(FindingDiagnostics),
             Verifier {
                 probes: probes.clone(),
@@ -370,10 +403,11 @@ mod tests {
             &[build_node("a.md#one", "a"), build_node("b.md", "b")],
         );
         let probes = Probes::default();
+        let cache = Rc::new(storage.cache);
         let mut service = CheckService::new(
             Refresh(|| Ok(build_outcome())),
-            Box::new(storage),
-            Box::new(GraphDiagnosticsService::new()),
+            Rc::clone(&cache),
+            Box::new(GraphDiagnosticsService::new(cache)),
             Verifier {
                 probes: probes.clone(),
                 result: SnapshotState::Missing,
@@ -409,7 +443,7 @@ mod tests {
                     ..build_outcome()
                 })
             }),
-            Box::new(storage),
+            Rc::new(storage.cache),
             Box::new(FindingDiagnostics),
             Verifier {
                 probes: Probes::default(),
@@ -439,71 +473,86 @@ mod tests {
         }
     }
 
-    impl<S: Storage> Storage for RecordingStorage<S> {
-        fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
-            self.events.borrow_mut().push("read");
+    use crate::service::utils::cache_test_support::{
+        delegate_cache_reads, delegate_cache_writes, delegate_graph_reads,
+    };
+    impl<S: crate::service::CacheDatabase> crate::service::StorageRead for RecordingStorage<S> {
+        delegate_cache_reads!();
+    }
+    impl<S: crate::service::CacheDatabase> crate::service::GraphRead for RecordingStorage<S> {
+        delegate_graph_reads!();
+    }
+    impl<S: crate::service::CacheDatabase> crate::service::CacheDatabase for RecordingStorage<S> {
+        delegate_cache_writes!();
+        fn with_read_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+        where
+            F: FnOnce() -> Result<T, E>,
+        {
+            let nested = self.active.get();
+            if !nested {
+                self.events.borrow_mut().push("read");
+            }
             if self.fail_read {
-                return Err(StorageError::new_with_cause(
+                return Err(TransactionError::Storage(StorageError::new_with_cause(
                     StorageErrorKind::InternalError,
                     "safe storage",
                     io::Error::other("SECRET_STORAGE"),
-                ));
+                )));
             }
-            self.inner.begin_read_tx()
+            self.active.set(true);
+            let result = self.inner.with_read_tx(operation);
+            self.active.set(nested);
+            result
         }
-        fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>> {
-            self.inner.begin_cache_write_tx()
+        fn with_write_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+        where
+            F: FnOnce() -> Result<T, E>,
+        {
+            self.inner.with_write_tx(operation)
         }
-        fn begin_vector_write_tx(
-            &mut self,
-            expected: &Sha256,
-        ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>> {
-            self.inner.begin_vector_write_tx(expected)
-        }
-        fn reset_vectors(
-            &mut self,
-            observed: Option<&Sha256>,
-            identity: &Sha256,
-        ) -> StorageResult<VectorOutcome<bool>> {
-            self.inner.reset_vectors(observed, identity)
+        fn with_status_read_tx<T, E, F>(
+            &self,
+            operation: F,
+        ) -> Result<Option<T>, TransactionError<E>>
+        where
+            F: FnOnce() -> Result<T, E>,
+        {
+            self.inner.with_status_read_tx(operation)
         }
     }
 
+    impl RecordingDiagnostics {
+        fn new<C: crate::service::CacheDatabase + 'static>(storage: Rc<C>, events: Events) -> Self {
+            Self {
+                storage: storage.clone(),
+                inner: Box::new(GraphDiagnosticsService::new(storage)),
+                events,
+            }
+        }
+    }
     impl GraphDiagnostics for RecordingDiagnostics {
-        fn find_problems(
-            &self,
-            view: &mut dyn StorageRead,
-            paths: &[RepoPath],
-        ) -> CommandResult<Vec<CommandProblem>> {
+        fn find_problems(&self, paths: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
             self.events.borrow_mut().push("diagnostics");
-            assert_eq!(view.get_revision(), 1);
-            GraphDiagnosticsService::new().find_problems(view, paths)
+            assert_eq!(self.storage.project_get_by_id().unwrap(), 1);
+            self.inner.find_problems(paths)
         }
     }
 
     impl GraphDiagnostics for PublishingDiagnostics {
-        fn find_problems(
-            &self,
-            view: &mut dyn StorageRead,
-            paths: &[RepoPath],
-        ) -> CommandResult<Vec<CommandProblem>> {
-            let revision = view.get_revision();
-            let findings = GraphDiagnosticsService::new().find_problems(view, paths)?;
+        fn find_problems(&self, paths: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
+            let revision = self.storage.project_get_by_id().unwrap();
+            let findings = self.inner.find_problems(paths)?;
             publish_nodes(
                 &mut self.writer.borrow_mut(),
                 &[build_node("a.md", "b"), build_node("b.md", "b")],
             );
-            assert_eq!(view.get_revision(), revision);
+            assert_eq!(self.storage.project_get_by_id().unwrap(), revision);
             Ok(findings)
         }
     }
 
     impl GraphDiagnostics for FindingDiagnostics {
-        fn find_problems(
-            &self,
-            _: &mut dyn StorageRead,
-            _: &[RepoPath],
-        ) -> CommandResult<Vec<CommandProblem>> {
+        fn find_problems(&self, _: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
             Ok(vec![CommandProblem {
                 code: CommandErrorKind::ValidationFailed,
                 message: "knowledge target is missing",
@@ -566,6 +615,12 @@ mod tests {
         }
     }
     fn assert_refresh_failure(directory: &TempDir, events: &Events, probes: &Probes) {
+        let cache = Rc::new(RecordingStorage {
+            active: std::cell::Cell::new(false),
+            inner: open_storage(directory).cache,
+            events: events.clone(),
+            fail_read: false,
+        });
         let mut refresh_failure = CheckService::new(
             Refresh(|| {
                 Err(DocumentError::new_with_cause(
@@ -574,14 +629,8 @@ mod tests {
                     io::Error::other("SECRET_REFRESH"),
                 ))
             }),
-            Box::new(RecordingStorage {
-                inner: open_storage(directory),
-                events: events.clone(),
-                fail_read: false,
-            }),
-            Box::new(RecordingDiagnostics {
-                events: events.clone(),
-            }),
+            Rc::clone(&cache),
+            Box::new(RecordingDiagnostics::new(Rc::clone(&cache), events.clone())),
             Verifier {
                 probes: probes.clone(),
                 result: SnapshotState::Available,
@@ -593,16 +642,16 @@ mod tests {
     }
 
     fn assert_storage_failure(directory: &TempDir, events: &Events, probes: &Probes) {
+        let cache = Rc::new(RecordingStorage {
+            active: std::cell::Cell::new(false),
+            inner: open_storage(directory).cache,
+            events: events.clone(),
+            fail_read: true,
+        });
         let mut storage_failure = CheckService::new(
             Refresh(|| Ok(build_outcome())),
-            Box::new(RecordingStorage {
-                inner: open_storage(directory),
-                events: events.clone(),
-                fail_read: true,
-            }),
-            Box::new(RecordingDiagnostics {
-                events: events.clone(),
-            }),
+            Rc::clone(&cache),
+            Box::new(RecordingDiagnostics::new(Rc::clone(&cache), events.clone())),
             Verifier {
                 probes: probes.clone(),
                 result: SnapshotState::Available,
@@ -613,19 +662,25 @@ mod tests {
         assert_eq!(*events.borrow(), ["read"]);
     }
 
-    fn open_storage(directory: &TempDir) -> SqliteStorage {
-        SqliteStorage::open(
+    fn open_storage(directory: &TempDir) -> TestDatabases {
+        crate::storage::open_test_storage(
             &directory.path().join("cache.db"),
             &directory.path().join("vectors.db"),
         )
         .unwrap()
     }
-    fn publish_nodes(storage: &mut SqliteStorage, nodes: &[NodeMetadata]) {
-        let mut unit = storage.begin_cache_write_tx().unwrap();
-        for node in nodes {
-            unit.upsert_node(node).unwrap();
-        }
-        unit.commit().unwrap();
+    fn publish_nodes(storage: &mut TestDatabases, nodes: &[NodeMetadata]) {
+        storage
+            .cache
+            .with_write_tx(|| {
+                let unit = &storage.cache;
+                for node in nodes {
+                    unit.nodes_upsert_by_id(node).unwrap();
+                }
+
+                unit.get_publication_revision()
+            })
+            .unwrap();
     }
     fn build_node(id: &str, oid: &str) -> NodeMetadata {
         let id = KnowledgeId::parse(id).unwrap();
@@ -668,19 +723,19 @@ mod tests {
     }
 
     mod pinned {
+        use crate::service::StorageError;
+        use crate::service::TransactionError;
+
         use super::{Refresh, build_node, build_outcome, open_storage, publish_nodes};
-        use crate::service::{ReadTransaction, VectorWrite};
         use crate::{
-            domain::{
-                Edge, EdgeTarget, EdgeType, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid,
-            },
+            domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, RepoPath, SourceUri, TreeOid},
             service::{
-                CacheWrite, Checker, CommandProblem, CommandResult, DocumentResult,
+                CacheDatabase, Checker, CommandProblem, CommandResult, DocumentResult,
                 GraphDiagnostics, ProvenanceObservation, ProvenanceRequest, SnapshotError,
-                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage,
-                StorageRead, StorageResult, VectorOutcome, check::CheckService,
+                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, StorageRead,
+                check::CheckService,
             },
-            storage::SqliteStorage,
+            storage::TestDatabases,
         };
         use std::{
             cell::{Cell, RefCell},
@@ -688,11 +743,11 @@ mod tests {
             rc::Rc,
         };
 
-        struct PublishingBindings(RefCell<SqliteStorage>);
+        struct PublishingBindings(RefCell<TestDatabases>, Rc<dyn StorageRead>);
         type RecordedSources = Vec<(Option<TreeOid>, BTreeSet<SourceUri>)>;
         struct Observations(Rc<RefCell<RecordedSources>>);
         struct OneRead {
-            inner: SqliteStorage,
+            inner: crate::storage::CacheStorage,
             count: Rc<Cell<usize>>,
         }
 
@@ -704,6 +759,10 @@ mod tests {
             publish_bindings(&mut writer, "a", "old.rs");
             let observations = Rc::new(RefCell::new(Vec::new()));
             let count = Rc::new(Cell::new(0));
+            let cache = Rc::new(OneRead {
+                inner: open_storage(&directory).cache,
+                count: count.clone(),
+            });
             let mut service = CheckService::new(
                 Refresh(|| {
                     Ok(crate::service::RefreshOutcome {
@@ -711,11 +770,8 @@ mod tests {
                         ..build_outcome()
                     })
                 }),
-                Box::new(OneRead {
-                    inner: open_storage(&directory),
-                    count: count.clone(),
-                }),
-                Box::new(PublishingBindings(RefCell::new(writer))),
+                Rc::clone(&cache),
+                Box::new(PublishingBindings(RefCell::new(writer), cache)),
                 Observations(observations.clone()),
             );
 
@@ -733,21 +789,23 @@ mod tests {
                 )]
             );
             assert_eq!(
-                open_storage(&directory)
-                    .begin_read_tx()
-                    .unwrap()
-                    .get_revision(),
+                {
+                    let scope_databases = open_storage(&directory);
+                    scope_databases
+                        .cache
+                        .with_read_tx(|| {
+                            Ok::<_, StorageError>(scope_databases.cache.project_get_by_id())
+                        })
+                        .unwrap()
+                }
+                .unwrap(),
                 4
             );
         }
 
         impl GraphDiagnostics for PublishingBindings {
-            fn find_problems(
-                &self,
-                view: &mut dyn StorageRead,
-                _: &[RepoPath],
-            ) -> CommandResult<Vec<CommandProblem>> {
-                assert_eq!(view.get_revision(), 2);
+            fn find_problems(&self, _: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
+                assert_eq!(self.1.project_get_by_id().unwrap(), 2);
                 publish_bindings(&mut self.0.borrow_mut(), "b", "new.rs");
                 Ok(Vec::new())
             }
@@ -775,44 +833,63 @@ mod tests {
                 panic!("check does not compare revisions")
             }
         }
-        impl Storage for OneRead {
-            fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
+        use crate::service::utils::cache_test_support::{
+            delegate_cache_reads, delegate_cache_writes, delegate_graph_reads,
+        };
+        impl crate::service::StorageRead for OneRead {
+            delegate_cache_reads!();
+        }
+        impl crate::service::GraphRead for OneRead {
+            delegate_graph_reads!();
+        }
+        impl crate::service::CacheDatabase for OneRead {
+            delegate_cache_writes!();
+            fn with_read_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
                 self.count.set(self.count.get() + 1);
-                assert_eq!(self.count.get(), 1, "check opened a second view");
-                self.inner.begin_read_tx()
+                assert_eq!(self.count.get(), 1);
+                self.inner.with_read_tx(operation)
             }
-            fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>> {
-                panic!("check cannot publish")
+            fn with_write_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_write_tx(operation)
             }
-            fn begin_vector_write_tx(
-                &mut self,
-                _: &Sha256,
-            ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>> {
-                panic!("check cannot write vectors")
-            }
-            fn reset_vectors(
-                &mut self,
-                _: Option<&Sha256>,
-                _: &Sha256,
-            ) -> StorageResult<VectorOutcome<bool>> {
-                panic!("check cannot reset vectors")
+            fn with_status_read_tx<T, E, F>(
+                &self,
+                operation: F,
+            ) -> Result<Option<T>, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_status_read_tx(operation)
             }
         }
-        fn publish_bindings(storage: &mut SqliteStorage, oid: &str, source: &str) {
+
+        fn publish_bindings(storage: &mut TestDatabases, oid: &str, source: &str) {
             publish_nodes(storage, &[build_node("a.md", oid)]);
-            let mut unit = storage.begin_cache_write_tx().unwrap();
-            let id = KnowledgeId::parse("a.md").unwrap();
-            unit.delete_outgoing(&id).unwrap();
-            unit.insert_edge(
-                &Edge::new(
-                    id,
-                    EdgeTarget::Source(SourceUri::parse(source).unwrap()),
-                    EdgeType::parse("external").unwrap(),
-                )
-                .unwrap(),
-            )
-            .unwrap();
-            unit.commit().unwrap();
+            storage
+                .cache
+                .with_write_tx(|| {
+                    let unit = &storage.cache;
+                    let id = KnowledgeId::parse("a.md").unwrap();
+                    unit.edges_delete_by_source_id(&id).unwrap();
+                    unit.edges_save_by_source_id_and_target_id_and_type(
+                        &Edge::new(
+                            id,
+                            EdgeTarget::Source(SourceUri::parse(source).unwrap()),
+                            EdgeType::parse("external").unwrap(),
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+
+                    unit.get_publication_revision()
+                })
+                .unwrap();
         }
     }
 
@@ -821,9 +898,9 @@ mod tests {
         use crate::{
             domain::TreeOid,
             service::{
-                DocumentResult, GraphDiagnosticsService, ProvenanceObservation, ProvenanceRequest,
-                SnapshotError, SnapshotState, SourceProvenance, SourceRevisionComparison,
-                SourceRevisionRequest, Storage, utils::CheckObservations,
+                CacheDatabase, DocumentResult, GraphDiagnosticsService, ProvenanceObservation,
+                ProvenanceRequest, SnapshotError, SnapshotState, SourceProvenance,
+                SourceRevisionComparison, SourceRevisionRequest, utils::CheckObservations,
             },
         };
         use std::{cell::RefCell, collections::BTreeSet};
@@ -850,15 +927,16 @@ mod tests {
                 },
                 sizes: RefCell::new(Vec::new()),
             };
-            let mut read = storage.begin_read_tx().unwrap();
+            let cache = std::rc::Rc::new(storage.cache);
             // When: common check/status problem collection observes these owners.
-            let diagnostics = GraphDiagnosticsService::new();
+            let diagnostics = GraphDiagnosticsService::new(std::rc::Rc::clone(&cache));
             let observations = CheckObservations {
+                storage: cache.as_ref(),
                 graph: &diagnostics,
                 provenance: &provenance,
             };
-            let problems = observations
-                .collect_check_problems(read.as_mut(), &[])
+            let problems = cache
+                .with_read_tx(|| observations.collect_check_problems(&[]))
                 .unwrap();
             // Then: bounded batches preserve all owner mappings and sorted diagnostics.
             assert_eq!(*provenance.sizes.borrow(), [256, 1]);

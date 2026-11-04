@@ -1,12 +1,11 @@
 use super::{
-    CommandError, CommandErrorKind, CommandProblem, CommandResult, Configuration,
+    CacheDatabase, CommandError, CommandErrorKind, CommandProblem, CommandResult, Configuration,
     EmbeddingProvider, EmbeddingStatusPolicy, EmbeddingStatusSummary, GraphDiagnostics,
-    SourceProvenance, StatusFiles, StatusReader, StatusReport, StatusStorage, StorageError,
-    StorageRead,
+    SourceProvenance, StatusFiles, StatusReader, StatusReport, StorageError,
     utils::{CheckObservations, sort_problems},
 };
 use serde_json::Value;
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt, rc::Rc};
 
 const REASON: &str = "reason";
 const INVALID_CONFIG: &str = "invalid_embedding_config";
@@ -14,43 +13,45 @@ const QUERY_FAILURE: &str = "query_embedding_failed";
 const EXHAUSTED: &str = "embedding_attempts_exhausted";
 
 /// Observes the last publication and live coordination without changing either.
-pub(crate) struct StatusService<'a> {
-    pub(crate) storage: Box<dyn StatusStorage>,
+pub(crate) struct StatusService<'a, C> {
+    pub(crate) storage: Rc<C>,
     pub(crate) files: &'a dyn StatusFiles,
     pub(crate) graph: &'a dyn GraphDiagnostics,
     pub(crate) provenance: &'a dyn SourceProvenance,
     pub(crate) provider: &'a dyn EmbeddingProvider,
 }
 
-impl fmt::Debug for StatusService<'_> {
+impl<C> fmt::Debug for StatusService<'_, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StatusService").finish_non_exhaustive()
     }
 }
 
-impl StatusReader for StatusService<'_> {
+impl<C: CacheDatabase> StatusReader for StatusService<'_, C> {
     fn get_status(&mut self) -> CommandResult<StatusReport> {
         let (policy, config_problem) = self.get_config_policy();
-        let observation = self
+        let published = self
             .storage
-            .begin_status_read_tx()
-            .map_err(map_storage_error)?;
-        let mut report = if let Some(mut view) = observation {
-            let observations = CheckObservations {
-                graph: self.graph,
-                provenance: self.provenance,
-            };
-            let problems = observations.collect_check_problems(view.as_mut(), &[])?;
-            get_published(view.as_mut(), &policy, problems)?
-        } else {
-            StatusReport {
-                revision: None,
-                embedding_backlog: 0,
-                embedding_failed: 0,
-                locks: Vec::new(),
-                problems: Vec::new(),
-            }
-        };
+            .with_status_read_tx(|| {
+                let observations = CheckObservations {
+                    storage: self.storage.as_ref(),
+                    graph: self.graph,
+                    provenance: self.provenance,
+                };
+                let problems = observations.collect_check_problems(&[])?;
+                self.get_published(&policy, problems)
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => map_storage_error(error),
+            })?;
+        let mut report = published.unwrap_or(StatusReport {
+            revision: None,
+            embedding_backlog: 0,
+            embedding_failed: 0,
+            locks: Vec::new(),
+            problems: Vec::new(),
+        });
         if let Some(problem) = config_problem {
             report.problems.push(problem);
         }
@@ -60,7 +61,7 @@ impl StatusReader for StatusService<'_> {
     }
 }
 
-impl StatusService<'_> {
+impl<C: CacheDatabase> StatusService<'_, C> {
     fn get_config_policy(&self) -> (EmbeddingStatusPolicy, Option<CommandProblem>) {
         let Ok(bytes) = self.files.get_config() else {
             return (
@@ -98,35 +99,44 @@ impl StatusService<'_> {
             }
         }
     }
-}
 
-fn get_published(
-    view: &mut dyn StorageRead,
-    policy: &EmbeddingStatusPolicy,
-    mut problems: Vec<CommandProblem>,
-) -> CommandResult<StatusReport> {
-    let revision = view.get_revision();
-    let summary = view
-        .get_embedding_status(policy)
-        .map_err(map_storage_error)?;
-    if !matches!(policy, EmbeddingStatusPolicy::Disabled) {
-        problems.extend(collect_exhausted(&summary));
-        if view.get_query_error().map_err(map_storage_error)?.is_some() {
-            problems.push(build_problem(
-                CommandErrorKind::EmbeddingFailed,
-                "query embedding failed",
-                QUERY_FAILURE,
-                None,
-            ));
+    fn get_published(
+        &self,
+        policy: &EmbeddingStatusPolicy,
+        mut problems: Vec<CommandProblem>,
+    ) -> CommandResult<StatusReport> {
+        let revision = self
+            .storage
+            .project_get_by_id()
+            .map_err(map_storage_error)?;
+        let summary = self
+            .storage
+            .get_embedding_status(policy)
+            .map_err(map_storage_error)?;
+        if !matches!(policy, EmbeddingStatusPolicy::Disabled) {
+            problems.extend(collect_exhausted(&summary));
+            if self
+                .storage
+                .query_error_get_by_id()
+                .map_err(map_storage_error)?
+                .is_some()
+            {
+                problems.push(build_problem(
+                    CommandErrorKind::EmbeddingFailed,
+                    "query embedding failed",
+                    QUERY_FAILURE,
+                    None,
+                ));
+            }
         }
+        Ok(StatusReport {
+            revision: Some(revision),
+            embedding_backlog: summary.backlog,
+            embedding_failed: summary.failed,
+            locks: Vec::new(),
+            problems,
+        })
     }
-    Ok(StatusReport {
-        revision: Some(revision),
-        embedding_backlog: summary.backlog,
-        embedding_failed: summary.failed,
-        locks: Vec::new(),
-        problems,
-    })
 }
 
 fn collect_exhausted(summary: &EmbeddingStatusSummary) -> Vec<CommandProblem> {
@@ -180,12 +190,20 @@ fn map_storage_error(cause: StorageError) -> CommandError {
 
 #[cfg(test)]
 mod tests {
+    use crate::service::StorageError;
+    use crate::service::TransactionError;
+    use crate::storage::get_current;
+
     mod configuration {
+        use crate::service::StorageError;
+
+        use crate::storage::get_current;
+
         use super::{
             CommandErrorKind, CommandProblem, CommandResult, Diagnostics, Files, GraphDiagnostics,
-            Provenance, Reads, RepoPath, Sha256, SqliteStorage, StatusReader, StatusService,
-            Storage, StorageRead, VALID_CONFIG, VectorOutcome, build_provider, build_service,
-            open_storage, publish_node,
+            Provenance, Reads, RepoPath, Sha256, StatusReader, StatusService, TestDatabases,
+            VALID_CONFIG, VectorDatabase, build_provider, build_service, open_storage,
+            publish_node,
         };
         use crate::service::Configuration;
         use std::{cell::Cell, rc::Rc};
@@ -204,8 +222,8 @@ mod tests {
             let provider = build_provider();
             let graph = ChangingDiagnostics(&files);
             let mut service = StatusService {
-                storage: Box::new(Reads {
-                    inner: Some(storage),
+                storage: Rc::new(Reads {
+                    inner: storage.cache,
                     count: Rc::new(Cell::new(0)),
                 }),
                 files: &files,
@@ -267,13 +285,9 @@ mod tests {
         }
 
         impl GraphDiagnostics for ChangingDiagnostics<'_> {
-            fn find_problems(
-                &self,
-                view: &mut dyn StorageRead,
-                paths: &[RepoPath],
-            ) -> CommandResult<Vec<CommandProblem>> {
+            fn find_problems(&self, paths: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
                 self.0.config.replace(None);
-                Diagnostics.find_problems(view, paths)
+                Diagnostics.find_problems(paths)
             }
         }
 
@@ -285,30 +299,39 @@ mod tests {
             }
         }
 
-        fn seed_exhausted(storage: &mut SqliteStorage) {
+        fn seed_exhausted(storage: &mut TestDatabases) {
             let config = Configuration::parse(VALID_CONFIG)
                 .unwrap()
                 .get_embedding_config()
                 .unwrap()
                 .clone();
             let identity = config.get_identity();
-            storage.reset_vectors(None, &identity).unwrap();
-            let VectorOutcome::Current(mut writer) =
-                storage.begin_vector_write_tx(&identity).unwrap()
-            else {
-                panic!("current identity")
-            };
-            assert!(
-                writer
-                    .reserve_attempt(&Sha256::digest(b"search"), 1)
-                    .unwrap()
-            );
-            assert!(
-                writer
-                    .record_failure(&Sha256::digest(b"search"), "private failure")
-                    .unwrap()
-            );
-            writer.commit().unwrap();
+            storage.vectors.reset_vectors(None, &identity).unwrap();
+            storage
+                .vectors
+                .with_write_tx(&identity, || {
+                    let writer = &storage.vectors;
+                    assert!(
+                        writer
+                            .embed_failures_upsert_by_search_hash_and_attempts(
+                                &Sha256::digest(b"search"),
+                                1
+                            )
+                            .unwrap()
+                    );
+                    assert!(
+                        writer
+                            .embed_failures_update_by_search_hash(
+                                &Sha256::digest(b"search"),
+                                "private failure"
+                            )
+                            .unwrap()
+                    );
+
+                    Ok::<_, StorageError>(())
+                })
+                .map(get_current)
+                .unwrap();
         }
     }
 
@@ -316,14 +339,14 @@ mod tests {
     use crate::{
         domain::{ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, TreeOid},
         service::{
-            CommandErrorKind, CommandProblem, CommandResult, DocumentError, DocumentErrorKind,
-            DocumentResult, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingProvider,
-            EmbeddingResult, GraphDiagnostics, HeldLock, KnowledgeMetadata, NodeMetadata,
-            ProvenanceIssue, ProvenanceObservation, ProvenanceRequest, SnapshotError,
+            CacheDatabase, CommandErrorKind, CommandProblem, CommandResult, DocumentError,
+            DocumentErrorKind, DocumentResult, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind,
+            EmbeddingProvider, EmbeddingResult, GraphDiagnostics, HeldLock, KnowledgeMetadata,
+            NodeMetadata, ProvenanceIssue, ProvenanceObservation, ProvenanceRequest, SnapshotError,
             SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, StatusFiles,
-            StatusReader, StatusStorage, Storage, StorageRead, StorageResult, VectorOutcome,
+            StatusReader, VectorDatabase,
         },
-        storage::SqliteStorage,
+        storage::TestDatabases,
     };
     use std::{cell::Cell, collections::BTreeSet, num::NonZeroUsize, rc::Rc};
     use tempfile::TempDir;
@@ -331,7 +354,7 @@ mod tests {
     const VALID_CONFIG: &[u8] = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api","dimensions":3},"max_retries":0}}"#;
 
     struct Reads {
-        inner: Option<SqliteStorage>,
+        inner: crate::storage::CacheStorage,
         count: Rc<Cell<usize>>,
     }
     struct Files {
@@ -387,16 +410,25 @@ mod tests {
         let mut storage = open_storage(&root);
         publish_node(&mut storage, 1);
         let identity = Sha256::digest(b"disabled fixture");
-        storage.reset_vectors(None, &identity).unwrap();
+        storage.vectors.reset_vectors(None, &identity).unwrap();
         let hash = Sha256::digest(b"search");
-        let VectorOutcome::Current(mut unit) = storage.begin_vector_write_tx(&identity).unwrap()
-        else {
-            panic!("expected current vector writer")
-        };
-        assert!(unit.reserve_attempt(&hash, 1).unwrap());
-        unit.record_failure(&hash, "private failure").unwrap();
-        unit.set_query_error(7, "safe query failure").unwrap();
-        unit.commit().unwrap();
+        storage
+            .vectors
+            .with_write_tx(&identity, || {
+                let unit = &storage.vectors;
+                assert!(
+                    unit.embed_failures_upsert_by_search_hash_and_attempts(&hash, 1)
+                        .unwrap()
+                );
+                unit.embed_failures_update_by_search_hash(&hash, "private failure")
+                    .unwrap();
+                unit.query_error_upsert_by_id(7, "safe query failure")
+                    .unwrap();
+
+                Ok::<_, StorageError>(())
+            })
+            .map(get_current)
+            .unwrap();
         let disabled = String::from_utf8(VALID_CONFIG.to_vec())
             .unwrap()
             .replace("\"enabled\":true", "\"enabled\":false");
@@ -544,13 +576,19 @@ mod tests {
         let mut storage = open_storage(&root);
         publish_node(&mut storage, 1);
         let identity = Sha256::digest(b"query fixture");
-        storage.reset_vectors(None, &identity).unwrap();
-        let VectorOutcome::Current(mut writer) = storage.begin_vector_write_tx(&identity).unwrap()
-        else {
-            panic!("expected current vector writer")
-        };
-        writer.set_query_error(7, "safe query failure").unwrap();
-        writer.commit().unwrap();
+        storage.vectors.reset_vectors(None, &identity).unwrap();
+        storage
+            .vectors
+            .with_write_tx(&identity, || {
+                let writer = &storage.vectors;
+                writer
+                    .query_error_upsert_by_id(7, "safe query failure")
+                    .unwrap();
+
+                Ok::<_, StorageError>(())
+            })
+            .map(get_current)
+            .unwrap();
         let files = Files {
             config: None.into(),
             fail: false,
@@ -669,15 +707,17 @@ mod tests {
     }
 
     fn build_service<'a>(
-        storage: Option<SqliteStorage>,
+        storage: Option<TestDatabases>,
         count: Rc<Cell<usize>>,
         files: &'a Files,
         provider: &'a MockProvider,
         provenance: &'a Provenance,
-    ) -> StatusService<'a> {
+    ) -> StatusService<'a, Reads> {
         StatusService {
-            storage: Box::new(Reads {
-                inner: storage,
+            storage: Rc::new(Reads {
+                inner: storage
+                    .map(|storage| storage.cache)
+                    .unwrap_or_else(|| crate::storage::CacheStorage::new_observed(None)),
                 count,
             }),
             files,
@@ -687,19 +727,41 @@ mod tests {
         }
     }
 
-    impl StatusStorage for Reads {
-        fn begin_status_read_tx(&mut self) -> StorageResult<Option<Box<dyn StorageRead + '_>>> {
+    use crate::service::utils::cache_test_support::{
+        delegate_cache_reads, delegate_cache_writes, delegate_graph_reads,
+    };
+    impl crate::service::StorageRead for Reads {
+        delegate_cache_reads!();
+    }
+    impl crate::service::GraphRead for Reads {
+        delegate_graph_reads!();
+    }
+    impl crate::service::CacheDatabase for Reads {
+        delegate_cache_writes!();
+        fn with_read_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+        where
+            F: FnOnce() -> Result<T, E>,
+        {
+            self.inner.with_read_tx(operation)
+        }
+        fn with_write_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+        where
+            F: FnOnce() -> Result<T, E>,
+        {
+            self.inner.with_write_tx(operation)
+        }
+        fn with_status_read_tx<T, E, F>(
+            &self,
+            operation: F,
+        ) -> Result<Option<T>, TransactionError<E>>
+        where
+            F: FnOnce() -> Result<T, E>,
+        {
             self.count.set(self.count.get() + 1);
-            self.inner
-                .as_mut()
-                .map(|storage| {
-                    storage
-                        .begin_read_tx()
-                        .map(|read| read as Box<dyn StorageRead>)
-                })
-                .transpose()
+            self.inner.with_status_read_tx(operation)
         }
     }
+
     impl StatusFiles for Files {
         fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
             self.count.set(self.count.get() + 1);
@@ -727,12 +789,7 @@ mod tests {
         provider
     }
     impl GraphDiagnostics for Diagnostics {
-        fn find_problems(
-            &self,
-            view: &mut dyn StorageRead,
-            _: &[RepoPath],
-        ) -> CommandResult<Vec<CommandProblem>> {
-            let _ = view;
+        fn find_problems(&self, _: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
             Ok(vec![CommandProblem {
                 code: CommandErrorKind::ValidationFailed,
                 message: "graph fixture",
@@ -771,30 +828,36 @@ mod tests {
             panic!("unused")
         }
     }
-    fn open_storage(root: &TempDir) -> SqliteStorage {
-        SqliteStorage::open(
+    fn open_storage(root: &TempDir) -> TestDatabases {
+        crate::storage::open_test_storage(
             &root.path().join("cache.db"),
             &root.path().join("vectors.db"),
         )
         .unwrap()
     }
-    fn publish_node(storage: &mut SqliteStorage, revision: usize) {
+    fn publish_node(storage: &mut TestDatabases, revision: usize) {
         let id = KnowledgeId::parse("a.md#one").unwrap();
         for _ in 0..revision {
-            let mut writer = storage.begin_cache_write_tx().unwrap();
-            writer
-                .upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
-                    uri: id.clone(),
-                    id: id.clone(),
-                    kind: ElementKind::Vertex,
-                    hash: Sha256::digest(b"content"),
-                    created_at: 1,
-                    source_snapshot: None,
-                    lines: LineRange::new(1, 2).unwrap(),
-                    search_hash: Sha256::digest(b"search"),
-                }))
+            storage
+                .cache
+                .with_write_tx(|| {
+                    let writer = &storage.cache;
+                    writer
+                        .nodes_upsert_by_id(&NodeMetadata::Knowledge(KnowledgeMetadata {
+                            uri: id.clone(),
+                            id: id.clone(),
+                            kind: ElementKind::Vertex,
+                            hash: Sha256::digest(b"content"),
+                            created_at: 1,
+                            source_snapshot: None,
+                            lines: LineRange::new(1, 2).unwrap(),
+                            search_hash: Sha256::digest(b"search"),
+                        }))
+                        .unwrap();
+
+                    writer.get_publication_revision()
+                })
                 .unwrap();
-            writer.commit().unwrap();
         }
     }
 }

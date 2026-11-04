@@ -1,9 +1,12 @@
-<!-- letopis: {"created_at":1793728137,"source_snapshot":"e6730713cdcf157bcb2294169c248f3b165a37f1"} -->
+<!-- letopis: {"created_at":1793728137,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
 # Embedding drain
 
 Drain fills missing document embeddings; it is separate from query embedding in
 `search`. It operates on the current branch's synchronous implementation: one
 work item is processed at a time, without a persistent job queue.
+Drain requires inactive cache and vector owners at entry. Storage rejects and
+poisons an inherited scope before configuration or work reservation; fresh reads
+on each iteration must observe the vector just published by the previous item.
 
 After a successful `search`, `traverse`, `inspect`, `check` or `reindex`, the
 background runner checks whether eligible work exists and probes `embed.lock`.
@@ -41,11 +44,7 @@ child has already completed.
 
 [Drain coordination](../../src/service/embedding.rs "letopis:type=external;path=src/service/embedding.rs")
 
-[Work selection and pruning](../../src/storage/work.rs "letopis:type=external;path=src/storage/work.rs")
-
-[Attempt and vector storage](../../src/storage/vectors.rs "letopis:type=external;path=src/storage/vectors.rs")
-
-[Vector transactions](../../src/storage/vector_write.rs "letopis:type=external;path=src/storage/vector_write.rs")
+[Work selection, pruning, attempts and vector transactions](../../src/storage/vector.rs "letopis:type=external;path=src/storage/vector.rs")
 
 [Background launch](../../src/service/background_runner.rs "letopis:type=external;path=src/service/background_runner.rs")
 

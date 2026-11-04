@@ -1,4 +1,4 @@
-use super::{LocalFileSystem, observe_lock_descriptor, retry_io, retry_lock};
+use super::{LocalFileSystem, get_lock_stat_by_descriptor, retry_io, retry_lock};
 use crate::filesystem::test_support::{Fixture, run_bounded};
 use crate::service::{DocumentErrorKind, EmbeddingFiles};
 use std::os::unix::fs::MetadataExt;
@@ -134,10 +134,10 @@ fn rejects_each_prior_lock_identity_mismatch_before_writing_pid() {
         let fixture = Fixture::new();
         let files = LocalFileSystem::open(&fixture.0).unwrap();
         let file = files.open_lock_file("embed.lock").unwrap();
-        let mut before = observe_lock_descriptor(&file).unwrap();
+        let mut before = get_lock_stat_by_descriptor(&file).unwrap();
         if change_inode {
             let other = files.open_lock_file("index.lock").unwrap();
-            before.inode = observe_lock_descriptor(&other).unwrap().inode;
+            before.inode = get_lock_stat_by_descriptor(&other).unwrap().inode;
         } else {
             before.device ^= 1;
         }
@@ -145,7 +145,7 @@ fn rejects_each_prior_lock_identity_mismatch_before_writing_pid() {
         fs::write(&path, b"previous owner").unwrap();
         file.try_lock().unwrap();
         let duplicate = file.try_clone().unwrap();
-        // When
+        // When: lock completion compares the prior and current file identities.
         let result = files.finish_lock(file, "embed.lock", before);
         // Then: failed completion releases ownership even with another fd open.
         let error = result.err().expect("identity mismatch was accepted");

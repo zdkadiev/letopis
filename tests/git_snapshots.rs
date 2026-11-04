@@ -139,12 +139,14 @@ fn incremental_operations_recheck_self_contained_object_policy() {
     }
 }
 
-fn parse_path(s: &str) -> RepoPath {
-    RepoPath::parse(s).unwrap()
+fn parse_path(text: &str) -> RepoPath {
+    RepoPath::parse(text).unwrap()
 }
-fn parse_tree_oid(s: &str) -> TreeOid {
-    TreeOid::parse(s).unwrap()
+
+fn parse_tree_oid(text: &str) -> TreeOid {
+    TreeOid::parse(text).unwrap()
 }
+
 fn create_external_tree(
     repo: &TempRepo,
     mode: &str,
@@ -157,6 +159,7 @@ fn create_external_tree(
         Some(format!("{mode} {kind} {child}\t{name}\0").as_bytes()),
     ))
 }
+
 fn configure_filter_trap(repo: &TempRepo) {
     let filter = repo.write_script("filter", "#!/bin/sh\ntouch FILTER_RAN\ncat\n");
     repo.run_git_successfully(
@@ -171,6 +174,7 @@ fn configure_filter_trap(repo: &TempRepo) {
     )
     .unwrap();
 }
+
 fn build_captured_inputs() -> ([RepoPath; 6], [&'static [u8]; 6]) {
     (
         [
@@ -362,6 +366,7 @@ fn build_tree_error_cases(repo: &TempRepo, empty: &TreeOid) -> Vec<(TreeOid, Sna
         ),
     ]
 }
+
 fn create_corrupted_blob_tree(repo: &TempRepo) -> TreeOid {
     let blob = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"valid expected"));
     let other = repo.get_oid(

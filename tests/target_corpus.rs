@@ -1,3 +1,6 @@
+use crate::support::storage::get_current;
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
 mod support;
 #[path = "support/target_corpus.rs"]
 mod target_corpus;
@@ -10,7 +13,7 @@ mod thin_slice;
 
 use letopis::{
     domain::Sha256,
-    service::{Configuration, EmbeddingConfig, NodeMetadata, Storage, VectorOutcome},
+    service::{Configuration, EmbeddingConfig, NodeMetadata},
 };
 use serde_json::{Value, json};
 use std::{
@@ -165,16 +168,19 @@ fn stale_hash_vector_does_not_cover_current_nodes() {
     // Given: stored vectors whose hashes no longer match current text.
     let repo = build_pair("current alpha", "current beta");
     let config = get_config(&repo);
-    let mut storage = repo.open_storage();
-    let mut write = unwrap_current(
-        storage
-            .begin_vector_write_tx(&config.get_identity())
-            .unwrap(),
-    );
-    write
-        .store_vector(&Sha256::digest(b"obsolete text"), &[1., 0.], 2)
+    let storage = repo.open_storage();
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let write = &storage.vectors;
+            write
+                .store_vector(&Sha256::digest(b"obsolete text"), &[1., 0.], 2)
+                .unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
         .unwrap();
-    write.commit().unwrap();
     drop(storage);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
@@ -227,22 +233,32 @@ fn exhausted_reservations_without_error_are_missing_but_not_failed() {
     // Given: exhausted reservations without failure messages.
     let repo = build_pair("alpha", "beta");
     let config = get_config(&repo);
-    let mut storage = repo.open_storage();
-    let nodes = storage.begin_read_tx().unwrap().get_nodes().unwrap();
-    let mut write = unwrap_current(
-        storage
-            .begin_vector_write_tx(&config.get_identity())
-            .unwrap(),
-    );
-    // When / Then: each current knowledge hash receives its only allowed reservation.
-    for node in nodes {
-        let NodeMetadata::Knowledge(node) = node.metadata else {
-            continue;
-        };
-        // When / Then: each current knowledge hash receives its only allowed reservation.
-        assert!(write.reserve_attempt(&node.search_hash, 1).unwrap());
-    }
-    write.commit().unwrap();
+    let storage = repo.open_storage();
+    let nodes = storage
+        .cache
+        .with_read_tx(|| storage.cache.nodes_get())
+        .unwrap();
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let write = &storage.vectors;
+            // When / Then: each current knowledge hash receives its only allowed reservation.
+            for node in nodes {
+                let NodeMetadata::Knowledge(node) = node.metadata else {
+                    continue;
+                };
+                // When / Then: each current knowledge hash receives its only allowed reservation.
+                assert!(
+                    write
+                        .embed_failures_upsert_by_search_hash_and_attempts(&node.search_hash, 1)
+                        .unwrap()
+                );
+            }
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
     drop(storage);
     let request = write_request(repo.get_root(), (2, 0, 0));
     observe_request(&request).unwrap();
@@ -496,9 +512,14 @@ fn configure_repo(repo: &ReadingRepo, retries: u64) -> EmbeddingConfig {
     .unwrap();
     repo.write(".letopis/config.json", &bytes);
     let config = EmbeddingConfig::parse(configured.to_string().as_bytes()).unwrap();
-    let mut storage = repo.open_storage();
-    let observed = storage.begin_read_tx().unwrap().get_config_identity();
+    let storage = repo.open_storage();
+    let observed = storage
+        .cache
+        .with_read_tx(|| Ok::<_, StorageError>(storage.cache.meta_get_by_id()))
+        .unwrap()
+        .unwrap();
     storage
+        .vectors
         .reset_vectors(observed.as_ref(), &config.get_identity())
         .unwrap();
     config
@@ -522,25 +543,41 @@ fn get_receipt(root: &Path) -> Value {
 
 fn seed_failures(repo: &ReadingRepo, budget: u64) {
     let config = get_config(repo);
-    let mut storage = repo.open_storage();
-    let nodes = storage.begin_read_tx().unwrap().get_nodes().unwrap();
-    let mut write = unwrap_current(
-        storage
-            .begin_vector_write_tx(&config.get_identity())
-            .unwrap(),
-    );
-    for node in nodes {
-        let NodeMetadata::Knowledge(node) = node.metadata else {
-            continue;
-        };
-        assert!(write.reserve_attempt(&node.search_hash, budget).unwrap());
-        assert!(
-            write
-                .record_failure(&node.search_hash, "safe test failure")
-                .unwrap()
-        );
-    }
-    write.commit().unwrap();
+    let storage = repo.open_storage();
+    let nodes = storage
+        .cache
+        .with_read_tx(|| storage.cache.nodes_get())
+        .unwrap();
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let write = &storage.vectors;
+            for node in nodes {
+                let NodeMetadata::Knowledge(node) = node.metadata else {
+                    continue;
+                };
+                assert!(
+                    write
+                        .embed_failures_upsert_by_search_hash_and_attempts(
+                            &node.search_hash,
+                            budget
+                        )
+                        .unwrap()
+                );
+                assert!(
+                    write
+                        .embed_failures_update_by_search_hash(
+                            &node.search_hash,
+                            "safe test failure"
+                        )
+                        .unwrap()
+                );
+            }
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
 }
 
 fn get_config(repo: &ReadingRepo) -> EmbeddingConfig {
@@ -556,11 +593,4 @@ fn capture_databases(root: &Path) -> Vec<Vec<u8>> {
         .into_iter()
         .map(|leaf| fs::read(root.join(".letopis").join(leaf)).unwrap())
         .collect()
-}
-
-fn unwrap_current<T>(outcome: VectorOutcome<T>) -> T {
-    match outcome {
-        VectorOutcome::Current(value) => value,
-        VectorOutcome::ConfigChanged => panic!("test identity changed"),
-    }
 }

@@ -25,6 +25,8 @@ _check:
 	$(call run,$(CARGO) fmt --all --check)
 	$(call run,$(CARGO) check --locked --offline --all-targets)
 	$(call run,$(CARGO) clippy --locked --offline --all-targets -- -D warnings)
+	$(call run,$(CARGO) test --locked --offline --example fixed_value_lint)
+	$(call run,$(CARGO) run --locked --offline --example fixed_value_lint)
 	$(call run,$(CARGO) test --locked --offline)
 
 release:

@@ -1,4 +1,4 @@
-use super::{LocalFileSystem, observe_descriptor, reopen_concurrently_created_lock};
+use super::{LocalFileSystem, get_file_stat_by_descriptor, reopen_concurrently_created_lock};
 use crate::{
     domain::RepoPath,
     service::{DocumentErrorKind, EmbedLocker, FileSystem},
@@ -24,16 +24,16 @@ use tempfile::tempdir;
 
 #[test]
 fn get_regular_file_preserves_bytes_and_stat() {
-    // Given
+    // Given: a regular document with non-UTF-8 bytes and a Unicode path.
     let root = tempdir().unwrap();
     let path = RepoPath::parse("заметка with spaces.md").unwrap();
     fs::write(root.path().join(path.as_str()), b"literal\0\xffbytes").unwrap();
     let filesystem = LocalFileSystem::open(root.path()).unwrap();
     let before = filesystem.get_time_ns().unwrap();
-    // When
+    // When: the document and its file metadata are retrieved.
     let captured = filesystem.get_file(&path).unwrap().unwrap();
-    let stat = filesystem.stat_file(&path).unwrap().unwrap();
-    // Then
+    let stat = filesystem.get_file_stat_by_path(&path).unwrap().unwrap();
+    // Then: bytes, metadata, and capture time match the file.
     assert_eq!(captured.bytes, b"literal\0\xffbytes");
     assert_eq!(captured.stat, stat);
     assert_eq!(stat.size, 14);
@@ -58,7 +58,7 @@ fn nonregular_final_entries_are_absent_without_following_symlinks() {
     for raw in ["link.md", "directory.md", "pipe.md"] {
         let path = RepoPath::parse(raw).unwrap();
         // When / Then: observation and capture treat the entry as absent.
-        assert!(filesystem.stat_file(&path).unwrap().is_none());
+        assert!(filesystem.get_file_stat_by_path(&path).unwrap().is_none());
         assert!(filesystem.get_file(&path).unwrap().is_none());
     }
 }
@@ -82,7 +82,7 @@ fn nonregular_entry_changes_between_observations_fail() {
         // When / Then: the changed entry is rejected instead of treated as stable absence.
         assert!(
             filesystem
-                .stat_file(&RepoPath::parse("note.md").unwrap())
+                .get_file_stat_by_path(&RepoPath::parse("note.md").unwrap())
                 .is_err()
         );
     }
@@ -99,7 +99,7 @@ fn reject_final_and_parent_symlinks() {
     let filesystem = LocalFileSystem::open(root.path()).unwrap();
     // When / Then: traversal through the parent symlink fails.
     assert!(filesystem.get_file(&path).is_err());
-    assert!(filesystem.stat_file(&path).is_err());
+    assert!(filesystem.get_file_stat_by_path(&path).is_err());
     let target = root.path().join("note.md");
     fs::write(&target, b"regular").unwrap();
     let external = outside.path().join("note.md");
@@ -117,14 +117,14 @@ fn reject_final_and_parent_symlinks() {
 
 #[test]
 fn missing_file_returns_none() {
-    // Given
+    // Given: a repository without the requested documents.
     let root = tempdir().unwrap();
     let filesystem = LocalFileSystem::open(root.path()).unwrap();
     for raw in ["missing.md", "missing/child.md"] {
         let path = RepoPath::parse(raw).unwrap();
-        // When / Then
+        // When / Then: reading and stating a missing document return no file.
         assert!(filesystem.get_file(&path).unwrap().is_none());
-        assert!(filesystem.stat_file(&path).unwrap().is_none());
+        assert!(filesystem.get_file_stat_by_path(&path).unwrap().is_none());
     }
 }
 
@@ -732,7 +732,7 @@ fn concurrent_first_lock_creation_preserves_one_regular_file() {
 #[test]
 fn concurrent_first_embed_lock_creation_has_one_owner_and_stable_inode() {
     for _ in 0..20 {
-        // Given both probes before the file exists, retain ownership through both probes.
+        // Given: both probes start before the file exists and retain ownership through both probes.
         let root = tempdir().unwrap();
         let barrier = Barrier::new(2);
         let outcomes = thread::scope(|scope| {
@@ -742,9 +742,9 @@ fn concurrent_first_embed_lock_creation_has_one_owner_and_stable_inode() {
                     let barrier = &barrier;
                     scope.spawn(move || {
                         barrier.wait();
-                        // When
+                        // When: both workers try to acquire the lock and inspect its inode.
                         let guard = filesystem.try_lock_embed();
-                        let observed = filesystem.observe_file(".letopis/embed.lock");
+                        let observed = filesystem.get_file_stat_by_raw_path(".letopis/embed.lock");
                         // Release the peer even when opening failed, so the
                         // assertion reports the error instead of hanging.
                         barrier.wait();
@@ -757,7 +757,7 @@ fn concurrent_first_embed_lock_creation_has_one_owner_and_stable_inode() {
                 .map(|worker| worker.join().unwrap())
                 .collect::<Vec<_>>()
         });
-        // Then
+        // Then: both observe the same inode and exactly one acquires the lock.
         assert_eq!(outcomes[0].0, outcomes[1].0);
         assert_ne!(outcomes[0].1, outcomes[1].1);
         assert_eq!(
@@ -772,7 +772,7 @@ fn concurrent_first_embed_lock_creation_has_one_owner_and_stable_inode() {
 #[test]
 fn missing_creation_reopens_existing_lock_without_replacing_it() {
     for name in ["index.lock", "embed.lock"] {
-        // Given the observed race outcome: a competitor created the file.
+        // Given: a competitor created the lock file before the current creation attempt.
         let root = tempdir().unwrap();
         let path = root.path().join(name);
         fs::write(&path, b"persistent owner state").unwrap();
@@ -781,8 +781,11 @@ fn missing_creation_reopens_existing_lock_without_replacing_it() {
         // When: select exactly the ENOENT creation-error path.
         let reopened =
             reopen_concurrently_created_lock(&directory, name, Err(Errno::NOENT)).unwrap();
-        // Then identity/bytes and no fallback for an unrelated creation error.
-        assert_eq!(observe_descriptor(&reopened).unwrap().inode, before);
+        // Then: identity and bytes remain intact, and unrelated errors do not trigger fallback.
+        assert_eq!(
+            get_file_stat_by_descriptor(&reopened).unwrap().inode,
+            before
+        );
         assert_eq!(fs::read(&path).unwrap(), b"persistent owner state");
         assert_eq!(
             reopen_concurrently_created_lock(&directory, name, Err(Errno::ACCESS)).unwrap_err(),
@@ -795,7 +798,7 @@ fn missing_creation_reopens_existing_lock_without_replacing_it() {
 fn missing_creation_reopen_rejects_absent_and_unsafe_lock_names() {
     for name in ["index.lock", "embed.lock"] {
         for kind in ["absent", "symlink", "fifo", "directory"] {
-            // Given an absent or unsafe name under the same live directory fd.
+            // Given: an absent or unsafe name under the same live directory descriptor.
             let root = tempdir().unwrap();
             let path = root.path().join(name);
             let directory = fs::File::open(root.path()).unwrap();
@@ -810,9 +813,9 @@ fn missing_creation_reopen_rejects_absent_and_unsafe_lock_names() {
             }
             // When: the fallback may open a FIFO, but the regular-file check rejects it.
             let result = reopen_concurrently_created_lock(&directory, name, Err(Errno::NOENT));
-            // Then no creation/following symlinks/acceptance of nonregular files.
+            // Then: no file is created, symlink followed, or nonregular file accepted.
             if let Ok(file) = result {
-                assert!(observe_descriptor(&file).is_err());
+                assert!(get_file_stat_by_descriptor(&file).is_err());
             }
             if kind == "absent" {
                 assert!(!path.exists());

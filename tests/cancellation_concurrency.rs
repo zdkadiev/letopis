@@ -1,3 +1,6 @@
+use letopis::service::StorageError;
+use letopis::service::TransactionError;
+use letopis::service::{CacheDatabase, StorageRead};
 #[expect(
     dead_code,
     reason = "Shared cancellation fixtures expose unrelated wait observers"
@@ -19,9 +22,7 @@ use cancellation::{
 use letopis::{
     domain::{EdgeTarget, KnowledgeId, Sha256},
     open_filesystem,
-    service::{
-        EmbeddingConfig, EmbeddingFailure, FileSystem, NodeMetadata, Storage, VectorOutcome,
-    },
+    service::{EmbeddingConfig, EmbeddingFailure, FileSystem, NodeMetadata, VectorOutcome},
 };
 use serde_json::{Value, json};
 use std::{
@@ -229,19 +230,25 @@ fn late_drain_vector_does_not_represent_changed_text() {
     let second = http.take_requests();
     assert_eq!(second.len(), 1);
     assert_eq!(second[0]["input"], json!(["NewDrainTextToken"]));
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().expect("storage read");
-    let matches = match read
-        .get_nearest_vectors(&config.get_identity(), &[0., 1.], 2)
-        .expect("vector query")
-    {
-        VectorOutcome::Current(matches) => matches,
-        VectorOutcome::ConfigChanged => panic!("configuration changed"),
-    };
-    assert_eq!(matches.len(), 1, "{matches:?}");
-    assert_eq!(matches[0].id.as_str(), "knowledge.md");
-    assert_eq!(matches[0].search_hash, new_hash);
-    assert!(matches[0].distance.abs() < 1e-6, "{matches:?}");
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            let matches = match read
+                .vector_index_get_by_vector(&config.get_identity(), &[0., 1.], 2)
+                .expect("vector query")
+            {
+                VectorOutcome::Current(matches) => matches,
+                VectorOutcome::ConfigChanged => panic!("configuration changed"),
+            };
+            assert_eq!(matches.len(), 1, "{matches:?}");
+            assert_eq!(matches[0].id.as_str(), "knowledge.md");
+            assert_eq!(matches[0].search_hash, new_hash);
+            assert!(matches[0].distance.abs() < 1e-6, "{matches:?}");
+            Ok::<_, StorageError>(())
+        })
+        .expect("storage read");
 }
 
 fn spawn_product(repo: &ReadingRepo, args: &[&str], path: Option<&OsStr>) -> cli::OwnedChild {
@@ -303,18 +310,26 @@ fn assert_search_result(repo: &ReadingRepo, query: &str, revision: u64) {
 }
 
 fn get_search_hash(repo: &ReadingRepo) -> Sha256 {
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().expect("storage read");
-    let node = read
-        .get_node_by_id(&EdgeTarget::Knowledge(
-            KnowledgeId::parse("knowledge.md").expect("knowledge id"),
-        ))
-        .expect("read node")
-        .expect("published knowledge");
-    let NodeMetadata::Knowledge(node) = node.metadata else {
-        panic!("expected knowledge metadata");
-    };
-    node.search_hash
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            Ok::<_, StorageError>({
+                let read = &storage.cache;
+                let node = read
+                    .nodes_get_by_id(&EdgeTarget::Knowledge(
+                        KnowledgeId::parse("knowledge.md").expect("knowledge id"),
+                    ))
+                    .expect("read node")
+                    .expect("published knowledge");
+                let NodeMetadata::Knowledge(node) = node.metadata else {
+                    panic!("expected knowledge metadata");
+                };
+                node.search_hash
+            })
+        })
+        .map_err(TransactionError::into_inner)
+        .expect("storage read")
 }
 
 fn get_vector_by_search_hash(
@@ -322,15 +337,23 @@ fn get_vector_by_search_hash(
     config: &EmbeddingConfig,
     search_hash: &Sha256,
 ) -> Option<Vec<f32>> {
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().expect("storage read");
-    match read
-        .get_vector_by_search_hash(&config.get_identity(), search_hash)
-        .expect("read vector")
-    {
-        VectorOutcome::Current(vector) => vector,
-        VectorOutcome::ConfigChanged => panic!("configuration changed"),
-    }
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            Ok::<_, StorageError>({
+                let read = &storage.cache;
+                match read
+                    .vector_keys_get_vector_by_search_hash(&config.get_identity(), search_hash)
+                    .expect("read vector")
+                {
+                    VectorOutcome::Current(vector) => vector,
+                    VectorOutcome::ConfigChanged => panic!("configuration changed"),
+                }
+            })
+        })
+        .map_err(TransactionError::into_inner)
+        .expect("storage read")
 }
 
 fn get_failure_by_search_hash(
@@ -338,15 +361,23 @@ fn get_failure_by_search_hash(
     config: &EmbeddingConfig,
     search_hash: &Sha256,
 ) -> Option<EmbeddingFailure> {
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().expect("storage read");
-    match read
-        .get_failure_by_search_hash(&config.get_identity(), search_hash)
-        .expect("read failure")
-    {
-        VectorOutcome::Current(failure) => failure,
-        VectorOutcome::ConfigChanged => panic!("configuration changed"),
-    }
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            Ok::<_, StorageError>({
+                let read = &storage.cache;
+                match read
+                    .embed_failures_get_by_search_hash(&config.get_identity(), search_hash)
+                    .expect("read failure")
+                {
+                    VectorOutcome::Current(failure) => failure,
+                    VectorOutcome::ConfigChanged => panic!("configuration changed"),
+                }
+            })
+        })
+        .map_err(TransactionError::into_inner)
+        .expect("storage read")
 }
 
 fn assert_drain_success(output: &Output) {

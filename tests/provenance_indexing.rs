@@ -1,9 +1,12 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
+use support::storage::open_storage;
 mod support;
 
 use letopis::{
     domain::{RepoPath, TreeOid},
-    open_git_snapshots, open_storage,
-    service::{GitSnapshots, NodeMetadata, RefreshOutcome, Refresher, Storage},
+    open_git_snapshots,
+    service::{GitSnapshots, NodeMetadata, RefreshOutcome, Refresher},
     wire_document_refresher,
 };
 use std::fs;
@@ -280,17 +283,24 @@ impl IndexFixture for TempRepo {
         fs::write(self.get_root().join(path), bytes).unwrap();
     }
     fn get_state(&self) -> State {
-        let mut storage = open_storage(
+        let storage = open_storage(
             &self.get_root().join(".letopis/cache.db"),
             &self.get_root().join(".letopis/vectors.db"),
         )
         .unwrap();
-        let mut read = storage.begin_read_tx().unwrap();
-        State {
-            revision: read.get_revision(),
-            nodes: read.get_nodes().unwrap(),
-            edges: read.get_edges_by_source_id(None).unwrap(),
-            files: read.get_files().unwrap(),
-        }
+        storage
+            .cache
+            .with_read_tx(|| {
+                Ok::<_, StorageError>({
+                    let read = &storage.cache;
+                    State {
+                        revision: read.project_get_by_id().unwrap(),
+                        nodes: read.nodes_get().unwrap(),
+                        edges: read.edges_get_by_source_id(None).unwrap(),
+                        files: read.files_get().unwrap(),
+                    }
+                })
+            })
+            .unwrap()
     }
 }

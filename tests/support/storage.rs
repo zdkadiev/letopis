@@ -1,9 +1,31 @@
 #![allow(dead_code)]
+use letopis::service::VectorOutcome;
 use letopis::{
-    open_storage,
-    service::{StorageError, StorageErrorKind},
+    open_storage as open_database_pair,
+    service::{CacheDatabase, StorageError, StorageErrorKind, StorageResult, VectorDatabase},
 };
 use std::path::Path;
+
+/// Real database owners exposed directly to regression fixtures.
+#[derive(Debug)]
+pub struct Databases<C, V> {
+    /// Vector owner closes its read-only cache attachment first.
+    pub vectors: V,
+    /// Cache owner retains the final writable cache connection.
+    pub cache: C,
+}
+
+/// Open independent real vector/cache owners through production composition.
+///
+/// # Errors
+/// Returns the original filesystem, schema, native capability or `SQLite` failure.
+pub fn open_storage(
+    cache: &Path,
+    vectors: &Path,
+) -> StorageResult<Databases<impl CacheDatabase + use<>, impl VectorDatabase + use<>>> {
+    let (vectors, cache) = open_database_pair(cache, vectors)?;
+    Ok(Databases { vectors, cache })
+}
 
 pub fn assert_error(cache: &Path, vectors: &Path, kind: StorageErrorKind) -> StorageError {
     let Err(error) = open_storage(cache, vectors) else {
@@ -62,5 +84,14 @@ pub fn build_file(path: &str, text: &str) -> letopis::service::FileRow {
         checked_at_ns: 17,
         valid: true,
         error: None,
+    }
+}
+
+/// Get a successful fixture outcome, panicking if its configuration changed.
+#[track_caller]
+pub fn get_current<T>(outcome: VectorOutcome<T>) -> T {
+    match outcome {
+        VectorOutcome::Current(value) => value,
+        VectorOutcome::ConfigChanged => panic!("fixture configuration changed"),
     }
 }

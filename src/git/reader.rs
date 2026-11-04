@@ -1,5 +1,5 @@
 use super::{
-    constants::{BLOB_KIND, HASH_CHUNK_BYTES, TREE_KIND},
+    constants::{BLOB_KIND, HASH_CHUNK_BYTES, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
     error::make_io_error,
     hashing::ObjectHasher,
 };
@@ -50,7 +50,10 @@ impl ObjectReader {
     /// Returns an internal error for a format mismatch or failure to open the local store.
     pub(super) fn new(repo: &Repository, oid_len: usize) -> Result<Self, SnapshotError> {
         if repo.object_hash().len_in_hex() != oid_len {
-            return Err(fail_integrity());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                OBJECT_INTEGRITY_MESSAGE,
+            ));
         }
         // Construct one operation-owned raw handle: gix's repository config can
         // impose a 16 MiB reduced-trust cap or user cap, neither belongs to this API.
@@ -148,9 +151,14 @@ impl ObjectReader {
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         {
-            return Err(fail_integrity());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                OBJECT_INTEGRITY_MESSAGE,
+            ));
         }
-        let id = ObjectId::from_hex(oid.as_bytes()).map_err(|_| fail_integrity())?;
+        let id = ObjectId::from_hex(oid.as_bytes()).map_err(|_| {
+            SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
+        })?;
         // Bypass Repository's payload cache, even if a caller configured one.
         // The raw local ODB handle cannot invoke promisor fetch or content filters.
         let (object, _) = self
@@ -158,19 +166,27 @@ impl ObjectReader {
             .try_find_cached(&id, &mut self.buffer, &mut Never)
             .map_err(|error| make_decode_error(&error))?
             .ok_or_else(|| SnapshotError::new(missing, "Git object is missing"))?;
-        let kind = std::str::from_utf8(object.kind.as_bytes()).map_err(|_| fail_integrity())?;
+        let kind = std::str::from_utf8(object.kind.as_bytes()).map_err(|_| {
+            SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
+        })?;
         if kind != expected {
             return Err(SnapshotError::new(wrong_type, "unexpected Git object type"));
         }
         if kind != BLOB_KIND && kind != TREE_KIND {
-            return Err(fail_integrity());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                OBJECT_INTEGRITY_MESSAGE,
+            ));
         }
         let mut hash = ObjectHasher::new(self.oid_len, kind, object.data.len() as u64)?;
         for chunk in object.data.chunks(HASH_CHUNK_BYTES) {
             hash.update(chunk);
         }
         if hash.finish()? != oid {
-            return Err(fail_integrity());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                OBJECT_INTEGRITY_MESSAGE,
+            ));
         }
         Ok(())
     }
@@ -181,13 +197,6 @@ fn make_decode_error(error: &gix::Error) -> SnapshotError {
         .downcast_any_ref::<io::Error>()
         .map_or(io::ErrorKind::InvalidData, io::Error::kind);
     make_io_error("Git object decode failed", io::Error::from(kind))
-}
-
-fn fail_integrity() -> SnapshotError {
-    SnapshotError::new(
-        SnapshotErrorKind::InternalError,
-        "Git object integrity failed",
-    )
 }
 
 #[cfg(test)]

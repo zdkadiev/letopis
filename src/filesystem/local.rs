@@ -27,6 +27,7 @@ use std::{
 };
 
 const COORDINATION_LOCK_ERROR: &str = "cannot observe coordination lock";
+const DOCUMENT_CHANGED_ERROR: &str = "document path changed during observation";
 const SERVICE_DIRECTORY_ERROR: &str = "cannot observe service directory";
 const TIMESTAMP_ERROR: &str = "unsupported file timestamp";
 const INDEX_LOCK: &str = "index.lock";
@@ -213,7 +214,7 @@ impl EmbedLocker for LocalFileSystem {
 
     fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>> {
         let file = self.open_lock_file(EMBED_LOCK)?;
-        let before = observe_lock_descriptor(&file)?;
+        let before = get_lock_stat_by_descriptor(&file)?;
         if !self.try_acquire_lock(&file)? {
             self.verify_lock(&file, EMBED_LOCK)?;
             return Ok(None);
@@ -226,7 +227,7 @@ impl FileSystem for LocalFileSystem {
     type IndexLock = PersistentLock;
 
     fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
-        let Some(stat) = self.stat_file(path)? else {
+        let Some(stat) = self.get_file_stat_by_path(path)? else {
             return Ok(None);
         };
         #[cfg(test)]
@@ -234,8 +235,11 @@ impl FileSystem for LocalFileSystem {
             hook();
         }
         let mut file = self.open_file(path)?;
-        if observe_descriptor(&file)? != stat {
-            return Err(fail_changed());
+        if get_file_stat_by_descriptor(&file)? != stat {
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENT_CHANGED_ERROR,
+            ));
         }
         let checked_at_ns = self.get_time_ns()?;
         let mut bytes = Vec::new();
@@ -253,15 +257,18 @@ impl FileSystem for LocalFileSystem {
         }))
     }
 
-    fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
-        let before = self.observe_entry(path.as_str())?;
+    fn get_file_stat_by_path(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
+        let before = self.get_entry_by_path(path.as_str())?;
         #[cfg(test)]
         if let Some(hook) = self.between_stats.take() {
             hook();
         }
-        let after = self.observe_entry(path.as_str())?;
-        if !same_entry(before.as_ref(), after.as_ref()) {
-            return Err(fail_changed());
+        let after = self.get_entry_by_path(path.as_str())?;
+        if !is_same_entry(before.as_ref(), after.as_ref()) {
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENT_CHANGED_ERROR,
+            ));
         }
         classify_entry(before.as_ref())
     }
@@ -280,7 +287,7 @@ impl FileSystem for LocalFileSystem {
 
     fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
         let file = self.open_lock_file(INDEX_LOCK)?;
-        let before = observe_lock_descriptor(&file)?;
+        let before = get_lock_stat_by_descriptor(&file)?;
         if !self.try_acquire_lock(&file)? {
             retry_io(|| file.lock())
                 .map_err(|cause| fail_io("cannot acquire coordination lock", cause))?;
@@ -316,14 +323,17 @@ impl LocalFileSystem {
         let current = fstat(&file).map_err(|cause| fail_io(COORDINATION_LOCK_ERROR, cause))?;
         require_identity(&before, &current)
             .map_err(|cause| fail_io("coordination lock changed", cause))?;
-        observe_lock_descriptor(&file)?;
+        get_lock_stat_by_descriptor(&file)?;
         self.verify_existing_lock(&file, name)?;
         Ok(Some(file))
     }
 
     pub(super) fn verify_existing_lock(&self, file: &File, name: &str) -> DocumentResult<()> {
         let Some(directory) = self.get_existing_service_directory()? else {
-            return Err(fail_changed());
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENT_CHANGED_ERROR,
+            ));
         };
         let pinned = fstat(file).map_err(|cause| fail_io(COORDINATION_LOCK_ERROR, cause))?;
         verify_entry(directory, name, &pinned)
@@ -360,7 +370,7 @@ impl LocalFileSystem {
             require_identity(&before, &current)
                 .map_err(|cause| fail_io("coordination lock changed", cause))?;
         }
-        observe_lock_descriptor(&file)?;
+        get_lock_stat_by_descriptor(&file)?;
         self.verify_lock(&file, name)?;
         Ok(file)
     }
@@ -388,13 +398,19 @@ impl LocalFileSystem {
         let mut guard = PersistentLock { file };
         self.verify_lock(&guard.file, name)?;
         let path = format!("{SERVICE_DIRECTORY}/{name}");
-        let Some(current) = self.observe_file(&path)? else {
-            return Err(fail_changed());
+        let Some(current) = self.get_file_stat_by_raw_path(&path)? else {
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENT_CHANGED_ERROR,
+            ));
         };
         if current.inode != before.inode || current.device != before.device {
-            return Err(fail_changed());
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENT_CHANGED_ERROR,
+            ));
         }
-        observe_lock_descriptor(&guard.file)?;
+        get_lock_stat_by_descriptor(&guard.file)?;
         fchmod(&guard.file, Mode::RUSR | Mode::WUSR)
             .map_err(|cause| fail_io("cannot protect coordination lock", cause))?;
         guard
@@ -420,7 +436,9 @@ impl LocalFileSystem {
             let directory = self.create_service_directory()?;
             let _ = self.service.set(directory);
         }
-        let directory = self.service.get().ok_or_else(fail_changed)?;
+        let directory = self.service.get().ok_or_else(|| {
+            DocumentError::new(DocumentErrorKind::InternalError, DOCUMENT_CHANGED_ERROR)
+        })?;
         self.verify_service_directory(directory)?;
         Ok(directory)
     }
@@ -446,7 +464,9 @@ impl LocalFileSystem {
                 .map_err(|cause| fail_io("service directory changed", cause))?;
             let _ = self.service.set(file);
         }
-        let directory = self.service.get().ok_or_else(fail_changed)?;
+        let directory = self.service.get().ok_or_else(|| {
+            DocumentError::new(DocumentErrorKind::InternalError, DOCUMENT_CHANGED_ERROR)
+        })?;
         self.verify_service_directory(directory)?;
         Ok(Some(directory))
     }
@@ -498,21 +518,24 @@ impl LocalFileSystem {
         before: FileStat,
         size: usize,
     ) -> DocumentResult<()> {
-        let after = observe_descriptor(file)?;
+        let after = get_file_stat_by_descriptor(file)?;
         if after != before
-            || self.observe_file(path.as_str())? != Some(before)
+            || self.get_file_stat_by_raw_path(path.as_str())? != Some(before)
             || u64::try_from(size).ok() != Some(before.size)
         {
-            return Err(fail_changed());
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENT_CHANGED_ERROR,
+            ));
         }
         Ok(())
     }
 
-    fn observe_file(&self, path: &str) -> DocumentResult<Option<FileStat>> {
-        classify_entry(self.observe_entry(path)?.as_ref())
+    fn get_file_stat_by_raw_path(&self, path: &str) -> DocumentResult<Option<FileStat>> {
+        classify_entry(self.get_entry_by_path(path)?.as_ref())
     }
 
-    fn observe_entry(&self, path: &str) -> DocumentResult<Option<Stat>> {
+    fn get_entry_by_path(&self, path: &str) -> DocumentResult<Option<Stat>> {
         let observation = self
             .open_parent(path)
             .and_then(|(parent, name)| statat(parent, name, AtFlags::SYMLINK_NOFOLLOW));
@@ -562,7 +585,7 @@ fn reopen_concurrently_created_lock(
     }
 }
 
-fn observe_lock_descriptor(file: &File) -> DocumentResult<FileStat> {
+fn get_lock_stat_by_descriptor(file: &File) -> DocumentResult<FileStat> {
     let stat = fstat(file).map_err(|cause| fail_io(COORDINATION_LOCK_ERROR, cause))?;
     if stat.st_nlink != 1 {
         return Err(DocumentError::new(
@@ -573,12 +596,12 @@ fn observe_lock_descriptor(file: &File) -> DocumentResult<FileStat> {
     build_file_stat(&stat)
 }
 
-fn observe_descriptor(file: &impl AsFd) -> DocumentResult<FileStat> {
+fn get_file_stat_by_descriptor(file: &impl AsFd) -> DocumentResult<FileStat> {
     let stat = fstat(file).map_err(|cause| fail_io("cannot observe open document file", cause))?;
     build_file_stat(&stat)
 }
 
-fn same_entry(before: Option<&Stat>, after: Option<&Stat>) -> bool {
+fn is_same_entry(before: Option<&Stat>, after: Option<&Stat>) -> bool {
     match (before, after) {
         (None, None) => true,
         (Some(before), Some(after)) => {
@@ -661,12 +684,6 @@ pub(super) fn fail_io(
     cause: impl Error + Send + Sync + 'static,
 ) -> DocumentError {
     DocumentError::new_with_cause(DocumentErrorKind::InternalError, message, cause)
-}
-fn fail_changed() -> DocumentError {
-    DocumentError::new(
-        DocumentErrorKind::InternalError,
-        "document path changed during observation",
-    )
 }
 
 #[cfg(test)]

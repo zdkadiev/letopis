@@ -30,6 +30,15 @@ const ROOT_SECTION: &str = "embedding_model";
 const SECTION_FIELDS: [&str; 5] = ["enabled", "provider", "model", "parameters", "max_retries"];
 const LEGACY_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retries"];
 
+/// Transaction contexts in which a use case may begin.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TransactionRequirement {
+    /// Require no inherited read or write scope.
+    Inactive,
+    /// Permit an inherited read, while rejecting an inherited write.
+    ReadOnly,
+}
+
 /// Complete generated configuration written by initialization.
 pub(crate) const GENERATED_CONFIG: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  }\n}\n";
 
@@ -754,7 +763,9 @@ impl Configuration {
     pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
         let JsonValue(value) =
             serde_json::from_slice::<JsonValue<true>>(bytes).map_err(map_config_error)?;
-        let root = value.as_object().ok_or_else(reject_config)?;
+        let root = value
+            .as_object()
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         if root.len() == 1
             && let Some(section) = root.get(ROOT_SECTION)
         {
@@ -763,7 +774,7 @@ impl Configuration {
         if root.keys().any(|key| LEGACY_FIELDS.contains(&key.as_str())) {
             return Err(EmbeddingError::new(EmbeddingErrorKind::MigrationRequired));
         }
-        Err(reject_config())
+        Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
     }
 
     /// Return whether configured embedding execution is enabled.
@@ -840,35 +851,37 @@ pub struct SnapshotEntry {
 }
 
 fn parse_section(value: &Value) -> EmbeddingResult<Configuration> {
-    let section = value.as_object().ok_or_else(reject_config)?;
+    let section = value
+        .as_object()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     if section.len() != SECTION_FIELDS.len()
         || section
             .keys()
             .any(|key| !SECTION_FIELDS.contains(&key.as_str()))
     {
-        return Err(reject_config());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     let enabled = section
         .get("enabled")
         .and_then(Value::as_bool)
-        .ok_or_else(reject_config)?;
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     let max_retries = section
         .get("max_retries")
         .and_then(Value::as_u64)
-        .ok_or_else(reject_config)?;
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     validate_retries(max_retries)?;
     let provider = get_optional_string(section, "provider")?;
     let model = get_optional_string(section, "model")?;
     let parameters = section
         .get("parameters")
         .and_then(Value::as_object)
-        .ok_or_else(reject_config)?;
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     match (provider, model) {
         (None, None) => parse_unconfigured(enabled, parameters, max_retries),
         (Some(provider), Some(model)) => {
             parse_configured(enabled, provider, model, parameters, max_retries)
         }
-        _ => Err(reject_config()),
+        _ => Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)),
     }
 }
 
@@ -879,7 +892,7 @@ fn get_optional_string<'a>(
     match section.get(field) {
         Some(Value::Null) => Ok(None),
         Some(Value::String(value)) => Ok(Some(value)),
-        _ => Err(reject_config()),
+        _ => Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)),
     }
 }
 
@@ -889,7 +902,7 @@ fn parse_unconfigured(
     max_retries: u64,
 ) -> EmbeddingResult<Configuration> {
     if enabled || !parameters.is_empty() {
-        return Err(reject_config());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     Ok(Configuration::Unconfigured { max_retries })
 }
@@ -921,7 +934,7 @@ fn validate_retries(retries: u64) -> EmbeddingResult<()> {
         .checked_add(1)
         .filter(|attempts| i64::try_from(*attempts).is_ok())
         .map(|_| ())
-        .ok_or_else(reject_config)
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
 }
 
 impl EmbeddingConfig {
@@ -936,36 +949,38 @@ impl EmbeddingConfig {
     pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
         let JsonValue(value) =
             serde_json::from_slice::<JsonValue<true>>(bytes).map_err(map_config_error)?;
-        let root = value.as_object().ok_or_else(reject_config)?;
+        let root = value
+            .as_object()
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         if root.len() != ROOT_FIELDS.len()
             || root.keys().any(|key| !ROOT_FIELDS.contains(&key.as_str()))
         {
-            return Err(reject_config());
+            return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
         }
         let provider = match root.get("provider").and_then(Value::as_str) {
             Some("ollama") => ProviderKind::Ollama,
             Some("openai") => ProviderKind::Openai,
-            _ => return Err(reject_config()),
+            _ => return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)),
         };
         let model = root
             .get("model")
             .and_then(Value::as_str)
             .filter(|model| !model.is_empty())
-            .ok_or_else(reject_config)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         let parameters = root
             .get("parameters")
             .and_then(Value::as_object)
-            .ok_or_else(reject_config)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         validate_parameters(parameters)?;
         let dimensions = get_dimensions(parameters)?;
         let retries = root
             .get("max_retries")
             .and_then(Value::as_u64)
-            .ok_or_else(reject_config)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         let max_attempts = retries
             .checked_add(1)
             .filter(|count| i64::try_from(*count).is_ok())
-            .ok_or_else(reject_config)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
         let canonical = serde_json_canonicalizer::to_vec(&value).map_err(map_config_error)?;
         verify_execution_identity(&value, &canonical)?;
         Ok(Self {
@@ -1021,7 +1036,7 @@ fn validate_parameters(parameters: &Map<String, Value>) -> EmbeddingResult<()> {
             .get("encoding_format")
             .is_some_and(|v| v.as_str() != Some("float"))
     {
-        return Err(reject_config());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     Ok(())
 }
@@ -1034,8 +1049,9 @@ fn get_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<Non
                 .as_u64()
                 .and_then(|size| usize::try_from(size).ok())
                 .filter(|size| (MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(size))
-                .ok_or_else(reject_config)?;
-            NonZeroUsize::new(size).ok_or_else(reject_config)
+                .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+            NonZeroUsize::new(size)
+                .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
         })
         .transpose()
 }
@@ -1044,7 +1060,7 @@ fn verify_execution_identity(original: &Value, bytes: &[u8]) -> EmbeddingResult<
     let JsonValue(canonical) =
         serde_json::from_slice::<JsonValue<false>>(bytes).map_err(map_config_error)?;
     if !has_exact_integers(original, &canonical) {
-        return Err(reject_config());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     Ok(())
 }
@@ -1073,10 +1089,6 @@ fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
 
 fn map_config_error(cause: impl std::error::Error + Send + Sync + 'static) -> EmbeddingError {
     EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
-}
-
-fn reject_config() -> EmbeddingError {
-    EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)
 }
 
 #[cfg(test)]

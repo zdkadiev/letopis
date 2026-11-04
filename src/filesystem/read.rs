@@ -1,7 +1,7 @@
 use super::confined::{
-    ConfinedParent, get_stat, map_io, reject_input, require_identity, require_type, verify_entry,
+    ConfinedParent, get_stat, map_io, require_identity, require_type, verify_entry,
 };
-use crate::service::EmbeddingResult;
+use crate::service::{EmbeddingError, EmbeddingErrorKind, EmbeddingResult};
 use rustix::fs::{FileType, Mode, OFlags, Stat, fstat, openat};
 use std::fs::File;
 use std::io::Read;
@@ -18,7 +18,9 @@ pub(super) fn get_regular(
     mut observe: impl FnMut(ReadStage),
 ) -> EmbeddingResult<Option<Vec<u8>>> {
     let parts: Vec<_> = path.split('/').collect();
-    let (name, ancestors) = parts.split_last().ok_or_else(reject_input)?;
+    let (name, ancestors) = parts
+        .split_last()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::Input))?;
     let Some(parent) = ConfinedParent::walk(root, ancestors)? else {
         return Ok(None);
     };
@@ -51,7 +53,7 @@ fn require_unchanged(before: &Stat, after: &Stat) -> EmbeddingResult<()> {
         || before.st_ctime != after.st_ctime
         || before.st_ctime_nsec != after.st_ctime_nsec
     {
-        return Err(reject_input());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::Input));
     }
     Ok(())
 }

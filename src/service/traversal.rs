@@ -1,21 +1,20 @@
-use super::ReadTransaction;
 use super::{
-    CommandError, CommandErrorKind, CommandResult, ElementAddress, ElementLocation, Embedder,
-    FileSystem, GraphRead, GraphTraversal, KnowledgeMetadata, MarkdownCodec, NEIGHBOR_PAGE_QUANTUM,
-    NeighborCursor, NeighborDirection, NeighborPageRequest, NodeMetadata, ProvenanceRequest,
-    Refresher, SearchFlag, SourceAvailability, SourceProvenance, SourceReader, Storage,
+    CacheDatabase, CommandError, CommandErrorKind, CommandResult, ElementAddress, ElementLocation,
+    Embedder, FileSystem, GraphRead, GraphTraversal, KnowledgeMetadata, MarkdownCodec,
+    NEIGHBOR_PAGE_QUANTUM, NeighborCursor, NeighborDirection, NeighborPageRequest, NodeMetadata,
+    ProvenanceRequest, Refresher, SearchFlag, SourceAvailability, SourceProvenance, SourceReader,
     StorageRead, Traversal, TraversalLink, TraversalMode, TraversalRequest, Traverser,
     utils::is_current_knowledge,
 };
 use crate::domain::{EdgeTarget, EdgeType, Graph, RepoPath, SourceUri};
-use std::{collections::BTreeSet, error::Error, fmt, num::NonZeroUsize};
+use std::{collections::BTreeSet, error::Error, fmt, num::NonZeroUsize, rc::Rc};
 
 /// Refresh, pin, traverse and observe selected links under one scoped storage read.
 ///
 /// Collaborators are independently owned; readiness cannot write through the pinned read view.
-pub(crate) struct TraversalService<F> {
+pub(crate) struct TraversalService<F, C> {
     /// Exclusive owner of the scoped graph/metadata read capability.
-    pub(crate) storage: Box<dyn Storage>,
+    pub(crate) storage: Rc<C>,
     /// Confined live knowledge observations.
     pub(crate) filesystem: F,
     /// Canonical publication before readiness and pinning.
@@ -31,68 +30,80 @@ pub(crate) struct TraversalService<F> {
     /// Injected incremental graph algorithm without complete metadata access.
     pub(crate) graph: Box<dyn GraphTraversal>,
 }
-struct LinkObservations<'a, F> {
+struct LinkObservations<'a, F, C> {
+    storage: &'a C,
     filesystem: &'a F,
     markdown: &'a dyn MarkdownCodec,
     sources: &'a dyn SourceReader,
     provenance: &'a dyn SourceProvenance,
 }
-impl<F: FileSystem> Traverser for TraversalService<F> {
+impl<F: FileSystem, C: CacheDatabase> Traverser for TraversalService<F, C> {
     fn traverse(&mut self, request: &TraversalRequest) -> CommandResult<Traversal> {
         self.refresher.refresh().map_err(map_traversal_error)?;
         self.embeddings
             .get_configuration()
             .map_err(map_traversal_error)?;
-        let mut read = self.storage.begin_read_tx().map_err(map_traversal_error)?;
-        let graph = self.graph.traverse(read.as_mut(), request)?;
-        let observations = LinkObservations {
-            filesystem: &self.filesystem,
-            markdown: self.markdown.as_ref(),
-            sources: self.sources.as_ref(),
-            provenance: self.provenance.as_ref(),
-        };
-        observations.get_links(read.as_mut(), graph)
+        self.storage
+            .with_read_tx(|| {
+                let graph = self.graph.traverse(request)?;
+                let observations = LinkObservations {
+                    storage: self.storage.as_ref(),
+                    filesystem: &self.filesystem,
+                    markdown: self.markdown.as_ref(),
+                    sources: self.sources.as_ref(),
+                    provenance: self.provenance.as_ref(),
+                };
+                observations.get_links(graph)
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => map_traversal_error(error),
+            })
     }
 }
-impl<F: FileSystem> LinkObservations<'_, F> {
-    fn get_links(&self, read: &mut dyn ReadTransaction, graph: Graph) -> CommandResult<Traversal> {
+impl<F: FileSystem, C: StorageRead + GraphRead> LinkObservations<'_, F, C> {
+    fn get_links(&self, graph: Graph) -> CommandResult<Traversal> {
         let (elements, edges) = graph.into_parts();
         let elements = elements
             .into_iter()
-            .map(|element| self.get_link(read, element))
+            .map(|element| self.get_link(element))
             .collect::<CommandResult<Vec<_>>>()?;
         Ok(Traversal { elements, edges })
     }
 
-    fn get_link(
-        &self,
-        read: &mut dyn ReadTransaction,
-        element: EdgeTarget,
-    ) -> CommandResult<TraversalLink> {
+    fn get_link(&self, element: EdgeTarget) -> CommandResult<TraversalLink> {
         match element {
-            EdgeTarget::Knowledge(_) => self.get_knowledge_link(read, &element),
-            EdgeTarget::Source(uri) => self.get_source_link(read, &uri),
+            EdgeTarget::Knowledge(_) => self.get_knowledge_link(&element),
+            EdgeTarget::Source(uri) => self.get_source_link(&uri),
         }
     }
 
-    fn get_knowledge_link(
-        &self,
-        read: &mut dyn ReadTransaction,
-        element: &EdgeTarget,
-    ) -> CommandResult<TraversalLink> {
-        let stored = read
-            .get_node_by_id(element)
+    fn get_knowledge_link(&self, element: &EdgeTarget) -> CommandResult<TraversalLink> {
+        let stored = self
+            .storage
+            .nodes_get_by_id(element)
             .map_err(map_traversal_error)?
-            .ok_or_else(fail_invalid_traversal_data)?;
+            .ok_or_else(|| {
+                CommandError::new(
+                    CommandErrorKind::InternalError,
+                    "invalid traversal index data",
+                )
+            })?;
         let NodeMetadata::Knowledge(node) = stored.metadata else {
-            return Err(fail_invalid_traversal_data());
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "invalid traversal index data",
+            ));
         };
         if node.id.as_str() != element.as_str() || node.uri != node.id {
-            return Err(fail_invalid_traversal_data());
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "invalid traversal index data",
+            ));
         }
         let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
             .map_err(map_traversal_error)?;
-        let mut flags = self.observe_bindings(read, &node)?;
+        let mut flags = self.observe_bindings(&node)?;
         let file = self
             .filesystem
             .get_file(&path)
@@ -107,23 +118,30 @@ impl<F: FileSystem> LinkObservations<'_, F> {
             element_id: ElementAddress::parse(node.id.as_str())?,
             path: ElementLocation::Local(path),
             lines: Some(node.lines),
-            revision: read.get_revision(),
+            revision: self
+                .storage
+                .project_get_by_id()
+                .map_err(map_traversal_error)?,
             flags,
         })
     }
 
-    fn get_source_link(
-        &self,
-        read: &mut dyn StorageRead,
-        uri: &SourceUri,
-    ) -> CommandResult<TraversalLink> {
+    fn get_source_link(&self, uri: &SourceUri) -> CommandResult<TraversalLink> {
         let observation = self
             .sources
-            .get_source(read, uri)
+            .get_source(uri)
             .map_err(map_traversal_error)?
-            .ok_or_else(fail_invalid_traversal_data)?;
+            .ok_or_else(|| {
+                CommandError::new(
+                    CommandErrorKind::InternalError,
+                    "invalid traversal index data",
+                )
+            })?;
         if observation.metadata.uri != *uri {
-            return Err(fail_invalid_traversal_data());
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "invalid traversal index data",
+            ));
         }
         let (path, lines) = match uri.get_local() {
             Some(local) => (
@@ -141,27 +159,35 @@ impl<F: FileSystem> LinkObservations<'_, F> {
             element_id: ElementAddress::parse(uri.as_str())?,
             path,
             lines,
-            revision: read.get_revision(),
+            revision: self
+                .storage
+                .project_get_by_id()
+                .map_err(map_traversal_error)?,
             flags,
         })
     }
-    /// Observe each outgoing source binding once in bounded pages, regardless of traversal filters.
-    fn observe_bindings(
-        &self,
-        read: &mut dyn GraphRead,
-        node: &KnowledgeMetadata,
-    ) -> CommandResult<BTreeSet<SearchFlag>> {
+}
+impl<F: FileSystem, C: GraphRead> LinkObservations<'_, F, C> {
+    /// Observe outgoing source bindings in bounded pages independently of traversal filters.
+    fn observe_bindings(&self, node: &KnowledgeMetadata) -> CommandResult<BTreeSet<SearchFlag>> {
         let id = ElementAddress::parse(node.id.as_str())?;
-        let handle = read
-            .get_node_ref_by_id(&id)
+        let handle = self
+            .storage
+            .nodes_get_ref_by_id(&id)
             .map_err(map_traversal_error)?
-            .ok_or_else(fail_invalid_traversal_data)?;
+            .ok_or_else(|| {
+                CommandError::new(
+                    CommandErrorKind::InternalError,
+                    "invalid traversal index data",
+                )
+            })?;
         let types = BTreeSet::from([EdgeType::parse("external").map_err(map_traversal_error)?]);
         let mut after = None;
         let mut flags = BTreeSet::new();
         loop {
-            let page = read
-                .get_neighbor_page(&NeighborPageRequest {
+            let page = self
+                .storage
+                .edges_get_by_nodes_row_id_and_type(&NeighborPageRequest {
                     node: handle.key,
                     direction: NeighborDirection::Outgoing,
                     mode: TraversalMode::Relations,
@@ -191,7 +217,10 @@ impl<F: FileSystem> LinkObservations<'_, F> {
                 .into_iter()
                 .map(|item| match item.node.element {
                     EdgeTarget::Source(source) => Ok(source),
-                    EdgeTarget::Knowledge(_) => Err(fail_invalid_traversal_data()),
+                    EdgeTarget::Knowledge(_) => Err(CommandError::new(
+                        CommandErrorKind::InternalError,
+                        "invalid traversal index data",
+                    )),
                 })
                 .collect::<CommandResult<BTreeSet<_>>>()?;
             flags.extend(self.observe_source_page(node, &sources)?);
@@ -213,7 +242,7 @@ impl<F: FileSystem> LinkObservations<'_, F> {
     }
 }
 
-impl<F> fmt::Debug for TraversalService<F> {
+impl<F, C> fmt::Debug for TraversalService<F, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TraversalService").finish_non_exhaustive()
     }
@@ -225,12 +254,7 @@ fn get_page_limit() -> NonZeroUsize {
     )]
     NonZeroUsize::new(NEIGHBOR_PAGE_QUANTUM).expect("positive internal quantum")
 }
-fn fail_invalid_traversal_data() -> CommandError {
-    CommandError::new(
-        CommandErrorKind::InternalError,
-        "invalid traversal index data",
-    )
-}
+
 fn map_traversal_error(cause: impl Error + Send + Sync + 'static) -> CommandError {
     CommandError::new_with_cause(
         CommandErrorKind::InternalError,
@@ -243,6 +267,7 @@ fn map_traversal_error(cause: impl Error + Send + Sync + 'static) -> CommandErro
 mod tests {
     mod bindings {
         use super::super::LinkObservations;
+        use crate::service::StorageError;
         use crate::{
             domain::{
                 Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, LineRange, Sha256, SourceUri,
@@ -276,7 +301,7 @@ mod tests {
         fn observes_large_source_bindings_pagewise() {
             // Given: source bindings and provenance observations have recorded call order.
             let events = Rc::new(RefCell::new(Vec::new()));
-            let mut read = BindingRead {
+            let read = BindingRead {
                 events: events.clone(),
                 count: 70,
                 fail_at: None,
@@ -289,15 +314,19 @@ mod tests {
             let node = build_knowledge();
             let root = tempfile::TempDir::new().unwrap();
             let filesystem = LocalFileSystem::open(root.path()).unwrap();
-            let sources = SourceService::new(LocalFileSystem::open(root.path()).unwrap());
+            let sources = SourceService::new(
+                Rc::new(crate::storage::CacheStorage::new_observed(None)),
+                LocalFileSystem::open(root.path()).unwrap(),
+            );
             let observations = LinkObservations {
+                storage: &read,
                 filesystem: &filesystem,
                 markdown: &MarkdownParser,
                 sources: &sources,
                 provenance: &provenance,
             };
             // When: the selected knowledge node observes its complete source bindings.
-            let flags = observations.observe_bindings(&mut read, &node).unwrap();
+            let flags = observations.observe_bindings(&node).unwrap();
             // Then: bounded observations preserve flags or report the expected failure.
             assert_eq!(
                 *events.borrow(),
@@ -332,7 +361,7 @@ mod tests {
         fn observes_empty_bindings_once_to_preserve_basis_validation() {
             // Given: source bindings and provenance observations have recorded call order.
             let events = Rc::new(RefCell::new(Vec::new()));
-            let mut read = BindingRead {
+            let read = BindingRead {
                 events: events.clone(),
                 count: 0,
                 fail_at: None,
@@ -345,15 +374,19 @@ mod tests {
             let node = build_knowledge();
             let root = tempfile::TempDir::new().unwrap();
             let filesystem = LocalFileSystem::open(root.path()).unwrap();
-            let sources = SourceService::new(LocalFileSystem::open(root.path()).unwrap());
+            let sources = SourceService::new(
+                Rc::new(crate::storage::CacheStorage::new_observed(None)),
+                LocalFileSystem::open(root.path()).unwrap(),
+            );
             let observations = LinkObservations {
+                storage: &read,
                 filesystem: &filesystem,
                 markdown: &MarkdownParser,
                 sources: &sources,
                 provenance: &provenance,
             };
             // When: the selected knowledge node observes its complete source bindings.
-            let flags = observations.observe_bindings(&mut read, &node).unwrap();
+            let flags = observations.observe_bindings(&node).unwrap();
             // Then: bounded observations preserve flags or report the expected failure.
             assert_eq!(*events.borrow(), ["resolve", "page:0", "observe:0"]);
             assert_eq!(flags, BTreeSet::from([SearchFlag::SourceChanged]));
@@ -363,7 +396,7 @@ mod tests {
         fn propagates_late_provenance_failure_without_partial_flags_or_further_pages() {
             // Given: source bindings and provenance observations have recorded call order.
             let events = Rc::new(RefCell::new(Vec::new()));
-            let mut read = BindingRead {
+            let read = BindingRead {
                 events: events.clone(),
                 count: 70,
                 fail_at: None,
@@ -376,15 +409,19 @@ mod tests {
             let node = build_knowledge();
             let root = tempfile::TempDir::new().unwrap();
             let filesystem = LocalFileSystem::open(root.path()).unwrap();
-            let sources = SourceService::new(LocalFileSystem::open(root.path()).unwrap());
+            let sources = SourceService::new(
+                Rc::new(crate::storage::CacheStorage::new_observed(None)),
+                LocalFileSystem::open(root.path()).unwrap(),
+            );
             let observations = LinkObservations {
+                storage: &read,
                 filesystem: &filesystem,
                 markdown: &MarkdownParser,
                 sources: &sources,
                 provenance: &provenance,
             };
             // When: the selected knowledge node observes its complete source bindings.
-            let error = observations.observe_bindings(&mut read, &node).unwrap_err();
+            let error = observations.observe_bindings(&node).unwrap_err();
             // Then: bounded observations preserve flags or report the expected failure.
             assert_eq!(
                 error.get_kind(),
@@ -400,7 +437,7 @@ mod tests {
         fn reports_late_binding_page_failure_after_completed_observations() {
             // Given: source bindings and provenance observations have recorded call order.
             let events = Rc::new(RefCell::new(Vec::new()));
-            let mut read = BindingRead {
+            let read = BindingRead {
                 events: events.clone(),
                 count: 70,
                 fail_at: Some(64),
@@ -412,8 +449,12 @@ mod tests {
             };
             let root = tempfile::TempDir::new().unwrap();
             let filesystem = LocalFileSystem::open(root.path()).unwrap();
-            let sources = SourceService::new(LocalFileSystem::open(root.path()).unwrap());
+            let sources = SourceService::new(
+                Rc::new(crate::storage::CacheStorage::new_observed(None)),
+                LocalFileSystem::open(root.path()).unwrap(),
+            );
             let observations = LinkObservations {
+                storage: &read,
                 filesystem: &filesystem,
                 markdown: &MarkdownParser,
                 sources: &sources,
@@ -421,7 +462,7 @@ mod tests {
             };
             // When: the selected knowledge node observes its complete source bindings.
             let error = observations
-                .observe_bindings(&mut read, &build_knowledge())
+                .observe_bindings(&build_knowledge())
                 .unwrap_err();
             // Then: bounded observations preserve flags or report the expected failure.
             assert_eq!(
@@ -452,8 +493,8 @@ mod tests {
             observed: RefCell<Vec<String>>,
         }
         impl GraphRead for BindingRead {
-            fn get_node_ref_by_id(
-                &mut self,
+            fn nodes_get_ref_by_id(
+                &self,
                 id: &ElementAddress,
             ) -> StorageResult<Option<GraphNodeRef>> {
                 assert_eq!(id.as_str(), "b.md");
@@ -463,8 +504,8 @@ mod tests {
                     element: EdgeTarget::Knowledge(KnowledgeId::parse("b.md").unwrap()),
                 }))
             }
-            fn get_neighbor_page(
-                &mut self,
+            fn edges_get_by_nodes_row_id_and_type(
+                &self,
                 request: &NeighborPageRequest<'_>,
             ) -> StorageResult<Vec<GraphNeighbor>> {
                 assert_eq!(request.limit.get(), 32);
@@ -481,7 +522,7 @@ mod tests {
                 });
                 self.events.borrow_mut().push(format!("page:{start}"));
                 if self.fail_at == Some(start) {
-                    return Err(crate::service::StorageError::new(
+                    return Err(StorageError::new(
                         crate::service::StorageErrorKind::InternalError,
                         "late binding page unavailable",
                     ));
@@ -565,6 +606,8 @@ mod tests {
         }
     }
     mod scoped {
+        use crate::service::TransactionError;
+
         use super::{
             super::TraversalService,
             traced_storage::{Events, TracedStorage},
@@ -577,16 +620,16 @@ mod tests {
             filesystem::LocalFileSystem,
             markdown::MarkdownParser,
             service::{
-                CommandErrorKind, ConfigState, DocumentError, DocumentErrorKind, DocumentResult,
-                DrainOutcome, ElementAddress, Embedder, EmbeddingErrorKind, EmbeddingResult,
-                GraphService, KnowledgeMetadata, NodeMetadata, ProvenanceObservation,
-                ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest, RefreshOutcome,
-                Refresher, SearchFlag, SnapshotError, SourceMetadata, SourceObservation,
-                SourceProvenance, SourceReader, SourceRevisionComparison, SourceRevisionRequest,
-                SourceService, Storage, StorageRead, TraversalDirection, TraversalMode,
-                TraversalRequest, Traverser,
+                CacheDatabase, CommandErrorKind, ConfigState, DocumentError, DocumentErrorKind,
+                DocumentResult, DrainOutcome, ElementAddress, Embedder, EmbeddingErrorKind,
+                EmbeddingResult, GraphService, KnowledgeMetadata, NodeMetadata,
+                ProvenanceObservation, ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest,
+                RefreshOutcome, Refresher, SearchFlag, SnapshotError, SourceMetadata,
+                SourceObservation, SourceProvenance, SourceReader, SourceRevisionComparison,
+                SourceRevisionRequest, SourceService, StorageRead, TraversalDirection,
+                TraversalMode, TraversalRequest, Traverser,
             },
-            storage::SqliteStorage,
+            storage::TestDatabases,
         };
         use std::{
             cell::RefCell, collections::BTreeSet, error::Error, num::NonZeroUsize, path::Path,
@@ -619,7 +662,7 @@ mod tests {
             failure: Failure,
         }
         struct Sources {
-            inner: SourceService<LocalFileSystem>,
+            inner: SourceService<LocalFileSystem, TracedStorage>,
             events: Events,
             failure: Failure,
         }
@@ -682,10 +725,7 @@ mod tests {
                     .any(|x| x.contains(S2) || x.contains("new.rs") || x.contains("c.md"))
             );
             assert_eq!(
-                events
-                    .iter()
-                    .filter(|x| x.as_str() == "begin_read_tx")
-                    .count(),
+                events.iter().filter(|x| x.as_str() == "read_scope").count(),
                 1
             );
             fixture.assert_released();
@@ -710,12 +750,9 @@ mod tests {
                 // Then: readiness precedes one pinned read without query inference.
                 assert_eq!(output.elements.len(), 1);
                 let events = fixture.events.borrow();
-                assert_eq!(&events[..3], ["refresh", "readiness", "begin_read_tx"]);
+                assert_eq!(&events[..3], ["refresh", "readiness", "read_scope"]);
                 assert_eq!(
-                    events
-                        .iter()
-                        .filter(|x| x.as_str() == "begin_read_tx")
-                        .count(),
+                    events.iter().filter(|x| x.as_str() == "read_scope").count(),
                     1
                 );
             }
@@ -727,12 +764,20 @@ mod tests {
             for failure in [Failure::Page, Failure::Source, Failure::Provenance] {
                 let fixture = Fixture::new();
                 if matches!(failure, Failure::Provenance) {
-                    let mut storage = open_storage(fixture.root.path());
-                    let mut write = storage.begin_cache_write_tx().unwrap();
-                    write
-                        .insert_edge(&build_edge("b.md", "c.md", "includes"))
+                    let storage = open_storage(fixture.root.path());
+                    storage
+                        .cache
+                        .with_write_tx(|| {
+                            let write = &storage.cache;
+                            write
+                                .edges_save_by_source_id_and_target_id_and_type(&build_edge(
+                                    "b.md", "c.md", "includes",
+                                ))
+                                .unwrap();
+
+                            write.get_publication_revision()
+                        })
                         .unwrap();
-                    write.commit().unwrap();
                 }
                 let mut service = fixture.build_service(failure, None);
                 let mut request = build_request();
@@ -754,7 +799,10 @@ mod tests {
                 fixture.assert_released();
                 publish_replacement(fixture.root.path());
                 assert_eq!(
-                    service.storage.begin_read_tx().unwrap().get_revision(),
+                    service
+                        .storage
+                        .with_read_tx(|| service.storage.project_get_by_id())
+                        .unwrap(),
                     if matches!(failure, Failure::Provenance) {
                         4
                     } else {
@@ -779,7 +827,13 @@ mod tests {
                 assert_eq!(output.elements.len(), usize::try_from(depth).unwrap());
                 fixture.assert_released();
                 publish_replacement(fixture.root.path());
-                assert_eq!(service.storage.begin_read_tx().unwrap().get_revision(), 3);
+                assert_eq!(
+                    service
+                        .storage
+                        .with_read_tx(|| service.storage.project_get_by_id())
+                        .unwrap(),
+                    3
+                );
             }
         }
 
@@ -787,19 +841,30 @@ mod tests {
             fn new() -> Self {
                 let root = TempDir::new().unwrap();
                 std::fs::write(root.path().join("old.rs"), b"live source").unwrap();
-                let mut storage = open_storage(root.path());
-                let mut write = storage.begin_cache_write_tx().unwrap();
-                for id in ["a.md", "b.md", "c.md"] {
-                    write.upsert_node(&build_knowledge(id, S1)).unwrap();
-                }
-                write.upsert_node(&build_source("old.rs")).unwrap();
-                write
-                    .insert_edge(&build_edge("a.md", "b.md", "includes"))
-                    .unwrap();
-                write
-                    .insert_edge(&build_edge("b.md", "old.rs", "external"))
-                    .unwrap();
-                assert_eq!(write.commit().unwrap(), 1);
+                let storage = open_storage(root.path());
+                let write_result = storage
+                    .cache
+                    .with_write_tx(|| {
+                        let write = &storage.cache;
+                        for id in ["a.md", "b.md", "c.md"] {
+                            write.nodes_upsert_by_id(&build_knowledge(id, S1)).unwrap();
+                        }
+                        write.nodes_upsert_by_id(&build_source("old.rs")).unwrap();
+                        write
+                            .edges_save_by_source_id_and_target_id_and_type(&build_edge(
+                                "a.md", "b.md", "includes",
+                            ))
+                            .unwrap();
+                        write
+                            .edges_save_by_source_id_and_target_id_and_type(&build_edge(
+                                "b.md", "old.rs", "external",
+                            ))
+                            .unwrap();
+
+                        write.get_publication_revision()
+                    })
+                    .map_err(TransactionError::into_inner);
+                assert_eq!(write_result.unwrap(), 1);
                 Self {
                     root,
                     events: Rc::new(RefCell::new(Vec::new())),
@@ -809,14 +874,17 @@ mod tests {
                 &self,
                 failure: Failure,
                 after_pin: Option<Box<dyn FnOnce()>>,
-            ) -> TraversalService<LocalFileSystem> {
+            ) -> TraversalService<LocalFileSystem, TracedStorage> {
+                let storage = Rc::new(TracedStorage {
+                    active: std::cell::Cell::new(false),
+                    inner: open_storage(self.root.path()).cache,
+                    events: self.events.clone(),
+                    after_pin: RefCell::new(after_pin),
+                    pages: std::cell::Cell::new(0),
+                    fail_page: matches!(failure, Failure::Page).then_some(2),
+                });
                 TraversalService {
-                    storage: Box::new(TracedStorage {
-                        inner: open_storage(self.root.path()),
-                        events: self.events.clone(),
-                        after_pin,
-                        fail_page: matches!(failure, Failure::Page).then_some(2),
-                    }),
+                    storage: Rc::clone(&storage),
                     filesystem: LocalFileSystem::open(self.root.path()).unwrap(),
                     refresher: Box::new(Refresh {
                         events: self.events.clone(),
@@ -827,7 +895,10 @@ mod tests {
                     }),
                     markdown: Box::new(MarkdownParser::new()),
                     sources: Box::new(Sources {
-                        inner: SourceService::new(LocalFileSystem::open(self.root.path()).unwrap()),
+                        inner: SourceService::new(
+                            Rc::clone(&storage),
+                            LocalFileSystem::open(self.root.path()).unwrap(),
+                        ),
                         events: self.events.clone(),
                         failure,
                     }),
@@ -835,7 +906,7 @@ mod tests {
                         events: self.events.clone(),
                         failure,
                     }),
-                    graph: Box::new(GraphService::new()),
+                    graph: Box::new(GraphService::new(storage)),
                 }
             }
             fn assert_released(&self) {
@@ -888,18 +959,18 @@ mod tests {
             }
         }
         impl SourceReader for Sources {
-            fn get_source(
-                &self,
-                view: &mut dyn StorageRead,
-                uri: &SourceUri,
-            ) -> DocumentResult<Option<SourceObservation>> {
+            fn get_source(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>> {
                 self.events
                     .borrow_mut()
                     .push(format!("source:{}", uri.as_str()));
                 if matches!(self.failure, Failure::Source) {
-                    return Err(build_private_error());
+                    return Err(DocumentError::new_with_cause(
+                        DocumentErrorKind::InternalError,
+                        "observation unavailable",
+                        std::io::Error::other("PRIVATE_OBSERVATION"),
+                    ));
                 }
-                self.inner.get_source(view, uri)
+                self.inner.get_source(uri)
             }
         }
         impl SourceProvenance for Provenance {
@@ -918,7 +989,11 @@ mod tests {
                     request.source_snapshot.unwrap().as_str()
                 ));
                 if matches!(self.failure, Failure::Provenance) && request.sources.is_empty() {
-                    return Err(build_private_error());
+                    return Err(DocumentError::new_with_cause(
+                        DocumentErrorKind::InternalError,
+                        "observation unavailable",
+                        std::io::Error::other("PRIVATE_OBSERVATION"),
+                    ));
                 }
                 Ok(ProvenanceObservation {
                     flags: BTreeSet::from([SearchFlag::SourceChanged]),
@@ -936,35 +1011,47 @@ mod tests {
             }
         }
         fn publish_replacement(root: &Path) {
-            let mut storage = open_storage(root);
-            let mut write = storage.begin_cache_write_tx().unwrap();
-            write
-                .delete_outgoing(&KnowledgeId::parse("a.md").unwrap())
+            let storage = open_storage(root);
+            storage
+                .cache
+                .with_write_tx(|| {
+                    let write = &storage.cache;
+                    write
+                        .edges_delete_by_source_id(&KnowledgeId::parse("a.md").unwrap())
+                        .unwrap();
+                    write
+                        .edges_delete_by_source_id(&KnowledgeId::parse("b.md").unwrap())
+                        .unwrap();
+                    let NodeMetadata::Knowledge(mut replacement) = build_knowledge("b.md", S2)
+                    else {
+                        panic!("expected knowledge fixture")
+                    };
+                    replacement.lines = LineRange::new(20, 30).unwrap();
+                    write
+                        .nodes_upsert_by_id(&NodeMetadata::Knowledge(replacement))
+                        .unwrap();
+                    write.nodes_upsert_by_id(&build_source("new.rs")).unwrap();
+                    write
+                        .edges_save_by_source_id_and_target_id_and_type(&build_edge(
+                            "a.md", "c.md", "includes",
+                        ))
+                        .unwrap();
+                    write
+                        .edges_save_by_source_id_and_target_id_and_type(&build_edge(
+                            "b.md", "new.rs", "external",
+                        ))
+                        .unwrap();
+                    write
+                        .delete_node(&EdgeTarget::Source(SourceUri::parse("old.rs").unwrap()))
+                        .unwrap();
+
+                    write.get_publication_revision()
+                })
                 .unwrap();
-            write
-                .delete_outgoing(&KnowledgeId::parse("b.md").unwrap())
-                .unwrap();
-            let NodeMetadata::Knowledge(mut replacement) = build_knowledge("b.md", S2) else {
-                panic!("expected knowledge fixture")
-            };
-            replacement.lines = LineRange::new(20, 30).unwrap();
-            write
-                .upsert_node(&NodeMetadata::Knowledge(replacement))
-                .unwrap();
-            write.upsert_node(&build_source("new.rs")).unwrap();
-            write
-                .insert_edge(&build_edge("a.md", "c.md", "includes"))
-                .unwrap();
-            write
-                .insert_edge(&build_edge("b.md", "new.rs", "external"))
-                .unwrap();
-            write
-                .delete_node(&EdgeTarget::Source(SourceUri::parse("old.rs").unwrap()))
-                .unwrap();
-            write.commit().unwrap();
         }
-        fn open_storage(root: &Path) -> SqliteStorage {
-            SqliteStorage::open(&root.join("cache.db"), &root.join("vectors.db")).unwrap()
+        fn open_storage(root: &Path) -> TestDatabases {
+            crate::storage::open_test_storage(&root.join("cache.db"), &root.join("vectors.db"))
+                .unwrap()
         }
         fn build_request() -> TraversalRequest {
             TraversalRequest {
@@ -1010,187 +1097,179 @@ mod tests {
             )
             .unwrap()
         }
-        fn build_private_error() -> DocumentError {
-            DocumentError::new_with_cause(
-                DocumentErrorKind::InternalError,
-                "observation unavailable",
-                std::io::Error::other("PRIVATE_OBSERVATION"),
-            )
-        }
     }
     mod traced_storage {
-        use crate::service::{CacheWrite, ReadTransaction, VectorWrite};
+
+        use crate::service::TransactionError;
         use crate::{
             domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
             service::{
                 ElementAddress, EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary,
                 EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef, GraphRead,
-                NeighborPageRequest, QueryError, Storage, StorageError, StorageErrorKind,
-                StorageRead, StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
+                NeighborPageRequest, QueryError, StorageError, StorageErrorKind, StorageRead,
+                StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
             },
-            storage::SqliteStorage,
         };
         use std::{cell::RefCell, collections::BTreeSet, num::NonZeroUsize, rc::Rc};
 
         pub(super) type Events = Rc<RefCell<Vec<String>>>;
         pub(super) struct TracedStorage {
-            pub(super) inner: SqliteStorage,
+            pub(super) inner: crate::storage::CacheStorage,
             pub(super) events: Events,
-            pub(super) after_pin: Option<Box<dyn FnOnce()>>,
+            pub(super) after_pin: RefCell<Option<Box<dyn FnOnce()>>>,
+            pub(super) pages: std::cell::Cell<usize>,
+            pub(super) active: std::cell::Cell<bool>,
             pub(super) fail_page: Option<usize>,
         }
-        pub(super) struct TracedRead<'a> {
-            inner: Box<dyn ReadTransaction + 'a>,
-            events: Events,
-            fail_page: Option<usize>,
-            pages: usize,
-            after_pin: Option<Box<dyn FnOnce()>>,
-        }
-        impl Storage for TracedStorage {
-            fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
-                self.events.borrow_mut().push("begin_read_tx".into());
-                let read = self.inner.begin_read_tx()?;
-                Ok(Box::new(TracedRead {
-                    inner: read,
-                    events: self.events.clone(),
-                    fail_page: self.fail_page,
-                    pages: 0,
-                    after_pin: self.after_pin.take(),
-                }))
+        use crate::service::utils::cache_test_support::delegate_cache_writes;
+        impl crate::service::CacheDatabase for TracedStorage {
+            delegate_cache_writes!();
+            fn with_read_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                let nested = self.active.replace(true);
+                if !nested {
+                    self.events.borrow_mut().push("read_scope".into());
+                    self.pages.set(0);
+                }
+                let result = self.inner.with_read_tx(operation);
+                self.active.set(nested);
+                result
             }
-            fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>> {
-                self.inner.begin_cache_write_tx()
+            fn with_write_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_write_tx(operation)
             }
-            fn begin_vector_write_tx(
-                &mut self,
-                expected: &Sha256,
-            ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>> {
-                self.inner.begin_vector_write_tx(expected)
-            }
-            fn reset_vectors(
-                &mut self,
-                observed: Option<&Sha256>,
-                identity: &Sha256,
-            ) -> StorageResult<VectorOutcome<bool>> {
-                self.inner.reset_vectors(observed, identity)
+            fn with_status_read_tx<T, E, F>(
+                &self,
+                operation: F,
+            ) -> Result<Option<T>, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_status_read_tx(operation)
             }
         }
-        impl<'a> GraphRead for TracedRead<'a> {
-            fn get_node_ref_by_id(
-                &mut self,
+
+        impl GraphRead for TracedStorage {
+            fn nodes_get_ref_by_id(
+                &self,
                 id: &ElementAddress,
             ) -> StorageResult<Option<GraphNodeRef>> {
                 self.events
                     .borrow_mut()
                     .push(format!("resolve:{}", id.as_str()));
-                self.inner.get_node_ref_by_id(id)
+                self.inner.nodes_get_ref_by_id(id)
             }
-            fn get_neighbor_page(
-                &mut self,
+            fn edges_get_by_nodes_row_id_and_type(
+                &self,
                 request: &NeighborPageRequest<'_>,
             ) -> StorageResult<Vec<GraphNeighbor>> {
                 assert!(request.limit.get() <= 32);
-                self.pages += 1;
+                self.pages.set(self.pages.get() + 1);
                 self.events
                     .borrow_mut()
-                    .push(format!("page:{}", self.pages));
-                if self.fail_page == Some(self.pages) {
+                    .push(format!("page:{}", self.pages.get()));
+                if self.fail_page == Some(self.pages.get()) {
                     return Err(StorageError::new_with_cause(
                         StorageErrorKind::InternalError,
                         "page unavailable",
                         std::io::Error::other("PRIVATE_PAGE"),
                     ));
                 }
-                let page = self.inner.get_neighbor_page(request)?;
+                let page = self.inner.edges_get_by_nodes_row_id_and_type(request)?;
                 if let Some(hook) = self.after_pin.take() {
                     hook();
                 }
                 Ok(page)
             }
         }
-        impl<'a> StorageRead for TracedRead<'a> {
+        impl StorageRead for TracedStorage {
             fn get_embedding_status(
-                &mut self,
+                &self,
                 policy: &EmbeddingStatusPolicy,
             ) -> StorageResult<EmbeddingStatusSummary> {
                 self.inner.get_embedding_status(policy)
             }
 
-            fn get_node_by_id(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
+            fn nodes_get_by_id(&self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
                 self.events
                     .borrow_mut()
                     .push(format!("metadata:{}", id.as_str()));
-                self.inner.get_node_by_id(id)
+                self.inner.nodes_get_by_id(id)
             }
-            fn get_revision(&self) -> u64 {
-                self.inner.get_revision()
+            fn project_get_by_id(&self) -> StorageResult<u64> {
+                self.inner.project_get_by_id()
             }
-            fn get_config_identity(&self) -> Option<Sha256> {
-                self.inner.get_config_identity()
+            fn meta_get_by_id(&self) -> StorageResult<Option<Sha256>> {
+                self.inner.meta_get_by_id()
             }
-            fn get_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
+            fn nodes_get(&self) -> StorageResult<Vec<StoredNode>> {
                 panic!("whole nodes")
             }
-            fn get_edges_by_source_id(
-                &mut self,
-                _: Option<&KnowledgeId>,
-            ) -> StorageResult<Vec<Edge>> {
+            fn edges_get_by_source_id(&self, _: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>> {
                 panic!("whole edges")
             }
-            fn get_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
-                self.inner.get_source_snapshots()
+            fn nodes_get_by_source_snapshot(&self) -> StorageResult<BTreeSet<TreeOid>> {
+                self.inner.nodes_get_by_source_snapshot()
             }
-            fn get_file_by_path(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
-                self.inner.get_file_by_path(path)
+            fn files_get_by_path(&self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
+                self.inner.files_get_by_path(path)
             }
-            fn get_files(&mut self) -> StorageResult<Vec<FileRow>> {
-                self.inner.get_files()
+            fn files_get(&self) -> StorageResult<Vec<FileRow>> {
+                self.inner.files_get()
             }
-            fn get_text_matches_by_expression(&mut self, _: &str) -> StorageResult<Vec<TextMatch>> {
+            fn text_index_get_by_expression(&self, _: &str) -> StorageResult<Vec<TextMatch>> {
                 panic!("query text")
             }
-            fn get_next_embedding_work_by_id_and_max_attempts(
-                &mut self,
+            fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                &self,
                 expected: &Sha256,
                 max_attempts: u64,
                 after: Option<&KnowledgeId>,
             ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>> {
-                self.inner.get_next_embedding_work_by_id_and_max_attempts(
-                    expected,
-                    max_attempts,
-                    after,
-                )
+                self.inner
+                    .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                        expected,
+                        max_attempts,
+                        after,
+                    )
             }
-            fn get_vector_dimensions(
-                &mut self,
+            fn vector_index_config_get_by_id(
+                &self,
                 expected: &Sha256,
             ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>> {
-                self.inner.get_vector_dimensions(expected)
+                self.inner.vector_index_config_get_by_id(expected)
             }
-            fn get_vector_by_search_hash(
-                &mut self,
+            fn vector_keys_get_vector_by_search_hash(
+                &self,
                 expected: &Sha256,
                 search_hash: &Sha256,
             ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>> {
-                self.inner.get_vector_by_search_hash(expected, search_hash)
+                self.inner
+                    .vector_keys_get_vector_by_search_hash(expected, search_hash)
             }
-            fn get_nearest_vectors(
-                &mut self,
+            fn vector_index_get_by_vector(
+                &self,
                 _: &Sha256,
                 _: &[f32],
                 _: usize,
             ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
                 panic!("query vectors")
             }
-            fn get_failure_by_search_hash(
-                &mut self,
+            fn embed_failures_get_by_search_hash(
+                &self,
                 expected: &Sha256,
                 search_hash: &Sha256,
             ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>> {
-                self.inner.get_failure_by_search_hash(expected, search_hash)
+                self.inner
+                    .embed_failures_get_by_search_hash(expected, search_hash)
             }
-            fn get_query_error(&mut self) -> StorageResult<Option<QueryError>> {
-                self.inner.get_query_error()
+            fn query_error_get_by_id(&self) -> StorageResult<Option<QueryError>> {
+                self.inner.query_error_get_by_id()
             }
         }
     }

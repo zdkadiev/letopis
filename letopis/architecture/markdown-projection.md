@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"e6730713cdcf157bcb2294169c248f3b165a37f1"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
 # Markdown projection and publication
 
 Marked Markdown in the Git worktree is the authored knowledge; SQLite is its
@@ -29,6 +29,6 @@ than an incremental one. The full unscoped `check` also requests verified refres
 
 [Parsing Markdown documents](markdown-parsing.md "letopis:type=related_to;path=letopis/architecture/markdown-parsing.md")
 
-[Cache transaction](../../src/storage/cache_write.rs "letopis:type=external;path=src/storage/cache_write.rs")
+[Cache transaction](../../src/storage/cache.rs "letopis:type=external;path=src/storage/cache.rs")
 
 [Storage model](storage.md "letopis:type=related_to;path=letopis/architecture/storage.md")

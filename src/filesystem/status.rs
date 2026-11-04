@@ -60,18 +60,25 @@ fn get_pid(file: &mut File) -> CommandResult<NonZeroU32> {
         .read_to_end(&mut bytes)
         .map_err(map_lock_error)?;
     if bytes.len() > MAX_PID_BYTES {
-        return Err(invalid_pid());
+        return Err(CommandError::new(
+            CommandErrorKind::InternalError,
+            INVALID_LOCK_PID,
+        ));
     }
-    let text = std::str::from_utf8(&bytes).map_err(|_| invalid_pid())?;
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|_| CommandError::new(CommandErrorKind::InternalError, INVALID_LOCK_PID))?;
     let digits = text.strip_suffix('\n').unwrap_or(text);
     if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
-        return Err(invalid_pid());
+        return Err(CommandError::new(
+            CommandErrorKind::InternalError,
+            INVALID_LOCK_PID,
+        ));
     }
     digits
         .parse::<u32>()
         .ok()
         .and_then(NonZeroU32::new)
-        .ok_or_else(invalid_pid)
+        .ok_or_else(|| CommandError::new(CommandErrorKind::InternalError, INVALID_LOCK_PID))
 }
 
 fn map_config_error(cause: DocumentError) -> EmbeddingError {
@@ -80,8 +87,4 @@ fn map_config_error(cause: DocumentError) -> EmbeddingError {
 
 fn map_lock_error(cause: impl std::error::Error + Send + Sync + 'static) -> CommandError {
     CommandError::new_with_cause(CommandErrorKind::InternalError, INVALID_LOCK_PID, cause)
-}
-
-fn invalid_pid() -> CommandError {
-    CommandError::new(CommandErrorKind::InternalError, INVALID_LOCK_PID)
 }

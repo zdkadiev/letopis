@@ -1,5 +1,7 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
-use letopis::service::Storage;
+
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -199,7 +201,14 @@ fn assert_internal(output: &Output) {
     assert!(output.stderr.is_empty());
 }
 fn get_revision(repo: &ReadingRepo) -> u64 {
-    repo.open_storage().begin_read_tx().unwrap().get_revision()
+    {
+        let scope_databases = repo.open_storage();
+        scope_databases
+            .cache
+            .with_read_tx(|| Ok::<_, StorageError>(scope_databases.cache.project_get_by_id()))
+            .unwrap()
+    }
+    .unwrap()
 }
 fn damage_child(repo: &ReadingRepo, tree: &str, name: &str) {
     let raw = run_git(repo, &["rev-parse", &format!("{tree}:{name}")]);

@@ -60,7 +60,7 @@ pub(super) fn get_stat(parent: &File, name: &str) -> EmbeddingResult<Option<Stat
         Err(Errno::NOENT) => match statat(parent, name, AtFlags::SYMLINK_NOFOLLOW) {
             Err(Errno::NOENT) => Ok(None),
             Err(error) => Err(map_io(error)),
-            Ok(_) => Err(reject_input()),
+            Ok(_) => Err(EmbeddingError::new(EmbeddingErrorKind::Input)),
         },
         Err(error) => Err(map_io(error)),
     }
@@ -73,18 +73,15 @@ pub(super) fn verify_entry(parent: &File, name: &str, identity: &Stat) -> Embedd
 }
 pub(super) fn require_identity(before: &Stat, after: &Stat) -> EmbeddingResult<()> {
     if !has_same_identity(before, after) || before.st_mode != after.st_mode {
-        return Err(reject_input());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::Input));
     }
     Ok(())
 }
 pub(super) fn require_type(stat: &Stat, expected: FileType) -> EmbeddingResult<()> {
     if FileType::from_raw_mode(stat.st_mode) != expected {
-        return Err(reject_input());
+        return Err(EmbeddingError::new(EmbeddingErrorKind::Input));
     }
     Ok(())
-}
-pub(super) fn reject_input() -> EmbeddingError {
-    EmbeddingError::new(EmbeddingErrorKind::Input)
 }
 pub(super) fn map_io(error: impl std::error::Error + Send + Sync + 'static) -> EmbeddingError {
     EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)

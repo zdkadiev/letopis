@@ -1,8 +1,10 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 
 use letopis::{
     open_git_snapshots,
-    service::{GitSnapshots, NodeMetadata, Storage},
+    service::{GitSnapshots, NodeMetadata},
 };
 use serde_json::{Value, json};
 use std::fs;
@@ -52,41 +54,27 @@ fn check_binary_reports_multiple_errors_and_repairs() {
             {"code":"validation_failed","message":"knowledge target is missing","details":{"path":"valid.md","reason":"dangling_target","element_id":"valid.md","target":"missing.md"}}
         ]}})
     );
-    let mut storage = repo.open_storage();
+    let storage = repo.open_storage();
     assert_eq!(
-        storage.begin_read_tx().unwrap().get_nodes().unwrap().len(),
+        storage
+            .cache
+            .with_read_tx(|| storage.cache.nodes_get())
+            .unwrap()
+            .len(),
         3
     );
     // Given: the declaration in duplicate.md is repaired.
     repo.write_knowledge("duplicate.md", "Repaired duplicate");
     // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
-    assert_eq!(
-        check(&repo, b"{}")["result"]["errors"]
-            .as_array()
-            .unwrap()
-            .len(),
-        4
-    );
+    assert_eq!(get_error_count(&check(&repo, b"{}")), 4);
     // Given: the declaration in nested.md is repaired.
     repo.write_knowledge("nested.md", "Repaired nesting");
     // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
-    assert_eq!(
-        check(&repo, b"{}")["result"]["errors"]
-            .as_array()
-            .unwrap()
-            .len(),
-        3
-    );
+    assert_eq!(get_error_count(&check(&repo, b"{}")), 3);
     // Given: the declaration in missing.md is repaired.
     repo.write_knowledge("missing.md", "Target restored");
     // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
-    assert_eq!(
-        check(&repo, b"{}")["result"]["errors"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
-    );
+    assert_eq!(get_error_count(&check(&repo, b"{}")), 2);
     // Given: the declaration in b.md is repaired.
     repo.write_knowledge("b.md", "Cycle repaired");
     // When / Then: the real check command runs; safe ordered findings reflect the current declarations.
@@ -121,9 +109,13 @@ fn check_paths_filters_owners_after_full_graph_validation() {
         check(&repo, br#"{"paths":["target.md","absent.md"]}"#),
         json!({"ok":true,"result":{"errors":[]}})
     );
-    let mut storage = repo.open_storage();
+    let storage = repo.open_storage();
     assert_eq!(
-        storage.begin_read_tx().unwrap().get_nodes().unwrap().len(),
+        storage
+            .cache
+            .with_read_tx(|| storage.cache.nodes_get())
+            .unwrap()
+            .len(),
         3
     );
 }
@@ -155,17 +147,20 @@ fn check_preserves_agent_layout_and_relation_names() {
     ] {
         assert_eq!(fs::read(repo.get_root().join(path)).unwrap(), expected);
     }
-    let mut storage = repo.open_storage();
-    let mut view = storage.begin_read_tx().unwrap();
-    let nodes = view.get_nodes().unwrap();
+    let storage = repo.open_storage();
+    storage.cache.with_read_tx(|| { let view = &storage.cache;
+    let nodes = view.nodes_get().unwrap();
     assert_eq!(nodes.len(), 2);
     assert!(nodes.iter().any(|node| matches!(&node.metadata, NodeMetadata::Knowledge(metadata) if metadata.id.as_str() == "knowledge/deep/notes.markdown" && metadata.created_at == 42)));
     assert_eq!(
-        view.get_edges_by_source_id(None).unwrap()[0]
+        view.edges_get_by_source_id(None).unwrap()[0]
             .get_edge_type()
             .as_str(),
         "explains_case7"
     );
+
+
+ Ok::<_, StorageError>(())}).unwrap();
 }
 
 #[test]
@@ -271,13 +266,7 @@ fn check_keeps_invalid_files_previous_projection_and_snapshot_findings() {
     let repo = ReadingRepo::new();
     repo.write("retained.md", b"<!-- letopis: {\"created_at\":42,\"source_snapshot\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"} -->\nKnowledge\n");
     // When / Then
-    assert_eq!(
-        check(&repo, b"{}")["result"]["errors"]
-            .as_array()
-            .unwrap()
-            .len(),
-        1
-    );
+    assert_eq!(get_error_count(&check(&repo, b"{}")), 1);
     repo.write("retained.md", b"<!-- letopis: broken SECRET_RAW_BODY -->\n");
 
     let response = check(&repo, b"{}");
@@ -324,4 +313,8 @@ fn check(repo: &ReadingRepo, input: &[u8]) -> Value {
     let response: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert!(!String::from_utf8_lossy(&output.stdout).contains("SECRET_RAW_BODY"));
     response
+}
+
+fn get_error_count(response: &serde_json::Value) -> usize {
+    response["result"]["errors"].as_array().unwrap().len()
 }

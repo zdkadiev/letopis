@@ -3,6 +3,56 @@ use crate::domain::{ByteSpan, Sha256};
 use serde_json::Value;
 use std::{collections::BTreeMap, error::Error, fmt};
 
+/// Failure in a transaction boundary or its caller's operation.
+#[derive(Debug)]
+pub enum TransactionError<E> {
+    /// The operation returned an error.
+    Operation(E),
+    /// The storage transaction failed.
+    Storage(StorageError),
+}
+
+impl TransactionError<StorageError> {
+    /// Consume a storage-only scope error while retaining its original classification and cause.
+    pub fn into_inner(self) -> StorageError {
+        match self {
+            Self::Operation(error) | Self::Storage(error) => error,
+        }
+    }
+}
+
+impl<E: fmt::Display> fmt::Display for TransactionError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Operation(error) => error.fmt(formatter),
+            Self::Storage(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl<E: Error + 'static> Error for TransactionError<E> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Operation(error) => Some(error),
+            Self::Storage(error) => Some(error),
+        }
+    }
+}
+
+impl<E> TransactionError<TransactionError<E>> {
+    /// Remove an internal transaction-error layer while preserving its source.
+    pub fn flatten(self) -> TransactionError<E> {
+        match self {
+            Self::Storage(error) | Self::Operation(TransactionError::Storage(error)) => {
+                TransactionError::Storage(error)
+            }
+            Self::Operation(TransactionError::Operation(error)) => {
+                TransactionError::Operation(error)
+            }
+        }
+    }
+}
+
 /// Durable reservation count and the latest safe failure for one search hash.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmbeddingFailure {

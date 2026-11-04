@@ -1,42 +1,53 @@
 use super::utils::is_current_knowledge;
 use super::{
-    CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder, EmbeddingConfig,
-    FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceRequest, QueryEmbedding,
-    QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag, SearchLink, SearchRequest,
-    Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance, SourceRevisionComparison,
-    SourceRevisionRequest, Storage, StorageRead, TextMatch, VectorMatch, VectorOutcome,
+    CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder,
+    EmbeddingConfig, FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceRequest,
+    QueryEmbedding, QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag, SearchLink,
+    SearchRequest, Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
+    SourceRevisionComparison, SourceRevisionRequest, StorageRead, TextMatch, VectorMatch,
+    VectorOutcome,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
-use std::fmt;
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
     num::NonZeroUsize,
 };
+use std::{fmt, rc::Rc};
 
 use comparisons::RevisionComparisons;
 use ranking::{rank_candidates, validate_metrics};
 
 /// Infer and validate vector candidates while storage owns the pinned read view.
 struct QueryCandidates<'a, E> {
+    storage: &'a dyn StorageRead,
     embeddings: &'a mut E,
 }
 
 /// Observe candidate eligibility through disjoint read-only boundaries.
 struct SearchEligibility<'a, F, M, P> {
+    storage: &'a dyn StorageRead,
     filesystem: &'a F,
     markdown: &'a M,
     provenance: &'a P,
 }
 
+struct CandidateReads<'a> {
+    storage: &'a dyn StorageRead,
+}
+struct CandidateMetadata {
+    row_id: i64,
+    metadata: KnowledgeMetadata,
+}
+
 /// Refreshes and ranks complete candidate channels from one scoped read.
 ///
 /// Boundaries are independently owned; inference cannot upgrade the search read into a write.
-pub(crate) struct SearchService<D, E, F, M, P> {
+pub(crate) struct SearchService<D, E, F, M, P, C> {
     /// Canonical document publication before pinning.
     pub(crate) refresher: D,
     /// Exclusive scoped search read connection.
-    pub(crate) storage: Box<dyn Storage>,
+    pub(crate) storage: Rc<C>,
     /// Query executor owning independent configuration and diagnostic connections.
     pub(crate) embeddings: E,
     /// Confined live knowledge observations.
@@ -47,15 +58,21 @@ pub(crate) struct SearchService<D, E, F, M, P> {
     pub(crate) provenance: P,
 }
 
-impl<D, E, F, M, P> fmt::Debug for SearchService<D, E, F, M, P> {
+impl<D, E, F, M, P, C> fmt::Debug for SearchService<D, E, F, M, P, C> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("SearchService")
             .finish_non_exhaustive()
     }
 }
-impl<D: Refresher, E: Embedder, F: FileSystem, M: MarkdownCodec, P: SourceProvenance> Searcher
-    for SearchService<D, E, F, M, P>
+impl<
+    D: Refresher,
+    E: Embedder,
+    F: FileSystem,
+    M: MarkdownCodec,
+    P: SourceProvenance,
+    C: CacheDatabase,
+> Searcher for SearchService<D, E, F, M, P, C>
 {
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
         self.refresher.refresh().map_err(map_search_error)?;
@@ -66,51 +83,70 @@ impl<D: Refresher, E: Embedder, F: FileSystem, M: MarkdownCodec, P: SourceProven
             .embeddings
             .get_configuration()
             .map_err(map_search_error)?;
-        let mut read = self.storage.begin_read_tx().map_err(map_search_error)?;
-        let captured = capture_vector_config(read.as_mut(), &config)?;
-        let Some(expression) = build_fts_expression(&request.query) else {
-            return Ok(Vec::new());
-        };
-        let vectors = QueryCandidates {
-            embeddings: &mut self.embeddings,
-        }
-        .find_vector_candidates(read.as_mut(), captured, &request.query)?;
-        let fts = read
-            .get_text_matches_by_expression(&expression)
-            .map_err(map_search_error)?;
-        validate_metrics(&fts, &vectors)?;
-        let metadata = get_candidate_metadata(read.as_mut(), &fts, &vectors)?;
-        let eligibility = SearchEligibility {
-            filesystem: &self.filesystem,
-            markdown: &self.markdown,
-            provenance: &self.provenance,
-        };
-        let mut links =
-            eligibility.get_eligible_links(read.as_mut(), &metadata, &request.filters)?;
-        let eligible = links.keys().cloned().collect();
-        let ranked = rank_candidates(&fts, &vectors, &eligible, request.limit)?;
-        ranked
-            .into_iter()
-            .map(|id| links.remove(&id).ok_or_else(fail_invalid_search_data))
-            .collect()
+        let storage = Rc::clone(&self.storage);
+        storage
+            .with_read_tx(|| {
+                let read: &dyn StorageRead = self.storage.as_ref();
+                let candidates = CandidateReads { storage: read };
+                let captured = candidates.capture_vector_config(&config)?;
+                let Some(expression) = build_fts_expression(&request.query) else {
+                    return Ok(Vec::new());
+                };
+                let vectors = QueryCandidates {
+                    storage: read,
+                    embeddings: &mut self.embeddings,
+                }
+                .find_vector_candidates(captured, &request.query)?;
+                let fts = read
+                    .text_index_get_by_expression(&expression)
+                    .map_err(map_search_error)?;
+                validate_metrics(&fts, &vectors)?;
+                let metadata = candidates.get_candidate_metadata(&fts, &vectors)?;
+                let eligibility = SearchEligibility {
+                    storage: read,
+                    filesystem: &self.filesystem,
+                    markdown: &self.markdown,
+                    provenance: &self.provenance,
+                };
+                let mut links = eligibility.get_eligible_links(&metadata, &request.filters)?;
+                let eligible = links.keys().cloned().collect();
+                let ranked = rank_candidates(&fts, &vectors, &eligible, request.limit)?;
+                ranked
+                    .into_iter()
+                    .map(|id| {
+                        links.remove(&id).ok_or_else(|| {
+                            CommandError::new(
+                                CommandErrorKind::InternalError,
+                                "invalid search index data",
+                            )
+                        })
+                    })
+                    .collect()
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => map_search_error(error),
+            })
     }
 }
 
 impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_, F, M, P> {
     fn get_eligible_links(
         &self,
-        read: &mut dyn StorageRead,
         metadata: &BTreeMap<KnowledgeId, KnowledgeMetadata>,
         filters: &SearchFilters,
     ) -> CommandResult<BTreeMap<KnowledgeId, SearchLink>> {
         let mut comparisons = RevisionComparisons::new(self.provenance);
         let mut links = BTreeMap::new();
         for (id, node) in metadata {
-            let sources = get_source_bindings(read, id)?;
+            let sources = self.get_source_bindings(id)?;
             if !Self::matches_sources(&mut comparisons, node, &sources, filters)? {
                 continue;
             }
-            let mut link = self.build_link(node, read.get_revision())?;
+            let mut link = self.build_link(
+                node,
+                self.storage.project_get_by_id().map_err(map_search_error)?,
+            )?;
             let observed = self
                 .provenance
                 .observe_sources(ProvenanceRequest {
@@ -190,12 +226,23 @@ impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
         }
         Ok(false)
     }
+    fn get_source_bindings(&self, id: &KnowledgeId) -> CommandResult<BTreeSet<SourceUri>> {
+        Ok(self
+            .storage
+            .edges_get_by_source_id(Some(id))
+            .map_err(map_search_error)?
+            .into_iter()
+            .filter_map(|edge| match edge.get_target() {
+                EdgeTarget::Source(source) => Some(source.clone()),
+                EdgeTarget::Knowledge(_) => None,
+            })
+            .collect())
+    }
 }
 
 impl<E: Embedder> QueryCandidates<'_, E> {
     fn find_vector_candidates(
         &mut self,
-        read: &mut dyn StorageRead,
         captured: Option<(&EmbeddingConfig, NonZeroUsize)>,
         query: &str,
     ) -> CommandResult<Vec<VectorMatch>> {
@@ -217,10 +264,14 @@ impl<E: Embedder> QueryCandidates<'_, E> {
             || vector.len() != dimensions.get()
             || vector.iter().any(|value| !value.is_finite())
         {
-            return Err(fail_invalid_search_data());
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "invalid search index data",
+            ));
         }
-        match read
-            .get_nearest_vectors(&identity, &vector, dimensions.get())
+        match self
+            .storage
+            .vector_index_get_by_vector(&identity, &vector, dimensions.get())
             .map_err(map_search_error)?
         {
             VectorOutcome::Current(matches) => Ok(matches),
@@ -229,44 +280,85 @@ impl<E: Embedder> QueryCandidates<'_, E> {
     }
 }
 
-fn get_source_bindings(
-    read: &mut dyn StorageRead,
-    id: &KnowledgeId,
-) -> CommandResult<BTreeSet<SourceUri>> {
-    Ok(read
-        .get_edges_by_source_id(Some(id))
-        .map_err(map_search_error)?
-        .into_iter()
-        .filter_map(|edge| match edge.get_target() {
-            EdgeTarget::Source(source) => Some(source.clone()),
-            EdgeTarget::Knowledge(_) => None,
+impl CandidateReads<'_> {
+    fn capture_vector_config<'a>(
+        &self,
+        state: &'a ConfigState,
+    ) -> CommandResult<Option<(&'a EmbeddingConfig, NonZeroUsize)>> {
+        let ConfigState::Ready(config) = state else {
+            return Ok(None);
+        };
+        if self.storage.meta_get_by_id().map_err(map_search_error)? != Some(config.get_identity()) {
+            return Ok(None);
+        }
+        let VectorOutcome::Current(Some(dimensions)) = self
+            .storage
+            .vector_index_config_get_by_id(&config.get_identity())
+            .map_err(map_search_error)?
+        else {
+            return Ok(None);
+        };
+        if config
+            .get_dimensions()
+            .is_some_and(|size| size != dimensions)
+        {
+            return Ok(None);
+        }
+        Ok(Some((config, dimensions)))
+    }
+    fn get_candidate_metadata(
+        &self,
+        fts: &[TextMatch],
+        vectors: &[VectorMatch],
+    ) -> CommandResult<BTreeMap<KnowledgeId, KnowledgeMetadata>> {
+        let mut metadata = BTreeMap::new();
+        for hit in fts {
+            let candidate = self.get_knowledge(&hit.id)?;
+            if candidate.row_id != hit.row_id {
+                return Err(CommandError::new(
+                    CommandErrorKind::InternalError,
+                    "invalid search index data",
+                ));
+            }
+            metadata.insert(hit.id.clone(), candidate.metadata);
+        }
+        for hit in vectors {
+            let candidate = self.get_knowledge(&hit.id)?;
+            if candidate.metadata.search_hash != hit.search_hash {
+                return Err(CommandError::new(
+                    CommandErrorKind::InternalError,
+                    "invalid search index data",
+                ));
+            }
+            metadata.insert(hit.id.clone(), candidate.metadata);
+        }
+        Ok(metadata)
+    }
+    fn get_knowledge(&self, id: &KnowledgeId) -> CommandResult<CandidateMetadata> {
+        let stored = self
+            .storage
+            .nodes_get_by_id(&EdgeTarget::Knowledge(id.clone()))
+            .map_err(map_search_error)?
+            .ok_or_else(|| {
+                CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
+            })?;
+        let NodeMetadata::Knowledge(node) = stored.metadata else {
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "invalid search index data",
+            ));
+        };
+        if node.id != *id || node.uri != *id {
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "invalid search index data",
+            ));
+        }
+        Ok(CandidateMetadata {
+            row_id: stored.row_id,
+            metadata: node,
         })
-        .collect())
-}
-
-fn capture_vector_config<'a>(
-    read: &mut dyn StorageRead,
-    state: &'a ConfigState,
-) -> CommandResult<Option<(&'a EmbeddingConfig, NonZeroUsize)>> {
-    let ConfigState::Ready(config) = state else {
-        return Ok(None);
-    };
-    if read.get_config_identity() != Some(config.get_identity()) {
-        return Ok(None);
     }
-    let VectorOutcome::Current(Some(dimensions)) = read
-        .get_vector_dimensions(&config.get_identity())
-        .map_err(map_search_error)?
-    else {
-        return Ok(None);
-    };
-    if config
-        .get_dimensions()
-        .is_some_and(|size| size != dimensions)
-    {
-        return Ok(None);
-    }
-    Ok(Some((config, dimensions)))
 }
 
 /// Quote deterministic Unicode alphanumeric segments; punctuation never becomes FTS grammar.
@@ -282,49 +374,6 @@ fn build_fts_expression(query: &str) -> Option<String> {
     Some(tokens.join(" AND "))
 }
 
-fn get_candidate_metadata(
-    read: &mut dyn StorageRead,
-    fts: &[TextMatch],
-    vectors: &[VectorMatch],
-) -> CommandResult<BTreeMap<KnowledgeId, KnowledgeMetadata>> {
-    let mut metadata = BTreeMap::new();
-    for hit in fts {
-        let (row_id, node) = get_knowledge(read, &hit.id)?;
-        if row_id != hit.row_id {
-            return Err(fail_invalid_search_data());
-        }
-        metadata.insert(hit.id.clone(), node);
-    }
-    for hit in vectors {
-        let (_, node) = get_knowledge(read, &hit.id)?;
-        if node.search_hash != hit.search_hash {
-            return Err(fail_invalid_search_data());
-        }
-        metadata.insert(hit.id.clone(), node);
-    }
-    Ok(metadata)
-}
-
-fn get_knowledge(
-    read: &mut dyn StorageRead,
-    id: &KnowledgeId,
-) -> CommandResult<(i64, KnowledgeMetadata)> {
-    let stored = read
-        .get_node_by_id(&EdgeTarget::Knowledge(id.clone()))
-        .map_err(map_search_error)?
-        .ok_or_else(fail_invalid_search_data)?;
-    let NodeMetadata::Knowledge(node) = stored.metadata else {
-        return Err(fail_invalid_search_data());
-    };
-    if node.id != *id || node.uri != *id {
-        return Err(fail_invalid_search_data());
-    }
-    Ok((stored.row_id, node))
-}
-
-fn fail_invalid_search_data() -> CommandError {
-    CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
-}
 fn map_revision_error(cause: SnapshotError) -> CommandError {
     let kind = match cause.get_kind() {
         SnapshotErrorKind::NotFound => CommandErrorKind::NotFound,
@@ -342,10 +391,10 @@ fn map_search_error(cause: impl Error + Send + Sync + 'static) -> CommandError {
 }
 
 mod ranking {
-    use super::{fail_invalid_search_data, map_search_error};
+    use super::map_search_error;
     use crate::{
         domain::KnowledgeId,
-        service::{CommandResult, TextMatch, VectorMatch},
+        service::{CommandError, CommandErrorKind, CommandResult, TextMatch, VectorMatch},
     };
     use std::{
         collections::{BTreeMap, BTreeSet},
@@ -373,7 +422,10 @@ mod ranking {
             let score = scores.entry(id.clone()).or_insert(0.0);
             *score += weight;
             if !score.is_finite() {
-                return Err(fail_invalid_search_data());
+                return Err(CommandError::new(
+                    CommandErrorKind::InternalError,
+                    "invalid search index data",
+                ));
             }
         }
         let mut ranked: Vec<_> = scores.into_iter().collect();
@@ -397,7 +449,10 @@ mod ranking {
             .map(|hit| hit.bm25)
             .chain(vectors.iter().map(|hit| hit.distance));
         if metrics.into_iter().any(|metric| !metric.is_finite()) {
-            return Err(fail_invalid_search_data());
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "invalid search index data",
+            ));
         }
         Ok(())
     }
@@ -421,7 +476,9 @@ mod ranking {
             let rank = index
                 .checked_add(1)
                 .and_then(NonZeroUsize::new)
-                .ok_or_else(fail_invalid_search_data)?;
+                .ok_or_else(|| {
+                    CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
+                })?;
             *weight = calculate_rank_weight(rank)?;
         }
         Ok(channel)
@@ -691,19 +748,23 @@ mod comparisons {
 
 #[cfg(test)]
 mod tests {
+    use crate::service::StorageError;
+    use crate::service::TransactionError;
+    use crate::storage::get_current;
+
     use super::{
-        QueryCandidates, build_fts_expression, capture_vector_config, get_candidate_metadata,
+        CandidateReads, QueryCandidates, build_fts_expression,
         ranking::{calculate_rank_weight, rank_candidates},
     };
     use crate::{
         domain::{ElementKind, KnowledgeId, LineRange, Sha256},
-        open_storage,
         service::{
-            CommandErrorKind, ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingError,
-            EmbeddingErrorKind, EmbeddingResult, KnowledgeMetadata, MockRefresher, NodeMetadata,
-            QueryEmbedding, QueryEmbeddingRequest, RefreshOutcome, Storage, TextMatch, VectorMatch,
-            VectorOutcome,
+            CacheDatabase, CommandErrorKind, ConfigState, DrainOutcome, Embedder, EmbeddingConfig,
+            EmbeddingError, EmbeddingErrorKind, EmbeddingResult, KnowledgeMetadata, MockRefresher,
+            NodeMetadata, QueryEmbedding, QueryEmbeddingRequest, RefreshOutcome, StorageRead,
+            TextMatch, VectorDatabase, VectorMatch,
         },
+        storage::open_test_storage as open_storage,
     };
     use std::{collections::BTreeSet, num::NonZeroUsize};
     mockall::mock! {
@@ -882,35 +943,57 @@ mod tests {
     fn candidate_metadata_rejects_wrong_rows_and_search_hashes() {
         // Given: candidate rows with mismatched identities or search hashes.
         let root = tempfile::TempDir::new().unwrap();
-        let mut storage =
+        let storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
-        let mut unit = storage.begin_cache_write_tx().unwrap();
-        let id = KnowledgeId::parse("a.md").unwrap();
-        let node = NodeMetadata::Knowledge(KnowledgeMetadata {
-            id: id.clone(),
-            uri: id,
-            kind: ElementKind::Vertex,
-            hash: Sha256::digest(b"body"),
-            created_at: 1,
-            source_snapshot: None,
-            lines: LineRange::new(1, 2).unwrap(),
-            search_hash: Sha256::digest(b"search"),
-        });
-        let row = unit.upsert_node(&node).unwrap();
-        unit.commit().unwrap();
-        let mut read = storage.begin_read_tx().unwrap();
-        let mut bad_row = make_text_match("a.md", 0.0);
-        bad_row.row_id = row + 1;
-        // When / Then: candidate metadata is retrieved; mismatched rows and hashes are rejected.
-        assert!(get_candidate_metadata(read.as_mut(), &[bad_row], &[]).is_err());
-        assert!(
-            get_candidate_metadata(read.as_mut(), &[], &[make_vector_match("a.md", 0.0)]).is_err()
-        );
-        assert!(
-            get_candidate_metadata(read.as_mut(), &[make_text_match("missing.md", 0.0)], &[])
-                .is_err()
-        );
-        assert_eq!(read.get_revision(), 1);
+        let unit_result = storage
+            .cache
+            .with_write_tx(|| {
+                let unit = &storage.cache;
+                let id = KnowledgeId::parse("a.md").unwrap();
+                let node = NodeMetadata::Knowledge(KnowledgeMetadata {
+                    id: id.clone(),
+                    uri: id,
+                    kind: ElementKind::Vertex,
+                    hash: Sha256::digest(b"body"),
+                    created_at: 1,
+                    source_snapshot: None,
+                    lines: LineRange::new(1, 2).unwrap(),
+                    search_hash: Sha256::digest(b"search"),
+                });
+                let row = unit.nodes_upsert_by_id(&node).unwrap();
+
+                Ok::<_, StorageError>((unit.get_publication_revision()?, row))
+            })
+            .map_err(TransactionError::into_inner);
+        let (_, row) = unit_result.unwrap();
+
+        storage
+            .cache
+            .with_read_tx(|| {
+                let read = &storage.cache;
+                let mut bad_row = make_text_match("a.md", 0.0);
+                bad_row.row_id = row + 1;
+                // When / Then: candidate metadata is retrieved; mismatched rows and hashes are rejected.
+                assert!(
+                    CandidateReads { storage: read }
+                        .get_candidate_metadata(&[bad_row], &[])
+                        .is_err()
+                );
+                assert!(
+                    CandidateReads { storage: read }
+                        .get_candidate_metadata(&[], &[make_vector_match("a.md", 0.0)])
+                        .is_err()
+                );
+                assert!(
+                    CandidateReads { storage: read }
+                        .get_candidate_metadata(&[make_text_match("missing.md", 0.0)], &[])
+                        .is_err()
+                );
+                assert_eq!(read.project_get_by_id().unwrap(), 1);
+
+                Ok::<_, StorageError>(())
+            })
+            .unwrap();
     }
     #[test]
     fn rank_weight_checks_integer_conversion_and_preserves_reciprocals() {
@@ -929,156 +1012,148 @@ mod tests {
     }
     #[test]
     fn captured_vector_configuration_requires_matching_identity_and_native_dimensions() {
-        // Given: captured configuration and native vector dimensions.
+        // Given: a configuration and an unconfigured native database.
         let root = tempfile::TempDir::new().unwrap();
-        let mut storage =
+        let storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         let config = build_config(2);
         let ready = ConfigState::Ready(config.clone());
-        // When / Then: the vector channel configuration is captured; identity and native dimensions must agree.
-        assert!(
-            capture_vector_config(storage.begin_read_tx().unwrap().as_mut(), &ready)
+        let capture = |state: &ConfigState| {
+            storage
+                .cache
+                .with_read_tx(|| {
+                    CandidateReads {
+                        storage: &storage.cache,
+                    }
+                    .capture_vector_config(state)
+                    .map(|value| value.map(|(_, dimensions)| dimensions.get()))
+                })
                 .unwrap()
-                .is_none()
-        );
-        storage.reset_vectors(None, &config.get_identity()).unwrap();
-        assert!(
-            capture_vector_config(storage.begin_read_tx().unwrap().as_mut(), &ready)
-                .unwrap()
-                .is_none()
-        );
-        seed_dimension(&mut storage, &config, 2);
-        let mut read = storage.begin_read_tx().unwrap();
-        assert_eq!(
-            capture_vector_config(read.as_mut(), &ready)
-                .unwrap()
-                .unwrap()
-                .1
-                .get(),
-            2
-        );
+        };
+        // When / Then: identity without a native vector table remains unavailable.
+        assert_eq!(capture(&ready), None);
+        storage
+            .vectors
+            .reset_vectors(None, &config.get_identity())
+            .unwrap();
+        assert_eq!(capture(&ready), None);
+        // Given: matching native dimensions are present.
+        seed_dimension(&storage, &config, 2);
+        // When / Then: only a valid matching configuration enables vectors.
+        assert_eq!(capture(&ready), Some(2));
         for state in [
             ConfigState::Missing,
             ConfigState::Invalid(EmbeddingErrorKind::InvalidConfig),
             ConfigState::Changed,
         ] {
-            assert!(
-                capture_vector_config(read.as_mut(), &state)
-                    .unwrap()
-                    .is_none()
-            );
+            assert_eq!(capture(&state), None);
         }
-        drop(read);
         let incompatible = build_config(3);
-        seed_dimension(&mut storage, &incompatible, 2);
-        assert!(
-            capture_vector_config(
-                storage.begin_read_tx().unwrap().as_mut(),
-                &ConfigState::Ready(incompatible)
-            )
-            .unwrap()
-            .is_none()
-        );
+        seed_dimension(&storage, &incompatible, 2);
+        assert_eq!(capture(&ConfigState::Ready(incompatible)), None);
     }
     #[test]
     fn malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed() {
         // Given: malformed query vectors and embedding failures.
         let root = tempfile::TempDir::new().unwrap();
-        let mut storage =
+        let storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         let config = build_config(2);
-        seed_dimension(&mut storage, &config, 2);
-        let mut read = storage.begin_read_tx().unwrap();
-        for (identity, vector) in [
-            (Sha256::digest(b"wrong model"), vec![1.0, 0.0]),
-            (config.get_identity(), vec![1.0]),
-            (config.get_identity(), vec![f32::NAN, 0.0]),
-        ] {
-            // Given: the query provider returns a mismatched identity or invalid vector.
-            let mut embeddings =
-                build_query(Some(Ok(QueryEmbedding::Available { identity, vector })));
-            // When: vector candidates are requested.
-            let error = QueryCandidates {
-                embeddings: &mut embeddings,
-            }
-            .find_vector_candidates(
-                read.as_mut(),
-                Some((&config, NonZeroUsize::new(2).unwrap())),
-                "query",
-            )
-            .unwrap_err();
-            // Then: invalid index data and infrastructure failures propagate.
-            assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
-            assert_eq!(error.get_message(), "invalid search index data");
-        }
-        // Given: the query provider returns an infrastructure error.
-        let mut embeddings = build_query(Some(Err(EmbeddingError::new(
-            EmbeddingErrorKind::InternalError,
-        ))));
-        // When / Then: vector candidates are requested; invalid index data and infrastructure failures propagate.
-        assert!(
-            QueryCandidates {
-                embeddings: &mut embeddings
-            }
-            .find_vector_candidates(
-                read.as_mut(),
-                Some((&config, NonZeroUsize::new(2).unwrap())),
-                "query"
-            )
-            .is_err()
-        );
+        seed_dimension(&storage, &config, 2);
+        storage
+            .cache
+            .with_read_tx(|| {
+                let read = &storage.cache;
+                for (identity, vector) in [
+                    (Sha256::digest(b"wrong model"), vec![1.0, 0.0]),
+                    (config.get_identity(), vec![1.0]),
+                    (config.get_identity(), vec![f32::NAN, 0.0]),
+                ] {
+                    // Given: the query provider returns a mismatched identity or invalid vector.
+                    let mut embeddings =
+                        build_query(Some(Ok(QueryEmbedding::Available { identity, vector })));
+                    // When: vector candidates are requested.
+                    let error = QueryCandidates {
+                        storage: read,
+                        embeddings: &mut embeddings,
+                    }
+                    .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+                    .unwrap_err();
+                    // Then: invalid index data and infrastructure failures propagate.
+                    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+                    assert_eq!(error.get_message(), "invalid search index data");
+                }
+                // Given: the query provider returns an infrastructure error.
+                let mut embeddings = build_query(Some(Err(EmbeddingError::new(
+                    EmbeddingErrorKind::InternalError,
+                ))));
+                // When / Then: vector candidates are requested; invalid index data and infrastructure failures propagate.
+                assert!(
+                    QueryCandidates {
+                        storage: read,
+                        embeddings: &mut embeddings
+                    }
+                    .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+                    .is_err()
+                );
+
+                Ok::<_, StorageError>(())
+            })
+            .unwrap();
     }
     #[test]
     fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
         // Given: an unavailable or changed vector channel.
         let root = tempfile::TempDir::new().unwrap();
-        let mut storage =
+        let storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         let config = build_config(2);
-        let mut read = storage.begin_read_tx().unwrap();
-        let mut embeddings = build_query(Some(Ok(QueryEmbedding::Available {
-            identity: config.get_identity(),
-            vector: vec![1.0, 0.0],
-        })));
-        // When / Then: vector candidates are requested; the lexical fallback remains available.
-        assert!(
-            QueryCandidates {
-                embeddings: &mut embeddings
-            }
-            .find_vector_candidates(
-                read.as_mut(),
-                Some((&config, NonZeroUsize::new(2).unwrap())),
-                "query"
-            )
-            .unwrap()
-            .is_empty()
-        );
-        // Given: the query provider reports unavailable embeddings.
-        let mut unavailable = build_query(Some(Ok(QueryEmbedding::Unavailable)));
-        // When / Then: vector candidates are requested; the lexical fallback remains available.
-        assert!(
-            QueryCandidates {
-                embeddings: &mut unavailable
-            }
-            .find_vector_candidates(
-                read.as_mut(),
-                Some((&config, NonZeroUsize::new(2).unwrap())),
-                "query"
-            )
-            .unwrap()
-            .is_empty()
-        );
-        // Given: no configured vector channel is available.
-        let mut unused = build_query(None);
-        // When / Then: vector candidates are requested; the lexical fallback remains available.
-        assert!(
-            QueryCandidates {
-                embeddings: &mut unused
-            }
-            .find_vector_candidates(read.as_mut(), None, "query")
-            .unwrap()
-            .is_empty()
-        );
+        storage
+            .cache
+            .with_read_tx(|| {
+                let read = &storage.cache;
+                let mut embeddings = build_query(Some(Ok(QueryEmbedding::Available {
+                    identity: config.get_identity(),
+                    vector: vec![1.0, 0.0],
+                })));
+                // When / Then: vector candidates are requested; the lexical fallback remains available.
+                assert!(
+                    QueryCandidates {
+                        storage: read,
+                        embeddings: &mut embeddings
+                    }
+                    .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+                    .unwrap()
+                    .is_empty()
+                );
+                // Given: the query provider reports unavailable embeddings.
+                let mut unavailable = build_query(Some(Ok(QueryEmbedding::Unavailable)));
+                // When / Then: vector candidates are requested; the lexical fallback remains available.
+                assert!(
+                    QueryCandidates {
+                        storage: read,
+                        embeddings: &mut unavailable
+                    }
+                    .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+                    .unwrap()
+                    .is_empty()
+                );
+                // Given: no configured vector channel is available.
+                let mut unused = build_query(None);
+                // When / Then: vector candidates are requested; the lexical fallback remains available.
+                assert!(
+                    QueryCandidates {
+                        storage: read,
+                        embeddings: &mut unused
+                    }
+                    .find_vector_candidates(None, "query")
+                    .unwrap()
+                    .is_empty()
+                );
+
+                Ok::<_, StorageError>(())
+            })
+            .unwrap();
     }
 
     fn build_query(result: Option<EmbeddingResult<QueryEmbedding>>) -> MockQuery {
@@ -1102,21 +1177,32 @@ mod tests {
     fn build_config(dimensions: usize) -> EmbeddingConfig {
         EmbeddingConfig::parse(format!(r#"{{"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://localhost/api","dimensions":{dimensions}}},"max_retries":0}}"#).as_bytes()).unwrap()
     }
-    fn seed_dimension<S: Storage>(storage: &mut S, config: &EmbeddingConfig, dimensions: usize) {
-        let observed = storage.begin_read_tx().unwrap().get_config_identity();
+    fn seed_dimension(
+        storage: &crate::storage::TestDatabases,
+        config: &EmbeddingConfig,
+        dimensions: usize,
+    ) {
+        let observed = storage
+            .cache
+            .with_read_tx(|| Ok::<_, StorageError>(storage.cache.meta_get_by_id()))
+            .unwrap()
+            .unwrap();
         storage
+            .vectors
             .reset_vectors(observed.as_ref(), &config.get_identity())
             .unwrap();
-        let VectorOutcome::Current(mut write) = storage
-            .begin_vector_write_tx(&config.get_identity())
-            .unwrap()
-        else {
-            panic!("identity")
-        };
-        write
-            .store_vector(&Sha256::digest(b"seed"), &vec![1.0; dimensions], dimensions)
+        storage
+            .vectors
+            .with_write_tx(&config.get_identity(), || {
+                let write = &storage.vectors;
+                write
+                    .store_vector(&Sha256::digest(b"seed"), &vec![1.0; dimensions], dimensions)
+                    .unwrap();
+
+                Ok::<_, StorageError>(())
+            })
+            .map(get_current)
             .unwrap();
-        write.commit().unwrap();
     }
     fn rank_ids(fts: &[TextMatch], vectors: &[VectorMatch], limit: usize) -> Vec<String> {
         rank_candidates(
@@ -1149,12 +1235,16 @@ mod tests {
     }
 
     mod scoped {
-        use crate::service::{ReadTransaction, VectorWrite};
+        use crate::service::StorageError;
+        use crate::service::TransactionError;
+
         mod revisions {
+            use crate::service::StorageError;
+
             use super::{ProvenanceFailure, ScopedFixture, build_filtered_request, open_storage};
             use crate::{
                 domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, SourceUri, TreeOid},
-                service::{CommandErrorKind, NodeMetadata, Searcher, Storage},
+                service::{CacheDatabase, CommandErrorKind, NodeMetadata, Searcher, StorageRead},
             };
             use std::path::Path;
 
@@ -1197,13 +1287,22 @@ mod tests {
             }
 
             fn add_second_candidate(root: &Path, basis: char) {
-                let mut storage = open_storage(root);
-                let mut read = storage.begin_read_tx().unwrap();
-                let stored = read
-                    .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
-                    .unwrap()
+                let storage = open_storage(root);
+                let stored = storage
+                    .cache
+                    .with_read_tx(|| {
+                        let read = &storage.cache;
+                        let stored = read
+                            .nodes_get_by_id(&EdgeTarget::Knowledge(
+                                KnowledgeId::parse("a.md").unwrap(),
+                            ))
+                            .unwrap()
+                            .unwrap();
+
+                        Ok::<_, StorageError>(stored)
+                    })
                     .unwrap();
-                drop(read);
+
                 let NodeMetadata::Knowledge(mut node) = stored.metadata else {
                     panic!("knowledge fixture")
                 };
@@ -1211,20 +1310,28 @@ mod tests {
                 node.source_snapshot = Some(TreeOid::parse(&basis.to_string().repeat(40)).unwrap());
                 node.id = id.clone();
                 node.uri = id.clone();
-                let mut write = storage.begin_cache_write_tx().unwrap();
-                write.upsert_node(&NodeMetadata::Knowledge(node)).unwrap();
-                write.replace_text(&id, "query").unwrap();
-                write
-                    .insert_edge(
-                        &Edge::new(
-                            id,
-                            EdgeTarget::Source(SourceUri::parse("old.rs").unwrap()),
-                            EdgeType::parse("external").unwrap(),
-                        )
-                        .unwrap(),
-                    )
+                storage
+                    .cache
+                    .with_write_tx(|| {
+                        let write = &storage.cache;
+                        write
+                            .nodes_upsert_by_id(&NodeMetadata::Knowledge(node))
+                            .unwrap();
+                        write.replace_text(&id, "query").unwrap();
+                        write
+                            .edges_save_by_source_id_and_target_id_and_type(
+                                &Edge::new(
+                                    id,
+                                    EdgeTarget::Source(SourceUri::parse("old.rs").unwrap()),
+                                    EdgeType::parse("external").unwrap(),
+                                )
+                                .unwrap(),
+                            )
+                            .unwrap();
+
+                        write.get_publication_revision()
+                    })
                     .unwrap();
-                write.commit().unwrap();
             }
         }
 
@@ -1237,15 +1344,15 @@ mod tests {
             filesystem::LocalFileSystem,
             markdown::MarkdownParser,
             service::{
-                CacheWrite, CommandErrorKind, ConfigState, DocumentError, DocumentErrorKind,
+                CacheDatabase, CommandErrorKind, ConfigState, DocumentError, DocumentErrorKind,
                 DocumentResult, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind,
                 EmbeddingResult, KnowledgeMetadata, MockRefresher, NodeMetadata,
                 ProvenanceObservation, ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest,
                 RecheckFilter, SearchFilters, SearchFlag, SearchRequest, Searcher, SnapshotError,
-                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage,
-                StorageResult, VectorOutcome, search::SearchService,
+                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, StorageRead,
+                search::SearchService,
             },
-            storage::SqliteStorage,
+            storage::TestDatabases,
         };
         use std::{
             cell::{Cell, RefCell},
@@ -1273,12 +1380,18 @@ mod tests {
             failure: Option<ProvenanceFailure>,
         }
         struct ReadOnlyStorage {
-            inner: SqliteStorage,
+            inner: crate::storage::CacheStorage,
             reads: Rc<Cell<usize>>,
         }
 
-        type ScopedSearch =
-            SearchService<MockRefresher, Query, LocalFileSystem, MarkdownParser, Observations>;
+        type ScopedSearch = SearchService<
+            MockRefresher,
+            Query,
+            LocalFileSystem,
+            MarkdownParser,
+            Observations,
+            ReadOnlyStorage,
+        >;
         struct ScopedFixture {
             root: tempfile::TempDir,
             config: EmbeddingConfig,
@@ -1336,9 +1449,18 @@ mod tests {
             connection
                 .execute("update nodes set created_at = 1 where id = ?1", ["a.md"])
                 .unwrap();
-            publish_candidate(&mut open_storage(root), "b", "new.rs");
+            publish_candidate(&open_storage(root), "b", "new.rs");
             assert_eq!(
-                open_storage(root).begin_read_tx().unwrap().get_revision(),
+                {
+                    let scope_databases = open_storage(root);
+                    scope_databases
+                        .cache
+                        .with_read_tx(|| {
+                            Ok::<_, StorageError>(scope_databases.cache.project_get_by_id())
+                        })
+                        .unwrap()
+                }
+                .unwrap(),
                 2
             );
             assert_can_checkpoint(root);
@@ -1350,10 +1472,10 @@ mod tests {
             // Given: an original publication and a writer changing metadata.
             let fixture = ScopedFixture::new();
             let root = fixture.root.path();
-            let mut writer = open_storage(root);
+            let writer = open_storage(root);
             let mut search = fixture.build_search(
                 Some(Box::new(move || {
-                    publish_candidate(&mut writer, "b", "new.rs");
+                    publish_candidate(&writer, "b", "new.rs");
                 })),
                 None,
             );
@@ -1378,7 +1500,16 @@ mod tests {
                 )]
             );
             assert_eq!(
-                open_storage(root).begin_read_tx().unwrap().get_revision(),
+                {
+                    let scope_databases = open_storage(root);
+                    scope_databases
+                        .cache
+                        .with_read_tx(|| {
+                            Ok::<_, StorageError>(scope_databases.cache.project_get_by_id())
+                        })
+                        .unwrap()
+                }
+                .unwrap(),
                 2
             );
             assert_can_checkpoint(root);
@@ -1406,9 +1537,18 @@ mod tests {
                 assert!(std::error::Error::source(&error).is_some());
                 assert!(!format!("{error:?} {error}").contains("PRIVATE"));
                 assert_can_checkpoint(root);
-                publish_candidate(&mut open_storage(root), "b", "new.rs");
+                publish_candidate(&open_storage(root), "b", "new.rs");
                 assert_eq!(
-                    open_storage(root).begin_read_tx().unwrap().get_revision(),
+                    {
+                        let scope_databases = open_storage(root);
+                        scope_databases
+                            .cache
+                            .with_read_tx(|| {
+                                Ok::<_, StorageError>(scope_databases.cache.project_get_by_id())
+                            })
+                            .unwrap()
+                    }
+                    .unwrap(),
                     2
                 );
                 assert_can_checkpoint(root);
@@ -1420,10 +1560,10 @@ mod tests {
         impl ScopedFixture {
             fn new() -> Self {
                 let root = tempfile::tempdir().unwrap();
-                let mut storage = open_storage(root.path());
-                publish_candidate(&mut storage, "a", "old.rs");
+                let storage = open_storage(root.path());
+                publish_candidate(&storage, "a", "old.rs");
                 let config = build_config(2);
-                seed_dimension(&mut storage, &config, 2);
+                seed_dimension(&storage, &config, 2);
                 Self {
                     root,
                     config,
@@ -1439,8 +1579,8 @@ mod tests {
             ) -> ScopedSearch {
                 SearchService {
                     refresher: build_noop_refresher(),
-                    storage: Box::new(ReadOnlyStorage {
-                        inner: open_storage(self.root.path()),
+                    storage: Rc::new(ReadOnlyStorage {
+                        inner: open_storage(self.root.path()).cache,
                         reads: self.reads.clone(),
                     }),
                     embeddings: Query {
@@ -1538,58 +1678,78 @@ mod tests {
                 Ok(SourceRevisionComparison::Equal)
             }
         }
-        impl Storage for ReadOnlyStorage {
-            fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
+        use crate::service::utils::cache_test_support::{
+            delegate_cache_reads, delegate_cache_writes, delegate_graph_reads,
+        };
+        impl crate::service::StorageRead for ReadOnlyStorage {
+            delegate_cache_reads!();
+        }
+        impl crate::service::GraphRead for ReadOnlyStorage {
+            delegate_graph_reads!();
+        }
+        impl crate::service::CacheDatabase for ReadOnlyStorage {
+            delegate_cache_writes!();
+            fn with_read_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
                 self.reads.set(self.reads.get() + 1);
                 assert_eq!(self.reads.get(), 1, "search opened a second view");
-                self.inner.begin_read_tx()
+                self.inner.with_read_tx(operation)
             }
-            fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>> {
-                panic!("search cannot publish")
+            fn with_write_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_write_tx(operation)
             }
-            fn begin_vector_write_tx(
-                &mut self,
-                _: &Sha256,
-            ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>> {
-                panic!("search cannot write vectors")
-            }
-            fn reset_vectors(
-                &mut self,
-                _: Option<&Sha256>,
-                _: &Sha256,
-            ) -> StorageResult<VectorOutcome<bool>> {
-                panic!("search cannot reset vectors")
+            fn with_status_read_tx<T, E, F>(
+                &self,
+                operation: F,
+            ) -> Result<Option<T>, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_status_read_tx(operation)
             }
         }
-        fn open_storage(root: &Path) -> SqliteStorage {
-            SqliteStorage::open(&root.join("cache.db"), &root.join("vectors.db")).unwrap()
+
+        fn open_storage(root: &Path) -> TestDatabases {
+            crate::storage::open_test_storage(&root.join("cache.db"), &root.join("vectors.db"))
+                .unwrap()
         }
-        fn publish_candidate(storage: &mut SqliteStorage, oid: &str, source: &str) {
+        fn publish_candidate(storage: &TestDatabases, oid: &str, source: &str) {
             let id = KnowledgeId::parse("a.md").unwrap();
-            let mut unit = storage.begin_cache_write_tx().unwrap();
-            unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
-                id: id.clone(),
-                uri: id.clone(),
-                kind: ElementKind::Vertex,
-                hash: Sha256::digest(b"body"),
-                created_at: 1,
-                source_snapshot: Some(TreeOid::parse(&oid.repeat(40)).unwrap()),
-                lines: LineRange::new(1, 2).unwrap(),
-                search_hash: Sha256::digest(b"query"),
-            }))
-            .unwrap();
-            unit.replace_text(&id, "query").unwrap();
-            unit.delete_outgoing(&id).unwrap();
-            unit.insert_edge(
-                &Edge::new(
-                    id,
-                    EdgeTarget::Source(SourceUri::parse(source).unwrap()),
-                    EdgeType::parse("external").unwrap(),
-                )
-                .unwrap(),
-            )
-            .unwrap();
-            unit.commit().unwrap();
+            storage
+                .cache
+                .with_write_tx(|| {
+                    let unit = &storage.cache;
+                    unit.nodes_upsert_by_id(&NodeMetadata::Knowledge(KnowledgeMetadata {
+                        id: id.clone(),
+                        uri: id.clone(),
+                        kind: ElementKind::Vertex,
+                        hash: Sha256::digest(b"body"),
+                        created_at: 1,
+                        source_snapshot: Some(TreeOid::parse(&oid.repeat(40)).unwrap()),
+                        lines: LineRange::new(1, 2).unwrap(),
+                        search_hash: Sha256::digest(b"query"),
+                    }))
+                    .unwrap();
+                    unit.replace_text(&id, "query").unwrap();
+                    unit.edges_delete_by_source_id(&id).unwrap();
+                    unit.edges_save_by_source_id_and_target_id_and_type(
+                        &Edge::new(
+                            id,
+                            EdgeTarget::Source(SourceUri::parse(source).unwrap()),
+                            EdgeType::parse("external").unwrap(),
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+
+                    unit.get_publication_revision()
+                })
+                .unwrap();
         }
         fn build_filtered_request() -> SearchRequest {
             SearchRequest {
@@ -1623,6 +1783,7 @@ mod tests {
     }
 
     mod filters {
+
         use super::{
             build_config, build_noop_refresher, make_text_match, make_vector_match, seed_dimension,
         };
@@ -1634,15 +1795,15 @@ mod tests {
             filesystem::LocalFileSystem,
             markdown::MarkdownParser,
             service::{
-                CommandErrorKind, ConfigState, DocumentResult, DrainOutcome, Embedder,
-                EmbeddingResult, KnowledgeMetadata, MarkdownCodec, MockRefresher, NodeMetadata,
-                ProvenanceObservation, ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest,
-                RecheckFilter, SearchFilters, SearchFlag, SearchRequest, Searcher, SnapshotError,
-                SnapshotErrorKind, SourceProvenance, SourceRevisionComparison,
-                SourceRevisionRequest, Storage, TextMatch, VectorMatch,
+                CacheDatabase, CommandErrorKind, ConfigState, DocumentResult, DrainOutcome,
+                Embedder, EmbeddingResult, KnowledgeMetadata, MarkdownCodec, MockRefresher,
+                NodeMetadata, ProvenanceObservation, ProvenanceRequest, QueryEmbedding,
+                QueryEmbeddingRequest, RecheckFilter, SearchFilters, SearchFlag, SearchRequest,
+                Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
+                SourceRevisionComparison, SourceRevisionRequest, TextMatch, VectorMatch,
                 search::{SearchService, ranking::rank_candidates},
             },
-            storage::SqliteStorage,
+            storage::TestDatabases,
         };
         use std::{cell::Cell, collections::BTreeSet, num::NonZeroUsize, path::Path, rc::Rc};
 
@@ -1664,8 +1825,14 @@ mod tests {
             observations: Rc<Cell<usize>>,
             validations: Rc<Cell<usize>>,
         }
-        type TestSearch =
-            SearchService<MockRefresher, Query, LocalFileSystem, MarkdownParser, Probe>;
+        type TestSearch = SearchService<
+            MockRefresher,
+            Query,
+            LocalFileSystem,
+            MarkdownParser,
+            Probe,
+            crate::storage::CacheStorage,
+        >;
 
         #[test]
         fn eligible_channel_ranks_are_recomputed_before_fusion() {
@@ -1921,17 +2088,18 @@ mod tests {
             failure: Option<SnapshotErrorKind>,
         ) -> Fixture {
             let mut storage =
-                SqliteStorage::open(&root.join("cache.db"), &root.join("vectors.db")).unwrap();
+                crate::storage::open_test_storage(&root.join("cache.db"), &root.join("vectors.db"))
+                    .unwrap();
             if matches!(candidate, Candidate::Present) {
                 publish_note(root, &mut storage);
             }
-            seed_dimension(&mut storage, &build_config(2), 2);
+            seed_dimension(&storage, &build_config(2), 2);
             let queries = Rc::new(Cell::new(0));
             let validations = Rc::new(Cell::new(0));
             let observations = Rc::new(Cell::new(0));
             let search = SearchService {
                 refresher: build_noop_refresher(),
-                storage: Box::new(storage),
+                storage: Rc::new(storage.cache),
                 embeddings: Query(queries.clone()),
                 filesystem: LocalFileSystem::open(root).unwrap(),
                 markdown: MarkdownParser::new(),
@@ -1949,7 +2117,7 @@ mod tests {
                 observations,
             }
         }
-        fn publish_note(root: &Path, storage: &mut SqliteStorage) {
+        fn publish_note(root: &Path, storage: &mut TestDatabases) {
             let bytes = b"<!-- letopis: {\"created_at\":1} -->\nquery\n";
             std::fs::write(root.join("note.md"), bytes).unwrap();
             let parsed = MarkdownParser::new()
@@ -1958,29 +2126,35 @@ mod tests {
                 .unwrap();
             let element = &parsed.elements[0].element;
             let id = KnowledgeId::parse("note.md").unwrap();
-            let mut unit = storage.begin_cache_write_tx().unwrap();
-            unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
-                id: id.clone(),
-                uri: id.clone(),
-                kind: ElementKind::Vertex,
-                hash: element.hash,
-                created_at: 1,
-                source_snapshot: Some(parse_tree("1")),
-                lines: element.lines,
-                search_hash: Sha256::digest(b"query"),
-            }))
-            .unwrap();
-            unit.replace_text(&id, "query").unwrap();
-            unit.insert_edge(
-                &Edge::new(
-                    id,
-                    EdgeTarget::Source(SourceUri::parse("code.rs").unwrap()),
-                    EdgeType::parse("external").unwrap(),
-                )
-                .unwrap(),
-            )
-            .unwrap();
-            unit.commit().unwrap();
+            storage
+                .cache
+                .with_write_tx(|| {
+                    let unit = &storage.cache;
+                    unit.nodes_upsert_by_id(&NodeMetadata::Knowledge(KnowledgeMetadata {
+                        id: id.clone(),
+                        uri: id.clone(),
+                        kind: ElementKind::Vertex,
+                        hash: element.hash,
+                        created_at: 1,
+                        source_snapshot: Some(parse_tree("1")),
+                        lines: element.lines,
+                        search_hash: Sha256::digest(b"query"),
+                    }))
+                    .unwrap();
+                    unit.replace_text(&id, "query").unwrap();
+                    unit.edges_save_by_source_id_and_target_id_and_type(
+                        &Edge::new(
+                            id,
+                            EdgeTarget::Source(SourceUri::parse("code.rs").unwrap()),
+                            EdgeType::parse("external").unwrap(),
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+
+                    unit.get_publication_revision()
+                })
+                .unwrap();
         }
         fn build_request(query: &str) -> SearchRequest {
             SearchRequest {

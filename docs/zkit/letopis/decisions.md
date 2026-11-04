@@ -2024,6 +2024,15 @@ commit потребляет Box, rollback/drop/identity/pinned-revision прав
 Согласованная цена — allocation/dynamic dispatch; фактические замеры и ограничения
 фиксируются в плане упрощения. EmbeddingService сохраняет S для условного Send.
 
+
+**Physical representation clarification, 2026-11-03:** the production storage
+components are `CacheStorage` in `storage/cache.rs` and `VectorStorage` in
+`storage/vector.rs`. All application-owned traits remain directly in
+`service/mod.rs`. Filesystem owns path policy; composition brackets database
+opening and attachment with its checks. No transaction or connection wrapper
+component replaces the removed components. Historical names above describe their
+captured revisions; the current API decision is recorded in [D-98](#D-98).
+
 <!-- links -->
 **Связи:** [architecture.md](architecture.md): 4. Parts; [mechanics.md](mechanics.md): Правка 2026-10-20, 4. Internal contracts
 <!-- /links -->
@@ -2056,6 +2065,23 @@ diagnostics, failure records и result aliases — в `service/error.rs`. Пре
 `service::...` имена явно реэкспортируются. Большой размер центральных contract
 файлов допустим; implementations сервисов и другие слои остаются раздельными.
 Различия error classification, formatting и cause privacy не унифицируются.
+
+
+**Representation clarification, 2026-11-03 (supersedes the 2026-11-01 boxed API):**
+`CacheStorage` (`storage/cache.rs`) and `VectorStorage` (`storage/vector.rs`) are
+exactly two production storage components implementing `CacheDatabase` and
+`VectorDatabase`. All application-owned traits remain directly in `service/mod.rs`.
+Services share the same `Rc<C>` / `Rc<V>` when their scopes must join. Zero-argument
+`with_read_tx` / `with_write_tx` callbacks access the injected owner; only the outer
+scope finalizes. Caught nested errors or failed writes make it rollback-only.
+Read inside write sees uncommitted changes; write inside read is rejected and
+poisons that scope. Separate instances and the two database owners do not join.
+Cache reads retain one attached snapshot; query diagnostics use the separate
+vector writer. Provider HTTP stays outside service-owned write scopes. Status
+uses observation-only CacheStorage: absent storage opens no connection or durable
+file and skips the callback. Filesystem owns path policy; composition brackets
+opening/attaching with its checks. SQL and connection lifecycle remain in storage.
+Schemas, CLI/JSON, synchronous I/O and cross-database atomicity are unchanged.
 
 <!-- links -->
 **Связи:** [architecture.md](architecture.md#program-structure); [development.md](../../development.md); [TK-9 specification](../../superpowers/specs/2026-10-22-tk-9-storage-design.md)

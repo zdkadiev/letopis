@@ -1,19 +1,19 @@
 use super::{
-    BasisRetainer, CacheWrite, CorpusLister, DocumentError, DocumentErrorKind, DocumentResult,
+    BasisRetainer, CacheDatabase, CorpusLister, DocumentError, DocumentErrorKind, DocumentResult,
     FileRow, FileStat, FileSystem, MarkdownCodec, RefreshOutcome, Refresher, SourceProvenance,
-    Storage,
 };
 use crate::domain::{RepoPath, Sha256, TreeOid};
 use basis::BasisPreparation;
-use projection::{EffectiveGraph, FileProjection, PreparedProjection, prepare_removal, publish};
-use std::fmt;
+use projection::{EffectiveGraph, FileProjection, prepare_removal};
+use std::{fmt, rc::Rc};
 
 use std::collections::{BTreeMap, BTreeSet};
 
+const DOCUMENTS_CHANGED_MESSAGE: &str = "documents changed during refresh";
 const RACY_WINDOW_NS: i64 = 1_000_000_000;
 
 /// Refreshes and retains the effective document projection from independently owned collaborators.
-pub(crate) struct DocumentRefreshService<G, F, M, P> {
+pub(crate) struct DocumentRefreshService<G, F, M, P, C> {
     /// Lists the current corpus candidates.
     pub(crate) git: G,
     /// Captures documents and owns the index exclusion lock.
@@ -21,12 +21,12 @@ pub(crate) struct DocumentRefreshService<G, F, M, P> {
     /// Parses canonical document metadata and source bindings.
     pub(crate) markdown: M,
     /// Reads the current projection and publishes cache changes atomically.
-    pub(crate) storage: Box<dyn Storage>,
+    pub(crate) storage: Rc<C>,
     /// Observes source bindings and retains author-declared roots.
     pub(crate) provenance: P,
 }
 
-impl<G, F, M, P> fmt::Debug for DocumentRefreshService<G, F, M, P> {
+impl<G, F, M, P, C> fmt::Debug for DocumentRefreshService<G, F, M, P, C> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("DocumentRefreshService")
@@ -49,7 +49,8 @@ pub(super) enum SnapshotVerification {
     Closure,
 }
 /// Borrows publication collaborators independently of the storage transaction.
-struct DocumentPublication<'a, F, M, P> {
+struct DocumentPublication<'a, F, M, P, C> {
+    storage: &'a C,
     filesystem: &'a F,
     markdown: &'a M,
     provenance: &'a P,
@@ -73,8 +74,13 @@ impl Delta {
         self.updated.is_empty() && self.removed.is_empty()
     }
 }
-impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + BasisRetainer>
-    Refresher for DocumentRefreshService<G, F, M, P>
+impl<
+    G: CorpusLister,
+    F: FileSystem,
+    M: MarkdownCodec,
+    P: SourceProvenance + BasisRetainer,
+    C: CacheDatabase,
+> Refresher for DocumentRefreshService<G, F, M, P, C>
 {
     fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
         let _lock = self.filesystem.lock_index()?;
@@ -98,7 +104,10 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
                 .is_empty()
             && preliminary.source_snapshots.is_empty()
         {
-            return Ok(build_outcome(preliminary.revision, false));
+            return Ok(build_outcome(
+                preliminary.revision,
+                PublicationState::Unchanged,
+            ));
         }
         #[cfg(test)]
         reach_checkpoint("detected");
@@ -109,8 +118,13 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         self.publish_current(PublicationMode::Incremental, SnapshotVerification::Root)
     }
 }
-impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + BasisRetainer>
-    DocumentRefreshService<G, F, M, P>
+impl<
+    G: CorpusLister,
+    F: FileSystem,
+    M: MarkdownCodec,
+    P: SourceProvenance + BasisRetainer,
+    C: CacheDatabase,
+> DocumentRefreshService<G, F, M, P, C>
 {
     fn publish_current(
         &mut self,
@@ -128,27 +142,35 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         reach_checkpoint("redetected");
         if delta.is_empty() && mode == PublicationMode::Incremental {
             DocumentPublication {
+                storage: self.storage.as_ref(),
                 filesystem: &self.filesystem,
                 markdown: &self.markdown,
                 provenance: &self.provenance,
             }
             .validate_snapshots(verification, &state.source_snapshots)?;
-            return Ok(build_outcome(state.revision, false));
+            return Ok(build_outcome(state.revision, PublicationState::Unchanged));
         }
         self.publish_changes(&state, delta, mode, verification)
     }
 
-    fn get_file_state(&mut self) -> DocumentResult<FileState> {
-        let mut read = self.storage.begin_read_tx()?;
-        Ok(FileState {
-            revision: read.get_revision(),
-            source_snapshots: read.get_source_snapshots()?,
-            files: read
-                .get_files()?
-                .into_iter()
-                .map(|row| (row.path.clone(), row))
-                .collect(),
-        })
+    fn get_file_state(&self) -> DocumentResult<FileState> {
+        self.storage
+            .with_read_tx(|| {
+                Ok(FileState {
+                    revision: self.storage.project_get_by_id()?,
+                    source_snapshots: self.storage.nodes_get_by_source_snapshot()?,
+                    files: self
+                        .storage
+                        .files_get()?
+                        .into_iter()
+                        .map(|row| (row.path.clone(), row))
+                        .collect(),
+                })
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => DocumentError::from(error),
+            })
     }
 
     fn detect_changes(&self, state: &FileState, mode: PublicationMode) -> DocumentResult<Delta> {
@@ -166,7 +188,7 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         }
         for path in candidates {
             let previous = state.files.get(&path);
-            let Some(stat) = self.filesystem.stat_file(&path)? else {
+            let Some(stat) = self.filesystem.get_file_stat_by_path(&path)? else {
                 if previous.is_some() {
                     delta.removed.insert(path, true);
                 }
@@ -191,9 +213,14 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         {
             return Ok(None);
         }
-        let captured = self.filesystem.get_file(path)?.ok_or_else(fail_changed)?;
+        let captured = self.filesystem.get_file(path)?.ok_or_else(|| {
+            DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+        })?;
         if captured.stat != stat {
-            return Err(fail_changed());
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENTS_CHANGED_MESSAGE,
+            ));
         }
         let hash = Sha256::digest(&captured.bytes);
         if same_stat && previous.is_some_and(|row| row.hash == hash) {
@@ -211,54 +238,58 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
     ) -> DocumentResult<RefreshOutcome> {
         let mut graph = self.prepare_publication(state, &delta, mode, verification)?;
         let publication = DocumentPublication {
+            storage: self.storage.as_ref(),
             filesystem: &self.filesystem,
             markdown: &self.markdown,
             provenance: &self.provenance,
         };
-        let mut unit = self.storage.begin_cache_write_tx()?;
-        #[cfg(test)]
-        reach_checkpoint("begun");
-        let mut outcome = build_outcome(state.revision, true);
-        let excluded: BTreeSet<_> = delta
-            .removed
-            .iter()
-            .filter(|(_, check_missing)| !**check_missing)
-            .map(|(path, _)| path.clone())
-            .collect();
-        for (path, check_missing) in delta.removed {
-            if check_missing && self.filesystem.stat_file(&path)?.is_some() {
-                return Err(fail_changed());
-            }
-            let prepared = prepare_removal(state.revision, path, &graph);
-            graph.apply(&prepared);
-            outcome = apply_projection(unit.as_mut(), prepared, outcome)?;
-        }
-        for (path, observation) in delta.updated {
-            let prepared = publication.prepare_file(&FileProjection {
-                base_revision: state.revision,
-                path: &path,
-                observed: &observation,
-                previous: mode.get_previous(state.files.get(&path)),
-                graph: &graph,
+        let outcome = self
+            .storage
+            .with_write_tx(|| -> DocumentResult<RefreshOutcome> {
+                #[cfg(test)]
+                reach_checkpoint("begun");
+                let mut outcome = build_outcome(state.revision, PublicationState::Published);
+                let excluded: BTreeSet<_> = delta
+                    .removed
+                    .iter()
+                    .filter(|(_, check_missing)| !**check_missing)
+                    .map(|(path, _)| path.clone())
+                    .collect();
+                for (path, check_missing) in delta.removed {
+                    if check_missing && self.filesystem.get_file_stat_by_path(&path)?.is_some() {
+                        return Err(DocumentError::new(
+                            DocumentErrorKind::InternalError,
+                            DOCUMENTS_CHANGED_MESSAGE,
+                        ));
+                    }
+                    let prepared = prepare_removal(state.revision, path, &graph);
+                    graph.apply(&prepared);
+                    outcome = publication.publish_projection(prepared, outcome)?;
+                }
+                for (path, observation) in delta.updated {
+                    let prepared = publication.prepare_file(&FileProjection {
+                        base_revision: state.revision,
+                        path: &path,
+                        observed: &observation,
+                        previous: mode.get_previous(state.files.get(&path)),
+                        graph: &graph,
+                    })?;
+                    graph.apply(&prepared);
+                    outcome = publication.publish_projection(prepared, outcome)?;
+                }
+                publication.reconcile_sources(&graph)?;
+                self.verify_excluded_candidates(&excluded)?;
+                #[cfg(test)]
+                reach_checkpoint("before_commit");
+                #[cfg(test)]
+                tests::process::fail_late(self.storage.as_ref())?;
+                outcome.revision = self.storage.get_publication_revision()?;
+                Ok(outcome)
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => DocumentError::from(error),
             })?;
-            graph.apply(&prepared);
-            outcome = apply_projection(unit.as_mut(), prepared, outcome)?;
-        }
-        publication.reconcile_sources(&graph, unit.as_mut())?;
-        if !excluded.is_empty()
-            && self
-                .git
-                .get_candidates()?
-                .iter()
-                .any(|path| excluded.contains(path))
-        {
-            return Err(fail_changed());
-        }
-        #[cfg(test)]
-        reach_checkpoint("before_commit");
-        #[cfg(test)]
-        tests::process::fail_late(unit.as_mut())?;
-        outcome.revision = unit.commit()?;
         #[cfg(test)]
         reach_checkpoint("after_commit");
         Ok(outcome)
@@ -272,17 +303,26 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         verification: SnapshotVerification,
     ) -> DocumentResult<EffectiveGraph> {
         // Keep only metadata after releasing this pinned read, before BEGIN IMMEDIATE.
-        let mut graph = {
-            let mut read = self.storage.begin_read_tx()?;
-            if read.get_revision() != state.revision {
-                return Err(fail_changed());
-            }
-            EffectiveGraph::read(read.as_mut())?
-        };
+        let mut graph = self
+            .storage
+            .with_read_tx(|| -> DocumentResult<EffectiveGraph> {
+                if self.storage.project_get_by_id()? != state.revision {
+                    return Err(DocumentError::new(
+                        DocumentErrorKind::InternalError,
+                        DOCUMENTS_CHANGED_MESSAGE,
+                    ));
+                }
+                EffectiveGraph::read(self.storage.as_ref())
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => DocumentError::from(error),
+            })?;
         if mode == PublicationMode::Full {
             graph.mark_all_sources();
         }
         let publication = DocumentPublication {
+            storage: self.storage.as_ref(),
             filesystem: &self.filesystem,
             markdown: &self.markdown,
             provenance: &self.provenance,
@@ -296,6 +336,22 @@ impl<G: CorpusLister, F: FileSystem, M: MarkdownCodec, P: SourceProvenance + Bas
         })?;
         publication.validate_basis(&basis, verification)?;
         Ok(graph)
+    }
+    /// Reject candidates that reappear after their removal projection was prepared.
+    fn verify_excluded_candidates(&self, excluded: &BTreeSet<RepoPath>) -> DocumentResult<()> {
+        if !excluded.is_empty()
+            && self
+                .git
+                .get_candidates()?
+                .iter()
+                .any(|path| excluded.contains(path))
+        {
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENTS_CHANGED_MESSAGE,
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -316,46 +372,32 @@ fn is_racy(previous: &FileRow, now: Option<i64>) -> bool {
         .is_none_or(|boundary| previous.mtime_ns >= boundary)
 }
 
-fn apply_projection(
-    unit: &mut dyn CacheWrite,
-    prepared: PreparedProjection,
-    outcome: RefreshOutcome,
-) -> DocumentResult<RefreshOutcome> {
-    if prepared.base_revision != outcome.revision {
-        return Err(fail_changed());
-    }
-    let outcome = prepared.add_counts(outcome);
-    publish(unit, prepared)?;
-    Ok(outcome)
+#[derive(Clone, Copy)]
+enum PublicationState {
+    Unchanged,
+    Published,
 }
 
-fn build_outcome(revision: u64, published: bool) -> RefreshOutcome {
+fn build_outcome(revision: u64, publication: PublicationState) -> RefreshOutcome {
     RefreshOutcome {
         revision,
-        published,
+        published: matches!(publication, PublicationState::Published),
         files_updated: 0,
         files_removed: 0,
         invalid_files_updated: 0,
     }
 }
 
-pub(super) fn fail_changed() -> DocumentError {
-    DocumentError::new(
-        DocumentErrorKind::InternalError,
-        "documents changed during refresh",
-    )
-}
-
 mod basis {
     use super::{
-        DocumentPublication, Observation, PublicationMode, SnapshotVerification, fail_changed,
-        projection::EffectiveGraph,
+        DOCUMENTS_CHANGED_MESSAGE, DocumentPublication, Observation, PublicationMode,
+        SnapshotVerification, projection::EffectiveGraph,
     };
     use crate::{
         domain::{EdgeTarget, RepoPath, Sha256, SourceUri, TreeOid},
         service::{
-            BasisRetainer, DocumentResult, FileRow, FileSystem, MarkdownCodec,
-            PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceRequest, SourceProvenance,
+            BasisRetainer, DocumentError, DocumentErrorKind, DocumentResult, FileRow, FileSystem,
+            MarkdownCodec, PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceRequest, SourceProvenance,
         },
     };
     use std::collections::{BTreeMap, BTreeSet};
@@ -380,8 +422,8 @@ mod basis {
         pub(super) previous: &'a BTreeMap<RepoPath, FileRow>,
         pub(super) mode: PublicationMode,
     }
-    impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance + BasisRetainer>
-        DocumentPublication<'_, F, M, P>
+    impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance + BasisRetainer, C>
+        DocumentPublication<'_, F, M, P, C>
     {
         /// Prepare only changed-content metadata, releasing each parsed file before the next.
         ///
@@ -411,11 +453,16 @@ mod basis {
                 {
                     continue;
                 }
-                let captured = self.filesystem.get_file(path)?.ok_or_else(fail_changed)?;
+                let captured = self.filesystem.get_file(path)?.ok_or_else(|| {
+                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+                })?;
                 if captured.stat != observed.stat
                     || Sha256::digest(&captured.bytes) != observed.hash
                 {
-                    return Err(fail_changed());
+                    return Err(DocumentError::new(
+                        DocumentErrorKind::InternalError,
+                        DOCUMENTS_CHANGED_MESSAGE,
+                    ));
                 }
                 let Ok(parsed) = self.markdown.parse_file(path, &captured.bytes) else {
                     continue;
@@ -497,12 +544,12 @@ mod basis {
 mod projection {
     #[cfg(test)]
     use super::reach_checkpoint;
-    use super::{DocumentPublication, Observation, fail_changed};
+    use super::{DOCUMENTS_CHANGED_MESSAGE, DocumentPublication, Observation};
     use crate::domain::{
         Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid, derive_element_kind,
     };
     use crate::service::{
-        CacheWrite, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileRow,
+        CacheDatabase, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileRow,
         FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile, RefreshOutcome,
         SourceMetadata, StorageRead,
     };
@@ -551,7 +598,7 @@ mod projection {
         edges: BTreeSet<Edge>,
         touched_sources: BTreeSet<SourceUri>,
     }
-    impl<F: FileSystem, M: MarkdownCodec, P> DocumentPublication<'_, F, M, P> {
+    impl<F: FileSystem, M: MarkdownCodec, P, C: CacheDatabase> DocumentPublication<'_, F, M, P, C> {
         /// Captures and parses one changed file against its effective previous projection.
         ///
         /// # Errors
@@ -567,9 +614,14 @@ mod projection {
                 previous,
                 graph,
             } = *request;
-            let captured = self.filesystem.get_file(path)?.ok_or_else(fail_changed)?;
+            let captured = self.filesystem.get_file(path)?.ok_or_else(|| {
+                DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+            })?;
             if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
-                return Err(fail_changed());
+                return Err(DocumentError::new(
+                    DocumentErrorKind::InternalError,
+                    DOCUMENTS_CHANGED_MESSAGE,
+                ));
             }
             let mut file = build_file_row(path, &captured, observed.hash);
             let mut prepared = PreparedProjection {
@@ -607,29 +659,26 @@ mod projection {
         ///
         /// # Errors
         /// Reports conflicting source addresses, unsafe captures, and transaction write failures.
-        pub(super) fn reconcile_sources(
-            &self,
-            graph: &EffectiveGraph,
-            unit: &mut dyn CacheWrite,
-        ) -> DocumentResult<()> {
+        pub(super) fn reconcile_sources(&self, graph: &EffectiveGraph) -> DocumentResult<()> {
             let references = graph.collect_source_references()?;
             let mut paths: BTreeMap<RepoPath, Vec<(SourceUri, u64)>> = BTreeMap::new();
             for uri in &graph.touched_sources {
                 if !references.contains_key(uri)
                     && !graph.knowledge.keys().any(|id| id.as_str() == uri.as_str())
                 {
-                    unit.delete_node(&EdgeTarget::Source(uri.clone()))?;
+                    self.storage.delete_node(&EdgeTarget::Source(uri.clone()))?;
                 }
                 let Some(&created_at) = references.get(uri) else {
                     continue;
                 };
                 let Some(local) = uri.get_local() else {
-                    unit.upsert_node(&NodeMetadata::Source(SourceMetadata {
-                        uri: uri.clone(),
-                        hash: None,
-                        created_at,
-                        lines: None,
-                    }))?;
+                    self.storage
+                        .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
+                            uri: uri.clone(),
+                            hash: None,
+                            created_at,
+                            lines: None,
+                        }))?;
                     continue;
                 };
                 paths
@@ -638,40 +687,92 @@ mod projection {
                     .push((uri.clone(), created_at));
             }
             for (path, sources) in paths {
-                self.publish_source_group(unit, &path, sources)?;
+                self.publish_source_group(&path, sources)?;
             }
             Ok(())
         }
 
         fn publish_source_group(
             &self,
-            unit: &mut dyn CacheWrite,
             path: &RepoPath,
             sources: Vec<(SourceUri, u64)>,
         ) -> DocumentResult<()> {
             // One capture serves every affected address of this path and then is released.
             let captured = self.filesystem.get_file(path)?;
             for (uri, created_at) in sources {
-                let local = uri.get_local().ok_or_else(fail_changed)?;
+                let local = uri.get_local().ok_or_else(|| {
+                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+                })?;
                 let lines = local.get_lines();
                 let hash = captured
                     .as_ref()
                     .and_then(|file| local.select_bytes(&file.bytes))
                     .map(Sha256::digest);
-                unit.upsert_node(&NodeMetadata::Source(SourceMetadata {
-                    uri,
-                    hash,
-                    created_at,
-                    lines,
-                }))?;
+                self.storage
+                    .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
+                        uri,
+                        hash,
+                        created_at,
+                        lines,
+                    }))?;
             }
             Ok(())
         }
     }
+    impl<F, M, P, C: CacheDatabase> DocumentPublication<'_, F, M, P, C> {
+        /// Apply a prepared projection to the active cache write scope.
+        ///
+        /// # Errors
+        /// Rejects a changed base revision and propagates atomic mutation failures.
+        pub(super) fn publish_projection(
+            &self,
+            prepared: PreparedProjection,
+            outcome: RefreshOutcome,
+        ) -> DocumentResult<RefreshOutcome> {
+            if prepared.base_revision != outcome.revision {
+                return Err(DocumentError::new(
+                    DocumentErrorKind::InternalError,
+                    DOCUMENTS_CHANGED_MESSAGE,
+                ));
+            }
+            let outcome = prepared.add_counts(outcome);
+            for id in &prepared.cleared {
+                self.storage.edges_delete_by_source_id(id)?;
+            }
+            for id in prepared.removed {
+                self.storage.delete_node(&EdgeTarget::Knowledge(id))?;
+            }
+            #[cfg(test)]
+            reach_checkpoint("cleared");
+            for text in &prepared.search {
+                self.storage
+                    .nodes_upsert_by_id(&NodeMetadata::Knowledge(text.metadata.clone()))?;
+            }
+            for edge in &prepared.edges {
+                self.storage
+                    .edges_save_by_source_id_and_target_id_and_type(edge)?;
+            }
+            #[cfg(test)]
+            reach_checkpoint("projections");
+            for text in prepared.search {
+                self.storage
+                    .replace_text(&text.metadata.id, &text.search_text)?;
+            }
+            #[cfg(test)]
+            reach_checkpoint("fts");
+            match prepared.file {
+                FileChange::Upsert(row) => self.storage.files_upsert_by_path(&row)?,
+                FileChange::Remove(path) => self.storage.files_delete_by_path(&path)?,
+            }
+            #[cfg(test)]
+            reach_checkpoint("fingerprints");
+            Ok(outcome)
+        }
+    }
     impl EffectiveGraph {
-        pub(super) fn read(read: &mut dyn StorageRead) -> DocumentResult<Self> {
+        pub(super) fn read(read: &dyn StorageRead) -> DocumentResult<Self> {
             let knowledge = read
-                .get_nodes()?
+                .nodes_get()?
                 .into_iter()
                 .filter_map(|row| match row.metadata {
                     NodeMetadata::Knowledge(node) => Some((node.id.clone(), node)),
@@ -680,7 +781,7 @@ mod projection {
                 .collect();
             Ok(Self {
                 knowledge,
-                edges: read.get_edges_by_source_id(None)?.into_iter().collect(),
+                edges: read.edges_get_by_source_id(None)?.into_iter().collect(),
                 touched_sources: BTreeSet::new(),
             })
         }
@@ -756,10 +857,9 @@ mod projection {
                         "source address conflicts with a knowledge element",
                     ));
                 }
-                let knowledge = self
-                    .knowledge
-                    .get(edge.get_source())
-                    .ok_or_else(fail_changed)?;
+                let knowledge = self.knowledge.get(edge.get_source()).ok_or_else(|| {
+                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+                })?;
                 references
                     .entry(uri.clone())
                     .and_modify(|created: &mut u64| {
@@ -785,40 +885,6 @@ mod projection {
             search: Vec::new(),
             file: FileChange::Remove(path),
         }
-    }
-
-    pub(super) fn publish(
-        unit: &mut dyn CacheWrite,
-        prepared: PreparedProjection,
-    ) -> DocumentResult<()> {
-        for id in &prepared.cleared {
-            unit.delete_outgoing(id)?;
-        }
-        for id in prepared.removed {
-            unit.delete_node(&EdgeTarget::Knowledge(id))?;
-        }
-        #[cfg(test)]
-        reach_checkpoint("cleared");
-        for text in &prepared.search {
-            unit.upsert_node(&NodeMetadata::Knowledge(text.metadata.clone()))?;
-        }
-        for edge in &prepared.edges {
-            unit.insert_edge(edge)?;
-        }
-        #[cfg(test)]
-        reach_checkpoint("projections");
-        for text in prepared.search {
-            unit.replace_text(&text.metadata.id, &text.search_text)?;
-        }
-        #[cfg(test)]
-        reach_checkpoint("fts");
-        match prepared.file {
-            FileChange::Upsert(row) => unit.upsert_file(&row)?,
-            FileChange::Remove(path) => unit.delete_file(&path)?,
-        }
-        #[cfg(test)]
-        reach_checkpoint("fingerprints");
-        Ok(())
     }
 
     fn build_file_row(path: &RepoPath, captured: &CapturedFile, hash: Sha256) -> FileRow {
@@ -875,16 +941,17 @@ pub(super) use tests::process::reach_checkpoint;
 #[cfg(test)]
 mod tests {
     use super::DocumentRefreshService;
+    use crate::service::TransactionError;
     use crate::{
         domain::{RepoPath, TreeOid},
         markdown::MarkdownParser,
         service::{
-            BasisRetainer, CapturedFile, Diagnostic, DocumentError, DocumentErrorKind,
-            DocumentResult, FileStat, FileSystem, MarkdownCodec, MockCorpusLister, ParsedFile,
-            ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError, SourceProvenance,
-            SourceRevisionComparison, SourceRevisionRequest,
+            BasisRetainer, CacheDatabase, CapturedFile, Diagnostic, DocumentError,
+            DocumentErrorKind, DocumentResult, FileStat, FileSystem, MarkdownCodec,
+            MockCorpusLister, ParsedFile, ProvenanceObservation, ProvenanceRequest, Refresher,
+            SnapshotError, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
+            StorageRead,
         },
-        storage::SqliteStorage,
     };
     use rusqlite::Connection;
     use std::{
@@ -933,7 +1000,7 @@ mod tests {
     }
     impl FileSystem for TestFiles {
         type IndexLock = ();
-        fn stat_file(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
+        fn get_file_stat_by_path(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
             Ok((!self.missing.get()).then(|| self.stat.get()))
         }
         fn get_file(&self, _: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
@@ -1004,8 +1071,116 @@ mod tests {
             Ok(())
         }
     }
-    type TestService =
-        DocumentRefreshService<Candidates, TestFiles, CountingMarkdown, TestProvenance>;
+    type TestService = DocumentRefreshService<
+        Candidates,
+        TestFiles,
+        CountingMarkdown,
+        TestProvenance,
+        crate::storage::CacheStorage,
+    >;
+
+    thread_local! {
+        static ON_COMMIT: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
+    }
+
+    #[test]
+    fn nested_publication_rolls_back_with_its_parent() {
+        use crate::service::CacheDatabase;
+        // Given: a document service shares the parent's cache and an independent observer.
+        let (directory, mut service) = build_service();
+        let cache = std::rc::Rc::clone(&service.storage);
+        let observer = Connection::open(directory.path().join("cache.db")).unwrap();
+        // When: a nested refresh succeeds but its parent rejects the operation.
+        let result = cache.with_write_tx(|| -> DocumentResult<()> {
+            assert_eq!(service.refresh()?.revision, 1);
+            assert_eq!(
+                observer
+                    .query_row("select revision from project", [], |row| row
+                        .get::<_, i64>(0))
+                    .unwrap(),
+                0
+            );
+            Err(DocumentError::new(
+                DocumentErrorKind::InvalidRequest,
+                "parent rejected publication",
+            ))
+        });
+        // Then: neither the document nor its provisional revision is published.
+        assert!(matches!(
+            result,
+            Err(TransactionError::Operation(error)) if error.get_kind() == DocumentErrorKind::InvalidRequest && error.get_message() == "parent rejected publication"
+        ));
+        assert_eq!(
+            observer
+                .query_row("select count(*) from nodes", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            observer
+                .query_row("select revision from project", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        assert_eq!(service.refresh().unwrap().revision, 1);
+    }
+
+    #[test]
+    fn joined_publications_advance_the_revision_once() {
+        use crate::service::CacheDatabase;
+        // Given: both refreshes share the same owning cache write.
+        let (directory, mut service) = build_service();
+        let cache = std::rc::Rc::clone(&service.storage);
+        let observer = Connection::open(directory.path().join("cache.db")).unwrap();
+        // When: the parent joins two successful publication operations.
+        cache
+            .with_write_tx(|| -> DocumentResult<()> {
+                assert_eq!(service.refresh()?.revision, 1);
+                assert_eq!(service.refresh()?.revision, 1);
+                Ok(())
+            })
+            .unwrap();
+        // Then: one node and one revision are published at the outer commit.
+        assert_eq!(
+            observer
+                .query_row("select count(*) from nodes", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            observer
+                .query_row("select revision from project", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn publication_returns_its_own_revision_after_a_later_commit() {
+        // Given: an independent publisher runs immediately after the first commit.
+        let (directory, mut service) = build_service();
+        let path = directory.path().join("cache.db");
+        ON_COMMIT.set(Some(Box::new(move || {
+            Connection::open(path)
+                .unwrap()
+                .execute("update project set revision=2", [])
+                .unwrap();
+        })));
+        // When: refresh finishes after the second publisher advances the database.
+        let outcome = service.refresh().unwrap();
+        // Then: it returns revision 1 even though revision 2 is already durable.
+        assert_eq!(outcome.revision, 1);
+        assert_eq!(
+            Connection::open(directory.path().join("cache.db"))
+                .unwrap()
+                .query_row("select revision from project", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+    }
     #[test]
     fn skip_body_reads_for_unchanged_non_racy_marked_unmarked_and_invalid_files() {
         // Given
@@ -1050,9 +1225,7 @@ mod tests {
         service.refresh().unwrap();
         let before = service
             .storage
-            .begin_read_tx()
-            .unwrap()
-            .get_files()
+            .with_read_tx(|| service.storage.files_get())
             .unwrap();
         service.filesystem.reset_counts();
         // When: refresh checks the captured bytes.
@@ -1069,9 +1242,7 @@ mod tests {
         assert_eq!(
             service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_files()
+                .with_read_tx(|| service.storage.files_get())
                 .unwrap(),
             before
         );
@@ -1130,15 +1301,11 @@ mod tests {
             service.refresh().unwrap();
             let before_nodes = service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_nodes()
+                .with_read_tx(|| service.storage.nodes_get())
                 .unwrap();
             let before_files = service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_files()
+                .with_read_tx(|| service.storage.files_get())
                 .unwrap();
             let before_fts = get_fts_blocks(dir.path());
             let parses = service.markdown.0.get();
@@ -1157,17 +1324,13 @@ mod tests {
             assert_eq!(
                 service
                     .storage
-                    .begin_read_tx()
-                    .unwrap()
-                    .get_nodes()
+                    .with_read_tx(|| service.storage.nodes_get())
                     .unwrap(),
                 before_nodes
             );
             let after_files = service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_files()
+                .with_read_tx(|| service.storage.files_get())
                 .unwrap();
             assert_eq!(after_files[0].inode, before_files[0].inode + 1);
             assert_eq!(after_files[0].valid, before_files[0].valid);
@@ -1187,10 +1350,17 @@ mod tests {
         // Then: inconsistent captures abort publication.
         assert_eq!(service.filesystem.reads.get(), 3);
         assert!(result.is_err());
-        let mut read = service.storage.begin_read_tx().unwrap();
-        assert_eq!(read.get_revision(), 0);
-        assert!(read.get_files().unwrap().is_empty());
-        assert!(read.get_nodes().unwrap().is_empty());
+        let cache = std::rc::Rc::clone(&service.storage);
+        cache
+            .with_read_tx(|| -> crate::service::StorageResult<()> {
+                let read = cache.as_ref();
+                assert_eq!(read.project_get_by_id().unwrap(), 0);
+                assert!(read.files_get().unwrap().is_empty());
+                assert!(read.nodes_get().unwrap().is_empty());
+
+                Ok(())
+            })
+            .unwrap();
     }
 
     #[test]
@@ -1214,15 +1384,22 @@ mod tests {
         let result = service.refresh();
         // Then: the race aborts publication and preserves the old projection.
         assert!(result.is_err());
-        let mut read = service.storage.begin_read_tx().unwrap();
-        assert_eq!(read.get_revision(), 1);
-        assert_eq!(read.get_files().unwrap().len(), 1);
-        assert_eq!(
-            read.get_text_matches_by_expression("AlphaToken")
-                .unwrap()
-                .len(),
-            1
-        );
+        let cache = std::rc::Rc::clone(&service.storage);
+        cache
+            .with_read_tx(|| -> crate::service::StorageResult<()> {
+                let read = cache.as_ref();
+                assert_eq!(read.project_get_by_id().unwrap(), 1);
+                assert_eq!(read.files_get().unwrap().len(), 1);
+                assert_eq!(
+                    read.text_index_get_by_expression("AlphaToken")
+                        .unwrap()
+                        .len(),
+                    1
+                );
+
+                Ok(())
+            })
+            .unwrap();
     }
 
     #[test]
@@ -1232,9 +1409,7 @@ mod tests {
         service.refresh().unwrap();
         let before = service
             .storage
-            .begin_read_tx()
-            .unwrap()
-            .get_files()
+            .with_read_tx(|| service.storage.files_get())
             .unwrap();
         service.filesystem.reset_counts();
         service.filesystem.stat.update(|mut stat| {
@@ -1244,16 +1419,23 @@ mod tests {
         service.filesystem.fail_on_read.set(Some(3));
         // When / Then: refresh fails rather than publishing an invalid Markdown result.
         assert!(service.refresh().is_err());
-        let mut read = service.storage.begin_read_tx().unwrap();
-        // Then: revision, file state and searchable text retain the prior publication.
-        assert_eq!(read.get_revision(), 1);
-        assert_eq!(read.get_files().unwrap(), before);
-        assert_eq!(
-            read.get_text_matches_by_expression("AlphaToken")
-                .unwrap()
-                .len(),
-            1
-        );
+        let cache = std::rc::Rc::clone(&service.storage);
+        cache
+            .with_read_tx(|| -> crate::service::StorageResult<()> {
+                let read = cache.as_ref();
+                // Then: revision, file state and searchable text retain the prior publication.
+                assert_eq!(read.project_get_by_id().unwrap(), 1);
+                assert_eq!(read.files_get().unwrap(), before);
+                assert_eq!(
+                    read.text_index_get_by_expression("AlphaToken")
+                        .unwrap()
+                        .len(),
+                    1
+                );
+
+                Ok(())
+            })
+            .unwrap();
     }
 
     #[test]
@@ -1313,16 +1495,18 @@ mod tests {
 
     fn build_service() -> (TempDir, TestService) {
         let dir = tempfile::tempdir().unwrap();
-        let storage =
-            SqliteStorage::open(&dir.path().join("cache.db"), &dir.path().join("vectors.db"))
-                .unwrap();
+        let storage = crate::storage::open_test_storage(
+            &dir.path().join("cache.db"),
+            &dir.path().join("vectors.db"),
+        )
+        .unwrap();
         (
             dir,
             DocumentRefreshService {
                 git: build_candidates(),
                 filesystem: TestFiles::new(),
                 markdown: CountingMarkdown(Cell::new(0)),
-                storage: Box::new(storage),
+                storage: std::rc::Rc::new(storage.cache),
                 provenance: TestProvenance,
             },
         )
@@ -1331,9 +1515,7 @@ mod tests {
     fn get_matches(service: &mut TestService, text: &str) -> Vec<String> {
         service
             .storage
-            .begin_read_tx()
-            .unwrap()
-            .get_text_matches_by_expression(text)
+            .with_read_tx(|| service.storage.text_index_get_by_expression(text))
             .unwrap()
             .into_iter()
             .map(|row| row.id.as_str().to_owned())
@@ -1342,23 +1524,30 @@ mod tests {
 
     mod basis {
         use super::{Candidates, CountingMarkdown, TestFiles, build_service};
-        use crate::service::{ReadTransaction, VectorWrite};
+        use crate::service::TransactionError;
+        use crate::service::{CacheDatabase, StorageRead};
         use crate::{
-            domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
+            domain::{RepoPath, TreeOid},
             service::{
-                BasisRetainer, CacheWrite, CapturedFile, DocumentError, DocumentErrorKind,
-                DocumentRefreshService, DocumentResult, FileRow, FileStat, FileSystem,
-                NodeMetadata, ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError,
-                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage,
-                StorageResult, VectorOutcome,
+                BasisRetainer, CapturedFile, DocumentError, DocumentErrorKind,
+                DocumentRefreshService, DocumentResult, FileStat, FileSystem,
+                ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError,
+                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
             },
         };
         use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
         use tempfile::TempDir;
 
+        const INJECTED_PROVENANCE_FAILURE: &str = "injected provenance failure";
+
         type Events = Rc<RefCell<Vec<&'static str>>>;
-        type Service =
-            DocumentRefreshService<Candidates, BoundaryFiles, CountingMarkdown, BoundaryProvenance>;
+        type Service = DocumentRefreshService<
+            Candidates,
+            BoundaryFiles,
+            CountingMarkdown,
+            BoundaryProvenance,
+            BoundaryStorage,
+        >;
         struct BoundaryFiles {
             inner: TestFiles,
             events: Events,
@@ -1369,11 +1558,7 @@ mod tests {
             failure: Option<&'static str>,
         }
         struct BoundaryStorage {
-            inner: Box<dyn Storage>,
-            events: Events,
-        }
-        struct BoundaryWrite<'a> {
-            inner: Box<dyn CacheWrite + 'a>,
+            inner: Rc<crate::storage::CacheStorage>,
             events: Events,
         }
 
@@ -1443,7 +1628,13 @@ mod tests {
                 *events.borrow(),
                 ["lock", "read", "read", "observe", "verify"]
             );
-            assert_eq!(service.storage.begin_read_tx().unwrap().get_revision(), 0);
+            assert_eq!(
+                service
+                    .storage
+                    .with_read_tx(|| service.storage.project_get_by_id())
+                    .unwrap(),
+                0
+            );
         }
 
         #[test]
@@ -1509,7 +1700,13 @@ mod tests {
                 *events.borrow(),
                 ["lock", "read", "read", "observe", "retain", "begin", "read"]
             );
-            assert_eq!(service.storage.begin_read_tx().unwrap().get_revision(), 0);
+            assert_eq!(
+                service
+                    .storage
+                    .with_read_tx(|| service.storage.project_get_by_id())
+                    .unwrap(),
+                0
+            );
         }
 
         #[test]
@@ -1575,7 +1772,7 @@ mod tests {
                     events: Rc::clone(&events),
                 },
                 markdown: service.markdown,
-                storage: Box::new(BoundaryStorage {
+                storage: Rc::new(BoundaryStorage {
                     inner: service.storage,
                     events: Rc::clone(&events),
                 }),
@@ -1589,8 +1786,8 @@ mod tests {
         }
         impl FileSystem for BoundaryFiles {
             type IndexLock = ();
-            fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
-                self.inner.stat_file(path)
+            fn get_file_stat_by_path(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
+                self.inner.get_file_stat_by_path(path)
             }
             fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
                 self.events.borrow_mut().push("read");
@@ -1614,7 +1811,10 @@ mod tests {
             ) -> DocumentResult<ProvenanceObservation> {
                 self.events.borrow_mut().push("observe");
                 if self.failure == Some("observe") {
-                    return Err(build_failure());
+                    return Err(DocumentError::new(
+                        DocumentErrorKind::InternalError,
+                        INJECTED_PROVENANCE_FAILURE,
+                    ));
                 }
                 Ok(ProvenanceObservation {
                     flags: BTreeSet::new(),
@@ -1642,91 +1842,82 @@ mod tests {
             fn verify_snapshots(&self, _: &BTreeSet<TreeOid>) -> DocumentResult<()> {
                 self.events.borrow_mut().push("verify");
                 if self.failure == Some("verify") {
-                    return Err(build_failure());
+                    return Err(DocumentError::new(
+                        DocumentErrorKind::InternalError,
+                        INJECTED_PROVENANCE_FAILURE,
+                    ));
                 }
                 Ok(())
             }
             fn retain_snapshots(&self, _: &BTreeSet<TreeOid>) -> DocumentResult<()> {
                 self.events.borrow_mut().push("retain");
                 if self.failure == Some("retain") {
-                    return Err(build_failure());
+                    return Err(DocumentError::new(
+                        DocumentErrorKind::InternalError,
+                        INJECTED_PROVENANCE_FAILURE,
+                    ));
                 }
                 Ok(())
             }
         }
-        impl Storage for BoundaryStorage {
-            fn begin_vector_write_tx(
-                &mut self,
-                expected: &Sha256,
-            ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>> {
-                self.inner.begin_vector_write_tx(expected)
+        use crate::service::utils::cache_test_support::{
+            delegate_cache_reads, delegate_cache_writes, delegate_graph_reads,
+        };
+        impl crate::service::StorageRead for BoundaryStorage {
+            delegate_cache_reads!(self => self.inner.as_ref());
+        }
+        impl crate::service::GraphRead for BoundaryStorage {
+            delegate_graph_reads!(self => self.inner.as_ref());
+        }
+        impl crate::service::CacheDatabase for BoundaryStorage {
+            delegate_cache_writes!(self => self.inner.as_ref());
+
+            fn with_read_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_read_tx(operation)
             }
-            fn reset_vectors(
-                &mut self,
-                observed: Option<&Sha256>,
-                identity: &Sha256,
-            ) -> StorageResult<VectorOutcome<bool>> {
-                self.inner.reset_vectors(observed, identity)
+            fn with_status_read_tx<T, E, F>(
+                &self,
+                operation: F,
+            ) -> Result<Option<T>, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_status_read_tx(operation)
             }
-            fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>> {
+
+            fn with_write_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
                 self.events.borrow_mut().push("begin");
-                Ok(Box::new(BoundaryWrite {
-                    inner: self.inner.begin_cache_write_tx()?,
-                    events: Rc::clone(&self.events),
-                }))
+                let result = self.inner.with_write_tx(operation);
+                if result.is_ok() {
+                    self.events.borrow_mut().push("commit");
+                }
+                result
             }
-            fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
-                self.inner.begin_read_tx()
-            }
-        }
-        impl<'a> CacheWrite for BoundaryWrite<'a> {
-            fn upsert_node(&mut self, node: &NodeMetadata) -> StorageResult<i64> {
-                self.inner.upsert_node(node)
-            }
-            fn insert_edge(&mut self, edge: &Edge) -> StorageResult<()> {
-                self.inner.insert_edge(edge)
-            }
-            fn delete_outgoing(&mut self, id: &KnowledgeId) -> StorageResult<()> {
-                self.inner.delete_outgoing(id)
-            }
-            fn delete_node(&mut self, id: &EdgeTarget) -> StorageResult<()> {
-                self.inner.delete_node(id)
-            }
-            fn replace_text(&mut self, id: &KnowledgeId, text: &str) -> StorageResult<()> {
-                self.inner.replace_text(id, text)
-            }
-            fn upsert_file(&mut self, file: &FileRow) -> StorageResult<()> {
-                self.inner.upsert_file(file)
-            }
-            fn delete_file(&mut self, path: &RepoPath) -> StorageResult<()> {
-                self.inner.delete_file(path)
-            }
-            fn commit(self: Box<Self>) -> StorageResult<u64> {
-                self.events.borrow_mut().push("commit");
-                self.inner.commit()
-            }
-        }
-        fn build_failure() -> DocumentError {
-            DocumentError::new(
-                DocumentErrorKind::InternalError,
-                "injected provenance failure",
-            )
         }
     }
     pub(super) mod process {
         //! Production-process schedules. Only this private test driver reads control variables.
         use super::super::DocumentRefreshService;
+        use crate::service::TransactionError;
+        use crate::service::{CacheDatabase, StorageRead};
+        use crate::storage::get_current;
         use crate::{
             domain::{Edge, RepoPath, Sha256},
             filesystem::LocalFileSystem,
             git::GitRepository,
             markdown::MarkdownParser,
             service::{
-                CacheWrite, EmbeddingFailure, FileRow, FileSystem, GraphDiagnosticsService,
-                NodeMetadata, ProvenanceService, QueryError, Refresher, StatusReader, StatusReport,
-                StatusService, Storage, StorageError, StorageResult, StoredNode, VectorOutcome,
+                EmbeddingFailure, FileRow, FileSystem, GraphDiagnosticsService, NodeMetadata,
+                ProvenanceService, QueryError, Refresher, StatusReader, StatusReport,
+                StatusService, StorageError, StorageResult, StoredNode, VectorDatabase,
+                VectorOutcome,
             },
-            storage::{SqliteStatusStorage, SqliteStorage},
             wire_document_refresher,
         };
         use rusqlite::Connection;
@@ -1774,6 +1965,7 @@ mod tests {
             LocalFileSystem,
             MarkdownParser,
             ProvenanceService<LocalFileSystem>,
+            crate::storage::CacheStorage,
         >;
         type Tokens = Vec<(String, i64, String, i64)>;
         thread_local! {
@@ -1782,6 +1974,11 @@ mod tests {
         }
 
         pub(in crate::service) fn reach_checkpoint(name: &str) {
+            if name == "after_commit"
+                && let Some(hook) = super::ON_COMMIT.take()
+            {
+                hook();
+            }
             CONTROL.with_borrow_mut(|control| {
                 if let Some(stream) = control {
                     writeln!(stream, "{name}").unwrap();
@@ -1793,9 +1990,11 @@ mod tests {
             });
         }
 
-        pub(in crate::service) fn fail_late(unit: &mut dyn CacheWrite) -> StorageResult<()> {
+        pub(in crate::service) fn fail_late<C: crate::service::CacheDatabase>(
+            unit: &C,
+        ) -> StorageResult<()> {
             if FAIL_LATE.with_borrow(|enabled| *enabled) {
-                return unit.upsert_file(&FileRow {
+                return unit.files_upsert_by_path(&FileRow {
                     path: RepoPath::parse("invalid-size.md").unwrap(),
                     size: u64::MAX,
                     mtime_ns: 0,
@@ -1906,20 +2105,27 @@ mod tests {
             let fixture = Fixture::new();
             let mut owner = Worker::spawn(fixture.root.path(), "hold");
             owner.reach("holding");
-            let mut storage = build_service(fixture.root.path()).storage;
+            let storage = crate::storage::open_test_storage(
+                &fixture.root.path().join(".letopis/cache.db"),
+                &fixture.root.path().join(".letopis/vectors.db"),
+            )
+            .unwrap();
             let identity = Sha256::digest(b"model identity");
-            let VectorOutcome::Current(mut unit) =
-                storage.begin_vector_write_tx(&identity).unwrap()
-            else {
-                panic!("identity changed");
-            };
-            unit.set_query_error(99, "uncommitted").unwrap();
-            // When: normal composition and a no-op must finish with both owners still active.
-            Worker::spawn(fixture.root.path(), "normal-noop").finish();
-            // Then: neither the cache nor the committed vector state was changed.
-            assert_eq!(get_state(fixture.root.path()), fixture.old);
-            assert_eq!(get_vectors(fixture.root.path()), fixture.vector_state);
-            drop(unit);
+            assert!(matches!(
+                storage.vectors.with_write_tx(&identity, || {
+                    let unit = &storage.vectors;
+                    unit.query_error_upsert_by_id(99, "uncommitted").unwrap();
+                    // When: normal composition and a no-op must finish with both owners still active.
+                    Worker::spawn(fixture.root.path(), "normal-noop").finish();
+                    // Then: neither the cache nor the committed vector state was changed.
+                    assert_eq!(get_state(fixture.root.path()), fixture.old);
+                    assert_eq!(get_vectors(fixture.root.path()), fixture.vector_state);
+
+                    Err::<(), _>(())
+                }),
+                Err(TransactionError::Operation(()))
+            ));
+
             owner.kill();
         }
 
@@ -2087,7 +2293,13 @@ mod tests {
                 let mut service = build_service(root.path());
                 assert_eq!(service.refresh().unwrap().revision, 1);
                 assert_eq!(get_git_objects(root.path()), git_objects);
-                seed_vectors(service.storage.as_mut());
+                seed_vectors(
+                    &crate::storage::open_test_storage(
+                        &root.path().join(".letopis/cache.db"),
+                        &root.path().join(".letopis/vectors.db"),
+                    )
+                    .unwrap(),
+                );
                 drop(service);
                 let old = get_state(root.path());
                 let vectors = fs::read(root.path().join(".letopis/vectors.db")).unwrap();
@@ -2301,24 +2513,31 @@ mod tests {
             let fixture = Fixture::new();
             fixture.edit(NEW);
             let expected = fixture.build_expected(NEW, "BravoToken");
-            let mut storage = build_service(fixture.root.path()).storage;
-            let mut pinned = storage.begin_read_tx().unwrap();
-            let fts = Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
-            fts.execute_batch("begin;").unwrap();
-            assert_eq!(get_tokens(&fts), fixture.old.tokens);
-            // When: a separate worker publishes changed contents.
-            Worker::spawn(fixture.root.path(), "publish").finish();
-            // Then: old and new readers see complete distinct revisions.
-            assert_eq!(pinned.get_revision(), fixture.old.revision);
-            assert_eq!(pinned.get_nodes().unwrap(), fixture.old.nodes);
-            assert_eq!(
-                pinned.get_edges_by_source_id(None).unwrap(),
-                fixture.old.edges
-            );
-            assert_eq!(pinned.get_files().unwrap(), fixture.old.files);
-            assert_eq!(get_tokens(&fts), fixture.old.tokens);
-            assert_eq!(get_state(fixture.root.path()), expected);
-            fixture.assert_preserved(NEW);
+            let storage = build_service(fixture.root.path()).storage;
+            storage
+                .with_read_tx(|| -> crate::service::StorageResult<()> {
+                    let pinned = storage.as_ref();
+                    let fts =
+                        Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
+                    fts.execute_batch("begin;").unwrap();
+                    assert_eq!(get_tokens(&fts), fixture.old.tokens);
+                    // When: a separate worker publishes changed contents.
+                    Worker::spawn(fixture.root.path(), "publish").finish();
+                    // Then: old and new readers see complete distinct revisions.
+                    assert_eq!(pinned.project_get_by_id().unwrap(), fixture.old.revision);
+                    assert_eq!(pinned.nodes_get().unwrap(), fixture.old.nodes);
+                    assert_eq!(
+                        pinned.edges_get_by_source_id(None).unwrap(),
+                        fixture.old.edges
+                    );
+                    assert_eq!(pinned.files_get().unwrap(), fixture.old.files);
+                    assert_eq!(get_tokens(&fts), fixture.old.tokens);
+                    assert_eq!(get_state(fixture.root.path()), expected);
+                    fixture.assert_preserved(NEW);
+
+                    Ok(())
+                })
+                .unwrap();
         }
 
         #[test]
@@ -2410,16 +2629,20 @@ mod tests {
         }
 
         fn get_state(root: &Path) -> State {
-            let mut storage = build_service(root).storage;
-            let mut read = storage.begin_read_tx().unwrap();
-            let connection = Connection::open(root.join(".letopis/cache.db")).unwrap();
-            State {
-                revision: read.get_revision(),
-                nodes: read.get_nodes().unwrap(),
-                edges: read.get_edges_by_source_id(None).unwrap(),
-                files: read.get_files().unwrap(),
-                tokens: get_tokens(&connection),
-            }
+            let storage = build_service(root).storage;
+            storage
+                .with_read_tx(|| {
+                    let read = storage.as_ref();
+                    let connection = Connection::open(root.join(".letopis/cache.db")).unwrap();
+                    Ok::<_, StorageError>(State {
+                        revision: read.project_get_by_id().unwrap(),
+                        nodes: read.nodes_get().unwrap(),
+                        edges: read.edges_get_by_source_id(None).unwrap(),
+                        files: read.files_get().unwrap(),
+                        tokens: get_tokens(&connection),
+                    })
+                })
+                .unwrap()
         }
 
         fn get_tokens(connection: &Connection) -> Tokens {
@@ -2436,19 +2659,29 @@ mod tests {
         }
 
         fn get_vectors(root: &Path) -> VectorState {
-            let mut storage = build_service(root).storage;
-            let mut read = storage.begin_read_tx().unwrap();
-            let identity = Sha256::digest(b"model identity");
-            VectorState {
-                identity: read.get_config_identity(),
-                vector: read
-                    .get_vector_by_search_hash(&identity, &Sha256::digest(b"retained vector"))
-                    .unwrap(),
-                failure: read
-                    .get_failure_by_search_hash(&identity, &Sha256::digest(b"failed vector"))
-                    .unwrap(),
-                query_error: read.get_query_error().unwrap(),
-            }
+            let storage = build_service(root).storage;
+            storage
+                .with_read_tx(|| {
+                    let read = storage.as_ref();
+                    let identity = Sha256::digest(b"model identity");
+                    Ok::<_, StorageError>(VectorState {
+                        identity: read.meta_get_by_id().unwrap(),
+                        vector: read
+                            .vector_keys_get_vector_by_search_hash(
+                                &identity,
+                                &Sha256::digest(b"retained vector"),
+                            )
+                            .unwrap(),
+                        failure: read
+                            .embed_failures_get_by_search_hash(
+                                &identity,
+                                &Sha256::digest(b"failed vector"),
+                            )
+                            .unwrap(),
+                        query_error: read.query_error_get_by_id().unwrap(),
+                    })
+                })
+                .unwrap()
         }
 
         fn get_status(root: &Path) -> StatusReport {
@@ -2456,16 +2689,16 @@ mod tests {
             let files = LocalFileSystem::open(git.get_root()).unwrap();
             let pinned = files.open_existing_service_directory().unwrap().unwrap();
             let storage =
-                SqliteStatusStorage::open_confined(&git.get_root().join(".letopis"), &pinned)
-                    .unwrap();
+                crate::open_observed_cache(&git.get_root().join(".letopis"), &pinned).unwrap();
             let provenance = ProvenanceService::new(
                 Box::new(GitRepository::open(root).unwrap()),
                 LocalFileSystem::open(root).unwrap(),
             );
             let provider = crate::build_embedding_provider().unwrap();
-            let graph = GraphDiagnosticsService::new();
+            let storage = std::rc::Rc::new(storage);
+            let graph = GraphDiagnosticsService::new(std::rc::Rc::clone(&storage));
             let mut status = StatusService {
-                storage: Box::new(storage),
+                storage,
                 files: &files,
                 graph: &graph,
                 provenance: &provenance,
@@ -2491,8 +2724,11 @@ mod tests {
             let mut filesystem = LocalFileSystem::open(git.get_root()).unwrap();
             filesystem.configure_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
             let directory = filesystem.open_service_directory().unwrap();
-            let storage =
-                SqliteStorage::open_confined(&git.get_root().join(".letopis"), &directory).unwrap();
+            let storage = crate::storage::open_confined_test_storage(
+                &git.get_root().join(".letopis"),
+                &directory,
+            )
+            .unwrap();
             let provenance = ProvenanceService::new(
                 Box::new(GitRepository::open(root).unwrap()),
                 LocalFileSystem::open(root).unwrap(),
@@ -2501,7 +2737,7 @@ mod tests {
                 git,
                 filesystem,
                 markdown: MarkdownParser::new(),
-                storage: Box::new(storage),
+                storage: std::rc::Rc::new(storage.cache),
                 provenance,
             }
         }
@@ -2517,26 +2753,34 @@ mod tests {
             output.stdout
         }
 
-        fn seed_vectors(storage: &mut dyn Storage) {
+        fn seed_vectors(storage: &crate::storage::TestDatabases) {
             let identity = Sha256::digest(b"model identity");
-            storage.reset_vectors(None, &identity).unwrap();
-            let VectorOutcome::Current(mut unit) =
-                storage.begin_vector_write_tx(&identity).unwrap()
-            else {
-                panic!("identity changed");
-            };
-            unit.store_vector(&Sha256::digest(b"retained vector"), &[1.0, 0.0], 2)
+            storage.vectors.reset_vectors(None, &identity).unwrap();
+            storage
+                .vectors
+                .with_write_tx(&identity, || {
+                    let unit = &storage.vectors;
+                    unit.store_vector(&Sha256::digest(b"retained vector"), &[1.0, 0.0], 2)
+                        .unwrap();
+                    let failure = Sha256::digest(b"failed vector");
+                    assert!(
+                        unit.embed_failures_upsert_by_search_hash_and_attempts(&failure, 3)
+                            .unwrap()
+                    );
+                    unit.embed_failures_update_by_search_hash(&failure, "safe failure")
+                        .unwrap();
+                    unit.query_error_upsert_by_id(7, "safe query error")
+                        .unwrap();
+
+                    Ok::<_, StorageError>(())
+                })
+                .map(get_current)
                 .unwrap();
-            let failure = Sha256::digest(b"failed vector");
-            assert!(unit.reserve_attempt(&failure, 3).unwrap());
-            unit.record_failure(&failure, "safe failure").unwrap();
-            unit.set_query_error(7, "safe query error").unwrap();
-            unit.commit().unwrap();
         }
 
         mod reindex {
             use super::{Fixture, LATEST, NEW, Worker, build_service, get_state, get_tokens};
-            use crate::service::Refresher;
+            use crate::service::{CacheDatabase, Refresher, StorageRead};
             use rusqlite::Connection;
             use std::{fs, os::unix::process::ExitStatusExt};
 
@@ -2578,27 +2822,34 @@ mod tests {
                 let fixture = Fixture::new();
                 fixture.edit(NEW);
                 let expected = fixture.build_expected(NEW, "BravoToken");
-                let mut storage = build_service(fixture.root.path()).storage;
-                let mut pinned = storage.begin_read_tx().unwrap();
-                let fts = Connection::open(fixture.root.path().join(".letopis/cache.db")).unwrap();
-                fts.execute_batch("begin").unwrap();
-                assert_eq!(get_tokens(&fts), fixture.old.tokens);
-                let mut worker = Worker::spawn(fixture.root.path(), "reindex");
-                worker.reach("before_commit");
-                assert_eq!(get_state(fixture.root.path()), fixture.old);
-                // When: the reindex worker is allowed to commit.
-                worker.resume();
-                worker.finish();
-                // Then: old readers keep the old state and a fresh read sees the complete new state.
-                assert_eq!(pinned.get_revision(), 1);
-                assert_eq!(pinned.get_nodes().unwrap(), fixture.old.nodes);
-                assert_eq!(
-                    pinned.get_edges_by_source_id(None).unwrap(),
-                    fixture.old.edges
-                );
-                assert_eq!(pinned.get_files().unwrap(), fixture.old.files);
-                assert_eq!(get_tokens(&fts), fixture.old.tokens);
-                assert_eq!(get_state(fixture.root.path()), expected);
+                let storage = build_service(fixture.root.path()).storage;
+                storage
+                    .with_read_tx(|| -> crate::service::StorageResult<()> {
+                        let pinned = storage.as_ref();
+                        let fts = Connection::open(fixture.root.path().join(".letopis/cache.db"))
+                            .unwrap();
+                        fts.execute_batch("begin").unwrap();
+                        assert_eq!(get_tokens(&fts), fixture.old.tokens);
+                        let mut worker = Worker::spawn(fixture.root.path(), "reindex");
+                        worker.reach("before_commit");
+                        assert_eq!(get_state(fixture.root.path()), fixture.old);
+                        // When: the reindex worker is allowed to commit.
+                        worker.resume();
+                        worker.finish();
+                        // Then: old readers keep the old state and a fresh read sees the complete new state.
+                        assert_eq!(pinned.project_get_by_id().unwrap(), 1);
+                        assert_eq!(pinned.nodes_get().unwrap(), fixture.old.nodes);
+                        assert_eq!(
+                            pinned.edges_get_by_source_id(None).unwrap(),
+                            fixture.old.edges
+                        );
+                        assert_eq!(pinned.files_get().unwrap(), fixture.old.files);
+                        assert_eq!(get_tokens(&fts), fixture.old.tokens);
+                        assert_eq!(get_state(fixture.root.path()), expected);
+
+                        Ok(())
+                    })
+                    .unwrap();
             }
 
             #[test]
@@ -2644,28 +2895,26 @@ mod tests {
 
     mod reading {
         use super::{CountingMarkdown, TestFiles, TestProvenance, build_candidates, build_service};
-        use crate::service::{ReadTransaction, VectorWrite};
+        use crate::service::CacheDatabase;
+        use crate::service::TransactionError;
         use crate::{
             domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
             service::{
-                BasisRetainer, CacheWrite, DocumentRefreshService, DocumentResult, ElementAddress,
+                BasisRetainer, DocumentRefreshService, DocumentResult, ElementAddress,
                 EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary, EmbeddingWork,
                 FileRow, GraphNeighbor, GraphNodeRef, GraphRead, NeighborPageRequest, NodeMetadata,
                 ProvenanceObservation, ProvenanceRequest, QueryError, Refresher, SnapshotError,
-                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, Storage,
-                StorageRead, StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
+                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, StorageRead,
+                StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
             },
         };
         use std::{cell::Cell, collections::BTreeSet, num::NonZeroUsize, rc::Rc};
 
         struct ReadingStorage {
-            inner: Box<dyn Storage>,
+            inner: Rc<crate::storage::CacheStorage>,
             reads: Rc<Cell<usize>>,
         }
-        struct ReadingView<'a> {
-            inner: Box<dyn ReadTransaction + 'a>,
-            reads: Rc<Cell<usize>>,
-        }
+
         struct RetainingProvenance;
 
         #[test]
@@ -2675,9 +2924,7 @@ mod tests {
             initial.refresh().unwrap();
             let mut node = initial
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_nodes()
+                .with_read_tx(|| initial.storage.nodes_get())
                 .unwrap()
                 .remove(0)
                 .metadata;
@@ -2685,15 +2932,16 @@ mod tests {
                 panic!()
             };
             knowledge.source_snapshot = Some(TreeOid::parse(&"a".repeat(40)).unwrap());
-            let mut write = initial.storage.begin_cache_write_tx().unwrap();
-            write.upsert_node(&node).unwrap();
-            write.commit().unwrap();
+            initial
+                .storage
+                .with_write_tx(|| initial.storage.nodes_upsert_by_id(&node))
+                .unwrap();
             let reads = Rc::new(Cell::new(0));
             let mut service = DocumentRefreshService {
                 git: build_candidates(),
                 filesystem: TestFiles::new(),
                 markdown: CountingMarkdown(Cell::new(0)),
-                storage: Box::new(ReadingStorage {
+                storage: Rc::new(ReadingStorage {
                     inner: initial.storage,
                     reads: Rc::clone(&reads),
                 }),
@@ -2710,128 +2958,136 @@ mod tests {
             assert_eq!(service.markdown.0.get(), 0);
         }
 
-        impl Storage for ReadingStorage {
-            fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>> {
-                Ok(Box::new(ReadingView {
-                    inner: self.inner.begin_read_tx()?,
-                    reads: Rc::clone(&self.reads),
-                }))
+        use crate::service::utils::cache_test_support::delegate_cache_writes;
+        impl crate::service::CacheDatabase for ReadingStorage {
+            delegate_cache_writes!(self => self.inner.as_ref());
+
+            fn with_read_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_read_tx(operation)
             }
-            fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>> {
-                self.inner.begin_cache_write_tx()
+            fn with_status_read_tx<T, E, F>(
+                &self,
+                operation: F,
+            ) -> Result<Option<T>, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_status_read_tx(operation)
             }
-            fn reset_vectors(
-                &mut self,
-                observed: Option<&Sha256>,
-                identity: &Sha256,
-            ) -> StorageResult<VectorOutcome<bool>> {
-                self.inner.reset_vectors(observed, identity)
-            }
-            fn begin_vector_write_tx(
-                &mut self,
-                expected: &Sha256,
-            ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>> {
-                self.inner.begin_vector_write_tx(expected)
+
+            fn with_write_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+            where
+                F: FnOnce() -> Result<T, E>,
+            {
+                self.inner.with_write_tx(operation)
             }
         }
-        impl<'a> GraphRead for ReadingView<'a> {
-            fn get_node_ref_by_id(
-                &mut self,
+
+        impl GraphRead for ReadingStorage {
+            fn nodes_get_ref_by_id(
+                &self,
                 id: &ElementAddress,
             ) -> StorageResult<Option<GraphNodeRef>> {
-                self.inner.get_node_ref_by_id(id)
+                self.inner.nodes_get_ref_by_id(id)
             }
-            fn get_neighbor_page(
-                &mut self,
+            fn edges_get_by_nodes_row_id_and_type(
+                &self,
                 request: &NeighborPageRequest<'_>,
             ) -> StorageResult<Vec<GraphNeighbor>> {
-                self.inner.get_neighbor_page(request)
+                self.inner.edges_get_by_nodes_row_id_and_type(request)
             }
         }
-        impl<'a> StorageRead for ReadingView<'a> {
+        impl StorageRead for ReadingStorage {
             fn get_embedding_status(
-                &mut self,
+                &self,
                 policy: &EmbeddingStatusPolicy,
             ) -> StorageResult<EmbeddingStatusSummary> {
                 self.inner.get_embedding_status(policy)
             }
 
-            fn get_nodes(&mut self) -> StorageResult<Vec<StoredNode>> {
+            fn nodes_get(&self) -> StorageResult<Vec<StoredNode>> {
                 panic!("warm refresh loaded node metadata")
             }
-            fn get_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>> {
+            fn nodes_get_by_source_snapshot(&self) -> StorageResult<BTreeSet<TreeOid>> {
                 self.reads.set(self.reads.get() + 1);
-                self.inner.get_source_snapshots()
+                self.inner.nodes_get_by_source_snapshot()
             }
-            fn get_next_embedding_work_by_id_and_max_attempts(
-                &mut self,
+            fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                &self,
                 expected: &Sha256,
                 max_attempts: u64,
                 after: Option<&KnowledgeId>,
             ) -> StorageResult<VectorOutcome<Option<EmbeddingWork>>> {
-                self.inner.get_next_embedding_work_by_id_and_max_attempts(
-                    expected,
-                    max_attempts,
-                    after,
-                )
+                self.inner
+                    .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                        expected,
+                        max_attempts,
+                        after,
+                    )
             }
-            fn get_vector_dimensions(
-                &mut self,
+            fn vector_index_config_get_by_id(
+                &self,
                 expected: &Sha256,
             ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>> {
-                self.inner.get_vector_dimensions(expected)
+                self.inner.vector_index_config_get_by_id(expected)
             }
-            fn get_node_by_id(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
-                self.inner.get_node_by_id(id)
+            fn nodes_get_by_id(&self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
+                self.inner.nodes_get_by_id(id)
             }
-            fn get_edges_by_source_id(
-                &mut self,
+            fn edges_get_by_source_id(
+                &self,
                 source: Option<&KnowledgeId>,
             ) -> StorageResult<Vec<Edge>> {
-                self.inner.get_edges_by_source_id(source)
+                self.inner.edges_get_by_source_id(source)
             }
-            fn get_file_by_path(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
-                self.inner.get_file_by_path(path)
+            fn files_get_by_path(&self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
+                self.inner.files_get_by_path(path)
             }
-            fn get_files(&mut self) -> StorageResult<Vec<FileRow>> {
-                self.inner.get_files()
+            fn files_get(&self) -> StorageResult<Vec<FileRow>> {
+                self.inner.files_get()
             }
-            fn get_text_matches_by_expression(
-                &mut self,
+            fn text_index_get_by_expression(
+                &self,
                 expression: &str,
             ) -> StorageResult<Vec<TextMatch>> {
-                self.inner.get_text_matches_by_expression(expression)
+                self.inner.text_index_get_by_expression(expression)
             }
-            fn get_vector_by_search_hash(
-                &mut self,
+            fn vector_keys_get_vector_by_search_hash(
+                &self,
                 expected: &Sha256,
                 search_hash: &Sha256,
             ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>> {
-                self.inner.get_vector_by_search_hash(expected, search_hash)
+                self.inner
+                    .vector_keys_get_vector_by_search_hash(expected, search_hash)
             }
-            fn get_nearest_vectors(
-                &mut self,
+            fn vector_index_get_by_vector(
+                &self,
                 expected: &Sha256,
                 query: &[f32],
                 dimensions: usize,
             ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
-                self.inner.get_nearest_vectors(expected, query, dimensions)
+                self.inner
+                    .vector_index_get_by_vector(expected, query, dimensions)
             }
-            fn get_failure_by_search_hash(
-                &mut self,
+            fn embed_failures_get_by_search_hash(
+                &self,
                 expected: &Sha256,
                 search_hash: &Sha256,
             ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>> {
-                self.inner.get_failure_by_search_hash(expected, search_hash)
+                self.inner
+                    .embed_failures_get_by_search_hash(expected, search_hash)
             }
-            fn get_query_error(&mut self) -> StorageResult<Option<QueryError>> {
-                self.inner.get_query_error()
+            fn query_error_get_by_id(&self) -> StorageResult<Option<QueryError>> {
+                self.inner.query_error_get_by_id()
             }
-            fn get_revision(&self) -> u64 {
-                self.inner.get_revision()
+            fn project_get_by_id(&self) -> StorageResult<u64> {
+                self.inner.project_get_by_id()
             }
-            fn get_config_identity(&self) -> Option<Sha256> {
-                self.inner.get_config_identity()
+            fn meta_get_by_id(&self) -> StorageResult<Option<Sha256>> {
+                self.inner.meta_get_by_id()
             }
         }
         impl SourceProvenance for RetainingProvenance {
@@ -2878,7 +3134,7 @@ mod tests {
 
     mod reindex {
         use super::{INITIAL, build_service, get_matches};
-        use crate::service::Refresher;
+        use crate::service::{CacheDatabase, Refresher, StorageRead};
         use rusqlite::Connection;
 
         #[test]
@@ -2935,24 +3191,29 @@ mod tests {
             service.refresh().unwrap();
             let before = service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_files()
+                .with_read_tx(|| service.storage.files_get())
                 .unwrap();
             service.filesystem.reset_counts();
             service.filesystem.fail_on_read.set(Some(3));
             // When: reindex fails during publication capture.
             assert!(service.reindex().is_err());
             // Then: the prior revision, file state and FTS entry remain intact.
-            let mut read = service.storage.begin_read_tx().unwrap();
-            assert_eq!(read.get_revision(), 1);
-            assert_eq!(read.get_files().unwrap(), before);
-            assert_eq!(
-                read.get_text_matches_by_expression("AlphaToken").unwrap()[0]
-                    .id
-                    .as_str(),
-                "note.md"
-            );
+            let cache = std::rc::Rc::clone(&service.storage);
+            cache
+                .with_read_tx(|| -> crate::service::StorageResult<()> {
+                    let read = cache.as_ref();
+                    assert_eq!(read.project_get_by_id().unwrap(), 1);
+                    assert_eq!(read.files_get().unwrap(), before);
+                    assert_eq!(
+                        read.text_index_get_by_expression("AlphaToken").unwrap()[0]
+                            .id
+                            .as_str(),
+                        "note.md"
+                    );
+
+                    Ok(())
+                })
+                .unwrap();
         }
     }
 

@@ -13,12 +13,14 @@ use std::{
 };
 use tempfile::TempDir;
 
+const WRITE_CANCELLED_MESSAGE: &str = "Git write cancelled";
+
 /// Owns actual temporary resources independently of the foreground repository.
 /// Admission/publication gates are short; payload writes and syncs never hold the gate.
 #[derive(Debug, Default)]
 pub(crate) struct GitWriteCleanup {
     cancelled: AtomicBool,
-    state: Mutex<WriteState>,
+    state_mutex: Mutex<WriteState>,
 }
 #[derive(Debug, Default)]
 struct WriteState {
@@ -144,14 +146,17 @@ impl GitWriteCleanup {
     fn admit(&self) -> Result<MutexGuard<'_, WriteState>, SnapshotError> {
         let state = self.lock_state();
         if self.is_cancelled() {
-            return Err(fail_cancelled());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                WRITE_CANCELLED_MESSAGE,
+            ));
         }
         Ok(state)
     }
 
     fn lock_state(&self) -> MutexGuard<'_, WriteState> {
         // A panic must not strand ownership; cleanup remains possible during unwinding.
-        self.state
+        self.state_mutex
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
@@ -162,7 +167,10 @@ impl WriteLease {
     pub(super) fn close_stage(self) -> Result<(), SnapshotError> {
         let mut state = self.cleanup.admit()?;
         let Some(WriteResource::Stage(directory)) = state.resources.remove(&self.id) else {
-            return Err(fail_cancelled());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                WRITE_CANCELLED_MESSAGE,
+            ));
         };
         directory.close().map_err(fail_cleanup)
     }
@@ -176,9 +184,14 @@ impl WriteLease {
     ) -> Result<bool, SnapshotError> {
         let state = self.cleanup.admit()?;
         if !matches!(state.resources.get(&self.id), Some(WriteResource::Stage(_))) {
-            return Err(fail_cancelled());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                WRITE_CANCELLED_MESSAGE,
+            ));
         }
-        let parent = destination.parent().ok_or_else(fail_cancelled)?;
+        let parent = destination.parent().ok_or_else(|| {
+            SnapshotError::new(SnapshotErrorKind::InternalError, WRITE_CANCELLED_MESSAGE)
+        })?;
         gix::fs::dir::create::all(parent, Default::default(), permissions).map_err(fail_cleanup)?;
         match fs::hard_link(staged, destination) {
             Ok(()) => Ok(true),
@@ -191,7 +204,10 @@ impl WriteLease {
     pub(super) fn commit_ref(self) -> Result<(), SnapshotError> {
         let mut state = self.cleanup.admit()?;
         let Some(WriteResource::Ref(lock)) = state.resources.remove(&self.id) else {
-            return Err(fail_cancelled());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                WRITE_CANCELLED_MESSAGE,
+            ));
         };
         lock.commit().map_err(|error| fail_cleanup(error.error))?;
         Ok(())
@@ -225,7 +241,9 @@ fn detach_and_remove(
     directory: &mut TempDir,
     #[cfg(test)] checkpoint: Option<tests::NamespaceCheckpoint>,
 ) -> Result<(), SnapshotError> {
-    let parent = directory.path().parent().ok_or_else(fail_cancelled)?;
+    let parent = directory.path().parent().ok_or_else(|| {
+        SnapshotError::new(SnapshotErrorKind::InternalError, WRITE_CANCELLED_MESSAGE)
+    })?;
     let detached = create_directory(parent)?;
     fs::rename(directory.path(), detached.path()).map_err(fail_cleanup)?;
     // Only after rename succeeds does the old name lose ownership; it is never reused.
@@ -257,9 +275,6 @@ fn create_directory(root: &Path) -> Result<TempDir, SnapshotError> {
 }
 fn fail_cleanup(error: io::Error) -> SnapshotError {
     make_io_error("Git write cleanup failed", error)
-}
-fn fail_cancelled() -> SnapshotError {
-    SnapshotError::new(SnapshotErrorKind::InternalError, "Git write cancelled")
 }
 
 #[cfg(test)]

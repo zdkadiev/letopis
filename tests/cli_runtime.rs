@@ -12,6 +12,26 @@ use std::{
 use tempfile::TempDir;
 
 #[test]
+fn early_rejection_keeps_its_error_receipt_after_stdin_closes() {
+    // Given: invalid arguments let the product reject input before reading stdin.
+    let root = make_repository();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_letopis"));
+    command
+        .arg("unknown")
+        .current_dir(root.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cli::OwnedChild::spawn(&mut command);
+    let output = child.collect_output(Duration::from_secs(10));
+    // When: the parent writes after the child has definitively exited.
+    child.send_input(b"{}");
+    // Then: a closed stdin does not hide the safe error or create service state.
+    assert_error(&output, "invalid_request");
+    assert!(!root.path().join(".letopis").exists());
+}
+
+#[test]
 fn malformed_requests_fail_before_service_directory_creation() {
     // Given
     let root = make_repository();

@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793278392,"source_snapshot":"e6730713cdcf157bcb2294169c248f3b165a37f1"} -->
+<!-- letopis: {"created_at":1793278392,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
 # Git snapshot storage
 
 `GitRepository` discovers a non-bare worktree in process through the pinned gix
@@ -21,3 +21,5 @@ distinction lets routine work retain roots while full audits use stronger checks
 [Retention and closure](../../src/git/refs.rs "letopis:type=external;path=src/git/refs.rs")
 
 [Inspection capture](../../src/service/inspection.rs "letopis:type=external;path=src/service/inspection.rs")
+
+[Shared-permission test oracle](../development/git-shared-permissions-oracle.md "letopis:type=related_to;path=letopis/development/git-shared-permissions-oracle.md")

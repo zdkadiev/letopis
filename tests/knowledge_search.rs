@@ -1,8 +1,10 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 use letopis::{
     domain::LineRange,
     service::{
-        CommandErrorKind, NodeMetadata, Refresher, SearchFlag, SearchRequest, Searcher, Storage,
+        CommandErrorKind, NodeMetadata, Refresher, SearchFlag, SearchRequest, Searcher,
         VectorOutcome,
     },
     wire_document_refresher, wire_searcher,
@@ -90,7 +92,14 @@ fn empty_query_never_calls_match_or_provider() {
     }
     assert!(server.take_requests().is_empty());
     assert_eq!(
-        repo.open_storage().begin_read_tx().unwrap().get_revision(),
+        {
+            let scope_databases = repo.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| Ok::<_, StorageError>(scope_databases.cache.project_get_by_id()))
+                .unwrap()
+        }
+        .unwrap(),
         2
     );
 }
@@ -169,20 +178,26 @@ fn provider_failure_sets_query_error_without_search_warning_or_attempts() {
     // Then: a query error is stored without warnings or document attempts.
     assert_eq!(links.len(), 1);
     assert!(links[0].flags.is_empty());
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    let error = read.get_query_error().unwrap().unwrap();
-    assert!(!error.error.contains("SECRET"));
-    let nodes = read.get_nodes().unwrap();
-    let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
-        panic!("knowledge")
-    };
-    assert_eq!(
-        read.get_failure_by_search_hash(&config.get_identity(), &node.search_hash)
-            .unwrap(),
-        VectorOutcome::Current(None)
-    );
-    assert_eq!(server.take_requests().len(), 1);
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            let error = read.query_error_get_by_id().unwrap().unwrap();
+            assert!(!error.error.contains("SECRET"));
+            let nodes = read.nodes_get().unwrap();
+            let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
+                panic!("knowledge")
+            };
+            assert_eq!(
+                read.embed_failures_get_by_search_hash(&config.get_identity(), &node.search_hash)
+                    .unwrap(),
+                VectorOutcome::Current(None)
+            );
+            assert_eq!(server.take_requests().len(), 1);
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 #[test]
 fn invalid_live_knowledge_retains_pinned_link_as_stale() {
@@ -376,11 +391,20 @@ fn stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes() {
     assert!(links[0].flags.is_empty());
     assert_eq!(server.take_requests().len(), 1);
     assert_eq!(
-        repo.open_storage()
-            .begin_read_tx()
-            .unwrap()
-            .get_nearest_vectors(&config.get_identity(), &[1.0, 0.0], 2)
-            .unwrap(),
+        {
+            let scope_databases = repo.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| {
+                    Ok::<_, StorageError>(scope_databases.cache.vector_index_get_by_vector(
+                        &config.get_identity(),
+                        &[1.0, 0.0],
+                        2,
+                    ))
+                })
+                .unwrap()
+        }
+        .unwrap(),
         VectorOutcome::Current(vec![])
     );
 }

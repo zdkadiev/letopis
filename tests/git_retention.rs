@@ -531,8 +531,8 @@ fn linked_worktree_checks_common_object_store_and_refuses_inactive_alternates() 
     }
 }
 
-fn parse_path(s: &str) -> RepoPath {
-    RepoPath::parse(s).unwrap()
+fn parse_path(text: &str) -> RepoPath {
+    RepoPath::parse(text).unwrap()
 }
 
 fn create_external_tree(repo: &TempRepo, child: &str, name: &str, kind: &str) -> TreeOid {
@@ -585,8 +585,8 @@ fn pin_worker(root: OsString) {
     assert_eq!(retained.get_oid(), &tree);
 }
 
-fn parse_tree_oid(s: &str) -> TreeOid {
-    TreeOid::parse(s).unwrap()
+fn parse_tree_oid(text: &str) -> TreeOid {
+    TreeOid::parse(text).unwrap()
 }
 
 fn spawn_pin_workers(root: &Path, tree: &TreeOid) -> Vec<git::OwnedChild> {

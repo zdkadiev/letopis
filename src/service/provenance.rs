@@ -903,7 +903,7 @@ mod tests {
     }
     impl FileSystem for RecordedFiles {
         type IndexLock = ();
-        fn stat_file(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
+        fn get_file_stat_by_path(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
             panic!("provenance must not stat sources")
         }
         fn get_file(&self, _: &RepoPath) -> DocumentResult<Option<CapturedFile>> {

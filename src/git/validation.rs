@@ -2,6 +2,7 @@ use super::tree::get_entry;
 use crate::service::{SnapshotError, SnapshotErrorKind};
 use std::{cmp::Ordering, collections::BTreeSet};
 
+const TREE_INTEGRITY_MESSAGE: &str = "Git tree integrity failed";
 const TREE_MODE: u16 = 0o040000;
 const SYMLINK_MODE: u16 = 0o120000;
 const VALID_MODES: [u16; 5] = [0o100644, 0o100755, SYMLINK_MODE, TREE_MODE, 0o160000];
@@ -16,27 +17,39 @@ const MAX_NAME_BYTES: usize = 4096;
 /// Returns `InternalError` when the body fails Git's structural checks.
 pub(super) fn validate_tree_bytes(mut bytes: &[u8], oid_len: usize) -> Result<(), SnapshotError> {
     if !matches!(oid_len, 40 | 64) {
-        return Err(make_integrity_error());
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            TREE_INTEGRITY_MESSAGE,
+        ));
     }
     let mut names = BTreeSet::new();
     let mut previous = None;
     while !bytes.is_empty() {
         // Git's tree descriptor also checks the final entry's NUL boundary.
         if bytes.get(bytes.len().saturating_sub(oid_len / 2 + 1)) != Some(&0) || bytes[0] == b'0' {
-            return Err(make_integrity_error());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                TREE_INTEGRITY_MESSAGE,
+            ));
         }
         let (entry, remaining) = get_entry(bytes, oid_len)?;
         if !VALID_MODES.contains(&entry.mode)
             || entry.oid.iter().all(|byte| *byte == 0)
             || !names.insert(entry.name)
         {
-            return Err(make_integrity_error());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                TREE_INTEGRITY_MESSAGE,
+            ));
         }
         validate_name(entry.name, entry.mode)?;
         if let Some((name, mode)) = previous
             && compare_names(name, mode, entry.name, entry.mode) != Ordering::Less
         {
-            return Err(make_integrity_error());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                TREE_INTEGRITY_MESSAGE,
+            ));
         }
         previous = Some((entry.name, entry.mode));
         bytes = remaining;
@@ -51,7 +64,10 @@ fn validate_name(name: &[u8], mode: u16) -> Result<(), SnapshotError> {
         || is_hfs_alias(name, b"git")
         || name.split(|byte| *byte == b'\\').any(is_ntfs_dotgit)
     {
-        return Err(make_integrity_error());
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            TREE_INTEGRITY_MESSAGE,
+        ));
     }
     if mode != SYMLINK_MODE {
         return Ok(());
@@ -63,14 +79,20 @@ fn validate_name(name: &[u8], mode: u16) -> Result<(), SnapshotError> {
         (b"mailmap", b"maba30"),
     ] {
         if is_hfs_alias(name, needle) || is_ntfs_alias(name, needle, short_prefix) {
-            return Err(make_integrity_error());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                TREE_INTEGRITY_MESSAGE,
+            ));
         }
     }
     // Only .gitmodules is protected after backslashes by Git's structural check.
     if name.iter().enumerate().any(|(offset, byte)| {
         *byte == b'\\' && is_ntfs_alias(&name[offset + 1..], b"gitmodules", b"gi7eba")
     }) {
-        return Err(make_integrity_error());
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            TREE_INTEGRITY_MESSAGE,
+        ));
     }
     Ok(())
 }
@@ -166,13 +188,6 @@ fn has_ntfs_suffix(suffix: &[u8]) -> bool {
         .iter()
         .take_while(|byte| **byte != b':')
         .all(|byte| matches!(byte, b' ' | b'.'))
-}
-
-fn make_integrity_error() -> SnapshotError {
-    SnapshotError::new(
-        SnapshotErrorKind::InternalError,
-        "Git tree integrity failed",
-    )
 }
 
 #[cfg(test)]

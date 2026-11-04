@@ -11,6 +11,8 @@ use serde::{
 use serde_json::value::RawValue;
 use std::{collections::BTreeSet, ffi::OsString, io::Read, num::NonZeroUsize};
 
+const INVALID_COMMAND_INPUT_MESSAGE: &str = "invalid command input";
+
 /// Typed command input after transport validation.
 #[derive(Debug)]
 pub(crate) enum Request {
@@ -78,7 +80,14 @@ pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResul
     }
     let args = args
         .iter()
-        .map(|arg| arg.to_str().ok_or_else(fail_invalid_request))
+        .map(|arg| {
+            arg.to_str().ok_or_else(|| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+        })
         .collect::<CommandResult<Vec<_>>>()?;
     // Validate all argv before reading stdin or constructing any service.
     match args.as_slice() {
@@ -103,22 +112,37 @@ pub(crate) fn parse_request(args: &[OsString], input: impl Read) -> CommandResul
         ["search"] => get_search(input).map(Request::Search),
         ["traverse"] => get_traversal(input).map(Request::Traverse),
         ["embed", "--drain"] => get_drain(input),
-        _ => Err(fail_invalid_request()),
+        _ => Err(CommandError::new(
+            CommandErrorKind::InvalidRequest,
+            INVALID_COMMAND_INPUT_MESSAGE,
+        )),
     }
 }
+
 fn get_check(input: impl Read) -> CommandResult<Request> {
     let dto: CheckInput = get_object(input)?;
     let paths = dto
         .paths
         .iter()
-        .map(|raw| RepoPath::parse(raw).map_err(|_| fail_invalid_request()))
+        .map(|raw| {
+            RepoPath::parse(raw).map_err(|_| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+        })
         .collect::<CommandResult<BTreeSet<_>>>()?;
     Ok(Request::Check(paths.into_iter().collect()))
 }
+
 fn get_inspection(input: impl Read) -> CommandResult<Request> {
     let dto: InspectInput = get_object(input)?;
     if dto.element_ids.is_empty() {
-        return Err(fail_invalid_request());
+        return Err(CommandError::new(
+            CommandErrorKind::InvalidRequest,
+            INVALID_COMMAND_INPUT_MESSAGE,
+        ));
     }
     let ids = dto
         .element_ids
@@ -127,10 +151,14 @@ fn get_inspection(input: impl Read) -> CommandResult<Request> {
         .collect::<CommandResult<BTreeSet<_>>>()?;
     Ok(Request::Inspect(ids.into_iter().collect()))
 }
+
 fn get_traversal(input: impl Read) -> CommandResult<TraversalRequest> {
     let dto: TraversalInput = get_object(input)?;
     if dto.element_ids.is_empty() {
-        return Err(fail_invalid_request());
+        return Err(CommandError::new(
+            CommandErrorKind::InvalidRequest,
+            INVALID_COMMAND_INPUT_MESSAGE,
+        ));
     }
     let element_ids = dto
         .element_ids
@@ -140,7 +168,14 @@ fn get_traversal(input: impl Read) -> CommandResult<TraversalRequest> {
     let edge_types = dto
         .edge_types
         .iter()
-        .map(|raw| EdgeType::parse(raw).map_err(|_| fail_invalid_request()))
+        .map(|raw| {
+            EdgeType::parse(raw).map_err(|_| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+        })
         .collect::<CommandResult<BTreeSet<_>>>()?;
     Ok(TraversalRequest {
         element_ids,
@@ -148,13 +183,23 @@ fn get_traversal(input: impl Read) -> CommandResult<TraversalRequest> {
             "relations" => TraversalMode::Relations,
             "containment" => TraversalMode::Containment,
             "both" => TraversalMode::Both,
-            _ => return Err(fail_invalid_request()),
+            _ => {
+                return Err(CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                ));
+            }
         },
         direction: match dto.direction.as_str() {
             "outgoing" => TraversalDirection::Outgoing,
             "incoming" => TraversalDirection::Incoming,
             "both" => TraversalDirection::Both,
-            _ => return Err(fail_invalid_request()),
+            _ => {
+                return Err(CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                ));
+            }
         },
         depth: dto.depth,
         limit: parse_positive_limit(dto.limit)?,
@@ -162,6 +207,7 @@ fn get_traversal(input: impl Read) -> CommandResult<TraversalRequest> {
         edge_limit: dto.edge_limit.map(parse_positive_limit).transpose()?,
     })
 }
+
 fn get_search(input: impl Read) -> CommandResult<SearchRequest> {
     let dto: SearchInput = get_object(input)?;
     let limit = parse_positive_limit(dto.limit)?;
@@ -177,12 +223,19 @@ fn get_search(input: impl Read) -> CommandResult<SearchRequest> {
         limit,
     })
 }
+
 fn parse_positive_limit(value: u64) -> CommandResult<NonZeroUsize> {
     usize::try_from(value)
         .ok()
         .and_then(NonZeroUsize::new)
-        .ok_or_else(fail_invalid_request)
+        .ok_or_else(|| {
+            CommandError::new(
+                CommandErrorKind::InvalidRequest,
+                INVALID_COMMAND_INPUT_MESSAGE,
+            )
+        })
 }
+
 fn parse_filters(input: &SearchFiltersInput) -> CommandResult<SearchFilters> {
     let needs_recheck = match input.needs_recheck {
         None => RecheckFilter::Any,
@@ -192,12 +245,26 @@ fn parse_filters(input: &SearchFiltersInput) -> CommandResult<SearchFilters> {
     let sources = input
         .sources
         .iter()
-        .map(|source| SourceUri::parse(source).map_err(|_| fail_invalid_request()))
+        .map(|source| {
+            SourceUri::parse(source).map_err(|_| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+        })
         .collect::<CommandResult<BTreeSet<_>>>()?;
     let source_revisions = input
         .source_revisions
         .iter()
-        .map(|revision| TreeOid::parse(revision).map_err(|_| fail_invalid_request()))
+        .map(|revision| {
+            TreeOid::parse(revision).map_err(|_| {
+                CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    INVALID_COMMAND_INPUT_MESSAGE,
+                )
+            })
+        })
         .collect::<CommandResult<BTreeSet<_>>>()?;
     Ok(SearchFilters {
         needs_recheck,
@@ -222,6 +289,7 @@ where
         .map(Some)
         .map_err(D::Error::custom)
 }
+
 fn get_drain(mut input: impl Read) -> CommandResult<Request> {
     let mut bytes = Vec::new();
     input.read_to_end(&mut bytes).map_err(|cause| {
@@ -239,6 +307,7 @@ fn get_drain(mut input: impl Read) -> CommandResult<Request> {
     }
     Ok(Request::Drain)
 }
+
 fn get_object<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
     let mut bytes = Vec::new();
     input.read_to_end(&mut bytes).map_err(|cause| {
@@ -255,17 +324,16 @@ fn get_object<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
         bytes = b"{}".to_vec();
     }
     if bytes.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'{') {
-        return Err(fail_invalid_request());
+        return Err(CommandError::new(
+            CommandErrorKind::InvalidRequest,
+            INVALID_COMMAND_INPUT_MESSAGE,
+        ));
     }
     serde_json::from_slice(&bytes).map_err(|cause| {
         CommandError::new_with_cause(
             CommandErrorKind::InvalidRequest,
-            "invalid command input",
+            INVALID_COMMAND_INPUT_MESSAGE,
             cause,
         )
     })
-}
-
-fn fail_invalid_request() -> CommandError {
-    CommandError::new(CommandErrorKind::InvalidRequest, "invalid command input")
 }

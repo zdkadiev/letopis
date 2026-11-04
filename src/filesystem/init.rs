@@ -206,6 +206,13 @@ fn sync_directory(directory: &File, target: SyncTarget) -> DocumentResult<()> {
         .map_err(|cause| fail_io("cannot sync service directory", cause))
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::unnecessary_wraps,
+        reason = "Production and test builds share the fallible fault-injection interface"
+    )
+)]
 fn maybe_fail_sync(_target: SyncTarget) -> DocumentResult<()> {
     #[cfg(test)]
     if NEXT_SYNC_FAULT.with(|next| {

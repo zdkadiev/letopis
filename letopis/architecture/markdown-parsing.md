@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793728313,"source_snapshot":"e6730713cdcf157bcb2294169c248f3b165a37f1"} -->
+<!-- letopis: {"created_at":1793728313,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
 # Parsing Markdown documents
 
 `MarkdownParser` is a pure codec: it receives a repository-relative path and

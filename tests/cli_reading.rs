@@ -1,3 +1,5 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 #[expect(
     dead_code,
     reason = "Shared process fixture also exposes unrelated runtime helpers"
@@ -15,8 +17,7 @@ use letopis::{
     domain::{RepoPath, TreeOid},
     open_filesystem, open_git_snapshots,
     service::{
-        EmbedLocker, EmbeddingExecutor, GitSnapshots, NodeMetadata, Refresher, Storage,
-        VectorOutcome,
+        EmbedLocker, EmbeddingExecutor, GitSnapshots, NodeMetadata, Refresher, VectorOutcome,
     },
     wire_document_refresher, wire_embedding_executor,
 };
@@ -105,7 +106,14 @@ fn binary_search_refreshes_and_returns_links_with_empty_filter_equivalence() {
         );
     }
     assert_eq!(
-        repo.open_storage().begin_read_tx().unwrap().get_revision(),
+        {
+            let scope_databases = repo.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| Ok::<_, StorageError>(scope_databases.cache.project_get_by_id()))
+                .unwrap()
+        }
+        .unwrap(),
         1
     );
 }
@@ -144,17 +152,27 @@ fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
         server.take_requests(),
         vec![json!({"model":"fixture","input":["sqlite"],"truncate":false})]
     );
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    let nodes = read.get_nodes().unwrap();
-    let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
-        panic!("knowledge")
-    };
-    assert_eq!(
-        read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
-            .unwrap(),
-        VectorOutcome::Current(Some(vec![1.0, 0.0]))
-    );
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            let nodes = read.nodes_get().unwrap();
+            let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
+                panic!("knowledge")
+            };
+            assert_eq!(
+                read.vector_keys_get_vector_by_search_hash(
+                    &config.get_identity(),
+                    &node.search_hash
+                )
+                .unwrap(),
+                VectorOutcome::Current(Some(vec![1.0, 0.0]))
+            );
+
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 #[test]
@@ -291,21 +309,31 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
         let requests = server.take_requests();
         assert_eq!(requests.len(), 1);
         assert_eq!(requests[0]["input"], json!(["sqlite"]));
-        let mut storage = repo.open_storage();
-        let mut read = storage.begin_read_tx().unwrap();
-        let error = read.get_query_error().unwrap().unwrap();
-        assert!(!error.error.contains("PRIVATE_PROVIDER_BODY"));
-        assert!(!error.error.contains("fixture-secret"));
-        assert_eq!(error.error, "embedding provider rejected request");
-        let nodes = read.get_nodes().unwrap();
-        let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
-            panic!("knowledge")
-        };
-        assert_eq!(
-            read.get_failure_by_search_hash(&config.get_identity(), &node.search_hash)
-                .unwrap(),
-            VectorOutcome::Current(None)
-        );
+        let storage = repo.open_storage();
+        storage
+            .cache
+            .with_read_tx(|| {
+                let read = &storage.cache;
+                let error = read.query_error_get_by_id().unwrap().unwrap();
+                assert!(!error.error.contains("PRIVATE_PROVIDER_BODY"));
+                assert!(!error.error.contains("fixture-secret"));
+                assert_eq!(error.error, "embedding provider rejected request");
+                let nodes = read.nodes_get().unwrap();
+                let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
+                    panic!("knowledge")
+                };
+                assert_eq!(
+                    read.embed_failures_get_by_search_hash(
+                        &config.get_identity(),
+                        &node.search_hash
+                    )
+                    .unwrap(),
+                    VectorOutcome::Current(None)
+                );
+
+                Ok::<_, StorageError>(())
+            })
+            .unwrap();
     }
 }
 
@@ -363,7 +391,16 @@ fn lost_output_then_retry_preserves_corpus_user_state_and_revision() {
             assert_eq!(get_response(&repo.invoke(&[args], body), 0)["ok"], true);
         }
         assert_eq!(
-            repo.open_storage().begin_read_tx().unwrap().get_revision(),
+            {
+                let scope_databases = repo.open_storage();
+                scope_databases
+                    .cache
+                    .with_read_tx(|| {
+                        Ok::<_, StorageError>(scope_databases.cache.project_get_by_id())
+                    })
+                    .unwrap()
+            }
+            .unwrap(),
             1
         );
         assert_eq!(capture_user_state(&repo), before);

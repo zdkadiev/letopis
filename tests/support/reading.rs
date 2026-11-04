@@ -1,7 +1,11 @@
 use super::git::{ObjectFormat, OwnedChild, TempRepo, isolate_command};
+use super::storage::Databases;
+use crate::support::storage::get_current;
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
-    service::{EmbeddingConfig, NodeMetadata, Storage, VectorOutcome},
+    service::{EmbeddingConfig, NodeMetadata},
 };
 use std::{
     fs,
@@ -51,34 +55,48 @@ impl ReadingRepo {
         EmbeddingConfig::parse(configured.to_string().as_bytes()).unwrap()
     }
     pub fn seed_vectors(&self, config: &EmbeddingConfig, vectors: &[(&str, &[f32])]) {
-        let mut storage = self.open_storage();
-        let observed = storage.begin_read_tx().unwrap().get_config_identity();
+        let storage = self.open_storage();
+        let observed = storage
+            .cache
+            .with_read_tx(|| Ok::<_, StorageError>(storage.cache.meta_get_by_id()))
+            .unwrap()
+            .unwrap();
         storage
+            .vectors
             .reset_vectors(observed.as_ref(), &config.get_identity())
             .unwrap();
         for (id, vector) in vectors {
-            let node = storage
-                .begin_read_tx()
-                .unwrap()
-                .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()))
-                .unwrap()
-                .unwrap();
+            let node =
+                storage
+                    .cache
+                    .with_read_tx(|| {
+                        Ok::<_, StorageError>(storage.cache.nodes_get_by_id(
+                            &EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()),
+                        ))
+                    })
+                    .unwrap()
+                    .unwrap()
+                    .unwrap();
             let NodeMetadata::Knowledge(node) = node.metadata else {
                 panic!("expected knowledge")
             };
-            let VectorOutcome::Current(mut unit) = storage
-                .begin_vector_write_tx(&config.get_identity())
-                .unwrap()
-            else {
-                panic!("identity changed")
-            };
-            unit.store_vector(&node.search_hash, vector, vector.len())
+            storage
+                .vectors
+                .with_write_tx(&config.get_identity(), || {
+                    let unit = &storage.vectors;
+                    unit.store_vector(&node.search_hash, vector, vector.len())
+                        .unwrap();
+
+                    Ok::<_, StorageError>(())
+                })
+                .map(get_current)
                 .unwrap();
-            unit.commit().unwrap();
         }
     }
-    pub fn open_storage(&self) -> impl Storage + use<> {
-        letopis::open_storage(
+    pub fn open_storage(
+        &self,
+    ) -> Databases<impl CacheDatabase + use<>, impl VectorDatabase + use<>> {
+        super::storage::open_storage(
             &self.get_root().join(".letopis/cache.db"),
             &self.get_root().join(".letopis/vectors.db"),
         )

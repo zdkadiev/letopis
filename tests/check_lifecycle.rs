@@ -1,8 +1,10 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
-    service::{Checker, KnowledgeMetadata, NodeMetadata, Storage},
+    service::{Checker, KnowledgeMetadata, NodeMetadata},
     wire_checker,
 };
 use serde_json::{Value, json};
@@ -159,20 +161,26 @@ fn check_keeps_last_valid_projection_while_reporting_current_file_error() {
     let repaired = get_knowledge(&repo, "retained.md").unwrap();
     assert_eq!(repaired.created_at, 42);
     assert_ne!(repaired.hash, original.hash);
-    let mut storage = repo.open_storage();
-    let mut view = storage.begin_read_tx().unwrap();
-    assert!(
-        view.get_text_matches_by_expression("RetainedOriginal")
-            .unwrap()
-            .is_empty()
-    );
-    assert_eq!(
-        view.get_text_matches_by_expression("RepairedCurrent")
-            .unwrap()[0]
-            .id
-            .as_str(),
-        "retained.md"
-    );
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let view = &storage.cache;
+            assert!(
+                view.text_index_get_by_expression("RetainedOriginal")
+                    .unwrap()
+                    .is_empty()
+            );
+            assert_eq!(
+                view.text_index_get_by_expression("RepairedCurrent")
+                    .unwrap()[0]
+                    .id
+                    .as_str(),
+                "retained.md"
+            );
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 #[test]
@@ -205,21 +213,28 @@ fn concurrent_check_publishes_edits_from_both_writers() {
     });
 
     // Then: one pinned view observes both IDs, authored times and FTS texts.
-    let mut storage = repo.open_storage();
-    let mut view = storage.begin_read_tx().unwrap();
-    let nodes = view.get_nodes().unwrap();
-    assert_eq!(nodes.len(), 2);
-    for (id, created_at, text) in [("a.md", 42, "LarchEdited"), ("b.md", 73, "BirchEdited")] {
-        let node = view.get_node_by_id(&build_target(id)).unwrap().unwrap();
-        let NodeMetadata::Knowledge(metadata) = node.metadata else {
-            panic!("knowledge node expected")
-        };
-        assert_eq!(metadata.id.as_str(), id);
-        assert_eq!(metadata.created_at, created_at);
-        let matches = view.get_text_matches_by_expression(text).unwrap();
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].id.as_str(), id);
-    }
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let view = &storage.cache;
+            let nodes = view.nodes_get().unwrap();
+            assert_eq!(nodes.len(), 2);
+            for (id, created_at, text) in [("a.md", 42, "LarchEdited"), ("b.md", 73, "BirchEdited")]
+            {
+                let node = view.nodes_get_by_id(&build_target(id)).unwrap().unwrap();
+                let NodeMetadata::Knowledge(metadata) = node.metadata else {
+                    panic!("knowledge node expected")
+                };
+                assert_eq!(metadata.id.as_str(), id);
+                assert_eq!(metadata.created_at, created_at);
+                let matches = view.text_index_get_by_expression(text).unwrap();
+                assert_eq!(matches.len(), 1);
+                assert_eq!(matches[0].id.as_str(), id);
+            }
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 #[test]
@@ -241,12 +256,21 @@ fn repeated_check_preserves_corpus_and_revision() {
     let first = check(&repo);
     // Then: canonical bytes and revision remain unchanged.
     assert_eq!(first, build_dangling("missing.md"));
-    let mut storage = repo.open_storage();
-    let revision = storage.begin_read_tx().unwrap().get_revision();
+    let storage = repo.open_storage();
+    let revision = storage
+        .cache
+        .with_read_tx(|| storage.cache.project_get_by_id())
+        .unwrap();
 
     for _ in 0..3 {
         assert_eq!(check(&repo), first);
-        assert_eq!(storage.begin_read_tx().unwrap().get_revision(), revision);
+        assert_eq!(
+            storage
+                .cache
+                .with_read_tx(|| storage.cache.project_get_by_id())
+                .unwrap(),
+            revision
+        );
         for (path, bytes) in ["source.md", "ordinary.md"].into_iter().zip(&before) {
             assert_eq!(fs::read(repo.get_root().join(path)).unwrap(), *bytes);
         }
@@ -306,11 +330,11 @@ fn build_section(anchor: &str) -> String {
 }
 
 fn get_knowledge(repo: &ReadingRepo, id: &str) -> Option<KnowledgeMetadata> {
-    let mut storage = repo.open_storage();
+    let storage = repo.open_storage();
     let row = storage
-        .begin_read_tx()
+        .cache
+        .with_read_tx(|| Ok::<_, StorageError>(storage.cache.nodes_get_by_id(&build_target(id))))
         .unwrap()
-        .get_node_by_id(&build_target(id))
         .unwrap()?;
     let NodeMetadata::Knowledge(metadata) = row.metadata else {
         panic!("knowledge node expected")

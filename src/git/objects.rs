@@ -1,6 +1,6 @@
 use super::{
     GitRepository,
-    constants::{BLOB_KIND, GITLINK_KIND, TREE_KIND},
+    constants::{BLOB_KIND, GITLINK_KIND, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
     durability::StagedObject,
     tree::get_entry,
     validation::validate_tree_bytes,
@@ -37,8 +37,9 @@ impl ObjectDb<'_> {
     }
     /// Durably publish exact bytes without filters or newline normalization.
     pub(super) fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
-        BlobOid::parse(&write_object(self.git, Kind::Blob, bytes)?)
-            .map_err(|_| make_integrity_error())
+        BlobOid::parse(&write_object(self.git, Kind::Blob, bytes)?).map_err(|_| {
+            SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
+        })
     }
     /// Preflight all paths and verify every distinct untrusted blob before publishing trees.
     pub(super) fn create_tree_from_blobs(
@@ -84,7 +85,7 @@ impl ObjectDb<'_> {
                 SnapshotErrorKind::InternalError,
                 SnapshotErrorKind::InternalError,
             )?;
-            let (kind, oid) = self.find_entry(&bytes, part.as_bytes())?;
+            let (kind, oid) = self.get_entry_by_name(&bytes, part.as_bytes())?;
             if parts.peek().is_none() {
                 if kind != BLOB_KIND {
                     return Err(SnapshotError::new(
@@ -100,11 +101,17 @@ impl ObjectDb<'_> {
                 );
             }
             if kind != TREE_KIND {
-                return Err(missing_path());
+                return Err(SnapshotError::new(
+                    SnapshotErrorKind::NotFound,
+                    MISSING_SNAPSHOT_PATH,
+                ));
             }
             current = oid;
         }
-        Err(missing_path())
+        Err(SnapshotError::new(
+            SnapshotErrorKind::NotFound,
+            MISSING_SNAPSHOT_PATH,
+        ))
     }
     /// Check the root's hash, exact type and structure without claiming closure integrity.
     pub(super) fn validate_tree(&self, oid: &TreeOid) -> Result<(), SnapshotError> {
@@ -136,7 +143,7 @@ impl ObjectDb<'_> {
         validate_tree_bytes(&bytes, self.git.oid_len)?;
         Ok(bytes)
     }
-    fn find_entry(
+    fn get_entry_by_name(
         &self,
         mut bytes: &[u8],
         name: &[u8],
@@ -150,13 +157,21 @@ impl ObjectDb<'_> {
                     _ => BLOB_KIND,
                 };
                 let oid = ObjectId::try_from(entry.oid)
-                    .map_err(|_| make_integrity_error())?
+                    .map_err(|_| {
+                        SnapshotError::new(
+                            SnapshotErrorKind::InternalError,
+                            OBJECT_INTEGRITY_MESSAGE,
+                        )
+                    })?
                     .to_string();
                 return Ok((kind, oid));
             }
             bytes = rest;
         }
-        Err(missing_path())
+        Err(SnapshotError::new(
+            SnapshotErrorKind::NotFound,
+            MISSING_SNAPSHOT_PATH,
+        ))
     }
 }
 impl<'a> Directory<'a> {
@@ -186,12 +201,15 @@ impl<'a> Directory<'a> {
         let mut bytes = Vec::new();
         for (mode, name, oid) in entries.values() {
             bytes.extend_from_slice(format!("{mode} {name}\0").as_bytes());
-            let oid = ObjectId::from_hex(oid.as_bytes()).map_err(|_| make_integrity_error())?;
+            let oid = ObjectId::from_hex(oid.as_bytes()).map_err(|_| {
+                SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
+            })?;
             bytes.extend_from_slice(oid.as_bytes());
         }
         validate_tree_bytes(&bytes, db.git.oid_len)?;
-        TreeOid::parse(&write_object(db.git, Kind::Tree, &bytes)?)
-            .map_err(|_| make_integrity_error())
+        TreeOid::parse(&write_object(db.git, Kind::Tree, &bytes)?).map_err(|_| {
+            SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
+        })
     }
 }
 fn write_object(git: &GitRepository, kind: Kind, bytes: &[u8]) -> Result<String, SnapshotError> {
@@ -201,9 +219,6 @@ fn write_object(git: &GitRepository, kind: Kind, bytes: &[u8]) -> Result<String,
     Ok(oid)
 }
 
-fn missing_path() -> SnapshotError {
-    SnapshotError::new(SnapshotErrorKind::NotFound, MISSING_SNAPSHOT_PATH)
-}
 fn validate_paths(paths: &[&RepoPath]) -> Result<(), SnapshotError> {
     let mut unique = BTreeSet::new();
     for path in paths {
@@ -230,11 +245,4 @@ fn validate_paths(paths: &[&RepoPath]) -> Result<(), SnapshotError> {
         }
     }
     Ok(())
-}
-
-fn make_integrity_error() -> SnapshotError {
-    SnapshotError::new(
-        SnapshotErrorKind::InternalError,
-        "Git object integrity failed",
-    )
 }

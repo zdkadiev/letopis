@@ -1,6 +1,8 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 
-use letopis::{domain::RepoPath, service::Storage};
+use letopis::domain::RepoPath;
 use rusqlite::{Connection, OpenFlags, types::Value as SqlValue};
 use serde_json::{Value, json};
 use std::{
@@ -210,34 +212,36 @@ fn assert_safe_failure(output: &Output) {
 }
 
 fn assert_invalid_projection(repo: &ReadingRepo) {
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    assert_eq!(read.get_revision(), 1);
-    assert_eq!(read.get_nodes().unwrap().len(), 1);
-    assert!(read.get_edges_by_source_id(None).unwrap().is_empty());
-    assert_eq!(
-        read.get_text_matches_by_expression("CharlieToken").unwrap()[0]
-            .id
-            .as_str(),
-        "b.md"
-    );
-    for token in ["AlphaToken", "BravoToken"] {
-        assert!(
-            read.get_text_matches_by_expression(token)
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            assert_eq!(read.project_get_by_id().unwrap(), 1);
+            assert_eq!(read.nodes_get().unwrap().len(), 1);
+            assert!(read.edges_get_by_source_id(None).unwrap().is_empty());
+            assert_eq!(
+                read.text_index_get_by_expression("CharlieToken").unwrap()[0]
+                    .id
+                    .as_str(),
+                "b.md"
+            );
+            for token in ["AlphaToken", "BravoToken"] {
+                assert!(read.text_index_get_by_expression(token).unwrap().is_empty());
+            }
+            let files = read.files_get().unwrap();
+            let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
+            assert_eq!(paths, ["a.md", "b.md", "live.md"]);
+            let invalid = read
+                .files_get_by_path(&RepoPath::parse("a.md").unwrap())
                 .unwrap()
-                .is_empty()
-        );
-    }
-    let files = read.get_files().unwrap();
-    let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
-    assert_eq!(paths, ["a.md", "b.md", "live.md"]);
-    let invalid = read
-        .get_file_by_path(&RepoPath::parse("a.md").unwrap())
-        .unwrap()
+                .unwrap();
+            assert!(!invalid.valid);
+            assert_eq!(invalid.error.as_deref(), Some("invalid letopis metadata"));
+            assert_eq!(invalid.size, u64::try_from(INVALID.len()).unwrap());
+            Ok::<_, StorageError>(())
+        })
         .unwrap();
-    assert!(!invalid.valid);
-    assert_eq!(invalid.error.as_deref(), Some("invalid letopis metadata"));
-    assert_eq!(invalid.size, u64::try_from(INVALID.len()).unwrap());
 }
 
 fn assert_invalid_status(repo: &ReadingRepo) {
@@ -258,29 +262,31 @@ fn assert_invalid_status(repo: &ReadingRepo) {
 }
 
 fn assert_repaired_projection(repo: &ReadingRepo) {
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    assert_eq!(read.get_revision(), 2);
-    assert_eq!(read.get_nodes().unwrap().len(), 2);
-    assert!(read.get_edges_by_source_id(None).unwrap().is_empty());
-    for (token, id) in [("DeltaToken", "a.md"), ("CharlieToken", "b.md")] {
-        let found = read.get_text_matches_by_expression(token).unwrap();
-        assert_eq!(found.len(), 1);
-        assert_eq!(found[0].id.as_str(), id);
-    }
-    for token in ["AlphaToken", "BravoToken"] {
-        assert!(
-            read.get_text_matches_by_expression(token)
-                .unwrap()
-                .is_empty()
-        );
-    }
-    let files = read.get_files().unwrap();
-    assert_eq!(files.len(), 3);
-    for file in files {
-        assert!(file.valid);
-        assert_eq!(file.error, None);
-    }
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            assert_eq!(read.project_get_by_id().unwrap(), 2);
+            assert_eq!(read.nodes_get().unwrap().len(), 2);
+            assert!(read.edges_get_by_source_id(None).unwrap().is_empty());
+            for (token, id) in [("DeltaToken", "a.md"), ("CharlieToken", "b.md")] {
+                let found = read.text_index_get_by_expression(token).unwrap();
+                assert_eq!(found.len(), 1);
+                assert_eq!(found[0].id.as_str(), id);
+            }
+            for token in ["AlphaToken", "BravoToken"] {
+                assert!(read.text_index_get_by_expression(token).unwrap().is_empty());
+            }
+            let files = read.files_get().unwrap();
+            assert_eq!(files.len(), 3);
+            for file in files {
+                assert!(file.valid);
+                assert_eq!(file.error, None);
+            }
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 /// Remove only the closed fixture cache and its explicit WAL/SHM siblings.

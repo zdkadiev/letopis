@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"e6730713cdcf157bcb2294169c248f3b165a37f1"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
 # Search pipeline
 
 A `search` request contains a query, a positive result limit and optional filters.
@@ -24,8 +24,8 @@ by ID. This is rank fusion, not arithmetic on raw BM25 and vector distances.
 
 [Search implementation](../../src/service/search.rs "letopis:type=external;path=src/service/search.rs")
 
-[FTS query](../../src/storage/fts.rs "letopis:type=external;path=src/storage/fts.rs")
+[FTS query](../../src/storage/cache.rs "letopis:type=external;path=src/storage/cache.rs")
 
-[Vector query](../../src/storage/vectors.rs "letopis:type=external;path=src/storage/vectors.rs")
+[Vector query](../../src/storage/vector.rs "letopis:type=external;path=src/storage/vector.rs")
 
 [Embedding execution](embedding-execution.md "letopis:type=related_to;path=letopis/architecture/embedding-execution.md")

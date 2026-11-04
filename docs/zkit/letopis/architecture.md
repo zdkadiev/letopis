@@ -112,13 +112,13 @@ CLI-обработчики команд — отдельный входной с
 
 Уточнение пользователя 2026-10-22: Storage, Service, Git, Embedding и остальные ответственности разделены модулями и связаны явными интерфейсами. В Rust интерфейсы — `trait`, конкретные сервисы/адаптеры — `struct` с `impl` соответствующего trait.
 
-В одном crate `domain/` содержит чистые сущности/правила; `service/` — прикладные интерфейсы и реализации сценариев. По [D-99](decisions.md#D-99) отдельного каталога contracts/ports нет: небольшие принадлежащие приложению traits (`Storage`, `GitSnapshots` и интерфейсы сервисов) объявляются в `service/mod.rs`. Когда интерфейсы вырастают, их определения можно выделить по ответственности в приватные файлы и явно реэкспортировать из mod.rs, сохранив короткий путь `service::Storage`.
+Application-owned interfaces, including `CacheDatabase`, `VectorDatabase`, `StorageRead` and `GraphRead`, are declared directly in `service/mod.rs`. Shared service values live in `service/types.rs`, and service failures in `service/error.rs`; concrete services remain flat files in `service/`.
 
 Уточнение пользователя 2026-11-01: все application-owned traits, включая Storage и scoped transaction interfaces, объявлены непосредственно в `service/mod.rs`. Отдельные trait-файлы удалены. Конкретные сервисы сохраняют собственные файлы, общие публичные значения собраны в `service/types.rs`, а ошибки/diagnostics/result aliases — в `service/error.rs`, с явными реэкспортами прежних имён из service. Для центрального файла интерфейсов допустим размер свыше обычного ориентира; runtime, публичные пути, сигнатуры и lifetime-контракты не меняются.
 
 Уточнение пользователя 2026-11-01: shared service data/value/request/response types и их pure validation находятся в едином публичном модуле `service/types.rs`; все service errors, diagnostics, persisted failures и error-result aliases — в `service/error.rs`. Traits остаются в mod.rs, конкретные сервисы — в своих файлах. Публичные `service::...` пути, visibility, field layouts, сообщения и cause privacy сохраняются; domain и технологические внутренние ошибки не переносятся в service.
 
-Технологические реализации расположены в отдельных корневых модулях `storage/`, `git/`, `embedding/`, `markdown/` и `filesystem/`, без промежуточного каталога adapters. Их структуры реализуют принадлежащие service интерфейсы. Каждая конкретная реализация занимает собственный файл: `git/repository.rs` содержит `GitRepository` и его inherent/trait impl, `storage/sqlite.rs` — `SqliteStorage` и его impl. То же правило действует для конкретных сервисов и других реализаций. mod.rs задаёт интерфейс модуля, объявляет дочерние модули и явно реэкспортирует нужные имена; тела конкретных реализаций находятся в отдельных файлах. Имена типов описывают ответственность/технологию без суффиксов Port/Adapter. Вспомогательные модули сохраняют собственную ответственность; пустые будущие файлы не создаются.
+Technology implementations live in responsibility-named root modules. Each concrete struct and its inherent/trait implementations share one file: `git/repository.rs` for `GitRepository`, `storage/cache.rs` for `CacheStorage` and `storage/vector.rs` for `VectorStorage`. Module declarations and explicit reexports stay in `mod.rs`. Cache node, edge, file, FTS and neighbor queries live in `storage/cache.rs`; vector, embedding work, pruning and embedding-status queries live in `storage/vector.rs`. Queries used by one owner are implemented directly in its trait methods; shared vector reads keep an explicit connection and schema selector so cache scopes retain their pinned attachment. Unit tests stay inline with their owner; public storage contract tests live under root `tests/`. Connection policy, schema/bootstrap, native probes, transaction mechanics and the bound-query builder remain separate infrastructure helpers.
 
 CLI вызывает интерфейсы сервисов; сервисы получают нужные реализации через конструктор и не импортируют конкретные Git/SQLite/provider-типы. По явному уточнению пользователя composition root расположен в `src/lib.rs`: здесь создаются конкретные структуры и передаются конструкторам сервисов через их интерфейсы. `src/main.rs` остаётся тонким запуском CLI. Storage, Git и Embedding не вызывают друг друга напрямую. Бизнес-алгоритмы остаются в service, Git/SQL/HTTP — в соответствующих модулях; ни домен, ни сервисы не зависят от корневой сборки.
 
@@ -137,9 +137,26 @@ CLI вызывает интерфейсы сервисов; сервисы по�
 
 Уточнение пользователя 2026-11-01 — provenance Git trait object: `VerifiedGitSnapshots` в `service/mod.rs` объединяет контракты `GitSnapshots` и `SnapshotVerifier` с blanket implementation. `ProvenanceService<F>` владеет одним `Box<dyn VerifiedGitSnapshots>`, без Git type parameter; `HistoricalObservations` больше не распространяет Git generic. Filesystem generic и associated lock capability остаются прежними; Git adapter, независимые исходные интерфейсы и гарантии provenance не меняются.
 
+
+**Representation clarification, 2026-11-03 (supersedes the 2026-11-01 boxed API):**
+`CacheStorage` (`storage/cache.rs`) and `VectorStorage` (`storage/vector.rs`) are
+exactly two production storage components implementing `CacheDatabase` and
+`VectorDatabase`. All application-owned traits remain directly in `service/mod.rs`.
+Services share the same `Rc<C>` / `Rc<V>` when their scopes must join. Zero-argument
+`with_read_tx` / `with_write_tx` callbacks access the injected owner; only the outer
+scope finalizes. Caught nested errors or failed writes make it rollback-only.
+Read inside write sees uncommitted changes; write inside read is rejected and
+poisons that scope. Separate instances and the two database owners do not join.
+Cache reads retain one attached snapshot; query diagnostics use the separate
+vector writer. Provider HTTP stays outside service-owned write scopes. Status
+uses observation-only CacheStorage: absent storage opens no connection or durable
+file and skips the callback. Filesystem owns path policy; composition brackets
+opening/attaching with its checks. SQL and connection lifecycle remain in storage.
+Schemas, CLI/JSON, synchronous I/O and cross-database atomicity are unchanged.
+
 #### TK-23 — данные Graph и алгоритм обхода
 
-`domain::Graph` — независимые упорядоченные данные результата, без I/O или injected storage. `service::GraphService` реализует GraphTraversal/BFS и читает object-safe GraphRead; TraversalService владеет refresh/readiness/pin/selected-link observations, сохраняя F для FileSystem lock; Storage передаётся через boxed application interface. Storage исполняет bounded keyset pages; lib.rs создаёт реальные collaborators, CLI вызывает Traverser. Нового процесса, runtime, forwarding layer или граф-кэша нет. BFS bound не распространяется на существующие publication/file/root/JSON buffers. [Физическая проверка, host/Linux native receipts и завершённые reviews](checks/TK-23/report.md).
+`domain::Graph` remains dependency-free result data. `GraphService<C>` owns BFS and bounded paging through its injected `Rc<C>` implementing `CacheDatabase`. `TraversalService` owns refresh, readiness, pinning and source observations and shares that same owner with graph/source collaborators. Composition in `lib.rs` wires them; CLI calls `Traverser`. There is no new process, runtime or graph cache. Historical TK-23 evidence remains in [its report](checks/TK-23/report.md).
 
 <a id="program-structure-review"></a>
 #### Приёмка структуры в каждой задаче

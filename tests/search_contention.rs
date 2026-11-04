@@ -1,9 +1,10 @@
+use crate::support::storage::get_current;
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
 mod support;
 
 use letopis::{
-    service::{
-        CommandResult, Refresher, SearchLink, SearchRequest, Searcher, Storage, VectorOutcome,
-    },
+    service::{CommandResult, Refresher, SearchLink, SearchRequest, Searcher},
     wire_document_refresher, wire_searcher,
 };
 use rusqlite::Connection;
@@ -56,12 +57,14 @@ fn assert_search_survives_writer(phase: WritePhase, response: &str) {
         ["a.md"]
     );
     assert_eq!(server.take_requests().len(), 1);
-    let error = repo
-        .open_storage()
-        .begin_read_tx()
-        .unwrap()
-        .get_query_error()
-        .unwrap();
+    let error = {
+        let scope_databases = repo.open_storage();
+        scope_databases
+            .cache
+            .with_read_tx(|| Ok::<_, StorageError>(scope_databases.cache.query_error_get_by_id()))
+            .unwrap()
+    }
+    .unwrap();
     if response == SUCCESS {
         assert_eq!(error, None);
     } else {
@@ -83,15 +86,17 @@ fn prepare_fixture(response: &str) -> (ReadingRepo, HttpFixture, ResponseBarrier
         .refresh()
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
-    let mut storage = repo.open_storage();
-    let VectorOutcome::Current(mut unit) = storage
-        .begin_vector_write_tx(&config.get_identity())
-        .unwrap()
-    else {
-        panic!("expected matching identity");
-    };
-    unit.set_query_error(1, "old diagnostic").unwrap();
-    unit.commit().unwrap();
+    let storage = repo.open_storage();
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let unit = &storage.vectors;
+            unit.query_error_upsert_by_id(1, "old diagnostic").unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
     (repo, server, barrier)
 }
 

@@ -1,7 +1,7 @@
 # CLI observation commands
 
 ## Check scope {#check-scope}
-<!-- letopis: {"created_at":1793278642,"source_snapshot":"e6730713cdcf157bcb2294169c248f3b165a37f1"} -->
+<!-- letopis: {"created_at":1793278642,"source_snapshot":"7d506ed54103d557f6da760bd189f084efb74dd5"} -->
 `check` refreshes the corpus and returns validation problems from a pinned storage
 view. With omitted or empty `paths`, it requests a verified refresh with a full
 source-snapshot audit. A scoped check uses ordinary refresh and restricts reported
@@ -16,7 +16,7 @@ internal error instead of reporting the newer, unaudited revision as checked.
 [CLI check contract](../../src/cli/help.rs "letopis:type=external;path=src/cli/help.rs")
 
 ## Inspect results {#inspect-results}
-<!-- letopis: {"created_at":1793278642,"source_snapshot":"e6730713cdcf157bcb2294169c248f3b165a37f1"} -->
+<!-- letopis: {"created_at":1793278642,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
 `inspect` accepts a nonempty set of knowledge or declared-source addresses. It
 refreshes the projection, captures marked corpus files and requested source data,
 assembles a Git tree from captured blobs and pins it before returning. An unknown

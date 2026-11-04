@@ -1,7 +1,7 @@
 use super::{
-    CommandError, CommandErrorKind, CommandResult, ElementAddress, GraphNeighbor, GraphNodeKey,
-    GraphRead, GraphTraversal, NEIGHBOR_PAGE_QUANTUM, NeighborCursor, NeighborDirection,
-    NeighborPageRequest, StorageError, TraversalDirection, TraversalRequest,
+    CacheDatabase, CommandError, CommandErrorKind, CommandResult, ElementAddress, GraphNeighbor,
+    GraphNodeKey, GraphRead, GraphTraversal, NEIGHBOR_PAGE_QUANTUM, NeighborCursor,
+    NeighborDirection, NeighborPageRequest, StorageError, TraversalDirection, TraversalRequest,
 };
 use crate::domain::{Edge, EdgeTarget, Graph};
 use std::{
@@ -10,44 +10,54 @@ use std::{
     num::NonZeroUsize,
 };
 
-/// Incremental, metadata-free traversal over the caller's pinned graph reader.
+/// Incremental traversal sharing the injected cache scope.
 #[derive(Debug)]
-pub(crate) struct GraphService;
-struct Discovery {
+pub(crate) struct GraphService<C> {
+    storage: std::rc::Rc<C>,
+}
+struct Discovery<'a> {
+    storage: &'a dyn GraphRead,
     queue: Vec<GraphNodeKey>,
     visited: BTreeSet<GraphNodeKey>,
     elements: Vec<EdgeTarget>,
     edges: Option<BTreeMap<Edge, usize>>,
 }
-struct NeighborStreams {
-    outgoing: Option<NeighborStream>,
-    incoming: Option<NeighborStream>,
+struct NeighborStreams<'a> {
+    outgoing: Option<NeighborStream<'a>>,
+    incoming: Option<NeighborStream<'a>>,
 }
-struct NeighborStream {
+struct NeighborStream<'a> {
+    storage: &'a dyn GraphRead,
     direction: NeighborDirection,
     buffer: VecDeque<GraphNeighbor>,
     after: Option<NeighborCursor>,
     exhausted: bool,
 }
-impl GraphService {
-    /// Construct the stateless traversal algorithm without I/O.
-    pub(crate) fn new() -> Self {
-        Self
+impl<C> GraphService<C> {
+    /// Retain the shared cache for bounded traversal without performing I/O.
+    pub(crate) fn new(storage: std::rc::Rc<C>) -> Self {
+        Self { storage }
     }
 }
-impl GraphTraversal for GraphService {
-    fn traverse(
-        &self,
-        read: &mut dyn GraphRead,
+impl<C: CacheDatabase> GraphTraversal for GraphService<C> {
+    fn traverse(&self, request: &TraversalRequest) -> CommandResult<Graph> {
+        self.storage
+            .with_read_tx(|| {
+                let mut discovery = Discovery::resolve_starts(self.storage.as_ref(), request)?;
+                discovery.walk(request)?;
+                Ok(discovery.into_graph())
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => map_graph_error(error),
+            })
+    }
+}
+impl<'a> Discovery<'a> {
+    fn resolve_starts(
+        storage: &'a dyn GraphRead,
         request: &TraversalRequest,
-    ) -> CommandResult<Graph> {
-        let mut discovery = Discovery::resolve_starts(read, request)?;
-        discovery.walk(read, request)?;
-        Ok(discovery.into_graph())
-    }
-}
-impl Discovery {
-    fn resolve_starts(read: &mut dyn GraphRead, request: &TraversalRequest) -> CommandResult<Self> {
+    ) -> CommandResult<Self> {
         if request.element_ids.is_empty() {
             return Err(CommandError::new(
                 CommandErrorKind::InvalidRequest,
@@ -55,14 +65,16 @@ impl Discovery {
             ));
         }
         let mut state = Self {
+            storage,
             queue: Vec::new(),
             visited: BTreeSet::new(),
             elements: Vec::new(),
             edges: request.edge_limit.map(|_| BTreeMap::new()),
         };
         for id in &request.element_ids {
-            let node = read
-                .get_node_ref_by_id(id)
+            let node = state
+                .storage
+                .nodes_get_ref_by_id(id)
                 .map_err(map_graph_error)?
                 .ok_or_else(|| {
                     CommandError::new(CommandErrorKind::NotFound, "traversal start not found")
@@ -75,7 +87,7 @@ impl Discovery {
     }
 
     /// Layer boundaries carry depth without copying full nodes into the FIFO.
-    fn walk(&mut self, read: &mut dyn GraphRead, request: &TraversalRequest) -> CommandResult<()> {
+    fn walk(&mut self, request: &TraversalRequest) -> CommandResult<()> {
         let mut head = 0;
         let mut depth = 0;
         while head < self.queue.len() && depth < request.depth {
@@ -83,7 +95,7 @@ impl Discovery {
             while head < layer_end {
                 let node = self.queue[head];
                 head += 1;
-                self.expand(read, node, request)?;
+                self.expand(node, request)?;
                 if self.elements.len() == request.limit.get() {
                     return Ok(());
                 }
@@ -93,14 +105,9 @@ impl Discovery {
         Ok(())
     }
 
-    fn expand(
-        &mut self,
-        read: &mut dyn GraphRead,
-        node: GraphNodeKey,
-        request: &TraversalRequest,
-    ) -> CommandResult<()> {
-        let mut streams = NeighborStreams::new(request.direction);
-        while let Some(neighbor) = streams.get_next(read, node, request)? {
+    fn expand(&mut self, node: GraphNodeKey, request: &TraversalRequest) -> CommandResult<()> {
+        let mut streams = NeighborStreams::new(self.storage, request.direction);
+        while let Some(neighbor) = streams.get_next(node, request)? {
             self.consider(neighbor, request);
             if self.elements.len() == request.limit.get() {
                 break;
@@ -132,28 +139,27 @@ impl Discovery {
         Graph::new(self.elements, edges)
     }
 }
-impl NeighborStreams {
-    fn new(direction: TraversalDirection) -> Self {
+impl<'a> NeighborStreams<'a> {
+    fn new(storage: &'a dyn GraphRead, direction: TraversalDirection) -> Self {
         Self {
             outgoing: (direction != TraversalDirection::Incoming)
-                .then(|| NeighborStream::new(NeighborDirection::Outgoing)),
+                .then(|| NeighborStream::new(storage, NeighborDirection::Outgoing)),
             incoming: (direction != TraversalDirection::Outgoing)
-                .then(|| NeighborStream::new(NeighborDirection::Incoming)),
+                .then(|| NeighborStream::new(storage, NeighborDirection::Incoming)),
         }
     }
 
     /// Merge at most two bounded pages by type, reached identity and original triple.
     fn get_next(
         &mut self,
-        read: &mut dyn GraphRead,
         node: GraphNodeKey,
         request: &TraversalRequest,
     ) -> CommandResult<Option<GraphNeighbor>> {
         if let Some(stream) = &mut self.outgoing {
-            stream.fill(read, node, request)?;
+            stream.fill(node, request)?;
         }
         if let Some(stream) = &mut self.incoming {
-            stream.fill(read, node, request)?;
+            stream.fill(node, request)?;
         }
         let outgoing = self
             .outgoing
@@ -180,9 +186,10 @@ impl NeighborStreams {
         }
     }
 }
-impl NeighborStream {
-    fn new(direction: NeighborDirection) -> Self {
+impl<'a> NeighborStream<'a> {
+    fn new(storage: &'a dyn GraphRead, direction: NeighborDirection) -> Self {
         Self {
+            storage,
             direction,
             buffer: VecDeque::new(),
             after: None,
@@ -190,12 +197,7 @@ impl NeighborStream {
         }
     }
 
-    fn fill(
-        &mut self,
-        read: &mut dyn GraphRead,
-        node: GraphNodeKey,
-        request: &TraversalRequest,
-    ) -> CommandResult<()> {
+    fn fill(&mut self, node: GraphNodeKey, request: &TraversalRequest) -> CommandResult<()> {
         if !self.buffer.is_empty() || self.exhausted {
             return Ok(());
         }
@@ -205,8 +207,9 @@ impl NeighborStream {
                 "invalid neighbor page quantum",
             )
         })?;
-        let page = read
-            .get_neighbor_page(&NeighborPageRequest {
+        let page = self
+            .storage
+            .edges_get_by_nodes_row_id_and_type(&NeighborPageRequest {
                 node,
                 direction: self.direction,
                 mode: request.mode,
@@ -253,6 +256,9 @@ fn map_graph_error(cause: StorageError) -> CommandError {
 }
 #[cfg(test)]
 mod tests {
+    use crate::service::StorageError;
+    use crate::service::TransactionError;
+
     use super::GraphService;
     use crate::{
         domain::{Edge, EdgeTarget, EdgeType, Graph, KnowledgeId, SourceUri},
@@ -262,7 +268,77 @@ mod tests {
             TraversalDirection, TraversalMode, TraversalRequest,
         },
     };
-    use std::{collections::BTreeSet, num::NonZeroUsize};
+    use std::{
+        cell::{Cell, RefCell},
+        collections::BTreeSet,
+        num::NonZeroUsize,
+    };
+
+    #[test]
+    fn graph_services_join_the_same_cache_snapshot() {
+        use crate::service::{CacheDatabase, NodeMetadata, SourceMetadata, StorageRead};
+        use std::rc::Rc;
+        // Given: two graph services share a cache containing one published source.
+        let root = tempfile::TempDir::new().unwrap();
+        let storage = crate::storage::open_test_storage(
+            &root.path().join("cache.db"),
+            &root.path().join("vectors.db"),
+        )
+        .unwrap();
+        let source = SourceUri::parse("code.rs").unwrap();
+        let write_result = storage
+            .cache
+            .with_write_tx(|| {
+                let write = &storage.cache;
+                write
+                    .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
+                        uri: source.clone(),
+                        hash: None,
+                        created_at: 1,
+                        lines: None,
+                    }))
+                    .unwrap();
+
+                write.get_publication_revision()
+            })
+            .map_err(TransactionError::into_inner);
+        assert_eq!(write_result.unwrap(), 1);
+        let cache = Rc::new(storage.cache);
+        let first = GraphService::new(Rc::clone(&cache));
+        let second = GraphService::new(Rc::clone(&cache));
+        let mut request = make_request();
+        request.element_ids = BTreeSet::from([parse_address("code.rs")]);
+        request.depth = 0;
+        // When: another publisher removes the source between the two service calls.
+        cache
+            .with_read_tx(|| -> crate::service::StorageResult<()> {
+                first.traverse(&request).unwrap();
+                let writer = crate::storage::open_test_storage(
+                    &root.path().join("cache.db"),
+                    &root.path().join("vectors.db"),
+                )
+                .unwrap();
+                let write_result = writer
+                    .cache
+                    .with_write_tx(|| {
+                        let write = &writer.cache;
+                        write.delete_node(&EdgeTarget::Source(source)).unwrap();
+
+                        write.get_publication_revision()
+                    })
+                    .map_err(TransactionError::into_inner);
+                assert_eq!(write_result.unwrap(), 2);
+                second.traverse(&request).unwrap();
+                assert_eq!(cache.project_get_by_id()?, 1);
+                Ok(())
+            })
+            .unwrap();
+        // Then: nested services saw the old membership; the next scope sees removal.
+        assert_eq!(
+            second.traverse(&request).unwrap_err().get_kind(),
+            CommandErrorKind::NotFound
+        );
+    }
 
     #[test]
     fn traverses_each_mode_and_direction_in_bfs_order() {
@@ -315,12 +391,12 @@ mod tests {
             ),
         ];
         for (mode, direction, expected) in cases {
-            let mut read = GeneratedRead::build_fixed();
+            let read = GeneratedRead::build_fixed();
             let mut request = make_request();
             request.mode = mode;
             request.direction = direction;
             // When
-            let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+            let graph = traverse_graph(&read, &request).unwrap();
             // Then
             assert_eq!(get_ids(&graph), expected, "{mode:?}/{direction:?}");
         }
@@ -329,11 +405,11 @@ mod tests {
     #[test]
     fn keeps_edge_budget_independent_from_node_budget() {
         // Given
-        let mut read = GeneratedRead::build_fixed();
+        let read = GeneratedRead::build_fixed();
         let mut request = make_request();
         request.edge_limit = NonZeroUsize::new(1);
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert_eq!(
             graph
@@ -353,12 +429,12 @@ mod tests {
     #[test]
     fn includes_consumes_one_depth_step() {
         // Given
-        let mut read = GeneratedRead::build_fixed();
+        let read = GeneratedRead::build_fixed();
         let mut request = make_request();
         request.mode = TraversalMode::Containment;
         request.depth = 1;
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert_eq!(get_ids(&graph), ["b.md"]);
     }
@@ -372,40 +448,38 @@ mod tests {
         request.element_ids.insert(parse_address("unknown.md"));
         request.depth = 0;
         // When
-        let error = GraphService::new()
-            .traverse(&mut read, &request)
-            .unwrap_err();
+        let error = traverse_graph(&read, &request).unwrap_err();
         // Then
         assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
-        assert_eq!(read.resolved, ["a.md", "unknown.md"]);
-        assert_eq!(read.page_calls, 0);
+        assert_eq!(*read.resolved.borrow(), ["a.md", "unknown.md"]);
+        assert_eq!(read.page_calls.get(), 0);
     }
 
     #[test]
     fn returns_requested_empty_edges_after_validating_depth_zero() {
         // Given
-        let mut read = GeneratedRead::build_fixed();
+        let read = GeneratedRead::build_fixed();
         let mut request = make_request();
         request.depth = 0;
         request.edge_limit = NonZeroUsize::new(5);
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert!(graph.get_elements().is_empty());
         assert_eq!(graph.get_edges(), Some([].as_slice()));
-        assert_eq!(read.resolved, ["a.md"]);
-        assert_eq!(read.page_calls, 0);
+        assert_eq!(*read.resolved.borrow(), ["a.md"]);
+        assert_eq!(read.page_calls.get(), 0);
     }
 
     #[test]
     fn stops_buffered_transitions_and_queries_at_node_cap() {
         // Given
-        let mut read = GeneratedRead::build_fixed();
+        let read = GeneratedRead::build_fixed();
         let mut request = make_request();
         request.limit = NonZeroUsize::new(2).unwrap();
         request.edge_limit = NonZeroUsize::new(20);
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert_eq!(get_ids(&graph), ["code.rs", "b.md"]);
         let triples = get_triples(&graph);
@@ -416,7 +490,7 @@ mod tests {
                 ("a.md", "b.md", "includes")
             ]
         );
-        assert_eq!(read.page_calls, 1);
+        assert_eq!(read.page_calls.get(), 1);
     }
 
     #[test]
@@ -428,11 +502,18 @@ mod tests {
         request.element_ids.insert(parse_address("c.md"));
         request.depth = u64::MAX;
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert_eq!(get_ids(&graph), ["code.rs", "b.md", "d.md"]);
-        assert_eq!(read.resolved, ["a.md", "c.md"]);
-        assert_eq!(read.expanded.iter().filter(|key| **key == 1).count(), 1);
+        assert_eq!(*read.resolved.borrow(), ["a.md", "c.md"]);
+        assert_eq!(
+            read.expanded
+                .borrow()
+                .iter()
+                .filter(|key| **key == 1)
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -445,7 +526,7 @@ mod tests {
         request.depth = u64::MAX;
         request.limit = NonZeroUsize::MAX;
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert_eq!(get_ids(&graph), ["b.md", "c.md"]);
     }
@@ -453,12 +534,12 @@ mod tests {
     #[test]
     fn preserves_original_incoming_edges_and_considered_back_edges() {
         // Given
-        let mut read = GeneratedRead::build_fixed();
+        let read = GeneratedRead::build_fixed();
         let mut request = make_request();
         request.direction = TraversalDirection::Incoming;
         request.edge_limit = NonZeroUsize::new(20);
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert_eq!(
             get_triples(&graph),
@@ -469,11 +550,11 @@ mod tests {
             ]
         );
         // Given
-        let mut read = GeneratedRead::build_fixed();
+        let read = GeneratedRead::build_fixed();
         request.direction = TraversalDirection::Outgoing;
         request.depth = u64::MAX;
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert_eq!(graph.get_edges().unwrap().len(), 7);
         assert!(get_triples(&graph).contains(&("d.md", "a.md", "z_custom_link")));
@@ -482,13 +563,13 @@ mod tests {
     #[test]
     fn intersects_open_types_and_omits_edges_when_not_requested() {
         // Given
-        let mut read = GeneratedRead::build_fixed();
+        let read = GeneratedRead::build_fixed();
         let mut request = make_request();
         request
             .edge_types
             .insert(EdgeType::parse("z_custom_link").unwrap());
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert_eq!(get_ids(&graph), ["c.md", "d.md"]);
         assert!(graph.get_edges().is_none());
@@ -497,13 +578,13 @@ mod tests {
     #[test]
     fn merges_page_crossing_ties_without_skips_and_bounds_high_degree_reads() {
         // Given
-        let mut read = GeneratedRead::build_star(100_000);
+        let read = GeneratedRead::build_star(100_000);
         let mut request = make_request();
         request.direction = TraversalDirection::Both;
         request.limit = NonZeroUsize::new(35).unwrap();
         request.edge_limit = NonZeroUsize::new(100);
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert_eq!(graph.get_elements().len(), 35);
         assert_eq!(graph.get_elements()[0].as_str(), "n00000.md");
@@ -518,7 +599,7 @@ mod tests {
             get_triples(&graph)[1],
             ("n00000.md", "a.md", "z_custom_link")
         );
-        assert_eq!(read.page_calls, 4);
+        assert_eq!(read.page_calls.get(), 4);
     }
 
     #[test]
@@ -529,11 +610,11 @@ mod tests {
         let mut request = make_request();
         request.limit = NonZeroUsize::new(35).unwrap();
         // When
-        let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+        let graph = traverse_graph(&read, &request).unwrap();
         // Then
         assert_eq!(graph.get_elements().len(), 35);
         assert_eq!(graph.get_elements()[34].as_str(), "n00034.md");
-        assert_eq!(read.page_calls, 5);
+        assert_eq!(read.page_calls.get(), 5);
     }
 
     #[test]
@@ -544,50 +625,46 @@ mod tests {
         let mut request = make_request();
         request.limit = NonZeroUsize::new(35).unwrap();
         // When
-        let error = GraphService::new()
-            .traverse(&mut read, &request)
-            .unwrap_err();
+        let error = traverse_graph(&read, &request).unwrap_err();
         // Then
         assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
-        assert_eq!(read.page_calls, 2);
+        assert_eq!(read.page_calls.get(), 2);
     }
 
     #[test]
     fn rejects_empty_typed_starts_without_any_read() {
         // Given
-        let mut read = GeneratedRead::build_fixed();
+        let read = GeneratedRead::build_fixed();
         let mut request = make_request();
         request.element_ids.clear();
         // When
-        let error = GraphService::new()
-            .traverse(&mut read, &request)
-            .unwrap_err();
+        let error = traverse_graph(&read, &request).unwrap_err();
         // Then
         assert_eq!(error.get_kind(), CommandErrorKind::InvalidRequest);
-        assert!(read.resolved.is_empty());
-        assert_eq!(read.page_calls, 0);
+        assert!(read.resolved.borrow().is_empty());
+        assert_eq!(read.page_calls.get(), 0);
     }
 
     #[test]
     fn traversal_work_does_not_scale_with_unrelated_nodes_or_hub_degree() {
         for degree in [64, 100_000_000] {
             // Given a lazy source: neither degree nor unrelated identities are collected.
-            let mut read = GeneratedRead::build_star(degree);
+            let read = GeneratedRead::build_star(degree);
             let mut request = make_request();
             request.limit = NonZeroUsize::new(3).unwrap();
             request.edge_limit = NonZeroUsize::new(1);
             request.depth = u64::MAX;
             // When.
-            let graph = GraphService::new().traverse(&mut read, &request).unwrap();
+            let graph = traverse_graph(&read, &request).unwrap();
             // Then identical literal output, independent edge cap and mid-page stop.
             assert_eq!(get_ids(&graph), ["n00000.md", "n00001.md", "n00002.md"]);
             assert_eq!(
                 get_triples(&graph),
                 [("a.md", "n00000.md", "z_custom_link")]
             );
-            assert_eq!(read.page_calls, 1);
-            assert_eq!(read.expanded, [1]);
-            assert_eq!(read.resolved, ["a.md"]);
+            assert_eq!(read.page_calls.get(), 1);
+            assert_eq!(*read.expanded.borrow(), [1]);
+            assert_eq!(*read.resolved.borrow(), ["a.md"]);
         }
     }
 
@@ -597,9 +674,9 @@ mod tests {
         fail_on_page: Option<usize>,
         includes_cycle: bool,
         expected_roots: usize,
-        resolved: Vec<String>,
-        page_calls: usize,
-        expanded: Vec<i64>,
+        resolved: RefCell<Vec<String>>,
+        page_calls: Cell<usize>,
+        expanded: RefCell<Vec<i64>>,
     }
     impl GeneratedRead {
         fn build_fixed() -> Self {
@@ -609,9 +686,9 @@ mod tests {
                 fail_on_page: None,
                 includes_cycle: false,
                 expected_roots: 1,
-                resolved: Vec::new(),
-                page_calls: 0,
-                expanded: Vec::new(),
+                resolved: RefCell::new(Vec::new()),
+                page_calls: Cell::new(0),
+                expanded: RefCell::new(Vec::new()),
             }
         }
         fn build_star(degree: usize) -> Self {
@@ -638,11 +715,8 @@ mod tests {
         }
     }
     impl GraphRead for GeneratedRead {
-        fn get_node_ref_by_id(
-            &mut self,
-            id: &ElementAddress,
-        ) -> StorageResult<Option<GraphNodeRef>> {
-            self.resolved.push(id.as_str().to_owned());
+        fn nodes_get_ref_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+            self.resolved.borrow_mut().push(id.as_str().to_owned());
             let key = match id.as_str() {
                 "a.md" => 1,
                 "b.md" => 2,
@@ -653,25 +727,25 @@ mod tests {
             };
             Ok(Some(make_node(key, id.as_str())))
         }
-        fn get_neighbor_page(
-            &mut self,
+        fn edges_get_by_nodes_row_id_and_type(
+            &self,
             request: &NeighborPageRequest<'_>,
         ) -> StorageResult<Vec<GraphNeighbor>> {
             assert_eq!(
-                self.resolved.len(),
+                self.resolved.borrow().len(),
                 self.expected_roots,
                 "all starts precede pages"
             );
             assert!(request.limit.get() <= 32);
-            self.page_calls += 1;
-            if self.fail_on_page == Some(self.page_calls) {
-                return Err(crate::service::StorageError::new(
+            self.page_calls.set(self.page_calls.get() + 1);
+            if self.fail_on_page == Some(self.page_calls.get()) {
+                return Err(StorageError::new(
                     crate::service::StorageErrorKind::InternalError,
                     "late page failure",
                 ));
             }
             if request.after.is_none() {
-                self.expanded.push(request.node.get_value());
+                self.expanded.borrow_mut().push(request.node.get_value());
             }
             if let Some(degree) = self.degree {
                 return Ok(generate_star_page(degree, self.page_size, request));
@@ -810,5 +884,13 @@ mod tests {
                 }
             })
             .collect()
+    }
+    fn traverse_graph(
+        read: &dyn GraphRead,
+        request: &TraversalRequest,
+    ) -> crate::service::CommandResult<Graph> {
+        let mut discovery = super::Discovery::resolve_starts(read, request)?;
+        discovery.walk(request)?;
+        Ok(discovery.into_graph())
     }
 }

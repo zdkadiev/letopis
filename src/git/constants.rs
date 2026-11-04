@@ -4,3 +4,5 @@ pub(super) const BLOB_KIND: &str = "blob";
 pub(super) const TREE_KIND: &str = "tree";
 pub(super) const GITLINK_KIND: &str = "gitlink";
 pub(super) const SNAPSHOT_REF_PREFIX: &str = "refs/letopis/snapshots/";
+
+pub(super) const OBJECT_INTEGRITY_MESSAGE: &str = "Git object integrity failed";

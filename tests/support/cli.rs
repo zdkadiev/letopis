@@ -1,4 +1,5 @@
-use letopis::{open_storage, service::EmbedLocker};
+use letopis::open_storage;
+use letopis::service::EmbedLocker;
 use serde_json::Value;
 use std::{
     env, fs,

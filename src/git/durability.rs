@@ -22,6 +22,8 @@ use std::{
     sync::Arc,
 };
 
+const DURABILITY_INTEGRITY_MESSAGE: &str = "Git durable write integrity failed";
+
 #[derive(Debug)]
 struct RefLockBusy;
 impl fmt::Display for RefLockBusy {
@@ -65,7 +67,12 @@ impl StagedObject {
         let object_root = repo.objects.store_ref().path().to_owned();
         let (directory, path) = cleanup.create_stage(&object_root)?;
         let store = gix::odb::loose::Store::at(path, repo.object_hash());
-        let oid = store.write_buf(kind, bytes).map_err(|_| fail_integrity())?;
+        let oid = store.write_buf(kind, bytes).map_err(|_| {
+            SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                DURABILITY_INTEGRITY_MESSAGE,
+            )
+        })?;
         verify_identity(oid, kind, bytes)?;
         let staged = store.object_path(&oid);
         let permissions = get_shared_permissions(repo)?;
@@ -97,7 +104,12 @@ impl StagedObject {
     /// # Errors
     /// Fails closed on invalid existing bytes or any write/sync failure; a complete orphan may remain.
     pub(super) fn publish(self) -> Result<(), SnapshotError> {
-        let parent = self.destination.parent().ok_or_else(fail_integrity)?;
+        let parent = self.destination.parent().ok_or_else(|| {
+            SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                DURABILITY_INTEGRITY_MESSAGE,
+            )
+        })?;
         #[cfg(test)]
         tests::inject_failure(tests::FailurePoint::ObjectPublish)?;
         if !self.directory.publish_object(
@@ -122,10 +134,23 @@ impl StagedObject {
         let mut bytes = Vec::new();
         let object = store
             .try_find(&self.oid, &mut bytes)
-            .map_err(|_| fail_integrity())?
-            .ok_or_else(fail_integrity)?;
+            .map_err(|_| {
+                SnapshotError::new(
+                    SnapshotErrorKind::InternalError,
+                    DURABILITY_INTEGRITY_MESSAGE,
+                )
+            })?
+            .ok_or_else(|| {
+                SnapshotError::new(
+                    SnapshotErrorKind::InternalError,
+                    DURABILITY_INTEGRITY_MESSAGE,
+                )
+            })?;
         if object.kind != self.kind {
-            return Err(fail_integrity());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                DURABILITY_INTEGRITY_MESSAGE,
+            ));
         }
         verify_identity(self.oid, object.kind, object.data)
     }
@@ -183,7 +208,10 @@ fn confirm_published_ref(
         get_shared_permissions(repo)?,
     )?;
     if !confirm_durable_ref(repo, name, oid, cleanup)? {
-        return Err(fail_integrity());
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        ));
     }
     Ok(())
 }
@@ -199,7 +227,12 @@ fn confirm_durable_ref(
     let loose = repo.common_dir().join(name);
     let packed_lock = match fs::symlink_metadata(&loose) {
         Ok(metadata) if metadata.file_type().is_file() => None,
-        Ok(_) => return Err(fail_integrity()),
+        Ok(_) => {
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                DURABILITY_INTEGRITY_MESSAGE,
+            ));
+        }
         Err(error) if error.kind() == io::ErrorKind::NotFound => Some(cleanup.acquire_marker(
             &repo.refs.packed_refs_path(),
             repo.common_dir(),
@@ -239,11 +272,19 @@ fn sync_existing_ref(
     #[cfg(test)]
     tests::inject_failure(tests::FailurePoint::RefDirectorySync)?;
     sync_parent_chain(
-        backing.parent().ok_or_else(fail_integrity)?,
+        backing.parent().ok_or_else(|| {
+            SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                DURABILITY_INTEGRITY_MESSAGE,
+            )
+        })?,
         repo.common_dir(),
     )?;
     if !has_exact_ref(repo, name, oid)? {
-        return Err(fail_integrity());
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        ));
     }
     Ok(())
 }
@@ -252,21 +293,34 @@ fn has_exact_ref(repo: &Repository, name: &str, oid: ObjectId) -> Result<bool, S
     if fs::symlink_metadata(repo.common_dir().join(name))
         .is_ok_and(|metadata| metadata.file_type().is_symlink())
     {
-        return Err(fail_integrity());
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        ));
     }
-    let packed = repo
-        .refs
-        .open_packed_buffer()
-        .map_err(|_| fail_integrity())?;
+    let packed = repo.refs.open_packed_buffer().map_err(|_| {
+        SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        )
+    })?;
     let found = repo
         .refs
         .try_find_packed(name, packed.as_ref())
-        .map_err(|_| fail_integrity())?;
+        .map_err(|_| {
+            SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                DURABILITY_INTEGRITY_MESSAGE,
+            )
+        })?;
     let Some(found) = found else {
         return Ok(false);
     };
     if found.name.as_bstr() != name.as_bytes() || found.target != Target::Object(oid) {
-        return Err(fail_integrity());
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        ));
     }
     Ok(true)
 }
@@ -278,17 +332,30 @@ fn get_shared_permissions(repo: &Repository) -> Result<i32, SnapshotError> {
     };
     gix::config::tree::Core::SHARED_REPOSITORY
         .try_into_shared_repository(Some(value))
-        .map_err(|_| fail_integrity())
+        .map_err(|_| {
+            SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                DURABILITY_INTEGRITY_MESSAGE,
+            )
+        })
 }
 
 fn verify_identity(oid: ObjectId, kind: Kind, bytes: &[u8]) -> Result<(), SnapshotError> {
-    let kind = std::str::from_utf8(kind.as_bytes()).map_err(|_| fail_integrity())?;
+    let kind = std::str::from_utf8(kind.as_bytes()).map_err(|_| {
+        SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        )
+    })?;
     let mut hash = ObjectHasher::new(oid.kind().len_in_hex(), kind, bytes.len() as u64)?;
     for chunk in bytes.chunks(HASH_CHUNK_BYTES) {
         hash.update(chunk);
     }
     if hash.finish()? != oid {
-        return Err(fail_integrity());
+        return Err(SnapshotError::new(
+            SnapshotErrorKind::InternalError,
+            DURABILITY_INTEGRITY_MESSAGE,
+        ));
     }
     Ok(())
 }
@@ -302,7 +369,10 @@ fn sync_parent_chain(path: &Path, boundary: &Path) -> Result<(), SnapshotError> 
             return Ok(());
         }
     }
-    Err(fail_integrity())
+    Err(SnapshotError::new(
+        SnapshotErrorKind::InternalError,
+        DURABILITY_INTEGRITY_MESSAGE,
+    ))
 }
 
 /// Preserve only typed lock contention and safe I/O classifications for retry decisions.
@@ -321,12 +391,6 @@ pub(super) fn make_lock_error(error: &gix::Error) -> SnapshotError {
 
 fn fail_io(error: io::Error) -> SnapshotError {
     make_io_error("Git durable write failed", error)
-}
-fn fail_integrity() -> SnapshotError {
-    SnapshotError::new(
-        SnapshotErrorKind::InternalError,
-        "Git durable write integrity failed",
-    )
 }
 
 #[cfg(test)]
@@ -805,10 +869,22 @@ mod tests {
             None,
         );
         let repo = gix::open(&linked).unwrap();
-        let oracle = fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(b"Git mode oracle"));
-        let object = StagedObject::new(&repo, Kind::Blob, b"library mode probe").unwrap();
+        let oracle_bytes = get_unused_blob(&fixture, "Git mode oracle", None);
+        let oracle = fixture.get_oid(&["hash-object", "--stdin"], Some(&oracle_bytes));
+        let probe_bytes = get_unused_blob(&fixture, "library mode probe", Some(&oracle[..2]));
+        let expected = fixture.get_oid(&["hash-object", "--stdin"], Some(&probe_bytes));
+        for oid in [&oracle, &expected] {
+            let object_path = fixture.build_object_path(oid);
+            assert!(!object_path.parent().unwrap().exists());
+        }
+        assert_eq!(
+            fixture.get_oid(&["hash-object", "-w", "--stdin"], Some(&oracle_bytes)),
+            oracle
+        );
+        let object = StagedObject::new(&repo, Kind::Blob, &probe_bytes).unwrap();
         let destination = object.destination.clone();
         let oid = object.get_oid();
+        assert_eq!(oid.to_string(), expected);
         // When: the linked-worktree handle publishes an object and private ref.
         object.publish().unwrap();
         retain_ref(&repo, oid).unwrap();
@@ -906,6 +982,19 @@ mod tests {
         if matches!(state, ConcurrentLock::Held) {
             fs::write(lock, b"foreign lock CANARY").unwrap();
         }
+    }
+
+    fn get_unused_blob(fixture: &TempRepo, label: &str, excluded_prefix: Option<&str>) -> Vec<u8> {
+        for index in 0..10_000 {
+            let bytes = format!("{label}-{index}").into_bytes();
+            let oid = fixture.get_oid(&["hash-object", "--stdin"], Some(&bytes));
+            if Some(&oid[..2]) != excluded_prefix
+                && !fixture.build_object_path(&oid).parent().unwrap().exists()
+            {
+                return bytes;
+            }
+        }
+        panic!("no unused loose-object prefix available");
     }
 
     fn retain_after_contention(repo: &Repository, oid: ObjectId) -> Result<(), SnapshotError> {

@@ -49,7 +49,7 @@ impl EmbeddingProvider for Openai {
         let items = response
             .get("data")
             .and_then(Value::as_array)
-            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::Credentials))?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidResponse))?;
         decode_vectors(
             items,
             texts.len(),

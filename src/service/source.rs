@@ -1,55 +1,65 @@
 use super::{
-    DocumentResult, FileSystem, NodeMetadata, SourceAvailability, SourceObservation, SourceReader,
-    StorageRead,
+    CacheDatabase, DocumentError, DocumentResult, FileSystem, NodeMetadata, SourceAvailability,
+    SourceObservation, SourceReader,
 };
 use crate::domain::{EdgeTarget, Sha256, SourceUri};
 
 #[derive(Debug)]
-pub(crate) struct SourceService<F> {
+pub(crate) struct SourceService<F, C> {
     filesystem: F,
+    storage: std::rc::Rc<C>,
 }
 
-impl<F: FileSystem> SourceService<F> {
-    pub(crate) fn new(filesystem: F) -> Self {
-        Self { filesystem }
+impl<F: FileSystem, C> SourceService<F, C> {
+    pub(crate) fn new(storage: std::rc::Rc<C>, filesystem: F) -> Self {
+        Self {
+            filesystem,
+            storage,
+        }
     }
 }
 
-impl<F: FileSystem> SourceReader for SourceService<F> {
-    fn get_source(
-        &self,
-        storage: &mut dyn StorageRead,
-        uri: &SourceUri,
-    ) -> DocumentResult<Option<SourceObservation>> {
-        let Some(row) = storage.get_node_by_id(&EdgeTarget::Source(uri.clone()))? else {
-            return Ok(None);
-        };
-        let NodeMetadata::Source(mut metadata) = row.metadata else {
-            return Ok(None);
-        };
-        let Some(local) = uri.get_local() else {
-            metadata.hash = None;
-            metadata.lines = None;
-            return Ok(Some(SourceObservation {
-                metadata,
-                availability: SourceAvailability::Unfetched,
-            }));
-        };
-        let file = self.filesystem.get_file(local.get_path())?;
-        metadata.hash = file
-            .as_ref()
-            .and_then(|file| local.select_bytes(&file.bytes))
-            .map(Sha256::digest);
-        metadata.lines = local.get_lines();
-        let availability = if metadata.hash.is_some() {
-            SourceAvailability::Available
-        } else {
-            SourceAvailability::SourceNotFound
-        };
-        Ok(Some(SourceObservation {
-            metadata,
-            availability,
-        }))
+impl<F: FileSystem, C: CacheDatabase> SourceReader for SourceService<F, C> {
+    fn get_source(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>> {
+        self.storage
+            .with_read_tx(|| {
+                let Some(row) = self
+                    .storage
+                    .nodes_get_by_id(&EdgeTarget::Source(uri.clone()))?
+                else {
+                    return Ok(None);
+                };
+                let NodeMetadata::Source(mut metadata) = row.metadata else {
+                    return Ok(None);
+                };
+                let Some(local) = uri.get_local() else {
+                    metadata.hash = None;
+                    metadata.lines = None;
+                    return Ok(Some(SourceObservation {
+                        metadata,
+                        availability: SourceAvailability::Unfetched,
+                    }));
+                };
+                let file = self.filesystem.get_file(local.get_path())?;
+                metadata.hash = file
+                    .as_ref()
+                    .and_then(|file| local.select_bytes(&file.bytes))
+                    .map(Sha256::digest);
+                metadata.lines = local.get_lines();
+                let availability = if metadata.hash.is_some() {
+                    SourceAvailability::Available
+                } else {
+                    SourceAvailability::SourceNotFound
+                };
+                Ok(Some(SourceObservation {
+                    metadata,
+                    availability,
+                }))
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => DocumentError::from(error),
+            })
     }
 }
 
@@ -58,7 +68,6 @@ mod tests {
     use super::super::{
         CapturedFile, DocumentError, DocumentErrorKind, DocumentRefreshService, DocumentResult,
         FileStat, FileSystem, ProvenanceService, Refresher, SourceAvailability, SourceReader,
-        Storage,
     };
     use super::SourceService;
     use crate::{
@@ -66,7 +75,7 @@ mod tests {
         filesystem::LocalFileSystem,
         git::GitRepository,
         markdown::MarkdownParser,
-        storage::SqliteStorage,
+        storage::TestDatabases,
     };
     use std::{cell::RefCell, error::Error, fs, io, path::Path, process::Command, rc::Rc};
 
@@ -87,7 +96,7 @@ mod tests {
             git: GitRepository::open(repo.path()).unwrap(),
             filesystem,
             markdown: MarkdownParser::new(),
-            storage: Box::new(storage),
+            storage: std::rc::Rc::new(storage.cache),
             provenance,
         };
 
@@ -117,25 +126,16 @@ mod tests {
         // Given: unknown and knowledge addresses with recorded source reads.
         let repo = prepare_sources();
         let recorded_reads = Rc::new(RefCell::new(Vec::new()));
-        let reader = SourceService::new(RecordedFiles::new(repo.path(), recorded_reads.clone()));
-        let mut storage = open_storage(repo.path());
-        let mut view = storage.begin_read_tx().unwrap();
+        let reader = SourceService::new(
+            Rc::new(open_storage(repo.path()).cache),
+            RecordedFiles::new(repo.path(), recorded_reads.clone()),
+        );
         let unknown = SourceUri::parse("unknown.txt").unwrap();
         let knowledge = SourceUri::parse("a.md").unwrap();
 
         // When / Then: the source reader resolves those addresses; no source filesystem read occurs.
-        assert!(
-            reader
-                .get_source(view.as_mut(), &unknown)
-                .unwrap()
-                .is_none()
-        );
-        assert!(
-            reader
-                .get_source(view.as_mut(), &knowledge)
-                .unwrap()
-                .is_none()
-        );
+        assert!(reader.get_source(&unknown).unwrap().is_none());
+        assert!(reader.get_source(&knowledge).unwrap().is_none());
         // Then: no source filesystem read occurs.
         assert!(recorded_reads.borrow().is_empty());
     }
@@ -145,13 +145,14 @@ mod tests {
         // Given: a declared remote source with recorded reads.
         let repo = prepare_sources();
         let recorded_reads = Rc::new(RefCell::new(Vec::new()));
-        let reader = SourceService::new(RecordedFiles::new(repo.path(), recorded_reads.clone()));
-        let mut storage = open_storage(repo.path());
-        let mut view = storage.begin_read_tx().unwrap();
+        let reader = SourceService::new(
+            Rc::new(open_storage(repo.path()).cache),
+            RecordedFiles::new(repo.path(), recorded_reads.clone()),
+        );
         let remote = SourceUri::parse("https://Host/a?x=1#section").unwrap();
 
         // When: the remote source is observed.
-        let observed = reader.get_source(view.as_mut(), &remote).unwrap().unwrap();
+        let observed = reader.get_source(&remote).unwrap().unwrap();
 
         // Then: it remains unfetched without local I/O.
         assert_eq!(observed.availability, SourceAvailability::Unfetched);
@@ -165,14 +166,15 @@ mod tests {
         // Given: a declared local source and unchanged referrers.
         let repo = prepare_sources();
         let recorded_reads = Rc::new(RefCell::new(Vec::new()));
-        let reader = SourceService::new(RecordedFiles::new(repo.path(), recorded_reads.clone()));
-        let mut storage = open_storage(repo.path());
-        let mut view = storage.begin_read_tx().unwrap();
+        let reader = SourceService::new(
+            Rc::new(open_storage(repo.path()).cache),
+            RecordedFiles::new(repo.path(), recorded_reads.clone()),
+        );
         let uri = SourceUri::parse("source.txt").unwrap();
         fs::write(repo.path().join("source.txt"), b"def").unwrap();
 
         // When: the live source bytes are observed.
-        let observed = reader.get_source(view.as_mut(), &uri).unwrap().unwrap();
+        let observed = reader.get_source(&uri).unwrap().unwrap();
 
         // Then: current bytes are returned without editing referrers.
         assert_eq!(observed.availability, SourceAvailability::Available);
@@ -193,13 +195,11 @@ mod tests {
         let recorded_reads = Rc::new(RefCell::new(Vec::new()));
         let mut files = RecordedFiles::new(repo.path(), recorded_reads);
         files.failure = Some(RepoPath::parse("source.txt").unwrap());
-        let reader = SourceService::new(files);
-        let mut storage = open_storage(repo.path());
-        let mut view = storage.begin_read_tx().unwrap();
+        let reader = SourceService::new(Rc::new(open_storage(repo.path()).cache), files);
         let uri = SourceUri::parse("source.txt").unwrap();
 
         // When: the live source is requested.
-        let error = reader.get_source(view.as_mut(), &uri).unwrap_err();
+        let error = reader.get_source(&uri).unwrap_err();
 
         // Then: a safe typed error preserves the private cause internally.
         assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
@@ -227,8 +227,8 @@ mod tests {
     impl FileSystem for RecordedFiles {
         type IndexLock = <LocalFileSystem as FileSystem>::IndexLock;
 
-        fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
-            self.inner.stat_file(path)
+        fn get_file_stat_by_path(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
+            self.inner.get_file_stat_by_path(path)
         }
 
         fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
@@ -276,9 +276,9 @@ mod tests {
         repo
     }
 
-    fn open_storage(root: &Path) -> SqliteStorage {
+    fn open_storage(root: &Path) -> TestDatabases {
         fs::create_dir_all(root.join(".letopis")).unwrap();
-        SqliteStorage::open(
+        crate::storage::open_test_storage(
             &root.join(".letopis/cache.db"),
             &root.join(".letopis/vectors.db"),
         )

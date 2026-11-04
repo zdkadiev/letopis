@@ -50,6 +50,11 @@ implicit_clone = "warn"
 inefficient_to_string = "warn"
 needless_pass_by_value = "warn"
 
+# Prefer explicit state and avoid unnecessary result wrappers.
+fn_params_excessive_bools = "warn"
+struct_excessive_bools = "warn"
+unnecessary_wraps = "warn"
+
 # Prefer direct method references and clear, consistent control flow.
 manual_let_else = "warn"
 match_same_arms = "warn"
@@ -68,6 +73,7 @@ cc = "=1.9.0"
 sha2 = "=0.10.9"
 
 [dev-dependencies]
+syn = { version = "=2.0.119", features = ["full", "visit"] }
 mockall = "=0.15.0"
 # Private filesystem watchdogs terminate their owned process groups.
 rustix = { version = "=1.1.5", default-features = false, features = ["process", "std"] }

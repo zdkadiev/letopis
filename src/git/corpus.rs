@@ -24,6 +24,8 @@ use rustix::{
 };
 use std::{borrow::Cow, collections::BTreeSet, ffi::OsStr, os::unix::ffi::OsStrExt, path::Path};
 
+const CANDIDATE_LIST_MESSAGE: &str = "cannot list document candidates";
+
 const DIRECTORY_FLAGS: OFlags = OFlags::RDONLY
     .union(OFlags::DIRECTORY)
     .union(OFlags::NOFOLLOW)
@@ -32,7 +34,9 @@ const DIRECTORY_FLAGS: OFlags = OFlags::RDONLY
 /// List Markdown candidates from the index and non-ignored untracked files.
 pub(super) fn get_candidates(git: &GitRepository, root: &Path) -> DocumentResult<Vec<RepoPath>> {
     let repo = &git.repo;
-    let index = repo.index_or_empty().map_err(|_| fail_listing())?;
+    let index = repo.index_or_empty().map_err(|_| {
+        DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+    })?;
     let index = expand_sparse_index(git, &index)?;
     let mut raw = Vec::new();
     for entry in index.entries() {
@@ -41,13 +45,18 @@ pub(super) fn get_candidates(git: &GitRepository, root: &Path) -> DocumentResult
     }
     let mut excludes = repo
         .excludes(&index, None, Default::default())
-        .map_err(|_| fail_listing())?
+        .map_err(|_| DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE))?
         .detach();
-    let mut pathspec =
-        Search::from_specs(std::iter::empty(), None, root).map_err(|_| fail_listing())?;
-    let caps = repo.filesystem_options().map_err(|_| fail_listing())?;
+    let mut pathspec = Search::from_specs(std::iter::empty(), None, root).map_err(|_| {
+        DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+    })?;
+    let caps = repo.filesystem_options().map_err(|_| {
+        DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+    })?;
     let lookup = caps.ignore_case.then(|| index.prepare_icase_backing());
-    let git_dir = repo.git_dir().canonicalize().map_err(|_| fail_listing())?;
+    let git_dir = repo.git_dir().canonicalize().map_err(|_| {
+        DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+    })?;
     let mut found = Collect::default();
     gix_dir::walk(
         root,
@@ -70,7 +79,7 @@ pub(super) fn get_candidates(git: &GitRepository, root: &Path) -> DocumentResult
         },
         &mut found,
     )
-    .map_err(|_| fail_listing())?;
+    .map_err(|_| DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE))?;
     for (entry, _) in found.unorded_entries {
         if entry.status == Status::Untracked
             && matches!(entry.disk_kind, Some(Kind::File | Kind::Symlink))
@@ -84,7 +93,9 @@ pub(super) fn get_candidates(git: &GitRepository, root: &Path) -> DocumentResult
 }
 
 fn filter_candidates(root: &Path, raw: &[u8]) -> DocumentResult<Vec<u8>> {
-    let root = open(root, DIRECTORY_FLAGS, FileMode::empty()).map_err(|_| fail_listing())?;
+    let root = open(root, DIRECTORY_FLAGS, FileMode::empty()).map_err(|_| {
+        DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+    })?;
     let mut filtered = Vec::new();
     for entry in raw
         .split(|byte| *byte == 0)
@@ -94,7 +105,12 @@ fn filter_candidates(root: &Path, raw: &[u8]) -> DocumentResult<Vec<u8>> {
         let safe_components = entry
             .split(|byte| *byte == b'/')
             .all(|part| !part.is_empty() && part != b"." && part != b"..");
-        if eligible && safe_components && is_symlink(&root, entry).map_err(|_| fail_listing())? {
+        if eligible
+            && safe_components
+            && is_symlink(&root, entry).map_err(|_| {
+                DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+            })?
+        {
             continue;
         }
         filtered.extend_from_slice(entry);
@@ -133,8 +149,9 @@ fn expand_sparse_index<'a>(
     if !index.is_sparse() {
         return Ok(Cow::Borrowed(index));
     }
-    git.require_self_contained_objects()
-        .map_err(|_| fail_listing())?;
+    git.require_self_contained_objects().map_err(|_| {
+        DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+    })?;
     let mut pending: Vec<_> = index
         .entries()
         .iter()
@@ -171,15 +188,23 @@ fn get_sparse_children(
             SnapshotErrorKind::InternalError,
             SnapshotErrorKind::InternalError,
         )
-        .map_err(|_| fail_listing())?;
+        .map_err(|_| {
+            DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+        })?;
     let mut remaining = bytes.as_slice();
     let mut children = Vec::new();
     while !remaining.is_empty() {
-        let (entry, rest) = get_entry(remaining, git.oid_len).map_err(|_| fail_listing())?;
+        let (entry, rest) = get_entry(remaining, git.oid_len).map_err(|_| {
+            DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+        })?;
         let mut path = prefix.to_vec();
         path.extend_from_slice(entry.name);
-        let id = ObjectId::try_from(entry.oid).map_err(|_| fail_listing())?;
-        let mode = Mode::from_bits(u32::from(entry.mode)).ok_or_else(fail_listing)?;
+        let id = ObjectId::try_from(entry.oid).map_err(|_| {
+            DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+        })?;
+        let mode = Mode::from_bits(u32::from(entry.mode)).ok_or_else(|| {
+            DocumentError::new(DocumentErrorKind::InternalError, CANDIDATE_LIST_MESSAGE)
+        })?;
         if mode.is_sparse() {
             path.push(b'/');
         }
@@ -187,12 +212,6 @@ fn get_sparse_children(
         remaining = rest;
     }
     Ok(children)
-}
-fn fail_listing() -> DocumentError {
-    DocumentError::new(
-        DocumentErrorKind::InternalError,
-        "cannot list document candidates",
-    )
 }
 pub(super) fn parse_candidates(raw: &[u8]) -> DocumentResult<Vec<RepoPath>> {
     if !raw.is_empty() && !raw.ends_with(&[0]) {

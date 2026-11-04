@@ -1,10 +1,14 @@
+use crate::support::get_current;
+use letopis::service::StorageError;
+use letopis::service::TransactionError;
+use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
+use support::open_storage;
 #[path = "support/storage.rs"]
 mod support;
 
 use letopis::{
     domain::{KnowledgeId, Sha256},
-    open_storage,
-    service::{Storage, StorageErrorKind, VectorOutcome},
+    service::{StorageErrorKind, VectorOutcome},
 };
 use rusqlite::Connection;
 use std::{
@@ -64,10 +68,16 @@ fn missing_and_zero_length_cache_are_unpublished() {
             fs::File::create(&cache).unwrap();
         }
 
-        let mut storage = open_storage(&cache, &vectors).unwrap();
+        let storage = open_storage(&cache, &vectors).unwrap();
 
         // When / Then: storage opens a read transaction; the cache remains unpublished.
-        assert_eq!(storage.begin_read_tx().unwrap().get_revision(), 0);
+        assert_eq!(
+            storage
+                .cache
+                .with_read_tx(|| storage.cache.project_get_by_id())
+                .unwrap(),
+            0
+        );
     }
 }
 
@@ -84,15 +94,21 @@ fn missing_and_zero_length_vectors_preserve_published_cache() {
             fs::File::create(&vectors).unwrap();
         }
 
-        let mut storage = open_storage(&cache, &vectors).unwrap();
-        let mut view = storage.begin_read_tx().unwrap();
+        let storage = open_storage(&cache, &vectors).unwrap();
+        storage
+            .cache
+            .with_read_tx(|| {
+                let view = &storage.cache;
 
-        // When / Then: cache revision and lexical results survive with no vector identity.
-        assert_eq!(view.get_revision(), 1);
-        assert_eq!(view.get_config_identity(), None);
-        let matches = view.get_text_matches_by_expression("searchable").unwrap();
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].id.as_str(), NODE_ID);
+                // When / Then: cache revision and lexical results survive with no vector identity.
+                assert_eq!(view.project_get_by_id().unwrap(), 1);
+                assert_eq!(view.meta_get_by_id().unwrap(), None);
+                let matches = view.text_index_get_by_expression("searchable").unwrap();
+                assert_eq!(matches.len(), 1);
+                assert_eq!(matches[0].id.as_str(), NODE_ID);
+                Ok::<_, StorageError>(())
+            })
+            .unwrap();
     }
 }
 
@@ -109,18 +125,24 @@ fn recreated_empty_cache_preserves_healthy_vectors() {
     assert_healthy(&cache, &vectors, &identity, &search_hash);
     remove_database(&cache);
 
-    let mut storage = open_storage(&cache, &vectors).unwrap();
-    let mut view = storage.begin_read_tx().unwrap();
+    let storage = open_storage(&cache, &vectors).unwrap();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let view = &storage.cache;
 
-    assert_eq!(view.get_revision(), 0);
-    assert_eq!(view.get_config_identity(), Some(identity));
-    let stored_vector = unwrap_current(
-        view.get_vector_by_search_hash(&identity, &search_hash)
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(stored_vector, vec![0.25_f32, 0.75_f32]);
-    assert_eq!(fs::read(canonical).unwrap(), CANONICAL_TEXT);
+            assert_eq!(view.project_get_by_id().unwrap(), 0);
+            assert_eq!(view.meta_get_by_id().unwrap(), Some(identity));
+            let stored_vector = unwrap_current(
+                view.vector_keys_get_vector_by_search_hash(&identity, &search_hash)
+                    .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(stored_vector, vec![0.25_f32, 0.75_f32]);
+            assert_eq!(fs::read(canonical).unwrap(), CANONICAL_TEXT);
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 fn assert_damage_is_rejected(target: &str, damage: DatabaseDamage) {
@@ -150,24 +172,38 @@ fn assert_damage_is_rejected(target: &str, damage: DatabaseDamage) {
 fn seed_vector(cache: &Path, vectors: &Path) -> (Sha256, Sha256) {
     let identity = Sha256::digest(b"known model identity");
     let search_hash = Sha256::digest(NODE_TEXT.as_bytes());
-    let mut storage = open_storage(cache, vectors).unwrap();
+    let storage = open_storage(cache, vectors).unwrap();
     assert_eq!(
-        storage.reset_vectors(None, &identity).unwrap(),
+        storage.vectors.reset_vectors(None, &identity).unwrap(),
         VectorOutcome::Current(true)
     );
-    let mut cache_write = storage.begin_cache_write_tx().unwrap();
-    cache_write
-        .upsert_node(&support::build_knowledge(NODE_ID, NODE_TEXT))
+    let cache_write_result = storage
+        .cache
+        .with_write_tx(|| {
+            let cache_write = &storage.cache;
+            cache_write
+                .nodes_upsert_by_id(&support::build_knowledge(NODE_ID, NODE_TEXT))
+                .unwrap();
+            cache_write
+                .replace_text(&KnowledgeId::parse(NODE_ID).unwrap(), NODE_TEXT)
+                .unwrap();
+
+            cache_write.get_publication_revision()
+        })
+        .map_err(TransactionError::into_inner);
+    assert_eq!(cache_write_result.unwrap(), 1);
+    storage
+        .vectors
+        .with_write_tx(&identity, || {
+            let vector_write = &storage.vectors;
+            vector_write
+                .store_vector(&search_hash, &[0.25_f32, 0.75_f32], 2)
+                .unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
         .unwrap();
-    cache_write
-        .replace_text(&KnowledgeId::parse(NODE_ID).unwrap(), NODE_TEXT)
-        .unwrap();
-    assert_eq!(cache_write.commit().unwrap(), 1);
-    let mut vector_write = unwrap_current(storage.begin_vector_write_tx(&identity).unwrap());
-    vector_write
-        .store_vector(&search_hash, &[0.25_f32, 0.75_f32], 2)
-        .unwrap();
-    vector_write.commit().unwrap();
     drop(storage);
     (identity, search_hash)
 }
@@ -203,19 +239,25 @@ fn damage_database(path: &Path, damage: DatabaseDamage) -> Vec<u8> {
 }
 
 fn assert_healthy(cache: &Path, vectors: &Path, identity: &Sha256, search_hash: &Sha256) {
-    let mut storage = open_storage(cache, vectors).unwrap();
-    let mut view = storage.begin_read_tx().unwrap();
-    assert_eq!(view.get_revision(), 1);
-    assert_eq!(view.get_config_identity(), Some(*identity));
-    let matches = view.get_text_matches_by_expression("searchable").unwrap();
-    assert_eq!(matches.len(), 1);
-    assert_eq!(matches[0].id.as_str(), NODE_ID);
-    let vector = unwrap_current(
-        view.get_vector_by_search_hash(identity, search_hash)
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(vector, vec![0.25_f32, 0.75_f32]);
+    let storage = open_storage(cache, vectors).unwrap();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let view = &storage.cache;
+            assert_eq!(view.project_get_by_id().unwrap(), 1);
+            assert_eq!(view.meta_get_by_id().unwrap(), Some(*identity));
+            let matches = view.text_index_get_by_expression("searchable").unwrap();
+            assert_eq!(matches.len(), 1);
+            assert_eq!(matches[0].id.as_str(), NODE_ID);
+            let vector = unwrap_current(
+                view.vector_keys_get_vector_by_search_hash(identity, search_hash)
+                    .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(vector, vec![0.25_f32, 0.75_f32]);
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 fn restore_databases(cache: &Path, cache_bytes: &[u8], vectors: &Path, vector_bytes: &[u8]) {

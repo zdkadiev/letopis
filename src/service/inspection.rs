@@ -639,7 +639,7 @@ mod tests {
     }
     impl FileSystem for RecordingFiles {
         type IndexLock = ();
-        fn stat_file(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
+        fn get_file_stat_by_path(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
             panic!("capture uses verified reads")
         }
         fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {

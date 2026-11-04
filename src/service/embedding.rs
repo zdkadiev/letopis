@@ -1,29 +1,33 @@
 use super::{
-    CommandError, CommandErrorKind, CommandResult, ConfigState, Configuration, DrainOutcome,
-    Embedder, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
+    CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, Configuration,
+    DrainOutcome, Embedder, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
     EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingWork, MarkdownCodec,
-    QueryEmbedding, QueryEmbeddingRequest, Storage, StorageError, StorageErrorKind, VectorOutcome,
+    QueryEmbedding, QueryEmbeddingRequest, StorageError, StorageErrorKind, TransactionError,
+    TransactionRequirement, VectorDatabase, VectorOutcome,
 };
 use crate::domain::{KnowledgeId, RepoPath, Sha256};
-use std::{collections::BTreeSet, num::NonZeroUsize, time::Duration};
+use std::{collections::BTreeSet, num::NonZeroUsize, rc::Rc, time::Duration};
 
 const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 /// Coordinates ready configuration, durable document work and transient queries.
 #[derive(Debug)]
-pub(crate) struct EmbeddingService<S, F, M, P> {
-    storage: S,
+pub(crate) struct EmbeddingService<C, V, F, M, P> {
+    // Release the read-only cache attachment before the final writable cache owner.
+    vectors: Rc<V>,
+    storage: Rc<C>,
     files: F,
     markdown: M,
     provider: P,
 }
 
-impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
-    EmbeddingService<S, F, M, P>
+impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
+    EmbeddingService<C, V, F, M, P>
 {
     /// Construct the application service from its owned boundary implementations.
-    pub(crate) fn new(storage: S, files: F, markdown: M, provider: P) -> Self {
+    pub(crate) fn new(storage: Rc<C>, vectors: Rc<V>, files: F, markdown: M, provider: P) -> Self {
         Self {
+            vectors,
             storage,
             files,
             markdown,
@@ -32,8 +36,8 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     }
 }
 
-impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> EmbeddingExecutor
-    for EmbeddingService<S, F, M, P>
+impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
+    EmbeddingExecutor for EmbeddingService<C, V, F, M, P>
 {
     fn has_work(&mut self) -> CommandResult<bool> {
         let ConfigState::Ready(config) = self.get_configuration().map_err(map_command)? else {
@@ -41,15 +45,15 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
         };
         let next = self
             .storage
-            .begin_read_tx()
-            .map_err(map_storage)
-            .map_err(map_command)?
-            .get_next_embedding_work_by_id_and_max_attempts(
-                &config.get_identity(),
-                config.get_max_attempts(),
-                None,
-            )
-            .map_err(map_storage)
+            .with_read_tx(|| {
+                self.storage
+                    .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                        &config.get_identity(),
+                        config.get_max_attempts(),
+                        None,
+                    )
+            })
+            .map_err(map_storage_transaction)
             .map_err(map_command)?;
         Ok(matches!(next, VectorOutcome::Current(Some(_))))
     }
@@ -64,10 +68,11 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     }
 }
 
-impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embedder
-    for EmbeddingService<S, F, M, P>
+impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
+    Embedder for EmbeddingService<C, V, F, M, P>
 {
     fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding> {
+        self.verify_query_scope()?;
         let ConfigState::Ready(config) = self.get_configuration()? else {
             return Ok(QueryEmbedding::Unavailable);
         };
@@ -85,6 +90,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
         &mut self,
         request: QueryEmbeddingRequest<'_>,
     ) -> EmbeddingResult<QueryEmbedding> {
+        self.verify_query_scope()?;
         if self.provider.validate_config(request.config).is_err() {
             return Ok(QueryEmbedding::Unavailable);
         }
@@ -104,6 +110,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     }
 
     fn drain(&mut self) -> EmbeddingResult<DrainOutcome> {
+        self.verify_drain_scope()?;
         let config = match self.get_configuration()? {
             ConfigState::Ready(config) => config,
             ConfigState::Changed => return Ok(DrainOutcome::ConfigChanged),
@@ -120,9 +127,8 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     fn get_configuration(&mut self) -> EmbeddingResult<ConfigState> {
         let observed = self
             .storage
-            .begin_read_tx()
-            .map_err(map_storage)?
-            .get_config_identity();
+            .with_read_tx(|| self.storage.meta_get_by_id())
+            .map_err(map_storage_transaction)?;
         #[cfg(test)]
         tests::reach_checkpoint("observed");
         let config = match self.get_config_file() {
@@ -136,7 +142,7 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
         #[cfg(test)]
         tests::reach_checkpoint("configuration");
         match self
-            .storage
+            .vectors
             .reset_vectors(observed.as_ref(), &config.get_identity())
             .map_err(map_storage)?
         {
@@ -146,9 +152,27 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider> Embe
     }
 }
 
-impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
-    EmbeddingService<S, F, M, P>
+impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
+    EmbeddingService<C, V, F, M, P>
 {
+    fn verify_query_scope(&self) -> EmbeddingResult<()> {
+        self.storage
+            .verify_transaction_scope(TransactionRequirement::ReadOnly)
+            .map_err(map_storage)?;
+        self.vectors
+            .verify_transaction_scope(TransactionRequirement::Inactive)
+            .map_err(map_storage)
+    }
+
+    fn verify_drain_scope(&self) -> EmbeddingResult<()> {
+        self.storage
+            .verify_transaction_scope(TransactionRequirement::Inactive)
+            .map_err(map_storage)?;
+        self.vectors
+            .verify_transaction_scope(TransactionRequirement::Inactive)
+            .map_err(map_storage)
+    }
+
     fn get_config_file(&self) -> EmbeddingResult<Option<Configuration>> {
         self.files
             .get_config()?
@@ -170,14 +194,15 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
         loop {
             let next = self
                 .storage
-                .begin_read_tx()
-                .map_err(map_storage)?
-                .get_next_embedding_work_by_id_and_max_attempts(
-                    &config.get_identity(),
-                    config.get_max_attempts(),
-                    after.as_ref(),
-                )
-                .map_err(map_storage)?;
+                .with_read_tx(|| {
+                    self.storage
+                        .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                            &config.get_identity(),
+                            config.get_max_attempts(),
+                            after.as_ref(),
+                        )
+                })
+                .map_err(map_storage_transaction)?;
             let work = match next {
                 VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
                 VectorOutcome::Current(None) => return self.prune(config),
@@ -203,17 +228,15 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
         }
     }
 
-    fn prune(&mut self, config: &EmbeddingConfig) -> EmbeddingResult<DrainOutcome> {
-        let VectorOutcome::Current(mut unit) = self
-            .storage
-            .begin_vector_write_tx(&config.get_identity())
-            .map_err(map_storage)?
-        else {
-            return Ok(DrainOutcome::ConfigChanged);
-        };
-        unit.prune_unreferenced().map_err(map_storage)?;
-        unit.commit().map_err(map_storage)?;
-        Ok(DrainOutcome::Complete)
+    fn prune(&self, config: &EmbeddingConfig) -> EmbeddingResult<DrainOutcome> {
+        let outcome = self
+            .vectors
+            .with_write_tx(&config.get_identity(), || self.vectors.prune_unreferenced())
+            .map_err(map_storage_transaction)?;
+        Ok(match outcome {
+            VectorOutcome::Current(()) => DrainOutcome::Complete,
+            VectorOutcome::ConfigChanged => DrainOutcome::ConfigChanged,
+        })
     }
 
     fn prepare_text(&self, work: &EmbeddingWork) -> EmbeddingResult<Option<String>> {
@@ -274,33 +297,30 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     }
 
     fn get_dimensions(
-        &mut self,
+        &self,
         config: &EmbeddingConfig,
     ) -> EmbeddingResult<VectorOutcome<Option<NonZeroUsize>>> {
-        self.storage
-            .begin_read_tx()
-            .map_err(map_storage)?
-            .get_vector_dimensions(&config.get_identity())
-            .map_err(map_storage)
+        self.vectors
+            .with_read_tx(&config.get_identity(), || {
+                self.vectors.vector_index_config_get_by_id()
+            })
+            .map_err(map_storage_transaction)
     }
 
     fn reserve(
-        &mut self,
+        &self,
         config: &EmbeddingConfig,
         hash: &Sha256,
     ) -> EmbeddingResult<VectorOutcome<bool>> {
-        let VectorOutcome::Current(mut unit) = self
-            .storage
-            .begin_vector_write_tx(&config.get_identity())
-            .map_err(map_storage)?
-        else {
-            return Ok(VectorOutcome::ConfigChanged);
-        };
-        let reserved = unit
-            .reserve_attempt(hash, config.get_max_attempts())
-            .map_err(map_storage)?;
-        unit.commit().map_err(map_storage)?;
-        Ok(VectorOutcome::Current(reserved))
+        self.vectors
+            .with_write_tx(&config.get_identity(), || {
+                self.vectors
+                    .embed_failures_upsert_by_search_hash_and_attempts(
+                        hash,
+                        config.get_max_attempts(),
+                    )
+            })
+            .map_err(map_storage_transaction)
     }
 
     fn finish_failure(
@@ -316,11 +336,11 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
             return Ok(DrainOutcome::ConfigChanged);
         }
         let failure = self
-            .storage
-            .begin_read_tx()
-            .map_err(map_storage)?
-            .get_failure_by_search_hash(&config.get_identity(), hash)
-            .map_err(map_storage)?;
+            .vectors
+            .with_read_tx(&config.get_identity(), || {
+                self.vectors.embed_failures_get_by_search_hash(hash)
+            })
+            .map_err(map_storage_transaction)?;
         match failure {
             VectorOutcome::ConfigChanged => return Ok(DrainOutcome::ConfigChanged),
             VectorOutcome::Current(Some(failure))
@@ -334,22 +354,18 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     }
 
     fn record_failure(
-        &mut self,
+        &self,
         config: &EmbeddingConfig,
         search_hash: &Sha256,
         error: &EmbeddingError,
     ) -> EmbeddingResult<VectorOutcome<()>> {
-        let VectorOutcome::Current(mut unit) = self
-            .storage
-            .begin_vector_write_tx(&config.get_identity())
-            .map_err(map_storage)?
-        else {
-            return Ok(VectorOutcome::ConfigChanged);
-        };
-        unit.record_failure(search_hash, &error.to_string())
-            .map_err(map_storage)?;
-        unit.commit().map_err(map_storage)?;
-        Ok(VectorOutcome::Current(()))
+        self.vectors
+            .with_write_tx(&config.get_identity(), || {
+                self.vectors
+                    .embed_failures_update_by_search_hash(search_hash, &error.to_string())
+                    .map(|_| ())
+            })
+            .map_err(map_storage_transaction)
     }
 
     fn compute_vector(
@@ -375,36 +391,32 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
     }
 
     fn publish_vector(
-        &mut self,
+        &self,
         config: &EmbeddingConfig,
         hash: &Sha256,
         vector: &[f32],
     ) -> EmbeddingResult<VectorOutcome<()>> {
-        let VectorOutcome::Current(mut unit) = self
-            .storage
-            .begin_vector_write_tx(&config.get_identity())
-            .map_err(map_storage)?
-        else {
-            return Ok(VectorOutcome::ConfigChanged);
-        };
-        match unit.store_vector(hash, vector, vector.len()) {
-            Ok(_) => {
-                unit.commit().map_err(map_storage)?;
-                Ok(VectorOutcome::Current(()))
-            }
-            Err(error) if error.get_kind() == StorageErrorKind::InvalidRequest => {
-                drop(unit);
-                Err(EmbeddingError::new_with_cause(
-                    EmbeddingErrorKind::InvalidResponse,
-                    error,
-                ))
-            }
-            Err(error) => Err(map_storage(error)),
-        }
+        self.vectors
+            .with_write_tx(&config.get_identity(), || {
+                self.vectors
+                    .store_vector(hash, vector, vector.len())
+                    .map(|_| ())
+                    .map_err(|error| {
+                        if error.get_kind() == StorageErrorKind::InvalidRequest {
+                            EmbeddingError::new_with_cause(
+                                EmbeddingErrorKind::InvalidResponse,
+                                error,
+                            )
+                        } else {
+                            map_storage(error)
+                        }
+                    })
+            })
+            .map_err(map_embedding_transaction)
     }
 
     fn publish_query(
-        &mut self,
+        &self,
         config: &EmbeddingConfig,
         result: EmbeddingResult<Vec<f32>>,
     ) -> EmbeddingResult<QueryEmbedding> {
@@ -412,29 +424,47 @@ impl<S: Storage, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
             Ok(vector) => Ok(vector),
             Err(error) => Err((self.files.get_time_secs()?, error)),
         };
-        let VectorOutcome::Current(mut unit) = self
-            .storage
-            .begin_vector_write_tx(&config.get_identity())
-            .map_err(map_storage)?
-        else {
-            return Ok(QueryEmbedding::Unavailable);
-        };
-        let outcome = match result {
-            Ok(vector) => {
-                unit.clear_query_error().map_err(map_storage)?;
-                QueryEmbedding::Available {
-                    identity: config.get_identity(),
-                    vector,
-                }
-            }
-            Err((at, error)) => {
-                unit.set_query_error(at, &error.to_string())
-                    .map_err(map_storage)?;
-                QueryEmbedding::Unavailable
-            }
-        };
-        unit.commit().map_err(map_storage)?;
-        Ok(outcome)
+        let outcome = self
+            .vectors
+            .with_write_tx(
+                &config.get_identity(),
+                || -> EmbeddingResult<QueryEmbedding> {
+                    match result {
+                        Ok(vector) => {
+                            self.vectors
+                                .query_error_delete_by_id()
+                                .map_err(map_storage)?;
+                            Ok(QueryEmbedding::Available {
+                                identity: config.get_identity(),
+                                vector,
+                            })
+                        }
+                        Err((at, error)) => {
+                            self.vectors
+                                .query_error_upsert_by_id(at, &error.to_string())
+                                .map_err(map_storage)?;
+                            Ok(QueryEmbedding::Unavailable)
+                        }
+                    }
+                },
+            )
+            .map_err(map_embedding_transaction)?;
+        Ok(match outcome {
+            VectorOutcome::Current(result) => result,
+            VectorOutcome::ConfigChanged => QueryEmbedding::Unavailable,
+        })
+    }
+}
+
+fn map_storage_transaction(error: TransactionError<StorageError>) -> EmbeddingError {
+    match error {
+        TransactionError::Operation(error) | TransactionError::Storage(error) => map_storage(error),
+    }
+}
+fn map_embedding_transaction(error: TransactionError<EmbeddingError>) -> EmbeddingError {
+    match error {
+        TransactionError::Operation(error) => error,
+        TransactionError::Storage(error) => map_storage(error),
     }
 }
 
@@ -453,17 +483,21 @@ fn map_storage(error: StorageError) -> EmbeddingError {
 
 #[cfg(test)]
 mod tests {
+    use crate::service::StorageError;
+    use crate::service::TransactionError;
+    use crate::storage::get_current;
+
     use super::{EmbeddingService, RETRY_DELAY};
     use crate::{
         domain::{ElementKind, KnowledgeId, RepoPath, Sha256},
         markdown::{MarkdownParser, parse},
         service::{
-            ConfigState, Configuration, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingError,
-            EmbeddingErrorKind, EmbeddingFailure, EmbeddingFiles, EmbeddingProvider,
-            EmbeddingResult, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
-            QueryEmbeddingRequest, Storage, VectorOutcome,
+            CacheDatabase, ConfigState, Configuration, DrainOutcome, Embedder, EmbeddingConfig,
+            EmbeddingError, EmbeddingErrorKind, EmbeddingFailure, EmbeddingFiles,
+            EmbeddingProvider, EmbeddingResult, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
+            QueryEmbeddingRequest, StorageRead, VectorDatabase, VectorOutcome,
         },
-        storage::SqliteStorage,
+        storage::TestDatabases,
     };
     use std::{
         cell::{Cell, RefCell},
@@ -473,11 +507,223 @@ mod tests {
     };
     use tempfile::TempDir;
 
+    #[test]
+    fn query_rejects_inherited_writers_before_inference() {
+        // Given: a ready service inside either cache or vector publication.
+        for cache_writer in [true, false] {
+            let root = TempDir::new().unwrap();
+            let mut service = build_embedding_service(
+                open_storage(&root),
+                Files::new(0),
+                MarkdownParser,
+                Provider::new(),
+            );
+            let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
+                panic!("ready configuration")
+            };
+            let cache = std::rc::Rc::clone(&service.storage);
+            let vectors = std::rc::Rc::clone(&service.vectors);
+            // When: the parent catches rejection of a captured query request.
+            let mut invoke = || {
+                let error = service
+                    .embed_query_with_config(QueryEmbeddingRequest {
+                        text: "query",
+                        config: &config,
+                        dimensions: None,
+                    })
+                    .unwrap_err();
+                assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
+                Ok::<_, StorageError>(())
+            };
+            let result = if cache_writer {
+                cache.with_write_tx(&mut invoke)
+            } else {
+                vectors
+                    .with_write_tx(&config.get_identity(), &mut invoke)
+                    .map(get_current)
+            };
+            // Then: no provider call occurs and the parent cannot commit after catching the error.
+            assert!(matches!(result, Err(TransactionError::Storage(_))));
+            assert_eq!(service.provider.calls.get(), 0);
+            assert_eq!(
+                cache
+                    .with_read_tx(|| cache.query_error_get_by_id())
+                    .unwrap(),
+                None
+            );
+        }
+    }
+
+    #[test]
+    fn query_rejects_an_inherited_vector_read_before_inference() {
+        // Given: query publication cannot upgrade an inherited vector read.
+        let root = TempDir::new().unwrap();
+        let mut service = build_embedding_service(
+            open_storage(&root),
+            Files::new(0),
+            MarkdownParser,
+            Provider::new(),
+        );
+        let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
+            panic!("ready configuration")
+        };
+        let vectors = std::rc::Rc::clone(&service.vectors);
+        // When: the parent catches rejection before inference or diagnostic publication.
+        let result = vectors.with_read_tx(&config.get_identity(), || {
+            let error = service
+                .embed_query_with_config(QueryEmbeddingRequest {
+                    text: "query",
+                    config: &config,
+                    dimensions: None,
+                })
+                .unwrap_err();
+            assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
+            Ok::<_, StorageError>(())
+        });
+        // Then: no provider call occurs and catching the rejection cannot rescue the read.
+        assert!(matches!(result, Err(TransactionError::Storage(_))));
+        assert_eq!(service.provider.calls.get(), 0);
+    }
+
+    #[test]
+    fn query_keeps_inference_available_inside_a_pinned_cache_read() {
+        // Given: the supported search shape with an independent vector writer.
+        let root = TempDir::new().unwrap();
+        let mut service = build_embedding_service(
+            open_storage(&root),
+            Files::new(0),
+            MarkdownParser,
+            Provider::new(),
+        );
+        let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
+            panic!("ready configuration")
+        };
+        let cache = std::rc::Rc::clone(&service.storage);
+        // When: query inference runs while the cache read remains pinned.
+        let result = cache
+            .with_read_tx(|| {
+                service.embed_query_with_config(QueryEmbeddingRequest {
+                    text: "query",
+                    config: &config,
+                    dimensions: None,
+                })
+            })
+            .unwrap();
+        // Then: exactly one call returns the independent literal vector.
+        assert!(
+            matches!(result, QueryEmbedding::Available { vector, .. } if vector == vec![1.0, 2.0, 3.0])
+        );
+        assert_eq!(service.provider.calls.get(), 1);
+    }
+
+    #[test]
+    fn drain_rejects_inherited_cache_scopes_before_selecting_work() {
+        // Given: one eligible document and a provider that bounds a repeated-selection bug.
+        for cache_writer in [false, true] {
+            let root = TempDir::new().unwrap();
+            let mut databases = open_storage(&root);
+            let mut files = Files::new(0);
+            let hash = publish(&mut databases, &mut files, "a.md", "eligible text");
+            let mut provider = Provider::new();
+            provider.max_calls = Some(1);
+            let mut service = build_embedding_service(databases, files, MarkdownParser, provider);
+            let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
+                panic!("ready configuration")
+            };
+            let cache = std::rc::Rc::clone(&service.storage);
+            // When: a parent catches drain's rejection within an inherited snapshot or writer.
+            let mut invoke = || {
+                let error = service.drain().unwrap_err();
+                assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
+                Ok::<_, StorageError>(())
+            };
+            let result = if cache_writer {
+                cache.with_write_tx(&mut invoke)
+            } else {
+                cache.with_read_tx(&mut invoke)
+            };
+            // Then: no work is reserved or inferred, and the rejected parent is rollback-only.
+            assert!(matches!(result, Err(TransactionError::Storage(_))));
+            assert_eq!(service.provider.calls.get(), 0);
+            assert_eq!(
+                cache
+                    .with_read_tx(
+                        || cache.embed_failures_get_by_search_hash(&config.get_identity(), &hash)
+                    )
+                    .unwrap(),
+                VectorOutcome::Current(None)
+            );
+            // When: the same service drains outside any inherited scope.
+            assert_eq!(service.drain().unwrap(), DrainOutcome::Complete);
+            // Then: fresh work selection sees publication and terminates after exactly one call.
+            assert_eq!(service.provider.calls.get(), 1);
+        }
+    }
+
+    #[test]
+    fn reservation_joins_the_shared_vector_scope_and_rolls_back_with_its_parent() {
+        use crate::service::VectorDatabase;
+        use rusqlite::Connection;
+        // Given: a ready embedding service and an independent vector observer.
+        let root = TempDir::new().unwrap();
+        let mut service = crate::service::embedding::tests::build_embedding_service(
+            open_storage(&root),
+            Files::new(0),
+            MarkdownParser,
+            Provider::new(),
+        );
+        let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
+            panic!("configuration must be ready")
+        };
+        let vectors = std::rc::Rc::clone(&service.vectors);
+        let hash = Sha256::digest(b"joined attempt");
+        let observer = Connection::open(root.path().join("vectors")).unwrap();
+        // When: a nested reservation succeeds but its parent rejects the operation.
+        let result = vectors.with_write_tx(&config.get_identity(), || -> EmbeddingResult<()> {
+            assert!(matches!(
+                service.reserve(&config, &hash)?,
+                VectorOutcome::Current(true)
+            ));
+            assert_eq!(
+                observer
+                    .query_row("select count(*) from embed_failures", [], |row| row
+                        .get::<_, i64>(0))
+                    .unwrap(),
+                0
+            );
+            Err(EmbeddingError::new(EmbeddingErrorKind::Input))
+        });
+        // Then: the attempt is rolled back, and a later standalone reservation commits once.
+        assert!(matches!(
+            result,
+            Err(TransactionError::Operation(error)) if error.get_kind() == EmbeddingErrorKind::Input
+        ));
+        assert_eq!(
+            observer
+                .query_row("select count(*) from embed_failures", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        assert!(matches!(
+            service.reserve(&config, &hash).unwrap(),
+            VectorOutcome::Current(true)
+        ));
+        assert_eq!(
+            observer
+                .query_row("select attempts from embed_failures", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+    }
+
     mod tasks {
         use super::{Files, Provider, open_storage, publish};
+        use crate::service::TransactionError;
         use crate::{
             markdown::MarkdownParser,
-            service::{CommandErrorKind, EmbeddingExecutor, EmbeddingService, Storage},
+            service::{CacheDatabase, CommandErrorKind, EmbeddingExecutor},
         };
         use rusqlite::Connection;
         use tempfile::TempDir;
@@ -489,21 +735,28 @@ mod tests {
             let mut storage = open_storage(&root);
             let mut files = Files::new(0);
             publish(&mut storage, &mut files, "a.md", "ready token");
-            let mut service =
-                EmbeddingService::new(storage, files, MarkdownParser, Provider::new());
+            let mut service = crate::service::embedding::tests::build_embedding_service(
+                storage,
+                files,
+                MarkdownParser,
+                Provider::new(),
+            );
             // When: readiness queries the scoped storage view.
             assert!(service.has_work().unwrap());
             // Then: no document/provider work; the read is gone before another unit starts.
             assert_eq!(service.provider.calls.get(), 0);
             assert!(service.files.reads.borrow().is_empty());
-            drop(service.storage.begin_cache_write_tx().unwrap());
+            assert!(matches!(
+                service.storage.with_write_tx(|| Err::<(), _>(())),
+                Err(TransactionError::Operation(()))
+            ));
         }
 
         #[test]
         fn readiness_preserves_storage_failure_as_a_safe_typed_error() {
             // Given
             let root = TempDir::new().unwrap();
-            let mut service = EmbeddingService::new(
+            let mut service = crate::service::embedding::tests::build_embedding_service(
                 open_storage(&root),
                 Files::new(0),
                 MarkdownParser,
@@ -586,6 +839,7 @@ mod tests {
     }
     struct Provider {
         calls: Cell<usize>,
+        max_calls: Option<usize>,
         invalid_config: bool,
         failure: Option<EmbeddingErrorKind>,
         vectors: Vec<Vec<f32>>,
@@ -595,6 +849,7 @@ mod tests {
         fn new() -> Self {
             Self {
                 calls: Cell::new(0),
+                max_calls: None,
                 invalid_config: false,
                 failure: None,
                 vectors: vec![vec![1., 2., 3.]],
@@ -617,6 +872,10 @@ mod tests {
             dimensions: Option<NonZeroUsize>,
         ) -> EmbeddingResult<Vec<Vec<f32>>> {
             self.calls.set(self.calls.get() + 1);
+            assert!(
+                self.max_calls.is_none_or(|limit| self.calls.get() <= limit),
+                "provider call bound exceeded"
+            );
             self.requests
                 .borrow_mut()
                 .push((config.get_identity(), texts[0].into(), dimensions));
@@ -630,12 +889,17 @@ mod tests {
     fn configuration_is_reread_and_provider_validation_precedes_identity_reset() {
         // Given: configuration changes and a provider requiring validation.
         let root = TempDir::new().unwrap();
-        let mut storage = open_storage(&root);
+        let storage = open_storage(&root);
         let old = Sha256::digest(b"old identity");
-        storage.reset_vectors(None, &old).unwrap();
+        storage.vectors.reset_vectors(None, &old).unwrap();
         let mut provider = Provider::new();
         provider.invalid_config = true;
-        let mut service = EmbeddingService::new(storage, Files::new(0), MarkdownParser, provider);
+        let mut service = crate::service::embedding::tests::build_embedding_service(
+            storage,
+            Files::new(0),
+            MarkdownParser,
+            provider,
+        );
         // When / Then: configuration is retrieved again; provider validation precedes resetting the vector identity.
         assert!(matches!(
             service.get_configuration().unwrap(),
@@ -644,9 +908,8 @@ mod tests {
         assert_eq!(
             service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_config_identity(),
+                .with_read_tx(|| service.storage.meta_get_by_id())
+                .unwrap(),
             Some(old)
         );
         *service.files.config.borrow_mut() = None;
@@ -667,7 +930,12 @@ mod tests {
         publish(&mut storage, &mut files, "b.md", "shared");
         publish(&mut storage, &mut files, "c.md", "different");
         files.documents.insert("a.md".into(), b"unmarked".to_vec());
-        let mut service = EmbeddingService::new(storage, files, MarkdownParser, Provider::new());
+        let mut service = crate::service::embedding::tests::build_embedding_service(
+            storage,
+            files,
+            MarkdownParser,
+            Provider::new(),
+        );
         // When
         assert_eq!(service.drain().unwrap(), DrainOutcome::Complete);
         // Then
@@ -687,7 +955,12 @@ mod tests {
         let hash = publish(&mut storage, &mut files, "a.md", "knowledge");
         let mut provider = Provider::new();
         provider.failure = Some(EmbeddingErrorKind::Credentials);
-        let mut service = EmbeddingService::new(storage, files, MarkdownParser, provider);
+        let mut service = crate::service::embedding::tests::build_embedding_service(
+            storage,
+            files,
+            MarkdownParser,
+            provider,
+        );
         // When: the embedding drain runs to completion.
         assert_eq!(service.drain().unwrap(), DrainOutcome::Complete);
         // Then: four attempts and three retry waits are durable.
@@ -698,9 +971,11 @@ mod tests {
         };
         let VectorOutcome::Current(Some(failure)) = service
             .storage
-            .begin_read_tx()
-            .unwrap()
-            .get_failure_by_search_hash(&config.get_identity(), &hash)
+            .with_read_tx(|| {
+                service
+                    .storage
+                    .embed_failures_get_by_search_hash(&config.get_identity(), &hash)
+            })
             .unwrap()
         else {
             panic!()
@@ -721,8 +996,12 @@ mod tests {
             let root = TempDir::new().unwrap();
             let mut provider = Provider::new();
             provider.vectors = vectors;
-            let mut service =
-                EmbeddingService::new(open_storage(&root), Files::new(0), MarkdownParser, provider);
+            let mut service = crate::service::embedding::tests::build_embedding_service(
+                open_storage(&root),
+                Files::new(0),
+                MarkdownParser,
+                provider,
+            );
             // When: a query embedding is requested.
             assert_eq!(
                 service.embed_query("query").unwrap(),
@@ -733,9 +1012,7 @@ mod tests {
             assert_eq!(
                 service
                     .storage
-                    .begin_read_tx()
-                    .unwrap()
-                    .get_query_error()
+                    .with_read_tx(|| service.storage.query_error_get_by_id())
                     .unwrap()
                     .unwrap()
                     .error,
@@ -752,8 +1029,12 @@ mod tests {
         files.time = u64::MAX;
         let mut provider = Provider::new();
         provider.failure = Some(EmbeddingErrorKind::Connection);
-        let mut service =
-            EmbeddingService::new(open_storage(&root), files, MarkdownParser, provider);
+        let mut service = crate::service::embedding::tests::build_embedding_service(
+            open_storage(&root),
+            files,
+            MarkdownParser,
+            provider,
+        );
         // When: a query embedding fails.
         let error = service.embed_query("query").unwrap_err();
         // Then: the timestamp is rejected without truncation.
@@ -761,9 +1042,7 @@ mod tests {
         assert_eq!(
             service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_query_error()
+                .with_read_tx(|| service.storage.query_error_get_by_id())
                 .unwrap(),
             None
         );
@@ -777,50 +1056,68 @@ mod tests {
         let mut files = Files::new(0);
         let hash = publish(&mut storage, &mut files, "a.md", "knowledge");
         let documents = files.documents.clone();
-        let revision = storage.begin_read_tx().unwrap().get_revision();
+        let revision = storage
+            .cache
+            .with_read_tx(|| storage.cache.project_get_by_id())
+            .unwrap();
         let mut provider = Provider::new();
         provider.vectors = vec![vec![1.]];
-        let mut service = EmbeddingService::new(storage, files, MarkdownParser, provider);
+        let mut service = crate::service::embedding::tests::build_embedding_service(
+            storage,
+            files,
+            MarkdownParser,
+            provider,
+        );
         // When: the drain tries to store the provider result.
         assert_eq!(service.drain().unwrap(), DrainOutcome::Complete);
         // Then: storage rejection rolled back, then a fresh unit persisted the error.
         let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
             panic!()
         };
-        let mut read = service.storage.begin_read_tx().unwrap();
-        let VectorOutcome::Current(Some(failure)) = read
-            .get_failure_by_search_hash(&config.get_identity(), &hash)
-            .unwrap()
-        else {
-            panic!()
-        };
-        assert_eq!(failure.attempts, 1);
-        assert_eq!(failure.error.unwrap(), "invalid embedding response");
-        assert_eq!(
-            read.get_vector_by_search_hash(&config.get_identity(), &hash)
-                .unwrap(),
-            VectorOutcome::Current(None)
-        );
-        assert_eq!(read.get_revision(), revision);
-        assert_eq!(service.files.documents, documents);
-        assert_eq!(
-            read.get_text_matches_by_expression("knowledge")
-                .unwrap()
-                .len(),
-            1
-        );
+        let cache = std::rc::Rc::clone(&service.storage);
+        cache
+            .with_read_tx(|| -> crate::service::StorageResult<()> {
+                let read = cache.as_ref();
+                let VectorOutcome::Current(Some(failure)) = read
+                    .embed_failures_get_by_search_hash(&config.get_identity(), &hash)
+                    .unwrap()
+                else {
+                    panic!()
+                };
+                assert_eq!(failure.attempts, 1);
+                assert_eq!(failure.error.unwrap(), "invalid embedding response");
+                assert_eq!(
+                    read.vector_keys_get_vector_by_search_hash(&config.get_identity(), &hash)
+                        .unwrap(),
+                    VectorOutcome::Current(None)
+                );
+                assert_eq!(read.project_get_by_id().unwrap(), revision);
+                assert_eq!(service.files.documents, documents);
+                assert_eq!(
+                    read.text_index_get_by_expression("knowledge")
+                        .unwrap()
+                        .len(),
+                    1
+                );
+
+                Ok(())
+            })
+            .unwrap();
     }
 
     mod process {
+        use crate::service::StorageError;
+
+        use crate::storage::get_current;
+
         use super::{Files, open_storage, publish};
         use crate::{
             domain::{RepoPath, Sha256},
             markdown::parse,
             service::{
-                ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingExecutor,
-                QueryEmbedding, Storage, VectorOutcome,
+                CacheDatabase, ConfigState, DrainOutcome, Embedder, EmbeddingConfig,
+                EmbeddingExecutor, QueryEmbedding, StorageRead, VectorDatabase, VectorOutcome,
             },
-            wire_embedder,
         };
         use rusqlite::{Connection, types::Value};
         use std::{
@@ -848,8 +1145,11 @@ mod tests {
             // Given
             reach_checkpoint("child");
             let root = PathBuf::from(env::var_os("LETOPIS_PROCESS_ROOT").unwrap());
-            let storage = crate::open_storage(&root.join("cache"), &root.join("vectors")).unwrap();
-            let mut service = wire_embedder(&root, storage).unwrap();
+            let storage =
+                crate::storage::open_test_storage(&root.join("cache"), &root.join("vectors"))
+                    .unwrap();
+            let mut service =
+                crate::service::embedding::tests::wire_test_embedder(&root, storage).unwrap();
             // When / Then: each action is checked in its assertion.
             if env::var("LETOPIS_PROCESS_ACTION").as_deref() == Ok("query") {
                 assert_eq!(
@@ -944,20 +1244,30 @@ mod tests {
                 vector: Option<Vec<f32>>,
                 attempts: Option<u64>,
             ) {
-                let mut storage = open_storage(&self.root);
-                let mut read = storage.begin_read_tx().unwrap();
-                assert_eq!(
-                    read.get_vector_by_search_hash(&config.get_identity(), &self.hash)
-                        .unwrap(),
-                    VectorOutcome::Current(vector)
-                );
-                let VectorOutcome::Current(failure) = read
-                    .get_failure_by_search_hash(&config.get_identity(), &self.hash)
-                    .unwrap()
-                else {
-                    panic!()
-                };
-                assert_eq!(failure.map(|failure| failure.attempts), attempts);
+                let storage = open_storage(&self.root);
+                storage
+                    .cache
+                    .with_read_tx(|| {
+                        let read = &storage.cache;
+                        assert_eq!(
+                            read.vector_keys_get_vector_by_search_hash(
+                                &config.get_identity(),
+                                &self.hash
+                            )
+                            .unwrap(),
+                            VectorOutcome::Current(vector)
+                        );
+                        let VectorOutcome::Current(failure) = read
+                            .embed_failures_get_by_search_hash(&config.get_identity(), &self.hash)
+                            .unwrap()
+                        else {
+                            panic!()
+                        };
+                        assert_eq!(failure.map(|failure| failure.attempts), attempts);
+
+                        Ok::<_, StorageError>(())
+                    })
+                    .unwrap();
             }
             fn capture_cache(&self) -> Vec<Vec<Vec<Value>>> {
                 let connection = Connection::open(self.root.path().join("cache")).unwrap();
@@ -1214,18 +1524,25 @@ mod tests {
         }
 
         fn assert_current_vector(fixture: &Fixture, config: &EmbeddingConfig) {
-            let mut storage = open_storage(&fixture.root);
-            let mut read = storage.begin_read_tx().unwrap();
-            let bytes = fs::read(fixture.root.path().join("b.md")).unwrap();
-            let parsed = parse(&RepoPath::parse("b.md").unwrap(), &bytes)
-                .unwrap()
+            let storage = open_storage(&fixture.root);
+            storage
+                .cache
+                .with_read_tx(|| {
+                    let read = &storage.cache;
+                    let bytes = fs::read(fixture.root.path().join("b.md")).unwrap();
+                    let parsed = parse(&RepoPath::parse("b.md").unwrap(), &bytes)
+                        .unwrap()
+                        .unwrap();
+                    let hash = parsed.elements[0].search_hash;
+                    assert_eq!(
+                        read.vector_keys_get_vector_by_search_hash(&config.get_identity(), &hash)
+                            .unwrap(),
+                        VectorOutcome::Current(Some(vec![4., 5., 6.]))
+                    );
+
+                    Ok::<_, StorageError>(())
+                })
                 .unwrap();
-            let hash = parsed.elements[0].search_hash;
-            assert_eq!(
-                read.get_vector_by_search_hash(&config.get_identity(), &hash)
-                    .unwrap(),
-                VectorOutcome::Current(Some(vec![4., 5., 6.]))
-            );
         }
 
         pub(super) fn reach_checkpoint(stage: &str) {
@@ -1278,21 +1595,28 @@ mod tests {
 
         fn reset_with_current_state(fixture: &Fixture) -> EmbeddingConfig {
             let next = Fixture::write_config(&fixture.root, &fixture.listener, 1);
-            let mut service =
-                wire_embedder(fixture.root.path(), open_storage(&fixture.root)).unwrap();
+            let mut service = crate::service::embedding::tests::wire_test_embedder(
+                fixture.root.path(),
+                open_storage(&fixture.root),
+            )
+            .unwrap();
             service.get_configuration().unwrap();
             let mut storage = open_storage(&fixture.root);
             let mut files = Files::new(0);
             let current = publish(&mut storage, &mut files, "b.md", "current knowledge");
             fs::write(fixture.root.path().join("b.md"), &files.documents["b.md"]).unwrap();
-            let VectorOutcome::Current(mut unit) =
-                storage.begin_vector_write_tx(&next.get_identity()).unwrap()
-            else {
-                panic!()
-            };
-            unit.store_vector(&current, &[4., 5., 6.], 3).unwrap();
-            unit.set_query_error(7, "current safe error").unwrap();
-            unit.commit().unwrap();
+            storage
+                .vectors
+                .with_write_tx(&next.get_identity(), || {
+                    let unit = &storage.vectors;
+                    unit.store_vector(&current, &[4., 5., 6.], 3).unwrap();
+                    unit.query_error_upsert_by_id(7, "current safe error")
+                        .unwrap();
+
+                    Ok::<_, StorageError>(())
+                })
+                .map(get_current)
+                .unwrap();
             next
         }
 
@@ -1305,11 +1629,11 @@ mod tests {
         }
 
         fn assert_current_error(fixture: &Fixture) {
-            let mut storage = open_storage(&fixture.root);
+            let storage = open_storage(&fixture.root);
             let error = storage
-                .begin_read_tx()
+                .cache
+                .with_read_tx(|| Ok::<_, StorageError>(storage.cache.query_error_get_by_id()))
                 .unwrap()
-                .get_query_error()
                 .unwrap()
                 .unwrap();
             assert_eq!(error.at, 7);
@@ -1317,14 +1641,15 @@ mod tests {
         }
 
         mod configuration {
+            use crate::service::StorageError;
+
+            use crate::storage::get_current;
+
             use super::{
                 Fixture, LIMIT, Process, SUCCESS, assert_current_vector, get_http_request,
                 open_storage, reply, reset_with_current_state,
             };
-            use crate::{
-                service::{Embedder, Storage, VectorOutcome},
-                wire_embedder,
-            };
+            use crate::service::{Embedder, VectorDatabase};
             use std::{
                 io::Write,
                 thread,
@@ -1355,14 +1680,23 @@ mod tests {
 
                 // When: B replaces the config and publishes newer vectors and attempts.
                 let next = reset_with_current_state(&fixture);
-                let mut storage = open_storage(&fixture.root);
-                let VectorOutcome::Current(mut unit) =
-                    storage.begin_vector_write_tx(&next.get_identity()).unwrap()
-                else {
-                    panic!()
-                };
-                assert!(unit.reserve_attempt(&fixture.hash, 4).unwrap());
-                unit.commit().unwrap();
+                let storage = open_storage(&fixture.root);
+                storage
+                    .vectors
+                    .with_write_tx(&next.get_identity(), || {
+                        let unit = &storage.vectors;
+                        assert!(
+                            unit.embed_failures_upsert_by_search_hash_and_attempts(
+                                &fixture.hash,
+                                4
+                            )
+                            .unwrap()
+                        );
+
+                        Ok::<_, StorageError>(())
+                    })
+                    .map(get_current)
+                    .unwrap();
                 let before = fixture.capture_cache();
                 barrier.write_all(b"C").unwrap();
                 let requests = finish_http_requests(&fixture, &mut child);
@@ -1378,8 +1712,11 @@ mod tests {
             fn assert_stale_observation(action: &str) {
                 // Given: P validates A while its original storage observation is still current.
                 let fixture = Fixture::new(0);
-                let mut service =
-                    wire_embedder(fixture.root.path(), open_storage(&fixture.root)).unwrap();
+                let mut service = crate::service::embedding::tests::wire_test_embedder(
+                    fixture.root.path(),
+                    open_storage(&fixture.root),
+                )
+                .unwrap();
                 service.get_configuration().unwrap();
                 drop(service);
                 let mut child = Process::spawn(
@@ -1391,14 +1728,23 @@ mod tests {
                 );
                 let mut barrier = child.await_checkpoint();
                 let next = reset_with_current_state(&fixture);
-                let mut storage = open_storage(&fixture.root);
-                let VectorOutcome::Current(mut unit) =
-                    storage.begin_vector_write_tx(&next.get_identity()).unwrap()
-                else {
-                    panic!()
-                };
-                assert!(unit.reserve_attempt(&fixture.hash, 4).unwrap());
-                unit.commit().unwrap();
+                let storage = open_storage(&fixture.root);
+                storage
+                    .vectors
+                    .with_write_tx(&next.get_identity(), || {
+                        let unit = &storage.vectors;
+                        assert!(
+                            unit.embed_failures_upsert_by_search_hash_and_attempts(
+                                &fixture.hash,
+                                4
+                            )
+                            .unwrap()
+                        );
+
+                        Ok::<_, StorageError>(())
+                    })
+                    .map(get_current)
+                    .unwrap();
                 let before = fixture.capture_cache();
                 // When: obsolete P resumes after B has stored both successful and pending work.
                 barrier.write_all(b"C").unwrap();
@@ -1443,17 +1789,19 @@ mod tests {
         files
             .config
             .replace(Some(serde_json::to_vec(&config).unwrap()));
-        let mut service =
-            EmbeddingService::new(open_storage(&root), files, MarkdownParser, Provider::new());
+        let mut service = crate::service::embedding::tests::build_embedding_service(
+            open_storage(&root),
+            files,
+            MarkdownParser,
+            Provider::new(),
+        );
         // When: this provider double returns three components despite the request.
         let result = service.embed_query("query").unwrap();
         // Then: a malformed result cannot become an available query vector.
         assert_eq!(result, QueryEmbedding::Unavailable);
         let error = service
             .storage
-            .begin_read_tx()
-            .unwrap()
-            .get_query_error()
+            .with_read_tx(|| service.storage.query_error_get_by_id())
             .unwrap()
             .unwrap();
         assert_eq!(error.error, "invalid embedding response");
@@ -1466,11 +1814,17 @@ mod tests {
         let root = TempDir::new().unwrap();
         let files = Files::new(0);
         let captured = files.get_configured();
-        let mut storage = open_storage(&root);
+        let storage = open_storage(&root);
         storage
+            .vectors
             .reset_vectors(None, &captured.get_identity())
             .unwrap();
-        let mut service = EmbeddingService::new(storage, files, MarkdownParser, Provider::new());
+        let mut service = crate::service::embedding::tests::build_embedding_service(
+            storage,
+            files,
+            MarkdownParser,
+            Provider::new(),
+        );
         service.files.config.replace(Some(br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"new-model","parameters":{"base_url":"http://localhost/api"},"max_retries":0}}"#.to_vec()));
         service.files.reject_config_reads = true;
         // When: the query uses its captured configuration.
@@ -1501,9 +1855,8 @@ mod tests {
         assert_eq!(
             service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_config_identity(),
+                .with_read_tx(|| service.storage.meta_get_by_id())
+                .unwrap(),
             Some(captured.get_identity())
         );
     }
@@ -1511,24 +1864,10 @@ mod tests {
     #[test]
     fn captured_query_preserves_readiness_policy_and_document_attempts() {
         // Given: a reserved document attempt must survive every query outcome.
-        let root = TempDir::new().unwrap();
-        let mut storage = open_storage(&root);
-        let mut files = Files::new(0);
-        let hash = publish(&mut storage, &mut files, "a.md", "knowledge");
-        let captured = files.get_configured();
-        storage
-            .reset_vectors(None, &captured.get_identity())
-            .unwrap();
-        let VectorOutcome::Current(mut unit) = storage
-            .begin_vector_write_tx(&captured.get_identity())
-            .unwrap()
-        else {
-            panic!()
-        };
-        unit.reserve_attempt(&hash, 1).unwrap();
-        unit.commit().unwrap();
-        files.reject_config_reads = true;
-        let mut service = EmbeddingService::new(storage, files, MarkdownParser, Provider::new());
+        let mut fixture = ReservedQueryFixture::new();
+        let service = &mut fixture.service;
+        let hash = fixture.hash;
+        let captured = &fixture.captured;
         // When / Then: standalone readiness maps unreadable config to unavailable.
         assert_eq!(
             service.embed_query("query").unwrap(),
@@ -1542,31 +1881,40 @@ mod tests {
             let result = service
                 .embed_query_with_config(QueryEmbeddingRequest {
                     text: "query",
-                    config: &captured,
+                    config: captured,
                     dimensions: None,
                 })
                 .unwrap();
             // Then: document attempts and readiness policy remain unchanged.
             assert_eq!(matches!(result, QueryEmbedding::Unavailable), failure);
-            let mut read = service.storage.begin_read_tx().unwrap();
-            assert_eq!(
-                read.get_query_error().unwrap().map(|error| error.error),
-                failure.then(|| "embedding credentials unavailable".into())
-            );
-            assert_eq!(
-                read.get_vector_by_search_hash(&captured.get_identity(), &hash)
-                    .unwrap(),
-                VectorOutcome::Current(None)
-            );
-            assert_eq!(
-                read.get_failure_by_search_hash(&captured.get_identity(), &hash)
-                    .unwrap(),
-                VectorOutcome::Current(Some(EmbeddingFailure {
-                    search_hash: hash,
-                    attempts: 1,
-                    error: None
-                }))
-            );
+            let cache = std::rc::Rc::clone(&service.storage);
+            cache
+                .with_read_tx(|| -> crate::service::StorageResult<()> {
+                    let read = cache.as_ref();
+                    assert_eq!(
+                        read.query_error_get_by_id()
+                            .unwrap()
+                            .map(|error| error.error),
+                        failure.then(|| "embedding credentials unavailable".into())
+                    );
+                    assert_eq!(
+                        read.vector_keys_get_vector_by_search_hash(&captured.get_identity(), &hash)
+                            .unwrap(),
+                        VectorOutcome::Current(None)
+                    );
+                    assert_eq!(
+                        read.embed_failures_get_by_search_hash(&captured.get_identity(), &hash)
+                            .unwrap(),
+                        VectorOutcome::Current(Some(EmbeddingFailure {
+                            search_hash: hash,
+                            attempts: 1,
+                            error: None
+                        }))
+                    );
+
+                    Ok(())
+                })
+                .unwrap();
         }
         assert_eq!(service.files.config_reads.get(), 1);
         assert_eq!(service.provider.calls.get(), 2);
@@ -1579,13 +1927,19 @@ mod tests {
         let root = TempDir::new().unwrap();
         let files = Files::new(0);
         let captured = files.get_configured();
-        let mut storage = open_storage(&root);
+        let storage = open_storage(&root);
         storage
+            .vectors
             .reset_vectors(None, &captured.get_identity())
             .unwrap();
         let mut provider = Provider::new();
         provider.invalid_config = true;
-        let mut service = EmbeddingService::new(storage, files, MarkdownParser, provider);
+        let mut service = crate::service::embedding::tests::build_embedding_service(
+            storage,
+            files,
+            MarkdownParser,
+            provider,
+        );
         // When: a captured query is attempted.
         let result = service
             .embed_query_with_config(QueryEmbeddingRequest {
@@ -1601,43 +1955,126 @@ mod tests {
         assert_eq!(
             service
                 .storage
-                .begin_read_tx()
-                .unwrap()
-                .get_config_identity(),
+                .with_read_tx(|| service.storage.meta_get_by_id())
+                .unwrap(),
             Some(captured.get_identity())
         );
     }
 
-    fn open_storage(root: &TempDir) -> SqliteStorage {
-        SqliteStorage::open(&root.path().join("cache"), &root.path().join("vectors")).unwrap()
+    fn open_storage(root: &TempDir) -> TestDatabases {
+        crate::storage::open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
+            .unwrap()
     }
 
-    fn publish(storage: &mut SqliteStorage, files: &mut Files, path: &str, body: &str) -> Sha256 {
+    fn publish(storage: &mut TestDatabases, files: &mut Files, path: &str, body: &str) -> Sha256 {
         let bytes = format!("<!-- letopis: {{\"created_at\":1}} -->\n{body}").into_bytes();
         let mut parsed = parse(&RepoPath::parse(path).unwrap(), &bytes)
             .unwrap()
             .unwrap();
         let element = parsed.elements.remove(0);
-        let mut unit = storage.begin_cache_write_tx().unwrap();
-        unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
-            id: element.element.id.clone(),
-            uri: element.element.id,
-            kind: ElementKind::Vertex,
-            hash: element.element.hash,
-            created_at: 1,
-            source_snapshot: None,
-            lines: element.element.lines,
-            search_hash: element.search_hash,
-        }))
-        .unwrap();
-        unit.replace_text(&KnowledgeId::parse(path).unwrap(), &element.search_text)
+        storage
+            .cache
+            .with_write_tx(|| {
+                let unit = &storage.cache;
+                unit.nodes_upsert_by_id(&NodeMetadata::Knowledge(KnowledgeMetadata {
+                    id: element.element.id.clone(),
+                    uri: element.element.id,
+                    kind: ElementKind::Vertex,
+                    hash: element.element.hash,
+                    created_at: 1,
+                    source_snapshot: None,
+                    lines: element.element.lines,
+                    search_hash: element.search_hash,
+                }))
+                .unwrap();
+                unit.replace_text(&KnowledgeId::parse(path).unwrap(), &element.search_text)
+                    .unwrap();
+
+                unit.get_publication_revision()
+            })
             .unwrap();
-        unit.commit().unwrap();
         files.documents.insert(path.into(), bytes);
         element.search_hash
     }
 
     pub(super) fn reach_checkpoint(stage: &str) {
         process::reach_checkpoint(stage);
+    }
+    fn build_embedding_service<
+        F: EmbeddingFiles,
+        M: crate::service::MarkdownCodec,
+        P: EmbeddingProvider,
+    >(
+        storage: TestDatabases,
+        files: F,
+        markdown: M,
+        provider: P,
+    ) -> EmbeddingService<crate::storage::CacheStorage, crate::storage::VectorStorage, F, M, P>
+    {
+        let (cache, vectors) = (storage.cache, storage.vectors);
+        EmbeddingService::new(
+            std::rc::Rc::new(cache),
+            std::rc::Rc::new(vectors),
+            files,
+            markdown,
+            provider,
+        )
+    }
+    fn wire_test_embedder(
+        root: &std::path::Path,
+        storage: TestDatabases,
+    ) -> EmbeddingResult<impl Embedder + crate::service::EmbeddingExecutor + use<>> {
+        let (cache, vectors) = (storage.cache, storage.vectors);
+        crate::wire_embedder(root, std::rc::Rc::new(cache), std::rc::Rc::new(vectors))
+    }
+    struct ReservedQueryFixture {
+        service: EmbeddingService<
+            crate::storage::CacheStorage,
+            crate::storage::VectorStorage,
+            Files,
+            MarkdownParser,
+            Provider,
+        >,
+        // Keep database files alive until the service has closed its connections.
+        _root: TempDir,
+        hash: Sha256,
+        captured: EmbeddingConfig,
+    }
+    impl ReservedQueryFixture {
+        fn new() -> Self {
+            let root = TempDir::new().unwrap();
+            let mut storage = open_storage(&root);
+            let mut files = Files::new(0);
+            let hash = publish(&mut storage, &mut files, "a.md", "knowledge");
+            let captured = files.get_configured();
+            storage
+                .vectors
+                .reset_vectors(None, &captured.get_identity())
+                .unwrap();
+            storage
+                .vectors
+                .with_write_tx(&captured.get_identity(), || {
+                    let unit = &storage.vectors;
+                    unit.embed_failures_upsert_by_search_hash_and_attempts(&hash, 1)
+                        .unwrap();
+
+                    Ok::<_, StorageError>(())
+                })
+                .map(get_current)
+                .unwrap();
+            files.reject_config_reads = true;
+            let service = crate::service::embedding::tests::build_embedding_service(
+                storage,
+                files,
+                MarkdownParser,
+                Provider::new(),
+            );
+            Self {
+                service,
+                _root: root,
+                hash,
+                captured,
+            }
+        }
     }
 }

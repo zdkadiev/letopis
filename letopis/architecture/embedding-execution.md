@@ -1,10 +1,15 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"e6730713cdcf157bcb2294169c248f3b165a37f1"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"7d506ed54103d557f6da760bd189f084efb74dd5"} -->
 # Embedding execution
 
 `EmbeddingService` connects configuration, Markdown-derived search text, storage
 and an embedding provider through application interfaces. A missing, invalid,
 disabled or changed configuration can make the vector channel unavailable;
 full-text search remains available when query embeddings cannot be used.
+
+Query entry permits a pinned cache read but requires an inactive vector owner.
+An inherited cache write or any vector scope is rejected before provider calls;
+that owner becomes rollback-only even when the parent catches the rejection.
+The independent vector writer remains available for query diagnostics.
 
 For a query, the service validates the provider configuration, checks the active
 vector configuration and dimensions, calls the provider, then checks the vector

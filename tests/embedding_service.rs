@@ -1,12 +1,16 @@
+use crate::support::storage::get_current;
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
+use support::storage::{Databases, open_storage};
 mod support;
 use letopis::{
     domain::{Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, RepoPath, Sha256},
     markdown::parse,
-    open_embedding_files, open_storage,
+    open_embedding_files,
     service::{
         ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind, EmbeddingFailure,
         EmbeddingFiles, FileRow, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
-        QueryEmbeddingRequest, QueryError, Storage, VectorOutcome,
+        QueryEmbeddingRequest, QueryError, VectorOutcome,
     },
     wire_embedder,
 };
@@ -24,7 +28,7 @@ impl Fixture {
             root: TempDir::new().unwrap(),
         }
     }
-    fn open_storage(&self) -> impl Storage + use<> {
+    fn open_storage(&self) -> Databases<impl CacheDatabase + use<>, impl VectorDatabase + use<>> {
         open_storage(
             &self.root.path().join("cache"),
             &self.root.path().join("vectors"),
@@ -32,7 +36,7 @@ impl Fixture {
         .unwrap()
     }
     fn open_service(&self) -> impl Embedder + use<> {
-        wire_embedder(self.root.path(), self.open_storage()).unwrap()
+        open_service_at(self.root.path())
     }
     fn write_config(&self, url: &str, retries: u64) -> EmbeddingConfig {
         self.write_raw_config(
@@ -74,43 +78,49 @@ impl Fixture {
             .unwrap();
         let element = parsed.elements.into_iter().next().unwrap();
         let metadata = &element.element;
-        let mut storage = self.open_storage();
-        let mut unit = storage.begin_cache_write_tx().unwrap();
-        unit.delete_outgoing(&metadata.id).unwrap();
-        unit.upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
-            id: metadata.id.clone(),
-            uri: metadata.id.clone(),
-            kind: ElementKind::Vertex,
-            hash: Sha256::digest(text.as_bytes()),
-            created_at: 1,
-            source_snapshot: None,
-            lines: metadata.lines,
-            search_hash: element.search_hash,
-        }))
-        .unwrap();
-        unit.replace_text(&metadata.id, &element.search_text)
+        let storage = self.open_storage();
+        storage
+            .cache
+            .with_write_tx(|| {
+                let unit = &storage.cache;
+                unit.edges_delete_by_source_id(&metadata.id).unwrap();
+                unit.nodes_upsert_by_id(&NodeMetadata::Knowledge(KnowledgeMetadata {
+                    id: metadata.id.clone(),
+                    uri: metadata.id.clone(),
+                    kind: ElementKind::Vertex,
+                    hash: Sha256::digest(text.as_bytes()),
+                    created_at: 1,
+                    source_snapshot: None,
+                    lines: metadata.lines,
+                    search_hash: element.search_hash,
+                }))
+                .unwrap();
+                unit.replace_text(&metadata.id, &element.search_text)
+                    .unwrap();
+                unit.edges_save_by_source_id_and_target_id_and_type(
+                    &Edge::new(
+                        metadata.id.clone(),
+                        EdgeTarget::Knowledge(KnowledgeId::parse("dangling.md").unwrap()),
+                        EdgeType::parse("supports").unwrap(),
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+                unit.files_upsert_by_path(&FileRow {
+                    path: RepoPath::parse(path).unwrap(),
+                    size: u64::try_from(text.len()).unwrap(),
+                    mtime_ns: 0,
+                    inode: 1,
+                    hash: Sha256::digest(text.as_bytes()),
+                    checked_at_ns: 0,
+                    valid: true,
+                    error: None,
+                })
+                .unwrap();
+
+                unit.get_publication_revision()
+            })
             .unwrap();
-        unit.insert_edge(
-            &Edge::new(
-                metadata.id.clone(),
-                EdgeTarget::Knowledge(KnowledgeId::parse("dangling.md").unwrap()),
-                EdgeType::parse("supports").unwrap(),
-            )
-            .unwrap(),
-        )
-        .unwrap();
-        unit.upsert_file(&FileRow {
-            path: RepoPath::parse(path).unwrap(),
-            size: u64::try_from(text.len()).unwrap(),
-            mtime_ns: 0,
-            inode: 1,
-            hash: Sha256::digest(text.as_bytes()),
-            checked_at_ns: 0,
-            valid: true,
-            error: None,
-        })
-        .unwrap();
-        unit.commit().unwrap();
         element.search_hash
     }
     fn get_failure_by_search_hash(
@@ -119,11 +129,21 @@ impl Fixture {
         search_hash: &Sha256,
     ) -> Option<EmbeddingFailure> {
         unwrap_current(
-            self.open_storage()
-                .begin_read_tx()
-                .unwrap()
-                .get_failure_by_search_hash(&config.get_identity(), search_hash)
-                .unwrap(),
+            {
+                let scope_databases = self.open_storage();
+                scope_databases
+                    .cache
+                    .with_read_tx(|| {
+                        Ok::<_, StorageError>(
+                            scope_databases.cache.embed_failures_get_by_search_hash(
+                                &config.get_identity(),
+                                search_hash,
+                            ),
+                        )
+                    })
+                    .unwrap()
+            }
+            .unwrap(),
         )
     }
     fn get_vector_by_search_hash(
@@ -132,19 +152,34 @@ impl Fixture {
         search_hash: &Sha256,
     ) -> Option<Vec<f32>> {
         unwrap_current(
-            self.open_storage()
-                .begin_read_tx()
-                .unwrap()
-                .get_vector_by_search_hash(&config.get_identity(), search_hash)
-                .unwrap(),
+            {
+                let scope_databases = self.open_storage();
+                scope_databases
+                    .cache
+                    .with_read_tx(|| {
+                        Ok::<_, StorageError>(
+                            scope_databases.cache.vector_keys_get_vector_by_search_hash(
+                                &config.get_identity(),
+                                search_hash,
+                            ),
+                        )
+                    })
+                    .unwrap()
+            }
+            .unwrap(),
         )
     }
     fn get_query_error(&self) -> Option<QueryError> {
-        self.open_storage()
-            .begin_read_tx()
-            .unwrap()
-            .get_query_error()
-            .unwrap()
+        {
+            let scope_databases = self.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| {
+                    Ok::<_, StorageError>(scope_databases.cache.query_error_get_by_id())
+                })
+                .unwrap()
+        }
+        .unwrap()
     }
     fn capture_corpus(&self) -> Corpus {
         let db = Connection::open(self.root.path().join("cache")).unwrap();
@@ -180,15 +215,22 @@ impl Fixture {
             .map(|entry| (entry.file_name(), fs::read(entry.path()).unwrap()))
             .collect();
         files.sort();
-        let mut storage = self.open_storage();
-        let mut read = storage.begin_read_tx().unwrap();
-        let matches = read.get_text_matches_by_expression("knowledge").unwrap();
-        Corpus {
-            rows,
-            files,
-            matches: matches.into_iter().map(|item| item.id).collect(),
-            revision: read.get_revision(),
-        }
+        let storage = self.open_storage();
+        storage
+            .cache
+            .with_read_tx(|| {
+                Ok::<_, StorageError>({
+                    let read = &storage.cache;
+                    let matches = read.text_index_get_by_expression("knowledge").unwrap();
+                    Corpus {
+                        rows,
+                        files,
+                        matches: matches.into_iter().map(|item| item.id).collect(),
+                        revision: read.project_get_by_id().unwrap(),
+                    }
+                })
+            })
+            .unwrap()
     }
 }
 #[derive(Debug, PartialEq)]
@@ -540,15 +582,21 @@ fn query_success_clears_error_without_caching_or_document_attempts() {
     let server = start_success();
     let config = fixture.write_config(&server.get_base_url(), 0);
     let hash = fixture.publish("a.md", "knowledge");
-    let mut storage = fixture.open_storage();
-    storage.reset_vectors(None, &config.get_identity()).unwrap();
-    let mut unit = unwrap_current(
-        storage
-            .begin_vector_write_tx(&config.get_identity())
-            .unwrap(),
-    );
-    unit.set_query_error(1, "old failure").unwrap();
-    unit.commit().unwrap();
+    let storage = fixture.open_storage();
+    storage
+        .vectors
+        .reset_vectors(None, &config.get_identity())
+        .unwrap();
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let unit = &storage.vectors;
+            unit.query_error_upsert_by_id(1, "old failure").unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
     let before = fixture.capture_corpus();
     // When / Then: the query is embedded successfully; the error clears without caching or consuming document attempts.
     assert_eq!(
@@ -593,9 +641,12 @@ fn reservation_precedes_http_and_new_work_is_found_after_compute() {
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
     let old = fixture.publish("z.md", "old knowledge");
-    let mut service = fixture.open_service();
+    let service_root = fixture.root.path().to_path_buf();
+    let open_worker_service = move || open_service_at(&service_root);
     // When
-    let worker = Operation::spawn(barrier.clone(), move || service.drain().unwrap());
+    let worker = Operation::spawn(barrier.clone(), move || {
+        open_worker_service().drain().unwrap()
+    });
     barrier.wait_until_entered();
     // Then
     assert_eq!(
@@ -623,8 +674,11 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
     let old = fixture.publish("a.md", "old knowledge");
-    let mut service = fixture.open_service();
-    let worker = Operation::spawn(barrier.clone(), move || service.drain().unwrap());
+    let service_root = fixture.root.path().to_path_buf();
+    let open_worker_service = move || open_service_at(&service_root);
+    let worker = Operation::spawn(barrier.clone(), move || {
+        open_worker_service().drain().unwrap()
+    });
     barrier.wait_until_entered();
     fs::write(
         fixture.root.path().join("a.md"),
@@ -643,12 +697,24 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
     assert_eq!(fixture.get_vector_by_search_hash(&config, &new), None);
     assert!(
         unwrap_current(
-            fixture
-                .open_storage()
-                .begin_read_tx()
-                .unwrap()
-                .get_next_embedding_work_by_id_and_max_attempts(&config.get_identity(), 1, None)
-                .unwrap()
+            {
+                let scope_databases = fixture.open_storage();
+                scope_databases
+                    .cache
+                    .with_read_tx(|| {
+                        Ok::<_, StorageError>(
+                            scope_databases
+                                .cache
+                                .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                                    &config.get_identity(),
+                                    1,
+                                    None,
+                                ),
+                        )
+                    })
+                    .unwrap()
+            }
+            .unwrap()
         )
         .is_some()
     );
@@ -661,16 +727,26 @@ fn reset_during_http_discards_old_result_without_old_cleanup() {
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     fixture.write_config(&server.get_base_url(), 0);
     let hash = fixture.publish("a.md", "knowledge");
-    let mut service = fixture.open_service();
-    let worker = Operation::spawn(barrier.clone(), move || service.drain().unwrap());
+    let service_root = fixture.root.path().to_path_buf();
+    let open_worker_service = move || open_service_at(&service_root);
+    let worker = Operation::spawn(barrier.clone(), move || {
+        open_worker_service().drain().unwrap()
+    });
     barrier.wait_until_entered();
     let next = fixture.write_config(&server.get_base_url(), 1);
     fixture.open_service().get_configuration().unwrap();
-    let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(storage.begin_vector_write_tx(&next.get_identity()).unwrap());
-    unit.store_vector(&hash, &[1., 2., 3.], 3).unwrap();
-    unit.set_query_error(7, "current failure").unwrap();
-    unit.commit().unwrap();
+    let storage = fixture.open_storage();
+    storage
+        .vectors
+        .with_write_tx(&next.get_identity(), || {
+            let unit = &storage.vectors;
+            unit.store_vector(&hash, &[1., 2., 3.], 3).unwrap();
+            unit.query_error_upsert_by_id(7, "current failure").unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
     let before = fixture.capture_corpus();
     // When: the obsolete response arrives.
     barrier.release();
@@ -693,9 +769,10 @@ fn late_old_query_success_or_error_cannot_replace_new_query_state() {
         let (old_server, barrier) = start_paused(body);
         fixture.write_config(&old_server.get_base_url(), 0);
         fixture.publish("a.md", "knowledge");
-        let mut old_service = fixture.open_service();
+        let service_root = fixture.root.path().to_path_buf();
+        let open_worker_old_service = move || open_service_at(&service_root);
         let worker = Operation::spawn(barrier.clone(), move || {
-            old_service.embed_query("query").unwrap()
+            open_worker_old_service().embed_query("query").unwrap()
         });
         barrier.wait_until_entered();
         let new_server = if new_success {
@@ -727,19 +804,23 @@ fn query_rechecks_dimension_established_during_http() {
     let (server, barrier) = start_paused(r#"{"model":"fixture-alias","embeddings":[[1,2,3]]}"#);
     let config = fixture.write_config(&server.get_base_url(), 0);
     let hash = fixture.publish("a.md", "knowledge");
-    let mut service = fixture.open_service();
+    let service_root = fixture.root.path().to_path_buf();
+    let open_worker_service = move || open_service_at(&service_root);
     let worker = Operation::spawn(barrier.clone(), move || {
-        service.embed_query("query").unwrap()
+        open_worker_service().embed_query("query").unwrap()
     });
     barrier.wait_until_entered();
-    let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(
-        storage
-            .begin_vector_write_tx(&config.get_identity())
-            .unwrap(),
-    );
-    unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
-    unit.commit().unwrap();
+    let storage = fixture.open_storage();
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let unit = &storage.vectors;
+            unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
     let before = fixture.capture_corpus();
     // When: the query provider response returns.
     barrier.release();
@@ -763,24 +844,35 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     let exhausted = fixture.publish("b.md", "exhausted");
     let known = fixture.publish("c.md", "known");
     fs::write(fixture.root.path().join("a.md"), "unmarked").unwrap();
-    let mut storage = fixture.open_storage();
-    storage.reset_vectors(None, &config.get_identity()).unwrap();
-    let orphan = Sha256::digest(b"orphan");
-    let mut unit = unwrap_current(
-        storage
-            .begin_vector_write_tx(&config.get_identity())
-            .unwrap(),
-    );
-    unit.reserve_attempt(&exhausted, 2).unwrap();
-    unit.reserve_attempt(&exhausted, 2).unwrap();
-    unit.reserve_attempt(&skipped, 2).unwrap();
-    unit.record_failure(&skipped, "prior skipped failure")
+    let storage = fixture.open_storage();
+    storage
+        .vectors
+        .reset_vectors(None, &config.get_identity())
         .unwrap();
-    unit.reserve_attempt(&orphan, 2).unwrap();
-    unit.store_vector(&known, &[1., 2., 3.], 3).unwrap();
-    unit.record_failure(&exhausted, "failure").unwrap();
-    unit.store_vector(&orphan, &[1., 2., 3.], 3).unwrap();
-    unit.commit().unwrap();
+    let orphan = Sha256::digest(b"orphan");
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let unit = &storage.vectors;
+            unit.embed_failures_upsert_by_search_hash_and_attempts(&exhausted, 2)
+                .unwrap();
+            unit.embed_failures_upsert_by_search_hash_and_attempts(&exhausted, 2)
+                .unwrap();
+            unit.embed_failures_upsert_by_search_hash_and_attempts(&skipped, 2)
+                .unwrap();
+            unit.embed_failures_update_by_search_hash(&skipped, "prior skipped failure")
+                .unwrap();
+            unit.embed_failures_upsert_by_search_hash_and_attempts(&orphan, 2)
+                .unwrap();
+            unit.store_vector(&known, &[1., 2., 3.], 3).unwrap();
+            unit.embed_failures_update_by_search_hash(&exhausted, "failure")
+                .unwrap();
+            unit.store_vector(&orphan, &[1., 2., 3.], 3).unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
     let before = fixture.capture_corpus();
     // When / Then: the drain performs cleanup; referenced rows survive and orphans are removed.
     assert_eq!(
@@ -788,27 +880,21 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
         DrainOutcome::Complete
     );
     assert_eq!(fixture.get_vector_by_search_hash(&config, &orphan), None);
-    assert_eq!(
-        fixture
-            .get_failure_by_search_hash(&config, &exhausted)
-            .unwrap()
-            .attempts,
-        2
-    );
-    assert_eq!(
-        fixture
-            .get_failure_by_search_hash(&config, &skipped)
-            .unwrap()
-            .attempts,
-        1
-    );
+    let exhausted_failure = fixture
+        .get_failure_by_search_hash(&config, &exhausted)
+        .unwrap();
+    let skipped_failure = fixture
+        .get_failure_by_search_hash(&config, &skipped)
+        .unwrap();
+    assert_eq!(exhausted_failure.attempts, 2);
+    assert_eq!(skipped_failure.attempts, 1);
     assert_eq!(fixture.get_failure_by_search_hash(&config, &orphan), None);
     assert!(fixture.get_vector_by_search_hash(&config, &known).is_some());
+    let id = EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap());
     assert!(
         storage
-            .begin_read_tx()
-            .unwrap()
-            .get_node_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
+            .cache
+            .with_read_tx(|| storage.cache.nodes_get_by_id(&id))
             .unwrap()
             .is_some()
     );
@@ -905,9 +991,10 @@ fn captured_query_preserves_replacement_diagnostics_after_http() {
         let (server, barrier) = start_paused(body);
         let captured = fixture.write_config(&server.get_base_url(), 0);
         fixture.open_service().get_configuration().unwrap();
-        let mut service = fixture.open_service();
+        let service_root = fixture.root.path().to_path_buf();
+        let open_worker_service = move || open_service_at(&service_root);
         let worker = Operation::spawn(barrier.clone(), move || {
-            service
+            open_worker_service()
                 .embed_query_with_config(QueryEmbeddingRequest {
                     text: "query",
                     config: &captured,
@@ -967,10 +1054,11 @@ fn captured_query_rejects_dimensions_established_during_http() {
     let hash = fixture.publish("a.md", "knowledge");
     fixture.open_service().get_configuration().unwrap();
     let config = captured.clone();
-    let mut service = fixture.open_service();
+    let service_root = fixture.root.path().to_path_buf();
+    let open_worker_service = move || open_service_at(&service_root);
     // When: the captured query response returns.
     let worker = Operation::spawn(barrier.clone(), move || {
-        service
+        open_worker_service()
             .embed_query_with_config(QueryEmbeddingRequest {
                 text: "query",
                 config: &captured,
@@ -979,14 +1067,17 @@ fn captured_query_rejects_dimensions_established_during_http() {
             .unwrap()
     });
     barrier.wait_until_entered();
-    let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(
-        storage
-            .begin_vector_write_tx(&config.get_identity())
-            .unwrap(),
-    );
-    unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
-    unit.commit().unwrap();
+    let storage = fixture.open_storage();
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let unit = &storage.vectors;
+            unit.store_vector(&hash, &[1., 2., 3., 4.], 4).unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
     barrier.release();
     // Then: the newly established native dimensions are enforced.
     assert_eq!(worker.join().unwrap(), QueryEmbedding::Unavailable);
@@ -1044,18 +1135,27 @@ fn captured_query_diagnostic_write_failure_remains_an_error() {
 }
 
 fn seed_query_error(fixture: &Fixture, config: &EmbeddingConfig) {
-    let mut storage = fixture.open_storage();
-    let observed = storage.begin_read_tx().unwrap().get_config_identity();
+    let storage = fixture.open_storage();
+    let observed = storage
+        .cache
+        .with_read_tx(|| Ok::<_, StorageError>(storage.cache.meta_get_by_id()))
+        .unwrap()
+        .unwrap();
     storage
+        .vectors
         .reset_vectors(observed.as_ref(), &config.get_identity())
         .unwrap();
-    let mut unit = unwrap_current(
-        storage
-            .begin_vector_write_tx(&config.get_identity())
-            .unwrap(),
-    );
-    unit.set_query_error(7, "replacement diagnostic").unwrap();
-    unit.commit().unwrap();
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let unit = &storage.vectors;
+            unit.query_error_upsert_by_id(7, "replacement diagnostic")
+                .unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
 }
 
 fn start_success() -> HttpFixture {
@@ -1084,15 +1184,22 @@ fn start_paused(body: &str) -> (HttpFixture, ResponseBarrier) {
 }
 
 fn exhaust_attempt(fixture: &Fixture, config: &EmbeddingConfig, search_hash: &Sha256) {
-    let mut storage = fixture.open_storage();
-    let mut unit = unwrap_current(
-        storage
-            .begin_vector_write_tx(&config.get_identity())
-            .unwrap(),
-    );
-    assert!(unit.reserve_attempt(search_hash, 1).unwrap());
-    unit.record_failure(search_hash, "safe failure").unwrap();
-    unit.commit().unwrap();
+    let storage = fixture.open_storage();
+    storage
+        .vectors
+        .with_write_tx(&config.get_identity(), || {
+            let unit = &storage.vectors;
+            assert!(
+                unit.embed_failures_upsert_by_search_hash_and_attempts(search_hash, 1)
+                    .unwrap()
+            );
+            unit.embed_failures_update_by_search_hash(search_hash, "safe failure")
+                .unwrap();
+
+            Ok::<_, StorageError>(())
+        })
+        .map(get_current)
+        .unwrap();
 }
 
 fn unwrap_current<T>(value: VectorOutcome<T>) -> T {
@@ -1100,4 +1207,10 @@ fn unwrap_current<T>(value: VectorOutcome<T>) -> T {
         VectorOutcome::Current(value) => value,
         VectorOutcome::ConfigChanged => panic!("unexpected configuration change"),
     }
+}
+
+fn open_service_at(root: &std::path::Path) -> impl Embedder + use<> {
+    let (vectors, cache) =
+        letopis::open_storage(&root.join("cache"), &root.join("vectors")).unwrap();
+    wire_embedder(root, std::rc::Rc::new(cache), std::rc::Rc::new(vectors)).unwrap()
 }
