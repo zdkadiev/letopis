@@ -20,6 +20,7 @@ COPY tests/support ./tests/support
 COPY tests/fixtures/markdown ./tests/fixtures/markdown
 COPY tests/fixtures/git ./tests/fixtures/git
 COPY tests/fixtures/config ./tests/fixtures/config
+COPY tests/fixtures/storage ./tests/fixtures/storage
 COPY tests/storage ./tests/storage
 ARG SOURCE_COMMIT=unknown
 RUN echo "$SOURCE_COMMIT" > SOURCE_COMMIT && cargo fetch --locked

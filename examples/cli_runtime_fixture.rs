@@ -2,8 +2,8 @@
 use letopis::{
     open_filesystem, open_storage,
     service::{
-        BackgroundRunner, CommandError, CommandErrorKind, CommandResult, EmbedLocker,
-        EmbeddingExecutor, FileSystem, Refresher,
+        BackgroundRunner, CommandError, CommandErrorKind, CommandResult, EmbeddingExecutor,
+        FileLocker, Refresher,
     },
     wire_background_runner, wire_document_refresher, wire_embedding_executor,
 };
@@ -47,7 +47,7 @@ impl FixtureTasks {
             return Err("missing acquire barrier".into());
         }
         let files = open_filesystem(&self.root)?;
-        let lease = files.try_lock_embed()?;
+        let lease = files.lock_try_acquire_by_path(Path::new(".letopis/embed.lock"))?;
         send_event(
             control.get_mut(),
             &json!({"event": "ownership", "owned": lease.is_some()}),
@@ -171,7 +171,7 @@ fn run_foreground(root: &Path) -> Result<(), Box<dyn Error>> {
         &root.join(".letopis/vectors.db"),
     )?;
     let files = open_filesystem(root)?;
-    let _index = files.lock_index()?;
+    let _index = files.lock_acquire_by_path(Path::new(".letopis/index.lock"))?;
     let executable = env::var_os("LETOPIS_FIXTURE_EXECUTABLE")
         .map_or_else(env::current_exe, |value| Ok(PathBuf::from(value)))?;
     let mut tasks = FixtureTasks {

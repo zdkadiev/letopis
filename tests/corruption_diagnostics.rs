@@ -1,6 +1,6 @@
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 
-use letopis::service::Storage;
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -145,8 +145,14 @@ fn assert_successful_status(repo: &ReadingRepo, revision: u64) {
 }
 
 fn assert_revision(repo: &ReadingRepo, expected: u64) {
-    let mut storage = repo.open_storage();
-    assert_eq!(storage.begin_read_tx().unwrap().get_revision(), expected);
+    let storage = repo.open_storage();
+    assert_eq!(
+        storage
+            .cache
+            .with_read_tx(|| storage.cache.project_get_by_id())
+            .unwrap(),
+        expected
+    );
 }
 
 fn capture_databases(repo: &ReadingRepo) -> (Vec<u8>, Vec<u8>) {

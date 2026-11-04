@@ -1,6 +1,6 @@
 use super::{
-    CommandError, CommandErrorKind, CommandProblem, CommandResult, DiagnosticKind, FileRow,
-    GraphDiagnostics, NodeMetadata, StorageError, StorageRead,
+    CacheDatabase, CommandError, CommandErrorKind, CommandProblem, CommandResult, DiagnosticKind,
+    FileRow, GraphDiagnostics, NodeMetadata, StorageError,
 };
 use crate::domain::{GraphProblem, KnowledgeId, RepoPath, find_graph_problems};
 use serde_json::Value;
@@ -24,45 +24,54 @@ const PARSER_KINDS: [DiagnosticKind; 10] = [
 ];
 
 /// Derives safe current findings from a caller-owned read view.
-#[derive(Debug, Default)]
-pub(crate) struct GraphDiagnosticsService;
+#[derive(Debug)]
+pub(crate) struct GraphDiagnosticsService<C> {
+    storage: std::rc::Rc<C>,
+}
 
-impl GraphDiagnosticsService {
-    pub(crate) fn new() -> Self {
-        Self
+impl<C> GraphDiagnosticsService<C> {
+    pub(crate) fn new(storage: std::rc::Rc<C>) -> Self {
+        Self { storage }
     }
 }
 
-impl GraphDiagnostics for GraphDiagnosticsService {
-    fn find_problems(
-        &self,
-        view: &mut dyn StorageRead,
-        paths: &[RepoPath],
-    ) -> CommandResult<Vec<CommandProblem>> {
-        let nodes = view.get_nodes().map_err(map_read_error)?;
-        let edges = view.get_edges_by_source_id(None).map_err(map_read_error)?;
-        let files = view.get_files().map_err(map_read_error)?;
-        let knowledge: BTreeSet<KnowledgeId> = nodes
-            .into_iter()
-            .filter_map(|node| match node.metadata {
-                NodeMetadata::Knowledge(metadata) => Some(metadata.id),
-                NodeMetadata::Source(_) => None,
+impl<C: CacheDatabase> GraphDiagnostics for GraphDiagnosticsService<C> {
+    fn find_problems(&self, paths: &[RepoPath]) -> CommandResult<Vec<CommandProblem>> {
+        self.storage
+            .with_read_tx(|| {
+                let nodes = self.storage.nodes_get().map_err(map_read_error)?;
+                let edges = self
+                    .storage
+                    .edges_get_by_source_id(None)
+                    .map_err(map_read_error)?;
+                let files = self.storage.files_get().map_err(map_read_error)?;
+                let knowledge: BTreeSet<KnowledgeId> = nodes
+                    .into_iter()
+                    .filter_map(|node| match node.metadata {
+                        NodeMetadata::Knowledge(metadata) => Some(metadata.id),
+                        NodeMetadata::Source(_) => None,
+                    })
+                    .collect();
+                let edges = edges.into_iter().collect();
+                let mut problems: Vec<CommandProblem> = files
+                    .iter()
+                    .filter(|file| !file.valid)
+                    .map(format_invalid_file)
+                    .collect();
+                for problem in find_graph_problems(&knowledge, &edges) {
+                    problems.extend(format_graph_problem(&problem));
+                }
+                let selected: BTreeSet<&str> = paths.iter().map(RepoPath::as_str).collect();
+                problems.retain(|problem| {
+                    selected.is_empty() || selected.contains(get_detail(problem, PATH))
+                });
+                problems.sort_by(|left, right| get_sort_key(left).cmp(&get_sort_key(right)));
+                Ok(problems)
             })
-            .collect();
-        let edges = edges.into_iter().collect();
-        let mut problems: Vec<CommandProblem> = files
-            .iter()
-            .filter(|file| !file.valid)
-            .map(format_invalid_file)
-            .collect();
-        for problem in find_graph_problems(&knowledge, &edges) {
-            problems.extend(format_graph_problem(&problem));
-        }
-        let selected: BTreeSet<&str> = paths.iter().map(RepoPath::as_str).collect();
-        problems
-            .retain(|problem| selected.is_empty() || selected.contains(get_detail(problem, PATH)));
-        problems.sort_by(|left, right| get_sort_key(left).cmp(&get_sort_key(right)));
-        Ok(problems)
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => map_read_error(error),
+            })
     }
 }
 
@@ -153,16 +162,17 @@ fn get_detail<'a>(problem: &'a CommandProblem, key: &str) -> &'a str {
 
 #[cfg(test)]
 mod tests {
+
     use super::{GraphDiagnosticsService, format_invalid_file, map_read_error};
     use crate::{
         domain::{
             Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, LineRange, RepoPath, Sha256,
         },
-        open_storage,
         service::{
-            CommandErrorKind, DiagnosticKind, FileRow, GraphDiagnostics, KnowledgeMetadata,
-            NodeMetadata, Storage, StorageError, StorageErrorKind,
+            CacheDatabase, CommandErrorKind, DiagnosticKind, FileRow, GraphDiagnostics,
+            KnowledgeMetadata, NodeMetadata, StorageError, StorageErrorKind,
         },
+        storage::open_test_storage as open_storage,
     };
     use serde_json::json;
     use std::{error::Error, io};
@@ -294,19 +304,19 @@ mod tests {
     fn finds_cross_file_cycle_before_filtering_and_deduplicates_selectors() {
         // Given: a cross-file cycle and repeated selectors.
         let root = TempDir::new().unwrap();
-        let mut storage =
+        let storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         seed_graph(
-            &mut storage,
+            &storage,
             &["a.md", "b.md"],
             &[("a.md", "b.md"), ("b.md", "a.md")],
         );
-        let mut view = storage.begin_read_tx().unwrap();
+        let cache = std::rc::Rc::new(storage.cache);
         let selected = RepoPath::parse("a.md").unwrap();
 
         // When: graph diagnostics run with the selected owners.
-        let problems = GraphDiagnosticsService::new()
-            .find_problems(view.as_mut(), &[selected.clone(), selected])
+        let problems = GraphDiagnosticsService::new(cache)
+            .find_problems(&[selected.clone(), selected])
             .unwrap();
 
         // Then: the cycle is found once before owner filtering.
@@ -329,10 +339,10 @@ mod tests {
     fn keeps_two_components_in_one_file_with_minimum_local_representatives() {
         // Given: two graph components owned by one file.
         let root = TempDir::new().unwrap();
-        let mut storage =
+        let storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         seed_graph(
-            &mut storage,
+            &storage,
             &["a.md#a", "a.md#b", "a.md#c", "b.md"],
             &[
                 ("a.md#a", "a.md#b"),
@@ -341,11 +351,11 @@ mod tests {
                 ("b.md", "a.md#c"),
             ],
         );
-        let mut view = storage.begin_read_tx().unwrap();
+        let cache = std::rc::Rc::new(storage.cache);
 
         // When: graph diagnostics inspect both components.
-        let problems = GraphDiagnosticsService::new()
-            .find_problems(view.as_mut(), &[])
+        let problems = GraphDiagnosticsService::new(cache)
+            .find_problems(&[])
             .unwrap();
 
         let details: Vec<_> = problems.iter().map(|problem| &problem.details).collect();
@@ -364,26 +374,32 @@ mod tests {
     fn orders_file_graph_and_distinct_anchor_findings_by_safe_context() {
         // Given: file, graph and distinct anchor problems.
         let root = TempDir::new().unwrap();
-        let mut storage =
+        let storage =
             open_storage(&root.path().join("cache"), &root.path().join("vectors")).unwrap();
         seed_graph(
-            &mut storage,
+            &storage,
             &["a.md#a", "a.md#b", "b.md"],
             &[("a.md#a", "z.md"), ("a.md#a", "x.md"), ("a.md#b", "x.md")],
         );
-        let mut write = storage.begin_cache_write_tx().unwrap();
-        write
-            .upsert_file(&build_invalid_file("a.md", Some("SECRET_RAW_BODY")))
+        storage
+            .cache
+            .with_write_tx(|| {
+                let write = &storage.cache;
+                write
+                    .files_upsert_by_path(&build_invalid_file("a.md", Some("SECRET_RAW_BODY")))
+                    .unwrap();
+                write
+                    .files_upsert_by_path(&build_invalid_file("z.md", Some("invalid graph target")))
+                    .unwrap();
+
+                write.get_publication_revision()
+            })
             .unwrap();
-        write
-            .upsert_file(&build_invalid_file("z.md", Some("invalid graph target")))
-            .unwrap();
-        write.commit().unwrap();
-        let mut view = storage.begin_read_tx().unwrap();
+        let cache = std::rc::Rc::new(storage.cache);
 
         // When: graph diagnostics collect the findings.
-        let problems = GraphDiagnosticsService::new()
-            .find_problems(view.as_mut(), &[])
+        let problems = GraphDiagnosticsService::new(cache)
+            .find_problems(&[])
             .unwrap();
 
         let details: Vec<_> = problems.iter().map(|problem| &problem.details).collect();
@@ -407,36 +423,42 @@ mod tests {
         assert!(!format!("{problems:?}").contains("SECRET_RAW_BODY"));
     }
 
-    fn seed_graph<S: Storage>(storage: &mut S, nodes: &[&str], edges: &[(&str, &str)]) {
-        let mut write = storage.begin_cache_write_tx().unwrap();
-        for raw in nodes {
-            let id = KnowledgeId::parse(raw).unwrap();
-            write
-                .upsert_node(&NodeMetadata::Knowledge(KnowledgeMetadata {
-                    uri: id.clone(),
-                    id,
-                    kind: ElementKind::Vertex,
-                    hash: Sha256::digest(b"text"),
-                    created_at: 1,
-                    source_snapshot: None,
-                    lines: LineRange::new(1, 1).unwrap(),
-                    search_hash: Sha256::digest(b"text"),
-                }))
-                .unwrap();
-        }
-        for (source, target) in edges {
-            write
-                .insert_edge(
-                    &Edge::new(
-                        KnowledgeId::parse(source).unwrap(),
-                        EdgeTarget::Knowledge(KnowledgeId::parse(target).unwrap()),
-                        EdgeType::parse("includes").unwrap(),
-                    )
-                    .unwrap(),
-                )
-                .unwrap();
-        }
-        write.commit().unwrap();
+    fn seed_graph(storage: &crate::storage::TestDatabases, nodes: &[&str], edges: &[(&str, &str)]) {
+        storage
+            .cache
+            .with_write_tx(|| {
+                let write = &storage.cache;
+                for raw in nodes {
+                    let id = KnowledgeId::parse(raw).unwrap();
+                    write
+                        .nodes_upsert_by_id(&NodeMetadata::Knowledge(KnowledgeMetadata {
+                            uri: id.clone(),
+                            id,
+                            kind: ElementKind::Vertex,
+                            hash: Sha256::digest(b"text"),
+                            created_at: 1,
+                            source_snapshot: None,
+                            lines: LineRange::new(1, 1).unwrap(),
+                            search_hash: Sha256::digest(b"text"),
+                        }))
+                        .unwrap();
+                }
+                for (source, target) in edges {
+                    write
+                        .edges_save_by_source_id_and_target_id_and_type(
+                            &Edge::new(
+                                KnowledgeId::parse(source).unwrap(),
+                                EdgeTarget::Knowledge(KnowledgeId::parse(target).unwrap()),
+                                EdgeType::parse("includes").unwrap(),
+                            )
+                            .unwrap(),
+                        )
+                        .unwrap();
+                }
+
+                write.get_publication_revision()
+            })
+            .unwrap();
     }
 
     fn build_invalid_file(path: &str, error: Option<&str>) -> FileRow {

@@ -1,7 +1,7 @@
 mod support;
 use letopis::{
     domain::RepoPath,
-    markdown::{DiagnosticKind, parse},
+    markdown::{self, DiagnosticKind},
 };
 use support::{assert_error, build_whole_file, parse_file};
 
@@ -64,7 +64,7 @@ fn rejects_legacy_titles() {
     ] {
         let text = build_whole_file(&format!("[x](b.md \"{title}\")"));
         // When: parse a recognized Letopis declaration.
-        let result = parse(&path, text.as_bytes());
+        let result = markdown::file_parse(&path, text.as_bytes());
         // Then: malformed titles invalidate the whole file.
         assert_error(result, DiagnosticKind::InvalidLinkTitle);
     }
@@ -139,7 +139,7 @@ fn rejects_mismatched_and_unsupported_navigation_paths() {
             "[x]({destination} \"letopis:type=external;path=src/cache.rs\")"
         ));
         // When: resolve local navigation relative to the containing file.
-        let result = parse(&path, text.as_bytes());
+        let result = markdown::file_parse(&path, text.as_bytes());
         // Then: failures use a safe, stable reason rather than exposing either path.
         let errors = result.unwrap_err();
         assert_eq!(
@@ -176,7 +176,7 @@ fn rejects_bad_metadata_before_comparing_navigation() {
             "[x](unrelated.md \"letopis:type={kind};path={target}\")"
         ));
         // When: canonical target parsing precedes comparison.
-        let result = parse(&path, text.as_bytes());
+        let result = markdown::file_parse(&path, text.as_bytes());
         // Then: target grammar retains its own diagnostic.
         assert_error(result, DiagnosticKind::InvalidTarget);
     }
@@ -196,7 +196,7 @@ fn rejects_encoded_separators_even_when_decoding_would_match() {
             "[x]({destination} \"letopis:type=external;path={target}\")"
         ));
         // When: comparison rejects unsupported navigation syntax before matching.
-        let result = parse(&path, text.as_bytes());
+        let result = markdown::file_parse(&path, text.as_bytes());
         // Then: the exact canonical target cannot authorize ambiguous navigation.
         assert_error(result, DiagnosticKind::LinkPathMismatch);
     }

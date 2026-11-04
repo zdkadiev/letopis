@@ -4,25 +4,368 @@ pub mod types;
 use crate::domain::{
     BlobOid, Edge, EdgeTarget, Graph, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid,
 };
+pub use error::TransactionError;
 pub use error::{
     CommandError, CommandErrorKind, CommandProblem, CommandResult, Diagnostic, DiagnosticKind,
     DocumentError, DocumentErrorKind, DocumentResult, EmbeddingError, EmbeddingErrorKind,
-    EmbeddingFailure, EmbeddingResult, QueryError, ServiceError, ServiceErrorKind, ServiceResult,
+    EmbeddingFailure, EmbeddingResult, FileError, FileErrorKind, FileResult, GitError, GitResult,
+    ProcessError, ProcessResult, QueryError, ServiceError, ServiceErrorKind, ServiceResult,
     SnapshotError, SnapshotErrorKind, StorageError, StorageErrorKind, StorageResult,
 };
-use std::{collections::BTreeSet, num::NonZeroUsize, os::fd::OwnedFd, path::Path, time::Duration};
+use std::{
+    collections::BTreeSet,
+    num::{NonZeroU32, NonZeroUsize},
+    os::fd::OwnedFd,
+    path::Path,
+    time::Duration,
+};
+
+/// Synchronous wall-clock observations and bounded waits.
+/// Implementations report failed or unrepresentable time observations as I/O errors.
+pub trait Clock: std::fmt::Debug {
+    /// Observe nanoseconds since the Unix epoch.
+    /// # Errors
+    /// Reports clock or signed nanosecond representation failures.
+    fn clock_get_time_ns(&self) -> std::io::Result<i64>;
+    /// Observe seconds since the Unix epoch.
+    /// # Errors
+    /// Reports clock failures.
+    fn clock_get_time_secs(&self) -> std::io::Result<u64>;
+    /// Wait synchronously for the requested duration.
+    /// # Errors
+    /// Reports an interrupted or otherwise unsuccessful wait.
+    fn clock_wait(&self, delay: Duration) -> std::io::Result<()>;
+}
+
+/// Confined, observational file operations rooted at one pinned directory.
+///
+/// Paths are relative and may not escape the root. Reads never create entries
+/// or change permissions. Missing regular files return `None`; stable nonregular
+/// leaves return `NonRegular`, while unsafe parents and failed I/O remain errors.
+/// Explicit directory observations pin identities for subsequent operations;
+/// ordinary per-file traversal retains descriptors only for that operation.
+#[cfg_attr(test, mockall::automock)]
+pub trait FileReader {
+    /// Observe final symlink presence without following any component or reading bytes.
+    /// Missing entries return false; directories and other nonsymlinks return false.
+    /// Verify the leaf identity and ancestry before returning, including absent entries.
+    ///
+    /// # Errors
+    /// Reports unsafe parents, replacements, invalid relative paths or I/O failures.
+    fn symlink_is_exist(&self, path: &Path) -> FileResult<bool>;
+
+    /// Capture regular bytes, verifying identity and content observations around I/O.
+    /// Verify leaf stability and ancestry before classifying nonregular exclusions;
+    /// replacing an observed regular leaf always remains an integrity failure.
+    ///
+    /// # Errors
+    /// Reports nonregular leaves, unsafe paths, changes, clock or I/O failures.
+    fn file_get_by_path(&self, path: &Path) -> FileResult<Option<CapturedFile>>;
+    /// Read regular file bytes with the same identity, content and ancestry checks as capture.
+    /// This operation does not sample the clock or require representable index metadata.
+    ///
+    /// # Errors
+    /// Reports nonregular leaves, unsafe paths, changes or I/O failures.
+    fn file_get_bytes_by_path(&self, path: &Path) -> FileResult<Option<Vec<u8>>>;
+    /// Observe a regular file's metadata without reading its body.
+    ///
+    /// # Errors
+    /// Reports nonregular leaves, unsafe paths, changing observations or I/O failures.
+    fn file_get_stat_by_path(&self, path: &Path) -> FileResult<Option<FileStat>>;
+    /// Observe stable regular-file identity without reading bytes or comparing content.
+    ///
+    /// # Errors
+    /// Reports nonregular leaves, unsafe paths, identity changes or I/O failures.
+    fn file_get_identity_by_path(&self, path: &Path) -> FileResult<Option<FileIdentity>>;
+    /// Return regular-file presence using metadata only; absence is the only false result.
+    ///
+    /// # Errors
+    /// Preserves nonregular, unsafe-path, replacement and I/O failures.
+    fn file_is_exist(&self, path: &Path) -> FileResult<bool>;
+    /// Verify an original identity still exists; an absent original permits safe creation.
+    ///
+    /// # Errors
+    /// Reports replacement/deletion of an original or any unsafe current entry.
+    fn file_verify_identity_by_path(
+        &self,
+        path: &Path,
+        identity: Option<FileIdentity>,
+    ) -> FileResult<()>;
+    /// Require distinct normalized paths and, when present, distinct regular-file identities.
+    ///
+    /// # Errors
+    /// Reports aliases, unsafe/nonregular entries or observation failures.
+    fn file_verify_distinct_by_paths(
+        &self,
+        first_path: &Path,
+        second_path: &Path,
+    ) -> FileResult<()>;
+    /// Pin an existing directory identity and return an owned duplicate, or absence.
+    /// The path `.` selects the root; this operation never creates or chmods entries.
+    ///
+    /// # Errors
+    /// Reports unsafe or changed directories, and I/O failures.
+    fn directory_get_by_path(&self, path: &Path) -> FileResult<Option<OwnedFd>>;
+    /// Observe a held file lock's bounded nonzero PID without creating or writing state.
+    /// An absent or currently unheld lock returns `None`.
+    ///
+    /// # Errors
+    /// Reports unsafe/nonregular/aliased locks, changes, malformed owners or I/O failures.
+    fn lock_get_owner_by_path(&self, path: &Path) -> FileResult<Option<NonZeroU32>>;
+}
+
+/// Private, durable file publication and directory creation under the reader's root.
+pub trait FileWriter: FileReader {
+    /// Publish complete mode-0600 bytes atomically if absent; preserve an existing winner.
+    /// Sync file data before publication and the parent directory before success.
+    ///
+    /// # Errors
+    /// Reports absent parents, unsafe/nonregular destinations, changes or I/O failures.
+    /// A failure preserves existing entries and may leave a complete published winner.
+    fn file_create_if_absent_by_path(&self, path: &Path, bytes: &[u8]) -> FileResult<()>;
+    /// Create missing directory components with mode 0700 and protect the final directory.
+    /// Pin the final identity; existing ancestors retain their permissions.
+    ///
+    /// # Errors
+    /// Reports unsafe or changed entries, permission or other I/O failures.
+    fn directory_create_by_path(&self, path: &Path) -> FileResult<OwnedFd>;
+    /// Verify and sync an existing directory without creating entries or changing modes.
+    ///
+    /// # Errors
+    /// Reports absence, unsafe/replaced directories or durability failures.
+    fn directory_sync_by_path(&self, path: &Path) -> FileResult<()>;
+}
+
+/// Persistent kernel file locks with exclusive ownership and bounded PID metadata.
+/// Acquisition may create private parents and lock files; names remain caller-selected.
+/// Owners unlock before closing, and acquisition never replaces an existing inode.
+pub trait FileLocker {
+    /// Actual RAII capability retaining the held kernel lock until dropped.
+    type Lock;
+    /// Wait for exclusive ownership, verify identities, then record this process's PID.
+    ///
+    /// # Errors
+    /// Reports unsafe/nonregular/aliased entries, changes, permission or I/O failures.
+    fn lock_acquire_by_path(&self, path: &Path) -> FileResult<Self::Lock>;
+    /// Try exclusive ownership without waiting; return `None` only for real contention.
+    ///
+    /// # Errors
+    /// Reports unsafe/nonregular/aliased entries, changes, permission or I/O failures.
+    fn lock_try_acquire_by_path(&self, path: &Path) -> FileResult<Option<Self::Lock>>;
+}
+
+/// Scoped operations on a shared cache database.
+///
+/// Callbacks take no transaction argument and use this owner for operations.
+/// Same-instance nested scopes join; only the outer scope finalizes. A caught
+/// nested error, failed write or panic makes the outer scope rollback-only.
+/// Reads inside writes see uncommitted data; writes inside reads are rejected
+/// and poison that scope. Ordinary operations require an active scope; writes
+/// require a write scope. Reads pin cache revision and attached vector identity
+/// before invoking the callback. Different owners never join. Failed cleanup
+/// that leaves a transaction active disables later scopes on that owner.
+/// Observation-only owners cannot write; absent status skips its callback
+/// without opening a connection or creating a durable file.
+pub trait CacheDatabase: StorageRead + GraphRead {
+    /// Verify a use case's entry requirement without opening a transaction.
+    /// An incompatible active scope becomes rollback-only, even if the caller
+    /// catches the error. Inactive storage satisfies either requirement.
+    ///
+    /// # Errors
+    /// Rejects incompatible active scopes and failed or disabled owners.
+    fn verify_transaction_scope(&self, requirement: TransactionRequirement) -> StorageResult<()>;
+
+    /// Execute status observation in a pinned view, skipping unpublished state.
+    ///
+    /// # Errors
+    /// Returns operation errors, malformed metadata or transaction failures.
+    fn with_status_read_tx<T, E, F>(&self, operation: F) -> Result<Option<T>, TransactionError<E>>
+    where
+        F: FnOnce() -> Result<T, E>;
+    /// Execute an operation within one pinned cache read view.
+    ///
+    /// # Errors
+    /// Returns the operation error or a storage transaction failure.
+    fn with_read_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+    where
+        F: FnOnce() -> Result<T, E>;
+    /// Return the provisional revision that the active write will publish on commit.
+    ///
+    /// # Errors
+    /// Rejects calls outside a write scope and revisions that cannot be incremented.
+    fn get_publication_revision(&self) -> StorageResult<u64>;
+    /// Execute and atomically commit a cache write scope.
+    ///
+    /// # Errors
+    /// Returns the operation error or a storage transaction failure.
+    fn with_write_tx<T, E, F>(&self, operation: F) -> Result<T, TransactionError<E>>
+    where
+        F: FnOnce() -> Result<T, E>;
+    /// Insert or replace metadata while preserving its row ID.
+    ///
+    /// # Errors
+    /// Rejects unsupported numeric values or database failures.
+    fn nodes_upsert_by_id(&self, node: &NodeMetadata) -> StorageResult<i64>;
+    /// Insert a declared edge, including a dangling target.
+    ///
+    /// # Errors
+    /// Rejects duplicate edges and missing sources; reports database failures.
+    fn edges_save_by_source_id_and_target_id_and_type(&self, edge: &Edge) -> StorageResult<()>;
+    /// Remove all declarations owned by a knowledge element.
+    ///
+    /// # Errors
+    /// Reports database failures.
+    fn edges_delete_by_source_id(&self, source_id: &KnowledgeId) -> StorageResult<()>;
+    /// Delete a node and its FTS entry, preserving incoming edges.
+    ///
+    /// # Errors
+    /// Rejects deletion while outgoing edges remain; reports database failures.
+    fn delete_node(&self, id: &EdgeTarget) -> StorageResult<()>;
+    /// Replace a knowledge element's contentless FTS entry.
+    ///
+    /// # Errors
+    /// Returns not found for absent knowledge, or a database failure.
+    fn replace_text(&self, id: &KnowledgeId, text: &str) -> StorageResult<()>;
+    /// Replace a Markdown candidate's state.
+    ///
+    /// # Errors
+    /// Rejects unsupported numbers and inconsistent validity; reports database failures.
+    fn files_upsert_by_path(&self, file: &FileRow) -> StorageResult<()>;
+    /// Remove a candidate's state.
+    ///
+    /// # Errors
+    /// Reports database failures.
+    fn files_delete_by_path(&self, path: &RepoPath) -> StorageResult<()>;
+}
+
+/// Scoped operations on a shared vector database.
+///
+/// Same-instance nested scopes join and only the outer scope finalizes. Caught
+/// nested errors, failed writes and panic prevent commit; writes cannot upgrade
+/// reads. Operations require an active scope on this owner and writes require a
+/// write scope. Identity mismatch skips the callback and returns `ConfigChanged`,
+/// preserving compatible outer work. Cache owners and different vector owners
+/// never join. Failed cleanup that leaves an active transaction disables reuse.
+/// Attempt reservations must commit before calling the provider; provider HTTP
+/// must run outside service-owned write scopes.
+pub trait VectorDatabase {
+    /// Verify a use case's entry requirement without opening a transaction.
+    /// An incompatible active scope becomes rollback-only, even if the caller
+    /// catches the error. Inactive storage satisfies either requirement.
+    ///
+    /// # Errors
+    /// Rejects incompatible active scopes and failed or disabled owners.
+    fn verify_transaction_scope(&self, requirement: TransactionRequirement) -> StorageResult<()>;
+
+    /// Atomically synchronize vector identity after a prior observation.
+    ///
+    /// # Errors
+    /// Reports an active scope, incompatible state, contention or database failure.
+    fn reset_vectors(
+        &self,
+        observed: Option<&Sha256>,
+        desired: &Sha256,
+    ) -> StorageResult<VectorOutcome<bool>>;
+    /// Get dimensions from the current vector view.
+    ///
+    /// # Errors
+    /// Reports an inactive scope, malformed metadata or database failure.
+    fn vector_index_config_get_by_id(&self) -> StorageResult<Option<NonZeroUsize>>;
+    /// Get the stored failure for a search hash.
+    ///
+    /// # Errors
+    /// Reports an inactive scope, invalid data or database failure.
+    fn embed_failures_get_by_search_hash(
+        &self,
+        search_hash: &Sha256,
+    ) -> StorageResult<Option<EmbeddingFailure>>;
+    /// Get the last query error.
+    ///
+    /// # Errors
+    /// Reports an inactive scope, invalid data or database failure.
+    fn query_error_get_by_id(&self) -> StorageResult<Option<QueryError>>;
+    /// Execute a vector read for the expected configuration identity.
+    ///
+    /// # Errors
+    /// Returns the operation error or a storage transaction failure.
+    fn with_read_tx<T, E, F>(
+        &self,
+        expected: &Sha256,
+        operation: F,
+    ) -> Result<VectorOutcome<T>, TransactionError<E>>
+    where
+        F: FnOnce() -> Result<T, E>;
+    /// Execute a vector write only for the expected configuration identity.
+    ///
+    /// # Errors
+    /// Returns the operation error or a storage transaction failure.
+    fn with_write_tx<T, E, F>(
+        &self,
+        expected: &Sha256,
+        operation: F,
+    ) -> Result<VectorOutcome<T>, TransactionError<E>>
+    where
+        F: FnOnce() -> Result<T, E>;
+    /// Remove vectors and failures absent from this transaction's cache observation.
+    /// Concurrent publication can leave recomputable missing vectors until next drain.
+    ///
+    /// # Errors
+    /// Reports database failures and prevents commit of a failed unit.
+    fn prune_unreferenced(&self) -> StorageResult<()>;
+    /// Reserve one durable attempt within the caller's total budget.
+    /// Commit before calling the provider; an unsent reservation still counts.
+    /// Returns `true` when an attempt was reserved and `false` when the budget is exhausted.
+    ///
+    /// # Errors
+    /// Rejects zero or budgets above `i64::MAX` and reports database failures.
+    fn embed_failures_upsert_by_search_hash_and_attempts(
+        &self,
+        search_hash: &Sha256,
+        max_attempts: u64,
+    ) -> StorageResult<bool>;
+    /// Replace an existing reservation's error with the caller's safe message.
+    /// Returns false when no reservation exists; never creates an attempt.
+    ///
+    /// # Errors
+    /// Reports database failures.
+    fn embed_failures_update_by_search_hash(
+        &self,
+        search_hash: &Sha256,
+        error: &str,
+    ) -> StorageResult<bool>;
+    /// Replace the singleton query failure with an already-safe message.
+    ///
+    /// # Errors
+    /// Rejects timestamps above `i64::MAX` and reports database failures.
+    fn query_error_upsert_by_id(&self, at: u64, error: &str) -> StorageResult<()>;
+    /// Clear the singleton error after a successful query embedding.
+    ///
+    /// # Errors
+    /// Reports database failures.
+    fn query_error_delete_by_id(&self) -> StorageResult<()>;
+    /// Store one text vector, preserving an existing key and vector.
+    ///
+    /// # Errors
+    /// Rejects empty, nonfinite or mismatched vectors and reports database corruption/I/O.
+    fn store_vector(
+        &self,
+        search_hash: &Sha256,
+        vector: &[f32],
+        dimensions: usize,
+    ) -> StorageResult<StoredVectorKey>;
+}
 pub use types::{
     CapturedFile, CheckReport, ConfigState, Configuration, DrainOutcome, ElementAddress,
-    ElementLocation, EmbeddingConfig, EmbeddingStatusPolicy, EmbeddingStatusSummary, EmbeddingWork,
-    FileRow, FileStat, GraphNeighbor, GraphNodeKey, GraphNodeRef, HeldLock, InspectedElement,
-    Inspection, KnowledgeMetadata, LockName, NeighborCursor, NeighborDirection,
-    NeighborPageRequest, NodeMetadata, ParsedElement, ParsedFile, ProvenanceIssue,
-    ProvenanceObservation, ProvenanceRequest, ProviderKind, QueryEmbedding, QueryEmbeddingRequest,
-    RecheckFilter, RefreshOutcome, RetainedTree, SearchFilters, SearchFlag, SearchLink,
-    SearchRequest, SnapshotEntry, SnapshotFile, SnapshotState, SourceAvailability, SourceMetadata,
+    ElementLocation, EmbeddingConfig, EmbeddingWork, FileIdentity, FileRow, FileStat,
+    GraphNeighbor, GraphNodeKey, GraphNodeRef, HeldLock, InspectedElement, Inspection,
+    KnowledgeMetadata, LockName, NeighborCursor, NeighborDirection, NeighborPageRequest,
+    NodeMetadata, ParsedElement, ParsedFile, ProvenanceIssue, ProvenanceObservation,
+    ProvenanceRequest, ProviderKind, QueryEmbedding, QueryEmbeddingRequest, RecheckFilter,
+    RefreshOutcome, RetainedTree, SearchFilters, SearchFlag, SearchLink, SearchRequest,
+    SnapshotEntry, SnapshotFile, SnapshotState, SourceAvailability, SourceMetadata,
     SourceObservation, SourceRevisionComparison, SourceRevisionRequest, StatusReport, StoredNode,
-    StoredVectorKey, TextMatch, Traversal, TraversalDirection, TraversalLink, TraversalMode,
-    TraversalRequest, VectorMatch, VectorOutcome,
+    StoredVectorKey, TextMatch, TransactionRequirement, Traversal, TraversalDirection,
+    TraversalLink, TraversalMode, TraversalRequest, VectorMatch, VectorOutcome,
 };
 pub(crate) use types::{GENERATED_CONFIG, MAX_DIMENSIONS, MIN_DIMENSIONS, NEIGHBOR_PAGE_QUANTUM};
 mod background_runner;
@@ -58,33 +401,19 @@ pub(crate) use search::SearchService;
 pub(crate) use source::SourceService;
 pub(crate) use status::StatusService;
 pub(crate) use traversal::TraversalService;
+pub(crate) use utils::map_document_file_error;
 
 /// Maximum number of already available bindings submitted in one observation batch.
 const PROVENANCE_BATCH_SIZE: usize = 256;
 
-/// Read-only live configuration and nonblocking kernel-lock observations.
-/// Implementations never create service state or write an owner PID while observing.
-pub trait StatusFiles {
-    /// Read stable raw configuration bytes, or absence.
-    ///
-    /// # Errors
-    /// Reports unsafe paths or filesystem failures without exposing file contents.
-    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
-
-    /// Return occupied index/embed locks and their best-effort recorded positive PIDs.
-    ///
-    /// # Errors
-    /// Reports unsafe paths, failed probes, or invalid/unreadable PIDs on busy locks.
-    fn observe_locks(&self) -> CommandResult<Vec<HeldLock>>;
-}
-
-/// Current graph diagnostics derived exclusively from the supplied consistent view.
+/// Current graph diagnostics derived from the injected shared cache.
 ///
 /// Implementations inspect the entire knowledge graph before filtering by exact
 /// owner file paths. An empty selector includes all files; repeated selectors do
 /// not duplicate findings. Results are sorted by path, reason, element ID and target,
 /// with absent optional fields sorting as empty strings. No refresh, write, network
-/// call or separately opened read transaction is permitted.
+/// call or separate database connection is permitted. A call joins a compatible
+/// active cache scope or owns a fresh pinned read scope.
 pub trait GraphDiagnostics {
     /// Find safe invalid-file, dangling-target and includes-cycle findings.
     ///
@@ -95,14 +424,10 @@ pub trait GraphDiagnostics {
     /// # Errors
     /// Returns an internal error with a private storage cause if any read fails;
     /// partially collected findings are never returned as success.
-    fn find_problems(
-        &self,
-        view: &mut dyn StorageRead,
-        paths: &[RepoPath],
-    ) -> CommandResult<Vec<CommandProblem>>;
+    fn find_problems(&self, paths: &[RepoPath]) -> CommandResult<Vec<CommandProblem>>;
 }
 
-/// Current source observations constrained by membership in a caller-pinned view.
+/// Current source observations constrained by membership in the injected cache view.
 ///
 /// Implementations read only the requested source, retaining its derived identity
 /// and creation time. Unknown addresses and knowledge nodes return `None` without
@@ -118,12 +443,9 @@ pub trait SourceReader {
     ///
     /// # Errors
     /// Returns a safe document error with a private cause when storage or confined
-    /// filesystem access fails; such failures never become `SourceNotFound`.
-    fn get_source(
-        &self,
-        view: &mut dyn StorageRead,
-        uri: &SourceUri,
-    ) -> DocumentResult<Option<SourceObservation>>;
+    /// filesystem access fails; such failures never become `SourceNotFound`. Calls
+    /// join a compatible active cache scope or own a fresh pinned read scope.
+    fn get_source(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>>;
 }
 
 /// Read-only source comparison using caller-owned consistent metadata.
@@ -213,138 +535,66 @@ pub trait GraphRead {
     ///
     /// # Errors
     /// Reports database failures or invalid persisted identities/kinds.
-    fn get_node_ref_by_id(&mut self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>>;
+    fn nodes_get_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>>;
     /// Read at most the requested number of eligible neighbors strictly after a cursor.
     ///
     /// The handle must originate in this view; the positive limit may not exceed 32.
     ///
     /// # Errors
     /// Rejects a limit above the internal quantum; reports database or decoding failures.
-    fn get_neighbor_page(
-        &mut self,
+    fn edges_get_by_row_id_and_type(
+        &self,
         request: &NeighborPageRequest<'_>,
     ) -> StorageResult<Vec<GraphNeighbor>>;
 }
 
-/// Incremental graph traversal within the caller's existing pinned read view.
+/// Incremental graph traversal through one shared cache read scope.
 ///
 /// Implementations validate all starts, preserve MC-6 BFS ordering, bound neighbor
 /// buffers and selected data, and never read unrelated complete node metadata.
 /// Starts are excluded from selected elements; edges preserve declaration orientation.
 pub trait GraphTraversal {
-    /// Discover bounded graph data without refreshing or opening another view.
+    /// Discover bounded graph data, joining an active scope or owning a fresh read.
     ///
     /// # Errors
     /// Rejects empty or absent starts and propagates safe storage/integrity failures.
     /// No partial graph is returned on failure.
-    fn traverse(
-        &self,
-        read: &mut dyn GraphRead,
-        request: &TraversalRequest,
-    ) -> CommandResult<Graph>;
+    fn traverse(&self, request: &TraversalRequest) -> CommandResult<Graph>;
 }
 
-/// One pinned transaction exposing both metadata and bounded graph reads.
-/// Implementations obey both parent contracts for the same captured database view.
-pub trait ReadTransaction: StorageRead + GraphRead {}
-
-impl<T: StorageRead + GraphRead> ReadTransaction for T {}
-
-/// Synchronous storage with exclusive scoped capabilities.
-///
-/// Every implementation hands out at most one scoped capability at a time (hence
-/// `&mut self`). A write capability commits atomically or not at all, and a dropped
-/// or failed capability leaves the stored data unchanged.
-///
-/// A live transaction prevents another mutable borrow of its storage:
-///
-/// ```compile_fail,E0499
-/// use letopis::service::Storage;
-/// fn cannot_borrow_storage_twice(storage: &mut dyn Storage) {
-///     let tx = storage.begin_read_tx().unwrap();
-///     let _other = &mut *storage;
-///     let _ = tx.get_revision();
-/// }
-/// ```
-///
-/// Storage cannot be dropped while a transaction is still used:
-///
-/// ```compile_fail,E0505
-/// use letopis::service::Storage;
-/// fn cannot_drop_borrowed_storage<S: Storage>(mut storage: S) {
-///     let tx = storage.begin_read_tx().unwrap();
-///     drop(storage);
-///     let _ = tx.get_revision();
-/// }
-/// ```
-pub trait Storage {
-    /// Begin a write only when the pinned vector identity matches.
-    ///
-    /// # Errors
-    /// Reports contention or database failures.
-    fn begin_vector_write_tx(
-        &mut self,
-        expected: &Sha256,
-    ) -> StorageResult<VectorOutcome<Box<dyn VectorWrite + '_>>>;
-    /// Atomically synchronize vectors using a prior observed identity, including absence.
-    ///
-    /// An already current `desired` identity returns `Current(false)` without changes.
-    /// Otherwise a matching observation resets vectors and attempts, returning `Current(true)`.
-    /// A superseded observation returns `ConfigChanged` without changing any data.
-    ///
-    /// # Errors
-    /// Reports contention, schema or database failures, rolling back all changes.
-    fn reset_vectors(
-        &mut self,
-        observed: Option<&Sha256>,
-        desired: &Sha256,
-    ) -> StorageResult<VectorOutcome<bool>>;
-    /// Begin an exclusive cache publication transaction.
-    ///
-    /// # Errors
-    /// Returns an internal error on contention or database failure.
-    fn begin_cache_write_tx(&mut self) -> StorageResult<Box<dyn CacheWrite + '_>>;
-    /// Begin and pin a read of cache revision and vector identity.
-    ///
-    /// # Errors
-    /// Returns an internal error if the snapshot cannot be opened or decoded.
-    fn begin_read_tx(&mut self) -> StorageResult<Box<dyn ReadTransaction + '_>>;
-}
-/// Observation-only access to an optional published cache.
-///
-/// Implementations never create durable databases, bootstrap or repair schemas,
-/// change configuration or vector identity, or acquire a database writer. Ordinary
-/// read-side journal/shared-memory files may still be managed by the database engine.
-/// Missing publication is distinct from read failure.
-pub trait StatusStorage {
-    /// Pin the current publication, returning none only when no publication exists.
-    ///
-    /// # Errors
-    /// Reports inaccessible, malformed or incompatible persisted state.
-    fn begin_status_read_tx(&mut self) -> StorageResult<Option<Box<dyn StorageRead + '_>>>;
-}
-
-/// Observations pinned within one read transaction.
+/// Shared-reference observations within an active cache read or write scope.
 ///
 /// Every implementation answers all methods from one consistent view, so results
 /// never mix revisions, and never modifies stored data.
 pub trait StorageRead {
-    /// Count distinct current knowledge hashes under the captured policy.
-    /// Sources and orphan vector/failure rows never count. A usable vector takes
-    /// precedence over failures; unavailable or mismatched identities count only backlog.
+    /// Count distinct non-source knowledge search hashes in the active cache scope.
     ///
     /// # Errors
-    /// Rejects invalid attempt budgets, malformed persisted values and database failures.
-    fn get_embedding_status(
-        &mut self,
-        policy: &EmbeddingStatusPolicy,
-    ) -> StorageResult<EmbeddingStatusSummary>;
+    /// Reports database failures or invalid persisted counts.
+    fn nodes_get_by_kind(&self) -> StorageResult<u64>;
+    /// Validate current native vector rows and count distinct covered knowledge hashes.
+    /// Sources and orphan vector keys are excluded. Requires an active cache scope.
+    ///
+    /// # Errors
+    /// Reports missing native rows, invalid counts and database failures.
+    fn get_vector_coverage(&self) -> StorageResult<u64>;
+    /// Read current uncovered failures at or above the positive attempt threshold.
+    /// Every current uncovered row is decoded and validated before threshold filtering;
+    /// only matching rows are retained, once each in ascending search-hash order.
+    /// Sources, orphan failures and hashes with vector keys are excluded.
+    ///
+    /// # Errors
+    /// Reports malformed persisted hashes/attempts or database failures.
+    fn embed_failures_get_by_kind_and_search_hash_and_attempts(
+        &self,
+        max_attempts: u64,
+    ) -> StorageResult<Vec<EmbeddingFailure>>;
     /// Read the first eligible knowledge ID strictly after the optional cursor.
     ///
     /// # Errors
     /// Rejects zero or unrepresentable attempt budgets; reports I/O or invalid data.
-    fn get_next_embedding_work_by_id_and_max_attempts(
-        &mut self,
+    fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+        &self,
         expected: &Sha256,
         max_attempts: u64,
         id: Option<&KnowledgeId>,
@@ -353,55 +603,51 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Reports malformed native metadata or database failures.
-    fn get_vector_dimensions(
-        &mut self,
+    fn vector_index_config_get_by_id(
+        &self,
         expected: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>>;
     /// Read typed metadata by normalized identity.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
-    fn get_node_by_id(&mut self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>>;
+    fn nodes_get_by_id(&self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>>;
     /// List distinct non-null author-declared source roots without reading node metadata.
     ///
     /// # Errors
     /// Reports database failures or malformed persisted tree identities.
-    fn get_source_snapshots(&mut self) -> StorageResult<BTreeSet<TreeOid>>;
+    fn nodes_get_by_source_snapshot(&self) -> StorageResult<BTreeSet<TreeOid>>;
     /// List all published node metadata in ascending normalized identity order.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
-    fn get_nodes(&mut self) -> StorageResult<Vec<StoredNode>>;
+    fn nodes_get(&self) -> StorageResult<Vec<StoredNode>>;
     /// List all declared edges, optionally restricted to their source.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted edges.
-    fn get_edges_by_source_id(
-        &mut self,
-        source_id: Option<&KnowledgeId>,
-    ) -> StorageResult<Vec<Edge>>;
+    fn edges_get_by_source_id(&self, source_id: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>>;
     /// Read a candidate file's change-detection state.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
-    fn get_file_by_path(&mut self, path: &RepoPath) -> StorageResult<Option<FileRow>>;
+    fn files_get_by_path(&self, path: &RepoPath) -> StorageResult<Option<FileRow>>;
     /// List all candidate file states in ascending exact path order.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
-    fn get_files(&mut self) -> StorageResult<Vec<FileRow>>;
+    fn files_get(&self) -> StorageResult<Vec<FileRow>>;
     /// Execute an already-prepared FTS expression without a candidate limit.
     ///
     /// # Errors
     /// Returns an invalid request for malformed expressions, or an internal error for I/O.
-    fn get_text_matches_by_expression(&mut self, expression: &str)
-    -> StorageResult<Vec<TextMatch>>;
+    fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>>;
     /// Read a text-addressed vector under the expected pinned identity.
     ///
     /// # Errors
     /// Reports malformed stored vectors or database failures.
-    fn get_vector_by_search_hash(
-        &mut self,
+    fn vector_keys_get_by_search_hash(
+        &self,
         expected: &Sha256,
         search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>>;
@@ -409,8 +655,8 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Rejects invalid query vectors or reports database/integrity failures.
-    fn get_nearest_vectors(
-        &mut self,
+    fn vector_index_get_by_vector(
+        &self,
         expected: &Sha256,
         query: &[f32],
         dimensions: usize,
@@ -419,8 +665,8 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Reports malformed persisted values or database failures.
-    fn get_failure_by_search_hash(
-        &mut self,
+    fn embed_failures_get_by_search_hash(
+        &self,
         expected: &Sha256,
         search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<EmbeddingFailure>>>;
@@ -428,103 +674,17 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Reports malformed persisted values or database failures.
-    fn get_query_error(&mut self) -> StorageResult<Option<QueryError>>;
-    /// Publication revision observed by this read.
-    fn get_revision(&self) -> u64;
-    /// Vector configuration identity observed by this read.
-    fn get_config_identity(&self) -> Option<Sha256>;
-}
-
-/// Caller-owned atomic cache publication; any failed mutation prevents commit.
-pub trait CacheWrite {
-    /// Insert or replace metadata while preserving its row ID.
+    fn query_error_get_by_id(&self) -> StorageResult<Option<QueryError>>;
+    /// Return the revision in the active cache scope.
     ///
     /// # Errors
-    /// Rejects unsupported numeric values or database failures.
-    fn upsert_node(&mut self, node: &NodeMetadata) -> StorageResult<i64>;
-    /// Insert a declared edge, including a dangling target.
+    /// Rejects calls outside a scope, malformed revisions and database failures.
+    fn project_get_by_id(&self) -> StorageResult<u64>;
+    /// Return the vector configuration identity in the active cache scope.
     ///
     /// # Errors
-    /// Rejects duplicate edges and missing sources; reports database failures.
-    fn insert_edge(&mut self, edge: &Edge) -> StorageResult<()>;
-    /// Remove all declarations owned by a knowledge element.
-    ///
-    /// # Errors
-    /// Reports database failures.
-    fn delete_outgoing(&mut self, source: &KnowledgeId) -> StorageResult<()>;
-    /// Delete a node and its FTS entry, preserving incoming edges.
-    ///
-    /// # Errors
-    /// Rejects deletion while outgoing edges remain; reports database failures.
-    fn delete_node(&mut self, id: &EdgeTarget) -> StorageResult<()>;
-    /// Replace a knowledge element's contentless FTS entry.
-    ///
-    /// # Errors
-    /// Returns not found for absent knowledge, or a database failure.
-    fn replace_text(&mut self, id: &KnowledgeId, text: &str) -> StorageResult<()>;
-    /// Replace a Markdown candidate's state.
-    ///
-    /// # Errors
-    /// Rejects unsupported numbers and inconsistent validity; reports database failures.
-    fn upsert_file(&mut self, file: &FileRow) -> StorageResult<()>;
-    /// Remove a candidate's state.
-    ///
-    /// # Errors
-    /// Reports database failures.
-    fn delete_file(&mut self, path: &RepoPath) -> StorageResult<()>;
-    /// Publish all mutations and increment the revision once, including empty units.
-    ///
-    /// # Errors
-    /// Rejects failed units, revision overflow, and database failures, rolling back.
-    fn commit(self: Box<Self>) -> StorageResult<u64>;
-}
-
-/// Caller-owned atomic vector write; any failed mutation prevents commit.
-pub trait VectorWrite {
-    /// Remove vectors and failures absent from this transaction's cache observation.
-    /// Concurrent publication can leave recomputable missing vectors until next drain.
-    ///
-    /// # Errors
-    /// Reports database failures and prevents commit of a failed unit.
-    fn prune_unreferenced(&mut self) -> StorageResult<()>;
-    /// Reserve one durable attempt within the caller's total budget.
-    /// Commit before calling the provider; an unsent reservation still counts.
-    /// Returns `true` when an attempt was reserved and `false` when the budget is exhausted.
-    ///
-    /// # Errors
-    /// Rejects zero or budgets above `i64::MAX` and reports database failures.
-    fn reserve_attempt(&mut self, search_hash: &Sha256, max_attempts: u64) -> StorageResult<bool>;
-    /// Replace an existing reservation's error with the caller's safe message.
-    /// Returns false when no reservation exists; never creates an attempt.
-    ///
-    /// # Errors
-    /// Reports database failures.
-    fn record_failure(&mut self, search_hash: &Sha256, error: &str) -> StorageResult<bool>;
-    /// Replace the singleton query failure with an already-safe message.
-    ///
-    /// # Errors
-    /// Rejects timestamps above `i64::MAX` and reports database failures.
-    fn set_query_error(&mut self, at: u64, error: &str) -> StorageResult<()>;
-    /// Clear the singleton error after a successful query embedding.
-    ///
-    /// # Errors
-    /// Reports database failures.
-    fn clear_query_error(&mut self) -> StorageResult<()>;
-    /// Store one text vector, preserving an existing key and vector.
-    ///
-    /// # Errors
-    /// Rejects empty, nonfinite or mismatched vectors and reports database corruption/I/O.
-    fn store_vector(
-        &mut self,
-        search_hash: &Sha256,
-        vector: &[f32],
-        dimensions: usize,
-    ) -> StorageResult<StoredVectorKey>;
-    /// Commit all writes atomically.
-    ///
-    /// # Errors
-    /// Rejects poisoned units or reports database failures, rolling back.
-    fn commit(self: Box<Self>) -> StorageResult<()>;
+    /// Rejects calls outside a scope, malformed identities and database failures.
+    fn meta_get_by_id(&self) -> StorageResult<Option<Sha256>>;
 }
 
 /// Synchronous document publication operations.
@@ -551,57 +711,30 @@ pub trait Refresher {
     /// Reports capture, provenance or storage failures without a partial publication.
     fn reindex(&mut self) -> DocumentResult<RefreshOutcome>;
 }
-/// Repository-owned discovery of Markdown candidate paths.
+/// Raw Git index and non-ignored untracked worktree path observations.
 ///
-/// Every implementation reports only normalized root-relative paths and never reads file bodies.
+/// Return nonempty NUL-terminated paths without UTF-8 or document-policy filtering.
+/// Include deleted tracked paths and expand sparse index membership; duplicate stages
+/// are permitted. Read only Git index, ignore and sparse-tree metadata; never
+/// modify the index or repository.
 #[cfg_attr(test, mockall::automock)]
-pub trait CorpusLister {
-    /// List normalized, deduplicated candidates including deleted tracked files.
-    /// Exclude final symlinks observed in the working tree; consumers must recheck paths.
+pub trait GitWorktreePaths {
+    /// Enumerate root-relative Git paths as raw NUL-delimited bytes.
     ///
     /// # Errors
-    /// Reports unsupported candidate paths or Git failures.
-    fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>>;
-}
-/// Confined synchronous file observations and publication exclusion.
-///
-/// Every implementation stays beneath one pinned root, never follows symlinks out of it, and
-/// fails rather than returning bytes it observed changing.
-pub trait FileSystem {
-    /// Exclusive kernel lock released when its guard is dropped.
-    type IndexLock;
-    /// Observe a regular file without reading its body; stable absence or a nonregular final entry is `None`.
-    ///
-    /// # Errors
-    /// Reports unsafe parent paths, observed changes and I/O failures.
-    fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>>;
-    /// Capture exact regular-file bytes, checking identity and stat around the read.
-    /// Stable absence or a nonregular final entry is `None`; symlinks are never followed.
-    ///
-    /// # Errors
-    /// Reports unsafe parent paths, observed replacements or edits, clock and I/O failures.
-    fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>>;
-    /// Observe wall-clock nanoseconds since the Unix epoch with checked conversion.
-    ///
-    /// # Errors
-    /// Reports clocks before the epoch or values outside the supported range.
-    fn get_time_ns(&self) -> DocumentResult<i64>;
-    /// Acquire the persistent exclusive index lock; never removes its file.
-    ///
-    /// # Errors
-    /// Reports unsafe service paths, lock replacement or filesystem/locking failures.
-    fn lock_index(&self) -> DocumentResult<Self::IndexLock>;
+    /// Reports index, ignore, sparse-object, worktree traversal or repository-policy failures.
+    fn worktree_paths_get(&self) -> GitResult<Vec<u8>>;
 }
 
 /// Pure shared Markdown projection and search-text codec.
 ///
-/// Every implementation is deterministic and performs no I/O: equal bytes give equal results.
+/// Every implementation is deterministic and performs no I/O: equal paths and bytes give equal results.
 pub trait MarkdownCodec {
     /// Parse a whole file atomically; unmarked Markdown produces `None`.
     ///
     /// # Errors
     /// Returns safe local diagnostics for invalid UTF-8, metadata or graph markup.
-    fn parse_file(
+    fn file_parse(
         &self,
         path: &RepoPath,
         bytes: &[u8],
@@ -619,7 +752,7 @@ pub trait SnapshotVerifier {
     /// # Errors
     /// Returns [`SnapshotErrorKind::InternalError`] for repository policy, Git I/O
     /// or object integrity failures; these failures must not become a state.
-    fn verify_snapshot(&self, tree: &TreeOid) -> Result<SnapshotState, SnapshotError>;
+    fn tree_verify_by_oid(&self, tree: &TreeOid) -> Result<SnapshotState, SnapshotError>;
 }
 /// Synchronous immutable snapshot operations. Creation alone does not retain.
 pub trait GitSnapshots {
@@ -629,18 +762,18 @@ pub trait GitSnapshots {
     /// Returns [`SnapshotErrorKind::InvalidRequest`] for invalid, duplicate or
     /// colliding paths, and [`SnapshotErrorKind::InternalError`] when repository
     /// policy, Git I/O or object integrity checks fail.
-    fn create_tree(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError>;
+    fn tree_create(&self, files: &[SnapshotFile<'_>]) -> Result<TreeOid, SnapshotError>;
     /// Write exact captured bytes without filters or normalization; does not retain.
     ///
     /// # Errors
     /// Reports repository policy, Git I/O or object integrity failures.
-    fn write_blob(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError>;
+    fn blob_write(&self, bytes: &[u8]) -> Result<BlobOid, SnapshotError>;
     /// Assemble exactly these paths after validating all blobs; does not retain.
     ///
     /// # Errors
     /// Invalid paths, collisions, missing/wrong-type blobs or foreign formats are
     /// invalid requests; policy, I/O and corruption failures are internal errors.
-    fn create_tree_from_blobs(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError>;
+    fn tree_assemble(&self, entries: &[SnapshotEntry]) -> Result<TreeOid, SnapshotError>;
     /// Read a complete blob from an exact tree, without live-file fallback.
     ///
     /// # Errors
@@ -648,14 +781,18 @@ pub trait GitSnapshots {
     /// [`SnapshotErrorKind::InvalidRequest`] for an incompatible OID format,
     /// non-tree root or non-blob path, and [`SnapshotErrorKind::InternalError`]
     /// for repository policy, Git I/O or integrity failures.
-    fn get_blob(&self, tree: &TreeOid, path: &RepoPath) -> Result<Vec<u8>, SnapshotError>;
+    fn blob_get_by_tree_oid_and_path(
+        &self,
+        tree: &TreeOid,
+        path: &RepoPath,
+    ) -> Result<Vec<u8>, SnapshotError>;
     /// Validate the exact root and retain its direct ref without auditing descendants.
     /// A retained ref protects healthy reachable objects from normal GC, not corruption.
     ///
     /// # Errors
     /// Missing roots are not found; wrong types/formats are invalid requests.
     /// Root corruption, policy, Git I/O and ref conflicts are internal errors.
-    fn retain(&self, tree: &TreeOid) -> Result<(), SnapshotError>;
+    fn tree_retain_by_oid(&self, tree: &TreeOid) -> Result<(), SnapshotError>;
     /// Validate the complete local closure and retain it through Git GC.
     ///
     /// # Errors
@@ -663,7 +800,7 @@ pub trait GitSnapshots {
     /// [`SnapshotErrorKind::InvalidRequest`] for an incompatible OID format or
     /// non-tree root, and [`SnapshotErrorKind::InternalError`] for an incomplete
     /// or corrupt closure, repository policy, Git I/O or ref publication failure.
-    fn pin(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError>;
+    fn tree_pin_by_oid(&self, tree: &TreeOid) -> Result<RetainedTree, SnapshotError>;
 }
 
 /// Snapshot operations and root verification for the same repository.
@@ -684,51 +821,17 @@ pub trait EmbeddingProvider {
     ///
     /// # Errors
     /// Returns invalid configuration when the endpoint or protocol is unsupported.
-    fn validate_config(&self, config: &EmbeddingConfig) -> EmbeddingResult<()>;
+    fn config_validate(&self, config: &EmbeddingConfig) -> EmbeddingResult<()>;
     /// Compute one attempt and validate every vector before returning it.
     ///
     /// # Errors
     /// Reports invalid config/input, credentials, transport or malformed output.
-    fn embed(
+    fn vectors_compute_by_texts(
         &self,
         config: &EmbeddingConfig,
         texts: &[&str],
         dimensions: Option<NonZeroUsize>,
     ) -> EmbeddingResult<Vec<Vec<f32>>>;
-}
-
-/// Confined synchronous file, clock and drain-lock operations.
-///
-/// Every implementation stays beneath one pinned root and fails rather than returning bytes
-/// it observed changing; at most one drain lock is held at a time.
-pub trait EmbeddingFiles {
-    /// Exclusive drain ownership, released when dropped.
-    type EmbedLock;
-    /// Read configuration bytes without decoding them; stable absence is `None`.
-    ///
-    /// # Errors
-    /// Reports unsafe paths, observed replacement or I/O failure.
-    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
-    /// Read a current regular document beneath the pinned checkout.
-    ///
-    /// # Errors
-    /// Reports unsafe paths, observed replacement or I/O failure.
-    fn get_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>>;
-    /// Try persistent kernel drain ownership without waiting; busy is `None`.
-    ///
-    /// # Errors
-    /// Reports unsafe service paths, observed replacement or I/O failure.
-    fn try_lock_embed(&self) -> EmbeddingResult<Option<Self::EmbedLock>>;
-    /// Read Unix seconds from the system clock.
-    ///
-    /// # Errors
-    /// Reports a system clock before the Unix epoch.
-    fn get_time_secs(&self) -> EmbeddingResult<u64>;
-    /// Wait synchronously for a caller-selected retry delay.
-    ///
-    /// # Errors
-    /// Reports an environment failure that prevents the wait; none is currently produced.
-    fn wait(&self, delay: Duration) -> EmbeddingResult<()>;
 }
 
 /// Synchronous embedding application operations.
@@ -790,28 +893,6 @@ pub trait StatusReader {
     /// # Errors
     /// Reports storage, provenance or unsafe lock failures without a partial report.
     fn get_status(&mut self) -> CommandResult<StatusReport>;
-}
-/// Filesystem capability required to initialize private service state.
-///
-/// Implementations create the service directory only when explicitly asked,
-/// publish configuration without replacement and report durability work separately.
-pub trait InitFiles: StatusFiles {
-    /// Atomically publish complete bytes when `config.json` is absent.
-    ///
-    /// # Errors
-    /// Rejects unsafe or nonregular destinations and reports write, link or sync
-    /// failures. Existing files and another writer's winner are never replaced.
-    fn install_config_if_absent(&self, bytes: &[u8]) -> DocumentResult<()>;
-    /// Open or create the pinned private service directory.
-    ///
-    /// # Errors
-    /// Reports unsafe/replaced paths, creation or permission failures.
-    fn open_service_directory(&self) -> DocumentResult<OwnedFd>;
-    /// Sync the existing service directory and its Git-root parent.
-    ///
-    /// # Errors
-    /// Reports absent/replaced state or durability-sync failures without creating entries.
-    fn sync_service_state(&self) -> DocumentResult<()>;
 }
 
 /// Storage capability required to initialize both service schemas.
@@ -892,29 +973,18 @@ pub trait EmbeddingExecutor {
     /// Reports unexpected storage, coordination or embedding infrastructure failures.
     fn drain(&mut self) -> CommandResult<()>;
 }
-/// Nonblocking persistent embedding exclusion.
+/// Detached launch of a configured executable, argument vector and working directory.
 ///
-/// Every implementation grants ownership to at most one holder at a time across processes
-/// and releases it when the returned lock is dropped.
-pub trait EmbedLocker {
-    /// Owned kernel lock released through RAII.
-    type EmbedLock;
-    /// Probe exclusive embedding ownership without waiting.
-    ///
-    /// # Errors
-    /// Reports unsafe lock paths or filesystem/locking failures.
-    fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>>;
-}
-/// Detached drain process launch capability.
-///
-/// Every implementation returns without waiting for the launched process to finish.
+/// Implementations preserve literal executable/arguments and working directory, inherit the
+/// environment, redirect standard I/O to null and create a separate session. They return
+/// without waiting for the launched process to finish.
 #[cfg_attr(test, mockall::automock)]
-pub trait DrainLauncher {
-    /// Start the internal drain command without waiting for inference.
+pub trait ProcessLauncher {
+    /// Start the configured process without interpreting arguments or waiting for completion.
     ///
     /// # Errors
-    /// Reports process setup or launch failures.
-    fn spawn_drain(&self) -> CommandResult<()>;
+    /// Reports process setup or launch failures while preserving the private I/O cause.
+    fn process_spawn(&self) -> ProcessResult<()>;
 }
 /// Foreground triggering and direct execution of background work.
 ///

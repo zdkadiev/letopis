@@ -1,10 +1,10 @@
 use rustix::{
     fs::{FlockOperation, flock},
-    process::{Pid, Signal, kill_process_group},
+    process::{Pid, Signal, getegid, geteuid, kill_process_group},
 };
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
-use std::os::unix::fs::symlink;
+use std::os::unix::fs::{PermissionsExt, symlink};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -155,6 +155,61 @@ pub(super) fn run_bounded(name: &str) -> bool {
     true
 }
 
+/// Supervise only this fixture as an unprivileged child when the parent is root.
+/// The child creates its fixture under /tmp, away from a root-private TMPDIR/cwd.
+pub(super) fn run_bounded_unprivileged(name: &str) -> bool {
+    const CASE: &str = "LETOPIS_FS_UNPRIVILEGED_CASE";
+    const UNPRIVILEGED_ID: u32 = 65534;
+    if std::env::var(CASE).ok().as_deref() == Some(name) {
+        assert_ne!(
+            geteuid().as_raw(),
+            0,
+            "permission child retained root privileges"
+        );
+        assert_eq!(
+            getegid().as_raw(),
+            UNPRIVILEGED_ID,
+            "permission child retained its group"
+        );
+        return false;
+    }
+    if geteuid().as_raw() != 0 {
+        return false;
+    }
+    // Root-private build paths are not traversable after dropping credentials.
+    let executable_directory = tempfile::Builder::new()
+        .prefix("letopis-permission-")
+        .tempdir_in("/tmp")
+        .unwrap();
+    fs::set_permissions(
+        executable_directory.path(),
+        fs::Permissions::from_mode(0o711),
+    )
+    .unwrap();
+    let executable = executable_directory.path().join("test");
+    fs::copy(std::env::current_exe().unwrap(), &executable).unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o555)).unwrap();
+    let mut child = OwnedProcess::spawn(
+        Command::new(executable)
+            .args(["--exact", name, "--nocapture"])
+            .env(CASE, name)
+            .env("TMPDIR", "/tmp")
+            .current_dir("/tmp")
+            .uid(UNPRIVILEGED_ID)
+            .gid(UNPRIVILEGED_ID)
+            .stdin(Stdio::null()),
+        ProcessGroup::Owned,
+    );
+    child.wait_success(DEADLINE);
+    true
+}
+
+/// Create a FIFO under the same deadline and cleanup guard as other fixture children.
+pub(super) fn create_fifo(path: &Path) {
+    let mut child = OwnedProcess::spawn(Command::new("mkfifo").arg(path), ProcessGroup::Inherited);
+    child.wait_success(DEADLINE);
+}
+
 fn hold_descendant_lease(root: &Path) {
     let lease = fs::File::create(root.join("lease")).unwrap();
     flock(&lease, FlockOperation::LockExclusive).unwrap();
@@ -205,13 +260,7 @@ fn run_mutation_child() {
         match action.as_str() {
             "regular" => fs::write(&target, b"new regular contents").unwrap(),
             "symlink" => symlink("/dev/null", &target).unwrap(),
-            "fifo" => {
-                let mut child = OwnedProcess::spawn(
-                    Command::new("mkfifo").arg(&target),
-                    ProcessGroup::Inherited,
-                );
-                child.wait_success(DEADLINE);
-            }
+            "fifo" => create_fifo(&target),
             "directory" => fs::create_dir(&target).unwrap(),
             "delete" => {}
             _ => panic!("unknown mutation"),

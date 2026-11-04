@@ -1,8 +1,10 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 
 use letopis::{
     domain::{LineRange, Sha256},
-    service::{NodeMetadata, Refresher, Storage},
+    service::{NodeMetadata, Refresher},
     wire_document_refresher,
 };
 use serde_json::{Value, json};
@@ -96,12 +98,20 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
                     "details":{"path":"bad.md","reason":"invalid_target"}
                 }]}})
             );
-            let mut storage = repo.open_storage();
-            let mut view = storage.begin_read_tx().unwrap();
-            assert!(view.get_nodes().unwrap().is_empty());
-            assert!(view.get_edges_by_source_id(None).unwrap().is_empty());
-            let files = view.get_files().unwrap();
-            assert_eq!(files.len(), 2); // ReadingRepo also contains unmarked live.md.
+            let storage = repo.open_storage();
+            let (nodes, edges, files) = storage
+                .cache
+                .with_read_tx(|| {
+                    Ok::<_, StorageError>((
+                        storage.cache.nodes_get()?,
+                        storage.cache.edges_get_by_source_id(None)?,
+                        storage.cache.files_get()?,
+                    ))
+                })
+                .unwrap();
+            assert!(nodes.is_empty());
+            assert!(edges.is_empty());
+            assert_eq!(files.len(), 2);
             let bad = files
                 .iter()
                 .find(|file| file.path.as_str() == "bad.md")
@@ -115,16 +125,10 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
         assert_eq!(run_check(&repo), json!({"ok":true,"result":{"errors":[]}}));
         let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
         assert!(!refresher.refresh().unwrap().published);
-        let mut storage = repo.open_storage();
-        let mut view = storage.begin_read_tx().unwrap();
-        assert_eq!(view.get_nodes().unwrap().len(), 1);
-        assert!(view.get_edges_by_source_id(None).unwrap().is_empty());
-        assert_eq!(
-            view.get_text_matches_by_expression("RepairedToken")
-                .unwrap()
-                .len(),
-            1
-        );
+        let (nodes, edges, matches) = get_repaired_projection(&repo);
+        assert_eq!(nodes, 1);
+        assert_eq!(edges, 0);
+        assert_eq!(matches, 1);
     }
 }
 
@@ -172,4 +176,21 @@ fn run_check(repo: &ReadingRepo) -> Value {
     assert!(!text.contains("SECRET_RAW_BODY"));
     assert!(!text.contains("https:notes"));
     serde_json::from_str(&text).unwrap()
+}
+
+fn get_repaired_projection(repo: &ReadingRepo) -> (usize, usize, usize) {
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            Ok::<_, StorageError>((
+                storage.cache.nodes_get()?.len(),
+                storage.cache.edges_get_by_source_id(None)?.len(),
+                storage
+                    .cache
+                    .text_index_get_by_expression("RepairedToken")?
+                    .len(),
+            ))
+        })
+        .unwrap()
 }

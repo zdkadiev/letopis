@@ -14,7 +14,7 @@ use cancellation::{
     CANCELLED_ENVELOPE, GitReadBarrier, WAIT, assert_cancelled_output, assert_index_lock_held,
     create_stdin_fifo, get_lock_identity, wait_until_index_lock_free,
 };
-use letopis::{open_filesystem, service::FileSystem};
+use letopis::{open_filesystem, service::FileLocker};
 use serde_json::{Value, json};
 use std::{
     ffi::OsStr,
@@ -88,7 +88,9 @@ fn cancels_waiting_index_lock_without_killing_holder() {
     // Given: this test owns a real kernel index lock and therefore its recorded PID.
     let repo = ReadingRepo::new();
     let filesystem = open_filesystem(repo.get_root()).expect("filesystem");
-    let holder = filesystem.lock_index().expect("holder lock");
+    let holder = filesystem
+        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        .expect("holder lock");
     let lock = repo.get_root().join(".letopis/index.lock");
     let identity = get_lock_identity(&lock);
     let mut child = spawn_reading(&repo, "reindex");

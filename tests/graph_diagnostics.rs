@@ -2,15 +2,16 @@ mod support;
 
 use letopis::{
     domain::LineRange,
-    open_storage,
+    open_cache_storage,
     service::{
-        CommandErrorKind, CommandProblem, GraphDiagnostics, NodeMetadata, Refresher, Storage,
+        CacheDatabase, CommandErrorKind, CommandProblem, GraphDiagnostics, NodeMetadata, Refresher,
+        StorageRead, StorageResult,
     },
     wire_document_refresher, wire_graph_diagnostics,
 };
 use rusqlite::Connection;
 use serde_json::{Value, json};
-use std::{error::Error, fs};
+use std::{error::Error, fs, rc::Rc};
 use support::documents::{DocumentRepo, build_whole};
 
 const RAW_BODY: &str = "SECRET_RAW_BODY";
@@ -165,26 +166,29 @@ fn diagnoses_the_pinned_revision_after_another_connection_publishes_a_target() {
     let mut writer = wire_document_refresher(repo.get_root()).unwrap();
     // When / Then: diagnostics inspect the pinned graph revision; later publication does not change pinned findings.
     assert_eq!(writer.refresh().unwrap().revision, 1);
-    let mut reader = open_storage(
-        &repo.get_root().join(".letopis/cache.db"),
-        &repo.get_root().join(".letopis/vectors.db"),
-    )
-    .unwrap();
-    let mut old = reader.begin_read_tx().unwrap();
-    assert_eq!(old.get_revision(), 1);
-    let diagnostics = wire_graph_diagnostics();
+    let reader = Rc::new(
+        open_cache_storage(
+            &repo.get_root().join(".letopis/cache.db"),
+            &repo.get_root().join(".letopis/vectors.db"),
+        )
+        .unwrap(),
+    );
+    let diagnostics = wire_graph_diagnostics(Rc::clone(&reader));
+    reader.with_read_tx(|| -> StorageResult<()> {
+    let old = reader.as_ref();
+    assert_eq!(old.project_get_by_id().unwrap(), 1);
     assert_eq!(
-        diagnostics.find_problems(old.as_mut(), &[]).unwrap().len(),
+        diagnostics.find_problems(&[]).unwrap().len(),
         1
     );
 
     repo.write("missing.md", build_whole(2, "Published target"));
     let publication = writer.refresh().unwrap();
-    let problems = diagnostics.find_problems(old.as_mut(), &[]).unwrap();
+    let problems = diagnostics.find_problems(&[]).unwrap();
 
     assert_eq!(publication.revision, 2);
     assert!(publication.published);
-    assert_eq!(old.get_revision(), 1);
+    assert_eq!(old.project_get_by_id().unwrap(), 1);
     assert_findings(
         &problems,
         &json!([
@@ -192,15 +196,13 @@ fn diagnoses_the_pinned_revision_after_another_connection_publishes_a_target() {
                 "path":"a.md", "reason":"dangling_target", "element_id":"a.md", "target":"missing.md"}}
         ]),
     );
-    drop(old);
-    let mut fresh = reader.begin_read_tx().unwrap();
-    assert_eq!(fresh.get_revision(), 2);
-    assert!(
-        diagnostics
-            .find_problems(fresh.as_mut(), &[])
-            .unwrap()
-            .is_empty()
+    Ok(())
+    }).unwrap();
+    assert_eq!(
+        reader.with_read_tx(|| reader.project_get_by_id()).unwrap(),
+        2
     );
+    assert!(diagnostics.find_problems(&[]).unwrap().is_empty());
     assert_bytes(&repo, "a.md", &source);
 }
 
@@ -218,23 +220,26 @@ fn propagates_corrupt_edge_reads_instead_of_returning_clean_or_partial_findings(
         .refresh()
         .unwrap();
     let cache = repo.get_root().join(".letopis/cache.db");
-    let mut storage = open_storage(&cache, &repo.get_root().join(".letopis/vectors.db")).unwrap();
-    {
-        // When: graph diagnostics retrieve those edges.
-        let mut before = storage.begin_read_tx().unwrap();
-        // Then: the read error propagates without a partial clean result.
-        assert_eq!(before.get_files().unwrap().len(), 1);
-        assert!(!before.get_files().unwrap()[0].valid);
-    }
+    let storage =
+        Rc::new(open_cache_storage(&cache, &repo.get_root().join(".letopis/vectors.db")).unwrap());
+    storage
+        .with_read_tx(|| -> StorageResult<()> {
+            // When: graph diagnostics retrieve those edges.
+            let before = storage.as_ref();
+            // Then: the read error propagates without a partial clean result.
+            assert_eq!(before.files_get().unwrap().len(), 1);
+            assert!(!before.files_get().unwrap()[0].valid);
+            Ok(())
+        })
+        .unwrap();
     // Deliberately corrupt only this private temporary cache before opening a read.
     Connection::open(&cache)
         .unwrap()
         .execute("drop table edges", [])
         .unwrap();
-    let mut view = storage.begin_read_tx().unwrap();
 
-    let error = wire_graph_diagnostics()
-        .find_problems(view.as_mut(), &[])
+    let error = wire_graph_diagnostics(storage)
+        .find_problems(&[])
         .unwrap_err();
 
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
@@ -257,15 +262,14 @@ fn propagates_corrupt_edge_reads_instead_of_returning_clean_or_partial_findings(
 }
 
 fn diagnose(repo: &DocumentRepo) -> Vec<CommandProblem> {
-    let mut storage = open_storage(
-        &repo.get_root().join(".letopis/cache.db"),
-        &repo.get_root().join(".letopis/vectors.db"),
-    )
-    .unwrap();
-    let mut view = storage.begin_read_tx().unwrap();
-    wire_graph_diagnostics()
-        .find_problems(view.as_mut(), &[])
-        .unwrap()
+    let storage = Rc::new(
+        open_cache_storage(
+            &repo.get_root().join(".letopis/cache.db"),
+            &repo.get_root().join(".letopis/vectors.db"),
+        )
+        .unwrap(),
+    );
+    wire_graph_diagnostics(storage).find_problems(&[]).unwrap()
 }
 
 fn assert_findings(problems: &[CommandProblem], expected: &Value) {

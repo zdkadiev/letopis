@@ -1,9 +1,10 @@
-//! Confined live file reads and persistent kernel drain ownership.
-mod confined;
-mod init;
+//! Confined file observations, durable publication and persistent file locks.
+mod file;
 mod local;
-mod read;
-mod status;
+mod lock;
+mod path;
+mod publication;
+mod resolve;
 
 pub(crate) use local::LocalFileSystem;
 
@@ -13,3 +14,17 @@ mod init_tests;
 mod read_tests;
 #[cfg(test)]
 mod test_support;
+
+#[cfg(test)]
+mod file_tests;
+
+#[cfg(test)]
+mod lock_tests;
+#[cfg(test)]
+mod publication_tests;
+
+#[cfg(test)]
+mod race_tests;
+
+#[cfg(test)]
+mod creation_tests;

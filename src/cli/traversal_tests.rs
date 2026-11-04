@@ -1,5 +1,5 @@
 //! Strict traversal transport; graph semantics are exercised through the real binary.
-use super::{Request, ResponseResult, finish_foreground, parse_request, write_response};
+use super::{Request, ResponseResult, finish_foreground, request_parse, response_write};
 use crate::domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, SourceUri};
 use crate::service::{
     CommandErrorKind, CommandProblem, CommandResult, ElementAddress, ElementLocation,
@@ -295,7 +295,7 @@ fn traversal_response_preserves_nonfatal_warning() {
 
 fn render(response: CommandResult<super::response::CommandResponse>) -> (u8, Value) {
     let mut bytes = vec![];
-    let exit = write_response(&mut bytes, response);
+    let exit = response_write(&mut bytes, response);
     assert_eq!(bytes.iter().filter(|byte| **byte == b'\n').count(), 1);
     (exit, serde_json::from_slice(&bytes).unwrap())
 }
@@ -311,5 +311,5 @@ fn assert_invalid(body: &str) {
     );
 }
 fn parse(body: &str) -> CommandResult<Request> {
-    parse_request(&["traverse".into()], body.as_bytes())
+    request_parse(&["traverse".into()], body.as_bytes())
 }

@@ -118,3 +118,10 @@ fn has_supported_integer_token(raw: &str) -> bool {
         raw.parse::<u64>().is_ok()
     }
 }
+
+/// Repository-relative embedding configuration file.
+pub(crate) const CONFIG_PATH: &str = ".letopis/config.json";
+/// Repository-relative publication exclusion file.
+pub(crate) const INDEX_LOCK_PATH: &str = ".letopis/index.lock";
+/// Repository-relative drain exclusion file.
+pub(crate) const EMBED_LOCK_PATH: &str = ".letopis/embed.lock";

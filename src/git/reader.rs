@@ -1,6 +1,6 @@
 use super::{
-    constants::{BLOB_KIND, HASH_CHUNK_BYTES, TREE_KIND},
-    error::make_io_error,
+    constants::{BLOB_KIND, HASH_CHUNK_BYTES, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
+    error::object_map_io_error,
     hashing::ObjectHasher,
 };
 use crate::service::{SnapshotError, SnapshotErrorKind};
@@ -50,7 +50,10 @@ impl ObjectReader {
     /// Returns an internal error for a format mismatch or failure to open the local store.
     pub(super) fn new(repo: &Repository, oid_len: usize) -> Result<Self, SnapshotError> {
         if repo.object_hash().len_in_hex() != oid_len {
-            return Err(fail_integrity());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                OBJECT_INTEGRITY_MESSAGE,
+            ));
         }
         // Construct one operation-owned raw handle: gix's repository config can
         // impose a 16 MiB reduced-trust cap or user cap, neither belongs to this API.
@@ -63,7 +66,7 @@ impl ObjectReader {
                 ..Options::default()
             },
         )
-        .map_err(|error| make_io_error("Git object store open failed", error))?;
+        .map_err(|error| object_map_io_error("Git object store open failed", error))?;
         Ok(Self {
             objects: Rc::new(store).to_handle(),
             oid_len,
@@ -78,7 +81,7 @@ impl ObjectReader {
     ///
     /// # Errors
     /// Uses caller-selected missing/type errors; decoding and integrity failures are internal.
-    pub(super) fn get_object(
+    pub(super) fn object_get_by_oid(
         &mut self,
         oid: &str,
         expected: &str,
@@ -90,7 +93,7 @@ impl ObjectReader {
             self.object_reads += 1;
         }
         let result = self
-            .verify_object(oid, expected, missing, wrong_type)
+            .object_verify_by_oid(oid, expected, missing, wrong_type)
             .map(|()| {
                 if expected == TREE_KIND {
                     VerifiedObject::Tree(self.buffer.clone())
@@ -110,7 +113,7 @@ impl ObjectReader {
 
     /// Count object verification requests on this owned test reader.
     #[cfg(test)]
-    pub(super) fn get_object_read_count(&self) -> usize {
+    pub(super) fn object_get_read_count(&self) -> usize {
         self.object_reads
     }
 
@@ -118,7 +121,7 @@ impl ObjectReader {
     ///
     /// # Errors
     /// Uses caller-selected missing/type errors; decoding and checksum failures are internal.
-    pub(super) fn get_bytes(
+    pub(super) fn object_bytes_get_by_oid(
         &mut self,
         oid: &str,
         expected: &str,
@@ -126,7 +129,7 @@ impl ObjectReader {
         wrong_type: SnapshotErrorKind,
     ) -> Result<Vec<u8>, SnapshotError> {
         let result = self
-            .verify_object(oid, expected, missing, wrong_type)
+            .object_verify_by_oid(oid, expected, missing, wrong_type)
             .map(|()| self.buffer.clone());
         if self.buffer.capacity() > MAX_REUSABLE_BYTES {
             self.buffer = Vec::new();
@@ -136,7 +139,7 @@ impl ObjectReader {
         result
     }
 
-    fn verify_object(
+    fn object_verify_by_oid(
         &mut self,
         oid: &str,
         expected: &str,
@@ -148,9 +151,14 @@ impl ObjectReader {
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         {
-            return Err(fail_integrity());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                OBJECT_INTEGRITY_MESSAGE,
+            ));
         }
-        let id = ObjectId::from_hex(oid.as_bytes()).map_err(|_| fail_integrity())?;
+        let id = ObjectId::from_hex(oid.as_bytes()).map_err(|_| {
+            SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
+        })?;
         // Bypass Repository's payload cache, even if a caller configured one.
         // The raw local ODB handle cannot invoke promisor fetch or content filters.
         let (object, _) = self
@@ -158,19 +166,27 @@ impl ObjectReader {
             .try_find_cached(&id, &mut self.buffer, &mut Never)
             .map_err(|error| make_decode_error(&error))?
             .ok_or_else(|| SnapshotError::new(missing, "Git object is missing"))?;
-        let kind = std::str::from_utf8(object.kind.as_bytes()).map_err(|_| fail_integrity())?;
+        let kind = std::str::from_utf8(object.kind.as_bytes()).map_err(|_| {
+            SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE)
+        })?;
         if kind != expected {
             return Err(SnapshotError::new(wrong_type, "unexpected Git object type"));
         }
         if kind != BLOB_KIND && kind != TREE_KIND {
-            return Err(fail_integrity());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                OBJECT_INTEGRITY_MESSAGE,
+            ));
         }
         let mut hash = ObjectHasher::new(self.oid_len, kind, object.data.len() as u64)?;
         for chunk in object.data.chunks(HASH_CHUNK_BYTES) {
             hash.update(chunk);
         }
         if hash.finish()? != oid {
-            return Err(fail_integrity());
+            return Err(SnapshotError::new(
+                SnapshotErrorKind::InternalError,
+                OBJECT_INTEGRITY_MESSAGE,
+            ));
         }
         Ok(())
     }
@@ -180,14 +196,7 @@ fn make_decode_error(error: &gix::Error) -> SnapshotError {
     let kind = error
         .downcast_any_ref::<io::Error>()
         .map_or(io::ErrorKind::InvalidData, io::Error::kind);
-    make_io_error("Git object decode failed", io::Error::from(kind))
-}
-
-fn fail_integrity() -> SnapshotError {
-    SnapshotError::new(
-        SnapshotErrorKind::InternalError,
-        "Git object integrity failed",
-    )
+    object_map_io_error("Git object decode failed", io::Error::from(kind))
 }
 
 #[cfg(test)]
@@ -286,7 +295,7 @@ mod tests {
         let mut reader = ObjectReader::new(&repo, oid.len()).unwrap();
         // When: the raw library reader verifies one object, measuring only that call's allocations.
         allocation::start();
-        let result = reader.get_object(
+        let result = reader.object_get_by_oid(
             &oid,
             &kind,
             SnapshotErrorKind::NotFound,
@@ -341,7 +350,7 @@ mod tests {
         let repo = gix::open(fixture.get_root()).unwrap();
         let mut reader = ObjectReader::new(&repo, original.len()).unwrap();
         // When: the reader accesses raw local identity, without gix's optional cap or replacement.
-        let result = reader.get_object(
+        let result = reader.object_get_by_oid(
             &original,
             "blob",
             SnapshotErrorKind::NotFound,
@@ -350,7 +359,7 @@ mod tests {
         // Then: canonical bytes pass, and a later corrupt replacement cannot be hidden by a payload cache.
         assert!(result.is_ok(), "{result:?}");
         fixture.replace_loose_object(&original, &replacement);
-        let result = reader.get_object(
+        let result = reader.object_get_by_oid(
             &original,
             "blob",
             SnapshotErrorKind::NotFound,

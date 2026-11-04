@@ -1,64 +1,83 @@
+use super::utils::map_document_file;
 use super::{
-    DocumentResult, FileSystem, NodeMetadata, SourceAvailability, SourceObservation, SourceReader,
-    StorageRead,
+    CacheDatabase, DocumentError, DocumentResult, FileReader, NodeMetadata, SourceAvailability,
+    SourceObservation, SourceReader, StorageRead,
 };
 use crate::domain::{EdgeTarget, Sha256, SourceUri};
+use std::path::Path;
 
 #[derive(Debug)]
-pub(crate) struct SourceService<F> {
+pub(crate) struct SourceService<F, C> {
     filesystem: F,
+    storage: std::rc::Rc<C>,
 }
 
-impl<F: FileSystem> SourceService<F> {
-    pub(crate) fn new(filesystem: F) -> Self {
-        Self { filesystem }
+impl<F: FileReader, C> SourceService<F, C> {
+    pub(crate) fn new(storage: std::rc::Rc<C>, filesystem: F) -> Self {
+        Self {
+            filesystem,
+            storage,
+        }
     }
 }
 
-impl<F: FileSystem> SourceReader for SourceService<F> {
-    fn get_source(
-        &self,
-        storage: &mut dyn StorageRead,
-        uri: &SourceUri,
-    ) -> DocumentResult<Option<SourceObservation>> {
-        let Some(row) = storage.get_node_by_id(&EdgeTarget::Source(uri.clone()))? else {
-            return Ok(None);
-        };
-        let NodeMetadata::Source(mut metadata) = row.metadata else {
-            return Ok(None);
-        };
-        let Some(local) = uri.get_local() else {
-            metadata.hash = None;
-            metadata.lines = None;
-            return Ok(Some(SourceObservation {
-                metadata,
-                availability: SourceAvailability::Unfetched,
-            }));
-        };
-        let file = self.filesystem.get_file(local.get_path())?;
-        metadata.hash = file
-            .as_ref()
-            .and_then(|file| local.select_bytes(&file.bytes))
-            .map(Sha256::digest);
-        metadata.lines = local.get_lines();
-        let availability = if metadata.hash.is_some() {
-            SourceAvailability::Available
-        } else {
-            SourceAvailability::SourceNotFound
-        };
-        Ok(Some(SourceObservation {
-            metadata,
-            availability,
-        }))
+impl<F: FileReader, C: CacheDatabase> SourceReader for SourceService<F, C> {
+    fn get_source(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>> {
+        self.storage
+            .with_read_tx(|| {
+                let Some(row) = StorageRead::nodes_get_by_id(
+                    self.storage.as_ref(),
+                    &EdgeTarget::Source(uri.clone()),
+                )?
+                else {
+                    return Ok(None);
+                };
+                let NodeMetadata::Source(mut metadata) = row.metadata else {
+                    return Ok(None);
+                };
+                let Some(local) = uri.get_local() else {
+                    metadata.hash = None;
+                    metadata.lines = None;
+                    return Ok(Some(SourceObservation {
+                        metadata,
+                        availability: SourceAvailability::Unfetched,
+                    }));
+                };
+                let file = map_document_file(
+                    self.filesystem
+                        .file_get_by_path(Path::new(local.get_path().as_str())),
+                )?;
+                metadata.hash = file
+                    .as_ref()
+                    .and_then(|file| local.select_bytes(&file.bytes))
+                    .map(Sha256::digest);
+                metadata.lines = local.get_lines();
+                let availability = if metadata.hash.is_some() {
+                    SourceAvailability::Available
+                } else {
+                    SourceAvailability::SourceNotFound
+                };
+                Ok(Some(SourceObservation {
+                    metadata,
+                    availability,
+                }))
+            })
+            .map_err(|error| match error {
+                super::TransactionError::Operation(error) => error,
+                super::TransactionError::Storage(error) => DocumentError::from(error),
+            })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::service::{
+        FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult, MockFileReader,
+    };
+
     use super::super::{
-        CapturedFile, DocumentError, DocumentErrorKind, DocumentRefreshService, DocumentResult,
-        FileStat, FileSystem, ProvenanceService, Refresher, SourceAvailability, SourceReader,
-        Storage,
+        CapturedFile, DocumentErrorKind, DocumentRefreshService, FileStat, ProvenanceService,
+        Refresher, SourceAvailability, SourceReader,
     };
     use super::SourceService;
     use crate::{
@@ -66,7 +85,7 @@ mod tests {
         filesystem::LocalFileSystem,
         git::GitRepository,
         markdown::MarkdownParser,
-        storage::SqliteStorage,
+        storage::TestDatabases,
     };
     use std::{cell::RefCell, error::Error, fs, io, path::Path, process::Command, rc::Rc};
 
@@ -80,14 +99,15 @@ mod tests {
         let filesystem = RecordedFiles::new(repo.path(), recorded_reads.clone());
         let storage = open_storage(repo.path());
         let provenance = ProvenanceService::new(
-            Box::new(GitRepository::open(repo.path()).unwrap()),
+            Box::new(GitRepository::open(repo.path(), &[crate::utils::SERVICE_DIRECTORY]).unwrap()),
             RecordedFiles::new(repo.path(), recorded_reads.clone()),
         );
         let mut refresher = DocumentRefreshService {
-            git: GitRepository::open(repo.path()).unwrap(),
+            clock: Box::new(crate::process::SystemClock::new()),
+            git: GitRepository::open(repo.path(), &[crate::utils::SERVICE_DIRECTORY]).unwrap(),
             filesystem,
             markdown: MarkdownParser::new(),
-            storage: Box::new(storage),
+            storage: std::rc::Rc::new(storage.cache),
             provenance,
         };
 
@@ -117,25 +137,16 @@ mod tests {
         // Given: unknown and knowledge addresses with recorded source reads.
         let repo = prepare_sources();
         let recorded_reads = Rc::new(RefCell::new(Vec::new()));
-        let reader = SourceService::new(RecordedFiles::new(repo.path(), recorded_reads.clone()));
-        let mut storage = open_storage(repo.path());
-        let mut view = storage.begin_read_tx().unwrap();
+        let reader = SourceService::new(
+            Rc::new(open_storage(repo.path()).cache),
+            RecordedFiles::new(repo.path(), recorded_reads.clone()),
+        );
         let unknown = SourceUri::parse("unknown.txt").unwrap();
         let knowledge = SourceUri::parse("a.md").unwrap();
 
         // When / Then: the source reader resolves those addresses; no source filesystem read occurs.
-        assert!(
-            reader
-                .get_source(view.as_mut(), &unknown)
-                .unwrap()
-                .is_none()
-        );
-        assert!(
-            reader
-                .get_source(view.as_mut(), &knowledge)
-                .unwrap()
-                .is_none()
-        );
+        assert!(reader.get_source(&unknown).unwrap().is_none());
+        assert!(reader.get_source(&knowledge).unwrap().is_none());
         // Then: no source filesystem read occurs.
         assert!(recorded_reads.borrow().is_empty());
     }
@@ -145,13 +156,14 @@ mod tests {
         // Given: a declared remote source with recorded reads.
         let repo = prepare_sources();
         let recorded_reads = Rc::new(RefCell::new(Vec::new()));
-        let reader = SourceService::new(RecordedFiles::new(repo.path(), recorded_reads.clone()));
-        let mut storage = open_storage(repo.path());
-        let mut view = storage.begin_read_tx().unwrap();
+        let reader = SourceService::new(
+            Rc::new(open_storage(repo.path()).cache),
+            RecordedFiles::new(repo.path(), recorded_reads.clone()),
+        );
         let remote = SourceUri::parse("https://Host/a?x=1#section").unwrap();
 
         // When: the remote source is observed.
-        let observed = reader.get_source(view.as_mut(), &remote).unwrap().unwrap();
+        let observed = reader.get_source(&remote).unwrap().unwrap();
 
         // Then: it remains unfetched without local I/O.
         assert_eq!(observed.availability, SourceAvailability::Unfetched);
@@ -165,14 +177,15 @@ mod tests {
         // Given: a declared local source and unchanged referrers.
         let repo = prepare_sources();
         let recorded_reads = Rc::new(RefCell::new(Vec::new()));
-        let reader = SourceService::new(RecordedFiles::new(repo.path(), recorded_reads.clone()));
-        let mut storage = open_storage(repo.path());
-        let mut view = storage.begin_read_tx().unwrap();
+        let reader = SourceService::new(
+            Rc::new(open_storage(repo.path()).cache),
+            RecordedFiles::new(repo.path(), recorded_reads.clone()),
+        );
         let uri = SourceUri::parse("source.txt").unwrap();
         fs::write(repo.path().join("source.txt"), b"def").unwrap();
 
         // When: the live source bytes are observed.
-        let observed = reader.get_source(view.as_mut(), &uri).unwrap().unwrap();
+        let observed = reader.get_source(&uri).unwrap().unwrap();
 
         // Then: current bytes are returned without editing referrers.
         assert_eq!(observed.availability, SourceAvailability::Available);
@@ -187,25 +200,60 @@ mod tests {
     }
 
     #[test]
+    fn excludes_only_stable_nonregular_source_leaves() {
+        for (kind, excluded) in [
+            (FileErrorKind::NonRegular, true),
+            (FileErrorKind::UnsafePath, false),
+            (FileErrorKind::Changed, false),
+            (FileErrorKind::Io, false),
+        ] {
+            // Given: a recorded source and a boundary reporting one precise file outcome.
+            let repo = prepare_sources();
+            let mut files = MockFileReader::new();
+            files
+                .expect_file_get_by_path()
+                .withf(|path| path == std::path::Path::new("source.txt"))
+                .times(1)
+                .returning(move |_| Err(FileError::new(kind)));
+            let reader = SourceService::new(Rc::new(open_storage(repo.path()).cache), files);
+            // When: the source consumer interprets the file outcome.
+            let result = reader.get_source(&SourceUri::parse("source.txt").unwrap());
+            // Then: only a stable nonregular final entry is missing; all failures stay errors.
+            if excluded {
+                assert_eq!(
+                    result.unwrap().unwrap().availability,
+                    SourceAvailability::SourceNotFound
+                );
+            } else {
+                assert_eq!(
+                    result.unwrap_err().get_kind(),
+                    DocumentErrorKind::InternalError
+                );
+            }
+        }
+    }
+
+    #[test]
     fn propagate_private_source_failure() {
         // Given: a source read that fails with a private cause.
         let repo = prepare_sources();
         let recorded_reads = Rc::new(RefCell::new(Vec::new()));
         let mut files = RecordedFiles::new(repo.path(), recorded_reads);
         files.failure = Some(RepoPath::parse("source.txt").unwrap());
-        let reader = SourceService::new(files);
-        let mut storage = open_storage(repo.path());
-        let mut view = storage.begin_read_tx().unwrap();
+        let reader = SourceService::new(Rc::new(open_storage(repo.path()).cache), files);
         let uri = SourceUri::parse("source.txt").unwrap();
 
         // When: the live source is requested.
-        let error = reader.get_source(view.as_mut(), &uri).unwrap_err();
+        let error = reader.get_source(&uri).unwrap_err();
 
         // Then: a safe typed error preserves the private cause internally.
         assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
         assert!(!error.to_string().contains("PRIVATE_SOURCE_CAUSE"));
         assert!(!format!("{error:?}").contains("PRIVATE_SOURCE_CAUSE"));
-        assert_eq!(error.source().unwrap().to_string(), "PRIVATE_SOURCE_CAUSE");
+        assert_eq!(
+            error.source().unwrap().source().unwrap().to_string(),
+            "PRIVATE_SOURCE_CAUSE"
+        );
     }
 
     struct RecordedFiles {
@@ -217,38 +265,79 @@ mod tests {
     impl RecordedFiles {
         fn new(root: &Path, reads: Rc<RefCell<Vec<RepoPath>>>) -> Self {
             Self {
-                inner: LocalFileSystem::open(root).unwrap(),
+                inner: LocalFileSystem::new(root).unwrap(),
                 reads,
                 failure: None,
             }
         }
     }
 
-    impl FileSystem for RecordedFiles {
-        type IndexLock = <LocalFileSystem as FileSystem>::IndexLock;
-
-        fn stat_file(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
-            self.inner.stat_file(path)
+    impl FileReader for RecordedFiles {
+        fn symlink_is_exist(&self, path: &Path) -> FileResult<bool> {
+            self.inner.symlink_is_exist(path)
         }
-
-        fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
-            self.reads.borrow_mut().push(path.clone());
-            if self.failure.as_ref() == Some(path) {
-                return Err(DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    "cannot read source",
+        fn file_get_stat_by_path(&self, path: &std::path::Path) -> FileResult<Option<FileStat>> {
+            self.inner.file_get_stat_by_path(path)
+        }
+        fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+            panic!("unexpected file_get_bytes_by_path")
+        }
+        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            self.reads
+                .borrow_mut()
+                .push(RepoPath::parse(path.to_str().unwrap()).unwrap());
+            if self
+                .failure
+                .as_ref()
+                .is_some_and(|failure| failure.as_str() == path.to_str().unwrap())
+            {
+                return Err(FileError::new_with_cause(
+                    FileErrorKind::Io,
                     io::Error::other("PRIVATE_SOURCE_CAUSE"),
                 ));
             }
-            self.inner.get_file(path)
+            self.inner.file_get_by_path(path)
         }
-
-        fn get_time_ns(&self) -> DocumentResult<i64> {
-            self.inner.get_time_ns()
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unexpected file_get_identity_by_path")
         }
-
-        fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
-            self.inner.lock_index()
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unexpected file_is_exist")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_identity_by_path")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_distinct_by_paths")
+        }
+        fn directory_get_by_path(&self, path: &Path) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            self.inner.directory_get_by_path(path)
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            panic!("unexpected lock_get_owner_by_path")
+        }
+    }
+    impl FileLocker for RecordedFiles {
+        type Lock = <LocalFileSystem as FileLocker>::Lock;
+        fn lock_acquire_by_path(&self, path: &std::path::Path) -> FileResult<Self::Lock> {
+            self.inner.lock_acquire_by_path(path)
+        }
+        fn lock_try_acquire_by_path(&self, _: &std::path::Path) -> FileResult<Option<Self::Lock>> {
+            panic!("unexpected lock probe")
         }
     }
 
@@ -276,9 +365,9 @@ mod tests {
         repo
     }
 
-    fn open_storage(root: &Path) -> SqliteStorage {
+    fn open_storage(root: &Path) -> TestDatabases {
         fs::create_dir_all(root.join(".letopis")).unwrap();
-        SqliteStorage::open(
+        crate::storage::open_test_storage(
             &root.join(".letopis/cache.db"),
             &root.join(".letopis/vectors.db"),
         )

@@ -5,7 +5,11 @@ use crate::domain::{
 use pulldown_cmark::{Event, LinkType, Tag, TagEnd};
 use std::{collections::BTreeSet, ops::Range};
 
-pub(super) fn collect(
+/// Collect the distinct declared edges inside the supplied elements without target I/O.
+///
+/// # Errors
+/// Returns a local diagnostic for an invalid declaration, target or navigation path.
+pub(super) fn edges_collect(
     events: &Events<'_>,
     elements: &[Element],
 ) -> Result<BTreeSet<Edge>, Diagnostic> {
@@ -45,27 +49,27 @@ pub(super) fn collect(
         if !title.starts_with("letopis:") {
             continue;
         }
-        edges.insert(build_edge(element, dest_url, title, range)?);
+        edges.insert(edge_build(element, dest_url, title, range)?);
     }
     Ok(edges)
 }
 
 /// Build one graph edge from a `letopis:` link title, rejecting malformed declarations.
-fn build_edge(
+fn edge_build(
     element: &Element,
     dest_url: &str,
     title: &str,
     range: &Range<usize>,
 ) -> Result<Edge, Diagnostic> {
     let (edge_type, address) =
-        parse_link_title(title).map_err(|kind| Diagnostic::new_at(kind, range.clone()))?;
+        link_title_parse(title).map_err(|kind| Diagnostic::new_at(kind, range.clone()))?;
     let target = if edge_type.as_str() == "external" {
         SourceUri::parse(address).map(EdgeTarget::Source)
     } else {
         KnowledgeId::parse(address).map(EdgeTarget::Knowledge)
     }
     .map_err(|_| Diagnostic::new_at(DiagnosticKind::InvalidTarget, range.clone()))?;
-    verify_navigation_path(&element.id, dest_url, &target)
+    navigation_path_verify(&element.id, dest_url, &target)
         .map_err(|kind| Diagnostic::new_at(kind, range.clone()))?;
     Edge::new(element.id.clone(), target, edge_type).map_err(|e| {
         Diagnostic::new_at(
@@ -80,7 +84,7 @@ fn build_edge(
 }
 
 /// Parse the fixed title prefix; the complete terminal address remains literal.
-fn parse_link_title(title: &str) -> Result<(EdgeType, &str), DiagnosticKind> {
+fn link_title_parse(title: &str) -> Result<(EdgeType, &str), DiagnosticKind> {
     let (kind, address) = title
         .strip_prefix("letopis:type=")
         .and_then(|title| title.split_once(";path="))
@@ -93,7 +97,7 @@ fn parse_link_title(title: &str) -> Result<(EdgeType, &str), DiagnosticKind> {
 }
 
 /// Compare local file identities only; remote source addresses stay opaque.
-fn verify_navigation_path(
+fn navigation_path_verify(
     source: &KnowledgeId,
     destination: &str,
     target: &EdgeTarget,
@@ -110,7 +114,7 @@ fn verify_navigation_path(
             local.get_path().as_str()
         }
     };
-    let navigation = resolve_navigation_path(source, destination)?;
+    let navigation = navigation_path_resolve(source, destination)?;
     if navigation.as_str() != target_path {
         return Err(DiagnosticKind::LinkPathMismatch);
     }
@@ -118,7 +122,7 @@ fn verify_navigation_path(
 }
 
 /// Resolve a relative navigation file against the owning Markdown file without I/O.
-fn resolve_navigation_path(
+fn navigation_path_resolve(
     source: &KnowledgeId,
     destination: &str,
 ) -> Result<RepoPath, DiagnosticKind> {
@@ -138,7 +142,7 @@ fn resolve_navigation_path(
     if raw.starts_with('/') || raw.contains('?') || has_scheme {
         return Err(DiagnosticKind::LinkPathMismatch);
     }
-    let decoded = decode_navigation_path(raw)?;
+    let decoded = navigation_path_decode(raw)?;
     let owner = source
         .as_str()
         .split_once('#')
@@ -156,7 +160,7 @@ fn resolve_navigation_path(
 }
 
 /// Decode navigation escapes once, rejecting ambiguous separators and non-UTF-8 paths.
-fn decode_navigation_path(raw: &str) -> Result<String, DiagnosticKind> {
+fn navigation_path_decode(raw: &str) -> Result<String, DiagnosticKind> {
     let mut decoded = Vec::with_capacity(raw.len());
     let mut bytes = raw.bytes();
     while let Some(byte) = bytes.next() {
@@ -187,7 +191,7 @@ fn decode_navigation_path(raw: &str) -> Result<String, DiagnosticKind> {
 
 #[cfg(test)]
 mod tests {
-    use super::decode_navigation_path;
+    use super::navigation_path_decode;
     use crate::service::DiagnosticKind;
 
     #[test]
@@ -204,7 +208,7 @@ mod tests {
             "cache%C2%85.rs",
         ] {
             // When: decode navigation independently of the canonical target.
-            let result = decode_navigation_path(raw);
+            let result = navigation_path_decode(raw);
             // Then: literal and decoded forbidden characters have the same safe reason.
             assert_eq!(result, Err(DiagnosticKind::LinkPathMismatch), "{raw:?}");
         }
@@ -215,7 +219,7 @@ mod tests {
         // Given: malformed escapes must fail independently of target comparison.
         for raw in ["%", "%A", "%GG", "%G0", "%0G", "cache%20key%.rs"] {
             // When: decode the navigation path directly.
-            let result = decode_navigation_path(raw);
+            let result = navigation_path_decode(raw);
             // Then: preserving malformed percent bytes cannot masquerade as a path mismatch.
             assert_eq!(result, Err(DiagnosticKind::LinkPathMismatch), "{raw:?}");
         }
@@ -226,7 +230,7 @@ mod tests {
         // Given: percent bytes encode invalid, truncated, overlong or surrogate UTF-8.
         for raw in ["%FF", "%80", "%E2%82", "%C0%AF", "%ED%A0%80"] {
             // When: decode the navigation path directly.
-            let result = decode_navigation_path(raw);
+            let result = navigation_path_decode(raw);
             // Then: replacing invalid bytes with Unicode replacement characters must fail.
             assert_eq!(result, Err(DiagnosticKind::LinkPathMismatch), "{raw:?}");
         }

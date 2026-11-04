@@ -1,20 +1,12 @@
 use super::native::register_vec1;
 use crate::service::{StorageError, StorageErrorKind, StorageResult};
-use crate::utils::has_same_identity;
 use rusqlite::{Connection, ErrorCode, OpenFlags};
-use rustix::{
-    fd::{AsFd, BorrowedFd},
-    fs::{AtFlags, FileType, Mode, OFlags, Stat, fstat, open, statat},
-    io::Errno,
-};
 #[cfg(test)]
 use std::cell::RefCell;
 use std::{
     error::Error,
     fmt::Write,
-    fs,
-    io::ErrorKind,
-    path::{Path, PathBuf},
+    path::Path,
     thread,
     time::{Duration, Instant},
 };
@@ -32,178 +24,12 @@ const MAIN_SCHEMA: &str = "main";
 const VECTOR_SCHEMA: &str = "vec";
 const FOREIGN_KEYS_PRAGMA: &str = "foreign_keys";
 const WAL_MODE: &str = "wal";
-pub(super) const CACHE_DATABASE: &str = "cache.db";
-pub(super) const VECTOR_DATABASE: &str = "vectors.db";
 const DATABASE_OPEN_FLAGS: OpenFlags = OpenFlags::SQLITE_OPEN_READ_WRITE
     .union(OpenFlags::SQLITE_OPEN_CREATE)
     .union(OpenFlags::SQLITE_OPEN_NO_MUTEX)
     .union(OpenFlags::SQLITE_OPEN_URI);
 
-pub(super) struct ConfinedDirectory<'a> {
-    path: &'a Path,
-    pinned: BorrowedFd<'a>,
-    #[cfg(test)]
-    before_open: RefCell<Option<Box<dyn FnOnce()>>>,
-}
-impl<'a> ConfinedDirectory<'a> {
-    pub(super) fn new(path: &'a Path, pinned: &'a impl AsFd) -> Self {
-        Self {
-            path,
-            pinned: pinned.as_fd(),
-            #[cfg(test)]
-            before_open: RefCell::new(None),
-        }
-    }
-
-    /// Open a named database only while its path matches the pinned service directory.
-    ///
-    /// # Errors
-    /// Rejects unsafe aliases, replacement/symlinks, native capability or `SQLite` failures.
-    pub(super) fn open_database(&self, name: &str) -> StorageResult<Connection> {
-        self.verify()?;
-        #[cfg(test)]
-        if let Some(hook) = self.before_open.take() {
-            hook();
-        }
-        // Keep the supplied path: canonicalization would hide the symlink from SQLite.
-        let connection = open_raw_database(
-            &self.path.join(name),
-            DATABASE_OPEN_FLAGS | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        )?;
-        self.verify()?;
-        configure_connection(&connection)?;
-        Ok(connection)
-    }
-
-    /// Open an existing regular database read-only, returning none for an absent leaf.
-    /// The path must retain the pinned directory and observed leaf identities.
-    pub(super) fn open_observed_database(&self, name: &str) -> StorageResult<Option<Connection>> {
-        self.verify()?;
-        let Some(before) = self.get_regular_stat(name)? else {
-            return Ok(None);
-        };
-        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
-            | OpenFlags::SQLITE_OPEN_NO_MUTEX
-            | OpenFlags::SQLITE_OPEN_URI
-            | OpenFlags::SQLITE_OPEN_NOFOLLOW;
-        let connection = open_raw_database(&self.path.join(name), flags)?;
-        self.verify_observed_leaf(name, &before)?;
-        connection
-            .busy_timeout(Duration::ZERO)
-            .map_err(map_sqlite)?;
-        Ok(Some(connection))
-    }
-
-    /// Attach an existing confined vector file read-only; absence is not created.
-    pub(super) fn attach_observed_vectors(&self, connection: &Connection) -> StorageResult<bool> {
-        self.verify()?;
-        let Some(before) = self.get_regular_stat(VECTOR_DATABASE)? else {
-            return Ok(false);
-        };
-        let uri = encode_read_only_uri(&self.path.join(VECTOR_DATABASE))?;
-        connection
-            .execute("attach database ?1 as vec", [uri])
-            .map_err(map_sqlite)?;
-        self.verify_observed_leaf(VECTOR_DATABASE, &before)?;
-        Ok(true)
-    }
-
-    /// Attach the confined vectors database under the connection's no-follow policy.
-    ///
-    /// # Errors
-    /// Rejects replaced/unsafe paths or `SQLite` attachment/configuration failures.
-    pub(super) fn attach_vectors(&self, connection: &Connection) -> StorageResult<()> {
-        self.verify()?;
-        #[cfg(test)]
-        if let Some(hook) = self.before_open.take() {
-            hook();
-        }
-        // ATTACH inherits SQLITE_OPEN_NOFOLLOW from this directory's main connection.
-        attach_unconfigured_vectors(connection, &self.path.join(VECTOR_DATABASE))?;
-        self.verify()?;
-        configure_database(connection, VECTOR_SCHEMA)
-    }
-
-    /// Attach the confined cache read-only for hash-reference checks during vector writes.
-    ///
-    /// # Errors
-    /// Rejects changed directory/leaf paths and failures attaching the read-only database.
-    pub(super) fn attach_cache(&self, connection: &Connection) -> StorageResult<()> {
-        self.verify()?;
-        #[cfg(test)]
-        if let Some(hook) = self.before_open.take() {
-            hook();
-        }
-        attach_cache(connection, &self.path.join(CACHE_DATABASE))?;
-        self.verify()
-    }
-
-    /// Verify the retained directory and require distinct regular database leaves.
-    ///
-    /// Missing leaves are allowed for initial creation; existing aliases are rejected.
-    /// # Errors
-    /// Reports unsafe paths, replacement or failed descriptor/path observations.
-    pub(super) fn verify(&self) -> StorageResult<()> {
-        let directory = open(
-            self.path,
-            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-            Mode::empty(),
-        )
-        .map_err(map_path_error)?;
-        let current = fstat(&directory).map_err(map_path_error)?;
-        let pinned = fstat(self.pinned).map_err(map_path_error)?;
-        if !has_same_identity(&current, &pinned) {
-            return Err(fail_unsafe_path());
-        }
-        let cache = self.get_regular_stat(CACHE_DATABASE)?;
-        let vectors = self.get_regular_stat(VECTOR_DATABASE)?;
-        if let (Some(cache), Some(vectors)) = (cache, vectors)
-            && has_same_identity(&cache, &vectors)
-        {
-            return Err(fail_unsafe_path());
-        }
-        Ok(())
-    }
-
-    fn verify_observed_leaf(&self, name: &str, before: &Stat) -> StorageResult<()> {
-        self.verify()?;
-        let Some(after) = self.get_regular_stat(name)? else {
-            return Err(fail_unsafe_path());
-        };
-        if !has_same_identity(before, &after) {
-            return Err(fail_unsafe_path());
-        }
-        Ok(())
-    }
-
-    fn get_regular_stat(&self, name: &str) -> StorageResult<Option<Stat>> {
-        match statat(self.pinned, name, AtFlags::SYMLINK_NOFOLLOW) {
-            Ok(stat) if FileType::from_raw_mode(stat.st_mode) == FileType::RegularFile => {
-                Ok(Some(stat))
-            }
-            Ok(_) => Err(fail_unsafe_path()),
-            Err(Errno::NOENT) => Ok(None),
-            Err(error) => Err(map_path_error(error)),
-        }
-    }
-}
-
-fn fail_unsafe_path() -> StorageError {
-    StorageError::new(
-        StorageErrorKind::InvalidRequest,
-        "unsafe document storage path",
-    )
-}
-
-fn map_path_error(error: Errno) -> StorageError {
-    StorageError::new_with_cause(
-        StorageErrorKind::InvalidRequest,
-        "cannot validate document storage path",
-        error,
-    )
-}
-
-pub(super) fn map_sqlite(error: rusqlite::Error) -> StorageError {
+pub(crate) fn map_sqlite(error: rusqlite::Error) -> StorageError {
     StorageError::new_with_cause(
         StorageErrorKind::InternalError,
         "storage database operation failed",
@@ -213,7 +39,7 @@ pub(super) fn map_sqlite(error: rusqlite::Error) -> StorageError {
 
 // Only schema creation and WAL initialization/readiness use this bounded lock wait.
 // The five-second budget applies to each call, not the entire open or command.
-// Cache/read connections retain zero busy timeout; SqliteStorage separately
+// Cache/read connections retain zero busy timeout; VectorStorage separately
 // configures a bounded wait on its independent vectors writer.
 pub(super) fn wait_for_initialization<T>(
     mut operation: impl FnMut() -> StorageResult<T>,
@@ -248,87 +74,42 @@ fn is_initialization_contention(error: &StorageError) -> bool {
     )
 }
 
-pub(super) fn prepare_paths(cache: &Path, vectors: &Path) -> StorageResult<(PathBuf, PathBuf)> {
-    let cache = resolve_path(cache)?;
-    let vectors = resolve_path(vectors)?;
-    if cache == vectors || has_same_file(&cache, &vectors)? {
-        return Err(StorageError::new(
-            StorageErrorKind::InvalidRequest,
-            "storage databases must be distinct files",
-        ));
-    }
-    Ok((cache, vectors))
-}
-
-fn resolve_path(path: &Path) -> StorageResult<PathBuf> {
-    let raw = path
-        .to_str()
-        .filter(|raw| !raw.is_empty() && !raw.contains('\0'))
-        .ok_or_else(|| {
-            StorageError::new(
-                StorageErrorKind::InvalidRequest,
-                "invalid storage database path",
-            )
-        })?;
-    let path = Path::new(raw);
-    let resolved = if path.exists() {
-        fs::canonicalize(path)
-    } else {
-        let name = path.file_name().ok_or_else(|| {
-            StorageError::new(
-                StorageErrorKind::InvalidRequest,
-                "invalid storage database path",
-            )
-        })?;
-        let parent = path
-            .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
-            .unwrap_or(Path::new("."));
-        fs::canonicalize(parent).map(|parent| parent.join(name))
-    }
-    .map_err(|error| {
-        StorageError::new_with_cause(
-            StorageErrorKind::InvalidRequest,
-            "storage parent or file is unavailable",
-            error,
-        )
-    })?;
-    if resolved.to_str().is_none()
-        || resolved.is_dir()
-        || (!path.exists() && fs::symlink_metadata(path).is_ok())
-    {
-        return Err(StorageError::new(
-            StorageErrorKind::InvalidRequest,
-            "invalid storage database path",
-        ));
-    }
-    Ok(resolved)
-}
-
-fn has_same_file(cache: &Path, vectors: &Path) -> StorageResult<bool> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        let read = |path| match fs::metadata(path) {
-            Ok(metadata) => Ok(Some(metadata)),
-            Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(StorageError::new_with_cause(
-                StorageErrorKind::InvalidRequest,
-                "storage file identity unavailable",
-                error,
-            )),
-        };
-        if let (Some(cache), Some(vectors)) = (read(cache)?, read(vectors)?) {
-            return Ok(cache.dev() == vectors.dev() && cache.ino() == vectors.ino());
-        }
-    }
-    Ok(false)
-}
-
-pub(super) fn open_database(path: &Path) -> StorageResult<Connection> {
+pub(crate) fn open_database(path: &Path) -> StorageResult<Connection> {
     let connection = open_raw_database(path, DATABASE_OPEN_FLAGS)?;
     configure_connection(&connection)?;
     Ok(connection)
+}
+
+/// Open a writable database without following the final path component.
+///
+/// # Errors
+/// Returns native registration and `SQLite` opening failures; callers verify paths before configuration.
+pub(crate) fn open_confined_database(path: &Path) -> StorageResult<Connection> {
+    open_raw_database(path, DATABASE_OPEN_FLAGS | OpenFlags::SQLITE_OPEN_NOFOLLOW)
+}
+
+/// Open an existing database read-only, without creating or configuring persistent state.
+///
+/// # Errors
+/// Returns native registration, `SQLite` opening or timeout configuration failures.
+pub(crate) fn open_observed_database(path: &Path) -> StorageResult<Connection> {
+    let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
+        | OpenFlags::SQLITE_OPEN_NO_MUTEX
+        | OpenFlags::SQLITE_OPEN_URI
+        | OpenFlags::SQLITE_OPEN_NOFOLLOW;
+    let connection = open_raw_database(path, flags)?;
+    connection
+        .busy_timeout(Duration::ZERO)
+        .map_err(map_sqlite)?;
+    Ok(connection)
+}
+
+/// Configure the writable vector attachment after composition has verified its path.
+///
+/// # Errors
+/// Reports unsupported `SQLite` policy or database contention and I/O.
+pub(crate) fn configure_vectors(connection: &Connection) -> StorageResult<()> {
+    configure_database(connection, VECTOR_SCHEMA)
 }
 
 fn open_raw_database(path: &Path, flags: OpenFlags) -> StorageResult<Connection> {
@@ -336,7 +117,7 @@ fn open_raw_database(path: &Path, flags: OpenFlags) -> StorageResult<Connection>
     Connection::open_with_flags(path, flags).map_err(map_sqlite)
 }
 
-fn configure_connection(connection: &Connection) -> StorageResult<()> {
+pub(crate) fn configure_connection(connection: &Connection) -> StorageResult<()> {
     connection
         .busy_timeout(Duration::ZERO)
         .map_err(map_sqlite)?;
@@ -344,12 +125,15 @@ fn configure_connection(connection: &Connection) -> StorageResult<()> {
     verify_capabilities(connection)
 }
 
-pub(super) fn attach_vectors(connection: &Connection, path: &Path) -> StorageResult<()> {
+pub(crate) fn attach_vectors(connection: &Connection, path: &Path) -> StorageResult<()> {
     attach_unconfigured_vectors(connection, path)?;
     configure_database(connection, VECTOR_SCHEMA)
 }
 
-fn attach_unconfigured_vectors(connection: &Connection, path: &Path) -> StorageResult<()> {
+pub(crate) fn attach_unconfigured_vectors(
+    connection: &Connection,
+    path: &Path,
+) -> StorageResult<()> {
     let filename = path.to_str().ok_or_else(|| {
         StorageError::new(
             StorageErrorKind::InvalidRequest,
@@ -362,10 +146,18 @@ fn attach_unconfigured_vectors(connection: &Connection, path: &Path) -> StorageR
     Ok(())
 }
 
-pub(super) fn attach_cache(connection: &Connection, path: &Path) -> StorageResult<()> {
+pub(crate) fn attach_cache(connection: &Connection, path: &Path) -> StorageResult<()> {
     let uri = encode_read_only_uri(path)?;
     connection
         .execute("attach database ?1 as cache", [uri])
+        .map_err(map_sqlite)?;
+    Ok(())
+}
+
+pub(crate) fn attach_read_only_vectors(connection: &Connection, path: &Path) -> StorageResult<()> {
+    let uri = encode_read_only_uri(path)?;
+    connection
+        .execute("attach database ?1 as vec", [uri])
         .map_err(map_sqlite)?;
     Ok(())
 }
@@ -480,9 +272,318 @@ fn verify_capabilities(connection: &Connection) -> StorageResult<()> {
 }
 
 #[cfg(test)]
-#[path = "connection_policy_tests.rs"]
-mod policy_tests;
+mod policy_tests {
+    use super::{
+        attach_cache, attach_vectors, can_retry_initialization, configure_database, get_journal,
+        map_sqlite, open_database, wait_for_initialization,
+    };
+    use crate::service::{StorageError, StorageErrorKind};
+    use crate::with_verified_database_paths;
+    use rusqlite::{Connection, ErrorCode, ffi};
+    use std::ffi::{CStr, c_char, c_int, c_void};
+    use std::{
+        fs::{self, File},
+        os::unix::fs::symlink,
+        process::Command,
+        time::Duration,
+    };
+    use tempfile::TempDir;
 
-#[cfg(test)]
-#[path = "connection_tests.rs"]
-mod tests;
+    use crate::process_test_support as process_fixture;
+
+    struct IgnoredPolicy<'a>(&'a Connection);
+
+    #[test]
+    fn initialization_retry_stops_at_the_exact_budget_without_retrying_other_errors() {
+        // Given: exercise the real SQLite contention classification without a clock race.
+        let busy = map_sqlite(rusqlite::Error::SqliteFailure(
+            ffi::Error::new(ffi::SQLITE_BUSY),
+            None,
+        ));
+        let ordinary = StorageError::new(StorageErrorKind::InternalError, "not contention");
+        for (seconds, expected) in [(0, true), (4, true), (5, false), (6, false)] {
+            // When / Then: the five-second deadline is exclusive for another retry.
+            let elapsed = Duration::from_secs(seconds);
+            assert_eq!(can_retry_initialization(&busy, elapsed), expected);
+            assert!(!can_retry_initialization(&ordinary, elapsed));
+        }
+    }
+
+    #[test]
+    fn rejects_a_service_symlink_back_to_the_pinned_directory() {
+        // Given: identity equality after following a link is not confinement.
+        let root = TempDir::new().unwrap();
+        let base = fs::canonicalize(root.path()).unwrap();
+        let path = base.join(".letopis");
+        fs::create_dir(&path).unwrap();
+        let pinned = File::open(&path).unwrap();
+
+        let original = base.join("original");
+        fs::rename(&path, &original).unwrap();
+        symlink(&original, &path).unwrap();
+        // When: the filesystem revalidates the retained directory and database leaves.
+        let error = with_verified_database_paths(&path, &pinned, |_, _| Ok(())).unwrap_err();
+        // Then: the unsafe replacement is rejected without creating database files.
+        assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
+        assert!(fs::read_dir(original).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn rejects_service_directory_replacement_with_a_fifo_without_blocking() {
+        const CHILD: &str = "LETOPIS_STORAGE_DIRECTORY_FIFO_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            process_fixture::supervise_test(
+                "storage::connection::policy_tests::rejects_service_directory_replacement_with_a_fifo_without_blocking",
+                &[(CHILD, "1")],
+            );
+            return;
+        }
+        // Given: the pin was valid before an independent path replacement.
+        let root = TempDir::new().unwrap();
+        let base = fs::canonicalize(root.path()).unwrap();
+        let path = base.join(".letopis");
+        fs::create_dir(&path).unwrap();
+        let pinned = File::open(&path).unwrap();
+
+        fs::rename(&path, base.join("original")).unwrap();
+        assert!(
+            Command::new("mkfifo")
+                .arg(&path)
+                .status()
+                .unwrap()
+                .success()
+        );
+        // When: the filesystem revalidates the retained directory and database leaves.
+        let error = with_verified_database_paths(&path, &pinned, |_, _| Ok(())).unwrap_err();
+        // Then: the parent's owned-child watchdog detects a blocking open.
+        assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
+        assert!(
+            fs::read_dir(base.join("original"))
+                .unwrap()
+                .next()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn rejects_non_regular_database_leaves_before_sqlite_opens_them() {
+        for name in ["cache.db", "vectors.db"] {
+            // Given: a pinned service directory contains a nonregular database leaf.
+            let root = TempDir::new().unwrap();
+            let path = fs::canonicalize(root.path()).unwrap();
+            let pinned = File::open(&path).unwrap();
+
+            fs::create_dir(path.join(name)).unwrap();
+            // When: the filesystem revalidates the retained directory and database leaves.
+            let error = with_verified_database_paths(&path, &pinned, |_, _| Ok(())).unwrap_err();
+            // Then: the unsafe replacement is rejected without creating database files.
+            assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
+            assert!(fs::read_dir(path.join(name)).unwrap().next().is_none());
+        }
+    }
+
+    #[test]
+    fn does_not_retry_non_contention_storage_errors() {
+        // Given: a finite second result exposes an accidental retry without timing.
+        let mut attempts = 0;
+        // When
+        let error = wait_for_initialization(|| {
+            attempts += 1;
+            if attempts == 1 {
+                return Err(StorageError::new(
+                    StorageErrorKind::InternalError,
+                    "nonretryable",
+                ));
+            }
+            Ok(42)
+        })
+        .unwrap_err();
+        // Then
+        assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
+        assert_eq!(attempts, 1);
+    }
+
+    #[test]
+    fn rejects_a_database_that_cannot_enable_wal() {
+        // Given: SQLite keeps an in-memory database in memory journal mode.
+        let connection = Connection::open_in_memory().unwrap();
+        // When
+        let error = configure_database(&connection, "main").unwrap_err();
+        // Then: successful PRAGMA execution alone does not establish durability.
+        assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
+        let journal: String = connection
+            .pragma_query_value(None, "journal_mode", |row| row.get(0))
+            .unwrap();
+        assert_eq!(journal, "memory");
+    }
+
+    #[test]
+    fn reads_the_existing_database_journal_mode() {
+        // Given
+        let root = TempDir::new().unwrap();
+        let connection = Connection::open(root.path().join("database")).unwrap();
+        for expected in ["wal", "delete"] {
+            connection
+                .pragma_update(None, "journal_mode", expected)
+                .unwrap();
+            // When
+            let journal = get_journal(&connection, "main").unwrap();
+            // Then: readiness checks must observe the mode before changing it.
+            assert_eq!(journal, expected);
+        }
+    }
+
+    #[test]
+    fn rejects_each_policy_setting_that_sqlite_does_not_apply() {
+        for policy in [c"foreign_keys", c"synchronous"] {
+            // Given: ignore only the selected setter while allowing all observations.
+            let root = TempDir::new().unwrap();
+            let connection = Connection::open(root.path().join("database")).unwrap();
+            let name = policy.to_str().unwrap();
+            connection.pragma_update(None, name, 0).unwrap();
+            let ignored = IgnoredPolicy::new(&connection, policy);
+            // When
+            let error = configure_database(&connection, "main").unwrap_err();
+            drop(ignored);
+            // Then: WAL and the other setting work, but one bad setting must fail closed.
+            assert_eq!(error.get_kind(), StorageErrorKind::InternalError);
+            assert_eq!(get_journal(&connection, "main").unwrap(), "wal");
+            for (setting, expected) in [("foreign_keys", 1), ("synchronous", 2)] {
+                let observed: i64 = connection
+                    .pragma_query_value(None, setting, |row| row.get(0))
+                    .unwrap();
+                assert_eq!(observed, if setting == name { 0 } else { expected });
+            }
+            // Cleanup is scoped: the same setter works after the authorizer is removed.
+            connection.pragma_update(None, name, 1).unwrap();
+            let restored: i64 = connection
+                .pragma_query_value(None, name, |row| row.get(0))
+                .unwrap();
+            assert_eq!(restored, 1);
+        }
+    }
+
+    #[test]
+    fn both_database_connections_enforce_policy() {
+        // Given
+        let root = TempDir::new().unwrap();
+        let cache = root.path().join("cache.db");
+        let vectors = root.path().join("vectors.db");
+        for path in [&cache, &vectors] {
+            // When
+            let connection = open_database(path).unwrap();
+            // Then
+            assert_policy(&connection, "main");
+            let info: String = connection
+                .query_row("select vec1_info()", [], |r| r.get(0))
+                .unwrap();
+            assert!(info.starts_with("version 0.8"));
+            let error = connection
+                .query_row("select load_extension('missing')", [], |r| {
+                    r.get::<_, String>(0)
+                })
+                .unwrap_err();
+            assert!(error.to_string().contains("not authorized"));
+        }
+        // When / Then: the attached vectors database follows the same policy.
+        let connection = open_database(&cache).unwrap();
+        attach_vectors(&connection, &vectors).unwrap();
+        assert_policy(&connection, "vec");
+    }
+
+    #[test]
+    fn attached_cache_is_read_only_with_encoded_path_delimiters() {
+        // Given: delimiters, quotes and UTF-8 must name the literal file.
+        let root = TempDir::new().unwrap();
+        let cache = root.path().join("cache ?#%é' name.db");
+        let writer = open_database(&cache).unwrap();
+        writer.pragma_update(None, "user_version", 7).unwrap();
+        let vectors = open_database(&root.path().join("vectors")).unwrap();
+        // When
+        attach_cache(&vectors, &cache).unwrap();
+        let version: i64 = vectors
+            .query_row("pragma cache.user_version", [], |r| r.get(0))
+            .unwrap();
+        let error = vectors
+            .execute_batch("pragma cache.user_version=8;")
+            .unwrap_err();
+        // Then: the attached URI uses the intended database and rejects writes.
+        assert_eq!(version, 7);
+        assert_eq!(error.sqlite_error_code(), Some(ErrorCode::ReadOnly));
+        assert_eq!(
+            writer
+                .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+                .unwrap(),
+            7
+        );
+    }
+
+    fn assert_policy(connection: &rusqlite::Connection, schema: &str) {
+        let journal: String = connection
+            .query_row(&format!("pragma {schema}.journal_mode"), [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(journal, "wal");
+        for (pragma, expected) in [("synchronous", 2), ("foreign_keys", 1), ("busy_timeout", 0)] {
+            let actual: i64 = connection
+                .query_row(&format!("pragma {schema}.{pragma}"), [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(actual, expected, "{schema}.{pragma}");
+        }
+        #[cfg(target_os = "macos")]
+        assert_eq!(
+            connection
+                .query_row(&format!("pragma {schema}.fullfsync"), [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+    }
+
+    impl<'a> IgnoredPolicy<'a> {
+        fn new(connection: &'a Connection, policy: &'static CStr) -> Self {
+            // SAFETY: the owned connection outlives this guard, the callback never
+            // unwinds, and its read-only C-string context has static lifetime.
+            let result = unsafe {
+                ffi::sqlite3_set_authorizer(
+                    connection.handle(),
+                    Some(accept_policy_setting),
+                    policy.as_ptr().cast_mut().cast(),
+                )
+            };
+            assert_eq!(result, ffi::SQLITE_OK);
+            Self(connection)
+        }
+    }
+
+    impl Drop for IgnoredPolicy<'_> {
+        fn drop(&mut self) {
+            // SAFETY: the borrowed connection is still live; removing a callback
+            // cannot access its context after this guard returns.
+            unsafe {
+                ffi::sqlite3_set_authorizer(self.0.handle(), None, std::ptr::null_mut());
+            }
+        }
+    }
+
+    unsafe extern "C" fn accept_policy_setting(
+        context: *mut c_void,
+        action: c_int,
+        name: *const c_char,
+        value: *const c_char,
+        _database: *const c_char,
+        _trigger: *const c_char,
+    ) -> c_int {
+        if action != ffi::SQLITE_PRAGMA || context.is_null() || name.is_null() || value.is_null() {
+            return ffi::SQLITE_OK;
+        }
+        // SAFETY: SQLite supplies a live NUL-terminated PRAGMA name for this action;
+        // the checked context is the static C string installed by IgnoredPolicy.
+        // Comparing bytes neither allocates, invokes SQLite, nor can panic/unwind.
+        let selected = unsafe { CStr::from_ptr(name) == CStr::from_ptr(context.cast()) };
+        if selected {
+            ffi::SQLITE_IGNORE
+        } else {
+            ffi::SQLITE_OK
+        }
+    }
+}

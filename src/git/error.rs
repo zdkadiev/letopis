@@ -18,6 +18,6 @@ impl fmt::Debug for SafeIo {
 impl Error for SafeIo {}
 
 /// Retain an I/O cause without exposing arbitrary library/object payloads.
-pub(super) fn make_io_error(message: &'static str, error: io::Error) -> SnapshotError {
+pub(super) fn object_map_io_error(message: &'static str, error: io::Error) -> SnapshotError {
     SnapshotError::new_with_cause(message, SafeIo(error))
 }

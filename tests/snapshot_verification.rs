@@ -23,10 +23,10 @@ fn verify_snapshot_accepts_exact_tree_without_writes() {
         let before_refs = repo.run_git_successfully(&["for-each-ref"], None);
         let before_objects = repo.run_git_successfully(&["count-objects", "-v"], None);
 
-        // When
-        let state = git.verify_snapshot(&tree).unwrap();
+        // When: verify the exact tree.
+        let state = git.tree_verify_by_oid(&tree).unwrap();
 
-        // Then
+        // Then: it is Available and index, user state, refs, and object count are unchanged.
         assert_eq!(state, SnapshotState::Available);
         assert_eq!(repo.capture_fixture_state(), before);
         assert_eq!(
@@ -59,7 +59,7 @@ fn verify_snapshot_classifies_absent_foreign_and_non_tree_objects() {
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let before_refs = repo.run_git_successfully(&["for-each-ref"], None);
 
-        // When / Then: neither commits nor tags may be peeled into trees.
+        // When / Then: verify missing, foreign, blob, commit, and tag OIDs without peeling them.
         for (oid, expected) in [
             (missing, SnapshotState::Missing),
             (blob.as_str(), SnapshotState::Invalid),
@@ -67,10 +67,9 @@ fn verify_snapshot_classifies_absent_foreign_and_non_tree_objects() {
             (tag.as_str(), SnapshotState::Invalid),
             (foreign, SnapshotState::Invalid),
         ] {
-            // When / Then
-            assert_eq!(git.verify_snapshot(&parse_tree(oid)).unwrap(), expected);
+            assert_eq!(git.tree_verify_by_oid(&parse_tree(oid)).unwrap(), expected);
         }
-        // Then
+        // Then: verification leaves refs unchanged.
         assert_eq!(
             repo.run_git_successfully(&["for-each-ref"], None),
             before_refs
@@ -90,8 +89,8 @@ fn verify_snapshot_propagates_policy_and_integrity_failures() {
         let alternates = repo.get_root().join(".git/objects/info/alternates");
         fs::write(&alternates, b"/DONOR_PATH_CANARY/objects\n").unwrap();
 
-        // When / Then
-        assert_safe_internal_error(&git.verify_snapshot(&tree).unwrap_err(), &repo, &tree);
+        // When / Then: the late alternates policy fails safely without changing refs.
+        assert_safe_internal_error(&git.tree_verify_by_oid(&tree).unwrap_err(), &repo, &tree);
         assert_eq!(
             repo.run_git_successfully(&["for-each-ref"], None),
             before_refs
@@ -101,8 +100,8 @@ fn verify_snapshot_propagates_policy_and_integrity_failures() {
         fs::remove_file(alternates).unwrap();
         repo.replace_loose_object(tree.as_str(), &replacement);
 
-        // When / Then
-        assert_safe_internal_error(&git.verify_snapshot(&tree).unwrap_err(), &repo, &tree);
+        // When / Then: the hash-mismatched tree fails safely without changing refs.
+        assert_safe_internal_error(&git.tree_verify_by_oid(&tree).unwrap_err(), &repo, &tree);
         assert_eq!(
             repo.run_git_successfully(&["for-each-ref"], None),
             before_refs
@@ -122,10 +121,10 @@ fn verify_snapshot_checks_root_integrity_without_requiring_child_closure() {
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let before_refs = repo.run_git_successfully(&["for-each-ref"], None);
 
-        // When
-        let state = git.verify_snapshot(&tree).unwrap();
+        // When: verify the intact root that references an absent child.
+        let state = git.tree_verify_by_oid(&tree).unwrap();
 
-        // Then
+        // Then: the root is Available without ref writes or child materialization.
         assert_eq!(state, SnapshotState::Available);
         assert_eq!(
             repo.run_git_successfully(&["for-each-ref"], None),

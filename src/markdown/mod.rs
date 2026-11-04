@@ -9,6 +9,6 @@ mod search;
 
 pub use crate::service::{Diagnostic, DiagnosticKind, ParsedElement, ParsedFile};
 pub use parser::MarkdownParser;
-pub use parser::parse;
+pub use parser::file_parse;
 
 use events::Events;

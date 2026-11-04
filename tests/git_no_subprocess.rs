@@ -1,9 +1,12 @@
 //! Product-only denial/tracing intervals; Git fixtures and oracles run outside them.
+
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 mod support;
 
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
-    service::{NodeMetadata, Storage, VectorOutcome},
+    service::{NodeMetadata, VectorOutcome},
 };
 use serde_json::{Value, json};
 use std::{
@@ -35,7 +38,7 @@ fn sparse_index_inspect_captures_unrequested_tracked_ignored_members_without_hel
         let restored = fs::read(repo.get_root().join("omit/staged.md")).unwrap();
         let denial = Denial::new();
         // When: a request addresses only a file inside the sparse cone.
-        let result = denial.success(
+        let result = denial.run_successful_command(
             repo.get_root(),
             &["inspect"],
             r#"{"element_ids":["keep/a.md"]}"#,
@@ -67,23 +70,26 @@ fn model_free_commands_use_only_local_library_git() {
         prepare_note(&repo);
         let denial = Denial::new();
         // When / Then: commands preserve independently specified literal outcomes.
-        assert_eq!(denial.success(repo.get_root(), &["init"], "{}"), json!({}));
         assert_eq!(
-            denial.success(repo.get_root(), &["check"], "{}"),
+            denial.run_successful_command(repo.get_root(), &["init"], "{}"),
+            json!({})
+        );
+        assert_eq!(
+            denial.run_successful_command(repo.get_root(), &["check"], "{}"),
             json!({"errors":[]})
         );
-        let config = denial.success(repo.get_root(), &["config"], "{}");
+        let config = denial.run_successful_command(repo.get_root(), &["config"], "{}");
         assert_eq!(config["embedding_model"]["enabled"], false);
-        let status = denial.success(repo.get_root(), &["status"], "{}");
+        let status = denial.run_successful_command(repo.get_root(), &["status"], "{}");
         assert_eq!(status["revision"], 1);
-        let search = denial.success(
+        let search = denial.run_successful_command(
             repo.get_root(),
             &["search"],
             r#"{"query":"Needle","limit":5}"#,
         );
         assert_eq!(search.as_array().unwrap().len(), 1);
         assert_eq!(search[0]["element_id"], "note.md");
-        let inspected = denial.success(
+        let inspected = denial.run_successful_command(
             repo.get_root(),
             &["inspect"],
             r#"{"element_ids":["note.md","source.txt"]}"#,
@@ -93,14 +99,14 @@ fn model_free_commands_use_only_local_library_git() {
             inspected["elements"]["source.txt"]["hash"],
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
-        let traversed = denial.success(repo.get_root(), &["traverse"], r#"{"element_ids":["note.md"],"mode":"relations","direction":"outgoing","depth":1,"limit":5}"#);
+        let traversed = denial.run_successful_command(repo.get_root(), &["traverse"], r#"{"element_ids":["note.md"],"mode":"relations","direction":"outgoing","depth":1,"limit":5}"#);
         assert_eq!(traversed["elements"][0]["element_id"], "source.txt");
         assert_eq!(
-            denial.success(repo.get_root(), &["reindex"], "{}"),
+            denial.run_successful_command(repo.get_root(), &["reindex"], "{}"),
             json!({"revision":2})
         );
         assert_eq!(
-            denial.success(repo.get_root(), &["embed", "--drain"], ""),
+            denial.run_successful_command(repo.get_root(), &["embed", "--drain"], ""),
             json!({})
         );
         fs::write(
@@ -108,7 +114,7 @@ fn model_free_commands_use_only_local_library_git() {
             b"<!-- letopis: {\"created_at\":1} -->\nUpdated\n",
         )
         .unwrap();
-        let refreshed = denial.success(
+        let refreshed = denial.run_successful_command(
             repo.get_root(),
             &["search"],
             r#"{"query":"Updated","limit":5}"#,
@@ -125,8 +131,8 @@ fn error_paths_never_fall_back_to_executable_git() {
         let repo = TempRepo::new(format);
         fs::write(repo.get_root().join("note.md"), NOTE).unwrap();
         let denial = Denial::new();
-        denial.success(repo.get_root(), &["init"], "{}");
-        let captured = denial.success(
+        denial.run_successful_command(repo.get_root(), &["init"], "{}");
+        let captured = denial.run_successful_command(
             repo.get_root(),
             &["inspect"],
             r#"{"element_ids":["note.md"]}"#,
@@ -141,27 +147,27 @@ fn error_paths_never_fall_back_to_executable_git() {
         fs::write(object, b"corrupted private bytes").unwrap();
         // When / Then: independent expected errors, without accepting partial success.
         let query = json!({"query":"Needle","limit":5,"filters":{"source_revisions":[oid]}});
-        denial.failure(
+        denial.assert_command_failure(
             repo.get_root(),
             &["search"],
             &query.to_string(),
             "internal_error",
         );
-        denial.failure(
+        denial.assert_command_failure(
             repo.get_root(),
             &["inspect"],
             r#"{"element_ids":["note.md","missing.md"]}"#,
             "not_found",
         );
         fs::write(repo.get_root().join(".git/objects/info/alternates"), b"").unwrap();
-        denial.failure(repo.get_root(), &["check"], "{}", "internal_error");
+        denial.assert_command_failure(repo.get_root(), &["check"], "{}", "internal_error");
         fs::remove_file(repo.get_root().join(".git/objects/info/alternates")).unwrap();
         fs::write(
             repo.get_root().join(".letopis/config.json"),
             b"malformed private config",
         )
         .unwrap();
-        denial.failure(repo.get_root(), &["config"], "{}", "embedding_failed");
+        denial.assert_command_failure(repo.get_root(), &["config"], "{}", "embedding_failed");
         denial.assert_no_trap();
     }
 }
@@ -189,7 +195,7 @@ fn help_version_and_invalid_roots_need_no_git_executable() {
         );
     }
     for root in [outside.path(), bare.path()] {
-        denial.failure(root, &["init"], "{}", "invalid_request");
+        denial.assert_command_failure(root, &["init"], "{}", "invalid_request");
         assert!(!root.join(".letopis").exists());
     }
     denial.assert_no_trap();
@@ -201,8 +207,8 @@ fn nonempty_direct_drain_uses_owned_local_provider_without_git_helpers() {
     let repo = support::reading::ReadingRepo::new();
     repo.write_knowledge("note.md", "Needle");
     let denial = Denial::new();
-    denial.success(repo.get_root(), &["init"], "{}");
-    denial.success(repo.get_root(), &["check"], "{}");
+    denial.run_successful_command(repo.get_root(), &["init"], "{}");
+    denial.run_successful_command(repo.get_root(), &["check"], "{}");
     let http = HttpFixture::start(FixtureReply::Status {
         status: 200,
         body: r#"{"model":"fixture","embeddings":[[1,2,3]]}"#.into(),
@@ -210,32 +216,39 @@ fn nonempty_direct_drain_uses_owned_local_provider_without_git_helpers() {
     let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
     // When: direct drain processes actual nonempty pending work under denial/tracing.
     assert_eq!(
-        denial.success(repo.get_root(), &["embed", "--drain"], ""),
+        denial.run_successful_command(repo.get_root(), &["embed", "--drain"], ""),
         json!({})
     );
     // Then: exactly one local request stores the independent literal vector.
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    let work = read
-        .get_next_embedding_work_by_id_and_max_attempts(
-            &config.get_identity(),
-            config.get_max_attempts(),
-            None,
-        )
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            let work = read
+                .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                    &config.get_identity(),
+                    config.get_max_attempts(),
+                    None,
+                )
+                .unwrap();
+            assert_eq!(work, VectorOutcome::Current(None));
+            let id = EdgeTarget::Knowledge(KnowledgeId::parse("note.md").unwrap());
+            let node = StorageRead::nodes_get_by_id(read, &id).unwrap().unwrap();
+            let NodeMetadata::Knowledge(node) = node.metadata else {
+                panic!("knowledge node")
+            };
+            assert_eq!(
+                read.vector_keys_get_by_search_hash(&config.get_identity(), &node.search_hash)
+                    .unwrap(),
+                VectorOutcome::Current(Some(vec![1., 2., 3.]))
+            );
+            assert_eq!(http.take_requests().len(), 1);
+            denial.assert_no_trap();
+
+            Ok::<_, StorageError>(())
+        })
         .unwrap();
-    assert_eq!(work, VectorOutcome::Current(None));
-    let id = EdgeTarget::Knowledge(KnowledgeId::parse("note.md").unwrap());
-    let node = read.get_node_by_id(&id).unwrap().unwrap();
-    let NodeMetadata::Knowledge(node) = node.metadata else {
-        panic!("knowledge node")
-    };
-    assert_eq!(
-        read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
-            .unwrap(),
-        VectorOutcome::Current(Some(vec![1., 2., 3.]))
-    );
-    assert_eq!(http.take_requests().len(), 1);
-    denial.assert_no_trap();
 }
 
 impl Denial {
@@ -251,7 +264,7 @@ impl Denial {
         Self { directory }
     }
 
-    fn success(&self, root: &Path, args: &[&str], input: &str) -> Value {
+    fn run_successful_command(&self, root: &Path, args: &[&str], input: &str) -> Value {
         let output = self.invoke(root, args, input);
         assert_eq!(output.status.code(), Some(0), "{args:?}: {output:?}");
         let value: Value = serde_json::from_slice(&output.stdout).unwrap();
@@ -259,7 +272,7 @@ impl Denial {
         value["result"].clone()
     }
 
-    fn failure(&self, root: &Path, args: &[&str], input: &str, code: &str) {
+    fn assert_command_failure(&self, root: &Path, args: &[&str], input: &str, code: &str) {
         let output = self.invoke(root, args, input);
         assert_eq!(output.status.code(), Some(1), "{output:?}");
         let value: Value = serde_json::from_slice(&output.stdout).unwrap();

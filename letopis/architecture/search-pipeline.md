@@ -1,8 +1,31 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"1fba9cfb01cddb4e763b1d33580f48000952ea74"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Search pipeline
 
-Search refreshes the document projection, validates source-revision filters, reads embedding configuration, and opens a storage read view. It obtains text and available vector candidates, checks candidate eligibility and source provenance, then ranks the eligible results. Results are metadata links rather than the knowledge text; source text can be read from an inspect snapshot.
+A `search` request contains a query, a positive result limit and optional filters.
+The service refreshes the document projection, validates requested source revisions,
+observes embedding configuration and opens a scoped storage read view.
 
-[Source: src/service/search.rs](../../src/service/search.rs "letopis:type=external;path=src/service/search.rs")
+The query is split into Unicode alphanumeric tokens. Tokens are quoted and joined
+with `AND` for FTS; a query with no tokens returns no candidates. The current
+implementation obtains vector candidates first, when configuration and compatible
+vectors are available, and then obtains FTS candidates. An unavailable query vector
+leaves the full-text channel available.
 
-[Source: src/cli/help.rs](../../src/cli/help.rs "letopis:type=external;path=src/cli/help.rs")
+FTS uses SQLite FTS5/BM25. Vector lookup uses cosine distance and joins vector keys
+to knowledge by `search_hash`. The service collects metadata for the candidate
+union, checks source bindings and live knowledge observations, and applies filters
+before ranking. The read view carries the publication revision used in returned
+metadata links; the links are not the knowledge text.
+
+For each eligible channel, smaller BM25 or distance ranks first, with knowledge ID
+as a tie-break. The channels are fused by adding `1 / rank` for each occurrence;
+only then is the requested limit applied. A tie in the combined score is ordered
+by ID. This is rank fusion, not arithmetic on raw BM25 and vector distances.
+
+[Search implementation](../../src/service/search.rs "letopis:type=external;path=src/service/search.rs")
+
+[FTS query](../../src/storage/cache.rs "letopis:type=external;path=src/storage/cache.rs")
+
+[Vector query](../../src/storage/vector.rs "letopis:type=external;path=src/storage/vector.rs")
+
+[Embedding execution](embedding-execution.md "letopis:type=related_to;path=letopis/architecture/embedding-execution.md")

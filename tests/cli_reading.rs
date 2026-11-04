@@ -1,3 +1,5 @@
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead};
 #[expect(
     dead_code,
     reason = "Shared process fixture also exposes unrelated runtime helpers"
@@ -15,8 +17,7 @@ use letopis::{
     domain::{RepoPath, TreeOid},
     open_filesystem, open_git_snapshots,
     service::{
-        EmbedLocker, EmbeddingExecutor, GitSnapshots, NodeMetadata, Refresher, Storage,
-        VectorOutcome,
+        EmbeddingExecutor, FileLocker, GitSnapshots, NodeMetadata, Refresher, VectorOutcome,
     },
     wire_document_refresher, wire_embedding_executor,
 };
@@ -34,7 +35,7 @@ use support::{
 
 #[test]
 fn effective_filters_initialize_repository_for_search() {
-    // Given
+    // Given: effective source and recheck filters in uninitialized repositories.
     for filters in [
         json!({"needs_recheck":true}),
         json!({"needs_recheck":false}),
@@ -43,23 +44,26 @@ fn effective_filters_initialize_repository_for_search() {
         let repo = ReadingRepo::new();
         let body = json!({"query":"x","limit":1,"filters":filters}).to_string();
 
-        // When
+        // When: run search with each filter.
         let response = get_response(&repo.invoke(&["search"], body.as_bytes()), 0);
 
-        // Then
+        // Then: search succeeds with no matches and creates the cache.
         assert_eq!(response, json!({"ok":true,"result":[]}));
         assert!(repo.get_root().join(".letopis/cache.db").exists());
     }
+    // Given: a source-revision filter addresses an existing empty tree.
     let repo = ReadingRepo::new();
     let tree = open_git_snapshots(repo.get_root())
         .unwrap()
-        .create_tree(&[])
+        .tree_create(&[])
         .unwrap();
     let body =
         json!({"query":"x","limit":1,"filters":{"source_revisions":[tree.as_str()]}}).to_string();
 
+    // When: search with the source-revision filter.
     let response = get_response(&repo.invoke(&["search"], body.as_bytes()), 0);
 
+    // Then: search succeeds with no matches and creates the cache.
     assert_eq!(response, json!({"ok":true,"result":[]}));
     assert!(repo.get_root().join(".letopis/cache.db").exists());
 }
@@ -105,7 +109,14 @@ fn binary_search_refreshes_and_returns_links_with_empty_filter_equivalence() {
         );
     }
     assert_eq!(
-        repo.open_storage().begin_read_tx().unwrap().get_revision(),
+        {
+            let scope_databases = repo.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| Ok::<_, StorageError>(scope_databases.cache.project_get_by_id()))
+                .unwrap()
+        }
+        .unwrap(),
         1
     );
 }
@@ -144,25 +155,32 @@ fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
         server.take_requests(),
         vec![json!({"model":"fixture","input":["sqlite"],"truncate":false})]
     );
-    let mut storage = repo.open_storage();
-    let mut read = storage.begin_read_tx().unwrap();
-    let nodes = read.get_nodes().unwrap();
-    let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
-        panic!("knowledge")
-    };
-    assert_eq!(
-        read.get_vector_by_search_hash(&config.get_identity(), &node.search_hash)
-            .unwrap(),
-        VectorOutcome::Current(Some(vec![1.0, 0.0]))
-    );
+    let storage = repo.open_storage();
+    storage
+        .cache
+        .with_read_tx(|| {
+            let read = &storage.cache;
+            let nodes = read.nodes_get().unwrap();
+            let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
+                panic!("knowledge")
+            };
+            assert_eq!(
+                read.vector_keys_get_by_search_hash(&config.get_identity(), &node.search_hash)
+                    .unwrap(),
+                VectorOutcome::Current(Some(vec![1.0, 0.0]))
+            );
+
+            Ok::<_, StorageError>(())
+        })
+        .unwrap();
 }
 
 #[test]
 fn binary_inspect_returns_current_retained_tree_metadata() {
-    // Given
+    // Given: a CRLF knowledge fixture and duplicate normalized IDs.
     let repo = ReadingRepo::new();
     repo.write("knowledge.md", include_bytes!("fixtures/markdown/crlf.md"));
-    // When
+    // When: inspect through the executable.
     let response = get_response(
         &repo.invoke(
             &["inspect"],
@@ -171,16 +189,18 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
         0,
     );
     emit_reading("inspect_success", "inspect", 0, &response);
-    // Then
+    // Then: normalized metadata has the exact independent range and hash.
     assert_eq!(
         response["result"]["elements"],
         json!({"knowledge.md#a":{"path":"knowledge.md","lines":[1,3],"hash":"eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864"}})
     );
     let tree = TreeOid::parse(response["result"]["snapshot"].as_str().unwrap()).unwrap();
+    // Given: the live knowledge file changes after capture.
     repo.write("knowledge.md", b"later live edit");
     let git = open_git_snapshots(repo.get_root()).unwrap();
+    // When / Then: the retained snapshot still yields the original CRLF bytes.
     assert_eq!(
-        git.get_blob(&tree, &RepoPath::parse("knowledge.md").unwrap())
+        git.blob_get_by_tree_oid_and_path(&tree, &RepoPath::parse("knowledge.md").unwrap())
             .unwrap(),
         include_bytes!("fixtures/markdown/crlf.md")
     );
@@ -188,18 +208,18 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
 
 #[test]
 fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
-    // Given
+    // Given: knowledge, local-range, missing, and remote source IDs.
     let repo = ReadingRepo::new();
     let knowledge = b"<!-- letopis: {\"created_at\":1792800000,\"source_snapshot\":\"0000000000000000000000000000000000000000\"} -->\nCache decision.\n[range](src/cache.rs#L2-L2 \"letopis:type=external;path=src/cache.rs#L2-L2\")\n[missing](src/missing.rs \"letopis:type=external;path=src/missing.rs\")\n[remote](https://example.invalid/a?q=1#fragment \"letopis:type=external;path=https://example.invalid/a?q=1#fragment\")\n";
     repo.write("knowledge.md", knowledge);
     repo.write("src/cache.rs", b"alpha\r\nbeta\n");
     let body = br#"{"element_ids":["knowledge.md","src/cache.rs#L2-L2","src/missing.rs","https://example.invalid/a?q=1#fragment","./knowledge.md"]}"#;
 
-    // When
+    // When: inspect the mixed normalized IDs through the executable.
     let response = get_response(&repo.invoke(&["inspect"], body), 0);
 
     emit_reading("inspect_mixed", "inspect", 0, &response);
-    // Then
+    // Then: metadata has exact hashes or nulls and the retained tree contains captured bytes.
     assert_eq!(response["ok"], true);
     assert_eq!(
         response["result"]["elements"],
@@ -213,17 +233,17 @@ fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
     let tree = TreeOid::parse(response["result"]["snapshot"].as_str().unwrap()).unwrap();
     let git = open_git_snapshots(repo.get_root()).unwrap();
     assert_eq!(
-        git.get_blob(&tree, &RepoPath::parse("knowledge.md").unwrap())
+        git.blob_get_by_tree_oid_and_path(&tree, &RepoPath::parse("knowledge.md").unwrap())
             .unwrap(),
         knowledge
     );
     assert_eq!(
-        git.get_blob(&tree, &RepoPath::parse("src/cache.rs").unwrap())
+        git.blob_get_by_tree_oid_and_path(&tree, &RepoPath::parse("src/cache.rs").unwrap())
             .unwrap(),
         b"alpha\r\nbeta\n"
     );
     assert!(
-        git.get_blob(&tree, &RepoPath::parse("src/missing.rs").unwrap())
+        git.blob_get_by_tree_oid_and_path(&tree, &RepoPath::parse("src/missing.rs").unwrap())
             .is_err()
     );
 }
@@ -291,21 +311,31 @@ fn binary_query_failure_is_plain_fts_success_with_safe_persisted_error() {
         let requests = server.take_requests();
         assert_eq!(requests.len(), 1);
         assert_eq!(requests[0]["input"], json!(["sqlite"]));
-        let mut storage = repo.open_storage();
-        let mut read = storage.begin_read_tx().unwrap();
-        let error = read.get_query_error().unwrap().unwrap();
-        assert!(!error.error.contains("PRIVATE_PROVIDER_BODY"));
-        assert!(!error.error.contains("fixture-secret"));
-        assert_eq!(error.error, "embedding provider rejected request");
-        let nodes = read.get_nodes().unwrap();
-        let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
-            panic!("knowledge")
-        };
-        assert_eq!(
-            read.get_failure_by_search_hash(&config.get_identity(), &node.search_hash)
-                .unwrap(),
-            VectorOutcome::Current(None)
-        );
+        let storage = repo.open_storage();
+        storage
+            .cache
+            .with_read_tx(|| {
+                let read = &storage.cache;
+                let error = read.query_error_get_by_id().unwrap().unwrap();
+                assert!(!error.error.contains("PRIVATE_PROVIDER_BODY"));
+                assert!(!error.error.contains("fixture-secret"));
+                assert_eq!(error.error, "embedding provider rejected request");
+                let nodes = read.nodes_get().unwrap();
+                let NodeMetadata::Knowledge(node) = &nodes[0].metadata else {
+                    panic!("knowledge")
+                };
+                assert_eq!(
+                    read.embed_failures_get_by_search_hash(
+                        &config.get_identity(),
+                        &node.search_hash
+                    )
+                    .unwrap(),
+                    VectorOutcome::Current(None)
+                );
+
+                Ok::<_, StorageError>(())
+            })
+            .unwrap();
     }
 }
 
@@ -363,7 +393,16 @@ fn lost_output_then_retry_preserves_corpus_user_state_and_revision() {
             assert_eq!(get_response(&repo.invoke(&[args], body), 0)["ok"], true);
         }
         assert_eq!(
-            repo.open_storage().begin_read_tx().unwrap().get_revision(),
+            {
+                let scope_databases = repo.open_storage();
+                scope_databases
+                    .cache
+                    .with_read_tx(|| {
+                        Ok::<_, StorageError>(scope_databases.cache.project_get_by_id())
+                    })
+                    .unwrap()
+            }
+            .unwrap(),
             1
         );
         assert_eq!(capture_user_state(&repo), before);
@@ -396,7 +435,10 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
                 .unwrap()
         );
         let files = open_filesystem(repo.get_root()).unwrap();
-        let _lease = files.try_lock_embed().unwrap().unwrap();
+        let _lease = files
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .unwrap()
+            .unwrap();
         let child_service = repo.get_root().join("subdir/.letopis");
         fs::write(&child_service, b"keep unsafe child service path").unwrap();
         // When: the nested cwd must not change the lock or service directory owner.

@@ -1,7 +1,9 @@
+use crate::support::storage::open_storage;
+use letopis::service::CacheDatabase;
+use letopis::service::TransactionError;
 use letopis::{
     domain::Sha256,
-    open_storage,
-    service::{Configuration, EmbeddingConfig, NodeMetadata, Storage, StorageRead, VectorOutcome},
+    service::{Configuration, EmbeddingConfig, NodeMetadata, StorageRead, VectorOutcome},
 };
 use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
@@ -84,9 +86,14 @@ pub(super) fn observe_request(path: &Path) -> ObservationResult<()> {
     let vectors = request.root.join(".letopis/vectors.db");
     verify_database(&cache, CACHE_SCHEMA_VERSION)?;
     verify_database(&vectors, VECTOR_SCHEMA_VERSION)?;
-    let mut storage = open_storage(&cache, &vectors)?;
-    let mut snapshot = storage.begin_read_tx()?;
-    let receipt = observe_snapshot(snapshot.as_mut(), &request, &config)?;
+    let storage = open_storage(&cache, &vectors)?;
+    let receipt = storage
+        .cache
+        .with_read_tx(|| observe_snapshot(&storage.cache, &request, &config))
+        .map_err(|error| match error {
+            TransactionError::Operation(error) => error,
+            TransactionError::Storage(error) => Box::new(error) as Box<dyn std::error::Error>,
+        })?;
     let bytes = serde_json::to_vec_pretty(&receipt)?;
     let mut output = OpenOptions::new()
         .write(true)
@@ -139,19 +146,20 @@ fn verify_regular_file(path: &Path) -> ObservationResult<()> {
 }
 
 fn observe_snapshot(
-    snapshot: &mut dyn StorageRead,
+    snapshot: &dyn StorageRead,
     request: &Request,
     config: &EmbeddingConfig,
 ) -> ObservationResult<Receipt> {
     let identity = config.get_identity();
-    if snapshot.get_config_identity() != Some(identity) {
+    if snapshot.meta_get_by_id().unwrap() != Some(identity) {
         return Err("configuration identity mismatch".into());
     }
-    let dimensions = get_current(snapshot.get_vector_dimensions(&identity)?)?.map(usize::from);
+    let dimensions =
+        get_current(snapshot.vector_index_config_get_by_id(&identity)?)?.map(usize::from);
     verify_dimensions(config, dimensions)?;
     let (hashes, source_nodes) = get_hashes(snapshot)?;
     let knowledge_nodes = hashes.iter().map(|(_, nodes)| nodes).sum();
-    let edges = snapshot.get_edges_by_source_id(None)?.len();
+    let edges = snapshot.edges_get_by_source_id(None)?.len();
     if (knowledge_nodes, source_nodes, edges)
         != (
             request.expected_knowledge,
@@ -162,7 +170,7 @@ fn observe_snapshot(
         return Err("corpus counts mismatch".into());
     }
     let invalid_files = snapshot
-        .get_files()?
+        .files_get()?
         .iter()
         .filter(|file| !file.valid)
         .count();
@@ -178,7 +186,7 @@ fn observe_snapshot(
     };
     Ok(Receipt {
         schema_version: RECEIPT_VERSION,
-        project_revision: snapshot.get_revision(),
+        project_revision: snapshot.project_get_by_id().unwrap(),
         config_identity: identity.to_hex(),
         dimensions,
         knowledge_nodes,
@@ -204,10 +212,10 @@ fn verify_dimensions(config: &EmbeddingConfig, dimensions: Option<usize>) -> Obs
     Ok(())
 }
 
-fn get_hashes(snapshot: &mut dyn StorageRead) -> ObservationResult<(Vec<(Sha256, usize)>, usize)> {
+fn get_hashes(snapshot: &dyn StorageRead) -> ObservationResult<(Vec<(Sha256, usize)>, usize)> {
     let mut hashes = BTreeMap::new();
     let mut sources = 0;
-    for node in snapshot.get_nodes()? {
+    for node in snapshot.nodes_get()? {
         match node.metadata {
             NodeMetadata::Knowledge(node) => {
                 hashes
@@ -222,7 +230,7 @@ fn get_hashes(snapshot: &mut dyn StorageRead) -> ObservationResult<(Vec<(Sha256,
 }
 
 fn get_coverage(
-    snapshot: &mut dyn StorageRead,
+    snapshot: &dyn StorageRead,
     config: &EmbeddingConfig,
     dimensions: Option<usize>,
     hashes: &[(Sha256, usize)],
@@ -230,8 +238,8 @@ fn get_coverage(
     let mut coverage = Coverage::default();
     let identity = config.get_identity();
     for (hash, nodes) in hashes {
-        let vector = get_current(snapshot.get_vector_by_search_hash(&identity, hash)?)?;
-        let failure = get_current(snapshot.get_failure_by_search_hash(&identity, hash)?)?;
+        let vector = get_current(snapshot.vector_keys_get_by_search_hash(&identity, hash)?)?;
+        let failure = get_current(snapshot.embed_failures_get_by_search_hash(&identity, hash)?)?;
         if let Some(vector) = vector {
             if Some(vector.len()) != dimensions || vector.iter().any(|value| !value.is_finite()) {
                 return Err("invalid current vector".into());

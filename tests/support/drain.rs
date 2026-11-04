@@ -1,12 +1,15 @@
+use crate::support::storage::{Databases, open_storage};
 use crate::{
     cli,
     support::documents::{DocumentRepo, State, build_whole},
 };
+use letopis::service::StorageError;
+use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
 use letopis::{
     domain::{RepoPath, Sha256},
-    markdown::parse,
-    open_filesystem, open_storage,
-    service::{EmbedLocker, EmbeddingConfig, EmbeddingFailure, Refresher, Storage, VectorOutcome},
+    markdown::file_parse,
+    open_filesystem,
+    service::{EmbeddingConfig, EmbeddingFailure, FileLocker, Refresher, VectorOutcome},
     wire_document_refresher,
 };
 use serde_json::{Value, json};
@@ -66,7 +69,7 @@ impl Fixture {
             .unwrap()
             .refresh()
             .unwrap();
-        parse(&RepoPath::parse("knowledge.md").unwrap(), bytes.as_bytes())
+        file_parse(&RepoPath::parse("knowledge.md").unwrap(), bytes.as_bytes())
             .unwrap()
             .unwrap()
             .elements[0]
@@ -169,11 +172,20 @@ impl Fixture {
         hash: &Sha256,
     ) -> Option<Vec<f32>> {
         unwrap_current(
-            self.open_storage()
-                .begin_read_tx()
-                .unwrap()
-                .get_vector_by_search_hash(&config.get_identity(), hash)
-                .unwrap(),
+            {
+                let scope_databases = self.open_storage();
+                scope_databases
+                    .cache
+                    .with_read_tx(|| {
+                        Ok::<_, StorageError>(
+                            scope_databases
+                                .cache
+                                .vector_keys_get_by_search_hash(&config.get_identity(), hash),
+                        )
+                    })
+                    .unwrap()
+            }
+            .unwrap(),
         )
     }
 
@@ -187,11 +199,20 @@ impl Fixture {
         hash: &Sha256,
     ) -> Option<EmbeddingFailure> {
         unwrap_current(
-            self.open_storage()
-                .begin_read_tx()
-                .unwrap()
-                .get_failure_by_search_hash(&config.get_identity(), hash)
-                .unwrap(),
+            {
+                let scope_databases = self.open_storage();
+                scope_databases
+                    .cache
+                    .with_read_tx(|| {
+                        Ok::<_, StorageError>(
+                            scope_databases
+                                .cache
+                                .embed_failures_get_by_search_hash(&config.get_identity(), hash),
+                        )
+                    })
+                    .unwrap()
+            }
+            .unwrap(),
         )
     }
 
@@ -200,16 +221,24 @@ impl Fixture {
     /// # Panics
     /// Panics on storage failure, changed identity or remaining eligible work.
     pub fn assert_no_work(&self, config: &EmbeddingConfig) {
-        let work = self
-            .open_storage()
-            .begin_read_tx()
-            .unwrap()
-            .get_next_embedding_work_by_id_and_max_attempts(
-                &config.get_identity(),
-                config.get_max_attempts(),
-                None,
-            )
-            .unwrap();
+        let work = {
+            let scope_databases = self.open_storage();
+            scope_databases
+                .cache
+                .with_read_tx(|| {
+                    Ok::<_, StorageError>(
+                        scope_databases
+                            .cache
+                            .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                                &config.get_identity(),
+                                config.get_max_attempts(),
+                                None,
+                            ),
+                    )
+                })
+                .unwrap()
+        }
+        .unwrap();
         assert_eq!(work, VectorOutcome::Current(None));
     }
 
@@ -232,7 +261,7 @@ impl Fixture {
         (self.repo.get_state(), files, refs.stdout)
     }
 
-    fn open_storage(&self) -> impl Storage + use<> {
+    fn open_storage(&self) -> Databases<impl CacheDatabase + use<>, impl VectorDatabase + use<>> {
         open_storage(
             &self.repo.get_root().join(".letopis/cache.db"),
             &self.repo.get_root().join(".letopis/vectors.db"),
@@ -343,7 +372,12 @@ pub fn assert_success(output: &Output) {
 /// Panics if the lock path is unsafe or another process retains ownership.
 pub fn assert_released(root: &Path) {
     let files = open_filesystem(root).unwrap();
-    assert!(files.try_lock_embed().unwrap().is_some());
+    assert!(
+        files
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .unwrap()
+            .is_some()
+    );
 }
 
 fn has_exited(pid: i32) -> bool {
