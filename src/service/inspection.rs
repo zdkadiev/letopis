@@ -1,11 +1,13 @@
+use super::utils::map_document_file;
 use super::{
     CommandError, CommandErrorKind, CommandResult, CorpusLister, DocumentError, DocumentErrorKind,
-    ElementAddress, ElementLocation, FileSystem, GitSnapshots, InspectedElement, Inspection,
+    ElementAddress, ElementLocation, FileReader, GitSnapshots, InspectedElement, Inspection,
     Inspector, MarkdownCodec, ParsedFile, Refresher, SnapshotEntry, SnapshotError,
     SnapshotErrorKind,
 };
 use crate::domain::{BlobOid, EdgeTarget, RepoPath, Sha256, SourceUri, TreeOid};
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 pub(crate) struct InspectionService<D, G, F, M> {
     refresher: D,
@@ -30,7 +32,7 @@ impl<D, G, F, M> InspectionService<D, G, F, M> {
         }
     }
 }
-impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileSystem, M: MarkdownCodec> Inspector
+impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileReader, M: MarkdownCodec> Inspector
     for InspectionService<D, G, F, M>
 {
     fn inspect(&mut self, ids: &[ElementAddress]) -> CommandResult<Inspection> {
@@ -59,7 +61,7 @@ impl<D: Refresher, G: CorpusLister + GitSnapshots, F: FileSystem, M: MarkdownCod
         })
     }
 }
-impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G, F, M> {
+impl<D, G: GitSnapshots, F: FileReader, M: MarkdownCodec> InspectionService<D, G, F, M> {
     // Each call drops the file's bytes and parsed search text before the next read.
     fn capture_file(
         &self,
@@ -67,10 +69,9 @@ impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G
         requested: &BTreeSet<&str>,
     ) -> CommandResult<CapturedKnowledge> {
         let mut captured = CapturedKnowledge::default();
-        let Some(file) = self
-            .filesystem
-            .get_file(&path)
-            .map_err(map_document_error)?
+        let Some(file) =
+            map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
+                .map_err(map_document_error)?
         else {
             captured.observations.insert(path, None);
             return Ok(captured);
@@ -144,9 +145,7 @@ impl<D, G: GitSnapshots, F: FileSystem, M: MarkdownCodec> InspectionService<D, G
                 .map(Some)
                 .map_err(map_snapshot_error);
         }
-        let bytes = self
-            .filesystem
-            .get_file(path)
+        let bytes = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
             .map_err(map_document_error)?
             .map(|file| file.bytes);
         if let Some(observed) = captured.observations.get(path)
@@ -276,15 +275,18 @@ fn map_snapshot_error(cause: SnapshotError) -> CommandError {
 
 #[cfg(test)]
 mod tests {
+    use crate::service::{
+        FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult,
+    };
+
     use super::InspectionService;
     use crate::{
         domain::{BlobOid, RepoPath, Sha256, TreeOid},
         markdown::MarkdownParser,
         service::{
-            CapturedFile, CommandErrorKind, CorpusLister, DocumentError, DocumentErrorKind,
-            DocumentResult, ElementAddress, FileStat, FileSystem, GitSnapshots, Inspector,
-            RefreshOutcome, Refresher, RetainedTree, SnapshotEntry, SnapshotError,
-            SnapshotErrorKind, SnapshotFile,
+            CapturedFile, CommandErrorKind, CorpusLister, DocumentResult, ElementAddress, FileStat,
+            GitSnapshots, Inspector, RefreshOutcome, Refresher, RetainedTree, SnapshotEntry,
+            SnapshotError, SnapshotErrorKind, SnapshotFile,
         },
     };
     use std::{cell::RefCell, rc::Rc};
@@ -637,26 +639,26 @@ mod tests {
             Ok(RetainedTree::new(tree.clone()))
         }
     }
-    impl FileSystem for RecordingFiles {
-        type IndexLock = ();
-        fn get_file_stat_by_path(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
+    impl FileReader for RecordingFiles {
+        fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("capture uses verified reads")
         }
-        fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
-            if self.1 == Scenario::SourceIoFailure && path.as_str() == "source.txt" {
+        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            if self.1 == Scenario::SourceIoFailure && path.to_str().unwrap() == "source.txt" {
                 self.0.borrow_mut().push("read source.txt".into());
-                return Err(DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    "cannot read source file",
+                return Err(FileError::new_with_cause(
+                    FileErrorKind::Io,
                     std::io::Error::other("PRIVATE_SOURCE_BYTES"),
                 ));
             }
-            let read_again =
-                path.as_str() == "a.md" && self.0.borrow().iter().any(|event| event == "read a.md");
-            self.0.borrow_mut().push(format!("read {}", path.as_str()));
+            let read_again = path.to_str().unwrap() == "a.md"
+                && self.0.borrow().iter().any(|event| event == "read a.md");
+            self.0
+                .borrow_mut()
+                .push(format!("read {}", path.to_str().unwrap()));
             if matches!(self.1, Scenario::AbsentToMarked | Scenario::AbsentUnchanged)
                 && (!read_again || self.1 == Scenario::AbsentUnchanged)
-                && path.as_str() == "a.md"
+                && path.to_str().unwrap() == "a.md"
             {
                 return Ok(None);
             }
@@ -671,7 +673,7 @@ mod tests {
                     Scenario::UnmarkedUnchanged => UNMARKED_SOURCE.to_vec(),
                     _ => b"live edited after capture\n".to_vec(),
                 }
-            } else if self.1.uses_candidate_source() && path.as_str() == "a.md" {
+            } else if self.1.uses_candidate_source() && path.to_str().unwrap() == "a.md" {
                 UNMARKED_SOURCE.to_vec()
             } else if self.1.uses_candidate_source() {
                 MARKED_REFERER.to_vec()
@@ -682,7 +684,7 @@ mod tests {
             } else {
                 format!(
                     "<!-- letopis: {{\"created_at\":1}} -->\n{}",
-                    &path.as_str()[..1]
+                    &path.to_str().unwrap()[..1]
                 )
                 .into_bytes()
             };
@@ -697,11 +699,49 @@ mod tests {
                 bytes,
             }))
         }
-        fn get_time_ns(&self) -> DocumentResult<i64> {
-            panic!("capture must not own publication timing")
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unexpected file_get_identity_by_path")
         }
-        fn lock_index(&self) -> DocumentResult<()> {
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unexpected file_is_exist")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_identity_by_path")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_distinct_by_paths")
+        }
+        fn directory_get_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            panic!("unexpected directory_get_by_path")
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            panic!("unexpected lock_get_owner_by_path")
+        }
+    }
+    impl FileLocker for RecordingFiles {
+        type Lock = ();
+        fn lock_acquire_by_path(&self, _path: &std::path::Path) -> FileResult<()> {
             panic!("capture must not own publication lock")
+        }
+        fn lock_try_acquire_by_path(&self, _: &std::path::Path) -> FileResult<Option<Self::Lock>> {
+            panic!("unexpected lock probe")
         }
     }
 

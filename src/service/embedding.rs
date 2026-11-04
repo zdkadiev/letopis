@@ -1,11 +1,15 @@
 use super::{
-    CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, Configuration,
-    DrainOutcome, Embedder, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor,
-    EmbeddingFiles, EmbeddingProvider, EmbeddingResult, EmbeddingWork, MarkdownCodec,
-    QueryEmbedding, QueryEmbeddingRequest, StorageError, StorageErrorKind, TransactionError,
-    TransactionRequirement, VectorDatabase, VectorOutcome,
+    CacheDatabase, Clock, CommandError, CommandErrorKind, CommandResult, ConfigState,
+    Configuration, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind,
+    EmbeddingExecutor, EmbeddingProvider, EmbeddingResult, EmbeddingWork, FileLocker, FileReader,
+    MarkdownCodec, QueryEmbedding, QueryEmbeddingRequest, StorageError, StorageErrorKind,
+    TransactionError, TransactionRequirement, VectorDatabase, VectorOutcome,
 };
 use crate::domain::{KnowledgeId, RepoPath, Sha256};
+use crate::service::{FileError, FileErrorKind};
+use crate::utils::{CONFIG_PATH, EMBED_LOCK_PATH, SERVICE_DIRECTORY};
+use std::error::Error;
+use std::path::Path;
 use std::{collections::BTreeSet, num::NonZeroUsize, rc::Rc, time::Duration};
 
 const RETRY_DELAY: Duration = Duration::from_secs(1);
@@ -17,27 +21,46 @@ pub(crate) struct EmbeddingService<C, V, F, M, P> {
     vectors: Rc<V>,
     storage: Rc<C>,
     files: F,
+    clock: Box<dyn Clock>,
     markdown: M,
     provider: P,
 }
 
-impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
-    EmbeddingService<C, V, F, M, P>
+impl<
+    C: CacheDatabase,
+    V: VectorDatabase,
+    F: FileReader + FileLocker,
+    M: MarkdownCodec,
+    P: EmbeddingProvider,
+> EmbeddingService<C, V, F, M, P>
 {
     /// Construct the application service from its owned boundary implementations.
-    pub(crate) fn new(storage: Rc<C>, vectors: Rc<V>, files: F, markdown: M, provider: P) -> Self {
+    pub(crate) fn new(
+        storage: Rc<C>,
+        vectors: Rc<V>,
+        files: F,
+        clock: Box<dyn Clock>,
+        markdown: M,
+        provider: P,
+    ) -> Self {
         Self {
             vectors,
             storage,
             files,
+            clock,
             markdown,
             provider,
         }
     }
 }
 
-impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
-    EmbeddingExecutor for EmbeddingService<C, V, F, M, P>
+impl<
+    C: CacheDatabase,
+    V: VectorDatabase,
+    F: FileReader + FileLocker,
+    M: MarkdownCodec,
+    P: EmbeddingProvider,
+> EmbeddingExecutor for EmbeddingService<C, V, F, M, P>
 {
     fn has_work(&mut self) -> CommandResult<bool> {
         let ConfigState::Ready(config) = self.get_configuration().map_err(map_command)? else {
@@ -68,8 +91,13 @@ impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P
     }
 }
 
-impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
-    Embedder for EmbeddingService<C, V, F, M, P>
+impl<
+    C: CacheDatabase,
+    V: VectorDatabase,
+    F: FileReader + FileLocker,
+    M: MarkdownCodec,
+    P: EmbeddingProvider,
+> Embedder for EmbeddingService<C, V, F, M, P>
 {
     fn embed_query(&mut self, text: &str) -> EmbeddingResult<QueryEmbedding> {
         self.verify_query_scope()?;
@@ -118,7 +146,11 @@ impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P
                 return Ok(DrainOutcome::Unavailable);
             }
         };
-        let Some(_guard) = self.files.try_lock_embed()? else {
+        let Some(_guard) = self
+            .files
+            .lock_try_acquire_by_path(Path::new(EMBED_LOCK_PATH))
+            .map_err(map_file_error)?
+        else {
             return Ok(DrainOutcome::AlreadyRunning);
         };
         self.drain_ready(&config)
@@ -152,8 +184,13 @@ impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P
     }
 }
 
-impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P: EmbeddingProvider>
-    EmbeddingService<C, V, F, M, P>
+impl<
+    C: CacheDatabase,
+    V: VectorDatabase,
+    F: FileReader + FileLocker,
+    M: MarkdownCodec,
+    P: EmbeddingProvider,
+> EmbeddingService<C, V, F, M, P>
 {
     fn verify_query_scope(&self) -> EmbeddingResult<()> {
         self.storage
@@ -175,8 +212,16 @@ impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P
 
     fn get_config_file(&self) -> EmbeddingResult<Option<Configuration>> {
         self.files
-            .get_config()?
-            .map(|bytes| self.validate_configuration(&bytes))
+            .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
+            .map_err(map_file_error)?;
+        let captured = self.files.file_get_by_path(Path::new(CONFIG_PATH));
+        // A directory replacement remains infrastructure failure even if capture also failed.
+        self.files
+            .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
+            .map_err(map_file_error)?;
+        captured
+            .map_err(map_capture_error)?
+            .map(|file| self.validate_configuration(&file.bytes))
             .transpose()
     }
 
@@ -246,7 +291,12 @@ impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P
             .map_err(|cause| {
                 EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, cause)
             })?;
-        let Some(bytes) = self.files.get_document(&path)? else {
+        let Some(bytes) = self
+            .files
+            .file_get_by_path(Path::new(path.as_str()))
+            .map_err(map_capture_error)?
+            .map(|file| file.bytes)
+        else {
             return Ok(None);
         };
         let parsed = self
@@ -346,7 +396,9 @@ impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P
             VectorOutcome::Current(Some(failure))
                 if failure.attempts < config.get_max_attempts() =>
             {
-                self.files.wait(RETRY_DELAY)?;
+                self.clock
+                    .clock_wait(RETRY_DELAY)
+                    .map_err(map_clock_error)?;
             }
             VectorOutcome::Current(_) => {}
         }
@@ -422,7 +474,10 @@ impl<C: CacheDatabase, V: VectorDatabase, F: EmbeddingFiles, M: MarkdownCodec, P
     ) -> EmbeddingResult<QueryEmbedding> {
         let result = match result {
             Ok(vector) => Ok(vector),
-            Err(error) => Err((self.files.get_time_secs()?, error)),
+            Err(error) => Err((
+                self.clock.clock_get_time_secs().map_err(map_clock_error)?,
+                error,
+            )),
         };
         let outcome = self
             .vectors
@@ -481,20 +536,48 @@ fn map_storage(error: StorageError) -> EmbeddingError {
     EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
 }
 
+fn map_capture_error(cause: FileError) -> EmbeddingError {
+    // Legacy captures classify invalid/stale input separately from failed OS calls.
+    // The file boundary retains OS causes even when a syscall reports deletion or NOFOLLOW.
+    let kind = match cause.get_kind() {
+        FileErrorKind::NonRegular | FileErrorKind::Changed | FileErrorKind::UnsafePath
+            if cause.source().is_none() =>
+        {
+            EmbeddingErrorKind::Input
+        }
+        _ => EmbeddingErrorKind::InternalError,
+    };
+    EmbeddingError::new_with_cause(kind, cause)
+}
+
+fn map_file_error(cause: FileError) -> EmbeddingError {
+    EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, cause)
+}
+fn map_clock_error(cause: std::io::Error) -> EmbeddingError {
+    EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, cause)
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::service::{
+        CapturedFile, Clock, FileError, FileErrorKind, FileIdentity, FileLocker, FileReader,
+        FileResult, FileStat,
+    };
+
+    use std::rc::Rc;
+
     use crate::service::StorageError;
     use crate::service::TransactionError;
     use crate::storage::get_current;
 
-    use super::{EmbeddingService, RETRY_DELAY};
+    use super::EmbeddingService;
     use crate::{
         domain::{ElementKind, KnowledgeId, RepoPath, Sha256},
         markdown::{MarkdownParser, parse},
         service::{
             CacheDatabase, ConfigState, Configuration, DrainOutcome, Embedder, EmbeddingConfig,
-            EmbeddingError, EmbeddingErrorKind, EmbeddingFailure, EmbeddingFiles,
-            EmbeddingProvider, EmbeddingResult, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
+            EmbeddingError, EmbeddingErrorKind, EmbeddingFailure, EmbeddingProvider,
+            EmbeddingResult, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
             QueryEmbeddingRequest, StorageRead, VectorDatabase, VectorOutcome,
         },
         storage::TestDatabases,
@@ -506,6 +589,36 @@ mod tests {
         time::Duration,
     };
     use tempfile::TempDir;
+
+    #[test]
+    fn strict_capture_preserves_input_and_os_failure_classifications() {
+        for kind in [
+            FileErrorKind::NonRegular,
+            FileErrorKind::Changed,
+            FileErrorKind::UnsafePath,
+        ] {
+            // Given: an invalid entry or a verified content/identity change without an OS failure.
+            let cause = FileError::new(kind);
+            // When: the embedding consumer maps the generic capture failure.
+            let error = super::map_capture_error(cause);
+            // Then: the pre-migration invalid-input classification and safe message remain.
+            assert_eq!(error.get_kind(), EmbeddingErrorKind::Input);
+            assert_eq!(error.to_string(), "invalid embedding input");
+        }
+        for kind in [
+            FileErrorKind::Io,
+            FileErrorKind::Changed,
+            FileErrorKind::UnsafePath,
+        ] {
+            // Given: a permission, deletion or no-follow syscall failure with its private cause.
+            let cause = FileError::new_with_cause(kind, std::io::Error::other("PRIVATE_IO"));
+            // When: the embedding consumer maps the failed OS operation.
+            let error = super::map_capture_error(cause);
+            // Then: the infrastructure classification and safe message remain.
+            assert_eq!(error.get_kind(), EmbeddingErrorKind::InternalError);
+            assert_eq!(error.to_string(), "embedding operation failed");
+        }
+    }
 
     #[test]
     fn query_rejects_inherited_writers_before_inference() {
@@ -780,7 +893,7 @@ mod tests {
         config: RefCell<Option<Vec<u8>>>,
         documents: BTreeMap<String, Vec<u8>>,
         reads: RefCell<BTreeMap<String, usize>>,
-        waits: RefCell<Vec<Duration>>,
+        waits: Rc<RefCell<Vec<Duration>>>,
         time: u64,
         config_reads: Cell<usize>,
         reject_config_reads: bool,
@@ -795,7 +908,7 @@ mod tests {
                 config: RefCell::new(Some(serde_json::to_vec(&config).unwrap())),
                 documents: BTreeMap::new(),
                 reads: RefCell::default(),
-                waits: RefCell::default(),
+                waits: Rc::default(),
                 time: 17,
                 config_reads: Cell::new(0),
                 reject_config_reads: false,
@@ -809,30 +922,96 @@ mod tests {
                 .clone()
         }
     }
-    impl EmbeddingFiles for Files {
-        type EmbedLock = ();
-        fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
-            self.config_reads.set(self.config_reads.get() + 1);
-            if self.reject_config_reads {
-                return Err(EmbeddingError::new(EmbeddingErrorKind::Input));
-            }
-            Ok(self.config.borrow().clone())
+    impl FileReader for Files {
+        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            let bytes = if path == std::path::Path::new(".letopis/config.json") {
+                self.config_reads.set(self.config_reads.get() + 1);
+                if self.reject_config_reads {
+                    return Err(FileError::new(FileErrorKind::Io));
+                }
+                self.config.borrow().clone()
+            } else {
+                *self
+                    .reads
+                    .borrow_mut()
+                    .entry(path.to_str().unwrap().into())
+                    .or_default() += 1;
+                self.documents.get(path.to_str().unwrap()).cloned()
+            };
+            Ok(bytes.map(|bytes| CapturedFile {
+                stat: FileStat {
+                    size: bytes.len() as u64,
+                    mtime_ns: 1,
+                    inode: 1,
+                    device: 1,
+                },
+                bytes,
+                checked_at_ns: 1,
+            }))
         }
-        fn get_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>> {
-            *self
-                .reads
-                .borrow_mut()
-                .entry(path.as_str().into())
-                .or_default() += 1;
-            Ok(self.documents.get(path.as_str()).cloned())
+        fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
+            panic!("unused stat")
         }
-        fn try_lock_embed(&self) -> EmbeddingResult<Option<()>> {
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unused identity")
+        }
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unused existence")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unused verification")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unused distinctness")
+        }
+        fn directory_get_by_path(
+            &self,
+            path: &std::path::Path,
+        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            assert_eq!(path, std::path::Path::new(".letopis"));
+            Ok(None)
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            panic!("unused lock observation")
+        }
+    }
+    impl FileLocker for Files {
+        type Lock = ();
+        fn lock_acquire_by_path(&self, _: &std::path::Path) -> FileResult<()> {
+            panic!("unused blocking lock")
+        }
+        fn lock_try_acquire_by_path(&self, path: &std::path::Path) -> FileResult<Option<()>> {
+            assert_eq!(path, std::path::Path::new(".letopis/embed.lock"));
             Ok(Some(()))
         }
-        fn get_time_secs(&self) -> EmbeddingResult<u64> {
+    }
+    #[derive(Debug)]
+    struct TestClock {
+        waits: Rc<RefCell<Vec<Duration>>>,
+        time: u64,
+    }
+    impl Clock for TestClock {
+        fn clock_get_time_ns(&self) -> std::io::Result<i64> {
+            panic!("unused nanoseconds")
+        }
+        fn clock_get_time_secs(&self) -> std::io::Result<u64> {
             Ok(self.time)
         }
-        fn wait(&self, delay: Duration) -> EmbeddingResult<()> {
+        fn clock_wait(&self, delay: Duration) -> std::io::Result<()> {
             self.waits.borrow_mut().push(delay);
             Ok(())
         }
@@ -965,7 +1144,10 @@ mod tests {
         assert_eq!(service.drain().unwrap(), DrainOutcome::Complete);
         // Then: four attempts and three retry waits are durable.
         assert_eq!(service.provider.calls.get(), 4);
-        assert_eq!(*service.files.waits.borrow(), vec![RETRY_DELAY; 3]);
+        assert_eq!(
+            *service.files.waits.borrow(),
+            vec![Duration::from_secs(1); 3]
+        );
         let ConfigState::Ready(config) = service.get_configuration().unwrap() else {
             panic!()
         };
@@ -2000,22 +2182,23 @@ mod tests {
     pub(super) fn reach_checkpoint(stage: &str) {
         process::reach_checkpoint(stage);
     }
-    fn build_embedding_service<
-        F: EmbeddingFiles,
-        M: crate::service::MarkdownCodec,
-        P: EmbeddingProvider,
-    >(
+    fn build_embedding_service<M: crate::service::MarkdownCodec, P: EmbeddingProvider>(
         storage: TestDatabases,
-        files: F,
+        files: Files,
         markdown: M,
         provider: P,
-    ) -> EmbeddingService<crate::storage::CacheStorage, crate::storage::VectorStorage, F, M, P>
+    ) -> EmbeddingService<crate::storage::CacheStorage, crate::storage::VectorStorage, Files, M, P>
     {
         let (cache, vectors) = (storage.cache, storage.vectors);
+        let clock = Box::new(TestClock {
+            waits: Rc::clone(&files.waits),
+            time: files.time,
+        });
         EmbeddingService::new(
             std::rc::Rc::new(cache),
             std::rc::Rc::new(vectors),
             files,
+            clock,
             markdown,
             provider,
         )

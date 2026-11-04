@@ -177,12 +177,33 @@ traits приложения переименовываются вместе с �
 
 Зависимости сервисов внедряются при сборке и используются через `self.dependency`; internal helper-функции не получают и не передают их отдельными параметрами. Для операции с раздельно заимствованными collaborators допустим приватный receiver с собственными методами. Общие free helpers работают с данными, domain остаётся без инфраструктуры. Операции хранилища используют активный closure scope своего владельца, без передачи transaction handle между сервисами.
 
-`ProvenanceService<F>` владеет Git через `Box<dyn VerifiedGitSnapshots>`: общий application-owned trait объединяет `GitSnapshots` и `SnapshotVerifier` и автоматически реализован для типов с обоими контрактами. Git type parameter удалён также из локального historical cache. Filesystem generic сохранён из-за associated `FileSystem::IndexLock`; эта правка не меняет lock capabilities или исходные Git-интерфейсы.
+`ProvenanceService<F>` владеет Git через `Box<dyn VerifiedGitSnapshots>`: общий application-owned trait объединяет `GitSnapshots` и `SnapshotVerifier` и автоматически реализован для типов с обоими контрактами. Git type parameter удалён также из локального historical cache. Наблюдение файлов использует `FileReader`; блокировка нужна только владельцам публикации и drain и передаётся через `FileLocker` с ассоциированным RAII-ресурсом. Время и ожидание повторов предоставляет отдельный `Clock`, реализованный синхронным `SystemClock` в `process/`.
 
 Тот же inline-подход и исключение по длине файла применяются к unit-тестам в `src/cli/response.rs` и файлах реализаций плоского `src/git/`: вложенные test-модули сохраняют свои имена и visibility, отдельные каталоги для них не создаются.
 
 Зависимости направлены к domain и принадлежащим service интерфейсам; конкретные реализации связывает lib.rs. Документация описывает реализованную раскладку D-99; исторический план TK-9 сохраняет шаги переноса своей ревизии.
 
+
+## Файлы и пути
+
+`LocalFileSystem` реализует `FileReader`, `FileWriter` и `FileLocker` из
+`service/mod.rs`. Он оперирует относительными путями, байтами, метаданными,
+идентичностями и блокировками файлов; конфигурационные и database-роли ему
+неизвестны. `open_filesystem` закрепляет существующий корень без создания
+состояния. Сервисы выбирают `.letopis/config.json`, `index.lock`, `embed.lock`
+и отображают `FileError` в собственные безопасные ошибки. Только документные
+потребители исключают стабильный `NonRegular`; `UnsafePath`, `Changed` и I/O
+остаются ошибками. Status наблюдает существующие файлы без mkdir/chmod/записи PID.
+
+Composition в `lib.rs` проверяет исходный дескриптор каталога, идентичности
+`cache.db`/`vectors.db` и отсутствие алиаса до и после каждого открытия/attachment,
+включая неуспешный SQLite-вызов. Идентичности отсутствующих файлов остаются
+наблюдениями одной операции; байты database-файлов для этого не читаются.
+Разрешение внешних путей сохраняет проверку UTF-8 до и после canonicalization.
+Исторические планы с `DatabasePaths` и role-specific интерфейсами описывают свою
+исходную ревизию; действующие сигнатуры находятся в
+[`service/mod.rs`](../src/service/mod.rs), реализация — в
+[`filesystem/local.rs`](../src/filesystem/local.rs).
 
 ## Построение SQL-запросов
 

@@ -1,6 +1,6 @@
 use super::{
     BackgroundRunner, CommandError, CommandErrorKind, CommandProblem, CommandResult, DrainLauncher,
-    EmbedLocker, EmbeddingExecutor,
+    EmbeddingExecutor, FileLocker,
 };
 
 pub(crate) struct BackgroundRunnerService<'a, F, P> {
@@ -9,7 +9,7 @@ pub(crate) struct BackgroundRunnerService<'a, F, P> {
     process: P,
 }
 
-impl<'a, F: EmbedLocker, P: DrainLauncher> BackgroundRunnerService<'a, F, P> {
+impl<'a, F: FileLocker, P: DrainLauncher> BackgroundRunnerService<'a, F, P> {
     pub(crate) fn new(tasks: Option<&'a mut dyn EmbeddingExecutor>, files: F, process: P) -> Self {
         Self {
             tasks,
@@ -19,7 +19,7 @@ impl<'a, F: EmbedLocker, P: DrainLauncher> BackgroundRunnerService<'a, F, P> {
     }
 }
 
-impl<F: EmbedLocker, P: DrainLauncher> BackgroundRunner for BackgroundRunnerService<'_, F, P> {
+impl<F: FileLocker, P: DrainLauncher> BackgroundRunner for BackgroundRunnerService<'_, F, P> {
     fn start_if_needed(&mut self) -> CommandResult<Option<CommandProblem>> {
         let Some(tasks) = self.tasks.as_deref_mut() else {
             return Ok(None);
@@ -27,7 +27,10 @@ impl<F: EmbedLocker, P: DrainLauncher> BackgroundRunner for BackgroundRunnerServ
         if !tasks.has_work()? {
             return Ok(None);
         }
-        match self.files.try_lock_embed() {
+        match self
+            .files
+            .lock_try_acquire_by_path(std::path::Path::new(crate::utils::EMBED_LOCK_PATH))
+        {
             Ok(Some(lease)) => drop(lease),
             Ok(None) => return Ok(None),
             Err(_) => return Ok(Some(build_warning())),
@@ -58,8 +61,8 @@ fn build_warning() -> CommandProblem {
 mod tests {
     use super::BackgroundRunnerService;
     use crate::service::{
-        BackgroundRunner, CommandError, CommandErrorKind, CommandResult, DocumentError,
-        DocumentErrorKind, DocumentResult, DrainLauncher, EmbedLocker, EmbeddingExecutor,
+        BackgroundRunner, CommandError, CommandErrorKind, CommandResult, DrainLauncher,
+        EmbeddingExecutor, FileLocker,
     };
     use std::{cell::RefCell, io};
 
@@ -91,14 +94,23 @@ mod tests {
         busy: bool,
         fails: bool,
     }
-    impl<'a> EmbedLocker for Locks<'a> {
-        type EmbedLock = Lease<'a>;
-        fn try_lock_embed(&self) -> DocumentResult<Option<Lease<'a>>> {
+    impl<'a> FileLocker for Locks<'a> {
+        type Lock = Lease<'a>;
+        fn lock_acquire_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> crate::service::FileResult<Self::Lock> {
+            panic!("background must not block")
+        }
+        fn lock_try_acquire_by_path(
+            &self,
+            path: &std::path::Path,
+        ) -> crate::service::FileResult<Option<Lease<'a>>> {
+            assert_eq!(path, std::path::Path::new(".letopis/embed.lock"));
             self.calls.0.borrow_mut().push("probe");
             if self.fails {
-                return Err(DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    "lock failed",
+                return Err(crate::service::FileError::new_with_cause(
+                    crate::service::FileErrorKind::Io,
                     io::Error::other("secret lock payload"),
                 ));
             }

@@ -4,7 +4,7 @@ mod support;
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
     open_filesystem,
-    service::{EmbedLocker, NodeMetadata, VectorOutcome},
+    service::{FileLocker, NodeMetadata, VectorOutcome},
 };
 use serde_json::{Value, json};
 use std::process::Output;
@@ -148,7 +148,10 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let bytes = fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap();
     let files = open_filesystem(repo.get_root()).unwrap();
-    let _lock = files.try_lock_embed().unwrap().unwrap();
+    let _lock = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     // When: cache deletion must leave vector data and configuration alone.
     assert_eq!(reindex(&repo)["result"]["revision"], 2);
     fs::remove_file(repo.get_root().join(".letopis/cache.db")).unwrap();
@@ -202,7 +205,10 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
     let config = repo.write_config("ollama", &http.get_base_url(), "fixture");
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0, 0.0])]);
     let files = open_filesystem(repo.get_root()).unwrap();
-    let lock = files.try_lock_embed().unwrap().unwrap();
+    let lock = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     // When: rebuild only the disposable cache while automatic embedding is excluded.
     fs::remove_file(repo.get_root().join(".letopis/cache.db")).unwrap();
     assert_eq!(reindex(&repo)["result"]["revision"], 1);

@@ -8,10 +8,137 @@ pub use error::TransactionError;
 pub use error::{
     CommandError, CommandErrorKind, CommandProblem, CommandResult, Diagnostic, DiagnosticKind,
     DocumentError, DocumentErrorKind, DocumentResult, EmbeddingError, EmbeddingErrorKind,
-    EmbeddingFailure, EmbeddingResult, QueryError, ServiceError, ServiceErrorKind, ServiceResult,
-    SnapshotError, SnapshotErrorKind, StorageError, StorageErrorKind, StorageResult,
+    EmbeddingFailure, EmbeddingResult, FileError, FileErrorKind, FileResult, QueryError,
+    ServiceError, ServiceErrorKind, ServiceResult, SnapshotError, SnapshotErrorKind, StorageError,
+    StorageErrorKind, StorageResult,
 };
-use std::{collections::BTreeSet, num::NonZeroUsize, os::fd::OwnedFd, path::Path, time::Duration};
+use std::{
+    collections::BTreeSet,
+    num::{NonZeroU32, NonZeroUsize},
+    os::fd::OwnedFd,
+    path::Path,
+    time::Duration,
+};
+
+/// Synchronous wall-clock observations and bounded waits.
+/// Implementations report failed or unrepresentable time observations as I/O errors.
+pub trait Clock: std::fmt::Debug {
+    /// Observe nanoseconds since the Unix epoch.
+    /// # Errors
+    /// Reports clock or signed nanosecond representation failures.
+    fn clock_get_time_ns(&self) -> std::io::Result<i64>;
+    /// Observe seconds since the Unix epoch.
+    /// # Errors
+    /// Reports clock failures.
+    fn clock_get_time_secs(&self) -> std::io::Result<u64>;
+    /// Wait synchronously for the requested duration.
+    /// # Errors
+    /// Reports an interrupted or otherwise unsuccessful wait.
+    fn clock_wait(&self, delay: Duration) -> std::io::Result<()>;
+}
+
+/// Confined, observational file operations rooted at one pinned directory.
+///
+/// Paths are relative and may not escape the root. Reads never create entries
+/// or change permissions. Missing regular files return `None`; stable nonregular
+/// leaves return `NonRegular`, while unsafe parents and failed I/O remain errors.
+/// Explicit directory observations pin identities for subsequent operations;
+/// ordinary per-file traversal retains descriptors only for that operation.
+#[cfg_attr(test, mockall::automock)]
+pub trait FileReader {
+    /// Capture regular bytes, verifying identity and content observations around I/O.
+    /// Verify leaf stability and ancestry before classifying nonregular exclusions;
+    /// replacing an observed regular leaf always remains an integrity failure.
+    ///
+    /// # Errors
+    /// Reports nonregular leaves, unsafe paths, changes, clock or I/O failures.
+    fn file_get_by_path(&self, path: &Path) -> FileResult<Option<CapturedFile>>;
+    /// Observe a regular file's metadata without reading its body.
+    ///
+    /// # Errors
+    /// Reports nonregular leaves, unsafe paths, changing observations or I/O failures.
+    fn file_get_stat_by_path(&self, path: &Path) -> FileResult<Option<FileStat>>;
+    /// Observe stable regular-file identity without reading bytes or comparing content.
+    ///
+    /// # Errors
+    /// Reports nonregular leaves, unsafe paths, identity changes or I/O failures.
+    fn file_get_identity_by_path(&self, path: &Path) -> FileResult<Option<FileIdentity>>;
+    /// Return regular-file presence using metadata only; absence is the only false result.
+    ///
+    /// # Errors
+    /// Preserves nonregular, unsafe-path, replacement and I/O failures.
+    fn file_is_exist(&self, path: &Path) -> FileResult<bool>;
+    /// Verify an original identity still exists; an absent original permits safe creation.
+    ///
+    /// # Errors
+    /// Reports replacement/deletion of an original or any unsafe current entry.
+    fn file_verify_identity_by_path(
+        &self,
+        path: &Path,
+        identity: Option<FileIdentity>,
+    ) -> FileResult<()>;
+    /// Require distinct normalized paths and, when present, distinct regular-file identities.
+    ///
+    /// # Errors
+    /// Reports aliases, unsafe/nonregular entries or observation failures.
+    fn file_verify_distinct_by_paths(
+        &self,
+        first_path: &Path,
+        second_path: &Path,
+    ) -> FileResult<()>;
+    /// Pin an existing directory identity and return an owned duplicate, or absence.
+    /// The path `.` selects the root; this operation never creates or chmods entries.
+    ///
+    /// # Errors
+    /// Reports unsafe or changed directories, and I/O failures.
+    fn directory_get_by_path(&self, path: &Path) -> FileResult<Option<OwnedFd>>;
+    /// Observe a held file lock's bounded nonzero PID without creating or writing state.
+    /// An absent or currently unheld lock returns `None`.
+    ///
+    /// # Errors
+    /// Reports unsafe/nonregular/aliased locks, changes, malformed owners or I/O failures.
+    fn lock_get_owner_by_path(&self, path: &Path) -> FileResult<Option<NonZeroU32>>;
+}
+
+/// Private, durable file publication and directory creation under the reader's root.
+pub trait FileWriter: FileReader {
+    /// Publish complete mode-0600 bytes atomically if absent; preserve an existing winner.
+    /// Sync file data before publication and the parent directory before success.
+    ///
+    /// # Errors
+    /// Reports absent parents, unsafe/nonregular destinations, changes or I/O failures.
+    /// A failure preserves existing entries and may leave a complete published winner.
+    fn file_create_if_absent_by_path(&self, path: &Path, bytes: &[u8]) -> FileResult<()>;
+    /// Create missing directory components with mode 0700 and protect the final directory.
+    /// Pin the final identity; existing ancestors retain their permissions.
+    ///
+    /// # Errors
+    /// Reports unsafe or changed entries, permission or other I/O failures.
+    fn directory_create_by_path(&self, path: &Path) -> FileResult<OwnedFd>;
+    /// Verify and sync an existing directory without creating entries or changing modes.
+    ///
+    /// # Errors
+    /// Reports absence, unsafe/replaced directories or durability failures.
+    fn directory_sync_by_path(&self, path: &Path) -> FileResult<()>;
+}
+
+/// Persistent kernel file locks with exclusive ownership and bounded PID metadata.
+/// Acquisition may create private parents and lock files; names remain caller-selected.
+/// Owners unlock before closing, and acquisition never replaces an existing inode.
+pub trait FileLocker {
+    /// Actual RAII capability retaining the held kernel lock until dropped.
+    type Lock;
+    /// Wait for exclusive ownership, verify identities, then record this process's PID.
+    ///
+    /// # Errors
+    /// Reports unsafe/nonregular/aliased entries, changes, permission or I/O failures.
+    fn lock_acquire_by_path(&self, path: &Path) -> FileResult<Self::Lock>;
+    /// Try exclusive ownership without waiting; return `None` only for real contention.
+    ///
+    /// # Errors
+    /// Reports unsafe/nonregular/aliased entries, changes, permission or I/O failures.
+    fn lock_try_acquire_by_path(&self, path: &Path) -> FileResult<Option<Self::Lock>>;
+}
 
 /// Scoped operations on a shared cache database.
 ///
@@ -216,8 +343,8 @@ pub trait VectorDatabase {
 pub use types::{
     CapturedFile, CheckReport, ConfigState, Configuration, DrainOutcome, ElementAddress,
     ElementLocation, EmbeddingConfig, EmbeddingStatusPolicy, EmbeddingStatusSummary, EmbeddingWork,
-    FileRow, FileStat, GraphNeighbor, GraphNodeKey, GraphNodeRef, HeldLock, InspectedElement,
-    Inspection, KnowledgeMetadata, LockName, NeighborCursor, NeighborDirection,
+    FileIdentity, FileRow, FileStat, GraphNeighbor, GraphNodeKey, GraphNodeRef, HeldLock,
+    InspectedElement, Inspection, KnowledgeMetadata, LockName, NeighborCursor, NeighborDirection,
     NeighborPageRequest, NodeMetadata, ParsedElement, ParsedFile, ProvenanceIssue,
     ProvenanceObservation, ProvenanceRequest, ProviderKind, QueryEmbedding, QueryEmbeddingRequest,
     RecheckFilter, RefreshOutcome, RetainedTree, SearchFilters, SearchFlag, SearchLink,
@@ -260,25 +387,10 @@ pub(crate) use search::SearchService;
 pub(crate) use source::SourceService;
 pub(crate) use status::StatusService;
 pub(crate) use traversal::TraversalService;
+pub(crate) use utils::map_document_file_error;
 
 /// Maximum number of already available bindings submitted in one observation batch.
 const PROVENANCE_BATCH_SIZE: usize = 256;
-
-/// Read-only live configuration and nonblocking kernel-lock observations.
-/// Implementations never create service state or write an owner PID while observing.
-pub trait StatusFiles {
-    /// Read stable raw configuration bytes, or absence.
-    ///
-    /// # Errors
-    /// Reports unsafe paths or filesystem failures without exposing file contents.
-    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
-
-    /// Return occupied index/embed locks and their best-effort recorded positive PIDs.
-    ///
-    /// # Errors
-    /// Reports unsafe paths, failed probes, or invalid/unreadable PIDs on busy locks.
-    fn observe_locks(&self) -> CommandResult<Vec<HeldLock>>;
-}
 
 /// Current graph diagnostics derived from the injected shared cache.
 ///
@@ -585,35 +697,6 @@ pub trait CorpusLister {
     /// Reports unsupported candidate paths or Git failures.
     fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>>;
 }
-/// Confined synchronous file observations and publication exclusion.
-///
-/// Every implementation stays beneath one pinned root, never follows symlinks out of it, and
-/// fails rather than returning bytes it observed changing.
-pub trait FileSystem {
-    /// Exclusive kernel lock released when its guard is dropped.
-    type IndexLock;
-    /// Observe a regular file without reading its body; stable absence or a nonregular final entry is `None`.
-    ///
-    /// # Errors
-    /// Reports unsafe parent paths, observed changes and I/O failures.
-    fn get_file_stat_by_path(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>>;
-    /// Capture exact regular-file bytes, checking identity and stat around the read.
-    /// Stable absence or a nonregular final entry is `None`; symlinks are never followed.
-    ///
-    /// # Errors
-    /// Reports unsafe parent paths, observed replacements or edits, clock and I/O failures.
-    fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>>;
-    /// Observe wall-clock nanoseconds since the Unix epoch with checked conversion.
-    ///
-    /// # Errors
-    /// Reports clocks before the epoch or values outside the supported range.
-    fn get_time_ns(&self) -> DocumentResult<i64>;
-    /// Acquire the persistent exclusive index lock; never removes its file.
-    ///
-    /// # Errors
-    /// Reports unsafe service paths, lock replacement or filesystem/locking failures.
-    fn lock_index(&self) -> DocumentResult<Self::IndexLock>;
-}
 
 /// Pure shared Markdown projection and search-text codec.
 ///
@@ -719,40 +802,6 @@ pub trait EmbeddingProvider {
     ) -> EmbeddingResult<Vec<Vec<f32>>>;
 }
 
-/// Confined synchronous file, clock and drain-lock operations.
-///
-/// Every implementation stays beneath one pinned root and fails rather than returning bytes
-/// it observed changing; at most one drain lock is held at a time.
-pub trait EmbeddingFiles {
-    /// Exclusive drain ownership, released when dropped.
-    type EmbedLock;
-    /// Read configuration bytes without decoding them; stable absence is `None`.
-    ///
-    /// # Errors
-    /// Reports unsafe paths, observed replacement or I/O failure.
-    fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>>;
-    /// Read a current regular document beneath the pinned checkout.
-    ///
-    /// # Errors
-    /// Reports unsafe paths, observed replacement or I/O failure.
-    fn get_document(&self, path: &RepoPath) -> EmbeddingResult<Option<Vec<u8>>>;
-    /// Try persistent kernel drain ownership without waiting; busy is `None`.
-    ///
-    /// # Errors
-    /// Reports unsafe service paths, observed replacement or I/O failure.
-    fn try_lock_embed(&self) -> EmbeddingResult<Option<Self::EmbedLock>>;
-    /// Read Unix seconds from the system clock.
-    ///
-    /// # Errors
-    /// Reports a system clock before the Unix epoch.
-    fn get_time_secs(&self) -> EmbeddingResult<u64>;
-    /// Wait synchronously for a caller-selected retry delay.
-    ///
-    /// # Errors
-    /// Reports an environment failure that prevents the wait; none is currently produced.
-    fn wait(&self, delay: Duration) -> EmbeddingResult<()>;
-}
-
 /// Synchronous embedding application operations.
 ///
 /// Every implementation keeps document vectors consistent with the committed configuration
@@ -812,28 +861,6 @@ pub trait StatusReader {
     /// # Errors
     /// Reports storage, provenance or unsafe lock failures without a partial report.
     fn get_status(&mut self) -> CommandResult<StatusReport>;
-}
-/// Filesystem capability required to initialize private service state.
-///
-/// Implementations create the service directory only when explicitly asked,
-/// publish configuration without replacement and report durability work separately.
-pub trait InitFiles: StatusFiles {
-    /// Atomically publish complete bytes when `config.json` is absent.
-    ///
-    /// # Errors
-    /// Rejects unsafe or nonregular destinations and reports write, link or sync
-    /// failures. Existing files and another writer's winner are never replaced.
-    fn install_config_if_absent(&self, bytes: &[u8]) -> DocumentResult<()>;
-    /// Open or create the pinned private service directory.
-    ///
-    /// # Errors
-    /// Reports unsafe/replaced paths, creation or permission failures.
-    fn open_service_directory(&self) -> DocumentResult<OwnedFd>;
-    /// Sync the existing service directory and its Git-root parent.
-    ///
-    /// # Errors
-    /// Reports absent/replaced state or durability-sync failures without creating entries.
-    fn sync_service_state(&self) -> DocumentResult<()>;
 }
 
 /// Storage capability required to initialize both service schemas.
@@ -913,19 +940,6 @@ pub trait EmbeddingExecutor {
     /// # Errors
     /// Reports unexpected storage, coordination or embedding infrastructure failures.
     fn drain(&mut self) -> CommandResult<()>;
-}
-/// Nonblocking persistent embedding exclusion.
-///
-/// Every implementation grants ownership to at most one holder at a time across processes
-/// and releases it when the returned lock is dropped.
-pub trait EmbedLocker {
-    /// Owned kernel lock released through RAII.
-    type EmbedLock;
-    /// Probe exclusive embedding ownership without waiting.
-    ///
-    /// # Errors
-    /// Reports unsafe lock paths or filesystem/locking failures.
-    fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>>;
 }
 /// Detached drain process launch capability.
 ///

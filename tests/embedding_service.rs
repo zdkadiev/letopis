@@ -6,10 +6,10 @@ mod support;
 use letopis::{
     domain::{Edge, EdgeTarget, EdgeType, ElementKind, KnowledgeId, RepoPath, Sha256},
     markdown::parse,
-    open_embedding_files,
+    open_filesystem,
     service::{
         ConfigState, DrainOutcome, Embedder, EmbeddingConfig, EmbeddingErrorKind, EmbeddingFailure,
-        EmbeddingFiles, FileRow, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
+        FileLocker, FileRow, KnowledgeMetadata, NodeMetadata, QueryEmbedding,
         QueryEmbeddingRequest, QueryError, VectorOutcome,
     },
     wire_embedder,
@@ -373,15 +373,15 @@ fn disabled_configuration_preserves_vectors_attempts_and_skips_execution() {
 
 #[test]
 fn unreadable_configuration_returns_safe_invalid_state() {
-    // Given
+    // Given: the embedding assembly pins its directory before a nonregular config is installed.
     let fixture = Fixture::new();
     let mut service = fixture.open_service();
     fs::create_dir(fixture.root.path().join(".letopis/config.json")).unwrap();
     let before = fixture.capture_corpus();
-    // When / Then
+    // When / Then: the strict config reader returns invalid input and preserves the corpus.
     assert!(matches!(
         service.get_configuration().unwrap(),
-        ConfigState::Invalid(_)
+        ConfigState::Invalid(EmbeddingErrorKind::Input)
     ));
     assert_eq!(fixture.capture_corpus(), before);
 }
@@ -614,14 +614,17 @@ fn query_success_clears_error_without_caching_or_document_attempts() {
 
 #[test]
 fn persistent_lock_prevents_another_drain() {
-    // Given
+    // Given: one active drain ownership guard.
     let fixture = Fixture::new();
     let server = start_success();
     fixture.write_config(&server.get_base_url(), 0);
     fixture.publish("a.md", "knowledge");
-    let files = open_embedding_files(fixture.root.path()).unwrap();
-    let guard = files.try_lock_embed().unwrap().unwrap();
-    // When / Then
+    let files = open_filesystem(fixture.root.path()).unwrap();
+    let guard = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
+    // When / Then: another embedding service attempts to drain; the second drain performs no provider work.
     assert_eq!(
         fixture.open_service().drain().unwrap(),
         DrainOutcome::AlreadyRunning

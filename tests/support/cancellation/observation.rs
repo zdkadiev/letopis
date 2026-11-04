@@ -71,7 +71,7 @@ pub fn observe_index_flock(pid: u32, _lock: &Path) -> String {
     let deadline = Instant::now() + WAIT;
     loop {
         let trace = sample_process(pid);
-        if trace.contains("lock_index")
+        if trace.contains("lock_acquire_by_path")
             && has_native_frame(&trace, "flock", "libsystem_kernel.dylib")
         {
             return format!("inside=flock\n{trace}");

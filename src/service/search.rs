@@ -1,13 +1,15 @@
 use super::utils::is_current_knowledge;
+use super::utils::map_document_file;
 use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder,
-    EmbeddingConfig, FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceRequest,
+    EmbeddingConfig, FileReader, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceRequest,
     QueryEmbedding, QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag, SearchLink,
     SearchRequest, Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
     SourceRevisionComparison, SourceRevisionRequest, StorageRead, TextMatch, VectorMatch,
     VectorOutcome,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
+use std::path::Path;
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
@@ -68,7 +70,7 @@ impl<D, E, F, M, P, C> fmt::Debug for SearchService<D, E, F, M, P, C> {
 impl<
     D: Refresher,
     E: Embedder,
-    F: FileSystem,
+    F: FileReader,
     M: MarkdownCodec,
     P: SourceProvenance,
     C: CacheDatabase,
@@ -130,7 +132,7 @@ impl<
     }
 }
 
-impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_, F, M, P> {
+impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_, F, M, P> {
     fn get_eligible_links(
         &self,
         metadata: &BTreeMap<KnowledgeId, KnowledgeMetadata>,
@@ -165,7 +167,8 @@ impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
     fn build_link(&self, node: &KnowledgeMetadata, revision: u64) -> CommandResult<SearchLink> {
         let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
             .map_err(map_search_error)?;
-        let file = self.filesystem.get_file(&path).map_err(map_search_error)?;
+        let file = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
+            .map_err(map_search_error)?;
         let parsed = file
             .as_ref()
             .and_then(|file| self.markdown.parse_file(&path, &file.bytes).ok().flatten());
@@ -1589,7 +1592,7 @@ mod tests {
                         calls: self.calls.clone(),
                         hook,
                     },
-                    filesystem: LocalFileSystem::open(self.root.path()).unwrap(),
+                    filesystem: LocalFileSystem::new(self.root.path()).unwrap(),
                     markdown: MarkdownParser::new(),
                     provenance: Observations {
                         events: RefCell::new(Vec::new()),
@@ -2101,7 +2104,7 @@ mod tests {
                 refresher: build_noop_refresher(),
                 storage: Rc::new(storage.cache),
                 embeddings: Query(queries.clone()),
-                filesystem: LocalFileSystem::open(root).unwrap(),
+                filesystem: LocalFileSystem::new(root).unwrap(),
                 markdown: MarkdownParser::new(),
                 provenance: Probe {
                     failure,

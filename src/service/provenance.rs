@@ -1,10 +1,12 @@
+use super::utils::map_document_file;
 use super::{
-    BasisRetainer, DocumentError, DocumentErrorKind, DocumentResult, FileSystem, ProvenanceIssue,
+    BasisRetainer, DocumentError, DocumentErrorKind, DocumentResult, FileReader, ProvenanceIssue,
     ProvenanceObservation, ProvenanceRequest, SearchFlag, SnapshotError, SnapshotErrorKind,
     SnapshotState, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
     VerifiedGitSnapshots,
 };
 use crate::domain::{Sha256, SourceUri, TreeOid};
+use std::path::Path;
 use std::{collections::BTreeSet, fmt};
 
 use observations::HistoricalObservations;
@@ -31,7 +33,7 @@ impl<F: fmt::Debug> fmt::Debug for ProvenanceService<F> {
     }
 }
 
-impl<F: FileSystem> SourceProvenance for ProvenanceService<F> {
+impl<F: FileReader> SourceProvenance for ProvenanceService<F> {
     fn validate_revisions(&self, revisions: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
         for revision in revisions {
             self.verify_requested_revision(revision)?;
@@ -105,7 +107,7 @@ impl<F> BasisRetainer for ProvenanceService<F> {
     }
 }
 
-impl<F: FileSystem> ProvenanceService<F> {
+impl<F: FileReader> ProvenanceService<F> {
     fn verify_requested_revision(&self, revision: &TreeOid) -> Result<(), SnapshotError> {
         match self.git.verify_snapshot(revision)? {
             SnapshotState::Available => Ok(()),
@@ -140,7 +142,10 @@ impl<F: FileSystem> ProvenanceService<F> {
         let Some(local) = source.get_local() else {
             return Ok(None);
         };
-        let captured = self.filesystem.get_file(local.get_path())?;
+        let captured = map_document_file(
+            self.filesystem
+                .file_get_by_path(Path::new(local.get_path().as_str())),
+        )?;
         Ok(captured
             .as_ref()
             .and_then(|file| local.select_bytes(&file.bytes))
@@ -184,7 +189,7 @@ mod observations {
     use crate::{
         domain::{Sha256, SourceUri, TreeOid},
         service::{
-            DocumentResult, FileSystem, ProvenanceIssue, ProvenanceObservation, ProvenanceRequest,
+            DocumentResult, FileReader, ProvenanceIssue, ProvenanceObservation, ProvenanceRequest,
             SearchFlag, SnapshotState,
         },
     };
@@ -200,7 +205,7 @@ mod observations {
         hashes: BTreeMap<(TreeOid, SourceUri), Option<Sha256>>,
     }
 
-    impl<'a, F: FileSystem> HistoricalObservations<'a, F> {
+    impl<'a, F: FileReader> HistoricalObservations<'a, F> {
         /// Start one empty operation-local history without performing I/O.
         pub(super) fn new(provenance: &'a ProvenanceService<F>) -> Self {
             Self {
@@ -286,6 +291,10 @@ mod observations {
 
 #[cfg(test)]
 mod tests {
+    use crate::service::{
+        FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult,
+    };
+
     mod batches {
         use super::{GitFault, create_oid, create_service};
         use crate::{
@@ -606,10 +615,10 @@ mod tests {
     use crate::{
         domain::{BlobOid, RepoPath, SourceUri, TreeOid},
         service::{
-            BasisRetainer, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult,
-            FileStat, FileSystem, GitSnapshots, ProvenanceRequest, RetainedTree, SnapshotEntry,
-            SnapshotError, SnapshotErrorKind, SnapshotFile, SnapshotState, SnapshotVerifier,
-            SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
+            BasisRetainer, CapturedFile, DocumentError, DocumentErrorKind, FileStat, GitSnapshots,
+            ProvenanceRequest, RetainedTree, SnapshotEntry, SnapshotError, SnapshotErrorKind,
+            SnapshotFile, SnapshotState, SnapshotVerifier, SourceProvenance,
+            SourceRevisionComparison, SourceRevisionRequest,
         },
     };
     use std::{
@@ -901,17 +910,15 @@ mod tests {
             Ok(RetainedTree::new(tree.clone()))
         }
     }
-    impl FileSystem for RecordedFiles {
-        type IndexLock = ();
-        fn get_file_stat_by_path(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
+    impl FileReader for RecordedFiles {
+        fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("provenance must not stat sources")
         }
-        fn get_file(&self, _: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+        fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             self.reads.set(self.reads.get() + 1);
             if self.fail {
-                return Err(DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    "cannot capture source",
+                return Err(FileError::new_with_cause(
+                    FileErrorKind::Io,
                     io::Error::other("PRIVATE_PROVENANCE_CAUSE"),
                 ));
             }
@@ -934,11 +941,49 @@ mod tests {
                 checked_at_ns: 1,
             }))
         }
-        fn get_time_ns(&self) -> DocumentResult<i64> {
-            panic!("provenance must not sample the clock")
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unexpected file_get_identity_by_path")
         }
-        fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unexpected file_is_exist")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_identity_by_path")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_distinct_by_paths")
+        }
+        fn directory_get_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            panic!("unexpected directory_get_by_path")
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            panic!("unexpected lock_get_owner_by_path")
+        }
+    }
+    impl FileLocker for RecordedFiles {
+        type Lock = ();
+        fn lock_acquire_by_path(&self, _path: &std::path::Path) -> FileResult<Self::Lock> {
             panic!("caller owns the index lock")
+        }
+        fn lock_try_acquire_by_path(&self, _: &std::path::Path) -> FileResult<Option<Self::Lock>> {
+            panic!("unexpected lock probe")
         }
     }
     impl Deref for RecordedProvenance {

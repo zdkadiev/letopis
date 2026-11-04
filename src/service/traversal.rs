@@ -1,12 +1,14 @@
+use super::utils::map_document_file;
 use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandResult, ElementAddress, ElementLocation,
-    Embedder, FileSystem, GraphRead, GraphTraversal, KnowledgeMetadata, MarkdownCodec,
+    Embedder, FileReader, GraphRead, GraphTraversal, KnowledgeMetadata, MarkdownCodec,
     NEIGHBOR_PAGE_QUANTUM, NeighborCursor, NeighborDirection, NeighborPageRequest, NodeMetadata,
     ProvenanceRequest, Refresher, SearchFlag, SourceAvailability, SourceProvenance, SourceReader,
     StorageRead, Traversal, TraversalLink, TraversalMode, TraversalRequest, Traverser,
     utils::is_current_knowledge,
 };
 use crate::domain::{EdgeTarget, EdgeType, Graph, RepoPath, SourceUri};
+use std::path::Path;
 use std::{collections::BTreeSet, error::Error, fmt, num::NonZeroUsize, rc::Rc};
 
 /// Refresh, pin, traverse and observe selected links under one scoped storage read.
@@ -37,7 +39,7 @@ struct LinkObservations<'a, F, C> {
     sources: &'a dyn SourceReader,
     provenance: &'a dyn SourceProvenance,
 }
-impl<F: FileSystem, C: CacheDatabase> Traverser for TraversalService<F, C> {
+impl<F: FileReader, C: CacheDatabase> Traverser for TraversalService<F, C> {
     fn traverse(&mut self, request: &TraversalRequest) -> CommandResult<Traversal> {
         self.refresher.refresh().map_err(map_traversal_error)?;
         self.embeddings
@@ -61,7 +63,7 @@ impl<F: FileSystem, C: CacheDatabase> Traverser for TraversalService<F, C> {
             })
     }
 }
-impl<F: FileSystem, C: StorageRead + GraphRead> LinkObservations<'_, F, C> {
+impl<F: FileReader, C: StorageRead + GraphRead> LinkObservations<'_, F, C> {
     fn get_links(&self, graph: Graph) -> CommandResult<Traversal> {
         let (elements, edges) = graph.into_parts();
         let elements = elements
@@ -104,9 +106,7 @@ impl<F: FileSystem, C: StorageRead + GraphRead> LinkObservations<'_, F, C> {
         let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
             .map_err(map_traversal_error)?;
         let mut flags = self.observe_bindings(&node)?;
-        let file = self
-            .filesystem
-            .get_file(&path)
+        let file = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
             .map_err(map_traversal_error)?;
         let parsed = file
             .as_ref()
@@ -167,7 +167,7 @@ impl<F: FileSystem, C: StorageRead + GraphRead> LinkObservations<'_, F, C> {
         })
     }
 }
-impl<F: FileSystem, C: GraphRead> LinkObservations<'_, F, C> {
+impl<F: FileReader, C: GraphRead> LinkObservations<'_, F, C> {
     /// Observe outgoing source bindings in bounded pages independently of traversal filters.
     fn observe_bindings(&self, node: &KnowledgeMetadata) -> CommandResult<BTreeSet<SearchFlag>> {
         let id = ElementAddress::parse(node.id.as_str())?;
@@ -313,10 +313,10 @@ mod tests {
             };
             let node = build_knowledge();
             let root = tempfile::TempDir::new().unwrap();
-            let filesystem = LocalFileSystem::open(root.path()).unwrap();
+            let filesystem = LocalFileSystem::new(root.path()).unwrap();
             let sources = SourceService::new(
                 Rc::new(crate::storage::CacheStorage::new_observed(None)),
-                LocalFileSystem::open(root.path()).unwrap(),
+                LocalFileSystem::new(root.path()).unwrap(),
             );
             let observations = LinkObservations {
                 storage: &read,
@@ -373,10 +373,10 @@ mod tests {
             };
             let node = build_knowledge();
             let root = tempfile::TempDir::new().unwrap();
-            let filesystem = LocalFileSystem::open(root.path()).unwrap();
+            let filesystem = LocalFileSystem::new(root.path()).unwrap();
             let sources = SourceService::new(
                 Rc::new(crate::storage::CacheStorage::new_observed(None)),
-                LocalFileSystem::open(root.path()).unwrap(),
+                LocalFileSystem::new(root.path()).unwrap(),
             );
             let observations = LinkObservations {
                 storage: &read,
@@ -408,10 +408,10 @@ mod tests {
             };
             let node = build_knowledge();
             let root = tempfile::TempDir::new().unwrap();
-            let filesystem = LocalFileSystem::open(root.path()).unwrap();
+            let filesystem = LocalFileSystem::new(root.path()).unwrap();
             let sources = SourceService::new(
                 Rc::new(crate::storage::CacheStorage::new_observed(None)),
-                LocalFileSystem::open(root.path()).unwrap(),
+                LocalFileSystem::new(root.path()).unwrap(),
             );
             let observations = LinkObservations {
                 storage: &read,
@@ -448,10 +448,10 @@ mod tests {
                 observed: RefCell::new(Vec::new()),
             };
             let root = tempfile::TempDir::new().unwrap();
-            let filesystem = LocalFileSystem::open(root.path()).unwrap();
+            let filesystem = LocalFileSystem::new(root.path()).unwrap();
             let sources = SourceService::new(
                 Rc::new(crate::storage::CacheStorage::new_observed(None)),
-                LocalFileSystem::open(root.path()).unwrap(),
+                LocalFileSystem::new(root.path()).unwrap(),
             );
             let observations = LinkObservations {
                 storage: &read,
@@ -885,7 +885,7 @@ mod tests {
                 });
                 TraversalService {
                     storage: Rc::clone(&storage),
-                    filesystem: LocalFileSystem::open(self.root.path()).unwrap(),
+                    filesystem: LocalFileSystem::new(self.root.path()).unwrap(),
                     refresher: Box::new(Refresh {
                         events: self.events.clone(),
                     }),
@@ -897,7 +897,7 @@ mod tests {
                     sources: Box::new(Sources {
                         inner: SourceService::new(
                             Rc::clone(&storage),
-                            LocalFileSystem::open(self.root.path()).unwrap(),
+                            LocalFileSystem::new(self.root.path()).unwrap(),
                         ),
                         events: self.events.clone(),
                         failure,

@@ -5,7 +5,7 @@ mod support;
 use letopis::{
     domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, RepoPath, Sha256},
     open_filesystem,
-    service::{EmbedLocker, EmbeddingConfig, NodeMetadata, VectorOutcome},
+    service::{EmbeddingConfig, FileLocker, NodeMetadata, VectorOutcome},
 };
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{Value, json};
@@ -75,7 +75,10 @@ fn reindex_preserves_healthy_vectors_after_corrupt_cache_removal() {
     let hashes = get_search_hashes(&repo);
     let canonical = capture_canonical_state(&repo);
     let files = open_filesystem(repo.get_root()).unwrap();
-    let _embed_lock = files.try_lock_embed().unwrap().unwrap();
+    let _embed_lock = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     corrupt_owned_database(repo.get_root(), CACHE);
 
     // When / Then: damage persists until the operator explicitly removes cache only.

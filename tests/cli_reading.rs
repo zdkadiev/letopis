@@ -17,7 +17,7 @@ use letopis::{
     domain::{RepoPath, TreeOid},
     open_filesystem, open_git_snapshots,
     service::{
-        EmbedLocker, EmbeddingExecutor, GitSnapshots, NodeMetadata, Refresher, VectorOutcome,
+        EmbeddingExecutor, FileLocker, GitSnapshots, NodeMetadata, Refresher, VectorOutcome,
     },
     wire_document_refresher, wire_embedding_executor,
 };
@@ -433,7 +433,10 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
                 .unwrap()
         );
         let files = open_filesystem(repo.get_root()).unwrap();
-        let _lease = files.try_lock_embed().unwrap().unwrap();
+        let _lease = files
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .unwrap()
+            .unwrap();
         let child_service = repo.get_root().join("subdir/.letopis");
         fs::write(&child_service, b"keep unsafe child service path").unwrap();
         // When: the nested cwd must not change the lock or service directory owner.

@@ -22,7 +22,7 @@ use cancellation::{
 use letopis::{
     domain::{EdgeTarget, KnowledgeId, Sha256},
     open_filesystem,
-    service::{EmbeddingConfig, EmbeddingFailure, FileSystem, NodeMetadata, VectorOutcome},
+    service::{EmbeddingConfig, EmbeddingFailure, FileLocker, NodeMetadata, VectorOutcome},
 };
 use serde_json::{Value, json};
 use std::{
@@ -67,14 +67,16 @@ fn cancelling_waiter_preserves_holder_and_lock_inode() {
     let repo = ReadingRepo::new();
     repo.write_knowledge("knowledge.md", "WaiterToken");
     let files = open_filesystem(repo.get_root()).expect("filesystem");
-    let holder = files.lock_index().expect("holder lock");
+    let holder = files
+        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        .expect("holder lock");
     let lock = repo.get_root().join(".letopis/index.lock");
     let identity = get_lock_identity(&lock);
     let mut child = spawn_product(&repo, &["reindex"], None);
     child.send_input(b"{}");
     let observation = observe_index_flock(child.get_id(), &lock);
     assert!(observation.starts_with("inside=flock"), "{observation}");
-    // When
+    // When: the waiting foreground is cancelled.
     child.send_sigint();
     let output = child.collect_output(WAIT);
     // Then: the foreign holder and its lock file survive the waiter's death.

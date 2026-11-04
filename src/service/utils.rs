@@ -1,9 +1,11 @@
 use super::{
-    CommandError, CommandErrorKind, CommandProblem, CommandResult, DocumentError, GraphDiagnostics,
-    KnowledgeMetadata, NodeMetadata, PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceIssue,
-    ProvenanceRequest, SourceProvenance, StorageError, StorageRead,
+    CommandError, CommandErrorKind, CommandProblem, CommandResult, DocumentError,
+    DocumentErrorKind, DocumentResult, GraphDiagnostics, KnowledgeMetadata, NodeMetadata,
+    PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceIssue, ProvenanceRequest, SourceProvenance,
+    StorageError, StorageRead,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
+use crate::service::{FileError, FileErrorKind, FileResult};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -189,6 +191,40 @@ fn map_provenance_error(cause: DocumentError) -> CommandError {
         "cannot observe knowledge sources",
         cause,
     )
+}
+
+/// Exclude only a verified stable nonregular final document entry.
+pub(super) fn map_document_file<T>(result: FileResult<Option<T>>) -> DocumentResult<Option<T>> {
+    match result {
+        Err(error) if error.get_kind() == FileErrorKind::NonRegular => Ok(None),
+        result => result.map_err(map_document_file_error),
+    }
+}
+
+pub(crate) fn map_document_file_error(cause: FileError) -> DocumentError {
+    DocumentError::new_with_cause(
+        DocumentErrorKind::InternalError,
+        "document path changed during observation",
+        cause,
+    )
+}
+
+pub(super) fn map_document_lock_error(cause: FileError) -> DocumentError {
+    let (kind, message) = match cause.get_kind() {
+        FileErrorKind::Aliased => (
+            DocumentErrorKind::InvalidRequest,
+            "private coordination lock required",
+        ),
+        FileErrorKind::NonRegular => (
+            DocumentErrorKind::InvalidRequest,
+            "regular document file required",
+        ),
+        _ => (
+            DocumentErrorKind::InternalError,
+            "cannot acquire coordination lock",
+        ),
+    };
+    DocumentError::new_with_cause(kind, message, cause)
 }
 
 #[cfg(test)]

@@ -18,18 +18,18 @@ use crate::embedding::{HttpProviders, Ollama, Openai};
 use crate::filesystem::LocalFileSystem;
 use crate::git::{GitRepository, GitWriteCleanup};
 use crate::markdown::MarkdownParser;
-use crate::process::{DetachedProcess, ProcessInput, SigintListener};
+use crate::process::{DetachedProcess, ProcessInput, SigintListener, SystemClock};
 use crate::service::{
     BackgroundRunner, BackgroundRunnerService, CheckService, Checker, CommandError,
     CommandErrorKind, CommandResult, ConfigReader, ConfigurationService, DocumentError,
-    DocumentErrorKind, DocumentRefreshService, DocumentResult, EmbedLocker, Embedder,
-    EmbeddingError, EmbeddingErrorKind, EmbeddingExecutor, EmbeddingFiles, EmbeddingProvider,
-    EmbeddingResult, EmbeddingService, FileSystem, GitSnapshots, GraphDiagnostics,
-    GraphDiagnosticsService, GraphService, InitService, Initializer, InspectionService, Inspector,
-    ProvenanceService, Refresher, SearchService, Searcher, ServiceError, ServiceErrorKind,
-    ServiceResult, SnapshotError, SnapshotErrorKind, SnapshotVerifier, SourceProvenance,
-    SourceReader, SourceService, StatusFiles, StatusReader, StatusService, StorageResult,
-    TraversalService, Traverser,
+    DocumentErrorKind, DocumentRefreshService, DocumentResult, Embedder, EmbeddingError,
+    EmbeddingErrorKind, EmbeddingExecutor, EmbeddingProvider, EmbeddingResult, EmbeddingService,
+    FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult, FileWriter,
+    GitSnapshots, GraphDiagnostics, GraphDiagnosticsService, GraphService, InitService,
+    Initializer, InspectionService, Inspector, ProvenanceService, Refresher, SearchService,
+    Searcher, ServiceError, ServiceErrorKind, ServiceResult, SnapshotError, SnapshotErrorKind,
+    SnapshotVerifier, SourceProvenance, SourceReader, SourceService, StatusReader, StatusService,
+    StorageError, StorageErrorKind, StorageResult, TraversalService, Traverser,
 };
 use crate::storage::{CacheStorage, VectorStorage};
 use crate::utils::SERVICE_DIRECTORY;
@@ -110,10 +110,10 @@ where
 {
     let git = open_repository_with_cleanup(directory, Arc::new(GitWriteCleanup::new()))?;
     let root = git.get_root().to_path_buf();
-    let files = LocalFileSystem::open(git.get_root())
+    let files = LocalFileSystem::new(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let service_directory = files
-        .open_existing_service_directory()
+        .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
     let storage = open_status_cache(&root.join(SERVICE_DIRECTORY), service_directory.as_ref())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Status, cause))?;
@@ -139,7 +139,7 @@ where
     F: FnOnce(&dyn ConfigReader) -> CommandResult<T>,
 {
     let git = open_repository_with_cleanup(directory, Arc::new(GitWriteCleanup::new()))?;
-    let files = LocalFileSystem::open(git.get_root())
+    let files = LocalFileSystem::new(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Configuration, cause))?;
     let provider = build_embedding_provider()
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Configuration, cause))?;
@@ -167,7 +167,7 @@ fn open_repository_with_cleanup(
 pub fn wire_initializer(start: &Path) -> ServiceResult<impl Initializer + use<>> {
     let git = GitRepository::open(start).map_err(map_snapshot_2_service_error)?;
     let root = git.get_root().to_path_buf();
-    let files = LocalFileSystem::open(&root)
+    let files = LocalFileSystem::new(&root)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Initialization, cause))?;
     let provider = build_embedding_provider()
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Initialization, cause))?;
@@ -191,10 +191,10 @@ pub fn wire_traverser(start: &Path) -> ServiceResult<impl Traverser + use<>> {
 
 /// Compose collaborators from the command's shared repository and cleanup owner.
 fn wire_traverser_with_repository(git: GitRepository) -> ServiceResult<impl Traverser + use<>> {
-    let filesystem = LocalFileSystem::open(git.get_root())
+    let filesystem = LocalFileSystem::new(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     let directory = filesystem
-        .open_service_directory()
+        .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?;
     let storage =
         crate::open_confined_databases(&git.get_root().join(SERVICE_DIRECTORY), &directory)
@@ -204,7 +204,7 @@ fn wire_traverser_with_repository(git: GitRepository) -> ServiceResult<impl Trav
     let vectors = Rc::new(vectors);
     let refresher = wire_document_refresher_with_storage(
         git.clone(),
-        LocalFileSystem::open(git.get_root())
+        LocalFileSystem::new(git.get_root())
             .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Traversal, cause))?,
         Rc::clone(&storage),
     )
@@ -243,7 +243,10 @@ pub fn wire_source_reader<C: service::CacheDatabase>(
     root: &Path,
     storage: Rc<C>,
 ) -> DocumentResult<impl SourceReader + use<C>> {
-    Ok(SourceService::new(storage, LocalFileSystem::open(root)?))
+    Ok(SourceService::new(
+        storage,
+        LocalFileSystem::new(root).map_err(service::map_document_file_error)?,
+    ))
 }
 
 /// Wire read-only source provenance beneath the repository containing `root`.
@@ -274,10 +277,10 @@ pub fn wire_checker(start: &Path) -> ServiceResult<impl Checker + use<>> {
 
 /// Compose collaborators from the command's shared repository and cleanup owner.
 fn wire_checker_with_repository(git: GitRepository) -> ServiceResult<impl Checker + use<>> {
-    let filesystem = LocalFileSystem::open(git.get_root())
+    let filesystem = LocalFileSystem::new(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     let directory = filesystem
-        .open_service_directory()
+        .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?;
     let storage =
         crate::open_confined_databases(&git.get_root().join(SERVICE_DIRECTORY), &directory)
@@ -285,7 +288,7 @@ fn wire_checker_with_repository(git: GitRepository) -> ServiceResult<impl Checke
     let storage = Rc::new(storage.1);
     let refresher = wire_document_refresher_with_storage(
         git.clone(),
-        LocalFileSystem::open(git.get_root())
+        LocalFileSystem::new(git.get_root())
             .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Check, cause))?,
         Rc::clone(&storage),
     )
@@ -311,10 +314,10 @@ pub fn wire_searcher(start: &Path) -> ServiceResult<impl Searcher + use<>> {
 
 /// Compose collaborators from the command's shared repository and cleanup owner.
 fn wire_searcher_with_repository(git: GitRepository) -> ServiceResult<impl Searcher + use<>> {
-    let filesystem = LocalFileSystem::open(git.get_root())
+    let filesystem = LocalFileSystem::new(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     let directory = filesystem
-        .open_service_directory()
+        .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?;
     let storage =
         crate::open_confined_databases(&git.get_root().join(SERVICE_DIRECTORY), &directory)
@@ -324,7 +327,7 @@ fn wire_searcher_with_repository(git: GitRepository) -> ServiceResult<impl Searc
     let vectors = Rc::new(vectors);
     let refresher = wire_document_refresher_with_storage(
         git.clone(),
-        LocalFileSystem::open(git.get_root())
+        LocalFileSystem::new(git.get_root())
             .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Search, cause))?,
         Rc::clone(&storage),
     )
@@ -356,7 +359,7 @@ pub fn wire_inspector(start: &Path) -> ServiceResult<impl Inspector + use<>> {
 fn wire_inspector_with_repository(git: GitRepository) -> ServiceResult<impl Inspector + use<>> {
     let refresher = wire_document_refresher_with_repository(git.clone())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
-    let files = LocalFileSystem::open(git.get_root())
+    let files = LocalFileSystem::new(git.get_root())
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Inspection, cause))?;
     Ok(InspectionService::new(
         refresher,
@@ -385,8 +388,11 @@ pub fn wire_document_refresher(start: &Path) -> DocumentResult<impl Refresher + 
 fn wire_document_refresher_with_repository(
     git: GitRepository,
 ) -> DocumentResult<impl Refresher + use<>> {
-    let filesystem = LocalFileSystem::open(git.get_root())?;
-    let directory = filesystem.open_service_directory()?;
+    let filesystem =
+        LocalFileSystem::new(git.get_root()).map_err(service::map_document_file_error)?;
+    let directory = filesystem
+        .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
+        .map_err(service::map_document_file_error)?;
     let storage =
         crate::open_confined_databases(&git.get_root().join(SERVICE_DIRECTORY), &directory)
             .map_err(|cause| {
@@ -404,14 +410,17 @@ fn wire_document_refresher_with_storage(
     filesystem: LocalFileSystem,
     storage: Rc<storage::CacheStorage>,
 ) -> DocumentResult<impl Refresher + use<>> {
-    filesystem.open_service_directory()?;
+    filesystem
+        .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
+        .map_err(service::map_document_file_error)?;
     let provenance = ProvenanceService::new(
         Box::new(git.clone()),
-        LocalFileSystem::open(git.get_root())?,
+        LocalFileSystem::new(git.get_root()).map_err(service::map_document_file_error)?,
     );
     Ok(DocumentRefreshService {
         git,
         filesystem,
+        clock: Box::new(SystemClock::new()),
         markdown: MarkdownParser::new(),
         storage,
         provenance,
@@ -422,7 +431,8 @@ fn wire_document_refresher_with_storage(
 fn wire_source_provenance_with_repository(
     git: GitRepository,
 ) -> DocumentResult<impl SourceProvenance + use<>> {
-    let filesystem = LocalFileSystem::open(git.get_root())?;
+    let filesystem =
+        LocalFileSystem::new(git.get_root()).map_err(service::map_document_file_error)?;
     Ok(ProvenanceService::new(Box::new(git), filesystem))
 }
 
@@ -444,10 +454,10 @@ pub fn wire_embedding_executor(
 fn wire_embedding_executor_at_root(
     root: &Path,
 ) -> ServiceResult<impl EmbeddingExecutor + Embedder + use<>> {
-    let files = LocalFileSystem::open(root)
+    let files = LocalFileSystem::new(root)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
     let directory = files
-        .open_service_directory()
+        .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
     let storage = crate::open_confined_databases(&root.join(SERVICE_DIRECTORY), &directory)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?;
@@ -456,6 +466,7 @@ fn wire_embedding_executor_at_root(
         Rc::new(cache),
         Rc::new(vectors),
         files,
+        Box::new(SystemClock::new()),
         MarkdownParser::new(),
         build_embedding_provider()
             .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Embedding, cause))?,
@@ -471,7 +482,7 @@ pub fn wire_background_runner<'a>(
     executable: &Path,
     tasks: Option<&'a mut dyn EmbeddingExecutor>,
 ) -> ServiceResult<impl BackgroundRunner + use<'a>> {
-    let files = LocalFileSystem::open(root)
+    let files = LocalFileSystem::new(root)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Background, cause))?;
     Ok(BackgroundRunnerService::new(
         tasks,
@@ -489,26 +500,18 @@ pub fn wire_embedder<C: service::CacheDatabase, V: service::VectorDatabase>(
     cache: Rc<C>,
     vectors: Rc<V>,
 ) -> EmbeddingResult<impl Embedder + EmbeddingExecutor + use<C, V>> {
+    let files = LocalFileSystem::new(root).map_err(map_embedding_files)?;
+    files
+        .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
+        .map_err(map_embedding_files)?;
     Ok(EmbeddingService::new(
         cache,
         vectors,
-        open_embedding_files(root)?,
+        files,
+        Box::new(SystemClock::new()),
         MarkdownParser::new(),
         build_embedding_provider()?,
     ))
-}
-
-/// Open confined embedding file reads and persistent drain exclusion.
-/// The checkout directory is pinned and `.letopis` is protected with mode 0700.
-///
-/// # Errors
-/// Reports unsafe service paths, observed replacements or filesystem failures.
-pub fn open_embedding_files(root: &Path) -> EmbeddingResult<impl EmbeddingFiles + use<>> {
-    let files = LocalFileSystem::open(root).map_err(map_embedding_files)?;
-    files
-        .open_service_directory()
-        .map_err(map_embedding_files)?;
-    Ok(files)
 }
 
 /// Construct the synchronous provider pair, capturing compatible credentials once.
@@ -547,14 +550,6 @@ pub fn open_status_storage<F: AsFd>(
     crate::open_observed_cache(directory, pinned)
 }
 
-/// Open status observations beneath a pinned checkout without creating service state.
-///
-/// # Errors
-/// Reports an unsafe or inaccessible checkout root.
-pub fn open_status_files(root: &Path) -> DocumentResult<impl StatusFiles + use<>> {
-    LocalFileSystem::open(root)
-}
-
 /// Open the disk cache and independent vector database.
 ///
 /// # Errors
@@ -585,8 +580,8 @@ pub fn open_cache_storage(
 ///
 /// # Errors
 /// Reports an inaccessible or non-directory root, including a symlink root.
-pub fn open_filesystem(root: &Path) -> DocumentResult<impl FileSystem + EmbedLocker + use<>> {
-    LocalFileSystem::open(root)
+pub fn open_filesystem(root: &Path) -> FileResult<impl FileWriter + FileLocker + use<>> {
+    LocalFileSystem::new(root)
 }
 
 // Initialization must validate existing configuration before creating database state.
@@ -606,7 +601,7 @@ fn open_sqlite_databases(
     cache: &Path,
     vectors: &Path,
 ) -> StorageResult<(VectorStorage, CacheStorage)> {
-    let (cache, vectors) = filesystem::prepare_paths(cache, vectors)?;
+    let [cache, vectors] = resolve_database_paths(cache, vectors)?;
     let mut cache_writer = storage::open_database(&cache)?;
     storage::bootstrap_cache(&mut cache_writer)?;
     let mut vector_writer = storage::open_database(&vectors)?;
@@ -678,7 +673,7 @@ fn open_confined_database(
     pinned: &impl AsFd,
     name: &str,
 ) -> StorageResult<rusqlite::Connection> {
-    let connection = with_verified_database_paths(directory, pinned, |_| {
+    let connection = with_verified_database_paths(directory, pinned, |_, _| {
         storage::open_confined_database(&directory.join(name))
     })?;
     storage::configure_connection(&connection)?;
@@ -690,8 +685,18 @@ fn get_observed_database(
     pinned: &impl AsFd,
     name: &str,
 ) -> StorageResult<Option<rusqlite::Connection>> {
-    with_verified_database_paths(directory, pinned, |paths| {
-        if !paths.get_database_exists(name)? {
+    with_verified_database_paths(directory, pinned, |cache, vectors| {
+        let identity = match name {
+            "cache.db" => cache,
+            "vectors.db" => vectors,
+            _ => {
+                return Err(StorageError::new(
+                    StorageErrorKind::InvalidRequest,
+                    "unsupported storage database",
+                ));
+            }
+        };
+        if identity.is_none() {
             return Ok(None);
         }
         let connection = storage::open_observed_database(&directory.join(name))?;
@@ -704,8 +709,8 @@ fn attach_observed_vectors(
     pinned: &impl AsFd,
     connection: &rusqlite::Connection,
 ) -> StorageResult<bool> {
-    with_verified_database_paths(directory, pinned, |paths| {
-        if !paths.get_database_exists("vectors.db")? {
+    with_verified_database_paths(directory, pinned, |_, vectors| {
+        if vectors.is_none() {
             return Ok(false);
         }
         storage::attach_read_only_vectors(connection, &directory.join("vectors.db"))?;
@@ -718,7 +723,7 @@ fn attach_confined_vectors(
     pinned: &impl AsFd,
     connection: &rusqlite::Connection,
 ) -> StorageResult<()> {
-    with_verified_database_paths(directory, pinned, |_| {
+    with_verified_database_paths(directory, pinned, |_, _| {
         storage::attach_unconfigured_vectors(connection, &directory.join("vectors.db"))
     })?;
     storage::configure_vectors(connection)
@@ -729,7 +734,7 @@ fn attach_confined_cache(
     pinned: &impl AsFd,
     connection: &rusqlite::Connection,
 ) -> StorageResult<()> {
-    with_verified_database_paths(directory, pinned, |_| {
+    with_verified_database_paths(directory, pinned, |_, _| {
         storage::attach_cache(connection, &directory.join("cache.db"))
     })
 }
@@ -740,16 +745,126 @@ fn with_verified_database_paths<T, F>(
     operation: F,
 ) -> StorageResult<T>
 where
-    F: FnOnce(&filesystem::DatabasePaths<'_>) -> StorageResult<T>,
+    F: FnOnce(Option<FileIdentity>, Option<FileIdentity>) -> StorageResult<T>,
 {
-    let paths = filesystem::DatabasePaths::observe(directory, pinned)?;
+    let files = LocalFileSystem::new(directory).map_err(|cause| {
+        StorageError::new_with_cause(
+            StorageErrorKind::InvalidRequest,
+            "cannot validate document storage path",
+            cause,
+        )
+    })?;
+    verify_storage_directory(&files, pinned)?;
+    let cache = files
+        .file_get_identity_by_path(Path::new("cache.db"))
+        .map_err(map_storage_path_error)?;
+    let vectors = files
+        .file_get_identity_by_path(Path::new("vectors.db"))
+        .map_err(map_storage_path_error)?;
+    verify_storage_files(&files, cache, vectors)?;
     #[cfg(test)]
     if let Some(hook) = BEFORE_DATABASE_OPERATION.take() {
         hook();
     }
-    let result = operation(&paths);
-    paths.verify()?;
+    let result = operation(cache, vectors);
+    verify_storage_directory(&files, pinned)?;
+    verify_storage_files(&files, cache, vectors)?;
     result
+}
+
+fn verify_storage_directory(files: &dyn FileReader, pinned: &impl AsFd) -> StorageResult<()> {
+    let current = files
+        .directory_get_by_path(Path::new("."))
+        .map_err(|cause| {
+            let message = if cause.get_kind() == FileErrorKind::Changed {
+                "document storage directory changed"
+            } else {
+                "cannot validate document storage path"
+            };
+            StorageError::new_with_cause(StorageErrorKind::InvalidRequest, message, cause)
+        })?
+        .ok_or_else(|| {
+            StorageError::new(
+                StorageErrorKind::InvalidRequest,
+                "document storage directory changed",
+            )
+        })?;
+    let current = rustix::fs::fstat(&current).map_err(|cause| {
+        StorageError::new_with_cause(
+            StorageErrorKind::InvalidRequest,
+            "cannot validate document storage path",
+            cause,
+        )
+    })?;
+    let pinned = rustix::fs::fstat(pinned).map_err(|cause| {
+        StorageError::new_with_cause(
+            StorageErrorKind::InvalidRequest,
+            "cannot validate document storage path",
+            cause,
+        )
+    })?;
+    if !utils::has_same_identity(&current, &pinned) {
+        return Err(StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "document storage directory changed",
+        ));
+    }
+    Ok(())
+}
+
+fn verify_storage_files(
+    files: &dyn FileReader,
+    cache: Option<FileIdentity>,
+    vectors: Option<FileIdentity>,
+) -> StorageResult<()> {
+    files
+        .file_verify_identity_by_path(Path::new("cache.db"), cache)
+        .map_err(map_storage_path_error)?;
+    files
+        .file_verify_identity_by_path(Path::new("vectors.db"), vectors)
+        .map_err(map_storage_path_error)?;
+    files
+        .file_verify_distinct_by_paths(Path::new("cache.db"), Path::new("vectors.db"))
+        .map_err(map_storage_path_error)
+}
+
+fn map_storage_path_error(cause: FileError) -> StorageError {
+    let message = match cause.get_kind() {
+        FileErrorKind::Changed => "document storage database changed",
+        FileErrorKind::Aliased => "storage databases must be distinct files",
+        FileErrorKind::UnsafePath | FileErrorKind::NonRegular => "unsafe document storage path",
+        _ => "cannot validate document storage path",
+    };
+    StorageError::new_with_cause(StorageErrorKind::InvalidRequest, message, cause)
+}
+
+fn resolve_database_paths(cache: &Path, vectors: &Path) -> StorageResult<[std::path::PathBuf; 2]> {
+    for path in [cache, vectors] {
+        if path.to_str().is_none() {
+            return Err(StorageError::new(
+                StorageErrorKind::InvalidRequest,
+                "invalid storage database path",
+            ));
+        }
+    }
+    let paths =
+        LocalFileSystem::file_get_distinct_paths_by_paths(cache, vectors).map_err(|cause| {
+            let message = match cause.get_kind() {
+                FileErrorKind::Aliased => "storage databases must be distinct files",
+                FileErrorKind::UnsafePath | FileErrorKind::NonRegular => {
+                    "invalid storage database path"
+                }
+                _ => "storage parent or file is unavailable",
+            };
+            StorageError::new_with_cause(StorageErrorKind::InvalidRequest, message, cause)
+        })?;
+    if paths.iter().any(|path| path.to_str().is_none()) {
+        return Err(StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "invalid storage database path",
+        ));
+    }
+    Ok(paths)
 }
 
 #[cfg(test)]
@@ -833,7 +948,7 @@ fn map_snapshot_2_service_error(cause: SnapshotError) -> ServiceError {
     ServiceError::new_with_cause(kind, cause)
 }
 
-fn map_embedding_files(error: DocumentError) -> EmbeddingError {
+fn map_embedding_files(error: FileError) -> EmbeddingError {
     EmbeddingError::new_with_cause(EmbeddingErrorKind::InternalError, error)
 }
 
@@ -1130,5 +1245,158 @@ mod database_tests {
                 .map(get_current)
                 .unwrap();
         }
+    }
+}
+
+#[cfg(test)]
+mod database_path_tests {
+    use super::{StorageResult, resolve_database_paths, with_verified_database_paths};
+    use crate::service::StorageErrorKind;
+    use std::fs::{self, File};
+    use std::path::Path;
+    use tempfile::TempDir;
+
+    #[test]
+    fn rejects_replacement_of_an_observed_database() {
+        // Given: a retained directory and a regular database leaf.
+        let root = TempDir::new().unwrap();
+        let path = root.path().canonicalize().unwrap();
+        let pinned = File::open(&path).unwrap();
+        fs::write(path.join("cache.db"), b"original").unwrap();
+        // When: a database operation replaces the original leaf and fails.
+        let error = with_verified_database_paths(&path, &pinned, |_, _| {
+            fs::rename(path.join("cache.db"), path.join("saved.db")).unwrap();
+            fs::write(path.join("cache.db"), b"replacement").unwrap();
+            Err::<(), _>(super::StorageError::new(
+                StorageErrorKind::InternalError,
+                "sqlite failed",
+            ))
+        })
+        .unwrap_err();
+        // Then: integrity verification takes precedence over the database failure.
+        assert_eq!(error.get_message(), "document storage database changed");
+        assert_eq!(fs::read(path.join("saved.db")).unwrap(), b"original");
+    }
+
+    #[test]
+    fn rejects_directory_replacement_before_fresh_file_observation() {
+        // Given: the original directory capability survives path replacement.
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("state");
+        fs::create_dir(&path).unwrap();
+        let pinned = File::open(&path).unwrap();
+        fs::rename(&path, root.path().join("saved")).unwrap();
+        fs::create_dir(&path).unwrap();
+        // When: composition starts a new observation under the replaced name.
+        let error = with_verified_database_paths(&path, &pinned, |_, _| -> StorageResult<()> {
+            panic!("unsafe operation entered")
+        })
+        .unwrap_err();
+        // Then: the retained original capability rejects the fresh directory.
+        assert_eq!(error.get_message(), "document storage directory changed");
+        assert_eq!(fs::read_dir(&path).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn rejects_existing_database_alias_before_entering_operation() {
+        // Given: both database names already refer to one regular file.
+        let root = TempDir::new().unwrap();
+        let path = root.path().canonicalize().unwrap();
+        let pinned = File::open(&path).unwrap();
+        fs::write(path.join("cache.db"), b"untouched").unwrap();
+        fs::hard_link(path.join("cache.db"), path.join("vectors.db")).unwrap();
+        // When: composition validates the pair before giving it to SQLite.
+        let error = with_verified_database_paths(&path, &pinned, |_, _| -> StorageResult<()> {
+            panic!("aliased operation entered")
+        })
+        .unwrap_err();
+        // Then: alias detection prevents the operation and preserves the original bytes.
+        assert_eq!(
+            error.get_message(),
+            "storage databases must be distinct files"
+        );
+        assert_eq!(fs::read(path.join("cache.db")).unwrap(), b"untouched");
+    }
+
+    #[test]
+    fn permits_creation_but_rejects_hard_link_aliases() {
+        // Given: both files are initially absent beneath the pinned directory.
+        let root = TempDir::new().unwrap();
+        let path = root.path().canonicalize().unwrap();
+        let pinned = File::open(&path).unwrap();
+        // When: the operation creates independent regular files.
+        with_verified_database_paths(&path, &pinned, |_, _| {
+            fs::write(path.join("cache.db"), []).unwrap();
+            fs::write(path.join("vectors.db"), []).unwrap();
+            Ok(())
+        })
+        .unwrap();
+        fs::remove_file(path.join("vectors.db")).unwrap();
+        // When: an operation fills the missing leaf with an alias to the cache.
+        let error = with_verified_database_paths(&path, &pinned, |_, _| {
+            fs::hard_link(path.join("cache.db"), path.join("vectors.db")).unwrap();
+            Ok(())
+        })
+        .unwrap_err();
+        // Then: post-operation distinctness rejects the alias.
+        assert_eq!(
+            error.get_message(),
+            "storage databases must be distinct files"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn rejects_non_utf8_targets_resolved_from_utf8_symlinks() {
+        use std::ffi::OsString;
+        use std::os::unix::{ffi::OsStringExt, fs::symlink};
+        // Given: a UTF-8 alias resolves to a native path SQLite cannot represent.
+        let root = TempDir::new().unwrap();
+        let target = root.path().join(OsString::from_vec(vec![0xff]));
+        fs::write(&target, b"untouched").unwrap();
+        let alias = root.path().join("alias");
+        symlink(&target, &alias).unwrap();
+        // When: composition resolves external storage paths.
+        let error = resolve_database_paths(&alias, &root.path().join("other")).unwrap_err();
+        // Then: the original safe classification and context are preserved.
+        assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
+        assert_eq!(error.get_message(), "invalid storage database path");
+        assert_eq!(fs::read(&target).unwrap(), b"untouched");
+        assert!(!root.path().join("other").exists());
+    }
+
+    #[test]
+    fn rejects_database_paths_with_nul_bytes() {
+        // Given / When: resolve a path containing an embedded NUL byte.
+        let error =
+            resolve_database_paths(Path::new("bad\0database"), Path::new("other")).unwrap_err();
+        // Then: SQLite must never receive a path that is not a filesystem name.
+        assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
+    }
+
+    #[test]
+    fn rejects_an_existing_directory_as_a_database_path() {
+        // Given: a directory exists where a database file is expected.
+        let root = TempDir::new().unwrap();
+        // When: resolve the directory as a database path.
+        let error = resolve_database_paths(root.path(), &root.path().join("other")).unwrap_err();
+        // Then: reject the invalid request without changing the filesystem.
+        assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
+    }
+
+    #[test]
+    fn preserves_non_absence_errors_when_observing_database_identity() {
+        // Given: a regular parent causes ENOTDIR rather than a missing leaf.
+        let root = TempDir::new().unwrap();
+        let parent = root.path().join("ordinary-file");
+        fs::write(&parent, b"preserved").unwrap();
+        // When: resolve database leaves below the regular file.
+        let error =
+            resolve_database_paths(&parent.join("cache.db"), &root.path().join("vectors.db"))
+                .unwrap_err();
+        // Then: reject the invalid request without changing the filesystem.
+        assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
+        assert_eq!(fs::read(&parent).unwrap(), b"preserved");
+        assert!(!root.path().join("vectors.db").exists());
     }
 }

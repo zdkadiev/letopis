@@ -9,7 +9,7 @@ use letopis::{
     domain::{RepoPath, Sha256},
     markdown::parse,
     open_filesystem,
-    service::{EmbedLocker, EmbeddingConfig, EmbeddingFailure, Refresher, VectorOutcome},
+    service::{EmbeddingConfig, EmbeddingFailure, FileLocker, Refresher, VectorOutcome},
     wire_document_refresher,
 };
 use serde_json::{Value, json};
@@ -373,7 +373,12 @@ pub fn assert_success(output: &Output) {
 /// Panics if the lock path is unsafe or another process retains ownership.
 pub fn assert_released(root: &Path) {
     let files = open_filesystem(root).unwrap();
-    assert!(files.try_lock_embed().unwrap().is_some());
+    assert!(
+        files
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .unwrap()
+            .is_some()
+    );
 }
 
 fn has_exited(pid: i32) -> bool {

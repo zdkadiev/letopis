@@ -184,6 +184,15 @@ pub struct ParsedElement {
     pub search_hash: Sha256,
 }
 
+/// Stable file identity; mutable content and timestamps are deliberately excluded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileIdentity {
+    /// Device number.
+    pub device: u64,
+    /// Inode number.
+    pub inode: u64,
+}
+
 /// Root-relative regular-file observation used by change detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FileStat {
@@ -195,6 +204,16 @@ pub struct FileStat {
     pub inode: u64,
     /// Device number.
     pub device: u64,
+}
+
+impl FileStat {
+    /// Return the stable identity without mutable content observations.
+    pub fn get_identity(&self) -> FileIdentity {
+        FileIdentity {
+            device: self.device,
+            inode: self.inode,
+        }
+    }
 }
 
 /// Exact file bytes with a verified observation and pre-read clock sample.
@@ -1323,13 +1342,15 @@ mod embedding_config_tests {
 
 #[cfg(test)]
 mod configuration_value_tests {
+    use crate::service::{CapturedFile, FileIdentity, FileReader, FileResult, FileStat};
+
     use super::{Configuration, GENERATED_CONFIG};
     use crate::{
         domain::Sha256,
         service::configuration::ConfigurationService,
         service::{
-            CommandResult, ConfigReader, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind,
-            EmbeddingProvider, EmbeddingResult, HeldLock, StatusFiles,
+            ConfigReader, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingProvider,
+            EmbeddingResult,
         },
     };
     use serde::Deserialize;
@@ -1351,6 +1372,18 @@ mod configuration_value_tests {
         validate_valid: bool,
     }
     struct Provider;
+    fn capture(bytes: Vec<u8>) -> CapturedFile {
+        CapturedFile {
+            stat: FileStat {
+                size: bytes.len() as u64,
+                mtime_ns: 1,
+                inode: 1,
+                device: 1,
+            },
+            bytes,
+            checked_at_ns: 1,
+        }
+    }
     struct Files {
         config: Vec<u8>,
     }
@@ -1431,13 +1464,48 @@ mod configuration_value_tests {
         }
     }
 
-    impl StatusFiles for Files {
-        fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
-            Ok(Some(self.config.clone()))
+    impl FileReader for Files {
+        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            assert_eq!(path, std::path::Path::new(".letopis/config.json"));
+            Ok(Some(capture(self.config.clone())))
         }
-
-        fn observe_locks(&self) -> CommandResult<Vec<HeldLock>> {
-            Ok(Vec::new())
+        fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
+            panic!("unexpected file_get_stat_by_path")
+        }
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unexpected file_get_identity_by_path")
+        }
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unexpected file_is_exist")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_identity_by_path")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_distinct_by_paths")
+        }
+        fn directory_get_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            Ok(None)
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            Ok(None)
         }
     }
 

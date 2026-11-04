@@ -1,7 +1,7 @@
-use super::{LocalFileSystem, get_file_stat_by_descriptor, reopen_concurrently_created_lock};
+use super::LocalFileSystem;
 use crate::{
     domain::RepoPath,
-    service::{DocumentErrorKind, EmbedLocker, FileSystem},
+    service::{Clock, FileErrorKind, FileLocker, FileReader},
 };
 use rustix::{
     fs::{FlockOperation, flock, fstat},
@@ -28,11 +28,19 @@ fn get_regular_file_preserves_bytes_and_stat() {
     let root = tempdir().unwrap();
     let path = RepoPath::parse("заметка with spaces.md").unwrap();
     fs::write(root.path().join(path.as_str()), b"literal\0\xffbytes").unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
-    let before = filesystem.get_time_ns().unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
+    let before = crate::process::SystemClock::new()
+        .clock_get_time_ns()
+        .unwrap();
     // When: the document and its file metadata are retrieved.
-    let captured = filesystem.get_file(&path).unwrap().unwrap();
-    let stat = filesystem.get_file_stat_by_path(&path).unwrap().unwrap();
+    let captured = filesystem
+        .file_get_by_path(Path::new(path.as_str()))
+        .unwrap()
+        .unwrap();
+    let stat = filesystem
+        .file_get_stat_by_path(Path::new(path.as_str()))
+        .unwrap()
+        .unwrap();
     // Then: bytes, metadata, and capture time match the file.
     assert_eq!(captured.bytes, b"literal\0\xffbytes");
     assert_eq!(captured.stat, stat);
@@ -42,11 +50,16 @@ fn get_regular_file_preserves_bytes_and_stat() {
         fs::metadata(root.path().join(path.as_str())).unwrap().ino()
     );
     assert!(captured.checked_at_ns >= before);
-    assert!(captured.checked_at_ns <= filesystem.get_time_ns().unwrap());
+    assert!(
+        captured.checked_at_ns
+            <= crate::process::SystemClock::new()
+                .clock_get_time_ns()
+                .unwrap()
+    );
 }
 
 #[test]
-fn nonregular_final_entries_are_absent_without_following_symlinks() {
+fn nonregular_final_entries_are_classified_without_following_symlinks() {
     // Given: a symlink to an external file, a directory, and a FIFO.
     let root = tempdir().unwrap();
     let outside = tempdir().unwrap();
@@ -54,12 +67,24 @@ fn nonregular_final_entries_are_absent_without_following_symlinks() {
     symlink(outside.path().join("note.md"), root.path().join("link.md")).unwrap();
     fs::create_dir(root.path().join("directory.md")).unwrap();
     create_fifo(&root.path().join("pipe.md"));
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
     for raw in ["link.md", "directory.md", "pipe.md"] {
         let path = RepoPath::parse(raw).unwrap();
-        // When / Then: observation and capture treat the entry as absent.
-        assert!(filesystem.get_file_stat_by_path(&path).unwrap().is_none());
-        assert!(filesystem.get_file(&path).unwrap().is_none());
+        // When / Then: observation and capture reject the stable nonregular leaf.
+        assert_eq!(
+            filesystem
+                .file_get_stat_by_path(Path::new(path.as_str()))
+                .unwrap_err()
+                .get_kind(),
+            FileErrorKind::NonRegular
+        );
+        assert_eq!(
+            filesystem
+                .file_get_by_path(Path::new(path.as_str()))
+                .unwrap_err()
+                .get_kind(),
+            FileErrorKind::NonRegular
+        );
     }
 }
 
@@ -72,7 +97,7 @@ fn nonregular_entry_changes_between_observations_fail() {
         if initial == "symlink" {
             symlink("target", &path).unwrap();
         }
-        let filesystem = LocalFileSystem::open(root.path()).unwrap();
+        let filesystem = LocalFileSystem::new(root.path()).unwrap();
         filesystem.between_stats.replace(Some(Box::new(move || {
             if initial == "symlink" {
                 fs::remove_file(&path).unwrap();
@@ -82,7 +107,7 @@ fn nonregular_entry_changes_between_observations_fail() {
         // When / Then: the changed entry is rejected instead of treated as stable absence.
         assert!(
             filesystem
-                .get_file_stat_by_path(&RepoPath::parse("note.md").unwrap())
+                .file_get_stat_by_path(std::path::Path::new("note.md"))
                 .is_err()
         );
     }
@@ -96,10 +121,18 @@ fn reject_final_and_parent_symlinks() {
     fs::write(outside.path().join("note.md"), b"secret").unwrap();
     symlink(outside.path(), root.path().join("parent")).unwrap();
     let path = RepoPath::parse("parent/note.md").unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
     // When / Then: traversal through the parent symlink fails.
-    assert!(filesystem.get_file(&path).is_err());
-    assert!(filesystem.get_file_stat_by_path(&path).is_err());
+    assert!(
+        filesystem
+            .file_get_by_path(Path::new(path.as_str()))
+            .is_err()
+    );
+    assert!(
+        filesystem
+            .file_get_stat_by_path(Path::new(path.as_str()))
+            .is_err()
+    );
     let target = root.path().join("note.md");
     fs::write(&target, b"regular").unwrap();
     let external = outside.path().join("note.md");
@@ -110,7 +143,7 @@ fn reject_final_and_parent_symlinks() {
     // When / Then: replacement after stat fails without reading the target.
     assert!(
         filesystem
-            .get_file(&RepoPath::parse("note.md").unwrap())
+            .file_get_by_path(std::path::Path::new("note.md"))
             .is_err()
     );
 }
@@ -119,24 +152,34 @@ fn reject_final_and_parent_symlinks() {
 fn missing_file_returns_none() {
     // Given: a repository without the requested documents.
     let root = tempdir().unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
     for raw in ["missing.md", "missing/child.md"] {
         let path = RepoPath::parse(raw).unwrap();
         // When / Then: reading and stating a missing document return no file.
-        assert!(filesystem.get_file(&path).unwrap().is_none());
-        assert!(filesystem.get_file_stat_by_path(&path).unwrap().is_none());
+        assert!(
+            filesystem
+                .file_get_by_path(Path::new(path.as_str()))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            filesystem
+                .file_get_stat_by_path(Path::new(path.as_str()))
+                .unwrap()
+                .is_none()
+        );
     }
 }
 
 #[test]
 fn replacement_during_read_fails() {
     for replacement in ["regular", "fifo", "parent", "deleted", "modified"] {
-        // Given
+        // Given: a regular file and an after-read replacement hook.
         let root = tempdir().unwrap();
         fs::create_dir(root.path().join("dir")).unwrap();
         let full = root.path().join("dir/note.md");
         fs::write(&full, b"before").unwrap();
-        let filesystem = LocalFileSystem::open(root.path()).unwrap();
+        let filesystem = LocalFileSystem::new(root.path()).unwrap();
         let directory = root.path().to_path_buf();
         filesystem
             .after_read
@@ -155,10 +198,10 @@ fn replacement_during_read_fails() {
                     }
                 }
             })));
-        // When / Then
+        // When / Then: capture reads across the replacement; the changed capture is rejected.
         assert!(
             filesystem
-                .get_file(&RepoPath::parse("dir/note.md").unwrap())
+                .file_get_by_path(std::path::Path::new("dir/note.md"))
                 .is_err()
         );
     }
@@ -166,11 +209,11 @@ fn replacement_during_read_fails() {
 
 #[test]
 fn fifo_replacement_before_open_is_rejected_without_blocking() {
-    // Given
+    // Given: a regular leaf replaced by a FIFO at the open barrier.
     let root = tempdir().unwrap();
     let path = root.path().join("note.md");
     fs::write(&path, b"regular").unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
     filesystem.before_open.replace(Some(Box::new(move || {
         fs::remove_file(&path).unwrap();
         create_fifo(&path);
@@ -179,23 +222,25 @@ fn fifo_replacement_before_open_is_rejected_without_blocking() {
     // When: timeout is a hang watchdog, not a scheduling mechanism.
     let worker = thread::spawn(move || {
         sender
-            .send(filesystem.get_file(&RepoPath::parse("note.md").unwrap()))
+            .send(filesystem.file_get_by_path(std::path::Path::new("note.md")))
             .unwrap();
     });
     let result = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
-    // Then
+    // Then: the capture fails promptly instead of blocking.
     assert!(result.is_err());
     worker.join().unwrap();
 }
 
 #[test]
 fn index_owner_writes_pid_after_acquiring_lock() {
-    // Given
+    // Given: an unowned persistent index lock path.
     let root = tempdir().unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
-    // When
-    let _guard = filesystem.lock_index().unwrap();
-    // Then
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
+    // When: the index lock is acquired.
+    let _guard = filesystem
+        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        .unwrap();
+    // Then: the file contains the current owner PID.
     assert_eq!(
         fs::read_to_string(root.path().join(".letopis/index.lock")).unwrap(),
         format!("{}\n", std::process::id())
@@ -204,23 +249,36 @@ fn index_owner_writes_pid_after_acquiring_lock() {
 
 #[test]
 fn embed_probe_preserves_busy_owner_bytes_and_independent_index_lock() {
-    // Given a stale PID longer than this process's PID.
+    // Given: a stale PID longer than this process's PID.
     let root = tempdir().unwrap();
     fs::create_dir(root.path().join(".letopis")).unwrap();
     let path = root.path().join(".letopis/embed.lock");
     fs::write(&path, b"99999999999999999999999999999999\n").unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
     // When: a stale PID does not prevent ownership; busy probes do not write.
-    let guard = filesystem.try_lock_embed().unwrap().unwrap();
+    let guard = filesystem
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     let bytes = fs::read(&path).unwrap();
     let inode = fs::metadata(&path).unwrap().ino();
-    let _index = filesystem.lock_index().unwrap();
-    assert!(filesystem.try_lock_embed().unwrap().is_none());
-    // Then
+    let _index = filesystem
+        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        .unwrap();
+    assert!(
+        filesystem
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .unwrap()
+            .is_none()
+    );
+    // Then: contention preserves the owner bytes and index ownership remains independent.
     assert_eq!(bytes, format!("{}\n", std::process::id()).as_bytes());
     assert_eq!(fs::read(&path).unwrap(), bytes);
     drop(guard);
-    let _next = filesystem.try_lock_embed().unwrap().unwrap();
+    let _next = filesystem
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     assert_eq!(fs::metadata(path).unwrap().ino(), inode);
 }
 
@@ -228,7 +286,7 @@ fn embed_probe_preserves_busy_owner_bytes_and_independent_index_lock() {
 fn hardlinked_lock_targets_are_rejected_without_modifying_corpus_or_external_bytes() {
     for name in ["index.lock", "embed.lock"] {
         for external in [false, true] {
-            // Given each target on the same filesystem as its lock hard link.
+            // Given: each target on the same filesystem as its lock hard link.
             let root = tempdir().unwrap();
             let outside = tempdir().unwrap();
             let target_root = if external {
@@ -243,14 +301,16 @@ fn hardlinked_lock_targets_are_rejected_without_modifying_corpus_or_external_byt
             let path = root.path().join(".letopis").join(name);
             fs::hard_link(&target, &path).unwrap();
             let inode = fs::metadata(&target).unwrap().ino();
-            let filesystem = LocalFileSystem::open(root.path()).unwrap();
-            // When
+            let filesystem = LocalFileSystem::new(root.path()).unwrap();
+            // When: both lock acquisition modes validate those aliases.
             let result = if name == "index.lock" {
-                filesystem.lock_index().map(Some)
+                filesystem
+                    .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                    .map(Some)
             } else {
-                filesystem.try_lock_embed()
+                filesystem.lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
             };
-            // Then the error neither mutates the inode nor exposes private data.
+            // Then: the error neither mutates the inode nor exposes private data.
             assert_eq!(
                 fs::read(&target).unwrap(),
                 bytes,
@@ -259,8 +319,8 @@ fn hardlinked_lock_targets_are_rejected_without_modifying_corpus_or_external_byt
             assert_eq!(fs::read(&path).unwrap(), bytes);
             assert_eq!(fs::metadata(&target).unwrap().ino(), inode);
             assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
-            let error = result.err().expect("hard-linked lock must fail");
-            assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+            let error = result.expect_err("hard-linked lock must fail");
+            assert_eq!(error.get_kind(), FileErrorKind::Aliased);
             let diagnostic = format!("{error} {error:?}");
             assert!(!diagnostic.contains("private corpus"));
             assert!(!diagnostic.contains(target.to_str().unwrap()));
@@ -270,7 +330,7 @@ fn hardlinked_lock_targets_are_rejected_without_modifying_corpus_or_external_byt
 
 #[test]
 fn aliased_index_and_embed_names_are_rejected_without_mutation() {
-    // Given
+    // Given: both lock names refer to the same inode.
     let root = tempdir().unwrap();
     fs::create_dir(root.path().join(".letopis")).unwrap();
     let index = root.path().join(".letopis/index.lock");
@@ -278,96 +338,107 @@ fn aliased_index_and_embed_names_are_rejected_without_mutation() {
     fs::write(&index, b"shared lock inode bytes").unwrap();
     fs::hard_link(&index, &embed).unwrap();
     let inode = fs::metadata(&index).unwrap().ino();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
     for name in ["index.lock", "embed.lock"] {
-        // When
+        // When: each role attempts acquisition.
         let result = if name == "index.lock" {
-            filesystem.lock_index().map(Some)
+            filesystem
+                .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                .map(Some)
         } else {
-            filesystem.try_lock_embed()
+            filesystem.lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
         };
-        // Then
+        // Then: the alias is rejected without changing owner bytes.
         assert_eq!(fs::read(&index).unwrap(), b"shared lock inode bytes");
         assert_eq!(fs::read(&embed).unwrap(), b"shared lock inode bytes");
         assert_eq!(fs::metadata(&index).unwrap().ino(), inode);
         assert_eq!(fs::metadata(&embed).unwrap().ino(), inode);
-        let error = result.err().expect("aliased lock names must fail");
-        assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+        let error = result.expect_err("aliased lock names must fail");
+        assert_eq!(error.get_kind(), FileErrorKind::Aliased);
     }
 }
 
 #[test]
 fn hardlink_added_during_index_contention_is_rejected_after_acquiring_ownership() {
-    // Given an initially private lock descriptor and observe actual contention.
+    // Given: an initially private lock descriptor and observe actual contention.
     let root = tempdir().unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
-    let guard = filesystem.lock_index().unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
+    let guard = filesystem
+        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        .unwrap();
     let path = root.path().join(".letopis/index.lock");
     fs::write(&path, b"holder bytes must survive").unwrap();
     let inode = fs::metadata(&path).unwrap().ino();
-    let waiting = LocalFileSystem::open(root.path()).unwrap();
+    let waiting = LocalFileSystem::new(root.path()).unwrap();
     let (sender, receiver) = mpsc::channel();
     waiting
         .on_contention
         .replace(Some(Box::new(move || sender.send(()).unwrap())));
-    let worker = thread::spawn(move || waiting.lock_index());
+    let worker = thread::spawn(move || {
+        waiting.lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+    });
     receiver.recv_timeout(Duration::from_secs(5)).unwrap();
     let alias = root.path().join("note.md");
     fs::hard_link(&path, &alias).unwrap();
-    // When
+    // When: the earlier owner releases the waiting acquisition.
     drop(guard);
     let result = worker.join().unwrap();
-    // Then the pre-acquisition check cannot hide a subsequently added link.
+    // Then: the pre-acquisition check cannot hide a subsequently added link.
     assert_eq!(fs::read(&path).unwrap(), b"holder bytes must survive");
     assert_eq!(fs::read(&alias).unwrap(), b"holder bytes must survive");
     assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
     assert_eq!(fs::metadata(&alias).unwrap().ino(), inode);
-    let error = result
-        .err()
-        .expect("new hard link must fail after contention");
-    assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+    let error = result.expect_err("new hard link must fail after contention");
+    assert_eq!(error.get_kind(), FileErrorKind::Aliased);
     // Removing the alias permits reacquisition; failure released its kernel lock.
     fs::remove_file(alias).unwrap();
-    drop(filesystem.lock_index().unwrap());
+    drop(
+        filesystem
+            .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+            .unwrap(),
+    );
 }
 
 #[test]
 fn busy_embed_probe_rejects_new_hardlink_without_touching_owner_bytes() {
-    // Given
+    // Given: an embed lock whose held inode gains a hardlink.
     let root = tempdir().unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
-    let _guard = filesystem.try_lock_embed().unwrap().unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
+    let _guard = filesystem
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     let path = root.path().join(".letopis/embed.lock");
     let alias = root.path().join("note.md");
     let bytes = fs::read(&path).unwrap();
     let inode = fs::metadata(&path).unwrap().ino();
     fs::hard_link(&path, &alias).unwrap();
-    // When
-    let result = filesystem.try_lock_embed();
-    // Then an unsafe descriptor is an error even when another owner is busy.
+    // When: a nonblocking caller probes the aliased lock.
+    let result = filesystem.lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"));
+    // Then: an unsafe descriptor is an error even when another owner is busy.
     assert_eq!(fs::read(&path).unwrap(), bytes);
     assert_eq!(fs::read(&alias).unwrap(), bytes);
     assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
     assert_eq!(fs::metadata(&alias).unwrap().ino(), inode);
-    let error = result.err().expect("hard-linked busy lock must fail");
-    assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+    let error = result.expect_err("hard-linked busy lock must fail");
+    assert_eq!(error.get_kind(), FileErrorKind::Aliased);
 }
 
 #[test]
 fn ordinary_hardlinked_document_reads_remain_supported() {
-    // Given
+    // Given: two ordinary file names share an inode.
     let root = tempdir().unwrap();
     fs::write(root.path().join("note.md"), b"unchanged document bytes").unwrap();
     fs::hard_link(root.path().join("note.md"), root.path().join("alias.md")).unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
     let inode = fs::metadata(root.path().join("note.md")).unwrap().ino();
     for name in ["note.md", "alias.md"] {
-        // When
+        // When: each name is captured through the generic reader.
         let captured = filesystem
-            .get_file(&RepoPath::parse(name).unwrap())
+            .file_get_by_path(std::path::Path::new(name))
             .unwrap()
             .unwrap();
-        // Then lock-specific validation must not reject ordinary document hard links.
+        // Then: lock-specific validation must not reject ordinary document hard links.
         assert_eq!(captured.bytes, b"unchanged document bytes");
         assert_eq!(captured.stat.inode, inode);
         assert_eq!(
@@ -388,7 +459,7 @@ fn both_lock_names_reject_unsafe_files_and_service_directories() {
             "service_file",
             "service_fifo",
         ] {
-            // Given
+            // Given: nonregular lock leaves or unsafe parent directories for each role.
             let root = tempdir().unwrap();
             let outside = tempdir().unwrap();
             let target = outside.path().join("untouched");
@@ -408,12 +479,20 @@ fn both_lock_names_reject_unsafe_files_and_service_directories() {
                     }
                 }
             }
-            let filesystem = LocalFileSystem::open(root.path()).unwrap();
-            // When / Then
+            let filesystem = LocalFileSystem::new(root.path()).unwrap();
+            // When / Then: each lock role attempts acquisition; unsafe paths fail without modifying the outside target.
             if name == "index.lock" {
-                assert!(filesystem.lock_index().is_err());
+                assert!(
+                    filesystem
+                        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                        .is_err()
+                );
             } else {
-                assert!(filesystem.try_lock_embed().is_err());
+                assert!(
+                    filesystem
+                        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+                        .is_err()
+                );
             }
             assert_eq!(fs::read(target).unwrap(), b"private outside bytes");
         }
@@ -423,16 +502,20 @@ fn both_lock_names_reject_unsafe_files_and_service_directories() {
 #[test]
 fn replacement_during_index_contention_is_rejected_before_pid_write() {
     for replacement in ["regular", "fifo", "service_link"] {
-        // Given
+        // Given: a contended index lock with a replacement at the wait barrier.
         let root = tempdir().unwrap();
-        let filesystem = LocalFileSystem::open(root.path()).unwrap();
-        let guard = filesystem.lock_index().unwrap();
-        let waiting = LocalFileSystem::open(root.path()).unwrap();
+        let filesystem = LocalFileSystem::new(root.path()).unwrap();
+        let guard = filesystem
+            .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+            .unwrap();
+        let waiting = LocalFileSystem::new(root.path()).unwrap();
         let (sender, receiver) = mpsc::channel();
         waiting
             .on_contention
             .replace(Some(Box::new(move || sender.send(()).unwrap())));
-        let worker = thread::spawn(move || waiting.lock_index());
+        let worker = thread::spawn(move || {
+            waiting.lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        });
         receiver.recv_timeout(Duration::from_secs(5)).unwrap();
         let path = root.path().join(".letopis/index.lock");
         let old = root.path().join("old.lock");
@@ -453,9 +536,9 @@ fn replacement_during_index_contention_is_rejected_before_pid_write() {
                 .unwrap();
             }
         }
-        // When
+        // When: the waiting caller resumes after the original owner drops.
         drop(guard);
-        // Then
+        // Then: replacement is rejected before recording a new PID.
         assert!(worker.join().unwrap().is_err());
         assert_eq!(
             fs::read(old).unwrap(),
@@ -470,13 +553,18 @@ fn replacement_during_index_contention_is_rejected_before_pid_write() {
 #[test]
 fn std_file_and_rustix_locks_exclude_each_other_for_both_names() {
     for name in ["index.lock", "embed.lock"] {
-        // Given
+        // Given: independent standard-library and rustix lock owners.
         let root = tempdir().unwrap();
-        let filesystem = LocalFileSystem::open(root.path()).unwrap();
+        let filesystem = LocalFileSystem::new(root.path()).unwrap();
         let guard = if name == "index.lock" {
-            filesystem.lock_index().unwrap()
+            filesystem
+                .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                .unwrap()
         } else {
-            filesystem.try_lock_embed().unwrap().unwrap()
+            filesystem
+                .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+                .unwrap()
+                .unwrap()
         };
         let file = fs::OpenOptions::new()
             .read(true)
@@ -492,18 +580,27 @@ fn std_file_and_rustix_locks_exclude_each_other_for_both_names() {
         flock(&file, FlockOperation::NonBlockingLockExclusive).unwrap();
         if name == "embed.lock" {
             let before = fs::read(root.path().join(".letopis/embed.lock")).unwrap();
-            assert!(filesystem.try_lock_embed().unwrap().is_none());
+            assert!(
+                filesystem
+                    .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+                    .unwrap()
+                    .is_none()
+            );
             assert_eq!(
                 fs::read(root.path().join(".letopis/embed.lock")).unwrap(),
                 before
             );
         } else {
-            let waiting = LocalFileSystem::open(root.path()).unwrap();
+            let waiting = LocalFileSystem::new(root.path()).unwrap();
             let (sender, receiver) = mpsc::channel();
             waiting
                 .on_contention
                 .replace(Some(Box::new(move || sender.send(()).unwrap())));
-            let worker = thread::spawn(move || waiting.lock_index().unwrap());
+            let worker = thread::spawn(move || {
+                waiting
+                    .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                    .unwrap()
+            });
             receiver.recv_timeout(Duration::from_secs(5)).unwrap();
             assert!(!worker.is_finished());
             flock(&file, FlockOperation::Unlock).unwrap();
@@ -514,13 +611,18 @@ fn std_file_and_rustix_locks_exclude_each_other_for_both_names() {
 
 #[test]
 fn created_lock_files_and_service_directory_have_restrictive_modes() {
-    // Given
+    // Given: an absent private directory and two lock paths.
     let root = tempdir().unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
-    // When
-    let _index = filesystem.lock_index().unwrap();
-    let _embed = filesystem.try_lock_embed().unwrap().unwrap();
-    // Then
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
+    // When: both file locks are acquired.
+    let _index = filesystem
+        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        .unwrap();
+    let _embed = filesystem
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
+    // Then: the directory is 0700 and each persistent lock is 0600.
     for (name, allowed) in [
         (".letopis", 0o700),
         (".letopis/index.lock", 0o600),
@@ -549,7 +651,7 @@ fn run_lock_child() {
     stream.set_read_timeout(Some(PROCESS_WAIT)).unwrap();
     // Keep the peer alive until the parent has configured its socket timeouts.
     stream.read_exact(&mut [0]).unwrap();
-    let filesystem = LocalFileSystem::open(Path::new(&root)).unwrap();
+    let filesystem = LocalFileSystem::new(Path::new(&root)).unwrap();
     let mut contention = stream.try_clone().unwrap();
     if mode == "index" {
         filesystem.on_contention.replace(Some(Box::new(move || {
@@ -558,9 +660,14 @@ fn run_lock_child() {
     }
     // When: attempt the requested lock operation.
     let guard = if mode == "index" {
-        filesystem.lock_index().unwrap()
+        filesystem
+            .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+            .unwrap()
     } else {
-        let Some(guard) = filesystem.try_lock_embed().unwrap() else {
+        let Some(guard) = filesystem
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .unwrap()
+        else {
             eprintln!("busy {mode} pid={}", std::process::id());
             writeln!(stream, "busy").unwrap();
             return;
@@ -649,7 +756,7 @@ impl Drop for LockWorker {
 fn process_owner_drop_or_death_releases_both_persistent_locks() {
     for mode in ["index", "embed"] {
         for kill in [false, true] {
-            // Given
+            // Given: an independent process owns each persistent lock.
             let root = tempdir().unwrap();
             let mut owner = LockWorker::spawn(root.path(), mode);
             assert_eq!(owner.get_event(), "owned");
@@ -657,21 +764,21 @@ fn process_owner_drop_or_death_releases_both_persistent_locks() {
             let inode = fs::metadata(&path).unwrap().ino();
             let bytes = format!("{}\n", owner.child.id()).into_bytes();
             assert_eq!(fs::read(&path).unwrap(), bytes);
-            let filesystem = LocalFileSystem::open(root.path()).unwrap();
+            let filesystem = LocalFileSystem::new(root.path()).unwrap();
             let mut waiter = LockWorker::spawn(root.path(), mode);
             assert_eq!(
                 waiter.get_event(),
                 if mode == "index" { "contended" } else { "busy" }
             );
             assert_eq!(fs::read(&path).unwrap(), bytes);
-            // When
+            // When: the owner exits normally or is killed.
             if kill {
                 owner.child.kill().unwrap();
                 assert!(!owner.child.wait().unwrap().success());
             } else {
                 owner.release();
             }
-            // Then the stale PID and persistent inode survive release/death.
+            // Then: the stale PID and persistent inode survive release/death.
             if mode == "index" {
                 assert_eq!(waiter.get_event(), "owned");
                 assert_eq!(
@@ -679,11 +786,20 @@ fn process_owner_drop_or_death_releases_both_persistent_locks() {
                     format!("{}\n", waiter.child.id()).as_bytes()
                 );
                 waiter.release();
-                drop(filesystem.lock_index().unwrap());
+                drop(
+                    filesystem
+                        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                        .unwrap(),
+                );
             } else {
                 assert_eq!(fs::read(&path).unwrap(), bytes);
                 assert!(waiter.child.wait().unwrap().success());
-                drop(filesystem.try_lock_embed().unwrap().unwrap());
+                drop(
+                    filesystem
+                        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+                        .unwrap()
+                        .unwrap(),
+                );
             }
             assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
             assert_eq!(
@@ -697,18 +813,20 @@ fn process_owner_drop_or_death_releases_both_persistent_locks() {
 #[test]
 fn concurrent_first_lock_creation_preserves_one_regular_file() {
     for _ in 0..20 {
-        // Given both callers before the persistent lock file exists.
+        // Given: both callers before the persistent lock file exists.
         let root = tempdir().unwrap();
         let barrier = Barrier::new(2);
         let inodes = thread::scope(|scope| {
             let workers: Vec<_> = (0..2)
                 .map(|_| {
-                    let filesystem = LocalFileSystem::open(root.path()).unwrap();
+                    let filesystem = LocalFileSystem::new(root.path()).unwrap();
                     let barrier = &barrier;
                     scope.spawn(move || {
                         barrier.wait();
                         // When: create/open and acquire the same persistent lock.
-                        let guard = filesystem.lock_index().unwrap();
+                        let guard = filesystem
+                            .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                            .unwrap();
                         fstat(&guard.file).unwrap().st_ino
                     })
                 })
@@ -738,13 +856,15 @@ fn concurrent_first_embed_lock_creation_has_one_owner_and_stable_inode() {
         let outcomes = thread::scope(|scope| {
             let workers: Vec<_> = (0..2)
                 .map(|_| {
-                    let filesystem = LocalFileSystem::open(root.path()).unwrap();
+                    let filesystem = LocalFileSystem::new(root.path()).unwrap();
                     let barrier = &barrier;
                     scope.spawn(move || {
                         barrier.wait();
                         // When: both workers try to acquire the lock and inspect its inode.
-                        let guard = filesystem.try_lock_embed();
-                        let observed = filesystem.get_file_stat_by_raw_path(".letopis/embed.lock");
+                        let guard = filesystem
+                            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"));
+                        let observed =
+                            filesystem.file_get_identity_by_path(Path::new(".letopis/embed.lock"));
                         // Release the peer even when opening failed, so the
                         // assertion reports the error instead of hanging.
                         barrier.wait();
@@ -770,67 +890,13 @@ fn concurrent_first_embed_lock_creation_has_one_owner_and_stable_inode() {
 }
 
 #[test]
-fn missing_creation_reopens_existing_lock_without_replacing_it() {
-    for name in ["index.lock", "embed.lock"] {
-        // Given: a competitor created the lock file before the current creation attempt.
-        let root = tempdir().unwrap();
-        let path = root.path().join(name);
-        fs::write(&path, b"persistent owner state").unwrap();
-        let directory = fs::File::open(root.path()).unwrap();
-        let before = fs::metadata(&path).unwrap().ino();
-        // When: select exactly the ENOENT creation-error path.
-        let reopened =
-            reopen_concurrently_created_lock(&directory, name, Err(Errno::NOENT)).unwrap();
-        // Then: identity and bytes remain intact, and unrelated errors do not trigger fallback.
-        assert_eq!(
-            get_file_stat_by_descriptor(&reopened).unwrap().inode,
-            before
-        );
-        assert_eq!(fs::read(&path).unwrap(), b"persistent owner state");
-        assert_eq!(
-            reopen_concurrently_created_lock(&directory, name, Err(Errno::ACCESS)).unwrap_err(),
-            Errno::ACCESS
-        );
-    }
-}
-
-#[test]
-fn missing_creation_reopen_rejects_absent_and_unsafe_lock_names() {
-    for name in ["index.lock", "embed.lock"] {
-        for kind in ["absent", "symlink", "fifo", "directory"] {
-            // Given: an absent or unsafe name under the same live directory descriptor.
-            let root = tempdir().unwrap();
-            let path = root.path().join(name);
-            let directory = fs::File::open(root.path()).unwrap();
-            let outside = tempdir().unwrap();
-            let target = outside.path().join("untouched");
-            fs::write(&target, b"outside").unwrap();
-            match kind {
-                "symlink" => symlink(&target, &path).unwrap(),
-                "fifo" => create_fifo(&path),
-                "directory" => fs::create_dir(&path).unwrap(),
-                _ => {}
-            }
-            // When: the fallback may open a FIFO, but the regular-file check rejects it.
-            let result = reopen_concurrently_created_lock(&directory, name, Err(Errno::NOENT));
-            // Then: no file is created, symlink followed, or nonregular file accepted.
-            if let Ok(file) = result {
-                assert!(get_file_stat_by_descriptor(&file).is_err());
-            }
-            if kind == "absent" {
-                assert!(!path.exists());
-            }
-            assert_eq!(fs::read(&target).unwrap(), b"outside");
-        }
-    }
-}
-
-#[test]
 fn lock_releases_on_drop() {
-    // Given
+    // Given: an owned lock with a duplicate descriptor still open.
     let root = tempdir().unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
-    let guard = filesystem.lock_index().unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
+    let guard = filesystem
+        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        .unwrap();
     // Model a descriptor briefly inherited by a concurrent fork before exec.
     let inherited = guard.file.try_clone().unwrap();
     let path = root.path().join(".letopis/index.lock");
@@ -838,14 +904,16 @@ fn lock_releases_on_drop() {
     let inode = second_fd.metadata().unwrap().ino();
     fs::write(&path, b"persistent").unwrap();
     assert!(flock(&second_fd, FlockOperation::NonBlockingLockExclusive).is_err());
-    // When
+    // When: the ownership guard is dropped.
     drop(guard);
-    // Then
+    // Then: the kernel lock is released before the duplicate closes.
     assert!(flock(&second_fd, FlockOperation::NonBlockingLockExclusive).is_ok());
     drop(second_fd);
     drop(inherited);
     assert_eq!(fs::read(&path).unwrap(), b"persistent");
-    let _next = filesystem.lock_index().unwrap();
+    let _next = filesystem
+        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        .unwrap();
     assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
     assert_eq!(
         fs::read(path).unwrap(),
@@ -855,28 +923,34 @@ fn lock_releases_on_drop() {
 
 #[test]
 fn contended_lock_waits_for_release() {
-    // Given
+    // Given: one held lock and a second waiting caller.
     let root = tempdir().unwrap();
-    let filesystem = LocalFileSystem::open(root.path()).unwrap();
-    let guard = filesystem.lock_index().unwrap();
-    let second = LocalFileSystem::open(root.path()).unwrap();
+    let filesystem = LocalFileSystem::new(root.path()).unwrap();
+    let guard = filesystem
+        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        .unwrap();
+    let second = LocalFileSystem::new(root.path()).unwrap();
     let (sender, receiver) = mpsc::channel();
     second
         .on_contention
         .replace(Some(Box::new(move || sender.send(()).unwrap())));
-    let worker = thread::spawn(move || second.lock_index().unwrap());
+    let worker = thread::spawn(move || {
+        second
+            .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+            .unwrap()
+    });
     receiver.recv().unwrap();
     assert!(!worker.is_finished());
-    // When
+    // When: the owner drops its guard.
     drop(guard);
-    // Then
+    // Then: the waiter acquires the same persistent file.
     drop(worker.join().unwrap());
 }
 
 #[test]
 fn reject_service_directory_and_lock_symlinks() {
     for directory_link in [true, false] {
-        // Given
+        // Given: a service-directory or lock symlink to an outside target.
         let root = tempdir().unwrap();
         let outside = tempdir().unwrap();
         fs::write(outside.path().join("target"), b"untouched").unwrap();
@@ -890,9 +964,13 @@ fn reject_service_directory_and_lock_symlinks() {
             )
             .unwrap();
         }
-        let filesystem = LocalFileSystem::open(root.path()).unwrap();
-        // When / Then
-        assert!(filesystem.lock_index().is_err());
+        let filesystem = LocalFileSystem::new(root.path()).unwrap();
+        // When / Then: lock acquisition encounters the unsafe path; the link is rejected and outside bytes remain intact.
+        assert!(
+            filesystem
+                .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                .is_err()
+        );
         assert_eq!(
             fs::read(outside.path().join("target")).unwrap(),
             b"untouched"

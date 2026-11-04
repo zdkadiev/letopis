@@ -1,7 +1,7 @@
 use letopis::domain::RepoPath;
 use letopis::markdown::{MarkdownParser, parse};
-use letopis::open_embedding_files;
-use letopis::service::{EmbeddingFiles, MarkdownCodec, ParsedFile};
+use letopis::open_filesystem;
+use letopis::service::{FileLocker, FileReader, FileWriter, MarkdownCodec, ParsedFile};
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
@@ -78,36 +78,67 @@ impl Drop for OwnedChild {
 }
 #[test]
 fn reads_exact_bytes_and_stable_absence_without_decoding_config() {
-    // Given
+    // Given: missing paths followed by files containing arbitrary bytes.
     let fixture = Fixture::new();
-    let files = open_embedding_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files
+        .directory_create_by_path(Path::new(".letopis"))
+        .unwrap();
     let path = RepoPath::parse("notes/a.md").unwrap();
-    assert_eq!(files.get_config().unwrap(), None);
-    assert_eq!(files.get_document(&path).unwrap(), None);
+    assert_eq!(
+        files
+            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
+            .map(|file| file.map(|file| file.bytes))
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        files
+            .file_get_by_path(Path::new(path.as_str()))
+            .map(|file| file.map(|file| file.bytes))
+            .unwrap(),
+        None
+    );
     fs::create_dir(fixture.0.join("notes")).unwrap();
     fs::write(fixture.0.join("notes/a.md"), b"\xff\r\ntext").unwrap();
     fs::write(fixture.0.join(".letopis/config.json"), b"not JSON\xff").unwrap();
-    // When / Then
-    assert_eq!(files.get_document(&path).unwrap().unwrap(), b"\xff\r\ntext");
-    assert_eq!(files.get_config().unwrap().unwrap(), b"not JSON\xff");
-    assert!(files.get_time_secs().unwrap() > 0);
-    files.wait(Duration::ZERO).unwrap();
+    // When / Then: the generic reader captures the selected paths; bytes remain undecoded and absence stays None.
+    assert_eq!(
+        files
+            .file_get_by_path(Path::new(path.as_str()))
+            .map(|file| file.map(|file| file.bytes))
+            .unwrap()
+            .unwrap(),
+        b"\xff\r\ntext"
+    );
+    assert_eq!(
+        files
+            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
+            .map(|file| file.map(|file| file.bytes))
+            .unwrap()
+            .unwrap(),
+        b"not JSON\xff"
+    );
 }
 
 #[test]
 fn rejects_final_and_ancestor_symlinks_and_nonregular_files() {
-    // Given
+    // Given: nonregular leaves and a parent symlink to outside data.
     let fixture = Fixture::new();
     let outside = Fixture::new();
     fs::write(outside.0.join("secret.md"), b"PRIVATE_PAYLOAD").unwrap();
     symlink(outside.0.join("secret.md"), fixture.0.join("link.md")).unwrap();
     symlink(&outside.0, fixture.0.join("escape")).unwrap();
     fs::create_dir(fixture.0.join("directory.md")).unwrap();
-    let files = open_embedding_files(&fixture.0).unwrap();
-    // When / Then
+    let files = open_filesystem(&fixture.0).unwrap();
+    files
+        .directory_create_by_path(Path::new(".letopis"))
+        .unwrap();
+    // When / Then: generic reads inspect the unsafe paths; typed failures expose no outside payload.
     for path in ["link.md", "escape/secret.md", "directory.md"] {
         let error = files
-            .get_document(&RepoPath::parse(path).unwrap())
+            .file_get_by_path(Path::new(path))
+            .map(|file| file.map(|file| file.bytes))
             .unwrap_err();
         assert!(!format!("{error} {error:?}").contains("PRIVATE_PAYLOAD"));
     }
@@ -116,34 +147,64 @@ fn rejects_final_and_ancestor_symlinks_and_nonregular_files() {
         fixture.0.join(".letopis/config.json"),
     )
     .unwrap();
-    assert!(files.get_config().is_err());
+    assert!(
+        files
+            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
+            .map(|file| file.map(|file| file.bytes))
+            .is_err()
+    );
 }
 
 #[test]
 fn rejects_replaced_service_directory_and_symlink_at_open() {
-    // Given
+    // Given: a pinned directory replaced by an outside symlink.
     let fixture = Fixture::new();
     let outside = Fixture::new();
-    let files = open_embedding_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files
+        .directory_create_by_path(Path::new(".letopis"))
+        .unwrap();
     fs::rename(fixture.0.join(".letopis"), fixture.0.join("old-service")).unwrap();
     symlink(&outside.0, fixture.0.join(".letopis")).unwrap();
-    // When / Then
-    assert!(files.get_config().is_err());
-    assert!(files.try_lock_embed().is_err());
-    assert!(open_embedding_files(&fixture.0).is_err());
+    // When / Then: reads and lock acquisition revisit the pinned path; both the old pin and a fresh directory request reject the unsafe path.
+    assert!(
+        files
+            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
+            .map(|file| file.map(|file| file.bytes))
+            .is_err()
+    );
+    assert!(
+        files
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .is_err()
+    );
+    assert!(
+        open_filesystem(&fixture.0)
+            .unwrap()
+            .directory_create_by_path(Path::new(".letopis"))
+            .is_err()
+    );
 }
 
 #[test]
 fn persistent_lock_excludes_real_process_and_survives_owner_death() {
-    // Given
+    // Given: an independent process holds a private persistent lock.
     let fixture = Fixture::new();
     let mut owner = OwnedChild::spawn(&fixture.0, "owner");
     wait_for(&fixture.0.join("ready"));
     let lock_path = fixture.0.join(".letopis/embed.lock");
     let before = fs::metadata(&lock_path).unwrap();
-    let files = open_embedding_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files
+        .directory_create_by_path(Path::new(".letopis"))
+        .unwrap();
     // When / Then: a real other process owns this inode.
-    assert!(files.try_lock_embed().unwrap().is_none());
+    assert!(
+        files
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .unwrap()
+            .is_none()
+    );
     let busy = fs::metadata(&lock_path).unwrap();
     assert_eq!(
         (before.ctime(), before.ctime_nsec()),
@@ -160,7 +221,10 @@ fn persistent_lock_excludes_real_process_and_survives_owner_death() {
     );
     owner.0.kill().unwrap();
     owner.0.wait().unwrap();
-    let guard = files.try_lock_embed().unwrap().unwrap();
+    let guard = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     let after = fs::metadata(&lock_path).unwrap();
     assert_eq!((before.dev(), before.ino()), (after.dev(), after.ino()));
     drop(guard);
@@ -169,9 +233,12 @@ fn persistent_lock_excludes_real_process_and_survives_owner_death() {
 
 #[test]
 fn fifo_reads_and_lock_attempts_finish_promptly() {
-    // Given
+    // Given: FIFO leaves in ordinary and lock paths.
     let fixture = Fixture::new();
-    let _files = open_embedding_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files
+        .directory_create_by_path(Path::new(".letopis"))
+        .unwrap();
     assert!(
         Command::new("mkfifo")
             .arg(fixture.0.join("fifo.md"))
@@ -210,27 +277,35 @@ fn markdown_capability_preserves_existing_parser_projection() {
 
 #[test]
 fn embedding_files_child() {
-    // Given
+    // Given: a child invocation with a specified file or lock scenario.
     let Some(root) = std::env::var_os(CHILD_ROOT) else {
         return;
     };
     let root = Path::new(&root);
-    // When
-    let files = open_embedding_files(root).unwrap();
+    // When: the child runs the requested generic file operation.
+    let files = open_filesystem(root).unwrap();
     match std::env::var(CHILD_CASE).unwrap().as_str() {
         "owner" => {
-            let _guard = files.try_lock_embed().unwrap().unwrap();
+            let _guard = files
+                .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+                .unwrap()
+                .unwrap();
             fs::write(root.join("ready"), b"ready").unwrap();
             wait_for(&root.join("release"));
         }
         "fifo" => {
-            // Then
+            // Then: the operation reports its expected ownership or failure outcome.
             assert!(
                 files
-                    .get_document(&RepoPath::parse("fifo.md").unwrap())
+                    .file_get_by_path(Path::new("fifo.md"))
+                    .map(|file| file.map(|file| file.bytes))
                     .is_err()
             );
-            assert!(files.try_lock_embed().is_err());
+            assert!(
+                files
+                    .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+                    .is_err()
+            );
         }
         _ => panic!("unknown child case"),
     }
@@ -238,7 +313,7 @@ fn embedding_files_child() {
 
 #[test]
 fn protects_existing_service_paths_and_rejects_lock_symlinks() {
-    // Given
+    // Given: existing service paths and a lock symlink.
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     fs::set_permissions(
@@ -252,10 +327,16 @@ fn protects_existing_service_paths_and_rejects_lock_symlinks() {
         fs::Permissions::from_mode(0o644),
     )
     .unwrap();
-    // When
-    let files = open_embedding_files(&fixture.0).unwrap();
-    let owner = files.try_lock_embed().unwrap().unwrap();
-    // Then
+    // When: generic directory creation and lock acquisition run.
+    let files = open_filesystem(&fixture.0).unwrap();
+    files
+        .directory_create_by_path(Path::new(".letopis"))
+        .unwrap();
+    let owner = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
+    // Then: private modes are applied and unsafe lock links are rejected.
     assert_eq!(
         fs::metadata(fixture.0.join(".letopis")).unwrap().mode() & 0o777,
         0o700
@@ -270,7 +351,11 @@ fn protects_existing_service_paths_and_rejects_lock_symlinks() {
     drop(owner);
     fs::remove_file(fixture.0.join(".letopis/embed.lock")).unwrap();
     symlink("/dev/null", fixture.0.join(".letopis/embed.lock")).unwrap();
-    assert!(files.try_lock_embed().is_err());
+    assert!(
+        files
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .is_err()
+    );
 }
 
 fn wait_for(path: &Path) {

@@ -277,8 +277,8 @@ mod policy_tests {
         attach_cache, attach_vectors, can_retry_initialization, configure_database, get_journal,
         map_sqlite, open_database, wait_for_initialization,
     };
-    use crate::filesystem::DatabasePaths;
     use crate::service::{StorageError, StorageErrorKind};
+    use crate::with_verified_database_paths;
     use rusqlite::{Connection, ErrorCode, ffi};
     use std::ffi::{CStr, c_char, c_int, c_void};
     use std::{
@@ -322,7 +322,7 @@ mod policy_tests {
         fs::rename(&path, &original).unwrap();
         symlink(&original, &path).unwrap();
         // When: the filesystem revalidates the retained directory and database leaves.
-        let error = DatabasePaths::observe(&path, &pinned).unwrap_err();
+        let error = with_verified_database_paths(&path, &pinned, |_, _| Ok(())).unwrap_err();
         // Then: the unsafe replacement is rejected without creating database files.
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
         assert!(fs::read_dir(original).unwrap().next().is_none());
@@ -354,7 +354,7 @@ mod policy_tests {
                 .success()
         );
         // When: the filesystem revalidates the retained directory and database leaves.
-        let error = DatabasePaths::observe(&path, &pinned).unwrap_err();
+        let error = with_verified_database_paths(&path, &pinned, |_, _| Ok(())).unwrap_err();
         // Then: the parent's owned-child watchdog detects a blocking open.
         assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
         assert!(
@@ -375,7 +375,7 @@ mod policy_tests {
 
             fs::create_dir(path.join(name)).unwrap();
             // When: the filesystem revalidates the retained directory and database leaves.
-            let error = DatabasePaths::observe(&path, &pinned).unwrap_err();
+            let error = with_verified_database_paths(&path, &pinned, |_, _| Ok(())).unwrap_err();
             // Then: the unsafe replacement is rejected without creating database files.
             assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
             assert!(fs::read_dir(path.join(name)).unwrap().next().is_none());

@@ -1,8 +1,10 @@
+use super::utils::map_document_file;
 use super::{
-    CacheDatabase, DocumentError, DocumentResult, FileSystem, NodeMetadata, SourceAvailability,
+    CacheDatabase, DocumentError, DocumentResult, FileReader, NodeMetadata, SourceAvailability,
     SourceObservation, SourceReader,
 };
 use crate::domain::{EdgeTarget, Sha256, SourceUri};
+use std::path::Path;
 
 #[derive(Debug)]
 pub(crate) struct SourceService<F, C> {
@@ -10,7 +12,7 @@ pub(crate) struct SourceService<F, C> {
     storage: std::rc::Rc<C>,
 }
 
-impl<F: FileSystem, C> SourceService<F, C> {
+impl<F: FileReader, C> SourceService<F, C> {
     pub(crate) fn new(storage: std::rc::Rc<C>, filesystem: F) -> Self {
         Self {
             filesystem,
@@ -19,7 +21,7 @@ impl<F: FileSystem, C> SourceService<F, C> {
     }
 }
 
-impl<F: FileSystem, C: CacheDatabase> SourceReader for SourceService<F, C> {
+impl<F: FileReader, C: CacheDatabase> SourceReader for SourceService<F, C> {
     fn get_source(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>> {
         self.storage
             .with_read_tx(|| {
@@ -40,7 +42,10 @@ impl<F: FileSystem, C: CacheDatabase> SourceReader for SourceService<F, C> {
                         availability: SourceAvailability::Unfetched,
                     }));
                 };
-                let file = self.filesystem.get_file(local.get_path())?;
+                let file = map_document_file(
+                    self.filesystem
+                        .file_get_by_path(Path::new(local.get_path().as_str())),
+                )?;
                 metadata.hash = file
                     .as_ref()
                     .and_then(|file| local.select_bytes(&file.bytes))
@@ -65,9 +70,13 @@ impl<F: FileSystem, C: CacheDatabase> SourceReader for SourceService<F, C> {
 
 #[cfg(test)]
 mod tests {
+    use crate::service::{
+        FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult, MockFileReader,
+    };
+
     use super::super::{
-        CapturedFile, DocumentError, DocumentErrorKind, DocumentRefreshService, DocumentResult,
-        FileStat, FileSystem, ProvenanceService, Refresher, SourceAvailability, SourceReader,
+        CapturedFile, DocumentErrorKind, DocumentRefreshService, FileStat, ProvenanceService,
+        Refresher, SourceAvailability, SourceReader,
     };
     use super::SourceService;
     use crate::{
@@ -93,6 +102,7 @@ mod tests {
             RecordedFiles::new(repo.path(), recorded_reads.clone()),
         );
         let mut refresher = DocumentRefreshService {
+            clock: Box::new(crate::process::SystemClock::new()),
             git: GitRepository::open(repo.path()).unwrap(),
             filesystem,
             markdown: MarkdownParser::new(),
@@ -189,6 +199,40 @@ mod tests {
     }
 
     #[test]
+    fn excludes_only_stable_nonregular_source_leaves() {
+        for (kind, excluded) in [
+            (FileErrorKind::NonRegular, true),
+            (FileErrorKind::UnsafePath, false),
+            (FileErrorKind::Changed, false),
+            (FileErrorKind::Io, false),
+        ] {
+            // Given: a recorded source and a boundary reporting one precise file outcome.
+            let repo = prepare_sources();
+            let mut files = MockFileReader::new();
+            files
+                .expect_file_get_by_path()
+                .withf(|path| path == std::path::Path::new("source.txt"))
+                .times(1)
+                .returning(move |_| Err(FileError::new(kind)));
+            let reader = SourceService::new(Rc::new(open_storage(repo.path()).cache), files);
+            // When: the source consumer interprets the file outcome.
+            let result = reader.get_source(&SourceUri::parse("source.txt").unwrap());
+            // Then: only a stable nonregular final entry is missing; all failures stay errors.
+            if excluded {
+                assert_eq!(
+                    result.unwrap().unwrap().availability,
+                    SourceAvailability::SourceNotFound
+                );
+            } else {
+                assert_eq!(
+                    result.unwrap_err().get_kind(),
+                    DocumentErrorKind::InternalError
+                );
+            }
+        }
+    }
+
+    #[test]
     fn propagate_private_source_failure() {
         // Given: a source read that fails with a private cause.
         let repo = prepare_sources();
@@ -205,7 +249,10 @@ mod tests {
         assert_eq!(error.get_kind(), DocumentErrorKind::InternalError);
         assert!(!error.to_string().contains("PRIVATE_SOURCE_CAUSE"));
         assert!(!format!("{error:?}").contains("PRIVATE_SOURCE_CAUSE"));
-        assert_eq!(error.source().unwrap().to_string(), "PRIVATE_SOURCE_CAUSE");
+        assert_eq!(
+            error.source().unwrap().source().unwrap().to_string(),
+            "PRIVATE_SOURCE_CAUSE"
+        );
     }
 
     struct RecordedFiles {
@@ -217,38 +264,76 @@ mod tests {
     impl RecordedFiles {
         fn new(root: &Path, reads: Rc<RefCell<Vec<RepoPath>>>) -> Self {
             Self {
-                inner: LocalFileSystem::open(root).unwrap(),
+                inner: LocalFileSystem::new(root).unwrap(),
                 reads,
                 failure: None,
             }
         }
     }
 
-    impl FileSystem for RecordedFiles {
-        type IndexLock = <LocalFileSystem as FileSystem>::IndexLock;
-
-        fn get_file_stat_by_path(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
-            self.inner.get_file_stat_by_path(path)
+    impl FileReader for RecordedFiles {
+        fn file_get_stat_by_path(&self, path: &std::path::Path) -> FileResult<Option<FileStat>> {
+            self.inner.file_get_stat_by_path(path)
         }
-
-        fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
-            self.reads.borrow_mut().push(path.clone());
-            if self.failure.as_ref() == Some(path) {
-                return Err(DocumentError::new_with_cause(
-                    DocumentErrorKind::InternalError,
-                    "cannot read source",
+        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            self.reads
+                .borrow_mut()
+                .push(RepoPath::parse(path.to_str().unwrap()).unwrap());
+            if self
+                .failure
+                .as_ref()
+                .is_some_and(|failure| failure.as_str() == path.to_str().unwrap())
+            {
+                return Err(FileError::new_with_cause(
+                    FileErrorKind::Io,
                     io::Error::other("PRIVATE_SOURCE_CAUSE"),
                 ));
             }
-            self.inner.get_file(path)
+            self.inner.file_get_by_path(path)
         }
-
-        fn get_time_ns(&self) -> DocumentResult<i64> {
-            self.inner.get_time_ns()
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unexpected file_get_identity_by_path")
         }
-
-        fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
-            self.inner.lock_index()
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unexpected file_is_exist")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_identity_by_path")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_distinct_by_paths")
+        }
+        fn directory_get_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            panic!("unexpected directory_get_by_path")
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            panic!("unexpected lock_get_owner_by_path")
+        }
+    }
+    impl FileLocker for RecordedFiles {
+        type Lock = <LocalFileSystem as FileLocker>::Lock;
+        fn lock_acquire_by_path(&self, path: &std::path::Path) -> FileResult<Self::Lock> {
+            self.inner.lock_acquire_by_path(path)
+        }
+        fn lock_try_acquire_by_path(&self, _: &std::path::Path) -> FileResult<Option<Self::Lock>> {
+            panic!("unexpected lock probe")
         }
     }
 

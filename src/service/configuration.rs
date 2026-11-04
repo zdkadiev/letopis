@@ -1,8 +1,11 @@
 use super::{
     CommandError, CommandErrorKind, CommandResult, ConfigReader, Configuration, EmbeddingError,
-    EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult, StatusFiles,
+    EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult, FileReader,
 };
+use crate::service::{FileError, FileResult};
+use crate::utils::{CONFIG_PATH, SERVICE_DIRECTORY};
 use std::fmt;
+use std::path::Path;
 
 const INVALID_CONFIG: &str = "invalid embedding configuration";
 const MIGRATION_REQUIRED: &str = "embedding configuration requires migration";
@@ -10,7 +13,7 @@ const READ_FAILURE: &str = "cannot read embedding configuration";
 
 /// Observes the current validated embedding configuration without changing state.
 pub(crate) struct ConfigurationService<'a> {
-    pub(crate) files: &'a dyn StatusFiles,
+    pub(crate) files: &'a dyn FileReader,
     pub(crate) provider: &'a dyn EmbeddingProvider,
 }
 
@@ -23,7 +26,7 @@ impl fmt::Debug for ConfigurationService<'_> {
 
 impl ConfigReader for ConfigurationService<'_> {
     fn get_config(&self) -> CommandResult<Option<Configuration>> {
-        let Some(bytes) = self.files.get_config().map_err(map_read_error)? else {
+        let Some(bytes) = self.get_config_bytes().map_err(map_read_error)? else {
             return Ok(None);
         };
         self.validate_configuration(&bytes)
@@ -33,6 +36,15 @@ impl ConfigReader for ConfigurationService<'_> {
 }
 
 impl ConfigurationService<'_> {
+    fn get_config_bytes(&self) -> FileResult<Option<Vec<u8>>> {
+        self.files
+            .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
+        Ok(self
+            .files
+            .file_get_by_path(Path::new(CONFIG_PATH))?
+            .map(|file| file.bytes))
+    }
+
     fn validate_configuration(&self, bytes: &[u8]) -> EmbeddingResult<Configuration> {
         let configuration = Configuration::parse(bytes)?;
         if let Some(config) = configuration.get_embedding_config() {
@@ -42,7 +54,7 @@ impl ConfigurationService<'_> {
     }
 }
 
-pub(crate) fn map_read_error(cause: EmbeddingError) -> CommandError {
+pub(crate) fn map_read_error(cause: FileError) -> CommandError {
     CommandError::new_with_cause(CommandErrorKind::InternalError, READ_FAILURE, cause)
 }
 
@@ -57,11 +69,15 @@ pub(crate) fn map_invalid_configuration(cause: EmbeddingError) -> CommandError {
 
 #[cfg(test)]
 mod tests {
+    use crate::service::{
+        CapturedFile, FileError, FileErrorKind, FileIdentity, FileReader, FileResult, FileStat,
+        MockFileReader,
+    };
+
     use super::ConfigurationService;
     use crate::service::{
-        CommandError, CommandErrorKind, CommandResult, ConfigReader, EmbeddingConfig,
-        EmbeddingError, EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult, HeldLock,
-        ProviderKind, StatusFiles,
+        CommandError, CommandErrorKind, ConfigReader, EmbeddingConfig, EmbeddingError,
+        EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult, ProviderKind,
     };
     use serde_json::json;
     use std::{cell::Cell, error::Error, io, num::NonZeroUsize};
@@ -70,6 +86,32 @@ mod tests {
     const DISABLED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":2}}"#;
     const UNCONFIGURED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#;
     const LEGACY: &[u8] = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":0}"#;
+
+    #[test]
+    fn selects_literal_configuration_path_without_writes() {
+        // Given: a reader accepting only the application configuration path.
+        let mut files = MockFileReader::new();
+        files
+            .expect_directory_get_by_path()
+            .withf(|path| path == std::path::Path::new(".letopis"))
+            .times(1)
+            .returning(|_| Ok(None));
+        files
+            .expect_file_get_by_path()
+            .withf(|path| path == std::path::Path::new(".letopis/config.json"))
+            .times(1)
+            .returning(|_| Ok(None));
+        let provider = Provider::accepting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+        // When: configuration is observed on an uninitialized checkout.
+        let result = service.get_config().unwrap();
+        // Then: absence is preserved and provider validation is unnecessary.
+        assert!(result.is_none());
+        assert_eq!(provider.validations.get(), 0);
+    }
 
     #[test]
     fn reads_missing_config_without_creating_service_state() {
@@ -309,6 +351,18 @@ mod tests {
         );
     }
 
+    fn capture(bytes: Vec<u8>) -> CapturedFile {
+        CapturedFile {
+            stat: FileStat {
+                size: bytes.len() as u64,
+                mtime_ns: 1,
+                inode: 1,
+                device: 1,
+            },
+            bytes,
+            checked_at_ns: 1,
+        }
+    }
     struct Files {
         config: Option<Vec<u8>>,
         fail: bool,
@@ -316,21 +370,55 @@ mod tests {
         lock_observations: Cell<usize>,
     }
 
-    impl StatusFiles for Files {
-        fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+    impl FileReader for Files {
+        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            assert_eq!(path, std::path::Path::new(".letopis/config.json"));
             self.reads.set(self.reads.get() + 1);
             if self.fail {
-                return Err(EmbeddingError::new_with_cause(
-                    EmbeddingErrorKind::InternalError,
+                return Err(FileError::new_with_cause(
+                    FileErrorKind::Io,
                     io::Error::other("CONFIG_CANARY"),
                 ));
             }
-            Ok(self.config.clone())
+            Ok(self.config.clone().map(capture))
         }
-
-        fn observe_locks(&self) -> CommandResult<Vec<HeldLock>> {
-            self.lock_observations.set(self.lock_observations.get() + 1);
-            Ok(Vec::new())
+        fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
+            panic!("unexpected file_get_stat_by_path")
+        }
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unexpected file_get_identity_by_path")
+        }
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unexpected file_is_exist")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_identity_by_path")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_distinct_by_paths")
+        }
+        fn directory_get_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            Ok(None)
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            Ok(None)
         }
     }
 

@@ -3,10 +3,7 @@
 #[path = "support/cli.rs"]
 mod cli;
 use cli::{Fixture, finish_foreground, wait_for_embed_lock};
-use letopis::{
-    open_filesystem,
-    service::{DocumentResult, EmbedLocker},
-};
+use letopis::{open_filesystem, service::FileLocker};
 use std::{cell::RefCell, fs, os::unix::fs::MetadataExt};
 
 #[test]
@@ -71,19 +68,24 @@ fn two_released_probes_yield_exactly_one_active_drain() {
 }
 #[test]
 fn owned_sigkill_and_stale_pid_preserve_inode_and_release_lock() {
-    // Given
+    // Given: a process owns the persistent lock and has recorded its PID.
     let fixture = Fixture::new();
     let mut foreground = fixture.spawn_foreground(None);
     let mut drain = fixture.accept_drain();
     drain.get_event();
     finish_foreground(&mut foreground);
     drain.send_command("acquire");
-    // When / Then
+    // When / Then: the owner is killed and another caller probes; kernel ownership releases while the inode remains persistent.
     assert_eq!(drain.get_event()["owned"], true);
     let lock = fixture.root.path().join(".letopis/embed.lock");
     let inode = fs::metadata(&lock).unwrap().ino();
     let files = open_filesystem(fixture.root.path()).unwrap();
-    assert!(files.try_lock_embed().unwrap().is_none());
+    assert!(
+        files
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .unwrap()
+            .is_none()
+    );
     // Only this owned fixture self-signals; no PID from a file is ever signalled.
     drain.send_command("crash");
     drain.expect_eof();
@@ -92,7 +94,7 @@ fn owned_sigkill_and_stale_pid_preserve_inode_and_release_lock() {
     drop(lease);
     fs::write(&lock, "999999999\n").unwrap();
     let lease = files
-        .try_lock_embed()
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
         .unwrap()
         .expect("stale PID is not ownership");
     assert_eq!(fs::metadata(&lock).unwrap().ino(), inode);
@@ -112,15 +114,24 @@ fn exec_failure_returns_safe_warning() {
     assert!(!response.to_string().contains("secret"));
 }
 
-struct ReleaseAfterBusyProbe<F: EmbedLocker> {
+struct ReleaseAfterBusyProbe<F: FileLocker> {
     files: F,
-    owner: RefCell<Option<F::EmbedLock>>,
+    owner: RefCell<Option<F::Lock>>,
 }
-impl<F: EmbedLocker> EmbedLocker for ReleaseAfterBusyProbe<F> {
-    type EmbedLock = F::EmbedLock;
+impl<F: FileLocker> FileLocker for ReleaseAfterBusyProbe<F> {
+    type Lock = F::Lock;
+    fn lock_acquire_by_path(
+        &self,
+        path: &std::path::Path,
+    ) -> letopis::service::FileResult<Self::Lock> {
+        self.files.lock_acquire_by_path(path)
+    }
 
-    fn try_lock_embed(&self) -> DocumentResult<Option<Self::EmbedLock>> {
-        let result = self.files.try_lock_embed()?;
+    fn lock_try_acquire_by_path(
+        &self,
+        path: &std::path::Path,
+    ) -> letopis::service::FileResult<Option<Self::Lock>> {
+        let result = self.files.lock_try_acquire_by_path(path)?;
         if result.is_none() {
             // Deterministically model cleanup after an observer saw an earlier
             // completion event: this first real probe must still report busy.
@@ -135,7 +146,10 @@ fn lock_release_wait_retries_busy_probe_and_retains_acquired_lease() {
     // Given: the observer initially sees a genuinely occupied kernel lock.
     let root = tempfile::tempdir().unwrap();
     let files = open_filesystem(root.path()).unwrap();
-    let owner = files.try_lock_embed().unwrap().unwrap();
+    let owner = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     let lock = root.path().join(".letopis/embed.lock");
     let inode = fs::metadata(&lock).unwrap().ino();
     let delayed = ReleaseAfterBusyProbe {
@@ -148,7 +162,19 @@ fn lock_release_wait_retries_busy_probe_and_retains_acquired_lease() {
 
     // Then: completion requires an actual lease, retained through observation.
     assert_eq!(fs::metadata(&lock).unwrap().ino(), inode);
-    assert!(delayed.files.try_lock_embed().unwrap().is_none());
+    assert!(
+        delayed
+            .files
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .unwrap()
+            .is_none()
+    );
     drop(lease);
-    assert!(delayed.files.try_lock_embed().unwrap().is_some());
+    assert!(
+        delayed
+            .files
+            .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+            .unwrap()
+            .is_some()
+    );
 }

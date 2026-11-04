@@ -1,10 +1,15 @@
 use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandProblem, CommandResult, Configuration,
-    EmbeddingProvider, EmbeddingStatusPolicy, EmbeddingStatusSummary, GraphDiagnostics,
-    SourceProvenance, StatusFiles, StatusReader, StatusReport, StorageError,
+    EmbeddingProvider, EmbeddingStatusPolicy, EmbeddingStatusSummary, FileReader, GraphDiagnostics,
+    SourceProvenance, StatusReader, StatusReport, StorageError,
     utils::{CheckObservations, sort_problems},
 };
+use super::{HeldLock, LockName};
+use crate::service::FileResult;
+use crate::utils::{CONFIG_PATH, SERVICE_DIRECTORY};
+use crate::utils::{EMBED_LOCK_PATH, INDEX_LOCK_PATH};
 use serde_json::Value;
+use std::path::Path;
 use std::{collections::BTreeMap, fmt, rc::Rc};
 
 const REASON: &str = "reason";
@@ -15,7 +20,7 @@ const EXHAUSTED: &str = "embedding_attempts_exhausted";
 /// Observes the last publication and live coordination without changing either.
 pub(crate) struct StatusService<'a, C> {
     pub(crate) storage: Rc<C>,
-    pub(crate) files: &'a dyn StatusFiles,
+    pub(crate) files: &'a dyn FileReader,
     pub(crate) graph: &'a dyn GraphDiagnostics,
     pub(crate) provenance: &'a dyn SourceProvenance,
     pub(crate) provider: &'a dyn EmbeddingProvider,
@@ -55,15 +60,46 @@ impl<C: CacheDatabase> StatusReader for StatusService<'_, C> {
         if let Some(problem) = config_problem {
             report.problems.push(problem);
         }
-        report.locks = self.files.observe_locks()?;
+        report.locks = self.get_locks()?;
         report.problems = sort_problems(report.problems);
         Ok(report)
     }
 }
 
 impl<C: CacheDatabase> StatusService<'_, C> {
+    fn get_locks(&self) -> CommandResult<Vec<HeldLock>> {
+        let mut locks = Vec::new();
+        for (path, name) in [
+            (INDEX_LOCK_PATH, LockName::Index),
+            (EMBED_LOCK_PATH, LockName::Embed),
+        ] {
+            let owner = self
+                .files
+                .lock_get_owner_by_path(Path::new(path))
+                .map_err(|cause| {
+                    CommandError::new_with_cause(
+                        CommandErrorKind::InternalError,
+                        "cannot observe coordination lock owner",
+                        cause,
+                    )
+                })?;
+            if let Some(pid) = owner {
+                locks.push(HeldLock { name, pid });
+            }
+        }
+        Ok(locks)
+    }
+    fn get_config_bytes(&self) -> FileResult<Option<Vec<u8>>> {
+        self.files
+            .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
+        Ok(self
+            .files
+            .file_get_by_path(Path::new(CONFIG_PATH))?
+            .map(|file| file.bytes))
+    }
+
     fn get_config_policy(&self) -> (EmbeddingStatusPolicy, Option<CommandProblem>) {
-        let Ok(bytes) = self.files.get_config() else {
+        let Ok(bytes) = self.get_config_bytes() else {
             return (
                 EmbeddingStatusPolicy::Unavailable,
                 Some(invalid_config_problem()),
@@ -190,6 +226,11 @@ fn map_storage_error(cause: StorageError) -> CommandError {
 
 #[cfg(test)]
 mod tests {
+    use crate::service::{
+        CapturedFile, FileError, FileErrorKind, FileIdentity, FileReader, FileResult, FileStat,
+        MockFileReader,
+    };
+
     use crate::service::StorageError;
     use crate::service::TransactionError;
     use crate::storage::get_current;
@@ -341,10 +382,10 @@ mod tests {
         service::{
             CacheDatabase, CommandErrorKind, CommandProblem, CommandResult, DocumentError,
             DocumentErrorKind, DocumentResult, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind,
-            EmbeddingProvider, EmbeddingResult, GraphDiagnostics, HeldLock, KnowledgeMetadata,
-            NodeMetadata, ProvenanceIssue, ProvenanceObservation, ProvenanceRequest, SnapshotError,
-            SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, StatusFiles,
-            StatusReader, VectorDatabase,
+            EmbeddingProvider, EmbeddingResult, GraphDiagnostics, KnowledgeMetadata, NodeMetadata,
+            ProvenanceIssue, ProvenanceObservation, ProvenanceRequest, SnapshotError,
+            SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, StatusReader,
+            VectorDatabase,
         },
         storage::TestDatabases,
     };
@@ -356,6 +397,18 @@ mod tests {
     struct Reads {
         inner: crate::storage::CacheStorage,
         count: Rc<Cell<usize>>,
+    }
+    fn capture(bytes: Vec<u8>) -> CapturedFile {
+        CapturedFile {
+            stat: FileStat {
+                size: bytes.len() as u64,
+                mtime_ns: 1,
+                inode: 1,
+                device: 1,
+            },
+            bytes,
+            checked_at_ns: 1,
+        }
     }
     struct Files {
         config: std::cell::RefCell<Option<Vec<u8>>>,
@@ -372,6 +425,73 @@ mod tests {
     struct Diagnostics;
     struct Provenance {
         fail: bool,
+    }
+
+    #[test]
+    fn observes_both_literal_lock_paths_in_order_and_preserves_labels() {
+        // Given: two held owners and mocks allowing only the exact application paths.
+        let mut files = MockFileReader::new();
+        let mut sequence = mockall::Sequence::new();
+        files
+            .expect_lock_get_owner_by_path()
+            .withf(|path| path == std::path::Path::new(".letopis/index.lock"))
+            .times(1)
+            .in_sequence(&mut sequence)
+            .returning(|_| Ok(std::num::NonZeroU32::new(101)));
+        files
+            .expect_lock_get_owner_by_path()
+            .withf(|path| path == std::path::Path::new(".letopis/embed.lock"))
+            .times(1)
+            .in_sequence(&mut sequence)
+            .returning(|_| Ok(std::num::NonZeroU32::new(202)));
+        let provider = build_provider();
+        let service = build_service(
+            None,
+            Rc::default(),
+            &files,
+            &provider,
+            &Provenance { fail: false },
+        );
+        // When: status aggregates the two file owners.
+        let locks = service.get_locks().unwrap();
+        // Then: labels and PIDs retain the established index-before-embed ordering.
+        assert_eq!(
+            locks
+                .iter()
+                .map(|lock| (lock.name, lock.pid.get()))
+                .collect::<Vec<_>>(),
+            [
+                (crate::service::LockName::Index, 101),
+                (crate::service::LockName::Embed, 202)
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_owner_retains_safe_status_diagnostic() {
+        // Given: the index owner record is malformed and must stop aggregation.
+        let mut files = MockFileReader::new();
+        files
+            .expect_lock_get_owner_by_path()
+            .withf(|path| path == std::path::Path::new(".letopis/index.lock"))
+            .times(1)
+            .returning(|_| Err(FileError::new(FileErrorKind::InvalidOwner)));
+        let provider = build_provider();
+        let service = build_service(
+            None,
+            Rc::default(),
+            &files,
+            &provider,
+            &Provenance { fail: false },
+        );
+        // When: status observes coordination ownership.
+        let error = service.get_locks().unwrap_err();
+        // Then: callers receive the original safe command classification and message.
+        assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+        assert_eq!(
+            error.get_message(),
+            "cannot observe coordination lock owner"
+        );
     }
 
     #[test]
@@ -709,7 +829,7 @@ mod tests {
     fn build_service<'a>(
         storage: Option<TestDatabases>,
         count: Rc<Cell<usize>>,
-        files: &'a Files,
+        files: &'a dyn FileReader,
         provider: &'a MockProvider,
         provenance: &'a Provenance,
     ) -> StatusService<'a, Reads> {
@@ -762,16 +882,52 @@ mod tests {
         }
     }
 
-    impl StatusFiles for Files {
-        fn get_config(&self) -> EmbeddingResult<Option<Vec<u8>>> {
+    impl FileReader for Files {
+        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            assert_eq!(path, std::path::Path::new(".letopis/config.json"));
             self.count.set(self.count.get() + 1);
             if self.fail {
-                return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
+                return Err(FileError::new(FileErrorKind::Io));
             }
-            Ok(self.config.borrow().clone())
+            Ok(self.config.borrow().clone().map(capture))
         }
-        fn observe_locks(&self) -> CommandResult<Vec<HeldLock>> {
-            Ok(Vec::new())
+        fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
+            panic!("unexpected file_get_stat_by_path")
+        }
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unexpected file_get_identity_by_path")
+        }
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unexpected file_is_exist")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_identity_by_path")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_distinct_by_paths")
+        }
+        fn directory_get_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            Ok(None)
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            Ok(None)
         }
     }
     fn build_provider() -> MockProvider {

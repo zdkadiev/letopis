@@ -468,6 +468,86 @@ impl Error for StorageError {
 /// A storage operation's typed outcome.
 pub type StorageResult<T> = Result<T, StorageError>;
 
+/// Stable classification for confined file operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileErrorKind {
+    /// A path is absolute, escapes its root, contains a NUL, or has an unsafe parent.
+    UnsafePath,
+    /// A stable final entry is not a regular file.
+    NonRegular,
+    /// A previously observed entry or pinned directory changed or disappeared.
+    Changed,
+    /// Two paths identify the same file, or a lock has another hardlink.
+    Aliased,
+    /// A required parent or directory is absent.
+    NotFound,
+    /// An observed locked file contains no valid bounded process identifier.
+    InvalidOwner,
+    /// An operating-system, clock, representation or durability operation failed.
+    Io,
+}
+
+/// File failure with a safe classification and a privately retained cause.
+pub struct FileError {
+    kind: FileErrorKind,
+    cause: Option<Box<dyn Error + Send + Sync>>,
+}
+
+impl FileError {
+    pub(crate) fn new(kind: FileErrorKind) -> Self {
+        Self { kind, cause: None }
+    }
+
+    pub(crate) fn new_with_cause(
+        kind: FileErrorKind,
+        cause: impl Error + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            kind,
+            cause: Some(Box::new(cause)),
+        }
+    }
+
+    /// Return the classification without exposing paths or file bytes.
+    pub fn get_kind(&self) -> FileErrorKind {
+        self.kind
+    }
+}
+
+impl fmt::Display for FileError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self.kind {
+            FileErrorKind::UnsafePath => "unsafe file path",
+            FileErrorKind::NonRegular => "regular file required",
+            FileErrorKind::Changed => "file identity or observation changed",
+            FileErrorKind::Aliased => "distinct file identities required",
+            FileErrorKind::NotFound => "file directory missing",
+            FileErrorKind::InvalidOwner => "invalid file lock owner",
+            FileErrorKind::Io => "file operation failed",
+        })
+    }
+}
+
+impl fmt::Debug for FileError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("FileError")
+            .field("kind", &self.kind)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Error for FileError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.cause
+            .as_deref()
+            .map(|cause| cause as &(dyn Error + 'static))
+    }
+}
+
+/// Typed result of a confined file operation.
+pub type FileResult<T> = Result<T, FileError>;
+
 /// Stable application classification for document refresh failures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocumentErrorKind {

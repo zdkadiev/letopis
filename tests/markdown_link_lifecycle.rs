@@ -11,7 +11,7 @@ use letopis::{
     markdown::parse,
     open_filesystem,
     service::{
-        EmbedLocker, EmbeddingFailure, FileRow, KnowledgeMetadata, NodeMetadata, SourceMetadata,
+        EmbeddingFailure, FileLocker, FileRow, KnowledgeMetadata, NodeMetadata, SourceMetadata,
         VectorOutcome,
     },
 };
@@ -204,7 +204,10 @@ fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
     repo.seed_vectors(&config, &[("note.md", &[1.0, 0.0, 0.0])]);
     seed_failure(&repo, &identity);
     let files = open_filesystem(repo.get_root()).unwrap();
-    let _lock = files.try_lock_embed().unwrap().unwrap();
+    let _lock = files
+        .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))
+        .unwrap()
+        .unwrap();
     let vectors = fs::read(repo.get_root().join(".letopis/vectors.db")).unwrap();
     // When: only destination/title syntax changes and the actual CLI rebuilds.
     repo.write("note.md", NEW_NOTE.as_bytes());

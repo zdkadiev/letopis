@@ -1,5 +1,5 @@
-use letopis::open_status_files;
-use letopis::service::{CommandErrorKind, LockName, StatusFiles};
+use letopis::open_filesystem;
+use letopis::service::{FileErrorKind, FileReader};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::{MetadataExt, symlink};
@@ -67,55 +67,65 @@ impl Drop for Owner {
 
 #[test]
 fn reports_busy_recorded_pid() {
-    // Given
+    // Given: an independent process holds the index lock with its PID.
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let child = Owner::spawn(&fixture.0, "index.lock", "self");
     let lock_path = fixture.get_lock_path("index.lock");
     let original_bytes = fs::read(&lock_path).unwrap();
     let original_inode = fs::metadata(&lock_path).unwrap().ino();
-    let files = open_status_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files.directory_get_by_path(Path::new(".letopis")).unwrap();
 
     let start = Instant::now();
-    let locks = files.observe_locks().unwrap();
+    let locks = files
+        .lock_get_owner_by_path(Path::new(".letopis/index.lock"))
+        .unwrap();
 
-    // When / Then
+    // When / Then: the generic observer reads the held owner; the exact PID returns without changing inode or bytes.
     assert!(start.elapsed() < Duration::from_secs(2));
-    assert_eq!(locks.len(), 1);
-    assert_eq!(locks[0].name, LockName::Index);
-    assert_eq!(locks[0].pid.get(), child.0.id());
+    assert_eq!(locks.unwrap().get(), child.0.id());
     assert_eq!(std::fs::read(&lock_path).unwrap(), original_bytes);
     assert_eq!(fs::metadata(&lock_path).unwrap().ino(), original_inode);
 }
 
 #[test]
 fn ignores_stale_unlocked_pid() {
-    // Given
+    // Given: an unlocked file contains stale PID bytes.
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let lock_path = fixture.get_lock_path("index.lock");
     fs::write(&lock_path, b"999999\n").unwrap();
-    let files = open_status_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files.directory_get_by_path(Path::new(".letopis")).unwrap();
 
-    let locks = files.observe_locks().unwrap();
+    let locks = files
+        .lock_get_owner_by_path(Path::new(".letopis/index.lock"))
+        .unwrap();
 
-    // When / Then
-    assert!(locks.is_empty());
+    // When / Then: lock ownership is observed; no active owner is reported and stale bytes remain unchanged.
+    assert!(locks.is_none());
     assert_eq!(fs::read(&lock_path).unwrap(), b"999999\n");
 }
 
 #[test]
 fn does_not_write_probe_pid() {
-    // Given
+    // Given: an unlocked embed lock with known bytes and inode.
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let lock_path = fixture.get_lock_path("embed.lock");
     fs::write(&lock_path, b"42\n").unwrap();
     let inode = fs::metadata(&lock_path).unwrap().ino();
-    let files = open_status_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files.directory_get_by_path(Path::new(".letopis")).unwrap();
 
-    // When / Then
-    assert!(files.observe_locks().unwrap().is_empty());
+    // When / Then: the observer probes kernel ownership; observation changes neither bytes nor inode.
+    assert!(
+        files
+            .lock_get_owner_by_path(Path::new(".letopis/embed.lock"))
+            .unwrap()
+            .is_none()
+    );
 
     assert_eq!(fs::read(&lock_path).unwrap(), b"42\n");
     assert_eq!(fs::metadata(&lock_path).unwrap().ino(), inode);
@@ -123,72 +133,118 @@ fn does_not_write_probe_pid() {
 
 #[test]
 fn rejects_busy_invalid_pid() {
-    // Given
+    // Given: a held lock contains malformed owner metadata.
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let _child = Owner::spawn(&fixture.0, "embed.lock", "invalid");
-    let files = open_status_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files.directory_get_by_path(Path::new(".letopis")).unwrap();
 
-    // When / Then
-    assert!(files.observe_locks().is_err());
+    // When / Then: the owner observer reads the bounded record; the malformed held record is rejected.
+    assert!(
+        files
+            .lock_get_owner_by_path(Path::new(".letopis/embed.lock"))
+            .is_err()
+    );
 }
 
 #[test]
 fn rejects_busy_pid_with_valid_prefix_and_trailing_bytes() {
-    // Given
+    // Given: a held record contains a valid PID prefix followed by excess bytes.
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     let _child = Owner::spawn(&fixture.0, "embed.lock", "overlong");
-    let files = open_status_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files.directory_get_by_path(Path::new(".letopis")).unwrap();
 
-    // When
-    let error = files.observe_locks().unwrap_err();
+    // When: the owner observer reads its bounded record.
+    let error = files
+        .lock_get_owner_by_path(Path::new(".letopis/embed.lock"))
+        .unwrap_err();
 
-    // Then
-    assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
+    // Then: InvalidOwner is returned instead of accepting the prefix.
+    assert_eq!(error.get_kind(), FileErrorKind::InvalidOwner);
 }
 
 #[test]
 fn returns_missing_locks_without_creating_files() {
-    // Given
+    // Given: a checkout without any service directory.
     let fixture = Fixture::new();
-    let files = open_status_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files.directory_get_by_path(Path::new(".letopis")).unwrap();
 
-    // When / Then
-    assert!(files.observe_locks().unwrap().is_empty());
-    assert_eq!(files.get_config().unwrap(), None);
+    // When / Then: missing lock and configuration paths are observed; no owner or bytes are returned and no directory is created.
+    assert!(
+        files
+            .lock_get_owner_by_path(Path::new(".letopis/index.lock"))
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        files
+            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
+            .map(|file| file.map(|file| file.bytes))
+            .unwrap(),
+        None
+    );
     assert!(!fixture.0.join(".letopis").exists());
 }
 
 #[test]
 fn rejects_symlink_and_inode_replacement() {
-    // Given
+    // Given: a pinned directory and a lock later replaced by a symlink.
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
-    let files = open_status_files(&fixture.0).unwrap();
-    // When / Then
-    assert!(files.observe_locks().unwrap().is_empty());
+    let files = open_filesystem(&fixture.0).unwrap();
+    files.directory_get_by_path(Path::new(".letopis")).unwrap();
+    // When / Then: the observer revisits the lock and replaced parent; unsafe or changed paths remain errors.
+    assert!(
+        files
+            .lock_get_owner_by_path(Path::new(".letopis/index.lock"))
+            .unwrap()
+            .is_none()
+    );
     symlink("/dev/null", fixture.get_lock_path("index.lock")).unwrap();
-    assert!(files.observe_locks().is_err());
-    // Given
+    assert!(
+        files
+            .lock_get_owner_by_path(Path::new(".letopis/index.lock"))
+            .is_err()
+    );
+    // Given: a pinned directory and a lock later replaced by a symlink.
     fs::remove_file(fixture.get_lock_path("index.lock")).unwrap();
     fs::rename(fixture.0.join(".letopis"), fixture.0.join("old-service")).unwrap();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
-    // When / Then
-    assert!(files.observe_locks().is_err());
-    assert!(files.get_config().is_err());
+    // When / Then: the observer revisits the lock and replaced parent; unsafe or changed paths remain errors.
+    assert!(
+        files
+            .lock_get_owner_by_path(Path::new(".letopis/index.lock"))
+            .is_err()
+    );
+    assert!(
+        files
+            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
+            .map(|file| file.map(|file| file.bytes))
+            .is_err()
+    );
 }
 
 #[test]
 fn reads_existing_config_without_mutation() {
-    // Given
+    // Given: a regular configuration file containing arbitrary bytes.
     let fixture = Fixture::new();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
     fs::write(fixture.0.join(".letopis/config.json"), b"raw\xff").unwrap();
-    let files = open_status_files(&fixture.0).unwrap();
+    let files = open_filesystem(&fixture.0).unwrap();
+    files.directory_get_by_path(Path::new(".letopis")).unwrap();
 
-    // When / Then
-    assert_eq!(files.get_config().unwrap(), Some(b"raw\xff".to_vec()));
+    // When / Then: the generic file reader captures it; the exact bytes return without mutation.
+    assert_eq!(
+        files
+            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
+            .map(|file| file.map(|file| file.bytes))
+            .unwrap(),
+        Some(b"raw\xff".to_vec())
+    );
 }
 
 #[test]

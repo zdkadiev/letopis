@@ -1,10 +1,15 @@
+use super::utils::map_document_file;
+use super::utils::map_document_lock_error;
 use super::{
     BasisRetainer, CacheDatabase, CorpusLister, DocumentError, DocumentErrorKind, DocumentResult,
-    FileRow, FileStat, FileSystem, MarkdownCodec, RefreshOutcome, Refresher, SourceProvenance,
+    FileReader, FileRow, FileStat, MarkdownCodec, RefreshOutcome, Refresher, SourceProvenance,
 };
+use super::{Clock, FileLocker};
 use crate::domain::{RepoPath, Sha256, TreeOid};
+use crate::utils::INDEX_LOCK_PATH;
 use basis::BasisPreparation;
 use projection::{EffectiveGraph, FileProjection, prepare_removal};
+use std::path::Path;
 use std::{fmt, rc::Rc};
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -18,6 +23,7 @@ pub(crate) struct DocumentRefreshService<G, F, M, P, C> {
     pub(crate) git: G,
     /// Captures documents and owns the index exclusion lock.
     pub(crate) filesystem: F,
+    pub(crate) clock: Box<dyn Clock>,
     /// Parses canonical document metadata and source bindings.
     pub(crate) markdown: M,
     /// Reads the current projection and publishes cache changes atomically.
@@ -76,21 +82,27 @@ impl Delta {
 }
 impl<
     G: CorpusLister,
-    F: FileSystem,
+    F: FileReader + FileLocker,
     M: MarkdownCodec,
     P: SourceProvenance + BasisRetainer,
     C: CacheDatabase,
 > Refresher for DocumentRefreshService<G, F, M, P, C>
 {
     fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
-        let _lock = self.filesystem.lock_index()?;
+        let _lock = self
+            .filesystem
+            .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
+            .map_err(map_document_lock_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
         self.publish_current(PublicationMode::Incremental, SnapshotVerification::Closure)
     }
 
     fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
-        let _lock = self.filesystem.lock_index()?;
+        let _lock = self
+            .filesystem
+            .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
+            .map_err(map_document_lock_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
         self.publish_current(PublicationMode::Full, SnapshotVerification::Closure)
@@ -112,7 +124,10 @@ impl<
         #[cfg(test)]
         reach_checkpoint("detected");
         drop(preliminary);
-        let _lock = self.filesystem.lock_index()?;
+        let _lock = self
+            .filesystem
+            .lock_acquire_by_path(Path::new(INDEX_LOCK_PATH))
+            .map_err(map_document_lock_error)?;
         #[cfg(test)]
         reach_checkpoint("locked");
         self.publish_current(PublicationMode::Incremental, SnapshotVerification::Root)
@@ -120,7 +135,7 @@ impl<
 }
 impl<
     G: CorpusLister,
-    F: FileSystem,
+    F: FileReader + FileLocker,
     M: MarkdownCodec,
     P: SourceProvenance + BasisRetainer,
     C: CacheDatabase,
@@ -188,7 +203,11 @@ impl<
         }
         for path in candidates {
             let previous = state.files.get(&path);
-            let Some(stat) = self.filesystem.get_file_stat_by_path(&path)? else {
+            let Some(stat) = map_document_file(
+                self.filesystem
+                    .file_get_stat_by_path(Path::new(path.as_str())),
+            )?
+            else {
                 if previous.is_some() {
                     delta.removed.insert(path, true);
                 }
@@ -209,13 +228,15 @@ impl<
     ) -> DocumentResult<Option<Observation>> {
         let same_stat = previous.is_some_and(|row| matches_stat(row, stat));
         if same_stat
-            && previous.is_some_and(|row| !is_racy(row, self.filesystem.get_time_ns().ok()))
+            && previous.is_some_and(|row| !is_racy(row, self.clock.clock_get_time_ns().ok()))
         {
             return Ok(None);
         }
-        let captured = self.filesystem.get_file(path)?.ok_or_else(|| {
-            DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
-        })?;
+        let captured =
+            map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
+                .ok_or_else(|| {
+                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+                })?;
         if captured.stat != stat {
             return Err(DocumentError::new(
                 DocumentErrorKind::InternalError,
@@ -256,11 +277,8 @@ impl<
                     .map(|(path, _)| path.clone())
                     .collect();
                 for (path, check_missing) in delta.removed {
-                    if check_missing && self.filesystem.get_file_stat_by_path(&path)?.is_some() {
-                        return Err(DocumentError::new(
-                            DocumentErrorKind::InternalError,
-                            DOCUMENTS_CHANGED_MESSAGE,
-                        ));
+                    if check_missing {
+                        self.verify_removed_candidate(&path)?;
                     }
                     let prepared = prepare_removal(state.revision, path, &graph);
                     graph.apply(&prepared);
@@ -293,6 +311,20 @@ impl<
         #[cfg(test)]
         reach_checkpoint("after_commit");
         Ok(outcome)
+    }
+
+    fn verify_removed_candidate(&self, path: &RepoPath) -> DocumentResult<()> {
+        let stat = map_document_file(
+            self.filesystem
+                .file_get_stat_by_path(Path::new(path.as_str())),
+        )?;
+        if stat.is_some() {
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENTS_CHANGED_MESSAGE,
+            ));
+        }
+        Ok(())
     }
 
     fn prepare_publication(
@@ -393,14 +425,17 @@ mod basis {
         DOCUMENTS_CHANGED_MESSAGE, DocumentPublication, Observation, PublicationMode,
         SnapshotVerification, projection::EffectiveGraph,
     };
+    use crate::service::FileLocker;
+    use crate::service::utils::map_document_file;
     use crate::{
         domain::{EdgeTarget, RepoPath, Sha256, SourceUri, TreeOid},
         service::{
-            BasisRetainer, DocumentError, DocumentErrorKind, DocumentResult, FileRow, FileSystem,
+            BasisRetainer, DocumentError, DocumentErrorKind, DocumentResult, FileReader, FileRow,
             MarkdownCodec, PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceRequest, SourceProvenance,
         },
     };
     use std::collections::{BTreeMap, BTreeSet};
+    use std::path::Path;
 
     /// Metadata captured before the SQL write, never document or search text.
     #[derive(Debug)]
@@ -422,7 +457,7 @@ mod basis {
         pub(super) previous: &'a BTreeMap<RepoPath, FileRow>,
         pub(super) mode: PublicationMode,
     }
-    impl<F: FileSystem, M: MarkdownCodec, P: SourceProvenance + BasisRetainer, C>
+    impl<F: FileReader + FileLocker, M: MarkdownCodec, P: SourceProvenance + BasisRetainer, C>
         DocumentPublication<'_, F, M, P, C>
     {
         /// Prepare only changed-content metadata, releasing each parsed file before the next.
@@ -453,9 +488,14 @@ mod basis {
                 {
                     continue;
                 }
-                let captured = self.filesystem.get_file(path)?.ok_or_else(|| {
-                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
-                })?;
+                let captured =
+                    map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
+                        .ok_or_else(|| {
+                            DocumentError::new(
+                                DocumentErrorKind::InternalError,
+                                DOCUMENTS_CHANGED_MESSAGE,
+                            )
+                        })?;
                 if captured.stat != observed.stat
                     || Sha256::digest(&captured.bytes) != observed.hash
                 {
@@ -545,12 +585,13 @@ mod projection {
     #[cfg(test)]
     use super::reach_checkpoint;
     use super::{DOCUMENTS_CHANGED_MESSAGE, DocumentPublication, Observation};
+    use super::{FileLocker, Path, map_document_file};
     use crate::domain::{
         Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid, derive_element_kind,
     };
     use crate::service::{
-        CacheDatabase, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileRow,
-        FileSystem, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile, RefreshOutcome,
+        CacheDatabase, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileReader,
+        FileRow, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile, RefreshOutcome,
         SourceMetadata, StorageRead,
     };
     use std::collections::{BTreeMap, BTreeSet};
@@ -598,7 +639,9 @@ mod projection {
         edges: BTreeSet<Edge>,
         touched_sources: BTreeSet<SourceUri>,
     }
-    impl<F: FileSystem, M: MarkdownCodec, P, C: CacheDatabase> DocumentPublication<'_, F, M, P, C> {
+    impl<F: FileReader + FileLocker, M: MarkdownCodec, P, C: CacheDatabase>
+        DocumentPublication<'_, F, M, P, C>
+    {
         /// Captures and parses one changed file against its effective previous projection.
         ///
         /// # Errors
@@ -614,9 +657,14 @@ mod projection {
                 previous,
                 graph,
             } = *request;
-            let captured = self.filesystem.get_file(path)?.ok_or_else(|| {
-                DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
-            })?;
+            let captured =
+                map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
+                    .ok_or_else(|| {
+                        DocumentError::new(
+                            DocumentErrorKind::InternalError,
+                            DOCUMENTS_CHANGED_MESSAGE,
+                        )
+                    })?;
             if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
                 return Err(DocumentError::new(
                     DocumentErrorKind::InternalError,
@@ -698,7 +746,8 @@ mod projection {
             sources: Vec<(SourceUri, u64)>,
         ) -> DocumentResult<()> {
             // One capture serves every affected address of this path and then is released.
-            let captured = self.filesystem.get_file(path)?;
+            let captured =
+                map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?;
             for (uri, created_at) in sources {
                 let local = uri.get_local().ok_or_else(|| {
                     DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
@@ -940,6 +989,12 @@ pub(super) use tests::process::reach_checkpoint;
 
 #[cfg(test)]
 mod tests {
+    use crate::service::{
+        Clock, FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult,
+    };
+
+    use std::rc::Rc;
+
     use super::DocumentRefreshService;
     use crate::service::TransactionError;
     use crate::{
@@ -947,10 +1002,9 @@ mod tests {
         markdown::MarkdownParser,
         service::{
             BasisRetainer, CacheDatabase, CapturedFile, Diagnostic, DocumentError,
-            DocumentErrorKind, DocumentResult, FileStat, FileSystem, MarkdownCodec,
-            MockCorpusLister, ParsedFile, ProvenanceObservation, ProvenanceRequest, Refresher,
-            SnapshotError, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
-            StorageRead,
+            DocumentErrorKind, DocumentResult, FileStat, MarkdownCodec, MockCorpusLister,
+            ParsedFile, ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError,
+            SourceProvenance, SourceRevisionComparison, SourceRevisionRequest, StorageRead,
         },
     };
     use rusqlite::Connection;
@@ -968,12 +1022,38 @@ mod tests {
     struct TestFiles {
         bytes: RefCell<Vec<u8>>,
         stat: Cell<FileStat>,
-        now: Cell<i64>,
+        now: Rc<Cell<i64>>,
         reads: Cell<usize>,
         locks: Cell<usize>,
         replace_on_read: Cell<Option<usize>>,
         fail_on_read: Cell<Option<usize>>,
         missing: Cell<bool>,
+    }
+    #[derive(Debug)]
+    struct TestClock(Rc<Cell<i64>>);
+    impl Clock for TestClock {
+        fn clock_get_time_ns(&self) -> std::io::Result<i64> {
+            Ok(self.0.get())
+        }
+        fn clock_get_time_secs(&self) -> std::io::Result<u64> {
+            panic!("unused seconds")
+        }
+        fn clock_wait(&self, _: std::time::Duration) -> std::io::Result<()> {
+            panic!("unused wait")
+        }
+    }
+    #[derive(Debug)]
+    struct FailedClock;
+    impl Clock for FailedClock {
+        fn clock_get_time_ns(&self) -> std::io::Result<i64> {
+            Err(std::io::Error::other("clock unavailable"))
+        }
+        fn clock_get_time_secs(&self) -> std::io::Result<u64> {
+            panic!("refresh does not request seconds")
+        }
+        fn clock_wait(&self, _: std::time::Duration) -> std::io::Result<()> {
+            panic!("refresh does not wait")
+        }
     }
     impl TestFiles {
         fn new() -> Self {
@@ -985,7 +1065,7 @@ mod tests {
                     inode: 2,
                     device: 3,
                 }),
-                now: Cell::new(NOW),
+                now: Rc::new(Cell::new(NOW)),
                 reads: Cell::new(0),
                 locks: Cell::new(0),
                 replace_on_read: Cell::new(None),
@@ -998,19 +1078,15 @@ mod tests {
             self.locks.set(0);
         }
     }
-    impl FileSystem for TestFiles {
-        type IndexLock = ();
-        fn get_file_stat_by_path(&self, _: &RepoPath) -> DocumentResult<Option<FileStat>> {
+    impl FileReader for TestFiles {
+        fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             Ok((!self.missing.get()).then(|| self.stat.get()))
         }
-        fn get_file(&self, _: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+        fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             let reads = self.reads.get() + 1;
             self.reads.set(reads);
             if self.fail_on_read.get() == Some(reads) {
-                return Err(DocumentError::new(
-                    DocumentErrorKind::InternalError,
-                    "cannot read document file",
-                ));
+                return Err(FileError::new(FileErrorKind::Io));
             }
             if self.replace_on_read.get() == Some(reads) {
                 self.bytes.replace(EDITED.to_vec());
@@ -1021,12 +1097,50 @@ mod tests {
                 checked_at_ns: self.now.get(),
             }))
         }
-        fn get_time_ns(&self) -> DocumentResult<i64> {
-            Ok(self.now.get())
+        fn file_get_identity_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<FileIdentity>> {
+            panic!("unexpected file_get_identity_by_path")
         }
-        fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
+        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+            panic!("unexpected file_is_exist")
+        }
+        fn file_verify_identity_by_path(
+            &self,
+            _: &std::path::Path,
+            _: Option<FileIdentity>,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_identity_by_path")
+        }
+        fn file_verify_distinct_by_paths(
+            &self,
+            _: &std::path::Path,
+            _: &std::path::Path,
+        ) -> FileResult<()> {
+            panic!("unexpected file_verify_distinct_by_paths")
+        }
+        fn directory_get_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+            panic!("unexpected directory_get_by_path")
+        }
+        fn lock_get_owner_by_path(
+            &self,
+            _: &std::path::Path,
+        ) -> FileResult<Option<std::num::NonZeroU32>> {
+            panic!("unexpected lock_get_owner_by_path")
+        }
+    }
+    impl FileLocker for TestFiles {
+        type Lock = ();
+        fn lock_acquire_by_path(&self, _path: &std::path::Path) -> FileResult<Self::Lock> {
             self.locks.set(self.locks.get() + 1);
             Ok(())
+        }
+        fn lock_try_acquire_by_path(&self, _: &std::path::Path) -> FileResult<Option<Self::Lock>> {
+            panic!("unexpected lock probe")
         }
     }
     struct CountingMarkdown(Cell<usize>);
@@ -1254,6 +1368,21 @@ mod tests {
         assert_eq!(changed.revision, 2);
         assert_eq!(get_matches(&mut service, "BravoToken"), ["note.md"]);
         assert!(get_matches(&mut service, "AlphaToken").is_empty());
+    }
+
+    #[test]
+    fn clock_failure_falls_back_to_bytes_without_publishing_unchanged_content() {
+        // Given: an unchanged non-racy publication and an unavailable application clock.
+        let (_dir, mut service) = build_service();
+        service.refresh().unwrap();
+        service.filesystem.reset_counts();
+        service.clock = Box::new(FailedClock);
+        // When: refresh cannot establish a safe age for the cached observation.
+        let outcome = service.refresh().unwrap();
+        // Then: verified bytes are read once, while publication and lock acquisition are skipped.
+        assert!(!outcome.published);
+        assert_eq!(service.filesystem.reads.get(), 1);
+        assert_eq!(service.filesystem.locks.get(), 0);
     }
 
     #[test]
@@ -1500,11 +1629,15 @@ mod tests {
             &dir.path().join("vectors.db"),
         )
         .unwrap();
+        let files = TestFiles::new();
         (
             dir,
             DocumentRefreshService {
                 git: build_candidates(),
-                filesystem: TestFiles::new(),
+                clock: Box::new(crate::service::document_refresher::tests::TestClock(
+                    Rc::clone(&files.now),
+                )),
+                filesystem: files,
                 markdown: CountingMarkdown(Cell::new(0)),
                 storage: std::rc::Rc::new(storage.cache),
                 provenance: TestProvenance,
@@ -1523,16 +1656,18 @@ mod tests {
     }
 
     mod basis {
+        use crate::service::{FileIdentity, FileLocker, FileReader, FileResult};
+
         use super::{Candidates, CountingMarkdown, TestFiles, build_service};
         use crate::service::TransactionError;
         use crate::service::{CacheDatabase, StorageRead};
         use crate::{
-            domain::{RepoPath, TreeOid},
+            domain::TreeOid,
             service::{
                 BasisRetainer, CapturedFile, DocumentError, DocumentErrorKind,
-                DocumentRefreshService, DocumentResult, FileStat, FileSystem,
-                ProvenanceObservation, ProvenanceRequest, Refresher, SnapshotError,
-                SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
+                DocumentRefreshService, DocumentResult, FileStat, ProvenanceObservation,
+                ProvenanceRequest, Refresher, SnapshotError, SourceProvenance,
+                SourceRevisionComparison, SourceRevisionRequest,
             },
         };
         use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
@@ -1767,6 +1902,7 @@ mod tests {
             let events = Rc::new(RefCell::new(Vec::new()));
             let service = DocumentRefreshService {
                 git: service.git,
+                clock: service.clock,
                 filesystem: BoundaryFiles {
                     inner: service.filesystem,
                     events: Rc::clone(&events),
@@ -1784,21 +1920,64 @@ mod tests {
             };
             (dir, service, events)
         }
-        impl FileSystem for BoundaryFiles {
-            type IndexLock = ();
-            fn get_file_stat_by_path(&self, path: &RepoPath) -> DocumentResult<Option<FileStat>> {
-                self.inner.get_file_stat_by_path(path)
+        impl FileReader for BoundaryFiles {
+            fn file_get_stat_by_path(
+                &self,
+                path: &std::path::Path,
+            ) -> FileResult<Option<FileStat>> {
+                self.inner.file_get_stat_by_path(path)
             }
-            fn get_file(&self, path: &RepoPath) -> DocumentResult<Option<CapturedFile>> {
+            fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
                 self.events.borrow_mut().push("read");
-                self.inner.get_file(path)
+                self.inner.file_get_by_path(path)
             }
-            fn get_time_ns(&self) -> DocumentResult<i64> {
-                self.inner.get_time_ns()
+            fn file_get_identity_by_path(
+                &self,
+                _: &std::path::Path,
+            ) -> FileResult<Option<FileIdentity>> {
+                panic!("unexpected file_get_identity_by_path")
             }
-            fn lock_index(&self) -> DocumentResult<Self::IndexLock> {
+            fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
+                panic!("unexpected file_is_exist")
+            }
+            fn file_verify_identity_by_path(
+                &self,
+                _: &std::path::Path,
+                _: Option<FileIdentity>,
+            ) -> FileResult<()> {
+                panic!("unexpected file_verify_identity_by_path")
+            }
+            fn file_verify_distinct_by_paths(
+                &self,
+                _: &std::path::Path,
+                _: &std::path::Path,
+            ) -> FileResult<()> {
+                panic!("unexpected file_verify_distinct_by_paths")
+            }
+            fn directory_get_by_path(
+                &self,
+                _: &std::path::Path,
+            ) -> FileResult<Option<std::os::fd::OwnedFd>> {
+                panic!("unexpected directory_get_by_path")
+            }
+            fn lock_get_owner_by_path(
+                &self,
+                _: &std::path::Path,
+            ) -> FileResult<Option<std::num::NonZeroU32>> {
+                panic!("unexpected lock_get_owner_by_path")
+            }
+        }
+        impl FileLocker for BoundaryFiles {
+            type Lock = ();
+            fn lock_acquire_by_path(&self, path: &std::path::Path) -> FileResult<Self::Lock> {
                 self.events.borrow_mut().push("lock");
-                self.inner.lock_index()
+                self.inner.lock_acquire_by_path(path)
+            }
+            fn lock_try_acquire_by_path(
+                &self,
+                _: &std::path::Path,
+            ) -> FileResult<Option<Self::Lock>> {
+                panic!("unexpected lock probe")
             }
         }
         impl SourceProvenance for BoundaryProvenance {
@@ -1913,10 +2092,10 @@ mod tests {
             git::GitRepository,
             markdown::MarkdownParser,
             service::{
-                EmbeddingFailure, FileRow, FileSystem, GraphDiagnosticsService, NodeMetadata,
-                ProvenanceService, QueryError, Refresher, StatusReader, StatusReport,
-                StatusService, StorageError, StorageResult, StoredNode, VectorDatabase,
-                VectorOutcome,
+                EmbeddingFailure, FileLocker, FileReader, FileRow, FileWriter,
+                GraphDiagnosticsService, NodeMetadata, ProvenanceService, QueryError, Refresher,
+                StatusReader, StatusReport, StatusService, StorageError, StorageResult, StoredNode,
+                VectorDatabase, VectorOutcome,
             },
             wire_document_refresher,
         };
@@ -2028,7 +2207,10 @@ mod tests {
             }
             let mut service = build_service(&root);
             if mode == "hold" {
-                let _guard = service.filesystem.lock_index().unwrap();
+                let _guard = service
+                    .filesystem
+                    .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                    .unwrap();
                 reach_checkpoint("holding");
             } else {
                 FAIL_LATE.with_borrow_mut(|enabled| *enabled = mode.ends_with("fail"));
@@ -2424,8 +2606,10 @@ mod tests {
                     .clone(),
                     "cut={cut}"
                 );
-                let filesystem = LocalFileSystem::open(fixture.root.path()).unwrap();
-                let guard = filesystem.lock_index().unwrap();
+                let filesystem = LocalFileSystem::new(fixture.root.path()).unwrap();
+                let guard = filesystem
+                    .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+                    .unwrap();
                 drop(guard);
                 fixture.assert_preserved(NEW);
                 Worker::spawn(
@@ -2618,7 +2802,8 @@ mod tests {
         }
 
         fn run_normal_service(root: &Path, mode: &str) {
-            LocalFileSystem::configure_next_process_test(
+            crate::process::SystemClock::configure_next(TIME);
+            LocalFileSystem::configure_next_file_test(
                 TIME,
                 Box::new(|| reach_checkpoint("contended")),
             );
@@ -2686,13 +2871,16 @@ mod tests {
 
         fn get_status(root: &Path) -> StatusReport {
             let git = GitRepository::open(root).unwrap();
-            let files = LocalFileSystem::open(git.get_root()).unwrap();
-            let pinned = files.open_existing_service_directory().unwrap().unwrap();
+            let files = LocalFileSystem::new(git.get_root()).unwrap();
+            let pinned = files
+                .directory_get_by_path(std::path::Path::new(".letopis"))
+                .unwrap()
+                .unwrap();
             let storage =
                 crate::open_observed_cache(&git.get_root().join(".letopis"), &pinned).unwrap();
             let provenance = ProvenanceService::new(
                 Box::new(GitRepository::open(root).unwrap()),
-                LocalFileSystem::open(root).unwrap(),
+                LocalFileSystem::new(root).unwrap(),
             );
             let provider = crate::build_embedding_provider().unwrap();
             let storage = std::rc::Rc::new(storage);
@@ -2721,9 +2909,11 @@ mod tests {
 
         fn build_service(root: &Path) -> Service {
             let git = GitRepository::open(root).unwrap();
-            let mut filesystem = LocalFileSystem::open(git.get_root()).unwrap();
-            filesystem.configure_process_test(TIME, Box::new(|| reach_checkpoint("contended")));
-            let directory = filesystem.open_service_directory().unwrap();
+            let mut filesystem = LocalFileSystem::new(git.get_root()).unwrap();
+            filesystem.configure_file_test(TIME, Box::new(|| reach_checkpoint("contended")));
+            let directory = filesystem
+                .directory_create_by_path(std::path::Path::new(".letopis"))
+                .unwrap();
             let storage = crate::storage::open_confined_test_storage(
                 &git.get_root().join(".letopis"),
                 &directory,
@@ -2731,10 +2921,11 @@ mod tests {
             .unwrap();
             let provenance = ProvenanceService::new(
                 Box::new(GitRepository::open(root).unwrap()),
-                LocalFileSystem::open(root).unwrap(),
+                LocalFileSystem::new(root).unwrap(),
             );
             DocumentRefreshService {
                 git,
+                clock: Box::new(crate::process::SystemClock::at(TIME)),
                 filesystem,
                 markdown: MarkdownParser::new(),
                 storage: std::rc::Rc::new(storage.cache),
@@ -2937,9 +3128,13 @@ mod tests {
                 .with_write_tx(|| initial.storage.nodes_upsert_by_id(&node))
                 .unwrap();
             let reads = Rc::new(Cell::new(0));
+            let files = TestFiles::new();
             let mut service = DocumentRefreshService {
                 git: build_candidates(),
-                filesystem: TestFiles::new(),
+                clock: Box::new(crate::service::document_refresher::tests::TestClock(
+                    Rc::clone(&files.now),
+                )),
+                filesystem: files,
                 markdown: CountingMarkdown(Cell::new(0)),
                 storage: Rc::new(ReadingStorage {
                     inner: initial.storage,
