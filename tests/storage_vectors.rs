@@ -61,7 +61,7 @@ fn text_hash_shares_one_vector() {
             let read = &storage.cache;
             assert_eq!(
                 unwrap_current(
-                    read.vector_keys_get_vector_by_search_hash(&identity, &hash)
+                    read.vector_keys_get_by_search_hash(&identity, &hash)
                         .unwrap()
                 ),
                 Some(vec![1.0, 0.0, 0.0])
@@ -106,8 +106,7 @@ fn vectors_require_matching_identity() {
         .with_read_tx(|| {
             let read = &storage.cache;
             assert!(matches!(
-                read.vector_keys_get_vector_by_search_hash(&m2, &m1)
-                    .unwrap(),
+                read.vector_keys_get_by_search_hash(&m2, &m1).unwrap(),
                 VectorOutcome::ConfigChanged
             ));
             assert!(matches!(
@@ -119,10 +118,6 @@ fn vectors_require_matching_identity() {
         .unwrap();
 }
 #[test]
-#[expect(
-    clippy::too_many_lines,
-    reason = "Keep the sequential transaction scenario and its assertions together"
-)]
 fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
     // Catches shared vec1 state or validation against a later global identity.
     // Given: an old reader pinned before a model reset.
@@ -143,7 +138,7 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
             // When / Then: old and new readers query vector state; the old view survives and late readers reject the old identity.
             assert_nearest(old, &m1, &[1.0, 0.0, 0.0]);
             assert_eq!(
-                unwrap_current(old.vector_keys_get_vector_by_search_hash(&m1, &m1).unwrap()),
+                unwrap_current(old.vector_keys_get_by_search_hash(&m1, &m1).unwrap()),
                 Some(vec![1.0, 0.0, 0.0])
             );
             assert_eq!(
@@ -158,7 +153,7 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
             );
             assert_nearest(old, &m1, &[1.0, 0.0, 0.0]);
             assert_eq!(
-                unwrap_current(old.vector_keys_get_vector_by_search_hash(&m1, &m1).unwrap()),
+                unwrap_current(old.vector_keys_get_by_search_hash(&m1, &m1).unwrap()),
                 Some(vec![1.0, 0.0, 0.0])
             );
             second
@@ -167,25 +162,15 @@ fn old_reader_survives_reset_and_late_reader_rejects_captured_old_identity() {
                     let fresh = &second.cache;
                     assert_nearest(fresh, &m2, &[0.0, 1.0, 0.0, 0.0]);
                     assert!(matches!(
-                        fresh
-                            .vector_keys_get_vector_by_search_hash(&m1, &m1)
-                            .unwrap(),
+                        fresh.vector_keys_get_by_search_hash(&m1, &m1).unwrap(),
                         VectorOutcome::ConfigChanged
                     ));
                     assert_eq!(
-                        unwrap_current(
-                            fresh
-                                .vector_keys_get_vector_by_search_hash(&m2, &m2)
-                                .unwrap()
-                        ),
+                        unwrap_current(fresh.vector_keys_get_by_search_hash(&m2, &m2).unwrap()),
                         Some(vec![0.0, 1.0, 0.0, 0.0])
                     );
                     assert_eq!(
-                        unwrap_current(
-                            fresh
-                                .vector_keys_get_vector_by_search_hash(&m2, &m1)
-                                .unwrap()
-                        ),
+                        unwrap_current(fresh.vector_keys_get_by_search_hash(&m2, &m1).unwrap()),
                         None
                     );
                     Ok::<_, StorageError>(())
@@ -268,17 +253,11 @@ fn caught_vector_error_cannot_commit_key_or_prior_write() {
             .with_read_tx(|| {
                 let read = &storage.cache;
                 assert_eq!(
-                    unwrap_current(
-                        read.vector_keys_get_vector_by_search_hash(&m1, &hash)
-                            .unwrap()
-                    ),
+                    unwrap_current(read.vector_keys_get_by_search_hash(&m1, &hash).unwrap()),
                     None
                 );
                 assert_eq!(
-                    unwrap_current(
-                        read.vector_keys_get_vector_by_search_hash(&m1, &m1)
-                            .unwrap()
-                    ),
+                    unwrap_current(read.vector_keys_get_by_search_hash(&m1, &m1).unwrap()),
                     None
                 );
                 Ok::<_, StorageError>(())
@@ -318,17 +297,11 @@ fn dimension_reset_and_rollback() {
         .with_read_tx(|| {
             let read = &storage.cache;
             assert_eq!(
-                unwrap_current(
-                    read.vector_keys_get_vector_by_search_hash(&m1, &m1)
-                        .unwrap()
-                ),
+                unwrap_current(read.vector_keys_get_by_search_hash(&m1, &m1).unwrap()),
                 Some(vec![1.0, 0.0, 0.0])
             );
             assert_eq!(
-                unwrap_current(
-                    read.vector_keys_get_vector_by_search_hash(&m1, &hash)
-                        .unwrap()
-                ),
+                unwrap_current(read.vector_keys_get_by_search_hash(&m1, &hash).unwrap()),
                 None
             );
             Ok::<_, StorageError>(())

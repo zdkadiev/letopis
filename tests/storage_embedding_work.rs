@@ -265,7 +265,7 @@ fn first_committed_dimension_wins_between_competing_connections() {
                 .cache
                 .with_read_tx(|| first
                     .cache
-                    .vector_keys_get_vector_by_search_hash(&identity, &identity))
+                    .vector_keys_get_by_search_hash(&identity, &identity))
                 .unwrap()
         ),
         Some(vec![1.0; 3])
@@ -345,7 +345,7 @@ fn cleanup_retains_referenced_hashes_and_diagnostics_without_cache_publication()
             let unused = Sha256::digest(b"unused");
             assert_eq!(
                 unwrap_current(
-                    read.vector_keys_get_vector_by_search_hash(&identity, &orphan)
+                    read.vector_keys_get_by_search_hash(&identity, &orphan)
                         .unwrap()
                 ),
                 None
@@ -442,7 +442,7 @@ fn late_old_identity_cannot_cleanup_current_vectors_or_query_error() {
             let read = &storage.cache;
             assert!(
                 unwrap_current(
-                    read.vector_keys_get_vector_by_search_hash(&current, &current)
+                    read.vector_keys_get_by_search_hash(&current, &current)
                         .unwrap()
                 )
                 .is_some()

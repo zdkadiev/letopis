@@ -238,7 +238,7 @@ fn get_coverage(
     let mut coverage = Coverage::default();
     let identity = config.get_identity();
     for (hash, nodes) in hashes {
-        let vector = get_current(snapshot.vector_keys_get_vector_by_search_hash(&identity, hash)?)?;
+        let vector = get_current(snapshot.vector_keys_get_by_search_hash(&identity, hash)?)?;
         let failure = get_current(snapshot.embed_failures_get_by_search_hash(&identity, hash)?)?;
         if let Some(vector) = vector {
             if Some(vector.len()) != dimensions || vector.iter().any(|value| !value.is_finite()) {
