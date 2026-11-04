@@ -26,7 +26,7 @@ fn shared_read_exposes_graph_and_metadata_in_one_scope() {
     // When: one closure reads metadata and graph identity through the same owner.
     storage.cache.with_read_tx(|| -> letopis::service::StorageResult<()> {
         let nodes = storage.cache.nodes_get()?;
-        let reference = storage.cache.nodes_get_ref_by_id(&ElementAddress::parse("a.md").unwrap())?.unwrap();
+        let reference = GraphRead::nodes_get_by_id(&storage.cache, &ElementAddress::parse("a.md").unwrap())?.unwrap();
         // Then: both roles observe the known node at publication revision one.
         assert_eq!(storage.cache.project_get_by_id()?,1);
         assert_eq!(nodes.len(),1);
@@ -66,12 +66,7 @@ fn closure_commit_abort_and_identity_guards() {
         .with_read_tx(|| -> letopis::service::StorageResult<()> {
             assert_eq!(storage.cache.project_get_by_id()?, 1);
             assert_eq!(storage.cache.nodes_get()?.len(), 1);
-            assert!(
-                storage
-                    .cache
-                    .nodes_get_by_id(&build_target("b.md"))?
-                    .is_none()
-            );
+            assert!(StorageRead::nodes_get_by_id(&storage.cache, &build_target("b.md"))?.is_none());
             Ok(())
         })
         .unwrap();
@@ -141,10 +136,13 @@ fn cache_commit_preserves_node_row_id() {
             assert_eq!(read.text_index_get_by_expression("alpha").unwrap().len(), 0);
             assert_eq!(read.text_index_get_by_expression("beta").unwrap().len(), 1);
             assert_eq!(
-                read.nodes_get_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
-                    .unwrap()
-                    .unwrap()
-                    .row_id,
+                StorageRead::nodes_get_by_id(
+                    read,
+                    &EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap())
+                )
+                .unwrap()
+                .unwrap()
+                .row_id,
                 first
             );
             Ok::<_, StorageError>(())
@@ -189,13 +187,19 @@ fn source_missing_bytes_and_declared_targets_round_trip() {
         .with_read_tx(|| {
             let read = &db.cache;
             // When / Then: the metadata is published and retrieved; source identities and optional data round-trip unchanged.
-            assert_eq!(read.nodes_get_by_id(&id).unwrap().unwrap().metadata, source);
+            assert_eq!(
+                StorageRead::nodes_get_by_id(read, &id)
+                    .unwrap()
+                    .unwrap()
+                    .metadata,
+                source
+            );
             assert_eq!(
                 read.edges_get_by_source_id(None).unwrap(),
                 vec![external, dangling]
             );
             assert!(
-                read.nodes_get_by_id(&build_target("missing.md"))
+                StorageRead::nodes_get_by_id(read, &build_target("missing.md"))
                     .unwrap()
                     .is_none()
             );
@@ -248,7 +252,7 @@ fn incoming_edges_survive_target_delete_and_reappear() {
                 vec![declared.clone()]
             );
             assert!(
-                read.nodes_get_by_id(&build_target("b.md"))
+                StorageRead::nodes_get_by_id(read, &build_target("b.md"))
                     .unwrap()
                     .is_none()
             );
@@ -267,7 +271,7 @@ fn incoming_edges_survive_target_delete_and_reappear() {
         .with_read_tx(|| {
             let read = &db.cache;
             assert!(
-                read.nodes_get_by_id(&build_target("b.md"))
+                StorageRead::nodes_get_by_id(read, &build_target("b.md"))
                     .unwrap()
                     .is_some()
             );
@@ -332,7 +336,10 @@ fn source_projection_can_be_recomputed_and_removed() {
             let read = &db.cache;
             // Then: stored source data follows the published projection.
             assert_eq!(
-                read.nodes_get_by_id(&id).unwrap().unwrap().metadata,
+                StorageRead::nodes_get_by_id(read, &id)
+                    .unwrap()
+                    .unwrap()
+                    .metadata,
                 updated
             );
             assert_eq!(
@@ -358,7 +365,7 @@ fn source_projection_can_be_recomputed_and_removed() {
         .with_read_tx(|| {
             let read = &db.cache;
             // Then: stored source data follows the published projection.
-            assert!(read.nodes_get_by_id(&id).unwrap().is_none());
+            assert!(StorageRead::nodes_get_by_id(read, &id).unwrap().is_none());
             assert!(read.edges_get_by_source_id(None).unwrap().is_empty());
             Ok::<_, StorageError>(())
         })
@@ -577,7 +584,7 @@ fn revision_overflow_rolls_back() {
             let read = &db.cache;
             assert_eq!(read.project_get_by_id().unwrap(), i64::MAX as u64);
             assert!(
-                read.nodes_get_by_id(&build_target("a.md"))
+                StorageRead::nodes_get_by_id(read, &build_target("a.md"))
                     .unwrap()
                     .is_none()
             );
@@ -805,9 +812,10 @@ fn malformed_persisted_values_return_internal_errors() {
         // When / Then: typed storage reads decode the rows; malformed values return internal errors.
         assert_eq!(
             db.cache
-                .with_read_tx(|| Ok::<_, StorageError>(
-                    db.cache.nodes_get_by_id(&build_target("a.md"))
-                ))
+                .with_read_tx(|| Ok::<_, StorageError>(StorageRead::nodes_get_by_id(
+                    &db.cache,
+                    &build_target("a.md")
+                )))
                 .unwrap()
                 .unwrap_err()
                 .get_kind(),
@@ -876,14 +884,17 @@ fn knowledge_and_source_optional_fields_survive_reopen() {
             let read = &reopened.cache;
             // Then: optional metadata fields survive intact.
             assert_eq!(
-                read.nodes_get_by_id(&build_target("a.md#Section"))
+                StorageRead::nodes_get_by_id(read, &build_target("a.md#Section"))
                     .unwrap()
                     .unwrap()
                     .metadata,
                 knowledge
             );
             assert_eq!(
-                read.nodes_get_by_id(&source_id).unwrap().unwrap().metadata,
+                StorageRead::nodes_get_by_id(read, &source_id)
+                    .unwrap()
+                    .unwrap()
+                    .metadata,
                 source
             );
             Ok::<_, StorageError>(())
@@ -988,7 +999,7 @@ fn deleting_node_removes_fts_and_refuses_remaining_outgoing_edges() {
             );
             assert!(read.edges_get_by_source_id(None).unwrap().is_empty());
             assert!(
-                read.nodes_get_by_id(&build_target("a.md"))
+                StorageRead::nodes_get_by_id(read, &build_target("a.md"))
                     .unwrap()
                     .is_none()
             );
@@ -1182,7 +1193,12 @@ fn get_nodes_preserves_metadata_and_row_ids() {
 
     let original = db
         .cache
-        .with_read_tx(|| Ok::<_, StorageError>(db.cache.nodes_get_by_id(&build_target("a%b.md"))))
+        .with_read_tx(|| {
+            Ok::<_, StorageError>(StorageRead::nodes_get_by_id(
+                &db.cache,
+                &build_target("a%b.md"),
+            ))
+        })
         .unwrap()
         .unwrap()
         .unwrap();
@@ -1255,7 +1271,7 @@ fn assert_empty<C: CacheDatabase, V: VectorDatabase>(db: &Databases<C, V>) {
             let read = &db.cache;
             assert_eq!(read.project_get_by_id().unwrap(), 0);
             assert!(
-                read.nodes_get_by_id(&build_target("a.md"))
+                StorageRead::nodes_get_by_id(read, &build_target("a.md"))
                     .unwrap()
                     .is_none()
             );

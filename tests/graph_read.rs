@@ -25,14 +25,13 @@ fn pages_neighbors_in_type_and_identity_order() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = read
-                .nodes_get_ref_by_id(&parse_address("./root.md"))
+            let key = GraphRead::nodes_get_by_id(read, &parse_address("./root.md"))
                 .unwrap()
                 .unwrap()
                 .key;
             let mut request = build_request(key, NeighborDirection::Outgoing, 2);
             // When / Then: pages skip the missing endpoint and continue across a type boundary.
-            let first = read.edges_get_by_nodes_row_id_and_type(&request).unwrap();
+            let first = read.edges_get_by_row_id_and_type(&request).unwrap();
             assert_eq!(
                 summarize(&first),
                 [
@@ -43,19 +42,19 @@ fn pages_neighbors_in_type_and_identity_order() {
             assert!(matches!(first[0].node.element, EdgeTarget::Source(_)));
             let cursor = build_cursor(first.last().unwrap());
             request.after = Some(&cursor);
-            let next = read.edges_get_by_nodes_row_id_and_type(&request).unwrap();
+            let next = read.edges_get_by_row_id_and_type(&request).unwrap();
             assert_eq!(
                 summarize(&next),
                 ["includes:root.md>b.md", "supports:root.md>a.md"]
             );
             let cursor = build_cursor(next.last().unwrap());
             request.after = Some(&cursor);
-            let last = read.edges_get_by_nodes_row_id_and_type(&request).unwrap();
+            let last = read.edges_get_by_row_id_and_type(&request).unwrap();
             assert_eq!(summarize(&last), ["supports:root.md>b.md"]);
             let cursor = build_cursor(last.last().unwrap());
             request.after = Some(&cursor);
             assert!(
-                read.edges_get_by_nodes_row_id_and_type(&request)
+                read.edges_get_by_row_id_and_type(&request)
                     .unwrap()
                     .is_empty()
             );
@@ -75,8 +74,7 @@ fn intersects_modes_and_type_filters_before_the_page_bound() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = read
-                .nodes_get_ref_by_id(&parse_address("root.md"))
+            let key = GraphRead::nodes_get_by_id(read, &parse_address("root.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -84,19 +82,19 @@ fn intersects_modes_and_type_filters_before_the_page_bound() {
             request.mode = TraversalMode::Containment;
             // When / Then: mode and edge-type filters intersect before the page limit.
             assert_eq!(
-                summarize(&read.edges_get_by_nodes_row_id_and_type(&request).unwrap()),
+                summarize(&read.edges_get_by_row_id_and_type(&request).unwrap()),
                 ["includes:root.md>b.md"]
             );
             request.mode = TraversalMode::Relations;
             let types = BTreeSet::from([EdgeType::parse("supports").unwrap()]);
             request.edge_types = &types;
             assert_eq!(
-                summarize(&read.edges_get_by_nodes_row_id_and_type(&request).unwrap()),
+                summarize(&read.edges_get_by_row_id_and_type(&request).unwrap()),
                 ["supports:root.md>a.md"]
             );
             request.mode = TraversalMode::Containment;
             assert!(
-                read.edges_get_by_nodes_row_id_and_type(&request)
+                read.edges_get_by_row_id_and_type(&request)
                     .unwrap()
                     .is_empty()
             );
@@ -115,14 +113,13 @@ fn keeps_incoming_edges_in_original_orientation() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = read
-                .nodes_get_ref_by_id(&parse_address("b.md"))
+            let key = GraphRead::nodes_get_by_id(read, &parse_address("b.md"))
                 .unwrap()
                 .unwrap()
                 .key;
             let mut request = build_request(key, NeighborDirection::Incoming, 2);
             // When: the first incoming page is retrieved.
-            let first = read.edges_get_by_nodes_row_id_and_type(&request).unwrap();
+            let first = read.edges_get_by_row_id_and_type(&request).unwrap();
             // Then: sources and targets retain their original orientation across pages.
             assert_eq!(
                 summarize(&first),
@@ -132,7 +129,7 @@ fn keeps_incoming_edges_in_original_orientation() {
             assert_eq!(first[1].node.element.as_str(), "a.md");
             let cursor = build_cursor(first.last().unwrap());
             request.after = Some(&cursor);
-            let next = read.edges_get_by_nodes_row_id_and_type(&request).unwrap();
+            let next = read.edges_get_by_row_id_and_type(&request).unwrap();
             assert_eq!(summarize(&next), ["supports:root.md>b.md"]);
 
             Ok::<_, StorageError>(())
@@ -149,8 +146,7 @@ fn filters_incoming_modes_and_types_before_limiting() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = read
-                .nodes_get_ref_by_id(&parse_address("b.md"))
+            let key = GraphRead::nodes_get_by_id(read, &parse_address("b.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -158,18 +154,18 @@ fn filters_incoming_modes_and_types_before_limiting() {
             request.mode = TraversalMode::Containment;
             // When / Then: containment, relations and type filters apply before limiting.
             assert_eq!(
-                summarize(&read.edges_get_by_nodes_row_id_and_type(&request).unwrap()),
+                summarize(&read.edges_get_by_row_id_and_type(&request).unwrap()),
                 ["includes:root.md>b.md"]
             );
             request.mode = TraversalMode::Relations;
             assert_eq!(
-                summarize(&read.edges_get_by_nodes_row_id_and_type(&request).unwrap()),
+                summarize(&read.edges_get_by_row_id_and_type(&request).unwrap()),
                 ["supports:a.md>b.md"]
             );
             let types = BTreeSet::from([EdgeType::parse("includes").unwrap()]);
             request.edge_types = &types;
             assert!(
-                read.edges_get_by_nodes_row_id_and_type(&request)
+                read.edges_get_by_row_id_and_type(&request)
                     .unwrap()
                     .is_empty()
             );
@@ -193,8 +189,7 @@ fn retains_one_snapshot_across_pages() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = read
-                .nodes_get_ref_by_id(&parse_address("root.md"))
+            let key = GraphRead::nodes_get_by_id(read, &parse_address("root.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -202,7 +197,7 @@ fn retains_one_snapshot_across_pages() {
             let mut request = build_request(key, NeighborDirection::Outgoing, 1);
             request.edge_types = &types;
             // When: the first supports page is retrieved.
-            let first = read.edges_get_by_nodes_row_id_and_type(&request).unwrap();
+            let first = read.edges_get_by_row_id_and_type(&request).unwrap();
             // Then: the pinned reader retains old neighbors across a concurrent publication.
             assert_eq!(summarize(&first), ["supports:root.md>a.md"]);
             let cursor = build_cursor(first.last().unwrap());
@@ -224,7 +219,7 @@ fn retains_one_snapshot_across_pages() {
                 .unwrap();
             request.after = Some(&cursor);
             assert_eq!(
-                summarize(&read.edges_get_by_nodes_row_id_and_type(&request).unwrap()),
+                summarize(&read.edges_get_by_row_id_and_type(&request).unwrap()),
                 ["supports:root.md>b.md"]
             );
 
@@ -240,7 +235,7 @@ fn retains_one_snapshot_across_pages() {
             let mut request = build_request(key, NeighborDirection::Outgoing, 1);
             request.edge_types = &types;
             assert_eq!(
-                summarize(&read.edges_get_by_nodes_row_id_and_type(&request).unwrap()),
+                summarize(&read.edges_get_by_row_id_and_type(&request).unwrap()),
                 ["supports:root.md>c.md"]
             );
 
@@ -277,27 +272,26 @@ fn bounds_large_degrees_and_rejects_excessive_page_limits() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let key = read
-                .nodes_get_ref_by_id(&parse_address("c.md"))
+            let key = GraphRead::nodes_get_by_id(read, &parse_address("c.md"))
                 .unwrap()
                 .unwrap()
                 .key;
             let mut request = build_request(key, NeighborDirection::Outgoing, 32);
             // When: the first bounded page is retrieved.
-            let first = read.edges_get_by_nodes_row_id_and_type(&request).unwrap();
+            let first = read.edges_get_by_row_id_and_type(&request).unwrap();
             // Then: pages contain thirty-two and eight neighbors and reject an excessive bound.
             assert_eq!(first.len(), 32);
             assert_eq!(first.first().unwrap().node.element.as_str(), "n00.md");
             assert_eq!(first.last().unwrap().node.element.as_str(), "n31.md");
             let cursor = build_cursor(first.last().unwrap());
             request.after = Some(&cursor);
-            let last = read.edges_get_by_nodes_row_id_and_type(&request).unwrap();
+            let last = read.edges_get_by_row_id_and_type(&request).unwrap();
             assert_eq!(last.len(), 8);
             assert_eq!(last.first().unwrap().node.element.as_str(), "n32.md");
             assert_eq!(last.last().unwrap().node.element.as_str(), "n39.md");
             request.limit = NonZeroUsize::new(33).unwrap();
             assert_eq!(
-                read.edges_get_by_nodes_row_id_and_type(&request)
+                read.edges_get_by_row_id_and_type(&request)
                     .unwrap_err()
                     .get_kind(),
                 StorageErrorKind::InvalidRequest
@@ -325,8 +319,7 @@ fn resolves_local_range_and_opaque_url_identities_from_actual_node_kinds() {
                 ("https://Host/A?q=1#L0-L9", "https://Host/A?q=1#L0-L9", true),
             ] {
                 // When: a local, ranged or opaque URL address is resolved.
-                let node = read
-                    .nodes_get_ref_by_id(&parse_address(raw))
+                let node = GraphRead::nodes_get_by_id(read, &parse_address(raw))
                     .unwrap()
                     .unwrap();
                 // Then: resolved references preserve normalized addresses and stored node kinds.
@@ -334,7 +327,7 @@ fn resolves_local_range_and_opaque_url_identities_from_actual_node_kinds() {
                 assert_eq!(matches!(node.element, EdgeTarget::Source(_)), source);
             }
             assert!(
-                read.nodes_get_ref_by_id(&parse_address("absent.md"))
+                GraphRead::nodes_get_by_id(read, &parse_address("absent.md"))
                     .unwrap()
                     .is_none()
             );
@@ -361,12 +354,11 @@ fn does_not_decode_unselected_node_metadata() {
             let read = &storage.cache;
             // When / Then: reference and neighbor retrieval succeed without decoding unselected columns.
             assert!(
-                read.nodes_get_ref_by_id(&parse_address("a.md"))
+                GraphRead::nodes_get_by_id(read, &parse_address("a.md"))
                     .unwrap()
                     .is_some()
             );
-            let key = read
-                .nodes_get_ref_by_id(&parse_address("root.md"))
+            let key = GraphRead::nodes_get_by_id(read, &parse_address("root.md"))
                 .unwrap()
                 .unwrap()
                 .key;
@@ -374,7 +366,7 @@ fn does_not_decode_unselected_node_metadata() {
             let mut request = build_request(key, NeighborDirection::Outgoing, 1);
             request.edge_types = &types;
             assert_eq!(
-                summarize(&read.edges_get_by_nodes_row_id_and_type(&request).unwrap()),
+                summarize(&read.edges_get_by_row_id_and_type(&request).unwrap()),
                 ["supports:root.md>a.md"]
             );
 
