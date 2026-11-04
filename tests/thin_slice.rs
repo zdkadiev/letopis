@@ -404,7 +404,7 @@ fn get_vector_by_search_hash(
             Ok::<_, StorageError>(
                 storage
                     .cache
-                    .vector_keys_get_vector_by_search_hash(&config.get_identity(), search_hash),
+                    .vector_keys_get_by_search_hash(&config.get_identity(), search_hash),
             )
         })
         .unwrap()

@@ -239,7 +239,7 @@ fn repair_legacy_url_only_after_explicit_cache_rebuild() {
         .with_read_tx(|| {
             let view = &storage.cache;
             let preserved_vector = unwrap_current(
-                view.vector_keys_get_vector_by_search_hash(&identity, &hash)
+                view.vector_keys_get_by_search_hash(&identity, &hash)
                     .unwrap(),
             );
             assert_eq!(preserved_vector, Some(vec![1.0, 0.0, 0.0]));

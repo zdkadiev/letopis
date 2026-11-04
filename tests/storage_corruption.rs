@@ -134,7 +134,7 @@ fn recreated_empty_cache_preserves_healthy_vectors() {
             assert_eq!(view.project_get_by_id().unwrap(), 0);
             assert_eq!(view.meta_get_by_id().unwrap(), Some(identity));
             let stored_vector = unwrap_current(
-                view.vector_keys_get_vector_by_search_hash(&identity, &search_hash)
+                view.vector_keys_get_by_search_hash(&identity, &search_hash)
                     .unwrap(),
             )
             .unwrap();
@@ -250,7 +250,7 @@ fn assert_healthy(cache: &Path, vectors: &Path, identity: &Sha256, search_hash: 
             assert_eq!(matches.len(), 1);
             assert_eq!(matches[0].id.as_str(), NODE_ID);
             let vector = unwrap_current(
-                view.vector_keys_get_vector_by_search_hash(identity, search_hash)
+                view.vector_keys_get_by_search_hash(identity, search_hash)
                     .unwrap(),
             )
             .unwrap();

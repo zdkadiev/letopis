@@ -314,17 +314,11 @@ fn stale_identity_cannot_reserve_or_record_or_store() {
                 })
             );
             assert_eq!(
-                unwrap_current(
-                    read.vector_keys_get_vector_by_search_hash(&m2, &m1)
-                        .unwrap()
-                ),
+                unwrap_current(read.vector_keys_get_by_search_hash(&m2, &m1).unwrap()),
                 Some(vec![1.0, 0.0])
             );
             assert_eq!(
-                unwrap_current(
-                    read.vector_keys_get_vector_by_search_hash(&m2, &m2)
-                        .unwrap()
-                ),
+                unwrap_current(read.vector_keys_get_by_search_hash(&m2, &m2).unwrap()),
                 None
             );
             Ok::<_, StorageError>(())

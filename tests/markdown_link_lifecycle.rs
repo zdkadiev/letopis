@@ -228,7 +228,7 @@ fn link_syntax_migration_reuses_vectors_and_preserves_source_basis() {
             let read = &storage.cache;
             assert_eq!(read.meta_get_by_id().unwrap(), Some(identity));
             assert_eq!(
-                read.vector_keys_get_vector_by_search_hash(&identity, &migrated.search_hash)
+                read.vector_keys_get_by_search_hash(&identity, &migrated.search_hash)
                     .unwrap(),
                 VectorOutcome::Current(Some(vec![1.0, 0.0, 0.0]))
             );

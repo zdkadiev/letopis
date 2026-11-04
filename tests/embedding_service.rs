@@ -158,7 +158,7 @@ impl Fixture {
                     .cache
                     .with_read_tx(|| {
                         Ok::<_, StorageError>(
-                            scope_databases.cache.vector_keys_get_vector_by_search_hash(
+                            scope_databases.cache.vector_keys_get_by_search_hash(
                                 &config.get_identity(),
                                 search_hash,
                             ),
@@ -897,7 +897,7 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     assert!(
         storage
             .cache
-            .with_read_tx(|| storage.cache.nodes_get_by_id(&id))
+            .with_read_tx(|| StorageRead::nodes_get_by_id(&storage.cache, &id))
             .unwrap()
             .is_some()
     );

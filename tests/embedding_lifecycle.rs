@@ -47,12 +47,12 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
             let matches = read.text_index_get_by_expression(FINAL_MARKER).unwrap();
             assert_eq!(matches.len(), 1);
             assert_eq!(matches[0].id.as_str(), "long.md");
-            let node = read
-                .nodes_get_by_id(&EdgeTarget::Knowledge(
-                    KnowledgeId::parse("long.md").unwrap(),
-                ))
-                .unwrap()
-                .unwrap();
+            let node = StorageRead::nodes_get_by_id(
+                read,
+                &EdgeTarget::Knowledge(KnowledgeId::parse("long.md").unwrap()),
+            )
+            .unwrap()
+            .unwrap();
             let NodeMetadata::Knowledge(node) = node.metadata else {
                 panic!()
             };
@@ -69,11 +69,8 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
             );
             assert!(!failure.error.unwrap().contains(PRIVATE_RESPONSE));
             assert_eq!(
-                read.vector_keys_get_vector_by_search_hash(
-                    &config.get_identity(),
-                    &node.search_hash
-                )
-                .unwrap(),
+                read.vector_keys_get_by_search_hash(&config.get_identity(), &node.search_hash)
+                    .unwrap(),
                 VectorOutcome::Current(None)
             );
             Ok::<_, StorageError>(())

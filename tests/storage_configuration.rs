@@ -44,7 +44,7 @@ fn reset_commits_only_for_the_observed_identity_and_keeps_a_pinned_read() {
                     assert_eq!(fresh.meta_get_by_id().unwrap(), Some(b));
                     assert_eq!(
                         fresh
-                            .vector_keys_get_vector_by_search_hash(&b, &Sha256::digest(b"vector"))
+                            .vector_keys_get_by_search_hash(&b, &Sha256::digest(b"vector"))
                             .unwrap(),
                         VectorOutcome::Current(None)
                     );
@@ -186,7 +186,7 @@ fn seed_state<C: CacheDatabase, V: VectorDatabase>(storage: &Databases<C, V>, id
 
 fn assert_state(read: &dyn StorageRead, identity: &Sha256) {
     assert_eq!(
-        read.vector_keys_get_vector_by_search_hash(identity, &Sha256::digest(b"vector"))
+        read.vector_keys_get_by_search_hash(identity, &Sha256::digest(b"vector"))
             .unwrap(),
         VectorOutcome::Current(Some(vec![4.0, 5.0, 6.0]))
     );
