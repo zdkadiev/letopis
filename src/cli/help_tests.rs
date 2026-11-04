@@ -41,7 +41,7 @@ fn find_help_recognizes_flags_and_every_command() {
     // When / Then: version and general help return their expected text.
     assert_eq!(
         help_get_by_args(&to_args(&["--version"])).as_deref(),
-        Some("letopis 0.1.2\n")
+        Some("letopis 0.2.0\n")
     );
     assert!(
         help_get_by_args(&to_args(&["--help"]))
@@ -98,7 +98,7 @@ fn run_cli_prints_help_without_reading_stdin() {
     assert_eq!(help_exit, 0);
     assert!(String::from_utf8(help).unwrap().starts_with("Usage"));
     assert_eq!(version_exit, 0);
-    assert_eq!(version, b"letopis 0.1.2\n");
+    assert_eq!(version, b"letopis 0.2.0\n");
 }
 
 #[test]
