@@ -39,10 +39,7 @@ impl ConfigurationService<'_> {
     fn get_config_bytes(&self) -> FileResult<Option<Vec<u8>>> {
         self.files
             .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
-        Ok(self
-            .files
-            .file_get_by_path(Path::new(CONFIG_PATH))?
-            .map(|file| file.bytes))
+        self.files.file_get_bytes_by_path(Path::new(CONFIG_PATH))
     }
 
     fn validate_configuration(&self, bytes: &[u8]) -> EmbeddingResult<Configuration> {
@@ -80,12 +77,49 @@ mod tests {
         EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult, ProviderKind,
     };
     use serde_json::json;
-    use std::{cell::Cell, error::Error, io, num::NonZeroUsize};
+    use std::{cell::Cell, error::Error, io, num::NonZeroUsize, os::unix::fs::MetadataExt};
 
     const CONFIG: &[u8] = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9","custom":{"enabled":true},"dimensions":3},"max_retries":2}}"#;
     const DISABLED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":2}}"#;
     const UNCONFIGURED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#;
     const LEGACY: &[u8] = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":0}"#;
+
+    #[test]
+    fn reads_configuration_at_extreme_filesystem_times() {
+        // Given: valid configuration files with old and future times accepted by this filesystem.
+        let root = tempfile::tempdir().unwrap();
+        let directory = root.path().join(".letopis");
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("config.json");
+        std::fs::write(&path, UNCONFIGURED).unwrap();
+        let file = std::fs::File::open(&path).unwrap();
+        let files = crate::filesystem::LocalFileSystem::new(root.path()).unwrap();
+        let provider = Provider::accepting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+        for time in [
+            std::time::UNIX_EPOCH - std::time::Duration::from_secs(10_000_000_000),
+            std::time::UNIX_EPOCH + std::time::Duration::from_secs(10_000_000_000),
+        ] {
+            file.set_times(std::fs::FileTimes::new().set_modified(time))
+                .unwrap();
+            let actual = file.metadata().unwrap();
+            eprintln!(
+                "filesystem mtime: {} seconds, {} nanos",
+                actual.mtime(),
+                actual.mtime_nsec()
+            );
+            // When: the configuration service reads the file.
+            let config = service.get_config().unwrap();
+            // Then: valid configuration remains readable regardless of its stored timestamp.
+            assert!(matches!(
+                config,
+                Some(crate::service::Configuration::Unconfigured { .. })
+            ));
+        }
+    }
 
     #[test]
     fn selects_literal_configuration_path_without_writes() {
@@ -97,7 +131,7 @@ mod tests {
             .times(1)
             .returning(|_| Ok(None));
         files
-            .expect_file_get_by_path()
+            .expect_file_get_bytes_by_path()
             .withf(|path| path == std::path::Path::new(".letopis/config.json"))
             .times(1)
             .returning(|_| Ok(None));
@@ -351,18 +385,6 @@ mod tests {
         );
     }
 
-    fn capture(bytes: Vec<u8>) -> CapturedFile {
-        CapturedFile {
-            stat: FileStat {
-                size: bytes.len() as u64,
-                mtime_ns: 1,
-                inode: 1,
-                device: 1,
-            },
-            bytes,
-            checked_at_ns: 1,
-        }
-    }
     struct Files {
         config: Option<Vec<u8>>,
         fail: bool,
@@ -374,7 +396,10 @@ mod tests {
         fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
             Ok(false)
         }
-        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+        fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            panic!("unexpected file_get_by_path")
+        }
+        fn file_get_bytes_by_path(&self, path: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
             assert_eq!(path, std::path::Path::new(".letopis/config.json"));
             self.reads.set(self.reads.get() + 1);
             if self.fail {
@@ -383,7 +408,7 @@ mod tests {
                     io::Error::other("CONFIG_CANARY"),
                 ));
             }
-            Ok(self.config.clone().map(capture))
+            Ok(self.config.clone())
         }
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("unexpected file_get_stat_by_path")

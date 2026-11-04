@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"7d506ed54103d557f6da760bd189f084efb74dd5"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Embedding execution
 
 `EmbeddingService` connects configuration, Markdown-derived search text, storage
@@ -22,10 +22,12 @@ distinct from this background work.
 
 [Embedding drain](embedding-drain.md "letopis:type=related_to;path=letopis/architecture/embedding-drain.md")
 
-`HttpProviders` dispatches to Ollama or OpenAI implementations. The Ollama adapter
-uses the `embed` endpoint and disables truncation; the OpenAI adapter uses
-`embeddings` and supplies bearer authorization. Both validate returned vectors
-against the expected item count and dimensions through shared HTTP decoding.
+One `HttpProviders` owns two independent HTTP pools and the captured compatible
+credential. It dispatches to private protocol functions in `ollama.rs` and
+`openai.rs`, rather than separate provider structs. Ollama uses the `embed` endpoint
+and disables truncation; OpenAI uses `embeddings` and bearer authorization. Native
+requests receive no compatible credential. Both validate returned vectors against
+the expected item count and dimensions through shared HTTP decoding.
 
 [Embedding service](../../src/service/embedding.rs "letopis:type=external;path=src/service/embedding.rs")
 
@@ -33,8 +35,10 @@ against the expected item count and dimensions through shared HTTP decoding.
 
 [Provider dispatch](../../src/embedding/provider.rs "letopis:type=external;path=src/embedding/provider.rs")
 
-[Ollama adapter](../../src/embedding/ollama.rs "letopis:type=external;path=src/embedding/ollama.rs")
+[Ollama protocol](../../src/embedding/ollama.rs "letopis:type=external;path=src/embedding/ollama.rs")
 
-[OpenAI adapter](../../src/embedding/openai.rs "letopis:type=external;path=src/embedding/openai.rs")
+[OpenAI protocol](../../src/embedding/openai.rs "letopis:type=external;path=src/embedding/openai.rs")
+
+[Shared HTTP transport and vector validation](../../src/embedding/http.rs "letopis:type=external;path=src/embedding/http.rs")
 
 [Background execution](process-execution.md "letopis:type=related_to;path=letopis/architecture/process-execution.md")

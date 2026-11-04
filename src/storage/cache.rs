@@ -3,10 +3,11 @@ use super::{
     query::{Edges, Files, Nodes, Project, TextIndex, build_query},
     transaction::{self, State},
     vector::{
-        VectorSchema, embed_failures_get_by_search_hash, get_embedding_status, get_nearest_vectors,
-        meta_get_by_id, nodes_get_by_kind_and_search_hash_and_attempts_and_id,
-        query_error_get_by_id, vector_index_config_get_by_id,
-        vector_keys_get_vector_by_search_hash,
+        VectorSchema, decode_config_identity,
+        embed_failures_get_by_kind_and_search_hash_and_attempts, embed_failures_get_by_search_hash,
+        get_nearest_vectors, get_vector_coverage, meta_get_by_id, nodes_get_by_kind,
+        nodes_get_by_kind_and_search_hash_and_attempts_and_id, query_error_get_by_id,
+        vector_index_config_get_by_id, vector_keys_get_by_search_hash,
     },
 };
 use crate::{
@@ -15,12 +16,11 @@ use crate::{
         RepoPath, Sha256, SourceUri, TreeOid,
     },
     service::{
-        CacheDatabase, ElementAddress, EmbeddingFailure, EmbeddingStatusPolicy,
-        EmbeddingStatusSummary, EmbeddingWork, FileRow, GraphNeighbor, GraphNodeKey, GraphNodeRef,
-        GraphRead, KnowledgeMetadata, NEIGHBOR_PAGE_QUANTUM, NeighborDirection,
-        NeighborPageRequest, NodeMetadata, QueryError, SourceMetadata, StorageError,
-        StorageErrorKind, StorageRead, StorageResult, StoredNode, TextMatch, TransactionError,
-        TransactionRequirement, TraversalMode, VectorMatch, VectorOutcome,
+        CacheDatabase, ElementAddress, EmbeddingFailure, EmbeddingWork, FileRow, GraphNeighbor,
+        GraphNodeKey, GraphNodeRef, GraphRead, KnowledgeMetadata, NEIGHBOR_PAGE_QUANTUM,
+        NeighborDirection, NeighborPageRequest, NodeMetadata, QueryError, SourceMetadata,
+        StorageError, StorageErrorKind, StorageRead, StorageResult, StoredNode, TextMatch,
+        TransactionError, TransactionRequirement, TraversalMode, VectorMatch, VectorOutcome,
     },
 };
 use rusqlite::{Connection, OptionalExtension, Row, params, params_from_iter};
@@ -434,11 +434,22 @@ impl CacheDatabase for CacheStorage {
 }
 
 impl StorageRead for CacheStorage {
-    fn get_embedding_status(
+    fn nodes_get_by_kind(&self) -> StorageResult<u64> {
+        nodes_get_by_kind(self.get_connection()?)
+    }
+
+    fn get_vector_coverage(&self) -> StorageResult<u64> {
+        get_vector_coverage(self.get_connection()?)
+    }
+
+    fn embed_failures_get_by_kind_and_search_hash_and_attempts(
         &self,
-        policy: &EmbeddingStatusPolicy,
-    ) -> StorageResult<EmbeddingStatusSummary> {
-        get_embedding_status(self.get_connection()?, self.meta_get_by_id()?, policy)
+        max_attempts: u64,
+    ) -> StorageResult<Vec<EmbeddingFailure>> {
+        embed_failures_get_by_kind_and_search_hash_and_attempts(
+            self.get_connection()?,
+            max_attempts,
+        )
     }
 
     fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
@@ -613,7 +624,7 @@ impl StorageRead for CacheStorage {
         Ok(found)
     }
 
-    fn vector_keys_get_vector_by_search_hash(
+    fn vector_keys_get_by_search_hash(
         &self,
         expected: &Sha256,
         search_hash: &Sha256,
@@ -621,7 +632,7 @@ impl StorageRead for CacheStorage {
         if self.meta_get_by_id()? != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        vector_keys_get_vector_by_search_hash(self.get_connection()?, search_hash)
+        vector_keys_get_by_search_hash(self.get_connection()?, search_hash)
             .map(VectorOutcome::Current)
     }
 
@@ -678,12 +689,15 @@ impl StorageRead for CacheStorage {
     }
 
     fn meta_get_by_id(&self) -> StorageResult<Option<Sha256>> {
-        meta_get_by_id(self.get_connection()?, VectorSchema::Attached)
+        decode_config_identity(meta_get_by_id(
+            self.get_connection()?,
+            VectorSchema::Attached,
+        )?)
     }
 }
 
 impl GraphRead for CacheStorage {
-    fn nodes_get_ref_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+    fn nodes_get_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
         let db = self.get_connection()?;
         let (sql, values) = build_query(
             Query::select()
@@ -699,7 +713,7 @@ impl GraphRead for CacheStorage {
         .transpose()
     }
 
-    fn edges_get_by_nodes_row_id_and_type(
+    fn edges_get_by_row_id_and_type(
         &self,
         request: &NeighborPageRequest<'_>,
     ) -> StorageResult<Vec<GraphNeighbor>> {
@@ -710,7 +724,7 @@ impl GraphRead for CacheStorage {
                 "invalid neighbor page limit",
             ));
         }
-        let (sql, values) = build_query(&edges_get_by_nodes_row_id_and_type(request))?;
+        let (sql, values) = build_query(&edges_get_by_row_id_and_type(request))?;
         let mut statement = db.prepare(&sql).map_err(map_sqlite)?;
         let mut rows = statement
             .query(params_from_iter(values))
@@ -950,7 +964,7 @@ fn map_match(error: rusqlite::Error) -> StorageError {
     }
 }
 
-fn edges_get_by_nodes_row_id_and_type(request: &NeighborPageRequest<'_>) -> SelectStatement {
+fn edges_get_by_row_id_and_type(request: &NeighborPageRequest<'_>) -> SelectStatement {
     let (anchor, neighbor, neighbor_id) = match request.direction {
         NeighborDirection::Outgoing => (Endpoint::Source, Endpoint::Target, Edges::TargetId),
         NeighborDirection::Incoming => (Endpoint::Target, Endpoint::Source, Edges::SourceId),
@@ -2150,7 +2164,7 @@ mod file_tests {
 #[cfg(test)]
 mod neighbor_tests {
     use super::{
-        CacheStorage, edges_get_by_nodes_row_id_and_type, nodes_get_by_source_snapshot, transaction,
+        CacheStorage, edges_get_by_row_id_and_type, nodes_get_by_source_snapshot, transaction,
     };
     use crate::service::StorageRead;
     use crate::{
@@ -2263,7 +2277,7 @@ mod neighbor_tests {
                     after,
                     limit: NonZeroUsize::new(32).unwrap(),
                 };
-                let plan = explain_query(db, &edges_get_by_nodes_row_id_and_type(&request));
+                let plan = explain_query(db, &edges_get_by_row_id_and_type(&request));
                 println!(
                     "{direction:?}/{mode:?}/{edge_types:?}/cursor={}: {plan:?}",
                     after.is_some()

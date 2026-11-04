@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793727646,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793727646,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # SQLite storage and read views
 
 Markdown and source files remain authoritative. `.letopis/cache.db` is the
@@ -37,12 +37,14 @@ two databases do not join into a shared transaction.
 
 Status uses an observation-only CacheStorage. Absent storage needs no connection,
 creates no durable file and skips the callback; an unpublished cache also skips
-observation. The observed owner cannot write. Filesystem owns pinned-path and
-file-identity checks, and composition brackets opening/attaching with these checks.
-Storage contains database operations, with no directory policy component.
+observation. The observed owner cannot write. `LocalFileSystem` provides generic
+file/directory identity, no-follow and alias checks. Composition selects database
+filenames and brackets opening/attaching with those checks; SQLite connections,
+schemas and attachments remain in storage. Filesystem has no database-role component.
 Cache node, edge, file, FTS and neighbor queries live with `CacheStorage` in
-`storage/cache.rs`. Vector, embedding work, pruning and embedding-status queries
-live with `VectorStorage` in `storage/vector.rs`; unit tests stay inline.
+`storage/cache.rs`. Vector, embedding work, pruning and status-supporting SQL
+observations live in `storage/vector.rs`; unit tests stay inline. `StatusService`
+owns configuration-mode policy, identity interpretation and backlog/failed arithmetic.
 
 Storage also validates use-case entry requirements without opening a transaction.
 An incompatible inherited scope becomes rollback-only. Query inference permits a
@@ -63,8 +65,14 @@ work selection can observe each completed vector publication.
 
 [Direct write rejection tests](../../tests/storage_read_scope_failures.rs "letopis:type=external;path=tests/storage_read_scope_failures.rs")
 
-[Filesystem checks](../../src/filesystem/database.rs "letopis:type=external;path=src/filesystem/database.rs")
+[Generic file checks](../../src/filesystem/file.rs "letopis:type=external;path=src/filesystem/file.rs")
+
+[Confined path checks](../../src/filesystem/path.rs "letopis:type=external;path=src/filesystem/path.rs")
+
+[Filesystem owner](../../src/filesystem/local.rs "letopis:type=external;path=src/filesystem/local.rs")
 
 [Composition](../../src/lib.rs "letopis:type=external;path=src/lib.rs")
+
+[Status policy](../../src/service/status.rs "letopis:type=external;path=src/service/status.rs")
 
 [Application interfaces](../../src/service/mod.rs "letopis:type=external;path=src/service/mod.rs")

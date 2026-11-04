@@ -1,17 +1,21 @@
-<!-- letopis: {"created_at":1793790204,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793790204,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Repository conventions and checks
 
-`AGENTS.md` is the repository's coding-convention source. Storage query
-functions and their application-owned trait methods use table-first names with
-schema column names in their filters; each query function has one database
-action. Transaction scopes and multi-statement operations retain names that
-describe their responsibilities. New and touched mutex fields use a `_mutex`
-suffix, while a lock guard is named for the protected state.
+`AGENTS.md` is the repository's coding-convention source. Infrastructure operations
+and their application-owned trait methods use entity–action–filter names from the
+component's own vocabulary: `file_get_by_path`, `tree_verify_by_oid`, `file_parse`
+and `process_spawn`. Filesystem predicates use entity–is–condition names such as
+`file_is_exist`. Storage SQL actions use exact table and column names, with one
+database action per query function. Application use cases, transaction scopes and
+multi-statement operations retain responsibility-based names; closure scopes are
+`with_read_tx`, `with_write_tx` and `with_status_read_tx`. Constructors, conversions
+and external trait names keep their established forms. New and touched mutex
+fields use a `_mutex` suffix; a lock guard is named for the protected state.
 
 The graph neighbor query `edges_get_by_nodes_row_id_and_type` names the joined
 `nodes.row_id` filter and the optional edge type. The Git entry lookup uses
-`get_entry_by_name`; the filesystem comparison uses the predicate
-`is_same_entry`. The response writer and Git cleanup owner name their mutex
+`tree_entry_get_by_name`; generic filesystem alias validation uses
+`file_verify_distinct_by_paths`. The response writer and Git cleanup owner name their mutex
 fields `completion_mutex` and `state_mutex`, respectively.
 
 The convention forbids helpers whose sole purpose is to return a fixed error or
@@ -43,7 +47,7 @@ absence of every possible fixed-value helper.
 
 [Git tree entry lookup](../../src/git/objects.rs "letopis:type=external;path=src/git/objects.rs")
 
-[Filesystem entry comparison](../../src/filesystem/local.rs "letopis:type=external;path=src/filesystem/local.rs")
+[Filesystem alias validation](../../src/filesystem/file.rs "letopis:type=external;path=src/filesystem/file.rs")
 
 [Git cleanup mutex](../../src/git/cleanup.rs "letopis:type=external;path=src/git/cleanup.rs")
 

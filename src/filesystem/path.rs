@@ -21,6 +21,20 @@ pub(super) const FILE_FLAGS: OFlags = OFlags::RDONLY
     .union(OFlags::CLOEXEC);
 const NANOS_PER_SECOND: i64 = 1_000_000_000;
 
+#[cfg(test)]
+type AbsenceHook = Box<dyn FnOnce()>;
+#[cfg(test)]
+thread_local! {
+    static AFTER_ABSENCE: std::cell::RefCell<Option<AbsenceHook>> = const { std::cell::RefCell::new(None) };
+    static BEFORE_NESTED_PREFLIGHT: std::cell::RefCell<Option<AbsenceHook>> = const { std::cell::RefCell::new(None) };
+}
+
+#[derive(Clone, Copy)]
+enum DirectoryObservation {
+    Strict,
+    CreatingLeaf,
+}
+
 struct DirectoryLink {
     parent: File,
     name: OsString,
@@ -46,6 +60,42 @@ impl FileParent {
         files: &LocalFileSystem,
         components: &[OsString],
     ) -> FileResult<Option<Self>> {
+        Self::directory_get_by_components_and_observation(
+            files,
+            components,
+            DirectoryObservation::Strict,
+        )
+    }
+
+    /// Verify named ancestors and the component's pinned root before completion.
+    pub(super) fn directory_verify_links(&self, files: &LocalFileSystem) -> FileResult<()> {
+        #[cfg(test)]
+        if let Some(hook) = files.before_directory_complete.take() {
+            hook();
+        }
+        for link in &self.links {
+            file_verify_entry(&link.parent, &link.name, &link.identity)?;
+        }
+        directory_verify_root(files)
+    }
+
+    fn directory_get_for_creation_by_path(
+        files: &LocalFileSystem,
+        path: &Path,
+    ) -> FileResult<Option<Self>> {
+        let components = path_get_components(path)?;
+        Self::directory_get_by_components_and_observation(
+            files,
+            &components,
+            DirectoryObservation::CreatingLeaf,
+        )
+    }
+
+    fn directory_get_by_components_and_observation(
+        files: &LocalFileSystem,
+        components: &[OsString],
+        observation: DirectoryObservation,
+    ) -> FileResult<Option<Self>> {
         directory_verify_root(files)?;
         let mut parent = Self {
             directory: files
@@ -55,15 +105,18 @@ impl FileParent {
             links: Vec::new(),
         };
         let mut path = PathBuf::new();
-        for name in components {
+        for (index, name) in components.iter().enumerate() {
             path.push(name);
-            let Some(before) = file_get_entry(&parent.directory, name)? else {
-                if files
-                    .directories
-                    .borrow()
-                    .keys()
-                    .any(|pinned| pinned.starts_with(&path))
-                {
+            let entry = if matches!(observation, DirectoryObservation::CreatingLeaf)
+                && index + 1 == components.len()
+                && !directory_is_pinned(files, &path)
+            {
+                file_get_entry_for_creation(&parent.directory, name)?
+            } else {
+                file_get_entry(&parent.directory, name)?
+            };
+            let Some(before) = entry else {
+                if directory_is_pinned(files, &path) {
                     return Err(FileError::new(FileErrorKind::Changed));
                 }
                 parent.directory_verify_links(files)?;
@@ -87,18 +140,6 @@ impl FileParent {
         }
         parent.directory_verify_links(files)?;
         Ok(Some(parent))
-    }
-
-    /// Verify named ancestors and the component's pinned root before completion.
-    pub(super) fn directory_verify_links(&self, files: &LocalFileSystem) -> FileResult<()> {
-        #[cfg(test)]
-        if let Some(hook) = files.before_directory_complete.take() {
-            hook();
-        }
-        for link in &self.links {
-            file_verify_entry(&link.parent, &link.name, &link.identity)?;
-        }
-        directory_verify_root(files)
     }
 }
 
@@ -127,7 +168,13 @@ pub(super) fn directory_create_components(
         )?
         .ok_or_else(|| FileError::new(FileErrorKind::NotFound))?;
         path.push(name);
-        if FileParent::directory_get_by_path(files, &path)?.is_none() {
+        #[cfg(test)]
+        if path.components().count() > 1
+            && let Some(hook) = BEFORE_NESTED_PREFLIGHT.with(|next| next.borrow_mut().take())
+        {
+            hook();
+        }
+        if FileParent::directory_get_for_creation_by_path(files, &path)?.is_none() {
             match mkdirat(&parent.directory, name, Mode::RWXU) {
                 Ok(()) | Err(Errno::EXIST) => {}
                 Err(cause) => return Err(file_map_io(cause)),
@@ -139,6 +186,14 @@ pub(super) fn directory_create_components(
     }
     FileParent::directory_get_by_components(files, components)?
         .ok_or_else(|| FileError::new(FileErrorKind::Changed))
+}
+
+fn directory_is_pinned(files: &LocalFileSystem, path: &Path) -> bool {
+    files
+        .directories
+        .borrow()
+        .keys()
+        .any(|pinned| pinned.starts_with(path))
 }
 
 pub(super) fn path_get_components(path: &Path) -> FileResult<Vec<OsString>> {
@@ -163,13 +218,31 @@ pub(super) fn path_get_file_components(path: &Path) -> FileResult<(Vec<OsString>
 }
 
 pub(super) fn file_get_entry(parent: &File, name: &OsStr) -> FileResult<Option<Stat>> {
+    let Some(before) = file_get_entry_once(parent, name)? else {
+        return match file_get_entry_once(parent, name)? {
+            None => Ok(None),
+            Some(_) => Err(FileError::new(FileErrorKind::Changed)),
+        };
+    };
+    Ok(Some(before))
+}
+
+/// Observe an entry once before an exclusive create or mkdir resolves peer publication.
+/// Callers must validate the resulting inode and may not use this for existing pins.
+pub(super) fn file_get_entry_for_creation(parent: &File, name: &OsStr) -> FileResult<Option<Stat>> {
+    file_get_entry_once(parent, name)
+}
+
+fn file_get_entry_once(parent: &File, name: &OsStr) -> FileResult<Option<Stat>> {
     match statat(parent, name, AtFlags::SYMLINK_NOFOLLOW) {
         Ok(stat) => Ok(Some(stat)),
-        Err(Errno::NOENT) => match statat(parent, name, AtFlags::SYMLINK_NOFOLLOW) {
-            Err(Errno::NOENT) => Ok(None),
-            Ok(_) => Err(FileError::new(FileErrorKind::Changed)),
-            Err(cause) => Err(file_map_io(cause)),
-        },
+        Err(Errno::NOENT) => {
+            #[cfg(test)]
+            if let Some(hook) = AFTER_ABSENCE.with(|next| next.borrow_mut().take()) {
+                hook();
+            }
+            Ok(None)
+        }
         Err(cause) => Err(file_map_io(cause)),
     }
 }
@@ -217,12 +290,9 @@ pub(super) fn file_require_type(
 }
 
 pub(super) fn file_build_stat(stat: &Stat) -> FileResult<FileStat> {
-    let seconds = i64::try_from(i128::from(stat.st_mtime)).map_err(file_map_cause)?;
-    let nanos = i64::try_from(i128::from(stat.st_mtime_nsec)).map_err(file_map_cause)?;
-    let mtime_ns = seconds
-        .checked_mul(NANOS_PER_SECOND)
-        .and_then(|value| value.checked_add(nanos))
-        .ok_or_else(|| FileError::new(FileErrorKind::Io))?;
+    let nanoseconds =
+        i128::from(stat.st_mtime) * i128::from(NANOS_PER_SECOND) + i128::from(stat.st_mtime_nsec);
+    let mtime_ns = i64::try_from(nanoseconds).map_err(file_map_cause)?;
     Ok(FileStat {
         size: u64::try_from(stat.st_size).map_err(file_map_cause)?,
         mtime_ns,
@@ -261,11 +331,54 @@ pub(super) fn file_map_cause(cause: impl std::error::Error + Send + Sync + 'stat
 }
 
 #[cfg(test)]
+pub(super) fn directory_set_before_nested_preflight(hook: AbsenceHook) {
+    BEFORE_NESTED_PREFLIGHT.set(Some(hook));
+}
+
+#[cfg(test)]
+pub(super) fn file_set_after_absence(hook: AbsenceHook) {
+    AFTER_ABSENCE.set(Some(hook));
+}
+
+#[cfg(test)]
 mod tests {
-    use super::file_require_unchanged;
+    use super::{file_build_stat, file_require_unchanged};
     use crate::service::FileErrorKind;
     use rustix::fs::fstat;
     use std::fs::File;
+
+    #[test]
+    fn represents_signed_nanosecond_boundaries() {
+        // Given: platform metadata with the exact normalized i64 nanosecond boundaries.
+        let file = File::open(".").unwrap();
+        let mut stat = fstat(&file).unwrap();
+        for (seconds, nanos, expected) in [
+            (-9_223_372_037, 145_224_192, i64::MIN),
+            (9_223_372_036, 854_775_807, i64::MAX),
+        ] {
+            stat.st_mtime = seconds;
+            stat.st_mtime_nsec = nanos;
+            // When: the index metadata is constructed.
+            let result = file_build_stat(&stat).unwrap();
+            // Then: the exact representable endpoint is retained.
+            assert_eq!(result.mtime_ns, expected);
+        }
+    }
+
+    #[test]
+    fn rejects_nanoseconds_outside_signed_range() {
+        // Given: platform metadata one nanosecond beyond each representable endpoint.
+        let file = File::open(".").unwrap();
+        let mut stat = fstat(&file).unwrap();
+        for (seconds, nanos) in [(-9_223_372_037, 145_224_191), (9_223_372_036, 854_775_808)] {
+            stat.st_mtime = seconds;
+            stat.st_mtime_nsec = nanos;
+            // When: the index metadata is constructed.
+            let error = file_build_stat(&stat).unwrap_err();
+            // Then: out-of-range metadata is an I/O error, never a saturated timestamp.
+            assert_eq!(error.get_kind(), FileErrorKind::Io);
+        }
+    }
 
     #[test]
     fn rejects_each_independent_stat_change() {

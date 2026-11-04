@@ -1238,7 +1238,7 @@ mod database_tests {
                         .cache
                         .with_read_tx(|| storage
                             .cache
-                            .vector_keys_get_vector_by_search_hash(&identity, &identity))
+                            .vector_keys_get_by_search_hash(&identity, &identity))
                         .unwrap()
                 ),
                 None

@@ -393,9 +393,9 @@ class RunnerTests(unittest.TestCase):
         run.capture_thin_slice_responses(evidence, catalogue)
 
     def test_inventory_covers_support_schema_and_ignores_bytecode(self):
-        # Given
+        # Given: support, schema and all compile-time fixture families must reach disposable copies.
         root = Path(__file__).resolve().parents[2]
-        # When
+        # When: hash the complete build and proof input inventory.
         inputs = run.hash_inputs(root)
         for name in ['tests/support/cli.rs', 'src/main.rs', 'tests/cli/run.py',
                      'tests/cli/Dockerfile', '.dockerignore', run.SCHEMA,
@@ -403,27 +403,101 @@ class RunnerTests(unittest.TestCase):
                      'tests/document_refresh.rs', 'tests/embedding_service.rs',
                      'tests/thin_slice.rs', 'tests/support/thin_slice.rs', 'skills/letopis/SKILL.md',
                      'tests/fixtures/markdown/thin_slice/cache.rs', 'tests/fixtures/markdown/thin_slice/cache.md.in',
-                     'tests/fixtures/markdown/thin_slice/flow.md.in']:
-            # Then
+                     'tests/fixtures/markdown/thin_slice/flow.md.in',
+                     'tests/fixtures/git/sha-mbles-1.bin', 'tests/fixtures/config/corpus.json',
+                     'tests/fixtures/storage/legacy-cache.sql', 'tests/fixtures/storage/legacy-vectors.sql']:
+            # Then: every independently named input is present and bytecode remains excluded.
             self.assertIn(name, inputs)
         self.assertFalse(any('__pycache__' in name for name in inputs))
 
     def test_every_negative_control_matches_current_source_exactly_once(self):
-        # Given
+        # Given: runtime controls target current committed production operations.
         root = Path(__file__).resolve().parents[2]
         for name, relative, needle, _replacement, _test, _oracle in negative_controls.CONTROLS:
             with self.subTest(control=name):
                 occurrences = (root / relative).read_text().count(needle)
-                # When / Then
+                # When / Then: every source mutation has one unambiguous anchor.
                 self.assertEqual(occurrences, 1, f'{name}: stale or ambiguous source anchor')
 
     def test_reading_controls_match_current_source_exactly_once(self):
-        # Given
+        # Given: reading controls target current committed production operations.
         root = Path(__file__).resolve().parents[2]
         for name, relative, needle, *_rest in negative_controls.READING_CONTROLS:
             with self.subTest(control=name):
-                # When / Then
+                # When / Then: a stale or ambiguous anchor prevents acceptance.
                 self.assertEqual((root / relative).read_text().count(needle), 1)
+
+    def test_control_selectors_reference_exact_existing_tests(self):
+        # Given: the controls have independently specified target tests and cargo selectors.
+        root = Path(__file__).resolve().parents[2]
+        expected = {
+            'null-output': ('tests/cli_process.rs', ['--test', 'cli_process'],
+                'detached_child_has_exact_context_null_fds_and_no_service_descriptors'),
+            'kernel-exclusion': ('tests/cli_process.rs', ['--test', 'cli_process'],
+                'two_released_probes_yield_exactly_one_active_drain'),
+            'captured-config': ('src/service/embedding.rs', ['--lib'],
+                'service::embedding::tests::captured_query_never_rereads_or_resets_configuration'),
+            'candidate-hash': ('src/service/search.rs', ['--lib'],
+                'service::search::tests::candidate_metadata_rejects_wrong_rows_and_search_hashes'),
+            'reopen-cache': ('tests/search_consistency.rs', ['--test', 'search_consistency'],
+                'concurrent_publication_preserves_old_membership_coordinates_and_revision'),
+            'live-inspect-reread': ('src/service/inspection.rs', ['--lib'],
+                'service::inspection::tests::capture_writes_each_blob_before_reading_the_next_file'),
+        }
+        # When: both configured control suites are inventoried.
+        observed = {name: (['--test', 'cli_process'], test)
+                    for name, _relative, _needle, _replacement, test, _oracle
+                    in negative_controls.CONTROLS}
+        observed.update({name: (target, test)
+                         for name, _relative, _needle, _replacement, target, test, _oracle
+                         in negative_controls.READING_CONTROLS})
+        # Then: missing or mistyped selectors and removed source tests fail validation.
+        self.assertEqual(observed, {name: (target, test)
+                                   for name, (_relative, target, test) in expected.items()})
+        for name, (relative, _target, test) in expected.items():
+            with self.subTest(control=name):
+                self.assertEqual((root / relative).read_text().count(
+                    'fn ' + test.rsplit('::', 1)[-1] + '('), 1)
+
+    def test_lock_capture_requires_exact_relocated_tests_and_selector(self):
+        # Given: independent libtest receipts cover old and relocated lock-test modules.
+        expected = [
+            'filesystem::local::tests::index_owner_writes_pid_after_acquiring_lock',
+            'filesystem::local::tests::std_file_and_rustix_locks_exclude_each_other_for_both_names',
+            'filesystem::lock::tests::lock_open_rejects_replacement_and_never_recreates_observed_deletion',
+            'filesystem::lock::tests::owner_drop_unlocks_while_duplicate_descriptor_remains_open',
+            'filesystem::lock::tests::retries_interrupted_lock_acquisition_until_success',
+            'filesystem::lock_tests::lock_observation_is_read_only_and_ownership_persists_until_drop',
+        ]
+        root = Path(__file__).resolve().parents[2]
+        modules = {'filesystem::local::tests': 'src/filesystem/document_tests.rs',
+                   'filesystem::lock::tests': 'src/filesystem/local_tests.rs',
+                   'filesystem::lock_tests': 'src/filesystem/lock_tests.rs'}
+        for selector in expected:
+            module, test = selector.rsplit('::', 1)
+            self.assertEqual((root / modules[module]).read_text().count('fn ' + test + '('), 1)
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            records = expected
+
+            def execute(argv, name):
+                self.assertEqual(argv, ['cargo', 'test', '--locked', '--offline', '--lib',
+                    'filesystem::', '--', '--nocapture', '--test-threads=1'])
+                self.assertEqual(name, 'locks.log')
+                (evidence / name).write_text(''.join(f'test {test} ... ok\n' for test in records))
+
+            # When / Then: exact successful selectors are accepted.
+            run.capture_lock_tests(evidence, execute)
+            for missing in expected:
+                records = [test for test in expected if test != missing]
+                # When / Then: removing any required test from a receipt is rejected.
+                with self.subTest(missing=missing), self.assertRaisesRegex(
+                        AssertionError, 'required lock tests missing'):
+                    run.capture_lock_tests(evidence, execute)
+            records = []
+            # When / Then: a successful cargo invocation with no tests is rejected.
+            with self.assertRaisesRegex(AssertionError, 'required lock tests missing'):
+                run.capture_lock_tests(evidence, execute)
 
     def test_artifact_resolution_respects_target_specific_cargo_path(self):
         # Given
@@ -448,16 +522,18 @@ class MakeWorkflowTests(unittest.TestCase):
                 self.assertEqual(result.stdout, 'ok\n')
 
     def test_verbose_verify_retains_every_steps_output(self):
-        # Given
+        # Given: a fake cargo reports both streams for every independently specified step.
         with tempfile.TemporaryDirectory() as directory:
-            # When
+            # When: verbose verify runs formatting, compile, lint, helper, root and doc checks.
             result = self.run_make(directory, 'verify', verbose=True)
-            # Then
+            # Then: every step's stdout and stderr is retained in order, followed by one ok.
             self.assertEqual(result.returncode, 0, result.stdout)
-            for step in ('fmt', 'check', 'clippy', 'test', 'doc'):
-                self.assertIn('stdout ' + step + '\n', result.stdout)
-                self.assertIn('stderr ' + step + '\n', result.stdout)
-            self.assertEqual(result.stdout.count('stdout test\n'), 2)
+            steps = ('fmt', 'check', 'clippy', 'test', 'run', 'test', 'doc', 'test')
+            expected = [stream + ' ' + step for step in steps
+                        for stream in ('stdout', 'stderr')]
+            observed = [line for line in result.stdout.splitlines()
+                        if line.startswith(('stdout ', 'stderr '))]
+            self.assertEqual(observed, expected)
             self.assertTrue(result.stdout.endswith('ok\n'))
 
     def test_failure_prints_complete_failed_step_and_stops(self):

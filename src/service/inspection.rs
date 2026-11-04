@@ -701,6 +701,9 @@ mod tests {
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("capture uses verified reads")
         }
+        fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+            panic!("unexpected file_get_bytes_by_path")
+        }
         fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             if self.1 == Scenario::SourceIoFailure && path.to_str().unwrap() == "source.txt" {
                 self.0.borrow_mut().push("read source.txt".into());

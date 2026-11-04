@@ -14,14 +14,14 @@ use std::fs;
 #[test]
 fn incremental_blobs_reproduce_tree_without_touching_user_state() {
     for format in FORMATS {
-        // Given
+        // Given: Unicode and CRLF bytes with a filter trap configured.
         let repo = TempRepo::new(format);
         configure_filter_trap(&repo);
         let before = repo.capture_fixture_state();
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let paths = [parse_path("a.md"), parse_path("nested/文档.md")];
         let bytes = [b"a\r\n".as_slice(), "Привет 🌳".as_bytes()];
-        // When
+        // When: write blobs and assemble the tree from captured bytes.
         let entries: Vec<_> = paths
             .iter()
             .zip(bytes)
@@ -40,7 +40,7 @@ fn incremental_blobs_reproduce_tree_without_touching_user_state() {
                     .collect::<Vec<_>>(),
             )
             .unwrap();
-        // Then
+        // Then: the tree and bytes match exactly, user state is unchanged, and the filter did not run.
         assert_eq!(tree, expected);
         assert!(format!("{:?}", entries[0]).starts_with("SnapshotEntry {"));
         for (path, bytes) in paths.iter().zip(bytes) {
@@ -57,7 +57,7 @@ fn incremental_blobs_reproduce_tree_without_touching_user_state() {
 #[test]
 fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format() {
     for format in FORMATS {
-        // Given
+        // Given: duplicate, prefix-conflicting, reserved, wrong-type, and foreign-format entries.
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let blob = git.blob_write(b"expected").unwrap();
@@ -80,7 +80,7 @@ fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format()
                 })
                 .collect();
             let before = repo.run_git_successfully(&["count-objects", "-v"], None);
-            // When / Then
+            // When / Then: invalid entries are rejected during preflight without object writes.
             assert_eq!(
                 git.tree_assemble(&entries).unwrap_err().get_kind(),
                 SnapshotErrorKind::InvalidRequest
@@ -90,6 +90,7 @@ fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format()
                 before
             );
         }
+        // When / Then: missing, foreign-format, and wrong-type blob OIDs are rejected.
         for oid in [missing, foreign, BlobOid::parse(tree.as_str()).unwrap()] {
             let entries = [SnapshotEntry {
                 path: parse_path("a"),
@@ -100,12 +101,14 @@ fn blob_entries_reject_duplicate_prefix_reserved_wrong_type_and_foreign_format()
                 SnapshotErrorKind::InvalidRequest
             );
         }
+        // Given: a blob is replaced with bytes that do not match its OID.
         let replacement = git.blob_write(b"corrupt replacement").unwrap();
         repo.replace_loose_object(blob.as_str(), replacement.as_str());
         let entries = [SnapshotEntry {
             path: parse_path("a"),
             oid: blob,
         }];
+        // When / Then: tree assembly rejects the corrupt blob without adding refs.
         assert_eq!(
             git.tree_assemble(&entries).unwrap_err().get_kind(),
             SnapshotErrorKind::InternalError
@@ -126,7 +129,7 @@ fn incremental_operations_recheck_self_contained_object_policy() {
         let oid = git.blob_write(b"captured").unwrap();
         fs::create_dir_all(repo.get_root().join(".git/objects/info")).unwrap();
         fs::write(repo.get_root().join(".git/objects/info/alternates"), b"").unwrap();
-        // When / Then
+        // When / Then: blob writing and tree assembly reject alternates added after repository open.
         assert_eq!(
             git.blob_write(b"later").unwrap_err().get_kind(),
             SnapshotErrorKind::InternalError
@@ -308,7 +311,7 @@ fn build_captured_inputs() -> ([RepoPath; 6], [&'static [u8]; 6]) {
 
 #[test]
 fn exact_bytes_without_index_or_commit() {
-    // Given
+    // Given: exact captured inputs are independent of index, commit, and live files.
     for format in FORMATS {
         let repo = TempRepo::new(format);
         configure_filter_trap(&repo);
@@ -320,7 +323,7 @@ fn exact_bytes_without_index_or_commit() {
             .zip(bytes)
             .map(|(path, bytes)| SnapshotFile { path, bytes })
             .collect();
-        // When
+        // When: create the tree and repeat creation with files reordered.
         let first = git.tree_create(&files).unwrap();
         let captured: Vec<_> = paths
             .iter()
@@ -329,7 +332,7 @@ fn exact_bytes_without_index_or_commit() {
         files.reverse();
         let reordered = git.tree_create(&files).unwrap();
         let after = repo.capture_fixture_state();
-        // Then
+        // Then: OIDs, bytes, user state, and filter state remain stable.
         for (actual, expected) in captured.iter().zip(bytes) {
             assert_eq!(actual, expected);
         }
@@ -339,7 +342,7 @@ fn exact_bytes_without_index_or_commit() {
 
         // Given: mutate and remove live files after capturing their bytes.
         repo.change_and_delete_live_files("live.md");
-        // When
+        // When: reread the first tree and create another tree from new bytes.
         let after_live_change = git
             .blob_get_by_tree_oid_and_path(&first, &paths[0])
             .unwrap();
@@ -354,7 +357,7 @@ fn exact_bytes_without_index_or_commit() {
             .unwrap();
         let listing =
             repo.run_git_successfully(&["ls-tree", "-rz", "--name-only", first.as_str()], None);
-        // Then
+        // Then: the first tree keeps its captured bytes after live changes and later creation.
         assert_eq!(after_live_change, bytes[0]);
         assert_ne!(first, second);
         assert_eq!(after_new_tree, bytes[0]);
@@ -367,7 +370,7 @@ fn exact_bytes_without_index_or_commit() {
 
 #[test]
 fn paths_are_literal_and_never_shell_input() {
-    // Given
+    // Given: paths contain shell metacharacters, leading dashes, and spaces.
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_subdir()).unwrap();
@@ -386,13 +389,13 @@ fn paths_are_literal_and_never_shell_input() {
                 bytes: b"literal",
             })
             .collect();
-        // When
+        // When: create the tree and read each path by its literal name.
         let tree = git.tree_create(&files).unwrap();
         let captured: Vec<_> = paths
             .iter()
             .map(|p| git.blob_get_by_tree_oid_and_path(&tree, p).unwrap())
             .collect();
-        // Then
+        // Then: all bytes match and no SENTINEL file is created.
         for bytes in captured {
             assert_eq!(bytes, b"literal");
         }
@@ -403,17 +406,17 @@ fn paths_are_literal_and_never_shell_input() {
 
 #[test]
 fn empty_tree_and_invalid_paths() {
-    // Given
+    // Given: an empty repository tree.
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
-        // When
+        // When: create and list the empty tree.
         let empty = git.tree_create(&[]).unwrap();
         let listing = repo.run_git_successfully(&["ls-tree", empty.as_str()], None);
-        // Then
+        // Then: its listing is empty.
         assert!(listing.is_empty());
 
-        // Given
+        // Given: duplicate, prefix-conflicting, and reserved metadata paths.
         for names in [
             vec!["a", "a"],
             vec!["a", "a/b"],
@@ -430,10 +433,10 @@ fn empty_tree_and_invalid_paths() {
                 })
                 .collect();
             let before = repo.run_git_successfully(&["count-objects", "-v"], None);
-            // When
+            // When: try to create a tree with each invalid path set.
             let error = git.tree_create(&files).unwrap_err();
             let after = repo.run_git_successfully(&["count-objects", "-v"], None);
-            // Then
+            // Then: InvalidRequest exposes no payload and creates no objects.
             assert_eq!(error.get_kind(), SnapshotErrorKind::InvalidRequest);
             assert!(!format!("{error:?} {error}").contains("CANARY"));
             assert_eq!(before, after, "invalid input must not write objects");
@@ -493,23 +496,23 @@ fn create_corrupted_blob_tree(repo: &TempRepo) -> TreeOid {
 
 #[test]
 fn tree_types_and_missing_objects_are_distinct() {
-    // Given
+    // Given: wrong-length, non-tree, missing, foreign-format, and incomplete tree objects.
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
         let leaf = parse_path("leaf");
         let empty = git.tree_create(&[]).unwrap();
         for (tree, expected) in build_tree_error_cases(&repo, &empty) {
-            // When
+            // When: read the addressed leaf from each tree.
             let error = git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap_err();
-            // Then
+            // Then: each failure has its expected classification.
             assert_eq!(error.get_kind(), expected);
         }
-        // Given
+        // Given: a child object whose bytes do not match its OID.
         let tree = create_corrupted_blob_tree(&repo);
-        // When
+        // When: read through the corrupted tree.
         let error = git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap_err();
-        // Then
+        // Then: the operation reports InternalError without exposing corrupt bytes.
         assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
         assert!(!format!("{error} {error:?}").contains("CORRUPT_CANARY"));
     }
@@ -517,7 +520,7 @@ fn tree_types_and_missing_objects_are_distinct() {
 
 #[test]
 fn replacement_refs_do_not_change_bytes() {
-    // Given
+    // Given: a replacement ref points from the original tree OID to a different tree.
     for format in FORMATS {
         let repo = TempRepo::new(format);
         let git = open_git_snapshots(repo.get_root()).unwrap();
@@ -535,9 +538,9 @@ fn replacement_refs_do_not_change_bytes() {
             }])
             .unwrap();
         repo.run_git_successfully(&["replace", original.as_str(), replacement.as_str()], None);
-        // When
+        // When: read the original tree by its OID.
         let bytes = git.blob_get_by_tree_oid_and_path(&original, &p).unwrap();
-        // Then
+        // Then: the original bytes are returned.
         assert_eq!(bytes, b"original");
     }
 }

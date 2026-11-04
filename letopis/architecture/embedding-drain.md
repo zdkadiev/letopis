@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793728137,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793728137,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Embedding drain
 
 Drain fills missing document embeddings; it is separate from query embedding in

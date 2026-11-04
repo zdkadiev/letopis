@@ -1,5 +1,7 @@
 use super::LocalFileSystem;
+use super::test_support::run_bounded_unprivileged;
 use crate::service::{FileErrorKind, FileLocker, FileReader};
+use std::io::ErrorKind;
 use std::{error::Error, fs, os::unix::fs::PermissionsExt, path::Path};
 use tempfile::TempDir;
 
@@ -222,13 +224,21 @@ fn existing_lock_deleted_before_open_is_changed_for_observation() {
 
 #[test]
 fn genuine_permission_failure_before_open_remains_io() {
-    // Given: a regular leaf becomes unreadable without being deleted or replaced.
+    // Given: an unprivileged fixture observes a leaf that will become unreadable.
+    if run_bounded_unprivileged(
+        "filesystem::race_tests::genuine_permission_failure_before_open_remains_io",
+    ) {
+        return;
+    }
     let root = TempDir::new().unwrap();
     fs::write(root.path().join("item"), b"original").unwrap();
     let files = LocalFileSystem::new(root.path()).unwrap();
     let path = root.path().join("item");
     files.before_open.replace(Some(Box::new(move || {
-        fs::set_permissions(path, fs::Permissions::from_mode(0o0)).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o0)).unwrap();
+        let denied = fs::File::open(path).unwrap_err();
+        assert_eq!(denied.kind(), ErrorKind::PermissionDenied);
+        assert_eq!(denied.raw_os_error(), Some(libc::EACCES));
     })));
     // When: the actual open syscall fails because owner access was removed.
     let error = files.file_get_by_path(Path::new("item")).unwrap_err();

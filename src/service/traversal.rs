@@ -81,9 +81,7 @@ impl<F: FileReader, C: StorageRead + GraphRead> LinkObservations<'_, F, C> {
     }
 
     fn get_knowledge_link(&self, element: &EdgeTarget) -> CommandResult<TraversalLink> {
-        let stored = self
-            .storage
-            .nodes_get_by_id(element)
+        let stored = StorageRead::nodes_get_by_id(self.storage, element)
             .map_err(map_traversal_error)?
             .ok_or_else(|| {
                 CommandError::new(
@@ -173,7 +171,7 @@ impl<F: FileReader, C: GraphRead> LinkObservations<'_, F, C> {
         let id = ElementAddress::parse(node.id.as_str())?;
         let handle = self
             .storage
-            .nodes_get_ref_by_id(&id)
+            .nodes_get_by_id(&id)
             .map_err(map_traversal_error)?
             .ok_or_else(|| {
                 CommandError::new(
@@ -187,7 +185,7 @@ impl<F: FileReader, C: GraphRead> LinkObservations<'_, F, C> {
         loop {
             let page = self
                 .storage
-                .edges_get_by_nodes_row_id_and_type(&NeighborPageRequest {
+                .edges_get_by_row_id_and_type(&NeighborPageRequest {
                     node: handle.key,
                     direction: NeighborDirection::Outgoing,
                     mode: TraversalMode::Relations,
@@ -493,10 +491,7 @@ mod tests {
             observed: RefCell<Vec<String>>,
         }
         impl GraphRead for BindingRead {
-            fn nodes_get_ref_by_id(
-                &self,
-                id: &ElementAddress,
-            ) -> StorageResult<Option<GraphNodeRef>> {
+            fn nodes_get_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
                 assert_eq!(id.as_str(), "b.md");
                 self.events.borrow_mut().push("resolve".into());
                 Ok(Some(GraphNodeRef {
@@ -504,7 +499,7 @@ mod tests {
                     element: EdgeTarget::Knowledge(KnowledgeId::parse("b.md").unwrap()),
                 }))
             }
-            fn edges_get_by_nodes_row_id_and_type(
+            fn edges_get_by_row_id_and_type(
                 &self,
                 request: &NeighborPageRequest<'_>,
             ) -> StorageResult<Vec<GraphNeighbor>> {
@@ -1104,10 +1099,10 @@ mod tests {
         use crate::{
             domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, TreeOid},
             service::{
-                ElementAddress, EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary,
-                EmbeddingWork, FileRow, GraphNeighbor, GraphNodeRef, GraphRead,
-                NeighborPageRequest, QueryError, StorageError, StorageErrorKind, StorageRead,
-                StorageResult, StoredNode, TextMatch, VectorMatch, VectorOutcome,
+                ElementAddress, EmbeddingFailure, EmbeddingWork, FileRow, GraphNeighbor,
+                GraphNodeRef, GraphRead, NeighborPageRequest, QueryError, StorageError,
+                StorageErrorKind, StorageRead, StorageResult, StoredNode, TextMatch, VectorMatch,
+                VectorOutcome,
             },
         };
         use std::{cell::RefCell, collections::BTreeSet, num::NonZeroUsize, rc::Rc};
@@ -1155,16 +1150,13 @@ mod tests {
         }
 
         impl GraphRead for TracedStorage {
-            fn nodes_get_ref_by_id(
-                &self,
-                id: &ElementAddress,
-            ) -> StorageResult<Option<GraphNodeRef>> {
+            fn nodes_get_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
                 self.events
                     .borrow_mut()
                     .push(format!("resolve:{}", id.as_str()));
-                self.inner.nodes_get_ref_by_id(id)
+                GraphRead::nodes_get_by_id(&self.inner, id)
             }
-            fn edges_get_by_nodes_row_id_and_type(
+            fn edges_get_by_row_id_and_type(
                 &self,
                 request: &NeighborPageRequest<'_>,
             ) -> StorageResult<Vec<GraphNeighbor>> {
@@ -1180,7 +1172,7 @@ mod tests {
                         std::io::Error::other("PRIVATE_PAGE"),
                     ));
                 }
-                let page = self.inner.edges_get_by_nodes_row_id_and_type(request)?;
+                let page = self.inner.edges_get_by_row_id_and_type(request)?;
                 if let Some(hook) = self.after_pin.take() {
                     hook();
                 }
@@ -1188,18 +1180,25 @@ mod tests {
             }
         }
         impl StorageRead for TracedStorage {
-            fn get_embedding_status(
+            fn nodes_get_by_kind(&self) -> StorageResult<u64> {
+                self.inner.nodes_get_by_kind()
+            }
+            fn get_vector_coverage(&self) -> StorageResult<u64> {
+                self.inner.get_vector_coverage()
+            }
+            fn embed_failures_get_by_kind_and_search_hash_and_attempts(
                 &self,
-                policy: &EmbeddingStatusPolicy,
-            ) -> StorageResult<EmbeddingStatusSummary> {
-                self.inner.get_embedding_status(policy)
+                max_attempts: u64,
+            ) -> StorageResult<Vec<EmbeddingFailure>> {
+                self.inner
+                    .embed_failures_get_by_kind_and_search_hash_and_attempts(max_attempts)
             }
 
             fn nodes_get_by_id(&self, id: &EdgeTarget) -> StorageResult<Option<StoredNode>> {
                 self.events
                     .borrow_mut()
                     .push(format!("metadata:{}", id.as_str()));
-                self.inner.nodes_get_by_id(id)
+                StorageRead::nodes_get_by_id(&self.inner, id)
             }
             fn project_get_by_id(&self) -> StorageResult<u64> {
                 self.inner.project_get_by_id()
@@ -1244,13 +1243,13 @@ mod tests {
             ) -> StorageResult<VectorOutcome<Option<NonZeroUsize>>> {
                 self.inner.vector_index_config_get_by_id(expected)
             }
-            fn vector_keys_get_vector_by_search_hash(
+            fn vector_keys_get_by_search_hash(
                 &self,
                 expected: &Sha256,
                 search_hash: &Sha256,
             ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>> {
                 self.inner
-                    .vector_keys_get_vector_by_search_hash(expected, search_hash)
+                    .vector_keys_get_by_search_hash(expected, search_hash)
             }
             fn vector_index_get_by_vector(
                 &self,

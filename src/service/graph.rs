@@ -74,7 +74,7 @@ impl<'a> Discovery<'a> {
         for id in &request.element_ids {
             let node = state
                 .storage
-                .nodes_get_ref_by_id(id)
+                .nodes_get_by_id(id)
                 .map_err(map_graph_error)?
                 .ok_or_else(|| {
                     CommandError::new(CommandErrorKind::NotFound, "traversal start not found")
@@ -209,7 +209,7 @@ impl<'a> NeighborStream<'a> {
         })?;
         let page = self
             .storage
-            .edges_get_by_nodes_row_id_and_type(&NeighborPageRequest {
+            .edges_get_by_row_id_and_type(&NeighborPageRequest {
                 node,
                 direction: self.direction,
                 mode: request.mode,
@@ -715,7 +715,7 @@ mod tests {
         }
     }
     impl GraphRead for GeneratedRead {
-        fn nodes_get_ref_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
+        fn nodes_get_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>> {
             self.resolved.borrow_mut().push(id.as_str().to_owned());
             let key = match id.as_str() {
                 "a.md" => 1,
@@ -727,7 +727,7 @@ mod tests {
             };
             Ok(Some(make_node(key, id.as_str())))
         }
-        fn edges_get_by_nodes_row_id_and_type(
+        fn edges_get_by_row_id_and_type(
             &self,
             request: &NeighborPageRequest<'_>,
         ) -> StorageResult<Vec<GraphNeighbor>> {

@@ -1,8 +1,9 @@
 use super::{
     local::{LocalFileSystem, PersistentLock, file_retry_io},
     path::{
-        FileParent, file_get_entry, file_map_cause, file_map_io, file_map_observed_open_io,
-        file_require_identity, file_require_type, file_verify_entry, path_get_file_components,
+        FileParent, file_get_entry, file_get_entry_for_creation, file_map_cause, file_map_io,
+        file_map_observed_open_io, file_require_identity, file_require_type, file_verify_entry,
+        path_get_file_components,
     },
 };
 use crate::service::{FileError, FileErrorKind, FileResult, FileWriter};
@@ -96,7 +97,7 @@ fn lock_get_file_by_path(
     }
     let parent = FileParent::directory_get_by_components(files, &components)?
         .ok_or_else(|| FileError::new(FileErrorKind::Changed))?;
-    let before = file_get_entry(&parent.directory, &name)?;
+    let before = file_get_entry_for_creation(&parent.directory, &name)?;
     if let Some(before) = &before {
         file_require_lock(before)?;
     }

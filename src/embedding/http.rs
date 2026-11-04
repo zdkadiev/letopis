@@ -22,22 +22,6 @@ impl Http {
     pub(super) fn new() -> Self {
         Self::new_with_deadline(ATTEMPT_DEADLINE)
     }
-    fn new_with_deadline(deadline: Duration) -> Self {
-        let agent = Agent::config_builder()
-            .proxy(None)
-            .max_redirects(0)
-            .max_redirects_will_error(false)
-            .http_status_as_error(false)
-            .timeout_global(Some(deadline))
-            .tls_config(
-                TlsConfig::builder()
-                    .root_certs(RootCerts::PlatformVerifier)
-                    .build(),
-            )
-            .build()
-            .new_agent();
-        Self { agent }
-    }
     /// Send one JSON POST without redirects or proxies under the agent's shared deadline.
     ///
     /// # Errors
@@ -72,6 +56,50 @@ impl Http {
         }
         Ok(value)
     }
+    fn new_with_deadline(deadline: Duration) -> Self {
+        let agent = Agent::config_builder()
+            .proxy(None)
+            .max_redirects(0)
+            .max_redirects_will_error(false)
+            .http_status_as_error(false)
+            .timeout_global(Some(deadline))
+            .tls_config(
+                TlsConfig::builder()
+                    .root_certs(RootCerts::PlatformVerifier)
+                    .build(),
+            )
+            .build()
+            .new_agent();
+        Self { agent }
+    }
+}
+pub(super) fn build_endpoint(
+    config: &EmbeddingConfig,
+    provider: ProviderKind,
+    suffix: &str,
+) -> EmbeddingResult<String> {
+    config_validate(config, provider)?;
+    let base = config
+        .get_parameters()
+        .get("base_url")
+        .and_then(Value::as_str)
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+    let base = base.split('#').next().unwrap_or_default();
+    let uri: Uri = base.parse().map_err(|cause| {
+        EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
+    })?;
+    let authority = uri
+        .authority()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+    let scheme = uri
+        .scheme_str()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+    let prefix = uri.path().trim_end_matches('/');
+    let query = uri
+        .query()
+        .map(|query| format!("?{query}"))
+        .unwrap_or_default();
+    Ok(format!("{scheme}://{authority}{prefix}/{suffix}{query}"))
 }
 /// Validate the selected protocol and complete HTTP(S) endpoint without network I/O.
 ///
@@ -107,34 +135,6 @@ pub(super) fn config_validate(
         return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     Ok(())
-}
-pub(super) fn build_endpoint(
-    config: &EmbeddingConfig,
-    provider: ProviderKind,
-    suffix: &str,
-) -> EmbeddingResult<String> {
-    config_validate(config, provider)?;
-    let base = config
-        .get_parameters()
-        .get("base_url")
-        .and_then(Value::as_str)
-        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
-    let base = base.split('#').next().unwrap_or_default();
-    let uri: Uri = base.parse().map_err(|cause| {
-        EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
-    })?;
-    let authority = uri
-        .authority()
-        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
-    let scheme = uri
-        .scheme_str()
-        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
-    let prefix = uri.path().trim_end_matches('/');
-    let query = uri
-        .query()
-        .map(|query| format!("?{query}"))
-        .unwrap_or_default();
-    Ok(format!("{scheme}://{authority}{prefix}/{suffix}{query}"))
 }
 pub(super) fn prepare_body(
     config: &EmbeddingConfig,

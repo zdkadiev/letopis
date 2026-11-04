@@ -25,3 +25,6 @@ mod publication_tests;
 
 #[cfg(test)]
 mod race_tests;
+
+#[cfg(test)]
+mod creation_tests;

@@ -61,6 +61,12 @@ pub trait FileReader {
     /// # Errors
     /// Reports nonregular leaves, unsafe paths, changes, clock or I/O failures.
     fn file_get_by_path(&self, path: &Path) -> FileResult<Option<CapturedFile>>;
+    /// Read regular file bytes with the same identity, content and ancestry checks as capture.
+    /// This operation does not sample the clock or require representable index metadata.
+    ///
+    /// # Errors
+    /// Reports nonregular leaves, unsafe paths, changes or I/O failures.
+    fn file_get_bytes_by_path(&self, path: &Path) -> FileResult<Option<Vec<u8>>>;
     /// Observe a regular file's metadata without reading its body.
     ///
     /// # Errors
@@ -350,13 +356,13 @@ pub trait VectorDatabase {
 }
 pub use types::{
     CapturedFile, CheckReport, ConfigState, Configuration, DrainOutcome, ElementAddress,
-    ElementLocation, EmbeddingConfig, EmbeddingStatusPolicy, EmbeddingStatusSummary, EmbeddingWork,
-    FileIdentity, FileRow, FileStat, GraphNeighbor, GraphNodeKey, GraphNodeRef, HeldLock,
-    InspectedElement, Inspection, KnowledgeMetadata, LockName, NeighborCursor, NeighborDirection,
-    NeighborPageRequest, NodeMetadata, ParsedElement, ParsedFile, ProvenanceIssue,
-    ProvenanceObservation, ProvenanceRequest, ProviderKind, QueryEmbedding, QueryEmbeddingRequest,
-    RecheckFilter, RefreshOutcome, RetainedTree, SearchFilters, SearchFlag, SearchLink,
-    SearchRequest, SnapshotEntry, SnapshotFile, SnapshotState, SourceAvailability, SourceMetadata,
+    ElementLocation, EmbeddingConfig, EmbeddingWork, FileIdentity, FileRow, FileStat,
+    GraphNeighbor, GraphNodeKey, GraphNodeRef, HeldLock, InspectedElement, Inspection,
+    KnowledgeMetadata, LockName, NeighborCursor, NeighborDirection, NeighborPageRequest,
+    NodeMetadata, ParsedElement, ParsedFile, ProvenanceIssue, ProvenanceObservation,
+    ProvenanceRequest, ProviderKind, QueryEmbedding, QueryEmbeddingRequest, RecheckFilter,
+    RefreshOutcome, RetainedTree, SearchFilters, SearchFlag, SearchLink, SearchRequest,
+    SnapshotEntry, SnapshotFile, SnapshotState, SourceAvailability, SourceMetadata,
     SourceObservation, SourceRevisionComparison, SourceRevisionRequest, StatusReport, StoredNode,
     StoredVectorKey, TextMatch, TransactionRequirement, Traversal, TraversalDirection,
     TraversalLink, TraversalMode, TraversalRequest, VectorMatch, VectorOutcome,
@@ -529,14 +535,14 @@ pub trait GraphRead {
     ///
     /// # Errors
     /// Reports database failures or invalid persisted identities/kinds.
-    fn nodes_get_ref_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>>;
+    fn nodes_get_by_id(&self, id: &ElementAddress) -> StorageResult<Option<GraphNodeRef>>;
     /// Read at most the requested number of eligible neighbors strictly after a cursor.
     ///
     /// The handle must originate in this view; the positive limit may not exceed 32.
     ///
     /// # Errors
     /// Rejects a limit above the internal quantum; reports database or decoding failures.
-    fn edges_get_by_nodes_row_id_and_type(
+    fn edges_get_by_row_id_and_type(
         &self,
         request: &NeighborPageRequest<'_>,
     ) -> StorageResult<Vec<GraphNeighbor>>;
@@ -561,16 +567,28 @@ pub trait GraphTraversal {
 /// Every implementation answers all methods from one consistent view, so results
 /// never mix revisions, and never modifies stored data.
 pub trait StorageRead {
-    /// Count distinct current knowledge hashes under the captured policy.
-    /// Sources and orphan vector/failure rows never count. A usable vector takes
-    /// precedence over failures; unavailable or mismatched identities count only backlog.
+    /// Count distinct non-source knowledge search hashes in the active cache scope.
     ///
     /// # Errors
-    /// Rejects invalid attempt budgets, malformed persisted values and database failures.
-    fn get_embedding_status(
+    /// Reports database failures or invalid persisted counts.
+    fn nodes_get_by_kind(&self) -> StorageResult<u64>;
+    /// Validate current native vector rows and count distinct covered knowledge hashes.
+    /// Sources and orphan vector keys are excluded. Requires an active cache scope.
+    ///
+    /// # Errors
+    /// Reports missing native rows, invalid counts and database failures.
+    fn get_vector_coverage(&self) -> StorageResult<u64>;
+    /// Read current uncovered failures at or above the positive attempt threshold.
+    /// Every current uncovered row is decoded and validated before threshold filtering;
+    /// only matching rows are retained, once each in ascending search-hash order.
+    /// Sources, orphan failures and hashes with vector keys are excluded.
+    ///
+    /// # Errors
+    /// Reports malformed persisted hashes/attempts or database failures.
+    fn embed_failures_get_by_kind_and_search_hash_and_attempts(
         &self,
-        policy: &EmbeddingStatusPolicy,
-    ) -> StorageResult<EmbeddingStatusSummary>;
+        max_attempts: u64,
+    ) -> StorageResult<Vec<EmbeddingFailure>>;
     /// Read the first eligible knowledge ID strictly after the optional cursor.
     ///
     /// # Errors
@@ -628,7 +646,7 @@ pub trait StorageRead {
     ///
     /// # Errors
     /// Reports malformed stored vectors or database failures.
-    fn vector_keys_get_vector_by_search_hash(
+    fn vector_keys_get_by_search_hash(
         &self,
         expected: &Sha256,
         search_hash: &Sha256,

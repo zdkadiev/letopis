@@ -214,14 +214,14 @@ impl<
         self.files
             .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
             .map_err(map_file_error)?;
-        let captured = self.files.file_get_by_path(Path::new(CONFIG_PATH));
-        // A directory replacement remains infrastructure failure even if capture also failed.
+        let bytes = self.files.file_get_bytes_by_path(Path::new(CONFIG_PATH));
+        // A directory replacement remains infrastructure failure even if the read also failed.
         self.files
             .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
             .map_err(map_file_error)?;
-        captured
+        bytes
             .map_err(map_capture_error)?
-            .map(|file| self.validate_configuration(&file.bytes))
+            .map(|bytes| self.validate_configuration(&bytes))
             .transpose()
     }
 
@@ -293,9 +293,8 @@ impl<
             })?;
         let Some(bytes) = self
             .files
-            .file_get_by_path(Path::new(path.as_str()))
+            .file_get_bytes_by_path(Path::new(path.as_str()))
             .map_err(map_capture_error)?
-            .map(|file| file.bytes)
         else {
             return Ok(None);
         };
@@ -928,7 +927,10 @@ mod tests {
         fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
             Ok(false)
         }
-        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+        fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            panic!("unexpected file_get_by_path")
+        }
+        fn file_get_bytes_by_path(&self, path: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
             let bytes = if path == std::path::Path::new(".letopis/config.json") {
                 self.config_reads.set(self.config_reads.get() + 1);
                 if self.reject_config_reads {
@@ -943,16 +945,7 @@ mod tests {
                     .or_default() += 1;
                 self.documents.get(path.to_str().unwrap()).cloned()
             };
-            Ok(bytes.map(|bytes| CapturedFile {
-                stat: FileStat {
-                    size: bytes.len() as u64,
-                    mtime_ns: 1,
-                    inode: 1,
-                    device: 1,
-                },
-                bytes,
-                checked_at_ns: 1,
-            }))
+            Ok(bytes)
         }
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("unused stat")

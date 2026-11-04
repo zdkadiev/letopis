@@ -1096,6 +1096,9 @@ mod tests {
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             Ok((!self.missing.get()).then(|| self.stat.get()))
         }
+        fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+            panic!("unexpected file_get_bytes_by_path")
+        }
         fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             let reads = self.reads.get() + 1;
             self.reads.set(reads);
@@ -1943,6 +1946,9 @@ mod tests {
                 path: &std::path::Path,
             ) -> FileResult<Option<FileStat>> {
                 self.inner.file_get_stat_by_path(path)
+            }
+            fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+                panic!("unexpected file_get_bytes_by_path")
             }
             fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
                 self.events.borrow_mut().push("read");
@@ -3461,7 +3467,7 @@ mod corpus {
         let root = repo.get_root();
         std::os::unix::fs::symlink("target", root.join("bad#anchor.md")).unwrap();
         repo.run_git_successfully(&["add", "bad#anchor.md"], None);
-        // When: the Git adapter lists the candidates.
+        // When: the application selects document candidates from raw Git paths.
         let candidates = build_selector(root).unwrap().get_candidates().unwrap();
         // Then: the symlink is not validated as a document path.
         assert_eq!(
@@ -3494,7 +3500,7 @@ mod corpus {
         fs::remove_file(root.join("changed-to-file.md")).unwrap();
         fs::write(root.join("changed-to-file.md"), b"now regular").unwrap();
         std::os::unix::fs::symlink("regular.md", root.join("untracked-link.md")).unwrap();
-        // When: the Git adapter enumerates the current corpus candidates.
+        // When: application selection observes current filesystem types for raw Git paths.
         let candidates = build_selector(root).unwrap().get_candidates().unwrap();
         // Then: only live regular files and the fixture's ordinary Markdown are returned.
         assert_eq!(
@@ -3505,7 +3511,7 @@ mod corpus {
 
     #[test]
     fn candidates_follow_git_ignore_and_preserve_deleted_tracked_paths() {
-        // Given: an independent repository/index fixture with the paths under test.
+        // Given: deleted tracked, tracked ignored, untracked ignored, and private paths coexist.
         let repo = TempRepo::new(ObjectFormat::Sha1);
         for path in [
             "deleted.md",
@@ -3527,7 +3533,7 @@ mod corpus {
         let git = build_selector(repo.get_root()).unwrap();
         // When: the application selects current document candidates.
         let candidates = git.get_candidates().unwrap();
-        // Then: the exact paths or failure classification match the independent expectation.
+        // Then: deleted and ignored tracked paths remain; ignored untracked and private paths do not. User state is unchanged.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
             [
@@ -3593,7 +3599,7 @@ mod corpus {
             b"bad#anchor.md".to_vec(),
             b"bad\nline.md".to_vec(),
         ] {
-            // Given: an independent repository/index fixture with the paths under test.
+            // Given: indexed Markdown names contain invalid UTF-8, a hash, or a newline.
             let repo = TempRepo::new(ObjectFormat::Sha1);
             // Git's index supports raw paths even when the host filesystem rejects them.
             let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"bytes"));
@@ -3604,7 +3610,7 @@ mod corpus {
             let git = build_selector(repo.get_root()).unwrap();
             // When: the application selects current document candidates.
             let error = git.get_candidates().unwrap_err();
-            // Then: the exact paths or failure classification match the independent expectation.
+            // Then: unsupported names produce InvalidRequest without exposing the filename.
             assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
             assert!(!error.to_string().contains("bad"));
         }
@@ -3612,7 +3618,7 @@ mod corpus {
 
     #[test]
     fn candidates_deduplicate_unmerged_index_stages() {
-        // Given: an independent repository/index fixture with the paths under test.
+        // Given: three conflict stages address the same conflict.md alongside live.md.
         let repo = TempRepo::new(ObjectFormat::Sha1);
         let oid = repo.get_oid(&["hash-object", "-w", "--stdin"], Some(b"conflict"));
         let entries = format!(
@@ -3623,7 +3629,7 @@ mod corpus {
         let git = build_selector(repo.get_root()).unwrap();
         // When: the application selects current document candidates.
         let candidates = git.get_candidates().unwrap();
-        // Then: the exact paths or failure classification match the independent expectation.
+        // Then: conflict.md appears once beside live.md.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
             ["conflict.md", "live.md"]
@@ -3648,7 +3654,7 @@ mod corpus {
             let git = build_selector(repo.get_root()).unwrap();
             // When: the application selects current document candidates.
             let candidates = git.get_candidates().unwrap();
-            // Then: the exact paths or failure classification match the independent expectation.
+            // Then: .letopis components are excluded before decoding; .letopis-notes.md and live.md remain.
             assert_eq!(
                 candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
                 [".letopis-notes.md", "live.md"]
@@ -3658,11 +3664,11 @@ mod corpus {
 
     #[test]
     fn candidates_exclude_raw_git_metadata_components() {
-        // Given: Git itself forbids adding .git paths to its real index.
+        // Given: a raw response contains .git components and the ordinary .git-notes.md name.
         let raw = b".git/bad#anchor.md\0nested/.git/bad\xff.markdown\0.git-notes.md\0";
-        // When: the application selects current document candidates.
+        // When: the application parses the raw response.
         let candidates = parse_candidates(raw).unwrap();
-        // Then: the exact paths or failure classification match the independent expectation.
+        // Then: only .git-notes.md remains.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
             [".git-notes.md"]
@@ -3671,10 +3677,11 @@ mod corpus {
 
     #[test]
     fn rejects_unterminated_candidates_and_accepts_empty_output() {
-        // Given / When: malformed framing and empty raw input are parsed independently.
+        // Given: an unterminated candidate response and an empty response.
+        // When: parse each response independently.
         let malformed = parse_candidates(b"note.md").unwrap_err();
         let empty = parse_candidates(b"").unwrap();
-        // Then: the exact paths or failure classification match the independent expectation.
+        // Then: the unterminated response is InternalError and the empty response has no candidates.
         assert_eq!(malformed.get_kind(), DocumentErrorKind::InternalError);
         assert!(empty.is_empty());
     }

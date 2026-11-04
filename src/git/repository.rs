@@ -344,7 +344,7 @@ mod tests {
         git.tree_retain_by_oid(&tree).unwrap();
         git.tree_pin_by_oid(&tree).unwrap();
         git.tree_pin_by_oid(&captured).unwrap();
-        // Then: old and new snapshots remain usable, with exact bytes and corpus membership.
+        // Then: old and new snapshots remain usable, with exact bytes and raw worktree path membership.
         assert_eq!(
             git.tree_verify_by_oid(&tree).unwrap(),
             SnapshotState::Available
@@ -432,17 +432,17 @@ mod tests {
 
     #[test]
     fn discovers_root_from_subdirectory() {
-        // Given
+        // Given: SHA-1 and SHA-256 repositories contain a subdirectory.
         for format in fixture::FORMATS {
             let repo = TempRepo::new(format);
             let expected_length = match format {
                 ObjectFormat::Sha1 => 40,
                 ObjectFormat::Sha256 => 64,
             };
-            // When
+            // When: open each repository from its subdirectory.
             let git =
                 GitRepository::open(repo.get_subdir(), &[crate::utils::SERVICE_DIRECTORY]).unwrap();
-            // Then
+            // Then: discovery returns the repository root and matching OID length.
             assert_eq!(git.root, repo.get_root());
             assert_eq!(git.oid_len, expected_length);
         }
@@ -450,16 +450,16 @@ mod tests {
 
     #[test]
     fn open_rejects_non_repository_and_bare() {
-        // Given
+        // Given: a bare repository and an ordinary empty directory.
         let repo = TempRepo::new(ObjectFormat::Sha1);
         let bare = repo.get_root().join("bare");
         repo.run_git_successfully(&["init", "-q", "--bare", bare.to_str().unwrap()], None);
         let empty = std::env::temp_dir().join(format!("letopis-empty-{}", std::process::id()));
         fs::create_dir(&empty).unwrap();
-        // When
+        // When: attempt to open both paths as working repositories.
         let bare_result = GitRepository::open(&bare, &[crate::utils::SERVICE_DIRECTORY]);
         let empty_result = GitRepository::open(&empty, &[crate::utils::SERVICE_DIRECTORY]);
-        // Then
+        // Then: both paths are rejected.
         assert!(bare_result.is_err());
         assert!(empty_result.is_err());
         fs::remove_dir(empty).unwrap();
@@ -489,7 +489,7 @@ mod tests {
 
     #[test]
     fn discovers_trailing_newline_repository_without_touching_sibling() {
-        // Given
+        // Given: sibling repositories share a parent and the target name ends with a newline.
         for format in fixture::FORMATS {
             let parent = TempRepo::new(format);
             let (sibling, target) = create_newline_repository_pair(&parent, format);
@@ -500,7 +500,7 @@ mod tests {
             let sibling_refs = parent
                 .run_git_successfully(&["-C", sibling.to_str().unwrap(), "for-each-ref"], None);
             let path = RepoPath::parse("captured.md").unwrap();
-            // When
+            // When: create, retain, and read a snapshot in the target repository.
             let git = open_git_snapshots(&target).unwrap();
             let tree = git
                 .tree_create(&[SnapshotFile {
@@ -530,7 +530,7 @@ mod tests {
             let discovered_root = GitRepository::open(&target, &[crate::utils::SERVICE_DIRECTORY])
                 .unwrap()
                 .root;
-            // Then
+            // Then: the target root and bytes are correct, and sibling objects and refs are unchanged.
             assert_eq!(
                 objects_after, sibling_objects,
                 "opening repo\\n must not write objects into sibling repo"
@@ -555,10 +555,10 @@ mod tests {
         let info = repo.get_root().join(".git/objects/info");
         fs::remove_dir(&info).unwrap();
         fs::write(&info, b"not a directory").unwrap();
-        // When
+        // When: open the repository whose objects/info path is a file.
         let error = GitRepository::open(repo.get_root(), &[crate::utils::SERVICE_DIRECTORY])
             .expect_err("unsafe object store was accepted");
-        // Then
+        // Then: opening reports InternalError and preserves the file bytes.
         assert_eq!(error.get_kind(), SnapshotErrorKind::InternalError);
         assert_eq!(fs::read(info).unwrap(), b"not a directory");
     }
