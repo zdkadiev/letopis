@@ -113,7 +113,7 @@ def run_smoke(binary: Path):
     with tempfile.TemporaryDirectory(prefix='letopis-release-') as directory:
         root = Path(directory)
         subprocess.run(['git', 'init', '-q', directory], check=True)
-        invoke(binary, root, 'init', {})
+        invoke(binary, root, ['init'], {})
         knowledge = root / 'letopis'
         knowledge.mkdir()
         content = '<!-- letopis: {"created_at":1793491200} -->\n# Retry budget\nKeep retries bounded.\n'
@@ -121,36 +121,37 @@ def run_smoke(binary: Path):
         nested = root / 'nested'
         nested.mkdir()
         element_id = 'letopis/retry-budget.md'
-        report = invoke(binary, nested, 'check', {})
+        report = invoke(binary, nested, ['check'], {})
         if report != {'errors': []}:
             raise ValueError(f'unexpected validation report: {report}')
-        links = invoke(binary, nested, 'search', {'query': 'retry', 'limit': 10})
+        links = invoke(binary, nested, ['search'], {'query': 'retry', 'limit': 10})
         if not any(link['element_id'] == element_id for link in links):
             raise ValueError('search did not find the fixture knowledge')
-        traversal = invoke(binary, nested, 'traverse', {
+        traversal = invoke(binary, nested, ['traverse'], {
             'element_ids': [element_id], 'mode': 'both', 'direction': 'both',
             'depth': 2, 'limit': 10, 'edge_limit': 10,
         })
         if traversal != {'elements': [], 'edges': []}:
             raise ValueError('unexpected traversal result')
-        inspected = invoke(binary, nested, 'inspect', {'element_ids': [element_id]})
+        inspected = invoke(binary, nested, ['inspect'], {'element_ids': [element_id]})
         snapshot_bytes = subprocess.check_output([
             'git', 'show', f'{inspected["snapshot"]}:{element_id}',
         ], cwd=root)
         if snapshot_bytes != content.encode():
             raise ValueError('inspect snapshot differs from the authored content')
-        invoke(binary, nested, 'status', {})
-        invoke(binary, nested, 'config', {})
-        invoke(binary, nested, 'reindex', {})
+        invoke(binary, nested, ['status'], {})
+        invoke(binary, nested, ['config'], {})
+        invoke(binary, nested, ['index', '--full'], {})
     print(json.dumps({'status': 'PASS', 'binary': str(binary), 'version': version,
                       'platform': platform.platform(), 'machine': platform.machine()}))
 
 
-def invoke(binary: Path, root: Path, command: str, request: dict):
-    process = subprocess.run([binary, command], input=json.dumps(request), text=True,
+def invoke(binary: Path, root: Path, arguments: list[str], request: dict):
+    process = subprocess.run([binary, *arguments], input=json.dumps(request), text=True,
                              capture_output=True, cwd=root, timeout=60)
     response = json.loads(process.stdout)
     if process.returncode != 0 or response.get('ok') is not True:
+        command = ' '.join(arguments)
         raise ValueError(f'{command} failed: {process.stdout}')
     return response['result']
 

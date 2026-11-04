@@ -111,6 +111,19 @@ class PackageTests(unittest.TestCase):
                 self.assertIn(expected, notices)
 
 
+class SmokeInvocationTests(unittest.TestCase):
+    def test_invoke_passes_every_command_argument(self):
+        # Given: an executable that reports the arguments it received.
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / 'letopis'
+            binary.write_text('#!/bin/sh\nprintf \'{"ok":true,"result":{"args":"%s"}}\\n\' "$*"\n')
+            os.chmod(binary, 0o755)
+            # When: a command with a mode flag is invoked.
+            result = release.invoke(binary, Path(directory), ['index', '--full'], {})
+            # Then: the executable receives both arguments in order.
+            self.assertEqual(result, {'args': 'index --full'})
+
+
 def create_fixture(directory, version='0.1.0'):
     root = directory / 'source'
     root.mkdir()
