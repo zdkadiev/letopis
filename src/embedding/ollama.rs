@@ -1,5 +1,8 @@
-use super::http::{Http, build_endpoint, decode_vectors, prepare_body, reject_response};
-use crate::service::{EmbeddingConfig, EmbeddingProvider, EmbeddingResult, ProviderKind};
+use super::http::{Http, build_endpoint, decode_vectors, prepare_body, validate_config};
+use crate::service::{
+    EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult,
+    ProviderKind,
+};
 use serde_json::Value;
 use std::num::NonZeroUsize;
 
@@ -13,7 +16,7 @@ impl Ollama {
 }
 impl EmbeddingProvider for Ollama {
     fn validate_config(&self, config: &EmbeddingConfig) -> EmbeddingResult<()> {
-        build_endpoint(config, ProviderKind::Ollama, "embed").map(|_| ())
+        validate_config(config, ProviderKind::Ollama)
     }
     fn embed(
         &self,
@@ -34,11 +37,11 @@ impl EmbeddingProvider for Ollama {
             .get("model")
             .and_then(Value::as_str)
             .filter(|model| !model.is_empty())
-            .ok_or_else(reject_response)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidResponse))?;
         let items = response
             .get("embeddings")
             .and_then(Value::as_array)
-            .ok_or_else(reject_response)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidResponse))?;
         decode_vectors(
             items,
             texts.len(),

@@ -1,4 +1,4 @@
-use super::http::{Http, build_endpoint, decode_vectors, prepare_body, reject_response};
+use super::http::{Http, build_endpoint, decode_vectors, prepare_body, validate_config};
 use crate::service::{
     EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingProvider, EmbeddingResult,
     ProviderKind,
@@ -33,7 +33,7 @@ impl fmt::Debug for Openai {
 }
 impl EmbeddingProvider for Openai {
     fn validate_config(&self, config: &EmbeddingConfig) -> EmbeddingResult<()> {
-        build_endpoint(config, ProviderKind::Openai, "embeddings").map(|_| ())
+        validate_config(config, ProviderKind::Openai)
     }
     fn embed(
         &self,
@@ -49,7 +49,7 @@ impl EmbeddingProvider for Openai {
         let items = response
             .get("data")
             .and_then(Value::as_array)
-            .ok_or_else(reject_response)?;
+            .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::Credentials))?;
         decode_vectors(
             items,
             texts.len(),

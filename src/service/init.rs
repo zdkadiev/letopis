@@ -318,11 +318,13 @@ mod tests {
         trace: Trace,
         fail: bool,
     }
+
     impl Storage {
         fn new(trace: Trace, fail: bool) -> Self {
             Self { trace, fail }
         }
     }
+
     impl InitStorage for Storage {
         fn initialize(&self, _: &Path, _: &OwnedFd) -> StorageResult<()> {
             self.trace.push("storage");

@@ -1,8 +1,25 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"1fba9cfb01cddb4e763b1d33580f48000952ea74"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"e6730713cdcf157bcb2294169c248f3b165a37f1"} -->
 # Graph model and traversal
 
-Knowledge edges are identified by source, target and type. `external` targets a source address; other edge types target knowledge. An element with an outgoing `includes` edge is classified as a metavertex. The domain graph holds graph data; the application GraphService traverses a supplied graph reader breadth-first, using a visited set and request depth and element limits.
+Knowledge elements are identified by repository path or path plus anchor. A graph
+edge is identified by the triple `(source, target, type)`; `external` targets a
+source address and other types target knowledge. Self-loops and target-kind/type
+mismatches are rejected. An element with an outgoing `includes` edge is a
+metavertex; this kind is derived rather than authored as Markdown metadata.
 
-[Source: src/domain/graph.rs](../../src/domain/graph.rs "letopis:type=external;path=src/domain/graph.rs")
+The domain `Graph` contains selected identities and optional edges; it does not
+load storage. The application `GraphService` receives a graph reader pinned by its
+caller. It expands neighbors breadth-first, tracks visited node keys, omits start
+nodes from discovered elements, and stops at the requested depth and element limit.
+The optional edge limit is separate from the element limit.
 
-[Source: src/service/graph.rs](../../src/service/graph.rs "letopis:type=external;path=src/service/graph.rs")
+`TraversalService` refreshes documents, observes embedding configuration and opens
+a storage read view before invoking graph traversal. It enriches selected elements
+with locations, revision and current observation flags. Search and traversal return
+links and metadata, not the Markdown body.
+
+[Graph domain](../../src/domain/graph.rs "letopis:type=external;path=src/domain/graph.rs")
+
+[Graph traversal](../../src/service/graph.rs "letopis:type=external;path=src/service/graph.rs")
+
+[Traversal service](../../src/service/traversal.rs "letopis:type=external;path=src/service/traversal.rs")
