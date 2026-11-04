@@ -1274,7 +1274,7 @@ mod tests {
                 assert_eq!(failure.attempts, 1);
                 assert_eq!(failure.error.unwrap(), "invalid embedding response");
                 assert_eq!(
-                    read.vector_keys_get_vector_by_search_hash(&config.get_identity(), &hash)
+                    read.vector_keys_get_by_search_hash(&config.get_identity(), &hash)
                         .unwrap(),
                     VectorOutcome::Current(None)
                 );
@@ -1437,11 +1437,8 @@ mod tests {
                     .with_read_tx(|| {
                         let read = &storage.cache;
                         assert_eq!(
-                            read.vector_keys_get_vector_by_search_hash(
-                                &config.get_identity(),
-                                &self.hash
-                            )
-                            .unwrap(),
+                            read.vector_keys_get_by_search_hash(&config.get_identity(), &self.hash)
+                                .unwrap(),
                             VectorOutcome::Current(vector)
                         );
                         let VectorOutcome::Current(failure) = read
@@ -1722,7 +1719,7 @@ mod tests {
                         .unwrap();
                     let hash = parsed.elements[0].search_hash;
                     assert_eq!(
-                        read.vector_keys_get_vector_by_search_hash(&config.get_identity(), &hash)
+                        read.vector_keys_get_by_search_hash(&config.get_identity(), &hash)
                             .unwrap(),
                         VectorOutcome::Current(Some(vec![4., 5., 6.]))
                     );
@@ -2085,7 +2082,7 @@ mod tests {
                         failure.then(|| "embedding credentials unavailable".into())
                     );
                     assert_eq!(
-                        read.vector_keys_get_vector_by_search_hash(&captured.get_identity(), &hash)
+                        read.vector_keys_get_by_search_hash(&captured.get_identity(), &hash)
                             .unwrap(),
                         VectorOutcome::Current(None)
                     );
