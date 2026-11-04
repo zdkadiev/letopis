@@ -1,7 +1,7 @@
 # Program structure and composition
 
 ## Component boundaries {#component-boundaries}
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"fe8c6d1c0a1a8dcef5745c7939daecf43050c3a7"} -->
 Letopis uses a hexagonal structure. Domain types and pure rules live in
 `src/domain`; application-owned interfaces and services live in `src/service`.
 Technology-specific implementations live in `git`, `storage`, `filesystem`,

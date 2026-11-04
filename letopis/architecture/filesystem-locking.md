@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793816837,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793816837,"source_snapshot":"fe8c6d1c0a1a8dcef5745c7939daecf43050c3a7"} -->
 # Filesystem locking and observation
 
 `LocalFileSystem` implements `FileReader`, `FileWriter` and `FileLocker`. The
@@ -17,6 +17,13 @@ retries interrupted try-locks, then verifies the entry again, sets mode 0600,
 truncates the file and writes the owner PID. Waiting acquisition falls back to the
 blocking lock. `PersistentLock` owns the descriptor and unlocks on drop, retrying
 while interrupted; closing the descriptor remains the teardown fallback.
+
+Initial lock-leaf creation can admit a peer's first publication. Directory-creation
+preflight permits this only for the final unpinned component; traversed ancestors,
+existing pins and pinned descendants remain strict. Exclusive creation or mkdir
+resolves the race without relaxing type, no-follow, lock single-link or identity
+checks. Ordinary file reads and lock-owner observations still reject an entry
+appearing while absence is confirmed or a replacement observed by those reads.
 
 Owner observation is optional and race-aware: it opens the recorded entry,
 requires a regular lock file with unchanged identity, and reports the PID only

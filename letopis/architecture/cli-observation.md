@@ -40,7 +40,7 @@ storage or provenance failures become an internal error response.
 [Source observation helper](../../src/service/utils.rs "letopis:type=external;path=src/service/utils.rs")
 
 ## Inspect results {#inspect-results}
-<!-- letopis: {"created_at":1793278642,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793278642,"source_snapshot":"fe8c6d1c0a1a8dcef5745c7939daecf43050c3a7"} -->
 `inspect` accepts a nonempty set of knowledge or declared-source addresses. It
 refreshes the projection, captures marked corpus files and requested source data,
 assembles a Git tree from captured blobs and pins it before returning. An unknown
