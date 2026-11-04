@@ -55,6 +55,28 @@ fn malformed_requests_fail_before_service_directory_creation() {
     }
 }
 #[test]
+fn early_argv_rejection_preserves_response_after_closed_stdin() {
+    // Given: invalid argv can terminate while the caller still owns the input pipe.
+    let root = make_repository();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_letopis"));
+    command
+        .arg("unknown")
+        .current_dir(root.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cli::OwnedChild::spawn(&mut command);
+
+    // When: the child rejects argv before stdin is sent, with no scheduling delay.
+    let output = child.collect_output(Duration::from_secs(10));
+    child.send_input(b"{}");
+
+    // Then: the safe error remains observable and no service directory is created.
+    assert_error(&output, "invalid_request");
+    assert!(!root.path().join(".letopis").exists());
+}
+
+#[test]
 fn nested_invalid_requests_do_not_initialize_repository_or_child() {
     // Given
     let root = make_repository();

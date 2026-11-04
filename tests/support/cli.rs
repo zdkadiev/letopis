@@ -2,7 +2,7 @@ use letopis::{open_storage, service::EmbedLocker};
 use serde_json::Value;
 use std::{
     env, fs,
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, ErrorKind, Read, Write},
     os::fd::AsRawFd,
     os::unix::{
         fs::PermissionsExt,
@@ -84,12 +84,21 @@ impl OwnedChild {
         Self(command.spawn().unwrap())
     }
 
-    /// Write the complete fixture input and close stdin to deliver EOF.
+    /// Write fixture input and close stdin, tolerating an already closed reader.
+    ///
+    /// A child may reject argv before reading stdin; callers must still verify
+    /// its actual output and exit status.
     ///
     /// # Panics
-    /// Panics if stdin was not piped, was already consumed, or writing fails.
+    /// Panics if stdin was not piped, was consumed, or writing fails otherwise.
     pub fn send_input(&mut self, input: &[u8]) {
-        self.0.stdin.take().unwrap().write_all(input).unwrap();
+        if let Err(error) = self.0.stdin.take().unwrap().write_all(input) {
+            assert_eq!(
+                error.kind(),
+                ErrorKind::BrokenPipe,
+                "writing child input failed: {error}"
+            );
+        }
     }
 
     pub fn get_id(&self) -> u32 {
