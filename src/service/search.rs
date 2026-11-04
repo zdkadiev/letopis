@@ -77,7 +77,7 @@ impl<
 > Searcher for SearchService<D, E, F, M, P, C>
 {
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
-        self.refresher.refresh().map_err(map_search_error)?;
+        self.refresher.refresh(&[]).map_err(map_search_error)?;
         self.provenance
             .validate_revisions(&request.filters.source_revisions)
             .map_err(map_revision_error)?;
@@ -2194,7 +2194,7 @@ mod tests {
     fn build_noop_refresher() -> MockRefresher {
         let mut refresher = MockRefresher::new();
         refresher.expect_reindex().times(0);
-        refresher.expect_refresh().returning(|| {
+        refresher.expect_refresh().returning(|_| {
             Ok(RefreshOutcome {
                 revision: 1,
                 published: false,

@@ -204,7 +204,7 @@ fn run_product_foreground(root: &Path) -> Result<(), Box<dyn Error>> {
     if executable == env::current_exe()? {
         return Err("product drain must not execute the fixture".into());
     }
-    wire_document_refresher(root)?.refresh()?;
+    wire_document_refresher(root)?.refresh(&[])?;
     let mut tasks = wire_embedding_executor(root)?;
     let warning = wire_background_runner(root, &executable, Some(&mut tasks))?.start_if_needed()?;
     println!(

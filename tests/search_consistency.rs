@@ -36,7 +36,7 @@ fn concurrent_publication_preserves_old_membership_coordinates_and_revision() {
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     let revision = wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap()
         .revision;
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
@@ -51,7 +51,7 @@ fn concurrent_publication_preserves_old_membership_coordinates_and_revision() {
     assert!(
         wire_document_refresher(repo.get_root())
             .unwrap()
-            .refresh()
+            .refresh(&[])
             .unwrap()
             .revision
             > revision
@@ -82,7 +82,7 @@ fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates()
     repo.write_knowledge("a.md", "sqlite");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     let config = repo.write_config("ollama", "http://localhost/api", "fixture");
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
@@ -141,7 +141,7 @@ fn reset_during_query_preserves_original_fts_and_new_model_diagnostic() {
         let config = repo.write_config(protocol, &server.get_base_url(), "fixture");
         let revision = wire_document_refresher(repo.get_root())
             .unwrap()
-            .refresh()
+            .refresh(&[])
             .unwrap()
             .revision;
         repo.seed_vectors(&config, &[("a.md", &[0.0, 1.0]), ("b.md", &[1.0, 0.0])]);
@@ -200,7 +200,7 @@ fn concurrent_vector_insert_cannot_add_membership_to_pinned_channel() {
     let config = repo.write_config("openai", &server.get_base_url(), "fixture");
     let revision = wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap()
         .revision;
     repo.seed_vectors(&config, &[("a.md", &[0.0, 1.0])]);
@@ -234,7 +234,7 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let worker = PausedSearch::spawn(repo.get_root(), barrier.clone());
@@ -271,7 +271,7 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
     assert!(
         wire_document_refresher(repo.get_root())
             .unwrap()
-            .refresh()
+            .refresh(&[])
             .unwrap()
             .published
     );
@@ -286,7 +286,7 @@ fn live_confinement_error_releases_read_before_subsequent_reset() {
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.seed_vectors(&config, &[("dir/a.md", &[1.0, 0.0])]);
     let worker = PausedSearch::spawn(repo.get_root(), barrier.clone());
@@ -321,7 +321,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
@@ -365,7 +365,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
     assert!(
         wire_document_refresher(repo.get_root())
             .unwrap()
-            .refresh()
+            .refresh(&[])
             .unwrap()
             .published
     );

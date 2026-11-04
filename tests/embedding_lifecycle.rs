@@ -22,7 +22,7 @@ fn over_context_rejection_keeps_full_text_searchable_and_exhausts_one_attempt() 
     let repo = ReadingRepo::new();
     let text = format!("{}{FINAL_MARKER}", "LongKnowledgeBodyToken ".repeat(4096));
     repo.write_knowledge("long.md", &text);
-    assert_success(&repo.invoke(&["reindex"], b"{}"));
+    assert_success(&repo.invoke(&["index", "--full"], b"{}"));
     let http = HttpFixture::start(FixtureReply::Status {
         status: 400,
         body: format!(r#"{{"error":"context exceeded {PRIVATE_RESPONSE}"}}"#),

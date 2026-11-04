@@ -323,7 +323,12 @@ fn matching_missing_targets_keep_existing_diagnostics() {
 }
 
 fn invoke(repo: &ReadingRepo, command: &str) -> Value {
-    let output = repo.invoke(&[command], b"{}");
+    let args: &[&str] = if command == "reindex" {
+        &["index", "--full"]
+    } else {
+        &[command]
+    };
+    let output = repo.invoke(args, b"{}");
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(

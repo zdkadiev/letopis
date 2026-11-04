@@ -42,9 +42,9 @@ impl<D, P, C> CheckService<D, P, C> {
 impl<D: Refresher, P: SourceProvenance, C: CacheDatabase> Checker for CheckService<D, P, C> {
     fn check(&mut self, paths: &[RepoPath]) -> CommandResult<CheckReport> {
         let outcome = if paths.is_empty() {
-            self.refresher.refresh_verified()
+            self.refresher.refresh_verified(&[])
         } else {
-            self.refresher.refresh()
+            self.refresher.refresh(&[])
         }
         .map_err(map_refresh_error)?;
         self.storage
@@ -151,12 +151,16 @@ mod tests {
         let mut storage = open_storage(&directory);
         publish_nodes(&mut storage, &[build_node("fresh.md", "a")]);
         let mut refresher = crate::service::MockRefresher::new();
-        refresher.expect_refresh_verified().once().returning(|| {
-            Ok(RefreshOutcome {
-                revision: 0,
-                ..build_outcome()
-            })
-        });
+        refresher
+            .expect_refresh_verified()
+            .once()
+            .returning(|paths| {
+                assert!(paths.is_empty());
+                Ok(RefreshOutcome {
+                    revision: 0,
+                    ..build_outcome()
+                })
+            });
         let mut service = CheckService::new(
             refresher,
             Rc::new(storage.cache),
@@ -181,10 +185,10 @@ mod tests {
         let mut storage = open_storage(&directory);
         publish_nodes(&mut storage, &[build_node("fresh.md", "a")]);
         let mut refresher = crate::service::MockRefresher::new();
-        refresher
-            .expect_refresh()
-            .once()
-            .returning(|| Ok(build_outcome()));
+        refresher.expect_refresh().once().returning(|paths| {
+            assert!(paths.is_empty());
+            Ok(build_outcome())
+        });
         let mut service = CheckService::new(
             refresher,
             Rc::new(storage.cache),
@@ -461,14 +465,14 @@ mod tests {
     }
 
     impl<F: FnMut() -> DocumentResult<RefreshOutcome>> Refresher for Refresh<F> {
-        fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
+        fn refresh_verified(&mut self, _paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
             (self.0)()
         }
-        fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
+        fn reindex(&mut self, _paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
             panic!("this scenario must not trigger a full reindex")
         }
 
-        fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
+        fn refresh(&mut self, _paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
             (self.0)()
         }
     }

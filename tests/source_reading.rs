@@ -22,7 +22,7 @@ fn observe_live_source_without_referrer_edits() {
     repo.write("a.md", "<!-- letopis: {\"created_at\":3,\"source_snapshot\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"} -->\nReferrerToken [source](source.txt \"letopis:type=external;path=source.txt\")\n");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     let before = repo.get_state();
     let storage = open_repo_storage(&repo);
@@ -85,7 +85,7 @@ fn retain_pinned_membership_while_observing_current_bytes() {
     repo.write("source.txt", b"abc");
     repo.write("a.md", build_external(3, "source.txt", "ReferrerToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
     let cache = open_repo_cache(&repo);
     let reader = wire_source_reader(repo.get_root(), Rc::clone(&cache)).unwrap();
     cache
@@ -94,7 +94,7 @@ fn retain_pinned_membership_while_observing_current_bytes() {
             let revision = old_view.project_get_by_id().unwrap();
             let uri = SourceUri::parse("source.txt").unwrap();
             repo.remove("a.md");
-            refresher.refresh().unwrap();
+            refresher.refresh(&[]).unwrap();
             repo.write("source.txt", b"def");
 
             // When: source bytes change after pinning.
@@ -138,7 +138,7 @@ fn distinguish_missing_file_and_incomplete_range_from_available_range() {
     );
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     let cache = open_repo_cache(&repo);
     let reader = wire_source_reader(repo.get_root(), Rc::clone(&cache)).unwrap();
@@ -175,7 +175,7 @@ fn nonregular_sources_are_reported_as_missing() {
     repo.write("a.md", build_external(3, "source.txt", "Token"));
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     let cache = open_repo_cache(&repo);
     let reader = wire_source_reader(repo.get_root(), Rc::clone(&cache)).unwrap();
@@ -206,7 +206,7 @@ fn propagate_failed_storage_read_before_source_capture() {
     repo.write("a.md", build_external(3, "source.txt", "Token"));
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     let cache = open_repo_cache(&repo);
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();

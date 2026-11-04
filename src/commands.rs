@@ -1,6 +1,8 @@
 //! Command wiring: builds the services each command needs and runs it.
 
-use crate::cli::{CommandResponse, Request, ResponseResult, finish_foreground};
+use crate::cli::{
+    CommandResponse, IndexMode, IndexRequest, Request, ResponseResult, finish_foreground,
+};
 use crate::domain::RepoPath;
 use crate::git::GitWriteCleanup;
 use crate::service::{
@@ -32,8 +34,9 @@ pub(crate) fn run_request(
         Request::Init => environment.and_then(|(directory, _)| run_init(&directory)),
         Request::Status => environment.and_then(|(directory, _)| run_status(&directory)),
         Request::Config => environment.and_then(|(directory, _)| run_config(&directory)),
-        Request::Reindex => environment
-            .and_then(|(directory, executable)| run_reindex(&directory, &executable, cleanup)),
+        Request::Index(request) => environment.and_then(|(directory, executable)| {
+            run_index(&request, &directory, &executable, cleanup)
+        }),
         Request::Check(paths) => environment.and_then(|(directory, executable)| {
             run_check(&paths, &directory, &executable, cleanup)
         }),
@@ -57,7 +60,8 @@ fn run_init(directory: &Path) -> CommandResult<CommandResponse> {
     Ok(CommandResponse::new(ResponseResult::Initialized))
 }
 
-fn run_reindex(
+fn run_index(
+    request: &IndexRequest,
     directory: &Path,
     executable: &Path,
     cleanup: Arc<GitWriteCleanup>,
@@ -68,8 +72,13 @@ fn run_reindex(
     let mut background = wire_background_runner(&root, executable, Some(&mut tasks))?;
     let mut documents = wire_document_refresher_with_repository(git)
         .map_err(|cause| ServiceError::new_with_cause(ServiceErrorKind::Reindex, cause))?;
-    let outcome = documents.reindex().map_err(map_reindex_error)?;
-    finish_foreground(ResponseResult::Reindex(outcome.revision), &mut background)
+    let outcome = match request.mode {
+        IndexMode::Incremental => documents.refresh(&request.paths),
+        IndexMode::Verified => documents.refresh_verified(&request.paths),
+        IndexMode::Full => documents.reindex(&request.paths),
+    }
+    .map_err(map_reindex_error)?;
+    finish_foreground(ResponseResult::Index(outcome), &mut background)
 }
 
 fn run_status(directory: &Path) -> CommandResult<CommandResponse> {

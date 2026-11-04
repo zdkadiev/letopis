@@ -36,7 +36,7 @@ impl<D: Refresher, G: GitWorktreePaths + GitSnapshots, F: FileReader, M: Markdow
     for InspectionService<D, G, F, M>
 {
     fn inspect(&mut self, ids: &[ElementAddress]) -> CommandResult<Inspection> {
-        self.refresher.refresh().map_err(map_document_error)?;
+        self.refresher.refresh(&[]).map_err(map_document_error)?;
         let requested = ids
             .iter()
             .map(ElementAddress::as_str)
@@ -70,7 +70,7 @@ impl<D, G: GitWorktreePaths, F: FileReader, M> InspectionService<D, G, F, M> {
             git: &self.git,
             filesystem: &self.filesystem,
         }
-        .get_candidates()
+        .get_candidates(&[])
     }
 }
 
@@ -579,14 +579,14 @@ mod tests {
     }
 
     impl Refresher for RecordingDocuments {
-        fn refresh_verified(&mut self) -> DocumentResult<RefreshOutcome> {
+        fn refresh_verified(&mut self, _paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
             panic!("routine reads must not request a full audit")
         }
-        fn reindex(&mut self) -> DocumentResult<RefreshOutcome> {
+        fn reindex(&mut self, _paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
             panic!("this scenario must not trigger a full reindex")
         }
 
-        fn refresh(&mut self) -> DocumentResult<RefreshOutcome> {
+        fn refresh(&mut self, _paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
             self.0.borrow_mut().push("refresh".into());
             Ok(RefreshOutcome {
                 revision: 1,

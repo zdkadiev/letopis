@@ -83,7 +83,7 @@ fn prepare_fixture(response: &str) -> (ReadingRepo, HttpFixture, ResponseBarrier
     let config = repo.write_config("ollama", &server.get_base_url(), "fixture");
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let storage = repo.open_storage();

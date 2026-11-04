@@ -21,7 +21,7 @@ fn publish_opaque_remote_without_local_interpretation() {
     repo.write("remote.md", build_external(7, address, "RemoteToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
 
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
 
     let state = repo.get_state();
     let NodeMetadata::Source(source) = &state.get_node(address).metadata else {
@@ -51,7 +51,7 @@ fn merge_equivalent_local_ranges_with_minimum_reference_time() {
     );
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
 
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
 
     let state = repo.get_state();
     // When / Then
@@ -124,7 +124,7 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
         // When / Then: the repaired file publishes without rebuilding the cache.
         assert_eq!(run_check(&repo), json!({"ok":true,"result":{"errors":[]}}));
         let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
-        assert!(!refresher.refresh().unwrap().published);
+        assert!(!refresher.refresh(&[]).unwrap().published);
         let (nodes, edges, matches) = get_repaired_projection(&repo);
         assert_eq!(nodes, 1);
         assert_eq!(edges, 0);
@@ -139,7 +139,7 @@ fn retain_last_valid_projection_after_ambiguous_source_edit() {
     repo.write("source.txt", b"abc");
     repo.write("valid.md", build_external(3, "source.txt", "RetainedToken"));
     let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
     let before = repo.get_state();
 
     // When
@@ -147,7 +147,7 @@ fn retain_last_valid_projection_after_ambiguous_source_edit() {
         "valid.md",
         build_external(3, "./https:notes", "SECRET_RAW_BODY"),
     );
-    let result = refresher.refresh().unwrap();
+    let result = refresher.refresh(&[]).unwrap();
 
     // Then: invalid-file policy preserves the readable effective graph and FTS.
     assert_eq!(result.invalid_files_updated, 1);
@@ -161,7 +161,7 @@ fn retain_last_valid_projection_after_ambiguous_source_edit() {
     // Given: the invalid referrer is deleted.
     repo.remove("valid.md");
     // When
-    refresher.refresh().unwrap();
+    refresher.refresh(&[]).unwrap();
     let removed = repo.get_state();
     // Then
     assert!(removed.nodes.is_empty());

@@ -55,7 +55,7 @@ impl CandidateSelection<'_> {
     ///
     /// # Errors
     /// Preserves document diagnostics for Git/file observation, framing or path failures.
-    pub(super) fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+    pub(super) fn get_candidates(&self, paths: &[RepoPath]) -> DocumentResult<Vec<RepoPath>> {
         let raw = self.git.worktree_paths_get().map_err(map_candidate_error)?;
         let entries = get_candidate_entries(&raw)?;
         self.filesystem
@@ -66,6 +66,12 @@ impl CandidateSelection<'_> {
             })?;
         let mut filtered = Vec::new();
         for entry in entries {
+            if !paths.is_empty()
+                && !normalize_candidate_bytes(entry)
+                    .is_some_and(|normalized| is_selected_path(&normalized, paths))
+            {
+                continue;
+            }
             if is_safe_candidate_probe(entry)
                 && self
                     .filesystem
@@ -79,6 +85,36 @@ impl CandidateSelection<'_> {
         }
         parse_candidates(&filtered)
     }
+}
+
+/// Resolve raw dot components for scope matching without decoding irrelevant names.
+fn normalize_candidate_bytes(entry: &[u8]) -> Option<Vec<u8>> {
+    if entry.starts_with(b"/") {
+        return None;
+    }
+    let mut parts = Vec::new();
+    for part in entry.split(|byte| *byte == b'/') {
+        match part {
+            b"" | b"." => {}
+            b".." => {
+                parts.pop()?;
+            }
+            _ => parts.push(part),
+        }
+    }
+    (!parts.is_empty()).then(|| parts.join(&b"/"[..]))
+}
+
+/// Select an exact owner path or a descendant at a component boundary.
+pub(super) fn is_selected_path(path: &[u8], paths: &[RepoPath]) -> bool {
+    paths.is_empty()
+        || paths.iter().any(|selector| {
+            let prefix = selector.as_str().as_bytes();
+            path == prefix
+                || path
+                    .strip_prefix(prefix)
+                    .is_some_and(|rest| rest.starts_with(b"/"))
+        })
 }
 
 impl std::fmt::Debug for CheckObservations<'_> {

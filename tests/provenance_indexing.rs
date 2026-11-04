@@ -108,12 +108,55 @@ fn reject_corrupt_closure_and_ref_failure_before_publication() {
         }
         let user_state_before = capture_head_and_index(&repo);
         // When
-        let refresh_result = wire_document_refresher(repo.get_root()).unwrap().refresh();
+        let refresh_result = wire_document_refresher(repo.get_root())
+            .unwrap()
+            .refresh(&[]);
         // Then
         assert!(refresh_result.is_err());
         assert_eq!(repo.get_state(), before);
         assert_eq!(capture_head_and_index(&repo), user_state_before);
     }
+}
+
+#[test]
+fn scoped_verified_refresh_audits_unselected_snapshot_closure() {
+    // Given: a cached outside owner declares a snapshot whose blob is later corrupted.
+    let repo = TempRepo::new(FORMATS[0]);
+    let tree = create_basis(repo.get_root(), &[("source.txt", b"basis\n")]);
+    repo.write("source.txt", b"basis\n");
+    repo.write(
+        "outside.md",
+        build_note(Some(&tree), &["source.txt"], "Outside knowledge"),
+    );
+    repo.write("selected.md", build_note(None, &[], "Original selected"));
+    refresh(&repo);
+    let blob = repo.get_oid(
+        &["rev-parse", &format!("{}:source.txt", tree.as_str())],
+        None,
+    );
+    fs::remove_file(repo.build_object_path(&blob)).unwrap();
+    fs::write(repo.build_object_path(&blob), b"invalid object").unwrap();
+    repo.write("selected.md", build_note(None, &[], "Changed selected"));
+    let paths = [RepoPath::parse("selected.md").unwrap()];
+
+    // When: routine mode publishes the selected edit, then verified mode audits the closure.
+    let routine = wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh(&paths)
+        .unwrap();
+    let before = repo.get_state();
+    let verified = wire_document_refresher(repo.get_root())
+        .unwrap()
+        .refresh_verified(&paths);
+    let full = wire_document_refresher(repo.get_root())
+        .unwrap()
+        .reindex(&paths);
+
+    // Then: both closure-auditing modes fail without changing the routine publication.
+    assert_eq!((routine.revision, routine.files_updated), (2, 1));
+    assert!(verified.is_err());
+    assert!(full.is_err());
+    assert_eq!(repo.get_state(), before);
 }
 
 #[test]
@@ -231,7 +274,7 @@ fn retain_shared_and_unreferenced_declared_basis_once() {
 fn refresh(repo: &TempRepo) -> RefreshOutcome {
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap()
 }
 fn has_exact_service_ref(repo: &TempRepo, tree: &TreeOid) -> bool {

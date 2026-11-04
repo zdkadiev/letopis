@@ -29,7 +29,20 @@ use support::{
 
 const CANCELLATION_CANARY: &str = "TK29_CANCELLATION_CANARY";
 const STDIN_PREFIX: &str = r#"{"canary":"TK29_CANCELLATION_CANARY"#;
-const FOREGROUND_COMMANDS: [&str; 5] = ["search", "traverse", "inspect", "check", "reindex"];
+const INDEX_MODES: &[&[&str]] = &[
+    &["index"],
+    &["index", "--verify"],
+    &["index", "--full"],
+    &["index", "--full", "--verify"],
+    &["index", "--verify", "--full"],
+];
+const FOREGROUND_COMMANDS: &[&[&str]] = &[
+    &["search"],
+    &["traverse"],
+    &["inspect"],
+    &["check"],
+    &["index", "--full"],
+];
 
 #[test]
 fn full_pin_runs_without_executable_helpers() {
@@ -57,14 +70,14 @@ fn full_pin_runs_without_executable_helpers() {
 fn cancels_each_foreground_command_while_reading_stdin() {
     // Given: the shipped binary reads a partial request from a live test FIFO.
     let repo = ReadingRepo::new();
-    for command in FOREGROUND_COMMANDS {
+    for args in FOREGROUND_COMMANDS.iter().chain(INDEX_MODES) {
         let fifo = tempfile::tempdir().expect("FIFO directory");
         let (mut stdin, address) = create_stdin_fifo(fifo.path());
         let mut process = Command::new(env!("CARGO_BIN_EXE_letopis"));
         isolate_command(&mut process);
         process
             .current_dir(repo.get_root())
-            .arg(command)
+            .args(*args)
             .stdin(Stdio::from(stdin.try_clone().expect("stdin clone")))
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -78,7 +91,7 @@ fn cancels_each_foreground_command_while_reading_stdin() {
         child.send_sigint();
         let output = child.collect_output(WAIT);
         // Then: exactly one cancelled envelope, exit 1 and no request text.
-        assert_cancelled_output(&output, command, &[CANCELLATION_CANARY, "canary"]);
+        assert_cancelled_output(&output, args[0], &[CANCELLATION_CANARY, "canary"]);
         assert_eq!(output.stdout, CANCELLED_ENVELOPE);
     }
 }
@@ -93,7 +106,7 @@ fn cancels_waiting_index_lock_without_killing_holder() {
         .expect("holder lock");
     let lock = repo.get_root().join(".letopis/index.lock");
     let identity = get_lock_identity(&lock);
-    let mut child = spawn_reading(&repo, "reindex");
+    let mut child = spawn_reading(&repo, "index");
     child.send_input(b"{}");
     // When: signal only after the product main thread is blocked in flock.
     let observation = observe_index_flock(child.get_id(), &lock);
@@ -105,10 +118,47 @@ fn cancels_waiting_index_lock_without_killing_holder() {
     assert_index_lock_held(&lock);
     assert_eq!(get_lock_identity(&lock), identity);
     drop(holder);
-    let completed = repo.invoke(&["reindex"], b"{}");
+    let completed = repo.invoke(&["index", "--full"], b"{}");
     assert_eq!(completed.status.code(), Some(0), "{completed:?}");
     let response: Value = serde_json::from_slice(&completed.stdout).expect("reindex response");
     assert_eq!(response["ok"], true);
+}
+
+#[test]
+fn cancels_each_index_mode_while_waiting_for_lock() {
+    // Given: an independent holder of the real index lock.
+    let repo = ReadingRepo::new();
+    let filesystem = open_filesystem(repo.get_root()).expect("filesystem");
+    let holder = filesystem
+        .lock_acquire_by_path(std::path::Path::new(".letopis/index.lock"))
+        .expect("holder lock");
+    let lock = repo.get_root().join(".letopis/index.lock");
+    let identity = get_lock_identity(&lock);
+    for args in INDEX_MODES {
+        let mut process = Command::new(env!("CARGO_BIN_EXE_letopis"));
+        isolate_command(&mut process);
+        process
+            .current_dir(repo.get_root())
+            .args(*args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let mut child = cli::OwnedChild::spawn(&mut process);
+        child.send_input(b"{}");
+
+        // When: SIGINT arrives after this mode blocks on the holder's lock.
+        let observation = observe_index_flock(child.get_id(), &lock);
+        assert!(observation.starts_with("inside=flock"), "{observation}");
+        child.send_sigint();
+        let output = child.collect_output(WAIT);
+
+        // Then: it emits one cancellation while the holder and lock identity survive.
+        assert_cancelled_output(&output, "index lock waiter", &[CANCELLATION_CANARY]);
+        assert_index_lock_held(&lock);
+        assert_eq!(get_lock_identity(&lock), identity);
+    }
+    drop(holder);
+    wait_until_index_lock_free(&lock);
 }
 
 #[test]
@@ -116,8 +166,7 @@ fn cancels_during_in_process_git_read() {
     // Given: the native ignore-file read blocks while the product holds index.lock.
     let repo = ReadingRepo::new();
     let barrier = GitReadBarrier::new(repo.get_root());
-    let mut child =
-        spawn_reading_with_path(&repo, "reindex", OsStr::new("/nonexistent-letopis-git"));
+    let mut child = spawn_reading_with_path(&repo, "index", OsStr::new("/nonexistent-letopis-git"));
     child.send_input(b"{}");
     // When
     barrier.observe(child.get_id());
@@ -137,7 +186,7 @@ fn cancels_while_provider_request_is_pending() {
     // Given: a published node, a ready vector identity and a provider that holds the request.
     let repo = ReadingRepo::new();
     repo.write_knowledge("knowledge.md", CANCELLATION_CANARY);
-    let published = repo.invoke(&["reindex"], b"{}");
+    let published = repo.invoke(&["index", "--full"], b"{}");
     assert_eq!(published.status.code(), Some(0), "{published:?}");
     let barrier = ResponseBarrier::default();
     let provider = HttpFixture::start(FixtureReply::Barrier {

@@ -33,7 +33,7 @@ fn reports_current_file_and_graph_problems_until_each_cause_is_repaired() {
     repo.write("bad.md", &invalid);
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
 
-    documents.refresh().unwrap();
+    documents.refresh(&[]).unwrap();
     // When
     let problems = diagnose(&repo);
 
@@ -52,7 +52,7 @@ fn reports_current_file_and_graph_problems_until_each_cause_is_repaired() {
     // A new target repairs only the derived graph problem; the source is untouched.
     let target = build_whole(9, "Target appears");
     repo.write("missing.md", &target);
-    documents.refresh().unwrap();
+    documents.refresh(&[]).unwrap();
     let problems = diagnose(&repo);
     assert_findings(
         &problems,
@@ -66,7 +66,7 @@ fn reports_current_file_and_graph_problems_until_each_cause_is_repaired() {
 
     let corrected = build_whole(8, "Corrected body");
     repo.write("bad.md", &corrected);
-    documents.refresh().unwrap();
+    documents.refresh(&[]).unwrap();
     assert!(diagnose(&repo).is_empty());
     assert_bytes(&repo, "a.md", &source);
     assert_bytes(&repo, "bad.md", &corrected);
@@ -79,7 +79,7 @@ fn preserves_anchor_identity_and_author_time_when_prefix_lines_move_coordinates(
     let repo = DocumentRepo::new();
     repo.write("a.md", ANCHORED);
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
-    documents.refresh().unwrap();
+    documents.refresh(&[]).unwrap();
     // When
     let before = repo.get_state();
     let NodeMetadata::Knowledge(original) = &before.get_node("a.md#one").metadata else {
@@ -93,7 +93,7 @@ fn preserves_anchor_identity_and_author_time_when_prefix_lines_move_coordinates(
     let edited =
         format!("Ordinary first line\nOrdinary second line\nOrdinary third line\n{ANCHORED}");
     repo.write("a.md", &edited);
-    documents.refresh().unwrap();
+    documents.refresh(&[]).unwrap();
     let problems = diagnose(&repo);
     let after = repo.get_state();
 
@@ -128,7 +128,7 @@ fn isolates_duplicate_and_nested_anchor_errors_from_a_valid_file() {
     repo.write("valid.md", &valid);
     let mut documents = wire_document_refresher(repo.get_root()).unwrap();
 
-    let outcome = documents.refresh().unwrap();
+    let outcome = documents.refresh(&[]).unwrap();
     // When
     let problems = diagnose(&repo);
     let state = repo.get_state();
@@ -165,7 +165,7 @@ fn diagnoses_the_pinned_revision_after_another_connection_publishes_a_target() {
     // The refresher owns the writer connection before the separate reader pins.
     let mut writer = wire_document_refresher(repo.get_root()).unwrap();
     // When / Then: diagnostics inspect the pinned graph revision; later publication does not change pinned findings.
-    assert_eq!(writer.refresh().unwrap().revision, 1);
+    assert_eq!(writer.refresh(&[]).unwrap().revision, 1);
     let reader = Rc::new(
         open_cache_storage(
             &repo.get_root().join(".letopis/cache.db"),
@@ -183,7 +183,7 @@ fn diagnoses_the_pinned_revision_after_another_connection_publishes_a_target() {
     );
 
     repo.write("missing.md", build_whole(2, "Published target"));
-    let publication = writer.refresh().unwrap();
+    let publication = writer.refresh(&[]).unwrap();
     let problems = diagnostics.find_problems(&[]).unwrap();
 
     assert_eq!(publication.revision, 2);
@@ -217,7 +217,7 @@ fn propagates_corrupt_edge_reads_instead_of_returning_clean_or_partial_findings(
     repo.write("bad.md", &invalid);
     wire_document_refresher(repo.get_root())
         .unwrap()
-        .refresh()
+        .refresh(&[])
         .unwrap();
     let cache = repo.get_root().join(".letopis/cache.db");
     let storage =
