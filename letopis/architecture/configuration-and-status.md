@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793727646,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793727646,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Initialization, configuration and status
 
 `init` discovers the repository and validates an existing configuration before
@@ -16,6 +16,13 @@ available; absent published state yields no revision and zero backlog. Status do
 not itself refresh the corpus. A disabled embedding configuration uses a disabled
 status policy; invalid configuration remains visible as a problem.
 
+`StatusService` owns Disabled/Unavailable/Ready policy, identity interpretation and
+backlog/failed arithmetic. Disabled still enters the validated status scope but
+skips work and query-error observations. Unavailable or mismatched identity keeps
+all current hashes in backlog and still exposes query failures. Storage owns SQL
+aggregation, decoding and integrity checks; uncovered attempt records are validated
+before threshold filtering, even when they would not be exhausted.
+
 Embedding configuration and durable vector identity are separate: embedding
 execution observes the config file and reconciles vector state through storage.
 The status/config read paths report observations and do not perform this reset.
@@ -25,6 +32,10 @@ The status/config read paths report observations and do not perform this reset.
 [Configuration reader](../../src/service/configuration.rs "letopis:type=external;path=src/service/configuration.rs")
 
 [Status service](../../src/service/status.rs "letopis:type=external;path=src/service/status.rs")
+
+[Status SQL observations](../../src/storage/cache.rs "letopis:type=external;path=src/storage/cache.rs")
+
+[Attempt validation](../../src/storage/vector.rs "letopis:type=external;path=src/storage/vector.rs")
 
 [Command dispatch](../../src/commands.rs "letopis:type=external;path=src/commands.rs")
 

@@ -1,7 +1,7 @@
 # CLI observation commands
 
 ## Check scope {#check-scope}
-<!-- letopis: {"created_at":1793278642,"source_snapshot":"7d506ed54103d557f6da760bd189f084efb74dd5"} -->
+<!-- letopis: {"created_at":1793278642,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 `check` refreshes the corpus and returns validation problems from a pinned storage
 view. With omitted or empty `paths`, it requests a verified refresh with a full
 source-snapshot audit. A scoped check uses ordinary refresh and restricts reported
@@ -15,8 +15,32 @@ internal error instead of reporting the newer, unaudited revision as checked.
 
 [CLI check contract](../../src/cli/help.rs "letopis:type=external;path=src/cli/help.rs")
 
+## Check findings {#check-findings}
+<!-- letopis: {"created_at":1793816837,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+`check` joins findings from two observers over the same pinned read view. Graph
+diagnostics report a file whose latest parse failed (`invalid_markup`, or a
+classified parser diagnostic), a knowledge link whose target is absent
+(`dangling_target`), and members of an `includes` cycle (`includes_cycle`, one
+finding per file).
+
+Source provenance reports a knowledge element without a `source_snapshot`
+(`missing_source_snapshot`), a snapshot tree that is unavailable
+(`source_snapshot_unavailable`), and an address absent from its snapshot tree
+(`source_not_found`). Observation is batched over the selected elements.
+
+Each finding carries `validation_failed` as its code, static safe text, and
+details with `path` and `reason`, plus `element_id` and `target` when applicable.
+Invalid-file findings carry only `path` and `reason`.
+Findings are filtered to the selected paths, sorted and deduplicated. They never
+fail the command: `ok` stays true with a nonempty `errors` array. Only refresh,
+storage or provenance failures become an internal error response.
+
+[Graph diagnostics](../../src/service/graph_diagnostics.rs "letopis:type=external;path=src/service/graph_diagnostics.rs")
+
+[Source observation helper](../../src/service/utils.rs "letopis:type=external;path=src/service/utils.rs")
+
 ## Inspect results {#inspect-results}
-<!-- letopis: {"created_at":1793278642,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793278642,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 `inspect` accepts a nonempty set of knowledge or declared-source addresses. It
 refreshes the projection, captures marked corpus files and requested source data,
 assembles a Git tree from captured blobs and pins it before returning. An unknown

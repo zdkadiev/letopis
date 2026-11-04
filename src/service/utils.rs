@@ -345,10 +345,9 @@ fn map_candidate_error(cause: impl std::error::Error + Send + Sync + 'static) ->
 #[cfg(test)]
 pub(crate) mod cache_test_support {
     macro_rules! delegate_cache_reads { () => { delegate_cache_reads!(self => &self.inner); }; ($receiver:ident => $target:expr) => {
-fn get_embedding_status(
-        &$receiver,
-        policy: &$crate::service::EmbeddingStatusPolicy,
-    ) -> $crate::service::StorageResult<$crate::service::EmbeddingStatusSummary> { $crate::service::StorageRead::get_embedding_status($target, policy) }
+fn nodes_get_by_kind(&$receiver) -> $crate::service::StorageResult<u64> { $crate::service::StorageRead::nodes_get_by_kind($target) }
+fn get_vector_coverage(&$receiver) -> $crate::service::StorageResult<u64> { $crate::service::StorageRead::get_vector_coverage($target) }
+fn embed_failures_get_by_kind_and_search_hash_and_attempts(&$receiver, max_attempts: u64) -> $crate::service::StorageResult<Vec<$crate::service::EmbeddingFailure>> { $crate::service::StorageRead::embed_failures_get_by_kind_and_search_hash_and_attempts($target, max_attempts) }
 fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
         &$receiver,
         expected: &$crate::domain::Sha256,
@@ -366,11 +365,11 @@ fn edges_get_by_source_id(&$receiver, source_id: Option<&$crate::domain::Knowled
 fn files_get_by_path(&$receiver, path: &$crate::domain::RepoPath) -> $crate::service::StorageResult<Option<$crate::service::FileRow>> { $crate::service::StorageRead::files_get_by_path($target, path) }
 fn files_get(&$receiver) -> $crate::service::StorageResult<Vec<$crate::service::FileRow>> { $crate::service::StorageRead::files_get($target) }
 fn text_index_get_by_expression(&$receiver, expression: &str) -> $crate::service::StorageResult<Vec<$crate::service::TextMatch>> { $crate::service::StorageRead::text_index_get_by_expression($target, expression) }
-fn vector_keys_get_vector_by_search_hash(
+fn vector_keys_get_by_search_hash(
         &$receiver,
         expected: &$crate::domain::Sha256,
         search_hash: &$crate::domain::Sha256,
-    ) -> $crate::service::StorageResult<$crate::service::VectorOutcome<Option<Vec<f32>>>> { $crate::service::StorageRead::vector_keys_get_vector_by_search_hash($target, expected, search_hash) }
+    ) -> $crate::service::StorageResult<$crate::service::VectorOutcome<Option<Vec<f32>>>> { $crate::service::StorageRead::vector_keys_get_by_search_hash($target, expected, search_hash) }
 fn vector_index_get_by_vector(
         &$receiver,
         expected: &$crate::domain::Sha256,
@@ -388,11 +387,11 @@ fn meta_get_by_id(&$receiver) -> $crate::service::StorageResult<Option<$crate::d
 }; }
     pub(crate) use delegate_cache_reads;
     macro_rules! delegate_graph_reads { () => { delegate_graph_reads!(self => &self.inner); }; ($receiver:ident => $target:expr) => {
-fn nodes_get_ref_by_id(&$receiver, id: &$crate::service::ElementAddress) -> $crate::service::StorageResult<Option<$crate::service::GraphNodeRef>> { $crate::service::GraphRead::nodes_get_ref_by_id($target, id) }
-fn edges_get_by_nodes_row_id_and_type(
+fn nodes_get_by_id(&$receiver, id: &$crate::service::ElementAddress) -> $crate::service::StorageResult<Option<$crate::service::GraphNodeRef>> { $crate::service::GraphRead::nodes_get_by_id($target, id) }
+fn edges_get_by_row_id_and_type(
         &$receiver,
         request: &$crate::service::NeighborPageRequest<'_>,
-    ) -> $crate::service::StorageResult<Vec<$crate::service::GraphNeighbor>> { $crate::service::GraphRead::edges_get_by_nodes_row_id_and_type($target, request) }
+    ) -> $crate::service::StorageResult<Vec<$crate::service::GraphNeighbor>> { $crate::service::GraphRead::edges_get_by_row_id_and_type($target, request) }
 }; }
     pub(crate) use delegate_graph_reads;
     macro_rules! delegate_cache_writes { () => { delegate_cache_writes!(self => &self.inner); }; ($receiver:ident => $target:expr) => {

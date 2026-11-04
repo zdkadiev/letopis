@@ -35,7 +35,7 @@ use support::{
 
 #[test]
 fn effective_filters_initialize_repository_for_search() {
-    // Given
+    // Given: effective source and recheck filters in uninitialized repositories.
     for filters in [
         json!({"needs_recheck":true}),
         json!({"needs_recheck":false}),
@@ -44,13 +44,14 @@ fn effective_filters_initialize_repository_for_search() {
         let repo = ReadingRepo::new();
         let body = json!({"query":"x","limit":1,"filters":filters}).to_string();
 
-        // When
+        // When: run search with each filter.
         let response = get_response(&repo.invoke(&["search"], body.as_bytes()), 0);
 
-        // Then
+        // Then: search succeeds with no matches and creates the cache.
         assert_eq!(response, json!({"ok":true,"result":[]}));
         assert!(repo.get_root().join(".letopis/cache.db").exists());
     }
+    // Given: a source-revision filter addresses an existing empty tree.
     let repo = ReadingRepo::new();
     let tree = open_git_snapshots(repo.get_root())
         .unwrap()
@@ -59,8 +60,10 @@ fn effective_filters_initialize_repository_for_search() {
     let body =
         json!({"query":"x","limit":1,"filters":{"source_revisions":[tree.as_str()]}}).to_string();
 
+    // When: search with the source-revision filter.
     let response = get_response(&repo.invoke(&["search"], body.as_bytes()), 0);
 
+    // Then: search succeeds with no matches and creates the cache.
     assert_eq!(response, json!({"ok":true,"result":[]}));
     assert!(repo.get_root().join(".letopis/cache.db").exists());
 }
@@ -174,10 +177,10 @@ fn binary_search_refreshes_returns_links_and_triggers_existing_drain() {
 
 #[test]
 fn binary_inspect_returns_current_retained_tree_metadata() {
-    // Given
+    // Given: a CRLF knowledge fixture and duplicate normalized IDs.
     let repo = ReadingRepo::new();
     repo.write("knowledge.md", include_bytes!("fixtures/markdown/crlf.md"));
-    // When
+    // When: inspect through the executable.
     let response = get_response(
         &repo.invoke(
             &["inspect"],
@@ -186,14 +189,16 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
         0,
     );
     emit_reading("inspect_success", "inspect", 0, &response);
-    // Then
+    // Then: normalized metadata has the exact independent range and hash.
     assert_eq!(
         response["result"]["elements"],
         json!({"knowledge.md#a":{"path":"knowledge.md","lines":[1,3],"hash":"eacc729e917594b0955d7ccaae6b41106a58c53cc7b9d58d7d186f957ad72864"}})
     );
     let tree = TreeOid::parse(response["result"]["snapshot"].as_str().unwrap()).unwrap();
+    // Given: the live knowledge file changes after capture.
     repo.write("knowledge.md", b"later live edit");
     let git = open_git_snapshots(repo.get_root()).unwrap();
+    // When / Then: the retained snapshot still yields the original CRLF bytes.
     assert_eq!(
         git.blob_get_by_tree_oid_and_path(&tree, &RepoPath::parse("knowledge.md").unwrap())
             .unwrap(),
@@ -203,18 +208,18 @@ fn binary_inspect_returns_current_retained_tree_metadata() {
 
 #[test]
 fn binary_inspect_returns_mixed_metadata_without_text_or_flags() {
-    // Given
+    // Given: knowledge, local-range, missing, and remote source IDs.
     let repo = ReadingRepo::new();
     let knowledge = b"<!-- letopis: {\"created_at\":1792800000,\"source_snapshot\":\"0000000000000000000000000000000000000000\"} -->\nCache decision.\n[range](src/cache.rs#L2-L2 \"letopis:type=external;path=src/cache.rs#L2-L2\")\n[missing](src/missing.rs \"letopis:type=external;path=src/missing.rs\")\n[remote](https://example.invalid/a?q=1#fragment \"letopis:type=external;path=https://example.invalid/a?q=1#fragment\")\n";
     repo.write("knowledge.md", knowledge);
     repo.write("src/cache.rs", b"alpha\r\nbeta\n");
     let body = br#"{"element_ids":["knowledge.md","src/cache.rs#L2-L2","src/missing.rs","https://example.invalid/a?q=1#fragment","./knowledge.md"]}"#;
 
-    // When
+    // When: inspect the mixed normalized IDs through the executable.
     let response = get_response(&repo.invoke(&["inspect"], body), 0);
 
     emit_reading("inspect_mixed", "inspect", 0, &response);
-    // Then
+    // Then: metadata has exact hashes or nulls and the retained tree contains captured bytes.
     assert_eq!(response["ok"], true);
     assert_eq!(
         response["result"]["elements"],

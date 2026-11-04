@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793727646,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793727646,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Foreground and background processes
 
 The CLI maps arguments and JSON input into a typed request. `run_request` locates
@@ -11,10 +11,12 @@ After a successful `search`, `traverse`, `inspect`, `check` or `reindex`,
 checks readiness and probes the embedding lock before requesting a child. A launch
 problem may be attached as a warning; a readiness error follows the error path.
 
-The launcher starts the same executable as `embed --drain`, in the repository
-root, with standard streams detached and a separate session. The parent does not
-wait for provider inference. The child acquires the embedding lock again when it
-actually drains: the earlier probe does not reserve the lock for it.
+Composition in `lib.rs::wire_background_runner` selects the executable, the literal
+`embed --drain` arguments and repository root as the working directory.
+`DetachedProcess` starts its supplied executable/arguments/cwd generically, with
+standard streams detached and a separate session. The parent does not wait for
+provider inference. The child acquires the embedding lock again when it actually
+drains: the earlier probe does not reserve the lock for it.
 
 For the five foreground command forms, the executable installs a SIGINT listener.
 The response writer coordinates normal completion and cancellation so only one

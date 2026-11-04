@@ -1,7 +1,7 @@
 # Program structure and composition
 
 ## Component boundaries {#component-boundaries}
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 Letopis uses a hexagonal structure. Domain types and pure rules live in
 `src/domain`; application-owned interfaces and services live in `src/service`.
 Technology-specific implementations live in `git`, `storage`, `filesystem`,
@@ -17,7 +17,8 @@ owner where required.
 
 The status service accesses its injected storage through a receiver method while
 inside the status read scope. This keeps storage access with the service that
-owns the orchestration.
+owns the orchestration. It also owns configuration-mode policy and backlog/failed
+interpretation; storage retains SQL aggregation and persisted-value validation.
 
 [Architecture](../../docs/zkit/letopis/architecture.md "letopis:type=external;path=docs/zkit/letopis/architecture.md")
 
@@ -34,7 +35,7 @@ owns the orchestration.
 [Repository conventions](../development/repository-conventions.md "letopis:type=related_to;path=letopis/development/repository-conventions.md")
 
 ## Command wiring {#command-wiring}
-<!-- letopis: {"created_at":1793278392,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793278392,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 The CLI validates arguments and decodes JSON input into a typed `Request`.
 `run_request` matches that request, constructs the collaborators needed by its
 command and returns a typed response for CLI formatting. Help can succeed when

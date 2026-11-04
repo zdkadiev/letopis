@@ -98,10 +98,7 @@ fn verify_vectors(cache: &impl CacheDatabase, identity: &Sha256) -> Result<(), B
         assert_eq!(cache.project_get_by_id()?, 1);
         assert_eq!(cache.meta_get_by_id()?, Some(*identity));
         Ok::<_, StorageError>((
-            cache.vector_keys_get_vector_by_search_hash(
-                identity,
-                &Sha256::digest(TEXT.as_bytes()),
-            )?,
+            cache.vector_keys_get_by_search_hash(identity, &Sha256::digest(TEXT.as_bytes()))?,
             cache.vector_index_get_by_vector(identity, &VECTOR, 3)?,
         ))
     })?;

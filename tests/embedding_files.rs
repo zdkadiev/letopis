@@ -85,36 +85,34 @@ fn reads_exact_bytes_and_stable_absence_without_decoding_config() {
         .directory_create_by_path(Path::new(".letopis"))
         .unwrap();
     let path = RepoPath::parse("notes/a.md").unwrap();
+    // When / Then: reads of both missing paths return absence.
     assert_eq!(
         files
-            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
-            .map(|file| file.map(|file| file.bytes))
+            .file_get_bytes_by_path(std::path::Path::new(".letopis/config.json"))
             .unwrap(),
         None
     );
     assert_eq!(
         files
-            .file_get_by_path(Path::new(path.as_str()))
-            .map(|file| file.map(|file| file.bytes))
+            .file_get_bytes_by_path(Path::new(path.as_str()))
             .unwrap(),
         None
     );
+    // Given: both paths now contain arbitrary bytes.
     fs::create_dir(fixture.0.join("notes")).unwrap();
     fs::write(fixture.0.join("notes/a.md"), b"\xff\r\ntext").unwrap();
     fs::write(fixture.0.join(".letopis/config.json"), b"not JSON\xff").unwrap();
-    // When / Then: the generic reader captures the selected paths; bytes remain undecoded and absence stays None.
+    // When / Then: the generic reader returns the selected bytes without decoding them.
     assert_eq!(
         files
-            .file_get_by_path(Path::new(path.as_str()))
-            .map(|file| file.map(|file| file.bytes))
+            .file_get_bytes_by_path(Path::new(path.as_str()))
             .unwrap()
             .unwrap(),
         b"\xff\r\ntext"
     );
     assert_eq!(
         files
-            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
-            .map(|file| file.map(|file| file.bytes))
+            .file_get_bytes_by_path(std::path::Path::new(".letopis/config.json"))
             .unwrap()
             .unwrap(),
         b"not JSON\xff"
@@ -136,21 +134,19 @@ fn rejects_final_and_ancestor_symlinks_and_nonregular_files() {
         .unwrap();
     // When / Then: generic reads inspect the unsafe paths; typed failures expose no outside payload.
     for path in ["link.md", "escape/secret.md", "directory.md"] {
-        let error = files
-            .file_get_by_path(Path::new(path))
-            .map(|file| file.map(|file| file.bytes))
-            .unwrap_err();
+        let error = files.file_get_bytes_by_path(Path::new(path)).unwrap_err();
         assert!(!format!("{error} {error:?}").contains("PRIVATE_PAYLOAD"));
     }
+    // Given: the configuration leaf also becomes an outside symlink.
     symlink(
         outside.0.join("secret.md"),
         fixture.0.join(".letopis/config.json"),
     )
     .unwrap();
+    // When / Then: the byte read rejects that symlink.
     assert!(
         files
-            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
-            .map(|file| file.map(|file| file.bytes))
+            .file_get_bytes_by_path(std::path::Path::new(".letopis/config.json"))
             .is_err()
     );
 }
@@ -169,8 +165,7 @@ fn rejects_replaced_service_directory_and_symlink_at_open() {
     // When / Then: reads and lock acquisition revisit the pinned path; both the old pin and a fresh directory request reject the unsafe path.
     assert!(
         files
-            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
-            .map(|file| file.map(|file| file.bytes))
+            .file_get_bytes_by_path(std::path::Path::new(".letopis/config.json"))
             .is_err()
     );
     assert!(
@@ -294,13 +289,8 @@ fn embedding_files_child() {
             wait_for(&root.join("release"));
         }
         "fifo" => {
-            // Then: the operation reports its expected ownership or failure outcome.
-            assert!(
-                files
-                    .file_get_by_path(Path::new("fifo.md"))
-                    .map(|file| file.map(|file| file.bytes))
-                    .is_err()
-            );
+            // When / Then: FIFO reads and lock attempts fail without blocking.
+            assert!(files.file_get_bytes_by_path(Path::new("fifo.md")).is_err());
             assert!(
                 files
                     .lock_try_acquire_by_path(std::path::Path::new(".letopis/embed.lock"))

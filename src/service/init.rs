@@ -24,10 +24,7 @@ impl InitService {
     fn get_config_bytes(&self) -> FileResult<Option<Vec<u8>>> {
         self.files
             .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
-        Ok(self
-            .files
-            .file_get_by_path(Path::new(CONFIG_PATH))?
-            .map(|file| file.bytes))
+        self.files.file_get_bytes_by_path(Path::new(CONFIG_PATH))
     }
 
     /// Construct initialization from owned adapter capabilities.
@@ -415,18 +412,6 @@ mod tests {
         )
     }
 
-    fn capture(bytes: Vec<u8>) -> CapturedFile {
-        CapturedFile {
-            stat: FileStat {
-                size: bytes.len() as u64,
-                mtime_ns: 1,
-                inode: 1,
-                device: 1,
-            },
-            bytes,
-            checked_at_ns: 1,
-        }
-    }
     struct Files {
         configs: RefCell<VecDeque<Option<Vec<u8>>>>,
         trace: Trace,
@@ -447,10 +432,13 @@ mod tests {
         fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
             Ok(false)
         }
-        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+        fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            panic!("unexpected file_get_by_path")
+        }
+        fn file_get_bytes_by_path(&self, path: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
             assert_eq!(path, std::path::Path::new(".letopis/config.json"));
             self.trace.push("config");
-            Ok(self.configs.borrow_mut().pop_front().flatten().map(capture))
+            Ok(self.configs.borrow_mut().pop_front().flatten())
         }
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("unexpected file_get_stat_by_path")

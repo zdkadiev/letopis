@@ -1,7 +1,7 @@
 use super::utils::map_document_file;
 use super::{
     CacheDatabase, DocumentError, DocumentResult, FileReader, NodeMetadata, SourceAvailability,
-    SourceObservation, SourceReader,
+    SourceObservation, SourceReader, StorageRead,
 };
 use crate::domain::{EdgeTarget, Sha256, SourceUri};
 use std::path::Path;
@@ -25,9 +25,10 @@ impl<F: FileReader, C: CacheDatabase> SourceReader for SourceService<F, C> {
     fn get_source(&self, uri: &SourceUri) -> DocumentResult<Option<SourceObservation>> {
         self.storage
             .with_read_tx(|| {
-                let Some(row) = self
-                    .storage
-                    .nodes_get_by_id(&EdgeTarget::Source(uri.clone()))?
+                let Some(row) = StorageRead::nodes_get_by_id(
+                    self.storage.as_ref(),
+                    &EdgeTarget::Source(uri.clone()),
+                )?
                 else {
                     return Ok(None);
                 };
@@ -277,6 +278,9 @@ mod tests {
         }
         fn file_get_stat_by_path(&self, path: &std::path::Path) -> FileResult<Option<FileStat>> {
             self.inner.file_get_stat_by_path(path)
+        }
+        fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+            panic!("unexpected file_get_bytes_by_path")
         }
         fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             self.reads

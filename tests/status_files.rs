@@ -182,8 +182,7 @@ fn returns_missing_locks_without_creating_files() {
     );
     assert_eq!(
         files
-            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
-            .map(|file| file.map(|file| file.bytes))
+            .file_get_bytes_by_path(std::path::Path::new(".letopis/config.json"))
             .unwrap(),
         None
     );
@@ -210,7 +209,7 @@ fn rejects_symlink_and_inode_replacement() {
             .lock_get_owner_by_path(Path::new(".letopis/index.lock"))
             .is_err()
     );
-    // Given: a pinned directory and a lock later replaced by a symlink.
+    // Given: the pinned service directory is replaced by a fresh directory.
     fs::remove_file(fixture.get_lock_path("index.lock")).unwrap();
     fs::rename(fixture.0.join(".letopis"), fixture.0.join("old-service")).unwrap();
     fs::create_dir(fixture.0.join(".letopis")).unwrap();
@@ -222,8 +221,7 @@ fn rejects_symlink_and_inode_replacement() {
     );
     assert!(
         files
-            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
-            .map(|file| file.map(|file| file.bytes))
+            .file_get_bytes_by_path(std::path::Path::new(".letopis/config.json"))
             .is_err()
     );
 }
@@ -237,11 +235,10 @@ fn reads_existing_config_without_mutation() {
     let files = open_filesystem(&fixture.0).unwrap();
     files.directory_get_by_path(Path::new(".letopis")).unwrap();
 
-    // When / Then: the generic file reader captures it; the exact bytes return without mutation.
+    // When / Then: the generic file reader returns the exact bytes without mutation.
     assert_eq!(
         files
-            .file_get_by_path(std::path::Path::new(".letopis/config.json"))
-            .map(|file| file.map(|file| file.bytes))
+            .file_get_bytes_by_path(std::path::Path::new(".letopis/config.json"))
             .unwrap(),
         Some(b"raw\xff".to_vec())
     );

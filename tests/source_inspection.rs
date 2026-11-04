@@ -123,13 +123,13 @@ fn inspect_preserves_source_bytes_and_deduplicates_ranges() {
 
 #[test]
 fn inspect_distinguishes_missing_bytes_from_missing_membership() {
-    // Given
+    // Given: one source file is absent and a second lacks the requested line range.
     let repo = ReadingRepo::new();
     write_references(&repo, &["missing.txt", "short.txt#L1-L2"]);
     repo.write("short.txt", b"abc");
-    // When
+    // When: inspect both declared source IDs.
     let result = inspect(&repo, &["note.md", "missing.txt", "short.txt#L1-L2"]);
-    // Then: a missing range retains its existing whole file in the tree.
+    // Then: absent bytes and unavailable ranges have null hashes, while the short file remains in the tree.
     assert_eq!(result.elements["missing.txt"].hash, None);
     assert_eq!(result.elements["short.txt#L1-L2"].hash, None);
     assert_eq!(get_blob(&repo, &result, "short.txt"), b"abc");
@@ -142,21 +142,21 @@ fn inspect_distinguishes_missing_bytes_from_missing_membership() {
             )
             .is_err()
     );
-    // Given: the last current declaration is removed.
+    // Given: remove the last current declaration for both source IDs.
     write_references(&repo, &[]);
     let ids = ["note.md", "missing.txt"].map(|id| ElementAddress::parse(id).unwrap());
-    // When
+    // When: inspect the formerly declared IDs again.
     let error = wire_inspector(repo.get_root())
         .unwrap()
         .inspect(&ids)
         .unwrap_err();
-    // Then
+    // Then: the removed declaration makes the requested element NotFound.
     assert_eq!(error.get_kind(), CommandErrorKind::NotFound);
 }
 
 #[test]
 fn inspect_includes_unrequested_declared_source_files() {
-    // Given
+    // Given: declared sources, unrequested knowledge, and an unrelated private file.
     let repo = ReadingRepo::new();
     repo.write("source.txt", b"abc");
     repo.write("unrelated.txt", b"private unrelated");
@@ -166,9 +166,9 @@ fn inspect_includes_unrequested_declared_source_files() {
     );
     repo.write("plain.md", b"unmarked source");
     write_references(&repo, &["source.txt", "plain.md"]);
-    // When
+    // When: inspect one knowledge ID.
     let result = inspect(&repo, &["note.md"]);
-    // Then
+    // Then: the snapshot includes declared source and knowledge bytes, but excludes unrelated and private files.
     assert_eq!(result.elements.len(), 1);
     assert_eq!(get_blob(&repo, &result, "source.txt"), b"abc");
     assert_eq!(get_blob(&repo, &result, "plain.md"), b"unmarked source");
@@ -178,7 +178,7 @@ fn inspect_includes_unrequested_declared_source_files() {
     );
     let git = open_git_snapshots(repo.get_root()).unwrap();
     for path in ["unrelated.txt", ".letopis/cache.db"] {
-        // When / Then
+        // When / Then: confirm unrelated and private paths are absent from the snapshot.
         assert!(
             git.blob_get_by_tree_oid_and_path(&result.snapshot, &RepoPath::parse(path).unwrap())
                 .is_err()

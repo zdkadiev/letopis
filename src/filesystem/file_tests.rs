@@ -9,6 +9,146 @@ use std::{
 use tempfile::TempDir;
 
 #[test]
+fn configuration_reads_without_sampling_wall_clock() {
+    // Given: a valid unconfigured file and a clock hook that fails on any sample.
+    use crate::service::{ConfigReader, Configuration, ConfigurationService};
+    let root = TempDir::new().unwrap();
+    fs::create_dir(root.path().join(".letopis")).unwrap();
+    fs::write(root.path().join(".letopis/config.json"), br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#).unwrap();
+    let files = LocalFileSystem::new(root.path()).unwrap();
+    files
+        .before_clock
+        .replace(Some(Box::new(|| panic!("unexpected wall-clock sample"))));
+    let provider = crate::embedding::HttpProviders::new(None);
+    let service = ConfigurationService {
+        files: &files,
+        provider: &provider,
+    };
+    // When: configuration is read and parsed.
+    let configuration = service.get_config().unwrap();
+    // Then: bytes are available without consulting the clock.
+    assert!(matches!(
+        configuration,
+        Some(Configuration::Unconfigured { .. })
+    ));
+}
+
+#[test]
+fn bytes_read_ignores_unrepresentable_index_timestamp() {
+    // Given: a file whose verified metadata is represented with an out-of-range mtime.
+    let root = TempDir::new().unwrap();
+    fs::write(root.path().join("item"), b"exact bytes").unwrap();
+    let mut files = LocalFileSystem::new(root.path()).unwrap();
+    files.mtime_seconds_override = Some(10_000_000_000);
+    // When: the two read operations observe the same synthetic platform timestamp.
+    let bytes = files.file_get_bytes_by_path(Path::new("item")).unwrap();
+    let captured_error = files.file_get_by_path(Path::new("item")).unwrap_err();
+    // Then: byte-only use succeeds while indexed metadata fails without saturation.
+    assert_eq!(bytes.as_deref(), Some(&b"exact bytes"[..]));
+    assert_eq!(captured_error.get_kind(), FileErrorKind::Io);
+}
+
+#[test]
+fn bytes_read_rejects_content_changed_after_reading() {
+    // Given: a regular file changed immediately after its bytes are read.
+    let root = TempDir::new().unwrap();
+    let path = root.path().join("item");
+    fs::write(&path, b"first").unwrap();
+    let files = LocalFileSystem::new(root.path()).unwrap();
+    files.after_read.replace(Some(Box::new(move || {
+        fs::write(path, b"changed content").unwrap();
+    })));
+    // When: the byte-only operation reads the changing file.
+    let error = files.file_get_bytes_by_path(Path::new("item")).unwrap_err();
+    // Then: changed content is rejected rather than returned as stable.
+    assert_eq!(error.get_kind(), FileErrorKind::Changed);
+}
+
+#[test]
+fn bytes_read_never_follows_leaf_or_parent_symlinks() {
+    // Given: a symlink leaf and a symlink parent pointing at real entries.
+    let root = TempDir::new().unwrap();
+    fs::create_dir(root.path().join("directory")).unwrap();
+    fs::write(root.path().join("directory/item"), b"secret").unwrap();
+    symlink("directory/item", root.path().join("link")).unwrap();
+    symlink("directory", root.path().join("parent")).unwrap();
+    let files = LocalFileSystem::new(root.path()).unwrap();
+    // When: byte-only reads encounter each symlink.
+    let leaf_error = files.file_get_bytes_by_path(Path::new("link")).unwrap_err();
+    let parent_error = files
+        .file_get_bytes_by_path(Path::new("parent/item"))
+        .unwrap_err();
+    // Then: neither destination is read and each error retains its classification.
+    assert_eq!(leaf_error.get_kind(), FileErrorKind::NonRegular);
+    assert_eq!(parent_error.get_kind(), FileErrorKind::UnsafePath);
+}
+
+#[test]
+fn bytes_read_rejects_symlink_replacing_the_observed_leaf() {
+    // Given: a regular file replaced with a symlink to that same inode before opening.
+    let root = TempDir::new().unwrap();
+    let original = root.path().join("item");
+    let moved = root.path().join("moved");
+    fs::write(&original, b"secret").unwrap();
+    let files = LocalFileSystem::new(root.path()).unwrap();
+    files.before_open.replace(Some(Box::new(move || {
+        fs::rename(&original, &moved).unwrap();
+        symlink("moved", original).unwrap();
+    })));
+    // When: the byte-only reader opens the replaced entry.
+    let error = files.file_get_bytes_by_path(Path::new("item")).unwrap_err();
+    // Then: the no-follow open rejects the replacement.
+    assert_eq!(error.get_kind(), FileErrorKind::UnsafePath);
+}
+
+#[test]
+fn bytes_read_rejects_ancestor_replaced_during_reading() {
+    // Given: a file whose ancestor is replaced immediately after reading its bytes.
+    let root = TempDir::new().unwrap();
+    let directory = root.path().join("directory");
+    let moved = root.path().join("moved");
+    fs::create_dir(&directory).unwrap();
+    fs::write(directory.join("item"), b"content").unwrap();
+    let files = LocalFileSystem::new(root.path()).unwrap();
+    files.after_read.replace(Some(Box::new(move || {
+        fs::rename(&directory, moved).unwrap();
+        fs::create_dir(directory).unwrap();
+    })));
+    // When: the byte-only operation reads under the replaced ancestor.
+    let error = files
+        .file_get_bytes_by_path(Path::new("directory/item"))
+        .unwrap_err();
+    // Then: no bytes escape from an unverified ancestor.
+    assert_eq!(error.get_kind(), FileErrorKind::Changed);
+}
+
+#[test]
+fn indexed_capture_samples_clock_before_reading_bytes() {
+    // Given: hooks recording the clock sample and checking it at the end of the read.
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    let root = TempDir::new().unwrap();
+    fs::write(root.path().join("item"), b"content").unwrap();
+    let files = LocalFileSystem::new(root.path()).unwrap();
+    let sampled = Arc::new(AtomicBool::new(false));
+    let on_clock = Arc::clone(&sampled);
+    files.before_clock.replace(Some(Box::new(move || {
+        on_clock.store(true, Ordering::SeqCst);
+    })));
+    let after_read = Arc::clone(&sampled);
+    files.after_read.replace(Some(Box::new(move || {
+        assert!(after_read.load(Ordering::SeqCst));
+    })));
+    // When: an indexed capture reads the document.
+    let captured = files.file_get_by_path(Path::new("item")).unwrap().unwrap();
+    // Then: the clock was sampled before the bytes and its result is retained.
+    assert_eq!(captured.bytes, b"content");
+    assert!(captured.checked_at_ns > 0);
+}
+
+#[test]
 fn observes_absent_and_present_files_without_creating_entries() {
     // Given: a root containing one ordinary file and no private state.
     let root = TempDir::new().unwrap();
@@ -24,7 +164,11 @@ fn observes_absent_and_present_files_without_creating_entries() {
             .is_none()
     );
     let captured = reader.file_get_by_path(Path::new("item")).unwrap().unwrap();
+    let missing_bytes = reader.file_get_bytes_by_path(Path::new("missing")).unwrap();
+    let present_bytes = reader.file_get_bytes_by_path(Path::new("item")).unwrap();
     // Then: bytes and stat agree and observations create no entries.
+    assert_eq!(missing_bytes, None);
+    assert_eq!(present_bytes.as_deref(), Some(&b"exact bytes"[..]));
     assert_eq!(captured.bytes, b"exact bytes");
     assert_eq!(captured.stat.size, 11);
     assert!(reader.file_is_exist(Path::new("item")).unwrap());

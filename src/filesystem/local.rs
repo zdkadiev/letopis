@@ -23,6 +23,10 @@ pub(crate) struct LocalFileSystem {
     root: File,
     #[cfg(test)]
     pub(super) capture_time: Option<i64>,
+    #[cfg(test)]
+    pub(super) mtime_seconds_override: Option<i64>,
+    #[cfg(test)]
+    pub(super) before_clock: RefCell<Option<Box<dyn FnOnce() + Send>>>,
     pub(super) root_path: PathBuf,
     pub(super) directories: RefCell<BTreeMap<PathBuf, File>>,
     #[cfg(test)]
@@ -70,6 +74,10 @@ impl LocalFileSystem {
             root: File::from(root),
             #[cfg(test)]
             capture_time: None,
+            #[cfg(test)]
+            mtime_seconds_override: None,
+            #[cfg(test)]
+            before_clock: RefCell::new(None),
             root_path,
             directories: RefCell::new(BTreeMap::new()),
             #[cfg(test)]
@@ -146,6 +154,9 @@ impl FileReader for LocalFileSystem {
 
     fn file_get_by_path(&self, path: &Path) -> FileResult<Option<CapturedFile>> {
         super::file::file_get_by_path(self, path)
+    }
+    fn file_get_bytes_by_path(&self, path: &Path) -> FileResult<Option<Vec<u8>>> {
+        super::file::file_get_bytes_by_path(self, path)
     }
     fn file_get_stat_by_path(&self, path: &Path) -> FileResult<Option<FileStat>> {
         super::file::file_get_stat_by_path(self, path)

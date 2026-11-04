@@ -1,7 +1,7 @@
-<!-- letopis: {"created_at":1793728313,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793728313,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Parsing Markdown documents
 
-`MarkdownParser` is a pure codec: it receives a repository-relative path and
+`MarkdownParser` implements `MarkdownCodec::file_parse` as a pure codec: it receives a repository-relative path and
 file bytes, and returns parsed data or diagnostics. It does not read the filesystem,
 write Markdown, access Git or SQLite, or call an embedding provider.
 

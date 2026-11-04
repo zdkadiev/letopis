@@ -42,46 +42,27 @@ pub(super) fn file_get_by_path(
     files: &LocalFileSystem,
     path: &Path,
 ) -> FileResult<Option<CapturedFile>> {
-    let (components, name) = path_get_file_components(path)?;
-    let Some(parent) = FileParent::directory_get_by_components(files, &components)? else {
+    let captured = file_get_content_by_path(files, path, || {
+        let checked_at_ns = file_get_time_ns(files)?;
+        #[cfg(test)]
+        let checked_at_ns = files.capture_time.unwrap_or(checked_at_ns);
+        Ok(checked_at_ns)
+    })?;
+    let Some((bytes, opened, checked_at_ns)) = captured else {
         return Ok(None);
     };
-    let Some(before) =
-        file_get_observation_by_parent_and_name(files, &parent, &name, file_require_unchanged)?
-    else {
-        return Ok(None);
-    };
-    #[cfg(test)]
-    if let Some(hook) = files.before_open.take() {
-        hook();
-    }
-    let mut file = File::from(
-        openat(&parent.directory, &name, FILE_FLAGS, Mode::empty())
-            .map_err(file_map_observed_open_io)?,
-    );
-    let opened = fstat(&file).map_err(file_map_io)?;
-    file_require_unchanged(&before, &opened)?;
-    let checked_at_ns = file_get_time_ns()?;
-    #[cfg(test)]
-    let checked_at_ns = files.capture_time.unwrap_or(checked_at_ns);
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes).map_err(file_map_cause)?;
-    #[cfg(test)]
-    if let Some(hook) = files.after_read.take() {
-        hook();
-    }
-    file_require_unchanged(&opened, &fstat(&file).map_err(file_map_io)?)?;
-    file_require_unchanged(
-        &opened,
-        &file_verify_entry(&parent.directory, &name, &opened)?,
-    )?;
-    parent.directory_verify_links(files)?;
-    super::path::directory_verify_root(files)?;
     Ok(Some(CapturedFile {
         bytes,
         stat: file_build_stat(&opened)?,
         checked_at_ns,
     }))
+}
+
+pub(super) fn file_get_bytes_by_path(
+    files: &LocalFileSystem,
+    path: &Path,
+) -> FileResult<Option<Vec<u8>>> {
+    Ok(file_get_content_by_path(files, path, || Ok(()))?.map(|(bytes, _, ())| bytes))
 }
 
 pub(super) fn file_get_stat_by_path(
@@ -163,6 +144,60 @@ pub(super) fn directory_get_by_path(
         .map_err(file_map_cause)
 }
 
+/// Read under one verified observation; sample any caller metadata immediately before I/O.
+fn file_get_content_by_path<T, F>(
+    files: &LocalFileSystem,
+    path: &Path,
+    before_read: F,
+) -> FileResult<Option<(Vec<u8>, Stat, T)>>
+where
+    F: FnOnce() -> FileResult<T>,
+{
+    let (components, name) = path_get_file_components(path)?;
+    let Some(parent) = FileParent::directory_get_by_components(files, &components)? else {
+        return Ok(None);
+    };
+    let Some(before) =
+        file_get_observation_by_parent_and_name(files, &parent, &name, file_require_unchanged)?
+    else {
+        return Ok(None);
+    };
+    #[cfg(test)]
+    if let Some(hook) = files.before_open.take() {
+        hook();
+    }
+    let mut file = File::from(
+        openat(&parent.directory, &name, FILE_FLAGS, Mode::empty())
+            .map_err(file_map_observed_open_io)?,
+    );
+    let opened = fstat(&file).map_err(file_map_io)?;
+    file_require_unchanged(&before, &opened)?;
+    let observation = before_read()?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).map_err(file_map_cause)?;
+    #[cfg(test)]
+    if let Some(hook) = files.after_read.take() {
+        hook();
+    }
+    file_require_unchanged(&opened, &fstat(&file).map_err(file_map_io)?)?;
+    file_require_unchanged(
+        &opened,
+        &file_verify_entry(&parent.directory, &name, &opened)?,
+    )?;
+    parent.directory_verify_links(files)?;
+    super::path::directory_verify_root(files)?;
+    #[cfg(test)]
+    let opened = {
+        let mut opened = opened;
+        if let Some(seconds) = files.mtime_seconds_override {
+            opened.st_mtime = seconds;
+            opened.st_mtime_nsec = 0;
+        }
+        opened
+    };
+    Ok(Some((bytes, opened, observation)))
+}
+
 fn file_get_verified_identity_by_path(
     files: &LocalFileSystem,
     path: &Path,
@@ -214,7 +249,11 @@ fn file_get_observation_by_parent_and_name(
     Ok(before)
 }
 
-fn file_get_time_ns() -> FileResult<i64> {
+fn file_get_time_ns(_files: &LocalFileSystem) -> FileResult<i64> {
+    #[cfg(test)]
+    if let Some(hook) = _files.before_clock.take() {
+        hook();
+    }
     let elapsed = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_err(file_map_cause)?;

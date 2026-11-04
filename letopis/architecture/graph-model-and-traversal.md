@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Graph model and traversal
 
 Knowledge elements are identified by repository path or path plus anchor. A graph
@@ -8,8 +8,9 @@ mismatches are rejected. An element with an outgoing `includes` edge is a
 metavertex; this kind is derived rather than authored as Markdown metadata.
 
 The domain `Graph` contains selected identities and optional edges; it does not
-load storage. The application `GraphService` receives a graph reader pinned by its
-caller. It expands neighbors breadth-first, tracks visited node keys, omits start
+load storage. The application `GraphService` receives the shared cache owner and enters a read
+scope; nested calls join the caller's pinned view. It expands neighbors breadth-first,
+tracks visited node keys, omits start
 nodes from discovered elements, and stops at the requested depth and element limit.
 The optional edge limit is separate from the element limit.
 

@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793278392,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793278392,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Git snapshot storage
 
 `GitRepository` discovers a non-bare worktree in process through the pinned gix
@@ -11,8 +11,8 @@ repository-relative path. Trees identify immutable Git content; a snapshot tree 
 not necessarily a commit or the current Git index. `inspect` uses this interface
 to construct a tree containing captured knowledge and addressed local sources.
 
-`retain` validates a tree root and durably retains its exact ref without walking
-all descendants. `pin` additionally validates the reachable closure on each call
+`tree_retain_by_oid` validates a tree root and durably retains its exact ref without
+walking all descendants. `tree_pin_by_oid` additionally validates the reachable closure on each call
 before retaining the root. Gitlinks are not traversed by that closure walk. This
 distinction lets routine work retain roots while full audits use stronger checks.
 

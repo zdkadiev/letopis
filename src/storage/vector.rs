@@ -9,9 +9,9 @@ use super::{
 use crate::{
     domain::{KnowledgeId, Sha256},
     service::{
-        EmbeddingFailure, EmbeddingStatusPolicy, EmbeddingStatusSummary, EmbeddingWork, QueryError,
-        StorageError, StorageErrorKind, StorageResult, StoredVectorKey, TransactionError,
-        TransactionRequirement, VectorDatabase, VectorMatch, VectorOutcome,
+        EmbeddingFailure, EmbeddingWork, QueryError, StorageError, StorageErrorKind, StorageResult,
+        StoredVectorKey, TransactionError, TransactionRequirement, VectorDatabase, VectorMatch,
+        VectorOutcome,
     },
 };
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params, params_from_iter};
@@ -93,6 +93,18 @@ impl VectorStorage {
             )),
         }
     }
+    fn vector_keys_get_by_search_hash(&self, search_hash: &Sha256) -> StorageResult<i64> {
+        let connection = self.get_write_connection()?;
+        let (sql, values) = build_query(
+            Query::select()
+                .column(VectorKeys::RowId)
+                .from(VectorKeys::Table)
+                .and_where(Expr::col(VectorKeys::SearchHash).eq(search_hash.to_hex())),
+        )?;
+        connection
+            .query_row(&sql, params_from_iter(values), |r| r.get(0))
+            .map_err(map_sqlite)
+    }
 }
 
 impl VectorDatabase for VectorStorage {
@@ -153,11 +165,13 @@ impl VectorDatabase for VectorStorage {
         F: FnOnce() -> Result<T, E>,
     {
         transaction::run_read(&self.connection, &self.state, || {
-            if !matches_identity(
+            if meta_get_by_id(
                 self.get_connection().map_err(TransactionError::Storage)?,
-                expected,
+                VectorSchema::Main,
             )
             .map_err(TransactionError::Storage)?
+            .as_deref()
+                != Some(expected.to_hex().as_str())
             {
                 return Ok(VectorOutcome::ConfigChanged);
             }
@@ -180,12 +194,14 @@ impl VectorDatabase for VectorStorage {
             &self.connection,
             &self.state,
             || {
-                if !matches_identity(
+                if meta_get_by_id(
                     self.get_write_connection()
                         .map_err(TransactionError::Storage)?,
-                    expected,
+                    VectorSchema::Main,
                 )
                 .map_err(TransactionError::Storage)?
+                .as_deref()
+                    != Some(expected.to_hex().as_str())
                 {
                     return Ok(VectorOutcome::ConfigChanged);
                 }
@@ -205,7 +221,7 @@ impl VectorDatabase for VectorStorage {
                 .column(VectorKeys::RowId)
                 .from(VectorKeys::Table)
                 .and_where(
-                    Expr::exists(nodes_get_by_kind_and_search_hash(Expr::col((
+                    Expr::exists(build_current_nodes_query(Expr::col((
                         VectorKeys::Table,
                         VectorKeys::SearchHash,
                     ))))
@@ -222,7 +238,7 @@ impl VectorDatabase for VectorStorage {
                 .map_err(map_sqlite)?;
             let (sql, values) = build_query(
                 Query::delete().from_table(VectorKeys::Table).and_where(
-                    Expr::exists(nodes_get_by_kind_and_search_hash(Expr::col((
+                    Expr::exists(build_current_nodes_query(Expr::col((
                         VectorKeys::Table,
                         VectorKeys::SearchHash,
                     ))))
@@ -234,7 +250,7 @@ impl VectorDatabase for VectorStorage {
                 .map_err(map_sqlite)?;
             let (sql, values) = build_query(
                 Query::delete().from_table(EmbedFailures::Table).and_where(
-                    Expr::exists(nodes_get_by_kind_and_search_hash(Expr::col((
+                    Expr::exists(build_current_nodes_query(Expr::col((
                         EmbedFailures::Table,
                         EmbedFailures::SearchHash,
                     ))))
@@ -359,7 +375,7 @@ impl VectorDatabase for VectorStorage {
             let bytes = encode_vector(vector, dimensions)?;
             validate_dimensions(connection, dimensions)?;
             let inserted = vector_keys_upsert_by_search_hash(connection, search_hash)?;
-            let row_id = vector_keys_get_by_search_hash(connection, search_hash)?;
+            let row_id = self.vector_keys_get_by_search_hash(search_hash)?;
             let key = StoredVectorKey { row_id, inserted };
             if key.inserted {
                 let (sql, values) = build_query(
@@ -411,7 +427,7 @@ fn reset_vectors(
 ) -> StorageResult<VectorOutcome<bool>> {
     let tx = rusqlite::Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
         .map_err(map_sqlite)?;
-    let current = meta_get_by_id(&tx, VectorSchema::Main)?;
+    let current = decode_config_identity(meta_get_by_id(&tx, VectorSchema::Main)?)?;
     if current.as_ref() == Some(identity) {
         return Ok(VectorOutcome::Current(false));
     }
@@ -443,10 +459,14 @@ fn reset_vectors(
     Ok(VectorOutcome::Current(true))
 }
 
+/// Read the raw identity text from the selected database.
+///
+/// # Errors
+/// Reports database failures; interpreting malformed text belongs to the caller.
 pub(super) fn meta_get_by_id(
     connection: &Connection,
     schema: VectorSchema,
-) -> StorageResult<Option<Sha256>> {
+) -> StorageResult<Option<String>> {
     let mut query = Query::select();
     query
         .column(Meta::ConfigIdentity)
@@ -456,10 +476,17 @@ pub(super) fn meta_get_by_id(
         VectorSchema::Attached => query.from((Schemas::Vec, Meta::Table)),
     };
     let (sql, values) = build_query(&query)?;
-    let identity: Option<String> = connection
+    connection
         .query_row(&sql, params_from_iter(values), |row| row.get(0))
         .optional()
-        .map_err(map_sqlite)?;
+        .map_err(map_sqlite)
+}
+
+/// Decode an optional persisted configuration identity.
+///
+/// # Errors
+/// Reports malformed hashes with the established metadata diagnostic.
+pub(super) fn decode_config_identity(identity: Option<String>) -> StorageResult<Option<Sha256>> {
     identity
         .map(|raw| Sha256::parse(&raw))
         .transpose()
@@ -470,20 +497,6 @@ pub(super) fn meta_get_by_id(
                 error,
             )
         })
-}
-
-fn matches_identity(connection: &Connection, expected: &Sha256) -> StorageResult<bool> {
-    let (sql, values) = build_query(
-        Query::select()
-            .column(Meta::ConfigIdentity)
-            .from(Meta::Table)
-            .and_where(Expr::col(Meta::Id).eq(1)),
-    )?;
-    let identity: Option<String> = connection
-        .query_row(&sql, params_from_iter(values), |r| r.get(0))
-        .optional()
-        .map_err(map_sqlite)?;
-    Ok(identity.as_deref() == Some(expected.to_hex().as_str()))
 }
 
 fn validate_dimensions(connection: &Connection, dimensions: usize) -> StorageResult<()> {
@@ -558,22 +571,11 @@ fn vector_keys_upsert_by_search_hash(
         .map_err(map_sqlite)
 }
 
-fn vector_keys_get_by_search_hash(
-    connection: &Connection,
-    search_hash: &Sha256,
-) -> StorageResult<i64> {
-    let (sql, values) = build_query(
-        Query::select()
-            .column(VectorKeys::RowId)
-            .from(VectorKeys::Table)
-            .and_where(Expr::col(VectorKeys::SearchHash).eq(search_hash.to_hex())),
-    )?;
-    connection
-        .query_row(&sql, params_from_iter(values), |r| r.get(0))
-        .map_err(map_sqlite)
-}
-
-pub(super) fn vector_keys_get_vector_by_search_hash(
+/// Read and decode the native vector joined through its current key.
+///
+/// # Errors
+/// Reports missing or malformed native rows and database failures.
+pub(super) fn vector_keys_get_by_search_hash(
     connection: &Connection,
     search_hash: &Sha256,
 ) -> StorageResult<Option<Vec<f32>>> {
@@ -635,14 +637,14 @@ pub(super) fn get_nearest_vectors(
     dimensions: usize,
 ) -> StorageResult<Vec<VectorMatch>> {
     let bytes = encode_vector(query, dimensions)?;
-    let count = vector_keys_get_count(connection)?;
+    let count = vector_keys_get(connection)?;
     if count == 0 {
         return Ok(Vec::new());
     }
     vector_index_get_by_vector(connection, &bytes, count)
 }
 
-fn vector_keys_get_count(connection: &Connection) -> StorageResult<i64> {
+fn vector_keys_get(connection: &Connection) -> StorageResult<i64> {
     let (sql, values) = build_query(
         Query::select()
             .expr(Expr::col(Asterisk).count())
@@ -805,8 +807,8 @@ pub(super) fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
         .columns([Nodes::Id, Nodes::SearchHash])
         .from(Nodes::Table)
         .and_where(Expr::col(Nodes::Kind).ne(SOURCE_KIND))
-        .and_where(Expr::exists(vector_keys_get_existence_by_search_hash()).not())
-        .and_where(Expr::exists(embed_failures_get_by_search_hash_and_attempts(max_attempts)).not())
+        .and_where(Expr::exists(build_vector_key_exists_query()).not())
+        .and_where(Expr::exists(build_failure_threshold_query(max_attempts)).not())
         .order_by(Nodes::Id, Order::Asc)
         .limit(1);
     if let Some(id) = id {
@@ -828,7 +830,7 @@ pub(super) fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
     .transpose()
 }
 
-fn embed_failures_get_by_search_hash_and_attempts(max_attempts: u64) -> SelectStatement {
+fn build_failure_threshold_query(max_attempts: u64) -> SelectStatement {
     Query::select()
         .expr(Expr::val(1))
         .from((Schemas::Vec, EmbedFailures::Table))
@@ -840,7 +842,7 @@ fn embed_failures_get_by_search_hash_and_attempts(max_attempts: u64) -> SelectSt
         .to_owned()
 }
 
-fn nodes_get_by_kind_and_search_hash(hash: Expr) -> SelectStatement {
+fn build_current_nodes_query(hash: Expr) -> SelectStatement {
     Query::select()
         .expr(Expr::val(1))
         .from((Schemas::Cache, Nodes::Table))
@@ -849,66 +851,25 @@ fn nodes_get_by_kind_and_search_hash(hash: Expr) -> SelectStatement {
         .to_owned()
 }
 
-pub(super) fn get_embedding_status(
-    connection: &Connection,
-    identity: Option<Sha256>,
-    policy: &EmbeddingStatusPolicy,
-) -> StorageResult<EmbeddingStatusSummary> {
-    if matches!(policy, EmbeddingStatusPolicy::Disabled) {
-        return Ok(EmbeddingStatusSummary {
-            backlog: 0,
-            failed: 0,
-            exhausted: vec![],
-        });
-    }
-    let total = nodes_get_count_by_kind_and_search_hash(connection, HashCoverage::All)?;
-    let EmbeddingStatusPolicy::Ready {
-        identity: expected,
-        max_attempts,
-    } = policy
-    else {
-        return Ok(EmbeddingStatusSummary {
-            backlog: total,
-            failed: 0,
-            exhausted: vec![],
-        });
-    };
-    if *max_attempts == 0 || i64::try_from(*max_attempts).is_err() {
-        return Err(StorageError::new(
-            StorageErrorKind::InvalidRequest,
-            "invalid status attempt budget",
-        ));
-    }
-    if identity != Some(*expected) {
-        return Ok(EmbeddingStatusSummary {
-            backlog: total,
-            failed: 0,
-            exhausted: vec![],
-        });
-    }
+/// Count distinct current non-source knowledge hashes in SQL.
+///
+/// # Errors
+/// Reports database failures or invalid aggregate values.
+pub(super) fn nodes_get_by_kind(connection: &Connection) -> StorageResult<u64> {
+    nodes_get_by_kind_and_search_hash(connection, HashCoverage::All)
+}
+
+/// Validate native rows and count distinct current hashes with vector keys.
+///
+/// # Errors
+/// Reports missing native rows, invalid counts and database failures.
+pub(super) fn get_vector_coverage(connection: &Connection) -> StorageResult<u64> {
     verify_current_vectors(connection)?;
-    let covered = nodes_get_count_by_kind_and_search_hash(connection, HashCoverage::Stored)?;
-    let exhausted =
-        embed_failures_get_by_kind_and_search_hash_and_attempts(connection, *max_attempts)?;
-    let failed = u64::try_from(exhausted.len()).map_err(map_invalid_value)?;
-    let backlog = total
-        .checked_sub(covered)
-        .and_then(|missing| missing.checked_sub(failed))
-        .ok_or_else(|| {
-            StorageError::new(
-                StorageErrorKind::InternalError,
-                "invalid embedding status counts",
-            )
-        })?;
-    Ok(EmbeddingStatusSummary {
-        backlog,
-        failed,
-        exhausted,
-    })
+    nodes_get_by_kind_and_search_hash(connection, HashCoverage::Stored)
 }
 
 fn verify_current_vectors(connection: &Connection) -> StorageResult<()> {
-    if vector_keys_get_missing_by_rowid_and_kind_and_search_hash(connection)?.is_some() {
+    if vector_keys_get_by_rowid_and_kind_and_search_hash(connection)?.is_some() {
         return Err(StorageError::new(
             StorageErrorKind::InternalError,
             "invalid stored vector data",
@@ -917,7 +878,7 @@ fn verify_current_vectors(connection: &Connection) -> StorageResult<()> {
     Ok(())
 }
 
-fn vector_keys_get_missing_by_rowid_and_kind_and_search_hash(
+fn vector_keys_get_by_rowid_and_kind_and_search_hash(
     connection: &Connection,
 ) -> StorageResult<Option<i64>> {
     let (sql, values) = build_query(
@@ -950,7 +911,7 @@ fn vector_keys_get_missing_by_rowid_and_kind_and_search_hash(
         .map_err(map_sqlite)
 }
 
-fn nodes_get_count_by_kind_and_search_hash(
+fn nodes_get_by_kind_and_search_hash(
     connection: &Connection,
     coverage: HashCoverage,
 ) -> StorageResult<u64> {
@@ -960,7 +921,7 @@ fn nodes_get_count_by_kind_and_search_hash(
         .from(Nodes::Table)
         .and_where(Expr::col(Nodes::Kind).ne(SOURCE_KIND));
     if matches!(coverage, HashCoverage::Stored) {
-        query.and_where(Expr::exists(vector_keys_get_existence_by_search_hash()));
+        query.and_where(Expr::exists(build_vector_key_exists_query()));
     }
     let (sql, values) = build_query(&query)?;
     let count: i64 = connection
@@ -969,7 +930,11 @@ fn nodes_get_count_by_kind_and_search_hash(
     u64::try_from(count).map_err(map_invalid_value)
 }
 
-fn embed_failures_get_by_kind_and_search_hash_and_attempts(
+/// Read current uncovered failures, decoding every row before applying the threshold.
+///
+/// # Errors
+/// Reports malformed hashes or attempts and database failures.
+pub(super) fn embed_failures_get_by_kind_and_search_hash_and_attempts(
     connection: &Connection,
     max_attempts: u64,
 ) -> StorageResult<Vec<EmbeddingFailure>> {
@@ -991,7 +956,7 @@ fn embed_failures_get_by_kind_and_search_hash_and_attempts(
                         Expr::col((Nodes::Table, Nodes::SearchHash))
                             .equals((EmbedFailures::Table, EmbedFailures::SearchHash)),
                     )
-                    .and_where(Expr::exists(vector_keys_get_existence_by_search_hash()).not())
+                    .and_where(Expr::exists(build_vector_key_exists_query()).not())
                     .to_owned(),
             ))
             .order_by(EmbedFailures::SearchHash, Order::Asc),
@@ -1006,6 +971,7 @@ fn embed_failures_get_by_kind_and_search_hash_and_attempts(
             ))
         })
         .map_err(map_sqlite)?;
+    // Decode every candidate before filtering: a low malformed count is still corruption.
     let mut exhausted = Vec::new();
     for row in rows {
         let (hash, attempts, error) = row.map_err(map_sqlite)?;
@@ -1028,7 +994,7 @@ fn embed_failures_get_by_kind_and_search_hash_and_attempts(
     Ok(exhausted)
 }
 
-fn vector_keys_get_existence_by_search_hash() -> SelectStatement {
+fn build_vector_key_exists_query() -> SelectStatement {
     Query::select()
         .expr(Expr::val(1))
         .from((Schemas::Vec, VectorKeys::Table))
@@ -1048,6 +1014,29 @@ mod tests {
         service::{StorageError, VectorDatabase, VectorOutcome},
     };
     use rusqlite::Connection;
+
+    #[test]
+    fn malformed_identity_skips_vector_scopes_without_decoding_it() {
+        // Given: persisted identity text is malformed rather than a valid SHA-256.
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch("create table meta(id integer primary key,config_identity text); insert into meta values(1,'malformed')").unwrap();
+        let storage = VectorStorage::new(connection);
+        let expected = Sha256::digest(b"current");
+        // When: both scope kinds compare the persisted identity before entering callbacks.
+        let read = storage
+            .with_read_tx(&expected, || -> Result<(), StorageError> {
+                panic!("mismatched read must skip callback")
+            })
+            .unwrap();
+        let write = storage
+            .with_write_tx(&expected, || -> Result<(), StorageError> {
+                panic!("mismatched write must skip callback")
+            })
+            .unwrap();
+        // Then: malformed text remains a configuration mismatch, not a decoding failure.
+        assert_eq!(read, VectorOutcome::ConfigChanged);
+        assert_eq!(write, VectorOutcome::ConfigChanged);
+    }
 
     #[test]
     fn failed_reset_cleanup_reports_failure_and_disables_the_connection() {
@@ -1290,8 +1279,8 @@ mod query_tests {
             vector_index_config_get_by_id(main, VectorSchema::Attached).unwrap();
 
         // Then: neither identity nor native dimensions leak across schema locations.
-        assert_eq!(main_id, Some(main_identity));
-        assert_eq!(attached_id, Some(attached_identity));
+        assert_eq!(main_id, Some(main_identity.to_hex()));
+        assert_eq!(attached_id, Some(attached_identity.to_hex()));
         assert_eq!(main_dimensions.unwrap().get(), 2);
         assert_eq!(attached_dimensions.unwrap().get(), 3);
     }

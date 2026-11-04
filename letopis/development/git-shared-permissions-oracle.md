@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793790634,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793790634,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Shared Git object-directory permission oracle
 
 The linked-worktree durability test compares the mode of the object directory

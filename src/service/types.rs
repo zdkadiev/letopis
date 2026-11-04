@@ -1,7 +1,7 @@
 //! Shared application data, requests, results and pure value rules.
 use super::error::{
     CommandError, CommandErrorKind, CommandProblem, CommandResult, EmbeddingError,
-    EmbeddingErrorKind, EmbeddingFailure, EmbeddingResult,
+    EmbeddingErrorKind, EmbeddingResult,
 };
 use crate::{
     domain::{
@@ -644,33 +644,6 @@ pub struct HeldLock {
     pub name: LockName,
     /// Recorded positive PID, which may briefly belong to a previous owner.
     pub pid: NonZeroU32,
-}
-
-/// Captured configuration policy; observing it never resets stored identity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EmbeddingStatusPolicy {
-    /// Every current hash is backlog and none has current exhausted attempts.
-    Unavailable,
-    /// Valid disabled configuration: report no embedding work or execution failures.
-    Disabled,
-    /// Use stored coverage and attempts only when the pinned identity matches.
-    Ready {
-        /// Captured valid configuration identity.
-        identity: Sha256,
-        /// Positive total durable attempt budget, including the initial attempt.
-        max_attempts: u64,
-    },
-}
-
-/// Distinct current knowledge hash counts and their exhausted reservations.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EmbeddingStatusSummary {
-    /// Current hashes without usable vectors or exhausted reservations.
-    pub backlog: u64,
-    /// Current hashes with exhausted reservations and no usable vectors.
-    pub failed: u64,
-    /// Exhausted current hashes, once each in ascending hash order.
-    pub exhausted: Vec<EmbeddingFailure>,
 }
 
 /// Select knowledge by whether its current X-1 flags require rechecking.
@@ -1372,18 +1345,6 @@ mod configuration_value_tests {
         validate_valid: bool,
     }
     struct Provider;
-    fn capture(bytes: Vec<u8>) -> CapturedFile {
-        CapturedFile {
-            stat: FileStat {
-                size: bytes.len() as u64,
-                mtime_ns: 1,
-                inode: 1,
-                device: 1,
-            },
-            bytes,
-            checked_at_ns: 1,
-        }
-    }
     struct Files {
         config: Vec<u8>,
     }
@@ -1468,9 +1429,12 @@ mod configuration_value_tests {
         fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
             Ok(false)
         }
-        fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+        fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
+            panic!("unexpected file_get_by_path")
+        }
+        fn file_get_bytes_by_path(&self, path: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
             assert_eq!(path, std::path::Path::new(".letopis/config.json"));
-            Ok(Some(capture(self.config.clone())))
+            Ok(Some(self.config.clone()))
         }
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("unexpected file_get_stat_by_path")

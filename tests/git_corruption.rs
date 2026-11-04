@@ -21,7 +21,7 @@ enum ObjectDamage {
 #[test]
 fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
     for format in FORMATS {
-        // Given
+        // Given: a truncated root tree with its original bytes saved.
         let repo = TempRepo::new(format);
         let (tree, _) = create_tree_case(&repo);
         let leaf = RepoPath::parse(LEAF_NAME).unwrap();
@@ -36,7 +36,7 @@ fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
         }
         let original = damage_object(&repo, tree.as_str(), ObjectDamage::Truncate);
 
-        // When / Then
+        // When / Then: after reopening, root verification and pinning reject the damaged object without changing user state.
         for _ in 0..2 {
             let git = open_git_snapshots(repo.get_root()).unwrap();
             let verify_error = git.tree_verify_by_oid(&tree).unwrap_err();
@@ -48,9 +48,11 @@ fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
             assert_eq!(repo.capture_fixture_state(), original_user_state);
         }
 
-        // Given / When / Then: exact fixture restoration returns a fresh handle to health.
+        // Given: restore the exact saved object bytes.
         restore_object(&repo, tree.as_str(), &original);
+        // When: reopen the repository after restoring the saved bytes.
         let git = open_git_snapshots(repo.get_root()).unwrap();
+        // Then: the captured leaf and pin are usable without changing user state.
         assert_eq!(
             git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap(),
             CANARY_BYTES
@@ -63,7 +65,7 @@ fn corrupt_tree_remains_an_error_across_reopen_until_restored() {
 #[test]
 fn corrupt_child_never_pins_an_incomplete_closure() {
     for format in FORMATS {
-        // Given
+        // Given: a truncated child blob under an otherwise valid root.
         let repo = TempRepo::new(format);
         let (tree, blob) = create_tree_case(&repo);
         let leaf = RepoPath::parse(LEAF_NAME).unwrap();
@@ -78,7 +80,7 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
         }
         let original = damage_object(&repo, blob.as_str(), ObjectDamage::Truncate);
 
-        // When / Then
+        // When / Then: after reopening, root verification succeeds but pinning rejects the damaged child without changing user state.
         for _ in 0..2 {
             let git = open_git_snapshots(repo.get_root()).unwrap();
             assert_eq!(
@@ -91,9 +93,11 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
             assert!(!format!("{error} {error:?}").contains("CORRUPTION_CANARY"));
         }
 
-        // Given / When / Then: exact fixture restoration returns a fresh handle to health.
+        // Given: restore the exact saved object bytes.
         restore_object(&repo, blob.as_str(), &original);
+        // When: reopen the repository after restoring the saved bytes.
         let git = open_git_snapshots(repo.get_root()).unwrap();
+        // Then: the captured leaf and pin are usable without changing user state.
         assert_eq!(
             git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap(),
             CANARY_BYTES
@@ -106,7 +110,7 @@ fn corrupt_child_never_pins_an_incomplete_closure() {
 #[test]
 fn missing_child_is_not_a_new_empty_snapshot() {
     for format in FORMATS {
-        // Given
+        // Given: a missing child blob under an otherwise valid root.
         let repo = TempRepo::new(format);
         let (tree, blob) = create_tree_case(&repo);
         let leaf = RepoPath::parse(LEAF_NAME).unwrap();
@@ -134,9 +138,11 @@ fn missing_child_is_not_a_new_empty_snapshot() {
             assert!(!format!("{error} {error:?}").contains("CORRUPTION_CANARY"));
         }
 
-        // Given / When / Then: exact fixture restoration returns a fresh handle to health.
+        // Given: restore the exact saved child bytes.
         restore_object(&repo, blob.as_str(), &original);
+        // When: reopen the repository after restoring the saved bytes.
         let git = open_git_snapshots(repo.get_root()).unwrap();
+        // Then: the captured leaf and pin are usable without changing user state.
         assert_eq!(
             git.blob_get_by_tree_oid_and_path(&tree, &leaf).unwrap(),
             CANARY_BYTES

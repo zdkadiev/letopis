@@ -7,11 +7,6 @@ mod input_tests {
         io::{self, Read},
     };
 
-    fn parse(command: &[&str], body: &str) -> CommandResult<Request> {
-        let args = command.iter().map(OsString::from).collect::<Vec<_>>();
-        request_parse(&args, &mut body.as_bytes())
-    }
-
     #[test]
     fn empty_input_uses_empty_request_and_checks_required_fields() {
         // Given: commands with optional and required request fields.
@@ -210,6 +205,11 @@ mod input_tests {
             assert_eq!(error.get_kind(), CommandErrorKind::InvalidRequest);
             assert!(!error.to_string().contains("SECRET_SENTINEL"));
         }
+    }
+
+    fn parse(command: &[&str], body: &str) -> CommandResult<Request> {
+        let args = command.iter().map(OsString::from).collect::<Vec<_>>();
+        request_parse(&args, &mut body.as_bytes())
     }
 }
 

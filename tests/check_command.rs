@@ -200,7 +200,7 @@ fn check_binary_rejects_invalid_input_and_infrastructure_failure() {
 
 #[test]
 fn check_snapshot_findings_are_current_and_safe() {
-    // Given
+    // Given: valid, missing, blob, and foreign snapshot references plus a missing source.
     let repo = ReadingRepo::new();
     let git = open_git_snapshots(repo.get_root()).unwrap();
     let valid = git.tree_create(&[]).unwrap();
@@ -227,10 +227,10 @@ fn check_snapshot_findings_are_current_and_safe() {
         );
     }
 
-    // When
+    // When: check the repository.
     let response = check(&repo, b"{}");
 
-    // Then
+    // Then: findings classify unavailable snapshots without exposing snapshot contents.
     assert_eq!(
         response,
         json!({"ok":true,"result":{"errors":[
@@ -242,7 +242,7 @@ fn check_snapshot_findings_are_current_and_safe() {
             {"code":"validation_failed","message":"knowledge source snapshot is unavailable","details":{"path":"repeat.md","reason":"source_snapshot_unavailable","element_id":"repeat.md","target":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
         ]}})
     );
-    // Repair both root metadata and addressed bytes; an empty tree has no code.rs.
+    // Given: repair each snapshot root and the addressed source bytes.
     let repaired = support::provenance::create_basis(repo.get_root(), &[("code.rs", b"source")]);
     repo.write("code.rs", b"source");
     for path in [
@@ -254,6 +254,7 @@ fn check_snapshot_findings_are_current_and_safe() {
     ] {
         repo.write(path, format!("<!-- letopis: {{\"created_at\":42,\"source_snapshot\":\"{}\"}} -->\n[source](code.rs \"letopis:type=external;path=code.rs\")\n", repaired.as_str()).as_bytes());
     }
+    // When / Then: the repaired repository has no remaining findings.
     assert_eq!(
         check(&repo, b"{}"),
         json!({"ok":true,"result":{"errors":[]}})

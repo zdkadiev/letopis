@@ -933,6 +933,9 @@ mod tests {
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("provenance must not stat sources")
         }
+        fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+            panic!("unexpected file_get_bytes_by_path")
+        }
         fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             self.reads.set(self.reads.get() + 1);
             if self.fail {

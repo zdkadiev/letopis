@@ -16,6 +16,14 @@ import uuid
 
 COMMANDS = []
 SCHEMA = 'docs/zkit/letopis/contracts/schemas/X-1-cli.yaml'
+LOCK_TESTS = (
+    'filesystem::local::tests::index_owner_writes_pid_after_acquiring_lock',
+    'filesystem::local::tests::std_file_and_rustix_locks_exclude_each_other_for_both_names',
+    'filesystem::lock::tests::lock_open_rejects_replacement_and_never_recreates_observed_deletion',
+    'filesystem::lock::tests::owner_drop_unlocks_while_duplicate_descriptor_remains_open',
+    'filesystem::lock::tests::retries_interrupted_lock_acquisition_until_success',
+    'filesystem::lock_tests::lock_observation_is_read_only_and_ownership_persists_until_drop',
+)
 
 
 def create_evidence(path):
@@ -29,7 +37,7 @@ def hash_file(path):
 def hash_inputs(root):
     paths = [root / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs', 'Makefile',
              'rust-toolchain.toml', 'clippy.toml', '.dockerignore', 'skills/letopis/SKILL.md', SCHEMA)]
-    for name in ('src', 'vendor', 'examples', 'scripts', 'tests/support', 'tests/cli', 'tests/fixtures/markdown'):
+    for name in ('src', 'vendor', 'examples', 'scripts', 'tests/support', 'tests/cli', 'tests/fixtures'):
         paths.extend(p for p in (root / name).rglob('*') if p.is_file()
                      and '__pycache__' not in p.parts)
     paths.extend((root / 'tests').glob('*.rs'))
@@ -216,8 +224,7 @@ def run_host(root, evidence, execute, manifest):
     execute(['cargo', 'test', '--locked', '--offline', '--lib', 'cli::',
              '--', '--nocapture', '--test-threads=1'], 'handlers.log')
     capture_handler_responses(evidence, catalogue)
-    execute(['cargo', 'test', '--locked', '--offline', '--lib', 'filesystem::local::tests::',
-             '--', '--nocapture', '--test-threads=1'], 'locks.log')
+    capture_lock_tests(evidence, execute)
     execute(['cargo', 'test', '--locked', '--offline', '--test', 'cli_process',
              '--test', 'cli_runtime', '--test', 'cli_reading', '--', '--nocapture', '--test-threads=1'],
             'runtime.log', extra={'LETOPIS_CLI_FIXTURE': str(artifacts['cli_runtime_fixture'])})
@@ -249,6 +256,16 @@ def run_host(root, evidence, execute, manifest):
     assert any(item['kind'] == 'PRODUCT_DRAIN' for item in captures)
     (evidence / 'product-observations.json').write_text(json.dumps(captures, indent=2) + '\n')
     capture_transport(root, evidence, execute, evidence / 'letopis', catalogue)
+
+
+def capture_lock_tests(evidence, execute):
+    execute(['cargo', 'test', '--locked', '--offline', '--lib', 'filesystem::',
+             '--', '--nocapture', '--test-threads=1'], 'locks.log')
+    passed = {line[len('test '):-len(' ... ok')]
+              for line in (evidence / 'locks.log').read_text().splitlines()
+              if line.startswith('test ') and line.endswith(' ... ok')}
+    missing = set(LOCK_TESTS) - passed
+    assert not missing, f'required lock tests missing: {sorted(missing)}'
 
 
 def capture_thin_slice_responses(evidence, catalogue):

@@ -1,10 +1,15 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"1c24df703adfbe1c196583a36ddcb19cea7bfeb5"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
 # Markdown projection and publication
 
 Marked Markdown in the Git worktree is the authored knowledge; SQLite is its
-searchable projection. The Git adapter enumerates indexed paths and non-ignored
-untracked candidates without running the Git executable. It skips final symlinks;
-file access does not follow unsafe components. Only marked Markdown produces nodes.
+searchable projection. `GitWorktreePaths::worktree_paths_get` returns raw indexed
+and non-ignored untracked paths without running the Git executable; deleted tracked
+paths remain included. Application `CandidateSelection` filters Markdown extensions
+and `.git`/`.letopis` components as bytes. For structurally safe paths it asks the
+filesystem to observe final symlinks without following components and skips them
+before UTF-8 decoding and `RepoPath` validation. Unsafe parents, replacement and
+I/O failures remain errors; only stable nonregular document leaves are excluded.
+Only marked Markdown produces nodes.
 
 `DocumentRefreshService` compares candidate file state with cached observations.
 A routine refresh can return early when nothing requires publication. Otherwise it
@@ -23,7 +28,9 @@ than an incremental one. The full unscoped `check` also requests verified refres
 
 [Refresh implementation](../../src/service/document_refresher.rs "letopis:type=external;path=src/service/document_refresher.rs")
 
-[Corpus discovery](../../src/git/corpus.rs "letopis:type=external;path=src/git/corpus.rs")
+[Raw Git worktree paths](../../src/git/worktree.rs "letopis:type=external;path=src/git/worktree.rs")
+
+[Application candidate selection](../../src/service/utils.rs "letopis:type=external;path=src/service/utils.rs")
 
 [Markdown parser](../../src/markdown/parser.rs "letopis:type=external;path=src/markdown/parser.rs")
 
