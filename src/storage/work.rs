@@ -23,15 +23,15 @@ pub(super) fn get_next_embedding_work_by_id_and_max_attempts(
     }
     let mut query = Query::select();
     query
-        .columns([Nodes::Id, Nodes::SearchHash])
+        .columns([Nodes::Uri, Nodes::SearchHash])
         .from(Nodes::Table)
         .and_where(Expr::col(Nodes::Kind).ne(SOURCE_KIND))
         .and_where(Expr::exists(select_stored_hash()).not())
         .and_where(Expr::exists(select_exhausted_hash(max_attempts)).not())
-        .order_by(Nodes::Id, Order::Asc)
+        .order_by(Nodes::Uri, Order::Asc)
         .limit(1);
     if let Some(id) = id {
-        query.and_where(Expr::col(Nodes::Id).gt(id.as_str()));
+        query.and_where(Expr::col(Nodes::Uri).gt(id.as_str()));
     }
     let (sql, values) = build_query(&query)?;
     let row = connection

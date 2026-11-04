@@ -292,8 +292,8 @@ fn missing_vector_dimensions_skip_inference_and_shared_hashes_keep_distinct_ids(
     assert_eq!(server.take_requests().len(), 1);
 }
 #[test]
-fn mismatched_persisted_knowledge_uri_fails_even_beyond_final_limit() {
-    // Given
+fn malformed_persisted_knowledge_uri_fails_even_beyond_final_limit() {
+    // Given: two searchable elements with one persisted address corrupted.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite sqlite sqlite");
     repo.write_knowledge("b.md", "sqlite plus extra words");
@@ -302,23 +302,26 @@ fn mismatched_persisted_knowledge_uri_fails_even_beyond_final_limit() {
         .refresh()
         .unwrap();
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
-    connection
-        .execute(
-            "update nodes set uri = ?1 where id = ?2",
-            ["wrong.md", "b.md"],
-        )
-        .unwrap();
-    // When
+    assert_eq!(
+        connection
+            .execute(
+                "update nodes set uri = ?1 where uri = ?2",
+                ["../wrong.md", "b.md"],
+            )
+            .unwrap(),
+        1
+    );
+    // When: search inspects candidates beyond its final result limit.
     let error = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 1))
         .unwrap_err();
-    // Then
+    // Then: the malformed persisted address produces a safe internal error.
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
 }
 #[test]
 fn stale_coordinates_are_observed_without_replacing_pinned_lines() {
-    // Given
+    // Given: a published element with deliberately changed cached coordinates.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     wire_document_refresher(repo.get_root())
@@ -326,15 +329,18 @@ fn stale_coordinates_are_observed_without_replacing_pinned_lines() {
         .refresh()
         .unwrap();
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
-    connection
-        .execute("update nodes set line_start = 2 where id = ?1", ["a.md"])
-        .unwrap();
-    // When
+    assert_eq!(
+        connection
+            .execute("update nodes set line_start = 2 where uri = ?1", ["a.md"])
+            .unwrap(),
+        1
+    );
+    // When: search compares the pinned metadata to the current canonical document.
     let links = wire_searcher(repo.get_root())
         .unwrap()
         .search(&make_request("sqlite", 2))
         .unwrap();
-    // Then
+    // Then: the original pinned coordinates return with a stale flag.
     assert_eq!(links[0].lines, LineRange::new(2, 2).unwrap());
     assert_eq!(
         links[0].flags.iter().copied().collect::<Vec<_>>(),

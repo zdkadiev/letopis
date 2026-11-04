@@ -294,12 +294,12 @@ pub(super) fn get_nearest_vectors(
     }
     let mut statement = connection
         .prepare(
-            "select n.id, k.search_hash, v.distance
+            "select n.uri, k.search_hash, v.distance
          from vec.vector_index(?1, ?2) v
          join vec.vector_keys k on k.row_id = v.rowid
          join nodes n on n.search_hash = k.search_hash
          where n.kind <> ?3
-         order by v.distance, n.id",
+         order by v.distance, n.uri",
         )
         .map_err(map_sqlite)?;
     let rows = statement

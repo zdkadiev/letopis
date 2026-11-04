@@ -66,7 +66,7 @@ HTTP/HTTPS sources исключены. `LinkPathMismatch` следует invalid
 её только при следующей успешной публикации. После upgrade обязателен полный
 reindex, затем check; fallback и автоматической миграции нет.
 
-Проверки одного файла: валидные JSON-метаданные, created_at присутствует, якоря уникальны и не вида L<n>-L<n>, нет вложенных элементов, корректные letopis title. Петля (ссылка на себя) — ошибка файла. Нарушение в файле делает файл невалидным: он сохраняет прежнюю проекцию. Все объявленные рёбра хранятся без признака активности ([D-95](decisions.md#D-95)): traverse и фильтры соединяют рёбра с nodes по цели, поэтому ребро к отсутствующей цели невидимо, пока цель не появится, и при её появлении или удалении ничего не пересчитывается. Висячие ссылки (рёбра без цели) и includes-циклы (поиск в глубину по подграфу includes) находят check и status запросом по текущему кэшу (MC-7). Check обновляет производный кэш, затем выполняет файловые проверки по корпусу или путям и эти запросы; авторские Markdown не меняет.
+Проверки одного файла: валидные JSON-метаданные, created_at присутствует, якоря уникальны и не вида L<n>-L<n>, нет вложенных элементов, корректные letopis title. Петля (ссылка на себя) — ошибка файла. Нарушение в файле делает файл невалидным: он сохраняет прежнюю проекцию. Все объявленные рёбра хранятся без признака активности ([D-95](decisions.md#D-95)): traverse и фильтры видят только resolved declarations. Ссылка на отсутствующую цель сохраняется в unresolved; при появлении/удалении цели storage выполняет promotion/demotion между таблицами (MC-2). Неизменённый владелец при этом не разбирается и его декларации не перевставляются. Висячие ссылки (рёбра без цели) и includes-циклы (поиск в глубину по подграфу includes) находят check и status запросом по текущему кэшу (MC-7). Check обновляет производный кэш, затем выполняет файловые проверки по корпусу или путям и эти запросы; авторские Markdown не меняет.
 
 Временное собственное search text строится единым кодеком без служебного комментария и letopis title, с подписями ссылок и собственными code examples. SHA-256 этого представления — search_hash; hash покрывает точные байты элемента. Изменение только адреса ссылки или метаданных не меняет search_hash и не требует нового вектора ([D-92](decisions.md#D-92)). Сдвиг строк меняет координаты, но не ID. Raw текст в SQLite не сохраняется.
 
@@ -88,9 +88,53 @@ reindex, затем check; fallback и автоматической миграц
 | released | — | — | serving | отпустить блокировку; запустить drain при текстах без вектора (MC-5) |
 | serving (final) | — | — | — | ответ команды |
 
-Повторная проверка под блокировкой обязательна: дельта, найденная до ожидания, могла устареть, и публикация по ней перезаписала бы более новую версию (model_publish.py, guard redetect). Строки files обновляются только в той же unit, что и проекции: иначе откатившаяся публикация больше не была бы обнаружена (guard prefilter). Невалидный файл получает новую строку files с hash текущих байтов, текстом ошибки и прежней проекцией: повторно его не разбирают, пока байты не изменятся. Единая unit: убрать исходящие рёбра изменённых/удалённых элементов, UPSERT nodes с сохранением row_id, удалить отсутствующие nodes и source без оставшихся ссылок, записать все объявленные рёбра изменённых файлов, заменить FTS изменённых знаний, записать строки files, project.revision+1. Рёбра других файлов не трогаются: входящее ребро удалённой цели остаётся и снова видно, когда цель вернётся. Векторы и задания в unit не входят: работу embeddings drain находит сам (MC-3).
+Повторная проверка под блокировкой обязательна: дельта, найденная до ожидания, могла устареть, и публикация по ней перезаписала бы более новую версию (model_publish.py, guard redetect). Строки files обновляются только в той же unit, что и проекции: иначе откатившаяся публикация больше не была бы обнаружена (guard prefilter). Невалидный файл получает новую строку files с hash текущих байтов, текстом ошибки и прежней проекцией: повторно его не разбирают, пока байты не изменятся. Единая unit выполняет два прохода: сначала убрать исходящие декларации изменённых/удалённых элементов, удалить отсутствующие nodes, UPSERT nodes по URI с сохранением integer id существующей строки, заменить FTS и files, затем согласовать derived source nodes. После всех node/source mutations записать декларации только изменённых владельцев из effective metadata graph. Неразрешённые декларации с появившейся целью переводятся в resolved перед единственным project.revision+1 и commit. Сохраняются только IDs изменённых владельцев; captured Markdown и search text живут по одному файлу. Неизменённые владельцы не разбираются и их декларации не перевставляются; при изменении наличия цели storage меняет только разрешение входящих деклараций. Invalid Markdown сохраняет last-valid projection; source без доступных байтов остаётся source node с null hash. Векторы и задания в unit не входят: работу embeddings drain находит сам (MC-3).
 
 Падение процесса в любой точке не оставляет частичной публикации: незафиксированная unit откатывается SQLite, блокировку снимает ядро. Корпус не меняется никогда. Источник истины для «что опубликовано» — строки files в кэше; удаление кэша означает полный reindex.
+
+#### MC-2 — идентичность узлов и версия кэша 4
+
+[D-108](decisions.md#D-108), issue #90: `nodes.id` — внутренний integer primary
+key autoincrement для FTS rowid и ограниченных graph handles; `nodes.uri` — один
+уникальный текстовый адрес во всём пространстве knowledge/source. Публичные IDs,
+URI и сортировка остаются текстовыми. Rust `KnowledgeMetadata.id`/`uri` сохранены:
+неравные значения отклоняются как `InvalidRequest` до SQL mutation и отравляют
+write unit; при чтении оба поля строятся из одного URI. `StoredNode.row_id`,
+`TextMatch.row_id` и `GraphNodeKey` сохраняют прежние внутренние роли.
+
+UPSERT конфликтует по URI, меняет только metadata и возвращает прежний integer
+id; ключ стабилен в течение жизни строки, включая смену vertex/metavertex.
+Удаление убирает её FTS entry. После удаления/пересборки стабильность ключей и
+revision не обещается. `edges.source_id` и `edges.target_id` — integer foreign
+keys к `nodes(id)` с restrictive deletion. Оба endpoint join возвращают URI.
+`unresolved_edges(source_id,target_uri,type)` хранит отсутствующие цели, source FK
+ссылается на `nodes(id)`. В committed state одна декларация находится ровно в
+одной таблице; placeholder nodes нет. Logical reads объединяют обе таблицы в
+порядке source URI, target URI, type; diagnostics видят missing targets, neighbor
+pages — только resolved edges. Перед удалением node проверяются обе исходящие
+таблицы, затем входящие resolved declarations переводятся в unresolved, FTS/node
+удаляются. Возврат цели разрешает декларации с новым integer id. Duplicate в
+любой таблице и отсутствующий source отравляют write unit; ошибка любого прохода,
+demotion/promotion, FTS/files или revision откатывает всю публикацию.
+
+Cache schema **4**, vector schema **1**. Vector keys — отдельные integer IDs;
+принадлежность текущим узлам определяется только `search_hash`. Старые схемы 1/2/3
+и malformed cache отвергаются open/status/reindex до vector access, без repair,
+миграции или reset. Direct open/reindex распознают точную схему read-only до
+writable cache open; status остаётся read-only. При отказе cache main/WAL bytes
+и identities, committed logical state, vectors/config/locks сохраняются, включая
+DELETE и uncheckpointed WAL. Все три пути могут создать пустой `cache.db-wal`
+и `cache.db-shm` (32768 bytes в проверенном stack); существующий SHM может менять
+reader bookkeeping, сохраняя identity и безопасное время жизни. Неизменность SHM bytes
+не гарантируется. Live WAL читается, sidecars не удаляются, vectors не открываются.
+Это не гарантия нулевых filesystem effects.
+[Явное обновление](../../development.md#issue-90-версия-кэша-4) выполняют после
+остановки calls/drain и закрытия handles: удалить только cache и его sidecars,
+сохранить vectors/config/locks/Markdown/Git, вызвать reindex. Свежий кэш не
+восстанавливает last-valid projection невалидного/отсутствующего Markdown.
+Сам переход не сбрасывает/prune векторы; последующие config reset и обычный drain
+pruning сохраняют существующие правила. Исторические models, fixtures и receipts
+относятся к своим captured revisions.
 
 #### MC-2 — состояния reindex
 
@@ -243,7 +287,7 @@ FTS сортируется по bm25, vector — по cosine distance по `.let
 
 Traverse — BFS от уникальных ID; все старты проверяются до обхода, неизвестный ID отклоняет вызов. Рёбра к отсутствующей цели пропускаются; посещённые узлы повторно не расширяются, поэтому includes-цикл, о котором сообщает check, не зацикливает обход ([D-95](decisions.md#D-95)). Соседи упорядочены по (тип, ID цели); relations исключает includes, containment оставляет includes, both объединяет. Direction применяется отдельно: outgoing/incoming/both; includes также один шаг глубины. Посещённые ID возвращаются один раз, старты исключены, но расширяются. Depth=0 возвращает пустые элементы/рёбра. Limit ограничивает суммарные vertex/metavertex/source по X-1; edge_limit независимо ограничивает возвращённые фактически пройденные edges, не прекращает поиск элементов. При отсутствии edge_limit edges не включается. Рёбра добавляются только при фактическом рассмотрении перехода в допустимой глубине; альтернативный путь к уже посещённой вершине тоже пройден, но не дублирует элемент. Когда достигнут node limit, новые переходы не выполняются; никакого induced graph всех связей между результатами не строится.
 
-Уточнение TK-23: чистый domain Graph содержит выбранные identities/edges; GraphService выполняет инкрементальный BFS через object-safe GraphRead. FIFO использует компактные discovery IDs; visited/результат/optional edges ограничены starts и лимитами, плюс не более двух страниц по 32 neighbor records. Для incoming ID порядка — достигнутый сосед, тройка сохраняет исходную ориентацию. Strict per-direction keysets используют directional indexes, endpoint joins и filters до LIMIT. Прогретый refresh читает отдельный distinct набор source roots вместо metadata всех nodes. Bindings выбранного знания наблюдаются page→provenance→next page, не собираются целиком. Traversal не вызывает query embedding; readiness остаётся до единственного pin. Первоначальная/изменённая публикация, file/root sets, parsing и JSON не входят в обещание BFS bound. [Evidence, host/Linux native receipts и завершённые reviews](checks/TK-23/report.md).
+Уточнение TK-23: чистый domain Graph содержит выбранные identities/edges; GraphService выполняет инкрементальный BFS через object-safe GraphRead. FIFO использует компактные discovery IDs; visited/результат/optional edges ограничены starts и лимитами, плюс не более двух страниц по 32 neighbor records. Для incoming ID порядка — достигнутый сосед, тройка сохраняет исходную ориентацию. Strict per-direction keysets используют directional indexes, integer endpoint joins и filters до LIMIT, но порядок остаётся `(type, neighbor URI)`. Integer indexes сами по себе не обеспечивают URI order: native SQLite VM проверяет bounded top-K с положительным LIMIT не более 32, без OFFSET, unbounded sorter или degree-sized materialization; retained sort records ограничены LIMIT плюс постоянный working record (filter lookup ограничен supplied filter constants). Страница может сканировать больше adjacency rows, а repeated-page latency расти с degree; прежняя index-only производительность не обещается. Прогретый refresh читает отдельный distinct набор source roots вместо metadata всех nodes. Bindings выбранного знания наблюдаются page→provenance→next page, не собираются целиком. Traversal не вызывает query embedding; readiness остаётся до единственного pin. Первоначальная/изменённая публикация, file/root sets, parsing и JSON не входят в обещание BFS bound. [Исходные TK-23 receipts/reviews](checks/TK-23/report.md) относятся к прежним query plans; текущий integer-edge proof и native acceptance описаны в [новом отчёте](../../superpowers/plans/2026-11-04-issue-90-integer-edges-report.md).
 
 Inspect пакетно получает у B-2 один Git snapshot текущих файлов для element_ids знаний и source ([D-93](decisions.md#D-93)); рёбра inspect не адресует. I-12 возвращает Map<ElementId, InspectedElement> с path/lines/hash; для знания кодек находит элемент в этом tree, для source берутся адресованные байты. Отсутствующий в текущем tree ID отклоняет всю группу, дубли выдаются один раз. Индексные stale координаты не подставляются. JSON содержит только метаданные/ссылки. Агент, которому нужен согласованный набор содержимого, читает все пути из этого же tree по [D-77](decisions.md#D-77).
 

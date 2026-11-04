@@ -35,6 +35,30 @@ reader до drop живого SearchService; последующие WAL checkpoi
 Query_error очищается фактическим следующим успешным query под той же config identity,
 без config reset; отдельная guarded diagnostic-запись не делает read view writable.
 
+## Идентичность в read view — issue 90
+
+[D-108](../decisions.md#D-108): cache schema 4 использует `nodes.id` как integer
+FTS/graph key и `nodes.uri` как единственный уникальный текстовый адрес.
+`StoredNode.row_id`, `TextMatch.row_id` и `GraphNodeKey` относятся к строке
+закреплённого cache view; их нельзя считать внешними IDs или vector keys.
+Публичные knowledge IDs и source URI, edge endpoints, tie ordering и neighbor
+cursors остаются текстовыми. Vector schema 1 и membership по `search_hash`
+не меняются. Стабильность integer keys/revision после удаления или пересборки
+кэша не обещается; несовместимая схема отвергается без изменения vectors.
+Оба resolved endpoint columns — integer FK к `nodes(id)`; textual endpoints
+восстанавливаются join по URI. Logical declaration reads объединяют resolved и
+unresolved, но bounded neighbor pages не включают отсутствующие цели. Один view
+видит публикацию целиком до или после двух проходов, включая demotion/promotion,
+FTS/files и revision. URI keysets используют LIMIT не более 32 без OFFSET;
+native bounded top-K допускает adjacency scan, но не degree-sized sort storage.
+Direct open/reindex распознают точную схему read-only до writable cache open;
+status остаётся read-only. При отказе main/WAL bytes и identities, committed
+logical state, vectors/config/locks сохраняются, включая DELETE и uncheckpointed WAL.
+Все три пути могут создать пустой cache WAL и SHM reader index; существующий SHM
+может менять reader bookkeeping, сохраняя identity и безопасное время жизни.
+SHM bytes не обещаны неизменными. Читается live WAL; sidecars не удаляются и
+vector files не создаются/не открываются. Нулевые filesystem effects не обещаются.
+
 ## Timing and limits
 
 Synchronous in-process call; no independent deadline or quota. The caller owns the existing read view or write unit. Computing embeddings never runs inside the write unit. Resource limits remain those of mechanics and resource-math.

@@ -372,7 +372,8 @@ pub trait StorageRead {
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
     fn get_nodes(&mut self) -> StorageResult<Vec<StoredNode>>;
-    /// List all declared edges, optionally restricted to their source.
+    /// List resolved and missing-target declarations in textual source, target and type order.
+    /// An optional source restricts both representations; absent targets have no node metadata.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted edges.
@@ -440,9 +441,11 @@ pub trait CacheWrite {
     /// Insert or replace metadata while preserving its row ID.
     ///
     /// # Errors
-    /// Rejects unsupported numeric values or database failures.
+    /// Rejects unequal knowledge identity/address fields, unsupported numeric values,
+    /// or database failures. Any error prevents publication of this write unit.
     fn upsert_node(&mut self, node: &NodeMetadata) -> StorageResult<i64>;
-    /// Insert a declared edge, including a dangling target.
+    /// Insert a declared edge, retaining an absent target without creating a placeholder node.
+    /// Targets introduced later in the unit resolve when the unit commits.
     ///
     /// # Errors
     /// Rejects duplicate edges and missing sources; reports database failures.
@@ -452,7 +455,7 @@ pub trait CacheWrite {
     /// # Errors
     /// Reports database failures.
     fn delete_outgoing(&mut self, source: &KnowledgeId) -> StorageResult<()>;
-    /// Delete a node and its FTS entry, preserving incoming edges.
+    /// Delete a node and its FTS entry, retaining incoming declarations as missing targets.
     ///
     /// # Errors
     /// Rejects deletion while outgoing edges remain; reports database failures.
@@ -472,7 +475,8 @@ pub trait CacheWrite {
     /// # Errors
     /// Reports database failures.
     fn delete_file(&mut self, path: &RepoPath) -> StorageResult<()>;
-    /// Publish all mutations and increment the revision once, including empty units.
+    /// Resolve declarations against the final node set and publish all mutations atomically.
+    /// Increment the revision once, including empty units; unchanged owners also resolve.
     ///
     /// # Errors
     /// Rejects failed units, revision overflow, and database failures, rolling back.
@@ -531,6 +535,8 @@ pub trait VectorWrite {
 ///
 /// Every implementation publishes a refresh atomically: readers see either the previous
 /// projection or the complete new one, never a partial update.
+/// Node and derived source publication precedes changed owners' edge insertion. Invalid
+/// Markdown retains its last-valid projection; unchanged declarations follow target lifecycle.
 #[cfg_attr(test, mockall::automock)]
 pub trait Refresher {
     /// Detect and atomically publish changed file projections.

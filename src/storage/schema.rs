@@ -5,7 +5,7 @@ use super::{
 use crate::service::{StorageError, StorageErrorKind, StorageResult};
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 
-const CACHE_SCHEMA_VERSION: i64 = 2;
+const CACHE_SCHEMA_VERSION: i64 = 4;
 const VECTOR_SCHEMA_VERSION: i64 = 1;
 const USER_VERSION_PRAGMA: &str = "user_version";
 const CACHE_SCHEMA: &str = include_str!("cache.sql");
@@ -32,6 +32,15 @@ pub(super) fn bootstrap_cache(connection: &mut Connection) -> StorageResult<()> 
 
 pub(super) fn bootstrap_vectors(connection: &mut Connection) -> StorageResult<()> {
     bootstrap_schema(connection, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION)
+}
+
+/// Reject incompatible nonempty caches in one read-only view before writable open.
+/// Empty databases remain eligible for the existing concurrent bootstrap.
+///
+/// # Errors
+/// Rejects incompatible definitions/version or database observation failures.
+pub(super) fn recognize_cache(connection: &mut Connection) -> StorageResult<()> {
+    recognize_schema(connection, CACHE_SCHEMA, CACHE_SCHEMA_VERSION).map(|_| ())
 }
 
 pub(super) fn validate_cache(connection: &Connection) -> StorageResult<()> {
@@ -72,17 +81,25 @@ fn bootstrap_schema(
     sql: &str,
     expected_version: i64,
 ) -> StorageResult<()> {
-    // Pin version and definitions to one read view without requesting a writer.
-    let initialized = wait_for_initialization(|| {
-        let read = connection.transaction().map_err(map_sqlite)?;
-        let initialized = has_schema(&read, sql, expected_version)?;
-        read.commit().map_err(map_sqlite)?;
-        Ok(initialized)
-    })?;
+    let initialized = recognize_schema(connection, sql, expected_version)?;
     if initialized {
         return Ok(());
     }
     initialize_schema(connection, sql, expected_version)
+}
+
+fn recognize_schema(
+    connection: &mut Connection,
+    sql: &str,
+    expected_version: i64,
+) -> StorageResult<bool> {
+    // Pin version and definitions to one read view without requesting a writer.
+    wait_for_initialization(|| {
+        let read = connection.transaction().map_err(map_sqlite)?;
+        let initialized = has_schema(&read, sql, expected_version)?;
+        read.commit().map_err(map_sqlite)?;
+        Ok(initialized)
+    })
 }
 
 fn initialize_schema(
@@ -264,17 +281,42 @@ mod tests {
     }
 
     #[test]
-    fn accepts_legacy_keyword_case_without_ignoring_literal_case() {
-        // Given: the previously published cache schema with uppercase keywords.
+    fn rejects_legacy_cache_layouts_without_relabeling_their_versions() {
+        for schema in [
+            include_str!("../../tests/fixtures/storage/legacy-cache.sql"),
+            include_str!("../../tests/fixtures/storage/cache-v2.sql"),
+        ] {
+            // Given: a frozen schema-2 cache with its original published version.
+            let mut connection = Connection::open_in_memory().unwrap();
+            connection.execute_batch(schema).unwrap();
+            connection.pragma_update(None, "user_version", 2).unwrap();
+            // When: the cache bootstrap encounters the incompatible identity layout.
+            let error = bootstrap_cache(&mut connection).unwrap_err();
+            // Then: it rejects the cache and preserves the original version.
+            assert_eq!(error.get_message(), "incompatible storage database schema");
+            assert_eq!(
+                connection
+                    .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                2
+            );
+        }
+    }
+
+    #[test]
+    fn accepts_keyword_case_without_ignoring_literal_case() {
+        // Given: a small schema using uppercase keywords and exact string literals.
         let mut connection = Connection::open_in_memory().unwrap();
         connection
-            .execute_batch(include_str!(
-                "../../tests/fixtures/storage/legacy-cache.sql"
-            ))
+            .execute_batch("CREATE TABLE t(value TEXT CHECK(value='A')); PRAGMA user_version=1")
             .unwrap();
-        connection.pragma_update(None, "user_version", 2).unwrap();
-        // When / Then: the lowercase source describes the same stored schema.
-        assert!(bootstrap_cache(&mut connection).is_ok());
+        // When / Then: lowercase keywords describe exactly the same schema.
+        bootstrap_schema(
+            &mut connection,
+            "create table t(value text check(value='A'))",
+            1,
+        )
+        .unwrap();
 
         // Given: an uppercase vector schema with its native extension registered.
         super::register_vec1().unwrap();
@@ -306,16 +348,18 @@ mod tests {
 
     #[test]
     fn cache_and_vector_versions_are_independent() {
-        // Given / When / Then: initialize each schema and check its version.
+        // Given: cache and vector schemas have independently expected versions.
         for (bootstrap, version) in [
             (
                 bootstrap_cache as fn(&mut Connection) -> StorageResult<()>,
-                2,
+                4,
             ),
             (bootstrap_vectors, 1),
         ] {
             let mut connection = Connection::open_in_memory().unwrap();
+            // When: initialize a fresh database with one schema.
             bootstrap(&mut connection).unwrap();
+            // Then: the persisted version matches that schema only.
             assert_eq!(
                 connection
                     .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))

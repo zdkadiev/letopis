@@ -34,6 +34,8 @@ const LEGACY_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retrie
 pub(crate) const GENERATED_CONFIG: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  }\n}\n";
 
 /// Searchable knowledge metadata; document text is never retained here.
+///
+/// Storage requires `id == uri` and reconstructs both from the persisted address.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeMetadata {
     /// Identity of the knowledge element.

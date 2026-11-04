@@ -128,7 +128,7 @@ fn invoke_reindex(repo: &ReadingRepo) -> Value {
 
 fn assert_basis_projection(repo: &ReadingRepo, basis: &str) {
     let db = open_cache_read_only(repo);
-    let mut statement = db.prepare("select id from nodes order by id").unwrap();
+    let mut statement = db.prepare("select uri from nodes order by uri").unwrap();
     let ids: Vec<String> = statement
         .query_map([], |row| row.get(0))
         .unwrap()
@@ -137,16 +137,20 @@ fn assert_basis_projection(repo: &ReadingRepo, basis: &str) {
     assert_eq!(ids, ["a.md", "source.txt"]);
     let declared: String = db
         .query_row(
-            "select source_snapshot from nodes where id='a.md'",
+            "select source_snapshot from nodes where uri='a.md'",
             [],
             |row| row.get(0),
         )
         .unwrap();
     assert_eq!(declared, basis);
     let edge: (String, String, String) = db
-        .query_row("select source_id, target_id, type from edges", [], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        })
+        .query_row(
+            "select source.uri,target.uri,edges.type from edges
+             join nodes as source on source.id=edges.source_id
+             join nodes as target on target.id=edges.target_id",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
         .unwrap();
     assert_eq!(
         edge,
@@ -334,7 +338,7 @@ fn open_cache_read_only(repo: &ReadingRepo) -> Connection {
 }
 
 fn get_matching_ids(db: &Connection, token: &str) -> Vec<String> {
-    db.prepare("select id from nodes join text_index on row_id=text_index.rowid where text_index match ? order by id")
+    db.prepare("select nodes.uri from nodes join text_index on nodes.id=text_index.rowid where text_index match ? order by nodes.uri")
         .unwrap()
         .query_map([token], |row| row.get(0))
         .unwrap()

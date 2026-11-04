@@ -58,3 +58,6 @@
 !tests/fixtures/config/corpus.json
 
 !tests/git/install-oracle.sh
+
+!tests/fixtures/storage/
+!tests/fixtures/storage/**

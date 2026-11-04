@@ -166,7 +166,7 @@ fn observes_late_source_binding_even_when_traversing_only_containment() {
 
 #[test]
 fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
-    // Given
+    // Given: two containment targets, with malformed metadata only on the later target.
     let repo = ReadingRepo::new();
     repo.write_knowledge(
         "a.md",
@@ -179,23 +179,26 @@ fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
         .refresh()
         .unwrap();
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
-    connection
-        .execute(
-            "update nodes set created_at = 'PRIVATE_INVALID' where id = ?1",
-            ["c.md"],
-        )
-        .unwrap();
+    assert_eq!(
+        connection
+            .execute(
+                "update nodes set created_at = 'PRIVATE_INVALID' where uri = ?1",
+                ["c.md"],
+            )
+            .unwrap(),
+        1
+    );
     let mut service = wire_traverser(repo.get_root()).unwrap();
     let mut request = make_request("a.md");
     request.limit = NonZeroUsize::new(1).unwrap();
-    // When
+    // When: traversal selects only the first target.
     let output = service.traverse(&request).unwrap();
-    // Then
+    // Then: unselected malformed metadata does not prevent the bounded result.
     assert_eq!(output.elements[0].element_id.as_str(), "b.md");
     request.limit = NonZeroUsize::new(2).unwrap();
-    // When
+    // When: the larger limit selects the corrupted target.
     let error = service.traverse(&request).unwrap_err();
-    // Then
+    // Then: traversal fails safely, releases its view and succeeds after metadata repair.
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert!(!format!("{error:?}").contains("PRIVATE_INVALID"));
     let busy: i64 = connection
@@ -205,9 +208,12 @@ fn skips_unselected_metadata_and_releases_view_after_selected_metadata_error() {
         busy, 0,
         "failed traversal must release its read view while the service lives"
     );
-    connection
-        .execute("update nodes set created_at = 3 where id = ?1", ["c.md"])
-        .unwrap();
+    assert_eq!(
+        connection
+            .execute("update nodes set created_at = 3 where uri = ?1", ["c.md"])
+            .unwrap(),
+        1
+    );
     assert_eq!(service.traverse(&request).unwrap().elements.len(), 2);
 }
 

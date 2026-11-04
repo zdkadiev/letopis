@@ -289,8 +289,8 @@ fn missing_databases_are_not_initialized() {
 
 #[test]
 fn empty_and_wrong_version_databases_are_unchanged() {
-    // Given
-    for (leaf, wrong_version) in [("cache.db", 3), ("vectors.db", 2)] {
+    // Given: empty databases or unsupported schema versions replace healthy databases.
+    for (leaf, wrong_version) in [("cache.db", 5), ("vectors.db", 2)] {
         for version in [0, wrong_version] {
             let repo = build_pair("alpha", "beta");
             let path = repo.get_root().join(".letopis").join(leaf);
@@ -300,9 +300,9 @@ fn empty_and_wrong_version_databases_are_unchanged() {
             drop(raw);
             let before = capture_databases(repo.get_root());
             let request = write_request(repo.get_root(), (2, 0, 0));
-            // When
+            // When: observation attempts to validate the existing database.
             let error = observe_request(&request).unwrap_err();
-            // Then
+            // Then: rejection leaves both database bytes and receipt state intact.
             assert!(
                 error.to_string().contains("unsupported database schema"),
                 "{error}"
@@ -387,17 +387,17 @@ fn missing_or_invalid_configuration_does_not_reset_databases() {
 
 #[test]
 fn expected_cache_version_without_product_schema_is_rejected() {
-    // Given
+    // Given: a cache claims the current version but has no product tables.
     let repo = build_pair("alpha", "beta");
     let path = repo.get_root().join(".letopis/cache.db");
     fs::remove_file(&path).unwrap();
     let raw = rusqlite::Connection::open(&path).unwrap();
-    raw.pragma_update(None, "user_version", 2).unwrap();
+    raw.pragma_update(None, "user_version", 4).unwrap();
     raw.pragma_update(None, "journal_mode", "wal").unwrap();
     drop(raw);
     let before = capture_databases(repo.get_root());
     let request = write_request(repo.get_root(), (2, 0, 0));
-    // When / Then
+    // When / Then: observation rejects it without changing either database.
     assert!(observe_request(&request).is_err());
     assert_eq!(capture_databases(repo.get_root()), before);
 }
