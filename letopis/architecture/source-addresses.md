@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793278392,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793278392,"source_snapshot":"fe8c6d1c0a1a8dcef5745c7939daecf43050c3a7"} -->
 # Source addresses
 
 `SourceUri` distinguishes normalized repository-relative paths, optionally with

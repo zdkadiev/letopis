@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793727646,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793727646,"source_snapshot":"fe8c6d1c0a1a8dcef5745c7939daecf43050c3a7"} -->
 # SQLite storage and read views
 
 Markdown and source files remain authoritative. `.letopis/cache.db` is the
@@ -41,6 +41,9 @@ observation. The observed owner cannot write. `LocalFileSystem` provides generic
 file/directory identity, no-follow and alias checks. Composition selects database
 filenames and brackets opening/attaching with those checks; SQLite connections,
 schemas and attachments remain in storage. Filesystem has no database-role component.
+Consumers needing only bytes can use `file_get_bytes_by_path`: it retains capture's
+identity, content and ancestry checks without sampling the clock or converting
+filesystem timestamps into index metadata.
 Cache node, edge, file, FTS and neighbor queries live with `CacheStorage` in
 `storage/cache.rs`. Vector, embedding work, pruning and status-supporting SQL
 observations live in `storage/vector.rs`; unit tests stay inline. `StatusService`
