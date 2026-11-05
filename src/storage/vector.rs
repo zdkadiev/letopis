@@ -662,12 +662,12 @@ fn vector_index_get_by_vector(
 ) -> StorageResult<Vec<VectorMatch>> {
     let mut statement = connection
         .prepare(
-            "select n.id, k.search_hash, v.distance
+            "select n.uri, k.search_hash, v.distance
          from vec.vector_index(?1, ?2) v
          join vec.vector_keys k on k.row_id = v.rowid
          join nodes n on n.search_hash = k.search_hash
          where n.kind <> ?3
-         order by v.distance, n.id",
+         order by v.distance, n.uri",
         )
         .map_err(map_sqlite)?;
     let rows = statement
@@ -804,15 +804,15 @@ pub(super) fn nodes_get_by_kind_and_search_hash_and_attempts_and_id(
     }
     let mut query = Query::select();
     query
-        .columns([Nodes::Id, Nodes::SearchHash])
+        .columns([Nodes::Uri, Nodes::SearchHash])
         .from(Nodes::Table)
         .and_where(Expr::col(Nodes::Kind).ne(SOURCE_KIND))
         .and_where(Expr::exists(build_vector_key_exists_query()).not())
         .and_where(Expr::exists(build_failure_threshold_query(max_attempts)).not())
-        .order_by(Nodes::Id, Order::Asc)
+        .order_by(Nodes::Uri, Order::Asc)
         .limit(1);
     if let Some(id) = id {
-        query.and_where(Expr::col(Nodes::Id).gt(id.as_str()));
+        query.and_where(Expr::col(Nodes::Uri).gt(id.as_str()));
     }
     let (sql, values) = build_query(&query)?;
     let row = connection

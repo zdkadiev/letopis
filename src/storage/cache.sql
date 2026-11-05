@@ -8,28 +8,26 @@ pragma foreign_keys=on;
 -- revision = publication counter (D-95); config identity lives in vectors.db meta.
 create table project(id integer primary key check(id=1), revision integer not null default 0);
 create table nodes(
- row_id integer primary key autoincrement,
- -- D-93: knowledge id = path or path#anchor; source id = normalized uri (D-91).
- id text not null unique,
+ id integer primary key autoincrement,
  -- D-95: kind is derived (metavertex = has outgoing includes), not written in metadata.
  kind text not null check(kind in ('vertex','metavertex','source')),
- uri text not null, hash text,
+ -- D-93: knowledge uri = path or path#anchor; source uri = normalized address (D-91).
+ uri text not null unique, hash text,
  created_at integer not null, source_snapshot text,
  line_start integer, line_end integer, search_hash text,
  check(hash is not null or kind='source'),
  check((line_start is null and line_end is null) or
        (line_start is not null and line_end is not null and line_start>=1 and line_end>=line_start)),
  check(kind='source' or (line_start is not null and search_hash is not null)),
- check(kind<>'source' or (source_snapshot is null and search_hash is null)),
- -- D-91: a source's ID is its normalized uri; created_at = MIN(created_at) of its external edges.
- check(kind<>'source' or id=uri)
+ -- D-91: source created_at = MIN(created_at) of its external edges.
+ check(kind<>'source' or (source_snapshot is null and search_hash is null))
 );
 -- D-93: an edge is the triple (source, target, type); no edge id, hash or created_at.
--- D-95: every declared edge is stored; target has no FK. Readers join nodes on
--- target_id, so an edge to a missing target is invisible until the target appears.
+-- Resolved declarations reference numeric keys; public identities remain nodes.uri.
+-- Restrictive endpoint FKs preserve declarations during explicit target demotion.
 create table edges(
- source_id text not null references nodes(id),
- target_id text not null,
+ source_id integer not null references nodes(id),
+ target_id integer not null references nodes(id),
  type text not null,
  primary key(source_id, target_id, type),
  check(source_id<>target_id)
@@ -37,6 +35,14 @@ create table edges(
 -- Plain indexes for required outgoing/incoming traversal, not speculative caches.
 create index edges_outgoing on edges(source_id,type,target_id);
 create index edges_incoming on edges(target_id,type,source_id);
+-- Missing targets retain their declaration without manufacturing node metadata.
+create table unresolved_edges(
+ source_id integer not null references nodes(id),
+ target_uri text not null,
+ type text not null,
+ primary key(source_id,target_uri,type)
+) without rowid;
+create index unresolved_edges_target_uri on unresolved_edges(target_uri);
 create index nodes_source_snapshot on nodes(source_snapshot) where source_snapshot is not null;
 -- Joins KNN results from vectors.db and finds texts without a vector.
 create index nodes_search_hash on nodes(search_hash) where search_hash is not null;
@@ -56,7 +62,7 @@ create table files(
 -- flock on .letopis/index.lock and .letopis/embed.lock (D-94). No recovery record (D-93).
 -- All application-wide graph invariants remain in the Rust validator.
 -- D-95: no errors, embedding_jobs or reindex_state tables. Problems are computed:
--- files.error, edges without target, includes cycles, vec.embed_failures, config.json check.
+-- files.error, unresolved_edges, includes cycles, vec.embed_failures, config.json check.
 -- Reindex publication: a source without remaining external edges is deleted.
 
 

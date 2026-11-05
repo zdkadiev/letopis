@@ -1,6 +1,6 @@
 use super::{
     connection::map_sqlite,
-    query::{Edges, Files, Nodes, Project, TextIndex, build_query},
+    query::{Edges, Files, Nodes, Project, TextIndex, UnresolvedEdges, build_query},
     transaction::{self, State},
     vector::{
         VectorSchema, decode_config_identity,
@@ -25,17 +25,16 @@ use crate::{
 };
 use rusqlite::{Connection, OptionalExtension, Row, params, params_from_iter};
 use sea_query::{
-    Expr, ExprTrait, Iden, JoinType, OnConflict, Order, Query, SelectStatement, Value,
+    Expr, ExprTrait, Iden, JoinType, OnConflict, Order, Query, SelectStatement, UnionType, Value,
 };
 use std::{cell::Cell, collections::BTreeSet, num::NonZeroUsize};
 
 pub(super) const SOURCE_KIND: &str = "source";
 const VERTEX_KIND: &str = "vertex";
 const METAVERTEX_KIND: &str = "metavertex";
-const NODE_COLUMNS: [Nodes; 9] = [
-    Nodes::Id,
-    Nodes::Kind,
+const NODE_COLUMNS: [Nodes; 8] = [
     Nodes::Uri,
+    Nodes::Kind,
     Nodes::Hash,
     Nodes::CreatedAt,
     Nodes::SourceSnapshot,
@@ -43,7 +42,6 @@ const NODE_COLUMNS: [Nodes; 9] = [
     Nodes::LineEnd,
     Nodes::SearchHash,
 ];
-const EDGE_COLUMNS: [Edges; 3] = [Edges::SourceId, Edges::TargetId, Edges::Type];
 
 const FILE_COLUMNS: [Files; 8] = [
     Files::Path,
@@ -60,6 +58,13 @@ const FILE_COLUMNS: [Files; 8] = [
 enum Endpoint {
     Source,
     Target,
+}
+
+#[derive(Clone, Copy, Iden)]
+enum Declaration {
+    SourceUri,
+    TargetUri,
+    Type,
 }
 
 #[derive(Debug)]
@@ -144,6 +149,7 @@ impl CacheStorage {
     }
 
     fn advance_revision(&self) -> StorageResult<()> {
+        resolve_edges(self.get_write_connection()?)?;
         let (sql, values) = build_query(
             Query::select()
                 .column(Project::Revision)
@@ -268,11 +274,11 @@ impl CacheDatabase for CacheStorage {
                 .values(build_node_values(node)?.map(Expr::val))
                 .map_err(map_invalid_value)?
                 .on_conflict(
-                    OnConflict::column(Nodes::Id)
+                    OnConflict::column(Nodes::Uri)
                         .update_columns(NODE_COLUMNS.into_iter().skip(1))
                         .to_owned(),
                 )
-                .returning_col(Nodes::RowId)
+                .returning_col(Nodes::Id)
                 .to_owned();
             let (sql, values) = build_query(&query)?;
             db.query_row(&sql, params_from_iter(values), |row| row.get(0))
@@ -283,68 +289,17 @@ impl CacheDatabase for CacheStorage {
 
     fn edges_save_by_source_id_and_target_id_and_type(&self, edge: &Edge) -> StorageResult<()> {
         let db = self.get_write_connection()?;
-        let result = (|| {
-            let (sql, values) = build_query(
-                Query::insert()
-                    .into_table(Edges::Table)
-                    .columns(EDGE_COLUMNS)
-                    .values(
-                        [
-                            edge.get_source().as_str(),
-                            edge.get_target().as_str(),
-                            edge.get_edge_type().as_str(),
-                        ]
-                        .map(Expr::val),
-                    )
-                    .map_err(map_invalid_value)?,
-            )?;
-            db.execute(&sql, params_from_iter(values))
-                .map_err(map_mutation)?;
-            Ok(())
-        })();
-        self.record(result)
+        self.record(insert_edge(db, edge))
     }
 
     fn edges_delete_by_source_id(&self, source_id: &KnowledgeId) -> StorageResult<()> {
         let db = self.get_write_connection()?;
-        let result = (|| {
-            let (sql, values) = build_query(
-                Query::delete()
-                    .from_table(Edges::Table)
-                    .and_where(Expr::col(Edges::SourceId).eq(source_id.as_str())),
-            )?;
-            db.execute(&sql, params_from_iter(values))
-                .map_err(map_mutation)?;
-            Ok(())
-        })();
-        self.record(result)
+        self.record(delete_outgoing(db, source_id))
     }
 
     fn delete_node(&self, id: &EdgeTarget) -> StorageResult<()> {
         let db = self.get_write_connection()?;
-        let result = (|| {
-            let node = Query::select()
-                .column(Nodes::RowId)
-                .from(Nodes::Table)
-                .and_where(Expr::col(Nodes::Id).eq(id.as_str()))
-                .to_owned();
-            let (sql, values) = build_query(
-                Query::delete()
-                    .from_table(TextIndex::Table)
-                    .and_where(Expr::col(TextIndex::Rowid).in_subquery(node)),
-            )?;
-            db.execute(&sql, params_from_iter(values))
-                .map_err(map_mutation)?;
-            let (sql, values) = build_query(
-                Query::delete()
-                    .from_table(Nodes::Table)
-                    .and_where(Expr::col(Nodes::Id).eq(id.as_str())),
-            )?;
-            db.execute(&sql, params_from_iter(values))
-                .map_err(map_mutation)?;
-            Ok(())
-        })();
-        self.record(result)
+        self.record(delete_node(db, id))
     }
 
     fn replace_text(&self, id: &KnowledgeId, text: &str) -> StorageResult<()> {
@@ -352,9 +307,9 @@ impl CacheDatabase for CacheStorage {
         let result = (|| {
             let (sql, values) = build_query(
                 Query::select()
-                    .column(Nodes::RowId)
+                    .column(Nodes::Id)
                     .from(Nodes::Table)
-                    .and_where(Expr::col(Nodes::Id).eq(id.as_str()))
+                    .and_where(Expr::col(Nodes::Uri).eq(id.as_str()))
                     .and_where(Expr::col(Nodes::Kind).ne(SOURCE_KIND)),
             )?;
             let row: Option<i64> = db
@@ -484,10 +439,10 @@ impl StorageRead for CacheStorage {
         let db = self.get_connection()?;
         let (sql, values) = build_query(
             Query::select()
-                .column(Nodes::RowId)
+                .column(Nodes::Id)
                 .columns(NODE_COLUMNS)
                 .from(Nodes::Table)
-                .and_where(Expr::col(Nodes::Id).eq(id.as_str())),
+                .and_where(Expr::col(Nodes::Uri).eq(id.as_str())),
         )?;
         db.query_row(&sql, params_from_iter(values), |row| Ok(decode_node(row)))
             .optional()
@@ -514,10 +469,10 @@ impl StorageRead for CacheStorage {
         let db = self.get_connection()?;
         let (sql, values) = build_query(
             Query::select()
-                .column(Nodes::RowId)
+                .column(Nodes::Id)
                 .columns(NODE_COLUMNS)
                 .from(Nodes::Table)
-                .order_by(Nodes::Id, Order::Asc),
+                .order_by(Nodes::Uri, Order::Asc),
         )?;
         let mut statement = db.prepare(&sql).map_err(map_sqlite)?;
         let mut rows = statement
@@ -531,38 +486,7 @@ impl StorageRead for CacheStorage {
     }
 
     fn edges_get_by_source_id(&self, source_id: Option<&KnowledgeId>) -> StorageResult<Vec<Edge>> {
-        let db = self.get_connection()?;
-        let mut query = Query::select();
-        query.columns(EDGE_COLUMNS).from(Edges::Table);
-        if let Some(source_id) = source_id {
-            query.and_where(Expr::col(Edges::SourceId).eq(source_id.as_str()));
-        }
-        for column in EDGE_COLUMNS {
-            query.order_by(column, Order::Asc);
-        }
-        let (sql, values) = build_query(&query)?;
-        let mut stmt = db.prepare(&sql).map_err(map_sqlite)?;
-        let mut rows = stmt.query(params_from_iter(values)).map_err(map_sqlite)?;
-        let mut edges = Vec::new();
-        while let Some(row) = rows.next().map_err(map_sqlite)? {
-            let source_id: String = row.get(0).map_err(map_sqlite)?;
-            let target: String = row.get(1).map_err(map_sqlite)?;
-            let kind: String = row.get(2).map_err(map_sqlite)?;
-            let target = if kind == "external" {
-                EdgeTarget::Source(SourceUri::parse(&target).map_err(map_invalid_value)?)
-            } else {
-                EdgeTarget::Knowledge(KnowledgeId::parse(&target).map_err(map_invalid_value)?)
-            };
-            edges.push(
-                Edge::new(
-                    KnowledgeId::parse(&source_id).map_err(map_invalid_value)?,
-                    target,
-                    EdgeType::parse(&kind).map_err(map_invalid_value)?,
-                )
-                .map_err(map_invalid_value)?,
-            );
-        }
-        Ok(edges)
+        get_edges_by_source_id(self.get_connection()?, source_id)
     }
 
     fn files_get_by_path(&self, path: &RepoPath) -> StorageResult<Option<FileRow>> {
@@ -602,11 +526,11 @@ impl StorageRead for CacheStorage {
         let db = self.get_connection()?;
         let mut stmt = db
             .prepare(
-                "select nodes.id, nodes.row_id, bm25(text_index) as score
+                "select nodes.uri, nodes.id, bm25(text_index) as score
                  from text_index
-                 join nodes on nodes.row_id = text_index.rowid
+                 join nodes on nodes.id = text_index.rowid
                  where text_index match ?1 and nodes.kind <> ?2
-                 order by score, nodes.id",
+                 order by score, nodes.uri",
             )
             .map_err(map_sqlite)?;
         let mut rows = stmt
@@ -701,9 +625,9 @@ impl GraphRead for CacheStorage {
         let db = self.get_connection()?;
         let (sql, values) = build_query(
             Query::select()
-                .columns([Nodes::RowId, Nodes::Id, Nodes::Kind])
+                .columns([Nodes::Id, Nodes::Uri, Nodes::Kind])
                 .from(Nodes::Table)
-                .and_where(Expr::col(Nodes::Id).eq(id.as_str())),
+                .and_where(Expr::col(Nodes::Uri).eq(id.as_str())),
         )?;
         db.query_row(&sql, params_from_iter(values), |row| {
             Ok(decode_node_ref(row))
@@ -737,15 +661,20 @@ impl GraphRead for CacheStorage {
     }
 }
 
-fn build_node_values(node: &NodeMetadata) -> StorageResult<[Value; 9]> {
-    let (id, kind, uri, hash, created, snapshot, lines, search) = match node {
+fn build_node_values(node: &NodeMetadata) -> StorageResult<[Value; 8]> {
+    if matches!(node, NodeMetadata::Knowledge(n) if n.id != n.uri) {
+        return Err(StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "knowledge identity must equal its address",
+        ));
+    }
+    let (uri, kind, hash, created, snapshot, lines, search) = match node {
         NodeMetadata::Knowledge(n) => (
-            n.id.as_str(),
+            n.uri.as_str(),
             match n.kind {
                 ElementKind::Vertex => VERTEX_KIND,
                 ElementKind::Metavertex => METAVERTEX_KIND,
             },
-            n.uri.as_str(),
             Some(n.hash.to_hex()),
             n.created_at,
             n.source_snapshot.as_ref().map(TreeOid::as_str),
@@ -755,7 +684,6 @@ fn build_node_values(node: &NodeMetadata) -> StorageResult<[Value; 9]> {
         NodeMetadata::Source(n) => (
             n.uri.as_str(),
             SOURCE_KIND,
-            n.uri.as_str(),
             n.hash.map(|h| h.to_hex()),
             n.created_at,
             None,
@@ -766,9 +694,8 @@ fn build_node_values(node: &NodeMetadata) -> StorageResult<[Value; 9]> {
     let start = lines.map(|r| check_unsigned(r.get_start())).transpose()?;
     let end = lines.map(|r| check_unsigned(r.get_end())).transpose()?;
     Ok([
-        id.into(),
-        kind.into(),
         uri.into(),
+        kind.into(),
         hash.into(),
         check_unsigned(created)?.into(),
         snapshot.into(),
@@ -779,12 +706,12 @@ fn build_node_values(node: &NodeMetadata) -> StorageResult<[Value; 9]> {
 }
 
 fn decode_node(row: &Row<'_>) -> StorageResult<StoredNode> {
-    let id: String = row.get(1).map_err(map_sqlite)?;
+    let uri: String = row.get(1).map_err(map_sqlite)?;
     let kind: String = row.get(2).map_err(map_sqlite)?;
     let metadata = if kind == SOURCE_KIND {
-        NodeMetadata::Source(decode_source_metadata(row, &id)?)
+        NodeMetadata::Source(decode_source_metadata(row)?)
     } else {
-        NodeMetadata::Knowledge(decode_knowledge_metadata(row, &id, &kind)?)
+        NodeMetadata::Knowledge(decode_knowledge_metadata(row, &uri, &kind)?)
     };
     Ok(StoredNode {
         row_id: row.get(0).map_err(map_sqlite)?,
@@ -792,22 +719,22 @@ fn decode_node(row: &Row<'_>) -> StorageResult<StoredNode> {
     })
 }
 
-fn decode_source_metadata(row: &Row<'_>, id: &str) -> StorageResult<SourceMetadata> {
-    let uri: String = row.get(3).map_err(map_sqlite)?;
-    let hash: Option<String> = row.get(4).map_err(map_sqlite)?;
-    let created_at = get_unsigned(row.get(5).map_err(map_sqlite)?)?;
-    let snapshot: Option<String> = row.get(6).map_err(map_sqlite)?;
+fn decode_source_metadata(row: &Row<'_>) -> StorageResult<SourceMetadata> {
+    let uri: String = row.get(1).map_err(map_sqlite)?;
+    let hash: Option<String> = row.get(3).map_err(map_sqlite)?;
+    let created_at = get_unsigned(row.get(4).map_err(map_sqlite)?)?;
+    let snapshot: Option<String> = row.get(5).map_err(map_sqlite)?;
     let lines = decode_lines(
+        row.get(6).map_err(map_sqlite)?,
         row.get(7).map_err(map_sqlite)?,
-        row.get(8).map_err(map_sqlite)?,
     )?;
-    let search: Option<String> = row.get(9).map_err(map_sqlite)?;
+    let search: Option<String> = row.get(8).map_err(map_sqlite)?;
     let hash = hash
         .as_deref()
         .map(Sha256::parse)
         .transpose()
         .map_err(map_invalid_value)?;
-    if id != uri || snapshot.is_some() || search.is_some() {
+    if snapshot.is_some() || search.is_some() {
         return Err(StorageError::new(
             StorageErrorKind::InternalError,
             "invalid persisted metadata",
@@ -823,18 +750,17 @@ fn decode_source_metadata(row: &Row<'_>, id: &str) -> StorageResult<SourceMetada
 
 fn decode_knowledge_metadata(
     row: &Row<'_>,
-    id: &str,
+    uri: &str,
     kind: &str,
 ) -> StorageResult<KnowledgeMetadata> {
-    let uri: String = row.get(3).map_err(map_sqlite)?;
-    let hash: Option<String> = row.get(4).map_err(map_sqlite)?;
-    let created_at = get_unsigned(row.get(5).map_err(map_sqlite)?)?;
-    let snapshot: Option<String> = row.get(6).map_err(map_sqlite)?;
+    let hash: Option<String> = row.get(3).map_err(map_sqlite)?;
+    let created_at = get_unsigned(row.get(4).map_err(map_sqlite)?)?;
+    let snapshot: Option<String> = row.get(5).map_err(map_sqlite)?;
     let lines = decode_lines(
+        row.get(6).map_err(map_sqlite)?,
         row.get(7).map_err(map_sqlite)?,
-        row.get(8).map_err(map_sqlite)?,
     )?;
-    let search: Option<String> = row.get(9).map_err(map_sqlite)?;
+    let search: Option<String> = row.get(8).map_err(map_sqlite)?;
     let hash = hash
         .as_deref()
         .map(Sha256::parse)
@@ -842,8 +768,8 @@ fn decode_knowledge_metadata(
         .map_err(map_invalid_value)?;
     let kind = decode_element_kind(kind)?;
     Ok(KnowledgeMetadata {
-        id: KnowledgeId::parse(id).map_err(map_invalid_value)?,
-        uri: KnowledgeId::parse(&uri).map_err(map_invalid_value)?,
+        id: KnowledgeId::parse(uri).map_err(map_invalid_value)?,
+        uri: KnowledgeId::parse(uri).map_err(map_invalid_value)?,
         kind,
         hash: hash.ok_or_else(|| {
             StorageError::new(
@@ -938,6 +864,366 @@ fn get_unsigned(value: i64) -> StorageResult<u64> {
     u64::try_from(value).map_err(map_invalid_value)
 }
 
+/// Insert one logical declaration, retaining absent targets without placeholder nodes.
+///
+/// # Errors
+/// Rejects missing sources and duplicates in either representation as invalid requests;
+/// reports database failures. The caller owns the surrounding transaction.
+fn insert_edge(db: &Connection, edge: &Edge) -> StorageResult<()> {
+    let source_id = get_node_id_by_uri(db, edge.get_source().as_str())?.ok_or_else(|| {
+        StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "invalid storage declaration",
+        )
+    })?;
+    let target_uri = edge.get_target().as_str();
+    let target_id = get_node_id_by_uri(db, target_uri)?;
+    verify_no_duplicate(db, source_id, target_uri, edge.get_edge_type().as_str())?;
+    let mut query = Query::insert();
+    if let Some(target_id) = target_id {
+        query
+            .into_table(Edges::Table)
+            .columns([Edges::SourceId, Edges::TargetId, Edges::Type])
+            .values([
+                Expr::val(source_id),
+                Expr::val(target_id),
+                Expr::val(edge.get_edge_type().as_str()),
+            ])
+            .map_err(map_invalid_value)?;
+    } else {
+        query
+            .into_table(UnresolvedEdges::Table)
+            .columns([
+                UnresolvedEdges::SourceId,
+                UnresolvedEdges::TargetUri,
+                UnresolvedEdges::Type,
+            ])
+            .values([
+                Expr::val(source_id),
+                Expr::val(target_uri),
+                Expr::val(edge.get_edge_type().as_str()),
+            ])
+            .map_err(map_invalid_value)?;
+    }
+    let (sql, values) = build_query(&query)?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
+    Ok(())
+}
+
+/// Get resolved and unresolved declarations ordered by source URI, target URI and type.
+///
+/// # Errors
+/// Reports query failures or invalid persisted domain values.
+fn get_edges_by_source_id(
+    db: &Connection,
+    source_id: Option<&KnowledgeId>,
+) -> StorageResult<Vec<Edge>> {
+    let mut resolved = build_resolved_query();
+    let mut unresolved = build_unresolved_query();
+    if let Some(source_id) = source_id {
+        let filter = Expr::col((Endpoint::Source, Nodes::Uri)).eq(source_id.as_str());
+        resolved.and_where(filter.clone());
+        unresolved.and_where(filter);
+    }
+    resolved.union(UnionType::All, unresolved);
+    for column in [
+        Declaration::SourceUri,
+        Declaration::TargetUri,
+        Declaration::Type,
+    ] {
+        resolved.order_by(column, Order::Asc);
+    }
+    let (sql, values) = build_query(&resolved)?;
+    let mut statement = db.prepare(&sql).map_err(map_sqlite)?;
+    let mut rows = statement
+        .query(params_from_iter(values))
+        .map_err(map_sqlite)?;
+    let mut edges = Vec::new();
+    while let Some(row) = rows.next().map_err(map_sqlite)? {
+        edges.push(decode_edge(row)?);
+    }
+    Ok(edges)
+}
+
+/// Remove both declaration representations owned by a source; unknown owners are a no-op.
+///
+/// # Errors
+/// Reports query or database failures inside the caller's transaction.
+fn delete_outgoing(db: &Connection, source: &KnowledgeId) -> StorageResult<()> {
+    let Some(source_id) = get_node_id_by_uri(db, source.as_str())? else {
+        return Ok(());
+    };
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(Edges::Table)
+            .and_where(Expr::col(Edges::SourceId).eq(source_id)),
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(UnresolvedEdges::Table)
+            .and_where(Expr::col(UnresolvedEdges::SourceId).eq(source_id)),
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
+    Ok(())
+}
+
+/// Reject node deletion while any owned declaration remains, before changing projections.
+///
+/// # Errors
+/// Returns an invalid request for remaining declarations or reports database failures.
+fn verify_no_outgoing(db: &Connection, source_id: i64) -> StorageResult<()> {
+    let resolved = Query::select()
+        .expr(Expr::val(1))
+        .from(Edges::Table)
+        .and_where(Expr::col(Edges::SourceId).eq(source_id))
+        .to_owned();
+    let unresolved = Query::select()
+        .expr(Expr::val(1))
+        .from(UnresolvedEdges::Table)
+        .and_where(Expr::col(UnresolvedEdges::SourceId).eq(source_id))
+        .to_owned();
+    let (sql, values) =
+        build_query(Query::select().expr(Expr::exists(resolved).or(Expr::exists(unresolved))))?;
+    let has_outgoing: bool = db
+        .query_row(&sql, params_from_iter(values), |row| row.get(0))
+        .map_err(map_sqlite)?;
+    if has_outgoing {
+        return Err(StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "invalid storage declaration",
+        ));
+    }
+    Ok(())
+}
+
+/// Preserve incoming declarations before deleting their target's restrictive numeric FK.
+///
+/// # Errors
+/// Reports mutation failures; the caller must roll back the transaction on error.
+fn demote_incoming_edges(db: &Connection, target_id: i64, target_uri: &str) -> StorageResult<()> {
+    let declarations = Query::select()
+        .column(Edges::SourceId)
+        .expr(Expr::val(target_uri))
+        .column(Edges::Type)
+        .from(Edges::Table)
+        .and_where(Expr::col(Edges::TargetId).eq(target_id))
+        .to_owned();
+    let (sql, values) = build_query(
+        Query::insert()
+            .into_table(UnresolvedEdges::Table)
+            .columns([
+                UnresolvedEdges::SourceId,
+                UnresolvedEdges::TargetUri,
+                UnresolvedEdges::Type,
+            ])
+            .select_from(declarations)
+            .map_err(map_invalid_value)?,
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(Edges::Table)
+            .and_where(Expr::col(Edges::TargetId).eq(target_id)),
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
+    Ok(())
+}
+
+/// Promote all declarations whose targets exist, without collecting graph rows in Rust.
+///
+/// # Errors
+/// Reports mutation failures; the caller must roll back rather than publish a revision.
+fn resolve_edges(db: &Connection) -> StorageResult<()> {
+    let declarations = Query::select()
+        .column((UnresolvedEdges::Table, UnresolvedEdges::SourceId))
+        .column((Nodes::Table, Nodes::Id))
+        .column((UnresolvedEdges::Table, UnresolvedEdges::Type))
+        .from(UnresolvedEdges::Table)
+        .inner_join(
+            Nodes::Table,
+            Expr::col((Nodes::Table, Nodes::Uri))
+                .equals((UnresolvedEdges::Table, UnresolvedEdges::TargetUri)),
+        )
+        .to_owned();
+    let (sql, values) = build_query(
+        Query::insert()
+            .into_table(Edges::Table)
+            .columns([Edges::SourceId, Edges::TargetId, Edges::Type])
+            .select_from(declarations)
+            .map_err(map_invalid_value)?,
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
+    let targets = Query::select()
+        .column(Nodes::Uri)
+        .from(Nodes::Table)
+        .to_owned();
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(UnresolvedEdges::Table)
+            .and_where(Expr::col(UnresolvedEdges::TargetUri).in_subquery(targets)),
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
+    Ok(())
+}
+
+fn verify_no_duplicate(
+    db: &Connection,
+    source_id: i64,
+    target_uri: &str,
+    r#type: &str,
+) -> StorageResult<()> {
+    let resolved = Query::select()
+        .expr(Expr::val(1))
+        .from(Edges::Table)
+        .inner_join(
+            Nodes::Table,
+            Expr::col((Nodes::Table, Nodes::Id)).equals((Edges::Table, Edges::TargetId)),
+        )
+        .and_where(Expr::col(Edges::SourceId).eq(source_id))
+        .and_where(Expr::col(Nodes::Uri).eq(target_uri))
+        .and_where(Expr::col(Edges::Type).eq(r#type))
+        .to_owned();
+    let unresolved = Query::select()
+        .expr(Expr::val(1))
+        .from(UnresolvedEdges::Table)
+        .and_where(Expr::col(UnresolvedEdges::SourceId).eq(source_id))
+        .and_where(Expr::col(UnresolvedEdges::TargetUri).eq(target_uri))
+        .and_where(Expr::col(UnresolvedEdges::Type).eq(r#type))
+        .to_owned();
+    let (sql, values) =
+        build_query(Query::select().expr(Expr::exists(resolved).or(Expr::exists(unresolved))))?;
+    let duplicate: bool = db
+        .query_row(&sql, params_from_iter(values), |row| row.get(0))
+        .map_err(map_sqlite)?;
+    if duplicate {
+        return Err(StorageError::new(
+            StorageErrorKind::InvalidRequest,
+            "invalid storage declaration",
+        ));
+    }
+    Ok(())
+}
+
+fn build_resolved_query() -> SelectStatement {
+    Query::select()
+        .expr_as(
+            Expr::col((Endpoint::Source, Nodes::Uri)),
+            Declaration::SourceUri,
+        )
+        .expr_as(
+            Expr::col((Endpoint::Target, Nodes::Uri)),
+            Declaration::TargetUri,
+        )
+        .expr_as(Expr::col((Edges::Table, Edges::Type)), Declaration::Type)
+        .from(Edges::Table)
+        .join_as(
+            JoinType::InnerJoin,
+            Nodes::Table,
+            Endpoint::Source,
+            Expr::col((Endpoint::Source, Nodes::Id)).equals((Edges::Table, Edges::SourceId)),
+        )
+        .join_as(
+            JoinType::InnerJoin,
+            Nodes::Table,
+            Endpoint::Target,
+            Expr::col((Endpoint::Target, Nodes::Id)).equals((Edges::Table, Edges::TargetId)),
+        )
+        .to_owned()
+}
+
+fn build_unresolved_query() -> SelectStatement {
+    Query::select()
+        .expr_as(
+            Expr::col((Endpoint::Source, Nodes::Uri)),
+            Declaration::SourceUri,
+        )
+        .expr_as(
+            Expr::col(UnresolvedEdges::TargetUri),
+            Declaration::TargetUri,
+        )
+        .expr_as(Expr::col(UnresolvedEdges::Type), Declaration::Type)
+        .from(UnresolvedEdges::Table)
+        .join_as(
+            JoinType::InnerJoin,
+            Nodes::Table,
+            Endpoint::Source,
+            Expr::col((Endpoint::Source, Nodes::Id))
+                .equals((UnresolvedEdges::Table, UnresolvedEdges::SourceId)),
+        )
+        .to_owned()
+}
+
+fn decode_edge(row: &Row<'_>) -> StorageResult<Edge> {
+    let source: String = row.get(0).map_err(map_sqlite)?;
+    let target: String = row.get(1).map_err(map_sqlite)?;
+    let edge_type: String = row.get(2).map_err(map_sqlite)?;
+    let target = if edge_type == "external" {
+        EdgeTarget::Source(SourceUri::parse(&target).map_err(map_invalid_value)?)
+    } else {
+        EdgeTarget::Knowledge(KnowledgeId::parse(&target).map_err(map_invalid_value)?)
+    };
+    Edge::new(
+        KnowledgeId::parse(&source).map_err(map_invalid_value)?,
+        target,
+        EdgeType::parse(&edge_type).map_err(map_invalid_value)?,
+    )
+    .map_err(map_invalid_value)
+}
+
+/// Delete an existing node after checking owned declarations and preserving incoming links.
+///
+/// The caller owns the transaction. Missing nodes are a no-op; successful deletion
+/// demotes incoming declarations before removing the node and its FTS projection.
+///
+/// # Errors
+/// Rejects nodes with outgoing declarations and reports mutation failures.
+fn delete_node(db: &Connection, id: &EdgeTarget) -> StorageResult<()> {
+    let Some(node_id) = get_node_id_by_uri(db, id.as_str())? else {
+        return Ok(());
+    };
+    verify_no_outgoing(db, node_id)?;
+    demote_incoming_edges(db, node_id, id.as_str())?;
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(TextIndex::Table)
+            .and_where(Expr::col(TextIndex::Rowid).eq(node_id)),
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
+    let (sql, values) = build_query(
+        Query::delete()
+            .from_table(Nodes::Table)
+            .and_where(Expr::col(Nodes::Id).eq(node_id)),
+    )?;
+    db.execute(&sql, params_from_iter(values))
+        .map_err(map_mutation)?;
+    Ok(())
+}
+
+/// Get the internal key for an existing public address without decoding metadata.
+///
+/// # Errors
+/// Reports query or database failures.
+fn get_node_id_by_uri(db: &Connection, uri: &str) -> StorageResult<Option<i64>> {
+    let (sql, values) = build_query(
+        Query::select()
+            .column(Nodes::Id)
+            .from(Nodes::Table)
+            .and_where(Expr::col(Nodes::Uri).eq(uri)),
+    )?;
+    db.query_row(&sql, params_from_iter(values), |row| row.get(0))
+        .optional()
+        .map_err(map_sqlite)
+}
+
 fn map_mutation(error: rusqlite::Error) -> StorageError {
     if matches!(&error, rusqlite::Error::SqliteFailure(e, _) if e.code == rusqlite::ErrorCode::ConstraintViolation)
     {
@@ -965,14 +1251,16 @@ fn map_match(error: rusqlite::Error) -> StorageError {
 }
 
 fn edges_get_by_row_id_and_type(request: &NeighborPageRequest<'_>) -> SelectStatement {
-    let (anchor, neighbor, neighbor_id) = match request.direction {
-        NeighborDirection::Outgoing => (Endpoint::Source, Endpoint::Target, Edges::TargetId),
-        NeighborDirection::Incoming => (Endpoint::Target, Endpoint::Source, Edges::SourceId),
+    let (anchor, neighbor) = match request.direction {
+        NeighborDirection::Outgoing => (Endpoint::Source, Endpoint::Target),
+        NeighborDirection::Incoming => (Endpoint::Target, Endpoint::Source),
     };
     let mut query = Query::select();
     query
-        .columns([Nodes::RowId, Nodes::Id, Nodes::Kind].map(|col| (neighbor, col)))
-        .columns([Edges::SourceId, Edges::TargetId, Edges::Type].map(|col| (Edges::Table, col)))
+        .columns([Nodes::Id, Nodes::Uri, Nodes::Kind].map(|col| (neighbor, col)))
+        .column((Endpoint::Source, Nodes::Uri))
+        .column((Endpoint::Target, Nodes::Uri))
+        .column((Edges::Table, Edges::Type))
         .column((Endpoint::Target, Nodes::Kind))
         .from(Edges::Table)
         .join_as(
@@ -987,16 +1275,20 @@ fn edges_get_by_row_id_and_type(request: &NeighborPageRequest<'_>) -> SelectStat
             Endpoint::Target,
             Expr::col((Endpoint::Target, Nodes::Id)).equals((Edges::Table, Edges::TargetId)),
         )
-        .and_where(Expr::col((anchor, Nodes::RowId)).eq(request.node.get_value()));
-    apply_filters(&mut query, request, neighbor_id);
+        .and_where(Expr::col((anchor, Nodes::Id)).eq(request.node.get_value()));
+    apply_filters(&mut query, request, neighbor);
     query
         .order_by((Edges::Table, Edges::Type), Order::Asc)
-        .order_by((Edges::Table, neighbor_id), Order::Asc)
+        .order_by((neighbor, Nodes::Uri), Order::Asc)
         .limit(request.limit.get() as u64);
     query
 }
 
-fn apply_filters(query: &mut SelectStatement, request: &NeighborPageRequest<'_>, neighbor: Edges) {
+fn apply_filters(
+    query: &mut SelectStatement,
+    request: &NeighborPageRequest<'_>,
+    neighbor: Endpoint,
+) {
     let kind = Expr::col((Edges::Table, Edges::Type));
     match request.mode {
         TraversalMode::Relations => {
@@ -1015,7 +1307,7 @@ fn apply_filters(query: &mut SelectStatement, request: &NeighborPageRequest<'_>,
     }
     if let Some(cursor) = request.after {
         query.and_where(
-            Expr::tuple([kind, Expr::col((Edges::Table, neighbor))]).gt(Expr::tuple([
+            Expr::tuple([kind, Expr::col((neighbor, Nodes::Uri))]).gt(Expr::tuple([
                 Expr::val(cursor.edge_type.as_str()),
                 Expr::val(cursor.neighbor.as_str()),
             ])),
@@ -1114,7 +1406,7 @@ mod tests {
         let root = tempfile::TempDir::new().unwrap();
         let path = root.path().join("cache.db");
         let writer = Connection::open(&path).unwrap();
-        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0)").unwrap();
+        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text)").unwrap();
         let reader = Connection::open(&path).unwrap();
         reader.execute_batch("attach database ':memory:' as vec; create table vec.meta(id integer primary key,config_identity text)").unwrap();
         let storage = CacheStorage::new(reader, writer);
@@ -1143,7 +1435,7 @@ mod tests {
         let root = tempfile::TempDir::new().unwrap();
         let path = root.path().join("cache.db");
         let writer = Connection::open(&path).unwrap();
-        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0)").unwrap();
+        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text)").unwrap();
         let reader = Connection::open(&path).unwrap();
         reader.execute_batch("attach database ':memory:' as vec; create table vec.meta(id integer primary key,config_identity text)").unwrap();
         let storage = CacheStorage::new(reader, writer);
@@ -1166,7 +1458,7 @@ mod tests {
     fn caught_write_attempt_poisons_an_observed_read_scope() {
         // Given: an observation-only cache with a published revision.
         let reader = Connection::open_in_memory().unwrap();
-        reader.execute_batch("create table project(id integer primary key, revision integer); insert into project values(1,1); attach database ':memory:' as vec; create table vec.meta(id integer primary key, config_identity text)").unwrap();
+        reader.execute_batch("create table project(id integer primary key, revision integer); insert into project values(1,1); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text); attach database ':memory:' as vec; create table vec.meta(id integer primary key, config_identity text)").unwrap();
         let storage = CacheStorage::new_observed(Some(reader));
         // When: the read callback catches a rejected write attempt.
         let result = storage.with_read_tx(|| -> Result<(), StorageError> {
@@ -1253,7 +1545,7 @@ mod tests {
         let root = tempfile::TempDir::new().unwrap();
         let path = root.path().join("cache.db");
         let writer = Connection::open(&path).unwrap();
-        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0)").unwrap();
+        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text)").unwrap();
         let observer = Connection::open(&path).unwrap();
         let storage = CacheStorage::new(Connection::open(&path).unwrap(), writer);
         // When: nested services obtain the pending publication revision.
@@ -1294,7 +1586,7 @@ mod tests {
         let root = tempfile::TempDir::new().unwrap();
         let path = root.path().join("cache.db");
         let writer = Connection::open(&path).unwrap();
-        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); attach database ':memory:' as vec; create table vec.meta(id integer primary key,config_identity text)").unwrap();
+        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text); attach database ':memory:' as vec; create table vec.meta(id integer primary key,config_identity text)").unwrap();
         let storage = CacheStorage::new(Connection::open(&path).unwrap(), writer);
         // When: a nested read observes a change made by the parent write.
         let revision = storage
@@ -1323,7 +1615,7 @@ mod tests {
         let path = root.path().join("cache.db");
         let vector_path = root.path().join("vectors.db");
         let writer = Connection::open(&path).unwrap();
-        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,1)").unwrap();
+        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,1); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text)").unwrap();
         let first = crate::domain::Sha256::digest(b"first");
         let second = crate::domain::Sha256::digest(b"second");
         let vector_writer = Connection::open(&vector_path).unwrap();
@@ -1355,7 +1647,7 @@ mod tests {
         let root = tempfile::TempDir::new().unwrap();
         let path = root.path().join("cache.db");
         let writer = Connection::open(&path).unwrap();
-        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table sample(value integer)").unwrap();
+        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text); create table sample(value integer)").unwrap();
         let observer = Connection::open(&path).unwrap();
         let storage = CacheStorage::new(Connection::open(&path).unwrap(), writer);
         // When: a service catches a database-operation error and returns success.
@@ -1392,7 +1684,7 @@ mod tests {
         let root = tempfile::TempDir::new().unwrap();
         let path = root.path().join("cache.db");
         let writer = Connection::open(&path).unwrap();
-        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0)").unwrap();
+        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text)").unwrap();
         let publisher = Connection::open(&path).unwrap();
         let reader = Connection::open(&path).unwrap();
         reader.execute_batch("attach database ':memory:' as vec; create table vec.meta(id integer primary key,config_identity text)").unwrap();
@@ -1430,7 +1722,7 @@ mod tests {
         let root = tempfile::TempDir::new().unwrap();
         let path = root.path().join("cache.db");
         let writer = Connection::open(&path).unwrap();
-        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table sample(value integer)").unwrap();
+        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text); create table sample(value integer)").unwrap();
         let observer = Connection::open(&path).unwrap();
         let storage = CacheStorage::new(Connection::open(&path).unwrap(), writer);
         // When: the parent catches a panic after a nested service has written.
@@ -1472,7 +1764,7 @@ mod tests {
         let root = tempfile::TempDir::new().unwrap();
         let path = root.path().join("cache.db");
         let writer = Connection::open(&path).unwrap();
-        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table sample(value integer)").unwrap();
+        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text); create table sample(value integer)").unwrap();
         let observer = Connection::open(&path).unwrap();
         let storage = CacheStorage::new(Connection::open(&path).unwrap(), writer);
         // When: a service performs one standalone write scope.
@@ -1505,7 +1797,7 @@ mod tests {
         let root = tempfile::TempDir::new().unwrap();
         let path = root.path().join("cache.db");
         let writer = Connection::open(&path).unwrap();
-        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table sample(value integer)").unwrap();
+        writer.execute_batch("pragma journal_mode=wal; create table project(id integer primary key,revision integer); insert into project values(1,0); create table nodes(id integer primary key, uri text); create table edges(source_id integer, target_id integer, type text); create table unresolved_edges(source_id integer, target_uri text, type text); create table sample(value integer)").unwrap();
         let observer = Connection::open(&path).unwrap();
         let storage = CacheStorage::new(Connection::open(&path).unwrap(), writer);
         // When: B joins A, writes, then fails and A catches that error.
@@ -2179,11 +2471,21 @@ mod neighbor_tests {
     use sea_query::SelectStatement;
     use std::{collections::BTreeSet, num::NonZeroUsize};
 
+    #[derive(Debug)]
+    struct Instruction {
+        address: i64,
+        opcode: String,
+        p1: i64,
+        p2: i64,
+        p4: Option<String>,
+    }
+
     #[test]
-    fn pages_use_directional_indexes_without_temporary_order_sorts() {
-        // Given
+    fn pages_retain_limit_bounded_top_k_for_every_query_variant() {
+        // Given: 4096 neighbors in reverse numeric/URI order and unresolved declarations.
         let mut db = Connection::open_in_memory().unwrap();
         bootstrap_cache(&mut db).unwrap();
+        create_high_degree_graph(&db);
         let filters = [
             BTreeSet::new(),
             BTreeSet::from([EdgeType::parse("supports").unwrap()]),
@@ -2192,14 +2494,30 @@ mod neighbor_tests {
                 EdgeType::parse("supports").unwrap(),
             ]),
         ];
-        // When / Then: inspect plans across directions, modes, and filters.
-        for direction in [NeighborDirection::Outgoing, NeighborDirection::Incoming] {
-            for mode in [
+        let cases = [
+            (
                 TraversalMode::Relations,
+                [Some("refutes"), Some("supports"), Some("supports")],
+            ),
+            (
                 TraversalMode::Containment,
+                [Some("includes"), None, Some("includes")],
+            ),
+            (
                 TraversalMode::Both,
-            ] {
-                assert_stream_query_plans(&db, direction, mode, &filters);
+                [Some("includes"), Some("supports"), Some("includes")],
+            ),
+        ];
+        // When / Then: all 72 directional/mode/filter/cursor/limit variants use bounded native bytecode and URI pages.
+        println!(
+            "bundled SQLite {}: high_degree=4096, variants=72",
+            rusqlite::version()
+        );
+        for direction in [NeighborDirection::Outgoing, NeighborDirection::Incoming] {
+            for (mode, first_types) in cases {
+                for (edge_types, first_type) in filters.iter().zip(first_types) {
+                    assert_bounded_query_variants(&db, direction, mode, edge_types, first_type);
+                }
             }
         }
     }
@@ -2209,11 +2527,11 @@ mod neighbor_tests {
         // Given: duplicate and null snapshot roots share the current cache.
         let mut db = Connection::open_in_memory().unwrap();
         bootstrap_cache(&mut db).unwrap();
-        db.execute_batch("insert into nodes(id,kind,uri,hash,created_at,source_snapshot,line_start,line_end,search_hash) values
-            ('a.md','vertex','a.md','unused',1,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,1,'unused'),
-            ('b.md','vertex','b.md','unused',1,null,1,1,'unused'),
-            ('c.md','vertex','c.md','unused',1,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',1,1,'unused'),
-            ('d.md','vertex','d.md','unused',1,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,1,'unused');").unwrap();
+        db.execute_batch("insert into nodes(uri,kind,hash,created_at,source_snapshot,line_start,line_end,search_hash) values
+            ('a.md','vertex','unused',1,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,1,'unused'),
+            ('b.md','vertex','unused',1,null,1,1,'unused'),
+            ('c.md','vertex','unused',1,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',1,1,'unused'),
+            ('d.md','vertex','unused',1,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,1,'unused');").unwrap();
         let storage = CacheStorage::new_observed(Some(db));
         let db = storage.get_test_reader();
         // When: distinct snapshot roots are retrieved in an active read scope.
@@ -2242,7 +2560,7 @@ mod neighbor_tests {
         );
         // Given: introduce a malformed snapshot identity.
         db.execute(
-            "update nodes set source_snapshot='malformed' where id='b.md'",
+            "update nodes set source_snapshot='malformed' where uri='b.md'",
             [],
         )
         .unwrap();
@@ -2257,46 +2575,246 @@ mod neighbor_tests {
         );
     }
 
-    fn assert_stream_query_plans(
+    fn create_high_degree_graph(db: &Connection) {
+        db.execute_batch("insert into nodes(id,uri,kind,hash,created_at,line_start,line_end,search_hash)
+            values(10000,'root.md','vertex','unused',1,1,1,'unused');
+            with recursive ordinal(n) as (values(0) union all select n+1 from ordinal where n<4095)
+            insert into nodes(id,uri,kind,hash,created_at,line_start,line_end,search_hash)
+            select 4096-n,printf('n%04d.md',n),'vertex','unused',1,1,1,'unused' from ordinal;
+            insert into edges select 10000,id,'supports' from nodes where id<>10000;
+            insert into edges select 10000,id,'refutes' from nodes where id<>10000;
+            insert into edges select 10000,id,'includes' from nodes where id<>10000;
+            insert into edges select id,10000,'supports' from nodes where id<>10000;
+            insert into edges select id,10000,'refutes' from nodes where id<>10000;
+            insert into edges select id,10000,'includes' from nodes where id<>10000;
+            insert into unresolved_edges values(10000,'a-missing.md','includes'),(10000,'a-missing.md','supports');").unwrap();
+    }
+
+    fn assert_bounded_query_variants(
         db: &Connection,
         direction: NeighborDirection,
         mode: TraversalMode,
-        filters: &[BTreeSet<EdgeType>],
+        edge_types: &BTreeSet<EdgeType>,
+        first_type: Option<&str>,
     ) {
         let cursor = NeighborCursor {
             edge_type: EdgeType::parse("supports").unwrap(),
-            neighbor: ElementAddress::parse("last.md").unwrap(),
+            neighbor: ElementAddress::parse("n2047.md").unwrap(),
         };
-        for edge_types in filters {
-            for after in [None, Some(&cursor)] {
+        for after in [None, Some(&cursor)] {
+            for limit in [1, 32] {
                 let request = NeighborPageRequest {
-                    node: GraphNodeKey::new(1),
+                    node: GraphNodeKey::new(10000),
                     direction,
                     mode,
                     edge_types,
                     after,
-                    limit: NonZeroUsize::new(32).unwrap(),
+                    limit: NonZeroUsize::new(limit).unwrap(),
                 };
-                let plan = explain_query(db, &edges_get_by_row_id_and_type(&request));
+                let query = edges_get_by_row_id_and_type(&request);
+                let plan = explain_query(db, &query);
+                assert_directional_index(&plan, direction);
+                assert_bounded_vm(db, &query, limit, edge_types.len());
+                let expected_type = match (after, mode) {
+                    (Some(_), TraversalMode::Containment) => None,
+                    (Some(_), _) => Some("supports"),
+                    (None, _) => first_type,
+                };
+                let first = if after.is_some() { 2048 } else { 0 };
+                let expected: Vec<_> = expected_type
+                    .into_iter()
+                    .flat_map(|kind| {
+                        (first..first + limit)
+                            .map(move |n| (kind.to_owned(), format!("n{n:04}.md")))
+                    })
+                    .collect();
+                let actual: Vec<_> = get_neighbor_page(db, &request)
+                    .into_iter()
+                    .map(|row| {
+                        (
+                            row.edge.get_edge_type().as_str().to_owned(),
+                            row.node.element.as_str().to_owned(),
+                        )
+                    })
+                    .collect();
+                assert_eq!(actual, expected);
                 println!(
-                    "{direction:?}/{mode:?}/{edge_types:?}/cursor={}: {plan:?}",
+                    "{direction:?}/{mode:?}/{edge_types:?}/cursor={}/limit={limit}: {plan:?}; top-K <= {limit}",
                     after.is_some()
-                );
-                let index = match direction {
-                    NeighborDirection::Outgoing => "edges_outgoing",
-                    NeighborDirection::Incoming => "edges_incoming",
-                };
-                assert!(
-                    plan.iter()
-                        .any(|line| line.contains("SEARCH edges USING") && line.contains(index)),
-                    "{plan:?}"
-                );
-                assert!(
-                    !plan.iter().any(|line| line.contains("TEMP B-TREE")),
-                    "{plan:?}"
                 );
             }
         }
+    }
+
+    fn assert_directional_index(plan: &[String], direction: NeighborDirection) {
+        let index = match direction {
+            NeighborDirection::Outgoing => "edges_outgoing",
+            NeighborDirection::Incoming => "edges_incoming",
+        };
+        assert!(
+            plan.iter()
+                .any(|line| line.contains("SEARCH edges USING") && line.contains(index)),
+            "{plan:?}"
+        );
+        assert!(
+            !plan
+                .iter()
+                .any(|line| line.contains("AUTOMATIC") || line.contains("MATERIALIZE")),
+            "{plan:?}"
+        );
+    }
+
+    fn assert_bounded_vm(
+        db: &Connection,
+        query: &SelectStatement,
+        limit: usize,
+        filter_count: usize,
+    ) {
+        let program = get_query_program(db, query);
+        assert!(
+            !program.iter().any(|op| op.opcode.starts_with("Sorter")
+                || matches!(
+                    op.opcode.as_str(),
+                    "OpenAutoindex"
+                        | "OffsetLimit"
+                        | "RowSetAdd"
+                        | "Insert"
+                        | "OpenDup"
+                        | "OpenPseudo"
+                )),
+            "{program:#?}"
+        );
+        for open in program.iter().filter(|op| op.opcode == "OpenEphemeral") {
+            assert!(open.p4.as_deref().is_some_and(|key| key.starts_with("k(")));
+            let inserts: Vec<_> = program
+                .iter()
+                .filter(|op| op.opcode == "IdxInsert" && op.p1 == open.p1)
+                .collect();
+            if program
+                .iter()
+                .any(|op| op.opcode == "Sequence" && op.p1 == open.p1)
+            {
+                assert_eq!(inserts.len(), 1, "{program:#?}");
+                assert_top_k_control_flow(&program, inserts[0], limit);
+            } else {
+                assert_constant_filter(&program, open, &inserts, filter_count);
+            }
+        }
+        assert!(
+            program.iter().any(|op| op.opcode == "IfNotZero"),
+            "{program:#?}"
+        );
+        if limit == 32 && filter_count == 0 {
+            println!(
+                "native VM: {:?}",
+                program
+                    .iter()
+                    .map(|op| (
+                        op.address,
+                        op.opcode.as_str(),
+                        op.p1,
+                        op.p2,
+                        op.p4.as_deref()
+                    ))
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+
+    fn get_query_program(db: &Connection, query: &SelectStatement) -> Vec<Instruction> {
+        let (sql, values) = build_query(query).unwrap();
+        db.prepare(&format!("explain {sql}"))
+            .unwrap()
+            .query_map(params_from_iter(&values), |row| {
+                Ok(Instruction {
+                    address: row.get(0)?,
+                    opcode: row.get(1)?,
+                    p1: row.get(2)?,
+                    p2: row.get(3)?,
+                    p4: row.get(5)?,
+                })
+            })
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+
+    fn assert_top_k_control_flow(program: &[Instruction], insert: &Instruction, limit: usize) {
+        let gate = program
+            .iter()
+            .rfind(|op| op.opcode == "IfNotZero" && op.address < insert.address)
+            .unwrap_or_else(|| panic!("{program:#?}"));
+        let start = usize::try_from(gate.address).unwrap();
+        let sequence = &program[start..=start + 3];
+        // Pinned SQLite pushOntoSorter: consume LIMIT slots, then discard or delete the largest before inserting.
+        assert_eq!(
+            sequence
+                .iter()
+                .map(|op| op.opcode.as_str())
+                .collect::<Vec<_>>(),
+            ["IfNotZero", "Last", "IdxLE", "Delete"]
+        );
+        assert_eq!(gate.p2, gate.address + 4);
+        for op in &sequence[1..=3] {
+            assert_eq!(op.p1, insert.p1);
+        }
+        assert!(sequence[2].p2 > insert.address);
+        assert!(
+            program[start + 4..usize::try_from(insert.address).unwrap()]
+                .iter()
+                .all(|op| matches!(
+                    op.opcode.as_str(),
+                    "Column" | "Rowid" | "IdxRowid" | "MakeRecord"
+                )),
+            "{program:#?}"
+        );
+        let limit_initialization = program
+            .iter()
+            .find(|op| op.opcode == "Integer" && op.p2 == gate.p1)
+            .unwrap_or_else(|| panic!("{program:#?}"));
+        assert_eq!(limit_initialization.p1, i64::try_from(limit).unwrap());
+    }
+
+    fn assert_constant_filter(
+        program: &[Instruction],
+        open: &Instruction,
+        inserts: &[&Instruction],
+        filter_count: usize,
+    ) {
+        assert_eq!(inserts.len(), filter_count);
+        assert!(filter_count <= 2);
+        assert_eq!(open.p2, 1);
+        let once = &program[usize::try_from(open.address - 1).unwrap()];
+        assert_eq!(once.opcode, "Once");
+        assert!(inserts.iter().all(|op| op.address < once.p2));
+        let end = usize::try_from(inserts.last().unwrap().address).unwrap();
+        assert!(
+            program[usize::try_from(open.address).unwrap()..=end]
+                .iter()
+                .all(|op| matches!(
+                    op.opcode.as_str(),
+                    "OpenEphemeral" | "Variable" | "MakeRecord" | "IdxInsert"
+                ))
+        );
+        for insert in inserts {
+            let index = usize::try_from(insert.address).unwrap();
+            assert_eq!(program[index - 2].opcode, "Variable");
+            assert_eq!(program[index - 1].opcode, "MakeRecord");
+        }
+    }
+
+    fn get_neighbor_page(
+        db: &Connection,
+        request: &NeighborPageRequest<'_>,
+    ) -> Vec<super::GraphNeighbor> {
+        let (sql, values) = build_query(&edges_get_by_row_id_and_type(request)).unwrap();
+        let mut statement = db.prepare(&sql).unwrap();
+        let mut rows = statement.query(params_from_iter(values)).unwrap();
+        let mut neighbors = Vec::new();
+        while let Some(row) = rows.next().unwrap() {
+            neighbors.push(super::decode_neighbor(row).unwrap());
+        }
+        neighbors
     }
 
     fn explain_query(db: &Connection, query: &SelectStatement) -> Vec<String> {
