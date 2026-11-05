@@ -1,5 +1,5 @@
 use super::{
-    connection::{map_sqlite, wait_for_initialization},
+    connection::{map_sqlite, wait_for_storage_contention},
     native::register_vec1,
 };
 use crate::service::{StorageError, StorageErrorKind, StorageResult};
@@ -82,7 +82,7 @@ fn bootstrap_schema(
     expected_version: i64,
 ) -> StorageResult<()> {
     // Pin version and definitions to one read view without requesting a writer.
-    let initialized = wait_for_initialization(|| {
+    let initialized = wait_for_storage_contention(|| {
         let read = connection.transaction().map_err(map_sqlite)?;
         let initialized = has_schema_in(&read, "main", sql, expected_version)?;
         read.commit().map_err(map_sqlite)?;
@@ -99,17 +99,20 @@ fn initialize_schema(
     sql: &str,
     expected_version: i64,
 ) -> StorageResult<()> {
-    let transaction = wait_for_initialization(|| {
-        Transaction::new_unchecked(connection, TransactionBehavior::Immediate).map_err(map_sqlite)
-    })?;
-    // A competing initializer may have committed while this connection waited.
-    if !has_schema_in(&transaction, "main", sql, expected_version)? {
-        transaction.execute_batch(sql).map_err(map_sqlite)?;
-        transaction
-            .pragma_update(None, USER_VERSION_PRAGMA, expected_version)
+    // The whole attempt is repeatable: a failed commit rolls back, and another
+    // initializer may have published the schema before the next attempt.
+    wait_for_storage_contention(|| {
+        let transaction = Transaction::new_unchecked(connection, TransactionBehavior::Immediate)
             .map_err(map_sqlite)?;
-    }
-    transaction.commit().map_err(map_sqlite)
+        // A competing initializer may have committed while this connection waited.
+        if !has_schema_in(&transaction, "main", sql, expected_version)? {
+            transaction.execute_batch(sql).map_err(map_sqlite)?;
+            transaction
+                .pragma_update(None, USER_VERSION_PRAGMA, expected_version)
+                .map_err(map_sqlite)?;
+        }
+        transaction.commit().map_err(map_sqlite)
+    })
 }
 
 fn has_schema_in(
@@ -235,7 +238,7 @@ mod tests {
         CACHE_SCHEMA, CACHE_SCHEMA_VERSION, VECTOR_SCHEMA, VECTOR_SCHEMA_VERSION, bootstrap_cache,
         bootstrap_schema, bootstrap_vectors,
     };
-    use crate::storage::connection::{ON_INITIALIZATION_CONTENTION, open_database};
+    use crate::storage::connection::{ON_STORAGE_CONTENTION, open_database};
     use crate::{
         domain::Sha256,
         process_test_support::supervise_test,
@@ -364,7 +367,7 @@ mod tests {
             let (contended, observed) = mpsc::channel();
             let (release, released) = mpsc::channel();
             let worker = thread::spawn(move || {
-                ON_INITIALIZATION_CONTENTION.set(Some(Box::new(move || {
+                ON_STORAGE_CONTENTION.set(Some(Box::new(move || {
                     contended.send(()).unwrap();
                     released.recv_timeout(Duration::from_secs(20)).unwrap();
                 })));
@@ -401,7 +404,7 @@ mod tests {
         let (contended, observed) = mpsc::channel();
         let (release, released) = mpsc::channel();
         let worker = thread::spawn(move || {
-            ON_INITIALIZATION_CONTENTION.set(Some(Box::new(move || {
+            ON_STORAGE_CONTENTION.set(Some(Box::new(move || {
                 contended.send(()).unwrap();
                 released.recv_timeout(Duration::from_secs(20)).unwrap();
             })));
@@ -476,6 +479,37 @@ mod tests {
             0
         );
     }
+    #[test]
+    fn schema_commit_contention_is_retried_until_the_reader_releases() {
+        // Given: a rollback-journal database and a reader holding a shared lock.
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("database");
+        let mut initializer = Connection::open(&path).unwrap();
+        initializer.busy_timeout(Duration::ZERO).unwrap();
+        let reader = Connection::open(&path).unwrap();
+        reader
+            .execute_batch("begin; select count(*) from sqlite_schema;")
+            .unwrap();
+        let (contended, observed) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            ON_STORAGE_CONTENTION.set(Some(Box::new(move || {
+                contended.send(()).unwrap();
+            })));
+            bootstrap_cache(&mut initializer)
+        });
+        // When: the blocked commit is retried after the reader releases its lock.
+        observed.recv_timeout(Duration::from_secs(10)).unwrap();
+        reader.execute_batch("commit;").unwrap();
+        // Then: the retried attempt publishes the complete schema.
+        worker.join().unwrap().unwrap();
+        assert_eq!(
+            reader
+                .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+                .unwrap(),
+            CACHE_SCHEMA_VERSION
+        );
+    }
+
     #[test]
     fn old_cache_rejection_preserves_populated_vectors_config_and_locks() {
         // Given: closed populated databases and independent configuration/lock identities.

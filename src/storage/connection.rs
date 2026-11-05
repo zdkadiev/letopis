@@ -13,11 +13,11 @@ use std::{
 
 #[cfg(test)]
 thread_local! {
-    pub(super) static ON_INITIALIZATION_CONTENTION: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
+    pub(super) static ON_STORAGE_CONTENTION: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
 }
 
-const INITIALIZATION_WAIT: Duration = Duration::from_secs(5);
-const INITIALIZATION_RETRY: Duration = Duration::from_millis(1);
+const STORAGE_CONTENTION_WAIT: Duration = Duration::from_secs(5);
+const STORAGE_CONTENTION_RETRY: Duration = Duration::from_millis(1);
 const MIN_SQLITE_VERSION: i32 = 3_051_003;
 const VEC1_VERSION_PREFIX: &str = "version 0.8";
 const MAIN_SCHEMA: &str = "main";
@@ -37,34 +37,34 @@ pub(crate) fn map_sqlite(error: rusqlite::Error) -> StorageError {
     )
 }
 
-// Only schema creation and WAL initialization/readiness use this bounded lock wait.
-// The five-second budget applies to each call, not the entire open or command.
-// Cache/read connections retain zero busy timeout; VectorStorage separately
-// configures a bounded wait on its independent vectors writer.
-pub(super) fn wait_for_initialization<T>(
+// Schema creation, WAL initialization/readiness and write-transaction acquisition
+// use this bounded lock wait. The five-second budget applies to each call, not the
+// entire open or command. Cache/read connections retain zero busy timeout;
+// VectorStorage separately configures a bounded wait on its independent writer.
+pub(super) fn wait_for_storage_contention<T>(
     mut operation: impl FnMut() -> StorageResult<T>,
 ) -> StorageResult<T> {
     let started = Instant::now();
     loop {
         match operation() {
             Ok(value) => return Ok(value),
-            Err(error) if can_retry_initialization(&error, started.elapsed()) => {
+            Err(error) if can_retry_storage_contention(&error, started.elapsed()) => {
                 #[cfg(test)]
-                if let Some(hook) = ON_INITIALIZATION_CONTENTION.take() {
+                if let Some(hook) = ON_STORAGE_CONTENTION.take() {
                     hook();
                 }
-                thread::sleep(INITIALIZATION_RETRY);
+                thread::sleep(STORAGE_CONTENTION_RETRY);
             }
             Err(error) => return Err(error),
         }
     }
 }
 
-fn can_retry_initialization(error: &StorageError, elapsed: Duration) -> bool {
-    is_initialization_contention(error) && elapsed < INITIALIZATION_WAIT
+fn can_retry_storage_contention(error: &StorageError, elapsed: Duration) -> bool {
+    is_storage_contention(error) && elapsed < STORAGE_CONTENTION_WAIT
 }
 
-fn is_initialization_contention(error: &StorageError) -> bool {
+fn is_storage_contention(error: &StorageError) -> bool {
     let cause = error
         .source()
         .and_then(|cause| cause.downcast_ref::<rusqlite::Error>());
@@ -233,7 +233,7 @@ fn configure_database(connection: &Connection, schema: &str) -> StorageResult<()
 fn initialize_journal(connection: &Connection, schema: &str) -> StorageResult<String> {
     // The first read can encounter BUSY_RECOVERY during concurrent WAL startup.
     // Already-ready databases only read their mode; no writer lock is requested.
-    wait_for_initialization(|| {
+    wait_for_storage_contention(|| {
         let journal = get_journal(connection, schema).map_err(map_sqlite)?;
         if journal == WAL_MODE {
             return Ok(journal);
@@ -274,8 +274,8 @@ fn verify_capabilities(connection: &Connection) -> StorageResult<()> {
 #[cfg(test)]
 mod policy_tests {
     use super::{
-        attach_cache, attach_vectors, can_retry_initialization, configure_database, get_journal,
-        map_sqlite, open_database, wait_for_initialization,
+        attach_cache, attach_vectors, can_retry_storage_contention, configure_database,
+        get_journal, map_sqlite, open_database, wait_for_storage_contention,
     };
     use crate::service::{StorageError, StorageErrorKind};
     use crate::with_verified_database_paths;
@@ -304,8 +304,8 @@ mod policy_tests {
         for (seconds, expected) in [(0, true), (4, true), (5, false), (6, false)] {
             // When / Then: the five-second deadline is exclusive for another retry.
             let elapsed = Duration::from_secs(seconds);
-            assert_eq!(can_retry_initialization(&busy, elapsed), expected);
-            assert!(!can_retry_initialization(&ordinary, elapsed));
+            assert_eq!(can_retry_storage_contention(&busy, elapsed), expected);
+            assert!(!can_retry_storage_contention(&ordinary, elapsed));
         }
     }
 
@@ -387,7 +387,7 @@ mod policy_tests {
         // Given: a finite second result exposes an accidental retry without timing.
         let mut attempts = 0;
         // When
-        let error = wait_for_initialization(|| {
+        let error = wait_for_storage_contention(|| {
             attempts += 1;
             if attempts == 1 {
                 return Err(StorageError::new(

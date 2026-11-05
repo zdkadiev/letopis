@@ -39,7 +39,9 @@ impl ConfigurationService<'_> {
     fn get_config_bytes(&self) -> FileResult<Option<Vec<u8>>> {
         self.files
             .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
-        self.files.file_get_bytes_by_path(Path::new(CONFIG_PATH))
+        super::utils::retry_changed_file_observation(|| {
+            self.files.file_get_bytes_by_path(Path::new(CONFIG_PATH))
+        })
     }
 
     fn validate_configuration(&self, bytes: &[u8]) -> EmbeddingResult<Configuration> {
@@ -83,6 +85,39 @@ mod tests {
     const DISABLED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":2}}"#;
     const UNCONFIGURED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#;
     const LEGACY: &[u8] = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":0}"#;
+
+    #[test]
+    fn retries_a_configuration_observation_that_raced_publication() {
+        // Given: the first configuration read observes a concurrent creation.
+        let attempts = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = std::sync::Arc::clone(&attempts);
+        let mut files = MockFileReader::new();
+        files
+            .expect_directory_get_by_path()
+            .times(1)
+            .returning(|_| Ok(None));
+        files.expect_file_get_bytes_by_path().returning(move |_| {
+            let attempt = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+            if attempt == 1 {
+                Err(FileError::new(FileErrorKind::Changed))
+            } else {
+                Ok(Some(UNCONFIGURED.to_vec()))
+            }
+        });
+        let provider = Provider::accepting();
+        let service = ConfigurationService {
+            files: &files,
+            provider: &provider,
+        };
+        // When: configuration is observed while another process publishes it.
+        let config = service.get_config().unwrap();
+        // Then: the retried observation returns the published configuration.
+        assert!(matches!(
+            config,
+            Some(crate::service::Configuration::Unconfigured { .. })
+        ));
+        assert_eq!(attempts.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
 
     #[test]
     fn reads_configuration_at_extreme_filesystem_times() {

@@ -1,4 +1,4 @@
-use super::connection::map_sqlite;
+use super::connection::{map_sqlite, wait_for_storage_contention};
 use crate::service::{
     StorageError, StorageErrorKind, StorageResult, TransactionError, TransactionRequirement,
 };
@@ -108,9 +108,10 @@ where
             )));
         }
     }
-    let transaction = Transaction::new_unchecked(connection, behavior)
-        .map_err(map_sqlite)
-        .map_err(TransactionError::Storage)?;
+    let transaction = wait_for_storage_contention(|| {
+        Transaction::new_unchecked(connection, behavior).map_err(map_sqlite)
+    })
+    .map_err(TransactionError::Storage)?;
     state.set(if matches!(behavior, TransactionBehavior::Deferred) {
         State::Reading
     } else {
@@ -179,7 +180,31 @@ mod tests {
     use super::{State, run};
     use crate::service::{StorageError, TransactionError};
     use rusqlite::Connection;
-    use std::cell::Cell;
+    use std::{cell::Cell, thread, time::Duration};
+    use tempfile::TempDir;
+
+    #[test]
+    fn write_scope_waits_for_a_concurrent_writer_to_release() {
+        // Given: another connection holds the database write lock.
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("database");
+        let owner = Connection::open(&path).unwrap();
+        owner.busy_timeout(Duration::ZERO).unwrap();
+        owner.execute_batch("begin immediate").unwrap();
+        let waiter = Connection::open(&path).unwrap();
+        waiter.busy_timeout(Duration::ZERO).unwrap();
+        let state = Cell::new(State::Idle);
+        let releaser = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+            owner.execute_batch("commit").unwrap();
+        });
+        // When: a write scope starts while the lock is still held.
+        let result = run(&waiter, &state, || Ok::<_, StorageError>(7), || Ok(()));
+        // Then: acquisition retries and the operation completes after the release.
+        assert_eq!(result.unwrap(), 7);
+        releaser.join().unwrap();
+        assert_eq!(state.get(), State::Idle);
+    }
 
     #[test]
     fn failed_commit_rolls_back_and_allows_reuse() {

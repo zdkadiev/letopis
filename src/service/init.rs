@@ -24,7 +24,9 @@ impl InitService {
     fn get_config_bytes(&self) -> FileResult<Option<Vec<u8>>> {
         self.files
             .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
-        self.files.file_get_bytes_by_path(Path::new(CONFIG_PATH))
+        super::utils::retry_changed_file_observation(|| {
+            self.files.file_get_bytes_by_path(Path::new(CONFIG_PATH))
+        })
     }
 
     /// Construct initialization from owned adapter capabilities.

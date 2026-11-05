@@ -12,10 +12,14 @@ use std::{
     ffi::OsStr,
     os::unix::ffi::OsStrExt,
     path::Path,
+    thread,
+    time::{Duration, Instant},
 };
 
 /// Public context shared by document candidate observations.
 const CANDIDATE_LIST_MESSAGE: &str = "cannot list document candidates";
+const FILE_OBSERVATION_WAIT: Duration = Duration::from_secs(5);
+const FILE_OBSERVATION_RETRY: Duration = Duration::from_millis(1);
 const UNSUPPORTED_DOCUMENT_PATH: &str = "unsupported document path";
 const PATH: &str = "path";
 const REASON: &str = "reason";
@@ -88,6 +92,31 @@ impl CandidateSelection<'_> {
 }
 
 /// Resolve raw dot components for scope matching without decoding irrelevant names.
+/// Repeat a file observation that raced another process creating the same file.
+///
+/// A presence flip between two observations is a transient `Changed` error.
+/// A stable replacement or another failure is returned without retrying.
+///
+/// # Errors
+/// Preserves the final file observation failure.
+pub(crate) fn retry_changed_file_observation<T>(
+    mut operation: impl FnMut() -> FileResult<T>,
+) -> FileResult<T> {
+    let started = Instant::now();
+    loop {
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(error)
+                if error.get_kind() == FileErrorKind::Changed
+                    && started.elapsed() < FILE_OBSERVATION_WAIT =>
+            {
+                thread::sleep(FILE_OBSERVATION_RETRY);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 fn normalize_candidate_bytes(entry: &[u8]) -> Option<Vec<u8>> {
     if entry.starts_with(b"/") {
         return None;

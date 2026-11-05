@@ -43,6 +43,8 @@ use std::{
     path::Path,
     rc::Rc,
     sync::Arc,
+    thread,
+    time::{Duration, Instant},
 };
 
 mod cli;
@@ -58,7 +60,9 @@ mod utils;
 
 pub mod service;
 
-const VECTOR_WRITE_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+const VECTOR_WRITE_WAIT: Duration = Duration::from_secs(5);
+const STORAGE_PATH_WAIT: Duration = Duration::from_secs(5);
+const STORAGE_PATH_RETRY: Duration = Duration::from_millis(1);
 
 const FOREGROUND_COMMANDS: [&str; 4] = ["search", "traverse", "inspect", "check"];
 
@@ -776,22 +780,54 @@ where
             cause,
         )
     })?;
-    verify_storage_directory(&files, pinned)?;
-    let cache = files
-        .file_get_identity_by_path(Path::new("cache.db"))
-        .map_err(map_storage_path_error)?;
-    let vectors = files
-        .file_get_identity_by_path(Path::new("vectors.db"))
-        .map_err(map_storage_path_error)?;
-    verify_storage_files(&files, cache, vectors)?;
+    let (cache, vectors) = wait_for_stable_storage_paths(|| {
+        verify_storage_directory(&files, pinned)?;
+        let cache = files
+            .file_get_identity_by_path(Path::new("cache.db"))
+            .map_err(map_storage_path_error)?;
+        let vectors = files
+            .file_get_identity_by_path(Path::new("vectors.db"))
+            .map_err(map_storage_path_error)?;
+        verify_storage_files(&files, cache, vectors)?;
+        Ok((cache, vectors))
+    })?;
     #[cfg(test)]
     if let Some(hook) = BEFORE_DATABASE_OPERATION.take() {
         hook();
     }
     let result = operation(cache, vectors);
-    verify_storage_directory(&files, pinned)?;
-    verify_storage_files(&files, cache, vectors)?;
+    wait_for_stable_storage_paths(|| {
+        verify_storage_directory(&files, pinned)?;
+        verify_storage_files(&files, cache, vectors)
+    })?;
     result
+}
+
+/// Repeat path verification while another process is creating a database leaf.
+///
+/// A presence flip between two leaf observations is reported as a transient
+/// `Changed` error. A replacement that stays different still exhausts the budget.
+fn wait_for_stable_storage_paths<T>(
+    mut operation: impl FnMut() -> StorageResult<T>,
+) -> StorageResult<T> {
+    let started = Instant::now();
+    loop {
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(error)
+                if is_storage_path_change(&error) && started.elapsed() < STORAGE_PATH_WAIT =>
+            {
+                thread::sleep(STORAGE_PATH_RETRY);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn is_storage_path_change(error: &StorageError) -> bool {
+    std::error::Error::source(error)
+        .and_then(|cause| cause.downcast_ref::<FileError>())
+        .is_some_and(|cause| cause.get_kind() == FileErrorKind::Changed)
 }
 
 fn verify_storage_directory(files: &dyn FileReader, pinned: &impl AsFd) -> StorageResult<()> {
@@ -1275,11 +1311,36 @@ mod database_tests {
 
 #[cfg(test)]
 mod database_path_tests {
-    use super::{StorageResult, resolve_database_paths, with_verified_database_paths};
-    use crate::service::StorageErrorKind;
+    use super::{
+        StorageResult, resolve_database_paths, wait_for_stable_storage_paths,
+        with_verified_database_paths,
+    };
+    use crate::service::{FileError, FileErrorKind, StorageError, StorageErrorKind};
     use std::fs::{self, File};
     use std::path::Path;
     use tempfile::TempDir;
+
+    #[test]
+    fn retries_transient_changed_database_observations() {
+        // Given: a path verification that reports a concurrent creation as changed once.
+        let attempts = std::cell::Cell::new(0);
+        // When: storage verification observes the same leaves again.
+        let result = wait_for_stable_storage_paths(|| {
+            attempts.set(attempts.get() + 1);
+            if attempts.get() == 1 {
+                Err(StorageError::new_with_cause(
+                    StorageErrorKind::InternalError,
+                    "document storage database changed",
+                    FileError::new(FileErrorKind::Changed),
+                ))
+            } else {
+                Ok(())
+            }
+        });
+        // Then: the transient change is retried and the stable observation succeeds.
+        result.unwrap();
+        assert_eq!(attempts.get(), 2);
+    }
 
     #[test]
     fn rejects_replacement_of_an_observed_database() {
