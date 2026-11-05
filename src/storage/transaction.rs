@@ -185,10 +185,14 @@ mod tests {
 
     #[test]
     fn write_scope_waits_for_a_concurrent_writer_to_release() {
-        // Given: another connection holds the database write lock.
+        // Given: a WAL database whose only write lock is held by another connection.
         let root = TempDir::new().unwrap();
         let path = root.path().join("database");
         let owner = Connection::open(&path).unwrap();
+        let journal: String = owner
+            .query_row("pragma journal_mode=wal", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(journal, "wal");
         owner.busy_timeout(Duration::ZERO).unwrap();
         owner.execute_batch("begin immediate").unwrap();
         let waiter = Connection::open(&path).unwrap();

@@ -37,9 +37,9 @@ impl ConfigReader for ConfigurationService<'_> {
 
 impl ConfigurationService<'_> {
     fn get_config_bytes(&self) -> FileResult<Option<Vec<u8>>> {
-        self.files
-            .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
         super::utils::retry_changed_file_observation(|| {
+            self.files
+                .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
             self.files.file_get_bytes_by_path(Path::new(CONFIG_PATH))
         })
     }
@@ -94,7 +94,7 @@ mod tests {
         let mut files = MockFileReader::new();
         files
             .expect_directory_get_by_path()
-            .times(1)
+            .times(2)
             .returning(|_| Ok(None));
         files.expect_file_get_bytes_by_path().returning(move |_| {
             let attempt = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;

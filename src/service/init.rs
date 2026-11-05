@@ -22,9 +22,9 @@ pub(crate) struct InitService {
 
 impl InitService {
     fn get_config_bytes(&self) -> FileResult<Option<Vec<u8>>> {
-        self.files
-            .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
         super::utils::retry_changed_file_observation(|| {
+            self.files
+                .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
             self.files.file_get_bytes_by_path(Path::new(CONFIG_PATH))
         })
     }
@@ -59,16 +59,19 @@ impl Initializer for InitService {
             self.validate_configuration(&bytes)
                 .map_err(map_invalid_configuration)?;
         }
-        let pinned = self
-            .files
-            .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
-            .map_err(map_files)?;
+        let pinned = super::utils::retry_changed_file_observation(|| {
+            self.files
+                .directory_create_by_path(Path::new(SERVICE_DIRECTORY))
+        })
+        .map_err(map_files)?;
         self.storage
             .initialize(&self.directory, &pinned)
             .map_err(map_storage)?;
-        self.files
-            .file_create_if_absent_by_path(Path::new(CONFIG_PATH), GENERATED_CONFIG)
-            .map_err(map_files)?;
+        super::utils::retry_changed_file_observation(|| {
+            self.files
+                .file_create_if_absent_by_path(Path::new(CONFIG_PATH), GENERATED_CONFIG)
+        })
+        .map_err(map_files)?;
         let Some(bytes) = self.get_config_bytes().map_err(map_read_error)? else {
             return Err(CommandError::new(
                 CommandErrorKind::InternalError,
@@ -77,16 +80,21 @@ impl Initializer for InitService {
         };
         self.validate_configuration(&bytes)
             .map_err(map_invalid_configuration)?;
-        self.files
-            .directory_sync_by_path(Path::new(SERVICE_DIRECTORY))
-            .map_err(map_files)?;
-        self.files
-            .directory_sync_by_path(Path::new("."))
-            .map_err(map_files)?;
-        self.files
-            .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
-            .map_err(map_files)?
-            .ok_or_else(|| CommandError::new(CommandErrorKind::InternalError, INIT_FAILURE))?;
+        super::utils::retry_changed_file_observation(|| {
+            self.files
+                .directory_sync_by_path(Path::new(SERVICE_DIRECTORY))
+        })
+        .map_err(map_files)?;
+        super::utils::retry_changed_file_observation(|| {
+            self.files.directory_sync_by_path(Path::new("."))
+        })
+        .map_err(map_files)?;
+        super::utils::retry_changed_file_observation(|| {
+            self.files
+                .directory_get_by_path(Path::new(SERVICE_DIRECTORY))
+        })
+        .map_err(map_files)?
+        .ok_or_else(|| CommandError::new(CommandErrorKind::InternalError, INIT_FAILURE))?;
         Ok(())
     }
 }
