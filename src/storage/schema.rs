@@ -5,7 +5,7 @@ use super::{
 use crate::service::{StorageError, StorageErrorKind, StorageResult};
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 
-const CACHE_SCHEMA_VERSION: i64 = 2;
+const CACHE_SCHEMA_VERSION: i64 = 4;
 const VECTOR_SCHEMA_VERSION: i64 = 1;
 const USER_VERSION_PRAGMA: &str = "user_version";
 const CACHE_SCHEMA: &str = include_str!("cache.sql");
@@ -272,17 +272,19 @@ mod tests {
     }
 
     #[test]
-    fn accepts_legacy_keyword_case_without_ignoring_literal_case() {
-        // Given: the previously published cache schema with uppercase keywords.
+    fn accepts_keyword_case_without_ignoring_literal_case() {
+        // Given: a small schema using uppercase keywords and exact string literals.
         let mut connection = Connection::open_in_memory().unwrap();
         connection
-            .execute_batch(include_str!(
-                "../../tests/fixtures/storage/legacy-cache.sql"
-            ))
+            .execute_batch("CREATE TABLE t(value TEXT CHECK(value='A')); PRAGMA user_version=1")
             .unwrap();
-        connection.pragma_update(None, "user_version", 2).unwrap();
-        // When / Then: the lowercase source describes the same stored schema.
-        assert!(bootstrap_cache(&mut connection).is_ok());
+        // When / Then: lowercase keywords describe exactly the same schema.
+        bootstrap_schema(
+            &mut connection,
+            "create table t(value text check(value='A'))",
+            1,
+        )
+        .unwrap();
 
         // Given: an uppercase vector schema with its native extension registered.
         super::register_vec1().unwrap();
@@ -318,7 +320,7 @@ mod tests {
         for (bootstrap, version) in [
             (
                 bootstrap_cache as fn(&mut Connection) -> StorageResult<()>,
-                2,
+                4,
             ),
             (bootstrap_vectors, 1),
         ] {

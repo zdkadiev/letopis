@@ -311,6 +311,7 @@ impl<
                     outcome = publication.publish_projection(prepared, outcome)?;
                 }
                 publication.reconcile_sources(&graph)?;
+                publication.publish_edges(&graph)?;
                 self.verify_excluded_candidates(&excluded, paths)?;
                 #[cfg(test)]
                 reach_checkpoint("before_commit");
@@ -667,6 +668,7 @@ mod projection {
         knowledge: BTreeMap<KnowledgeId, KnowledgeMetadata>,
         edges: BTreeSet<Edge>,
         touched_sources: BTreeSet<SourceUri>,
+        changed_owners: BTreeSet<KnowledgeId>,
     }
     impl<F: FileReader + FileLocker, M: MarkdownCodec, P, C: CacheDatabase>
         DocumentPublication<'_, F, M, P, C>
@@ -798,6 +800,21 @@ mod projection {
         }
     }
     impl<F, M, P, C: CacheDatabase> DocumentPublication<'_, F, M, P, C> {
+        /// Inserts changed owners' final declarations after all nodes and sources exist.
+        /// Unchanged owners keep their declarations for storage's commit-time reconciliation.
+        ///
+        /// # Errors
+        /// Reports declaration failures, leaving the caller's transaction unpublished.
+        pub(super) fn publish_edges(&self, graph: &EffectiveGraph) -> DocumentResult<()> {
+            for edge in &graph.edges {
+                if graph.changed_owners.contains(edge.get_source()) {
+                    self.storage
+                        .edges_save_by_source_id_and_target_id_and_type(edge)?;
+                }
+            }
+            Ok(())
+        }
+
         /// Apply a prepared projection to the active cache write scope.
         ///
         /// # Errors
@@ -825,10 +842,6 @@ mod projection {
             for text in &prepared.search {
                 self.storage
                     .nodes_upsert_by_id(&NodeMetadata::Knowledge(text.metadata.clone()))?;
-            }
-            for edge in &prepared.edges {
-                self.storage
-                    .edges_save_by_source_id_and_target_id_and_type(edge)?;
             }
             #[cfg(test)]
             reach_checkpoint("projections");
@@ -861,6 +874,7 @@ mod projection {
                 knowledge,
                 edges: read.edges_get_by_source_id(None)?.into_iter().collect(),
                 touched_sources: BTreeSet::new(),
+                changed_owners: BTreeSet::new(),
             })
         }
 
@@ -903,6 +917,7 @@ mod projection {
         }
 
         pub(super) fn apply(&mut self, prepared: &PreparedProjection) {
+            self.changed_owners.extend(prepared.cleared.iter().cloned());
             self.edges.retain(|edge| {
                 if prepared.cleared.contains(edge.get_source()) {
                     if let EdgeTarget::Source(uri) = edge.get_target() {
@@ -917,6 +932,7 @@ mod projection {
                 self.knowledge.remove(id);
             }
             for text in &prepared.search {
+                self.changed_owners.insert(text.metadata.id.clone());
                 self.knowledge
                     .insert(text.metadata.id.clone(), text.metadata.clone());
             }

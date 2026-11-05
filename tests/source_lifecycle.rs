@@ -369,19 +369,13 @@ fn seed_legacy_address(repo: &DocumentRepo) {
     let transaction = connection.transaction().unwrap();
     transaction
         .execute(
-            "update nodes set id=?1, uri=?1 where id=?2",
-            params!["https:/Host/a", "https://Host/a"],
-        )
-        .unwrap();
-    transaction
-        .execute(
-            "update edges set target_id=?1 where target_id=?2",
+            "update nodes set uri=?1 where uri=?2",
             params!["https:/Host/a", "https://Host/a"],
         )
         .unwrap();
     transaction.commit().unwrap();
     let cached: String = connection
-        .query_row("select id from nodes where kind=?1", ["source"], |row| {
+        .query_row("select uri from nodes where kind=?1", ["source"], |row| {
             row.get(0)
         })
         .unwrap();

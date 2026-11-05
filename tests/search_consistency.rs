@@ -311,7 +311,7 @@ fn live_confinement_error_releases_read_before_subsequent_reset() {
 
 #[test]
 fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publication() {
-    // Given
+    // Given: a seeded search projection with a deliberately malformed source root.
     let repo = ReadingRepo::new();
     repo.write_knowledge("a.md", "sqlite");
     let server = HttpFixture::start(FixtureReply::Status {
@@ -325,14 +325,9 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
         .unwrap();
     repo.seed_vectors(&config, &[("a.md", &[1.0, 0.0])]);
     let connection = rusqlite::Connection::open(repo.get_root().join(".letopis/cache.db")).unwrap();
-    connection
-        .execute(
-            "update nodes set source_snapshot = 'malformed' where id = ?1",
-            ["a.md"],
-        )
-        .unwrap();
+    update_source_snapshot(&connection, Some("malformed"));
     // Refresh validates declared source roots before inference without decoding unrelated metadata.
-    // When
+    // When: search validates the persisted source roots before querying the provider.
     let error = wire_searcher(repo.get_root())
         .unwrap()
         .search(&SearchRequest {
@@ -341,7 +336,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
             limit: NonZeroUsize::new(10).unwrap(),
         })
         .unwrap_err();
-    // Then
+    // Then: malformed roots fail safely without inference and release the read view.
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
     assert!(server.take_requests().is_empty());
     let next = repo.write_config("ollama", &server.get_base_url(), "next");
@@ -353,15 +348,10 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
         VectorOutcome::Current(true)
     );
     // Repair deliberately malformed persisted data before asking refresh to publish it.
-    connection
-        .execute(
-            "update nodes set source_snapshot = null where id = ?1",
-            ["a.md"],
-        )
-        .unwrap();
-    // Given
+    update_source_snapshot(&connection, None);
+    // Given: the persisted source root and canonical document are repaired.
     repo.write_knowledge("a.md", "repaired sqlite");
-    // When / Then
+    // When / Then: refresh publishes the repair and permits an immediate checkpoint.
     assert!(
         wire_document_refresher(repo.get_root())
             .unwrap()
@@ -426,4 +416,16 @@ fn assert_can_checkpoint(repo: &ReadingRepo) {
             .unwrap();
         assert_eq!(busy, 0, "leaked read prevented checkpoint of {file}");
     }
+}
+
+fn update_source_snapshot(connection: &rusqlite::Connection, snapshot: Option<&str>) {
+    assert_eq!(
+        connection
+            .execute(
+                "update nodes set source_snapshot = ?1 where uri = ?2",
+                (snapshot, "a.md"),
+            )
+            .unwrap(),
+        1,
+    );
 }

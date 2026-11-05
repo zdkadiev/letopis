@@ -624,12 +624,11 @@ fn duplicate_edges_and_invalid_checks_are_rejected() {
     assert!(write_result.is_err());
     let sql = Connection::open(&cache).unwrap();
     for query in [
-        "insert into nodes(id,kind,uri,created_at) values('bad','source','different',1)",
-        "insert into nodes(id,kind,uri,created_at,source_snapshot) values('bad','source','bad',1,'snapshot')",
-        "insert into nodes(id,kind,uri,created_at,search_hash) values('bad','source','bad',1,'hash')",
-        "insert into nodes(id,kind,uri,created_at,line_start) values('bad','source','bad',1,1)",
-        "insert into nodes(id,kind,uri,created_at) values('bad','vertex','bad',1)",
-        "insert into nodes(id,kind,uri,created_at,line_start,line_end) values('bad','source','bad',1,0,1)",
+        "insert into nodes(kind,uri,created_at,source_snapshot) values('source','bad',1,'snapshot')",
+        "insert into nodes(kind,uri,created_at,search_hash) values('source','bad',1,'hash')",
+        "insert into nodes(kind,uri,created_at,line_start) values('source','bad',1,1)",
+        "insert into nodes(kind,uri,created_at) values('vertex','bad',1)",
+        "insert into nodes(kind,uri,created_at,line_start,line_end) values('source','bad',1,0,1)",
         "insert into files values('x',1,2,3,'hash',4,1,'error')",
         "insert into files values('x',1,2,3,'hash',4,0,null)",
         "insert into files values('x',1,2,3,'hash',4,2,null)",
@@ -834,8 +833,11 @@ fn malformed_persisted_values_return_internal_errors() {
             .get_kind(),
         StorageErrorKind::InternalError
     );
-    sql.execute("insert into edges values('a.md','b.md','INVALID')", [])
-        .unwrap();
+    sql.execute(
+        "insert into unresolved_edges select id,'b.md','INVALID' from nodes where uri='a.md'",
+        [],
+    )
+    .unwrap();
     assert_eq!(
         db.cache
             .with_read_tx(|| Ok::<_, StorageError>(db.cache.edges_get_by_source_id(None)))
@@ -854,7 +856,7 @@ fn knowledge_and_source_optional_fields_survive_reopen() {
     let vectors = root.path().join("v");
     let mut knowledge = build_knowledge("a.md#Section", "alpha");
     if let NodeMetadata::Knowledge(ref mut n) = knowledge {
-        n.uri = KnowledgeId::parse("a.md").unwrap();
+        n.uri = KnowledgeId::parse("a.md#Section").unwrap();
         n.kind = letopis::domain::ElementKind::Metavertex;
         n.created_at = 0;
         n.source_snapshot = Some(letopis::domain::TreeOid::parse(&"a".repeat(40)).unwrap());

@@ -204,19 +204,21 @@ pub trait CacheDatabase: StorageRead + GraphRead {
     /// Insert or replace metadata while preserving its row ID.
     ///
     /// # Errors
-    /// Rejects unsupported numeric values or database failures.
+    /// Rejects unequal knowledge identity/address fields, unsupported numeric values,
+    /// or database failures. Any error prevents publication of this write unit.
     fn nodes_upsert_by_id(&self, node: &NodeMetadata) -> StorageResult<i64>;
-    /// Insert a declared edge, including a dangling target.
+    /// Insert a declared edge, retaining an absent target without creating a placeholder node.
+    /// Targets introduced later in the unit resolve when the unit commits.
     ///
     /// # Errors
     /// Rejects duplicate edges and missing sources; reports database failures.
     fn edges_save_by_source_id_and_target_id_and_type(&self, edge: &Edge) -> StorageResult<()>;
-    /// Remove all declarations owned by a knowledge element.
+    /// Remove resolved and unresolved declarations owned by a knowledge element.
     ///
     /// # Errors
     /// Reports database failures.
     fn edges_delete_by_source_id(&self, source_id: &KnowledgeId) -> StorageResult<()>;
-    /// Delete a node and its FTS entry, preserving incoming edges.
+    /// Delete a node and its FTS entry, retaining incoming declarations as missing targets.
     ///
     /// # Errors
     /// Rejects deletion while outgoing edges remain; reports database failures.
@@ -622,7 +624,8 @@ pub trait StorageRead {
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted values.
     fn nodes_get(&self) -> StorageResult<Vec<StoredNode>>;
-    /// List all declared edges, optionally restricted to their source.
+    /// List resolved and missing-target declarations in textual source, target and type order.
+    /// An optional source restricts both representations; absent targets have no node metadata.
     ///
     /// # Errors
     /// Returns an internal error for I/O or malformed persisted edges.
