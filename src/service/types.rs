@@ -745,6 +745,15 @@ enum EmbeddingState {
     Enabled(EmbeddingConfig),
 }
 
+/// Selects whether standard Git ignore sources constrain untracked enumeration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitIgnoreMode {
+    /// Honor repository, per-directory and global Git exclusion sources.
+    Standard,
+    /// Enumerate untracked paths without consulting standard exclusion sources.
+    Disabled,
+}
+
 /// Author-controlled corpus enumeration policy, independent of embedding identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DiscoveryConfig {

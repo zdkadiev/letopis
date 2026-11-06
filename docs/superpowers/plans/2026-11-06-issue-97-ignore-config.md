@@ -187,7 +187,7 @@ Create `src/git/ignore.rs` with inline unit tests.
   `paths_filter_by_patterns(raw: &[u8], patterns: &[u8], case: gix::glob::pattern::Case) -> GitResult<Vec<u8>>`.
   It owns no filesystem or application configuration dependency.
 
-- [ ] **Step 1: Add failing literal and Git-oracle tests.** In
+- [x] **Step 1: Add failing literal and Git-oracle tests.** In
   `git::ignore::tests`, pin at least these cases with explicit expected results:
 
   | Patterns | Excluded | Included |
@@ -217,11 +217,11 @@ Create `src/git/ignore.rs` with inline unit tests.
   ignored names. Accept oracle exit 0 or 1, reject other exits. Never make the
   product's own matcher compute the expectation. Isolate HOME/XDG and user Git
   settings per child command without process-global environment mutation.
-- [ ] **Step 2: Confirm red tests.** Run
+- [x] **Step 2: Confirm red tests.** Run
   `cargo test --locked --offline --lib git::ignore::tests` and
   `cargo test --locked --offline --lib git::repository::tests`.
   Missing APIs or differing membership are the expected initial failures.
-- [ ] **Step 3: Implement enumeration and matching.** Preserve index expansion;
+- [x] **Step 3: Implement enumeration and matching.** Preserve index expansion;
   build the standard exclusion stack only in Standard mode. Disabled mode passes
   no exclusion stack to the existing `gix_dir` walk; do not replace the walker.
   Apply supplied patterns after combining raw index and untracked membership.
@@ -229,21 +229,21 @@ Create `src/git/ignore.rs` with inline unit tests.
   positive exclusion; otherwise use the leaf's last matching pattern. Use
   `gix::ignore::Search`, Git-compatible parsing and repository case behavior.
   An ignore buffer's physical filename must not change its root pattern base.
-- [ ] **Step 4: Adapt all existing trait callers and test doubles.** Until Task
+- [x] **Step 4: Adapt all existing trait callers and test doubles.** Until Task
   3 connects application settings, CandidateSelection supplies Standard and an
   empty pattern slice, preserving old product behavior. Adjust mock argument
   assertions and test callbacks. Preserve the existing cancellation observer's
   `worktree_paths_get` symbol and the no-product-subprocess guarantees.
-- [ ] **Step 5: Run the new tests and existing corpus/safety regressions.**
+- [x] **Step 5: Run the new tests and existing corpus/safety regressions.**
   Repeat Step 2, then
   `cargo test --locked --offline --lib service::document_refresher::corpus` and
   `cargo test --locked --offline --test git_no_subprocess --test git_snapshots`.
   Every differential case must agree with Git and its literal expected cases.
-- [ ] **Step 6: Mutation-check parent precedence, raw-path filtering and toggle
+- [x] **Step 6: Mutation-check parent precedence, raw-path filtering and toggle
   scope.** Bypass ancestor matching, reverse pattern order, and always construct
   standard excludes, independently. Named tests must detect each mutation.
   Restore all changes and rerun affected cases.
-- [ ] **Step 7: Commit `feat: support Git discovery exclusion policies`.**
+- [x] **Step 7: Commit `feat: support Git discovery exclusion policies`.**
   Review the staged file list and confirm no dependency/native-stack changes.
 
 ### Task 3: Observe policy inputs and preserve refresh consistency

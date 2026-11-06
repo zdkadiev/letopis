@@ -1564,14 +1564,16 @@ mod tests {
         let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let observed = std::sync::Arc::clone(&calls);
         let mut candidates = Candidates::new();
-        candidates.expect_worktree_paths_get().returning(move || {
-            let count = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-            if count < 3 {
-                Ok(Vec::new())
-            } else {
-                Ok(b"note.md\0".to_vec())
-            }
-        });
+        candidates
+            .expect_worktree_paths_get()
+            .returning(move |_, _| {
+                let count = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                if count < 3 {
+                    Ok(Vec::new())
+                } else {
+                    Ok(b"note.md\0".to_vec())
+                }
+            });
         service.git = candidates;
         // When: refresh tries to publish the removal.
         let result = service.refresh(&[]);
@@ -3491,7 +3493,7 @@ mod tests {
         let mut candidates = Candidates::new();
         candidates
             .expect_worktree_paths_get()
-            .returning(|| Ok(b"note.md\0".to_vec()));
+            .returning(|_, _| Ok(b"note.md\0".to_vec()));
         candidates
     }
 }
@@ -4007,7 +4009,7 @@ mod corpus {
         // Given: relevant raw paths whose structural form is unsafe to probe.
         let mut git = MockGitWorktreePaths::new();
         git.expect_worktree_paths_get()
-            .returning(|| Ok(b"a/../note.md\0./note.md\0a//b.md\0".to_vec()));
+            .returning(|_, _| Ok(b"a/../note.md\0./note.md\0a//b.md\0".to_vec()));
         let service = DocumentRefreshService {
             git,
             filesystem: build_root_only_files(),
@@ -4034,7 +4036,7 @@ mod corpus {
         // Given: a raw name escaping the selected directory and another dot path resolving into it.
         let mut git = MockGitWorktreePaths::new();
         git.expect_worktree_paths_get()
-            .returning(|| Ok(b"notes/../outside.md\0notes/./a.md\0notes/ab.md\0".to_vec()));
+            .returning(|_, _| Ok(b"notes/../outside.md\0notes/./a.md\0notes/ab.md\0".to_vec()));
         let mut filesystem = build_root_only_files();
         filesystem
             .expect_symlink_is_exist()
@@ -4072,7 +4074,7 @@ mod corpus {
         // Given: an escaping path and a filesystem mock that permits only the root observation.
         let mut git = MockGitWorktreePaths::new();
         git.expect_worktree_paths_get()
-            .returning(|| Ok(b"../note.md\0".to_vec()));
+            .returning(|_, _| Ok(b"../note.md\0".to_vec()));
         let service = DocumentRefreshService {
             git,
             filesystem: build_root_only_files(),
@@ -4101,7 +4103,7 @@ mod corpus {
         fs::create_dir(&root).unwrap();
         let mut git = MockGitWorktreePaths::new();
         git.expect_worktree_paths_get()
-            .returning(|| Ok(b"irrelevant.txt\0".to_vec()));
+            .returning(|_, _| Ok(b"irrelevant.txt\0".to_vec()));
         let service = DocumentRefreshService {
             git,
             filesystem,

@@ -332,7 +332,7 @@ mod tests {
         use crate::service::{MockFileReader, MockGitWorktreePaths};
         // Given: raw irrelevant/private names, a symlink and a normalized duplicate.
         let mut git = MockGitWorktreePaths::new();
-        git.expect_worktree_paths_get().returning(|| {
+        git.expect_worktree_paths_get().returning(|_, _| {
             Ok(b"bad\xff.txt\0.letopis/bad\xff.md\0link\xff.md\0./note.md\0note.md\0".to_vec())
         });
         let mut files = MockFileReader::new();
@@ -360,7 +360,7 @@ mod tests {
         // Given: an independent Git enumeration failure and no permitted filesystem calls.
         let mut git = MockGitWorktreePaths::new();
         git.expect_worktree_paths_get()
-            .returning(|| Err(GitError::new(std::io::Error::other("private cause"))));
+            .returning(|_, _| Err(GitError::new(std::io::Error::other("private cause"))));
         let service = InspectionService::new((), git, MockFileReader::new(), ());
         // When: the selection error takes inspection's document-error mapping.
         let error = super::map_document_error(service.get_candidates().unwrap_err());
@@ -598,7 +598,11 @@ mod tests {
         }
     }
     impl GitWorktreePaths for RecordingGit {
-        fn worktree_paths_get(&self) -> crate::service::GitResult<Vec<u8>> {
+        fn worktree_paths_get(
+            &self,
+            _: crate::service::GitIgnoreMode,
+            _: &[u8],
+        ) -> crate::service::GitResult<Vec<u8>> {
             self.0.borrow_mut().push("list".into());
             let paths = if matches!(self.1, Scenario::Overlap | Scenario::SourceIoFailure) {
                 &['a'][..]

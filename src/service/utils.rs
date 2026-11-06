@@ -1,8 +1,8 @@
 use super::{
     CommandError, CommandErrorKind, CommandProblem, CommandResult, DocumentError,
-    DocumentErrorKind, DocumentResult, FileReader, GitWorktreePaths, GraphDiagnostics,
-    KnowledgeMetadata, NodeMetadata, PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceIssue,
-    ProvenanceRequest, SourceProvenance, StorageError, StorageRead,
+    DocumentErrorKind, DocumentResult, FileReader, GitIgnoreMode, GitWorktreePaths,
+    GraphDiagnostics, KnowledgeMetadata, NodeMetadata, PROVENANCE_BATCH_SIZE, ParsedFile,
+    ProvenanceIssue, ProvenanceRequest, SourceProvenance, StorageError, StorageRead,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
 use crate::service::{FileError, FileErrorKind, FileResult};
@@ -60,7 +60,10 @@ impl CandidateSelection<'_> {
     /// # Errors
     /// Preserves document diagnostics for Git/file observation, framing or path failures.
     pub(super) fn get_candidates(&self, paths: &[RepoPath]) -> DocumentResult<Vec<RepoPath>> {
-        let raw = self.git.worktree_paths_get().map_err(map_candidate_error)?;
+        let raw = self
+            .git
+            .worktree_paths_get(GitIgnoreMode::Standard, &[])
+            .map_err(map_candidate_error)?;
         let entries = get_candidate_entries(&raw)?;
         self.filesystem
             .directory_get_by_path(Path::new("."))
