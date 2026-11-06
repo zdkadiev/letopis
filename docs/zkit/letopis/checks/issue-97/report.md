@@ -1,7 +1,6 @@
 # Issue #97: discovery ignore configuration
 
-Status: implementation and host/Linux acceptance passed; independent final review
-is pending. Branch `isssue-97-ignore-config`, product base `52ed491`.
+Status: implementation, host/Linux acceptance and independent final review passed. Branch `isssue-97-ignore-config`, product base `52ed491`.
 
 [Approved design](../../../../superpowers/specs/2026-11-06-issue-97-ignore-config-design.md) ·
 [Approved plan](../../../../superpowers/plans/2026-11-06-issue-97-ignore-config.md) ·
@@ -69,7 +68,7 @@ The Git test image also lacked existing storage SQL fixtures needed to compile
 library tests; its COPY list was corrected, then host/Linux storage acceptance
 was run in new directories. Initial failed receipts remain available.
 
-An initial installed-binary knowledge query had created a schema-2 local cache;
+The cache used for an initial installed-binary knowledge query was schema 2;
 this checkout expects schema 4. The inactive task-worktree cache was preserved at
 `.artifacts/issue-97/cache-from-installed-binary`; a fresh built-binary projection
 validated the edited knowledge. Main-worktree state was not used or replaced.
@@ -88,4 +87,7 @@ has been performed.
 
 ## Independent review
 
-Pending one fresh whole-branch review against the approved specification and plan.
+[One fresh whole-branch review](review.md) found no Critical, Important or Minor
+findings and no declined behaviors. All five focus areas and ledger rulings were
+accepted. The review range ends at `ad2770185ec7331aaaffb14e48f4c0483c0a3af3`; subsequent edits record
+completion only. Acceptance source hashes still match the current product/test tree.

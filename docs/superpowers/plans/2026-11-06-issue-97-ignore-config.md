@@ -17,7 +17,7 @@ and the storage schema stay unchanged.
 
 **Spec:** [Approved design](../specs/2026-11-06-issue-97-ignore-config-design.md).
 
-Status: approved by the user on 2026-11-06; Native execution is in progress. Work only in
+Status: approved by the user on 2026-11-06; Native execution and final review are complete. Work only in
 `/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config`, branch
 `isssue-97-ignore-config`. Base product revision: `52ed491`.
 
@@ -434,7 +434,7 @@ from Tasks 1–4. No new product mechanism is introduced by this acceptance task
   CLI transport runner or unrelated historical proof is silently substituted.
   If infrastructure is unavailable, retain the concrete failure and label Linux
   evidence unrun; do not weaken assertions or claim platform completion.
-- [ ] **Step 5: Get one independent final branch review.** Under Native
+- [x] **Step 5: Get one independent final branch review.** Under Native
   execution, use the requesting-code-review skill and a fresh reviewer on the
   most capable available model. Review base `52ed491` through the actual changed
   tree against the approved spec/plan, prioritizing parent rules, races, typed
@@ -444,7 +444,7 @@ from Tasks 1–4. No new product mechanism is introduced by this acceptance task
   Rust API documentation or dependency correction after the acceptance run
   requires `make verify` again on the corrected tree; Markdown-only corrections
   require their affected link/consistency checks.
-- [ ] **Step 6: Finalize the report and commit intended deliverables.** Include
+- [x] **Step 6: Finalize the report and commit intended deliverables.** Include
   a row for every acceptance area, exact passing commands and mutation failures,
   source-hash/evidence references, reviewer outcome and platform limitations.
   Summarize synthetic HTTP fixtures honestly. Commit documentation/evidence
@@ -462,5 +462,5 @@ Focus items have named owning tasks. Signatures are defined before consumers;
 Task 2 supplies legacy defaults only until Task 3 wires policy observations.
 
 This plan preserves the already completed baseline (`cargo test --locked
---offline`, exit 0) as baseline evidence only. No task checkbox is complete yet;
-plan preparation did not implement the feature or run its proposed tests.
+--offline`, exit 0) as baseline evidence only. The completed task checkboxes now record execution;
+plan preparation itself did not implement the feature or run tests.

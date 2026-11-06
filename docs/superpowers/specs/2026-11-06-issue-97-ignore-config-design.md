@@ -1,7 +1,8 @@
 # Discovery ignore configuration — issue #97
 
 Date: 2026-11-06. Status: approved by the user on 2026-11-06; implementation
-follows the separately approved plan. Final acceptance is in progress.
+follows the separately approved plan. Implementation and final acceptance are
+complete; see the [verification report](../../zkit/letopis/checks/issue-97/report.md).
 
 Issue: [#97](https://github.com/zdkadiev/letopis/issues/97).
 Branch and worktree: `isssue-97-ignore-config`.
