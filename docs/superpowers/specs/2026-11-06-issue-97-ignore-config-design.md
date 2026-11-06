@@ -18,10 +18,11 @@ the rule that a negated child cannot escape an excluded parent. They require
 intact component boundaries, implementation mainly behind the Git interface,
 and verification of every command, end-to-end workflows and varied patterns.
 
-The selected library and semantics are accepted. The remaining behavior below
-is a proposal until the user approves this design. In particular, the config
-failure policy changes a currently tested fallback and requires an explicit
-decision; it must not be inferred from the library choice.
+The selected library, Gitignore semantics and config failure policy are accepted.
+The user explicitly agreed that refresh stops when discovery configuration cannot
+be safely read or parsed, missing config uses defaults, and invalid embedding
+settings still permit FTS. The remaining behavior below is a proposal until the
+user approves this complete design.
 
 ## Current behavior and sources
 
@@ -105,7 +106,7 @@ commands and per-pattern diagnostic commands are outside this issue.
   diagnostics or discard vectors for still-referenced hashes. Ordinary existing
   orphan cleanup for removed knowledge remains valid.
 
-### Proposed failure policy — pending user decision
+### Accepted failure policy
 
 Corpus membership must be interpretable before refresh publishes anything.
 Missing config defaults to standard Git ignores. Invalid discovery types,
@@ -123,9 +124,9 @@ second permissive JSON parser. Do not require provider validation to enumerate
 the corpus.
 
 This deliberately changes the existing FTS fallback for malformed JSON and
-unreadable config. Update the old regression with explicit scenarios only if
-this policy is accepted. Missing config and invalid provider settings must still
-permit FTS. As an author-selected integration detail, malformed discovery input
+unreadable config, as explicitly accepted by the user on 2026-11-06. Update the
+old regression with explicit scenarios. Missing config and invalid provider
+settings must still permit FTS. As an author-selected integration detail, malformed discovery input
 uses `DocumentErrorKind::InvalidRequest` with a private config-validation cause;
 existing consumer mappings produce the fatal `invalid_request` envelope with
 their safe command context and empty details. Unsafe/unreadable config or ignore
@@ -267,9 +268,9 @@ or production/provider/power-loss acceptance claim.
 
 ## Remaining decisions and builder discretion
 
-The user must settle the proposed config failure policy before this document can
-be approved. Toggle scope, default config output and absent-ignore initialization
-behavior above are explicit author proposals for the same design approval.
+No unanswered behavior questions remain. Toggle scope, default config output and
+absent-ignore initialization behavior above are explicit author proposals for
+approval of this complete design; they have not been individually accepted.
 
 The builder may choose private helper organization, the exact finite exclusion
 mode/type names, operation-scoped policy observation data, and focused test grouping
@@ -282,7 +283,8 @@ An independent Rust builder review on 2026-11-06 identified one substantive
 planning ambiguity: the fatal CLI representation of invalid configuration versus
 the existing status-only `invalid_config` reason. The explicit mapping above
 resolves it without a new public error envelope. The review raised no other
-planning questions beyond the already pending user decision on failure policy.
+planning questions. The user subsequently accepted the failure policy on
+2026-11-06.
 
 ## Sources and baseline
 
