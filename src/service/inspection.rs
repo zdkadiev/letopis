@@ -1,4 +1,4 @@
-use super::utils::{CandidateSelection, map_document_file};
+use super::utils::{CandidateObservation, CandidateSelection, map_document_file};
 use super::{
     CommandError, CommandErrorKind, CommandResult, DocumentError, DocumentErrorKind,
     DocumentResult, ElementAddress, ElementLocation, FileReader, GitSnapshots, GitWorktreePaths,
@@ -41,8 +41,9 @@ impl<D: Refresher, G: GitWorktreePaths + GitSnapshots, F: FileReader, M: Markdow
             .iter()
             .map(ElementAddress::as_str)
             .collect::<BTreeSet<_>>();
+        let observation = self.get_candidates().map_err(map_document_error)?;
         let mut captured = CapturedKnowledge::default();
-        for path in self.get_candidates().map_err(map_document_error)? {
+        for path in observation.paths {
             let file = self.capture_file(path, &requested)?;
             captured.entries.extend(file.entries);
             captured.elements.extend(file.elements);
@@ -54,10 +55,22 @@ impl<D: Refresher, G: GitWorktreePaths + GitSnapshots, F: FileReader, M: Markdow
             captured = self.capture_sources(captured, &requested)?;
         }
         let tree = self.assemble_tree(&captured)?;
+        CandidateSelection {
+            git: &self.git,
+            filesystem: &self.filesystem,
+        }
+        .verify_discovery(&observation.discovery)
+        .map_err(map_document_error)?;
         let retained = self
             .git
             .tree_pin_by_oid(&tree)
             .map_err(map_snapshot_error)?;
+        CandidateSelection {
+            git: &self.git,
+            filesystem: &self.filesystem,
+        }
+        .verify_discovery(&observation.discovery)
+        .map_err(map_document_error)?;
         Ok(Inspection {
             snapshot: retained.get_oid().clone(),
             elements: captured.elements,
@@ -65,13 +78,12 @@ impl<D: Refresher, G: GitWorktreePaths + GitSnapshots, F: FileReader, M: Markdow
     }
 }
 impl<D, G: GitWorktreePaths, F: FileReader, M> InspectionService<D, G, F, M> {
-    fn get_candidates(&self) -> DocumentResult<Vec<RepoPath>> {
+    fn get_candidates(&self) -> DocumentResult<CandidateObservation> {
         CandidateSelection {
             git: &self.git,
             filesystem: &self.filesystem,
         }
         .get_candidates(&[])
-        .map(|observation| observation.paths)
     }
 }
 
@@ -290,6 +302,7 @@ mod tests {
     use crate::service::{
         FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult,
     };
+    use std::path::Path;
 
     use super::InspectionService;
     use crate::{
@@ -322,6 +335,8 @@ mod tests {
         Overlap,
         PinFailure,
         SourceIoFailure,
+        DiscoveryChange,
+        DiscoveryChangeAtPin,
         UnmarkedToMarked,
         UnmarkedToInvalid,
         UnmarkedUnchanged,
@@ -353,7 +368,7 @@ mod tests {
         });
         let service = InspectionService::new((), git, files, ());
         // When: inspection selects candidates before capture.
-        let paths = service.get_candidates().unwrap();
+        let paths = service.get_candidates().unwrap().paths;
         // Then: invalid-byte symlinks and irrelevant names are excluded before decoding.
         assert_eq!(paths, [RepoPath::parse("note.md").unwrap()]);
     }
@@ -442,6 +457,46 @@ mod tests {
         assert_eq!(result.elements["a.md"].hash, None);
         assert_eq!(events.borrow().last().map(String::as_str), Some("pin"));
     }
+    #[test]
+    fn inspect_rejects_discovery_policy_changed_during_capture() {
+        // Given: policy becomes exclusionary only after a knowledge file is captured.
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let mut service = InspectionService::new(
+            RecordingDocuments(events.clone()),
+            RecordingGit(events.clone(), Scenario::DiscoveryChange),
+            RecordingFiles(events.clone(), Scenario::DiscoveryChange),
+            MarkdownParser::new(),
+        );
+        // When: inspection would return a file its author excluded during capture.
+        let result = service.inspect(&[ElementAddress::parse("a.md").unwrap()]);
+        // Then: no successful snapshot can escape the changed discovery policy.
+        assert_eq!(
+            result.unwrap_err().get_kind(),
+            CommandErrorKind::InternalError
+        );
+        assert!(!events.borrow().iter().any(|event| event == "pin"));
+    }
+
+    #[test]
+    fn inspect_rejects_discovery_policy_changed_during_pin() {
+        // Given: policy changes while the snapshot's strong pin runs.
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let mut service = InspectionService::new(
+            RecordingDocuments(events.clone()),
+            RecordingGit(events.clone(), Scenario::DiscoveryChangeAtPin),
+            RecordingFiles(events.clone(), Scenario::DiscoveryChangeAtPin),
+            MarkdownParser::new(),
+        );
+        // When: the final snapshot pin completes after the author excludes a captured owner.
+        let result = service.inspect(&[ElementAddress::parse("a.md").unwrap()]);
+        // Then: pin execution cannot bypass the final policy observation.
+        assert_eq!(
+            result.unwrap_err().get_kind(),
+            CommandErrorKind::InternalError
+        );
+        assert!(events.borrow().iter().any(|event| event == "pin"));
+    }
+
     #[test]
     fn capture_writes_each_blob_before_reading_the_next_file() {
         // Given: sequencing at the I/O boundaries proves bounded capture.
@@ -719,6 +774,18 @@ mod tests {
                 path.to_str(),
                 Some(".letopis/config.json" | ".letopis/ignore")
             ));
+            let changed = match self.1 {
+                Scenario::DiscoveryChange => {
+                    self.0.borrow().iter().any(|event| event == "read a.md")
+                }
+                Scenario::DiscoveryChangeAtPin => {
+                    self.0.borrow().iter().any(|event| event == "pin")
+                }
+                _ => false,
+            };
+            if changed && path == Path::new(".letopis/ignore") {
+                return Ok(Some(b"a.md\n".to_vec()));
+            }
             Ok(None)
         }
         fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {

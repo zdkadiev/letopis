@@ -333,7 +333,7 @@ extract shared helpers only if two real consumers require them.
 `invoke_in(&Path, &[&str], &[u8]) -> Output`, private test helpers, storage
 inspection scopes and the synthetic `HttpFixture`. No new production API.
 
-- [ ] **Step 1: Write the actual-command matrix as failing tests.** Each
+- [x] **Step 1: Write the actual-command matrix as failing tests.** Each
   refreshing command receives a fresh independently prepared repository so a
   preceding command cannot hide a missing refresh. Use tracked `keep.md` and
   `vendor/drop.md`, plus Git-ignored untracked `notes/local.md`, with distinct
@@ -356,7 +356,7 @@ inspection scopes and the synthetic `HttpFixture`. No new production API.
   Run representative policy/error scenarios from a nested directory. Include
   `.md` and `.markdown`, invalid markup that becomes excluded, deleted tracked
   paths and hard-protected nested `.git`/`.letopis` components with negations.
-- [ ] **Step 2: Write dangerous-input tests.** In discovery_safety, use owned
+- [x] **Step 2: Write dangerous-input tests.** In discovery_safety, use owned
   child watchdogs for ignore FIFO/directory/symlink cases and unsafe parents;
   assert bounded failure and unchanged logical index. Also cover missing/empty
   ignore, replacement during observation, malformed config and literal safe
@@ -364,7 +364,7 @@ inspection scopes and the synthetic `HttpFixture`. No new production API.
   an injected file failure and a real file where the host enforces it; record any
   privileged-host limitation. Stable final document symlinks/nonregular files
   remain silently absent; unsafe parent traversal remains fatal.
-- [ ] **Step 3: Confirm failures and strengthen state-preservation tests.** Run
+- [x] **Step 3: Confirm failures and strengthen state-preservation tests.** Run
   `cargo test --locked --offline --test discovery_commands --test discovery_safety`.
   Add `discovery_only_changes_preserve_embedding_state` in embedding_service:
   seed literal vectors, attempts and query error, change only discovery, refresh
@@ -373,18 +373,18 @@ inspection scopes and the synthetic `HttpFixture`. No new production API.
   retained hashes keep their vector and attempt state. Assert zero HTTP for
   enumeration and config/status/init. Allow legitimate inference/drain effects
   only in separately identified command scenarios.
-- [ ] **Step 4: Extend helper-denial coverage.** Run the configured true/false
+- [x] **Step 4: Extend helper-denial coverage.** Run the configured true/false
   modes and nonempty additional patterns through the existing poisoned-PATH
   product runner. Fixture Git/oracles run outside denial intervals. Preserve
   SHA-1/SHA-256 and the Linux process-trace assertion; no shell/helper fallback.
-- [ ] **Step 5: Make only missing feature corrections in their existing owners.**
+- [x] **Step 5: Make only missing feature corrections in their existing owners.**
   Test helpers stay private with scenario assertions visible. Repeat Step 3 and
   `cargo test --locked --offline --test embedding_service --test git_no_subprocess --test config_command --test init_command --test index_command --test cli_help`.
-- [ ] **Step 6: Mutation-check the matrix.** Independently bypass additional
+- [x] **Step 6: Mutation-check the matrix.** Independently bypass additional
   pattern filtering, omit Disabled mode, include discovery in embedding identity,
   ignore an unsafe policy read and drop scoped-removal confinement. Each targeted
   scenario must fail. Restore exact source and rerun the corresponding tests.
-- [ ] **Step 7: Commit `test: cover discovery policies across commands and races`.**
+- [x] **Step 7: Commit `test: cover discovery policies across commands and races`.**
   Include any focused production fixes in the same task-owned commit and report
   why they were needed; do not create tests that merely mirror the implementation.
 
