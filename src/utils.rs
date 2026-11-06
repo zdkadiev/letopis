@@ -121,6 +121,8 @@ fn has_supported_integer_token(raw: &str) -> bool {
 
 /// Repository-relative embedding configuration file.
 pub(crate) const CONFIG_PATH: &str = ".letopis/config.json";
+/// Repository-relative additional corpus exclusion patterns.
+pub(crate) const IGNORE_PATH: &str = ".letopis/ignore";
 /// Repository-relative publication exclusion file.
 pub(crate) const INDEX_LOCK_PATH: &str = ".letopis/index.lock";
 /// Repository-relative drain exclusion file.

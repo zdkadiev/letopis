@@ -1,21 +1,24 @@
 use super::utils::map_document_lock_error;
-use super::utils::{CandidateSelection, is_selected_path, map_document_file};
+use super::utils::{
+    CandidateObservation, CandidateSelection, DOCUMENTS_CHANGED_MESSAGE, DiscoveryObservation,
+    is_selected_path, map_document_file,
+};
 use super::{
-    BasisRetainer, CacheDatabase, DocumentError, DocumentErrorKind, DocumentResult, FileReader,
-    FileRow, FileStat, GitWorktreePaths, MarkdownCodec, RefreshOutcome, Refresher,
-    SourceProvenance,
+    BasisRetainer, CacheDatabase, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult,
+    FileReader, FileRow, FileStat, GitWorktreePaths, KnowledgeMetadata, MarkdownCodec,
+    NodeMetadata, PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceRequest, RefreshOutcome, Refresher,
+    SourceMetadata, SourceProvenance, StorageRead,
 };
 use super::{Clock, FileLocker};
-use crate::domain::{RepoPath, Sha256, TreeOid};
+use crate::domain::{
+    Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid, derive_element_kind,
+};
 use crate::utils::INDEX_LOCK_PATH;
-use basis::BasisPreparation;
-use projection::{EffectiveGraph, FileProjection, prepare_removal};
 use std::path::Path;
 use std::{fmt, rc::Rc};
 
 use std::collections::{BTreeMap, BTreeSet};
 
-const DOCUMENTS_CHANGED_MESSAGE: &str = "documents changed during refresh";
 const RACY_WINDOW_NS: i64 = 1_000_000_000;
 
 /// Refreshes and retains the effective document projection from independently owned collaborators.
@@ -33,6 +36,63 @@ pub(crate) struct DocumentRefreshService<G, F, M, P, C> {
     pub(crate) provenance: P,
 }
 
+/// Metadata captured before the SQL write, never document or search text.
+#[derive(Debug)]
+struct BasisPreflight {
+    snapshots: BTreeSet<TreeOid>,
+    bases: Vec<PreparedBasis>,
+}
+#[derive(Debug)]
+struct PreparedBasis {
+    source_snapshot: Option<TreeOid>,
+    sources: BTreeSet<SourceUri>,
+}
+/// Borrowed inputs for metadata-only preflight against one pinned cache revision.
+#[derive(Clone, Copy)]
+struct BasisPreparation<'a> {
+    graph: &'a EffectiveGraph,
+    updated: &'a BTreeMap<RepoPath, Observation>,
+    removed: &'a BTreeMap<RepoPath, bool>,
+    previous: &'a BTreeMap<RepoPath, FileRow>,
+    mode: PublicationMode,
+}
+// Text is owned only by one prepared file. Metadata supplies its id, uri and search_hash.
+struct PreparedText {
+    metadata: KnowledgeMetadata,
+    search_text: String,
+}
+struct PreparedProjection {
+    base_revision: u64,
+    cleared: Vec<KnowledgeId>,
+    removed: Vec<KnowledgeId>,
+    edges: BTreeSet<Edge>,
+    search: Vec<PreparedText>,
+    file: FileChange,
+}
+enum FileChange {
+    Upsert(FileRow),
+    Remove(RepoPath),
+}
+/// Inputs for projecting one observed file against the previously published graph.
+struct FileProjection<'a> {
+    base_revision: u64,
+    path: &'a RepoPath,
+    observed: &'a Observation,
+    previous: Option<&'a FileRow>,
+    graph: &'a EffectiveGraph,
+}
+struct EffectiveGraph {
+    knowledge: BTreeMap<KnowledgeId, KnowledgeMetadata>,
+    edges: BTreeSet<Edge>,
+    touched_sources: BTreeSet<SourceUri>,
+    changed_owners: BTreeSet<KnowledgeId>,
+}
+#[derive(Clone, Copy)]
+enum PublicationState {
+    Unchanged,
+    Published,
+}
+
 impl<G, F, M, P, C> fmt::Debug for DocumentRefreshService<G, F, M, P, C> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -41,17 +101,17 @@ impl<G, F, M, P, C> fmt::Debug for DocumentRefreshService<G, F, M, P, C> {
     }
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum PublicationMode {
+enum PublicationMode {
     Incremental,
     Full,
 }
 impl PublicationMode {
-    pub(super) fn get_previous(self, previous: Option<&FileRow>) -> Option<&FileRow> {
+    fn get_previous(self, previous: Option<&FileRow>) -> Option<&FileRow> {
         previous.filter(|_| self == Self::Incremental)
     }
 }
 #[derive(Clone, Copy)]
-pub(super) enum SnapshotVerification {
+enum SnapshotVerification {
     Root,
     Closure,
 }
@@ -67,11 +127,12 @@ struct FileState {
     source_snapshots: BTreeSet<TreeOid>,
     files: BTreeMap<RepoPath, FileRow>,
 }
-pub(super) struct Observation {
-    pub stat: FileStat,
-    pub hash: Sha256,
+struct Observation {
+    stat: FileStat,
+    hash: Sha256,
 }
 struct Delta {
+    discovery: DiscoveryObservation,
     updated: BTreeMap<RepoPath, Observation>,
     // True means Git still selected this path, but it was consistently missing.
     removed: BTreeMap<RepoPath, bool>,
@@ -115,16 +176,17 @@ impl<
 
     fn refresh(&mut self, paths: &[RepoPath]) -> DocumentResult<RefreshOutcome> {
         let preliminary = self.get_file_state()?;
-        if preliminary.revision != 0
-            && self
-                .detect_changes(&preliminary, PublicationMode::Incremental, paths)?
-                .is_empty()
-            && preliminary.source_snapshots.is_empty()
-        {
-            return Ok(build_outcome(
-                preliminary.revision,
-                PublicationState::Unchanged,
-            ));
+        if preliminary.revision != 0 {
+            let delta = self.detect_changes(&preliminary, PublicationMode::Incremental, paths)?;
+            if delta.is_empty() && preliminary.source_snapshots.is_empty() {
+                #[cfg(test)]
+                reach_checkpoint("noop_policy");
+                self.verify_discovery(&delta.discovery)?;
+                return Ok(build_outcome(
+                    preliminary.revision,
+                    PublicationState::Unchanged,
+                ));
+            }
         }
         #[cfg(test)]
         reach_checkpoint("detected");
@@ -174,6 +236,9 @@ impl<
                 provenance: &self.provenance,
             }
             .validate_snapshots(verification, &state.source_snapshots)?;
+            #[cfg(test)]
+            reach_checkpoint("locked_noop_policy");
+            self.verify_discovery(&delta.discovery)?;
             return Ok(build_outcome(state.revision, PublicationState::Unchanged));
         }
         self.publish_changes(&state, delta, mode, verification, paths)
@@ -205,8 +270,10 @@ impl<
         mode: PublicationMode,
         paths: &[RepoPath],
     ) -> DocumentResult<Delta> {
-        let candidates: BTreeSet<_> = self.get_candidates(paths)?.into_iter().collect();
+        let observation = self.get_candidates(paths)?;
+        let candidates: BTreeSet<_> = observation.paths.into_iter().collect();
         let mut delta = Delta {
+            discovery: observation.discovery,
             updated: BTreeMap::new(),
             removed: BTreeMap::new(),
         };
@@ -315,6 +382,7 @@ impl<
                 self.verify_excluded_candidates(&excluded, paths)?;
                 #[cfg(test)]
                 reach_checkpoint("before_commit");
+                self.verify_discovery(&delta.discovery)?;
                 #[cfg(test)]
                 tests::process::fail_late(self.storage.as_ref())?;
                 outcome.revision = self.storage.get_publication_revision()?;
@@ -395,6 +463,7 @@ impl<
         if !excluded.is_empty()
             && self
                 .get_candidates(paths)?
+                .paths
                 .iter()
                 .any(|path| excluded.contains(path))
         {
@@ -408,12 +477,447 @@ impl<
 }
 
 impl<G: GitWorktreePaths, F: FileReader, M, P, C> DocumentRefreshService<G, F, M, P, C> {
-    fn get_candidates(&self, paths: &[RepoPath]) -> DocumentResult<Vec<RepoPath>> {
+    fn get_candidates(&self, paths: &[RepoPath]) -> DocumentResult<CandidateObservation> {
         CandidateSelection {
             git: &self.git,
             filesystem: &self.filesystem,
         }
         .get_candidates(paths)
+    }
+    fn verify_discovery(&self, observation: &DiscoveryObservation) -> DocumentResult<()> {
+        CandidateSelection {
+            git: &self.git,
+            filesystem: &self.filesystem,
+        }
+        .verify_discovery(observation)
+    }
+}
+
+impl<F: FileReader + FileLocker, M: MarkdownCodec, P: SourceProvenance + BasisRetainer, C>
+    DocumentPublication<'_, F, M, P, C>
+{
+    /// Prepare only changed-content metadata, releasing each parsed file before the next.
+    ///
+    /// # Errors
+    /// Reports capture failures and observed stat/hash changes; invalid Markdown keeps its old basis.
+    fn prepare_basis(&self, request: BasisPreparation<'_>) -> DocumentResult<BasisPreflight> {
+        let BasisPreparation {
+            graph,
+            updated,
+            removed,
+            previous,
+            mode,
+        } = request;
+        let mut preflight = BasisPreflight {
+            snapshots: BTreeSet::new(),
+            bases: Vec::new(),
+        };
+        let mut replaced: BTreeSet<_> = removed.keys().cloned().collect();
+        for (path, observed) in updated {
+            // Hash-equal files reuse their last valid projection already represented by graph.
+            if mode
+                .get_previous(previous.get(path))
+                .is_some_and(|previous| previous.hash == observed.hash)
+            {
+                continue;
+            }
+            let captured =
+                map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
+                    .ok_or_else(|| {
+                        DocumentError::new(
+                            DocumentErrorKind::InternalError,
+                            DOCUMENTS_CHANGED_MESSAGE,
+                        )
+                    })?;
+            if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
+                return Err(DocumentError::new(
+                    DocumentErrorKind::InternalError,
+                    DOCUMENTS_CHANGED_MESSAGE,
+                ));
+            }
+            let Ok(parsed) = self.markdown.file_parse(path, &captured.bytes) else {
+                continue;
+            };
+            replaced.insert(path.clone());
+            let Some(parsed) = parsed else {
+                continue;
+            };
+            preflight.add_file(parsed);
+        }
+        preflight
+            .snapshots
+            .extend(graph.get_source_snapshots(&replaced));
+        Ok(preflight)
+    }
+
+    /// Observe new valid source bindings and retain all roots before SQL publication.
+    /// The caller holds index.lock; diagnostic findings do not reject valid Markdown.
+    ///
+    /// # Errors
+    /// Reports unsafe source reads, Git corruption, and retention failures before SQL begins.
+    fn validate_basis(
+        &self,
+        preflight: &BasisPreflight,
+        verification: SnapshotVerification,
+    ) -> DocumentResult<()> {
+        for bases in preflight.bases.chunks(PROVENANCE_BATCH_SIZE) {
+            let requests: Vec<_> = bases
+                .iter()
+                .map(|basis| ProvenanceRequest {
+                    source_snapshot: basis.source_snapshot.as_ref(),
+                    sources: &basis.sources,
+                })
+                .collect();
+            self.provenance.observe_sources_batch(&requests)?;
+        }
+        self.validate_snapshots(verification, &preflight.snapshots)
+    }
+
+    /// Retains declared roots or verifies their closure according to the publication mode.
+    ///
+    /// # Errors
+    /// Reports missing or corrupt snapshot objects and retention failures.
+    fn validate_snapshots(
+        &self,
+        verification: SnapshotVerification,
+        snapshots: &BTreeSet<TreeOid>,
+    ) -> DocumentResult<()> {
+        match verification {
+            SnapshotVerification::Root => self.provenance.retain_snapshots(snapshots),
+            SnapshotVerification::Closure => self.provenance.verify_snapshots(snapshots),
+        }
+    }
+}
+impl BasisPreflight {
+    fn add_file(&mut self, parsed: ParsedFile) {
+        for element in parsed.elements {
+            let id = element.element.id;
+            let source_snapshot = element.element.metadata.source_snapshot;
+            self.snapshots.extend(source_snapshot.iter().cloned());
+            let sources = parsed
+                .edges
+                .iter()
+                .filter(|edge| edge.get_source() == &id)
+                .filter_map(|edge| match edge.get_target() {
+                    EdgeTarget::Source(uri) => Some(uri.clone()),
+                    EdgeTarget::Knowledge(_) => None,
+                })
+                .collect();
+            self.bases.push(PreparedBasis {
+                source_snapshot,
+                sources,
+            });
+        }
+    }
+}
+
+impl<F: FileReader + FileLocker, M: MarkdownCodec, P, C: CacheDatabase>
+    DocumentPublication<'_, F, M, P, C>
+{
+    /// Captures and parses one changed file against its effective previous projection.
+    ///
+    /// # Errors
+    /// Reports capture failures or changes since detection; invalid Markdown retains old nodes.
+    fn prepare_file(&self, request: &FileProjection<'_>) -> DocumentResult<PreparedProjection> {
+        let FileProjection {
+            base_revision,
+            path,
+            observed,
+            previous,
+            graph,
+        } = *request;
+        let captured =
+            map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
+                .ok_or_else(|| {
+                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+                })?;
+        if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENTS_CHANGED_MESSAGE,
+            ));
+        }
+        let mut file = build_file_row(path, &captured, observed.hash);
+        let mut prepared = PreparedProjection {
+            base_revision,
+            cleared: Vec::new(),
+            removed: Vec::new(),
+            edges: BTreeSet::new(),
+            search: Vec::new(),
+            file: FileChange::Upsert(file.clone()),
+        };
+        if let Some(previous) = previous.filter(|row| row.hash == observed.hash) {
+            file.valid = previous.valid;
+            file.error.clone_from(&previous.error);
+        } else {
+            match self.markdown.file_parse(path, &captured.bytes) {
+                Ok(parsed) => {
+                    prepared = prepare_valid(prepared, parsed, graph.get_file_ids(path));
+                }
+                Err(errors) => {
+                    file.valid = false;
+                    file.error = Some(
+                        errors
+                            .first()
+                            .map_or("invalid Markdown", |error| error.message.as_str())
+                            .to_owned(),
+                    );
+                }
+            }
+        }
+        prepared.file = FileChange::Upsert(file);
+        Ok(prepared)
+    }
+
+    /// Publishes each affected source using one current capture per local path.
+    ///
+    /// # Errors
+    /// Reports conflicting source addresses, unsafe captures, and transaction write failures.
+    fn reconcile_sources(&self, graph: &EffectiveGraph) -> DocumentResult<()> {
+        let references = graph.collect_source_references()?;
+        let mut paths: BTreeMap<RepoPath, Vec<(SourceUri, u64)>> = BTreeMap::new();
+        for uri in &graph.touched_sources {
+            if !references.contains_key(uri)
+                && !graph.knowledge.keys().any(|id| id.as_str() == uri.as_str())
+            {
+                self.storage.delete_node(&EdgeTarget::Source(uri.clone()))?;
+            }
+            let Some(&created_at) = references.get(uri) else {
+                continue;
+            };
+            let Some(local) = uri.get_local() else {
+                self.storage
+                    .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
+                        uri: uri.clone(),
+                        hash: None,
+                        created_at,
+                        lines: None,
+                    }))?;
+                continue;
+            };
+            paths
+                .entry(local.get_path().clone())
+                .or_default()
+                .push((uri.clone(), created_at));
+        }
+        for (path, sources) in paths {
+            self.publish_source_group(&path, sources)?;
+        }
+        Ok(())
+    }
+
+    fn publish_source_group(
+        &self,
+        path: &RepoPath,
+        sources: Vec<(SourceUri, u64)>,
+    ) -> DocumentResult<()> {
+        // One capture serves every affected address of this path and then is released.
+        let captured =
+            map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?;
+        for (uri, created_at) in sources {
+            let local = uri.get_local().ok_or_else(|| {
+                DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+            })?;
+            let lines = local.get_lines();
+            let hash = captured
+                .as_ref()
+                .and_then(|file| local.select_bytes(&file.bytes))
+                .map(Sha256::digest);
+            self.storage
+                .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
+                    uri,
+                    hash,
+                    created_at,
+                    lines,
+                }))?;
+        }
+        Ok(())
+    }
+}
+impl<F, M, P, C: CacheDatabase> DocumentPublication<'_, F, M, P, C> {
+    /// Inserts changed owners' final declarations after all nodes and sources exist.
+    /// Unchanged owners keep their declarations for storage's commit-time reconciliation.
+    ///
+    /// # Errors
+    /// Reports declaration failures, leaving the caller's transaction unpublished.
+    fn publish_edges(&self, graph: &EffectiveGraph) -> DocumentResult<()> {
+        for edge in &graph.edges {
+            if graph.changed_owners.contains(edge.get_source()) {
+                self.storage
+                    .edges_save_by_source_id_and_target_id_and_type(edge)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Apply a prepared projection to the active cache write scope.
+    ///
+    /// # Errors
+    /// Rejects a changed base revision and propagates atomic mutation failures.
+    fn publish_projection(
+        &self,
+        prepared: PreparedProjection,
+        outcome: RefreshOutcome,
+    ) -> DocumentResult<RefreshOutcome> {
+        if prepared.base_revision != outcome.revision {
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENTS_CHANGED_MESSAGE,
+            ));
+        }
+        let outcome = prepared.add_counts(outcome);
+        for id in &prepared.cleared {
+            self.storage.edges_delete_by_source_id(id)?;
+        }
+        for id in prepared.removed {
+            self.storage.delete_node(&EdgeTarget::Knowledge(id))?;
+        }
+        #[cfg(test)]
+        reach_checkpoint("cleared");
+        for text in &prepared.search {
+            self.storage
+                .nodes_upsert_by_id(&NodeMetadata::Knowledge(text.metadata.clone()))?;
+        }
+        #[cfg(test)]
+        reach_checkpoint("projections");
+        for text in prepared.search {
+            self.storage
+                .replace_text(&text.metadata.id, &text.search_text)?;
+        }
+        #[cfg(test)]
+        reach_checkpoint("fts");
+        match prepared.file {
+            FileChange::Upsert(row) => self.storage.files_upsert_by_path(&row)?,
+            FileChange::Remove(path) => self.storage.files_delete_by_path(&path)?,
+        }
+        #[cfg(test)]
+        reach_checkpoint("fingerprints");
+        Ok(outcome)
+    }
+}
+impl PreparedProjection {
+    /// Returns `outcome` with this projection's file change counted.
+    fn add_counts(&self, mut outcome: RefreshOutcome) -> RefreshOutcome {
+        match &self.file {
+            FileChange::Upsert(row) => {
+                outcome.files_updated += 1;
+                outcome.invalid_files_updated += usize::from(!row.valid);
+            }
+            FileChange::Remove(_) => outcome.files_removed += 1,
+        }
+        outcome
+    }
+}
+impl EffectiveGraph {
+    fn read(read: &dyn StorageRead) -> DocumentResult<Self> {
+        let knowledge = read
+            .nodes_get()?
+            .into_iter()
+            .filter_map(|row| match row.metadata {
+                NodeMetadata::Knowledge(node) => Some((node.id.clone(), node)),
+                NodeMetadata::Source(_) => None,
+            })
+            .collect();
+        Ok(Self {
+            knowledge,
+            edges: read.edges_get_by_source_id(None)?.into_iter().collect(),
+            touched_sources: BTreeSet::new(),
+            changed_owners: BTreeSet::new(),
+        })
+    }
+
+    /// Reobserve every declared source during a full rebuild, including invalid owners.
+    fn mark_sources_by_paths(&mut self, paths: &[RepoPath]) {
+        self.touched_sources
+            .extend(self.edges.iter().filter_map(|edge| {
+                match edge.get_target() {
+                    EdgeTarget::Source(uri)
+                        if is_selected_path(
+                            edge.get_source()
+                                .as_str()
+                                .split('#')
+                                .next()
+                                .unwrap_or_default()
+                                .as_bytes(),
+                            paths,
+                        ) =>
+                    {
+                        Some(uri.clone())
+                    }
+                    EdgeTarget::Source(_) | EdgeTarget::Knowledge(_) => None,
+                }
+            }));
+    }
+
+    /// Return every declared root in the last effective knowledge projection.
+    fn get_source_snapshots(&self, excluded: &BTreeSet<RepoPath>) -> BTreeSet<TreeOid> {
+        let paths: BTreeSet<_> = excluded.iter().map(RepoPath::as_str).collect();
+        self.knowledge
+            .values()
+            .filter(|node| !paths.contains(node.id.as_str().split('#').next().unwrap_or_default()))
+            .filter_map(|node| node.source_snapshot.clone())
+            .collect()
+    }
+
+    fn apply(&mut self, prepared: &PreparedProjection) {
+        self.changed_owners.extend(prepared.cleared.iter().cloned());
+        self.edges.retain(|edge| {
+            if prepared.cleared.contains(edge.get_source()) {
+                if let EdgeTarget::Source(uri) = edge.get_target() {
+                    self.touched_sources.insert(uri.clone());
+                }
+                false
+            } else {
+                true
+            }
+        });
+        for id in &prepared.removed {
+            self.knowledge.remove(id);
+        }
+        for text in &prepared.search {
+            self.changed_owners.insert(text.metadata.id.clone());
+            self.knowledge
+                .insert(text.metadata.id.clone(), text.metadata.clone());
+        }
+        for edge in &prepared.edges {
+            if let EdgeTarget::Source(uri) = edge.get_target() {
+                self.touched_sources.insert(uri.clone());
+            }
+            self.edges.insert(edge.clone());
+        }
+    }
+
+    fn get_file_ids(&self, path: &RepoPath) -> Vec<KnowledgeId> {
+        self.knowledge
+            .keys()
+            .filter(|id| id.as_str().split('#').next() == Some(path.as_str()))
+            .cloned()
+            .collect()
+    }
+
+    fn collect_source_references(&self) -> DocumentResult<BTreeMap<SourceUri, u64>> {
+        let mut references = BTreeMap::new();
+        for edge in &self.edges {
+            let EdgeTarget::Source(uri) = edge.get_target() else {
+                continue;
+            };
+            if self.knowledge.keys().any(|id| id.as_str() == uri.as_str()) {
+                return Err(DocumentError::new(
+                    DocumentErrorKind::InvalidRequest,
+                    "source address conflicts with a knowledge element",
+                ));
+            }
+            let knowledge = self.knowledge.get(edge.get_source()).ok_or_else(|| {
+                DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
+            })?;
+            references
+                .entry(uri.clone())
+                .and_modify(|created: &mut u64| {
+                    *created = (*created).min(knowledge.created_at);
+                })
+                .or_insert(knowledge.created_at);
+        }
+        Ok(references)
     }
 }
 
@@ -434,12 +938,6 @@ fn is_racy(previous: &FileRow, now: Option<i64>) -> bool {
         .is_none_or(|boundary| previous.mtime_ns >= boundary)
 }
 
-#[derive(Clone, Copy)]
-enum PublicationState {
-    Unchanged,
-    Published,
-}
-
 fn build_outcome(revision: u64, publication: PublicationState) -> RefreshOutcome {
     RefreshOutcome {
         revision,
@@ -450,596 +948,67 @@ fn build_outcome(revision: u64, publication: PublicationState) -> RefreshOutcome
     }
 }
 
-mod basis {
-    use super::{
-        DOCUMENTS_CHANGED_MESSAGE, DocumentPublication, Observation, PublicationMode,
-        SnapshotVerification, projection::EffectiveGraph,
-    };
-    use crate::service::FileLocker;
-    use crate::service::utils::map_document_file;
-    use crate::{
-        domain::{EdgeTarget, RepoPath, Sha256, SourceUri, TreeOid},
-        service::{
-            BasisRetainer, DocumentError, DocumentErrorKind, DocumentResult, FileReader, FileRow,
-            MarkdownCodec, PROVENANCE_BATCH_SIZE, ParsedFile, ProvenanceRequest, SourceProvenance,
-        },
-    };
-    use std::collections::{BTreeMap, BTreeSet};
-    use std::path::Path;
-
-    /// Metadata captured before the SQL write, never document or search text.
-    #[derive(Debug)]
-    pub(super) struct BasisPreflight {
-        snapshots: BTreeSet<TreeOid>,
-        bases: Vec<PreparedBasis>,
-    }
-    #[derive(Debug)]
-    struct PreparedBasis {
-        source_snapshot: Option<TreeOid>,
-        sources: BTreeSet<SourceUri>,
-    }
-    /// Borrowed inputs for metadata-only preflight against one pinned cache revision.
-    #[derive(Clone, Copy)]
-    pub(super) struct BasisPreparation<'a> {
-        pub(super) graph: &'a EffectiveGraph,
-        pub(super) updated: &'a BTreeMap<RepoPath, Observation>,
-        pub(super) removed: &'a BTreeMap<RepoPath, bool>,
-        pub(super) previous: &'a BTreeMap<RepoPath, FileRow>,
-        pub(super) mode: PublicationMode,
-    }
-    impl<F: FileReader + FileLocker, M: MarkdownCodec, P: SourceProvenance + BasisRetainer, C>
-        DocumentPublication<'_, F, M, P, C>
-    {
-        /// Prepare only changed-content metadata, releasing each parsed file before the next.
-        ///
-        /// # Errors
-        /// Reports capture failures and observed stat/hash changes; invalid Markdown keeps its old basis.
-        pub(super) fn prepare_basis(
-            &self,
-            request: BasisPreparation<'_>,
-        ) -> DocumentResult<BasisPreflight> {
-            let BasisPreparation {
-                graph,
-                updated,
-                removed,
-                previous,
-                mode,
-            } = request;
-            let mut preflight = BasisPreflight {
-                snapshots: BTreeSet::new(),
-                bases: Vec::new(),
-            };
-            let mut replaced: BTreeSet<_> = removed.keys().cloned().collect();
-            for (path, observed) in updated {
-                // Hash-equal files reuse their last valid projection already represented by graph.
-                if mode
-                    .get_previous(previous.get(path))
-                    .is_some_and(|previous| previous.hash == observed.hash)
-                {
-                    continue;
-                }
-                let captured =
-                    map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
-                        .ok_or_else(|| {
-                            DocumentError::new(
-                                DocumentErrorKind::InternalError,
-                                DOCUMENTS_CHANGED_MESSAGE,
-                            )
-                        })?;
-                if captured.stat != observed.stat
-                    || Sha256::digest(&captured.bytes) != observed.hash
-                {
-                    return Err(DocumentError::new(
-                        DocumentErrorKind::InternalError,
-                        DOCUMENTS_CHANGED_MESSAGE,
-                    ));
-                }
-                let Ok(parsed) = self.markdown.file_parse(path, &captured.bytes) else {
-                    continue;
-                };
-                replaced.insert(path.clone());
-                let Some(parsed) = parsed else {
-                    continue;
-                };
-                preflight.add_file(parsed);
-            }
-            preflight
-                .snapshots
-                .extend(graph.get_source_snapshots(&replaced));
-            Ok(preflight)
-        }
-
-        /// Observe new valid source bindings and retain all roots before SQL publication.
-        /// The caller holds index.lock; diagnostic findings do not reject valid Markdown.
-        ///
-        /// # Errors
-        /// Reports unsafe source reads, Git corruption, and retention failures before SQL begins.
-        pub(super) fn validate_basis(
-            &self,
-            preflight: &BasisPreflight,
-            verification: SnapshotVerification,
-        ) -> DocumentResult<()> {
-            for bases in preflight.bases.chunks(PROVENANCE_BATCH_SIZE) {
-                let requests: Vec<_> = bases
-                    .iter()
-                    .map(|basis| ProvenanceRequest {
-                        source_snapshot: basis.source_snapshot.as_ref(),
-                        sources: &basis.sources,
-                    })
-                    .collect();
-                self.provenance.observe_sources_batch(&requests)?;
-            }
-            self.validate_snapshots(verification, &preflight.snapshots)
-        }
-
-        /// Retains declared roots or verifies their closure according to the publication mode.
-        ///
-        /// # Errors
-        /// Reports missing or corrupt snapshot objects and retention failures.
-        pub(super) fn validate_snapshots(
-            &self,
-            verification: SnapshotVerification,
-            snapshots: &BTreeSet<TreeOid>,
-        ) -> DocumentResult<()> {
-            match verification {
-                SnapshotVerification::Root => self.provenance.retain_snapshots(snapshots),
-                SnapshotVerification::Closure => self.provenance.verify_snapshots(snapshots),
-            }
-        }
-    }
-    impl BasisPreflight {
-        fn add_file(&mut self, parsed: ParsedFile) {
-            for element in parsed.elements {
-                let id = element.element.id;
-                let source_snapshot = element.element.metadata.source_snapshot;
-                self.snapshots.extend(source_snapshot.iter().cloned());
-                let sources = parsed
-                    .edges
-                    .iter()
-                    .filter(|edge| edge.get_source() == &id)
-                    .filter_map(|edge| match edge.get_target() {
-                        EdgeTarget::Source(uri) => Some(uri.clone()),
-                        EdgeTarget::Knowledge(_) => None,
-                    })
-                    .collect();
-                self.bases.push(PreparedBasis {
-                    source_snapshot,
-                    sources,
-                });
-            }
-        }
+fn prepare_removal(
+    base_revision: u64,
+    path: RepoPath,
+    graph: &EffectiveGraph,
+) -> PreparedProjection {
+    let ids = graph.get_file_ids(&path);
+    PreparedProjection {
+        base_revision,
+        cleared: ids.clone(),
+        removed: ids,
+        edges: BTreeSet::new(),
+        search: Vec::new(),
+        file: FileChange::Remove(path),
     }
 }
 
-mod projection {
-    #[cfg(test)]
-    use super::reach_checkpoint;
-    use super::{DOCUMENTS_CHANGED_MESSAGE, DocumentPublication, Observation, is_selected_path};
-    use super::{FileLocker, Path, map_document_file};
-    use crate::domain::{
-        Edge, EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid, derive_element_kind,
-    };
-    use crate::service::{
-        CacheDatabase, CapturedFile, DocumentError, DocumentErrorKind, DocumentResult, FileReader,
-        FileRow, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile, RefreshOutcome,
-        SourceMetadata, StorageRead,
-    };
-    use std::collections::{BTreeMap, BTreeSet};
+fn build_file_row(path: &RepoPath, captured: &CapturedFile, hash: Sha256) -> FileRow {
+    FileRow {
+        path: path.clone(),
+        size: captured.stat.size,
+        mtime_ns: captured.stat.mtime_ns,
+        inode: captured.stat.inode,
+        hash,
+        checked_at_ns: captured.checked_at_ns,
+        valid: true,
+        error: None,
+    }
+}
 
-    // Text is owned only by one prepared file. Metadata supplies its id, uri and search_hash.
-    struct PreparedText {
-        metadata: KnowledgeMetadata,
-        search_text: String,
-    }
-    pub(super) struct PreparedProjection {
-        pub base_revision: u64,
-        cleared: Vec<KnowledgeId>,
-        removed: Vec<KnowledgeId>,
-        edges: BTreeSet<Edge>,
-        search: Vec<PreparedText>,
-        file: FileChange,
-    }
-    enum FileChange {
-        Upsert(FileRow),
-        Remove(RepoPath),
-    }
-    impl PreparedProjection {
-        /// Returns `outcome` with this projection's file change counted.
-        pub(super) fn add_counts(&self, mut outcome: RefreshOutcome) -> RefreshOutcome {
-            match &self.file {
-                FileChange::Upsert(row) => {
-                    outcome.files_updated += 1;
-                    outcome.invalid_files_updated += usize::from(!row.valid);
-                }
-                FileChange::Remove(_) => outcome.files_removed += 1,
-            }
-            outcome
-        }
-    }
-    /// Inputs for projecting one observed file against the previously published graph.
-    pub(super) struct FileProjection<'a> {
-        pub(super) base_revision: u64,
-        pub(super) path: &'a RepoPath,
-        pub(super) observed: &'a Observation,
-        pub(super) previous: Option<&'a FileRow>,
-        pub(super) graph: &'a EffectiveGraph,
-    }
-    pub(super) struct EffectiveGraph {
-        knowledge: BTreeMap<KnowledgeId, KnowledgeMetadata>,
-        edges: BTreeSet<Edge>,
-        touched_sources: BTreeSet<SourceUri>,
-        changed_owners: BTreeSet<KnowledgeId>,
-    }
-    impl<F: FileReader + FileLocker, M: MarkdownCodec, P, C: CacheDatabase>
-        DocumentPublication<'_, F, M, P, C>
-    {
-        /// Captures and parses one changed file against its effective previous projection.
-        ///
-        /// # Errors
-        /// Reports capture failures or changes since detection; invalid Markdown retains old nodes.
-        pub(super) fn prepare_file(
-            &self,
-            request: &FileProjection<'_>,
-        ) -> DocumentResult<PreparedProjection> {
-            let FileProjection {
-                base_revision,
-                path,
-                observed,
-                previous,
-                graph,
-            } = *request;
-            let captured =
-                map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?
-                    .ok_or_else(|| {
-                        DocumentError::new(
-                            DocumentErrorKind::InternalError,
-                            DOCUMENTS_CHANGED_MESSAGE,
-                        )
-                    })?;
-            if captured.stat != observed.stat || Sha256::digest(&captured.bytes) != observed.hash {
-                return Err(DocumentError::new(
-                    DocumentErrorKind::InternalError,
-                    DOCUMENTS_CHANGED_MESSAGE,
-                ));
-            }
-            let mut file = build_file_row(path, &captured, observed.hash);
-            let mut prepared = PreparedProjection {
-                base_revision,
-                cleared: Vec::new(),
-                removed: Vec::new(),
-                edges: BTreeSet::new(),
-                search: Vec::new(),
-                file: FileChange::Upsert(file.clone()),
-            };
-            if let Some(previous) = previous.filter(|row| row.hash == observed.hash) {
-                file.valid = previous.valid;
-                file.error.clone_from(&previous.error);
-            } else {
-                match self.markdown.file_parse(path, &captured.bytes) {
-                    Ok(parsed) => {
-                        prepared = prepare_valid(prepared, parsed, graph.get_file_ids(path));
-                    }
-                    Err(errors) => {
-                        file.valid = false;
-                        file.error = Some(
-                            errors
-                                .first()
-                                .map_or("invalid Markdown", |error| error.message.as_str())
-                                .to_owned(),
-                        );
-                    }
-                }
-            }
-            prepared.file = FileChange::Upsert(file);
-            Ok(prepared)
-        }
-
-        /// Publishes each affected source using one current capture per local path.
-        ///
-        /// # Errors
-        /// Reports conflicting source addresses, unsafe captures, and transaction write failures.
-        pub(super) fn reconcile_sources(&self, graph: &EffectiveGraph) -> DocumentResult<()> {
-            let references = graph.collect_source_references()?;
-            let mut paths: BTreeMap<RepoPath, Vec<(SourceUri, u64)>> = BTreeMap::new();
-            for uri in &graph.touched_sources {
-                if !references.contains_key(uri)
-                    && !graph.knowledge.keys().any(|id| id.as_str() == uri.as_str())
-                {
-                    self.storage.delete_node(&EdgeTarget::Source(uri.clone()))?;
-                }
-                let Some(&created_at) = references.get(uri) else {
-                    continue;
-                };
-                let Some(local) = uri.get_local() else {
-                    self.storage
-                        .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
-                            uri: uri.clone(),
-                            hash: None,
-                            created_at,
-                            lines: None,
-                        }))?;
-                    continue;
-                };
-                paths
-                    .entry(local.get_path().clone())
-                    .or_default()
-                    .push((uri.clone(), created_at));
-            }
-            for (path, sources) in paths {
-                self.publish_source_group(&path, sources)?;
-            }
-            Ok(())
-        }
-
-        fn publish_source_group(
-            &self,
-            path: &RepoPath,
-            sources: Vec<(SourceUri, u64)>,
-        ) -> DocumentResult<()> {
-            // One capture serves every affected address of this path and then is released.
-            let captured =
-                map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))?;
-            for (uri, created_at) in sources {
-                let local = uri.get_local().ok_or_else(|| {
-                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
-                })?;
-                let lines = local.get_lines();
-                let hash = captured
-                    .as_ref()
-                    .and_then(|file| local.select_bytes(&file.bytes))
-                    .map(Sha256::digest);
-                self.storage
-                    .nodes_upsert_by_id(&NodeMetadata::Source(SourceMetadata {
-                        uri,
-                        hash,
-                        created_at,
-                        lines,
-                    }))?;
-            }
-            Ok(())
-        }
-    }
-    impl<F, M, P, C: CacheDatabase> DocumentPublication<'_, F, M, P, C> {
-        /// Inserts changed owners' final declarations after all nodes and sources exist.
-        /// Unchanged owners keep their declarations for storage's commit-time reconciliation.
-        ///
-        /// # Errors
-        /// Reports declaration failures, leaving the caller's transaction unpublished.
-        pub(super) fn publish_edges(&self, graph: &EffectiveGraph) -> DocumentResult<()> {
-            for edge in &graph.edges {
-                if graph.changed_owners.contains(edge.get_source()) {
-                    self.storage
-                        .edges_save_by_source_id_and_target_id_and_type(edge)?;
-                }
-            }
-            Ok(())
-        }
-
-        /// Apply a prepared projection to the active cache write scope.
-        ///
-        /// # Errors
-        /// Rejects a changed base revision and propagates atomic mutation failures.
-        pub(super) fn publish_projection(
-            &self,
-            prepared: PreparedProjection,
-            outcome: RefreshOutcome,
-        ) -> DocumentResult<RefreshOutcome> {
-            if prepared.base_revision != outcome.revision {
-                return Err(DocumentError::new(
-                    DocumentErrorKind::InternalError,
-                    DOCUMENTS_CHANGED_MESSAGE,
-                ));
-            }
-            let outcome = prepared.add_counts(outcome);
-            for id in &prepared.cleared {
-                self.storage.edges_delete_by_source_id(id)?;
-            }
-            for id in prepared.removed {
-                self.storage.delete_node(&EdgeTarget::Knowledge(id))?;
-            }
-            #[cfg(test)]
-            reach_checkpoint("cleared");
-            for text in &prepared.search {
-                self.storage
-                    .nodes_upsert_by_id(&NodeMetadata::Knowledge(text.metadata.clone()))?;
-            }
-            #[cfg(test)]
-            reach_checkpoint("projections");
-            for text in prepared.search {
-                self.storage
-                    .replace_text(&text.metadata.id, &text.search_text)?;
-            }
-            #[cfg(test)]
-            reach_checkpoint("fts");
-            match prepared.file {
-                FileChange::Upsert(row) => self.storage.files_upsert_by_path(&row)?,
-                FileChange::Remove(path) => self.storage.files_delete_by_path(&path)?,
-            }
-            #[cfg(test)]
-            reach_checkpoint("fingerprints");
-            Ok(outcome)
-        }
-    }
-    impl EffectiveGraph {
-        pub(super) fn read(read: &dyn StorageRead) -> DocumentResult<Self> {
-            let knowledge = read
-                .nodes_get()?
-                .into_iter()
-                .filter_map(|row| match row.metadata {
-                    NodeMetadata::Knowledge(node) => Some((node.id.clone(), node)),
-                    NodeMetadata::Source(_) => None,
-                })
-                .collect();
-            Ok(Self {
-                knowledge,
-                edges: read.edges_get_by_source_id(None)?.into_iter().collect(),
-                touched_sources: BTreeSet::new(),
-                changed_owners: BTreeSet::new(),
-            })
-        }
-
-        /// Reobserve every declared source during a full rebuild, including invalid owners.
-        pub(super) fn mark_sources_by_paths(&mut self, paths: &[RepoPath]) {
-            self.touched_sources
-                .extend(self.edges.iter().filter_map(|edge| {
-                    match edge.get_target() {
-                        EdgeTarget::Source(uri)
-                            if is_selected_path(
-                                edge.get_source()
-                                    .as_str()
-                                    .split('#')
-                                    .next()
-                                    .unwrap_or_default()
-                                    .as_bytes(),
-                                paths,
-                            ) =>
-                        {
-                            Some(uri.clone())
-                        }
-                        EdgeTarget::Source(_) | EdgeTarget::Knowledge(_) => None,
-                    }
-                }));
-        }
-
-        /// Return every declared root in the last effective knowledge projection.
-        pub(super) fn get_source_snapshots(
-            &self,
-            excluded: &BTreeSet<RepoPath>,
-        ) -> BTreeSet<TreeOid> {
-            let paths: BTreeSet<_> = excluded.iter().map(RepoPath::as_str).collect();
-            self.knowledge
-                .values()
-                .filter(|node| {
-                    !paths.contains(node.id.as_str().split('#').next().unwrap_or_default())
-                })
-                .filter_map(|node| node.source_snapshot.clone())
-                .collect()
-        }
-
-        pub(super) fn apply(&mut self, prepared: &PreparedProjection) {
-            self.changed_owners.extend(prepared.cleared.iter().cloned());
-            self.edges.retain(|edge| {
-                if prepared.cleared.contains(edge.get_source()) {
-                    if let EdgeTarget::Source(uri) = edge.get_target() {
-                        self.touched_sources.insert(uri.clone());
-                    }
-                    false
-                } else {
-                    true
-                }
+fn prepare_valid(
+    mut prepared: PreparedProjection,
+    parsed: Option<ParsedFile>,
+    old_ids: Vec<KnowledgeId>,
+) -> PreparedProjection {
+    prepared.cleared = old_ids;
+    if let Some(parsed) = parsed {
+        prepared.edges = parsed.edges;
+        for parsed in parsed.elements {
+            let element = parsed.element;
+            prepared.search.push(PreparedText {
+                metadata: KnowledgeMetadata {
+                    kind: derive_element_kind(&element.id, &prepared.edges),
+                    uri: element.id.clone(),
+                    id: element.id,
+                    hash: element.hash,
+                    created_at: element.metadata.created_at,
+                    source_snapshot: element.metadata.source_snapshot,
+                    lines: element.lines,
+                    search_hash: parsed.search_hash,
+                },
+                search_text: parsed.search_text,
             });
-            for id in &prepared.removed {
-                self.knowledge.remove(id);
-            }
-            for text in &prepared.search {
-                self.changed_owners.insert(text.metadata.id.clone());
-                self.knowledge
-                    .insert(text.metadata.id.clone(), text.metadata.clone());
-            }
-            for edge in &prepared.edges {
-                if let EdgeTarget::Source(uri) = edge.get_target() {
-                    self.touched_sources.insert(uri.clone());
-                }
-                self.edges.insert(edge.clone());
-            }
-        }
-
-        fn get_file_ids(&self, path: &RepoPath) -> Vec<KnowledgeId> {
-            self.knowledge
-                .keys()
-                .filter(|id| id.as_str().split('#').next() == Some(path.as_str()))
-                .cloned()
-                .collect()
-        }
-
-        fn collect_source_references(&self) -> DocumentResult<BTreeMap<SourceUri, u64>> {
-            let mut references = BTreeMap::new();
-            for edge in &self.edges {
-                let EdgeTarget::Source(uri) = edge.get_target() else {
-                    continue;
-                };
-                if self.knowledge.keys().any(|id| id.as_str() == uri.as_str()) {
-                    return Err(DocumentError::new(
-                        DocumentErrorKind::InvalidRequest,
-                        "source address conflicts with a knowledge element",
-                    ));
-                }
-                let knowledge = self.knowledge.get(edge.get_source()).ok_or_else(|| {
-                    DocumentError::new(DocumentErrorKind::InternalError, DOCUMENTS_CHANGED_MESSAGE)
-                })?;
-                references
-                    .entry(uri.clone())
-                    .and_modify(|created: &mut u64| {
-                        *created = (*created).min(knowledge.created_at);
-                    })
-                    .or_insert(knowledge.created_at);
-            }
-            Ok(references)
         }
     }
-
-    pub(super) fn prepare_removal(
-        base_revision: u64,
-        path: RepoPath,
-        graph: &EffectiveGraph,
-    ) -> PreparedProjection {
-        let ids = graph.get_file_ids(&path);
-        PreparedProjection {
-            base_revision,
-            cleared: ids.clone(),
-            removed: ids,
-            edges: BTreeSet::new(),
-            search: Vec::new(),
-            file: FileChange::Remove(path),
-        }
-    }
-
-    fn build_file_row(path: &RepoPath, captured: &CapturedFile, hash: Sha256) -> FileRow {
-        FileRow {
-            path: path.clone(),
-            size: captured.stat.size,
-            mtime_ns: captured.stat.mtime_ns,
-            inode: captured.stat.inode,
-            hash,
-            checked_at_ns: captured.checked_at_ns,
-            valid: true,
-            error: None,
-        }
-    }
-
-    fn prepare_valid(
-        mut prepared: PreparedProjection,
-        parsed: Option<ParsedFile>,
-        old_ids: Vec<KnowledgeId>,
-    ) -> PreparedProjection {
-        prepared.cleared = old_ids;
-        if let Some(parsed) = parsed {
-            prepared.edges = parsed.edges;
-            for parsed in parsed.elements {
-                let element = parsed.element;
-                prepared.search.push(PreparedText {
-                    metadata: KnowledgeMetadata {
-                        kind: derive_element_kind(&element.id, &prepared.edges),
-                        uri: element.id.clone(),
-                        id: element.id,
-                        hash: element.hash,
-                        created_at: element.metadata.created_at,
-                        source_snapshot: element.metadata.source_snapshot,
-                        lines: element.lines,
-                        search_hash: parsed.search_hash,
-                    },
-                    search_text: parsed.search_text,
-                });
-            }
-        }
-        prepared.removed = prepared
-            .cleared
-            .iter()
-            .filter(|id| !prepared.search.iter().any(|text| &text.metadata.id == *id))
-            .cloned()
-            .collect();
-        prepared
-    }
+    prepared.removed = prepared
+        .cleared
+        .iter()
+        .filter(|id| !prepared.search.iter().any(|text| &text.metadata.id == *id))
+        .cloned()
+        .collect();
+    prepared
 }
 
 #[cfg(test)]
@@ -1047,6 +1016,115 @@ pub(super) use tests::process::reach_checkpoint;
 
 #[cfg(test)]
 mod tests {
+    mod discovery {
+        use crate::process_test_support::{ObjectFormat, TempRepo};
+        use crate::service::{DocumentErrorKind, Refresher};
+        use crate::wire_document_refresher;
+        use std::fs;
+
+        #[test]
+        fn discovery_policy_updates_membership_and_preserves_noop_revision() {
+            // Given: an indexed untracked file and an already-open service.
+            let repo = TempRepo::new(ObjectFormat::Sha1);
+            fs::write(repo.get_root().join("note.md"), b"ordinary Markdown").unwrap();
+            let mut service = wire_document_refresher(repo.get_root()).unwrap();
+            assert_eq!(service.refresh(&[]).unwrap().revision, 1);
+            // When: a new pattern excludes the existing owner.
+            fs::write(repo.get_root().join(".letopis/ignore"), b"note.md\n").unwrap();
+            let excluded = service.refresh(&[]).unwrap();
+            // Then: exactly that file leaves the next revision.
+            assert_eq!((excluded.files_removed, excluded.revision), (1, 2));
+            // When: patterns are cleared and later replaced by a comment.
+            fs::write(repo.get_root().join(".letopis/ignore"), b"").unwrap();
+            let restored = service.refresh(&[]).unwrap();
+            fs::write(
+                repo.get_root().join(".letopis/ignore"),
+                b"# no exclusions\n",
+            )
+            .unwrap();
+            let unchanged = service.refresh(&[]).unwrap();
+            // Then: restoration publishes once and equivalent policy does not publish.
+            assert_eq!((restored.files_updated, restored.revision), (1, 3));
+            assert!(!unchanged.published);
+            assert_eq!(unchanged.revision, 3);
+        }
+
+        #[test]
+        fn discovery_toggle_is_reread_by_existing_service() {
+            // Given: standard Git ignores hide an untracked Markdown file.
+            let repo = TempRepo::new(ObjectFormat::Sha1);
+            fs::write(repo.get_root().join("ignored.md"), b"local knowledge").unwrap();
+            fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
+            let mut service = wire_document_refresher(repo.get_root()).unwrap();
+            service.refresh(&[]).unwrap();
+            // When: valid discovery settings disable Git exclusions despite invalid embedding settings.
+            let config = repo.get_root().join(".letopis/config.json");
+            fs::write(
+                &config,
+                br#"{"embedding_model":null,"discovery":{"respect_gitignore":false}}"#,
+            )
+            .unwrap();
+            let included = service.refresh(&[]).unwrap();
+            fs::write(
+                &config,
+                br#"{"embedding_model":null,"discovery":{"respect_gitignore":true}}"#,
+            )
+            .unwrap();
+            let removed = service.refresh(&[]).unwrap();
+            // Then: the same service observes both changes without resetting its repository.
+            assert_eq!((included.files_updated, included.revision), (1, 2));
+            assert_eq!((removed.files_removed, removed.revision), (1, 3));
+        }
+
+        #[test]
+        fn discovery_same_stat_ignore_edit_is_observed() {
+            // Given: two indexed files and an ignore file excluding the first.
+            let repo = TempRepo::new(ObjectFormat::Sha1);
+            for name in ["a.md", "b.md"] {
+                fs::write(repo.get_root().join(name), b"note").unwrap();
+            }
+            let mut service = wire_document_refresher(repo.get_root()).unwrap();
+            let ignore = repo.get_root().join(".letopis/ignore");
+            fs::write(&ignore, b"a.md\n").unwrap();
+            service.refresh(&[]).unwrap();
+            let modified = fs::metadata(&ignore).unwrap().modified().unwrap();
+            // When: different equal-length patterns restore the original mtime.
+            fs::write(&ignore, b"b.md\n").unwrap();
+            fs::File::open(&ignore)
+                .unwrap()
+                .set_times(fs::FileTimes::new().set_modified(modified))
+                .unwrap();
+            let outcome = service.refresh(&[]).unwrap();
+            // Then: policy bytes are re-read and both membership transitions publish.
+            assert_eq!(
+                (
+                    outcome.files_updated,
+                    outcome.files_removed,
+                    outcome.revision
+                ),
+                (1, 1, 2)
+            );
+        }
+
+        #[test]
+        fn invalid_discovery_input_preserves_the_previous_publication() {
+            // Given: an initialized publication and a malformed configuration file.
+            let repo = TempRepo::new(ObjectFormat::Sha1);
+            let mut service = wire_document_refresher(repo.get_root()).unwrap();
+            service.refresh(&[]).unwrap();
+            let config = repo.get_root().join(".letopis/config.json");
+            fs::write(&config, b"{invalid}").unwrap();
+            // When: refresh cannot interpret its discovery input.
+            let error = service.refresh(&[]).unwrap_err();
+            // Then: malformed input is fatal and removing it reveals the unchanged publication.
+            assert_eq!(error.get_kind(), DocumentErrorKind::InvalidRequest);
+            fs::remove_file(config).unwrap();
+            let restored = service.refresh(&[]).unwrap();
+            assert!(!restored.published);
+            assert_eq!(restored.revision, 1);
+        }
+    }
+
     use crate::service::{
         Clock, FileError, FileErrorKind, FileIdentity, FileLocker, FileReader, FileResult,
     };
@@ -1143,8 +1221,12 @@ mod tests {
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             Ok((!self.missing.get()).then(|| self.stat.get()))
         }
-        fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
-            panic!("unexpected file_get_bytes_by_path")
+        fn file_get_bytes_by_path(&self, path: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+            assert!(matches!(
+                path.to_str(),
+                Some(".letopis/config.json" | ".letopis/ignore")
+            ));
+            Ok(None)
         }
         fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             let reads = self.reads.get() + 1;
@@ -1564,14 +1646,16 @@ mod tests {
         let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let observed = std::sync::Arc::clone(&calls);
         let mut candidates = Candidates::new();
-        candidates.expect_worktree_paths_get().returning(move || {
-            let count = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-            if count < 3 {
-                Ok(Vec::new())
-            } else {
-                Ok(b"note.md\0".to_vec())
-            }
-        });
+        candidates
+            .expect_worktree_paths_get()
+            .returning(move |_, _| {
+                let count = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                if count < 3 {
+                    Ok(Vec::new())
+                } else {
+                    Ok(b"note.md\0".to_vec())
+                }
+            });
         service.git = candidates;
         // When: refresh tries to publish the removal.
         let result = service.refresh(&[]);
@@ -1994,8 +2078,11 @@ mod tests {
             ) -> FileResult<Option<FileStat>> {
                 self.inner.file_get_stat_by_path(path)
             }
-            fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
-                panic!("unexpected file_get_bytes_by_path")
+            fn file_get_bytes_by_path(
+                &self,
+                path: &std::path::Path,
+            ) -> FileResult<Option<Vec<u8>>> {
+                self.inner.file_get_bytes_by_path(path)
             }
             fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
                 self.events.borrow_mut().push("read");
@@ -2152,6 +2239,105 @@ mod tests {
     }
     pub(super) mod process {
         //! Production-process schedules. Only this private test driver reads control variables.
+        mod discovery {
+            use super::{Fixture, NEW, Worker, get_state, get_vectors};
+            use std::fs;
+
+            #[test]
+            fn discovery_edit_before_lock_is_redetected() {
+                // Given: prepared file changes and either direction of an ignore-policy edit.
+                for (initial, changed, includes_a, count) in [
+                    (b"".as_slice(), b"a.md\n".as_slice(), false, 2),
+                    (b"a.md\n".as_slice(), b"".as_slice(), true, 3),
+                ] {
+                    let fixture = Fixture::new();
+                    fixture.edit(NEW);
+                    fs::write(fixture.root.path().join(".letopis/ignore"), initial).unwrap();
+                    let mut worker = Worker::spawn(fixture.root.path(), "publish");
+                    worker.reach("detected");
+                    // When: the author edits policy before locked redetection.
+                    fs::write(fixture.root.path().join(".letopis/ignore"), changed).unwrap();
+                    worker.resume();
+                    worker.finish();
+                    let state = get_state(fixture.root.path());
+                    // Then: the locked observation publishes only the newly selected owners.
+                    assert_eq!(state.revision, 2);
+                    assert_eq!(state.files.len(), count);
+                    assert_eq!(
+                        state.files.iter().any(|row| row.path.as_str() == "a.md"),
+                        includes_a
+                    );
+                }
+            }
+
+            #[test]
+            fn discovery_edit_during_preparation_rolls_back() {
+                // Given / When / Then: changing policy after locked detection preserves the old publication.
+                assert_policy_race(
+                    "redetected",
+                    "publish-policy-race",
+                    ".letopis/ignore",
+                    b"a.md\n",
+                );
+            }
+
+            #[test]
+            fn discovery_edit_before_commit_rolls_back() {
+                // Given / When / Then: new exclusions and re-inclusions from either input cannot publish mixed policy.
+                assert_policy_race(
+                    "before_commit",
+                    "publish-policy-race",
+                    ".letopis/ignore",
+                    b"a.md\n",
+                );
+                assert_policy_race(
+                    "before_commit",
+                    "publish-policy-race",
+                    ".letopis/config.json",
+                    br#"{"discovery":{"respect_gitignore":false}}"#,
+                );
+            }
+
+            #[test]
+            fn discovery_edit_before_noop_return_is_rejected() {
+                // Given / When / Then: a preliminary no-op rechecks its original policy bytes.
+                assert_policy_race(
+                    "noop_policy",
+                    "noop-policy-race",
+                    ".letopis/ignore",
+                    b"a.md\n",
+                );
+            }
+
+            #[test]
+            fn discovery_edit_before_locked_noop_return_is_rejected() {
+                // Given / When / Then: verified no-op also rechecks after source validation.
+                assert_policy_race(
+                    "locked_noop_policy",
+                    "verified-policy-race",
+                    ".letopis/ignore",
+                    b"a.md\n",
+                );
+            }
+
+            fn assert_policy_race(checkpoint: &str, mode: &str, path: &str, changed: &[u8]) {
+                let fixture = Fixture::new();
+                if mode.starts_with("publish") {
+                    fixture.edit(NEW);
+                }
+                if path.ends_with("config.json") {
+                    fs::write(fixture.root.path().join(".gitignore"), b"a.md\n").unwrap();
+                }
+                let mut worker = Worker::spawn(fixture.root.path(), mode);
+                worker.reach(checkpoint);
+                fs::write(fixture.root.path().join(path), changed).unwrap();
+                worker.resume();
+                worker.finish();
+                assert_eq!(get_state(fixture.root.path()), fixture.old);
+                assert_eq!(get_vectors(fixture.root.path()), fixture.vector_state);
+            }
+        }
+
         use super::super::DocumentRefreshService;
         use crate::service::TransactionError;
         use crate::service::{CacheDatabase, StorageRead};
@@ -2286,11 +2472,18 @@ mod tests {
                 FAIL_LATE.with_borrow_mut(|enabled| *enabled = mode.ends_with("fail"));
                 let result = if mode.starts_with("reindex") {
                     service.reindex(&[])
+                } else if mode.starts_with("verified") {
+                    service.refresh_verified(&[])
                 } else {
                     service.refresh(&[])
                 };
                 eprintln!("refresh result: {result:?}");
-                if mode.ends_with("fail") {
+                if mode.ends_with("policy-race") {
+                    assert_eq!(
+                        result.unwrap_err().get_message(),
+                        "documents changed during refresh"
+                    );
+                } else if mode.ends_with("fail") {
                     let error = result.unwrap_err();
                     // Then
                     assert!(
@@ -3491,7 +3684,7 @@ mod tests {
         let mut candidates = Candidates::new();
         candidates
             .expect_worktree_paths_get()
-            .returning(|| Ok(b"note.md\0".to_vec()));
+            .returning(|_, _| Ok(b"note.md\0".to_vec()));
         candidates
     }
 }
@@ -3515,7 +3708,11 @@ mod corpus {
         std::os::unix::fs::symlink("target", root.join("bad#anchor.md")).unwrap();
         repo.run_git_successfully(&["add", "bad#anchor.md"], None);
         // When: the application selects document candidates from raw Git paths.
-        let candidates = build_selector(root).unwrap().get_candidates(&[]).unwrap();
+        let candidates = build_selector(root)
+            .unwrap()
+            .get_candidates(&[])
+            .unwrap()
+            .paths;
         // Then: the symlink is not validated as a document path.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3548,7 +3745,11 @@ mod corpus {
         fs::write(root.join("changed-to-file.md"), b"now regular").unwrap();
         std::os::unix::fs::symlink("regular.md", root.join("untracked-link.md")).unwrap();
         // When: application selection observes current filesystem types for raw Git paths.
-        let candidates = build_selector(root).unwrap().get_candidates(&[]).unwrap();
+        let candidates = build_selector(root)
+            .unwrap()
+            .get_candidates(&[])
+            .unwrap()
+            .paths;
         // Then: only live regular files and the fixture's ordinary Markdown are returned.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3579,7 +3780,7 @@ mod corpus {
         let refs = repo.run_git_successfully(&["show-ref"], None);
         let git = build_selector(repo.get_root()).unwrap();
         // When: the application selects current document candidates.
-        let candidates = git.get_candidates(&[]).unwrap();
+        let candidates = git.get_candidates(&[]).unwrap().paths;
         // Then: deleted and ignored tracked paths remain; ignored untracked and private paths do not. User state is unchanged.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3615,7 +3816,7 @@ mod corpus {
                 provenance: (),
             };
             assert_eq!(
-                git.get_candidates(&[]).unwrap(),
+                git.get_candidates(&[]).unwrap().paths,
                 [RepoPath::parse("live.md").unwrap()]
             );
             // When: Git stages an ignored file and removes the previous index entry.
@@ -3624,7 +3825,7 @@ mod corpus {
             fs::write(repo.get_root().join(".gitignore"), b"ignored.md\nlive.md\n").unwrap();
             // Then: the clone sees the new index and fresh ignore bytes without reopening.
             assert_eq!(
-                shared.get_candidates(&[]).unwrap(),
+                shared.get_candidates(&[]).unwrap().paths,
                 [RepoPath::parse("ignored.md").unwrap()]
             );
             // When: remove the tracked file and make the other live file eligible again.
@@ -3632,7 +3833,7 @@ mod corpus {
             fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
             // Then: the original handle also refreshes its index/exclude observation.
             assert_eq!(
-                git.get_candidates(&[]).unwrap(),
+                git.get_candidates(&[]).unwrap().paths,
                 [RepoPath::parse("live.md").unwrap()]
             );
         }
@@ -3675,7 +3876,7 @@ mod corpus {
         repo.run_git_successfully(&["update-index", "--index-info"], Some(entries.as_bytes()));
         let git = build_selector(repo.get_root()).unwrap();
         // When: the application selects current document candidates.
-        let candidates = git.get_candidates(&[]).unwrap();
+        let candidates = git.get_candidates(&[]).unwrap().paths;
         // Then: conflict.md appears once beside live.md.
         assert_eq!(
             candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3700,7 +3901,7 @@ mod corpus {
             repo.run_git_successfully(&["update-index", "-z", "--index-info"], Some(&entry));
             let git = build_selector(repo.get_root()).unwrap();
             // When: the application selects current document candidates.
-            let candidates = git.get_candidates(&[]).unwrap();
+            let candidates = git.get_candidates(&[]).unwrap().paths;
             // Then: .letopis components are excluded before decoding; .letopis-notes.md and live.md remain.
             assert_eq!(
                 candidates.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3769,7 +3970,8 @@ mod corpus {
         let actual = build_selector(repo.get_root())
             .unwrap()
             .get_candidates(&[])
-            .unwrap();
+            .unwrap()
+            .paths;
         // Then: all eligible oracle paths except the live symlink are returned.
         assert_eq!(
             actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3823,7 +4025,8 @@ mod corpus {
         let actual = build_selector(&linked)
             .unwrap()
             .get_candidates(&[])
-            .unwrap();
+            .unwrap()
+            .paths;
         // Then: the deleted-but-staged linked path is retained and the other index is untouched.
         assert!(
             expected
@@ -3836,6 +4039,7 @@ mod corpus {
                 .unwrap()
                 .get_candidates(&[])
                 .unwrap()
+                .paths
                 .contains(&RepoPath::parse("linked-only.md").unwrap())
         );
     }
@@ -3856,7 +4060,8 @@ mod corpus {
         let actual = build_selector(repo.get_root())
             .unwrap()
             .get_candidates(&[])
-            .unwrap();
+            .unwrap()
+            .paths;
         // Then: replacement refs cannot change corpus membership.
         assert_eq!(
             actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3902,7 +4107,8 @@ mod corpus {
             let actual = build_selector(repo.get_root())
                 .unwrap()
                 .get_candidates(&[])
-                .unwrap();
+                .unwrap()
+                .paths;
             // Then: tracked paths survive ignores, untracked ignored paths do not.
             assert_eq!(
                 actual.iter().map(RepoPath::as_str).collect::<Vec<_>>(),
@@ -3950,7 +4156,7 @@ mod corpus {
         stage_raw_path(&repo, b"irrelevant\xff.txt", "100644");
         let service = build_selector(repo.get_root()).unwrap();
         // When: the application selects documents from raw Git bytes.
-        let candidates = service.get_candidates(&[]).unwrap();
+        let candidates = service.get_candidates(&[]).unwrap().paths;
         // Then: only the ordinary fixture document remains.
         assert_eq!(candidates, [RepoPath::parse("live.md").unwrap()]);
     }
@@ -3966,7 +4172,7 @@ mod corpus {
         stage_raw_path(&repo, b"raw\xff.md", "120000");
         let service = build_selector(repo.get_root()).unwrap();
         // When: the final symlink is observed before UTF-8 decoding.
-        let candidates = service.get_candidates(&[]).unwrap();
+        let candidates = service.get_candidates(&[]).unwrap().paths;
         // Then: the invalid-byte symlink never becomes an unsupported document.
         assert_eq!(candidates, [RepoPath::parse("live.md").unwrap()]);
         // Given: the same tracked raw name is now an ordinary file.
@@ -4007,7 +4213,7 @@ mod corpus {
         // Given: relevant raw paths whose structural form is unsafe to probe.
         let mut git = MockGitWorktreePaths::new();
         git.expect_worktree_paths_get()
-            .returning(|| Ok(b"a/../note.md\0./note.md\0a//b.md\0".to_vec()));
+            .returning(|_, _| Ok(b"a/../note.md\0./note.md\0a//b.md\0".to_vec()));
         let service = DocumentRefreshService {
             git,
             filesystem: build_root_only_files(),
@@ -4017,7 +4223,7 @@ mod corpus {
             provenance: (),
         };
         // When: the service selects and normalizes paths without probing raw file paths.
-        let candidates = service.get_candidates(&[]).unwrap();
+        let candidates = service.get_candidates(&[]).unwrap().paths;
         // Then: normalization and deduplication remain owned by RepoPath.
         assert_eq!(
             candidates,
@@ -4034,7 +4240,7 @@ mod corpus {
         // Given: a raw name escaping the selected directory and another dot path resolving into it.
         let mut git = MockGitWorktreePaths::new();
         git.expect_worktree_paths_get()
-            .returning(|| Ok(b"notes/../outside.md\0notes/./a.md\0notes/ab.md\0".to_vec()));
+            .returning(|_, _| Ok(b"notes/../outside.md\0notes/./a.md\0notes/ab.md\0".to_vec()));
         let mut filesystem = build_root_only_files();
         filesystem
             .expect_symlink_is_exist()
@@ -4052,8 +4258,8 @@ mod corpus {
         let directory = [RepoPath::parse("notes").unwrap()];
 
         // When: scopes select by normalized owner identity.
-        let selected = service.get_candidates(&exact).unwrap();
-        let descendants = service.get_candidates(&directory).unwrap();
+        let selected = service.get_candidates(&exact).unwrap().paths;
+        let descendants = service.get_candidates(&directory).unwrap().paths;
 
         // Then: an outside owner is excluded and the selected dot path is retained.
         assert_eq!(selected, exact);
@@ -4072,7 +4278,7 @@ mod corpus {
         // Given: an escaping path and a filesystem mock that permits only the root observation.
         let mut git = MockGitWorktreePaths::new();
         git.expect_worktree_paths_get()
-            .returning(|| Ok(b"../note.md\0".to_vec()));
+            .returning(|_, _| Ok(b"../note.md\0".to_vec()));
         let service = DocumentRefreshService {
             git,
             filesystem: build_root_only_files(),
@@ -4101,7 +4307,7 @@ mod corpus {
         fs::create_dir(&root).unwrap();
         let mut git = MockGitWorktreePaths::new();
         git.expect_worktree_paths_get()
-            .returning(|| Ok(b"irrelevant.txt\0".to_vec()));
+            .returning(|_, _| Ok(b"irrelevant.txt\0".to_vec()));
         let service = DocumentRefreshService {
             git,
             filesystem,
@@ -4121,8 +4327,17 @@ mod corpus {
         let mut files = crate::service::MockFileReader::new();
         files
             .expect_directory_get_by_path()
-            .withf(|path| path == Path::new("."))
+            .withf(|path| matches!(path.to_str(), Some("." | ".letopis")))
             .returning(|_| Ok(Some(std::fs::File::open(".").unwrap().into())));
+        files
+            .expect_file_get_bytes_by_path()
+            .withf(|path| {
+                matches!(
+                    path.to_str(),
+                    Some(".letopis/config.json" | ".letopis/ignore")
+                )
+            })
+            .returning(|_| Ok(None));
         files
     }
 

@@ -1,0 +1,80 @@
+{
+  "tree": "b3d2f67dce3dfb7bddbcd5e90545b1a475d8e5fb",
+  "verified_bindings": [
+    {
+      "knowledge": "letopis/architecture/configuration-and-status.md",
+      "source": "src/service/init.rs",
+      "sha256": "3d6119df4bb08e208224bb87d103ad6ad433900851f757b91c296998bbeed74c"
+    },
+    {
+      "knowledge": "letopis/architecture/configuration-and-status.md",
+      "source": "src/service/types.rs",
+      "sha256": "fba59199a569e8cc7b46c9a8240e6fabb3be04665dcc7e1f4358d4bd5dba50e6"
+    },
+    {
+      "knowledge": "letopis/architecture/configuration-and-status.md",
+      "source": "src/service/configuration.rs",
+      "sha256": "e50a63a445f3a86e214cb151aef645eb007495a03dad0f5f403f02d441ac1609"
+    },
+    {
+      "knowledge": "letopis/architecture/configuration-and-status.md",
+      "source": "src/service/status.rs",
+      "sha256": "6e7767975af5e4d4478014ae6b7ff3dc2691cdf51cc6702220a6f80c11224a1a"
+    },
+    {
+      "knowledge": "letopis/architecture/configuration-and-status.md",
+      "source": "src/storage/cache.rs",
+      "sha256": "88126a47843b1627c3149f7499a75fb766e759e75bec4b801862ae21026482d0"
+    },
+    {
+      "knowledge": "letopis/architecture/configuration-and-status.md",
+      "source": "src/storage/vector.rs",
+      "sha256": "6052fe55843164da11857223f18381e2c3b13bffdb41449d89b989e5ca5567f8"
+    },
+    {
+      "knowledge": "letopis/architecture/configuration-and-status.md",
+      "source": "src/commands.rs",
+      "sha256": "898caeb218f442b54ab2c92168a40fcb2171933ec1ee5cce67f0efc1a3b02254"
+    },
+    {
+      "knowledge": "letopis/architecture/markdown-projection.md",
+      "source": "src/service/document_refresher.rs",
+      "sha256": "74e43e3a2ec2e44b2651f9696e20c405a49e5c7c97a0a8421422ca19c18f1865"
+    },
+    {
+      "knowledge": "letopis/architecture/markdown-projection.md",
+      "source": "src/git/worktree.rs",
+      "sha256": "893242c72835f51d0cc0c4071ce9a8d8f3fe50776b43124ffdc60a06ff74c92d"
+    },
+    {
+      "knowledge": "letopis/architecture/markdown-projection.md",
+      "source": "src/service/utils.rs",
+      "sha256": "ac90d402f9c606d71093c2289b7912a43f40ab45ec0646db93dc6dc30b2ee791"
+    },
+    {
+      "knowledge": "letopis/architecture/markdown-projection.md",
+      "source": "src/markdown/parser.rs",
+      "sha256": "e0b2a19aff19fa50bad0b337f3edf93705fec4cdba22e6e436ecffbf0617bcf6"
+    },
+    {
+      "knowledge": "letopis/architecture/markdown-projection.md",
+      "source": "src/storage/cache.rs",
+      "sha256": "88126a47843b1627c3149f7499a75fb766e759e75bec4b801862ae21026482d0"
+    },
+    {
+      "knowledge": "letopis/architecture/git-snapshots.md",
+      "source": "src/git/repository.rs",
+      "sha256": "f6ba2d29ebc056089a8c01dee08af961f974245627ae9bc529c12809fa342376"
+    },
+    {
+      "knowledge": "letopis/architecture/git-snapshots.md",
+      "source": "src/git/refs.rs",
+      "sha256": "f38329fdc40c278cee551f74c3ac1002451de777790e6c7e9e66bc8667c6a5b0"
+    },
+    {
+      "knowledge": "letopis/architecture/git-snapshots.md",
+      "source": "src/service/inspection.rs",
+      "sha256": "37b4565a72c91fec6808ced0ba011814c3b178626d4a3de78e14386e03e76e46"
+    }
+  ]
+}

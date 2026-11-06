@@ -7,14 +7,25 @@ use super::{
 };
 use crate::domain::{Sha256, SourceUri, TreeOid};
 use std::path::Path;
-use std::{collections::BTreeSet, fmt};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
-use observations::HistoricalObservations;
+const HISTORICAL_ENTRY_LIMIT: usize = 4096;
 
 /// Compares exact addressed bytes and separately retains author-declared bases.
 pub(crate) struct ProvenanceService<F> {
     git: Box<dyn VerifiedGitSnapshots>,
     filesystem: F,
+}
+
+/// Operation-local immutable successes only; live captures and failures are never retained.
+#[derive(Debug)]
+struct HistoricalObservations<'a, F> {
+    provenance: &'a ProvenanceService<F>,
+    available: BTreeSet<TreeOid>,
+    hashes: BTreeMap<(TreeOid, SourceUri), Option<Sha256>>,
 }
 
 impl<F> ProvenanceService<F> {
@@ -165,6 +176,85 @@ impl<F: FileReader> ProvenanceService<F> {
     }
 }
 
+impl<'a, F: FileReader> HistoricalObservations<'a, F> {
+    /// Start one empty operation-local history without performing I/O.
+    fn new(provenance: &'a ProvenanceService<F>) -> Self {
+        Self {
+            provenance,
+            available: BTreeSet::new(),
+            hashes: BTreeMap::new(),
+        }
+    }
+
+    /// Observe one binding in demand order, reusing only successful historical work.
+    ///
+    /// # Errors
+    /// Propagates the first root, addressed-object or confined live capture failure.
+    fn observe_sources(
+        &mut self,
+        request: ProvenanceRequest<'_>,
+    ) -> DocumentResult<ProvenanceObservation> {
+        let state = request
+            .source_snapshot
+            .map(|tree| self.verify_root(tree))
+            .transpose()?;
+        let mut observation = build_observation(request, state);
+        let basis = request
+            .source_snapshot
+            .filter(|_| state == Some(SnapshotState::Available));
+        for source in request.sources {
+            if source.get_local().is_none() {
+                continue;
+            }
+            let historical = basis.map(|tree| self.get_hash(tree, source)).transpose()?;
+            let current = self.provenance.get_current_hash(source)?;
+            if current.is_none() || historical == Some(None) {
+                observation.issues.insert(ProvenanceIssue::SourceNotFound {
+                    source: source.clone(),
+                });
+                observation.flags.insert(SearchFlag::SourceNotFound);
+            } else if historical.is_some_and(|hash| hash != current) {
+                observation.flags.insert(SearchFlag::SourceChanged);
+            }
+        }
+        Ok(observation)
+    }
+
+    fn verify_root(&mut self, tree: &TreeOid) -> DocumentResult<SnapshotState> {
+        if self.available.contains(tree) {
+            return Ok(SnapshotState::Available);
+        }
+        let state = self
+            .provenance
+            .git
+            .tree_verify_by_oid(tree)
+            .map_err(map_snapshot_error)?;
+        if state == SnapshotState::Available && self.has_capacity() {
+            self.available.insert(tree.clone());
+        }
+        Ok(state)
+    }
+
+    fn get_hash(&mut self, tree: &TreeOid, source: &SourceUri) -> DocumentResult<Option<Sha256>> {
+        let key = (tree.clone(), source.clone());
+        if let Some(hash) = self.hashes.get(&key) {
+            return Ok(*hash);
+        }
+        let hash = self
+            .provenance
+            .get_snapshot_hash(tree, source)
+            .map_err(map_snapshot_error)?;
+        if self.has_capacity() {
+            self.hashes.insert(key, hash);
+        }
+        Ok(hash)
+    }
+
+    fn has_capacity(&self) -> bool {
+        self.available.len() + self.hashes.len() < HISTORICAL_ENTRY_LIMIT
+    }
+}
+
 fn build_observation(
     request: ProvenanceRequest<'_>,
     state: Option<SnapshotState>,
@@ -194,111 +284,6 @@ fn map_snapshot_error(cause: SnapshotError) -> DocumentError {
         "source provenance Git operation failed",
         cause,
     )
-}
-
-mod observations {
-    use super::{ProvenanceService, build_observation, map_snapshot_error};
-    use crate::{
-        domain::{Sha256, SourceUri, TreeOid},
-        service::{
-            DocumentResult, FileReader, ProvenanceIssue, ProvenanceObservation, ProvenanceRequest,
-            SearchFlag, SnapshotState,
-        },
-    };
-    use std::collections::{BTreeMap, BTreeSet};
-
-    const HISTORICAL_ENTRY_LIMIT: usize = 4096;
-
-    /// Operation-local immutable successes only; live captures and failures are never retained.
-    #[derive(Debug)]
-    pub(super) struct HistoricalObservations<'a, F> {
-        provenance: &'a ProvenanceService<F>,
-        available: BTreeSet<TreeOid>,
-        hashes: BTreeMap<(TreeOid, SourceUri), Option<Sha256>>,
-    }
-
-    impl<'a, F: FileReader> HistoricalObservations<'a, F> {
-        /// Start one empty operation-local history without performing I/O.
-        pub(super) fn new(provenance: &'a ProvenanceService<F>) -> Self {
-            Self {
-                provenance,
-                available: BTreeSet::new(),
-                hashes: BTreeMap::new(),
-            }
-        }
-
-        /// Observe one binding in demand order, reusing only successful historical work.
-        ///
-        /// # Errors
-        /// Propagates the first root, addressed-object or confined live capture failure.
-        pub(super) fn observe_sources(
-            &mut self,
-            request: ProvenanceRequest<'_>,
-        ) -> DocumentResult<ProvenanceObservation> {
-            let state = request
-                .source_snapshot
-                .map(|tree| self.verify_root(tree))
-                .transpose()?;
-            let mut observation = build_observation(request, state);
-            let basis = request
-                .source_snapshot
-                .filter(|_| state == Some(SnapshotState::Available));
-            for source in request.sources {
-                if source.get_local().is_none() {
-                    continue;
-                }
-                let historical = basis.map(|tree| self.get_hash(tree, source)).transpose()?;
-                let current = self.provenance.get_current_hash(source)?;
-                if current.is_none() || historical == Some(None) {
-                    observation.issues.insert(ProvenanceIssue::SourceNotFound {
-                        source: source.clone(),
-                    });
-                    observation.flags.insert(SearchFlag::SourceNotFound);
-                } else if historical.is_some_and(|hash| hash != current) {
-                    observation.flags.insert(SearchFlag::SourceChanged);
-                }
-            }
-            Ok(observation)
-        }
-
-        fn verify_root(&mut self, tree: &TreeOid) -> DocumentResult<SnapshotState> {
-            if self.available.contains(tree) {
-                return Ok(SnapshotState::Available);
-            }
-            let state = self
-                .provenance
-                .git
-                .tree_verify_by_oid(tree)
-                .map_err(map_snapshot_error)?;
-            if state == SnapshotState::Available && self.has_capacity() {
-                self.available.insert(tree.clone());
-            }
-            Ok(state)
-        }
-
-        fn get_hash(
-            &mut self,
-            tree: &TreeOid,
-            source: &SourceUri,
-        ) -> DocumentResult<Option<Sha256>> {
-            let key = (tree.clone(), source.clone());
-            if let Some(hash) = self.hashes.get(&key) {
-                return Ok(*hash);
-            }
-            let hash = self
-                .provenance
-                .get_snapshot_hash(tree, source)
-                .map_err(map_snapshot_error)?;
-            if self.has_capacity() {
-                self.hashes.insert(key, hash);
-            }
-            Ok(hash)
-        }
-
-        fn has_capacity(&self) -> bool {
-            self.available.len() + self.hashes.len() < HISTORICAL_ENTRY_LIMIT
-        }
-    }
 }
 
 #[cfg(test)]

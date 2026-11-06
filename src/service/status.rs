@@ -119,18 +119,19 @@ impl<C: CacheDatabase> StatusService<'_, C> {
                 Some(invalid_config_problem()),
             );
         }
-        match configuration {
-            Configuration::Enabled(config) => (
-                EmbeddingStatusPolicy::Ready {
-                    identity: config.get_identity(),
-                    max_attempts: config.get_max_attempts(),
-                },
-                None,
-            ),
-            Configuration::Unconfigured { .. } | Configuration::Disabled(_) => {
-                (EmbeddingStatusPolicy::Disabled, None)
-            }
+        if !configuration.get_enabled() {
+            return (EmbeddingStatusPolicy::Disabled, None);
         }
+        let Some(config) = configuration.get_embedding_config() else {
+            return (EmbeddingStatusPolicy::Disabled, None);
+        };
+        (
+            EmbeddingStatusPolicy::Ready {
+                identity: config.get_identity(),
+                max_attempts: config.get_max_attempts(),
+            },
+            None,
+        )
     }
 
     fn get_config_bytes(&self) -> FileResult<Option<Vec<u8>>> {
@@ -588,10 +589,7 @@ mod tests {
     fn disabled_mode_still_rejects_invalid_scope_metadata_and_revision() {
         // Given: independently parsed disabled configuration and corrupted identity or revision metadata.
         let disabled_config = br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"disabled-scope-fixture","parameters":{"base_url":"http://localhost/api","dimensions":3},"max_retries":0}}"#;
-        assert!(matches!(
-            Configuration::parse(disabled_config).unwrap(),
-            Configuration::Disabled(_)
-        ));
+        assert!(!Configuration::parse(disabled_config).unwrap().get_enabled());
         for (database, statement) in [
             ("vectors.db", "update meta set config_identity='malformed'"),
             ("cache.db", "update project set revision=-1"),

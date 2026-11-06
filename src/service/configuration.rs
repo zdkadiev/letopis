@@ -112,10 +112,11 @@ mod tests {
         // When: configuration is observed while another process publishes it.
         let config = service.get_config().unwrap();
         // Then: the retried observation returns the published configuration.
-        assert!(matches!(
-            config,
-            Some(crate::service::Configuration::Unconfigured { .. })
-        ));
+        assert!(
+            config.as_ref().is_some_and(
+                |config| !config.get_enabled() && config.get_embedding_config().is_none()
+            )
+        );
         assert_eq!(attempts.load(std::sync::atomic::Ordering::SeqCst), 2);
     }
 
@@ -149,9 +150,8 @@ mod tests {
             // When: the configuration service reads the file.
             let config = service.get_config().unwrap();
             // Then: valid configuration remains readable regardless of its stored timestamp.
-            assert!(matches!(
-                config,
-                Some(crate::service::Configuration::Unconfigured { .. })
+            assert!(config.as_ref().is_some_and(
+                |config| !config.get_enabled() && config.get_embedding_config().is_none()
             ));
         }
     }

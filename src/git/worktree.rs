@@ -1,5 +1,7 @@
+use super::ignore::paths_filter_by_patterns;
 use super::{GitRepository, objects::tree_get_by_oid, tree::tree_entry_get};
-use crate::service::{GitError, GitResult, SnapshotErrorKind};
+use crate::service::{GitError, GitIgnoreMode, GitResult, SnapshotErrorKind};
+use gix::glob::pattern::Case;
 use gix::{
     bstr::ByteSlice,
     hash::ObjectId,
@@ -15,20 +17,26 @@ use gix_dir::{
 use gix_pathspec::Search;
 use std::{borrow::Cow, path::Path};
 
-/// Enumerate raw index and non-ignored untracked paths without content policy.
-pub(super) fn worktree_paths_get(git: &GitRepository, root: &Path) -> GitResult<Vec<u8>> {
+/// Enumerate raw index and selected untracked paths with caller-supplied Git ignore rules.
+pub(super) fn worktree_paths_get(
+    git: &GitRepository,
+    root: &Path,
+    ignore_mode: GitIgnoreMode,
+    patterns: &[u8],
+) -> GitResult<Vec<u8>> {
     let repo = &git.repo;
     let index = repo.index_or_empty().map_err(GitError::new)?;
     let index = index_expand_sparse(git, &index)?;
-    let mut raw = Vec::new();
-    for entry in index.entries() {
-        raw.extend_from_slice(entry.path(&index));
-        raw.push(0);
-    }
-    let mut excludes = repo
-        .excludes(&index, None, Default::default())
-        .map_err(GitError::new)?
-        .detach();
+    let mut raw = index_paths_get(&index);
+    let mut excludes = if ignore_mode == GitIgnoreMode::Standard {
+        Some(
+            repo.excludes(&index, None, Default::default())
+                .map_err(GitError::new)?
+                .detach(),
+        )
+    } else {
+        None
+    };
     let mut pathspec = Search::from_specs(std::iter::empty(), None, root).map_err(GitError::new)?;
     let caps = repo.filesystem_options().map_err(GitError::new)?;
     let lookup = caps.ignore_case.then(|| index.prepare_icase_backing());
@@ -44,7 +52,7 @@ pub(super) fn worktree_paths_get(git: &GitRepository, root: &Path) -> GitResult<
             ignore_case_index_lookup: lookup.as_ref(),
             pathspec: &mut pathspec,
             pathspec_attributes: &mut |_, _, _, _| false,
-            excludes: Some(&mut excludes),
+            excludes: excludes.as_mut(),
             objects: &repo.objects,
             explicit_traversal_root: Some(root),
         },
@@ -64,7 +72,24 @@ pub(super) fn worktree_paths_get(git: &GitRepository, root: &Path) -> GitResult<
             raw.push(0);
         }
     }
-    Ok(raw)
+    paths_filter_by_patterns(
+        &raw,
+        patterns,
+        if caps.ignore_case {
+            Case::Fold
+        } else {
+            Case::Sensitive
+        },
+    )
+}
+
+fn index_paths_get(index: &State) -> Vec<u8> {
+    let mut raw = Vec::new();
+    for entry in index.entries() {
+        raw.extend_from_slice(entry.path(index));
+        raw.push(0);
+    }
+    raw
 }
 
 /// Expand only metadata in a private copy: excludes and walk need the same tracked view.

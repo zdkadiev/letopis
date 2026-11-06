@@ -250,34 +250,79 @@ fn search_propagates_non_config_io_failures() {
     assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
 }
 #[test]
-fn unreadable_invalid_and_missing_configuration_permit_fts_without_provider() {
-    // Given
-    let repo = ReadingRepo::new();
-    repo.write_knowledge("a.md", "sqlite");
-    for state in ["missing", "invalid", "unreadable"] {
-        match state {
-            "invalid" => repo.write(".letopis/config.json", b"{invalid}"),
-            "unreadable" => {
-                std::fs::remove_file(repo.get_root().join(".letopis/config.json")).unwrap();
-                std::fs::create_dir(repo.get_root().join(".letopis/config.json")).unwrap();
-            }
-            _ => {}
+fn missing_and_invalid_embedding_configuration_permit_fts_without_provider() {
+    // Given: marked knowledge and either absent config or invalid embedding settings.
+    for config in [
+        None,
+        Some(br#"{"embedding_model":null,"discovery":{"respect_gitignore":true}}"#.as_slice()),
+    ] {
+        let repo = ReadingRepo::new();
+        repo.write_knowledge("a.md", "sqlite");
+        if let Some(bytes) = config {
+            repo.write(".letopis/config.json", bytes);
         }
-        // When
+        // When: search refreshes valid discovery independently of embedding availability.
         let links = wire_searcher(repo.get_root())
             .unwrap()
             .search(&make_request("sqlite", 2))
             .unwrap();
-        // Then
+        // Then: the literal FTS owner remains available without a provider.
         assert_eq!(
             links
                 .iter()
-                .map(|x| x.element_id.as_str())
+                .map(|link| link.element_id.as_str())
                 .collect::<Vec<_>>(),
             ["a.md"]
         );
     }
 }
+
+#[test]
+fn invalid_discovery_configuration_stops_fts_and_preserves_corpus() {
+    use letopis::service::CommandErrorKind;
+    // Given: each malformed or unreadable configuration starts from a published corpus.
+    for state in ["invalid", "unreadable"] {
+        let repo = ReadingRepo::new();
+        repo.write_knowledge("a.md", "sqlite");
+        wire_searcher(repo.get_root())
+            .unwrap()
+            .search(&make_request("sqlite", 2))
+            .unwrap();
+        let storage = repo.open_storage();
+        let before = storage
+            .cache
+            .with_read_tx(|| storage.cache.files_get())
+            .unwrap();
+        if state == "invalid" {
+            repo.write(".letopis/config.json", b"{PRIVATE_INVALID}");
+        } else {
+            std::fs::create_dir(repo.get_root().join(".letopis/config.json")).unwrap();
+        }
+        // When: refresh cannot safely interpret its policy inputs.
+        let error = wire_searcher(repo.get_root())
+            .unwrap()
+            .search(&make_request("sqlite", 2))
+            .unwrap_err();
+        // Then: failure is typed, private bytes stay hidden, and the old file rows survive.
+        assert_eq!(
+            error.get_kind(),
+            if state == "invalid" {
+                CommandErrorKind::InvalidRequest
+            } else {
+                CommandErrorKind::InternalError
+            }
+        );
+        assert!(!format!("{error:?}").contains("PRIVATE_INVALID"));
+        assert_eq!(
+            storage
+                .cache
+                .with_read_tx(|| storage.cache.files_get())
+                .unwrap(),
+            before
+        );
+    }
+}
+
 #[test]
 fn missing_vector_dimensions_skip_inference_and_shared_hashes_keep_distinct_ids() {
     // Given

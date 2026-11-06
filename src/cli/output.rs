@@ -78,6 +78,11 @@ struct Lock {
 #[derive(Serialize)]
 struct ConfigurationOutput<'a> {
     embedding_model: EmbeddingModelOutput<'a>,
+    discovery: DiscoveryOutput,
+}
+#[derive(Serialize)]
+struct DiscoveryOutput {
+    respect_gitignore: bool,
 }
 #[derive(Serialize)]
 struct EmbeddingModelOutput<'a> {
@@ -233,6 +238,9 @@ fn configuration_build(configuration: &Configuration) -> ConfigurationOutput<'_>
                 .map(|config| Value::Object(config.get_parameters().clone()))
                 .unwrap_or_else(|| Value::Object(Map::new())),
             max_retries: configuration.get_max_retries(),
+        },
+        discovery: DiscoveryOutput {
+            respect_gitignore: configuration.get_discovery().get_respect_gitignore(),
         },
     }
 }

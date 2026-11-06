@@ -1,4 +1,5 @@
 use super::{cleanup::GitWriteCleanup, objects, reader::ObjectReader, refs, worktree};
+use crate::service::GitIgnoreMode;
 use crate::{
     domain::{BlobOid, RepoPath, TreeOid},
     service::{
@@ -162,8 +163,12 @@ impl SnapshotVerifier for GitRepository {
 }
 
 impl GitWorktreePaths for GitRepository {
-    fn worktree_paths_get(&self) -> GitResult<Vec<u8>> {
-        worktree::worktree_paths_get(self, &self.root)
+    fn worktree_paths_get(
+        &self,
+        ignore_mode: GitIgnoreMode,
+        patterns: &[u8],
+    ) -> GitResult<Vec<u8>> {
+        worktree::worktree_paths_get(self, &self.root, ignore_mode, patterns)
     }
 }
 fn alternates_require_absent(path: &Path) -> Result<(), SnapshotError> {
@@ -220,7 +225,7 @@ fn repository_classify_open_error(error: &gix::Error) -> SnapshotError {
 }
 #[cfg(test)]
 mod tests {
-    use super::GitRepository;
+    use super::{GitIgnoreMode, GitRepository};
     use crate::git::constants::SNAPSHOT_REF_PREFIX;
     use crate::process_test_support as fixture;
     use crate::{
@@ -230,6 +235,54 @@ mod tests {
     };
     use fixture::{ObjectFormat, TempRepo};
     use std::{fs, path::PathBuf, rc::Rc, sync::Arc};
+
+    #[test]
+    fn exclusion_modes_match_git_membership_without_user_state_changes() {
+        use crate::service::GitWorktreePaths;
+        // Given: both object formats contain tracked, deleted and independently ignored paths.
+        for format in fixture::FORMATS {
+            let repo = TempRepo::new(format);
+            prepare_discovery_files(&repo);
+            let git =
+                GitRepository::open(repo.get_root(), &[crate::utils::SERVICE_DIRECTORY]).unwrap();
+            let before = repo.capture_fixture_state();
+            for (mode, arguments) in [
+                (
+                    GitIgnoreMode::Standard,
+                    vec![
+                        "ls-files",
+                        "-z",
+                        "--cached",
+                        "--others",
+                        "--exclude-standard",
+                    ],
+                ),
+                (
+                    GitIgnoreMode::Disabled,
+                    vec!["ls-files", "-z", "--cached", "--others"],
+                ),
+            ] {
+                // When: the Git library and independent Git CLI enumerate the same repository.
+                let actual = git.worktree_paths_get(mode, &[]).unwrap();
+                let oracle = repo.run_git_successfully(&arguments, None);
+                // Then: all raw paths agree, including deleted tracked membership.
+                assert_eq!(get_path_set(&actual), get_path_set(&oracle));
+                assert!(get_path_set(&actual).contains(b"deleted.md".as_slice()));
+            }
+            // When: an additional rule targets tracked membership while standard exclusions are off.
+            let filtered = git
+                .worktree_paths_get(GitIgnoreMode::Disabled, b"tracked.md\n")
+                .unwrap();
+            // Then: only that tracked file is excluded and Git user state is unchanged.
+            let paths = get_path_set(&filtered);
+            assert!(!paths.contains(b"tracked.md".as_slice()));
+            assert!(paths.contains(b"ignored.md".as_slice()));
+            assert!(paths.contains(b"nested/nested.md".as_slice()));
+            assert!(paths.contains(b"info.md".as_slice()));
+            assert!(paths.contains(b"global.md".as_slice()));
+            assert_eq!(repo.capture_fixture_state(), before);
+        }
+    }
 
     #[test]
     fn worktree_paths_preserve_raw_names_and_non_document_entries() {
@@ -243,7 +296,7 @@ mod tests {
         fs::write(repo.get_root().join("plain.txt"), b"text").unwrap();
         let git = GitRepository::open(repo.get_root(), &[crate::utils::SERVICE_DIRECTORY]).unwrap();
         // When: the infrastructure boundary enumerates repository paths.
-        let paths = git.worktree_paths_get();
+        let paths = git.worktree_paths_get(GitIgnoreMode::Standard, &[]);
         // Then: document encoding and extension policies do not reject Git paths.
         let paths = paths.unwrap();
         assert!(
@@ -358,7 +411,7 @@ mod tests {
             b"raw\r\n\0bytes"
         );
         assert!(
-            git.worktree_paths_get()
+            git.worktree_paths_get(GitIgnoreMode::Standard, &[])
                 .unwrap()
                 .split(|byte| *byte == 0)
                 .any(|path| path == b"live.md")
@@ -638,5 +691,40 @@ mod tests {
             );
             assert_eq!(repo.capture_fixture_state(), before);
         }
+    }
+    fn prepare_discovery_files(repo: &TempRepo) {
+        fs::create_dir_all(repo.get_root().join("nested")).unwrap();
+        for name in [
+            "tracked.md",
+            "deleted.md",
+            "ignored.md",
+            "nested/nested.md",
+            "info.md",
+            "global.md",
+        ] {
+            fs::write(repo.get_root().join(name), b"bytes").unwrap();
+        }
+        fs::write(
+            repo.get_root().join(".gitignore"),
+            b"ignored.md\ntracked.md\n",
+        )
+        .unwrap();
+        fs::write(repo.get_root().join("nested/.gitignore"), b"nested.md\n").unwrap();
+        fs::write(repo.get_root().join(".git/info/exclude"), b"info.md\n").unwrap();
+        let global = repo.get_root().join("global-ignore");
+        fs::write(&global, b"global.md\n").unwrap();
+        repo.run_git_successfully(
+            &["config", "core.excludesFile", global.to_str().unwrap()],
+            None,
+        );
+        repo.run_git_successfully(&["add", "-f", "tracked.md", "deleted.md"], None);
+        fs::remove_file(repo.get_root().join("deleted.md")).unwrap();
+    }
+
+    fn get_path_set(raw: &[u8]) -> std::collections::BTreeSet<Vec<u8>> {
+        raw.split(|byte| *byte == 0)
+            .filter(|path| !path.is_empty())
+            .map(<[u8]>::to_vec)
+            .collect()
     }
 }

@@ -1,0 +1,11 @@
+{
+  "argv": [
+    ".artifacts/issue-97/python/bin/python",
+    "-B",
+    "tests/config_schema_agreement.py"
+  ],
+  "cwd": "/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config",
+  "started_unix": 1793975428.192673,
+  "exit_code": 0,
+  "elapsed_seconds": 0.124
+}

@@ -357,14 +357,14 @@ pub trait VectorDatabase {
     ) -> StorageResult<StoredVectorKey>;
 }
 pub use types::{
-    CapturedFile, CheckReport, ConfigState, Configuration, DrainOutcome, ElementAddress,
-    ElementLocation, EmbeddingConfig, EmbeddingWork, FileIdentity, FileRow, FileStat,
-    GraphNeighbor, GraphNodeKey, GraphNodeRef, HeldLock, InspectedElement, Inspection,
-    KnowledgeMetadata, LockName, NeighborCursor, NeighborDirection, NeighborPageRequest,
-    NodeMetadata, ParsedElement, ParsedFile, ProvenanceIssue, ProvenanceObservation,
-    ProvenanceRequest, ProviderKind, QueryEmbedding, QueryEmbeddingRequest, RecheckFilter,
-    RefreshOutcome, RetainedTree, SearchFilters, SearchFlag, SearchLink, SearchRequest,
-    SnapshotEntry, SnapshotFile, SnapshotState, SourceAvailability, SourceMetadata,
+    CapturedFile, CheckReport, ConfigState, Configuration, DiscoveryConfig, DrainOutcome,
+    ElementAddress, ElementLocation, EmbeddingConfig, EmbeddingWork, FileIdentity, FileRow,
+    FileStat, GitIgnoreMode, GraphNeighbor, GraphNodeKey, GraphNodeRef, HeldLock, InspectedElement,
+    Inspection, KnowledgeMetadata, LockName, NeighborCursor, NeighborDirection,
+    NeighborPageRequest, NodeMetadata, ParsedElement, ParsedFile, ProvenanceIssue,
+    ProvenanceObservation, ProvenanceRequest, ProviderKind, QueryEmbedding, QueryEmbeddingRequest,
+    RecheckFilter, RefreshOutcome, RetainedTree, SearchFilters, SearchFlag, SearchLink,
+    SearchRequest, SnapshotEntry, SnapshotFile, SnapshotState, SourceAvailability, SourceMetadata,
     SourceObservation, SourceRevisionComparison, SourceRevisionRequest, StatusReport, StoredNode,
     StoredVectorKey, TextMatch, TransactionRequirement, Traversal, TraversalDirection,
     TraversalLink, TraversalMode, TraversalRequest, VectorMatch, VectorOutcome,
@@ -714,19 +714,22 @@ pub trait Refresher {
     /// Reports capture, provenance or storage failures without a partial publication.
     fn reindex(&mut self, _paths: &[RepoPath]) -> DocumentResult<RefreshOutcome>;
 }
-/// Raw Git index and non-ignored untracked worktree path observations.
+/// Raw Git index and policy-selected untracked worktree path observations.
 ///
-/// Return nonempty NUL-terminated paths without UTF-8 or document-policy filtering.
+/// Return nonempty NUL-terminated paths after the supplied root-relative Gitignore
+/// patterns apply to tracked and untracked paths, without document-role filtering.
 /// Include deleted tracked paths and expand sparse index membership; duplicate stages
 /// are permitted. Read only Git index, ignore and sparse-tree metadata; never
 /// modify the index or repository.
 #[cfg_attr(test, mockall::automock)]
 pub trait GitWorktreePaths {
-    /// Enumerate root-relative Git paths as raw NUL-delimited bytes.
+    /// Enumerate raw root-relative paths with standard exclusions selected by mode.
+    /// Additional patterns apply to the complete union, including tracked paths.
     ///
     /// # Errors
     /// Reports index, ignore, sparse-object, worktree traversal or repository-policy failures.
-    fn worktree_paths_get(&self) -> GitResult<Vec<u8>>;
+    fn worktree_paths_get(&self, ignore_mode: GitIgnoreMode, patterns: &[u8])
+    -> GitResult<Vec<u8>>;
 }
 
 /// Pure shared Markdown projection and search-text codec.

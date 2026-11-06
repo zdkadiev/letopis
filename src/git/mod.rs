@@ -4,6 +4,7 @@ mod constants;
 mod durability;
 mod error;
 mod hashing;
+mod ignore;
 mod objects;
 mod reader;
 mod refs;

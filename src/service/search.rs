@@ -1,4 +1,5 @@
 use super::utils::is_current_knowledge;
+use super::utils::map_document_error;
 use super::utils::map_document_file;
 use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder,
@@ -8,7 +9,7 @@ use super::{
     SourceRevisionComparison, SourceRevisionRequest, StorageRead, TextMatch, VectorMatch,
     VectorOutcome,
 };
-use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
+use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri, TreeOid};
 use std::path::Path;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -17,8 +18,7 @@ use std::{
 };
 use std::{fmt, rc::Rc};
 
-use comparisons::RevisionComparisons;
-use ranking::{rank_candidates, validate_metrics};
+const REVISION_COMPARISON_LIMIT: usize = 4096;
 
 /// Infer and validate vector candidates while storage owns the pinned read view.
 struct QueryCandidates<'a, E> {
@@ -60,6 +60,12 @@ pub(crate) struct SearchService<D, E, F, M, P, C> {
     pub(crate) provenance: P,
 }
 
+/// Results demanded by one eligibility computation, after requested-root validation.
+struct RevisionComparisons<'a> {
+    provenance: &'a dyn SourceProvenance,
+    results: BTreeMap<(Option<TreeOid>, SourceUri, TreeOid), SourceRevisionComparison>,
+}
+
 impl<D, E, F, M, P, C> fmt::Debug for SearchService<D, E, F, M, P, C> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -77,7 +83,9 @@ impl<
 > Searcher for SearchService<D, E, F, M, P, C>
 {
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
-        self.refresher.refresh(&[]).map_err(map_search_error)?;
+        self.refresher
+            .refresh(&[])
+            .map_err(|cause| map_document_error(cause, "cannot search knowledge"))?;
         self.provenance
             .validate_revisions(&request.filters.source_revisions)
             .map_err(map_revision_error)?;
@@ -364,6 +372,49 @@ impl CandidateReads<'_> {
     }
 }
 
+impl<'a> RevisionComparisons<'a> {
+    /// Start one empty operation-local history without performing I/O.
+    fn new(provenance: &'a dyn SourceProvenance) -> Self {
+        Self {
+            provenance,
+            results: BTreeMap::new(),
+        }
+    }
+
+    /// Compare only when demanded, reusing verified immutable results within this search.
+    /// Unavailable bases are rechecked because an object can appear before the next demand.
+    ///
+    /// # Errors
+    /// Propagates comparison failures without retaining them.
+    fn compare_revision(
+        &mut self,
+        request: SourceRevisionRequest<'_>,
+    ) -> Result<SourceRevisionComparison, SnapshotError> {
+        let key = (
+            request.source_snapshot.cloned(),
+            request.source.clone(),
+            request.revision.clone(),
+        );
+        if let Some(result) = self.results.get(&key) {
+            return Ok(*result);
+        }
+        let result = self.provenance.compare_revision(request)?;
+        if result != SourceRevisionComparison::BasisUnavailable
+            && self.results.len() < REVISION_COMPARISON_LIMIT
+        {
+            self.results.insert(key, result);
+        }
+        Ok(result)
+    }
+}
+
+impl fmt::Debug for RevisionComparisons<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RevisionComparisons")
+            .finish_non_exhaustive()
+    }
+}
+
 /// Quote deterministic Unicode alphanumeric segments; punctuation never becomes FTS grammar.
 fn build_fts_expression(query: &str) -> Option<String> {
     let tokens: Vec<_> = query
@@ -385,368 +436,98 @@ fn map_revision_error(cause: SnapshotError) -> CommandError {
     };
     CommandError::new_with_cause(kind, "cannot search source revisions", cause)
 }
+/// Validate complete metrics, rank eligible channels, and fuse before the final limit.
+fn rank_candidates(
+    fts: &[TextMatch],
+    vectors: &[VectorMatch],
+    eligible: &BTreeSet<KnowledgeId>,
+    limit: NonZeroUsize,
+) -> CommandResult<Vec<KnowledgeId>> {
+    validate_metrics(fts, vectors)?;
+    let text_ranks = rank_channel(
+        fts.iter().map(|hit| (&hit.id, hit.bm25)).collect(),
+        eligible,
+    )?;
+    let vector_ranks = rank_channel(
+        vectors.iter().map(|hit| (&hit.id, hit.distance)).collect(),
+        eligible,
+    )?;
+    let mut scores = BTreeMap::new();
+    for (id, weight) in text_ranks.into_iter().chain(vector_ranks) {
+        let score = scores.entry(id.clone()).or_insert(0.0);
+        *score += weight;
+        if !score.is_finite() {
+            return Err(CommandError::new(
+                CommandErrorKind::InternalError,
+                "invalid search index data",
+            ));
+        }
+    }
+    let mut ranked: Vec<_> = scores.into_iter().collect();
+    ranked.sort_by(|(left_id, left), (right_id, right)| {
+        right.total_cmp(left).then_with(|| left_id.cmp(right_id))
+    });
+    Ok(ranked
+        .into_iter()
+        .take(limit.get())
+        .map(|(id, _)| id)
+        .collect())
+}
+
+/// Reject corrupt native metrics before eligibility can discard their candidates.
+fn validate_metrics(fts: &[TextMatch], vectors: &[VectorMatch]) -> CommandResult<()> {
+    let metrics = fts
+        .iter()
+        .map(|hit| hit.bm25)
+        .chain(vectors.iter().map(|hit| hit.distance));
+    if metrics.into_iter().any(|metric| !metric.is_finite()) {
+        return Err(CommandError::new(
+            CommandErrorKind::InternalError,
+            "invalid search index data",
+        ));
+    }
+    Ok(())
+}
+
+fn rank_channel<'a>(
+    mut channel: Vec<(&'a KnowledgeId, f64)>,
+    eligible: &BTreeSet<KnowledgeId>,
+) -> CommandResult<Vec<(&'a KnowledgeId, f64)>> {
+    channel.retain(|(id, _)| eligible.contains(*id));
+    channel.sort_by(|(left_id, left), (right_id, right)| {
+        // Signed zeros are equal metrics and therefore use the same identity tie-break.
+        if left == right {
+            left_id.cmp(right_id)
+        } else {
+            left.total_cmp(right)
+        }
+    });
+    let mut seen = BTreeSet::new();
+    channel.retain(|(id, _)| seen.insert(*id));
+    for (index, (_, weight)) in channel.iter_mut().enumerate() {
+        let rank = index
+            .checked_add(1)
+            .and_then(NonZeroUsize::new)
+            .ok_or_else(|| {
+                CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
+            })?;
+        *weight = calculate_rank_weight(rank)?;
+    }
+    Ok(channel)
+}
+
+/// Restrict ranks to an exactly representable integer before computing their reciprocal.
+fn calculate_rank_weight(rank: NonZeroUsize) -> CommandResult<f64> {
+    let rank = u32::try_from(rank.get()).map_err(map_search_error)?;
+    Ok(1.0 / f64::from(rank))
+}
+
 fn map_search_error(cause: impl Error + Send + Sync + 'static) -> CommandError {
     CommandError::new_with_cause(
         CommandErrorKind::InternalError,
         "cannot search knowledge",
         cause,
     )
-}
-
-mod ranking {
-    use super::map_search_error;
-    use crate::{
-        domain::KnowledgeId,
-        service::{CommandError, CommandErrorKind, CommandResult, TextMatch, VectorMatch},
-    };
-    use std::{
-        collections::{BTreeMap, BTreeSet},
-        num::NonZeroUsize,
-    };
-
-    /// Validate complete metrics, rank eligible channels, and fuse before the final limit.
-    pub(super) fn rank_candidates(
-        fts: &[TextMatch],
-        vectors: &[VectorMatch],
-        eligible: &BTreeSet<KnowledgeId>,
-        limit: NonZeroUsize,
-    ) -> CommandResult<Vec<KnowledgeId>> {
-        validate_metrics(fts, vectors)?;
-        let text_ranks = rank_channel(
-            fts.iter().map(|hit| (&hit.id, hit.bm25)).collect(),
-            eligible,
-        )?;
-        let vector_ranks = rank_channel(
-            vectors.iter().map(|hit| (&hit.id, hit.distance)).collect(),
-            eligible,
-        )?;
-        let mut scores = BTreeMap::new();
-        for (id, weight) in text_ranks.into_iter().chain(vector_ranks) {
-            let score = scores.entry(id.clone()).or_insert(0.0);
-            *score += weight;
-            if !score.is_finite() {
-                return Err(CommandError::new(
-                    CommandErrorKind::InternalError,
-                    "invalid search index data",
-                ));
-            }
-        }
-        let mut ranked: Vec<_> = scores.into_iter().collect();
-        ranked.sort_by(|(left_id, left), (right_id, right)| {
-            right.total_cmp(left).then_with(|| left_id.cmp(right_id))
-        });
-        Ok(ranked
-            .into_iter()
-            .take(limit.get())
-            .map(|(id, _)| id)
-            .collect())
-    }
-
-    /// Reject corrupt native metrics before eligibility can discard their candidates.
-    pub(super) fn validate_metrics(
-        fts: &[TextMatch],
-        vectors: &[VectorMatch],
-    ) -> CommandResult<()> {
-        let metrics = fts
-            .iter()
-            .map(|hit| hit.bm25)
-            .chain(vectors.iter().map(|hit| hit.distance));
-        if metrics.into_iter().any(|metric| !metric.is_finite()) {
-            return Err(CommandError::new(
-                CommandErrorKind::InternalError,
-                "invalid search index data",
-            ));
-        }
-        Ok(())
-    }
-
-    fn rank_channel<'a>(
-        mut channel: Vec<(&'a KnowledgeId, f64)>,
-        eligible: &BTreeSet<KnowledgeId>,
-    ) -> CommandResult<Vec<(&'a KnowledgeId, f64)>> {
-        channel.retain(|(id, _)| eligible.contains(*id));
-        channel.sort_by(|(left_id, left), (right_id, right)| {
-            // Signed zeros are equal metrics and therefore use the same identity tie-break.
-            if left == right {
-                left_id.cmp(right_id)
-            } else {
-                left.total_cmp(right)
-            }
-        });
-        let mut seen = BTreeSet::new();
-        channel.retain(|(id, _)| seen.insert(*id));
-        for (index, (_, weight)) in channel.iter_mut().enumerate() {
-            let rank = index
-                .checked_add(1)
-                .and_then(NonZeroUsize::new)
-                .ok_or_else(|| {
-                    CommandError::new(CommandErrorKind::InternalError, "invalid search index data")
-                })?;
-            *weight = calculate_rank_weight(rank)?;
-        }
-        Ok(channel)
-    }
-
-    /// Restrict ranks to an exactly representable integer before computing their reciprocal.
-    pub(super) fn calculate_rank_weight(rank: NonZeroUsize) -> CommandResult<f64> {
-        let rank = u32::try_from(rank.get()).map_err(map_search_error)?;
-        Ok(1.0 / f64::from(rank))
-    }
-}
-
-mod comparisons {
-    use crate::{
-        domain::{SourceUri, TreeOid},
-        service::{
-            SnapshotError, SourceProvenance, SourceRevisionComparison, SourceRevisionRequest,
-        },
-    };
-    use std::{collections::BTreeMap, fmt};
-
-    const REVISION_COMPARISON_LIMIT: usize = 4096;
-
-    /// Results demanded by one eligibility computation, after requested-root validation.
-    pub(super) struct RevisionComparisons<'a> {
-        provenance: &'a dyn SourceProvenance,
-        results: BTreeMap<(Option<TreeOid>, SourceUri, TreeOid), SourceRevisionComparison>,
-    }
-
-    impl<'a> RevisionComparisons<'a> {
-        /// Start one empty operation-local history without performing I/O.
-        pub(super) fn new(provenance: &'a dyn SourceProvenance) -> Self {
-            Self {
-                provenance,
-                results: BTreeMap::new(),
-            }
-        }
-
-        /// Compare only when demanded, reusing verified immutable results within this search.
-        /// Unavailable bases are rechecked because an object can appear before the next demand.
-        ///
-        /// # Errors
-        /// Propagates comparison failures without retaining them.
-        pub(super) fn compare_revision(
-            &mut self,
-            request: SourceRevisionRequest<'_>,
-        ) -> Result<SourceRevisionComparison, SnapshotError> {
-            let key = (
-                request.source_snapshot.cloned(),
-                request.source.clone(),
-                request.revision.clone(),
-            );
-            if let Some(result) = self.results.get(&key) {
-                return Ok(*result);
-            }
-            let result = self.provenance.compare_revision(request)?;
-            if result != SourceRevisionComparison::BasisUnavailable
-                && self.results.len() < REVISION_COMPARISON_LIMIT
-            {
-                self.results.insert(key, result);
-            }
-            Ok(result)
-        }
-    }
-
-    impl fmt::Debug for RevisionComparisons<'_> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.debug_struct("RevisionComparisons")
-                .finish_non_exhaustive()
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::RevisionComparisons;
-        use crate::{
-            domain::{SourceUri, TreeOid},
-            service::{
-                DocumentResult, ProvenanceObservation, ProvenanceRequest, SnapshotError,
-                SnapshotErrorKind, SourceProvenance, SourceRevisionComparison,
-                SourceRevisionRequest,
-            },
-        };
-        use std::{
-            cell::{Cell, RefCell},
-            collections::BTreeSet,
-        };
-
-        type ComparisonKey = (Option<TreeOid>, SourceUri, TreeOid);
-        #[derive(Default)]
-        struct Recorded {
-            calls: RefCell<Vec<ComparisonKey>>,
-            failure: Cell<bool>,
-            result: Cell<Option<SourceRevisionComparison>>,
-        }
-
-        #[test]
-        fn exact_basis_address_range_and_revision_are_distinct() {
-            // Given: requests differ in exactly one key component, including an absent basis.
-            let provenance = Recorded::default();
-            let mut comparisons = RevisionComparisons::new(&provenance);
-            let first = TreeOid::parse(&"a".repeat(40)).unwrap();
-            let second = TreeOid::parse(&"b".repeat(40)).unwrap();
-            let whole = SourceUri::parse("a").unwrap();
-            let range = SourceUri::parse("a#L1-L1").unwrap();
-            let other = SourceUri::parse("b").unwrap();
-            let requests = [
-                (None, &whole, &first),
-                (Some(&first), &whole, &first),
-                (Some(&second), &whole, &first),
-                (Some(&first), &range, &first),
-                (Some(&first), &other, &first),
-                (Some(&first), &whole, &second),
-            ];
-            // When: each request is repeated, without changing their exact identities.
-            for (basis, source, revision) in requests {
-                let request = SourceRevisionRequest {
-                    source_snapshot: basis,
-                    source,
-                    revision,
-                };
-                let left = comparisons.compare_revision(request).unwrap();
-                let right = comparisons.compare_revision(request).unwrap();
-                assert_eq!(left, right);
-            }
-            // Then: each exact key is demanded once, in its first-use order.
-            assert_eq!(provenance.calls.borrow().len(), 6);
-            assert_eq!(
-                provenance.calls.borrow()[0],
-                (None, whole.clone(), first.clone())
-            );
-            assert_eq!(provenance.calls.borrow()[5], (Some(first), whole, second));
-        }
-
-        #[test]
-        fn revision_failures_are_retried_and_overflow_recomputes() {
-            // Given: one failing comparison is retried after repair.
-            let provenance = Recorded::default();
-            let mut comparisons = RevisionComparisons::new(&provenance);
-            let tree = TreeOid::parse(&"a".repeat(40)).unwrap();
-            let source = SourceUri::parse("a").unwrap();
-            let request = SourceRevisionRequest {
-                source_snapshot: Some(&tree),
-                source: &source,
-                revision: &tree,
-            };
-            provenance.failure.set(true);
-            assert_eq!(
-                comparisons
-                    .compare_revision(request)
-                    .unwrap_err()
-                    .get_kind(),
-                SnapshotErrorKind::InternalError
-            );
-            provenance.failure.set(false);
-            // When: the repaired result and 4096 additional distinct addresses are demanded.
-            assert_eq!(
-                comparisons.compare_revision(request).unwrap(),
-                SourceRevisionComparison::Equal
-            );
-            for n in 0..4096 {
-                let source = SourceUri::parse(&format!("source{n}")).unwrap();
-                comparisons
-                    .compare_revision(SourceRevisionRequest {
-                        source: &source,
-                        ..request
-                    })
-                    .unwrap();
-            }
-            let overflow = SourceUri::parse("source4095").unwrap();
-            comparisons.compare_revision(request).unwrap();
-            comparisons
-                .compare_revision(SourceRevisionRequest {
-                    source: &overflow,
-                    ..request
-                })
-                .unwrap();
-            // Then: the failure was retried, a cached success reused and overflow recomputed.
-            assert_eq!(provenance.calls.borrow().len(), 4099);
-        }
-
-        #[test]
-        fn successful_comparison_variants_are_preserved() {
-            for expected in [
-                SourceRevisionComparison::Different,
-                SourceRevisionComparison::SourceNotFound,
-                SourceRevisionComparison::Unfetched,
-            ] {
-                // Given: a demanded typed result, independent of the later collaborator value.
-                let provenance = Recorded::default();
-                provenance.result.set(Some(expected));
-                let tree = TreeOid::parse(&"a".repeat(40)).unwrap();
-                let source = SourceUri::parse("a").unwrap();
-                let request = SourceRevisionRequest {
-                    source_snapshot: Some(&tree),
-                    source: &source,
-                    revision: &tree,
-                };
-                let mut comparisons = RevisionComparisons::new(&provenance);
-                // When: the successful exact comparison is requested again.
-                assert_eq!(comparisons.compare_revision(request).unwrap(), expected);
-                provenance.result.set(Some(SourceRevisionComparison::Equal));
-                let result = comparisons.compare_revision(request).unwrap();
-                // Then: the original typed result is returned without more historical work.
-                assert_eq!(result, expected);
-                assert_eq!(provenance.calls.borrow().len(), 1);
-            }
-        }
-
-        #[test]
-        fn unavailable_basis_is_rechecked_when_the_same_key_becomes_available() {
-            // Given: a declared basis is unavailable on the first demanded comparison.
-            let provenance = Recorded::default();
-            provenance
-                .result
-                .set(Some(SourceRevisionComparison::BasisUnavailable));
-            let tree = TreeOid::parse(&"a".repeat(40)).unwrap();
-            let source = SourceUri::parse("a").unwrap();
-            let request = SourceRevisionRequest {
-                source_snapshot: Some(&tree),
-                source: &source,
-                revision: &tree,
-            };
-            let mut comparisons = RevisionComparisons::new(&provenance);
-            assert_eq!(
-                comparisons.compare_revision(request).unwrap(),
-                SourceRevisionComparison::BasisUnavailable
-            );
-            // When: the same basis appears before its next demand.
-            provenance.result.set(Some(SourceRevisionComparison::Equal));
-            let result = comparisons.compare_revision(request).unwrap();
-            // Then: the negative classification cannot hide the now available bytes.
-            assert_eq!(result, SourceRevisionComparison::Equal);
-            assert_eq!(provenance.calls.borrow().len(), 2);
-        }
-
-        impl SourceProvenance for Recorded {
-            fn validate_revisions(&self, _: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
-                panic!("caller validates roots before eligibility")
-            }
-            fn observe_sources(
-                &self,
-                _: ProvenanceRequest<'_>,
-            ) -> DocumentResult<ProvenanceObservation> {
-                panic!("comparisons never observe live bytes")
-            }
-            fn compare_revision(
-                &self,
-                request: SourceRevisionRequest<'_>,
-            ) -> Result<SourceRevisionComparison, SnapshotError> {
-                self.calls.borrow_mut().push((
-                    request.source_snapshot.cloned(),
-                    request.source.clone(),
-                    request.revision.clone(),
-                ));
-                if self.failure.get() {
-                    return Err(SnapshotError::new(
-                        SnapshotErrorKind::InternalError,
-                        "comparison failure",
-                    ));
-                }
-                Ok(self.result.get().unwrap_or(SourceRevisionComparison::Equal))
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -756,8 +537,8 @@ mod tests {
     use crate::storage::get_current;
 
     use super::{
-        CandidateReads, QueryCandidates, build_fts_expression,
-        ranking::{calculate_rank_weight, rank_candidates},
+        CandidateReads, QueryCandidates, build_fts_expression, calculate_rank_weight,
+        rank_candidates,
     };
     use crate::{
         domain::{ElementKind, KnowledgeId, LineRange, Sha256},
@@ -1810,7 +1591,7 @@ mod tests {
                 QueryEmbeddingRequest, RecheckFilter, SearchFilters, SearchFlag, SearchRequest,
                 Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
                 SourceRevisionComparison, SourceRevisionRequest, TextMatch, VectorMatch,
-                search::{SearchService, ranking::rank_candidates},
+                search::{SearchService, rank_candidates},
             },
             storage::TestDatabases,
         };
@@ -2210,5 +1991,203 @@ mod tests {
             })
         });
         refresher
+    }
+}
+
+#[cfg(test)]
+mod comparisons {
+    use super::RevisionComparisons;
+
+    mod tests {
+        use super::RevisionComparisons;
+        use crate::{
+            domain::{SourceUri, TreeOid},
+            service::{
+                DocumentResult, ProvenanceObservation, ProvenanceRequest, SnapshotError,
+                SnapshotErrorKind, SourceProvenance, SourceRevisionComparison,
+                SourceRevisionRequest,
+            },
+        };
+        use std::{
+            cell::{Cell, RefCell},
+            collections::BTreeSet,
+        };
+
+        type ComparisonKey = (Option<TreeOid>, SourceUri, TreeOid);
+        #[derive(Default)]
+        struct Recorded {
+            calls: RefCell<Vec<ComparisonKey>>,
+            failure: Cell<bool>,
+            result: Cell<Option<SourceRevisionComparison>>,
+        }
+
+        #[test]
+        fn exact_basis_address_range_and_revision_are_distinct() {
+            // Given: requests differ in exactly one key component, including an absent basis.
+            let provenance = Recorded::default();
+            let mut comparisons = RevisionComparisons::new(&provenance);
+            let first = TreeOid::parse(&"a".repeat(40)).unwrap();
+            let second = TreeOid::parse(&"b".repeat(40)).unwrap();
+            let whole = SourceUri::parse("a").unwrap();
+            let range = SourceUri::parse("a#L1-L1").unwrap();
+            let other = SourceUri::parse("b").unwrap();
+            let requests = [
+                (None, &whole, &first),
+                (Some(&first), &whole, &first),
+                (Some(&second), &whole, &first),
+                (Some(&first), &range, &first),
+                (Some(&first), &other, &first),
+                (Some(&first), &whole, &second),
+            ];
+            // When: each request is repeated, without changing their exact identities.
+            for (basis, source, revision) in requests {
+                let request = SourceRevisionRequest {
+                    source_snapshot: basis,
+                    source,
+                    revision,
+                };
+                let left = comparisons.compare_revision(request).unwrap();
+                let right = comparisons.compare_revision(request).unwrap();
+                assert_eq!(left, right);
+            }
+            // Then: each exact key is demanded once, in its first-use order.
+            assert_eq!(provenance.calls.borrow().len(), 6);
+            assert_eq!(
+                provenance.calls.borrow()[0],
+                (None, whole.clone(), first.clone())
+            );
+            assert_eq!(provenance.calls.borrow()[5], (Some(first), whole, second));
+        }
+
+        #[test]
+        fn revision_failures_are_retried_and_overflow_recomputes() {
+            // Given: one failing comparison is retried after repair.
+            let provenance = Recorded::default();
+            let mut comparisons = RevisionComparisons::new(&provenance);
+            let tree = TreeOid::parse(&"a".repeat(40)).unwrap();
+            let source = SourceUri::parse("a").unwrap();
+            let request = SourceRevisionRequest {
+                source_snapshot: Some(&tree),
+                source: &source,
+                revision: &tree,
+            };
+            provenance.failure.set(true);
+            assert_eq!(
+                comparisons
+                    .compare_revision(request)
+                    .unwrap_err()
+                    .get_kind(),
+                SnapshotErrorKind::InternalError
+            );
+            provenance.failure.set(false);
+            // When: the repaired result and 4096 additional distinct addresses are demanded.
+            assert_eq!(
+                comparisons.compare_revision(request).unwrap(),
+                SourceRevisionComparison::Equal
+            );
+            for n in 0..4096 {
+                let source = SourceUri::parse(&format!("source{n}")).unwrap();
+                comparisons
+                    .compare_revision(SourceRevisionRequest {
+                        source: &source,
+                        ..request
+                    })
+                    .unwrap();
+            }
+            let overflow = SourceUri::parse("source4095").unwrap();
+            comparisons.compare_revision(request).unwrap();
+            comparisons
+                .compare_revision(SourceRevisionRequest {
+                    source: &overflow,
+                    ..request
+                })
+                .unwrap();
+            // Then: the failure was retried, a cached success reused and overflow recomputed.
+            assert_eq!(provenance.calls.borrow().len(), 4099);
+        }
+
+        #[test]
+        fn successful_comparison_variants_are_preserved() {
+            for expected in [
+                SourceRevisionComparison::Different,
+                SourceRevisionComparison::SourceNotFound,
+                SourceRevisionComparison::Unfetched,
+            ] {
+                // Given: a demanded typed result, independent of the later collaborator value.
+                let provenance = Recorded::default();
+                provenance.result.set(Some(expected));
+                let tree = TreeOid::parse(&"a".repeat(40)).unwrap();
+                let source = SourceUri::parse("a").unwrap();
+                let request = SourceRevisionRequest {
+                    source_snapshot: Some(&tree),
+                    source: &source,
+                    revision: &tree,
+                };
+                let mut comparisons = RevisionComparisons::new(&provenance);
+                // When: the successful exact comparison is requested again.
+                assert_eq!(comparisons.compare_revision(request).unwrap(), expected);
+                provenance.result.set(Some(SourceRevisionComparison::Equal));
+                let result = comparisons.compare_revision(request).unwrap();
+                // Then: the original typed result is returned without more historical work.
+                assert_eq!(result, expected);
+                assert_eq!(provenance.calls.borrow().len(), 1);
+            }
+        }
+
+        #[test]
+        fn unavailable_basis_is_rechecked_when_the_same_key_becomes_available() {
+            // Given: a declared basis is unavailable on the first demanded comparison.
+            let provenance = Recorded::default();
+            provenance
+                .result
+                .set(Some(SourceRevisionComparison::BasisUnavailable));
+            let tree = TreeOid::parse(&"a".repeat(40)).unwrap();
+            let source = SourceUri::parse("a").unwrap();
+            let request = SourceRevisionRequest {
+                source_snapshot: Some(&tree),
+                source: &source,
+                revision: &tree,
+            };
+            let mut comparisons = RevisionComparisons::new(&provenance);
+            assert_eq!(
+                comparisons.compare_revision(request).unwrap(),
+                SourceRevisionComparison::BasisUnavailable
+            );
+            // When: the same basis appears before its next demand.
+            provenance.result.set(Some(SourceRevisionComparison::Equal));
+            let result = comparisons.compare_revision(request).unwrap();
+            // Then: the negative classification cannot hide the now available bytes.
+            assert_eq!(result, SourceRevisionComparison::Equal);
+            assert_eq!(provenance.calls.borrow().len(), 2);
+        }
+
+        impl SourceProvenance for Recorded {
+            fn validate_revisions(&self, _: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
+                panic!("caller validates roots before eligibility")
+            }
+            fn observe_sources(
+                &self,
+                _: ProvenanceRequest<'_>,
+            ) -> DocumentResult<ProvenanceObservation> {
+                panic!("comparisons never observe live bytes")
+            }
+            fn compare_revision(
+                &self,
+                request: SourceRevisionRequest<'_>,
+            ) -> Result<SourceRevisionComparison, SnapshotError> {
+                self.calls.borrow_mut().push((
+                    request.source_snapshot.cloned(),
+                    request.source.clone(),
+                    request.revision.clone(),
+                ));
+                if self.failure.get() {
+                    return Err(SnapshotError::new(
+                        SnapshotErrorKind::InternalError,
+                        "comparison failure",
+                    ));
+                }
+                Ok(self.result.get().unwrap_or(SourceRevisionComparison::Equal))
+            }
+        }
     }
 }

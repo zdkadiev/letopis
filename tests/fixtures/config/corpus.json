@@ -183,6 +183,62 @@
       "schema_valid": false,
       "parse_valid": true,
       "validate_valid": false
+    },
+    {
+      "name": "discovery default object",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0},\"discovery\":{}}",
+      "schema_check": true,
+      "schema_valid": true,
+      "parse_valid": true,
+      "validate_valid": true
+    },
+    {
+      "name": "discovery standard",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0},\"discovery\":{\"respect_gitignore\":true}}",
+      "schema_check": true,
+      "schema_valid": true,
+      "parse_valid": true,
+      "validate_valid": true
+    },
+    {
+      "name": "discovery disabled",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0},\"discovery\":{\"respect_gitignore\":false}}",
+      "schema_check": true,
+      "schema_valid": true,
+      "parse_valid": true,
+      "validate_valid": true
+    },
+    {
+      "name": "discovery null",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0},\"discovery\":null}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "discovery array",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0},\"discovery\":[]}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "discovery wrong boolean",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0},\"discovery\":{\"respect_gitignore\":\"false\"}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
+    },
+    {
+      "name": "discovery unknown field",
+      "raw": "{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0},\"discovery\":{\"future\":false}}",
+      "schema_check": true,
+      "schema_valid": false,
+      "parse_valid": false,
+      "validate_valid": false
     }
   ]
 }

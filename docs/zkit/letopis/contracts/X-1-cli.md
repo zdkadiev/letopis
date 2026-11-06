@@ -86,8 +86,39 @@ URI base_url включает API-префикс; его локальная пр
 
 `traverse` выполняет metadata-only BFS без query embedding, vector ranking и загрузки URL. Все старты валидируются до обхода; они исключены из результата, depth=0 возвращает пустой результат, includes занимает один шаг. Соседи обеих направлений объединяются по (тип, достигнутый ID, исходная тройка); incoming сохраняет ориентацию объявления. Node limit прекращает новые переходы сразу, edge_limit независимо ограничивает только реально рассмотренные рёбра, включая альтернативные пути и back edges; induced graph не строится. Строгий transport отклоняет неизвестные поля, malformed адреса и нецелые/отрицательные/переполненные числа до открытия storage.
 
-После refresh/readiness один read view закрепляет membership, metadata, coordinates, source bindings, basis и revision. Bindings наблюдаются страницами не более 32; live flags не обещают атомарности между файлами. Поздняя storage/source/provenance ошибка возвращает один безопасный error без partial links и освобождает reader до фонового пути. Missing/invalid config разрешены. [Проверки реализации и ограничения](../checks/TK-23/report.md): host PASS и новый Linux arm64 native/standalone PASS на741930e; исходный Docker FAIL сохранён исторически; Task4 independent review и I1 rereview пройдены; final whole-branch review завершён: Critical/Important product findings нет, code quality approved with M1/M2 documentation corrections; M1/M2 documentation corrections approved by scoped re-review; no open code or documentation finding.
+После refresh/readiness один read view закрепляет membership, metadata, coordinates, source bindings, basis и revision. Bindings наблюдаются страницами не более 32; live flags не обещают атомарности между файлами. Поздняя storage/source/provenance ошибка возвращает один безопасный error без partial links и освобождает reader до фонового пути. Missing config и невалидные embedding settings разрешены при валидном discovery; malformed/unsafe discovery inputs останавливают refresh (issue #97). [Проверки реализации и ограничения](../checks/TK-23/report.md): host PASS и новый Linux arm64 native/standalone PASS на741930e; исходный Docker FAIL сохранён исторически; Task4 independent review и I1 rereview пройдены; final whole-branch review завершён: Critical/Important product findings нет, code quality approved with M1/M2 documentation corrections; M1/M2 documentation corrections approved by scoped re-review; no open code or documentation finding.
 
 ## Index command — issue #94
 
 `index` uses argv flags `--verify` and `--full` in either order; `--full` implies verification. Its stdin is `{}` or `{"paths":["letopis/architecture"]}` without a command wrapper. Nonempty paths select the named owner file or descendants at a directory boundary. Rows and removals outside the scope are untouched; valid unmatched selectors contribute nothing. An unchanged incremental corpus reports `published:false` and keeps its revision. Full mode always publishes and increments the revision, including for unchanged corpus. The `check.paths` input only filters findings and never scopes refresh. The former `reindex` command is removed; use `index --full`.
+
+## Discovery configuration — issue #97, 2026-11-06
+
+The full file requires `embedding_model` and optionally accepts
+`"discovery":{"respect_gitignore":true}`. The object/member defaults to true
+when absent; wrong types, null, duplicates and unknown root/discovery fields are
+invalid. The config response always includes effective discovery defaults when a
+file exists; a missing file still produces null. Init includes the default in new
+config, preserves existing valid bytes, and leaves an absent ignore file absent.
+
+False disables all standard Git exclusions, including nested `.gitignore`,
+`info/exclude` and explicit/default global excludes. `.letopis/ignore` filters
+tracked and untracked candidates using Gitignore patterns based at repository
+root; child negation cannot bypass an excluded parent. Hard protected components,
+extension filters and no-follow checks remain effective. Exclusions remove owner
+projections at refresh; explicit external source bindings remain readable.
+
+Search/check/traverse/inspect and every index mode share this policy. Scoped index
+leaves outside owners untouched; check paths select findings only. Config/status/
+init/drain do not refresh membership. Discovery does not enter embedding identity.
+
+Discovery-only validation tolerates invalid/missing embedding settings in a known-
+key, otherwise valid JSON root. Missing config defaults; malformed JSON or invalid
+root/discovery input fails refresh with `invalid_request` and safe command context.
+Unsafe/unreadable config/ignore observations fail with `internal_error`. Neither
+failure publishes a partial index. Full config/init validation preserves the
+existing `embedding_failed` envelope and legacy migration behavior; status uses
+`validation_failed` with `details.reason:"invalid_embedding_config"`. Changes during
+publication or inspection cause safe failure/retry. See the
+[design](../../../superpowers/specs/2026-11-06-issue-97-ignore-config-design.md)
+and [verification report](../checks/issue-97/report.md).

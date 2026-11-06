@@ -63,6 +63,56 @@ fn sparse_index_inspect_captures_unrequested_tracked_ignored_members_without_hel
 }
 
 #[test]
+fn configured_discovery_modes_and_patterns_use_no_git_helpers() {
+    // Given: both object formats contain ignored local knowledge and tracked excluded knowledge.
+    for format in FORMATS {
+        let repo = TempRepo::new(format);
+        prepare_note(&repo);
+        let denial = Denial::new();
+        denial.run_successful_command(repo.get_root(), &["init"], "{}");
+        fs::write(
+            repo.get_root().join("ignored.md"),
+            b"<!-- letopis: {\"created_at\":1} -->\nDiscoveryNeedle\n",
+        )
+        .unwrap();
+        fs::write(
+            repo.get_root().join("excluded.md"),
+            b"<!-- letopis: {\"created_at\":1} -->\nDiscoveryNeedle\n",
+        )
+        .unwrap();
+        repo.run_git_successfully(&["add", "-f", "excluded.md"], None);
+        fs::write(repo.get_root().join(".gitignore"), b"ignored.md\n").unwrap();
+        fs::write(repo.get_root().join(".letopis/ignore"), b"excluded.md\n").unwrap();
+        let before = repo.capture_fixture_state();
+        for respect_gitignore in [false, true] {
+            fs::write(repo.get_root().join(".letopis/config.json"), serde_json::to_vec(&json!({"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0},"discovery":{"respect_gitignore":respect_gitignore}})).unwrap()).unwrap();
+            // When: the actual search runs under poisoned PATH and optional Linux tracing.
+            let result = denial.run_successful_command(
+                repo.get_root(),
+                &["search"],
+                r#"{"query":"DiscoveryNeedle","limit":5}"#,
+            );
+            // Then: tracked patterns and the standard-ignore toggle govern results without helpers.
+            let ids: Vec<_> = result
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|item| item["element_id"].as_str().unwrap())
+                .collect();
+            assert_eq!(
+                ids,
+                if respect_gitignore {
+                    Vec::<&str>::new()
+                } else {
+                    vec!["ignored.md"]
+                }
+            );
+        }
+        assert_eq!(repo.capture_fixture_state(), before);
+    }
+}
+
+#[test]
 fn model_free_commands_use_only_local_library_git() {
     for format in FORMATS {
         // Given: real Git prepares each format before any denied/traced product call.

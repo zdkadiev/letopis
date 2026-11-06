@@ -155,10 +155,14 @@ Result:
 const CONFIG_DETAILS: &str = r#"Input (JSON object): {} (no fields)
 
 Result: {"embedding_model": {"enabled", "provider", "model",
-                             "parameters", "max_retries"}}, or null.
+                             "parameters", "max_retries"},
+         "discovery": {"respect_gitignore"}}, or null.
   Reads .letopis/config.json without changing it. The old flat format must be
   migrated manually under embedding_model. Disabled settings are still
-  validated locally. Edit the file directly; there is no setter command.
+  validated locally. Discovery defaults to respect_gitignore:true; false also
+  admits untracked paths hidden by standard Git ignores. .letopis/ignore applies
+  root-relative Gitignore patterns to tracked and untracked candidates.
+  Edit the files directly; there is no setter command.
 "#;
 
 const CONTRACT: &str = r#"
