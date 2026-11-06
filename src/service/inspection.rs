@@ -71,6 +71,7 @@ impl<D, G: GitWorktreePaths, F: FileReader, M> InspectionService<D, G, F, M> {
             filesystem: &self.filesystem,
         }
         .get_candidates(&[])
+        .map(|observation| observation.paths)
     }
 }
 
@@ -337,6 +338,9 @@ mod tests {
         });
         let mut files = MockFileReader::new();
         files
+            .expect_file_get_bytes_by_path()
+            .returning(|_| Ok(None));
+        files
             .expect_directory_get_by_path()
             .returning(|_| Ok(Some(std::fs::File::open(".").unwrap().into())));
         files.expect_symlink_is_exist().returning(|path| {
@@ -361,7 +365,12 @@ mod tests {
         let mut git = MockGitWorktreePaths::new();
         git.expect_worktree_paths_get()
             .returning(|_, _| Err(GitError::new(std::io::Error::other("private cause"))));
-        let service = InspectionService::new((), git, MockFileReader::new(), ());
+        let mut files = MockFileReader::new();
+        files.expect_directory_get_by_path().returning(|_| Ok(None));
+        files
+            .expect_file_get_bytes_by_path()
+            .returning(|_| Ok(None));
+        let service = InspectionService::new((), git, files, ());
         // When: the selection error takes inspection's document-error mapping.
         let error = super::map_document_error(service.get_candidates().unwrap_err());
         // Then: the public capture diagnostic and internal cause remain distinct.
@@ -705,8 +714,12 @@ mod tests {
         fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
             panic!("capture uses verified reads")
         }
-        fn file_get_bytes_by_path(&self, _: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
-            panic!("unexpected file_get_bytes_by_path")
+        fn file_get_bytes_by_path(&self, path: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
+            assert!(matches!(
+                path.to_str(),
+                Some(".letopis/config.json" | ".letopis/ignore")
+            ));
+            Ok(None)
         }
         fn file_get_by_path(&self, path: &std::path::Path) -> FileResult<Option<CapturedFile>> {
             if self.1 == Scenario::SourceIoFailure && path.to_str().unwrap() == "source.txt" {

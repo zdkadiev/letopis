@@ -1,4 +1,5 @@
 use super::utils::is_current_knowledge;
+use super::utils::map_document_error;
 use super::utils::map_document_file;
 use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder,
@@ -77,7 +78,9 @@ impl<
 > Searcher for SearchService<D, E, F, M, P, C>
 {
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
-        self.refresher.refresh(&[]).map_err(map_search_error)?;
+        self.refresher
+            .refresh(&[])
+            .map_err(|cause| map_document_error(cause, "cannot search knowledge"))?;
         self.provenance
             .validate_revisions(&request.filters.source_revisions)
             .map_err(map_revision_error)?;

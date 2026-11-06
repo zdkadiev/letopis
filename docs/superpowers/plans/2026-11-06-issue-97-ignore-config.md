@@ -270,7 +270,7 @@ No new infrastructure component or injected dependency is required.
 - `DocumentRefreshService::get_candidates` returns CandidateObservation; Delta
   carries the consumed discovery observation until a no-op return or commit.
 
-- [ ] **Step 1: Add failing service tests.** Add an inline `tests::discovery`
+- [x] **Step 1: Add failing service tests.** Add an inline `tests::discovery`
   module in `document_refresher.rs` for selection and publication. Pin tracked
   exclusion, ignored-untracked inclusion, later restore, changed policy through
   the same service/shared Git handle, same-stat byte edits, comment-only policy
@@ -279,7 +279,7 @@ No new infrastructure component or injected dependency is required.
   into named scenarios: missing config succeeds; malformed JSON/unreadable input
   fails and preserves the publication; invalid embedding with valid discovery
   still returns the literal expected FTS IDs.
-- [ ] **Step 2: Add failing deterministic race tests.** Add an inline
+- [x] **Step 2: Add failing deterministic race tests.** Add an inline
   `tests::process::discovery` child module beside the existing process scenarios
   so it can reuse its parent's private socket/checkpoint fixtures and state
   snapshots; do not expose fixtures to sibling production modules. No sleep-based race
@@ -289,10 +289,10 @@ No new infrastructure component or injected dependency is required.
   `discovery_edit_before_noop_return_is_rejected`. Exercise config and ignore
   files, presence changes and both membership directions. Assert exact old
   nodes/edges/files/FTS/revision and retained embedding state on abort.
-- [ ] **Step 3: Confirm red tests.** Run
+- [x] **Step 3: Confirm red tests.** Run
   `cargo test --locked --offline --lib discovery`
   and `cargo test --locked --offline --test knowledge_search`.
-- [ ] **Step 4: Implement observation and selection.** Check the private
+- [x] **Step 4: Implement observation and selection.** Check the private
   directory through existing generic capabilities, read each file with existing
   no-follow/identity-safe methods and bounded Changed retry, parse discovery,
   pass generic Git arguments and preserve application filtering order. Missing
@@ -300,7 +300,7 @@ No new infrastructure component or injected dependency is required.
   InvalidRequest with its private cause; observation errors remain InternalError.
   Adapt touched mocks by path so new policy reads do not weaken document-read
   counts or existing failure/race assertions.
-- [ ] **Step 5: Implement final rechecks.** Keep preliminary redetection and
+- [x] **Step 5: Implement final rechecks.** Keep preliminary redetection and
   locked publication independent. Recheck Delta's policy on preliminary no-op,
   locked no-op after snapshot validation, and after prepared updates/removals
   immediately before commit. The existing `before_commit` test checkpoint must
@@ -310,12 +310,12 @@ No new infrastructure component or injected dependency is required.
   Keep `verify_excluded_candidates`; it still protects candidate reappearance.
   Its own fresh listing must not replace comparison with the original Delta
   observation, since new exclusions also matter.
-- [ ] **Step 6: Run focused regression tests.** Repeat Step 3, then
+- [x] **Step 6: Run focused regression tests.** Repeat Step 3, then
   `cargo test --locked --offline --test document_refresh --test check_lifecycle --test index_command --test knowledge_inspection`.
   Run `cargo test --locked --offline --lib service::document_refresher::tests::process`;
   expected all pass with no ignored
   parent schedule substituted for real execution.
-- [ ] **Step 7: Mutation-check each final check independently.** Remove the
+- [x] **Step 7: Mutation-check each final check independently.** Remove the
   preliminary no-op check, locked no-op check, final commit check and locked
   policy reread one at a time. The corresponding schedule must fail while the
   others can remain intact. Restore, rerun and commit

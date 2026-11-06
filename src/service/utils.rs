@@ -1,11 +1,12 @@
 use super::{
-    CommandError, CommandErrorKind, CommandProblem, CommandResult, DocumentError,
+    CommandError, CommandErrorKind, CommandProblem, CommandResult, DiscoveryConfig, DocumentError,
     DocumentErrorKind, DocumentResult, FileReader, GitIgnoreMode, GitWorktreePaths,
     GraphDiagnostics, KnowledgeMetadata, NodeMetadata, PROVENANCE_BATCH_SIZE, ParsedFile,
     ProvenanceIssue, ProvenanceRequest, SourceProvenance, StorageError, StorageRead,
 };
 use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
 use crate::service::{FileError, FileErrorKind, FileResult};
+use crate::utils::{CONFIG_PATH, IGNORE_PATH, SERVICE_DIRECTORY};
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -17,6 +18,7 @@ use std::{
 };
 
 /// Public context shared by document candidate observations.
+pub(super) const DOCUMENTS_CHANGED_MESSAGE: &str = "documents changed during refresh";
 const CANDIDATE_LIST_MESSAGE: &str = "cannot list document candidates";
 const FILE_OBSERVATION_WAIT: Duration = Duration::from_secs(5);
 const FILE_OBSERVATION_RETRY: Duration = Duration::from_millis(1);
@@ -33,6 +35,20 @@ const SOURCE_NOT_FOUND: &str = "source_not_found";
 pub(super) struct CandidateSelection<'a> {
     pub(super) git: &'a dyn GitWorktreePaths,
     pub(super) filesystem: &'a dyn FileReader,
+}
+
+/// Bytes and presence observed for one corpus-selection policy.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct DiscoveryObservation {
+    config_bytes: Option<Vec<u8>>,
+    ignore_bytes: Option<Vec<u8>>,
+}
+
+/// Selected paths and the policy that must still hold at publication.
+#[derive(Debug)]
+pub(super) struct CandidateObservation {
+    pub(super) paths: Vec<RepoPath>,
+    pub(super) discovery: DiscoveryObservation,
 }
 
 /// Borrows graph and provenance observers for one pinned check/status operation.
@@ -59,11 +75,12 @@ impl CandidateSelection<'_> {
     ///
     /// # Errors
     /// Preserves document diagnostics for Git/file observation, framing or path failures.
-    pub(super) fn get_candidates(&self, paths: &[RepoPath]) -> DocumentResult<Vec<RepoPath>> {
-        let raw = self
-            .git
-            .worktree_paths_get(GitIgnoreMode::Standard, &[])
-            .map_err(map_candidate_error)?;
+    pub(super) fn get_candidates(
+        &self,
+        paths: &[RepoPath],
+    ) -> DocumentResult<CandidateObservation> {
+        let discovery = self.get_discovery()?;
+        let raw = self.get_raw_candidates(&discovery)?;
         let entries = get_candidate_entries(&raw)?;
         self.filesystem
             .directory_get_by_path(Path::new("."))
@@ -90,7 +107,61 @@ impl CandidateSelection<'_> {
             filtered.extend_from_slice(entry);
             filtered.push(0);
         }
-        parse_candidates(&filtered)
+        Ok(CandidateObservation {
+            paths: parse_candidates(&filtered)?,
+            discovery,
+        })
+    }
+
+    /// Reject a policy edit since the candidate observation, including same-stat replacements.
+    pub(super) fn verify_discovery(&self, previous: &DiscoveryObservation) -> DocumentResult<()> {
+        if self.get_discovery()? != *previous {
+            return Err(DocumentError::new(
+                DocumentErrorKind::InternalError,
+                DOCUMENTS_CHANGED_MESSAGE,
+            ));
+        }
+        Ok(())
+    }
+
+    fn get_raw_candidates(&self, discovery: &DiscoveryObservation) -> DocumentResult<Vec<u8>> {
+        let configuration = discovery
+            .config_bytes
+            .as_deref()
+            .map(DiscoveryConfig::parse)
+            .transpose()
+            .map_err(|cause| {
+                DocumentError::new_with_cause(
+                    DocumentErrorKind::InvalidRequest,
+                    "invalid discovery configuration",
+                    cause,
+                )
+            })?
+            .unwrap_or_default();
+        let mode = if configuration.get_respect_gitignore() {
+            GitIgnoreMode::Standard
+        } else {
+            GitIgnoreMode::Disabled
+        };
+        self.git
+            .worktree_paths_get(mode, discovery.ignore_bytes.as_deref().unwrap_or_default())
+            .map_err(map_candidate_error)
+    }
+
+    fn get_discovery(&self) -> DocumentResult<DiscoveryObservation> {
+        retry_changed_file_observation(|| {
+            self.filesystem
+                .directory_get_by_path(Path::new(SERVICE_DIRECTORY))?;
+            Ok(DiscoveryObservation {
+                config_bytes: self
+                    .filesystem
+                    .file_get_bytes_by_path(Path::new(CONFIG_PATH))?,
+                ignore_bytes: self
+                    .filesystem
+                    .file_get_bytes_by_path(Path::new(IGNORE_PATH))?,
+            })
+        })
+        .map_err(map_candidate_error)
     }
 }
 
@@ -299,6 +370,15 @@ fn get_sort_key(problem: &CommandProblem) -> [&str; 4] {
             .and_then(Value::as_str)
             .unwrap_or("")
     })
+}
+
+/// Preserve the document failure class at a command's refresh boundary.
+pub(super) fn map_document_error(cause: DocumentError, message: &'static str) -> CommandError {
+    let kind = match cause.get_kind() {
+        DocumentErrorKind::InvalidRequest => CommandErrorKind::InvalidRequest,
+        DocumentErrorKind::InternalError => CommandErrorKind::InternalError,
+    };
+    CommandError::new_with_cause(kind, message, cause)
 }
 
 fn map_storage_error(cause: StorageError) -> CommandError {

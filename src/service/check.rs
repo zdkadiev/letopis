@@ -1,7 +1,7 @@
+use super::utils::map_document_error;
 use super::{
     CacheDatabase, CheckReport, Checker, CommandError, CommandErrorKind, CommandResult,
-    DocumentError, GraphDiagnostics, Refresher, SourceProvenance, StorageError,
-    utils::CheckObservations,
+    GraphDiagnostics, Refresher, SourceProvenance, StorageError, utils::CheckObservations,
 };
 use crate::domain::RepoPath;
 use std::{fmt, rc::Rc};
@@ -46,7 +46,7 @@ impl<D: Refresher, P: SourceProvenance, C: CacheDatabase> Checker for CheckServi
         } else {
             self.refresher.refresh(&[])
         }
-        .map_err(map_refresh_error)?;
+        .map_err(|cause| map_document_error(cause, "cannot refresh corpus for check"))?;
         self.storage
             .with_read_tx(|| {
                 let view: &dyn super::StorageRead = self.storage.as_ref();
@@ -73,13 +73,6 @@ impl<D: Refresher, P: SourceProvenance, C: CacheDatabase> Checker for CheckServi
     }
 }
 
-fn map_refresh_error(cause: DocumentError) -> CommandError {
-    CommandError::new_with_cause(
-        CommandErrorKind::InternalError,
-        "cannot refresh corpus for check",
-        cause,
-    )
-}
 fn map_storage_error(cause: StorageError) -> CommandError {
     CommandError::new_with_cause(
         CommandErrorKind::InternalError,

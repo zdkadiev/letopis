@@ -1,3 +1,4 @@
+use super::utils::map_document_error;
 use super::utils::map_document_file;
 use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandResult, ElementAddress, ElementLocation,
@@ -41,7 +42,9 @@ struct LinkObservations<'a, F, C> {
 }
 impl<F: FileReader, C: CacheDatabase> Traverser for TraversalService<F, C> {
     fn traverse(&mut self, request: &TraversalRequest) -> CommandResult<Traversal> {
-        self.refresher.refresh(&[]).map_err(map_traversal_error)?;
+        self.refresher
+            .refresh(&[])
+            .map_err(|cause| map_document_error(cause, "cannot traverse knowledge"))?;
         self.embeddings
             .get_configuration()
             .map_err(map_traversal_error)?;
