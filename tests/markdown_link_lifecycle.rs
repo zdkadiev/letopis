@@ -398,7 +398,7 @@ fn seed_pre_upgrade_errors(repo: &ReadingRepo) -> (FileRow, FileRow) {
             unit.files_upsert_by_path(&valid).unwrap();
             unit.files_upsert_by_path(&mismatch).unwrap();
 
-            unit.get_publication_revision()
+            unit.project_get_revision()
         })
         .unwrap();
     drop(storage);
@@ -447,7 +447,7 @@ fn seed_legacy_projection(repo: &ReadingRepo) {
             unit.replace_text(&id, "StableToken source").unwrap();
             unit.files_upsert_by_path(&file).unwrap();
 
-            unit.get_publication_revision()
+            unit.project_get_revision()
         })
         .unwrap();
 }

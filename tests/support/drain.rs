@@ -229,7 +229,7 @@ impl Fixture {
                     Ok::<_, StorageError>(
                         scope_databases
                             .cache
-                            .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                            .nodes_get_by_kind_and_search_hash_and_attempts_and_uri(
                                 &config.get_identity(),
                                 config.get_max_attempts(),
                                 None,

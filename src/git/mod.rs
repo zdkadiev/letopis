@@ -4,14 +4,12 @@ mod constants;
 mod durability;
 mod error;
 mod hashing;
-mod ignore;
 mod objects;
 mod reader;
 mod refs;
 mod repository;
 mod tree;
 mod validation;
-mod worktree;
 
 /// Command-owned Git write resources for foreground cancellation.
 pub(crate) use cleanup::GitWriteCleanup;

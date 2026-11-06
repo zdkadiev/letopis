@@ -27,7 +27,7 @@ struct FixtureTasks {
     root: PathBuf,
 }
 impl EmbeddingExecutor for FixtureTasks {
-    fn has_work(&mut self) -> CommandResult<bool> {
+    fn is_work_available(&mut self) -> CommandResult<bool> {
         Ok(true)
     }
     fn drain(&mut self) -> CommandResult<()> {

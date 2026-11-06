@@ -82,12 +82,41 @@ The external target-corpus observation requiring a supplied request was not run;
 private ignored child entries were driven by their parent tests, and the isolated
 60-second provider deadline entry was explicitly run by native acceptance.
 One unchanged symbolic Markdown example target (`цель`) in historical decision
-prose remains outside the affected-link check. No merge, push or GitHub update
-has been performed.
+prose remains outside the affected-link check. These limits describe the original
+acceptance run; PR #98 was subsequently opened without merging.
 
 ## Independent review
 
 [One fresh whole-branch review](review.md) found no Critical, Important or Minor
 findings and no declined behaviors. All five focus areas and ledger rulings were
 accepted. The review range ends at `ad2770185ec7331aaaffb14e48f4c0483c0a3af3`; subsequent edits record
-completion only. Acceptance source hashes still match the current product/test tree.
+completion only, through `9757061`. The subsequent organizational follow-up is
+recorded below and preserves the original evidence against its captured inputs.
+
+## PR follow-up: inline modules only for tests
+
+The user replaced the former inline production-helper convention after PR #98
+was opened. Five existing modules (`basis`, `projection`, `ranking`, `comparisons`,
+`observations`) were flattened into their owning three service files. Helpers
+are now private items; the flat service layout, behavior, test namespaces and
+selectors are preserved. AGENTS.md, development guidance and architecture now
+state the updated rule.
+
+[Follow-up results and changed source hashes](inline-modules.json):
+
+- PASS: syntax scan of all 99 Rust source files found zero production inline
+  modules and 79 test-only module roots.
+- PASS: all 77 production function/method bodies match the pre-refactor baseline
+  after normalizing formatting, trailing call commas and trivial closure blocks.
+- PASS: before/after library inventories are identical: 620 tests.
+- PASS: `cargo check --locked --offline --all-targets`, `make fmt`, `make verify`
+  and `git diff --check`, on macOS arm64. The verification includes full root
+  debug/release tests, strict Rustdoc, all-target compilation and Clippy.
+- PASS: focused independent review found no issues with behavior, visibility,
+  cfg gating, imports, ownership, test selectors or guidance.
+
+Exactly three of the original 267 product/test inputs changed; the other 264
+remain byte-identical. Linux/native acceptance and behavioral mutation receipts
+remain historical evidence for the original tree and were not repeated for this
+organizational follow-up. No new behavior or test assertions were introduced.
+Raw follow-up receipts are in `.artifacts/issue-97/inline-module-followup`.

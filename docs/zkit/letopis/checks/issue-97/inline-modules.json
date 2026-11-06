@@ -1,0 +1,75 @@
+{
+  "baseline_commit": "97570614c45383fd230496ade26a5c44cae9f801",
+  "change": "Flatten five production helper modules into their owning service files; retain test-only inline modules.",
+  "platform": "macOS arm64",
+  "commands": [
+    {
+      "command": "cargo check --locked --offline --all-targets",
+      "exit_code": 0
+    },
+    {
+      "command": "make fmt",
+      "exit_code": 0
+    },
+    {
+      "command": "make verify",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --locked --offline --lib -- --list",
+      "exit_code": 0,
+      "before_and_after_equal": true,
+      "test_count": 620,
+      "inventory_sha256": "e8c54b70e0adcd73fcb841609f6584f589a030e3be31d0504b12e18c29839ae5"
+    },
+    {
+      "command": ".artifacts/issue-97/inline-module-followup/audit scan",
+      "exit_code": 0,
+      "source_file_count": 99,
+      "test_only_module_roots": 79,
+      "production_inline_modules": 0
+    },
+    {
+      "command": ".artifacts/issue-97/inline-module-followup/audit .artifacts/issue-97/inline-module-followup src/service/document_refresher.rs src/service/provenance.rs src/service/search.rs",
+      "exit_code": 0,
+      "syntax_normalized_function_body_counts": {
+        "document_refresher": 38,
+        "provenance": 18,
+        "search": 21
+      }
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "command": "Local Markdown file-target check across changed documentation",
+      "exit_code": 0,
+      "checked_targets": 199
+    }
+  ],
+  "changed_inputs_since_original_acceptance": {
+    "src/service/document_refresher.rs": {
+      "before": "74e43e3a2ec2e44b2651f9696e20c405a49e5c7c97a0a8421422ca19c18f1865",
+      "after": "9a4267a5339f5b39d8c836b7c42a183c8dd01fcb04f76be2ca3ff14b7375f544"
+    },
+    "src/service/provenance.rs": {
+      "before": "8cd33f5b489e5c7967189be6a3f12114cddf6b5b557a82fc5cd5dd30e73c63dd",
+      "after": "3a4bf4ea21392fede86604856c7658724d94a08f97803d1e7ffa4292926aec73"
+    },
+    "src/service/search.rs": {
+      "before": "cd0ca40a72d606e9fb1c6a701d8bc173d5f2157b305d2e0adf322e087303454a",
+      "after": "2a9c7c862cc694ca3885e31203ea0c8128d42fa37afb5ccc2dac97d2c48ba622"
+    }
+  },
+  "unchanged_original_inputs": 264,
+  "review": {
+    "findings": [],
+    "scope": "Three Rust files and three current guidance files, read-only independent review against baseline commit."
+  },
+  "limits": [
+    "Linux/native acceptance and behavioral mutation evidence remain captured against the original pre-refactor tree; those gates were not repeated for the organizational change.",
+    "No new behavior or test assertions were added."
+  ],
+  "raw_evidence": ".artifacts/issue-97/inline-module-followup"
+}

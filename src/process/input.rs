@@ -9,28 +9,33 @@ const FIRST_BYTE_WAIT_MS: i32 = 250;
 #[derive(Debug)]
 pub(crate) struct ProcessInput {
     stdin: Stdin,
-    started: bool,
-    empty: bool,
+    is_started: bool,
+    is_empty: bool,
 }
 
 impl ProcessInput {
-    /// Create a reader that skips terminal input and bounds the first pipe read.
+    /// Creates a reader that skips terminal input and bounds the first pipe read.
+    ///
+    /// # Arguments
+    ///
+    /// * `stdin` — the process stdin to read; when it is a terminal, reads immediately
+    ///   report empty input.
     pub(crate) fn new(stdin: Stdin) -> Self {
-        let empty = stdin.is_terminal();
+        let is_empty = stdin.is_terminal();
         Self {
             stdin,
-            started: false,
-            empty,
+            is_started: false,
+            is_empty,
         }
     }
 }
 
 impl Read for ProcessInput {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if self.empty || buf.is_empty() {
+        if self.is_empty || buf.is_empty() {
             return Ok(0);
         }
-        if !self.started {
+        if !self.is_started {
             let mut fd = libc::pollfd {
                 fd: self.stdin.as_raw_fd(),
                 events: libc::POLLIN,
@@ -42,10 +47,10 @@ impl Read for ProcessInput {
                 return Err(io::Error::last_os_error());
             }
             if ready == 0 {
-                self.empty = true;
+                self.is_empty = true;
                 return Ok(0);
             }
-            self.started = true;
+            self.is_started = true;
         }
         self.stdin.read(buf)
     }

@@ -391,7 +391,7 @@ fn assert_unchanged_vector_state(repo: &ReadingRepo, config: &EmbeddingConfig) {
             let read = &storage.cache;
             assert_eq!(read.meta_get_by_id().unwrap(), Some(config.get_identity()));
             assert_eq!(
-                read.nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                read.nodes_get_by_kind_and_search_hash_and_attempts_and_uri(
                     &config.get_identity(),
                     1,
                     None

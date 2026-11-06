@@ -1,6 +1,6 @@
 use super::{
     GitRepository,
-    constants::{BLOB_KIND, GITLINK_KIND, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
+    constants::{BLOB_KIND, OBJECT_INTEGRITY_MESSAGE, TREE_KIND},
     durability::StagedObject,
     tree::tree_entry_get,
     validation::tree_bytes_validate,
@@ -11,15 +11,23 @@ use crate::{
 };
 use gix::{hash::ObjectId, objs::Kind};
 use std::collections::{BTreeMap, BTreeSet};
+
 const FOREIGN_OID_FORMAT: &str = "OID does not match repository object format";
 const MISSING_SNAPSHOT_PATH: &str = "snapshot path is missing";
+const GITLINK_KIND: &str = "gitlink";
 
 #[derive(Default)]
 struct Directory<'a> {
     files: BTreeMap<&'a str, BlobOid>,
     dirs: BTreeMap<&'a str, Directory<'a>>,
 }
-/// Validate the entire path request before writing exact blobs and ordered trees.
+
+/// Creates a tree, validating all paths first and writing exact blobs.
+///
+/// # Arguments
+///
+/// * `git` — repository whose excluded roots and object store are used.
+/// * `files` — complete snapshot files whose exact bytes and paths form the tree.
 pub(super) fn tree_create(
     git: &GitRepository,
     files: &[SnapshotFile<'_>],
@@ -34,12 +42,24 @@ pub(super) fn tree_create(
     }
     root.tree_write(git)
 }
-/// Durably publish exact bytes without filters or newline normalization.
+
+/// Writes exact bytes durably without filters or newline normalization.
+///
+/// # Arguments
+///
+/// * `git` — repository whose object store receives the blob.
+/// * `bytes` — exact payload written without filters or newline normalization.
 pub(super) fn blob_write(git: &GitRepository, bytes: &[u8]) -> Result<BlobOid, SnapshotError> {
     BlobOid::parse(&object_write(git, Kind::Blob, bytes)?)
         .map_err(|_| SnapshotError::new(SnapshotErrorKind::InternalError, OBJECT_INTEGRITY_MESSAGE))
 }
-/// Preflight all paths and verify every distinct untrusted blob before publishing trees.
+
+/// Creates a tree, validating all paths and verifying each distinct untrusted blob first.
+///
+/// # Arguments
+///
+/// * `git` — repository whose excluded roots, reader and object store are used.
+/// * `entries` — snapshot entries whose declared paths and existing blobs form the tree.
 pub(super) fn tree_assemble(
     git: &GitRepository,
     entries: &[SnapshotEntry],
@@ -71,7 +91,15 @@ pub(super) fn tree_assemble(
     }
     root.tree_write(git)
 }
-/// Verify the root and addressed objects, without auditing unrelated descendants.
+
+/// Returns one blob's bytes after verifying the root and addressed objects without auditing
+/// unrelated descendants.
+///
+/// # Arguments
+///
+/// * `git` — repository whose reader and object format are used.
+/// * `oid` — root tree identity whose addressed path is read.
+/// * `path` — repository-relative path of the blob within the tree.
 pub(super) fn blob_get_by_tree_oid_and_path(
     git: &GitRepository,
     oid: &TreeOid,
@@ -115,7 +143,13 @@ pub(super) fn blob_get_by_tree_oid_and_path(
         MISSING_SNAPSHOT_PATH,
     ))
 }
-/// Check the root's hash, exact type and structure without claiming closure integrity.
+
+/// Verifies the root tree's hash, type and own structure without claiming closure integrity.
+///
+/// # Arguments
+///
+/// * `git` — repository whose reader and object format are used.
+/// * `oid` — tree identity whose hash, type and own structure are checked.
 pub(super) fn tree_validate_by_oid(
     git: &GitRepository,
     oid: &TreeOid,
@@ -134,7 +168,15 @@ pub(super) fn tree_validate_by_oid(
     )
     .map(|_| ())
 }
-/// Read one verified tree body without traversing its children.
+
+/// Returns one verified tree body without traversing its children.
+///
+/// # Arguments
+///
+/// * `git` — repository whose reader and object format are used.
+/// * `oid` — hexadecimal object identity of the tree to read.
+/// * `missing` — error kind used when the object is absent.
+/// * `wrong` — error kind used when the object is not a tree.
 pub(super) fn tree_get_by_oid(
     git: &GitRepository,
     oid: &str,
@@ -148,6 +190,7 @@ pub(super) fn tree_get_by_oid(
     tree_bytes_validate(&bytes, git.oid_len)?;
     Ok(bytes)
 }
+
 fn tree_entry_get_by_name(
     git: &GitRepository,
     mut bytes: &[u8],
@@ -175,6 +218,7 @@ fn tree_entry_get_by_name(
         MISSING_SNAPSHOT_PATH,
     ))
 }
+
 impl<'a> Directory<'a> {
     fn entry_insert_by_path(&mut self, path: &'a str, oid: BlobOid) {
         match path.split_once('/') {
@@ -188,6 +232,7 @@ impl<'a> Directory<'a> {
             }
         }
     }
+
     fn tree_write(&self, git: &GitRepository) -> Result<TreeOid, SnapshotError> {
         // Git compares directory names with a virtual '/' terminator.
         let mut entries = BTreeMap::new();
@@ -217,6 +262,7 @@ impl<'a> Directory<'a> {
         })
     }
 }
+
 fn object_write(git: &GitRepository, kind: Kind, bytes: &[u8]) -> Result<String, SnapshotError> {
     let object = StagedObject::new_with_cleanup(&git.repo, kind, bytes, &git.cleanup)?;
     let oid = object.object_get_oid().to_string();

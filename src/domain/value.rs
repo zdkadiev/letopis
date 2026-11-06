@@ -1,5 +1,8 @@
 use std::fmt;
 
+pub(crate) const SHA1_OID_HEX_LEN: usize = 40;
+pub(crate) const SHA256_OID_HEX_LEN: usize = 64;
+
 /// A violation of an identity or graph value's local invariants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueError {
@@ -20,6 +23,7 @@ pub enum ValueError {
     /// An edge from an element to itself.
     SelfLoop,
 }
+
 impl fmt::Display for ValueError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
@@ -34,6 +38,7 @@ impl fmt::Display for ValueError {
         })
     }
 }
+
 impl std::error::Error for ValueError {}
 
 /// A half-open byte range. Its caller verifies bounds against the input file.
@@ -42,8 +47,14 @@ pub struct ByteSpan {
     start: usize,
     end: usize,
 }
+
 impl ByteSpan {
-    /// Reject reversed ranges; empty ranges are allowed.
+    /// Creates a byte range, rejecting reversed ranges; empty ranges are allowed.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` — the first included byte offset.
+    /// * `end` — the first excluded byte offset.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidRange`] when `start > end`.
@@ -53,11 +64,13 @@ impl ByteSpan {
         }
         Ok(Self { start, end })
     }
-    /// First included byte offset.
+
+    /// Returns the first included byte offset.
     pub fn get_start(&self) -> usize {
         self.start
     }
-    /// First excluded byte offset.
+
+    /// Returns the first excluded byte offset.
     pub fn get_end(&self) -> usize {
         self.end
     }
@@ -69,8 +82,14 @@ pub struct LineRange {
     start: u64,
     end: u64,
 }
+
 impl LineRange {
-    /// Reject line zero and reversed ranges.
+    /// Creates a line range, rejecting line zero and reversed ranges.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` — the first included one-based line number.
+    /// * `end` — the last included one-based line number.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidRange`] when `start` is zero or greater
@@ -81,24 +100,28 @@ impl LineRange {
         }
         Ok(Self { start, end })
     }
-    /// First included line.
+
+    /// Returns the first included line.
     pub fn get_start(&self) -> u64 {
         self.start
     }
-    /// Last included line.
+
+    /// Returns the last included line.
     pub fn get_end(&self) -> u64 {
         self.end
     }
 }
 
-pub(crate) const SHA1_OID_HEX_LEN: usize = 40;
-pub(crate) const SHA256_OID_HEX_LEN: usize = 64;
-
 /// A full SHA-1 or SHA-256 Git tree OID; existence/type require a Git adapter.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TreeOid(String);
+
 impl TreeOid {
-    /// Accept exactly 40 or 64 lowercase hexadecimal characters.
+    /// Parses exactly 40 or 64 lowercase hexadecimal characters.
+    ///
+    /// # Arguments
+    ///
+    /// * `raw` — the candidate full tree OID text.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidOid`] for any other length or for a
@@ -107,7 +130,8 @@ impl TreeOid {
         validate_oid(raw)?;
         Ok(Self(raw.into()))
     }
-    /// The unmodified full OID.
+
+    /// Returns the unmodified full OID.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -116,8 +140,13 @@ impl TreeOid {
 /// A full SHA-1 or SHA-256 Git blob OID; adapters verify existence and type.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BlobOid(String);
+
 impl BlobOid {
-    /// Accept exactly 40 or 64 lowercase hexadecimal characters.
+    /// Parses exactly 40 or 64 lowercase hexadecimal characters.
+    ///
+    /// # Arguments
+    ///
+    /// * `raw` — the candidate full blob OID text.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidOid`] for noncanonical input. Existence is not checked.
@@ -125,11 +154,13 @@ impl BlobOid {
         validate_oid(raw)?;
         Ok(Self(raw.into()))
     }
-    /// The unmodified full object identity.
+
+    /// Returns the unmodified full object identity.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
+
 fn validate_oid(raw: &str) -> Result<(), ValueError> {
     if ![SHA1_OID_HEX_LEN, SHA256_OID_HEX_LEN].contains(&raw.len())
         || !raw

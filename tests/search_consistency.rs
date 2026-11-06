@@ -273,7 +273,7 @@ fn inference_failure_releases_read_before_subsequent_reset_and_publication() {
             .unwrap()
             .refresh(&[])
             .unwrap()
-            .published
+            .is_published
     );
     assert_can_checkpoint(&repo);
 }
@@ -357,7 +357,7 @@ fn corrupt_declared_root_releases_read_before_inference_and_allows_new_publicati
             .unwrap()
             .refresh(&[])
             .unwrap()
-            .published
+            .is_published
     );
     assert_can_checkpoint(&repo);
 }

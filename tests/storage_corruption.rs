@@ -188,7 +188,7 @@ fn seed_vector(cache: &Path, vectors: &Path) -> (Sha256, Sha256) {
                 .replace_text(&KnowledgeId::parse(NODE_ID).unwrap(), NODE_TEXT)
                 .unwrap();
 
-            cache_write.get_publication_revision()
+            cache_write.project_get_revision()
         })
         .map_err(TransactionError::into_inner);
     assert_eq!(cache_write_result.unwrap(), 1);

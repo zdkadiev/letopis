@@ -13,6 +13,8 @@ use std::{collections::BTreeSet, ffi::OsString, io::Read, num::NonZeroUsize};
 
 const INVALID_COMMAND_INPUT_MESSAGE: &str = "invalid command input";
 
+const FOREGROUND_COMMANDS: [&str; 4] = ["search", "traverse", "inspect", "check"];
+
 /// Typed command input after transport validation.
 #[derive(Debug)]
 pub(crate) enum Request {
@@ -28,6 +30,7 @@ pub(crate) enum Request {
     /// Plain-text help or version output, produced before any input is read.
     Help(String),
 }
+
 /// Mode selected by explicit index argv flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum IndexMode {
@@ -43,7 +46,66 @@ pub(crate) struct IndexRequest {
     pub(crate) paths: Vec<RepoPath>,
 }
 
-/// Recognize only supported index argv forms before reading stdin.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CheckInput {
+    #[serde(default)]
+    paths: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InspectInput {
+    element_ids: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SearchInput {
+    query: String,
+    limit: u64,
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
+    filters: Option<SearchFiltersInput>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SearchFiltersInput {
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
+    needs_recheck: Option<bool>,
+    #[serde(default)]
+    sources: Vec<String>,
+    #[serde(default)]
+    source_revisions: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TraversalInput {
+    element_ids: Vec<String>,
+    mode: String,
+    direction: String,
+    depth: u64,
+    limit: u64,
+    #[serde(default)]
+    edge_types: Vec<String>,
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
+    edge_limit: Option<u64>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EmptyInput {}
+
+/// Returns the index mode for the exact supported `index` arguments.
+///
+/// Only the exact `index`, `--verify` and `--full` combinations match; every
+/// other form returns `None`. Does not read stdin.
+///
+/// # Arguments
+///
+/// * `args` — the full argv slice; only the exact `index`, `--verify` and
+///   `--full` combinations are recognized.
 pub(crate) fn get_index_mode_by_args(args: &[OsString]) -> Option<IndexMode> {
     let args = args
         .iter()
@@ -59,60 +121,39 @@ pub(crate) fn get_index_mode_by_args(args: &[OsString]) -> Option<IndexMode> {
     }
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct CheckInput {
-    #[serde(default)]
-    paths: Vec<String>,
+/// Returns whether the arguments select a command that must handle `SIGINT`.
+///
+/// # Arguments
+///
+/// * `args` — process arguments excluding the executable name.
+pub(crate) fn is_cancellation_handler_required(args: &[OsString]) -> bool {
+    if get_index_mode_by_args(args).is_some() {
+        return true;
+    }
+    match args {
+        [command] => command
+            .to_str()
+            .is_some_and(|command| FOREGROUND_COMMANDS.contains(&command)),
+        _ => false,
+    }
 }
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct InspectInput {
-    element_ids: Vec<String>,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SearchInput {
-    query: String,
-    limit: u64,
-    #[serde(default, deserialize_with = "non_null_option_deserialize")]
-    filters: Option<SearchFiltersInput>,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SearchFiltersInput {
-    #[serde(default, deserialize_with = "non_null_option_deserialize")]
-    needs_recheck: Option<bool>,
-    #[serde(default)]
-    sources: Vec<String>,
-    #[serde(default)]
-    source_revisions: Vec<String>,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct TraversalInput {
-    element_ids: Vec<String>,
-    mode: String,
-    direction: String,
-    depth: u64,
-    limit: u64,
-    #[serde(default)]
-    edge_types: Vec<String>,
-    #[serde(default, deserialize_with = "non_null_option_deserialize")]
-    edge_limit: Option<u64>,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct EmptyInput {}
 
-/// Parse one command request after validating argv and before any service is used.
+/// Parses one command request from the arguments and the input before any service is used.
 ///
 /// Help and version requests return their text without reading input. Other
-/// requests consume input to EOF, treating whitespace-only input as an empty object.
+/// requests read input to EOF and treat whitespace-only input as an empty object.
+///
+/// # Arguments
+///
+/// * `args` — the full argv slice; it selects the command and decides whether
+///   help or an index mode applies.
+/// * `input` — the request body source; read to EOF unless help or version
+///   returns before any input is read.
 ///
 /// # Errors
-/// Returns a redacted invalid-request error for unsupported argv, invalid JSON,
-/// invalid field values or input I/O failure.
+/// Returns an invalid-request error for unsupported argv, invalid JSON,
+/// invalid field values or input I/O failure, with no request values in the
+/// message.
 pub(crate) fn request_parse(args: &[OsString], input: impl Read) -> CommandResult<Request> {
     if let Some(text) = help_get_by_args(args) {
         return Ok(Request::Help(text));

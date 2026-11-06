@@ -70,7 +70,7 @@ impl ReadingRepo {
                 storage
                     .cache
                     .with_read_tx(|| {
-                        Ok::<_, StorageError>(storage.cache.nodes_get_by_id(
+                        Ok::<_, StorageError>(storage.cache.nodes_get_by_uri(
                             &EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()),
                         ))
                     })

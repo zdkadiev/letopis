@@ -30,7 +30,7 @@ fn cursor_orders_shared_hashes_and_excludes_sources_and_stored_hashes() {
             unit.nodes_upsert_by_id(&support::build_source("file://source.txt", None, 7))
                 .unwrap();
 
-            unit.get_publication_revision()
+            unit.project_get_revision()
         })
         .unwrap();
     store(&storage, &identity, "stored", 3);
@@ -138,7 +138,7 @@ fn work_and_dimensions_use_the_pinned_identity_and_membership() {
             assert_eq!(
                 unwrap_current(
                     pinned
-                        .nodes_get_by_kind_and_search_hash_and_attempts_and_id(&m1, 4, None)
+                        .nodes_get_by_kind_and_search_hash_and_attempts_and_uri(&m1, 4, None)
                         .unwrap()
                 )
                 .unwrap()
@@ -155,7 +155,7 @@ fn work_and_dimensions_use_the_pinned_identity_and_membership() {
                     let fresh = &second.cache;
                     assert!(matches!(
                         fresh
-                            .nodes_get_by_kind_and_search_hash_and_attempts_and_id(&m1, 4, None)
+                            .nodes_get_by_kind_and_search_hash_and_attempts_and_uri(&m1, 4, None)
                             .unwrap(),
                         VectorOutcome::ConfigChanged
                     ));
@@ -472,7 +472,7 @@ fn deleting_one_shared_representative_retains_the_shared_vector() {
             unit.delete_node(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
                 .unwrap();
 
-            unit.get_publication_revision()
+            unit.project_get_revision()
         })
         .unwrap();
     // When: one representative is deleted and cleanup runs.
@@ -586,7 +586,7 @@ fn invalid_attempt_budgets_are_rejected_without_changing_storage() {
             for budget in [0, u64::MAX] {
                 // When: the next embedding work is requested.
                 let error = read
-                    .nodes_get_by_kind_and_search_hash_and_attempts_and_id(&identity, budget, None)
+                    .nodes_get_by_kind_and_search_hash_and_attempts_and_uri(&identity, budget, None)
                     .unwrap_err();
                 // Then: storage rejects the budget without mutation.
                 assert_eq!(error.get_kind(), StorageErrorKind::InvalidRequest);
@@ -666,7 +666,7 @@ fn publish<C: CacheDatabase, V: VectorDatabase>(
                     .unwrap();
             }
 
-            unit.get_publication_revision()
+            unit.project_get_revision()
         })
         .map_err(TransactionError::into_inner);
     unit_result.unwrap()
@@ -708,7 +708,7 @@ fn get_next_work<C: CacheDatabase, V: VectorDatabase>(
                 Ok::<_, StorageError>(
                     storage
                         .cache
-                        .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                        .nodes_get_by_kind_and_search_hash_and_attempts_and_uri(
                             identity, budget, after,
                         ),
                 )

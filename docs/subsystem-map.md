@@ -44,20 +44,20 @@ flowchart TD
 | --- | --- | --- |
 | `domain` | Знания, адреса, hash/identity, чистые правила и данные графа | `KnowledgeId`, `RepoPath`, `Sha256`, `TreeOid`, `Graph` |
 | `service` | Refresh, команды, graph/provenance, embedding orchestration | `DocumentRefreshService`, `CheckService`, `InspectionService`, `SearchService`, `TraversalService`, `StatusService`, `EmbeddingService`, `BackgroundRunnerService` |
-| `git` | Repository/worktree/index/ignore, raw пути, objects/trees/refs | `GitRepository`: `GitWorktreePaths`, `GitSnapshots`, `SnapshotVerifier`; локальная gix, без Git subprocess |
+| `git` | Repository/worktree/index/ignore, raw пути, objects/trees/refs | `GitRepository`: `GitWorktreeListing`, `GitSnapshots`, `SnapshotVerifier`; локальная gix, без Git subprocess |
 | `filesystem` | Generic files/directories/paths/bytes/identities/symlinks/locks | Один `LocalFileSystem`: `FileReader`, `FileWriter`, `FileLocker`; guards владеют реальными ресурсами |
 | `markdown` | Чистый X-4 разбор в знания, рёбра и текстовые/hash projections | `MarkdownParser`: `MarkdownCodec::file_parse` |
 | `storage` | SQL/schema/connections, согласованные reads и атомарные writes | Независимые `CacheStorage`/`CacheDatabase` и `VectorStorage`/`VectorDatabase` |
-| `embedding` | Provider/model/vector/HTTP протоколы | Один `HttpProviders`: `EmbeddingProvider`, два независимых HTTP pools; `ollama.rs`/`openai.rs` — private protocol functions |
+| `embedding` | Provider/model/vector/HTTP протоколы | Один `HttpProviders`: `EmbeddingProvider`, два независимых HTTP pools; private protocol functions, транспорт и общая валидация в `provider.rs` |
 | `process` | Generic process launch, stdin, signals, clock | `DetachedProcess`: `ProcessLauncher`; `ProcessInput`, `SigintListener`, `SystemClock` |
 | `cli` | Аргументы/JSON, help, typed results, foreground completion и вывод | `Request`, `CommandResponse`, `finish_foreground` |
 
-Операции инфраструктуры используют имена entity–action–filter из контекста компонента, например `worktree_paths_get`, `tree_retain_by_oid`, `file_get_by_path`, `file_parse`, `process_spawn`. Application use cases сохраняют имена по ответственности. Полные правила и исключения — в [AGENTS.md](../AGENTS.md).
+Операции инфраструктуры используют имена entity–action–filter из контекста компонента, например `worktree_paths_get_by_ignore_mode_and_patterns`, `tree_retain_by_oid`, `file_get_by_path`, `file_parse`, `process_spawn`. Application use cases сохраняют имена по ответственности. Полные правила и исключения — в [AGENTS.md](../AGENTS.md).
 
 ## Контракты и владельцы правил
 
 - `Refresher`: `refresh`, `refresh_verified`, `reindex` у `DocumentRefreshService`. `Checker`, `Inspector`, `Searcher`, `Traverser`, `StatusReader`, `ConfigReader`, `Initializer` имеют реализации своих сценариев.
-- `GitWorktreePaths::worktree_paths_get` возвращает NUL-delimited raw indexed и non-ignored untracked paths, включая удалённые tracked. Application `CandidateSelection` в `service/utils.rs` выбирает Markdown/private-root policy для refresh и inspect. Git не интерпретирует Markdown и document errors.
+- `GitWorktreeListing::worktree_paths_get_by_ignore_mode_and_patterns` возвращает NUL-delimited raw indexed и non-ignored untracked paths, включая удалённые tracked. Application `CandidateSelection` в `service/utils.rs` выбирает Markdown/private-root policy для refresh и inspect. Git не интерпретирует Markdown и document errors.
 - `FileReader`/`FileWriter`/`FileLocker` дают generic file operations и typed `FileError`. Имена `config.json`, `cache.db`, `vectors.db` и coordination paths выбирают потребители/composition. Файловая система сохраняет confinement, no-follow, identity/replacement и alias checks; SQLite connections, schemas и attachments принадлежат storage.
 - `GitSnapshots`: `tree_create`, `blob_write`, `tree_assemble`, `blob_get_by_tree_oid_and_path`. `tree_retain_by_oid` проверяет root/ref без полного обхода; `tree_pin_by_oid` каждый раз проверяет полную closure. `.git` защищает Git; composition передаёт generic excluded roots для `.letopis`, в том числе прямому `open_git_snapshots` API.
 - `CacheDatabase`/`VectorDatabase`: zero-argument `with_read_tx`/`with_write_tx`; cache также имеет `with_status_read_tx`. Операции используют внедрённого владельца. Same-instance nested scopes присоединяются, только outer scope завершает transaction; caught nested error/failed write делает его rollback-only. Разные owners и две базы не образуют общей transaction. Provider HTTP остаётся вне service-owned write scopes.
@@ -80,8 +80,8 @@ flowchart TD
 | Вход, маршрутизация и JSON | `src/main.rs`, `src/commands.rs`, `src/cli/` |
 | Интерфейсы и service data/errors | `src/service/mod.rs`, `src/service/types.rs`, `src/service/error.rs` |
 | Refresh и projection | `src/service/document_refresher.rs`, включая inline projection/basis helpers |
-| Raw Git paths / application selection | `src/git/worktree.rs`, `src/service/utils.rs` |
-| Generic file/path checks / database opening policy | `src/filesystem/file.rs`, `path.rs`, `resolve.rs`, `local.rs`; `src/lib.rs` |
+| Raw Git paths / application selection | `src/git/repository.rs`, `src/service/utils.rs` |
+| Generic file/path checks / database opening policy | `src/filesystem/local.rs`; `src/lib.rs` |
 | Check / inspect / search / traverse / status | `src/service/check.rs`, `inspection.rs`, `search.rs`, `traversal.rs`, `status.rs` |
 | Embedding и drain | `src/service/embedding.rs`, `src/service/background_runner.rs`, `src/embedding/`, `src/process/` |
 | SQL/schema/connections/transactions | `src/storage/cache.sql`, `vectors.sql`, `connection.rs`, `cache.rs`, `vector.rs`, `transaction.rs` |

@@ -300,3 +300,14 @@ planning questions. The user subsequently accepted the failure policy on
   targets and doc-tests also passed. Ignored real-provider/corpus acceptance and
   historical harnesses were not independently rerun. This is a baseline, not
   evidence that issue #97 is implemented.
+
+## Accepted follow-up: production module layout
+
+On 2026-11-06, after PR #98 was opened, the user required inline `mod name { ... }`
+blocks to contain tests only. This supersedes the earlier inline production-helper
+convention. Production modules use separate files; helpers of a single service
+remain ordinary private items in its owning file, preserving the flat service
+layout. The existing `basis`, `projection`, `ranking`, `comparisons` and
+`observations` production modules are flattened accordingly. Test namespaces and
+selectors remain intact. This changes organization and private visibility only;
+the discovery behavior and component boundaries above remain the accepted design.

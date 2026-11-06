@@ -6,10 +6,12 @@ use crate::{
 use sha1_checked::Sha1;
 use sha2::{Digest, Sha256};
 
+/// Incremental hasher for the repository's configured object format.
 pub(super) enum ObjectHasher {
     Sha1(Box<Sha1>),
     Sha256(Sha256),
 }
+
 impl ObjectHasher {
     pub(super) fn new(oid_len: usize, kind: &str, size: u64) -> Result<Self, SnapshotError> {
         let mut hash = match oid_len {
@@ -25,12 +27,14 @@ impl ObjectHasher {
         hash.update(format!("{kind} {size}\0").as_bytes());
         Ok(hash)
     }
+
     pub(super) fn update(&mut self, bytes: &[u8]) {
         match self {
             Self::Sha1(hash) => hash.update(bytes),
             Self::Sha256(hash) => hash.update(bytes),
         }
     }
+
     pub(super) fn finish(self) -> Result<String, SnapshotError> {
         match self {
             Self::Sha1(hash) => {
@@ -49,17 +53,5 @@ impl ObjectHasher {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{ObjectHasher, Sha1};
-    use sha2::Digest;
-    #[test]
-    fn rejects_sha1_collision() {
-        // Given: the upstream unprefixed SHA-mbles collision block.
-        let mut raw = Sha1::new();
-        raw.update(include_bytes!("../../tests/fixtures/git/sha-mbles-1.bin"));
-        // When: the existing hasher finalizes the detected collision.
-        let result = ObjectHasher::Sha1(Box::new(raw)).finish();
-        // Then: collision detection propagates as an integrity error.
-        assert!(result.is_err());
-    }
-}
+#[path = "hashing_test.rs"]
+mod tests;

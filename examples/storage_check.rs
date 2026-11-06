@@ -71,7 +71,7 @@ fn publish_nodes(cache: &impl CacheDatabase) -> Result<(), Box<dyn Error>> {
             };
             cache.replace_text(&metadata.id, TEXT)?;
         }
-        cache.get_publication_revision()
+        cache.project_get_revision()
     })?;
     assert_eq!(revision, 1);
     Ok(())

@@ -464,3 +464,13 @@ Task 2 supplies legacy defaults only until Task 3 wires policy observations.
 This plan preserves the already completed baseline (`cargo test --locked
 --offline`, exit 0) as baseline evidence only. The completed task checkboxes now record execution;
 plan preparation itself did not implement the feature or run tests.
+
+## PR follow-up: production module layout
+
+The user's 2026-11-06 review instruction permits inline modules only for tests.
+Flatten the five production helper modules into their owning service files,
+make their implementation details private, preserve test selectors, and update
+the canonical guidance. Verify the complete source tree has no production inline
+modules, compare the library test inventories and production function bodies,
+run `make verify`, obtain a focused independent review, and update PR #98.
+The follow-up results are recorded in the issue's verification report.

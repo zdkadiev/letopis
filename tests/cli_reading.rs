@@ -431,7 +431,7 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
         assert!(
             wire_embedding_executor(repo.get_root())
                 .unwrap()
-                .has_work()
+                .is_work_available()
                 .unwrap()
         );
         let files = open_filesystem(repo.get_root()).unwrap();
@@ -456,7 +456,7 @@ fn nested_read_commands_honor_root_lock_and_ignore_poisoned_child_service_path()
         assert!(
             wire_embedding_executor(repo.get_root())
                 .unwrap()
-                .has_work()
+                .is_work_available()
                 .unwrap()
         );
     }
@@ -500,7 +500,7 @@ fn nested_search_and_inspect_launch_the_existing_drain_only_at_repository_root()
         assert!(
             !wire_embedding_executor(repo.get_root())
                 .unwrap()
-                .has_work()
+                .is_work_available()
                 .unwrap()
         );
     }

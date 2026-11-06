@@ -124,7 +124,7 @@ fn reject_ambiguous_sources_before_fresh_cache_publication_and_allow_repair() {
         // When / Then: the repaired file publishes without rebuilding the cache.
         assert_eq!(run_check(&repo), json!({"ok":true,"result":{"errors":[]}}));
         let mut refresher = wire_document_refresher(repo.get_root()).unwrap();
-        assert!(!refresher.refresh(&[]).unwrap().published);
+        assert!(!refresher.refresh(&[]).unwrap().is_published);
         let (nodes, edges, matches) = get_repaired_projection(&repo);
         assert_eq!(nodes, 1);
         assert_eq!(edges, 0);

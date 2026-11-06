@@ -15,10 +15,15 @@ pub struct LocalSource {
 }
 
 impl SourceUri {
-    /// Normalize local components or preserve an HTTP/HTTPS address verbatim.
+    /// Parses a source address, normalizing local components and preserving remote addresses.
     ///
-    /// Remote fragments are opaque, even when they resemble local line ranges.
+    /// Remote fragments are kept as written, even when they resemble local line ranges.
     /// This operation performs no I/O or URL equivalence normalization.
+    ///
+    /// # Arguments
+    ///
+    /// * `raw` — the source address, either a local path with optional line range or an
+    ///   HTTP/HTTPS address.
     ///
     /// # Errors
     /// Returns [`ValueError::InvalidPath`] for invalid local paths or remote
@@ -29,7 +34,7 @@ impl SourceUri {
     /// Returns [`ValueError::InvalidRange`] for
     /// malformed, zero, reversed or overflowing local line ranges.
     pub fn parse(raw: &str) -> Result<Self, ValueError> {
-        if has_remote_scheme(raw) {
+        if is_remote_scheme(raw) {
             validate_remote_address(raw)?;
             return Ok(Self {
                 address: raw.into(),
@@ -37,7 +42,7 @@ impl SourceUri {
             });
         }
         let local = LocalSource::parse(raw)?;
-        if has_remote_scheme(local.path.as_str()) {
+        if is_remote_scheme(local.path.as_str()) {
             return Err(ValueError::InvalidPath);
         }
         let mut address = local.path.as_str().to_owned();
@@ -50,34 +55,38 @@ impl SourceUri {
         })
     }
 
-    /// Return the canonical address, which is also the source identity.
+    /// Returns the canonical address, which is also the source identity.
     pub fn as_str(&self) -> &str {
         &self.address
     }
 
-    /// Return validated local components, or `None` for opaque remote addresses.
+    /// Returns validated local components, or `None` for remote addresses.
     pub fn get_local(&self) -> Option<&LocalSource> {
         self.local.as_ref()
     }
 }
 
 impl LocalSource {
-    /// Return the normalized root-relative source path.
+    /// Returns the normalized root-relative source path.
     pub fn get_path(&self) -> &RepoPath {
         &self.path
     }
 
-    /// Return the inclusive line range, or `None` for the whole file.
+    /// Returns the inclusive line range, or `None` for the whole file.
     pub fn get_lines(&self) -> Option<LineRange> {
         self.lines
     }
 
-    /// Select all bytes or the complete addressed line range without decoding.
+    /// Returns all bytes or the complete addressed line range without decoding.
     ///
     /// LF terminates a line and remains in its bytes; CR is preserved. An
     /// unterminated final line counts, but a trailing LF adds no empty line.
     /// Whole empty files return `Some`, while empty or incomplete line ranges
     /// return `None`. The returned slice borrows only the supplied bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` — the complete file contents from which the selected slice is taken.
     pub fn select_bytes<'a>(&self, bytes: &'a [u8]) -> Option<&'a [u8]> {
         let Some(lines) = self.lines else {
             return Some(bytes);
@@ -107,7 +116,7 @@ impl LocalSource {
     }
 }
 
-fn has_remote_scheme(raw: &str) -> bool {
+fn is_remote_scheme(raw: &str) -> bool {
     raw.split_once(':').is_some_and(|(scheme, _)| {
         scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
     })

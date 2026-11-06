@@ -222,7 +222,7 @@ fn identity_reset_during_product_http_discards_the_late_result() {
         next.get_configuration().unwrap(),
         ConfigState::Ready(_)
     ));
-    assert!(EmbeddingExecutor::has_work(&mut next).unwrap());
+    assert!(EmbeddingExecutor::is_work_available(&mut next).unwrap());
     barrier.release();
     assert_success(&child.collect_output(WAIT));
     // Then old work did not publish into the new identity; a fresh drain can finish.

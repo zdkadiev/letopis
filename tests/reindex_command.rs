@@ -166,7 +166,7 @@ fn reindex_reuses_vectors_without_waiting_for_held_embed_lock() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let node = StorageRead::nodes_get_by_id(
+            let node = StorageRead::nodes_get_by_uri(
                 read,
                 &EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()),
             )
@@ -229,7 +229,7 @@ fn reindex_reuses_vectors_and_only_requests_the_missing_hash() {
         .with_read_tx(|| {
             let read = &storage.cache;
             for (id, vector) in [("a.md", vec![1., 0., 0.]), ("b.md", vec![0., 1., 0.])] {
-                let node = StorageRead::nodes_get_by_id(
+                let node = StorageRead::nodes_get_by_uri(
                     read,
                     &EdgeTarget::Knowledge(KnowledgeId::parse(id).unwrap()),
                 )
@@ -269,7 +269,7 @@ fn reindex_preserves_author_basis_bytes_head_and_index() {
         .cache
         .with_read_tx(|| {
             let read = &storage.cache;
-            let node = StorageRead::nodes_get_by_id(
+            let node = StorageRead::nodes_get_by_uri(
                 read,
                 &EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()),
             )

@@ -32,6 +32,9 @@ const RESPECT_GITIGNORE: &str = "respect_gitignore";
 const SECTION_FIELDS: [&str; 5] = ["enabled", "provider", "model", "parameters", "max_retries"];
 const LEGACY_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retries"];
 
+/// Complete generated configuration written by initialization.
+pub(crate) const GENERATED_CONFIG: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  },\n  \"discovery\": {\n    \"respect_gitignore\": true\n  }\n}\n";
+
 /// Transaction contexts in which a use case may begin.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransactionRequirement {
@@ -40,9 +43,6 @@ pub enum TransactionRequirement {
     /// Permit an inherited read, while rejecting an inherited write.
     ReadOnly,
 }
-
-/// Complete generated configuration written by initialization.
-pub(crate) const GENERATED_CONFIG: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  },\n  \"discovery\": {\n    \"respect_gitignore\": true\n  }\n}\n";
 
 /// Searchable knowledge metadata; document text is never retained here.
 ///
@@ -145,7 +145,7 @@ pub struct StoredVectorKey {
     /// Row identifier of the vector key.
     pub row_id: i64,
     /// Whether this unit created the key rather than finding an existing one.
-    pub inserted: bool,
+    pub is_inserted: bool,
 }
 
 /// A native cosine match joined to a currently published knowledge element.
@@ -211,7 +211,9 @@ pub struct FileStat {
 }
 
 impl FileStat {
-    /// Return the stable identity without mutable content observations.
+    /// Returns the file identity.
+    ///
+    /// Size and modification time are not part of the identity.
     pub fn get_identity(&self) -> FileIdentity {
         FileIdentity {
             device: self.device,
@@ -237,7 +239,7 @@ pub struct RefreshOutcome {
     /// Publication revision visible when this refresh returns.
     pub revision: u64,
     /// Whether this call committed a publication.
-    pub published: bool,
+    pub is_published: bool,
     /// Selected file observations, including every existing candidate for a full reindex.
     pub files_updated: usize,
     /// Previously stored candidates removed by this publication.
@@ -307,10 +309,17 @@ impl fmt::Debug for QueryEmbeddingRequest<'_> {
 pub struct ElementAddress(String);
 
 impl ElementAddress {
-    /// Normalize local knowledge/source addresses or preserve opaque absolute HTTP/HTTPS spelling.
+    /// Parses one element address.
+    ///
+    /// Absolute HTTP/HTTPS URLs keep their spelling; local knowledge and source addresses are
+    /// normalized.
+    ///
+    /// # Arguments
+    ///
+    /// * `raw` — Address text to normalize or keep as an absolute HTTP/HTTPS URL.
     ///
     /// # Errors
-    /// Returns invalid request for malformed absolute URLs or invalid local knowledge/source addresses.
+    /// Reports an invalid request for malformed absolute URLs or invalid local addresses.
     pub fn parse(raw: &str) -> CommandResult<Self> {
         let absolute_http = raw.split_once("://").is_some_and(|(scheme, _)| {
             scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
@@ -332,7 +341,10 @@ impl ElementAddress {
         })?;
         Ok(Self(normalized))
     }
-    /// Return the normalized selector, preserving case and Unicode.
+
+    /// Returns the normalized address.
+    ///
+    /// Case and Unicode are preserved.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -431,7 +443,9 @@ pub enum ElementLocation {
 }
 
 impl ElementLocation {
-    /// Return the normalized local path or verbatim remote URL.
+    /// Returns the local path or remote URL.
+    ///
+    /// A remote URL is returned verbatim.
     pub fn as_str(&self) -> &str {
         match self {
             Self::Local(path) => path.as_str(),
@@ -502,11 +516,18 @@ pub enum NeighborDirection {
 pub struct GraphNodeKey(i64);
 
 impl GraphNodeKey {
-    /// Wrap a backend node handle for its originating read view.
-    pub fn new(value: i64) -> Self {
-        Self(value)
+    /// Creates a node key for one read view.
+    ///
+    /// # Arguments
+    ///
+    /// * `handle` — Backend node handle valid only in its read view.
+    pub fn new(handle: i64) -> Self {
+        Self(handle)
     }
-    /// Return the backend handle without extending its read-view lifetime.
+
+    /// Returns the backend node handle.
+    ///
+    /// The handle stays tied to the key's read view.
     pub fn get_value(self) -> i64 {
         self.0
     }
@@ -676,8 +697,12 @@ pub struct SearchFilters {
 }
 
 impl SearchFilters {
-    /// Return whether the observed flags satisfy the recheck restriction.
-    pub(crate) fn matches_flags(&self, flags: &BTreeSet<SearchFlag>) -> bool {
+    /// Returns whether the observed flags satisfy the recheck restriction.
+    ///
+    /// # Arguments
+    ///
+    /// * `flags` — Freshness flags to test against the restriction.
+    pub(crate) fn is_matched_by_flags(&self, flags: &BTreeSet<SearchFlag>) -> bool {
         match self.needs_recheck {
             RecheckFilter::Any => true,
             RecheckFilter::Required => !flags.is_empty(),
@@ -696,7 +721,8 @@ impl RetainedTree {
     pub(crate) fn new(oid: TreeOid) -> Self {
         Self { oid }
     }
-    /// The exact retained tree OID.
+
+    /// Returns the retained tree OID.
     pub fn get_oid(&self) -> &TreeOid {
         &self.oid
     }
@@ -750,7 +776,7 @@ enum EmbeddingState {
 pub enum GitIgnoreMode {
     /// Honor repository, per-directory and global Git exclusion sources.
     Standard,
-    /// Enumerate untracked paths without consulting standard exclusion sources.
+    /// Return untracked paths without consulting standard exclusion sources.
     Disabled,
 }
 
@@ -761,12 +787,17 @@ pub struct DiscoveryConfig {
 }
 
 impl Configuration {
-    /// Parse and validate both supported configuration sections.
+    /// Parses the supported configuration sections.
     ///
-    /// Configured embedding identity excludes discovery, enabled and the root wrapper.
+    /// The embedding identity excludes discovery, enabled and the root wrapper.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` — Complete configuration document bytes.
     ///
     /// # Errors
-    /// Rejects malformed/duplicate JSON, unknown fields, invalid sections and legacy flat documents.
+    /// Rejects malformed or duplicate JSON, unknown fields, invalid sections and legacy flat
+    /// documents.
     pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
         let root = parse_config_root(bytes)?;
         let section = root
@@ -778,12 +809,14 @@ impl Configuration {
         })
     }
 
-    /// Return whether configured embedding execution is enabled.
-    pub fn get_enabled(&self) -> bool {
+    /// Returns whether embedding execution is enabled.
+    pub fn is_enabled(&self) -> bool {
         matches!(self.embedding_model, EmbeddingState::Enabled(_))
     }
 
-    /// Return the configured retry count, including unconfigured settings.
+    /// Returns the configured retry count.
+    ///
+    /// Unconfigured settings return their retry count too.
     pub fn get_max_retries(&self) -> u64 {
         match &self.embedding_model {
             EmbeddingState::Unconfigured { max_retries } => *max_retries,
@@ -793,7 +826,7 @@ impl Configuration {
         }
     }
 
-    /// Return retained provider settings, including disabled configurations.
+    /// Returns the provider settings, including disabled configurations.
     pub fn get_embedding_config(&self) -> Option<&EmbeddingConfig> {
         match &self.embedding_model {
             EmbeddingState::Unconfigured { .. } => None,
@@ -801,12 +834,12 @@ impl Configuration {
         }
     }
 
-    /// Return the effective discovery policy.
+    /// Returns the discovery configuration.
     pub fn get_discovery(&self) -> DiscoveryConfig {
         self.discovery
     }
 
-    /// Consume the configuration and return retained provider settings, if configured.
+    /// Returns the provider settings, if configured.
     pub fn into_embedding_config(self) -> Option<EmbeddingConfig> {
         match self.embedding_model {
             EmbeddingState::Unconfigured { .. } => None,
@@ -816,16 +849,22 @@ impl Configuration {
 }
 
 impl DiscoveryConfig {
-    /// Parse discovery without requiring valid embedding settings.
+    /// Parses the discovery configuration.
+    ///
+    /// Embedding settings are not required.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` — Complete configuration document bytes.
     ///
     /// # Errors
-    /// Rejects malformed/duplicate JSON, unknown root/discovery fields and invalid discovery types.
+    /// Rejects malformed or duplicate JSON, unknown fields and invalid discovery values.
     pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
         parse_discovery_section(&parse_config_root(bytes)?)
     }
 
-    /// Return whether standard Git exclusion sources constrain untracked paths.
-    pub fn get_respect_gitignore(&self) -> bool {
+    /// Returns whether standard Git ignores constrain untracked paths.
+    pub fn is_gitignore_respected(&self) -> bool {
         self.respect_gitignore
     }
 }
@@ -839,8 +878,9 @@ impl Default for DiscoveryConfig {
 }
 
 fn parse_config_root(bytes: &[u8]) -> EmbeddingResult<Map<String, Value>> {
-    let JsonValue(value) =
-        serde_json::from_slice::<JsonValue<true>>(bytes).map_err(map_config_error)?;
+    let JsonValue(value) = serde_json::from_slice::<JsonValue<true>>(bytes).map_err(|error| {
+        EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, error)
+    })?;
     let Value::Object(root) = value else {
         return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     };
@@ -923,8 +963,8 @@ pub struct SnapshotEntry {
     pub oid: BlobOid,
 }
 
-fn parse_section(value: &Value) -> EmbeddingResult<EmbeddingState> {
-    let section = value
+fn parse_section(settings: &Value) -> EmbeddingResult<EmbeddingState> {
+    let section = settings
         .as_object()
         .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     if section.len() != SECTION_FIELDS.len()
@@ -934,7 +974,7 @@ fn parse_section(value: &Value) -> EmbeddingResult<EmbeddingState> {
     {
         return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
-    let enabled = section
+    let is_enabled = section
         .get("enabled")
         .and_then(Value::as_bool)
         .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
@@ -950,9 +990,9 @@ fn parse_section(value: &Value) -> EmbeddingResult<EmbeddingState> {
         .and_then(Value::as_object)
         .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
     match (provider, model) {
-        (None, None) => parse_unconfigured(enabled, parameters, max_retries),
+        (None, None) => parse_unconfigured(is_enabled, parameters, max_retries),
         (Some(provider), Some(model)) => {
-            parse_configured(enabled, provider, model, parameters, max_retries)
+            parse_configured(is_enabled, provider, model, parameters, max_retries)
         }
         _ => Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)),
     }
@@ -970,18 +1010,18 @@ fn get_optional_string<'a>(
 }
 
 fn parse_unconfigured(
-    enabled: bool,
+    is_enabled: bool,
     parameters: &Map<String, Value>,
     max_retries: u64,
 ) -> EmbeddingResult<EmbeddingState> {
-    if enabled || !parameters.is_empty() {
+    if is_enabled || !parameters.is_empty() {
         return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     Ok(EmbeddingState::Unconfigured { max_retries })
 }
 
 fn parse_configured(
-    enabled: bool,
+    is_enabled: bool,
     provider: &str,
     model: &str,
     parameters: &Map<String, Value>,
@@ -993,9 +1033,11 @@ fn parse_configured(
         ("parameters".into(), Value::Object(parameters.clone())),
         ("max_retries".into(), Value::from(max_retries)),
     ]));
-    let bytes = serde_json::to_vec(&projection).map_err(map_config_error)?;
+    let bytes = serde_json::to_vec(&projection).map_err(|error| {
+        EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, error)
+    })?;
     let config = EmbeddingConfig::parse(&bytes)?;
-    Ok(if enabled {
+    Ok(if is_enabled {
         EmbeddingState::Enabled(config)
     } else {
         EmbeddingState::Disabled(config)
@@ -1011,17 +1053,24 @@ fn validate_retries(retries: u64) -> EmbeddingResult<()> {
 }
 
 impl EmbeddingConfig {
-    /// Parse the internal four-field configured-settings projection and compute
-    /// its RFC 8785 identity. This is not a config-file reader; use
+    /// Parses the configured-settings projection.
+    ///
+    /// The identity is computed from the canonical JSON. This is not a config-file reader; use
     /// [`Configuration::parse`](super::Configuration::parse) for
     /// `.letopis/config.json`. Endpoint syntax is checked by the provider boundary.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` — Configured-settings projection bytes in JSON.
     ///
     /// # Errors
     /// Rejects malformed shapes, forbidden keys, invalid parameters, unsupported
     /// dimensions and budgets not exactly preserved by JCS or storage integers.
     pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
         let JsonValue(value) =
-            serde_json::from_slice::<JsonValue<true>>(bytes).map_err(map_config_error)?;
+            serde_json::from_slice::<JsonValue<true>>(bytes).map_err(|error| {
+                EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, error)
+            })?;
         let root = value
             .as_object()
             .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
@@ -1054,7 +1103,9 @@ impl EmbeddingConfig {
             .checked_add(1)
             .filter(|count| i64::try_from(*count).is_ok())
             .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
-        let canonical = serde_json_canonicalizer::to_vec(&value).map_err(map_config_error)?;
+        let canonical = serde_json_canonicalizer::to_vec(&value).map_err(|error| {
+            EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, error)
+        })?;
         verify_execution_identity(&value, &canonical)?;
         Ok(Self {
             provider,
@@ -1065,27 +1116,33 @@ impl EmbeddingConfig {
             dimensions,
         })
     }
-    /// Return the selected protocol.
+
+    /// Returns the provider protocol.
     pub fn get_provider(&self) -> ProviderKind {
         self.provider
     }
-    /// Return the configured model name.
+
+    /// Returns the configured model name.
     pub fn get_model(&self) -> &str {
         &self.model
     }
-    /// Return allowed configuration values, including preserved unknown parameters.
+
+    /// Returns the configuration parameters, including unknown ones.
     pub fn get_parameters(&self) -> &Map<String, Value> {
         &self.parameters
     }
-    /// Return the hash of the complete canonical configuration.
+
+    /// Returns the hash of the canonical configuration.
     pub fn get_identity(&self) -> Sha256 {
         self.identity
     }
-    /// Return the checked total attempt budget, including the initial attempt.
+
+    /// Returns the total attempt budget, including the initial attempt.
     pub fn get_max_attempts(&self) -> u64 {
         self.max_attempts
     }
-    /// Return explicitly requested native dimensions.
+
+    /// Returns the requested vector dimensions.
     pub fn get_dimensions(&self) -> Option<NonZeroUsize> {
         self.dimensions
     }
@@ -1131,14 +1188,16 @@ fn get_dimensions(parameters: &Map<String, Value>) -> EmbeddingResult<Option<Non
 
 fn verify_execution_identity(original: &Value, bytes: &[u8]) -> EmbeddingResult<()> {
     let JsonValue(canonical) =
-        serde_json::from_slice::<JsonValue<false>>(bytes).map_err(map_config_error)?;
-    if !has_exact_integers(original, &canonical) {
+        serde_json::from_slice::<JsonValue<false>>(bytes).map_err(|error| {
+            EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, error)
+        })?;
+    if !is_exact_integers(original, &canonical) {
         return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
     Ok(())
 }
 
-fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
+fn is_exact_integers(original: &Value, canonical: &Value) -> bool {
     match original {
         Value::Number(number) if number.is_u64() => number.as_u64() == canonical.as_u64(),
         Value::Number(number) if number.is_i64() => number.as_i64() == canonical.as_i64(),
@@ -1147,509 +1206,19 @@ fn has_exact_integers(original: &Value, canonical: &Value) -> bool {
                 && values
                     .iter()
                     .zip(other)
-                    .all(|(a, b)| has_exact_integers(a, b))
+                    .all(|(a, b)| is_exact_integers(a, b))
         }),
         Value::Object(values) => canonical.as_object().is_some_and(|other| {
             values.iter().all(|(key, value)| {
                 other
                     .get(key)
-                    .is_some_and(|other| has_exact_integers(value, other))
+                    .is_some_and(|other| is_exact_integers(value, other))
             })
         }),
         _ => true,
     }
 }
 
-fn map_config_error(cause: impl std::error::Error + Send + Sync + 'static) -> EmbeddingError {
-    EmbeddingError::new_with_cause(EmbeddingErrorKind::InvalidConfig, cause)
-}
-
 #[cfg(test)]
-mod model_tests {
-    use super::{EmbeddingConfig, QueryEmbeddingRequest};
-    use std::num::NonZeroUsize;
-
-    #[test]
-    fn query_request_debug_omits_text_and_provider_parameters() {
-        // Given: each private field has an independent recognizable sentinel.
-        let config = EmbeddingConfig::parse(
-            br#"{"provider":"ollama","model":"PRIVATE_MODEL","parameters":{"base_url":"http://PRIVATE_ENDPOINT"},"max_retries":0}"#,
-        )
-        .unwrap();
-        let request = QueryEmbeddingRequest {
-            text: "PRIVATE_QUERY",
-            config: &config,
-            dimensions: NonZeroUsize::new(2),
-        };
-        // When
-        let diagnostic = format!("{request:?}");
-        // Then
-        for private in ["PRIVATE_QUERY", "PRIVATE_MODEL", "PRIVATE_ENDPOINT"] {
-            assert!(!diagnostic.contains(private));
-        }
-        assert!(diagnostic.starts_with("QueryEmbeddingRequest {"));
-        assert!(diagnostic.contains("dimensions: Some(2)"));
-    }
-}
-
-#[cfg(test)]
-mod command_tests {
-    use super::{CommandError, CommandErrorKind, ElementAddress};
-    use std::error::Error;
-
-    #[test]
-    fn preserve_local_anchor_and_range_normalization() {
-        // Given
-        for (raw, expected) in [
-            ("./x.md", "x.md"),
-            ("a/../x.md#A", "x.md#A"),
-            ("./source#L01-L02", "source#L1-L2"),
-            ("résumé.MD", "résumé.MD"),
-            ("x.md#Lfoo-Lbar", "x.md#Lfoo-Lbar"),
-        ] {
-            // When / Then
-            assert_eq!(ElementAddress::parse(raw).unwrap().as_str(), expected);
-        }
-        for raw in [
-            "",
-            "/x",
-            "../x",
-            "x#L0-L1",
-            "x#L2-L1",
-            "x.md#",
-            "x#anchor",
-            "x#L1-L18446744073709551616",
-            "x\u{0}",
-        ] {
-            // When / Then
-            assert_eq!(
-                ElementAddress::parse(raw).unwrap_err().get_kind(),
-                CommandErrorKind::InvalidRequest
-            );
-        }
-    }
-
-    #[test]
-    fn preserve_opaque_http_addresses() {
-        // Given
-        for raw in [
-            "https://Host/a?q=1#L0-L2",
-            "HTTP://Host/a#Anchor",
-            "https://Host",
-            "https://Host/a.md",
-            "HtTp://Host/a.markdown#A",
-        ] {
-            // When / Then
-            assert_eq!(ElementAddress::parse(raw).unwrap().as_str(), raw);
-        }
-    }
-
-    #[test]
-    fn round_trip_http_prefix_knowledge_addresses() {
-        // Given
-        for (raw, expected) in [
-            ("http:notes.md", "http:notes.md"),
-            ("./http:notes.md#A", "http:notes.md#A"),
-            ("dir/../HTTP:notes.markdown#A", "HTTP:notes.markdown#A"),
-            ("https:/Host/a.md", "https:/Host/a.md"),
-        ] {
-            // When
-            let parsed = ElementAddress::parse(raw).unwrap();
-            // Then
-            assert_eq!(parsed.as_str(), expected);
-            assert_eq!(ElementAddress::parse(expected).unwrap(), parsed);
-        }
-    }
-
-    #[test]
-    fn reject_malformed_absolute_urls_and_source_http_fallbacks() {
-        // Given
-        for raw in [
-            "http:notes",
-            "https:/Host/a",
-            "HTTP:///a",
-            "HTTP:///a.md",
-            "https://?q=a.md",
-            "http://#A.md",
-            "https://",
-            "./https:notes",
-            "a/../HTTP:notes",
-            "https://Host/a b",
-        ] {
-            // When / Then
-            assert!(ElementAddress::parse(raw).is_err(), "{raw}");
-        }
-    }
-
-    #[test]
-    fn retain_error_cause_without_exposing_it_in_diagnostics() {
-        // Given / When
-        let error = CommandError::new_with_cause(
-            CommandErrorKind::InternalError,
-            "safe failure",
-            std::io::Error::other("SECRET_SENTINEL"),
-        );
-        // Then
-        assert_eq!(error.get_message(), "safe failure");
-        assert!(
-            error
-                .source()
-                .unwrap()
-                .to_string()
-                .contains("SECRET_SENTINEL")
-        );
-        assert_eq!(error.to_string(), "safe failure");
-        let debug = format!("{error:?}");
-        assert!(debug.contains(error.get_message()));
-        assert!(!debug.contains("SECRET_SENTINEL"));
-    }
-}
-
-#[cfg(test)]
-mod search_filters_tests {
-    use super::{RecheckFilter, SearchFilters};
-    use crate::service::SearchFlag;
-    use std::collections::BTreeSet;
-
-    #[test]
-    fn default_filters_impose_no_restrictions() {
-        // Given
-        let filters = SearchFilters::default();
-        let observations = [
-            BTreeSet::new(),
-            BTreeSet::from([SearchFlag::Stale]),
-            BTreeSet::from([SearchFlag::SourceChanged]),
-            BTreeSet::from([SearchFlag::SourceNotFound]),
-        ];
-        // When / Then
-        assert_eq!(filters.needs_recheck, RecheckFilter::Any);
-        assert!(filters.sources.is_empty());
-        assert!(filters.source_revisions.is_empty());
-        for flags in observations {
-            assert!(filters.matches_flags(&flags), "{flags:?}");
-        }
-    }
-
-    #[test]
-    fn required_recheck_matches_each_current_flag_and_rejects_no_flags() {
-        // Given
-        let filters = SearchFilters {
-            needs_recheck: RecheckFilter::Required,
-            ..SearchFilters::default()
-        };
-        let cases = [
-            (BTreeSet::new(), false),
-            (BTreeSet::from([SearchFlag::Stale]), true),
-            (BTreeSet::from([SearchFlag::SourceChanged]), true),
-            (BTreeSet::from([SearchFlag::SourceNotFound]), true),
-        ];
-        // When / Then
-        for (flags, expected) in cases {
-            assert_eq!(filters.matches_flags(&flags), expected, "{flags:?}");
-        }
-    }
-
-    #[test]
-    fn not_required_recheck_matches_no_flags_and_rejects_each_current_flag() {
-        // Given
-        let filters = SearchFilters {
-            needs_recheck: RecheckFilter::NotRequired,
-            ..SearchFilters::default()
-        };
-        let cases = [
-            (BTreeSet::new(), true),
-            (BTreeSet::from([SearchFlag::Stale]), false),
-            (BTreeSet::from([SearchFlag::SourceChanged]), false),
-            (BTreeSet::from([SearchFlag::SourceNotFound]), false),
-        ];
-        // When / Then
-        for (flags, expected) in cases {
-            assert_eq!(filters.matches_flags(&flags), expected, "{flags:?}");
-        }
-    }
-}
-
-#[cfg(test)]
-mod embedding_config_tests {
-    use super::EmbeddingConfig;
-    use crate::utils::JsonValue;
-
-    #[test]
-    fn bounds_raw_token_traversal_before_canonicalization() {
-        // Given
-        let nested = format!("{}0{}", "[".repeat(130), "]".repeat(130));
-        // When
-        let result = serde_json::from_str::<JsonValue<true>>(&nested);
-        // Then
-        assert!(result.is_err());
-    }
-    #[test]
-    fn rejects_trailing_json_after_configuration() {
-        // Given
-        let bytes = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":0} null"#;
-        // When
-        let result = EmbeddingConfig::parse(bytes);
-        // Then
-        assert!(result.is_err());
-    }
-}
-
-#[cfg(test)]
-mod discovery_configuration_tests {
-    use super::{Configuration, DiscoveryConfig};
-
-    #[test]
-    fn discovery_defaults_preserve_embedding_identity() {
-        // Given: fixed provider settings and three discovery representations.
-        for discovery in [
-            "",
-            ",\"discovery\":{}",
-            ",\"discovery\":{\"respect_gitignore\":false}",
-        ] {
-            let bytes = format!(
-                r#"{{"embedding_model":{{"enabled":true,"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://127.0.0.1:9/api"}},"max_retries":2}}{discovery}}}"#
-            );
-            // When: the complete configuration is parsed.
-            let configuration = Configuration::parse(bytes.as_bytes()).unwrap();
-            // Then: only the independently specified embedding projection controls identity.
-            assert_eq!(
-                configuration
-                    .get_embedding_config()
-                    .unwrap()
-                    .get_identity()
-                    .to_hex(),
-                "c713040f35c46c21c7389aa69b25910ad51fb1ce6ceb26b378513ea5dec8748b"
-            );
-            assert_eq!(
-                configuration.get_discovery().get_respect_gitignore(),
-                !discovery.contains("false")
-            );
-        }
-        assert!(DiscoveryConfig::default().get_respect_gitignore());
-    }
-
-    #[test]
-    fn discovery_projection_ignores_invalid_embedding_settings() {
-        // Given: valid discovery objects alongside absent or invalid embedding settings.
-        for bytes in [br#"{"discovery":{"respect_gitignore":false}}"#.as_slice(),
-            br#"{"embedding_model":null,"discovery":{"respect_gitignore":false}}"#,
-            br#"{"embedding_model":{"provider":"unsupported"},"discovery":{"respect_gitignore":false}}"#] {
-            // When: discovery and complete validation are requested separately.
-            let discovery = DiscoveryConfig::parse(bytes).unwrap();
-            let complete = Configuration::parse(bytes);
-            // Then: FTS can select its corpus without accepting invalid embedding settings.
-            assert!(!discovery.get_respect_gitignore());
-            assert!(complete.is_err());
-        }
-    }
-
-    #[test]
-    fn discovery_rejects_ambiguous_or_invalid_input() {
-        // Given: ambiguous roots, wrong types and unknown fields.
-        for bytes in [
-            "null",
-            "[]",
-            "{invalid}",
-            r#"{"future":true}"#,
-            r#"{"discovery":null}"#,
-            r#"{"discovery":[]}"#,
-            r#"{"discovery":{"respect_gitignore":"false"}}"#,
-            r#"{"discovery":{"respect_gitignore":0}}"#,
-            r#"{"discovery":{"future":false}}"#,
-            r#"{"discovery":{},"discovery":{}}"#,
-            r#"{"discovery":{"respect_gitignore":true,"respect_gitignore":false}}"#,
-        ] {
-            // When: the independent discovery projection is parsed.
-            let result = DiscoveryConfig::parse(bytes.as_bytes());
-            // Then: invalid input never silently chooses a wider corpus.
-            assert!(result.is_err(), "{bytes}");
-        }
-    }
-}
-
-#[cfg(test)]
-mod configuration_value_tests {
-    use crate::service::{CapturedFile, FileIdentity, FileReader, FileResult, FileStat};
-
-    use super::{Configuration, GENERATED_CONFIG};
-    use crate::{
-        domain::Sha256,
-        service::configuration::ConfigurationService,
-        service::{
-            ConfigReader, EmbeddingConfig, EmbeddingError, EmbeddingErrorKind, EmbeddingProvider,
-            EmbeddingResult,
-        },
-    };
-    use serde::Deserialize;
-    use std::num::NonZeroUsize;
-
-    const CORPUS: &str = include_str!("../../tests/fixtures/config/corpus.json");
-    const ENABLED: &[u8] = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9/api"},"max_retries":2}}"#;
-    const DISABLED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9/api"},"max_retries":2}}"#;
-
-    #[derive(Deserialize)]
-    struct Corpus {
-        cases: Vec<Case>,
-    }
-    #[derive(Deserialize)]
-    struct Case {
-        name: String,
-        raw: String,
-        parse_valid: bool,
-        validate_valid: bool,
-    }
-    struct Provider;
-    struct Files {
-        config: Vec<u8>,
-    }
-
-    #[test]
-    fn parses_generated_defaults_and_preserves_retry_setting() {
-        // Given / When: the exact generated default configuration is parsed.
-        let configuration = Configuration::parse(GENERATED_CONFIG).unwrap();
-
-        // Then: embeddings remain unconfigured and the retry default is preserved.
-        assert!(!configuration.get_enabled());
-        assert!(configuration.get_embedding_config().is_none());
-        assert_eq!(configuration.get_max_retries(), 0);
-    }
-
-    #[test]
-    fn identity_excludes_enabled_and_the_root_wrapper() {
-        // Given: the same configured projection under both execution states.
-        let enabled = Configuration::parse(ENABLED).unwrap();
-        let disabled = Configuration::parse(DISABLED).unwrap();
-        let expected = Sha256::digest(
-            br#"{"max_retries":2,"model":"fixture","parameters":{"base_url":"http://127.0.0.1:9/api"},"provider":"ollama"}"#,
-        );
-
-        // When / Then: only the four configured settings participate.
-        assert_eq!(
-            enabled.get_embedding_config().unwrap().get_identity(),
-            expected
-        );
-        assert_eq!(
-            disabled.get_embedding_config().unwrap().get_identity(),
-            expected
-        );
-        assert!(enabled.get_enabled());
-        assert!(!disabled.get_enabled());
-    }
-
-    #[test]
-    fn reports_legacy_flat_document_for_migration() {
-        // Given
-        let raw = br#"{"provider":"ollama","model":"fixture","parameters":{"base_url":"http://localhost/api"},"max_retries":0}"#;
-
-        // When
-        let error = Configuration::parse(raw).unwrap_err();
-
-        // Then
-        assert_eq!(error.get_kind(), EmbeddingErrorKind::MigrationRequired);
-    }
-
-    #[test]
-    fn shared_corpus_agrees_with_local_parse_and_validation() {
-        // Given: the same corpus the schema checker consumes.
-        let corpus: Corpus = serde_json::from_str(CORPUS).unwrap();
-
-        for case in corpus.cases {
-            // Given: a corpus document exposed through the configuration service.
-            let files = Files {
-                config: case.raw.as_bytes().to_vec(),
-            };
-            let service = ConfigurationService {
-                files: &files,
-                provider: &Provider,
-            };
-
-            // When: structural parsing inspects the document.
-            let parsed = Configuration::parse(case.raw.as_bytes());
-
-            // Then: parsing agrees with the independently recorded corpus result.
-            assert_eq!(parsed.is_ok(), case.parse_valid, "{}", case.name);
-            if parsed.is_ok() {
-                // When: the service also validates retained provider settings.
-                let validated = service.get_config();
-
-                // Then: validation agrees with the recorded corpus result.
-                assert_eq!(validated.is_ok(), case.validate_valid, "{}", case.name);
-            }
-        }
-    }
-
-    impl FileReader for Files {
-        fn symlink_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
-            Ok(false)
-        }
-        fn file_get_by_path(&self, _: &std::path::Path) -> FileResult<Option<CapturedFile>> {
-            panic!("unexpected file_get_by_path")
-        }
-        fn file_get_bytes_by_path(&self, path: &std::path::Path) -> FileResult<Option<Vec<u8>>> {
-            assert_eq!(path, std::path::Path::new(".letopis/config.json"));
-            Ok(Some(self.config.clone()))
-        }
-        fn file_get_stat_by_path(&self, _: &std::path::Path) -> FileResult<Option<FileStat>> {
-            panic!("unexpected file_get_stat_by_path")
-        }
-        fn file_get_identity_by_path(
-            &self,
-            _: &std::path::Path,
-        ) -> FileResult<Option<FileIdentity>> {
-            panic!("unexpected file_get_identity_by_path")
-        }
-        fn file_is_exist(&self, _: &std::path::Path) -> FileResult<bool> {
-            panic!("unexpected file_is_exist")
-        }
-        fn file_verify_identity_by_path(
-            &self,
-            _: &std::path::Path,
-            _: Option<FileIdentity>,
-        ) -> FileResult<()> {
-            panic!("unexpected file_verify_identity_by_path")
-        }
-        fn file_verify_distinct_by_paths(
-            &self,
-            _: &std::path::Path,
-            _: &std::path::Path,
-        ) -> FileResult<()> {
-            panic!("unexpected file_verify_distinct_by_paths")
-        }
-        fn directory_get_by_path(
-            &self,
-            _: &std::path::Path,
-        ) -> FileResult<Option<std::os::fd::OwnedFd>> {
-            Ok(None)
-        }
-        fn lock_get_owner_by_path(
-            &self,
-            _: &std::path::Path,
-        ) -> FileResult<Option<std::num::NonZeroU32>> {
-            Ok(None)
-        }
-    }
-
-    impl EmbeddingProvider for Provider {
-        fn config_validate(&self, config: &EmbeddingConfig) -> EmbeddingResult<()> {
-            let url = config
-                .get_parameters()
-                .get("base_url")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default();
-            if url.starts_with("http://") || url.starts_with("https://") {
-                Ok(())
-            } else {
-                Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
-            }
-        }
-
-        fn vectors_compute_by_texts(
-            &self,
-            _: &EmbeddingConfig,
-            _: &[&str],
-            _: Option<NonZeroUsize>,
-        ) -> EmbeddingResult<Vec<Vec<f32>>> {
-            Err(EmbeddingError::new(EmbeddingErrorKind::Input))
-        }
-    }
-}
+#[path = "types_test.rs"]
+mod tests;

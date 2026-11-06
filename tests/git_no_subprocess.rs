@@ -276,7 +276,7 @@ fn nonempty_direct_drain_uses_owned_local_provider_without_git_helpers() {
         .with_read_tx(|| {
             let read = &storage.cache;
             let work = read
-                .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                .nodes_get_by_kind_and_search_hash_and_attempts_and_uri(
                     &config.get_identity(),
                     config.get_max_attempts(),
                     None,
@@ -284,7 +284,7 @@ fn nonempty_direct_drain_uses_owned_local_provider_without_git_helpers() {
                 .unwrap();
             assert_eq!(work, VectorOutcome::Current(None));
             let id = EdgeTarget::Knowledge(KnowledgeId::parse("note.md").unwrap());
-            let node = StorageRead::nodes_get_by_id(read, &id).unwrap().unwrap();
+            let node = StorageRead::nodes_get_by_uri(read, &id).unwrap().unwrap();
             let NodeMetadata::Knowledge(node) = node.metadata else {
                 panic!("knowledge node")
             };

@@ -127,7 +127,7 @@ impl Fixture {
                 })
                 .unwrap();
 
-                unit.get_publication_revision()
+                unit.project_get_revision()
             })
             .unwrap();
         element.search_hash
@@ -311,7 +311,7 @@ fn discovery_only_changes_preserve_embedding_state() {
         .unwrap();
         raw["discovery"] = serde_json::json!({"respect_gitignore":respect_gitignore});
         repo.write(".letopis/config.json", &serde_json::to_vec(&raw).unwrap());
-        assert!(!refresher.refresh(&[]).unwrap().published);
+        assert!(!refresher.refresh(&[]).unwrap().is_published);
         let mut embedder = letopis::wire_embedding_executor(repo.get_root()).unwrap();
         assert!(matches!(
             embedder.get_configuration().unwrap(),
@@ -768,7 +768,7 @@ fn edit_during_compute_stores_captured_hash_and_keeps_new_hash_pending() {
                         Ok::<_, StorageError>(
                             scope_databases
                                 .cache
-                                .nodes_get_by_kind_and_search_hash_and_attempts_and_id(
+                                .nodes_get_by_kind_and_search_hash_and_attempts_and_uri(
                                     &config.get_identity(),
                                     1,
                                     None,
@@ -957,7 +957,7 @@ fn cleanup_retains_skipped_and_exhausted_references_and_removes_orphans() {
     assert!(
         storage
             .cache
-            .with_read_tx(|| StorageRead::nodes_get_by_id(&storage.cache, &id))
+            .with_read_tx(|| StorageRead::nodes_get_by_uri(&storage.cache, &id))
             .unwrap()
             .is_some()
     );
@@ -1286,7 +1286,7 @@ fn seed_discovery_embedding_state(repo: &ReadingRepo, config: &EmbeddingConfig) 
         .with_read_tx(|| {
             storage
                 .cache
-                .nodes_get_by_id(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
+                .nodes_get_by_uri(&EdgeTarget::Knowledge(KnowledgeId::parse("a.md").unwrap()))
         })
         .unwrap()
         .unwrap();

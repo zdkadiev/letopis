@@ -22,4 +22,14 @@ including preserving the real `invalid_embedding_config` wire reason.
 The reviewer ran `git diff --check` on the reviewed range and inspected recorded
 host/Linux and mutation evidence without repeating broad accepted suites. No
 source, index, HEAD or branch state was changed by the review. No fix pass was
-needed. Remaining edits after the reviewed commit only record completion.
+needed. Edits through `9757061` after the reviewed commit only record completion.
+
+## Production inline-module follow-up
+
+A fresh read-only reviewer compared the subsequent refactor against
+`97570614c45383fd230496ade26a5c44cae9f801`: three Rust service files and three
+current guidance files. Assessment: **no findings**. Flattening the five modules
+preserves behavior, narrows helper visibility appropriately, retains test
+selectors and keeps helpers with their owning services. Remaining inline modules
+are test-only. Imports, physical layout, reading order and guidance are consistent.
+The reviewer ran `git diff --check`; the implementer ran the full `make verify`.

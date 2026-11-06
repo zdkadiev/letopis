@@ -4,15 +4,6 @@ use std::ffi::OsString;
 const HELP_FLAG: &str = "--help";
 const VERSION_FLAG: &str = "--version";
 
-/// Help for one public command. `example` is the bare JSON request body.
-#[derive(Debug)]
-pub(super) struct CommandHelp {
-    pub(super) name: &'static str,
-    pub(super) summary: &'static str,
-    pub(super) details: &'static str,
-    pub(super) example: &'static str,
-}
-
 /// Public commands in display order; `embed --drain` is internal and absent.
 pub(super) const COMMANDS: [CommandHelp; 8] = [
     CommandHelp {
@@ -185,11 +176,26 @@ Examples:
   letopis traverse --help
 "#;
 
-/// Return the text for `--help`, `--version` or `<command> --help`.
+/// Help for one public command. `example` is the bare JSON request body.
+#[derive(Debug)]
+pub(super) struct CommandHelp {
+    pub(super) name: &'static str,
+    pub(super) summary: &'static str,
+    pub(super) details: &'static str,
+    pub(super) example: &'static str,
+}
+
+/// Returns the plain-text help or version for the exact `--help`, `--version`
+/// and `<command> --help` arguments.
 ///
-/// Only these exact argv forms match, so every other invocation, including
-/// non-UTF-8 arguments, keeps its existing request handling. Pure: reads no
+/// Only these exact forms match; every other invocation, including non-UTF-8
+/// arguments, returns `None` and keeps its existing request handling. Reads no
 /// input and touches no repository or service.
+///
+/// # Arguments
+///
+/// * `args` — the full argv slice; only the exact `--help`, `--version` and
+///   `<command> --help` forms are recognized.
 pub(crate) fn help_get_by_args(args: &[OsString]) -> Option<String> {
     let args = args
         .iter()

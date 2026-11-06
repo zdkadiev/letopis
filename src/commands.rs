@@ -86,7 +86,11 @@ fn run_status(directory: &Path) -> CommandResult<CommandResponse> {
     Ok(CommandResponse::new(ResponseResult::Status(report)))
 }
 
-/// Observe the current configuration through non-creating files without background work.
+/// Reads the current configuration without creating files or starting background work.
+///
+/// # Arguments
+///
+/// * `directory` — path where the command was invoked; discovery walks to its work tree.
 fn run_config(directory: &Path) -> CommandResult<CommandResponse> {
     let config = with_configuration_service(directory, |configuration| configuration.get_config())?;
     Ok(CommandResponse::new(ResponseResult::Config(config)))
@@ -240,100 +244,5 @@ fn map_service_error(error: ServiceError) -> CommandError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::map_service_error;
-    use crate::service::{CommandErrorKind, ServiceError, ServiceErrorKind};
-    use std::{error::Error, io};
-
-    #[test]
-    fn maps_each_service_kind_and_keeps_causes_private() {
-        // Given: every service setup kind with one private cause sentinel.
-        // When / Then: public classification/message is stable and the cause stays private.
-        for (service_kind, command_kind, message) in SERVICE_MAPPINGS {
-            let error = ServiceError::new_with_cause(
-                service_kind,
-                io::Error::other("PRIVATE_SERVICE_CAUSE"),
-            );
-            let mapped = map_service_error(error);
-            assert_eq!(mapped.get_kind(), command_kind, "{service_kind:?}");
-            assert_eq!(mapped.get_message(), message, "{service_kind:?}");
-            assert!(!format!("{mapped:?}").contains("PRIVATE_SERVICE_CAUSE"));
-            let source = mapped.source().unwrap();
-            let service = source.downcast_ref::<ServiceError>().unwrap();
-            assert!(
-                service
-                    .source()
-                    .unwrap()
-                    .to_string()
-                    .contains("PRIVATE_SERVICE_CAUSE")
-            );
-        }
-    }
-
-    const SERVICE_MAPPINGS: [(ServiceErrorKind, CommandErrorKind, &str); 12] = [
-        (
-            ServiceErrorKind::RepositoryRequired,
-            CommandErrorKind::InvalidRequest,
-            "Git repository required",
-        ),
-        (
-            ServiceErrorKind::Repository,
-            CommandErrorKind::InternalError,
-            "cannot locate repository",
-        ),
-        (
-            ServiceErrorKind::Initialization,
-            CommandErrorKind::InternalError,
-            "cannot initialize repository",
-        ),
-        (
-            ServiceErrorKind::Check,
-            CommandErrorKind::InternalError,
-            "cannot open check service",
-        ),
-        (
-            ServiceErrorKind::Search,
-            CommandErrorKind::InternalError,
-            "cannot open search service",
-        ),
-        (
-            ServiceErrorKind::Traversal,
-            CommandErrorKind::InternalError,
-            "cannot prepare traversal",
-        ),
-        (
-            ServiceErrorKind::Inspection,
-            CommandErrorKind::InternalError,
-            "cannot open inspection service",
-        ),
-        (
-            ServiceErrorKind::Status,
-            CommandErrorKind::InternalError,
-            "cannot open status service",
-        ),
-        (
-            ServiceErrorKind::Configuration,
-            CommandErrorKind::InternalError,
-            "cannot read embedding configuration",
-        ),
-        (
-            ServiceErrorKind::Embedding,
-            CommandErrorKind::InternalError,
-            "cannot open embedding service",
-        ),
-        (
-            ServiceErrorKind::Background,
-            CommandErrorKind::InternalError,
-            "cannot open background root",
-        ),
-        (
-            ServiceErrorKind::Reindex,
-            CommandErrorKind::InternalError,
-            "cannot open corpus reindex service",
-        ),
-    ];
-}
-
-#[cfg(test)]
-#[path = "commands/construction_tests.rs"]
-mod construction_tests;
+#[path = "commands_test.rs"]
+mod tests;
