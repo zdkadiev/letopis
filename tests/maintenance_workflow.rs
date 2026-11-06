@@ -58,8 +58,10 @@ fn maintenance_roundtrip_preserves_knowledge_and_source_basis() {
     // When / Then: normal refresh, search, traversal and mixed inspection share one snapshot.
     assert_reading_workflow(&workflow);
 
-    // When / Then: invalid configuration fails safely while FTS stays available.
+    // When / Then: invalid embedding settings retain FTS with valid discovery.
     assert_invalid_configuration(&workflow);
+    // When / Then: malformed discovery stops refresh while preserving the publication.
+    assert_malformed_discovery_preserves_publication(&workflow);
 
     // When / Then: restoring the file fixes observation and the next refresh succeeds.
     assert_repaired_configuration(&workflow, &provider.get_base_url());
@@ -170,7 +172,7 @@ fn configure_and_publish(workflow: &Workflow, endpoint: &str) {
             "model":"fixture",
             "parameters":{"base_url":endpoint},
             "max_retries":0
-        }})
+        },"discovery":{"respect_gitignore":true}})
     );
     let status = workflow.invoke_command("status", b"{}", 0);
     assert_eq!(status["result"]["revision"], Value::Null);
@@ -273,7 +275,10 @@ fn assert_mixed_inspection(workflow: &Workflow) {
 fn assert_invalid_configuration(workflow: &Workflow) {
     workflow.repo.write(
         ".letopis/config.json",
-        format!("{CONFIG_CANARY} not json").as_bytes(),
+        serde_json::to_vec(&json!({"embedding_model":CONFIG_CANARY,
+            "discovery":{"respect_gitignore":true}}))
+        .unwrap()
+        .as_slice(),
     );
     let error = workflow.invoke_command("config", b"{}", 1);
     assert_eq!(
@@ -292,6 +297,26 @@ fn assert_invalid_configuration(workflow: &Workflow) {
     );
     assert!(contains_link(&searched, DECISION_ID), "{searched}");
     assert!(!searched.to_string().contains(CONFIG_CANARY));
+}
+
+fn assert_malformed_discovery_preserves_publication(workflow: &Workflow) {
+    // Given: already published knowledge and an invalid root JSON document.
+    workflow.repo.write(
+        ".letopis/config.json",
+        format!("{CONFIG_CANARY} not json").as_bytes(),
+    );
+    // When: the actual search command reaches discovery before query inference.
+    let response = workflow.invoke_command(
+        "search",
+        format!(r#"{{"query":"{CACHE_TOKEN}","limit":5}}"#).as_bytes(),
+        1,
+    );
+    // Then: safe failure leaves the prior publication observable and discloses no config.
+    assert_eq!(response["error"]["code"], "invalid_request");
+    assert!(!response.to_string().contains(CONFIG_CANARY));
+    let status = workflow.invoke_command("status", b"{}", 0);
+    assert_eq!(status["result"]["revision"], 1);
+    assert_problem_reason(&status, "invalid_embedding_config", true);
 }
 
 fn assert_repaired_configuration(workflow: &Workflow, endpoint: &str) {

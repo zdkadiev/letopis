@@ -401,19 +401,19 @@ and the approved spec's implementation status without rewriting historical proof
 **Interfaces:** The final public config/schema, Git and refresher interfaces
 from Tasks 1–4. No new product mechanism is introduced by this acceptance task.
 
-- [ ] **Step 1: Update current contracts and usage.** Explain true/false source
+- [x] **Step 1: Update current contracts and usage.** Explain true/false source
   scope, tracked filtering, root-relative examples, parent negation, effective
   defaults, absent-ignore init and failure behavior. Update D-97/D-104 with dated
   clarifications and consistent architecture/mechanics ownership. Preserve
   historical decisions and captured examples in proof harnesses. Use the Letopis
   skill for any affected marked knowledge/source_snapshot updates; do not simply
   change an OID without checking its addressed source bytes.
-- [ ] **Step 2: Self-review architecture and requirement coverage.** Inspect
+- [x] **Step 2: Self-review architecture and requirement coverage.** Inspect
   physical files, visibility/import direction, trait implementations, private
   helper ownership, actual lib.rs constructor wiring and full config-versus-
   embedding identity separation. Trace every spec matrix row to an exact test
   name or receipt. Resolve gaps before the broad run.
-- [ ] **Step 3: Create a fresh evidence directory and run host acceptance.**
+- [x] **Step 3: Create a fresh evidence directory and run host acceptance.**
   Inventory changed source hashes, tool versions, base/HEAD/diff, case names and
   commands. Run `make fmt`, then `git diff --check`, then `make verify` with its
   full stdout/stderr captured. Require final exit 0 and `ok`; never infer success
@@ -421,7 +421,7 @@ from Tasks 1–4. No new product mechanism is introduced by this acceptance task
   Run schema agreement with the prepared interpreter and affected Markdown link
   checks. Record ignored helpers/real-provider/corpus tests accurately. Do not
   rerun make verify on an unchanged tree just to get another identical receipt.
-- [ ] **Step 4: Run focused Linux evidence using available Docker.** Build the
+- [x] **Step 4: Run focused Linux evidence using available Docker.** Build the
   existing `tests/git/Dockerfile` from this changed source as a task-specific
   local image. Record image ID, architecture and Git/Rust versions. Run current
   Rust targets offline with a mounted fresh receipt directory:

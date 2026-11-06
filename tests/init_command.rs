@@ -61,13 +61,13 @@ fn init_creates_exact_private_configuration_and_usable_schemas() {
 
 #[test]
 fn init_from_subdirectory_targets_the_git_root_only() {
-    // Given
+    // Given: an uninitialized repository with a nested invocation directory.
     let repo = ReadingRepo::new();
 
-    // When
+    // When: init runs from the nested directory.
     let output = repo.invoke_in(repo.get_subdir(), &["init"], b"");
 
-    // Then
+    // Then: generated defaults appear only under the Git root.
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     assert_eq!(
         fs::read(repo.get_root().join(".letopis/config.json")).unwrap(),

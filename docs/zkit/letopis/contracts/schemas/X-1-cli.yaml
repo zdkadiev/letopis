@@ -703,6 +703,14 @@
       "additionalProperties": false,
       "description": "Content of .letopis/config.json, edited as a file; read by config. The legacy flat four-field form is rejected and must be migrated manually."
     },
+    "EffectiveConfiguration": {
+      "allOf": [{"$ref": "#/$defs/Configuration"}],
+      "required": ["embedding_model", "discovery"],
+      "properties": {
+        "discovery": {"required": ["respect_gitignore"]}
+      },
+      "description": "Complete observed configuration, including effective discovery defaults."
+    },
     "ConfigOutput": {
       "type": "object",
       "properties": {
@@ -712,7 +720,7 @@
         "result": {
           "anyOf": [
             {
-              "$ref": "#/$defs/Configuration"
+              "$ref": "#/$defs/EffectiveConfiguration"
             },
             {
               "type": "null"

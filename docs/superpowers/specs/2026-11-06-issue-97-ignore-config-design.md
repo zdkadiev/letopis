@@ -1,7 +1,7 @@
 # Discovery ignore configuration — issue #97
 
-Date: 2026-11-06. Status: approved by the user on 2026-11-06. The next step is
-the implementation plan, which requires separate approval before product changes.
+Date: 2026-11-06. Status: approved by the user on 2026-11-06; implementation
+follows the separately approved plan. Final acceptance is in progress.
 
 Issue: [#97](https://github.com/zdkadiev/letopis/issues/97).
 Branch and worktree: `isssue-97-ignore-config`.
@@ -132,9 +132,9 @@ existing consumer mappings produce the fatal `invalid_request` envelope with
 their safe command context and empty details. Unsafe/unreadable config or ignore
 file observations remain `internal_error`. `config` and `init` keep the current
 `embedding_failed` envelope for full-config validation failure; `status` retains
-`validation_failed` problems with `details.reason: "invalid_config"`. The issue's
-`invalid_config` wording names the validation/status classification, not an
-existing fatal CLI code: no such fatal code exists today. Do not add a new public
+`validation_failed` problems with `details.reason: "invalid_embedding_config"`. The issue's
+`invalid_config` wording names validation failure. No fatal CLI code has that
+name; the retained status wire reason is `invalid_embedding_config`. Do not add a new public
 error code, fatal-error details mechanism or provider call for this feature.
 
 ## Ignore-file semantics
@@ -281,7 +281,8 @@ gix, weaken confinement or invent a new component boundary to simplify the task.
 
 An independent Rust builder review on 2026-11-06 identified one substantive
 planning ambiguity: the fatal CLI representation of invalid configuration versus
-the existing status-only `invalid_config` reason. The explicit mapping above
+the status diagnostic reason (whose actual wire spelling is
+`invalid_embedding_config`, corrected during implementation verification). The explicit mapping above
 resolves it without a new public error envelope. The review raised no other
 planning questions. The user subsequently accepted the failure policy on
 2026-11-06.

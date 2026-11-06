@@ -1505,10 +1505,10 @@ mod configuration_value_tests {
 
     #[test]
     fn parses_generated_defaults_and_preserves_retry_setting() {
-        // Given / When
+        // Given / When: the exact generated default configuration is parsed.
         let configuration = Configuration::parse(GENERATED_CONFIG).unwrap();
 
-        // Then
+        // Then: embeddings remain unconfigured and the retry default is preserved.
         assert!(!configuration.get_enabled());
         assert!(configuration.get_embedding_config().is_none());
         assert_eq!(configuration.get_max_retries(), 0);

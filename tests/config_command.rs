@@ -58,7 +58,7 @@ fn config_returns_complete_generated_defaults() {
     let repo = ReadingRepo::new();
     repo.write(".letopis/config.json", GENERATED_CONFIG);
 
-    // When
+    // When: the actual config command reads the legacy generated file.
     let output = repo.invoke(&["config"], b"{}");
 
     // Then: the whole nested object is returned with stable field order.

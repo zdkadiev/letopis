@@ -160,7 +160,7 @@ Schemas, CLI/JSON, synchronous I/O and cross-database atomicity are unchanged.
 
 Это уточнение конкретизирует текущие имена и владельцев по [спецификации границ](../../superpowers/specs/2026-11-04-infrastructure-component-boundaries-design.md), не переписывая исторические решения и evidence. Операции инфраструктуры и их application-owned traits используют entity–action–filter имена из собственного контекста компонента; application use cases сохраняют имена по ответственности. Канонические исключения и примеры находятся в [AGENTS.md](../../../AGENTS.md).
 
-`GitRepository` реализует `GitWorktreePaths::worktree_paths_get`: raw NUL-delimited indexed/non-ignored untracked paths, включая удалённые tracked-пути, без UTF-8 и Markdown-фильтров. Общий application helper `CandidateSelection` в `service/utils.rs` выбирает `.md`/`.markdown`, исключает `.git`/`.letopis` как байты и для структурно безопасных путей пропускает final symlinks через generic filesystem observation до декодирования. Небезопасные raw-компоненты проходят прежнюю `RepoPath`-валидацию без предварительного leaf probe; unsafe parents, replacement и I/O остаются ошибками. Git intrinsically защищает `.git`; composition передаёт `.letopis` как generic excluded root для прямых snapshot API. `tree_retain_by_oid` проверяет root/ref, `tree_pin_by_oid` — полную closure.
+`GitRepository` реализует `GitWorktreePaths::worktree_paths_get`: raw NUL-delimited indexed/policy-selected untracked paths после supplied root-relative Gitignore patterns, включая удалённые tracked-пути, без UTF-8 и Markdown-фильтров. Общий application helper `CandidateSelection` в `service/utils.rs` читает config/ignore через generic `FileReader`, передаёт Git только mode и bytes, выбирает `.md`/`.markdown`, исключает `.git`/`.letopis` как байты и для структурно безопасных путей пропускает final symlinks через generic filesystem observation до декодирования. Небезопасные raw-компоненты проходят прежнюю `RepoPath`-валидацию без предварительного leaf probe; unsafe parents, replacement и I/O остаются ошибками. Git intrinsically защищает `.git`; composition передаёт `.letopis` как generic excluded root для прямых snapshot API. `tree_retain_by_oid` проверяет root/ref, `tree_pin_by_oid` — полную closure.
 
 `LocalFileSystem` остаётся одним владельцем generic file/directory/path/symlink/lock операций. Имена файлов и их прикладные роли выбирает потребитель/composition; проверки identity/alias и confinement остаются в filesystem. `lib.rs` обрамляет открытие/attachment этими проверками, а SQLite connections/schemas/transactions принадлежат storage. `MarkdownParser` реализует чистый `MarkdownCodec::file_parse`; X-4 parsing и projections не оркестрируют I/O.
 
@@ -413,3 +413,20 @@ Inspect отличается от search/traverse: B-4 запрашивает у
 ## Index CLI — issue #94 (2026-11-05)
 
 The explicit `index` command uses the existing synchronous Refresher publication pipeline. Default incremental publication retains roots, `--verify` audits effective snapshot closures, and `--full` reparses the selected owners and forces a revision bump while auditing closures. Optional JSON `paths` scope candidate observations and cached-owner removals at path-component boundaries; unselected owners remain untouched. Full graph/source-reference accounting and snapshot closure verification remain global. `check.paths` filters findings only. The former `reindex` CLI command is removed; use `index --full`. The index lock and background drain behavior are unchanged.
+
+## Discovery policy — issue #97, 2026-11-06
+
+The complete Configuration value separates embedding state from DiscoveryConfig;
+only the four configured embedding fields enter identity. GitWorktreePaths accepts
+GitIgnoreMode and root-relative pattern bytes; GitRepository owns gix enumeration
+and matching. CandidateSelection owns `.letopis/config.json`/`.letopis/ignore`
+interpretation and uses the existing generic filesystem interface. No new service,
+filesystem role, persistent policy cache, dependency or database table is added.
+
+A selection carries observed config/ignore contents until the no-op or commit
+recheck. Locked redetection obtains fresh inputs; changes during prepared
+publication abort and roll back. Inspection independently observes its capture
+policy and checks it before/after strong pin. These are bounded live observations,
+not an atomic snapshot of arbitrary author edits. See the
+[approved design](../../superpowers/specs/2026-11-06-issue-97-ignore-config-design.md)
+and [verification report](checks/issue-97/report.md).

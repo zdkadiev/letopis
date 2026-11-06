@@ -19,13 +19,22 @@ registration is required. Reuse the repository's existing organization.
 The `letopis/` knowledge folder is distinct from the private `.letopis/`
 service directory, which is excluded from indexing.
 
-Letopis discovers `.md` and `.markdown` files from
-`git ls-files --cached --others --exclude-standard`: tracked files and untracked
-files allowed by Git's ignore rules. Ignored untracked files are not indexed;
-directories named `.git` or `.letopis` are excluded. Only Letopis markup outside
-code blocks declares knowledge; ordinary Markdown alone creates no elements.
-A clean `check` does not prove an ignored file was indexed. If a new concept is
-missing, check its eligibility before changing its content or rebuilding the cache.
+By default, Letopis discovers `.md` and `.markdown` files from Git's tracked
+paths and untracked paths allowed by standard Git ignores. The optional
+`discovery.respect_gitignore` boolean in `.letopis/config.json` defaults to true;
+false also admits untracked files hidden by `.gitignore`, `info/exclude` and
+Git's global excludes. `.letopis/ignore` applies root-relative Gitignore patterns
+to both tracked and untracked candidates, including `!` negation. Excluded parents
+still block child negation; `.git` and `.letopis` components always stay excluded.
+The ignore file is optional and `init` does not create it.
+
+Only Letopis markup outside code blocks declares knowledge; ordinary Markdown
+alone creates no elements. A clean `check` does not prove a filtered file was
+indexed. If a concept is missing, check Git eligibility, the discovery toggle and
+Letopis patterns before changing its content or rebuilding. Malformed or unsafe
+policy inputs stop refreshing commands and preserve the last publication;
+invalid embedding settings alone still allow FTS when discovery is valid. See
+[operations](references/operations.md#discovery-settings) for author examples.
 
 Group closely related knowledge in a file named after its common concept. A
 file may hold one whole-file element or several section elements about that

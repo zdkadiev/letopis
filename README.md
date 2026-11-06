@@ -139,7 +139,7 @@ The Markdown destination is relative to the document. The title's mandatory `pat
 <details>
 <summary><strong>File discovery, sections, and source verification</strong></summary>
 
-Keep one concept per file. The `letopis/` folder is a convention; no folder registration is needed. Marked `.md` and `.markdown` files can live anywhere in the repository. Tracked files and untracked files allowed by Git ignore rules are discoverable; ignored untracked files are not. Ordinary Markdown without Letopis metadata creates no knowledge elements.
+Keep one concept per file. The `letopis/` folder is a convention; no folder registration is needed. Marked `.md` and `.markdown` files can live anywhere in the repository. By default, tracked files and untracked files allowed by Git ignore rules are discoverable. Use [discovery settings](#discovery-settings) to exclude tracked files or admit ignored local knowledge. Ordinary Markdown without Letopis metadata creates no knowledge elements.
 
 A whole-file element starts with its metadata comment on the first line. Its ID is its path relative to the Git root, such as `letopis/retry-budget.md`.
 
@@ -324,7 +324,7 @@ Use it for a deliberate rebuild; routine edits only need the next refreshing com
 Input: `{}`. Returns the current configuration without changing it, or `{"ok":true,"result":null}` before setup. After initialization, the default response is:
 
 ```json
-{"ok":true,"result":{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}}}
+{"ok":true,"result":{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0},"discovery":{"respect_gitignore":true}}}
 ```
 
 </details>
@@ -335,6 +335,44 @@ Input: `{}`. Returns the current configuration without changing it, or `{"ok":tr
 Send Ctrl-C (SIGINT) to your own running `search`, `traverse`, `inspect`, `check`, or `index` command. Cancellation returns the `cancelled` error shown above and exit status `1`. Work already published may remain; inspect status or retry. Background embedding work may finish independently.
 
 </details>
+
+## Discovery settings
+
+Edit `.letopis/config.json` to add the optional section
+`"discovery": {"respect_gitignore": false}` alongside `embedding_model`.
+The default is `true`, including when the section or config file is absent.
+Setting it to `false` admits untracked paths hidden by `.gitignore`,
+`.git/info/exclude` and global Git excludes. Tracked paths remain candidates in
+both modes.
+
+Use `.letopis/ignore` to exclude tracked or untracked candidates from Letopis:
+
+```gitignore
+/vendor/
+generated/**/*.md
+notes/*
+!notes/keep.md
+```
+
+Patterns use Gitignore syntax and the repository root as their base. A bare
+filename matches at any depth; a leading `/` anchors it at root. Last matching
+rules win, but an excluded parent prevents child negation: `notes/` followed by
+`!notes/keep.md` still excludes the child. The example uses `notes/*` so its direct
+child can be re-included. `.git` and `.letopis` components always stay excluded.
+An absent ignore file means no additional exclusions; `init` does not create it.
+Git itself does not read this file.
+
+The next `check`, `search`, `traverse`, `inspect` or `index` refresh applies the
+settings and removes excluded owners from the index. Scoped indexing changes only
+selected owners. Surviving external source bindings remain readable even when the
+source path is excluded from knowledge discovery. `config`, `status`, `init` and
+internal drain do not refresh membership. Discovery changes preserve embedding
+identity and state for retained hashes.
+
+Malformed or unreadable discovery inputs stop refresh and preserve the previous
+publication. Missing config uses defaults; valid discovery with invalid embedding
+settings still permits full-text search. `config` displays effective discovery
+defaults without rewriting an existing file.
 
 ## Semantic search
 
