@@ -690,6 +690,11 @@
       "properties": {
         "embedding_model": {
           "$ref": "#/$defs/EmbeddingModel"
+        },
+        "discovery": {
+          "type": "object",
+          "properties": {"respect_gitignore": {"type": "boolean", "default": true}},
+          "additionalProperties": false
         }
       },
       "required": [

@@ -69,7 +69,7 @@ fn renders_exact_contract_object_without_warnings() {
                 "dimensions":3
             },
             "max_retries":2
-        }}})
+        },"discovery":{"respect_gitignore":true}}})
     );
     assert!(value.get("warnings").is_none());
     assert_eq!(output.iter().filter(|byte| **byte == b'\n').count(), 1);

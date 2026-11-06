@@ -27,6 +27,8 @@ pub(crate) const MAX_DIMENSIONS: usize = 4096;
 const ROOT_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retries"];
 
 const ROOT_SECTION: &str = "embedding_model";
+const DISCOVERY_SECTION: &str = "discovery";
+const RESPECT_GITIGNORE: &str = "respect_gitignore";
 const SECTION_FIELDS: [&str; 5] = ["enabled", "provider", "model", "parameters", "max_retries"];
 const LEGACY_FIELDS: [&str; 4] = ["provider", "model", "parameters", "max_retries"];
 
@@ -40,7 +42,7 @@ pub enum TransactionRequirement {
 }
 
 /// Complete generated configuration written by initialization.
-pub(crate) const GENERATED_CONFIG: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  }\n}\n";
+pub(crate) const GENERATED_CONFIG: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  },\n  \"discovery\": {\n    \"respect_gitignore\": true\n  }\n}\n";
 
 /// Searchable knowledge metadata; document text is never retained here.
 ///
@@ -731,68 +733,136 @@ impl fmt::Debug for EmbeddingConfig {
 
 /// Validated complete `.letopis/config.json` value.
 #[derive(Debug, Clone)]
-pub enum Configuration {
-    /// Embeddings are off and no provider settings are retained.
-    Unconfigured {
-        /// Additional configured retries, preserved for later setup.
-        max_retries: u64,
-    },
-    /// Locally valid provider settings are retained with execution disabled.
+pub struct Configuration {
+    embedding_model: EmbeddingState,
+    discovery: DiscoveryConfig,
+}
+
+#[derive(Debug, Clone)]
+enum EmbeddingState {
+    Unconfigured { max_retries: u64 },
     Disabled(EmbeddingConfig),
-    /// Locally valid provider settings with embedding execution enabled.
     Enabled(EmbeddingConfig),
 }
 
+/// Author-controlled corpus enumeration policy, independent of embedding identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DiscoveryConfig {
+    respect_gitignore: bool,
+}
+
 impl Configuration {
-    /// Parse one strict nested configuration document.
+    /// Parse and validate both supported configuration sections.
     ///
-    /// The root contains exactly the `embedding_model` section. Configured
-    /// provider settings use the same four-field projection and JCS identity as
-    /// [`EmbeddingConfig`], excluding the section, `enabled` and root wrapper.
+    /// Configured embedding identity excludes discovery, enabled and the root wrapper.
     ///
     /// # Errors
-    /// Rejects legacy flat documents, malformed or duplicate-key JSON, unknown or
-    /// missing fields, partial provider/model settings, inconsistent unconfigured
-    /// values, invalid retry counts and configured settings rejected locally.
+    /// Rejects malformed/duplicate JSON, unknown fields, invalid sections and legacy flat documents.
     pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
-        let JsonValue(value) =
-            serde_json::from_slice::<JsonValue<true>>(bytes).map_err(map_config_error)?;
-        let root = value
-            .as_object()
+        let root = parse_config_root(bytes)?;
+        let section = root
+            .get(ROOT_SECTION)
             .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
-        if root.len() == 1
-            && let Some(section) = root.get(ROOT_SECTION)
-        {
-            return parse_section(section);
-        }
-        if root.keys().any(|key| LEGACY_FIELDS.contains(&key.as_str())) {
-            return Err(EmbeddingError::new(EmbeddingErrorKind::MigrationRequired));
-        }
-        Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))
+        Ok(Self {
+            embedding_model: parse_section(section)?,
+            discovery: parse_discovery_section(&root)?,
+        })
     }
 
     /// Return whether configured embedding execution is enabled.
     pub fn get_enabled(&self) -> bool {
-        matches!(self, Self::Enabled(_))
+        matches!(self.embedding_model, EmbeddingState::Enabled(_))
     }
 
-    /// Return the configured retry count, including the unconfigured document.
+    /// Return the configured retry count, including unconfigured settings.
     pub fn get_max_retries(&self) -> u64 {
-        match self {
-            Self::Unconfigured { max_retries } => *max_retries,
-            Self::Disabled(config) | Self::Enabled(config) => {
+        match &self.embedding_model {
+            EmbeddingState::Unconfigured { max_retries } => *max_retries,
+            EmbeddingState::Disabled(config) | EmbeddingState::Enabled(config) => {
                 config.get_max_attempts().saturating_sub(1)
             }
         }
     }
 
-    /// Return validated provider settings when the document retains any.
+    /// Return retained provider settings, including disabled configurations.
     pub fn get_embedding_config(&self) -> Option<&EmbeddingConfig> {
-        match self {
-            Self::Unconfigured { .. } => None,
-            Self::Disabled(config) | Self::Enabled(config) => Some(config),
+        match &self.embedding_model {
+            EmbeddingState::Unconfigured { .. } => None,
+            EmbeddingState::Disabled(config) | EmbeddingState::Enabled(config) => Some(config),
         }
     }
+
+    /// Return the effective discovery policy.
+    pub fn get_discovery(&self) -> DiscoveryConfig {
+        self.discovery
+    }
+
+    /// Consume the configuration and return retained provider settings, if configured.
+    pub fn into_embedding_config(self) -> Option<EmbeddingConfig> {
+        match self.embedding_model {
+            EmbeddingState::Unconfigured { .. } => None,
+            EmbeddingState::Disabled(config) | EmbeddingState::Enabled(config) => Some(config),
+        }
+    }
+}
+
+impl DiscoveryConfig {
+    /// Parse discovery without requiring valid embedding settings.
+    ///
+    /// # Errors
+    /// Rejects malformed/duplicate JSON, unknown root/discovery fields and invalid discovery types.
+    pub fn parse(bytes: &[u8]) -> EmbeddingResult<Self> {
+        parse_discovery_section(&parse_config_root(bytes)?)
+    }
+
+    /// Return whether standard Git exclusion sources constrain untracked paths.
+    pub fn get_respect_gitignore(&self) -> bool {
+        self.respect_gitignore
+    }
+}
+
+impl Default for DiscoveryConfig {
+    fn default() -> Self {
+        Self {
+            respect_gitignore: true,
+        }
+    }
+}
+
+fn parse_config_root(bytes: &[u8]) -> EmbeddingResult<Map<String, Value>> {
+    let JsonValue(value) =
+        serde_json::from_slice::<JsonValue<true>>(bytes).map_err(map_config_error)?;
+    let Value::Object(root) = value else {
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
+    };
+    if root.keys().any(|key| LEGACY_FIELDS.contains(&key.as_str())) {
+        return Err(EmbeddingError::new(EmbeddingErrorKind::MigrationRequired));
+    }
+    if root
+        .keys()
+        .any(|key| key != ROOT_SECTION && key != DISCOVERY_SECTION)
+    {
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
+    }
+    Ok(root)
+}
+
+fn parse_discovery_section(root: &Map<String, Value>) -> EmbeddingResult<DiscoveryConfig> {
+    let Some(value) = root.get(DISCOVERY_SECTION) else {
+        return Ok(DiscoveryConfig::default());
+    };
+    let section = value
+        .as_object()
+        .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
+    if section.keys().any(|key| key != RESPECT_GITIGNORE) {
+        return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
+    }
+    let respect_gitignore = match section.get(RESPECT_GITIGNORE) {
+        None => true,
+        Some(Value::Bool(value)) => *value,
+        _ => return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig)),
+    };
+    Ok(DiscoveryConfig { respect_gitignore })
 }
 
 /// Metadata and current availability of one referenced source; contains no bytes.
@@ -844,7 +914,7 @@ pub struct SnapshotEntry {
     pub oid: BlobOid,
 }
 
-fn parse_section(value: &Value) -> EmbeddingResult<Configuration> {
+fn parse_section(value: &Value) -> EmbeddingResult<EmbeddingState> {
     let section = value
         .as_object()
         .ok_or_else(|| EmbeddingError::new(EmbeddingErrorKind::InvalidConfig))?;
@@ -894,11 +964,11 @@ fn parse_unconfigured(
     enabled: bool,
     parameters: &Map<String, Value>,
     max_retries: u64,
-) -> EmbeddingResult<Configuration> {
+) -> EmbeddingResult<EmbeddingState> {
     if enabled || !parameters.is_empty() {
         return Err(EmbeddingError::new(EmbeddingErrorKind::InvalidConfig));
     }
-    Ok(Configuration::Unconfigured { max_retries })
+    Ok(EmbeddingState::Unconfigured { max_retries })
 }
 
 fn parse_configured(
@@ -907,7 +977,7 @@ fn parse_configured(
     model: &str,
     parameters: &Map<String, Value>,
     max_retries: u64,
-) -> EmbeddingResult<Configuration> {
+) -> EmbeddingResult<EmbeddingState> {
     let projection = Value::Object(Map::from_iter([
         ("provider".into(), Value::String(provider.into())),
         ("model".into(), Value::String(model.into())),
@@ -917,9 +987,9 @@ fn parse_configured(
     let bytes = serde_json::to_vec(&projection).map_err(map_config_error)?;
     let config = EmbeddingConfig::parse(&bytes)?;
     Ok(if enabled {
-        Configuration::Enabled(config)
+        EmbeddingState::Enabled(config)
     } else {
-        Configuration::Disabled(config)
+        EmbeddingState::Disabled(config)
     })
 }
 
@@ -1316,6 +1386,79 @@ mod embedding_config_tests {
 }
 
 #[cfg(test)]
+mod discovery_configuration_tests {
+    use super::{Configuration, DiscoveryConfig};
+
+    #[test]
+    fn discovery_defaults_preserve_embedding_identity() {
+        // Given: fixed provider settings and three discovery representations.
+        for discovery in [
+            "",
+            ",\"discovery\":{}",
+            ",\"discovery\":{\"respect_gitignore\":false}",
+        ] {
+            let bytes = format!(
+                r#"{{"embedding_model":{{"enabled":true,"provider":"ollama","model":"fixture","parameters":{{"base_url":"http://127.0.0.1:9/api"}},"max_retries":2}}{discovery}}}"#
+            );
+            // When: the complete configuration is parsed.
+            let configuration = Configuration::parse(bytes.as_bytes()).unwrap();
+            // Then: only the independently specified embedding projection controls identity.
+            assert_eq!(
+                configuration
+                    .get_embedding_config()
+                    .unwrap()
+                    .get_identity()
+                    .to_hex(),
+                "c713040f35c46c21c7389aa69b25910ad51fb1ce6ceb26b378513ea5dec8748b"
+            );
+            assert_eq!(
+                configuration.get_discovery().get_respect_gitignore(),
+                !discovery.contains("false")
+            );
+        }
+        assert!(DiscoveryConfig::default().get_respect_gitignore());
+    }
+
+    #[test]
+    fn discovery_projection_ignores_invalid_embedding_settings() {
+        // Given: valid discovery objects alongside absent or invalid embedding settings.
+        for bytes in [br#"{"discovery":{"respect_gitignore":false}}"#.as_slice(),
+            br#"{"embedding_model":null,"discovery":{"respect_gitignore":false}}"#,
+            br#"{"embedding_model":{"provider":"unsupported"},"discovery":{"respect_gitignore":false}}"#] {
+            // When: discovery and complete validation are requested separately.
+            let discovery = DiscoveryConfig::parse(bytes).unwrap();
+            let complete = Configuration::parse(bytes);
+            // Then: FTS can select its corpus without accepting invalid embedding settings.
+            assert!(!discovery.get_respect_gitignore());
+            assert!(complete.is_err());
+        }
+    }
+
+    #[test]
+    fn discovery_rejects_ambiguous_or_invalid_input() {
+        // Given: ambiguous roots, wrong types and unknown fields.
+        for bytes in [
+            "null",
+            "[]",
+            "{invalid}",
+            r#"{"future":true}"#,
+            r#"{"discovery":null}"#,
+            r#"{"discovery":[]}"#,
+            r#"{"discovery":{"respect_gitignore":"false"}}"#,
+            r#"{"discovery":{"respect_gitignore":0}}"#,
+            r#"{"discovery":{"future":false}}"#,
+            r#"{"discovery":{},"discovery":{}}"#,
+            r#"{"discovery":{"respect_gitignore":true,"respect_gitignore":false}}"#,
+        ] {
+            // When: the independent discovery projection is parsed.
+            let result = DiscoveryConfig::parse(bytes.as_bytes());
+            // Then: invalid input never silently chooses a wider corpus.
+            assert!(result.is_err(), "{bytes}");
+        }
+    }
+}
+
+#[cfg(test)]
 mod configuration_value_tests {
     use crate::service::{CapturedFile, FileIdentity, FileReader, FileResult, FileStat};
 
@@ -1357,10 +1500,9 @@ mod configuration_value_tests {
         let configuration = Configuration::parse(GENERATED_CONFIG).unwrap();
 
         // Then
-        let Configuration::Unconfigured { max_retries } = configuration else {
-            panic!("generated defaults must be unconfigured")
-        };
-        assert_eq!(max_retries, 0);
+        assert!(!configuration.get_enabled());
+        assert!(configuration.get_embedding_config().is_none());
+        assert_eq!(configuration.get_max_retries(), 0);
     }
 
     #[test]

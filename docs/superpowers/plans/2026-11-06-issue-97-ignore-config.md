@@ -17,7 +17,7 @@ and the storage schema stay unchanged.
 
 **Spec:** [Approved design](../specs/2026-11-06-issue-97-ignore-config-design.md).
 
-Status: proposed plan; execution awaits user approval. Work only in
+Status: approved by the user on 2026-11-06; Native execution is in progress. Work only in
 `/Users/zdkadiev/.codex/worktrees/a20c/isssue-97-ignore-config`, branch
 `isssue-97-ignore-config`. Base product revision: `52ed491`.
 
@@ -117,7 +117,7 @@ wiring; its existing collaborators already provide what this feature needs.
   owns discovery validation. Full parsing additionally requires/validates
   `embedding_model`; discovery-only parsing does not validate that section.
 
-- [ ] **Step 1: Add failing pure config and CLI contract tests.** Name the new
+- [x] **Step 1: Add failing pure config and CLI contract tests.** Name the new
   unit tests `discovery_defaults_preserve_embedding_identity`,
   `discovery_projection_ignores_invalid_embedding_settings`, and
   `discovery_rejects_ambiguous_or_invalid_input`. Extend the shared corpus with
@@ -140,32 +140,32 @@ wiring; its existing collaborators already provide what this feature needs.
   Keep enabled/disabled identity coverage. Add literal CLI output assertions for
   effective discovery defaults and false. Assert `init` preserves old valid bytes,
   adds defaults only to a newly generated config and does not create `ignore`.
-- [ ] **Step 2: Confirm red tests.** Run
+- [x] **Step 2: Confirm red tests.** Run
   `cargo test --locked --offline --lib discovery` and
   `cargo test --locked --offline --test config_command --test init_command`.
   First failures must identify missing discovery support or old literal output.
-- [ ] **Step 3: Implement the value/parser/output contracts above.** Reuse
+- [x] **Step 3: Implement the value/parser/output contracts above.** Reuse
   `JsonValue<true>` and existing embedding projection/JCS logic. Retain migration
   diagnostics. Adapt `Configuration::...` matches throughout current source/tests
   to the accessor/consuming API; enabled execution checks the enabled flag and
   consumes its owned `EmbeddingConfig`. Do not expose the
   private enum merely to reproduce cross-module pattern matching.
-- [ ] **Step 4: Update schema and generated/expected config literals.** Input
+- [x] **Step 4: Update schema and generated/expected config literals.** Input
   `discovery` and its boolean member are optional; unknown members are rejected.
   Output includes effective defaults after `embedding_model`. Preserve missing
   config's null output and strict validation without provider HTTP.
-- [ ] **Step 5: Run focused tests and schema agreement.** Repeat Step 2, then
+- [x] **Step 5: Run focused tests and schema agreement.** Repeat Step 2, then
   `cargo test --locked --offline --test embedding_service --test status_command`.
   Use a Python environment with `jsonschema==4.26.0` and PyYAML to run
   `python -B tests/config_schema_agreement.py`; expect exit 0 and `errors: []`.
   System Python currently lacks both packages. Reuse a suitable prepared env or
   prepare an ignored task env during execution and record package versions;
   do not alter Cargo dependencies or another task's environment.
-- [ ] **Step 6: Mutation-check defaults, validation and identity tests.** Flip
+- [x] **Step 6: Mutation-check defaults, validation and identity tests.** Flip
   the absent-section default, accept a wrong-type field, then include discovery
   in identity, one mutation at a time. Each named test must fail. Restore exact
   source and rerun those tests; record outcomes before committing.
-- [ ] **Step 7: Commit the config deliverable.** Stage only this task's actual
+- [x] **Step 7: Commit the config deliverable.** Stage only this task's actual
   paths, inspect the staged diff, commit `feat: add discovery configuration`.
 
 ### Task 2: Enumerate and filter Git paths with supplied ignore rules

@@ -357,9 +357,9 @@ pub trait VectorDatabase {
     ) -> StorageResult<StoredVectorKey>;
 }
 pub use types::{
-    CapturedFile, CheckReport, ConfigState, Configuration, DrainOutcome, ElementAddress,
-    ElementLocation, EmbeddingConfig, EmbeddingWork, FileIdentity, FileRow, FileStat,
-    GraphNeighbor, GraphNodeKey, GraphNodeRef, HeldLock, InspectedElement, Inspection,
+    CapturedFile, CheckReport, ConfigState, Configuration, DiscoveryConfig, DrainOutcome,
+    ElementAddress, ElementLocation, EmbeddingConfig, EmbeddingWork, FileIdentity, FileRow,
+    FileStat, GraphNeighbor, GraphNodeKey, GraphNodeRef, HeldLock, InspectedElement, Inspection,
     KnowledgeMetadata, LockName, NeighborCursor, NeighborDirection, NeighborPageRequest,
     NodeMetadata, ParsedElement, ParsedFile, ProvenanceIssue, ProvenanceObservation,
     ProvenanceRequest, ProviderKind, QueryEmbedding, QueryEmbeddingRequest, RecheckFilter,

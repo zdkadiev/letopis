@@ -11,7 +11,7 @@ use tempfile::TempDir;
 #[test]
 fn configuration_reads_without_sampling_wall_clock() {
     // Given: a valid unconfigured file and a clock hook that fails on any sample.
-    use crate::service::{ConfigReader, Configuration, ConfigurationService};
+    use crate::service::{ConfigReader, ConfigurationService};
     let root = TempDir::new().unwrap();
     fs::create_dir(root.path().join(".letopis")).unwrap();
     fs::write(root.path().join(".letopis/config.json"), br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0}}"#).unwrap();
@@ -27,10 +27,11 @@ fn configuration_reads_without_sampling_wall_clock() {
     // When: configuration is read and parsed.
     let configuration = service.get_config().unwrap();
     // Then: bytes are available without consulting the clock.
-    assert!(matches!(
-        configuration,
-        Some(Configuration::Unconfigured { .. })
-    ));
+    assert!(
+        configuration
+            .as_ref()
+            .is_some_and(|config| !config.get_enabled() && config.get_embedding_config().is_none())
+    );
 }
 
 #[test]

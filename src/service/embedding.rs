@@ -163,13 +163,16 @@ impl<
             .map_err(map_storage_transaction)?;
         #[cfg(test)]
         tests::reach_checkpoint("observed");
-        let config = match self.get_config_file() {
+        let configuration = match self.get_config_file() {
             Ok(None) => return Ok(ConfigState::Missing),
             Err(error) => return Ok(ConfigState::Invalid(error.get_kind())),
-            Ok(Some(Configuration::Unconfigured { .. } | Configuration::Disabled(_))) => {
-                return Ok(ConfigState::Disabled);
-            }
-            Ok(Some(Configuration::Enabled(config))) => config,
+            Ok(Some(configuration)) => configuration,
+        };
+        if !configuration.get_enabled() {
+            return Ok(ConfigState::Disabled);
+        }
+        let Some(config) = configuration.into_embedding_config() else {
+            return Ok(ConfigState::Disabled);
         };
         #[cfg(test)]
         tests::reach_checkpoint("configuration");

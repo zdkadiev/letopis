@@ -16,17 +16,17 @@ use support::{
     reading::ReadingRepo,
 };
 
-const GENERATED: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  }\n}\n";
+const GENERATED: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  },\n  \"discovery\": {\n    \"respect_gitignore\": true\n  }\n}\n";
 const SUCCESS: &[u8] = b"{\"ok\":true,\"result\":{}}\n";
 const DISABLED: &[u8] = br#"{"embedding_model":{"enabled":false,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9/api"},"max_retries":2}}"#;
 
 #[test]
 fn init_creates_exact_private_configuration_and_usable_schemas() {
-    // Given
+    // Given: a repository containing the configuration inputs described below.
     let repo = ReadingRepo::new();
     repo.write_knowledge("known.md", "searchable knowledge");
 
-    // When
+    // When: the actual command observes or initializes the configuration.
     let output = repo.invoke(&["init"], b"{}");
 
     // Then: exact config, no corpus indexing, and the next check uses the schemas.
@@ -49,6 +49,7 @@ fn init_creates_exact_private_configuration_and_usable_schemas() {
     );
     assert!(service.join("cache.db").is_file());
     assert!(service.join("vectors.db").is_file());
+    assert!(!service.join("ignore").exists());
     let status = repo.invoke(&["status"], b"{}");
     let status: Value = serde_json::from_slice(&status.stdout).unwrap();
     assert_eq!(status["result"]["revision"], Value::Null);
@@ -268,7 +269,7 @@ fn concurrent_init_calls_leave_one_complete_valid_state() {
         value,
         json!({"ok":true,"result":{"embedding_model":{
             "enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0
-        }}})
+        },"discovery":{"respect_gitignore":true}}})
     );
     let status = repo.invoke(&["status"], b"{}");
     assert!(status.status.success(), "{status:?}");

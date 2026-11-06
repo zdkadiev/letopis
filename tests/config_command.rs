@@ -13,10 +13,27 @@ use std::{
 use support::{git::isolate_command, reading::ReadingRepo};
 
 const LITERAL_CONFIG: &[u8] = br#"{"embedding_model":{"enabled":true,"provider":"ollama","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9","custom":{"enabled":true},"dimensions":3},"max_retries":2}}"#;
-const LITERAL_OUTPUT: &[u8] = b"{\"ok\":true,\"result\":{\"embedding_model\":{\"enabled\":true,\"provider\":\"ollama\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://127.0.0.1:9\",\"custom\":{\"enabled\":true},\"dimensions\":3},\"max_retries\":2}}}\n";
+const LITERAL_OUTPUT: &[u8] = b"{\"ok\":true,\"result\":{\"embedding_model\":{\"enabled\":true,\"provider\":\"ollama\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://127.0.0.1:9\",\"custom\":{\"enabled\":true},\"dimensions\":3},\"max_retries\":2},\"discovery\":{\"respect_gitignore\":true}}}\n";
 const GENERATED_CONFIG: &[u8] = b"{\n  \"embedding_model\": {\n    \"enabled\": false,\n    \"provider\": null,\n    \"model\": null,\n    \"parameters\": {},\n    \"max_retries\": 0\n  }\n}\n";
-const GENERATED_OUTPUT: &[u8] = b"{\"ok\":true,\"result\":{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0}}}\n";
+const GENERATED_OUTPUT: &[u8] = b"{\"ok\":true,\"result\":{\"embedding_model\":{\"enabled\":false,\"provider\":null,\"model\":null,\"parameters\":{},\"max_retries\":0},\"discovery\":{\"respect_gitignore\":true}}}\n";
 const MIGRATION_OUTPUT: &[u8] = b"{\"ok\":false,\"error\":{\"code\":\"embedding_failed\",\"message\":\"embedding configuration requires migration\",\"details\":{}}}\n";
+
+#[test]
+fn config_returns_explicit_discovery_without_creating_ignore() {
+    // Given: valid embedding settings and an explicitly disabled Git exclusion policy.
+    let repo = ReadingRepo::new();
+    repo.write(".letopis/config.json", br#"{"embedding_model":{"enabled":false,"provider":null,"model":null,"parameters":{},"max_retries":0},"discovery":{"respect_gitignore":false}}"#);
+    // When: the actual binary observes configuration.
+    let output = repo.invoke(&["config"], b"{}");
+    // Then: the effective setting is exposed without creating a pattern file.
+    assert!(output.status.success(), "{output:?}");
+    let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        response["result"]["discovery"],
+        json!({"respect_gitignore":false})
+    );
+    assert!(!repo.get_root().join(".letopis/ignore").exists());
+}
 
 #[test]
 fn config_without_file_returns_null_without_service_state() {
@@ -52,15 +69,15 @@ fn config_returns_complete_generated_defaults() {
 
 #[test]
 fn config_preserves_literal_values_without_service_side_effects() {
-    // Given
+    // Given: a repository containing the configuration inputs described below.
     let repo = ReadingRepo::new();
     repo.write(".letopis/config.json", LITERAL_CONFIG);
     let before = capture_service_files(&repo);
 
-    // When
+    // When: the actual command observes or initializes the configuration.
     let output = repo.invoke(&["config"], b"{}");
 
-    // Then
+    // Then: the complete response and private files satisfy the scenario.
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(output.stdout, LITERAL_OUTPUT);
@@ -231,22 +248,22 @@ fn config_preserves_existing_databases_and_metadata() {
 
 #[test]
 fn config_reads_valid_openai_configuration_without_credentials() {
-    // Given
+    // Given: a repository containing the configuration inputs described below.
     let repo = ReadingRepo::new();
     repo.write(
         ".letopis/config.json",
         br#"{"embedding_model":{"enabled":false,"provider":"openai","model":"fixture","parameters":{"base_url":"http://127.0.0.1:9"},"max_retries":0}}"#,
     );
 
-    // When
+    // When: the actual command observes or initializes the configuration.
     let output = invoke_without_openai_key(&repo);
 
-    // Then
+    // Then: the complete response and private files satisfy the scenario.
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     assert!(output.stderr.is_empty(), "{output:?}");
     assert_eq!(
         output.stdout,
-        b"{\"ok\":true,\"result\":{\"embedding_model\":{\"enabled\":false,\"provider\":\"openai\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://127.0.0.1:9\"},\"max_retries\":0}}}\n"
+        b"{\"ok\":true,\"result\":{\"embedding_model\":{\"enabled\":false,\"provider\":\"openai\",\"model\":\"fixture\",\"parameters\":{\"base_url\":\"http://127.0.0.1:9\"},\"max_retries\":0},\"discovery\":{\"respect_gitignore\":true}}}\n"
     );
 }
 
