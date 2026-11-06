@@ -1,7 +1,7 @@
 # Discovery ignore configuration — issue #97
 
-Date: 2026-11-06. Status: draft; user approval is pending. No product
-implementation or implementation plan is authorized by this document yet.
+Date: 2026-11-06. Status: approved by the user on 2026-11-06. The next step is
+the implementation plan, which requires separate approval before product changes.
 
 Issue: [#97](https://github.com/zdkadiev/letopis/issues/97).
 Branch and worktree: `isssue-97-ignore-config`.
@@ -21,8 +21,8 @@ and verification of every command, end-to-end workflows and varied patterns.
 The selected library, Gitignore semantics and config failure policy are accepted.
 The user explicitly agreed that refresh stops when discovery configuration cannot
 be safely read or parsed, missing config uses defaults, and invalid embedding
-settings still permit FTS. The remaining behavior below is a proposal until the
-user approves this complete design.
+settings still permit FTS. The user subsequently approved this complete design,
+including the explicitly identified author proposals below.
 
 ## Current behavior and sources
 
@@ -92,7 +92,7 @@ commands and per-pattern diagnostic commands are outside this issue.
   accepted. Wrong types, null sections, duplicate keys and unknown fields fail
   strict full-document validation. Existing embedding validation and legacy
   migration diagnostics remain applicable.
-- **Proposed toggle scope:** `false` disables all standard Git exclusions:
+- **Approved toggle scope:** `false` disables all standard Git exclusions:
   per-directory `.gitignore`, common Git `info/exclude`, configured
   `core.excludesFile` and its default global ignore source. This corresponds to
   omitting `--exclude-standard` from the issue's independent Git oracle. `true`
@@ -269,8 +269,8 @@ or production/provider/power-loss acceptance claim.
 ## Remaining decisions and builder discretion
 
 No unanswered behavior questions remain. Toggle scope, default config output and
-absent-ignore initialization behavior above are explicit author proposals for
-approval of this complete design; they have not been individually accepted.
+absent-ignore initialization behavior above originated as explicit author
+proposals and were accepted through approval of this complete design.
 
 The builder may choose private helper organization, the exact finite exclusion
 mode/type names, operation-scoped policy observation data, and focused test grouping
