@@ -1,4 +1,4 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"d847bd142c5889b78651302170a3f3490940e38d"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"41e999b9c873fc11d715bd30fe7e3aec2d203c70"} -->
 # Search pipeline
 
 A search request requires a query. An omitted limit defaults to 100; an explicit
@@ -30,6 +30,11 @@ search eligibility7.626% of observed CPU; inclusive scopes overlap, not wall sha
 Actual-root make verify and host storage acceptance passed. Measurements are warm
 local observations, not a Linux/minimum-hardware gate; no document drain was timed.
 
+The separate 10k synthetic corpus measured L5 5.294→0.182s (29.15x) and L100
+5.261→0.291s (18.06x), three paired runs each. This is one query with warm model;
+these separate campaigns do not establish linear scaling or general relevance.
+
+[10k measurements](../../docs/zkit/letopis/checks/issue-65/2026-11-07-10k-hybrid/report.md "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/2026-11-07-10k-hybrid/report.md")
 [Search service](../../src/service/search.rs "letopis:type=external;path=src/service/search.rs")
 [CLI defaults and validation](../../src/cli/input.rs "letopis:type=external;path=src/cli/input.rs")
 [Shared request limit](../../src/service/types.rs "letopis:type=external;path=src/service/types.rs")
