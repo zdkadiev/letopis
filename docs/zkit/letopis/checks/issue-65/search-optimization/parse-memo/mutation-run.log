@@ -1,0 +1,10 @@
+ignore-content-hash CAUGHT
+ignore-path CAUGHT
+ignore-binding-predicates CAUGHT
+retain-through-missing CAUGHT
+remove-byte-bound CAUGHT
+remove-entry-bound CAUGHT
+remove-id-bound CAUGHT
+retain-search-text CAUGHT
+retain-graph CAUGHT
+skip-fresh-capture CAUGHT

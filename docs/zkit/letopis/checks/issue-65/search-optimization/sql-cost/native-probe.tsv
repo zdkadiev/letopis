@@ -1,0 +1,32 @@
+sqlite	3.53.2
+knowledge	100000
+fts_matches	1
+plan	nodes	SEARCH nodes USING INDEX sqlite_autoindex_nodes_1 (uri=?)
+plan	revision	SEARCH project USING INTEGER PRIMARY KEY (rowid=?)
+plan	edges	MERGE (UNION ALL)
+plan	edges	LEFT
+plan	edges	SEARCH source USING COVERING INDEX sqlite_autoindex_nodes_1 (uri=?)
+plan	edges	SEARCH edges USING COVERING INDEX edges_outgoing (source_id=?)
+plan	edges	SEARCH target USING INTEGER PRIMARY KEY (rowid=?)
+plan	edges	USE TEMP B-TREE FOR LAST 2 TERMS OF ORDER BY
+plan	edges	RIGHT
+plan	edges	SEARCH source USING COVERING INDEX sqlite_autoindex_nodes_1 (uri=?)
+plan	edges	SEARCH unresolved_edges USING PRIMARY KEY (source_id=?)
+timing	nodes	0	100000	100000	0	0.216056000
+timing	revision	0	100000	100000	0	0.063190000
+timing	edges	0	100000	500000	0	1.205266000
+timing	nodes	1	100000	100000	0	0.064811000
+timing	revision	1	100000	100000	0	0.013127000
+timing	edges	1	100000	500000	0	0.268672000
+timing	nodes	0	100000	100000	0	0.219577000
+timing	revision	0	100000	100000	0	0.064561000
+timing	edges	0	100000	500000	0	1.099431000
+timing	nodes	1	100000	100000	0	0.066690000
+timing	revision	1	100000	100000	0	0.013021000
+timing	edges	1	100000	500000	0	0.213720000
+timing	nodes	0	100000	100000	0	0.217145000
+timing	revision	0	100000	100000	0	0.066649000
+timing	edges	0	100000	500000	0	1.090756000
+timing	nodes	1	100000	100000	0	0.063797000
+timing	revision	1	100000	100000	0	0.013508000
+timing	edges	1	100000	500000	0	0.210977000

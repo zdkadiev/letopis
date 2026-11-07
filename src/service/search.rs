@@ -3,13 +3,13 @@ use super::utils::map_document_error;
 use super::utils::map_document_file;
 use super::{
     CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder,
-    EmbeddingConfig, FileReader, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceRequest,
-    QueryEmbedding, QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag, SearchLink,
-    SearchRequest, Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
+    EmbeddingConfig, FileReader, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile,
+    ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag,
+    SearchLink, SearchRequest, Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
     SourceRevisionComparison, SourceRevisionRequest, StorageRead, TextMatch, VectorMatch,
     VectorOutcome,
 };
-use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri, TreeOid};
+use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri, TreeOid};
 use std::path::Path;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -18,6 +18,23 @@ use std::{
 use std::{fmt, rc::Rc};
 
 const REVISION_COMPARISON_LIMIT: usize = 4096;
+
+const MAX_REUSED_FILE_BYTES: usize = 256 * 1024;
+const MAX_REUSED_ELEMENTS: usize = 1024;
+const MAX_REUSED_ID_BYTES: usize = 256 * 1024;
+
+/// Observe every binding independently while reusing one bounded pure projection.
+struct CurrentKnowledge<'a> {
+    filesystem: &'a dyn FileReader,
+    markdown: &'a dyn MarkdownCodec,
+    last_parsed: Option<ParsedKnowledge>,
+}
+
+struct ParsedKnowledge {
+    path: RepoPath,
+    file_hash: Sha256,
+    parsed: ParsedFile,
+}
 
 /// Infer and validate vector candidates while storage owns the pinned read view.
 struct QueryCandidates<'a, E> {
@@ -153,12 +170,17 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
     ) -> CommandResult<BTreeMap<KnowledgeId, SearchLink>> {
         let mut comparisons = RevisionComparisons::new(self.provenance);
         let mut links = BTreeMap::new();
+        let mut current = CurrentKnowledge {
+            filesystem: self.filesystem,
+            markdown: self.markdown,
+            last_parsed: None,
+        };
         for (id, node) in metadata {
             let sources = self.get_source_bindings(id)?;
             if !Self::is_matched_by_sources(&mut comparisons, node, &sources, filters)? {
                 continue;
             }
-            let mut link = self.build_link(
+            let mut link = current.build_link(
                 node,
                 self.storage_read.project_get_by_id().map_err(|error| {
                     CommandError::new_with_cause(
@@ -187,40 +209,6 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
             }
         }
         Ok(links)
-    }
-
-    fn build_link(&self, node: &KnowledgeMetadata, revision: u64) -> CommandResult<SearchLink> {
-        let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
-            .map_err(|error| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot search knowledge",
-                    error,
-                )
-            })?;
-        let file = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
-            .map_err(|error| {
-                CommandError::new_with_cause(
-                    CommandErrorKind::InternalError,
-                    "cannot search knowledge",
-                    error,
-                )
-            })?;
-        let parsed = file
-            .as_ref()
-            .and_then(|file| self.markdown.file_parse(&path, &file.bytes).ok().flatten());
-        let flags = if is_current_knowledge(node, parsed.as_ref()) {
-            BTreeSet::new()
-        } else {
-            BTreeSet::from([SearchFlag::Stale])
-        };
-        Ok(SearchLink {
-            element_id: node.id.clone(),
-            path,
-            lines: node.lines,
-            revision,
-            flags,
-        })
     }
 
     fn is_matched_by_sources(
@@ -284,6 +272,85 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
                 EdgeTarget::Knowledge(_) => None,
             })
             .collect())
+    }
+}
+
+impl CurrentKnowledge<'_> {
+    fn build_link(&mut self, node: &KnowledgeMetadata, revision: u64) -> CommandResult<SearchLink> {
+        let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
+            .map_err(|error| {
+                CommandError::new_with_cause(
+                    CommandErrorKind::InternalError,
+                    "cannot search knowledge",
+                    error,
+                )
+            })?;
+        let file = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
+            .map_err(|error| {
+                CommandError::new_with_cause(
+                    CommandErrorKind::InternalError,
+                    "cannot search knowledge",
+                    error,
+                )
+            })?;
+        let current = if let Some(file) = file {
+            self.is_current(node, &path, &file.bytes)
+        } else {
+            self.last_parsed = None;
+            false
+        };
+        let flags = if current {
+            BTreeSet::new()
+        } else {
+            BTreeSet::from([SearchFlag::Stale])
+        };
+        Ok(SearchLink {
+            element_id: node.id.clone(),
+            path,
+            lines: node.lines,
+            revision,
+            flags,
+        })
+    }
+
+    /// Reuse only successful parsing after hashing bytes from this binding's fresh capture.
+    /// Missing, invalid, unmarked and oversized observations never leave reusable state.
+    fn is_current(&mut self, node: &KnowledgeMetadata, path: &RepoPath, bytes: &[u8]) -> bool {
+        let file_hash = Sha256::digest(bytes);
+        if let Some(last) = &self.last_parsed
+            && last.path == *path
+            && last.file_hash == file_hash
+        {
+            return is_current_knowledge(node, Some(&last.parsed));
+        }
+        self.last_parsed = None;
+        let Some(mut parsed) = self.markdown.file_parse(path, bytes).ok().flatten() else {
+            return false;
+        };
+        let current = is_current_knowledge(node, Some(&parsed));
+        let id_bytes = parsed
+            .elements
+            .iter()
+            .fold(path.as_str().len(), |size, item| {
+                size.saturating_add(item.element.id.as_str().len())
+            });
+        if bytes.len() <= MAX_REUSED_FILE_BYTES
+            && parsed.elements.len() <= MAX_REUSED_ELEMENTS
+            && id_bytes <= MAX_REUSED_ID_BYTES
+        {
+            // Eligibility needs no graph or search payload; retain only its existing pure predicate inputs.
+            parsed.edges.clear();
+            for element in &mut parsed.elements {
+                element.search_text = String::new();
+            }
+            parsed.elements.shrink_to_fit();
+            self.last_parsed = Some(ParsedKnowledge {
+                path: path.clone(),
+                file_hash,
+                parsed,
+            });
+        }
+        current
     }
 }
 

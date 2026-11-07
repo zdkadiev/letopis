@@ -202,6 +202,8 @@ fn layout_build(
 ) -> Result<Layout, Diagnostic> {
     let mut elements: Vec<Element> = Vec::new();
     let mut metadata_ranges = Vec::new();
+    let mut line_offset = 0;
+    let mut line_number = 1;
     for range in comments {
         let start = line_start_calculate(text, range.start);
         let after = line_end_calculate(text, start);
@@ -226,12 +228,13 @@ fn layout_build(
             reason = "element_bounds_calculate returns ordered ranges"
         )]
         let bytes = ByteSpan::new(begin, end).expect("heading ranges are ordered");
+        // Validated elements never overlap, so preceding bytes need no second line scan.
+        let line_start = line_number + line_breaks_count(&text.as_bytes()[line_offset..begin]);
+        line_offset = end.saturating_sub(1);
+        line_number = line_start + line_breaks_count(&text.as_bytes()[begin..line_offset]);
         #[expect(clippy::expect_used, reason = "a nonempty element spans ordered lines")]
-        let lines = LineRange::new(
-            line_number_calculate(text, begin),
-            line_number_calculate(text, end.saturating_sub(1)),
-        )
-        .expect("nonempty element lines are ordered");
+        let lines =
+            LineRange::new(line_start, line_number).expect("nonempty element lines are ordered");
         elements.push(Element {
             id,
             metadata,
@@ -280,12 +283,8 @@ fn line_end_calculate(text: &str, offset: usize) -> usize {
         .map_or(text.len(), |position| offset + position + 1)
 }
 
-fn line_number_calculate(text: &str, at: usize) -> u64 {
-    text.as_bytes()[..at]
-        .iter()
-        .filter(|&&c| c == b'\n')
-        .count() as u64
-        + 1
+fn line_breaks_count(bytes: &[u8]) -> u64 {
+    bytes.iter().filter(|&&c| c == b'\n').count() as u64
 }
 
 /// Parses one complete X-4 metadata line without retaining a partial value.

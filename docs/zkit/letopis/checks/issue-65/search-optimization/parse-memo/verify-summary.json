@@ -1,0 +1,17 @@
+{
+  "exit": 0,
+  "profiles": {
+    "debug": {
+      "passed": 1206,
+      "failed": 0,
+      "ignored": 11,
+      "test_binaries": 85
+    },
+    "release": {
+      "passed": 1205,
+      "failed": 0,
+      "ignored": 11,
+      "test_binaries": 84
+    }
+  }
+}

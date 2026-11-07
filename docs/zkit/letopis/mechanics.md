@@ -491,3 +491,19 @@ before consulting that metadata. Failed validation is never memoized; overflow
 continues normal validation. Full closure audits validate each visited tree body
 directly on every audit, independent of addressed-read reuse. Current source
 captures and provenance batch/error boundaries are unchanged.
+
+## Pure Markdown reuse during search — issue #65 (2026-11-06)
+
+Search eligibility retains at most the last successful pure Markdown projection
+within one invocation, after every binding performs its fresh confined file
+capture and hashes the captured bytes. Reuse requires the same repository path
+and byte hash; the existing per-node identity/hash/line predicate still runs.
+Retention bypasses inputs over 256 KiB, more than 1024 elements or over 256 KiB
+of combined path/element-ID content. Edges and search text are released before
+retention. These are logical payload/entry budgets, not a total allocator/RSS cap.
+Missing, invalid and unmarked observations leave no reusable parse. Source reads,
+provenance, filter/error demand order and complete eligible-channel ranking remain
+unchanged. The parser computes line coordinates with a monotonic byte/line cursor
+after disjoint element bounds are validated, preserving CRLF, Unicode and EOF
+coordinates without repeated prefix scans. See the
+[search experiment spec](../../superpowers/specs/2026-11-06-search-optimization-design.md).

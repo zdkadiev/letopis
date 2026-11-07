@@ -1,0 +1,22 @@
+{
+  "source_revision": "3d820de41ee12385bc734ac4ceeb56b78ba379f9",
+  "binary": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parser-cpu/letopis-parser-cpu",
+  "binary_sha256": "83b990af8b7b16c650fbf3c1f9453d86988e910347e2c665c6210d6dd03947e0",
+  "binary_bytes": 11123720,
+  "patch_sha256": "77dfcf06ae68866147fe15a6c16693487ea30c70762a749cfe6742552513511e",
+  "build_command": "CARGO_TARGET_DIR=../target CARGO_BUILD_JOBS=2 CARGO_PROFILE_RELEASE_DEBUG=1 cargo build --locked --offline --release --bin letopis",
+  "changed_paths": [
+    "src/markdown/scan.rs",
+    "tests/markdown_elements.rs"
+  ],
+  "verification": {
+    "make_verify": "PASS (exit 0, ok)",
+    "markdown_integration_tests": 44,
+    "diff_check": "PASS",
+    "completed_at": "2026-11-06T19:10:20.172779+00:00"
+  },
+  "changed_source_sha256": {
+    "src/markdown/scan.rs": "d1fd2f97f74d08190f57a35f8dd05002bafd80dc1de0d430a917edd1e600b4fd",
+    "tests/markdown_elements.rs": "13c137df3005475ee6c8a8f49891cf780790179c69124c2e80f787b74841c9de"
+  }
+}

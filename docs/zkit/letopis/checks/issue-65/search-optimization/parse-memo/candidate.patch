@@ -1,0 +1,538 @@
+diff --git a/src/service/search.rs b/src/service/search.rs
+index bad0e15..b67223f 100644
+--- a/src/service/search.rs
++++ b/src/service/search.rs
+@@ -2,13 +2,13 @@ use super::utils::is_current_knowledge;
+ use super::utils::map_document_file;
+ use super::{
+     CacheDatabase, CommandError, CommandErrorKind, CommandResult, ConfigState, Embedder,
+-    EmbeddingConfig, FileReader, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ProvenanceRequest,
+-    QueryEmbedding, QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag, SearchLink,
+-    SearchRequest, Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
++    EmbeddingConfig, FileReader, KnowledgeMetadata, MarkdownCodec, NodeMetadata, ParsedFile,
++    ProvenanceRequest, QueryEmbedding, QueryEmbeddingRequest, Refresher, SearchFilters, SearchFlag,
++    SearchLink, SearchRequest, Searcher, SnapshotError, SnapshotErrorKind, SourceProvenance,
+     SourceRevisionComparison, SourceRevisionRequest, StorageRead, TextMatch, VectorMatch,
+     VectorOutcome,
+ };
+-use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, SourceUri};
++use crate::domain::{EdgeTarget, KnowledgeId, RepoPath, Sha256, SourceUri};
+ use std::path::Path;
+ use std::{
+     collections::{BTreeMap, BTreeSet},
+@@ -20,6 +20,23 @@ use std::{fmt, rc::Rc};
+ use comparisons::RevisionComparisons;
+ use ranking::{rank_candidates, validate_metrics};
+ 
++const MAX_REUSED_FILE_BYTES: usize = 256 * 1024;
++const MAX_REUSED_ELEMENTS: usize = 1024;
++const MAX_REUSED_ID_BYTES: usize = 256 * 1024;
++
++/// Observe every binding independently while reusing one bounded pure projection.
++struct CurrentKnowledge<'a> {
++    filesystem: &'a dyn FileReader,
++    markdown: &'a dyn MarkdownCodec,
++    last_parsed: Option<ParsedKnowledge>,
++}
++
++struct ParsedKnowledge {
++    path: RepoPath,
++    file_hash: Sha256,
++    parsed: ParsedFile,
++}
++
+ /// Infer and validate vector candidates while storage owns the pinned read view.
+ struct QueryCandidates<'a, E> {
+     storage: &'a dyn StorageRead,
+@@ -140,12 +157,17 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
+     ) -> CommandResult<BTreeMap<KnowledgeId, SearchLink>> {
+         let mut comparisons = RevisionComparisons::new(self.provenance);
+         let mut links = BTreeMap::new();
++        let mut current = CurrentKnowledge {
++            filesystem: self.filesystem,
++            markdown: self.markdown,
++            last_parsed: None,
++        };
+         for (id, node) in metadata {
+             let sources = self.get_source_bindings(id)?;
+             if !Self::matches_sources(&mut comparisons, node, &sources, filters)? {
+                 continue;
+             }
+-            let mut link = self.build_link(
++            let mut link = current.build_link(
+                 node,
+                 self.storage.project_get_by_id().map_err(map_search_error)?,
+             )?;
+@@ -164,28 +186,6 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
+         Ok(links)
+     }
+ 
+-    fn build_link(&self, node: &KnowledgeMetadata, revision: u64) -> CommandResult<SearchLink> {
+-        let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
+-            .map_err(map_search_error)?;
+-        let file = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
+-            .map_err(map_search_error)?;
+-        let parsed = file
+-            .as_ref()
+-            .and_then(|file| self.markdown.file_parse(&path, &file.bytes).ok().flatten());
+-        let flags = if is_current_knowledge(node, parsed.as_ref()) {
+-            BTreeSet::new()
+-        } else {
+-            BTreeSet::from([SearchFlag::Stale])
+-        };
+-        Ok(SearchLink {
+-            element_id: node.id.clone(),
+-            path,
+-            lines: node.lines,
+-            revision,
+-            flags,
+-        })
+-    }
+-
+     fn matches_sources(
+         comparisons: &mut RevisionComparisons<'_>,
+         node: &KnowledgeMetadata,
+@@ -243,6 +243,73 @@ impl<F: FileReader, M: MarkdownCodec, P: SourceProvenance> SearchEligibility<'_,
+     }
+ }
+ 
++impl CurrentKnowledge<'_> {
++    fn build_link(&mut self, node: &KnowledgeMetadata, revision: u64) -> CommandResult<SearchLink> {
++        let path = RepoPath::parse(node.id.as_str().split('#').next().unwrap_or_default())
++            .map_err(map_search_error)?;
++        let file = map_document_file(self.filesystem.file_get_by_path(Path::new(path.as_str())))
++            .map_err(map_search_error)?;
++        let current = if let Some(file) = file {
++            self.is_current(node, &path, &file.bytes)
++        } else {
++            self.last_parsed = None;
++            false
++        };
++        let flags = if current {
++            BTreeSet::new()
++        } else {
++            BTreeSet::from([SearchFlag::Stale])
++        };
++        Ok(SearchLink {
++            element_id: node.id.clone(),
++            path,
++            lines: node.lines,
++            revision,
++            flags,
++        })
++    }
++
++    /// Reuse only successful parsing after hashing bytes from this binding's fresh capture.
++    /// Missing, invalid, unmarked and oversized observations never leave reusable state.
++    fn is_current(&mut self, node: &KnowledgeMetadata, path: &RepoPath, bytes: &[u8]) -> bool {
++        let file_hash = Sha256::digest(bytes);
++        if let Some(last) = &self.last_parsed
++            && last.path == *path
++            && last.file_hash == file_hash
++        {
++            return is_current_knowledge(node, Some(&last.parsed));
++        }
++        self.last_parsed = None;
++        let Some(mut parsed) = self.markdown.file_parse(path, bytes).ok().flatten() else {
++            return false;
++        };
++        let current = is_current_knowledge(node, Some(&parsed));
++        let id_bytes = parsed
++            .elements
++            .iter()
++            .fold(path.as_str().len(), |size, item| {
++                size.saturating_add(item.element.id.as_str().len())
++            });
++        if bytes.len() <= MAX_REUSED_FILE_BYTES
++            && parsed.elements.len() <= MAX_REUSED_ELEMENTS
++            && id_bytes <= MAX_REUSED_ID_BYTES
++        {
++            // Eligibility needs no graph or search payload; retain only its existing pure predicate inputs.
++            parsed.edges.clear();
++            for element in &mut parsed.elements {
++                element.search_text = String::new();
++            }
++            parsed.elements.shrink_to_fit();
++            self.last_parsed = Some(ParsedKnowledge {
++                path: path.clone(),
++                file_hash,
++                parsed,
++            });
++        }
++        current
++    }
++}
++
+ impl<E: Embedder> QueryCandidates<'_, E> {
+     fn find_vector_candidates(
+         &mut self,
+@@ -2197,6 +2264,369 @@ mod tests {
+         }
+     }
+ 
++    mod parse_reuse {
++        use crate::{
++            domain::{ElementKind, KnowledgeId, LineRange, RepoPath, Sha256, TreeOid},
++            markdown::{Diagnostic, MarkdownParser},
++            service::{
++                CacheDatabase, CapturedFile, CommandErrorKind, CommandResult, DocumentResult,
++                FileError, FileErrorKind, FileStat, KnowledgeMetadata, MarkdownCodec,
++                MockFileReader, ParsedFile, ProvenanceObservation, ProvenanceRequest,
++                SearchFilters, SearchFlag, SearchLink, SnapshotError, SourceProvenance,
++                SourceRevisionComparison, SourceRevisionRequest, TransactionError,
++                search::{CurrentKnowledge, SearchEligibility, map_search_error},
++            },
++            storage::{TestDatabases, open_test_storage},
++        };
++        use std::{
++            cell::Cell,
++            collections::{BTreeMap, BTreeSet},
++            path::Path,
++        };
++
++        struct CountedParser(Cell<usize>);
++        struct NoSources;
++
++        #[test]
++        fn repeated_bindings_capture_every_time_but_parse_once_per_operation() {
++            // Given: eight published sections of one unchanged current file.
++            let bytes = build_sections(8);
++            let nodes = build_metadata("note.md", &bytes);
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            let files = build_files(vec![Some(bytes.clone()); 16]);
++            // When: the same live collaborators serve two independent eligibility operations.
++            let first = get_links(&storage, &files, &parser, &nodes);
++            let second = get_links(&storage, &files, &parser, &nodes);
++            // Then: all links remain current, all sixteen captures occur, and neither parse survives its operation.
++            assert_eq!(first.len(), 8);
++            assert_eq!(second.len(), 8);
++            assert!(
++                first
++                    .values()
++                    .chain(second.values())
++                    .all(|link| link.flags.is_empty())
++            );
++            assert_eq!(parser.0.get(), 2);
++        }
++
++        #[test]
++        fn changed_invalid_missing_and_restored_captures_retain_their_flags() {
++            // Given: eight section bindings encounter same-size edits, invalid bytes, absence, and restoration.
++            let original = build_sections(8);
++            let edited = String::from_utf8(original.clone())
++                .unwrap()
++                .replace("body", "edit")
++                .into_bytes();
++            let invalid = b"<!-- letopis: {} -->\ninvalid\n".to_vec();
++            let files = build_files(vec![
++                Some(original.clone()),
++                Some(edited),
++                Some(original.clone()),
++                Some(invalid.clone()),
++                Some(invalid),
++                None,
++                Some(original.clone()),
++                Some(original.clone()),
++            ]);
++            let nodes = build_metadata("note.md", &original);
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            // When: eligibility follows sorted bindings while every capture independently changes.
++            let links = get_links(&storage, &files, &parser, &nodes);
++            // Then: exact current-byte changes are visible, and invalid parses are retried rather than retained.
++            let stale: Vec<_> = links
++                .values()
++                .map(|link| link.flags.contains(&SearchFlag::Stale))
++                .collect();
++            assert_eq!(stale, [false, true, false, true, true, true, false, false]);
++            assert_eq!(parser.0.get(), 6);
++        }
++
++        #[test]
++        fn equal_bytes_at_distinct_paths_need_distinct_parses() {
++            // Given: two files contain identical section bytes but have distinct knowledge identities.
++            let bytes = build_sections(2);
++            let mut nodes = build_metadata("a.md", &bytes);
++            nodes.extend(build_metadata("b.md", &bytes));
++            let files = build_files(vec![Some(bytes); 4]);
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            // When: sorted demand moves from a.md to b.md.
++            let links = get_links(&storage, &files, &parser, &nodes);
++            // Then: each file is parsed once and no path-specific identity leaks to the next file.
++            assert_eq!(links.len(), 4);
++            assert!(links.values().all(|link| link.flags.is_empty()));
++            assert_eq!(parser.0.get(), 2);
++        }
++
++        #[test]
++        fn oversized_inputs_and_entry_sets_bypass_retention() {
++            // Given: byte and entry budgets are independently exceeded by valid files.
++            let long_path = format!("{}.md", "n".repeat(300));
++            for (path, bytes) in [
++                (
++                    "note.md",
++                    [build_sections(2), vec![b'x'; 256 * 1024]].concat(),
++                ),
++                ("note.md", build_sections(1025)),
++                (long_path.as_str(), build_sections(1024)),
++            ] {
++                let mut nodes = build_metadata(path, &bytes);
++                nodes.retain(|id, _| {
++                    id.as_str().ends_with("s0000") || id.as_str().ends_with("s0001")
++                });
++                let files = build_files(vec![Some(bytes); 2]);
++                let parser = CountedParser(Cell::new(0));
++                let root = tempfile::tempdir().unwrap();
++                let storage =
++                    open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                        .unwrap();
++                // When: both bindings are evaluated using the ordinary path.
++                let links = get_links(&storage, &files, &parser, &nodes);
++                // Then: bypass changes no flags and retains no reusable parse.
++                assert_eq!(links.len(), 2);
++                assert!(links.values().all(|link| link.flags.is_empty()));
++                assert_eq!(parser.0.get(), 2);
++            }
++        }
++
++        #[test]
++        fn missing_capture_discards_the_previous_success() {
++            // Given: a valid file disappears between its three bindings and then returns unchanged.
++            let bytes = build_sections(3);
++            let nodes = build_metadata("note.md", &bytes);
++            let files = build_files(vec![Some(bytes.clone()), None, Some(bytes)]);
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            // When: each binding captures its own current file state.
++            let links = get_links(&storage, &files, &parser, &nodes);
++            // Then: absence marks only its binding stale and restoration is parsed again.
++            assert_eq!(
++                links
++                    .values()
++                    .map(|link| link.flags.contains(&SearchFlag::Stale))
++                    .collect::<Vec<_>>(),
++                [false, true, false]
++            );
++            assert_eq!(parser.0.get(), 2);
++        }
++
++        #[test]
++        fn every_binding_still_checks_its_own_hash_and_lines() {
++            // Given: three pinned bindings include a wrong hash and wrong line range.
++            let bytes = build_sections(3);
++            let mut nodes = build_metadata("note.md", &bytes);
++            nodes
++                .get_mut(&KnowledgeId::parse("note.md#s0001").unwrap())
++                .unwrap()
++                .hash = Sha256::digest(b"wrong");
++            nodes
++                .get_mut(&KnowledgeId::parse("note.md#s0002").unwrap())
++                .unwrap()
++                .lines = LineRange::new(1, 2).unwrap();
++            let files = build_files(vec![Some(bytes); 3]);
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            // When: all bindings reuse one successful parse after their fresh captures.
++            let links = get_links(&storage, &files, &parser, &nodes);
++            // Then: stale predicates use each pinned node rather than the first node's answer.
++            assert_eq!(
++                links
++                    .values()
++                    .map(|link| link.flags.contains(&SearchFlag::Stale))
++                    .collect::<Vec<_>>(),
++                [false, true, true]
++            );
++            assert_eq!(parser.0.get(), 1);
++        }
++
++        #[test]
++        fn retained_projection_releases_search_and_graph_payloads() {
++            // Given: a valid whole-file element contains searchable text and a graph link.
++            let bytes = b"<!-- letopis: {\"created_at\":1} -->\nbody [source](code.rs \"letopis:type=external;path=code.rs\")\n";
++            let nodes = build_metadata("note.md", bytes);
++            let files = build_files(vec![Some(bytes.to_vec())]);
++            let parser = CountedParser(Cell::new(0));
++            let mut current = CurrentKnowledge {
++                filesystem: &files,
++                markdown: &parser,
++                last_parsed: None,
++            };
++            // When: one current binding leaves a reusable eligibility projection.
++            let link = current
++                .build_link(nodes.values().next().unwrap(), 1)
++                .unwrap();
++            let parsed = &current.last_parsed.as_ref().unwrap().parsed;
++            // Then: only bounded element metadata is retained, while text buffers and graph allocations are released.
++            assert!(link.flags.is_empty());
++            assert!(parsed.edges.is_empty());
++            assert_eq!(parsed.elements.len(), 1);
++            assert_eq!(parsed.elements[0].search_text.capacity(), 0);
++        }
++
++        #[test]
++        fn fresh_capture_errors_abort_without_retaining_state_for_retry() {
++            // Given: a safe first capture is followed by an I/O error at the second binding.
++            let bytes = build_sections(2);
++            let nodes = build_metadata("note.md", &bytes);
++            let mut files = MockFileReader::new();
++            let mut demand = 0;
++            files
++                .expect_file_get_by_path()
++                .times(4)
++                .returning(move |_| {
++                    demand += 1;
++                    if demand == 2 {
++                        return Err(FileError::new(FileErrorKind::Io));
++                    }
++                    Ok(Some(build_capture(bytes.clone())))
++                });
++            let parser = CountedParser(Cell::new(0));
++            let root = tempfile::tempdir().unwrap();
++            let storage =
++                open_test_storage(&root.path().join("cache"), &root.path().join("vectors"))
++                    .unwrap();
++            // When: the failed operation is retried using the same collaborators.
++            let error = get_links_result(&storage, &files, &parser, &nodes).unwrap_err();
++            let links = get_links(&storage, &files, &parser, &nodes);
++            // Then: I/O remains an error rather than stale or partial success, and the retry parses afresh.
++            assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
++            assert_eq!(links.len(), 2);
++            assert!(links.values().all(|link| link.flags.is_empty()));
++            assert_eq!(parser.0.get(), 2);
++        }
++
++        impl MarkdownCodec for CountedParser {
++            fn file_parse(
++                &self,
++                path: &RepoPath,
++                bytes: &[u8],
++            ) -> Result<Option<ParsedFile>, Vec<Diagnostic>> {
++                self.0.set(self.0.get() + 1);
++                MarkdownParser::new().file_parse(path, bytes)
++            }
++        }
++        impl SourceProvenance for NoSources {
++            fn validate_revisions(&self, _: &BTreeSet<TreeOid>) -> Result<(), SnapshotError> {
++                Ok(())
++            }
++            fn observe_sources(
++                &self,
++                _: ProvenanceRequest<'_>,
++            ) -> DocumentResult<ProvenanceObservation> {
++                Ok(ProvenanceObservation {
++                    flags: BTreeSet::new(),
++                    issues: BTreeSet::new(),
++                })
++            }
++            fn compare_revision(
++                &self,
++                _: SourceRevisionRequest<'_>,
++            ) -> Result<SourceRevisionComparison, SnapshotError> {
++                panic!("unfiltered search cannot compare revisions")
++            }
++        }
++        fn get_links(
++            storage: &TestDatabases,
++            files: &MockFileReader,
++            parser: &CountedParser,
++            nodes: &BTreeMap<KnowledgeId, KnowledgeMetadata>,
++        ) -> BTreeMap<KnowledgeId, SearchLink> {
++            get_links_result(storage, files, parser, nodes).unwrap()
++        }
++        fn get_links_result(
++            storage: &TestDatabases,
++            files: &MockFileReader,
++            parser: &CountedParser,
++            nodes: &BTreeMap<KnowledgeId, KnowledgeMetadata>,
++        ) -> CommandResult<BTreeMap<KnowledgeId, SearchLink>> {
++            storage
++                .cache
++                .with_read_tx(|| {
++                    SearchEligibility {
++                        storage: &storage.cache,
++                        filesystem: files,
++                        markdown: parser,
++                        provenance: &NoSources,
++                    }
++                    .get_eligible_links(nodes, &SearchFilters::default())
++                })
++                .map_err(|error| match error {
++                    TransactionError::Operation(error) => error,
++                    TransactionError::Storage(error) => map_search_error(error),
++                })
++        }
++        fn build_files(captures: Vec<Option<Vec<u8>>>) -> MockFileReader {
++            let mut files = MockFileReader::new();
++            let count = captures.len();
++            let mut captures = captures.into_iter();
++            files
++                .expect_file_get_by_path()
++                .times(count)
++                .returning(move |_: &Path| {
++                    Ok(captures.next().expect("extra live read").map(build_capture))
++                });
++            files
++        }
++        fn build_capture(bytes: Vec<u8>) -> CapturedFile {
++            CapturedFile {
++                bytes,
++                stat: FileStat {
++                    size: 1,
++                    mtime_ns: 1,
++                    inode: 1,
++                    device: 1,
++                },
++                checked_at_ns: 1,
++            }
++        }
++        fn build_sections(count: usize) -> Vec<u8> {
++            (0..count).map(|index| format!("## Section {{#s{index:04}}}\n<!-- letopis: {{\"created_at\":1}} -->\nbody\n"))
++                .collect::<String>().into_bytes()
++        }
++        fn build_metadata(path: &str, bytes: &[u8]) -> BTreeMap<KnowledgeId, KnowledgeMetadata> {
++            MarkdownParser::new()
++                .file_parse(&RepoPath::parse(path).unwrap(), bytes)
++                .unwrap()
++                .unwrap()
++                .elements
++                .into_iter()
++                .map(|parsed| {
++                    let element = parsed.element;
++                    (
++                        element.id.clone(),
++                        KnowledgeMetadata {
++                            uri: element.id.clone(),
++                            id: element.id,
++                            kind: ElementKind::Vertex,
++                            hash: element.hash,
++                            created_at: 1,
++                            source_snapshot: None,
++                            lines: element.lines,
++                            search_hash: parsed.search_hash,
++                        },
++                    )
++                })
++                .collect()
++        }
++    }
++
+     fn build_noop_refresher() -> MockRefresher {
+         let mut refresher = MockRefresher::new();
+         refresher.expect_reindex().times(0);

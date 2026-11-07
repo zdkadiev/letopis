@@ -1,0 +1,17 @@
+{
+  "baseline": "3d820de41ee12385bc734ac4ceeb56b78ba379f9",
+  "source_sha256": "94a1c8473134b681fa36690368da520bff9fab2d241093775e9fc5d6939f7c41",
+  "patch_sha256": "a9fd5947e0db0d9eb7972d3b1eb4510435b84fbb9386d3d39518fa5e0dd5c4a8",
+  "binary": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parse-memo/bin/letopis",
+  "binary_sha256": "7106a460e5177bfe1472b543840908ec69f684e1826e9b40823d5f37050eeb7a",
+  "binary_size": 11117176,
+  "debug_info": "CARGO_PROFILE_RELEASE_DEBUG=1",
+  "version": "letopis 0.2.0",
+  "platform": "Darwin arm64",
+  "mutants_caught": 10,
+  "mutants_total": 10,
+  "source_restored": true,
+  "verification_exit": 0,
+  "scoped_final_tests_passed": 8,
+  "background_work": "none"
+}

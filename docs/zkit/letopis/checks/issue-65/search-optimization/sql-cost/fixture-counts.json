@@ -1,0 +1,9 @@
+{
+  "source_read_mode": "sqlite URI mode=ro and query_only=on; cache copied with SQLite backup",
+  "vector_keys": 100000,
+  "knowledge": 100000,
+  "vector_covered_knowledge": 100000,
+  "resolved_edges": 500000,
+  "unresolved_edges": 0,
+  "cache_copy_sha256": "6eb479a70e8345f632a8f6acf8752ebe0ee53bd1087333316feb10c9e3a15abf"
+}

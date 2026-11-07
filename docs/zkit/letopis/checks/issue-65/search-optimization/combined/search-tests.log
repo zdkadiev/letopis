@@ -1,0 +1,49 @@
+   Compiling ring v0.17.14
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/combined/source)
+   Compiling rustls v0.23.46
+   Compiling rustls-webpki v0.103.16
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling ureq v3.4.2
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.90s
+     Running unittests src/lib.rs (.artifacts/issue-65/search-optimization-2026-11-06/parser-cpu/target/debug/deps/letopis-43e59323f2756d14)
+
+running 36 tests
+test service::search::comparisons::tests::exact_basis_address_range_and_revision_are_distinct ... ok
+test service::search::comparisons::tests::successful_comparison_variants_are_preserved ... ok
+test service::search::comparisons::tests::unavailable_basis_is_rechecked_when_the_same_key_becomes_available ... ok
+test service::search::tests::literal_query_quotes_unicode_tokens_without_fts_operators ... ok
+test service::search::tests::filters::excluded_nonfinite_metrics_remain_integrity_errors ... ok
+test service::search::tests::filters::excluded_channel_heads_do_not_consume_limit ... ok
+test service::search::tests::filters::eligible_ties_and_duplicates_keep_identity_order ... ok
+test service::search::tests::filters::eligible_channel_ranks_are_recomputed_before_fusion ... ok
+test service::search::comparisons::tests::revision_failures_are_retried_and_overflow_recomputes ... ok
+test service::search::tests::parse_reuse::retained_projection_releases_search_and_graph_payloads ... ok
+test service::search::tests::rank_weight_checks_integer_conversion_and_preserves_reciprocals ... ok
+test service::search::tests::ranking_orders_ties_deduplicates_and_keeps_disjoint_channels ... ok
+test service::search::tests::ranking_rejects_nonfinite_native_metrics ... ok
+test service::search::tests::reciprocal_rank_unions_channels_before_limit ... ok
+test service::search::tests::reciprocal_ranks_reward_overlap_before_applying_small_limit ... ok
+test service::search::tests::parse_reuse::changed_invalid_missing_and_restored_captures_retain_their_flags ... ok
+test service::search::tests::parse_reuse::missing_capture_discards_the_previous_success ... ok
+test service::search::tests::parse_reuse::every_binding_still_checks_its_own_hash_and_lines ... ok
+test service::search::tests::parse_reuse::equal_bytes_at_distinct_paths_need_distinct_parses ... ok
+test service::search::tests::parse_reuse::repeated_bindings_capture_every_time_but_parse_once_per_operation ... ok
+test service::search::tests::parse_reuse::fresh_capture_errors_abort_without_retaining_state_for_retry ... ok
+test service::search::tests::signed_zero_metrics_tie_by_identity_in_both_channels ... ok
+test service::search::tests::candidate_metadata_rejects_wrong_rows_and_search_hashes ... ok
+test service::search::tests::malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed ... ok
+test service::search::tests::filters::changing_observer_is_called_once_and_retained_flags_drive_rendering ... ok
+test service::search::tests::captured_vector_configuration_requires_matching_identity_and_native_dimensions ... ok
+test service::search::tests::unavailable_or_changed_vector_channel_keeps_fts_fallback ... ok
+test service::search::tests::scoped::revisions::first_observation_failure_precedes_later_candidate_comparison ... ok
+test service::search::tests::scoped::revisions::revision_cache_keeps_demand_order_and_resets_between_searches ... ok
+test service::search::tests::scoped::metadata_failure_after_query_releases_pinned_view ... ok
+test service::search::tests::scoped::search_observes_metadata_and_bindings_from_original_pinned_view ... ok
+test service::search::tests::scoped::late_provenance_failure_releases_pinned_view_while_service_stays_alive ... ok
+test service::search::tests::filters::revision_comparison_errors_preserve_typed_codes ... ok
+test service::search::tests::scoped::non_ready_configuration_preserves_fts_and_one_pinned_consumer_view ... ok
+test service::search::tests::parse_reuse::oversized_inputs_and_entry_sets_bypass_retention ... ok
+test service::search::tests::filters::revision_preflight_precedes_provider_and_candidate_dependent_exits ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 582 filtered out; finished in 1.84s
+

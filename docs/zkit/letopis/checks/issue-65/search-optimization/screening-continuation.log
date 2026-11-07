@@ -1,0 +1,5 @@
+{"label": "baseline", "phase": "screen", "mode": "hybrid", "seconds": 117.01996212499216, "valid": true, "cpu": 111.17413599999999, "rss": 179142656}
+{"label": "parser", "phase": "screen", "mode": "hybrid", "seconds": 91.07506554108113, "valid": true, "cpu": 86.269393, "rss": 188743680}
+{"label": "memo", "phase": "screen", "mode": "hybrid", "seconds": 62.733120708027855, "valid": true, "cpu": 58.721255, "rss": 190038016}
+{"label": "combined", "phase": "screen", "mode": "hybrid", "seconds": 61.14591208402999, "valid": true, "cpu": 57.507219, "rss": 194052096}
+Serial screening complete

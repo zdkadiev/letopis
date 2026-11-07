@@ -1,0 +1,62 @@
+[
+  {
+    "name": "ignore-content-hash",
+    "test": "changed_invalid_missing_and_restored_captures_retain_their_flags",
+    "exit": 101,
+    "caught": false
+  },
+  {
+    "name": "ignore-path",
+    "test": "equal_bytes_at_distinct_paths_need_distinct_parses",
+    "exit": 101,
+    "caught": false
+  },
+  {
+    "name": "ignore-binding-predicates",
+    "test": "every_binding_still_checks_its_own_hash_and_lines",
+    "exit": 101,
+    "caught": true
+  },
+  {
+    "name": "retain-through-missing",
+    "test": "missing_capture_discards_the_previous_success",
+    "exit": 101,
+    "caught": true
+  },
+  {
+    "name": "remove-byte-bound",
+    "test": "oversized_inputs_and_entry_sets_bypass_retention",
+    "exit": 101,
+    "caught": false
+  },
+  {
+    "name": "remove-entry-bound",
+    "test": "oversized_inputs_and_entry_sets_bypass_retention",
+    "exit": 101,
+    "caught": false
+  },
+  {
+    "name": "remove-id-bound",
+    "test": "oversized_inputs_and_entry_sets_bypass_retention",
+    "exit": 101,
+    "caught": false
+  },
+  {
+    "name": "retain-search-text",
+    "test": "retained_projection_releases_search_and_graph_payloads",
+    "exit": 101,
+    "caught": true
+  },
+  {
+    "name": "retain-graph",
+    "test": "retained_projection_releases_search_and_graph_payloads",
+    "exit": 101,
+    "caught": true
+  },
+  {
+    "name": "skip-fresh-capture",
+    "test": "repeated_bindings_capture_every_time_but_parse_once_per_operation",
+    "exit": 101,
+    "caught": true
+  }
+]

@@ -1,0 +1,121 @@
+{
+  "baseline": {
+    "samples": [
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 1.26595975
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 1.2822995
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 1.245512583
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 1.326768667
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 1.303081792
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 1.294435167
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 1.271810916
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 1.2373977919999999
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 1.30402725
+      }
+    ],
+    "median_seconds": 1.2822995
+  },
+  "line_cursor": {
+    "samples": [
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 0.77671175
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 0.814558375
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 0.827556708
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 0.800475292
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 0.812329833
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 0.897222209
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 0.815369917
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 0.789100917
+      },
+      {
+        "iterations": 2000,
+        "bytes": 60000,
+        "elements": 30,
+        "elapsed_seconds": 0.779285958
+      }
+    ],
+    "median_seconds": 0.812329833
+  },
+  "projections_identical": true
+}

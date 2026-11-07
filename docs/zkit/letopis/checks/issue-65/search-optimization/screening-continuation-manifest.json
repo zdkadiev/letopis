@@ -1,0 +1,31 @@
+{
+  "started_utc": "2026-11-06T19:23:28Z",
+  "variants": [
+    {
+      "label": "baseline",
+      "binary": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/product/letopis",
+      "sha256": "9a3e2b70a907d135604ad04e6491e358d07575e987c1457d514a1820c2d2ba6a",
+      "source": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/2026-11-06-native-followup/source"
+    },
+    {
+      "label": "parser",
+      "binary": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parser-cpu/letopis-parser-cpu",
+      "sha256": "83b990af8b7b16c650fbf3c1f9453d86988e910347e2c665c6210d6dd03947e0",
+      "source": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parser-cpu/source"
+    },
+    {
+      "label": "memo",
+      "binary": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parse-memo/bin/letopis",
+      "sha256": "7106a460e5177bfe1472b543840908ec69f684e1826e9b40823d5f37050eeb7a",
+      "source": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parse-memo/source"
+    },
+    {
+      "label": "combined",
+      "binary": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/combined/letopis-combined",
+      "sha256": "386a82e2cc1ca6f05abbc2b076bddf229938499abc35f74f8ef6d410416a77ae",
+      "source": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/combined/source"
+    }
+  ],
+  "scope": "serial screening, n=1 per variant after one complete baseline conditioning call; not final comparative speedup evidence",
+  "host_shared": true
+}

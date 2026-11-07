@@ -1,0 +1,24 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parse-memo/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.49s
+     Running unittests src/lib.rs (../target/debug/deps/letopis-43e59323f2756d14)
+
+running 1 test
+test service::search::tests::parse_reuse::changed_invalid_missing_and_restored_captures_retain_their_flags ... FAILED
+
+failures:
+
+---- service::search::tests::parse_reuse::changed_invalid_missing_and_restored_captures_retain_their_flags stdout ----
+
+thread 'service::search::tests::parse_reuse::changed_invalid_missing_and_restored_captures_retain_their_flags' (541389035) panicked at src/service/search.rs:2348:13:
+assertion `left == right` failed
+  left: [false, false, false, false, false, true, false, false]
+ right: [false, true, false, true, true, true, false, false]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    service::search::tests::parse_reuse::changed_invalid_missing_and_restored_captures_retain_their_flags
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 617 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,76 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parser-cpu/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.38s
+     Running tests/markdown_elements.rs (../target/debug/deps/markdown_elements-c4e21ca0b637474f)
+
+running 12 tests
+test locates_the_complete_invalid_comment_without_unrelated_prefix_text ... ok
+test anchors_are_unique_across_real_headings ... ok
+test snapshot_metadata_preserves_full_oid_and_zero_created_at ... ok
+test unmarked_markdown_is_not_corpus_and_invalid_utf8_is_rejected ... ok
+test code_examples_do_not_declare_elements ... ok
+test adjacent_sections_preserve_lines_across_gaps_unicode_and_line_endings ... ok
+test metadata_must_fit_exactly_one_standalone_line ... ok
+test nested_elements_and_orphan_metadata_are_rejected ... ok
+test raw_html_content_does_not_declare_metadata ... ok
+test unicode_crlf_and_eof_have_exact_spans ... ok
+test file_errors_never_return_partial_elements ... ok
+test golden_elements_have_exact_bytes_and_metadata ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_link_lifecycle.rs (../target/debug/deps/markdown_link_lifecycle-80b0757a988b0029)
+
+running 6 tests
+test syntax_migration_preserves_literal_search_text_and_updates_exact_bytes ... ok
+test matching_missing_targets_keep_existing_diagnostics ... ok
+test link_syntax_migration_reuses_vectors_and_preserves_source_basis ... ok
+test legacy_titles_never_publish_into_a_fresh_cache ... ok
+test reindex_reparses_unchanged_pre_upgrade_rows ... ok
+test status_reports_published_path_mismatch_until_a_refresh_repairs_it ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
+
+     Running tests/markdown_link_paths.rs (../target/debug/deps/markdown_link_paths-7236c4fb09d61b17)
+
+running 10 tests
+test compares_paths_from_the_containing_section_file ... ok
+test uses_path_as_the_only_target ... ok
+test rejects_bad_metadata_before_comparing_navigation ... ok
+test rejects_encoded_separators_even_when_decoding_would_match ... ok
+test uses_metadata_ranges_even_when_navigation_is_a_canonical_address ... ok
+test rejects_legacy_titles ... ok
+test decodes_only_navigation_paths_once ... ok
+test preserves_terminal_address_bytes ... ok
+test ignores_navigation_fragments_and_target_existence ... ok
+test rejects_mismatched_and_unsupported_navigation_paths ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_links.rs (../target/debug/deps/markdown_links-c59d185af2fd8e15)
+
+running 7 tests
+test image_alt_links_do_not_declare_edges ... ok
+test links_outside_elements_are_only_navigation ... ok
+test links_wrapping_images_still_declare_edges ... ok
+test inline_links_after_image_alt_text_still_declare_edges ... ok
+test sources_are_normalized_without_loading_destinations ... ok
+test only_inline_links_declare_edges ... ok
+test invalid_graph_titles_and_targets_fail_file ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_search.rs (../target/debug/deps/markdown_search-09d32edd236e837f)
+
+running 9 tests
+test moving_path_preserves_text_hashes ... ok
+test code_examples_remain_searchable ... ok
+test crlf_metadata_line_does_not_add_search_whitespace ... ok
+test reference_labels_use_whole_file_context ... ok
+test own_text_label_and_code_change_search_hash ... ok
+test search_text_preserves_word_and_block_boundaries ... ok
+test equivalent_link_syntax_preserves_literal_search_text_and_hash ... ok
+test metadata_and_link_changes_keep_search_hash ... ok
+test golden_search_representations ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,6 @@
+{
+  "duration_seconds": 0.8500867912080139,
+  "model": "embeddinggemma:300m-qat-q4_0",
+  "dimensions": 768,
+  "scope": "single direct query warmup outside measured CLI calls; no vector database write"
+}

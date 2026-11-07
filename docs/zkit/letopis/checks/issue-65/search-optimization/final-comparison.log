@@ -1,0 +1,39 @@
+{"label": "before", "phase": "measured", "mode": "hybrid", "seconds": 114.43447187496349, "valid": true, "cpu": 108.14304800000001, "rss": 182353920}
+{"label": "after", "phase": "measured", "mode": "hybrid", "seconds": 62.91646270779893, "valid": true, "cpu": 58.679688999999996, "rss": 181714944}
+{"label": "after", "phase": "measured", "mode": "hybrid", "seconds": 60.99676312482916, "valid": true, "cpu": 57.23388, "rss": 186433536}
+{"label": "before", "phase": "measured", "mode": "hybrid", "seconds": 110.91821866692044, "valid": true, "cpu": 105.96047899999999, "rss": 196034560}
+{"label": "before", "phase": "measured", "mode": "hybrid", "seconds": 111.88586795795709, "valid": true, "cpu": 106.628184, "rss": 189333504}
+{"label": "after", "phase": "measured", "mode": "hybrid", "seconds": 61.10203754086979, "valid": true, "cpu": 57.269202, "rss": 189415424}
+{
+  "before": {
+    "samples_seconds": [
+      114.43447187496349,
+      110.91821866692044,
+      111.88586795795709
+    ],
+    "median_seconds": 111.88586795795709
+  },
+  "after": {
+    "samples_seconds": [
+      62.91646270779893,
+      60.99676312482916,
+      61.10203754086979
+    ],
+    "median_seconds": 61.10203754086979
+  },
+  "speedup": 1.8311315376859427,
+  "latency_reduction_percent": 45.38895871654688,
+  "valid_calls": 6,
+  "n_per_side": 3
+}
+{"label": "before", "phase": "measured", "mode": "fts", "seconds": 0.7396352919749916, "valid": true, "cpu": 0.666441, "rss": 18464768}
+{"label": "after", "phase": "measured", "mode": "fts", "seconds": 0.7355073338840157, "valid": true, "cpu": 0.6802699999999999, "rss": 18923520}
+{"label": "after", "phase": "measured", "mode": "fts", "seconds": 0.6298716249875724, "valid": true, "cpu": 0.620821, "rss": 18497536}
+{"label": "before", "phase": "measured", "mode": "fts", "seconds": 0.6825298750773072, "valid": true, "cpu": 0.6368659999999999, "rss": 19136512}
+{"label": "before", "phase": "measured", "mode": "fts", "seconds": 0.6690517920069396, "valid": true, "cpu": 0.631657, "rss": 18989056}
+{"label": "after", "phase": "measured", "mode": "fts", "seconds": 0.626173583092168, "valid": true, "cpu": 0.616484, "rss": 18579456}
+{"label": "after", "phase": "measured", "mode": "fts", "seconds": 0.7082526658196002, "valid": true, "cpu": 0.6356059999999999, "rss": 18595840}
+{"label": "before", "phase": "measured", "mode": "fts", "seconds": 0.6883635411504656, "valid": true, "cpu": 0.6457099999999999, "rss": 18956288}
+{"label": "before", "phase": "measured", "mode": "fts", "seconds": 0.6483099171891809, "valid": true, "cpu": 0.63541, "rss": 18661376}
+{"label": "after", "phase": "measured", "mode": "fts", "seconds": 0.6746258330531418, "valid": true, "cpu": 0.640048, "rss": 18677760}
+Final ordinary comparisons complete

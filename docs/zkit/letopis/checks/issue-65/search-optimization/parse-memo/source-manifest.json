@@ -1,0 +1,25 @@
+{
+  "baseline": "3d820de41ee12385bc734ac4ceeb56b78ba379f9",
+  "patch_sha256": "a9fd5947e0db0d9eb7972d3b1eb4510435b84fbb9386d3d39518fa5e0dd5c4a8",
+  "files": {
+    "src/service/search.rs": "94a1c8473134b681fa36690368da520bff9fab2d241093775e9fc5d6939f7c41",
+    "src/service/utils.rs": "e663dd2a5078fb21ccd409d0b194b856cf2dbdeb8163d3c75845368546463893",
+    "src/service/types.rs": "a28a8ed6876c7c1c7d25d162fcb131779f472a6ce44c73904577a4e1fd287202",
+    "src/service/mod.rs": "572ab0eb134df1d3b32c1094ebdad579c1b888638a867c8c19b66cb3b623936c",
+    "Cargo.toml": "2b7c5f55e87e02c35c7ad553c12b1fe77dd87e743163b26fdbc83930f0854c15",
+    "Cargo.lock": "21027320b69f0f03f3685e58de112182708ccb87182abed722cca4d53f2aa8e4",
+    "rust-toolchain.toml": "12dc5d64dbd96c1b07be2943241d52d9f6127a79ba47a820455ba7b873fc896a"
+  },
+  "build_env": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "../target",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1"
+  },
+  "build_command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline"
+  ]
+}

@@ -1,0 +1,22 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/search-optimization-2026-11-06/parse-memo/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.75s
+     Running unittests src/lib.rs (../target/debug/deps/letopis-43e59323f2756d14)
+
+running 1 test
+test service::search::tests::parse_reuse::equal_bytes_at_distinct_paths_need_distinct_parses ... FAILED
+
+failures:
+
+---- service::search::tests::parse_reuse::equal_bytes_at_distinct_paths_need_distinct_parses stdout ----
+
+thread 'service::search::tests::parse_reuse::equal_bytes_at_distinct_paths_need_distinct_parses' (541915268) panicked at src/service/search.rs:2368:13:
+assertion failed: links.values().all(|link| link.flags.is_empty())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    service::search::tests::parse_reuse::equal_bytes_at_distinct_paths_need_distinct_parses
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 617 filtered out; finished in 0.09s
+
+error: test failed, to rerun pass `--lib`

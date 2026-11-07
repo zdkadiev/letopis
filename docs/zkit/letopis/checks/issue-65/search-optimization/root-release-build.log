@@ -1,0 +1,7 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.46
+   Compiling rustls-webpki v0.103.16
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling ureq v3.4.2
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis)
+    Finished `release` profile [optimized + debuginfo] target(s) in 27.39s
