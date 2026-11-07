@@ -2336,3 +2336,28 @@ paired CLI measurements или formal hardware acceptance. Итог провер
 
 **Связи:** [design](../../superpowers/specs/2026-11-07-exact-vector-index-design.md),
 [mechanics](mechanics.md), [D-79](#D-79), [D-96](#D-96).
+
+
+### D-108 — ограниченные SQL-кандидаты гибридного search {#D-108}
+
+**Статус:** согласовано пользователем; реализовано и проверено на host · **Дата:** 2026-11-07
+
+Пользователь согласовал ограничение выборки из БД: без limit применяется 100,
+явное положительное значение ограничивается сверху 100. FTS и nearest-vector
+matching, SQL ordering и final candidate limit выполняются в SQLite; приложение
+получает только выбранные metadata-строки. Конкретный согласованный дизайн —
+до L knowledge hits на канал, до 2L уникальных кандидатов, до L ссылок в ответе.
+Фильтры и fresh captures работают внутри этого пула, без refill; ошибки и
+изменения за его пределами не наблюдаются. Это явное изменение прежнего полного
+eligible-channel ranking и tail-error поведения D-107/MC-6.
+
+Нативный K внутри vec1 пока сохраняет полное покрытие для orphan vectors и URI
+ties, а SQL LIMIT после joins ограничивает выдачу knowledge rows. Ни полный набор
+векторов, ни все совпадения не материализуются в Rust. SQLite работает внутри
+процесса CLI и имеет собственную рабочую память; bounded output не обещает O(L)
+внутреннего сканирования. Векторное хранение/identity, синхронная модель и FTS
+fallback не меняются. Измеренный корпус — 100k знаний/100k векторов; существующее
+физическое sharing по search_hash сохраняется, новая схема дедупликации не вводится.
+
+**Связи:** [design](../../superpowers/specs/2026-11-07-bounded-search-design.md),
+[plan](../../superpowers/plans/2026-11-07-bounded-search.md), [MC-6](mechanics.md#mc-6--чтение-поиск-и-обход).

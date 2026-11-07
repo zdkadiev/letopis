@@ -1,0 +1,70 @@
+ M docs/zkit/letopis/contracts/X-1-cli.md
+ M docs/zkit/letopis/contracts/schemas/X-1-cli.yaml
+ M docs/zkit/letopis/decisions.md
+ M docs/zkit/letopis/mechanics.md
+ M docs/zkit/letopis/mechanics/storage-schema.sql
+ M examples/storage_check.rs
+ M letopis/architecture/search-pipeline.md
+ M letopis/architecture/storage.md
+ M src/cli/help.rs
+ M src/cli/input.rs
+ M src/cli/search_tests.rs
+ M src/git/cleanup.rs
+ M src/git/durability.rs
+ M src/git/objects.rs
+ M src/git/reader.rs
+ M src/git/validation.rs
+ M src/markdown/scan.rs
+ M src/service/document_refresher.rs
+ M src/service/embedding.rs
+ M src/service/mod.rs
+ M src/service/search.rs
+ M src/service/status.rs
+ M src/service/traversal.rs
+ M src/service/types.rs
+ M src/service/utils.rs
+ M src/storage/cache.rs
+ M src/storage/mod.rs
+ M src/storage/schema.rs
+ M src/storage/vector.rs
+ M src/storage/vectors.sql
+ M tests/cancellation_concurrency.rs
+ M tests/check_lifecycle.rs
+ M tests/corruption_recovery.rs
+ M tests/corruption_reindex.rs
+ M tests/embedding_lifecycle.rs
+ M tests/embedding_service.rs
+ M tests/index_command.rs
+ M tests/knowledge_search.rs
+ M tests/markdown_elements.rs
+ M tests/markdown_link_lifecycle.rs
+ M tests/performance/README.md
+ M tests/performance/contention.py
+ M tests/performance/report.py
+ M tests/performance/scenarios.py
+ M tests/performance/test_contention.py
+ M tests/performance/test_report.py
+ M tests/performance/test_scenarios.py
+ M tests/reindex_command.rs
+ M tests/search_consistency.rs
+ M tests/search_filters.rs
+ M tests/source_projection.rs
+ M tests/storage_cache.rs
+ M tests/storage_corruption.rs
+ M tests/storage_vectors.rs
+ M tests/support/documents.rs
+?? docs/superpowers/plans/2026-11-05-issue-65-refresh.md
+?? docs/superpowers/plans/2026-11-06-search-optimization.md
+?? docs/superpowers/plans/2026-11-07-bounded-search.md
+?? docs/superpowers/specs/2026-11-05-issue-65-refresh-design.md
+?? docs/superpowers/specs/2026-11-06-search-optimization-design.md
+?? docs/superpowers/specs/2026-11-07-bounded-search-design.md
+?? docs/superpowers/specs/2026-11-07-exact-vector-index-design.md
+?? docs/zkit/letopis/checks/issue-65/2026-11-06-100k/
+?? docs/zkit/letopis/checks/issue-65/check-status-profiling/
+?? docs/zkit/letopis/checks/issue-65/current/
+?? docs/zkit/letopis/checks/issue-65/native-followup/
+?? docs/zkit/letopis/checks/issue-65/search-next/
+?? docs/zkit/letopis/checks/issue-65/search-optimization/
+?? docs/zkit/letopis/checks/issue-65/vector-index/
+?? src/storage/vector_index.rs

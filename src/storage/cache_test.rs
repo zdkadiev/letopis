@@ -833,7 +833,10 @@ mod cancellation_tests {
     }
 
     fn get_text_matches_by_expression(read: &dyn StorageRead, expression: &str) -> Vec<String> {
-        read.text_index_get_by_expression(expression)
+        read.text_index_get_by_expression(
+            expression,
+            std::num::NonZeroUsize::new(100).unwrap(),
+        )
             .expect("FTS expression")
             .into_iter()
             .map(|found| found.id.as_str().to_owned())

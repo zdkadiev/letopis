@@ -677,7 +677,10 @@ fn reject_candidate_reappearing_before_publication() {
             assert_eq!(read.project_get_by_id().unwrap(), 1);
             assert_eq!(read.files_get().unwrap().len(), 1);
             assert_eq!(
-                read.text_index_get_by_expression("AlphaToken")
+                read.text_index_get_by_expression(
+                    "AlphaToken",
+                    std::num::NonZeroUsize::new(100).unwrap(),
+                )
                     .unwrap()
                     .len(),
                 1
@@ -713,7 +716,10 @@ fn fatal_read_is_not_an_invalid_markdown_publication() {
             assert_eq!(read.project_get_by_id().unwrap(), 1);
             assert_eq!(read.files_get().unwrap(), before);
             assert_eq!(
-                read.text_index_get_by_expression("AlphaToken")
+                read.text_index_get_by_expression(
+                    "AlphaToken",
+                    std::num::NonZeroUsize::new(100).unwrap(),
+                )
                     .unwrap()
                     .len(),
                 1
@@ -806,7 +812,11 @@ fn build_service() -> (TempDir, TestService) {
 fn get_matches(service: &mut TestService, text: &str) -> Vec<String> {
     service
         .cache
-        .with_read_tx(|| service.cache.text_index_get_by_expression(text))
+        .with_read_tx(|| {
+            service
+                .cache
+                .text_index_get_by_expression(text, std::num::NonZeroUsize::new(100).unwrap())
+        })
         .unwrap()
         .into_iter()
         .map(|row| row.id.as_str().to_owned())
@@ -2555,8 +2565,12 @@ mod reading {
             self.inner.files_get()
         }
 
-        fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>> {
-            self.inner.text_index_get_by_expression(expression)
+        fn text_index_get_by_expression(
+            &self,
+            expression: &str,
+            limit: NonZeroUsize,
+        ) -> StorageResult<Vec<TextMatch>> {
+            self.inner.text_index_get_by_expression(expression, limit)
         }
 
         fn vector_keys_get_by_search_hash(
@@ -2573,9 +2587,10 @@ mod reading {
             expected: &Sha256,
             query: &[f32],
             dimensions: usize,
+            limit: NonZeroUsize,
         ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
             self.inner
-                .vector_index_get_by_vector(expected, query, dimensions)
+                .vector_index_get_by_vector(expected, query, dimensions, limit)
         }
 
         fn embed_failures_get_by_search_hash(
@@ -2720,7 +2735,10 @@ mod reindex {
                 assert_eq!(read.project_get_by_id().unwrap(), 1);
                 assert_eq!(read.files_get().unwrap(), before);
                 assert_eq!(
-                    read.text_index_get_by_expression("AlphaToken").unwrap()[0]
+                    read.text_index_get_by_expression(
+                    "AlphaToken",
+                    std::num::NonZeroUsize::new(100).unwrap(),
+                ).unwrap()[0]
                         .id
                         .as_str(),
                     "note.md"

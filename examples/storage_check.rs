@@ -6,7 +6,7 @@ use letopis::{
         CacheDatabase, KnowledgeMetadata, NodeMetadata, StorageError, VectorDatabase, VectorOutcome,
     },
 };
-use std::{error::Error, fs, path::Path};
+use std::{error::Error, fs, num::NonZeroUsize, path::Path};
 
 const TEXT: &str = "shared acceptance text";
 const VECTOR: [f32; 3] = [1.0, 0.25, -0.5];
@@ -78,9 +78,10 @@ fn publish_nodes(cache: &impl CacheDatabase) -> Result<(), Box<dyn Error>> {
 }
 
 fn verify_text(cache: &impl CacheDatabase) -> Result<(), Box<dyn Error>> {
+    let limit = NonZeroUsize::new(2).ok_or("invalid fixture limit")?;
     cache.with_read_tx(|| {
         assert_eq!(cache.project_get_by_id()?, 1);
-        let matches = cache.text_index_get_by_expression("shared")?;
+        let matches = cache.text_index_get_by_expression("shared", limit)?;
         assert_eq!(
             matches
                 .iter()
@@ -94,12 +95,13 @@ fn verify_text(cache: &impl CacheDatabase) -> Result<(), Box<dyn Error>> {
 }
 
 fn verify_vectors(cache: &impl CacheDatabase, identity: &Sha256) -> Result<(), Box<dyn Error>> {
+    let limit = NonZeroUsize::new(2).ok_or("invalid fixture limit")?;
     let (vector, matches) = cache.with_read_tx(|| {
         assert_eq!(cache.project_get_by_id()?, 1);
         assert_eq!(cache.meta_get_by_id()?, Some(*identity));
         Ok::<_, StorageError>((
             cache.vector_keys_get_by_search_hash(identity, &Sha256::digest(TEXT.as_bytes()))?,
-            cache.vector_index_get_by_vector(identity, &VECTOR, 3)?,
+            cache.vector_index_get_by_vector(identity, &VECTOR, 3, limit)?,
         ))
     })?;
     let vector = require_current(vector)?.ok_or("missing vector")?;

@@ -1,0 +1,13 @@
+    Checking letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+error: this function has too many lines (62/60)
+   --> tests/storage_cache.rs:126:1
+    |
+126 | fn cache_commit_preserves_node_row_id() {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_lines
+    = note: `-D clippy::too-many-lines` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::too_many_lines)]`
+
+error: could not compile `letopis` (test "storage_cache") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

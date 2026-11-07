@@ -981,7 +981,11 @@ mod traced_storage {
             self.inner.files_get()
         }
 
-        fn text_index_get_by_expression(&self, _: &str) -> StorageResult<Vec<TextMatch>> {
+        fn text_index_get_by_expression(
+            &self,
+            _: &str,
+            _limit: NonZeroUsize,
+        ) -> StorageResult<Vec<TextMatch>> {
             panic!("query text")
         }
 
@@ -1020,6 +1024,7 @@ mod traced_storage {
             _: &Sha256,
             _: &[f32],
             _: usize,
+            _limit: NonZeroUsize,
         ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
             panic!("query vectors")
         }

@@ -1,0 +1,10 @@
+{
+  "command": "make verify V=1 (inside actual-root host storage runner)",
+  "result": "PASS",
+  "successful_groups": 170,
+  "passed_test_executions": 2460,
+  "failed_test_executions": 0,
+  "ignored_test_executions": 22,
+  "scope": "Counts include debug/release, lint-example and logged subprocess repetitions; they are executions, not unique tests. Host native remainder is separate.",
+  "log_sha256": "d744540df4ce35d5e8d23645c0117001e5f31abf592928b405ac03ded89a6f20"
+}

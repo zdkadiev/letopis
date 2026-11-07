@@ -546,17 +546,32 @@ impl StorageRead for CacheStorage {
         Ok(files)
     }
 
-    fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>> {
+    fn text_index_get_by_expression(
+        &self,
+        expression: &str,
+        limit: NonZeroUsize,
+    ) -> StorageResult<Vec<TextMatch>> {
         let db = self.get_connection()?;
         let mut stmt = db.prepare(
             "select nodes.uri, nodes.id, bm25(text_index) as score
                  from text_index
                  join nodes on nodes.id = text_index.rowid
                  where text_index match ?1 and nodes.kind <> ?2
-                 order by score, nodes.uri",
+                 order by score, nodes.uri
+                 limit ?3",
         )?;
         let mut rows = stmt
-            .query(params![expression, SOURCE_KIND])
+            .query(params![
+                expression,
+                SOURCE_KIND,
+                i64::try_from(limit.get()).map_err(|error| {
+                    StorageError::new_with_cause(
+                        StorageErrorKind::InternalError,
+                        "invalid persisted storage value",
+                        error,
+                    )
+                })?
+            ])
             .map_err(map_match)?;
         let mut found = Vec::new();
         while let Some(row) = rows.next().map_err(map_match)? {
@@ -593,11 +608,12 @@ impl StorageRead for CacheStorage {
         expected: &Sha256,
         query: &[f32],
         dimensions: usize,
+        limit: NonZeroUsize,
     ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>> {
         if self.meta_get_by_id()? != Some(*expected) {
             return Ok(VectorOutcome::ConfigChanged);
         }
-        vector_index_get_nearest_by_vector(self.get_connection()?, query, dimensions)
+        vector_index_get_nearest_by_vector(self.get_connection()?, query, dimensions, limit)
             .map(VectorOutcome::Current)
     }
 

@@ -1,5 +1,6 @@
 use letopis::service::StorageError;
 use letopis::service::{CacheDatabase, StorageRead};
+use std::num::NonZeroUsize;
 mod support;
 use letopis::{
     domain::{EdgeTarget, KnowledgeId},
@@ -32,7 +33,8 @@ fn reindex_binary_rebuilds_unchanged_fts_and_returns_next_revision() {
         .with_read_tx(|| {
             let read = &storage.cache;
             assert_eq!(
-                read.text_index_get_by_expression("AlphaToken").unwrap()[0]
+                read.text_index_get_by_expression("AlphaToken", NonZeroUsize::new(100).unwrap())
+                    .unwrap()[0]
                     .id
                     .as_str(),
                 "a.md"
@@ -81,19 +83,21 @@ fn reindex_binary_preserves_invalid_owner_and_exposes_current_diagnostic() {
         .with_read_tx(|| {
             let read = &storage.cache;
             assert_eq!(
-                read.text_index_get_by_expression("AlphaToken").unwrap()[0]
+                read.text_index_get_by_expression("AlphaToken", NonZeroUsize::new(100).unwrap())
+                    .unwrap()[0]
                     .id
                     .as_str(),
                 "a.md"
             );
             assert_eq!(
-                read.text_index_get_by_expression("CharlieToken").unwrap()[0]
+                read.text_index_get_by_expression("CharlieToken", NonZeroUsize::new(100).unwrap())
+                    .unwrap()[0]
                     .id
                     .as_str(),
                 "b.md"
             );
             assert!(
-                read.text_index_get_by_expression("BravoToken")
+                read.text_index_get_by_expression("BravoToken", NonZeroUsize::new(100).unwrap())
                     .unwrap()
                     .is_empty()
             );
@@ -321,15 +325,19 @@ fn reindex_reports_safe_capture_failure_and_keeps_previous_revision() {
             let read = &storage.cache;
             assert_eq!(read.project_get_by_id().unwrap(), 1);
             assert_eq!(
-                read.text_index_get_by_expression("AlphaToken").unwrap()[0]
+                read.text_index_get_by_expression("AlphaToken", NonZeroUsize::new(100).unwrap())
+                    .unwrap()[0]
                     .id
                     .as_str(),
                 "a.md"
             );
             assert!(
-                read.text_index_get_by_expression("UnpublishedToken")
-                    .unwrap()
-                    .is_empty()
+                read.text_index_get_by_expression(
+                    "UnpublishedToken",
+                    NonZeroUsize::new(100).unwrap()
+                )
+                .unwrap()
+                .is_empty()
             );
             Ok::<_, StorageError>(())
         })

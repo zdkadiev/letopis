@@ -1,0 +1,7 @@
+{
+  "pid": 13915,
+  "utc": "2026-11-07T09:18:16Z",
+  "exclusive_output": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/pairs",
+  "fixture_lock": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/campaign.lock",
+  "protocol": "Atomic mkdir refuses existing campaign; nonblocking flock held until process exit; per-call compiler/test/profile/letopis process checks; no external writer prevention implied."
+}

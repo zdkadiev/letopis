@@ -1,0 +1,16 @@
+{
+  "name": "5-2-after",
+  "label": "after",
+  "limit": 5,
+  "request": {
+    "query": "case 000000",
+    "limit": 5
+  },
+  "seconds": 1.3435168750584126,
+  "cpu_seconds": 1.156547,
+  "peak_rss_bytes": 35602432,
+  "stdout_sha256": "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5",
+  "validated": true,
+  "matching_tool_processes_before_call": [],
+  "config_and_vector_metadata_unchanged": true
+}

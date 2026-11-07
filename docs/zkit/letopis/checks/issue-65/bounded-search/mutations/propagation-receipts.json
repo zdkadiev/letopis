@@ -1,0 +1,30 @@
+[
+  {
+    "name": "fts-propagation",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "explicit_five_limits_both_hybrid_channels_before_observation"
+    ],
+    "exit": 101,
+    "caught": true,
+    "source_sha256": "822f3e82763b4a503a40b389f07396c5bceedd7fdb0ecc9edae0a511a755d61c"
+  },
+  {
+    "name": "vector-propagation",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "explicit_five_limits_both_hybrid_channels_before_observation"
+    ],
+    "exit": 101,
+    "caught": true,
+    "source_sha256": "822f3e82763b4a503a40b389f07396c5bceedd7fdb0ecc9edae0a511a755d61c"
+  }
+]

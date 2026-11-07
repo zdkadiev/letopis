@@ -1,5 +1,6 @@
 use letopis::service::StorageError;
 use letopis::service::{CacheDatabase, StorageRead};
+use std::num::NonZeroUsize;
 mod support;
 
 use letopis::domain::RepoPath;
@@ -225,13 +226,18 @@ fn assert_invalid_projection(repo: &ReadingRepo) {
             assert_eq!(read.nodes_get().unwrap().len(), 1);
             assert!(read.edges_get_by_source_id(None).unwrap().is_empty());
             assert_eq!(
-                read.text_index_get_by_expression("CharlieToken").unwrap()[0]
+                read.text_index_get_by_expression("CharlieToken", NonZeroUsize::new(100).unwrap())
+                    .unwrap()[0]
                     .id
                     .as_str(),
                 "b.md"
             );
             for token in ["AlphaToken", "BravoToken"] {
-                assert!(read.text_index_get_by_expression(token).unwrap().is_empty());
+                assert!(
+                    read.text_index_get_by_expression(token, NonZeroUsize::new(100).unwrap())
+                        .unwrap()
+                        .is_empty()
+                );
             }
             let files = read.files_get().unwrap();
             let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
@@ -275,12 +281,18 @@ fn assert_repaired_projection(repo: &ReadingRepo) {
             assert_eq!(read.nodes_get().unwrap().len(), 2);
             assert!(read.edges_get_by_source_id(None).unwrap().is_empty());
             for (token, id) in [("DeltaToken", "a.md"), ("CharlieToken", "b.md")] {
-                let found = read.text_index_get_by_expression(token).unwrap();
+                let found = read
+                    .text_index_get_by_expression(token, NonZeroUsize::new(100).unwrap())
+                    .unwrap();
                 assert_eq!(found.len(), 1);
                 assert_eq!(found[0].id.as_str(), id);
             }
             for token in ["AlphaToken", "BravoToken"] {
-                assert!(read.text_index_get_by_expression(token).unwrap().is_empty());
+                assert!(
+                    read.text_index_get_by_expression(token, NonZeroUsize::new(100).unwrap())
+                        .unwrap()
+                        .is_empty()
+                );
             }
             let files = read.files_get().unwrap();
             assert_eq!(files.len(), 3);

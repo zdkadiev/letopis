@@ -1,8 +1,8 @@
 use super::help::help_get_by_args;
 use crate::domain::{EdgeType, RepoPath, SourceUri, TreeOid};
 use crate::service::{
-    CommandError, CommandErrorKind, CommandResult, ElementAddress, RecheckFilter, SearchFilters,
-    SearchRequest, TraversalDirection, TraversalMode, TraversalRequest,
+    CommandError, CommandErrorKind, CommandResult, ElementAddress, MAX_SEARCH_LIMIT, RecheckFilter,
+    SearchFilters, SearchRequest, TraversalDirection, TraversalMode, TraversalRequest,
 };
 use serde::{
     Deserialize, Deserializer,
@@ -63,7 +63,8 @@ struct InspectInput {
 #[serde(deny_unknown_fields)]
 struct SearchInput {
     query: String,
-    limit: u64,
+    #[serde(default, deserialize_with = "non_null_option_deserialize")]
+    limit: Option<u64>,
     #[serde(default, deserialize_with = "non_null_option_deserialize")]
     filters: Option<SearchFiltersInput>,
 }
@@ -306,7 +307,8 @@ fn traversal_request_parse(input: impl Read) -> CommandResult<TraversalRequest> 
 
 fn search_request_parse(input: impl Read) -> CommandResult<SearchRequest> {
     let dto: SearchInput = object_parse(input)?;
-    let limit = positive_limit_parse(dto.limit)?;
+    let requested = dto.limit.unwrap_or(MAX_SEARCH_LIMIT.get() as u64);
+    let limit = positive_limit_parse(requested.min(MAX_SEARCH_LIMIT.get() as u64))?;
     let filters = dto
         .filters
         .as_ref()
@@ -432,4 +434,44 @@ fn object_parse<T: DeserializeOwned>(mut input: impl Read) -> CommandResult<T> {
             cause,
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::search_request_parse;
+    use crate::service::CommandErrorKind;
+
+    #[test]
+    fn search_defaults_and_caps_positive_limits() {
+        // Given: omitted, small, boundary and oversized valid limits.
+        for (input, expected) in [
+            (r#"{"query":"sqlite"}"#, 100),
+            (r#"{"query":"sqlite","limit":1}"#, 1),
+            (r#"{"query":"sqlite","limit":5}"#, 5),
+            (r#"{"query":"sqlite","limit":100}"#, 100),
+            (r#"{"query":"sqlite","limit":101}"#, 100),
+            (r#"{"query":"sqlite","limit":18446744073709551615}"#, 100),
+        ] {
+            // When: the search request is decoded.
+            let request = search_request_parse(input.as_bytes()).unwrap();
+            // Then: each request has its independently specified effective bound.
+            assert_eq!(request.limit.get(), expected, "{input}");
+        }
+    }
+
+    #[test]
+    fn search_rejects_invalid_limits_without_defaulting_them() {
+        // Given: supplied limits that are not positive unsigned integers.
+        for limit in ["0", "null", "-1", "1.0", "1e0", "18446744073709551616"] {
+            let input = format!(r#"{{"query":"sqlite","limit":{limit}}}"#);
+            // When: the search request is decoded.
+            let error = search_request_parse(input.as_bytes()).unwrap_err();
+            // Then: an explicit invalid value is rejected rather than replaced by a default.
+            assert_eq!(
+                error.get_kind(),
+                CommandErrorKind::InvalidRequest,
+                "{limit}"
+            );
+        }
+    }
 }

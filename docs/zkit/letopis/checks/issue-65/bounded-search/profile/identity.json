@@ -1,0 +1,15 @@
+{
+  "profile_library": {
+    "name": "letopis",
+    "path": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/product/letopis",
+    "debugName": "letopis",
+    "debugPath": "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/product/letopis",
+    "breakpadId": "519E48897285391598A859BE598FA9D10",
+    "codeId": "519E48897285391598A859BE598FA9D1",
+    "arch": "arm64"
+  },
+  "binary_sha256": "117bee3d746af4946c0a3a52f2aa6e8bd972e06ba25d2e982b1fe27a73af53ba",
+  "dwarfdump_uuid": "UUID: 519E4889-7285-3915-98A8-59BE598FA9D1 (arm64) /Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/product/letopis\n",
+  "profile_helper_sha256": "e9074d11996b353e997a5ce0e1d69dd9aee44bc2baad9e39e8e64d21440cbbe0",
+  "samply_version": "samply 0.13.1"
+}

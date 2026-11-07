@@ -1,0 +1,70 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.76s
+     Running tests/knowledge_search.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/knowledge_search-3fe0a649623e3b57)
+
+running 14 tests
+test fts_literals_work_on_native_tokenizer ... ok
+test restrictive_filter_does_not_refill_outside_sql_candidates ... ok
+test search_refreshes_and_returns_only_knowledge_links ... ok
+test provider_failure_sets_query_error_without_search_warning_or_attempts ... ok
+test stale_coordinates_are_observed_without_replacing_pinned_lines ... ok
+test search_propagates_non_config_io_failures ... ok
+test missing_vector_dimensions_skip_inference_and_shared_hashes_keep_distinct_ids ... ok
+test invalid_live_knowledge_retains_pinned_link_as_stale ... ok
+test unreadable_invalid_and_missing_configuration_permit_fts_without_provider ... ok
+test malformed_persisted_knowledge_uri_is_decoded_only_inside_sql_limit ... ok
+test search_uses_prepared_vectors_and_actual_query_client ... ok
+test stale_only_vectors_allow_one_query_but_never_join_obsolete_hashes ... ok
+test empty_query_never_calls_match_or_provider ... ok
+test service_caps_direct_requests_at_one_hundred_results ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+
+     Running tests/storage_cache.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/storage_cache-3c57354589c457e1)
+
+running 26 tests
+test caught_mutation_error_poisoned_unit_cannot_commit ... ok
+test get_empty_published_state_returns_no_rows ... ok
+test dropped_unit_rolls_back ... ok
+test fts_matches_use_native_score_then_id_without_candidate_limit ... ok
+test get_edges_keeps_optional_filter_and_order ... ok
+test duplicate_edges_and_invalid_checks_are_rejected ... ok
+test fts_limits_rows_in_sql_before_decoding ... ok
+test file_text_values_remain_literal ... ok
+test empty_cache_publications_preserve_vector_identity_and_state ... ok
+test deleting_node_removes_fts_and_refuses_remaining_outgoing_edges ... ok
+test closure_commit_abort_and_identity_guards ... ok
+test cache_commit_preserves_node_row_id ... ok
+test contentless_fts_does_not_return_original_text ... ok
+test get_files_preserves_exact_paths_and_state ... ok
+test late_fts_error_rolls_back_all_changes ... ok
+test shared_read_exposes_graph_and_metadata_in_one_scope ... ok
+test revision_overflow_rolls_back ... ok
+test unsigned_values_do_not_wrap ... ok
+test source_missing_bytes_and_declared_targets_round_trip ... ok
+test source_time_and_line_overflow_poison_the_unit ... ok
+test valid_invalid_and_unmarked_file_rows_round_trip ... ok
+test malformed_persisted_values_return_internal_errors ... ok
+test get_nodes_preserves_metadata_and_row_ids ... ok
+test incoming_edges_survive_target_delete_and_reappear ... ok
+test source_projection_can_be_recomputed_and_removed ... ok
+test knowledge_and_source_optional_fields_survive_reopen ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+
+     Running tests/storage_vectors.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/storage_vectors-a26abeac900b6854)
+
+running 10 tests
+test dimension_reset_and_rollback ... ok
+test vectors_require_matching_identity ... ok
+test text_hash_shares_one_vector ... ok
+test current_node_hash_excludes_old_vector ... ok
+test nearest_does_not_decode_an_unselected_malformed_uri ... ok
+test nearest_limits_current_knowledge_after_joins_and_ties ... ok
+test nearest_validates_query_and_orders_all_candidates_by_distance_then_id ... ok
+test old_reader_survives_reset_and_late_reader_rejects_captured_old_identity ... ok
+test cache_and_vector_writers_are_independent ... ok
+test caught_vector_error_cannot_commit_key_or_prior_write ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+

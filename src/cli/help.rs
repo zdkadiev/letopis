@@ -87,7 +87,7 @@ Result:
 
 const SEARCH_DETAILS: &str = r#"Input (JSON object):
   query    required string
-  limit    required integer >= 1
+  limit    optional integer >= 1; default 100, values above 100 use 100
   filters  optional object:
     needs_recheck     true: only results with flags; false: only without
     sources           array of source URIs: path, path#Lstart-Lend or

@@ -268,19 +268,19 @@ fn every_requested_root_is_validated_even_after_a_matching_tree() {
 }
 
 #[test]
-fn ineligible_fts_head_cannot_consume_the_final_limit() {
-    // Given
+fn ineligible_sql_head_leaves_an_underfilled_result_without_refill() {
+    // Given: the strongest lexical hit has no matching source; a lower hit does.
     let repo = ReadingRepo::new();
     write_note(&repo, "a.md", None, &["code.rs"]);
     write_note(&repo, "b.md", None, &[]);
-    // When
+    // When: a limit-one SQL pool is filtered by the source selector.
     let value = invoke(
         &repo,
         &json!({"query":"needle","limit":1,"filters":{"sources":["code.rs"]}}),
     );
-    // Then
+    // Then: no outside candidate is fetched to replace the excluded head.
     assert_eq!(value["ok"], true);
-    assert_eq!(ids(&value["result"]), ["a.md"]);
+    assert!(ids(&value["result"]).is_empty());
 }
 
 fn write_note(repo: &ReadingRepo, path: &str, basis: Option<&TreeOid>, sources: &[&str]) {

@@ -215,7 +215,9 @@ fn assert_projection(repo: &ReadingRepo, revision: u64) {
                 .collect();
             assert_eq!(ids, ["a.md", "b.md"]);
             for (token, id) in [("AlphaToken", "a.md"), ("BravoToken", "b.md")] {
-                let matches = read.text_index_get_by_expression(token).unwrap();
+                let matches = read
+                    .text_index_get_by_expression(token, NonZeroUsize::new(100).unwrap())
+                    .unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(matches[0].id.as_str(), id);
             }

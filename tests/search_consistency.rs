@@ -100,7 +100,12 @@ fn old_native_reader_survives_vector_schema_reset_without_new_model_candidates()
             let next = repo.write_config("ollama", "http://localhost/api", "next");
             repo.seed_vectors(&next, &[("a.md", &[0.0, 0.0, 1.0])]);
             let matches = old
-                .vector_index_get_by_vector(&identity, &[1.0, 0.0], 2)
+                .vector_index_get_by_vector(
+                    &identity,
+                    &[1.0, 0.0],
+                    2,
+                    NonZeroUsize::new(100).unwrap(),
+                )
                 .unwrap();
             let VectorOutcome::Current(matches) = matches else {
                 panic!("old identity must remain pinned")

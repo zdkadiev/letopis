@@ -337,7 +337,11 @@ fn malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed() {
                     storage_read: read,
                     embeddings: &mut embeddings,
                 }
-                .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+                .find_vector_candidates(
+                    Some((&config, NonZeroUsize::new(2).unwrap())),
+                    "query",
+                    NonZeroUsize::new(100).unwrap(),
+                )
                 .unwrap_err();
                 // Then: invalid index data and infrastructure failures propagate.
                 assert_eq!(error.get_kind(), CommandErrorKind::InternalError);
@@ -353,7 +357,11 @@ fn malformed_query_vectors_and_embedding_infrastructure_errors_fail_closed() {
                     storage_read: read,
                     embeddings: &mut embeddings
                 }
-                .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+                .find_vector_candidates(
+                    Some((&config, NonZeroUsize::new(2).unwrap())),
+                    "query",
+                    NonZeroUsize::new(100).unwrap(),
+                )
                 .is_err()
             );
 
@@ -382,7 +390,11 @@ fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
                     storage_read: read,
                     embeddings: &mut embeddings
                 }
-                .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+                .find_vector_candidates(
+                    Some((&config, NonZeroUsize::new(2).unwrap())),
+                    "query",
+                    NonZeroUsize::new(100).unwrap(),
+                )
                 .unwrap()
                 .is_empty()
             );
@@ -394,7 +406,11 @@ fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
                     storage_read: read,
                     embeddings: &mut unavailable
                 }
-                .find_vector_candidates(Some((&config, NonZeroUsize::new(2).unwrap())), "query")
+                .find_vector_candidates(
+                    Some((&config, NonZeroUsize::new(2).unwrap())),
+                    "query",
+                    NonZeroUsize::new(100).unwrap(),
+                )
                 .unwrap()
                 .is_empty()
             );
@@ -406,7 +422,7 @@ fn unavailable_or_changed_vector_channel_keeps_fts_fallback() {
                     storage_read: read,
                     embeddings: &mut unused
                 }
-                .find_vector_candidates(None, "query")
+                .find_vector_candidates(None, "query", NonZeroUsize::new(100).unwrap())
                 .unwrap()
                 .is_empty()
             );
@@ -506,16 +522,19 @@ mod scoped {
 
         use super::{ProvenanceFailure, ScopedFixture, build_filtered_request, open_storage};
         use crate::{
-            domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, SourceUri, TreeOid},
-            service::{CacheDatabase, CommandErrorKind, NodeMetadata, Searcher, StorageRead},
+            domain::{Edge, EdgeTarget, EdgeType, KnowledgeId, Sha256, SourceUri, TreeOid},
+            service::{
+                CacheDatabase, CommandErrorKind, NodeMetadata, Searcher, StorageRead,
+                VectorDatabase,
+            },
         };
-        use std::path::Path;
+        use std::{num::NonZeroUsize, path::Path};
 
         #[test]
         fn revision_cache_keeps_demand_order_and_resets_between_searches() {
             // Given: two candidates share one exact basis/source/revision comparison.
             let fixture = ScopedFixture::new();
-            add_second_candidate(fixture.root.path(), 'a');
+            add_candidate(fixture.root.path(), "b.md", 'a');
             let mut search = fixture.build_search(None, None);
             // When: the same service executes two searches.
             let first = search.search(&build_filtered_request()).unwrap();
@@ -534,10 +553,71 @@ mod scoped {
         }
 
         #[test]
+        fn sql_pool_limits_fresh_candidate_observations() {
+            // Given: two equally ranked candidates share one source comparison.
+            let fixture = ScopedFixture::new();
+            add_candidate(fixture.root.path(), "b.md", 'a');
+            let mut search = fixture.build_search(None, None);
+            let mut request = build_filtered_request();
+            request.limit = NonZeroUsize::MIN;
+            // When: each SQL channel is limited to one knowledge hit.
+            let links = search.search(&request).unwrap();
+            // Then: only the selected candidate is captured and observed; there is no tail walk.
+            assert_eq!(links.len(), 1);
+            assert_eq!(links[0].element_id.as_str(), "a.md");
+            assert_eq!(fixture.reads.get(), 1);
+            assert_eq!(
+                *search.provenance.events.borrow(),
+                ["validate", "compare", "observe"]
+            );
+        }
+
+        #[test]
+        fn explicit_five_limits_both_hybrid_channels_before_observation() {
+            // Given: seven equally ranked nodes occur in both SQL channels.
+            let fixture = ScopedFixture::new();
+            for candidate in ["b.md", "c.md", "d.md", "e.md", "f.md", "g.md"] {
+                add_candidate(fixture.root.path(), candidate, 'a');
+            }
+            let storage = open_storage(fixture.root.path());
+            let identity = fixture.config.get_identity();
+            storage
+                .vector_storage
+                .with_write_tx(&identity, || {
+                    storage
+                        .vector_storage
+                        .store_vector(&Sha256::digest(b"query"), &[1.0, 0.0], 2)
+                        .map(|_| ())
+                })
+                .unwrap();
+            let mut search = fixture.build_search(None, None);
+            let mut request = build_filtered_request();
+            request.filters = Default::default();
+            request.limit = NonZeroUsize::new(5).unwrap();
+            // When: search forwards the explicit bound to lexical and vector retrieval.
+            let links = search.search(&request).unwrap();
+            // Then: either channel returning more than five would enlarge this observed union.
+            assert_eq!(
+                links
+                    .iter()
+                    .map(|link| link.element_id.as_str())
+                    .collect::<Vec<_>>(),
+                ["a.md", "b.md", "c.md", "d.md", "e.md"]
+            );
+            assert_eq!(fixture.observed.borrow().len(), 5);
+            assert_eq!(
+                *search.provenance.events.borrow(),
+                [
+                    "validate", "observe", "observe", "observe", "observe", "observe"
+                ]
+            );
+        }
+
+        #[test]
         fn first_observation_failure_precedes_later_candidate_comparison() {
             // Given: two candidates and a first-observation failure.
             let fixture = ScopedFixture::new();
-            add_second_candidate(fixture.root.path(), 'b');
+            add_candidate(fixture.root.path(), "b.md", 'b');
             let mut search = fixture.build_search(None, Some(ProvenanceFailure::Observation));
             // When: the first candidate cannot be observed.
             let error = search.search(&build_filtered_request()).unwrap_err();
@@ -549,7 +629,7 @@ mod scoped {
             );
         }
 
-        fn add_second_candidate(root: &Path, basis: char) {
+        fn add_candidate(root: &Path, candidate: &str, basis: char) {
             let storage = open_storage(root);
             let stored = storage
                 .cache_storage
@@ -569,7 +649,7 @@ mod scoped {
             let NodeMetadata::Knowledge(mut node) = stored.metadata else {
                 panic!("knowledge fixture")
             };
-            let id = KnowledgeId::parse("b.md").unwrap();
+            let id = KnowledgeId::parse(candidate).unwrap();
             node.source_snapshot = Some(TreeOid::parse(&basis.to_string().repeat(40)).unwrap());
             node.id = id.clone();
             node.uri = id.clone();

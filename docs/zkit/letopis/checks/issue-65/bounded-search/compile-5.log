@@ -1,0 +1,36 @@
+    Checking letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> examples/storage_check.rs:83:29
+    |
+ 83 |         let matches = cache.text_index_get_by_expression("shared")?;
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^---------- argument #2 of type `NonZero<usize>` is missing
+    |
+note: method defined here
+   --> src/service/mod.rs:650:8
+    |
+650 |     fn text_index_get_by_expression(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: provide the argument
+    |
+ 83 |         let matches = cache.text_index_get_by_expression("shared", /* NonZero<usize> */)?;
+    |                                                                  ++++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> examples/storage_check.rs:102:19
+    |
+102 |             cache.vector_index_get_by_vector(identity, &VECTOR, 3)?,
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^---------------------- argument #4 of type `NonZero<usize>` is missing
+    |
+note: method defined here
+   --> src/service/mod.rs:670:8
+    |
+670 |     fn vector_index_get_by_vector(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: provide the argument
+    |
+102 |             cache.vector_index_get_by_vector(identity, &VECTOR, 3, /* NonZero<usize> */)?,
+    |                                                                  ++++++++++++++++++++++
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `letopis` (example "storage_check") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

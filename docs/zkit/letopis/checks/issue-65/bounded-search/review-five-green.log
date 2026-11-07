@@ -1,0 +1,9 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.39s
+     Running unittests src/lib.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/letopis-43e59323f2756d14)
+
+running 1 test
+test service::search::tests::scoped::revisions::explicit_five_limits_both_hybrid_channels_before_observation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 631 filtered out; finished in 0.36s
+

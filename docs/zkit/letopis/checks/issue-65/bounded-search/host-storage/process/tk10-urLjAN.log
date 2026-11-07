@@ -1,0 +1,18 @@
+
+running 1 test
+checkpoint connected
+checkpoint detected
+checkpoint locked
+checkpoint redetected
+checkpoint begun
+checkpoint cleared
+checkpoint projections
+checkpoint fts
+checkpoint fingerprints
+checkpoint before_commit
+refresh result: Err(DocumentError { kind: InternalError, message: "document storage operation failed", .. })
+checkpoint finished
+test service::document_refresher::tests::process::run_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 631 filtered out; finished in 0.10s
+

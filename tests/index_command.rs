@@ -16,6 +16,7 @@ use cancellation::{WAIT, observation::observe_index_flock};
 use letopis::service::{CacheDatabase, StorageRead};
 use letopis::{open_filesystem, service::FileLocker};
 use serde_json::{Value, json};
+use std::num::NonZeroUsize;
 use std::process::{Command, Stdio};
 use support::git::isolate_command;
 use support::reading::ReadingRepo;
@@ -64,7 +65,11 @@ fn index_modes_and_scope() {
     let storage = repo.open_storage();
     let rows = storage
         .cache
-        .with_read_tx(|| storage.cache.text_index_get_by_expression("BravoToken"))
+        .with_read_tx(|| {
+            storage
+                .cache
+                .text_index_get_by_expression("BravoToken", NonZeroUsize::new(100).unwrap())
+        })
         .unwrap();
     assert_eq!(rows[0].id.as_str(), "b.md");
     // When / Then: both combined flag orders force the selected full reparse.
@@ -138,7 +143,11 @@ fn index_reports_edits_invalid_markdown_and_removals() {
     let storage = repo.open_storage();
     let rows = storage
         .cache
-        .with_read_tx(|| storage.cache.text_index_get_by_expression("ChangedToken"))
+        .with_read_tx(|| {
+            storage
+                .cache
+                .text_index_get_by_expression("ChangedToken", NonZeroUsize::new(100).unwrap())
+        })
         .unwrap();
     assert_eq!(rows[0].id.as_str(), "a.md");
 
@@ -211,7 +220,11 @@ fn two_scoped_publishers_redetect_after_index_lock_contention() {
         let storage = repo.open_storage();
         let outside = storage
             .cache
-            .with_read_tx(|| storage.cache.text_index_get_by_expression("OutsideToken"))
+            .with_read_tx(|| {
+                storage
+                    .cache
+                    .text_index_get_by_expression("OutsideToken", NonZeroUsize::new(100).unwrap())
+            })
             .unwrap();
         assert_eq!(outside[0].id.as_str(), "outside.md");
     }

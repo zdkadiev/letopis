@@ -1,0 +1,39 @@
+    Checking letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+error[E0433]: cannot find type `NonZeroUsize` in this scope
+    --> src/storage/cache.rs:2233:55
+     |
+2233 |         read.text_index_get_by_expression(expression, NonZeroUsize::new(100).unwrap())
+     |                                                       ^^^^^^^^^^^^ use of undeclared type `NonZeroUsize`
+     |
+help: consider importing one of these type aliases
+     |
+1854 +     use crate::storage::cache::NonZeroUsize;
+     |
+1854 +     use std::num::NonZeroUsize;
+     |
+
+error[E0433]: cannot find type `NonZeroUsize` in this scope
+    --> src/service/document_refresher.rs:3494:29
+     |
+3494 | ...                   NonZeroUsize::new(100).unwrap()
+     |                       ^^^^^^^^^^^^ use of undeclared type `NonZeroUsize`
+     |
+help: consider importing one of these type aliases
+     |
+3420 +         use crate::service::NonZeroUsize;
+     |
+3420 +         use std::num::NonZeroUsize;
+     |
+
+error: unused import: `std::num::NonZeroUsize`
+    --> src/service/document_refresher.rs:3058:17
+     |
+3058 |             use std::num::NonZeroUsize;
+     |                 ^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `-D unused-imports` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(unused_imports)]`
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `letopis` (lib test) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...

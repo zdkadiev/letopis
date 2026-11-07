@@ -1,0 +1,205 @@
+    Checking letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+error: expected one of `(`, `)`, `,`, `.`, `?`, or an operator, found `::`
+    --> src/storage/cache.rs:1290:27
+     |
+1290 |         .limit(request.i64::try_from(limit.get()).map_err(map_invalid_value)?);
+     |                           -^
+     |                           |
+     |                           expected one of `(`, `)`, `,`, `.`, `?`, or an operator
+     |                           help: missing `,`
+
+error[E0432]: unresolved import `NonZeroUsize`
+ --> src/embedding/ollama.rs:6:5
+  |
+6 | use NonZeroUsize;
+  |     ^^^^^^^^^^^^ no external crate `NonZeroUsize`
+  |
+help: consider importing this type alias instead
+  |
+6 | use std::num::NonZeroUsize;
+  |     ++++++++++
+
+error[E0432]: unresolved import `NonZeroUsize`
+ --> src/embedding/openai.rs:6:5
+  |
+6 | use NonZeroUsize;
+  |     ^^^^^^^^^^^^ no external crate `NonZeroUsize`
+  |
+help: consider importing this type alias instead
+  |
+6 | use std::num::NonZeroUsize;
+  |     ++++++++++
+
+error[E0425]: cannot find crate `try_from` in the list of imported crates
+    --> src/storage/cache.rs:1290:29
+     |
+1290 |         .limit(request.i64::try_from(limit.get()).map_err(map_invalid_value)?);
+     |                             ^^^^^^^^ not found in the list of imported crates
+
+error[E0425]: cannot find value `limit` in this scope
+    --> src/storage/cache.rs:1290:38
+     |
+1290 |         .limit(request.i64::try_from(limit.get()).map_err(map_invalid_value)?);
+     |                                      ^^^^^ not found in this scope
+
+error: unused import: `std::num::NonZeroUsize`
+ --> src/service/document_refresher.rs:1:5
+  |
+1 | use std::num::NonZeroUsize;
+  |     ^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `-D unused-imports` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(unused_imports)]`
+
+error: unused import: `std::num::NonZeroUsize`
+ --> src/service/status.rs:1:5
+  |
+1 | use std::num::NonZeroUsize;
+  |     ^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0432]: unresolved import `NonZeroUsize`
+ --> src/embedding/ollama.rs:6:5
+  |
+6 | use NonZeroUsize;
+  |     ^^^^^^^^^^^^ no external crate `NonZeroUsize`
+  |
+  = note: type alias `crate::service::__mock_MockBackgroundRunner_BackgroundRunner::NonZeroUsize` exists but is inaccessible
+help: consider importing this type alias instead
+  |
+6 | use std::num::NonZeroUsize;
+  |     ++++++++++
+
+error[E0432]: unresolved import `NonZeroUsize`
+ --> src/embedding/openai.rs:6:5
+  |
+6 | use NonZeroUsize;
+  |     ^^^^^^^^^^^^ no external crate `NonZeroUsize`
+  |
+  = note: type alias `crate::service::__mock_MockBackgroundRunner_BackgroundRunner::NonZeroUsize` exists but is inaccessible
+help: consider importing this type alias instead
+  |
+6 | use std::num::NonZeroUsize;
+  |     ++++++++++
+
+error[E0432]: unresolved import `NonZeroUsize`
+    --> src/service/types.rs:1099:9
+     |
+1099 |     use NonZeroUsize;
+     |         ^^^^^^^^^^^^ no external crate `NonZeroUsize`
+     |
+help: consider importing one of these type aliases instead
+     |
+1099 |     use crate::service::NonZeroUsize;
+     |         ++++++++++++++++
+1099 |     use std::num::NonZeroUsize;
+     |         ++++++++++
+
+error[E0432]: unresolved import `NonZeroUsize`
+    --> src/service/types.rs:1340:9
+     |
+1340 |     use NonZeroUsize;
+     |         ^^^^^^^^^^^^ no external crate `NonZeroUsize`
+     |
+help: consider importing one of these type aliases instead
+     |
+1340 |     use crate::service::NonZeroUsize;
+     |         ++++++++++++++++
+1340 |     use std::num::NonZeroUsize;
+     |         ++++++++++
+
+error[E0433]: cannot find type `NonZeroUsize` in this scope
+    --> src/storage/cache.rs:2229:55
+     |
+2229 |         read.text_index_get_by_expression(expression, NonZeroUsize::new(100).unwrap())
+     |                                                       ^^^^^^^^^^^^ use of undeclared type `NonZeroUsize`
+     |
+help: consider importing one of these type aliases
+     |
+1850 +     use crate::storage::cache::NonZeroUsize;
+     |
+1850 +     use std::num::NonZeroUsize;
+     |
+
+error[E0433]: cannot find type `NonZeroUsize` in this scope
+    --> src/service/document_refresher.rs:1590:25
+     |
+1590 |                         NonZeroUsize::new(100).unwrap()
+     |                         ^^^^^^^^^^^^ use of undeclared type `NonZeroUsize`
+     |
+help: consider importing one of these type aliases
+     |
+1051 +     use crate::service::NonZeroUsize;
+     |
+1051 +     use std::num::NonZeroUsize;
+     |
+
+error[E0433]: cannot find type `NonZeroUsize` in this scope
+    --> src/service/document_refresher.rs:1629:25
+     |
+1629 |                         NonZeroUsize::new(100).unwrap()
+     |                         ^^^^^^^^^^^^ use of undeclared type `NonZeroUsize`
+     |
+help: consider importing one of these type aliases
+     |
+1051 +     use crate::service::NonZeroUsize;
+     |
+1051 +     use std::num::NonZeroUsize;
+     |
+
+error[E0433]: cannot find type `NonZeroUsize` in this scope
+    --> src/service/document_refresher.rs:1725:57
+     |
+1725 |                     .text_index_get_by_expression(text, NonZeroUsize::new(100).unwrap())
+     |                                                         ^^^^^^^^^^^^ use of undeclared type `NonZeroUsize`
+     |
+help: consider importing one of these type aliases
+     |
+1051 +     use crate::service::NonZeroUsize;
+     |
+1051 +     use std::num::NonZeroUsize;
+     |
+
+error[E0433]: cannot find type `NonZeroUsize` in this scope
+    --> src/service/document_refresher.rs:3493:29
+     |
+3493 | ...                   NonZeroUsize::new(100).unwrap()
+     |                       ^^^^^^^^^^^^ use of undeclared type `NonZeroUsize`
+     |
+help: consider importing one of these type aliases
+     |
+3419 +         use crate::service::NonZeroUsize;
+     |
+3419 +         use std::num::NonZeroUsize;
+     |
+
+error[E0609]: no field `i64` on type `&NeighborPageRequest<'_>`
+    --> src/storage/cache.rs:1290:24
+     |
+1290 |         .limit(request.i64::try_from(limit.get()).map_err(map_invalid_value)?);
+     |                        ^^^ unknown field
+     |
+     = note: available fields are: `node`, `direction`, `mode`, `edge_types`, `after`, `limit`
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+    --> src/storage/cache.rs:1290:10
+     |
+1290 |         .limit(request.i64::try_from(limit.get()).map_err(map_invalid_value)?);
+     |          ^^^^^            --------------------------------------------------- unexpected argument #2
+     |
+note: method defined here
+    --> /Users/zdkadiev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sea-query-1.0.2/src/query/select.rs:2240:12
+     |
+2240 |     pub fn limit(&mut self, limit: u64) -> &mut Self {
+     |            ^^^^^
+help: remove the extra argument
+     |
+1290 -         .limit(request.i64::try_from(limit.get()).map_err(map_invalid_value)?);
+1290 +         .limit(request.i64);
+     |
+
+Some errors have detailed explanations: E0061, E0425, E0432, E0609.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `letopis` (lib) due to 9 previous errors
+warning: build failed, waiting for other jobs to finish...
+Some errors have detailed explanations: E0061, E0425, E0432, E0433, E0609.
+error: could not compile `letopis` (lib test) due to 16 previous errors

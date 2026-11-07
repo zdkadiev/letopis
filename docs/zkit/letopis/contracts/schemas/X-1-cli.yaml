@@ -319,15 +319,16 @@
         },
         "limit": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "default": 100,
+          "description": "Optional positive integer; omitted defaults to 100, explicit values above 100 are clamped to 100. Each SQL channel and final output use the effective limit."
         },
         "filters": {
           "$ref": "#/$defs/Filters"
         }
       },
       "required": [
-        "query",
-        "limit"
+        "query"
       ],
       "additionalProperties": false
     },
@@ -998,7 +999,7 @@
         "$ref": "#/$defs/Failure"
       },
       "x-idempotency": "natural",
-      "description": "Read; hybrid with FTS fallback; no timed truncation.",
+      "description": "Read; SQL-selected top-L per channel, L=min(limit or 100,100), then freshness/filtering/fusion within the bounded pool; no refill; FTS fallback.",
       "stdout": "one JSON",
       "exit": {
         "success": 0,

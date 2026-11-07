@@ -17,6 +17,12 @@ use std::{
     num::{NonZeroU32, NonZeroUsize},
 };
 
+/// Default and maximum number of knowledge hits returned by each search channel.
+pub(crate) const MAX_SEARCH_LIMIT: NonZeroUsize = match NonZeroUsize::new(100) {
+    Some(limit) => limit,
+    None => panic!("the fixed search limit must be positive"),
+};
+
 /// Internal bound shared by neighbor producers and consumers.
 pub(crate) const NEIGHBOR_PAGE_QUANTUM: usize = 32;
 
@@ -377,12 +383,12 @@ pub struct InspectedElement {
     pub hash: Option<Sha256>,
 }
 
-/// Literal search text, normalized restrictions and final result bound.
+/// Literal search text, normalized restrictions and bounded retrieval/result limit.
 #[derive(Debug)]
 pub struct SearchRequest {
     /// Uninterpreted user query, tokenized by the search service.
     pub query: String,
-    /// Maximum links after combining complete candidate channels.
+    /// Positive per-channel and final limit; search caps it at 100.
     pub limit: NonZeroUsize,
     /// Normalized source, revision and current-flag restrictions.
     pub filters: SearchFilters,

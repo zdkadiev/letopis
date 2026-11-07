@@ -670,13 +670,14 @@ pub(super) fn vector_index_get_nearest_by_vector(
     connection: &Connection,
     query: &[f32],
     dimensions: usize,
+    limit: NonZeroUsize,
 ) -> StorageResult<Vec<VectorMatch>> {
     let bytes = encode_vector(query, dimensions)?;
     let count = vector_keys_get(connection)?;
     if count == 0 {
         return Ok(Vec::new());
     }
-    vector_index_get_by_vector(connection, &bytes, count)
+    vector_index_get_by_vector(connection, &bytes, count, limit)
 }
 
 fn vector_keys_get(connection: &Connection) -> StorageResult<i64> {
@@ -694,6 +695,7 @@ fn vector_index_get_by_vector(
     connection: &Connection,
     bytes: &[u8],
     count: i64,
+    limit: NonZeroUsize,
 ) -> StorageResult<Vec<VectorMatch>> {
     let mut statement = connection.prepare(
         "select n.uri, k.search_hash, v.distance
@@ -701,15 +703,30 @@ fn vector_index_get_by_vector(
          join vec.vector_keys k on k.row_id = v.rowid
          join nodes n on n.search_hash = k.search_hash
          where n.kind <> ?3
-         order by v.distance, n.uri",
+         order by v.distance, n.uri
+         limit ?4",
     )?;
-    let rows = statement.query_map(params![bytes, format!("{{K:{count}}}"), SOURCE_KIND], |r| {
-        Ok((
-            r.get::<_, String>(0)?,
-            r.get::<_, String>(1)?,
-            r.get::<_, f64>(2)?,
-        ))
-    })?;
+    let rows = statement.query_map(
+        params![
+            bytes,
+            format!("{{K:{count}}}"),
+            SOURCE_KIND,
+            i64::try_from(limit.get()).map_err(|error| {
+                StorageError::new_with_cause(
+                    StorageErrorKind::InternalError,
+                    "invalid persisted storage value",
+                    error,
+                )
+            })?
+        ],
+        |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, f64>(2)?,
+            ))
+        },
+    )?;
     rows.map(|row| {
         let (id, search_hash, distance) = row?;
         Ok(VectorMatch {

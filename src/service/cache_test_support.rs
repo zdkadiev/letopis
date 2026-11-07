@@ -30,7 +30,7 @@ fn files_get_by_path(&$receiver, path: &$crate::domain::RepoPath) -> $crate::ser
 
 fn files_get(&$receiver) -> $crate::service::StorageResult<Vec<$crate::service::FileRow>> { $crate::service::StorageRead::files_get($target) }
 
-fn text_index_get_by_expression(&$receiver, expression: &str) -> $crate::service::StorageResult<Vec<$crate::service::TextMatch>> { $crate::service::StorageRead::text_index_get_by_expression($target, expression) }
+fn text_index_get_by_expression(&$receiver, expression: &str, limit: std::num::NonZeroUsize) -> $crate::service::StorageResult<Vec<$crate::service::TextMatch>> { $crate::service::StorageRead::text_index_get_by_expression($target, expression, limit) }
 
 fn vector_keys_get_by_search_hash(
     &$receiver,
@@ -43,7 +43,8 @@ fn vector_index_get_by_vector(
     expected: &$crate::domain::Sha256,
     query: &[f32],
     dimensions: usize,
-) -> $crate::service::StorageResult<$crate::service::VectorOutcome<Vec<$crate::service::VectorMatch>>> { $crate::service::StorageRead::vector_index_get_by_vector($target, expected, query, dimensions) }
+    limit: std::num::NonZeroUsize,
+) -> $crate::service::StorageResult<$crate::service::VectorOutcome<Vec<$crate::service::VectorMatch>>> { $crate::service::StorageRead::vector_index_get_by_vector($target, expected, query, dimensions, limit) }
 
 fn embed_failures_get_by_search_hash(
     &$receiver,

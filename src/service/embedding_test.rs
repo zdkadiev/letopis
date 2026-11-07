@@ -733,7 +733,7 @@ fn rejected_vector_input_drops_poisoned_unit_before_recording_failure() {
             assert_eq!(read.project_get_by_id().unwrap(), revision);
             assert_eq!(service.file_reader.documents, documents);
             assert_eq!(
-                read.text_index_get_by_expression("knowledge")
+                read.text_index_get_by_expression("knowledge", NonZeroUsize::new(100).unwrap())
                     .unwrap()
                     .len(),
                 1

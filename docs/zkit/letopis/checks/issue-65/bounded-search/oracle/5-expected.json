@@ -1,0 +1,16 @@
+{
+  "limit": 5,
+  "channel_counts": {
+    "fts": 1,
+    "vectors": 5
+  },
+  "unique_candidates": 6,
+  "expected_ids": [
+    "knowledge/part-0000.md#node-000000",
+    "knowledge/part-0666.md#node-019999",
+    "knowledge/part-0999.md#node-029999",
+    "knowledge/part-3330.md#node-099900",
+    "knowledge/part-0733.md#node-022000"
+  ],
+  "scope": "Independent native SQL top-L channels and exact rational reciprocal-rank oracle; immutable synthetic corpus flags independently clean."
+}

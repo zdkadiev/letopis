@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.45s
+     Running tests/search_filters.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/search_filters-b5e9e6a952b96606)
+
+running 1 test
+test ineligible_fts_head_cannot_consume_the_final_limit ... FAILED
+
+failures:
+
+---- ineligible_fts_head_cannot_consume_the_final_limit stdout ----
+
+thread 'ineligible_fts_head_cannot_consume_the_final_limit' (564436386) panicked at tests/search_filters.rs:283:5:
+assertion `left == right` failed
+  left: []
+ right: ["a.md"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ineligible_fts_head_cannot_consume_the_final_limit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.91s
+
+error: test failed, to rerun pass `--test search_filters`

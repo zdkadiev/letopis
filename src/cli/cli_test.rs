@@ -643,7 +643,6 @@ mod search_tests {
         // Given: search bodies with invalid shapes, fields, numbers or trailing input.
         for body in [
             "{}",
-            r#"{"query":"x"}"#,
             r#"{"limit":1}"#,
             r#"{"query":null,"limit":1}"#,
             r#"{"query":1,"limit":1}"#,

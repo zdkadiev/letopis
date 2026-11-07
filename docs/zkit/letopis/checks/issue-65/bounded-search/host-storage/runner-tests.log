@@ -1,0 +1,15 @@
+test_inventory_excludes_nested_build_caches_and_keeps_source_hashes (test_runner.InputInventoryTests.test_inventory_excludes_nested_build_caches_and_keeps_source_hashes) ... ok
+test_git_preparation_failure_retains_command_exit_and_fail_receipt (test_runner.PreparationTests.test_git_preparation_failure_retains_command_exit_and_fail_receipt) ... ok
+test_hash_preparation_failure_retains_fail_receipt (test_runner.PreparationTests.test_hash_preparation_failure_retains_fail_receipt) ... ok
+test_successful_git_preparation_records_both_commands (test_runner.PreparationTests.test_successful_git_preparation_records_both_commands) ... ok
+test_process_receipt_environment_and_real_deadline_are_explicit (test_runner.ProcessEvidenceTests.test_process_receipt_environment_and_real_deadline_are_explicit) ... ok
+test_child_receipts_use_current_evidence_and_keep_command_overrides (test_runner.RunnerTests.test_child_receipts_use_current_evidence_and_keep_command_overrides) ... ok
+test_existing_evidence_directory_is_rejected (test_runner.RunnerTests.test_existing_evidence_directory_is_rejected) ... ok
+test_nonzero_command_prevents_pass_manifest (test_runner.RunnerTests.test_nonzero_command_prevents_pass_manifest) ... ok
+test_timeout_reaps_owned_process (test_runner.RunnerTests.test_timeout_reaps_owned_process) ... ok
+test_parity_accepts_current_schema_and_rejects_deliberate_drift (test_runner.SchemaParityTests.test_parity_accepts_current_schema_and_rejects_deliberate_drift) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 1.466s
+
+OK

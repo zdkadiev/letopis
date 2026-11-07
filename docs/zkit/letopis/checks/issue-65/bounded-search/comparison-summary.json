@@ -1,0 +1,74 @@
+{
+  "5": {
+    "before": {
+      "n": 3,
+      "wall_samples_seconds": [
+        66.70765116601251,
+        66.57503362488933,
+        66.6220504580997
+      ],
+      "wall_median_seconds": 66.6220504580997,
+      "cpu_median_seconds": 62.207466,
+      "max_cli_peak_rss_bytes": 166363136,
+      "stdout_sha256": [
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5",
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5",
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5"
+      ]
+    },
+    "after": {
+      "n": 3,
+      "wall_samples_seconds": [
+        1.400298209162429,
+        1.2225322090089321,
+        1.3435168750584126
+      ],
+      "wall_median_seconds": 1.3435168750584126,
+      "cpu_median_seconds": 1.156547,
+      "max_cli_peak_rss_bytes": 35667968,
+      "stdout_sha256": [
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5",
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5",
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5"
+      ]
+    },
+    "speedup": 49.58780324601665,
+    "latency_reduction_percent": 97.98337507503858
+  },
+  "100": {
+    "before": {
+      "n": 3,
+      "wall_samples_seconds": [
+        72.72051495802589,
+        70.9150112499483,
+        67.11667437502183
+      ],
+      "wall_median_seconds": 70.9150112499483,
+      "cpu_median_seconds": 65.787615,
+      "max_cli_peak_rss_bytes": 158646272,
+      "stdout_sha256": [
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf",
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf",
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf"
+      ]
+    },
+    "after": {
+      "n": 3,
+      "wall_samples_seconds": [
+        1.866692375158891,
+        1.5164809999987483,
+        2.04346870793961
+      ],
+      "wall_median_seconds": 1.866692375158891,
+      "cpu_median_seconds": 1.4146549999999998,
+      "max_cli_peak_rss_bytes": 36847616,
+      "stdout_sha256": [
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf",
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf",
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf"
+      ]
+    },
+    "speedup": 37.98966138912528,
+    "latency_reduction_percent": 97.36770488750327
+  }
+}

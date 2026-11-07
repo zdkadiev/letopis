@@ -1,0 +1,63 @@
+[
+  {
+    "name": "fts-sql-cap",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "--test",
+      "storage_cache",
+      "sql_"
+    ],
+    "exit": 101,
+    "caught": true,
+    "source_sha256": "bdd6390aedda4a2be1cf701a691f790514d7c2348797ce47b271ac52d6a260fb"
+  },
+  {
+    "name": "vector-sql-cap",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--test",
+      "storage_vectors",
+      "nearest_limits_current_knowledge"
+    ],
+    "exit": 101,
+    "caught": true,
+    "source_sha256": "be4f02a0b788c4e12667218d44247f74a930449f09f445763371db6caeb1267f"
+  },
+  {
+    "name": "service-clamp",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--test",
+      "knowledge_search",
+      "service_caps_direct"
+    ],
+    "exit": 101,
+    "caught": true,
+    "source_sha256": "98a1813614b85728e0cbc138675b207f51546f6c060ea41d6415f46928ea516a"
+  },
+  {
+    "name": "premature-native-k",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--test",
+      "storage_vectors",
+      "nearest_limits_current_knowledge"
+    ],
+    "exit": 101,
+    "caught": true,
+    "source_sha256": "be4f02a0b788c4e12667218d44247f74a930449f09f445763371db6caeb1267f"
+  }
+]

@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/condition.py", line 5, in <module>
+    from measure import measure_process
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/measure.py", line 12, in <module>
+    from scenarios import get_environment
+  File "/Users/zdkadiev/Repos/letopis/tests/performance/scenarios.py", line 210, in <module>
+    def verify_new_output(output: Path, source: Path | None = None) -> None:
+TypeError: unsupported operand type(s) for |: 'type' and 'NoneType'

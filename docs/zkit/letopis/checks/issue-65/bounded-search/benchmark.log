@@ -1,0 +1,90 @@
+{"name": "screening-5", "label": "after", "limit": 5, "request": {"query": "case 000000", "limit": 5}, "seconds": 3.459733125055209, "cpu_seconds": 1.409221, "peak_rss_bytes": 35880960, "stdout_sha256": "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "screening-100", "label": "after", "limit": 100, "request": {"query": "case 000000", "limit": 100}, "seconds": 1.451485333032906, "cpu_seconds": 1.287835, "peak_rss_bytes": 35684352, "stdout_sha256": "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "5-0-before", "label": "before", "limit": 5, "request": {"query": "case 000000", "limit": 5}, "seconds": 66.70765116601251, "cpu_seconds": 62.247232, "peak_rss_bytes": 166363136, "stdout_sha256": "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "5-0-after", "label": "after", "limit": 5, "request": {"query": "case 000000", "limit": 5}, "seconds": 1.400298209162429, "cpu_seconds": 1.2272029999999998, "peak_rss_bytes": 35667968, "stdout_sha256": "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "5-1-after", "label": "after", "limit": 5, "request": {"query": "case 000000", "limit": 5}, "seconds": 1.2225322090089321, "cpu_seconds": 1.1474579999999999, "peak_rss_bytes": 35618816, "stdout_sha256": "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "5-1-before", "label": "before", "limit": 5, "request": {"query": "case 000000", "limit": 5}, "seconds": 66.57503362488933, "cpu_seconds": 61.878913, "peak_rss_bytes": 158056448, "stdout_sha256": "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "5-2-before", "label": "before", "limit": 5, "request": {"query": "case 000000", "limit": 5}, "seconds": 66.6220504580997, "cpu_seconds": 62.207466, "peak_rss_bytes": 158203904, "stdout_sha256": "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "5-2-after", "label": "after", "limit": 5, "request": {"query": "case 000000", "limit": 5}, "seconds": 1.3435168750584126, "cpu_seconds": 1.156547, "peak_rss_bytes": 35602432, "stdout_sha256": "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "100-0-before", "label": "before", "limit": 100, "request": {"query": "case 000000", "limit": 100}, "seconds": 72.72051495802589, "cpu_seconds": 66.59487999999999, "peak_rss_bytes": 158121984, "stdout_sha256": "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "100-0-after", "label": "after", "limit": 100, "request": {"query": "case 000000", "limit": 100}, "seconds": 1.866692375158891, "cpu_seconds": 1.447997, "peak_rss_bytes": 36798464, "stdout_sha256": "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "100-1-after", "label": "after", "limit": 100, "request": {"query": "case 000000", "limit": 100}, "seconds": 1.5164809999987483, "cpu_seconds": 1.3877309999999998, "peak_rss_bytes": 36847616, "stdout_sha256": "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "100-1-before", "label": "before", "limit": 100, "request": {"query": "case 000000", "limit": 100}, "seconds": 70.9150112499483, "cpu_seconds": 65.787615, "peak_rss_bytes": 158646272, "stdout_sha256": "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "100-2-before", "label": "before", "limit": 100, "request": {"query": "case 000000", "limit": 100}, "seconds": 67.11667437502183, "cpu_seconds": 62.066541, "peak_rss_bytes": 158269440, "stdout_sha256": "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "100-2-after", "label": "after", "limit": 100, "request": {"query": "case 000000", "limit": 100}, "seconds": 2.04346870793961, "cpu_seconds": 1.4146549999999998, "peak_rss_bytes": 35733504, "stdout_sha256": "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "smoke-default", "label": "after", "limit": 100, "request": {"query": "case 000000"}, "seconds": 1.3799467079807073, "cpu_seconds": 1.284625, "peak_rss_bytes": 35815424, "stdout_sha256": "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{"name": "smoke-clamped", "label": "after", "limit": 100, "request": {"query": "case 000000", "limit": 1000}, "seconds": 1.6136800420936197, "cpu_seconds": 1.342195, "peak_rss_bytes": 35749888, "stdout_sha256": "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf", "validated": true, "matching_tool_processes_before_call": [], "config_and_vector_metadata_unchanged": true}
+{
+  "5": {
+    "before": {
+      "n": 3,
+      "wall_samples_seconds": [
+        66.70765116601251,
+        66.57503362488933,
+        66.6220504580997
+      ],
+      "wall_median_seconds": 66.6220504580997,
+      "cpu_median_seconds": 62.207466,
+      "max_cli_peak_rss_bytes": 166363136,
+      "stdout_sha256": [
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5",
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5",
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5"
+      ]
+    },
+    "after": {
+      "n": 3,
+      "wall_samples_seconds": [
+        1.400298209162429,
+        1.2225322090089321,
+        1.3435168750584126
+      ],
+      "wall_median_seconds": 1.3435168750584126,
+      "cpu_median_seconds": 1.156547,
+      "max_cli_peak_rss_bytes": 35667968,
+      "stdout_sha256": [
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5",
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5",
+        "b26711052c65b68801fe86b458b50889cb5adc8e4ca3a28e0cbec17212e42af5"
+      ]
+    },
+    "speedup": 49.58780324601665,
+    "latency_reduction_percent": 97.98337507503858
+  },
+  "100": {
+    "before": {
+      "n": 3,
+      "wall_samples_seconds": [
+        72.72051495802589,
+        70.9150112499483,
+        67.11667437502183
+      ],
+      "wall_median_seconds": 70.9150112499483,
+      "cpu_median_seconds": 65.787615,
+      "max_cli_peak_rss_bytes": 158646272,
+      "stdout_sha256": [
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf",
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf",
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf"
+      ]
+    },
+    "after": {
+      "n": 3,
+      "wall_samples_seconds": [
+        1.866692375158891,
+        1.5164809999987483,
+        2.04346870793961
+      ],
+      "wall_median_seconds": 1.866692375158891,
+      "cpu_median_seconds": 1.4146549999999998,
+      "max_cli_peak_rss_bytes": 36847616,
+      "stdout_sha256": [
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf",
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf",
+        "32a345bd71695739847e631e86bcdf7a7d588d73b2def901d7476a37eb8c04cf"
+      ]
+    },
+    "speedup": 37.98966138912528,
+    "latency_reduction_percent": 97.36770488750327
+  }
+}

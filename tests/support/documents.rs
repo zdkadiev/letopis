@@ -5,6 +5,7 @@ use letopis::{
     domain::{Edge, EdgeTarget, KnowledgeId, RepoPath, SourceUri},
     service::{FileRow, NodeMetadata, StoredNode},
 };
+use std::num::NonZeroUsize;
 use std::{fs, path::Path, process::Command};
 use tempfile::TempDir;
 
@@ -64,7 +65,11 @@ impl DocumentRepo {
         storage
             .cache
             .with_read_tx(|| {
-                Ok::<_, StorageError>(storage.cache.text_index_get_by_expression(text))
+                Ok::<_, StorageError>(
+                    storage
+                        .cache
+                        .text_index_get_by_expression(text, NonZeroUsize::new(100).unwrap()),
+                )
             })
             .unwrap()
             .unwrap()

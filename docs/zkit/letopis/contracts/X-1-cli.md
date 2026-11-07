@@ -12,7 +12,7 @@
 | init | {} / {} | инициализация Git work tree, не являющегося bare: `.letopis/`, схемы `cache.db`/`vectors.db`, сгенерированный `config.json`, если файла нет; существующие валидные файлы и данные не заменяются, [D-70](../decisions.md#D-70), [D-95](../decisions.md#D-95), [D-104](../decisions.md#D-104) |
 | check | необязательный paths / errors | проверка всего корпуса или путей по X-4; файлы не меняются; пустой errors — корпус валиден, [D-93](../decisions.md#D-93) |
 | inspect | element_ids / snapshot, elements | актуальные path/lines/hash знаний и source одного Git-снимка, без текста; неизвестный ID отклоняет пакет |
-| search | query, limit, необязательный filters / список ссылок | гибридный поиск; до настройки и при сбое query embedding — FTS |
+| search | query; необязательные limit, filters / список ссылок | гибридный поиск; до настройки и при сбое query embedding — FTS |
 | traverse | element_ids, mode, direction, depth, limit; необязательные edge_types, edge_limit / elements и опциональный edges | relations/containment/both; стартовые элементы исключены, повторные достижения возвращаются один раз |
 | index | необязательный paths / revision, published, files_updated, files_removed, invalid_files_updated | argv: без флагов инкрементально; --verify проверяет замыкания снимков; --full принудительно перепарсивает выбранные файлы и проверяет замыкания. paths ограничивает наблюдаемые владельцы и удаления, но проверка снимков остаётся глобальной; пустые paths охватывают весь корпус |
 | status | {} / revision, embedding_backlog, embedding_failed, locks (занятые flock index/embed и PID), problems | только текущее состояние: число текстов без вектора и с исчерпанными попытками, текущие проблемы (невалидные файлы, висячие ссылки, циклы includes, отсутствующие в Git source_snapshot, исчерпанные попытки embeddings, последняя ошибка embedding запроса, невалидный config.json), [D-95](../decisions.md#D-95) |
@@ -122,3 +122,16 @@ existing `embedding_failed` envelope and legacy migration behavior; status uses
 publication or inspection cause safe failure/retry. See the
 [design](../../../superpowers/specs/2026-11-06-issue-97-ignore-config-design.md)
 and [verification report](../checks/issue-97/report.md).
+
+### Ограниченная SQL-выборка search (2026-11-07, D-108)
+
+Для search отсутствующий limit означает 100, явно заданный положительный limit
+используется как min(limit,100); ноль, null и неверные типы отклоняются. SQL FTS
+возвращает не более L знаний по BM25/ID, SQL vec1 — не более L текущих знаний
+по cosine distance/ID после joins. В Rust поступают только выбранные строки: до
+2L уникальных кандидатов. Свежесть, source/revision/flag filters и RRF считаются
+внутри этого пула; ответ содержит до L ссылок. Дозаполнения из остального корпуса
+нет: фильтры могут уменьшить ответ, а полный eligible-корпус даёт иной порядок.
+Метаданные и provenance непопавших в SQL-пул кандидатов не проверяются. Ошибки
+выбранных кандидатов и preflight всех requested revisions остаются ошибками.
+Внутреннее сканирование и рабочая память SQLite не равны числу выданных строк.

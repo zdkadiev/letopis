@@ -1,0 +1,24 @@
+   Compiling letopis v0.2.0 (/Users/zdkadiev/Repos/letopis/.artifacts/issue-65/bounded-search-2026-11-07/source)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.68s
+     Running tests/storage_cache.rs (/Users/zdkadiev/Repos/letopis/target/debug/deps/storage_cache-3c57354589c457e1)
+
+running 1 test
+test fts_limits_rows_in_sql_before_decoding ... FAILED
+
+failures:
+
+---- fts_limits_rows_in_sql_before_decoding stdout ----
+
+thread 'fts_limits_rows_in_sql_before_decoding' (563868580) panicked at tests/storage_cache.rs:28:5:
+assertion `left == right` failed
+  left: ["a.md", "b.md", "c.md"]
+ right: ["a.md"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    fts_limits_rows_in_sql_before_decoding
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--test storage_cache`

@@ -1,0 +1,12 @@
+[
+  {
+    "mutation": "default",
+    "exit": 101,
+    "caught": true
+  },
+  {
+    "mutation": "clamp",
+    "exit": 101,
+    "caught": true
+  }
+]

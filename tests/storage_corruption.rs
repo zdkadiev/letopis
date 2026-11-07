@@ -2,6 +2,7 @@ use crate::support::get_current;
 use letopis::service::StorageError;
 use letopis::service::TransactionError;
 use letopis::service::{CacheDatabase, StorageRead, VectorDatabase};
+use std::num::NonZeroUsize;
 use support::open_storage;
 #[path = "support/storage.rs"]
 mod support;
@@ -103,7 +104,9 @@ fn missing_and_zero_length_vectors_preserve_published_cache() {
                 // When / Then: cache revision and lexical results survive with no vector identity.
                 assert_eq!(view.project_get_by_id().unwrap(), 1);
                 assert_eq!(view.meta_get_by_id().unwrap(), None);
-                let matches = view.text_index_get_by_expression("searchable").unwrap();
+                let matches = view
+                    .text_index_get_by_expression("searchable", NonZeroUsize::new(100).unwrap())
+                    .unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(matches[0].id.as_str(), NODE_ID);
                 Ok::<_, StorageError>(())
@@ -246,7 +249,9 @@ fn assert_healthy(cache: &Path, vectors: &Path, identity: &Sha256, search_hash: 
             let view = &storage.cache;
             assert_eq!(view.project_get_by_id().unwrap(), 1);
             assert_eq!(view.meta_get_by_id().unwrap(), Some(*identity));
-            let matches = view.text_index_get_by_expression("searchable").unwrap();
+            let matches = view
+                .text_index_get_by_expression("searchable", NonZeroUsize::new(100).unwrap())
+                .unwrap();
             assert_eq!(matches.len(), 1);
             assert_eq!(matches[0].id.as_str(), NODE_ID);
             let vector = unwrap_current(

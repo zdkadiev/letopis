@@ -619,7 +619,9 @@ pub use types::{
     StoredVectorKey, TextMatch, TransactionRequirement, Traversal, TraversalDirection,
     TraversalLink, TraversalMode, TraversalRequest, VectorMatch, VectorOutcome,
 };
-pub(crate) use types::{GENERATED_CONFIG, MAX_DIMENSIONS, MIN_DIMENSIONS, NEIGHBOR_PAGE_QUANTUM};
+pub(crate) use types::{
+    GENERATED_CONFIG, MAX_DIMENSIONS, MAX_SEARCH_LIMIT, MIN_DIMENSIONS, NEIGHBOR_PAGE_QUANTUM,
+};
 mod background_runner;
 mod check;
 mod configuration;
@@ -990,18 +992,22 @@ pub trait StorageRead {
     /// # Errors
     /// Reports an internal error for I/O or malformed persisted values.
     fn files_get(&self) -> StorageResult<Vec<FileRow>>;
-
-    /// Returns full-text matches for an FTS expression.
+    /// Selects at most `limit` FTS knowledge hits ordered by BM25 then identity.
     ///
-    /// The expression is executed without a candidate limit.
+    /// Only selected rows are decoded; filtering and fusion operate on this bounded pool.
     ///
     /// # Arguments
     ///
     /// * `expression` — Prepared FTS5 expression to execute.
+    /// * `limit` — Maximum number of knowledge hits to select.
     ///
     /// # Errors
     /// Reports an invalid request for malformed expressions, or an internal error for I/O.
-    fn text_index_get_by_expression(&self, expression: &str) -> StorageResult<Vec<TextMatch>>;
+    fn text_index_get_by_expression(
+        &self,
+        expression: &str,
+        limit: NonZeroUsize,
+    ) -> StorageResult<Vec<TextMatch>>;
 
     /// Returns the vector stored under one search hash.
     ///
@@ -1020,16 +1026,17 @@ pub trait StorageRead {
         expected: &Sha256,
         search_hash: &Sha256,
     ) -> StorageResult<VectorOutcome<Option<Vec<f32>>>>;
-
-    /// Returns native cosine matches joined to current node search hashes.
+    /// Selects at most `limit` current knowledge hits ordered by cosine distance then identity.
     ///
-    /// Returns `ConfigChanged` when the stored identity differs from `expected`.
+    /// Native matching, joins, ordering and the knowledge-row limit execute in `SQLite`.
+    /// Unreferenced vectors consume no returned slots; only selected rows are decoded.
     ///
     /// # Arguments
     ///
     /// * `expected` — Configuration identity the vector index must match.
     /// * `query` — Query vector used for native cosine search.
     /// * `dimensions` — Expected length of `query` and of the indexed vectors.
+    /// * `limit` — Maximum number of knowledge hits to select.
     ///
     /// # Errors
     /// Rejects invalid query vectors or reports database/integrity failures.
@@ -1038,6 +1045,7 @@ pub trait StorageRead {
         expected: &Sha256,
         query: &[f32],
         dimensions: usize,
+        limit: NonZeroUsize,
     ) -> StorageResult<VectorOutcome<Vec<VectorMatch>>>;
 
     /// Returns durable attempts and the latest failure for one search hash.

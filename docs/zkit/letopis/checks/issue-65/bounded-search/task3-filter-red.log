@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+     Running tests/knowledge_search.rs (target/debug/deps/knowledge_search-3fe0a649623e3b57)
+
+running 1 test
+test restrictive_filter_does_not_refill_outside_sql_candidates ... FAILED
+
+failures:
+
+---- restrictive_filter_does_not_refill_outside_sql_candidates stdout ----
+
+thread 'restrictive_filter_does_not_refill_outside_sql_candidates' (563954118) panicked at tests/knowledge_search.rs:44:5:
+assertion failed: links.is_empty()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    restrictive_filter_does_not_refill_outside_sql_candidates
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.62s
+
+error: test failed, to rerun pass `--test knowledge_search`

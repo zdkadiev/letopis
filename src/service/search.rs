@@ -1,3 +1,4 @@
+use super::MAX_SEARCH_LIMIT;
 use super::utils::is_current_knowledge;
 use super::utils::map_document_error;
 use super::utils::map_document_file;
@@ -59,7 +60,7 @@ struct CandidateMetadata {
     metadata: KnowledgeMetadata,
 }
 
-/// Refreshes and ranks complete candidate channels from one scoped read.
+/// Refreshes and ranks SQL-selected bounded candidate channels from one scoped read.
 ///
 /// Boundaries are independently owned; inference cannot upgrade the search read into a write.
 pub(crate) struct SearchService<D, E, F, M, P, C> {
@@ -101,6 +102,7 @@ impl<
 > Searcher for SearchService<D, E, F, M, P, C>
 {
     fn search(&mut self, request: &SearchRequest) -> CommandResult<Vec<SearchLink>> {
+        let limit = request.limit.min(MAX_SEARCH_LIMIT);
         self.refresher
             .refresh(&[])
             .map_err(|cause| map_document_error(cause, "cannot search knowledge"))?;
@@ -127,16 +129,16 @@ impl<
                     storage_read: read,
                     embeddings: &mut self.embeddings,
                 }
-                .find_vector_candidates(captured, &request.query)?;
-                let text_matches =
-                    read.text_index_get_by_expression(&expression)
-                        .map_err(|error| {
-                            CommandError::new_with_cause(
-                                CommandErrorKind::InternalError,
-                                "cannot search knowledge",
-                                error,
-                            )
-                        })?;
+                .find_vector_candidates(captured, &request.query, limit)?;
+                let text_matches = read
+                    .text_index_get_by_expression(&expression, limit)
+                    .map_err(|error| {
+                        CommandError::new_with_cause(
+                            CommandErrorKind::InternalError,
+                            "cannot search knowledge",
+                            error,
+                        )
+                    })?;
                 validate_metrics(&text_matches, &vector_matches)?;
                 let metadata = candidates.get_candidate_metadata(&text_matches, &vector_matches)?;
                 let eligibility = SearchEligibility {
@@ -148,7 +150,7 @@ impl<
                 let links = eligibility.get_eligible_links(&metadata, &request.filters)?;
                 let eligible = links.keys().cloned().collect();
                 let ranked =
-                    rank_candidates(&text_matches, &vector_matches, &eligible, request.limit)?;
+                    rank_candidates(&text_matches, &vector_matches, &eligible, limit)?;
                 get_ranked_links(links, ranked)
             })
             .map_err(|error| match error {
@@ -359,6 +361,7 @@ impl<E: Embedder> QueryCandidates<'_, E> {
         &mut self,
         captured: Option<(&EmbeddingConfig, NonZeroUsize)>,
         query: &str,
+        limit: NonZeroUsize,
     ) -> CommandResult<Vec<VectorMatch>> {
         let Some((config, dimensions)) = captured else {
             return Ok(Vec::new());
@@ -391,7 +394,7 @@ impl<E: Embedder> QueryCandidates<'_, E> {
         }
         match self
             .storage_read
-            .vector_index_get_by_vector(&identity, &vector, dimensions.get())
+            .vector_index_get_by_vector(&identity, &vector, dimensions.get(), limit)
             .map_err(|error| {
                 CommandError::new_with_cause(
                     CommandErrorKind::InternalError,
