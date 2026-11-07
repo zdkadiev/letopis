@@ -1,0 +1,69 @@
+{
+  "basis_commit": "14185239ebb1710db9562c914d047c1910205e76",
+  "basis_tree": "d847bd142c5889b78651302170a3f3490940e38d",
+  "reading_snapshot": "7b788a29dfe831b5ab935e8dc1671f7242d97f2f",
+  "bindings": 39,
+  "readback_addresses": 37,
+  "selected_knowledge": [
+    {
+      "element_id": "letopis/architecture/search-pipeline.md",
+      "path": "letopis/architecture/search-pipeline.md",
+      "lines": [
+        1,
+        45
+      ],
+      "revision": 107,
+      "flags": []
+    },
+    {
+      "element_id": "letopis/architecture/storage.md",
+      "path": "letopis/architecture/storage.md",
+      "lines": [
+        1,
+        214
+      ],
+      "revision": 107,
+      "flags": []
+    }
+  ],
+  "verified_hashes": {
+    "docs/superpowers/specs/2026-11-07-bounded-search-design.md": "4db27182e424f241ad9b8076faba94712e963d6cf6d6dd7ea4adfeba85d3373e",
+    "docs/zkit/letopis/checks/issue-65/bounded-search/comparison-summary.json": "276cfbae4e12c7fff42089e113fa4e84eaff4285bba1a49950061bc176dbc656",
+    "docs/zkit/letopis/checks/issue-65/bounded-search/host-storage/manifest.json": "c6aa6cacf4bcb40f7a3e7978c0a1d425831247658d91f942a846ba709c0507a2",
+    "docs/zkit/letopis/checks/issue-65/bounded-search/profile/stacks.json": "a4682ee272b7f3fab09614240d050d42de81ec5043246ae281fc02515942d182",
+    "docs/zkit/letopis/checks/issue-65/bounded-search/vector-preservation/summary.json": "f621e4d37d6f255d56ab5e2fc017ca81dec5740cd03f1d8d206489ad0c085c81",
+    "docs/zkit/letopis/checks/issue-65/vector-index/candidate/mutations.json": "01123b367a961401f5694ac015e3631ede399b2c6c7e8fcd15f7275513fc18d6",
+    "docs/zkit/letopis/checks/issue-65/vector-index/comparison-summary.json": "e6ae9a75d1c26551c9b9c3d04e908f03faafe8a19625cd18975880c169b0eb49",
+    "docs/zkit/letopis/checks/issue-65/vector-index/first-upgrade-init.json": "cb9a40bdadafc040cc4e334ee05f9a662676b8f1afcb9fce71f34f211b4e60a7",
+    "docs/zkit/letopis/checks/issue-65/vector-index/host-storage/manifest.json": "e80402c50cfe1180ec441440892de0b06b32e58420bf15944385ce5727a185b7",
+    "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/control-v2-runs.json": "7df35a23f18e9bbd80611106ae6716d76ac2ebcb4b6739ad35f04a3fe285bbf5",
+    "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/report.md": "14545ba446ac21b130e1e46088b769a4291f9a6699cb9defe3d8b624062493b9",
+    "docs/zkit/letopis/checks/issue-65/vector-index/native-probe/summary.json": "a4ba7cf782b827d5f79cfb5f7e78ab7f074e1962b81486f61a26cfdb6722c51a",
+    "docs/zkit/letopis/checks/issue-65/vector-index/profile/receipt.json": "b1abd594de57ba6f48a6f0da7fee6c2a9c83abdc0082779e105e190646e67ebf",
+    "docs/zkit/letopis/checks/issue-65/vector-index/profile/stacks.json": "15f28e21c747e76ab9d674311defd26a7513024cd86cfceb01da55ecbc17ad3f",
+    "docs/zkit/letopis/checks/issue-65/vector-index/profile/validation.json": "cc6e3f46abbe3bc6ebb89661310e9f35a48051d6af7a90862f2f42efa53b3642",
+    "docs/zkit/letopis/checks/issue-65/vector-index/verification.json": "0e210be0e441f25b2eed2838029060de9b669929809e1ea9172eb6eaf6e20561",
+    "letopis/architecture/search-pipeline.md": "6ca0493bdab1df8f1953c01271804d5eadb5d0fba6909e21d9384e5b0d211178",
+    "letopis/architecture/storage.md": "b949332a049477cef040460a6e190a2bd6967ba3e3c667bb0cbf302c037d414c",
+    "src/cli/input.rs": "0d1b3db355087d2b2a18e015ca8dae69a646a6c91b97fb9e014798df70449e67",
+    "src/filesystem/file.rs": "dede73e3b1216c1a07a339ffe0df6f468b3a59e8dc2c32c1e0a7fc2c036e34df",
+    "src/filesystem/local.rs": "0bf819fd5cc1afd7c14676d825226fcd4505f76203efcb4ae97690d4dff347d6",
+    "src/filesystem/path.rs": "e56e8a27ae997c7e1c88eb502754211f4fb544df5f762bd49c2728d91eebbf09",
+    "src/lib.rs": "276cfa2816f1ae84bc877c4621b4a17fe210abf4719a9d8cc86ad366e1409696",
+    "src/service/mod.rs": "edc8a6cd1db0f23b404b28922138d9b0c77533ba70a793cd52462478ab99d031",
+    "src/service/search.rs": "822f3e82763b4a503a40b389f07396c5bceedd7fdb0ecc9edae0a511a755d61c",
+    "src/service/status.rs": "d6911db6c251bdc82b73242ec1c184dcdf899cbaa33ded9acf1035fc00406214",
+    "src/service/types.rs": "31aea31fcf4d3e508eedd619900d719ce991031f6c767a06ad49a7a66bf504ea",
+    "src/storage/cache.rs": "bdd6390aedda4a2be1cf701a691f790514d7c2348797ce47b271ac52d6a260fb",
+    "src/storage/cache.sql": "a8caf0fa4da5c0291838348c8b3d5a535b70feb9bb8918b39d538c574a7072ae",
+    "src/storage/connection.rs": "0001ba4b71609cb5ecd618110f2675fdc8ea2d9e84e4fcd61384647f7efa7ad9",
+    "src/storage/schema.rs": "d440844eaaf1d36c99eb6740206022cc4eec9527eaefd359113beb4a9f2dd481",
+    "src/storage/transaction.rs": "66f8ab6de96ca68a63353b478ce46ba22637cf78fd4c96770cf5c2ec07bae0e4",
+    "src/storage/vector.rs": "be4f02a0b788c4e12667218d44247f74a930449f09f445763371db6caeb1267f",
+    "src/storage/vector_index.rs": "caa01aa98ca077dfa6906036bcdadebe1c109c0fbea795243fd354342a8b6a4a",
+    "src/storage/vectors.sql": "3a934553394c296ee5dfe680440c1b61c16eb288121f935f72739bb951d321a5",
+    "tests/storage_read_scope_failures.rs": "db9bc78cd6d81ebd59a9623bf8b65c419c458dc48d3c6d3d2f2b60ae9136e305",
+    "vendor/vec1/vec1.c": "a38c62274093bec34631831371ad433703d6dde7fa9ecd6088da4ed33d4a61f9"
+  },
+  "scope": "Installed compatible letopis 0.2.0; scoped check and same-tree readback on preserved schema2. No new vector readiness or performance claim."
+}

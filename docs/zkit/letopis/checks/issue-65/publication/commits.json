@@ -1,0 +1,51 @@
+[
+  {
+    "commit": "2a34166c164f11358d4b348dc1c257166d574531",
+    "subject": "perf(git): reuse verified loose objects without staging duplicates",
+    "verified_product_tree": {
+      "inputs": 106,
+      "tree": "5220d17c0f00840738b6627eb543e1952d36ceab",
+      "reference_pin": "docs/zkit/letopis/checks/issue-65/current/optimized-build.json"
+    }
+  },
+  {
+    "commit": "aef61b62b8ff355e6b3ed51db0c0e17d76982e5c",
+    "subject": "perf(git): reuse successful tree structure validation",
+    "verified_product_tree": {
+      "inputs": 106,
+      "tree": "a865b189f119c4e6e59db9e1b9470b12142033ab",
+      "reference_pin": ".artifacts/issue-65/2026-11-06-native-followup/after-build.json"
+    }
+  },
+  {
+    "commit": "2191b7a25162c6c11ba1cc227909a2932a32cdd4",
+    "subject": "perf(search): avoid repeated Markdown scans and parsing",
+    "verified_product_tree": {
+      "inputs": 106,
+      "tree": "c2938cb95e7baa2f2b9b0f182f78d863389e5cd4",
+      "reference_pin": ".artifacts/issue-65/search-optimization-2026-11-06/after-build.json"
+    }
+  },
+  {
+    "commit": "f6792c82275a29e2b91b7c3fe5ca9474eac316dd",
+    "subject": "perf(storage): prepare exact flat cosine vector indexes",
+    "verified_product_tree": {
+      "inputs": 107,
+      "tree": "ccd76d91c6488fe1be732dc89cb084e7f22ad78e",
+      "reference_pin": ".artifacts/issue-65/vector-index-2026-11-07/product/after-build.json"
+    }
+  },
+  {
+    "commit": "7b358a053603e6ddc43235b3868f46b3554ee55a",
+    "subject": "perf(search): limit SQL candidate retrieval to requested top results",
+    "verified_product_tree": {
+      "inputs": 107,
+      "tree": "ee9f96df89b95cf865759eb807ce2cbe4d20a5d3",
+      "reference_pin": ".artifacts/issue-65/bounded-search-2026-11-07/product/pin.json"
+    }
+  },
+  {
+    "commit": "14185239ebb1710db9562c914d047c1910205e76",
+    "subject": "test(performance): refresh benchmark validation and preserve captured bytes"
+  }
+]

@@ -1,31 +1,45 @@
-<!-- letopis: {"created_at":1793278527,"source_snapshot":"20757d2dc4bdd8f2f2e45843fed128c7cc780bb7"} -->
+<!-- letopis: {"created_at":1793278527,"source_snapshot":"d847bd142c5889b78651302170a3f3490940e38d"} -->
 # Search pipeline
 
-A `search` request contains a query, a positive result limit and optional filters.
-The service refreshes the document projection, validates requested source revisions,
-observes embedding configuration and opens a scoped storage read view.
+A search request requires a query. An omitted limit defaults to 100; an explicit
+positive limit uses min(limit, 100). Zero/null/invalid numeric forms are errors.
+The same effective L bounds each SQL channel and the final response.
 
-The query is split into Unicode alphanumeric tokens. Tokens are quoted and joined
-with `AND` for FTS; a query with no tokens returns no candidates. The current
-implementation obtains vector candidates first, when configuration and compatible
-vectors are available, and then obtains FTS candidates. An unavailable query vector
-leaves the full-text channel available.
+Search refreshes the projection, validates all requested source revisions and
+captures configuration before its pinned read. Query tokens form a bound literal
+FTS AND expression; unavailable query embeddings retain the FTS fallback.
+FTS5/BM25 and vec1 cosine matching, joins, ordering and top-L selection execute
+inside SQLite. Rust decodes only selected knowledge IDs and ranking metadata:
+at most L per channel, at most 2L unique candidates. It loads no complete vector
+or FTS result collection. SQLite's own exact scan/workspace may still cover all
+vectors; final SQL limiting follows current-node joins and URI tie ordering.
 
-FTS uses SQLite FTS5/BM25. Vector lookup uses cosine distance and joins vector keys
-to knowledge by `search_hash`. The service collects metadata for the candidate
-union, checks source bindings and live knowledge observations, and applies filters
-before ranking. The read view carries the publication revision used in returned
-metadata links; the links are not the knowledge text.
+Only selected candidates receive fresh knowledge/provenance observations. Filters
+apply inside that pool without refill; lower candidates cannot fill an excluded
+head. Eligible ranks are recomputed per channel, fused by sum(1/rank), then limited.
+Ties use knowledge ID. This replaces full-corpus eligible RRF and tail-candidate
+error observation; global refresh/revision/SQL failures still apply. No new ANN,
+runtime, embedding identity reset or physical vector ownership change is involved.
 
-For each eligible channel, smaller BM25 or distance ranks first, with knowledge ID
-as a tie-break. The channels are fused by adding `1 / rank` for each occurrence;
-only then is the requested limit applied. A tie in the combined score is ordered
-by ID. This is rank fusion, not arithmetic on raw BM25 and vector distances.
+The synthetic 100k corpus with real 768-dimensional Gemma vectors, query `case 000000`,
+measured three ordinary pairs per L: L5 wall median66.622→1.344s (49.59x), L100
+70.915→1.867s (37.99x). All six outputs per L match byte-for-byte in this scenario;
+that is not a general full-corpus ranking equivalence or relevance-quality proof.
+Separate genuine Samply at L100 shows refresh44.846%, vector retrieval37.263%,
+search eligibility7.626% of observed CPU; inclusive scopes overlap, not wall shares.
+Actual-root make verify and host storage acceptance passed. Measurements are warm
+local observations, not a Linux/minimum-hardware gate; no document drain was timed.
 
-[Search implementation](../../src/service/search.rs "letopis:type=external;path=src/service/search.rs")
+[Search service](../../src/service/search.rs "letopis:type=external;path=src/service/search.rs")
+[CLI defaults and validation](../../src/cli/input.rs "letopis:type=external;path=src/cli/input.rs")
+[Shared request limit](../../src/service/types.rs "letopis:type=external;path=src/service/types.rs")
+[FTS SQL](../../src/storage/cache.rs "letopis:type=external;path=src/storage/cache.rs")
+[Vector SQL](../../src/storage/vector.rs "letopis:type=external;path=src/storage/vector.rs")
+[Agreed design](../../docs/superpowers/specs/2026-11-07-bounded-search-design.md "letopis:type=external;path=docs/superpowers/specs/2026-11-07-bounded-search-design.md")
+[Paired measurements](../../docs/zkit/letopis/checks/issue-65/bounded-search/comparison-summary.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/bounded-search/comparison-summary.json")
+[Genuine sampled CPU](../../docs/zkit/letopis/checks/issue-65/bounded-search/profile/stacks.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/bounded-search/profile/stacks.json")
+[Host verification](../../docs/zkit/letopis/checks/issue-65/bounded-search/host-storage/manifest.json "letopis:type=external;path=docs/zkit/letopis/checks/issue-65/bounded-search/host-storage/manifest.json")
 
-[FTS query](../../src/storage/cache.rs "letopis:type=external;path=src/storage/cache.rs")
-
-[Vector query](../../src/storage/vector.rs "letopis:type=external;path=src/storage/vector.rs")
-
+[Full report](../../docs/zkit/letopis/checks/issue-65/bounded-search/report.md)
+[Earlier research](../../docs/zkit/letopis/checks/issue-65/search-next/report.md)
 [Embedding execution](embedding-execution.md "letopis:type=related_to;path=letopis/architecture/embedding-execution.md")
